@@ -26,6 +26,7 @@ import {
 	type PropertyDef,
 	defaultViewFor,
 } from "@brainstorm/sdk-types";
+import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign } from "@brainstorm/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
@@ -122,6 +123,35 @@ export function FormDesignerApp(): ReactElement {
 	const [invalidFields, setInvalidFields] = useState<ReadonlySet<string>>(() => new Set());
 	const [status, setStatus] = useState<string>(() => t("status.newForm"));
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+	// Horizontal tablist keyboard model (←/→/Home/End move + select, roving
+	// tabindex, aria-selected) for the surface + mode tab rows — roles flow
+	// through the hook, not literals.
+	const surfaceTabs = [DesignerSurface.Forms, DesignerSurface.Documents] as const;
+	const selectSurface = (index: number) => setSurface(surfaceTabs[index] ?? DesignerSurface.Forms);
+	const surfaceKeyboard = useCompositeKeyboard({
+		orientation: Orientation.Horizontal,
+		count: surfaceTabs.length,
+		activeIndex: Math.max(0, surfaceTabs.indexOf(surface)),
+		onActiveIndexChange: selectSurface,
+		onActivate: selectSurface,
+		role: "tablist",
+		itemRole: "tab",
+	});
+	const modeTabs = [FormMode.Builder, FormMode.Fill] as const;
+	const selectMode = (index: number) => {
+		if (index === 0) setInvalidFields(new Set());
+		setMode(modeTabs[index] ?? FormMode.Builder);
+	};
+	const modeKeyboard = useCompositeKeyboard({
+		orientation: Orientation.Horizontal,
+		count: modeTabs.length,
+		activeIndex: Math.max(0, modeTabs.indexOf(mode)),
+		onActiveIndexChange: selectMode,
+		onActivate: selectMode,
+		role: "tablist",
+		itemRole: "tab",
+	});
 
 	const moreButtonRef = useRef<HTMLButtonElement>(null);
 	const addFieldRef = useRef<HTMLButtonElement>(null);
@@ -428,11 +458,10 @@ export function FormDesignerApp(): ReactElement {
 					<h1 className="app-header__title">{t("app.title")}</h1>
 				</div>
 				<div className="app-header__right">
-					<div className="fd-mode" role="tablist" aria-label={t("surface.region")}>
+					<div className="fd-mode" {...surfaceKeyboard.containerProps} aria-label={t("surface.region")}>
 						<button
 							type="button"
-							role="tab"
-							aria-selected={surface === DesignerSurface.Forms}
+							{...surfaceKeyboard.getItemProps(0)}
 							className={
 								surface === DesignerSurface.Forms ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"
 							}
@@ -442,8 +471,7 @@ export function FormDesignerApp(): ReactElement {
 						</button>
 						<button
 							type="button"
-							role="tab"
-							aria-selected={surface === DesignerSurface.Documents}
+							{...surfaceKeyboard.getItemProps(1)}
 							className={
 								surface === DesignerSurface.Documents ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"
 							}
@@ -453,11 +481,10 @@ export function FormDesignerApp(): ReactElement {
 						</button>
 					</div>
 					{surface === DesignerSurface.Forms && (
-						<div className="fd-mode" role="tablist" aria-label={t("mode.region")}>
+						<div className="fd-mode" {...modeKeyboard.containerProps} aria-label={t("mode.region")}>
 							<button
 								type="button"
-								role="tab"
-								aria-selected={mode === FormMode.Builder}
+								{...modeKeyboard.getItemProps(0)}
 								className={mode === FormMode.Builder ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"}
 								onClick={() => {
 									setInvalidFields(new Set());
@@ -468,8 +495,7 @@ export function FormDesignerApp(): ReactElement {
 							</button>
 							<button
 								type="button"
-								role="tab"
-								aria-selected={mode === FormMode.Fill}
+								{...modeKeyboard.getItemProps(1)}
 								className={mode === FormMode.Fill ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"}
 								onClick={() => setMode(FormMode.Fill)}
 							>
