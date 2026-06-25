@@ -101,9 +101,24 @@ console.info(`[app:${appId}] build ${buildArg ?? "unknown"} v${handshake.app.ver
 const appIconVarsCss = buildAppIconVarsCss(appId);
 const appIconVars = appIconVarPairs(appId);
 
+// Once the renderer starts navigating away (tab close / dev reload), the main
+// process unregisters this webContents from the renderer-identity registry, so
+// any in-flight or late broker call comes back "app identity verification
+// failed". The result can't be consumed by a page that's being torn down, and
+// the SDK service proxy turns that `ok:false` into a throw — which surfaces as
+// an "Uncaught (in promise)" in the dying page. Suppress calls once `pagehide`
+// fires by returning a never-settling promise: safe because it only triggers
+// during real teardown, so it can never mask a genuine identity failure in a
+// live window.
+let unloading = false;
+addEventListener("pagehide", () => {
+	unloading = true;
+});
+
 const bridge: Bridge = {
 	app: appId,
 	dispatch: async (envelope) => {
+		if (unloading) return new Promise<never>(() => {});
 		const wire = {
 			v: 1,
 			msg: newMessageId(),
@@ -113,7 +128,7 @@ const bridge: Bridge = {
 			args: envelope.args,
 			caps: envelope.caps,
 		};
-		const reply = (await ipcRenderer.invoke(BROKER_CHANNEL, wire)) as
+		let reply:
 			| { v: number; msg: string; ok: true; value: unknown }
 			| {
 					v: number;
@@ -121,6 +136,14 @@ const bridge: Bridge = {
 					ok: false;
 					error: { kind: string; message: string } & Record<string, unknown>;
 			  };
+		try {
+			reply = (await ipcRenderer.invoke(BROKER_CHANNEL, wire)) as typeof reply;
+		} catch (error) {
+			// The IPC channel can tear down mid-call during navigation; swallow
+			// only while unloading, otherwise surface the genuine failure.
+			if (unloading) return new Promise<never>(() => {});
+			throw error;
+		}
 		if (reply.ok) return { ok: true, value: reply.value };
 		return { ok: false, error: reply.error };
 	},
