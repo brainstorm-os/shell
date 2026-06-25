@@ -434,7 +434,7 @@ export function Bin({ onClose }: BinProps) {
 										className={isChecked ? "bin__row bin__row--checked" : "bin__row"}
 										style={place}
 									>
-										{/* a11y-exempt: decorative selection mirror — row owns the accessible name + selection; button is aria-hidden + tabIndex=-1 (mouse convenience only). */}
+										{/* Decorative selection mirror — the row owns the accessible name + selection; this button is aria-hidden + tabIndex=-1 (mouse convenience only), so the a11y audit exempts it automatically. */}
 										<button
 											type="button"
 											className="bin__row-check"
