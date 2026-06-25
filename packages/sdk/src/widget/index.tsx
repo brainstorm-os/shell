@@ -125,6 +125,7 @@ export function WidgetRoot({ widgets, launch }: WidgetRootProps) {
 	return (
 		<div className="bs-widget" data-widget-id={launch.widgetId}>
 			<div className="bs-widget__body">
+				{/* i18n-exempt: dev/error fallback for an unregistered widget id; the SDK widget host has no t() infrastructure and this is not part of normal UI. */}
 				{def ? def.render() : <p className="bs-widget__missing">Unknown widget: {launch.widgetId}</p>}
 			</div>
 		</div>

@@ -325,6 +325,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 									<input
 										type="number"
 										className="invoices__input invoices__num-col"
+										aria-label={t("invoice.item.qty")}
 										value={item.quantity}
 										min={0}
 										onChange={(e) =>
@@ -339,6 +340,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 									<input
 										type="number"
 										className="invoices__input invoices__num-col"
+										aria-label={t("invoice.item.unitPrice")}
 										value={item.unitPrice}
 										min={0}
 										step="0.01"

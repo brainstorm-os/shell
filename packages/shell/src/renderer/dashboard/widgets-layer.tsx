@@ -674,6 +674,10 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 						<iframe
 							ref={iframeRef}
 							className="dashboard-widgets__frame"
+							// Loads the widget's ES-module bundle from the distinct
+							// `bswidget://<appId>` origin — srcdoc can't pull a module graph;
+							// sandbox + distinct-origin isolation is the security boundary.
+							// iframe-src-exempt
 							src={src}
 							title={title}
 							// `allow-same-origin` so the app's ES-module bundle actually loads
