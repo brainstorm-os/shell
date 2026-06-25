@@ -1,6 +1,6 @@
 # Brainstorm
 
-A knowledge-management product modeled as a desktop OS.
+A knowledge-management product modeled as a desktop OS — local-first, on your machine. **[getbrainstorm.online](https://getbrainstorm.online)**
 
 The shell is a dashboard with a wallpaper, icons, and widgets. The work happens in **apps** — a text editor, a database, a file viewer, a PDF editor, a graph viewer, a code editor, and so on — each launched in its own window and responsible for its own logic. Apps can be added, removed, and updated independently of the shell and of each other.
 
@@ -51,3 +51,7 @@ We use **Bun workspaces** for the monorepo. The shell is one package; design tok
 A previous attempt in this space became hard to evolve because everything was interconnected — data, UI, sync, schema, and product surface fused into a single mass. Brainstorm is a deliberate retry where the central organizing principle is **separation**: the shell hosts apps, apps interoperate only through standard contracts (Block Protocol entities, capability grants, host services), and the schema is owned by no one app.
 
 Design docs, the implementation plan, and internal references are maintained privately in the project's `harness` repository.
+
+## License
+
+[FSL-1.1-Apache-2.0](LICENSE.md) © Brainstorm — source-available, converts to Apache-2.0 two years after each release.
