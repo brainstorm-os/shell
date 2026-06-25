@@ -35,6 +35,8 @@ const ROOT = new URL("../../..", import.meta.url).pathname;
 // fall back to the harness-root sibling.
 const MANIFEST_CANDIDATES = [
 	join(ROOT, "docs/help-manifest.json"),
+	// Sibling-repo layout: the design docs live in the harness repo next door.
+	join(ROOT, "../harness/docs/help-manifest.json"),
 	join(ROOT, "../docs/help-manifest.json"),
 ];
 const MANIFEST_PATH = MANIFEST_CANDIDATES.find((p) => existsSync(p)) ?? MANIFEST_CANDIDATES[0];

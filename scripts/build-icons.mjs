@@ -29,10 +29,12 @@ import sharp from "sharp";
 const execFileP = promisify(execFile);
 
 const ROOT = new URL("..", import.meta.url).pathname;
-// docs/ relocated from app/docs/ to the harness root in the 2026-06 restructure.
-const SOURCE = [join(ROOT, "docs/art/icon/icon10.png"), join(ROOT, "../docs/art/icon/icon10.png")].find(
-	(p) => existsSync(p),
-);
+// The design docs live in the sibling harness repo (../harness/docs).
+const SOURCE = [
+	join(ROOT, "docs/art/icon/icon10.png"),
+	join(ROOT, "../harness/docs/art/icon/icon10.png"),
+	join(ROOT, "../docs/art/icon/icon10.png"),
+].find((p) => existsSync(p));
 const ART_DIR = join(ROOT, "packages/shell/art");
 const ICONSET_DIR = join(ART_DIR, "icon.iconset");
 
