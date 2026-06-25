@@ -14,6 +14,8 @@
  * API the apps touch (structural types — no dependency on its large d.ts).
  */
 
+import { installMathSumPrecise } from "./math-sum-precise";
+
 export type PdfEngineViewport = {
 	width: number;
 	height: number;
@@ -168,12 +170,15 @@ let loadedPdfjs: typeof import("pdfjs-dist") | null = null;
 
 /** Lazy-load pdf.js + wire its worker (idempotent across calls). */
 export async function loadPdfEngine(): Promise<typeof import("pdfjs-dist")> {
+	// Electron 41 (Chromium 134) lacks `Math.sumPrecise`, which pdf.js v6 calls
+	// on both threads. Install it on the main thread before pdf.js loads; the
+	// worker installs its own in `pdf-worker.ts` (a separate realm).
+	installMathSumPrecise();
 	const pdfjs = await import("pdfjs-dist");
 	if (!pdfjs.GlobalWorkerOptions.workerPort && !pdfjs.GlobalWorkerOptions.workerSrc) {
-		pdfjs.GlobalWorkerOptions.workerPort = new Worker(
-			new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url),
-			{ type: "module" },
-		);
+		pdfjs.GlobalWorkerOptions.workerPort = new Worker(new URL("./pdf-worker.ts", import.meta.url), {
+			type: "module",
+		});
 	}
 	loadedPdfjs = pdfjs;
 	return pdfjs;

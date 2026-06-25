@@ -7,7 +7,11 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css",
+    "./src/pdf-engine/math-sum-precise-install.ts",
+    "./src/pdf-engine/pdf-worker.ts"
+  ],
   "scripts": {
     "build:glyphs": "node scripts/build-glyphs.mjs && biome format --write src/icon/icon-glyphs.ts"
   },
