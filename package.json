@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "Brainstorm — knowledge-management product modeled as a desktop OS.",
-  "license": "UNLICENSED",
+  "license": "FSL-1.1-Apache-2.0",
   "type": "module",
   "workspaces": ["packages/*", "apps/*", "tools/*"],
   "scripts": {

@@ -9,7 +9,7 @@
  *   bun run build:apps
  *   CATALOG_OUT=/tmp/catalog-out bun tools/publish-first-party-catalog.ts
  *   CATALOG_BIND=127.0.0.1:8788 CATALOG_BUNDLE_DIR=/tmp/catalog-out \
- *     ../brainstorm-cloud/services/catalog-edge/target/debug/catalog-edge &
+ *     ../cloud/services/catalog-edge/target/debug/catalog-edge &
  *   # 2. verify:
  *   bun tools/verify-catalog-live.ts io.brainstorm.notes
  */

@@ -781,7 +781,7 @@ export async function seedDemoEntities(session: VaultSession): Promise<SeedEntit
 
 	// ── Brainstorm Cloud (control-plane) tracking ──────────────────────
 	// The commercial backend lives in its own out-of-product repo
-	// (../brainstorm-cloud) but is tracked AS vault entities so the infra
+	// (../cloud) but is tracked AS vault entities so the infra
 	// work shows up in Tasks / Database / Graph like any other project —
 	// the team dogfoods its own tracker. Mirrors brainstorm-cloud/.
 	// Undated (backlog) so the Calendar demo window is unaffected.

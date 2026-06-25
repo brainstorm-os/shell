@@ -1,6 +1,6 @@
 /**
  * Catalog wire types — the shape the catalog API serves, mirrored from
- * `../../../brainstorm-cloud/services/catalog-edge`. Renderer-safe (no Electron,
+ * `../cloud/services/catalog-edge`. Renderer-safe (no Electron,
  * no native): pure data shapes shared by the pure core + the client.
  *
  * Per §The catalog API contract.
