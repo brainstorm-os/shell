@@ -31,3 +31,8 @@ tests/dogfood/.data/
 tests/dogfood/.data-collab/
 tests/dogfood/.sessions/
 tests/dogfood/.screenshots-data/
+
+# Local dev bridge to the harness-root dev MCP server (dev reseed only).
+# Points outside this repo (../../tools/mcp-server); never ship it in the
+# standalone/published app — the dev shell resolves it via the harness layout.
+/tools/mcp-server
