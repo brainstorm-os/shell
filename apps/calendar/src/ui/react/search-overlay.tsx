@@ -84,8 +84,7 @@ export function SearchOverlay({ getItems, now, onPick, onClose }: SearchOverlayP
 				{/* Combobox listbox: focus stays on the input (aria-activedescendant);
 				    the listbox itself is not a Tab stop, per the WAI-ARIA combobox pattern. */}
 				{/* biome-ignore lint/a11y/useFocusableInteractive: combobox listbox is driven by the input, not focusable */}
-				{/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA combobox listbox is a <ul> */}
-				{/* kbn-roles-exempt: combobox listbox popup; keyboard via the useCompositeKeyboard Combobox host on the input above. */}
+				{/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA combobox listbox is a <ul> — kbn-roles-exempt: keyboard via the useCompositeKeyboard Combobox host on the input */}
 				<ul className="cal-search__results" role="listbox">
 					{results.map((item, index) => {
 						const date = new Date(item.start).toLocaleDateString(undefined, {
