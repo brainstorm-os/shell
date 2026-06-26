@@ -37,7 +37,6 @@ import "@brainstorm/sdk/property-ui/dictionary-editor.css";
 import "@brainstorm/sdk/count-badge.css";
 import { EntityCommentsPanel } from "@brainstorm/editor";
 import { openEntity, quickLookEntity } from "@brainstorm/sdk";
-import { createCountBadge } from "@brainstorm/sdk/count-badge";
 import {
 	COLLECTION_TYPE_URL,
 	type Cover,
@@ -55,6 +54,7 @@ import {
 	type VaultEntity,
 	isMultiValued,
 } from "@brainstorm/sdk-types";
+import { createCountBadge } from "@brainstorm/sdk/count-badge";
 import { coverOf, createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
 import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
 import { IconName, createIconElement } from "@brainstorm/sdk/icon";
@@ -258,7 +258,7 @@ import { InspectorProperties } from "./react/inspector-properties";
 // React component of the same name. Keep the component name parity in
 // the `react/` directory and disambiguate here.
 import { ListView as ListViewComponent } from "./react/list-view";
-import { mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
+import { EmptyState, mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
 import { TimelineView } from "./react/timeline-view";
 import { entityIcon, entityTitle, formatDate, formatDateTime, typeLabel } from "./render/cells";
 import { IconKind } from "./types/icon";
@@ -1069,6 +1069,25 @@ function emptyStateContent(state: AppState): { title: string; body: string } {
 	};
 }
 
+/** Calendar / Board views need a property to lay items out by (a date for
+ *  Calendar, a group for Board). When that property is unset the per-kind
+ *  switch breaks without a body — surface a guiding empty-state instead of a
+ *  blank stage so the user knows why it's empty and how to fix it. */
+function grouplessViewEmptyState(kind: ListViewKind): { title: string; body: string } {
+	if (kind === ListViewKind.Calendar) {
+		return {
+			title: "No date to schedule by",
+			body:
+				"This calendar view needs a date property. Open view settings (the gear icon) and pick a date to lay your items out on the calendar.",
+		};
+	}
+	return {
+		title: "Nothing to group by",
+		body:
+			"This board view needs a property to group by. Open view settings (the gear icon) and choose one to see columns.",
+	};
+}
+
 function renderActiveView(state: AppState): void {
 	time("db.renderActiveView", () => renderActiveViewInner(state));
 }
@@ -1266,10 +1285,14 @@ function renderActiveViewInner(state: AppState): void {
 	if (reactBody) {
 		renderViewBodyReact(body, { selection, element: withProperties(state, reactBody) });
 	} else {
-		// `groupBy === null` for a Board/Calendar view falls through here
-		// (the per-kind switch breaks early). Empty body keeps the stage
-		// honest — no stale prior render.
-		renderViewBodyReact(body, { selection, element: createElement("div") });
+		// `groupBy === null` for a Board/Calendar view falls through here (the
+		// per-kind switch breaks early). Render a guiding empty-state — not a
+		// blank stage — so the user learns why it's empty and how to fix it
+		// (a Calendar/Board with no layout property used to paint a silent void).
+		renderViewBodyReact(body, {
+			selection,
+			element: createElement(EmptyState, grouplessViewEmptyState(view.kind)),
+		});
 	}
 }
 
