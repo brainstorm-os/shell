@@ -46,7 +46,12 @@ export class CollabDevBridge {
 	readonly #getRelay: () => CollabRelayLike | null;
 	readonly #engine: SharingEngine;
 	#receiver: ((frame: Uint8Array) => void) | null = null;
-	#receiverEntityId: string | null = null;
+	/** Every entity channel this shell currently subscribes to. The receiver is a
+	 *  single shared listener that dispatches each frame by its own header
+	 *  entityId, so one teammate can hold live subscriptions to many shared docs
+	 *  at once (mirrors the production LiveSyncEngine; fixes the single-entity
+	 *  receiver, F-289). */
+	readonly #receiverEntityIds = new Set<string>();
 	#receiveChain: Promise<unknown> = Promise.resolve();
 
 	constructor(session: VaultSession, getRelay: () => CollabRelayLike | null) {
@@ -73,10 +78,11 @@ export class CollabDevBridge {
 	/**
 	 * Subscribe to `entityId`'s relay channel and install the combined,
 	 * serialized receiver (WrapBootstrap → install DEK, Update → apply). Usable
-	 * by BOTH sides. Idempotent — a second call replaces the prior listener.
-	 * Ensures a local entity row exists (no DEK yet on the collaborator side —
-	 * the wrap installs it). This bespoke receiver is the dev/dogfood analog of
-	 * the production `LiveSyncEngine`.
+	 * by BOTH sides. Idempotent + ADDITIVE — a second call subscribes another
+	 * channel without dropping the first, so a teammate can hold many shared docs
+	 * live at once. Ensures a local entity row exists (no DEK yet on the
+	 * collaborator side — the wrap installs it). This bespoke receiver is the
+	 * dev/dogfood analog of the production `LiveSyncEngine`.
 	 */
 	async installShareReceiver(entityId: string, type: string): Promise<void> {
 		await this.#engine.ensureDekStore();
@@ -93,16 +99,18 @@ export class CollabDevBridge {
 			});
 		}
 		const relay = this.#engine.requireRelay();
-		this.#detachReceiver(relay);
 		relay.subscribe?.(entityId);
-		this.#receiverEntityId = entityId;
-		const listener = (frame: Uint8Array): void => {
-			this.#receiveChain = this.#receiveChain
-				.catch(() => {})
-				.then(() => this.#handleFrame(entityId, frame));
-		};
-		relay.onFrame(listener);
-		this.#receiver = listener;
+		this.#receiverEntityIds.add(entityId);
+		// One shared listener for ALL subscribed channels; it dispatches each frame
+		// by the entityId in the frame's own header (#handleFrame). Installing a
+		// second entity must not drop the first.
+		if (!this.#receiver) {
+			const listener = (frame: Uint8Array): void => {
+				this.#receiveChain = this.#receiveChain.catch(() => {}).then(() => this.#handleFrame(frame));
+			};
+			relay.onFrame(listener);
+			this.#receiver = listener;
+		}
 	}
 
 	/** Owner-side share — delegates to the engine. */
@@ -160,10 +168,11 @@ export class CollabDevBridge {
 
 	// --- internals ----------------------------------------------------------
 
-	async #handleFrame(entityId: string, frame: Uint8Array): Promise<void> {
+	async #handleFrame(frame: Uint8Array): Promise<void> {
 		try {
 			const decoded = decodeFrame(frame);
-			if (decoded.header.entityId !== entityId) return;
+			const entityId = decoded.header.entityId;
+			if (!this.#receiverEntityIds.has(entityId)) return;
 			const relay = this.#getRelay();
 			if (!relay) return;
 			const ctx = this.#engine.makeCtx(relay.currentPort());
@@ -186,10 +195,8 @@ export class CollabDevBridge {
 			relay.offFrame(this.#receiver);
 			this.#receiver = null;
 		}
-		if (this.#receiverEntityId !== null) {
-			relay.unsubscribe?.(this.#receiverEntityId);
-			this.#receiverEntityId = null;
-		}
+		for (const id of this.#receiverEntityIds) relay.unsubscribe?.(id);
+		this.#receiverEntityIds.clear();
 	}
 }
 

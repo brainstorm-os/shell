@@ -156,4 +156,44 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 			expect(hex.includes(Buffer.from("[marcus edit]", "utf8").toString("hex"))).toBe(false);
 		}
 	});
+
+	it("Marcus receives live edits on TWO entities shared at once (multi-entity receiver; F-289)", async () => {
+		const A = "ent_brief_a";
+		const B = "ent_crm_b";
+
+		await bridgeMira.provisionEntity(A, ENTITY_TYPE);
+		await bridgeMira.provisionEntity(B, ENTITY_TYPE);
+		await bridgeMira.editText(A, "brief A. ");
+		await bridgeMira.editText(B, "crm B. ");
+
+		// Both teammates install receivers for BOTH entities. The single-entity
+		// receiver detaches A when B is installed, so A never converges (F-289).
+		await bridgeMarcus.installShareReceiver(A, ENTITY_TYPE);
+		await bridgeMarcus.installShareReceiver(B, ENTITY_TYPE);
+		await bridgeMira.installShareReceiver(A, ENTITY_TYPE);
+		await bridgeMira.installShareReceiver(B, ENTITY_TYPE);
+
+		await bridgeMira.share({
+			entityId: A,
+			type: ENTITY_TYPE,
+			invite: bridgeMarcus.createInvite("Marcus"),
+			role: AccessRole.Editor,
+		});
+		await bridgeMira.share({
+			entityId: B,
+			type: ENTITY_TYPE,
+			invite: bridgeMarcus.createInvite("Marcus"),
+			role: AccessRole.Editor,
+		});
+
+		// Marcus converges on BOTH shared docs and receives LIVE edits to each.
+		await awaitConverged(bridgeMira, bridgeMarcus, A);
+		await awaitConverged(bridgeMira, bridgeMarcus, B);
+		await bridgeMira.editText(A, "[a live] ");
+		await bridgeMira.editText(B, "[b live] ");
+		await awaitConverged(bridgeMira, bridgeMarcus, A);
+		await awaitConverged(bridgeMira, bridgeMarcus, B);
+		expect(await bridgeMarcus.readText(A)).toContain("[a live]");
+		expect(await bridgeMarcus.readText(B)).toContain("[b live]");
+	});
 });
