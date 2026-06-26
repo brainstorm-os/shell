@@ -250,19 +250,24 @@ export function CalendarApp() {
 	entitiesRef.current = entities;
 	const dateKeyInfoRef = useRef(dateKeyInfo);
 	dateKeyInfoRef.current = dateKeyInfo;
+	// Latest anchor, read by nav actions so they can compute the next anchor +
+	// record nav OUTSIDE the setAnchorState updater — calling recordNav (which
+	// notifies the nav-history subscribers → setState) from inside the updater
+	// runs during render and trips React's "setState in render" warning.
+	const anchorRef = useRef(anchor);
+	anchorRef.current = anchor;
 
 	// ── Navigation actions ──────────────────────────────────────────────
 	const setView = useCallback(
 		(kind: CalendarViewKind) => {
-			setAnchorState((cur) => {
-				let next = cur;
-				if (kind === CalendarViewKind.Day) next = startOfDay(cur);
-				if (kind === CalendarViewKind.Week) next = startOfWeek(cur, weekStartsOn);
-				if (kind === CalendarViewKind.Year) next = startOfYear(cur);
-				recordNav({ viewKind: kind, anchor: next });
-				return next;
-			});
+			const cur = anchorRef.current;
+			let next = cur;
+			if (kind === CalendarViewKind.Day) next = startOfDay(cur);
+			if (kind === CalendarViewKind.Week) next = startOfWeek(cur, weekStartsOn);
+			if (kind === CalendarViewKind.Year) next = startOfYear(cur);
+			setAnchorState(next);
 			setViewKind(kind);
+			recordNav({ viewKind: kind, anchor: next });
 		},
 		[recordNav, weekStartsOn],
 	);
@@ -293,28 +298,27 @@ export function CalendarApp() {
 
 	const step = useCallback(
 		(direction: 1 | -1) => {
-			setAnchorState((cur) => {
-				let next = cur;
-				switch (viewKind) {
-					case CalendarViewKind.Month:
-						next = addMonths(cur, direction);
-						break;
-					case CalendarViewKind.Week:
-						next = addDays(cur, 7 * direction);
-						break;
-					case CalendarViewKind.Day:
-						next = addDays(cur, direction);
-						break;
-					case CalendarViewKind.Agenda:
-						next = addDays(cur, 7 * direction);
-						break;
-					case CalendarViewKind.Year:
-						next = addMonths(cur, 12 * direction);
-						break;
-				}
-				recordNav({ viewKind, anchor: next });
-				return next;
-			});
+			const cur = anchorRef.current;
+			let next = cur;
+			switch (viewKind) {
+				case CalendarViewKind.Month:
+					next = addMonths(cur, direction);
+					break;
+				case CalendarViewKind.Week:
+					next = addDays(cur, 7 * direction);
+					break;
+				case CalendarViewKind.Day:
+					next = addDays(cur, direction);
+					break;
+				case CalendarViewKind.Agenda:
+					next = addDays(cur, 7 * direction);
+					break;
+				case CalendarViewKind.Year:
+					next = addMonths(cur, 12 * direction);
+					break;
+			}
+			setAnchorState(next);
+			recordNav({ viewKind, anchor: next });
 		},
 		[recordNav, viewKind],
 	);
