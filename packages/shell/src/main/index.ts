@@ -431,6 +431,12 @@ function registerBrainstormProtocol(): void {
 			if (!target.startsWith(baseEmoji + sep)) {
 				return new Response(null, { status: 403 });
 			}
+			// A glyph newer than the bundled set (e.g. Emoji-14+ 1faea/1faef) has
+			// no webp — return a clean 404 instead of letting net.fetch on a
+			// missing file:// throw and surface as ERR_UNEXPECTED in the renderer.
+			if (!(await stat(target).catch(() => null))) {
+				return new Response(null, { status: 404 });
+			}
 			const upstream = await net.fetch(pathToFileURL(target).toString());
 			if (!upstream.ok) return upstream;
 			const headers = new Headers(upstream.headers);
