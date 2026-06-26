@@ -22,6 +22,14 @@
   "build": {
     "appId": "io.brainstorm.shell",
     "productName": "Brainstorm",
+    "protocols": [
+      {
+        "name": "Brainstorm",
+        "schemes": [
+          "brainstorm"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "art"

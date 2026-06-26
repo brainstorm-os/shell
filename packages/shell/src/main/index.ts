@@ -218,6 +218,7 @@ import { makePropertiesServiceHandler } from "./properties/properties-service";
 import { UsageIndex } from "./properties/usage-index";
 import { mentionTargets, shouldNotify } from "./roster/mention-notifier";
 import { makeRosterServiceHandler } from "./roster/roster-service";
+import { deepLinkFromArgv, parseEntityDeepLink } from "./runtime/deep-link";
 import { createLaunchSetup } from "./runtime/launch-setup";
 import { SHELL_ACTION_CHANNEL, createMenuSetup } from "./runtime/menu-setup";
 import { createShortcutSetup } from "./runtime/shortcut-setup";
@@ -635,12 +636,16 @@ function setupSingleInstance(): void {
 		app.quit();
 		return;
 	}
-	app.on("second-instance", () => {
+	app.on("second-instance", (_event, argv) => {
 		const existing = BrowserWindow.getAllWindows()[0];
 		if (existing) {
 			if (existing.isMinimized()) existing.restore();
 			existing.focus();
 		}
+		// Windows / Linux deliver a deeplink to the already-running instance as a
+		// launch argument on the second instance's argv.
+		const link = deepLinkFromArgv(argv);
+		if (link) handleInboundDeepLink(link);
 	});
 }
 
@@ -666,6 +671,34 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 setupSingleInstance();
+
+// ── Inbound OS deeplinks (`brainstorm://entity/<id>` from a browser / mail /
+// Spotlight) ─────────────────────────────────────────────────────────────
+// The router is wired once the open path exists (in `whenReady`); links that
+// arrive before then — a cold-start `open-url` on macOS, or the launch argv —
+// queue here and flush once ready.
+const pendingDeepLinks: string[] = [];
+let deepLinkRouter: ((url: string) => void) | null = null;
+function handleInboundDeepLink(url: string): void {
+	if (deepLinkRouter) deepLinkRouter(url);
+	else pendingDeepLinks.push(url);
+}
+
+// Register as the OS handler for the `brainstorm://` scheme so external
+// deeplinks launch/focus us. In dev the running binary is Electron itself, so
+// the relaunch command must carry execPath + the entry script.
+if (process.defaultApp) {
+	const entry = process.argv[1];
+	if (entry) app.setAsDefaultProtocolClient("brainstorm", process.execPath, [normalize(entry)]);
+} else {
+	app.setAsDefaultProtocolClient("brainstorm");
+}
+// macOS delivers deeplinks via `open-url` — it can fire on cold start before a
+// window exists, so the URL is queued (above) until the router is ready.
+app.on("open-url", (event, url) => {
+	event.preventDefault();
+	handleInboundDeepLink(url);
+});
 
 let workers: WorkersHandle | null = null;
 let dashboardWindow: BrowserWindow | null = null;
@@ -853,6 +886,30 @@ void app.whenReady().then(async () => {
 		},
 	});
 	stampDashboardFocus = () => launchSetup.stampDashboardFocus();
+
+	// Inbound-deeplink router: parse `brainstorm://entity/<id>`, focus the
+	// dashboard, and dispatch an `open` for that entity through the same ladder
+	// a dashboard link uses (shell-sourced). Then flush any links queued during
+	// boot + the cold-start launch argv.
+	deepLinkRouter = (url: string) => {
+		const entityId = parseEntityDeepLink(url);
+		if (!entityId) return;
+		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+			if (dashboardWindow.isMinimized()) dashboardWindow.restore();
+			revealWindow(dashboardWindow);
+			if (!focusStealingDisabled()) dashboardWindow.focus();
+		}
+		void launchSetup
+			.getIntents()
+			.then((intents) =>
+				intents?.dispatch({ verb: OPEN_VERB, payload: { entityId } }, { app: SHELL_INTENT_SOURCE }),
+			)
+			.catch((error) => console.warn("[deep-link] open dispatch failed:", error));
+	};
+	const coldLink = deepLinkFromArgv(process.argv);
+	if (coldLink) pendingDeepLinks.push(coldLink);
+	for (const queued of pendingDeepLinks.splice(0)) deepLinkRouter(queued);
+
 	// The dashboard renderer gets the same external-link guard as app tab
 	// views: links route through the open ladder (shell-sourced, so the
 	// OS-handoff option stays available) instead of Electron's default
