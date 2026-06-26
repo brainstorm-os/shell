@@ -1073,6 +1073,32 @@ body[data-view-mode="gallery"]
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
+/* Tile modes render the row as a vertical card, so the list-mode grips — pinned
+ * to the row's left/right gutter at vertical-center — floated as stray squares
+ * over the card face (the reported "weird square" artifact). Re-pin them to the
+ * card's free corners (the ⋯ owns top-right) as deliberate, hover-revealed
+ * chips, matching the corner treatment above. */
+body[data-view-mode="grid"] .content-row__drag-grip,
+body[data-view-mode="gallery"] .content-row__drag-grip,
+body[data-view-mode="grid"] .content-row__export-grip,
+body[data-view-mode="gallery"] .content-row__export-grip {
+	transform: none;
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-md);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+body[data-view-mode="grid"] .content-row__drag-grip,
+body[data-view-mode="gallery"] .content-row__drag-grip {
+	inset: var(--space-2) auto auto var(--space-2);
+}
+
+body[data-view-mode="grid"] .content-row__export-grip,
+body[data-view-mode="gallery"] .content-row__export-grip {
+	inset: auto var(--space-2) var(--space-2) auto;
+}
+
 body[data-view-mode="grid"] .content-row {
 	display: flex;
 	flex-direction: column;
@@ -1135,6 +1161,18 @@ body[data-view-mode="gallery"] .content-row__glyph[data-kind="folder"] {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
+	display: block;
+}
+
+/* Opener-app squircle — the sanctioned type-identity badge for a typed
+ * object (Note/Task/Bookmark/…) with no own icon, so its tile reads as
+ * what it is instead of going blank. Sized to the glyph slot, not stretched
+ * edge-to-edge like a thumbnail. */
+.content-row__app-icon {
+	width: 64%;
+	height: 64%;
+	object-fit: contain;
+	border-radius: var(--radius-md);
 	display: block;
 }
 

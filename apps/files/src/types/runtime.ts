@@ -78,6 +78,15 @@ export type BrainstormRuntime = {
 				verb: string;
 				payload: Record<string, unknown>;
 			}) => unknown | Promise<unknown>;
+			/** Read-only "which apps can open this?" — the same registry query the
+			 *  shared object menu's "Open with ▸" uses. Files resolves browsability
+			 *  per entity type with it: a type with ≥1 opener is shown in the
+			 *  browser (and the default opener app names + icons the row). Gated on
+			 *  the `intents.dispatch:open` grant the manifest already holds. */
+			suggest?: (request: {
+				verb: string;
+				payload: Record<string, unknown>;
+			}) => Promise<ReadonlyArray<{ appId: string; label: string | null }>>;
 		};
 		dashboard?: {
 			pin?: (t: { entityId: string }) => Promise<boolean>;

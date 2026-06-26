@@ -8,7 +8,14 @@ import type { Icon } from "@brainstorm/sdk-types";
 import { parseIcon } from "@brainstorm/sdk/entity-icon";
 import { plural } from "@brainstorm/sdk/i18n";
 import { t } from "../i18n";
-import { type Entity, FILE_TYPE, FOLDER_TYPE, NOTE_TYPE, readMembers } from "../types/entity";
+import {
+	type Entity,
+	FILE_TYPE,
+	FOLDER_TYPE,
+	NOTE_TYPE,
+	entityTypeName,
+	readMembers,
+} from "../types/entity";
 
 /** The object's OWN universal icon, parsed defensively via the shared
  *  `parseIcon` (same validation every app uses). Returns null when the
@@ -37,7 +44,10 @@ export function typeLabel(entity: Entity): string {
 			: t("brainstorm.files.type.file");
 	}
 	if (entity.type === NOTE_TYPE) return t("brainstorm.files.type.note");
-	return entity.type;
+	// The "Kind" cell for an arbitrary object the universal browser shows: the
+	// type's name segment (`brainstorm/Task/v1` → "Task"). Machine-derived from
+	// the type id like the file-mime fallback above, so it isn't t()-wrapped.
+	return entityTypeName(entity.type);
 }
 
 const DAY_SECONDS = 86_400;

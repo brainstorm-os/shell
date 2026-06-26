@@ -3,11 +3,15 @@
  * keystone behind "manage the files in your vault" (the Database
  * 9.12.2-read-half move, applied to Files).
  *
- * Until this iteration the renderer flattened *every* entity as a direct
- * member of one synthetic `(vault)` root, ignoring real `brainstorm/Folder/v1`
- * entities entirely. This respects folder membership: a `Folder/v1`'s
- * `members` define its children (folders nest); any entity no folder
- * contains surfaces at the synthetic root so nothing is unreachable.
+ * Files is a UNIVERSAL object browser, not a files-only one (design 30
+ * §"Not opinionated about content" — a Folder can contain any entity
+ * type; design 41 §"the content pane shows all entity types"). The
+ * `browsableTypes` set governs which non-File/Folder types surface: a
+ * type is browsable when some app registered an opener for it (resolved
+ * once via `intents.suggest` in the store and passed in here). Internal
+ * state/config rows (`*View/v1`, `FileManagerState/v1`, connector
+ * accounts, …) register no opener, so they never leak into the browser.
+ * File and Folder rows are ALWAYS included regardless of the set.
  *
  * Pure + deterministic — it survives the swap from the `vaultEntities`
  * preview aggregator to the real entities service (9.3) and the Files
@@ -36,6 +40,12 @@ function displayName(properties: Record<string, unknown>): string {
  * @param rootId   the well-known root Folder id the renderer navigates to
  *                 (`ROOT_FOLDER_ID` — shell-bootstrapped via
  *                 `VaultSession.ensureRootFolder`)
+ * @param now      synthetic-root timestamp seam (tests pin it)
+ * @param browsableTypes the non-File/Folder entity types an app can open
+ *                 (so Files may surface them). Undefined / empty ⇒ the
+ *                 legacy files-only projection (File + Folder only); the
+ *                 store fills it from `intents.suggest`. File and Folder
+ *                 are always included irrespective of this set.
  * @returns `[root, ...entities]`. When the snapshot contains the real
  *          `rootId` Folder (the shell bootstrap ran) its OWN row is the
  *          root — its declared members first, then any orphan no folder
@@ -49,15 +59,17 @@ export function buildVaultFileTree(
 	entities: readonly VaultEntityInput[],
 	rootId: string,
 	now: number = Date.now(),
+	browsableTypes?: ReadonlySet<string>,
 ): Entity[] {
-	// Files manages only files and folders — the vault snapshot is the whole
-	// shared object space (notes, tasks, bookmarks, journal entries, …), so we
-	// scope to File/Folder rows here. Member refs that pointed at a now-excluded
-	// entity are dropped by the dangling-ref sanitiser below (it keys off the
-	// filtered `liveIds`), so nothing non-file can surface as a ghost row.
-	const live = entities.filter(
-		(e) => e.deletedAt == null && (e.type === FILE_TYPE || e.type === FOLDER_TYPE),
-	);
+	// Files is a universal browser, but the vault snapshot is the WHOLE shared
+	// object space — including internal state/config rows no app can open. A row
+	// surfaces only when it is a File/Folder (structural) or its type is openable
+	// (`browsableTypes`, resolved from the opener registry). Member refs pointing
+	// at an excluded entity are dropped by the dangling-ref sanitiser below (it
+	// keys off the filtered `liveIds`), so nothing unbrowsable leaks as a ghost.
+	const isBrowsable = (type: string): boolean =>
+		type === FILE_TYPE || type === FOLDER_TYPE || (browsableTypes?.has(type) ?? false);
+	const live = entities.filter((e) => e.deletedAt == null && isBrowsable(e.type));
 	const liveIds = new Set(live.map((e) => e.id));
 	const rootRow = live.find((e) => e.id === rootId && e.type === FOLDER_TYPE);
 	const nonRoot = live.filter((e) => e.id !== rootId);

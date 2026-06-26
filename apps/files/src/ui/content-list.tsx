@@ -30,7 +30,7 @@ import { RenameStatus } from "../logic/rename";
 import { initialSelectionRange } from "../logic/rename";
 import { SelectionModifier } from "../logic/selection";
 import type { FilesStore } from "../store/use-files-store";
-import { type Entity, FOLDER_TYPE, readName } from "../types/entity";
+import { type Entity, FILE_TYPE, FOLDER_TYPE, readName } from "../types/entity";
 import type { BrainstormRuntime } from "../types/runtime";
 import { TileSize, ViewMode, isListMode } from "../view-mode";
 import { formatBytes, formatTimeAgo, readEntityIcon, typeLabel } from "./entity-view";
@@ -511,10 +511,24 @@ function extensionChip(name: string): string | null {
  * type-indicator exception to [[feedback_no_default_type_icon_fallback]] —
  * a container genuinely needs an indicator) on a neutral surface rather
  * than an empty tinted "cover" band.
+ *
+ * A non-File/Folder object (the universal browser) with no own icon shows
+ * its default opener app's squircle (`brainstorm://app-icon/<appId>`) —
+ * the same sanctioned type-identity badge the dashboard pins use, so a
+ * Task/Note/Bookmark tile reads as *what it is* rather than going blank.
  */
-function TileMedia({ entity, iconSize }: { entity: Entity; iconSize: number }) {
+function TileMedia({
+	entity,
+	iconSize,
+	openerAppId,
+}: {
+	entity: Entity;
+	iconSize: number;
+	openerAppId: string | null;
+}) {
 	const icon = readEntityIcon(entity);
 	const isFolder = entity.type === FOLDER_TYPE;
+	const isFile = entity.type === FILE_TYPE;
 	const assetId = entity.properties.assetId;
 	const assetMime = entity.properties.assetMime;
 	const hasImage =
@@ -522,7 +536,8 @@ function TileMedia({ entity, iconSize }: { entity: Entity; iconSize: number }) {
 		assetId !== "" &&
 		typeof assetMime === "string" &&
 		assetMime.startsWith("image/");
-	const chip = !isFolder && !hasImage && !icon ? extensionChip(readName(entity)) : null;
+	const chip = isFile && !hasImage && !icon ? extensionChip(readName(entity)) : null;
+	const appIcon = !isFolder && !isFile && !icon && !hasImage ? openerAppId : null;
 	return (
 		<span className="content-row__glyph" data-kind={isFolder ? "folder" : "file"} aria-hidden="true">
 			{hasImage ? (
@@ -537,6 +552,14 @@ function TileMedia({ entity, iconSize }: { entity: Entity; iconSize: number }) {
 				<EntityIcon icon={icon} size={iconSize} />
 			) : isFolder ? (
 				<Icon name={IconName.Folder} size={iconSize} />
+			) : appIcon ? (
+				<img
+					className="content-row__app-icon"
+					src={`brainstorm://app-icon/${appIcon}`}
+					alt=""
+					loading="lazy"
+					draggable={false}
+				/>
 			) : chip ? (
 				<span className="content-row__ext">{chip}</span>
 			) : null}
@@ -752,7 +775,11 @@ function ContentRow({
 					</button>
 				) : null}
 				{isTileMediaMode(store.viewMode) ? (
-					<TileMedia entity={entity} iconSize={iconSizeFor(store.viewMode, store.tileSize)} />
+					<TileMedia
+						entity={entity}
+						iconSize={iconSizeFor(store.viewMode, store.tileSize)}
+						openerAppId={store.openerForType(entity.type)?.appId ?? null}
+					/>
 				) : isFolder && !readEntityIcon(entity) ? (
 					<span className="content-row__glyph" data-glyph="folder" aria-hidden="true">
 						<Icon name={IconName.Folder} size={iconSizeFor(store.viewMode, store.tileSize)} />

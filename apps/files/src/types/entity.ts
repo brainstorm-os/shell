@@ -67,6 +67,19 @@ export type FileProperties = {
 	tags?: string[];
 };
 
+/** The name segment of a `<namespace>/<Name>/<version>` type id —
+ *  `brainstorm/ListView/v1` → "ListView", `io.brainstorm.notes/Note/v1` →
+ *  "Note". Drops a trailing `vN` and takes the last remaining segment;
+ *  falls back to the raw id. Shared by the "Kind" label (`humanizeType`)
+ *  and the app-internal-type filter (`isAppInternalType`). */
+export function entityTypeName(type: string): string {
+	const segments = type.split("/").filter((s) => s.length > 0);
+	while (segments.length > 1 && /^v\d+$/.test(segments[segments.length - 1] ?? "")) {
+		segments.pop();
+	}
+	return segments[segments.length - 1] ?? type;
+}
+
 export function readName(entity: Entity): string {
 	const name = entity.properties.name;
 	return typeof name === "string" && name.length > 0 ? name : "(untitled)";

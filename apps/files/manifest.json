@@ -9,9 +9,7 @@
   "capabilities": [
     "storage.kv",
     "entities.read:*",
-    "entities.write:brainstorm/Folder/v1",
-    "entities.write:brainstorm/File/v1",
-    "entities.write:brainstorm/Comment/v1",
+    "entities.write:*",
     "intents.dispatch:open",
     "intents.dispatch:quick-look",
     "intents.dispatch:move",

@@ -23,6 +23,12 @@ import { type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { type BreadcrumbSegment, deriveBreadcrumbs } from "../logic/breadcrumbs";
+import {
+	type OpenerMeta,
+	browsableTypeSet,
+	openerFromHandlers,
+	unresolvedTypes,
+} from "../logic/browsable-types";
 import { type EntityLink, partitionLinksForEntity } from "../logic/entity-links";
 import { FolderTree } from "../logic/folder-tree";
 import { DEFAULT_GROUP_KEY, type EntityGroup, GroupKey, groupEntities } from "../logic/group";
@@ -102,18 +108,21 @@ export type FilesStore = ReturnType<typeof useFilesStore>;
  *  sealed the content into the vault asset store. */
 type StoredUpload = { size: number; hash?: string; assetId?: string; assetMime?: string };
 
-/** Cheap structural hash over the file/folder slice of a snapshot. Notes /
- *  Tasks / Calendar / etc. churn never touches these rows, so a snapshot
- *  that differs only in non-file types collapses to the same fingerprint
- *  and skips the full tree rebuild. */
+/** Cheap structural hash over the BROWSABLE slice of a snapshot — File /
+ *  Folder rows plus every type the opener registry says Files can show
+ *  (`browsable`). Files is a universal browser now, so a sibling app
+ *  adding a Note/Task DOES change what's on screen and must rebuild; only
+ *  churn in truly-internal types (no opener, never shown) still collapses
+ *  to the same fingerprint and skips the rebuild. */
 function fingerprintFilesSnapshot(
 	entities: readonly VaultEntityShape[],
 	links: readonly VaultLinkShape[],
+	browsable: ReadonlySet<string>,
 ): string {
 	let entitySig = "";
 	let count = 0;
 	for (const e of entities) {
-		if (e.type !== FILE_TYPE && e.type !== FOLDER_TYPE) continue;
+		if (e.type !== FILE_TYPE && e.type !== FOLDER_TYPE && !browsable.has(e.type)) continue;
 		entitySig += `${e.id}:${e.updatedAt ?? 0}:${e.deletedAt ?? 0};`;
 		count += 1;
 	}
@@ -283,6 +292,16 @@ export function useFilesStore() {
 	const [clipboard, setClipboard] = useState<Clipboard>(null);
 	const [vaultLinks, setVaultLinks] = useState<readonly VaultLinkShape[]>([]);
 	const [vaultIndex, setVaultIndex] = useState<Map<string, LinkedEntityMeta>>(() => new Map());
+
+	// Universal browser: which non-File/Folder types an app can open. Resolved
+	// once per type via `intents.suggest` (registry truth) and cached — `null`
+	// = resolved-but-unopenable (hidden, never re-queried). `browsableTypes` is
+	// the derived "has an opener" set the tree projection + fingerprint use; a
+	// render bumps it whenever a new type resolves to an opener.
+	const openersByTypeRef = useRef<Map<string, OpenerMeta | null>>(new Map());
+	const [browsableTypes, setBrowsableTypes] = useState<ReadonlySet<string>>(() => new Set());
+	const browsableTypesRef = useRef(browsableTypes);
+	browsableTypesRef.current = browsableTypes;
 
 	// Mirror the tree's + nav controller's subscriptions into React renders.
 	useEffect(() => tree.subscribe(rerender), [tree, rerender]);
@@ -868,8 +887,8 @@ export function useFilesStore() {
 	// `copyIds`, the ids may be FOREIGN objects (a note/contact from another app)
 	// not present in this Files tree, so it goes through `tree.addMembers` (no
 	// `missing-entity` rejection) and persists the dest folder's members the same
-	// way move/copy do. The entities service resolves the foreign id; the manifest
-	// `entities.write:brainstorm/Folder/v1` capability gates the write fail-closed.
+	// way move/copy do. The entities service resolves the foreign id; the write
+	// is the Folder's own `members[]`, gated by the manifest `entities.write:*`.
 	const addMembers = useCallback(
 		(destId: string, ids: string[]) => {
 			const result = tree.addMembers(destId, ids);
@@ -1001,15 +1020,65 @@ export function useFilesStore() {
 		[vaultLinks],
 	);
 
+	// The default opener (app id + name) for a non-File/Folder type, or null
+	// when the type isn't openable / not yet resolved. Drives the type-identity
+	// icon for iconless typed objects. Reads the live cache ref, so a stable
+	// identity is fine — consumers re-render off the `browsableTypes` state bump
+	// whenever a new type resolves, and re-read it then.
+	const openerForType = useCallback(
+		(type: string): OpenerMeta | null => openersByTypeRef.current.get(type) ?? null,
+		[],
+	);
+
 	// ─── Vault wiring (EXISTING preview read path) ───────────────────────
 
 	const loadedOnceRef = useRef(false);
 	// Fingerprint of the last snapshot we applied: when a sibling app (Notes,
 	// Tasks, …) writes through storage, vaultEntities.onChange fires for
-	// every consumer. The Files window only cares about File/Folder rows and
-	// their links, so a fingerprint over the file/folder slice (id +
-	// updatedAt) lets us bail when nothing relevant changed.
+	// every consumer. The fingerprint over the BROWSABLE slice (File/Folder +
+	// every openable type) lets us bail when nothing on screen changed —
+	// churn in hidden internal types still collapses to the same hash.
 	const lastFingerprintRef = useRef<string | null>(null);
+
+	// Resolve the opener for each not-yet-seen non-File/Folder type via
+	// `intents.suggest` (registry truth). A type that resolves to an opener
+	// becomes browsable and triggers one reload so its rows appear; a batch
+	// that resolves only to "no opener" just seeds the cache (no rebuild).
+	// Fire-and-forget: the current render proceeds with the types known so far.
+	// The cache is session-scoped and never re-queries a resolved type, so an
+	// opener registered mid-session (a freshly installed app) surfaces its type
+	// only after a relaunch — acceptable for an install-time-stable registry.
+	const resolveOpeners = useCallback((entities: readonly VaultEntityShape[]) => {
+		const suggest = window.brainstorm?.services?.intents?.suggest;
+		if (!suggest) return;
+		const pending = unresolvedTypes(entities, openersByTypeRef.current);
+		if (pending.length === 0) return;
+		void (async () => {
+			const resolved = await Promise.all(
+				pending.map(async (type) => {
+					try {
+						const handlers = await suggest({ verb: "open", payload: { entityType: type } });
+						return [type, openerFromHandlers(handlers)] as const;
+					} catch {
+						return [type, null] as const;
+					}
+				}),
+			);
+			let gainedBrowsable = false;
+			for (const [type, opener] of resolved) {
+				openersByTypeRef.current.set(type, opener);
+				if (opener !== null) gainedBrowsable = true;
+			}
+			if (!gainedBrowsable) return;
+			const nextSet = browsableTypeSet(openersByTypeRef.current);
+			// Keep the ref in lockstep with the state so the immediate reload below
+			// reads the just-grown set (setState hasn't flushed to the mirror yet).
+			browsableTypesRef.current = nextSet;
+			setBrowsableTypes(nextSet);
+			loadFromVaultRef.current();
+		})();
+	}, []);
+
 	const loadFromVault = useCallback(() => {
 		const runtime = window.brainstorm;
 		const svc = runtime?.services?.vaultEntities;
@@ -1022,19 +1091,25 @@ export function useFilesStore() {
 		void (async () => {
 			try {
 				const snapshot = await list.call(svc);
+				const entities = snapshot.entities ?? [];
+				// Resolve any new types first (before the early-return) so a freshly
+				// appeared openable type gets a follow-up rebuild even when the
+				// browsable slice is otherwise unchanged this pass.
+				resolveOpeners(entities);
+				const browsable = browsableTypesRef.current;
 				const isInitial = !loadedOnceRef.current;
-				const fingerprint = fingerprintFilesSnapshot(snapshot.entities ?? [], snapshot.links ?? []);
+				const fingerprint = fingerprintFilesSnapshot(entities, snapshot.links ?? [], browsable);
 				if (!isInitial && fingerprint === lastFingerprintRef.current) return;
 				lastFingerprintRef.current = fingerprint;
 				setVaultLinks(snapshot.links ?? []);
-				setVaultIndex(buildVaultEntityIndex(snapshot.entities ?? []));
+				setVaultIndex(buildVaultEntityIndex(entities));
 				// Derive the per-vault discriminator for the view-options blob
 				// from the root Folder's per-vault `createdAt` (stamped once at
 				// `ensureRootFolder`). Stable for the life of the vault, distinct
 				// across vaults, and never leaves the renderer.
-				const derived = deriveVaultKey(snapshot.entities ?? []);
+				const derived = deriveVaultKey(entities);
 				if (derived) setVaultKey((cur) => (cur === derived ? cur : derived));
-				const tree_ = buildVaultFileTree(snapshot.entities ?? [], ROOT_FOLDER_ID);
+				const tree_ = buildVaultFileTree(entities, ROOT_FOLDER_ID, Date.now(), browsable);
 				if (isInitial) {
 					// One-shot boot diagnostic — confirms vault loaded + tree built
 					// when Files appears empty. `console.warn` (not info) so it
@@ -1045,9 +1120,9 @@ export function useFilesStore() {
 						? (rootRow.properties.members as readonly unknown[]).length
 						: 0;
 					const folderTypes = new Set<string>();
-					for (const e of snapshot.entities ?? []) folderTypes.add(e.type);
+					for (const e of entities) folderTypes.add(e.type);
 					console.warn(
-						`[files] boot: snapshot=${snapshot.entities?.length ?? 0} entities, ` +
+						`[files] boot: snapshot=${entities.length} entities, ` +
 							`tree=${tree_.length} nodes, root.members=${rootMembers}, ` +
 							`types=[${[...folderTypes].slice(0, 8).join(", ")}${folderTypes.size > 8 ? ", …" : ""}]`,
 					);
@@ -1067,7 +1142,7 @@ export function useFilesStore() {
 				console.warn("[files] vaultEntities.list failed; keeping current view", error);
 			}
 		})();
-	}, [tree, revealEntityById, navHist]);
+	}, [tree, revealEntityById, navHist, resolveOpeners]);
 	loadFromVaultRef.current = loadFromVault;
 
 	useEffect(() => {
@@ -1183,6 +1258,12 @@ export function useFilesStore() {
 		focusedId,
 		linksForFocused,
 		vaultIndex,
+		/** Default opener (app id + name) for a non-File/Folder type, or null —
+		 *  the type-identity badge source for iconless typed objects. */
+		openerForType,
+		/** The set of openable non-File/Folder types currently shown. Bumps a
+		 *  render whenever a new type resolves to an opener. */
+		browsableTypes,
 	};
 }
 
@@ -1236,10 +1317,10 @@ export function handleMoveIntent(
  *  unavailable and swallows-and-logs rejection, so the optimistic
  *  in-memory state reverts on the next `vaultEntities.list` refresh.
  *
- *  Capability note: the Files manifest grants `entities.write:brainstorm/
- *  Folder/v1` only, so a write to a File/v1 row fails-closed at the broker
- *  (rejection logged, optimistic state reverts) — the folder path is the
- *  durable one until a File write capability lands. */
+ *  Capability note: the Files manifest grants `entities.write:*` (the
+ *  universal browser manages any object — move/rename/edit-metadata and
+ *  soft-delete-to-Bin work across every browsable type, mirroring the
+ *  cross-type write grant Database / Graph / Notes already hold). */
 async function persistEntityCreate(
 	type: string,
 	properties: Record<string, unknown>,

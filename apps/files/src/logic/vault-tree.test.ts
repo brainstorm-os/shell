@@ -108,15 +108,16 @@ describe("buildVaultFileTree", () => {
 		expect(root?.properties.members).toEqual(["fld_a", "fil_b"]);
 	});
 
-	it("shows only files and folders — notes/tasks/bookmarks/journal are excluded", () => {
-		const foreign = (id: string, type: string): VaultEntityInput => ({
-			id,
-			type,
-			properties: { title: id, name: id },
-			createdAt: 1,
-			updatedAt: 2,
-			deletedAt: null,
-		});
+	const foreign = (id: string, type: string): VaultEntityInput => ({
+		id,
+		type,
+		properties: { title: id, name: id },
+		createdAt: 1,
+		updatedAt: 2,
+		deletedAt: null,
+	});
+
+	it("excludes non-File/Folder types when no browsable set is supplied (legacy projection)", () => {
 		const entities: VaultEntityInput[] = [
 			folder(ROOT_FOLDER_ID, "Vault", ["fld_docs", "note_x"]),
 			folder("fld_docs", "Docs", ["fil_inner", "task_y"]),
@@ -124,18 +125,38 @@ describe("buildVaultFileTree", () => {
 			file("fil_orphan", "orphan.txt"),
 			foreign("note_x", "io.brainstorm.notes/Note/v1"),
 			foreign("task_y", "brainstorm/Task/v1"),
-			foreign("bm_z", "brainstorm/Bookmark/v1"),
-			foreign("journal-2026-06-01", "io.brainstorm.journal/Entry/v1"),
 		];
 		const tree = buildVaultFileTree(entities, ROOT_FOLDER_ID, NOW);
 		const ids = tree.map((e) => e.id);
 		// Only the root + the two folders + the two files survive.
 		expect(ids.sort()).toEqual([ROOT_FOLDER_ID, "fld_docs", "fil_inner", "fil_orphan"].sort());
-		// Foreign-typed member refs are dropped from folder member lists.
 		const root = tree.find((e) => e.id === ROOT_FOLDER_ID);
 		const docs = tree.find((e) => e.id === "fld_docs");
 		expect((root?.properties.members as string[]).includes("note_x")).toBe(false);
 		expect((docs?.properties.members as string[]).includes("task_y")).toBe(false);
 		expect(docs?.properties.members).toEqual(["fil_inner"]);
+	});
+
+	it("surfaces browsable non-file types (members + orphans), still dropping unbrowsable ones", () => {
+		const entities: VaultEntityInput[] = [
+			folder(ROOT_FOLDER_ID, "Vault", ["fld_docs", "note_orphan"]),
+			folder("fld_docs", "Docs", ["fil_inner", "task_y"]),
+			file("fil_inner", "inner.txt"),
+			foreign("note_orphan", "io.brainstorm.notes/Note/v1"),
+			foreign("task_y", "brainstorm/Task/v1"),
+			// An internal view-state row no app opens: never browsable.
+			foreign("calview_1", "brainstorm/CalendarView/v1"),
+		];
+		const browsable = new Set(["io.brainstorm.notes/Note/v1", "brainstorm/Task/v1"]);
+		const tree = buildVaultFileTree(entities, ROOT_FOLDER_ID, NOW, browsable);
+		const ids = tree.map((e) => e.id).sort();
+		// Note + Task survive (as folder member and root orphan); CalendarView does not.
+		expect(ids).toEqual([ROOT_FOLDER_ID, "fld_docs", "fil_inner", "note_orphan", "task_y"].sort());
+		const root = tree.find((e) => e.id === ROOT_FOLDER_ID);
+		const docs = tree.find((e) => e.id === "fld_docs");
+		// The browsable task is kept inside its folder; the orphan note surfaces at root.
+		expect(docs?.properties.members).toEqual(["fil_inner", "task_y"]);
+		expect((root?.properties.members as string[]).includes("note_orphan")).toBe(true);
+		expect((root?.properties.members as string[]).includes("calview_1")).toBe(false);
 	});
 });
