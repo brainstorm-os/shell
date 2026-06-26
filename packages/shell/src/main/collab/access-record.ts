@@ -275,6 +275,28 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 	return out;
 }
 
+/** Collapse the per-entry audit log to ONE row per member — the member's CURRENT
+ *  status. `resolveMembers` returns one row per append (the full grant/revoke
+ *  audit history), so a member who was revoked then re-granted appears twice; a
+ *  consumer doing `find(member)` on that raw list hits the stale revoked row
+ *  first and concludes the member is inactive (F-287). This view keeps one row:
+ *  an active grant wins; absent one, the latest-granted (by `addedAt`) entry
+ *  represents the member. First-seen member order is preserved. Use this for
+ *  "who are the members now"; use `resolveMembers` for the audit trail. */
+export function resolveCurrentMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
+	const byMember = new Map<string, ResolvedMember>();
+	for (const m of resolveMembers(doc, entityId)) {
+		const prev = byMember.get(m.member);
+		if (!prev) {
+			byMember.set(m.member, m);
+			continue;
+		}
+		const preferNew = m.active !== prev.active ? m.active : m.addedAt > prev.addedAt;
+		if (preferNew) byMember.set(m.member, m);
+	}
+	return [...byMember.values()];
+}
+
 /** Currently-active members (valid grant, not validly revoked). */
 export function activeMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 	return resolveMembers(doc, entityId).filter((m) => m.active);

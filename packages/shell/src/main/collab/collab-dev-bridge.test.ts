@@ -196,4 +196,34 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 		expect(await bridgeMarcus.readText(A)).toContain("[a live]");
 		expect(await bridgeMarcus.readText(B)).toContain("[b live]");
 	});
+
+	it("re-granting a revoked member reactivates them in the access view (F-287)", async () => {
+		await bridgeMira.provisionEntity(ENTITY_ID, ENTITY_TYPE);
+		await bridgeMarcus.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
+		await bridgeMira.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
+		const marcusB64 = bridgeMarcus.whoami().userPubB64;
+
+		await bridgeMira.share({
+			entityId: ENTITY_ID,
+			type: ENTITY_TYPE,
+			invite: bridgeMarcus.createInvite("Marcus"),
+			role: AccessRole.Editor,
+		});
+		expect(await bridgeMira.revoke(ENTITY_ID, marcusB64)).toBe(true);
+		const revokedView = await bridgeMira.access(ENTITY_ID);
+		expect(revokedView.find((m) => m.member === marcusB64)?.active).toBe(false);
+
+		// Re-grant with a fresh invite. The access VIEW must show one CURRENT row
+		// for Marcus, active again — not the stale revoked row first (F-287: the
+		// raw audit list returned two rows, and find() hit the revoked one).
+		const reView = await bridgeMira.share({
+			entityId: ENTITY_ID,
+			type: ENTITY_TYPE,
+			invite: bridgeMarcus.createInvite("Marcus"),
+			role: AccessRole.Editor,
+		});
+		const marcusRows = reView.filter((m) => m.member === marcusB64);
+		expect(marcusRows.length, "one current row per member").toBe(1);
+		expect(marcusRows[0]?.active, "re-grant reactivates the member").toBe(true);
+	});
 });

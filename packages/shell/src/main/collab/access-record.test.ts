@@ -14,6 +14,7 @@ import {
 	getAccessArray,
 	grantAccess,
 	isActiveMember,
+	resolveCurrentMembers,
 	resolveMembers,
 	revokeAccess,
 	roleOf,
@@ -134,6 +135,13 @@ describe("access-record (Collab C1)", () => {
 		expect(resolveMembers(doc, ENT)).toHaveLength(2); // both the revoked + the new
 		expect(activeMembers(doc, ENT)).toHaveLength(1);
 		expect(roleOf(doc, ENT, marcus.pub)).toBe(AccessRole.Editor);
+		// The CURRENT-members view collapses to one row per member (F-287): the
+		// live re-grant, not the stale revoked row a raw find(member) would hit.
+		const current = resolveCurrentMembers(doc, ENT);
+		expect(current).toHaveLength(1);
+		expect(firstMember(current).member).toBe(marcus.pub);
+		expect(firstMember(current).active).toBe(true);
+		expect(firstMember(current).role).toBe(AccessRole.Editor);
 	});
 
 	it("rejects a tampered role (grant signature no longer verifies)", () => {

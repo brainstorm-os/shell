@@ -31,7 +31,7 @@ import {
 	AccessRole,
 	type ResolvedMember,
 	grantAccess,
-	resolveMembers,
+	resolveCurrentMembers,
 	revokeAccess,
 } from "./access-record";
 import { inboxChannelFor } from "./inbox-channel";
@@ -216,7 +216,9 @@ export class SharingEngine {
 	async access(entityId: string): Promise<CollabAccessView[]> {
 		const { doc } = await this.#session.ydocStore.load(entityId);
 		try {
-			return resolveMembers(doc, entityId).map(toAccessView);
+			// One CURRENT row per member (re-grant-after-revoke wins) — not the raw
+			// per-append audit list, which would surface a stale revoked row (F-287).
+			return resolveCurrentMembers(doc, entityId).map(toAccessView);
 		} finally {
 			doc.destroy();
 		}
