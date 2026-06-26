@@ -64,6 +64,10 @@ let sourceDir: string;
 let stores: DataStores;
 let yStore: YDocStore;
 let dashboardStore: DashboardStore;
+/** Every dashboard store opened during a test — drained + closed in afterEach
+ *  before the vault dir is removed, so a pending debounced ydoc persist can't
+ *  fire after teardown (unhandled ENOENT on dashboard-rebuilt.ydoc). */
+const openDashStores: DashboardStore[] = [];
 let sends: Array<{ channel: string; payload: EnrichedDashboardSnapshot }>;
 let dashboardWindow: BrowserWindow;
 
@@ -89,6 +93,7 @@ beforeEach(async () => {
 	stores = new DataStores(vaultDir);
 	yStore = new YDocStore(vaultDir);
 	dashboardStore = await DashboardStore.open(yStore);
+	openDashStores.push(dashboardStore);
 	activeSession = makeSession(dashboardStore);
 
 	const registry = await stores.open("registry");
@@ -120,6 +125,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	for (const ds of openDashStores) {
+		await ds.flush().catch(() => undefined);
+		await ds.close().catch(() => undefined);
+	}
+	openDashStores.length = 0;
 	stores.close();
 	await rm(vaultDir, { recursive: true, force: true });
 	await rm(sourceDir, { recursive: true, force: true });
@@ -166,6 +176,7 @@ describe("apps:uninstall × dashboard snapshot push", () => {
 		// never re-fetched against. The app icon (and a marker icon proving
 		// which store a push reflects) live only in the new store.
 		const rebuiltStore = await DashboardStore.open(yStore, { docId: "dashboard-rebuilt" });
+		openDashStores.push(rebuiltStore);
 		rebuiltStore.upsertIcon("icon-notes", {
 			x: 0,
 			y: 0,
