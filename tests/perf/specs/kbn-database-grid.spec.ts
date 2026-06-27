@@ -48,10 +48,13 @@ async function openSeededDashboard(page: Page, userDataDir: string): Promise<voi
 	);
 	await page.reload();
 	await waitForDashboard(page);
+	// `seedPrebuiltApps` installs the already-built bundles WITHOUT a per-app
+	// vite rebuild; `seedDemoApps` rebuilds all 11 apps, which blows the per-test
+	// budget and hangs setup (the e2e job already runs `e2e:build`).
 	await page.evaluate(async () => {
 		await (
-			window as unknown as { brainstorm: { dev: { seedDemoApps: () => Promise<unknown> } } }
-		).brainstorm.dev.seedDemoApps();
+			window as unknown as { brainstorm: { dev: { seedPrebuiltApps: () => Promise<unknown> } } }
+		).brainstorm.dev.seedPrebuiltApps();
 	});
 }
 
