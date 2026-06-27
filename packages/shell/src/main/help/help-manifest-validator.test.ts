@@ -12,8 +12,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "..", "..", "..", "..", "..");
-const MANIFEST_PATH = join(ROOT, "docs", "help-manifest.json");
 const CONTENT_DIR = join(ROOT, "packages", "shell", "help-content");
+// The manifest is vendored alongside the help content (so a standalone shell
+// checkout / CI builds without the harness `docs/`); fall back to the legacy
+// `docs/` location for a harness-based checkout.
+const MANIFEST_PATH = [
+	join(CONTENT_DIR, "help-manifest.json"),
+	join(ROOT, "docs", "help-manifest.json"),
+].find((p) => existsSync(p)) as string;
 
 type ManifestSection = {
 	id: string;

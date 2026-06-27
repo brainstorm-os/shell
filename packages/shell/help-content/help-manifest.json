@@ -1,0 +1,115 @@
+{
+  "format": "brainstorm/help-manifest/v1",
+  "sections": [
+    {
+      "id": "getting-started",
+      "titleKey": "shell.help.section.gettingStarted",
+      "kind": "getting-started",
+      "files": [
+        "getting-started/welcome.md",
+        "getting-started/first-vault.md",
+        "getting-started/dashboard-tour.md",
+        "getting-started/install-an-app.md"
+      ]
+    },
+    {
+      "id": "concepts",
+      "titleKey": "shell.help.section.concepts",
+      "kind": "guide",
+      "files": [
+        "concepts/vaults.md",
+        "concepts/apps.md",
+        "concepts/entities.md",
+        "concepts/links-and-mentions.md",
+        "concepts/collections.md",
+        "concepts/properties.md",
+        "concepts/search.md",
+        "concepts/pinning.md",
+        "concepts/sync-across-devices.md",
+        "concepts/themes.md"
+      ]
+    },
+    {
+      "id": "app-notes",
+      "titleKey": "shell.help.section.app.notes",
+      "kind": "app",
+      "appId": "io.brainstorm.notes",
+      "files": ["apps/notes.md"]
+    },
+    {
+      "id": "app-tasks",
+      "titleKey": "shell.help.section.app.tasks",
+      "kind": "app",
+      "appId": "io.brainstorm.tasks",
+      "files": ["apps/tasks.md"]
+    },
+    {
+      "id": "app-files",
+      "titleKey": "shell.help.section.app.files",
+      "kind": "app",
+      "appId": "io.brainstorm.files",
+      "files": ["apps/files.md"]
+    },
+    {
+      "id": "app-calendar",
+      "titleKey": "shell.help.section.app.calendar",
+      "kind": "app",
+      "appId": "io.brainstorm.calendar",
+      "files": ["apps/calendar.md"]
+    },
+    {
+      "id": "app-journal",
+      "titleKey": "shell.help.section.app.journal",
+      "kind": "app",
+      "appId": "io.brainstorm.journal",
+      "files": ["apps/journal.md"]
+    },
+    {
+      "id": "app-database",
+      "titleKey": "shell.help.section.app.database",
+      "kind": "app",
+      "appId": "io.brainstorm.database",
+      "files": ["apps/database.md"]
+    },
+    {
+      "id": "app-graph",
+      "titleKey": "shell.help.section.app.graph",
+      "kind": "app",
+      "appId": "io.brainstorm.graph",
+      "files": ["apps/graph.md"]
+    },
+    {
+      "id": "app-whiteboard",
+      "titleKey": "shell.help.section.app.whiteboard",
+      "kind": "app",
+      "appId": "io.brainstorm.whiteboard",
+      "files": ["apps/whiteboard.md"]
+    },
+    {
+      "id": "app-bookmarks",
+      "titleKey": "shell.help.section.app.bookmarks",
+      "kind": "app",
+      "appId": "io.brainstorm.bookmarks",
+      "files": ["apps/bookmarks.md"]
+    },
+    {
+      "id": "app-code-editor",
+      "titleKey": "shell.help.section.app.codeEditor",
+      "kind": "app",
+      "appId": "io.brainstorm.code-editor",
+      "files": ["apps/code-editor.md"]
+    },
+    {
+      "id": "customising",
+      "titleKey": "shell.help.section.customising",
+      "kind": "guide",
+      "files": ["keyboard.md"]
+    },
+    {
+      "id": "privacy",
+      "titleKey": "shell.help.section.privacy",
+      "kind": "guide",
+      "files": ["privacy-and-security.md"]
+    }
+  ]
+}
