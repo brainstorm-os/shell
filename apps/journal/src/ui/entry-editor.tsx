@@ -80,6 +80,9 @@ export type JournalEntryEditorProps = {
 	/** The journal note's stable entity id (e.g. `journal-2026-05-14`).
 	 *  Resolved through the shell-installed YDocResolver. */
 	noteId: string;
+	/** When `false`, the entry is locked (read-only) — the contenteditable
+	 *  rejects edits. Defaults to editable. */
+	editable?: boolean;
 	/** Raw `entity.properties.body` from the projection. When present
 	 *  AND shaped like a Lexical `SerializedEditorState`, used to seed
 	 *  the Y.Doc on first open via `CollaborationPlugin`'s
@@ -183,6 +186,7 @@ function stripNotesOnlyNodes(value: SerializedEditorState): SerializedEditorStat
 
 export function JournalEntryEditor({
 	noteId,
+	editable,
 	seedBody,
 	onDenormalize,
 	onCommentSelection,
@@ -264,6 +268,7 @@ export function JournalEntryEditor({
 		<BrainstormEditor
 			doc={doc}
 			docId={noteId}
+			editable={editable ?? true}
 			namespace="journal"
 			theme={richTextTheme}
 			contentClassName="notes__contenteditable journal__entry-editor"

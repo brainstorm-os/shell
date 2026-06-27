@@ -35,6 +35,8 @@ import type { JournalCommentHooks, JournalDenormalizeFn } from "../entry-editor-
 export type EntryEditorIslandProps = {
 	resolver: YDocResolver;
 	noteId: string;
+	/** When `false`, the entry is locked (read-only). Defaults to editable. */
+	editable?: boolean;
 	seedBody?: unknown;
 	onDenormalize?: JournalDenormalizeFn;
 	comments?: JournalCommentHooks;
@@ -43,6 +45,7 @@ export type EntryEditorIslandProps = {
 export function EntryEditorIsland({
 	resolver,
 	noteId,
+	editable,
 	seedBody,
 	onDenormalize,
 	comments,
@@ -59,6 +62,7 @@ export function EntryEditorIsland({
 				<JournalEntryEditor
 					key={noteId}
 					noteId={noteId}
+					editable={editable ?? true}
 					seedBody={seedBody}
 					onRecoverBlank={onRecoverBlank}
 					onRecoverReset={onRecoverReset}

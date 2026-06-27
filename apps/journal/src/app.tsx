@@ -37,6 +37,7 @@ import {
 	createFindController,
 } from "@brainstorm/sdk/find-replace";
 import { Icon as Glyph, IconName } from "@brainstorm/sdk/icon";
+import { LockButton } from "@brainstorm/sdk/lock-button";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
 import {
@@ -839,6 +840,16 @@ export function JournalApp(): ReactElement {
 	}, []);
 
 	const focusEntryNoteId = focusEntry?.noteId ?? null;
+	// Read-only lock — a synced `locked` property on the entry, same model as
+	// Notes. Read from the live vault so it reflects edits from any device.
+	const focusEntryLocked = focusEntryNoteId
+		? vault.entities.some((e) => e.id === focusEntryNoteId && e.properties.locked === true)
+		: false;
+	const toggleFocusEntryLock = useCallback(() => {
+		if (!focusEntryNoteId) return;
+		const entities = getJournalRuntime()?.services?.entities;
+		void entities?.update?.call(entities, focusEntryNoteId, { locked: !focusEntryLocked });
+	}, [focusEntryNoteId, focusEntryLocked]);
 	const commentHooks = useMemo<JournalCommentHooks>(
 		() => ({
 			onSelection(anchor) {
@@ -1132,6 +1143,14 @@ export function JournalApp(): ReactElement {
 					>
 						<Glyph name={IconName.Search} size={18} />
 					</button>
+					{focusEntryNoteId && (
+						<LockButton
+							locked={focusEntryLocked}
+							onToggle={toggleFocusEntryLock}
+							lockLabel={t("header.lock")}
+							unlockLabel={t("header.unlock")}
+						/>
+					)}
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={navOpen}
@@ -1821,6 +1840,8 @@ function EntryBody({
 
 	const outgoing = snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
 	const backlinks = snapshot ? findBacklinks(snapshot, entry.noteId) : [];
+	const entryLocked =
+		snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false;
 
 	return (
 		<div className="journal__entry-body">
@@ -1829,6 +1850,7 @@ function EntryBody({
 					<EntryEditorIsland
 						resolver={resolver.resolve}
 						noteId={entry.noteId}
+						editable={mutable && !entryLocked}
 						seedBody={seedBody}
 						onDenormalize={journalDenormalize}
 						comments={commentHooks}

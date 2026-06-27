@@ -27,6 +27,7 @@ import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellchec
 import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import type { InitialEditorStateType } from "@lexical/react/LexicalComposer";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
@@ -34,7 +35,7 @@ import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import type { Provider } from "@lexical/yjs";
 import type { Klass, LexicalNode } from "lexical";
-import { type MutableRefObject, type ReactNode, useCallback, useMemo } from "react";
+import { type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo } from "react";
 import type { Doc } from "yjs";
 import { type BrainstormEditorConfigOptions, createEditorConfig } from "./config";
 import { EditorI18nProvider, type EditorManifest } from "./i18n";
@@ -181,8 +182,24 @@ export function BrainstormEditor(props: BrainstormEditorProps): ReactNode {
 				<ListPlugin />
 				<LinkPlugin />
 				<VirtualizePlugin />
+				<EditableSync editable={editable} />
 				{children}
 			</LexicalComposer>
 		</EditorI18nProvider>
 	);
+}
+
+/**
+ * Reactively applies the `editable` prop after mount. `initialConfig.editable`
+ * only seeds the FIRST render — Lexical never re-reads it — so without this a
+ * lock/unlock toggle (e.g. a read-only object lock) wouldn't flip the live
+ * contenteditable. `undefined` means "leave editable" (the default).
+ */
+function EditableSync({ editable }: { editable: boolean | undefined }): null {
+	const [editor] = useLexicalComposerContext();
+	useEffect(() => {
+		if (editable === undefined) return;
+		editor.setEditable(editable);
+	}, [editor, editable]);
+	return null;
 }

@@ -90,6 +90,8 @@ export type JournalI18nKey =
 	| "search.empty"
 	| "search.filterMood"
 	| "search.filterHabits"
+	| "header.lock"
+	| "header.unlock"
 	| "moreActions"
 	| "iconPicker"
 	| "sidebar.show"
@@ -184,6 +186,8 @@ export const JOURNAL_I18N: JournalManifest = Object.freeze({
 	"search.empty": "No matching entries.",
 	"search.filterMood": "Mood",
 	"search.filterHabits": "Habits",
+	"header.lock": "Lock entry (read-only)",
+	"header.unlock": "Unlock entry",
 	moreActions: "More actions",
 	iconPicker: "Change icon",
 	"sidebar.show": "Show calendar",
