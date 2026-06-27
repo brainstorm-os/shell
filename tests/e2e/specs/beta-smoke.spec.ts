@@ -131,13 +131,13 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 				// `setAppearanceMode` resolves when the main process accepts it;
 				// the renderer repaint arrives on the snapshot push. Anchor each
 				// read on the pushed `data-theme` flip (fresh vault = Midnight in
-				// dark, the default light theme in light — same contract as
+				// dark, Rose in light — same contract as
 				// new-vault-onboarding.spec.ts).
 				await setMode("dark");
 				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("midnight");
 				const dark = await readBg();
 				await setMode("light");
-				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("default-light");
+				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("rose");
 				const light = await readBg();
 				expect(dark, "dark and light backgrounds differ").not.toBe(light);
 			});
