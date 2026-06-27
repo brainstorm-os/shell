@@ -145,7 +145,9 @@ describe("entities service handler", () => {
 	});
 	afterEach(async () => {
 		e.stores.close();
-		await rm(e.vaultDir, { recursive: true, force: true });
+		await rm(e.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("create stamps createdBy = calling app and persists", async () => {
@@ -333,7 +335,9 @@ describe("entities service handler", () => {
 			ro.handler(env("io.x", "create", { type: "io.x/Note/v1", properties: {} })),
 		).rejects.toMatchObject({ name: "Denied" });
 		ro.stores.close();
-		await rm(ro.vaultDir, { recursive: true, force: true });
+		await rm(ro.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("get silently filters a type the app cannot read", async () => {
@@ -680,7 +684,9 @@ describe("entities service — Y.Doc → entities.db projection", () => {
 	});
 	afterEach(async () => {
 		h.stores.close();
-		await rm(h.vaultDir, { recursive: true, force: true });
+		await rm(h.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	// An editor edits the entity's CURRENT doc state, then ships the diff —
@@ -839,7 +845,9 @@ describe("entities service — live-sync hooks (10.12)", () => {
 	});
 	afterEach(async () => {
 		e.stores.close();
-		await rm(e.vaultDir, { recursive: true, force: true });
+		await rm(e.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("loadDoc fires onDocOpened with the entity id + type", async () => {

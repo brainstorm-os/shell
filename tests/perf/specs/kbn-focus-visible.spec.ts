@@ -73,12 +73,19 @@ test.describe("KBN-P-focus-visible — pointer vs keyboard modality contract", (
 				);
 				console.log(`[kbn] focus-visible step 2 (Tab): :focus-visible = ${fv2}`);
 
-				// Step 3: real pointer click on a settings sidebar option —
-				// back to pointer modality, no ring.
-				const navOption = dashboard
-					.locator('[data-testid="settings"] nav.settings__nav [data-composite-index]')
-					.first();
-				await navOption.click();
+				// Step 3: real pointer click on a NATIVE button — a theme swatch in
+				// Appearance — back to pointer modality, no ring. (A composite sidebar
+				// OPTION can't prove this: the composite moves focus PROGRAMMATICALLY,
+				// and Chromium keeps :focus-visible across a programmatic focus when
+				// the prior element had it. A native <button> gets native click-focus
+				// → pointer modality → no ring.)
+				await dashboard
+					.locator('[data-testid="settings"] nav.settings__nav')
+					.getByText("Appearance", { exact: true })
+					.click();
+				const swatch = dashboard.locator('[data-testid="settings"] [data-theme-id]').first();
+				await swatch.waitFor({ state: "visible", timeout: 10_000 });
+				await swatch.click();
 				await raf();
 				const fv3 = await isFocusVisible(dashboard);
 				expect(fv3, "Step 3: pointer-driven focus must NOT set :focus-visible (no ring)").toBe(false);

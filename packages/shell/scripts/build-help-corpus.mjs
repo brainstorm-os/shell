@@ -28,8 +28,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("../../..", import.meta.url).pathname;
+// `new URL(...).pathname` yields a leading-slash drive form on Windows
+// (`/D:/…`) that `path.join` then mangles into a doubled drive (`D:\D:\…`);
+// `fileURLToPath` decodes to the correct native path on every platform.
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const CONTENT_DIR = join(ROOT, "packages/shell/help-content");
 // The Help corpus is built entirely from sources VENDORED into the shell repo
 // (`help-content/`), so a public/standalone shell checkout — and CI — builds
