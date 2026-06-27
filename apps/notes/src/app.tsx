@@ -31,6 +31,7 @@ import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-pick
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon as IconGlyph, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
+import { LockButton } from "@brainstorm/sdk/lock-button";
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
 import { type NoteReference, extractNoteReferences } from "@brainstorm/sdk/note-references";
 import {
@@ -807,16 +808,12 @@ export function NotesApp() {
 						<PlusIcon />
 					</button>
 					{note && (
-						<button
-							type="button"
-							className="header-icon-btn"
-							aria-pressed={locked}
-							onClick={toggleLock}
-							aria-label={locked ? t("notes.header.unlock") : t("notes.header.lock")}
-							data-bs-tooltip={locked ? t("notes.header.unlock") : t("notes.header.lock")}
-						>
-							<IconGlyph name={IconName.Lock} />
-						</button>
+						<LockButton
+							locked={locked}
+							onToggle={toggleLock}
+							lockLabel={t("notes.header.lock")}
+							unlockLabel={t("notes.header.unlock")}
+						/>
 					)}
 					<PanelToggleButton
 						side={PanelSide.Left}

@@ -99,6 +99,7 @@
     "./coming-soon": "./src/coming-soon/index.ts",
     "./empty-state": "./src/empty-state/index.ts",
     "./empty-state.css": "./src/empty-state/empty-state.css",
+    "./lock-button": "./src/lock-button/index.ts",
     "./app-theme.css": "./src/app-theme.css",
     "./coming-soon/coming-soon.css": "./src/coming-soon/coming-soon.css",
     "./searchbar/searchbar.css": "./src/searchbar/searchbar.css",
