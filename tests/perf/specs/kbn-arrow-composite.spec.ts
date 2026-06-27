@@ -30,7 +30,17 @@ import {
 import { launchShell } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
-const ACTIVE_INDEX = () => document.activeElement?.getAttribute("data-composite-index") ?? null;
+// The composite controls the list via `aria-activedescendant`: focus stays on
+// the container, and the active option is the one whose `id` matches the
+// container's `aria-activedescendant` (it carries `data-composite-index`). Fall
+// back to the focused element itself for a roving-tabindex composite.
+const ACTIVE_INDEX = () => {
+	const active = document.activeElement;
+	const option = active?.hasAttribute("data-composite-index")
+		? active
+		: document.getElementById(active?.getAttribute("aria-activedescendant") ?? "");
+	return option?.getAttribute("data-composite-index") ?? null;
+};
 
 test.describe("KBN-P-arrow-composite — arrow navigation inside composites", () => {
 	test("settings sidebar arrow navigation", async () => {
@@ -56,6 +66,11 @@ test.describe("KBN-P-arrow-composite — arrow navigation inside composites", ()
 				// short timeout so a contract miss fails fast, never hangs to the
 				// test timeout.
 				await listbox.focus({ timeout: 15_000 });
+				// Engage the roving cursor: focusing the container alone doesn't move
+				// into the list while the cursor is already at 0 (Home would be a
+				// no-op), so ArrowDown roves focus onto an option first; Home then
+				// anchors deterministically back at the first.
+				await win.keyboard.press("ArrowDown");
 				await win.keyboard.press("Home");
 				const atHome = await win.evaluate(ACTIVE_INDEX);
 				expect(atHome, "Home lands on the first option").toBe("0");
@@ -64,7 +79,10 @@ test.describe("KBN-P-arrow-composite — arrow navigation inside composites", ()
 				// focus arrived via keyboard so :focus-visible is true.
 				await win.keyboard.press("ArrowDown");
 				const afterDown = await win.evaluate(() => {
-					const el = document.activeElement as HTMLElement | null;
+					const active = document.activeElement;
+					const el = active?.hasAttribute("data-composite-index")
+						? active
+						: document.getElementById(active?.getAttribute("aria-activedescendant") ?? "");
 					return {
 						index: el?.getAttribute("data-composite-index") ?? null,
 						selected: el?.getAttribute("aria-selected") ?? null,
