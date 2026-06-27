@@ -117,8 +117,12 @@ describe("BP block-bundle loader (install → serve) — 9.5.x", () => {
 
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("the real installer persists the app-contributed bundle into registry.db", () => {

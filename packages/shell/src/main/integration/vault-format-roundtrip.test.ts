@@ -36,7 +36,9 @@ describe("vault format 10.8 — integration roundtrip", () => {
 	});
 
 	afterEach(async () => {
-		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	async function freshShell(): Promise<{

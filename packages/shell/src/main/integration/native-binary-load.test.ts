@@ -40,7 +40,13 @@ describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
 	});
 
 	afterEach(() => {
-		rmSync(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		// Best-effort: the test require()s the staged .node, and Windows locks a
+		// loaded native addon's file — a leaked temp dir the OS reaps is fine.
+		try {
+			rmSync(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		} catch {
+			// swallow Windows EBUSY on the still-mapped binary.
+		}
 		if (savedEnv === undefined) {
 			// biome-ignore lint/performance/noDelete: same reason as above
 			delete process.env.NAPI_RS_NATIVE_LIBRARY_PATH;

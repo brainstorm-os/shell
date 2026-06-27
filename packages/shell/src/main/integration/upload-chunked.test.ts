@@ -88,8 +88,12 @@ describe("chunked upload through the real broker", () => {
 	afterEach(async () => {
 		await _resetStorageWorker();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	describe("with storage.kv granted", () => {

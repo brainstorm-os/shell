@@ -54,7 +54,9 @@ describe("EntitiesRepository — listMissingDekIds + stampDekId", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("listMissingDekIds returns [] on an empty vault", () => {
@@ -120,7 +122,9 @@ describe("retroWrapNullDeks", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("empty vault → wrapped 0 / skipped 0, idempotent", async () => {

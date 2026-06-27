@@ -148,8 +148,12 @@ describe("BP Graph through the real broker + entities pipeline", () => {
 
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("createEntity for a granted type round-trips through the real ledger + entities-service", async () => {
@@ -276,8 +280,12 @@ describe("BP Hook through the real broker (router is wired, overlay is OQ-BP-5)"
 
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("destroy (`node: null` + hookId) returns OK idempotently", async () => {

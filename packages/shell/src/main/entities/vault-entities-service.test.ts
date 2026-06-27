@@ -359,7 +359,9 @@ describe("vault-entities-service — temp vault lifecycle (smoke)", () => {
 		vaultPath = await mkdtemp(join(tmpdir(), "vault-entities-"));
 	});
 	afterEach(async () => {
-		await rm(vaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(vaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("no repo + a real vault path → empty snapshot (kv is no longer scanned)", async () => {

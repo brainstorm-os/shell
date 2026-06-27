@@ -222,7 +222,9 @@ describe("Connectors pipeline — fire → sync → real Tasks → persisted Syn
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("a scheduled SyncMapping fire projects issues into Task/v1 + persists a SyncRun", async () => {

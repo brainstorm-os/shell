@@ -63,7 +63,9 @@ describe("IE-1 .bsbundle round-trip", () => {
 		// Close any session a (possibly-throwing) test left open before removing
 		// its dir — an open SQLite handle locks the file on Windows.
 		closeActiveVaultSession();
-		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("export → import-as-new-vault → re-export is byte-equivalent", async () => {
@@ -376,7 +378,9 @@ describe("IE-1 .bsbundle round-trip", () => {
 				/unsafe (entity|asset) id/,
 			);
 			closeActiveVaultSession();
-			await rm(targetPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+			await rm(targetPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+				() => {},
+			);
 		}
 	});
 });

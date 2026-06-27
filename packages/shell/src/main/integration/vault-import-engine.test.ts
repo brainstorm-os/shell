@@ -41,7 +41,9 @@ describe("IE-2 import engine (vault)", () => {
 		// Close any session a (possibly-throwing) test left open before removing
 		// its dir — an open SQLite handle locks the file on Windows.
 		closeActiveVaultSession();
-		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
 	});
 
 	it("imports JSON rows then re-imports idempotently (update, not duplicate)", async () => {
