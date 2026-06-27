@@ -103,7 +103,7 @@ describe("entities service — post-commit change hook", () => {
 
 	afterEach(async () => {
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("emits Create/Update/Delete with identifiers only, post-commit", async () => {
