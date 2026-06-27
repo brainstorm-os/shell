@@ -96,6 +96,35 @@ export function sealBytes(key: Uint8Array, plaintext: Uint8Array, aad?: Uint8Arr
 }
 
 /**
+ * Like {@link sealBytes} but with a CALLER-SUPPLIED nonce, returning the same
+ * `nonce(24) || ciphertext` framing so {@link openBytes} reads it unchanged.
+ *
+ * For deterministic content-addressed sealing (the asset-chunk transport): the
+ * nonce is derived from the chunk's content so the same chunk re-seals to the
+ * same ciphertext → a stable CAS address, which is what makes resume +
+ * skip-already-present work. ⚠️ The caller MUST guarantee a `(key, nonce)` pair
+ * is never reused with DIFFERENT plaintext — deriving the nonce from the
+ * plaintext (a synthetic IV) ensures this; reuse across distinct plaintext
+ * breaks XChaCha20-Poly1305's confidentiality + integrity.
+ */
+export function sealBytesWithNonce(
+	key: Uint8Array,
+	nonce: Uint8Array,
+	plaintext: Uint8Array,
+	aad?: Uint8Array,
+): Uint8Array {
+	assertKey(key);
+	if (!(nonce instanceof Uint8Array) || nonce.length !== XCHACHA_NONCE_BYTES) {
+		throw new Error(`sealBytesWithNonce: nonce must be ${XCHACHA_NONCE_BYTES} bytes`);
+	}
+	const ciphertext = xchacha20Poly1305Seal(key, nonce, plaintext, aad ?? EMPTY_AAD);
+	const out = new Uint8Array(nonce.length + ciphertext.length);
+	out.set(nonce, 0);
+	out.set(ciphertext, nonce.length);
+	return out;
+}
+
+/**
  * Decrypt a `sealBytes` blob (`nonce(24) || ciphertext`). Throws on a blob
  * too short to carry a nonce, a wrong key, a wrong `aad`, or a tampered
  * ciphertext (Poly1305 tag mismatch).
