@@ -727,6 +727,16 @@
 	transition: background var(--motion-duration-fast) ease, color var(--motion-duration-fast) ease;
 }
 
+/* Icons render at 20×20, `display:block` so the inline SVG carries no
+ * text-baseline descender gap — without it the glyph sits high in the button
+ * (the off-center artifact). The icon components' intrinsic 16px is overridden
+ * here so this size is scoped to the inline toolbar, not the shared catalogue. */
+.notes__inline-toolbar-btn svg {
+	display: block;
+	width: 20px;
+	height: 20px;
+}
+
 /* Exclude --primary (shell-injected gloss face) so this generic background
  * doesn't clobber it on hover/focus and leave the orphaned glow; --active /
  * --destructive paint their own hover below. */
@@ -1888,9 +1898,10 @@ body.bs-table-col-resizing * {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* Scrim only — no full-viewport backdrop-filter here (it would stack a
+	 * second whole-screen blur pass under the modal's own). See
+	 * `@brainstorm/sdk` dictionary-editor.css for the canonical note. */
 	background: color-mix(in srgb, var(--bg) 55%, transparent);
-	backdrop-filter: blur(2px);
-	-webkit-backdrop-filter: blur(2px);
 }
 
 .notes__dict {

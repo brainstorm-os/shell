@@ -21,9 +21,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* Scrim only — no backdrop-filter on this full-viewport overlay: the 55%
+	 * tint already pushes the dashboard back, and a whole-screen blur here would
+	 * composite as a second backdrop pass stacked under the modal's own
+	 * `.notes__dict` blur (two full re-samples for a 2px effect nobody can see). */
 	background: color-mix(in srgb, var(--bg) 55%, transparent);
-	backdrop-filter: blur(2px);
-	-webkit-backdrop-filter: blur(2px);
 }
 
 .notes__dict {
