@@ -156,8 +156,8 @@ describe("app-data pipeline (real install → ledger → broker → aggregator)"
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("the real installer grants the `entities.read:*` wildcard the apps need", async () => {
@@ -452,8 +452,8 @@ describe("properties pipeline (real install → ledger → broker → Properties
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	async function dispatchList() {
@@ -571,8 +571,8 @@ describe("Y.Doc → entities.db pipeline (real entities service + real ydoc work
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	async function makeService() {

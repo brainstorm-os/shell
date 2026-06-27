@@ -22,7 +22,8 @@ const dbs: SqliteDatabase[] = [];
 
 afterEach(() => {
 	for (const db of dbs.splice(0)) db.close();
-	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+	for (const d of dirs.splice(0))
+		rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 async function freshRepo(): Promise<EntitiesRepository> {

@@ -122,7 +122,7 @@ describe("Automations pipeline — fire → run → real entity → persisted ru
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	function host(over: Partial<Parameters<typeof makeHost>[0]> = {}) {

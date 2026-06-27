@@ -63,7 +63,7 @@ describe("EntityDekStore", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("persist returns a 32-byte DEK + a fresh dekId, persists the wrap row", () => {
