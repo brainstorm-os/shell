@@ -35,8 +35,17 @@ afterEach(() => {
 		}
 		db.close();
 	}
-	for (const d of dirs.splice(0))
-		rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	for (const d of dirs.splice(0)) {
+		// Best-effort: if Windows STILL holds the WAL `-shm` mapping past the
+		// checkpoint + retries above, a leaked test temp dir (the OS reaps `Temp`)
+		// is not a test failure — the seeding assertions have already run. Don't
+		// let teardown throw and turn green logic red on the Windows runner.
+		try {
+			rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		} catch {
+			// swallow EBUSY/EPERM lock-lag; the OS cleans the temp dir later.
+		}
+	}
 });
 
 async function freshRepo(): Promise<EntitiesRepository> {

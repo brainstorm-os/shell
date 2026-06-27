@@ -93,21 +93,28 @@ test("note export — PDF and Markdown land real bytes on disk", async () => {
 				return { size: buf.length, head: buf.subarray(0, 8).toString("latin1") };
 			};
 
-			const pdfPath = join(userDataDir, "note-export-probe.pdf");
-			await test.step("⋯ menu → Export as PDF → bytes on disk", async () => {
-				await armSavePath(pdfPath);
+			// The ⋯ menu now offers a single "Export…" row that opens the shared
+			// format-picker popover (Markdown / HTML / PDF) + an Export button.
+			const exportVia = async (format: string) => {
 				await notes.locator(".bs-object-menu__more").first().click();
-				await notes.getByText("Export as PDF").click();
+				await notes.getByText("Export…").click();
+				await notes.locator(".bs-export-popover__format").filter({ hasText: format }).click();
+				await notes.locator(".bs-export-popover__btn[data-bs-primary]").click();
+			};
+
+			const pdfPath = join(userDataDir, "note-export-probe.pdf");
+			await test.step("⋯ menu → Export… → PDF → bytes on disk", async () => {
+				await armSavePath(pdfPath);
+				await exportVia("PDF");
 				await expect
 					.poll(() => readSaved(pdfPath), { timeout: 45_000 })
 					.toMatchObject({ head: expect.stringContaining("%PDF-") });
 			});
 
 			const mdPath = join(userDataDir, "note-export-probe.md");
-			await test.step("⋯ menu → Export as Markdown → typed text on disk", async () => {
+			await test.step("⋯ menu → Export… → Markdown → typed text on disk", async () => {
 				await armSavePath(mdPath);
-				await notes.locator(".bs-object-menu__more").first().click();
-				await notes.getByText("Export as Markdown").click();
+				await exportVia("Markdown");
 				await expect.poll(() => readSaved(mdPath), { timeout: 30_000 }).not.toBeNull();
 				expect(readFileSync(mdPath, "utf8")).toContain(TYPED);
 			});

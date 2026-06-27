@@ -3,7 +3,7 @@
  * production-built shell under Electron (no mocks, real `window.brainstorm`):
  *
  *   1. create-vault → the welcome starter content is seeded AND the vault
- *      opens on-brand (Midnight theme, dark mode, the bundled wallpaper).
+ *      opens on-brand (Rose theme, light mode, the bundled wallpaper).
  *   2. welcome UI → the secondary CTAs render as white-gloss buttons (not the
  *      old hardcoded blue), the Join-vault popover shows a single title (no
  *      duplicated header), and the create form surfaces an inline error when
@@ -28,8 +28,9 @@ type Snapshot = {
 
 /** Poll the dashboard snapshot until the fresh-vault defaults have landed.
  *  `seedNewVaultDefaults` runs after the welcome seed in the same vault-open
- *  pass, so a Midnight snapshot also means the starter content is committed. */
-async function waitForMidnightSnapshot(dashboard: Page): Promise<Snapshot> {
+ *  pass, so a Rose snapshot also means the starter content is committed. The
+ *  fresh-vault default is Rose theme in LIGHT mode (Midnight is the dark slot). */
+async function waitForDefaultSnapshot(dashboard: Page): Promise<Snapshot> {
 	return await dashboard.evaluate(async () => {
 		const bs = (
 			window as unknown as {
@@ -39,15 +40,17 @@ async function waitForMidnightSnapshot(dashboard: Page): Promise<Snapshot> {
 		const deadline = Date.now() + 30_000;
 		while (Date.now() < deadline) {
 			const snap = await bs.dashboard.snapshot();
-			if (snap && snap.theme === "midnight") return snap;
+			// A fresh vault is Rose-by-default before the seed runs, so also wait
+			// for the seed to commit light mode — that's the "fully seeded" signal.
+			if (snap && snap.theme === "rose" && snap.appearance.mode === "light") return snap;
 			await new Promise((r) => setTimeout(r, 200));
 		}
 		const last = await bs.dashboard.snapshot();
-		throw new Error(`snapshot never reached midnight; last=${JSON.stringify(last)}`);
+		throw new Error(`snapshot never reached rose/light default; last=${JSON.stringify(last)}`);
 	});
 }
 
-test("new vault seeds welcome content and applies Midnight/dark/wallpaper defaults", async () => {
+test("new vault seeds welcome content and applies Rose/light/wallpaper defaults", async () => {
 	const userDataDir = mkdtempSync(join(tmpdir(), "bs-e2e-newvault-"));
 	try {
 		const { app } = await launchShell({ userDataDir });
@@ -74,12 +77,12 @@ test("new vault seeds welcome content and applies Midnight/dark/wallpaper defaul
 				);
 			});
 
-			await test.step("vault opens on Midnight + dark + bundled wallpaper", async () => {
-				const snap = await waitForMidnightSnapshot(dashboard);
-				expect(snap.theme, "theme is Midnight").toBe("midnight");
-				expect(snap.appearance.mode, "appearance mode is dark").toBe("dark");
+			await test.step("vault opens on Rose + light + bundled wallpaper", async () => {
+				const snap = await waitForDefaultSnapshot(dashboard);
+				expect(snap.theme, "theme is Rose").toBe("rose");
+				expect(snap.appearance.mode, "appearance mode is light").toBe("light");
 				expect(snap.wallpaper.kind, "wallpaper is an image").toBe("image");
-				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain("stormy-sea");
+				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain("rose-peaks");
 			});
 
 			await test.step("welcome starter content is present (searchable)", async () => {
@@ -128,7 +131,7 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 		try {
 			const dashboard = await app.firstWindow({ timeout: 60_000 });
 
-			// Vault A: fresh → Midnight/dark. Wait for the seed to settle BEFORE
+			// Vault A: fresh → Rose/light. Wait for the seed to settle BEFORE
 			// overriding, so the async `seedNewVaultDefaults` can't clobber the
 			// override mid-flight.
 			await dashboard.evaluate(
@@ -144,16 +147,21 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				},
 				{ dir: userDataDir },
 			);
+			// Anchor on the IPC snapshot first: the async seed commits rose/light
+			// there before the renderer repaints `data-theme`, so on a slow runner
+			// the bare attr poll can time out otherwise.
+			await waitForDefaultSnapshot(dashboard);
 			await expect
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
-					timeout: 15_000,
+					timeout: 30_000,
 				})
-				.toBe("midnight");
+				.toBe("rose");
 
-			// Force Alpha to LIGHT so the switch to B is observable on data-theme.
-			// Confirm via the (deterministic) IPC snapshot, then reload so the
-			// renderer settles cleanly on Alpha-light before the switch — keeps
-			// the setup from racing Alpha's still-running vault-open pass.
+			// Force Alpha to DARK so its theme (Midnight) differs from Bravo's fresh
+			// default (Rose) and the switch is observable on data-theme. Confirm via
+			// the (deterministic) IPC snapshot, then reload so the renderer settles
+			// cleanly on Alpha-dark before the switch — keeps the setup from racing
+			// Alpha's still-running vault-open pass.
 			await dashboard.evaluate(async () => {
 				const bs = (
 					window as unknown as {
@@ -165,25 +173,26 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 						};
 					}
 				).brainstorm;
-				await bs.dashboard.setAppearanceMode("light");
+				await bs.dashboard.setAppearanceMode("dark");
 				const deadline = Date.now() + 10_000;
 				while (Date.now() < deadline) {
 					const snap = await bs.dashboard.snapshot();
-					if (snap?.appearance.mode === "light") return;
+					if (snap?.appearance.mode === "dark") return;
 					await new Promise((r) => setTimeout(r, 100));
 				}
-				throw new Error("appearance mode never became light");
+				throw new Error("appearance mode never became dark");
 			});
 			await dashboard.reload();
 			await expect
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
-					timeout: 15_000,
+					timeout: 30_000,
 				})
-				.toBe("default-light");
+				.toBe("midnight");
 
 			// Vault B: a brand-new vault. The active session switches to B; the
 			// dashboard window is NOT remounted, so only the main-side rebind +
-			// push can repaint it. Without the fix this stays "default-light".
+			// push can repaint it. Without the fix this stays "midnight" (Alpha's
+			// forced dark theme).
 			await dashboard.evaluate(
 				async ({ dir }) => {
 					const bs = (
@@ -199,9 +208,9 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 			);
 			await expect
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
-					timeout: 15_000,
+					timeout: 30_000,
 				})
-				.toBe("midnight");
+				.toBe("rose");
 		} finally {
 			await app.close();
 		}
@@ -265,32 +274,41 @@ test("welcome screen: white-gloss CTAs, single-title join popover, duplicate-nam
 				await popover.waitFor({ state: "hidden", timeout: 10_000 });
 			});
 
-			await test.step("create form flags a duplicate vault name inline", async () => {
+			await test.step("create form (step 1) flags a duplicate vault name inline", async () => {
 				await dashboard.getByText("Create a new vault").click();
 				const error = dashboard.locator('[data-testid="welcome-name-error"]');
 				await error.waitFor({ state: "visible", timeout: 10_000 });
-				const createBtn = dashboard.getByRole("button", { name: "Create vault" });
-				await expect(createBtn).toBeDisabled();
+				// The name/location step gates "Continue"; "Create vault" is on step 2.
+				const continueBtn = dashboard.getByRole("button", { name: "Continue" });
+				await expect(continueBtn).toBeDisabled();
 				await dashboard.screenshot({ path: "tests/e2e/results/welcome-name-error.png" });
 
-				// Typing a fresh name clears the error and re-enables Create.
+				// Typing a fresh name clears the error and re-enables Continue.
 				const nameInput = dashboard.locator(".welcome__input").first();
 				await nameInput.fill("Research");
 				await expect(error).toBeHidden();
-				await expect(createBtn).toBeEnabled();
+				await expect(continueBtn).toBeEnabled();
 			});
 
 			await test.step("opting out of starter content creates an empty vault", async () => {
-				// Welcome-1b: unchecking the starter-content checkbox pre-stamps
-				// the seed, so the fresh vault opens with NO welcome-* entities.
-				// The testid sits on the Checkbox's visually-hidden native input
-				// (the painted box covers it) — skip actionability, flip directly.
+				// Advance from the name step (a valid "Research" is in place) to the
+				// starting-point step (step 2), where the starter-content toggle lives.
+				await dashboard.getByRole("button", { name: "Continue" }).click();
+				// Welcome-1b: unchecking the starter-content checkbox pre-stamps the
+				// seed, so the fresh vault opens with NO welcome-* entities. The
+				// native input is visually-hidden and the step transition can leave it
+				// off-viewport for setChecked, so toggle via the visible label.
 				const checkbox = dashboard.locator('[data-testid="welcome-starter-content"]');
 				await checkbox.waitFor({ state: "attached", timeout: 10_000 });
 				await expect(checkbox).toBeChecked();
-				await checkbox.setChecked(false, { force: true });
+				// Step 2's lower content can sit below the short e2e window and won't
+				// scroll into view; drive the toggle + submit via direct DOM clicks,
+				// which fire React's handlers without Playwright's viewport gate.
+				await checkbox.evaluate((el: HTMLInputElement) => el.click());
 				await expect(checkbox).not.toBeChecked();
-				await dashboard.getByRole("button", { name: "Create vault" }).click();
+				await dashboard
+					.getByRole("button", { name: "Create vault" })
+					.evaluate((el: HTMLButtonElement) => el.click());
 
 				// The new vault opens onto the dashboard.
 				await dashboard
