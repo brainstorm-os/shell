@@ -1,0 +1,145 @@
+name: Alpha
+
+# Versioned, unsigned alpha drops for Windows + Linux only. macOS is
+# deliberately excluded: shipping a usable mac build needs an Apple Developer ID
+# + notarisation, which we don't hold yet (an ad-hoc-signed mac app is
+# Gatekeeper-blocked on other machines, so it's not worth publishing). Windows
+# and Linux have no notarisation equivalent — Windows is unsigned (SmartScreen
+# "unknown publisher" warning), Linux AppImage/deb need no signing at all. When
+# the mac certs land, add the two macos-* rows back (mirror nightly.yml) and the
+# real CSC_* env block (mirror release.yml).
+
+on:
+  push:
+    tags:
+      - "v*-alpha*" # e.g. v0.1.0-alpha.1
+
+# Don't cancel an in-flight alpha drop; let each tagged build finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the prerelease for the tag
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      # Windows + Linux only — runner/arch/native columns mirror the non-mac
+      # rows of ci.yml / nightly.yml / release.yml; keep them in sync. As in
+      # nightly, packaging is pinned to the row's single arch (builder-targets,
+      # see the Package step): the shared build config declares
+      # arch:["x64","arm64"] per target, so an unpinned `package:*` would build
+      # BOTH arches on every runner — and the cross-arch half is broken (its
+      # native isn't built on that host). One arch per job keeps the published
+      # binaries correct and collision-free on merge.
+      matrix:
+        include:
+          - os: windows-2022
+            arch: x64
+            runner: windows-2022
+            rust-target: x86_64-pc-windows-msvc
+            napi-script: build:windows-x64
+            builder-platform: "--win"
+            builder-targets: "nsis"
+          - os: windows-11-arm
+            arch: arm64
+            runner: windows-11-arm
+            rust-target: aarch64-pc-windows-msvc
+            napi-script: build:windows-arm64
+            builder-platform: "--win"
+            builder-targets: "nsis"
+          - os: ubuntu-22.04
+            arch: x64
+            runner: ubuntu-22.04
+            rust-target: x86_64-unknown-linux-gnu
+            napi-script: build:linux-x64
+            builder-platform: "--linux"
+            builder-targets: "AppImage deb"
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            runner: ubuntu-22.04-arm
+            rust-target: aarch64-unknown-linux-gnu
+            napi-script: build:linux-arm64
+            builder-platform: "--linux"
+            builder-targets: "AppImage deb"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup-bun-rust
+        with:
+          rust-target: ${{ matrix.rust-target }}
+
+      - name: Build native + apps + shell
+        shell: bash
+        run: |
+          bun run --filter @brainstorm/native ${{ matrix.napi-script }}
+          bun run --filter @brainstorm/shell build
+          bun run build:apps
+
+      - name: Package (unsigned)
+        shell: bash
+        run: |
+          # Pin every target to this row's arch (`<target>:<arch>`); a bare
+          # `--win/--linux` would honour the config's two-arch arrays and build
+          # the other (broken) arch too. CLI `--x64/--arm64` flags are *ignored*
+          # when the config sets per-target arch — only the `target:arch` form
+          # overrides it.
+          spec=""
+          for t in ${{ matrix.builder-targets }}; do
+            spec="$spec $t:${{ matrix.arch }}"
+          done
+          cd packages/shell
+          bunx electron-builder ${{ matrix.builder-platform }} $spec --publish never
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p staged
+          # Only the distributable installer files — not unpacked app dirs or
+          # the auto-update *.yml (no updater wired yet). Each job built a single
+          # arch, so sibling artefacts never collide on merge.
+          find packages/shell/dist -maxdepth 1 -type f \
+            \( -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) \
+            -exec cp {} staged/ \;
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-${{ matrix.os }}-${{ matrix.arch }}
+          path: staged/*
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    name: Publish alpha prerelease
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: alpha-*
+          path: installers
+          merge-multiple: true
+
+      - name: Create alpha prerelease for the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ github.ref_name }}" \
+            --prerelease \
+            --title "Alpha ${{ github.ref_name }}" \
+            --generate-notes \
+            --notes "Unsigned alpha build (Windows + Linux only). Windows is unsigned — expect a SmartScreen \"unknown publisher\" warning. macOS is not built for alpha yet (pending Apple Developer ID + notarisation)." \
+            installers/*
