@@ -157,9 +157,12 @@ jobs:
           # Reset the rolling tag + release so stale platform files don't linger,
           # then recreate it pointing at this run's commit.
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+          # --generate-notes appends a categorised "What's Changed" section
+          # (grouped per .github/release.yml) below the contextual note.
           gh release create nightly \
             --prerelease \
             --target "${{ github.sha }}" \
             --title "Nightly ${stamp}" \
+            --generate-notes \
             --notes "Unsigned automated build from ${{ github.sha }} (${stamp}). macOS is ad-hoc signed; Windows/Linux are unsigned — expect Gatekeeper/SmartScreen warnings." \
             installers/*
