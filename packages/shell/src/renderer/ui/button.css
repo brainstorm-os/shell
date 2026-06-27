@@ -199,11 +199,12 @@
 	transform: translateX(-50%);
 	border-radius: 50%;
 	pointer-events: none;
-	will-change: transform, opacity, filter;
-	/* Glow eases in softly: opacity + the blur bloom + the scale all glide
-	 * on the decelerated curve so the highlight swells rather than snaps. */
-	transition: opacity var(--motion-duration-slow) var(--motion-easing-decelerated), filter
-		var(--motion-duration-slow) var(--motion-easing-decelerated), transform
+	will-change: transform, opacity;
+	/* Glow eases in softly: opacity + the scale glide on the decelerated curve
+	 * so the highlight swells rather than snaps. (The static blur is not
+	 * animated — no hover state changes `filter` — so it's kept out of both the
+	 * transition and `will-change`, sparing a permanent GPU layer per button.) */
+	transition: opacity var(--motion-duration-slow) var(--motion-easing-decelerated), transform
 		var(--motion-duration-slow) var(--motion-easing-decelerated);
 }
 
