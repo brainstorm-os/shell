@@ -1949,3 +1949,45 @@ body:not([data-inspector="open"]) .inspector {
 .bulk-rename__submit {
 	align-self: flex-end;
 }
+
+/* Native drag image (see `applyDragImage` in content-list.tsx) — a solid themed
+   pill so the dragged row isn't snapshotted onto white. Lives off-screen; only
+   the browser's drag snapshot of it is ever visible. */
+.files-drag-image {
+	position: fixed;
+	top: -1000px;
+	left: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	max-width: 280px;
+	padding: var(--space-1) var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+	color: var(--text);
+	border: var(--border-width) solid var(--color-border-subtle);
+	box-shadow: var(--shadow-lg);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+.files-drag-image__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.files-drag-image__count {
+	flex: 0 0 auto;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 var(--space-1);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-full);
+	background: var(--accent);
+	color: var(--accent-fg);
+	font-size: var(--text-size-xs);
+}

@@ -1186,7 +1186,12 @@ body.is-resizing .calendar-resize {
 .cal-chip--drag-ghost {
 	cursor: grabbing;
 	box-shadow: var(--shadow-popover);
-	opacity: 0.92;
+	/* Full opacity + a SOLID event-tinted fill: the live chip background is a
+	   `color-mix(... transparent)`, so a translucent floating clone let the page
+	   bleed through and read as a washed-out / white chip. Mix the same tint over
+	   the surface colour instead of transparent so the ghost is opaque. */
+	opacity: 1;
+	background: color-mix(in srgb, var(--chip-color) 22%, var(--bg-elev));
 	transform: rotate(-1deg);
 	pointer-events: none;
 }

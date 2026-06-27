@@ -44,7 +44,7 @@ const STYLES = `
 * { box-sizing: border-box; }
 body { margin: 0; }
 .bstask { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--color-text-primary, #1c1c1e); }
-.bstask__check { appearance: none; width: 16px; height: 16px; flex: 0 0 auto; border: 1.5px solid var(--color-border-strong, #b0b0b5); border-radius: 5px; cursor: pointer; position: relative; margin: 0; background: transparent; }
+.bstask__check { appearance: none; width: 16px; height: 16px; flex: 0 0 auto; border: 1.5px solid var(--color-border-strong, #b0b0b5); border-radius: 4px; cursor: pointer; position: relative; margin: 0; background: transparent; }
 .bstask__check:checked { background: var(--color-accent-default, #3b82f6); border-color: var(--color-accent-default, #3b82f6); }
 .bstask__check:checked::after { content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid var(--color-accent-text, #fff); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .bstask__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }

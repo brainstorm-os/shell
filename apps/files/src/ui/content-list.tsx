@@ -38,6 +38,31 @@ import { EntityIcon } from "./entity-visuals";
 import { filesObjectMenuContext } from "./object-menu-context";
 
 const DND_MIME = "application/x-brainstorm-entity";
+
+/** Native HTML5 drag falls back to the browser's default drag image — a
+ *  snapshot of the (transparent-background) row composited onto white, which
+ *  reads as a stray white box following the cursor. Replace it with a small
+ *  solid themed pill (file name + a count badge for a multi-selection). The
+ *  element is appended off-screen, snapshotted by the browser during
+ *  `dragstart`, then removed on the next frame. */
+function applyDragImage(dataTransfer: DataTransfer, label: string, count: number): void {
+	const ghost = document.createElement("div");
+	ghost.className = "files-drag-image";
+	const text = document.createElement("span");
+	text.className = "files-drag-image__label";
+	text.textContent = label;
+	ghost.appendChild(text);
+	if (count > 1) {
+		const badge = document.createElement("span");
+		badge.className = "files-drag-image__count";
+		badge.textContent = String(count);
+		ghost.appendChild(badge);
+	}
+	document.body.appendChild(ghost);
+	dataTransfer.setDragImage(ghost, 12, 12);
+	requestAnimationFrame(() => ghost.remove());
+}
+
 const ROW_HEIGHT = 36;
 /** IconList is a one-lane list like List, but a taller row carrying a larger
  *  leading glyph (the Finder "as Icons in a list" density). */
@@ -641,6 +666,7 @@ function ContentRow({
 		event.dataTransfer.setData(DND_MIME, JSON.stringify({ ids, sourceId: store.nav.current }));
 		event.dataTransfer.setData("text/plain", readName(entity));
 		event.dataTransfer.effectAllowed = "copyMove";
+		applyDragImage(event.dataTransfer, readName(entity), ids.length);
 	}
 
 	function onDrop(event: React.DragEvent) {

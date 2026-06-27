@@ -127,16 +127,16 @@ const STYLES = `
 :root { color-scheme: light dark; }
 body { margin: 0; }
 .bsdb { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--color-text-primary, light-dark(#1c1c1e, #f7f7f7)); }
-.bsdb__title { font-weight: 600; font-size: 13px; padding: 8px 10px 6px; display: flex; align-items: center; gap: 6px; }
+.bsdb__title { font-weight: 600; font-size: 13px; padding: 8px 12px 6px; display: flex; align-items: center; gap: 8px; }
 .bsdb__count { color: var(--color-text-tertiary, light-dark(#8a8a8e, rgba(247,247,247,.62))); font-weight: 400; }
 .bsdb__scroll { overflow-x: auto; border-top: 1px solid var(--color-border-subtle, rgba(127,127,127,.16)); }
 .bsdb__table { border-collapse: collapse; width: 100%; }
-.bsdb__th { text-align: left; font-weight: 600; color: var(--color-text-secondary, light-dark(#6b6b70, #f7f7f7)); padding: 6px 10px; white-space: nowrap; border-bottom: 1px solid var(--color-border-subtle, rgba(127,127,127,.16)); position: sticky; top: 0; background: var(--color-background-subtle, rgba(127,127,127,.04)); }
-.bsdb__td { padding: 6px 10px; border-bottom: 1px solid var(--color-border-subtle, rgba(127,127,127,.1)); white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.bsdb__th { text-align: left; font-weight: 600; color: var(--color-text-secondary, light-dark(#6b6b70, #f7f7f7)); padding: 8px 12px; white-space: nowrap; border-bottom: 1px solid var(--color-border-subtle, rgba(127,127,127,.16)); position: sticky; top: 0; background: var(--color-background-subtle, rgba(127,127,127,.04)); }
+.bsdb__td { padding: 8px 12px; border-bottom: 1px solid var(--color-border-subtle, rgba(127,127,127,.1)); white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .bsdb__row { cursor: pointer; }
 .bsdb__row:hover { background: var(--color-accent-subtle, rgba(127,127,127,.07)); }
 .bsdb__ref { color: var(--color-text-tertiary, light-dark(#8a8a8e, rgba(247,247,247,.62))); font-style: italic; }
-.bsdb__empty, .bsdb__error { padding: 14px 10px; color: var(--color-text-tertiary, light-dark(#8a8a8e, rgba(247,247,247,.62))); }
+.bsdb__empty, .bsdb__error { padding: 16px 12px; color: var(--color-text-tertiary, light-dark(#8a8a8e, rgba(247,247,247,.62))); }
 .bsdb__error { color: var(--color-state-error, light-dark(#dc2626, #f87171)); }
 `;
 
