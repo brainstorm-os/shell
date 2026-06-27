@@ -122,7 +122,7 @@ describe("Automations pipeline — fire → run → real entity → persisted ru
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	function host(over: Partial<Parameters<typeof makeHost>[0]> = {}) {
@@ -323,7 +323,7 @@ describe("Automations deployment — session-open registration over the real ent
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	const callEntities = (method: string, arg: unknown) =>

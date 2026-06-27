@@ -156,8 +156,8 @@ describe("app-data pipeline (real install → ledger → broker → aggregator)"
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("the real installer grants the `entities.read:*` wildcard the apps need", async () => {
@@ -452,8 +452,8 @@ describe("properties pipeline (real install → ledger → broker → Properties
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	async function dispatchList() {
@@ -571,8 +571,8 @@ describe("Y.Doc → entities.db pipeline (real entities service + real ydoc work
 	afterEach(async () => {
 		__ydocCacheResetForTest();
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	async function makeService() {
@@ -862,8 +862,8 @@ describe("cross-app open-routing fence (9.18.7)", () => {
 
 	afterEach(async () => {
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
-		await rm(bundleRoot, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(bundleRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("every first-party type's `open` suggests its primary opener first", async () => {
@@ -994,8 +994,8 @@ describe("packaged-app upgrade path (13.10 — stale install → seed-upgrade �
 
 	afterEach(async () => {
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
-		await rm(appsRoot, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(appsRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it("the stale app is DENIED before upgrade, then the seed-upgrade grants the new cap and the broker ALLOWS", async () => {

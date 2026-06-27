@@ -165,7 +165,7 @@ describe("stress: 100k entities (entities.db + FTS5)", () => {
 		indexer.dispose();
 		searchDb.close();
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it(
@@ -282,7 +282,7 @@ describe("stress: 50MB Yjs doc (ydoc-store snapshot+tail)", () => {
 		vaultDir = await mkdtemp(join(tmpdir(), "bs-stress-ydoc-"));
 	});
 	afterEach(async () => {
-		await rm(vaultDir, { recursive: true, force: true });
+		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	it(

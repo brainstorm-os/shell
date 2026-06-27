@@ -3,6 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "description": "The Brainstorm shell (Electron main + preload + dashboard renderer).",
+  "author": "Brainstorm <hello@getbrainstorm.online>",
+  "homepage": "https://getbrainstorm.online",
   "license": "UNLICENSED",
   "type": "module",
   "main": "out/main/index.js",
@@ -124,6 +126,7 @@
       ]
     },
     "linux": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         {
           "target": "AppImage",

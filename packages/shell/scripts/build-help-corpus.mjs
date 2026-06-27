@@ -30,17 +30,19 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const ROOT = new URL("../../..", import.meta.url).pathname;
-// `docs/` relocated from `app/docs/` to the harness root in the 2026-06
-// restructure. Prefer the legacy in-app location (a standalone checkout), then
-// fall back to the harness-root sibling.
+const CONTENT_DIR = join(ROOT, "packages/shell/help-content");
+// The Help corpus is built entirely from sources VENDORED into the shell repo
+// (`help-content/`), so a public/standalone shell checkout — and CI — builds
+// without the harness repo present. The manifest lives alongside that content;
+// the `docs/`-rooted candidates are legacy fallbacks for a harness-based build
+// (the engineering `docs/` are the harness repo's, not the shell's).
 const MANIFEST_CANDIDATES = [
+	join(CONTENT_DIR, "help-manifest.json"),
 	join(ROOT, "docs/help-manifest.json"),
-	// Sibling-repo layout: the design docs live in the harness repo next door.
 	join(ROOT, "../harness/docs/help-manifest.json"),
 	join(ROOT, "../docs/help-manifest.json"),
 ];
 const MANIFEST_PATH = MANIFEST_CANDIDATES.find((p) => existsSync(p)) ?? MANIFEST_CANDIDATES[0];
-const CONTENT_DIR = join(ROOT, "packages/shell/help-content");
 const OUT_PATH = join(ROOT, "packages/shell/help-corpus/corpus.json");
 
 const TopicKind = {

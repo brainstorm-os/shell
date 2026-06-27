@@ -21,8 +21,22 @@ const dirs: string[] = [];
 const dbs: SqliteDatabase[] = [];
 
 afterEach(() => {
-	for (const db of dbs.splice(0)) db.close();
-	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+	for (const db of dbs.splice(0)) {
+		// `tunePragmas` opens these in WAL mode; on Windows the `-shm` shared-
+		// memory mapping lingers past `close()` and locks the dir (POSIX releases
+		// it immediately — this only bit the Windows CI runner). Checkpoint +
+		// switch journal_mode off WAL so the `-wal`/`-shm` files (and their
+		// mapping) are gone before close, leaving the dir free to remove.
+		try {
+			db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+			db.exec("PRAGMA journal_mode = DELETE");
+		} catch {
+			// Best-effort — a half-open db still gets closed + the dir retried.
+		}
+		db.close();
+	}
+	for (const d of dirs.splice(0))
+		rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 async function freshRepo(): Promise<EntitiesRepository> {

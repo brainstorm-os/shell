@@ -91,8 +91,8 @@ describe("files service through the real broker", () => {
 	let env: Awaited<ReturnType<typeof setup>>;
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
-		await rm(env.sourceDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
 	describe("with `files.read` granted at install", () => {
