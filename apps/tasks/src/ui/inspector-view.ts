@@ -1,16 +1,18 @@
 /**
  * Task detail route — the centered reading / editing surface the content area
  * shows when a task is opened (replacing the list), mirroring the Bookmarks
- * detail. Plain DOM except the body editor, which the app mounts into
- * `editorHost` as a React island (`inspector-editor-mount`). The properties
- * inspector is a separate `.bs-props` glass overlay toggled from the header —
- * it is NOT part of this view.
+ * detail. Plain DOM except two React islands the app mounts into: the inline
+ * property cells (`detail-properties-mount`, into `propertyHost`) and the body
+ * editor (`inspector-editor-mount`, into `editorHost`). The full property list
+ * (incl. custom props + comments) also lives in the separate `.bs-props` glass
+ * inspector toggled from the header.
  *
- * The title + chips reuse the *same* builders the list rows use
- * (`task-row.ts`), so a task's title and properties behave identically in the
- * list and the detail — no duplicated chrome. Closing the route is the header
- * back button's job (the open task is part of the nav location), so this view
- * has no close affordance of its own.
+ * The title reuses the *same* builders the list rows use (`task-row.ts`), so a
+ * task's title behaves identically in the list and the detail. The first-class
+ * fields (status / priority / dates / project / estimate / logged / tags) are
+ * edited through the shared property cells, not hand-rolled chips. Closing the
+ * route is the header back button's job (the open task is part of the nav
+ * location), so this view has no close affordance of its own.
  */
 
 import type { Recurrence, RecurrenceSummaryLabels } from "@brainstorm/sdk-types";
@@ -19,27 +21,13 @@ import {
 	createRecurrenceEditor,
 } from "@brainstorm/sdk/recurrence-editor";
 import { t } from "../i18n/t";
-import { isPastDue } from "../logic/task-status";
-import { formatMinutes, parseDurationToMinutes } from "../logic/task-time";
-import type { Project } from "../types/project";
 import type { Task, TaskComment } from "../types/task";
-import {
-	dateChip,
-	priorityChip,
-	projectChip,
-	renderCompletionToggle,
-	renderEditableName,
-} from "./task-row";
+import { renderCompletionToggle, renderEditableName } from "./task-row";
 
 export type TaskDetailViewProps = {
 	task: Task;
-	now: number;
-	projectsById: ReadonlyMap<string, Project>;
 	onToggleComplete(task: Task): void;
 	onRenameTask(task: Task, name: string): void;
-	onPickPriority(task: Task, anchor: HTMLElement): void;
-	onPickDate(task: Task, anchor: HTMLElement): void;
-	onPickProject(task: Task, anchor: HTMLElement): void;
 	/** Direct child tasks (9.14.7). Omit (or empty) in preview / standalone
 	 *  mode to hide the Subtasks section entirely. */
 	subtasks?: readonly Task[];
@@ -68,22 +56,6 @@ export type TaskDetailViewProps = {
 		summaryLabels: RecurrenceSummaryLabels;
 		onChange(value: Recurrence | null): void;
 	};
-	/** Time estimate / logged effort (9.14.13). When provided, a Time section
-	 *  shows two free-typed duration fields. `null` clears the field. */
-	time?: {
-		estimateMinutes: number | null;
-		loggedMinutes: number | null;
-		onChangeEstimate(minutes: number | null): void;
-		onChangeLogged(minutes: number | null): void;
-	};
-	/** Tags (9.14.10). When provided, a Tags section shows removable chips +
-	 *  an add field; clicking a chip filters by that tag. */
-	tags?: {
-		values: readonly string[];
-		onAdd(tag: string): void;
-		onRemove(tag: string): void;
-		onClickTag(tag: string): void;
-	};
 	/** Comments / activity (9.14.14). When provided, a Comments section shows
 	 *  the thread + an add field. */
 	comments?: {
@@ -95,15 +67,17 @@ export type TaskDetailViewProps = {
 
 export type TaskDetailView = {
 	root: HTMLElement;
+	/** The slot the app mounts the inline property cells island into
+	 *  (`detail-properties-mount`). */
+	propertyHost: HTMLElement;
 	/** The slot the app mounts the body editor (or the read-only fallback)
 	 *  into. */
 	editorHost: HTMLElement;
 };
 
 export function renderTaskDetailView(props: TaskDetailViewProps): TaskDetailView {
-	const { task, now } = props;
+	const { task } = props;
 	const done = task.completedAt !== null;
-	const overdue = isPastDue(task, now);
 
 	const root = document.createElement("section");
 	root.className = "tasks-detail";
@@ -121,26 +95,16 @@ export function renderTaskDetailView(props: TaskDetailViewProps): TaskDetailView
 	titleRow.appendChild(titleGroup);
 	root.appendChild(titleRow);
 
-	// Property chips — the same editable chips the list rows carry, so
-	// priority / date / project edits flow through the identical app handlers
-	// and look identical in both places.
-	const chips = document.createElement("div");
-	chips.className = "tasks-detail__chips";
-	chips.appendChild(priorityChip(task, (anchor) => props.onPickPriority(task, anchor)));
-	chips.appendChild(dateChip(task, now, overdue, (anchor) => props.onPickDate(task, anchor)));
-	chips.appendChild(
-		projectChip(task, props.projectsById, (anchor) => props.onPickProject(task, anchor)),
-	);
-	root.appendChild(chips);
+	// Inline property cells — status / priority / dates / project / estimate /
+	// logged / tags as the SHARED property cells, mounted by the app as a React
+	// island into this slot (`detail-properties-mount`). Replaces the old
+	// hand-rolled chips + tags section + time inputs.
+	const propertyHost = document.createElement("div");
+	propertyHost.className = "tasks-detail__properties";
+	root.appendChild(propertyHost);
 
 	const blockedSection = renderBlockedBySection(props);
 	if (blockedSection) root.appendChild(blockedSection);
-
-	const tagsSection = renderTagsSection(props);
-	if (tagsSection) root.appendChild(tagsSection);
-
-	const timeSection = renderTimeSection(props);
-	if (timeSection) root.appendChild(timeSection);
 
 	const recurrenceSection = renderRecurrenceSection(props);
 	if (recurrenceSection) root.appendChild(recurrenceSection);
@@ -155,7 +119,7 @@ export function renderTaskDetailView(props: TaskDetailViewProps): TaskDetailView
 	const commentsSection = renderCommentsSection(props);
 	if (commentsSection) root.appendChild(commentsSection);
 
-	return { root, editorHost };
+	return { root, propertyHost, editorHost };
 }
 
 /** Comments / activity section (9.14.14) — an oldest-first thread + an add box.
@@ -314,131 +278,6 @@ function renderAddSubtask(onAddSubtask: (name: string) => void): HTMLElement {
 		input.focus();
 	});
 	return form;
-}
-
-/** Tags section (9.14.10) — removable tag chips + an add field; clicking a
- *  chip filters by that tag. */
-function renderTagsSection(props: TaskDetailViewProps): HTMLElement | null {
-	const config = props.tags;
-	if (!config) return null;
-	const section = document.createElement("section");
-	section.className = "tasks-detail__tags";
-	section.setAttribute("aria-label", t("tasks.tags.region"));
-
-	const header = document.createElement("div");
-	header.className = "tasks-detail__subtasks-header";
-	const heading = document.createElement("h2");
-	heading.className = "tasks-detail__subtasks-title";
-	heading.textContent = t("tasks.tags.heading");
-	header.appendChild(heading);
-	section.appendChild(header);
-
-	const list = document.createElement("div");
-	list.className = "tasks-detail__tag-list";
-	for (const tag of config.values) {
-		const chip = document.createElement("span");
-		chip.className = "tasks-detail__tag";
-		const label = document.createElement("button");
-		label.type = "button";
-		label.className = "tasks-detail__tag-label";
-		label.textContent = tag;
-		label.addEventListener("click", () => config.onClickTag(tag));
-		const remove = document.createElement("button");
-		remove.type = "button";
-		remove.className = "tasks-detail__tag-remove";
-		remove.textContent = "✕";
-		remove.setAttribute("aria-label", t("tasks.tags.remove"));
-		remove.addEventListener("click", () => config.onRemove(tag));
-		chip.append(label, remove);
-		list.appendChild(chip);
-	}
-	section.appendChild(list);
-
-	const form = document.createElement("form");
-	form.className = "tasks-detail__tag-add";
-	const input = document.createElement("input");
-	input.type = "text";
-	input.className = "tasks-detail__tag-add-input";
-	input.placeholder = t("tasks.tags.addPlaceholder");
-	input.setAttribute("aria-label", t("tasks.tags.addPlaceholder"));
-	form.appendChild(input);
-	form.addEventListener("submit", (e) => {
-		e.preventDefault();
-		const value = input.value.trim();
-		if (value.length === 0) return;
-		config.onAdd(value);
-		input.value = "";
-		input.focus();
-	});
-	section.appendChild(form);
-	return section;
-}
-
-/** Time section (9.14.13) — Estimate + Logged free-typed duration fields. */
-function renderTimeSection(props: TaskDetailViewProps): HTMLElement | null {
-	const config = props.time;
-	if (!config) return null;
-	const section = document.createElement("section");
-	section.className = "tasks-detail__time";
-	section.setAttribute("aria-label", t("tasks.time.region"));
-
-	const header = document.createElement("div");
-	header.className = "tasks-detail__subtasks-header";
-	const heading = document.createElement("h2");
-	heading.className = "tasks-detail__subtasks-title";
-	heading.textContent = t("tasks.time.heading");
-	header.appendChild(heading);
-	section.appendChild(header);
-
-	section.appendChild(
-		durationField(t("tasks.time.estimate"), config.estimateMinutes, config.onChangeEstimate),
-	);
-	section.appendChild(
-		durationField(t("tasks.time.logged"), config.loggedMinutes, config.onChangeLogged),
-	);
-	return section;
-}
-
-function durationField(
-	label: string,
-	minutes: number | null,
-	onChange: (minutes: number | null) => void,
-): HTMLElement {
-	const row = document.createElement("label");
-	row.className = "tasks-detail__time-row";
-	const span = document.createElement("span");
-	span.className = "tasks-detail__time-label";
-	span.textContent = label;
-	const input = document.createElement("input");
-	input.type = "text";
-	input.className = "tasks-detail__time-input";
-	input.value = formatMinutes(minutes);
-	input.placeholder = "2h 30m";
-	input.setAttribute("aria-label", label);
-	const commit = (): void => {
-		const trimmed = input.value.trim();
-		const next = trimmed.length === 0 ? null : parseDurationToMinutes(trimmed);
-		// An unparseable entry reverts to the last good value rather than persisting.
-		if (trimmed.length > 0 && next === null) {
-			input.value = formatMinutes(minutes);
-			return;
-		}
-		if (next !== minutes) onChange(next);
-		input.value = formatMinutes(next);
-	};
-	input.addEventListener("blur", commit);
-	// Enter commits this editable <input>; the shortcut registry suppresses
-	// single keys in editable fields by design.
-	// keyboard-exempt
-	input.addEventListener("keydown", (e) => {
-		// keyboard-exempt
-		if (e.key === "Enter") {
-			e.preventDefault();
-			input.blur();
-		}
-	});
-	row.append(span, input);
-	return row;
 }
 
 /** Repeat section (9.14.12) — mounts the shared recurrence editor. Recreated

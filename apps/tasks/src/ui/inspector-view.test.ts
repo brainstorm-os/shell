@@ -11,7 +11,6 @@
 import type { RecurrenceEditorLabels } from "@brainstorm/sdk/recurrence-editor";
 import { buildRecurrenceLabels } from "@brainstorm/sdk/recurrence-labels";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";
 import { renderLegacyNotesFallback, renderTaskDetailView } from "./inspector-view";
 
@@ -34,28 +33,11 @@ function task(overrides: Partial<Task> = {}): Task {
 	};
 }
 
-function project(id: string, name: string): Project {
-	return {
-		id,
-		name,
-		statusKey: null,
-		milestoneAt: null,
-		colorHint: null,
-		createdAt: 0,
-		updatedAt: 0,
-	};
-}
-
 function mount(t: Task, over: Partial<Parameters<typeof renderTaskDetailView>[0]> = {}) {
 	const props = {
 		task: t,
-		now: 0,
-		projectsById: new Map<string, Project>(),
 		onToggleComplete: vi.fn(),
 		onRenameTask: vi.fn(),
-		onPickPriority: vi.fn(),
-		onPickDate: vi.fn(),
-		onPickProject: vi.fn(),
 		...over,
 	};
 	const view = renderTaskDetailView(props);
@@ -74,24 +56,15 @@ describe("renderTaskDetailView", () => {
 		expect(view.root.querySelector(".tasks-detail__title-group")).not.toBeNull();
 	});
 
-	it("reuses the same property chips the list rows carry", () => {
-		const { view } = mount(task({ priority: Priority.High }));
-		expect(view.root.querySelector('[data-kind="priority"]')).not.toBeNull();
-		expect(view.root.querySelector('[data-kind="date"]')).not.toBeNull();
-		expect(view.root.querySelector('[data-kind="project"]')).not.toBeNull();
-	});
-
-	it("the priority chip routes through the shared handler", () => {
-		const { view, props } = mount(task({ priority: Priority.High }));
-		view.root.querySelector<HTMLButtonElement>('[data-kind="priority"]')?.click();
-		expect(props.onPickPriority).toHaveBeenCalledTimes(1);
-	});
-
-	it("the project chip shows the project name when set", () => {
-		const { view } = mount(task({ projectId: "p-1" }), {
-			projectsById: new Map([["p-1", project("p-1", "Garden")]]),
-		});
-		expect(view.root.querySelector('[data-kind="project"]')?.textContent).toBe("Garden");
+	it("exposes an empty property-cells host for the app to mount into", () => {
+		const { view } = mount(task());
+		expect(view.propertyHost).not.toBeNull();
+		expect(view.propertyHost.children).toHaveLength(0);
+		// The hand-rolled chips / tags / time sections are gone — properties are
+		// edited through the shared cells mounted into propertyHost.
+		expect(view.root.querySelector(".tasks-detail__chips")).toBeNull();
+		expect(view.root.querySelector(".tasks-detail__tags")).toBeNull();
+		expect(view.root.querySelector(".tasks-detail__time")).toBeNull();
 	});
 
 	it("the completion toggle fires onToggleComplete", () => {
@@ -253,87 +226,6 @@ describe("renderTaskDetailView — recurrence (9.14.12)", () => {
 		const section = view.root.querySelector(".tasks-detail__recurrence");
 		expect(section).not.toBeNull();
 		expect(section?.querySelector(".bs-recur__kind")).not.toBeNull();
-	});
-});
-
-describe("renderTaskDetailView — time (9.14.13)", () => {
-	it("omits the Time section without a time config", () => {
-		const { view } = mount(task());
-		expect(view.root.querySelector(".tasks-detail__time")).toBeNull();
-	});
-
-	it("shows estimate + logged fields with formatted values", () => {
-		const { view } = mount(task(), {
-			time: {
-				estimateMinutes: 150,
-				loggedMinutes: 60,
-				onChangeEstimate: vi.fn(),
-				onChangeLogged: vi.fn(),
-			},
-		});
-		const inputs = view.root.querySelectorAll<HTMLInputElement>(".tasks-detail__time-input");
-		expect(inputs).toHaveLength(2);
-		expect(inputs[0]?.value).toBe("2h 30m");
-		expect(inputs[1]?.value).toBe("1h");
-	});
-
-	it("committing a parsed estimate fires onChangeEstimate with minutes", () => {
-		const onChangeEstimate = vi.fn();
-		const { view } = mount(task(), {
-			time: { estimateMinutes: null, loggedMinutes: null, onChangeEstimate, onChangeLogged: vi.fn() },
-		});
-		const input = view.root.querySelector<HTMLInputElement>(".tasks-detail__time-input");
-		if (!input) throw new Error("no time input");
-		input.value = "2h30m";
-		input.dispatchEvent(new Event("blur"));
-		expect(onChangeEstimate).toHaveBeenCalledWith(150);
-	});
-
-	it("an unparseable entry reverts and does not fire onChange", () => {
-		const onChangeEstimate = vi.fn();
-		const { view } = mount(task(), {
-			time: { estimateMinutes: 60, loggedMinutes: null, onChangeEstimate, onChangeLogged: vi.fn() },
-		});
-		const input = view.root.querySelector<HTMLInputElement>(".tasks-detail__time-input");
-		if (!input) throw new Error("no time input");
-		input.value = "nonsense";
-		input.dispatchEvent(new Event("blur"));
-		expect(onChangeEstimate).not.toHaveBeenCalled();
-		expect(input.value).toBe("1h");
-	});
-});
-
-describe("renderTaskDetailView — tags (9.14.10)", () => {
-	it("omits the Tags section without a tags config", () => {
-		expect(mount(task()).view.root.querySelector(".tasks-detail__tags")).toBeNull();
-	});
-
-	it("renders tag chips + an add field", () => {
-		const { view } = mount(task(), {
-			tags: { values: ["urgent", "later"], onAdd: vi.fn(), onRemove: vi.fn(), onClickTag: vi.fn() },
-		});
-		const chips = [...view.root.querySelectorAll(".tasks-detail__tag-label")].map(
-			(c) => c.textContent,
-		);
-		expect(chips).toEqual(["urgent", "later"]);
-		expect(view.root.querySelector(".tasks-detail__tag-add-input")).not.toBeNull();
-	});
-
-	it("remove + clickTag + add fire their handlers", () => {
-		const onRemove = vi.fn();
-		const onClickTag = vi.fn();
-		const onAdd = vi.fn();
-		const { view } = mount(task(), {
-			tags: { values: ["urgent"], onAdd, onRemove, onClickTag },
-		});
-		(view.root.querySelector(".tasks-detail__tag-label") as HTMLButtonElement).click();
-		expect(onClickTag).toHaveBeenCalledWith("urgent");
-		(view.root.querySelector(".tasks-detail__tag-remove") as HTMLButtonElement).click();
-		expect(onRemove).toHaveBeenCalledWith("urgent");
-		const input = view.root.querySelector(".tasks-detail__tag-add-input") as HTMLInputElement;
-		input.value = "new-tag";
-		(input.closest("form") as HTMLFormElement).requestSubmit();
-		expect(onAdd).toHaveBeenCalledWith("new-tag");
 	});
 });
 

@@ -29,7 +29,8 @@ import {
 	PropertyFormat,
 	ValueType,
 } from "@brainstorm/sdk-types";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui";
+import type { PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
+import { type ValuesMap, readValue } from "@brainstorm/sdk/property-ui";
 import { t } from "../i18n/t";
 import { Priority } from "../types/task";
 import type { Task } from "../types/task";
@@ -220,6 +221,62 @@ export function parseTagsValue(next: unknown): string[] {
 export function parseDurationValue(next: unknown): number | null {
 	if (typeof next !== "number" || !Number.isFinite(next) || next <= 0) return null;
 	return Math.round(next * 60);
+}
+
+/** Per-field persisters supplied by the host. An absent handler leaves that
+ *  row read-only — created / updated have none by design. Shared by the
+ *  slide-over inspector panel and the inline detail property block so both
+ *  build the bridged rows identically. */
+export type TaskFieldHandlers = {
+	onStatusChange?: (statusKey: string | null) => void;
+	onPriorityChange?: (priority: Priority) => void;
+	onScheduledChange?: (at: number | null) => void;
+	onDueChange?: (at: number | null) => void;
+	onProjectChange?: (projectId: string | null) => void;
+	onAssigneeChange?: (assigneeId: string | null) => void;
+	onEstimateChange?: (minutes: number | null) => void;
+	onLoggedChange?: (minutes: number | null) => void;
+	onTagsChange?: (tags: string[]) => void;
+};
+
+/** Build the bridged property rows for a task — each field's cell value plus an
+ *  `onChange` that maps the edited value back through its parser to the typed
+ *  `Task` patch. An optional `only` set restricts the rows (the inline detail
+ *  block shows a subset; the inspector panel shows all). */
+export function bridgedTaskRows(
+	task: Task,
+	handlers: TaskFieldHandlers,
+	only?: ReadonlySet<string>,
+): PropertiesPanelRow[] {
+	const values = taskToValues(task);
+	const {
+		onStatusChange,
+		onPriorityChange,
+		onScheduledChange,
+		onDueChange,
+		onProjectChange,
+		onAssigneeChange,
+		onEstimateChange,
+		onLoggedChange,
+		onTagsChange,
+	} = handlers;
+	const editable: Record<string, ((next: unknown) => void) | undefined> = {
+		[TASK_PROP_KEY.status]: onStatusChange && ((n) => onStatusChange(parseStatusValue(n))),
+		[TASK_PROP_KEY.priority]: onPriorityChange && ((n) => onPriorityChange(parsePriorityValue(n))),
+		[TASK_PROP_KEY.scheduled]: onScheduledChange && ((n) => onScheduledChange(parseDateValue(n))),
+		[TASK_PROP_KEY.due]: onDueChange && ((n) => onDueChange(parseDateValue(n))),
+		[TASK_PROP_KEY.project]: onProjectChange && ((n) => onProjectChange(parseProjectValue(n))),
+		[TASK_PROP_KEY.assignee]: onAssigneeChange && ((n) => onAssigneeChange(parseAssigneeValue(n))),
+		[TASK_PROP_KEY.estimate]: onEstimateChange && ((n) => onEstimateChange(parseDurationValue(n))),
+		[TASK_PROP_KEY.logged]: onLoggedChange && ((n) => onLoggedChange(parseDurationValue(n))),
+		[TASK_PROP_KEY.tags]: onTagsChange && ((n) => onTagsChange(parseTagsValue(n))),
+	};
+	return TASK_PROPERTY_DEFS.filter((def) => !only || only.has(def.key)).map((def) => {
+		const onChange = editable[def.key];
+		return onChange
+			? { def, value: readValue(values, def), onChange }
+			: { def, value: readValue(values, def), readOnly: true };
+	});
 }
 
 /** Catalog defs bound on the task (a key in `values` that resolves in the

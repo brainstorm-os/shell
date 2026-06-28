@@ -85,6 +85,7 @@ import {
 } from "./logic/task-selection";
 import { TASK_SORTS, TaskSort } from "./logic/task-sort";
 import { addTag, removeTag, tagsOf, tasksWithTag } from "./logic/task-tags";
+import type { TaskFieldHandlers } from "./properties/task-properties";
 import { TAGS_DICT_ID, backfillTagDictionary } from "./properties/task-vocab";
 import { ActionId, bindShortcut } from "./shortcuts";
 import { PROJECT_TYPE, TASK_TYPE, createEntitiesRepository } from "./storage/entities-repository";
@@ -97,6 +98,10 @@ import { PRIORITIES, Priority, type Task, TaskStatus } from "./types/task";
 import { renderBoardView } from "./ui/board-view";
 import { buildComposeForm } from "./ui/compose-view";
 import { bindDelegatedObjectMenu } from "./ui/delegated-object-menu";
+import {
+	type TaskDetailPropertiesHandle,
+	mountTaskDetailProperties,
+} from "./ui/detail-properties-mount";
 import { formatDateRelative } from "./ui/format-date";
 import { projectHeaderMenuContext, taskHeaderMenuContext } from "./ui/header-object-menu";
 import { beginInlineEdit } from "./ui/inline-edit";
@@ -903,6 +908,28 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			});
 		},
 		[patchTask, nowAnchor],
+	);
+
+	// The bridged-field persisters bound to one task id — shared by the
+	// slide-over inspector panel and the inline detail property cells so both
+	// edit through one path. Status routes through `moveTaskToStatus` so the
+	// Done→completedAt rule (and board-drag parity) holds.
+	const taskFieldHandlers = useCallback(
+		(taskId: string): TaskFieldHandlers => ({
+			onStatusChange: (statusKey) => moveTaskToStatus(taskId, statusKey),
+			onPriorityChange: (priority) =>
+				patchTask(taskId, (e) => ({ ...e, priority, updatedAt: nowAnchor() })),
+			onScheduledChange: (at) =>
+				patchTask(taskId, (e) => ({ ...e, scheduledAt: at, updatedAt: nowAnchor() })),
+			onDueChange: (at) => patchTask(taskId, (e) => ({ ...e, dueAt: at, updatedAt: nowAnchor() })),
+			onProjectChange: (projectId) =>
+				patchTask(taskId, (e) => ({ ...e, projectId, updatedAt: nowAnchor() })),
+			onAssigneeChange: (assigneeId) => onPickAssignee(taskId, assigneeId),
+			onEstimateChange: (minutes) => setTaskMinutes(taskId, "estimateMinutes", minutes),
+			onLoggedChange: (minutes) => setTaskMinutes(taskId, "loggedMinutes", minutes),
+			onTagsChange: (tags) => setTaskTags(taskId, tags),
+		}),
+		[moveTaskToStatus, patchTask, nowAnchor, onPickAssignee, setTaskMinutes, setTaskTags],
 	);
 
 	const onRemoveTask = useCallback(
@@ -1844,6 +1871,8 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const inspectorHandleRef = useRef<TaskInspectorHandle | null>(null);
 	const inspectorHostRef = useRef<HTMLElement | null>(null);
 	const inspectorTaskIdRef = useRef<string | null>(null);
+	const propertyHandleRef = useRef<TaskDetailPropertiesHandle | null>(null);
+	const propertyHostRef = useRef<HTMLElement | null>(null);
 
 	const onBodyFirstEdit = useCallback(
 		(taskId: string) => {
@@ -1880,13 +1909,8 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		}
 		const view = renderTaskDetailView({
 			task,
-			now,
-			projectsById: projectsById(),
 			onToggleComplete,
 			onRenameTask,
-			onPickPriority,
-			onPickDate,
-			onPickProject,
 			subtasks: childrenOf(dataRef.current.tasks, task.id),
 			onOpenSubtask: openTask,
 			onToggleSubtask: onToggleComplete,
@@ -1907,24 +1931,31 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 						updatedAt: nowAnchor(),
 					})),
 			},
-			time: {
-				estimateMinutes: task.estimateMinutes ?? null,
-				loggedMinutes: task.loggedMinutes ?? null,
-				onChangeEstimate: (minutes) => setTaskMinutes(task.id, "estimateMinutes", minutes),
-				onChangeLogged: (minutes) => setTaskMinutes(task.id, "loggedMinutes", minutes),
-			},
-			tags: {
-				values: task.tags ?? [],
-				onAdd: (raw) => addTaskTag(task.id, raw),
-				onRemove: (tag) => removeTaskTag(task.id, tag),
-				onClickTag: setActiveTagFilter,
-			},
 			comments: {
 				values: task.comments ?? [],
 				onAdd: (body) => addTaskComment(task.id, body),
 				onRemove: (id) => removeTaskComment(task.id, id),
 			},
 		});
+
+		// Inline property cells island — persistent root moved into the fresh
+		// chrome, re-rendered each rebuild so edited values reflect (mirrors the
+		// body editor below). Absent in preview (no properties service).
+		if (propertiesSvc) {
+			if (propertyHandleRef.current && propertyHostRef.current) {
+				view.propertyHost.appendChild(propertyHostRef.current);
+				propertyHandleRef.current.update(task);
+			} else {
+				const target = document.createElement("div");
+				view.propertyHost.appendChild(target);
+				propertyHandleRef.current = mountTaskDetailProperties(target, task, {
+					properties: propertiesSvc,
+					entityTitleSource,
+					makeHandlers: taskFieldHandlers,
+				});
+				propertyHostRef.current = target;
+			}
+		}
 
 		if (inspectorHandleRef.current && inspectorHostRef.current) {
 			view.editorHost.appendChild(inspectorHostRef.current);
@@ -1951,6 +1982,8 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		() => () => {
 			inspectorHandleRef.current?.dispose();
 			inspectorHandleRef.current = null;
+			propertyHandleRef.current?.dispose();
+			propertyHandleRef.current = null;
 		},
 		[],
 	);
@@ -2186,32 +2219,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 							onClose={toggleProps}
 							{...(repository
 								? {
-										onStatusChange: (statusKey) => moveTaskToStatus(openTaskRecord.id, statusKey),
-										onPriorityChange: (priority) =>
-											patchTask(openTaskRecord.id, (e) => ({
-												...e,
-												priority,
-												updatedAt: nowAnchor(),
-											})),
-										onScheduledChange: (at) =>
-											patchTask(openTaskRecord.id, (e) => ({
-												...e,
-												scheduledAt: at,
-												updatedAt: nowAnchor(),
-											})),
-										onDueChange: (at) =>
-											patchTask(openTaskRecord.id, (e) => ({ ...e, dueAt: at, updatedAt: nowAnchor() })),
-										onProjectChange: (projectId) =>
-											patchTask(openTaskRecord.id, (e) => ({
-												...e,
-												projectId,
-												updatedAt: nowAnchor(),
-											})),
-										onAssigneeChange: (assigneeId) => onPickAssignee(openTaskRecord.id, assigneeId),
-										onEstimateChange: (minutes) =>
-											setTaskMinutes(openTaskRecord.id, "estimateMinutes", minutes),
-										onLoggedChange: (minutes) => setTaskMinutes(openTaskRecord.id, "loggedMinutes", minutes),
-										onTagsChange: (tags) => setTaskTags(openTaskRecord.id, tags),
+										...taskFieldHandlers(openTaskRecord.id),
 										onValuesChange: (values: ValuesMap) => onTaskValuesChange(openTaskRecord.id, values),
 									}
 								: {})}
