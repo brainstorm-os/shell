@@ -68,5 +68,6 @@ export function parseStoredEvent(raw: unknown): Event | null {
 		updatedAt: r.updatedAt,
 	};
 	if (typeof r.description === "string") event.description = r.description;
+	if (r.locked === true) event.locked = true;
 	return event;
 }

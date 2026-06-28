@@ -256,6 +256,8 @@ export const MANIFEST = {
 	"calendar.detail.save": "Save event",
 	"calendar.detail.cancel": "Cancel",
 	"calendar.detail.delete": "Delete event",
+	"calendar.detail.lock": "Lock event (read-only)",
+	"calendar.detail.unlock": "Unlock event",
 	"calendar.detail.validation.title": "Give the event a title.",
 	"calendar.detail.validation.endBeforeStart": "End must be after the start.",
 } as const;

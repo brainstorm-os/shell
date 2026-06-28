@@ -20,6 +20,9 @@ export type Event = {
 	title: string;
 	description?: string;
 	icon?: Icon | null;
+	/** Read-only lock — the event's synced `locked` property. When true the
+	 *  detail form is read-only. */
+	locked?: boolean;
 
 	/** Epoch ms — start instant. Required. */
 	start: number;

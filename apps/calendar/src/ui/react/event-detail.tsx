@@ -11,6 +11,7 @@
 
 import type { Icon } from "@brainstorm/sdk-types";
 import { Checkbox } from "@brainstorm/sdk/checkbox";
+import { LockButton } from "@brainstorm/sdk/lock-button";
 import { type ObjectMenuContext, openObjectMenu } from "@brainstorm/sdk/object-menu";
 import { closePicker, openIconPicker } from "@brainstorm/sdk/picker-host";
 import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm/sdk/popover";
@@ -61,6 +62,12 @@ export type EventDetailProps = {
 	onClose(): void;
 	/** Object-menu context for the open Event (editing only). */
 	objectMenu?: () => ObjectMenuContext;
+	/** Read-only lock — the open event's synced `locked` property. When true
+	 *  the form is read-only (Save/Delete suppressed); only Unlock + Cancel. */
+	locked?: boolean;
+	/** Toggle the lock — persists `!locked` on the event. Only wired for an
+	 *  existing event. */
+	onToggleLock?: () => void;
 };
 
 const HOUR_MS = 3_600_000;
@@ -147,6 +154,8 @@ export function EventDetail({
 	onResolve,
 	onClose,
 	objectMenu,
+	locked,
+	onToggleLock,
 }: EventDetailProps) {
 	const isCreate = event === null;
 	const [draft, setDraft] = useState<Event>(() => (event ? { ...event } : newDraft(defaultStart)));
@@ -296,10 +305,18 @@ export function EventDetail({
 
 	const footer = (
 		<div className="cal-detail__footer">
-			{!isCreate ? (
+			{!isCreate && !locked ? (
 				<button type="button" className="bs-btn bs-btn--danger" onClick={del}>
 					{t("calendar.detail.delete")}
 				</button>
+			) : null}
+			{!isCreate && onToggleLock ? (
+				<LockButton
+					locked={!!locked}
+					onToggle={onToggleLock}
+					lockLabel={t("calendar.detail.lock")}
+					unlockLabel={t("calendar.detail.unlock")}
+				/>
 			) : null}
 			<span className="cal-detail__footer-spacer" />
 			<button
@@ -312,9 +329,11 @@ export function EventDetail({
 			>
 				{t("calendar.detail.cancel")}
 			</button>
-			<button type="button" className="bs-btn" data-bs-primary="" onClick={save}>
-				{t("calendar.detail.save")}
-			</button>
+			{!locked ? (
+				<button type="button" className="bs-btn" data-bs-primary="" onClick={save}>
+					{t("calendar.detail.save")}
+				</button>
+			) : null}
 		</div>
 	);
 
@@ -329,187 +348,192 @@ export function EventDetail({
 			size={PopoverSize.Medium}
 			bodyPadding={PopoverBodyPadding.Comfortable}
 		>
-			<div className="cal-detail">
-				<div
-					className="cal-detail__title-row"
-					onContextMenu={
-						!isCreate && objectMenu
-							? (e) => {
-									const ctx = objectMenu();
-									if (!ctx) return;
-									e.preventDefault();
-									void openObjectMenu({ x: e.clientX, y: e.clientY }, ctx);
-								}
-							: undefined
-					}
-				>
-					<button
-						type="button"
-						className="cal-detail__icon"
-						aria-label={t("calendar.detail.field.iconChoose")}
-						onClick={chooseIcon}
+			{/* A locked event is read-only: `disabled` on the fieldset freezes every
+			    input/control inside. The Lock/Unlock + Cancel live in the footer
+			    (outside the fieldset), so unlocking stays reachable. */}
+			<fieldset className="cal-detail__lock-fieldset" disabled={!!locked}>
+				<div className="cal-detail">
+					<div
+						className="cal-detail__title-row"
+						onContextMenu={
+							!isCreate && objectMenu
+								? (e) => {
+										const ctx = objectMenu();
+										if (!ctx) return;
+										e.preventDefault();
+										void openObjectMenu({ x: e.clientX, y: e.clientY }, ctx);
+									}
+								: undefined
+						}
 					>
-						<EntityIcon icon={draft.icon ?? null} size={22} />
-					</button>
-					<input
-						type="text"
-						className="cal-detail__input cal-detail__input--title"
-						value={draft.title}
-						placeholder={t("calendar.detail.field.titlePlaceholder")}
-						aria-label={t("calendar.detail.field.title")}
-						onChange={(e) => patch({ title: e.target.value })}
-						onKeyDown={onTitleKey}
-						// biome-ignore lint/a11y/noAutofocus: detail dialog focuses the title on open
-						autoFocus
-					/>
-					{!isCreate && objectMenu ? (
-						<MoreButton
-							context={objectMenu}
-							label={t("calendar.event.moreActions")}
-							className="cal-detail__more"
-						/>
-					) : null}
-				</div>
-
-				<div className="cal-detail__field cal-detail__field--inline">
-					<span className="cal-detail__label">{t("calendar.detail.field.allDay")}</span>
-					<Checkbox
-						ariaLabel={t("calendar.detail.field.allDay")}
-						checked={draft.allDay}
-						onChange={onAllDayToggle}
-					/>
-				</div>
-
-				<DateTimeField
-					labelKey="calendar.detail.field.start"
-					value={startStr}
-					allDay={draft.allDay}
-					onChange={onStartChange}
-				/>
-				<DateTimeField
-					labelKey="calendar.detail.field.end"
-					value={endStr}
-					allDay={draft.allDay}
-					onChange={onEndChange}
-				/>
-
-				<details className="cal-detail__more" open={moreOpen}>
-					<summary className="cal-detail__more-summary">{t("calendar.detail.more")}</summary>
-
-					<Field labelKey="calendar.detail.field.timeZone">
-						<SelectMenu
-							className="cal-detail__tz"
-							ariaLabel={t("calendar.detail.field.timeZone")}
-							value={draft.timeZone ?? ""}
-							options={tzOptions}
-							onChange={onTzChange}
-						/>
-					</Field>
-
-					<Field labelKey="calendar.detail.field.location">
+						<button
+							type="button"
+							className="cal-detail__icon"
+							aria-label={t("calendar.detail.field.iconChoose")}
+							onClick={chooseIcon}
+						>
+							<EntityIcon icon={draft.icon ?? null} size={22} />
+						</button>
 						<input
 							type="text"
-							className="cal-detail__input"
-							value={draft.location ?? ""}
-							placeholder={t("calendar.detail.field.locationPlaceholder")}
-							onChange={(e) => patch({ location: e.target.value })}
+							className="cal-detail__input cal-detail__input--title"
+							value={draft.title}
+							placeholder={t("calendar.detail.field.titlePlaceholder")}
+							aria-label={t("calendar.detail.field.title")}
+							onChange={(e) => patch({ title: e.target.value })}
+							onKeyDown={onTitleKey}
+							// biome-ignore lint/a11y/noAutofocus: detail dialog focuses the title on open
+							autoFocus
 						/>
-					</Field>
+						{!isCreate && objectMenu ? (
+							<MoreButton
+								context={objectMenu}
+								label={t("calendar.event.moreActions")}
+								className="cal-detail__more"
+							/>
+						) : null}
+					</div>
 
-					<Field labelKey="calendar.detail.field.status">
-						<RadioGroup
-							className="cal-detail__segmented"
-							ariaLabel={t("calendar.detail.field.status")}
-							value={statusValue}
-							onChange={(status) => patch({ statusKey: statusToStored(status) })}
-							options={EVENT_STATUSES.map((status) => ({
-								value: status,
-								className: "cal-detail__segment",
-								label: t(STATUS_LABEL_KEY[status]),
-								dataset: { "data-status": status },
-								children: t(STATUS_LABEL_KEY[status]),
-							}))}
+					<div className="cal-detail__field cal-detail__field--inline">
+						<span className="cal-detail__label">{t("calendar.detail.field.allDay")}</span>
+						<Checkbox
+							ariaLabel={t("calendar.detail.field.allDay")}
+							checked={draft.allDay}
+							onChange={onAllDayToggle}
 						/>
-					</Field>
+					</div>
 
-					<Field labelKey="calendar.detail.field.color">
-						<RadioGroup
-							className="cal-detail__swatches"
-							ariaLabel={t("calendar.detail.field.color")}
-							value={colorValue}
-							onChange={(color) => patch({ colorHint: color })}
-							options={[
-								{
-									value: null,
-									className: "cal-detail__swatch cal-detail__swatch--none",
-									label: t("calendar.color.none"),
-									dataset: { "data-color": "none" },
-								},
-								...EVENT_COLOR_PRESETS.map((preset) => ({
-									value: preset.value as string | null,
-									className: "cal-detail__swatch",
-									label: t("calendar.color.choose", { color: t(`calendar.color.${preset.key}` as TKey) }),
-									dataset: { "data-color": preset.key },
-									style: { "--swatch-color": preset.value },
-								})),
-							]}
-						/>
-					</Field>
+					<DateTimeField
+						labelKey="calendar.detail.field.start"
+						value={startStr}
+						allDay={draft.allDay}
+						onChange={onStartChange}
+					/>
+					<DateTimeField
+						labelKey="calendar.detail.field.end"
+						value={endStr}
+						allDay={draft.allDay}
+						onChange={onEndChange}
+					/>
 
-					<Field labelKey="calendar.detail.field.repeat">
-						<RecurrenceEditor
-							value={draft.recurrence}
-							start={draft.start}
-							labels={calendarRecurrenceEditorLabels()}
-							summaryLabels={recurrenceLabels()}
-							onChange={(rec) => patch({ recurrence: rec })}
-						/>
-					</Field>
+					<details className="cal-detail__more" open={moreOpen}>
+						<summary className="cal-detail__more-summary">{t("calendar.detail.more")}</summary>
 
-					<Field labelKey="calendar.detail.field.reminders">
-						<div
-							className="cal-detail__reminders"
-							role="group"
-							aria-label={t("calendar.detail.field.reminders")}
-						>
-							{REMINDER_PRESET_MINUTES.map((minutes) => {
-								const on = selectedReminders.has(minutes);
-								return (
-									<button
-										key={minutes}
-										type="button"
-										className="cal-detail__reminder"
-										data-minutes={String(minutes)}
-										aria-pressed={on}
-										data-selected={String(on)}
-										onClick={() => patch({ reminders: toggleReminder([...selectedReminders], minutes) })}
-									>
-										{reminderOffsetLabel(minutes)}
-									</button>
-								);
-							})}
-						</div>
-					</Field>
+						<Field labelKey="calendar.detail.field.timeZone">
+							<SelectMenu
+								className="cal-detail__tz"
+								ariaLabel={t("calendar.detail.field.timeZone")}
+								value={draft.timeZone ?? ""}
+								options={tzOptions}
+								onChange={onTzChange}
+							/>
+						</Field>
 
-					<Field labelKey="calendar.detail.field.attendees">
-						<AttendeeEditor value={draft.attendees} onChange={(attendees) => patch({ attendees })} />
-					</Field>
+						<Field labelKey="calendar.detail.field.location">
+							<input
+								type="text"
+								className="cal-detail__input"
+								value={draft.location ?? ""}
+								placeholder={t("calendar.detail.field.locationPlaceholder")}
+								onChange={(e) => patch({ location: e.target.value })}
+							/>
+						</Field>
 
-					<Field labelKey="calendar.detail.field.description">
-						<textarea
-							className="cal-detail__textarea"
-							rows={3}
-							value={draft.description ?? ""}
-							placeholder={t("calendar.detail.field.descriptionPlaceholder")}
-							onChange={(e) => patch({ description: e.target.value })}
-						/>
-					</Field>
-				</details>
+						<Field labelKey="calendar.detail.field.status">
+							<RadioGroup
+								className="cal-detail__segmented"
+								ariaLabel={t("calendar.detail.field.status")}
+								value={statusValue}
+								onChange={(status) => patch({ statusKey: statusToStored(status) })}
+								options={EVENT_STATUSES.map((status) => ({
+									value: status,
+									className: "cal-detail__segment",
+									label: t(STATUS_LABEL_KEY[status]),
+									dataset: { "data-status": status },
+									children: t(STATUS_LABEL_KEY[status]),
+								}))}
+							/>
+						</Field>
 
-				<p className="cal-detail__error" role="alert" hidden={error === null}>
-					{error}
-				</p>
-			</div>
+						<Field labelKey="calendar.detail.field.color">
+							<RadioGroup
+								className="cal-detail__swatches"
+								ariaLabel={t("calendar.detail.field.color")}
+								value={colorValue}
+								onChange={(color) => patch({ colorHint: color })}
+								options={[
+									{
+										value: null,
+										className: "cal-detail__swatch cal-detail__swatch--none",
+										label: t("calendar.color.none"),
+										dataset: { "data-color": "none" },
+									},
+									...EVENT_COLOR_PRESETS.map((preset) => ({
+										value: preset.value as string | null,
+										className: "cal-detail__swatch",
+										label: t("calendar.color.choose", { color: t(`calendar.color.${preset.key}` as TKey) }),
+										dataset: { "data-color": preset.key },
+										style: { "--swatch-color": preset.value },
+									})),
+								]}
+							/>
+						</Field>
+
+						<Field labelKey="calendar.detail.field.repeat">
+							<RecurrenceEditor
+								value={draft.recurrence}
+								start={draft.start}
+								labels={calendarRecurrenceEditorLabels()}
+								summaryLabels={recurrenceLabels()}
+								onChange={(rec) => patch({ recurrence: rec })}
+							/>
+						</Field>
+
+						<Field labelKey="calendar.detail.field.reminders">
+							<div
+								className="cal-detail__reminders"
+								role="group"
+								aria-label={t("calendar.detail.field.reminders")}
+							>
+								{REMINDER_PRESET_MINUTES.map((minutes) => {
+									const on = selectedReminders.has(minutes);
+									return (
+										<button
+											key={minutes}
+											type="button"
+											className="cal-detail__reminder"
+											data-minutes={String(minutes)}
+											aria-pressed={on}
+											data-selected={String(on)}
+											onClick={() => patch({ reminders: toggleReminder([...selectedReminders], minutes) })}
+										>
+											{reminderOffsetLabel(minutes)}
+										</button>
+									);
+								})}
+							</div>
+						</Field>
+
+						<Field labelKey="calendar.detail.field.attendees">
+							<AttendeeEditor value={draft.attendees} onChange={(attendees) => patch({ attendees })} />
+						</Field>
+
+						<Field labelKey="calendar.detail.field.description">
+							<textarea
+								className="cal-detail__textarea"
+								rows={3}
+								value={draft.description ?? ""}
+								placeholder={t("calendar.detail.field.descriptionPlaceholder")}
+								onChange={(e) => patch({ description: e.target.value })}
+							/>
+						</Field>
+					</details>
+
+					<p className="cal-detail__error" role="alert" hidden={error === null}>
+						{error}
+					</p>
+				</div>
+			</fieldset>
 		</Popover>
 	);
 }

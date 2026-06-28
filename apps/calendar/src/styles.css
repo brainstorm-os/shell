@@ -1227,6 +1227,16 @@ body.is-resizing .calendar-resize {
 
 /* ─── Event detail / create surface ───────────────────────────────── */
 
+/* The lock fieldset wraps the whole form so `disabled` can freeze every control
+   for a read-only (locked) event; strip the native fieldset chrome so it's an
+   invisible wrapper. */
+.cal-detail__lock-fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+	min-inline-size: 0;
+}
+
 .cal-detail {
 	display: flex;
 	flex-direction: column;

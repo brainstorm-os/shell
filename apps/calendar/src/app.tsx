@@ -768,8 +768,18 @@ export function CalendarApp() {
 					defaultStart={detail.defaultStart}
 					onResolve={applyDetailResult}
 					onClose={() => setDetail(null)}
+					locked={detail.event?.locked ?? false}
 					{...(detail.event
-						? { objectMenu: () => objectMenuFor(eventToScheduledItem(detail.event as Event)) }
+						? {
+								objectMenu: () => objectMenuFor(eventToScheduledItem(detail.event as Event)),
+								onToggleLock: () => {
+									const ev = detail.event;
+									if (!ev) return;
+									const next = !ev.locked;
+									void storageRuntime?.services?.entities?.update?.(ev.id, { locked: next });
+									setDetail((d) => (d?.event ? { ...d, event: { ...d.event, locked: next } } : d));
+								},
+							}
 						: {})}
 				/>
 			) : null}
