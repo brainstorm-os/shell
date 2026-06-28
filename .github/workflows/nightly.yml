@@ -8,8 +8,12 @@ name: Nightly
 # (mirror release.yml's env block) once they exist.
 
 on:
-  schedule:
-    - cron: "0 7 * * *" # 07:00 UTC daily (~midnight US Pacific)
+  # Daily schedule is OFF until we hold signing certs + an updater (the builds
+  # are unsigned and nothing consumes the prerelease yet), and to cap Actions
+  # spend — a 6-OS build+publish every night is expensive. Re-enable the cron
+  # when release infra lands. Until then, run on demand via the Actions tab.
+  # schedule:
+  #   - cron: "0 7 * * *" # 07:00 UTC daily (~midnight US Pacific)
   workflow_dispatch: {}
 
 # One nightly at a time; a newer trigger supersedes an in-flight run.

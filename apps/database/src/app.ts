@@ -1435,7 +1435,9 @@ function renderInspector(state: AppState): void {
 		lockBtn.hidden = false;
 		lockBtn.replaceChildren(createIconElement(IconName.Lock));
 		lockBtn.setAttribute("aria-pressed", String(recordLocked));
-		const lockLabel = recordLocked ? "Unlock record" : "Lock record (read-only)";
+		const lockLabel = recordLocked
+			? t("brainstorm.database.record.unlock")
+			: t("brainstorm.database.record.lock");
 		lockBtn.setAttribute("aria-label", lockLabel);
 		lockBtn.setAttribute("data-bs-tooltip", lockLabel);
 		lockBtn.onclick = () => {

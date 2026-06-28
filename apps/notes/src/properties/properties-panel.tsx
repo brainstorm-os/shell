@@ -40,6 +40,9 @@ export type PropertiesPanelProps = {
 	/** Suppress the panel's own header when hosted inside the comments tab strip
 	 *  (the tab already says "Properties") — avoids a doubled header (F-252). */
 	hideHeader?: boolean;
+	/** A locked note: every row renders read-only and the add-property
+	 *  affordance hides (the value writes are already no-ops upstream). */
+	readOnly?: boolean;
 };
 
 export function PropertiesPanel({
@@ -49,6 +52,7 @@ export function PropertiesPanel({
 	onBind,
 	onClose,
 	hideHeader,
+	readOnly,
 }: PropertiesPanelProps): JSX.Element {
 	const { store, properties } = usePropertyStore();
 	const addButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -61,13 +65,17 @@ export function PropertiesPanel({
 			if (def) out.push({ key, def });
 		}
 		out.sort((a, b) => a.def.name.localeCompare(b.def.name));
-		return out.map(({ def }) => ({
-			def,
-			value: readValue(values, def),
-			onChange: (next: unknown) => onSetValue(def, next),
-			onRemove: () => onClear(def.key),
-		}));
-	}, [note.values, properties, onSetValue, onClear]);
+		return out.map(({ def }) =>
+			readOnly
+				? { def, value: readValue(values, def), readOnly: true }
+				: {
+						def,
+						value: readValue(values, def),
+						onChange: (next: unknown) => onSetValue(def, next),
+						onRemove: () => onClear(def.key),
+					},
+		);
+	}, [note.values, properties, onSetValue, onClear, readOnly]);
 
 	const meta = useMemo<PropertiesPanelMeta[]>(
 		() => [
@@ -110,9 +118,9 @@ export function PropertiesPanel({
 			removeLabel={(name) => t("notes.properties.remove", { name })}
 			{...(hideHeader ? { hideHeader: true } : { onClose })}
 			closeLabel={t("notes.properties.hide")}
-			onAdd={openAddProperty}
-			addLabel={t("notes.properties.add")}
-			addButtonRef={addButtonRef}
+			{...(readOnly
+				? {}
+				: { onAdd: openAddProperty, addLabel: t("notes.properties.add"), addButtonRef })}
 			meta={meta}
 		/>
 	);

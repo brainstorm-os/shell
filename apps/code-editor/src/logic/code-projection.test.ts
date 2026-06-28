@@ -50,6 +50,7 @@ describe("entityToCodeFileRow", () => {
 			sizeBytes: 19,
 			lineCount: 1,
 			isDirty: true,
+			locked: false,
 			lastOpenedAt: 42,
 			createdAt: 1,
 			updatedAt: 2,

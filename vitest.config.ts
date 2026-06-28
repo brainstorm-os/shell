@@ -139,6 +139,7 @@ export default defineConfig({
 				"packages/sdk/src/storage-repository.ts",
 			),
 			"@brainstorm/sdk/last-viewed": resolve(__dirname, "packages/sdk/src/last-viewed.ts"),
+			"@brainstorm/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
 			"@brainstorm/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
 			"@brainstorm/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),

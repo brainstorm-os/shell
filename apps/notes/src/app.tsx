@@ -622,30 +622,32 @@ export function NotesApp() {
 		[note, setValue, commentsAdapter, onCommentSelection, commentedBlockIds, onCommentBlockClick],
 	);
 
+	// A locked note is read-only — its property bag freezes alongside the body
+	// editor (the panel itself also renders read-only via `locked` below).
 	const onSetPropertyValue = useCallback(
 		<V extends ValueType>(def: PropertyDef & { valueType: V }, next: PropertyValueByValueType[V]) => {
-			if (!note) return;
+			if (!note || locked) return;
 			setValue(note.id, def, next);
 		},
-		[note, setValue],
+		[note, locked, setValue],
 	);
 
 	const onClearPropertyValue = useCallback(
 		(key: string) => {
-			if (!note) return;
+			if (!note || locked) return;
 			update(note.id, { values: clearValue(note.values, key) });
 		},
-		[note, update],
+		[note, locked, update],
 	);
 
 	const onBindProperty = useCallback(
 		(def: PropertyDef) => {
-			if (!note) return;
+			if (!note || locked) return;
 			const nextValues = bindValue(note.values, def as PropertyDef & { valueType: ValueType });
 			if (nextValues === note.values) return;
 			update(note.id, { values: nextValues });
 		},
-		[note, update],
+		[note, locked, update],
 	);
 
 	const headerTitle = note?.title.trim() || (note ? t("notes.list.untitled") : t("notes.app.title"));
@@ -745,6 +747,7 @@ export function NotesApp() {
 			onClear={onClearPropertyValue}
 			onBind={onBindProperty}
 			onClose={toggleProps}
+			readOnly={locked}
 			// Inside the comments tab strip the tab already says "Properties";
 			// suppress the panel's own header so it isn't doubled (F-252).
 			hideHeader={Boolean(commentsAdapter)}

@@ -855,20 +855,27 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	// edit through one path. Status routes through `moveTaskToStatus` so the
 	// Done→completedAt rule (and board-drag parity) holds.
 	const taskFieldHandlers = useCallback(
-		(taskId: string): TaskFieldHandlers => ({
-			onStatusChange: (statusKey) => moveTaskToStatus(taskId, statusKey),
-			onPriorityChange: (priority) =>
-				patchTask(taskId, (e) => ({ ...e, priority, updatedAt: nowAnchor() })),
-			onScheduledChange: (at) =>
-				patchTask(taskId, (e) => ({ ...e, scheduledAt: at, updatedAt: nowAnchor() })),
-			onDueChange: (at) => patchTask(taskId, (e) => ({ ...e, dueAt: at, updatedAt: nowAnchor() })),
-			onProjectChange: (projectId) =>
-				patchTask(taskId, (e) => ({ ...e, projectId, updatedAt: nowAnchor() })),
-			onAssigneeChange: (assigneeId) => onPickAssignee(taskId, assigneeId),
-			onEstimateChange: (minutes) => setTaskMinutes(taskId, "estimateMinutes", minutes),
-			onLoggedChange: (minutes) => setTaskMinutes(taskId, "loggedMinutes", minutes),
-			onTagsChange: (tags) => setTaskTags(taskId, tags),
-		}),
+		(taskId: string): TaskFieldHandlers => {
+			// A locked task is read-only: hand back no persisters, so every
+			// bridged property cell renders read-only (mirrors Database's
+			// locked-record freeze). The title + custom-property paths are
+			// frozen at their own call sites.
+			if (dataRef.current.tasks.find((x) => x.id === taskId)?.locked) return {};
+			return {
+				onStatusChange: (statusKey) => moveTaskToStatus(taskId, statusKey),
+				onPriorityChange: (priority) =>
+					patchTask(taskId, (e) => ({ ...e, priority, updatedAt: nowAnchor() })),
+				onScheduledChange: (at) =>
+					patchTask(taskId, (e) => ({ ...e, scheduledAt: at, updatedAt: nowAnchor() })),
+				onDueChange: (at) => patchTask(taskId, (e) => ({ ...e, dueAt: at, updatedAt: nowAnchor() })),
+				onProjectChange: (projectId) =>
+					patchTask(taskId, (e) => ({ ...e, projectId, updatedAt: nowAnchor() })),
+				onAssigneeChange: (assigneeId) => onPickAssignee(taskId, assigneeId),
+				onEstimateChange: (minutes) => setTaskMinutes(taskId, "estimateMinutes", minutes),
+				onLoggedChange: (minutes) => setTaskMinutes(taskId, "loggedMinutes", minutes),
+				onTagsChange: (tags) => setTaskTags(taskId, tags),
+			};
+		},
 		[moveTaskToStatus, patchTask, nowAnchor, onPickAssignee, setTaskMinutes, setTaskTags],
 	);
 
@@ -1974,7 +1981,8 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		? openTaskRecord.name
 		: headerTitleText(selection, headerProject);
 
-	const titleEditable = openTaskRecord !== null || headerProject !== null;
+	const titleEditable =
+		(openTaskRecord !== null && !openTaskRecord.locked) || headerProject !== null;
 	const onTitleDblClick = useCallback(
 		(event: React.MouseEvent<HTMLElement>) => {
 			if (!titleEditable) return;
@@ -2169,7 +2177,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 							task={openTaskRecord}
 							open={propsOpen}
 							onClose={toggleProps}
-							{...(repository
+							{...(repository && !openTaskRecord.locked
 								? {
 										...taskFieldHandlers(openTaskRecord.id),
 										onValuesChange: (values: ValuesMap) => onTaskValuesChange(openTaskRecord.id, values),

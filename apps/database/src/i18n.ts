@@ -68,6 +68,10 @@ const DEFAULTS = {
 	// Sidebar System section (F-212)
 	"brainstorm.database.sidebar.system": "System",
 	"brainstorm.database.sidebar.systemToggle": "Toggle the System section",
+
+	// Read-only record lock (inspector header toggle)
+	"brainstorm.database.record.lock": "Lock record (read-only)",
+	"brainstorm.database.record.unlock": "Unlock record",
 } as const;
 
 export type DatabaseManifest = typeof DEFAULTS;

@@ -2064,22 +2064,31 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		};
 	}
 
+	// A locked board rejects every mutation, keyboard included — the disabled
+	// header menus only cover the pointer path (per setReadonly's contract).
+	function unlessReadonly(fn: () => void): () => void {
+		return () => {
+			if (state.readonly) return;
+			fn();
+		};
+	}
+
 	function bindShortcuts(): void {
 		const off = (fn: () => void): void => {
 			unbinders.push(fn);
 		};
-		off(bindShortcut(ActionId.CreateSticky, unlessEditing(createSticky)));
-		off(bindShortcut(ActionId.CreateText, unlessEditing(createText)));
-		off(bindShortcut(ActionId.CreateFrame, unlessEditing(createFrame)));
-		off(bindShortcut(ActionId.CreateGroup, createGroupFromSelection));
-		off(bindShortcut(ActionId.Ungroup, ungroupSelection));
-		off(bindShortcut(ActionId.DeleteNode, deleteSelection));
-		off(bindShortcut(ActionId.DuplicateNode, duplicateSelection));
+		off(bindShortcut(ActionId.CreateSticky, unlessReadonly(unlessEditing(createSticky))));
+		off(bindShortcut(ActionId.CreateText, unlessReadonly(unlessEditing(createText))));
+		off(bindShortcut(ActionId.CreateFrame, unlessReadonly(unlessEditing(createFrame))));
+		off(bindShortcut(ActionId.CreateGroup, unlessReadonly(createGroupFromSelection)));
+		off(bindShortcut(ActionId.Ungroup, unlessReadonly(ungroupSelection)));
+		off(bindShortcut(ActionId.DeleteNode, unlessReadonly(deleteSelection)));
+		off(bindShortcut(ActionId.DuplicateNode, unlessReadonly(duplicateSelection)));
 		off(bindShortcut(ActionId.SelectAll, selectAll));
-		off(bindShortcut(ActionId.Undo, undoBoard));
-		off(bindShortcut(ActionId.Redo, redoBoard));
-		off(bindShortcut(ActionId.ToggleBold, toggleSelectionBold));
-		off(bindShortcut(ActionId.ToggleItalic, toggleSelectionItalic));
+		off(bindShortcut(ActionId.Undo, unlessReadonly(undoBoard)));
+		off(bindShortcut(ActionId.Redo, unlessReadonly(redoBoard)));
+		off(bindShortcut(ActionId.ToggleBold, unlessReadonly(toggleSelectionBold)));
+		off(bindShortcut(ActionId.ToggleItalic, unlessReadonly(toggleSelectionItalic)));
 		off(
 			bindShortcut(ActionId.ClearSelection, () => {
 				if (state.editingNodeId !== null) return;
@@ -2089,10 +2098,30 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 				liveRegion.announce(t("whiteboard.a11y.cleared"));
 			}),
 		);
-		off(bindShortcut(ActionId.NudgeUp, () => nudgeSelection(0, -1)));
-		off(bindShortcut(ActionId.NudgeDown, () => nudgeSelection(0, 1)));
-		off(bindShortcut(ActionId.NudgeLeft, () => nudgeSelection(-1, 0)));
-		off(bindShortcut(ActionId.NudgeRight, () => nudgeSelection(1, 0)));
+		off(
+			bindShortcut(
+				ActionId.NudgeUp,
+				unlessReadonly(() => nudgeSelection(0, -1)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.NudgeDown,
+				unlessReadonly(() => nudgeSelection(0, 1)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.NudgeLeft,
+				unlessReadonly(() => nudgeSelection(-1, 0)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.NudgeRight,
+				unlessReadonly(() => nudgeSelection(1, 0)),
+			),
+		);
 		off(
 			bindShortcut(ActionId.EditNode, () => {
 				const id = firstSelectedId();

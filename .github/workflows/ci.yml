@@ -18,49 +18,23 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      # Trimmed to the two runners GitHub reliably provides (the macOS runners
+      # are 10× the cost and were perpetually queued/cancelled; the arm runners
+      # are unavailable "GA-2025 preview" labels). `verify` is platform-agnostic
+      # logic, fully covered by ubuntu-x64; windows-x64 stays because Windows
+      # has real path/SQLite-lock behaviour the suite exercises. macOS is the
+      # dev platform, so it's covered locally. Per-OS packaging lives in
+      # release.yml / alpha.yml — it doesn't belong on every push.
       matrix:
         include:
-          - os: macos-13
-            arch: x64
-            runner: macos-13
-            rust-target: x86_64-apple-darwin
-            napi-script: build:darwin-x64
-            package-script: package:mac
-          - os: macos-14
-            arch: arm64
-            runner: macos-14
-            rust-target: aarch64-apple-darwin
-            napi-script: build:darwin-arm64
-            package-script: package:mac
-          - os: windows-2022
-            arch: x64
-            runner: windows-2022
-            rust-target: x86_64-pc-windows-msvc
-            napi-script: build:windows-x64
-            package-script: package:win
-          # GA-2025 — verify availability + exact label at iteration start.
-          # If the runner label is wrong, this matrix entry fails fast with
-          # "unknown runner" and the label can be corrected without affecting
-          # the other entries (fail-fast is off).
-          - os: windows-11-arm
-            arch: arm64
-            runner: windows-11-arm
-            rust-target: aarch64-pc-windows-msvc
-            napi-script: build:windows-arm64
-            package-script: package:win
           - os: ubuntu-22.04
             arch: x64
             runner: ubuntu-22.04
             rust-target: x86_64-unknown-linux-gnu
-            napi-script: build:linux-x64
-            package-script: package:linux
-          # GA-2025 — verify availability + exact label at iteration start.
-          - os: ubuntu-22.04-arm
-            arch: arm64
-            runner: ubuntu-22.04-arm
-            rust-target: aarch64-unknown-linux-gnu
-            napi-script: build:linux-arm64
-            package-script: package:linux
+          - os: windows-2022
+            arch: x64
+            runner: windows-2022
+            rust-target: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
 
@@ -70,33 +44,11 @@ jobs:
           rust-target: ${{ matrix.rust-target }}
 
       - name: Verify (typecheck + lint + tests)
+        # `verify` already builds the native addon + all apps before testing.
         run: bun run verify
 
-      - name: Build native (host-arch)
-        run: bun run --filter @brainstorm/native ${{ matrix.napi-script }}
-
-      - name: Build apps + shell
-        run: bun run --filter @brainstorm/shell build && bun run build:apps
-
-      - name: Package (unsigned)
-        env:
-          # Signing is env-var-gated; no secrets → no-op signed step.
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: bun run --filter @brainstorm/shell ${{ matrix.package-script }}
-
-      - name: Smoke-check artefact (host platform)
-        if: matrix.os == 'macos-14'  # the host-platform smoke; other OSes skip
-        run: node packages/shell/scripts/preview-package.mjs
-
-      - name: Upload artefact (diagnostic only — not for release)
-        uses: actions/upload-artifact@v4
-        with:
-          name: brainstorm-${{ matrix.os }}-${{ matrix.arch }}
-          path: packages/shell/dist/*
-          retention-days: 7
+      - name: Build shell bundle (sanity)
+        run: bun run --filter @brainstorm/shell build
 
   # 13.3 — real-renderer smoke on a virtual display. Runs the Playwright e2e
   # suite (beta-exit flows) and the KBN-P keyboard-accessibility specs against
