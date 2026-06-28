@@ -54,12 +54,6 @@ export type TaskRowProps = {
 	/** Open the shared icon picker for this task (the app mounts the
 	 *  picker + persists — the row stays presentational). */
 	onPickIcon(task: Task): void;
-	/** Inline edit affordances. The app opens an anchored menu / picker
-	 *  and persists via its existing patchTask path; the row only signals
-	 *  intent + supplies the anchor element. */
-	onPickPriority(task: Task, anchor: HTMLElement): void;
-	onPickDate(task: Task, anchor: HTMLElement): void;
-	onPickProject(task: Task, anchor: HTMLElement): void;
 	onRenameTask(task: Task, name: string): void;
 	onOpenEdit(task: Task): void;
 	/** Select the task → open the right-side inspector (9.14.6). Fired by
@@ -98,9 +92,10 @@ export type TaskRowProps = {
 	 *  the estimate). */
 	estimateMinutes?: number | null;
 	loggedMinutes?: number | null;
-	/** Tags (9.14.10) shown as small chips; clicking one filters by it. */
-	tags?: readonly string[];
-	onClickTag?(tag: string): void;
+	/** Tags (9.14.10) shown as small chips; clicking one filters by it. Each is
+	 *  the vocabulary item `id` plus its resolved display `label`. */
+	tags?: readonly { id: string; label: string }[];
+	onClickTag?(tagId: string): void;
 	/** Assignee display name (9.14.15) — resolved by the app from
 	 *  `task.assigneeId` via the shared entity-title index. Null/absent =
 	 *  unassigned (no chip); editing happens in the detail's properties
@@ -181,10 +176,12 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 	const chips = document.createElement("div");
 	chips.className = "task-row__chips";
 
-	chips.appendChild(priorityChip(task, (anchor) => props.onPickPriority(task, anchor)));
+	const pri = priorityChip(task);
+	if (pri) chips.appendChild(pri);
 
 	if (!dateChipRedundant(task, props.sectionDateKey)) {
-		chips.appendChild(dateChip(task, now, overdue, (anchor) => props.onPickDate(task, anchor)));
+		const date = dateChip(task, now, overdue);
+		if (date) chips.appendChild(date);
 	}
 
 	if (task.recurrence !== null) {
@@ -200,7 +197,8 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 	}
 
 	if (showProjectChip) {
-		chips.appendChild(projectChip(task, projectsById, (anchor) => props.onPickProject(task, anchor)));
+		const proj = projectChip(task, projectsById);
+		if (proj) chips.appendChild(proj);
 	}
 
 	if (props.assigneeName) {
@@ -236,12 +234,12 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 			const chip = document.createElement("button");
 			chip.type = "button";
 			chip.className = "task-row__tag";
-			chip.textContent = tag;
+			chip.textContent = tag.label;
 			if (props.onClickTag) {
 				const onClickTag = props.onClickTag;
 				chip.addEventListener("click", (e) => {
 					e.stopPropagation();
-					onClickTag(tag);
+					onClickTag(tag.id);
 				});
 			} else {
 				chip.disabled = true;
@@ -360,24 +358,17 @@ export function renderEditableName(
 	return host;
 }
 
-export function priorityChip(task: Task, open: (anchor: HTMLElement) => void): HTMLButtonElement {
-	const button = document.createElement("button");
-	button.type = "button";
-	button.className = "task-row__chip task-row__chip--editable";
-	button.dataset.kind = "priority";
-	button.dataset.value = task.priority;
-	button.setAttribute("aria-label", t("tasks.row.chip.priority.aria"));
-	if (task.priority === Priority.None) {
-		button.dataset.empty = "true";
-		button.textContent = t("tasks.row.chip.priority.set");
-	} else {
-		button.textContent = t(PRIORITY_LABEL[task.priority]);
-	}
-	button.addEventListener("click", (event) => {
-		event.stopPropagation();
-		open(button);
-	});
-	return button;
+// The chips below are glance-only: they display a task's priority / date /
+// project at rest. Editing happens by opening the task (its detail mounts the
+// shared property cells). An unset field shows no chip.
+export function priorityChip(task: Task): HTMLSpanElement | null {
+	if (task.priority === Priority.None) return null;
+	const el = document.createElement("span");
+	el.className = "task-row__chip";
+	el.dataset.kind = "priority";
+	el.dataset.value = task.priority;
+	el.textContent = t(PRIORITY_LABEL[task.priority]);
+	return el;
 }
 
 /** True when the row sits in a date-grouped section whose heading
@@ -391,68 +382,37 @@ function dateChipRedundant(task: Task, sectionDateKey: string | undefined): bool
 	return dateKey(anchor) === sectionDateKey;
 }
 
-export function dateChip(
-	task: Task,
-	now: number,
-	overdue: boolean,
-	open: (anchor: HTMLElement) => void,
-): HTMLButtonElement {
-	const button = document.createElement("button");
-	button.type = "button";
-	button.className = "task-row__chip task-row__chip--editable";
+export function dateChip(task: Task, now: number, overdue: boolean): HTMLSpanElement | null {
 	const dateAnchor = task.dueAt ?? task.scheduledAt ?? null;
-	if (dateAnchor === null) {
-		button.dataset.kind = "date";
-		button.dataset.empty = "true";
-		button.textContent = t("tasks.row.chip.date.set");
-	} else {
-		button.dataset.kind = overdue ? "date-overdue" : "date";
-		const labelKey = task.dueAt !== null ? "tasks.row.due" : "tasks.row.scheduled";
-		button.textContent = t(labelKey, { date: formatDateRelative(dateAnchor, now) });
-	}
-	button.setAttribute("aria-label", t("tasks.row.chip.date.aria"));
-	button.addEventListener("click", (event) => {
-		event.stopPropagation();
-		open(button);
-	});
-	return button;
+	if (dateAnchor === null) return null;
+	const el = document.createElement("span");
+	el.className = "task-row__chip";
+	el.dataset.kind = overdue ? "date-overdue" : "date";
+	const labelKey = task.dueAt !== null ? "tasks.row.due" : "tasks.row.scheduled";
+	el.textContent = t(labelKey, { date: formatDateRelative(dateAnchor, now) });
+	return el;
 }
 
 export function projectChip(
 	task: Task,
 	projectsById: ReadonlyMap<string, Project>,
-	open: (anchor: HTMLElement) => void,
-): HTMLButtonElement {
-	const button = document.createElement("button");
-	button.type = "button";
-	button.className = "task-row__chip task-row__chip--editable";
-	button.dataset.kind = "project";
-	button.setAttribute("aria-label", t("tasks.row.chip.project.aria"));
-	if (task.projectId === null) {
-		button.dataset.empty = "true";
-		button.textContent = t("tasks.row.chip.project.set");
-	} else {
-		const project = projectsById.get(task.projectId);
-		if (project) {
-			if (project.colorHint) button.style.setProperty("--chip-color", project.colorHint);
-			// Project names are unbounded user/seed text — keep the label in
-			// its own span so CSS can ellipsize it without collapsing the
-			// leading color dot, and expose the full name via `title`.
-			const text = document.createElement("span");
-			text.className = "task-row__chip-text";
-			text.textContent = project.name;
-			button.title = project.name;
-			button.appendChild(text);
-		} else {
-			button.dataset.empty = "true";
-			button.textContent = t("tasks.row.chip.project.set");
-		}
-	}
-	button.addEventListener("click", (event) => {
-		event.stopPropagation();
-		open(button);
-	});
-	return button;
+): HTMLSpanElement | null {
+	if (task.projectId === null) return null;
+	const project = projectsById.get(task.projectId);
+	if (!project) return null;
+	const el = document.createElement("span");
+	el.className = "task-row__chip";
+	el.dataset.kind = "project";
+	if (project.colorHint) el.style.setProperty("--chip-color", project.colorHint);
+	// Project names are unbounded user/seed text — keep the label in its own
+	// span so CSS can ellipsize it without collapsing the leading color dot,
+	// and expose the full name via `title`.
+	const text = document.createElement("span");
+	text.className = "task-row__chip-text";
+	text.textContent = project.name;
+	el.title = project.name;
+	el.appendChild(text);
+	return el;
 }
 
 type ChipSpec = {

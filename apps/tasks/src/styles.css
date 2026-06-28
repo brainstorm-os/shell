@@ -233,21 +233,12 @@ body.is-resizing .tasks-resize {
 	line-height: var(--text-line-height-tight, 1.2);
 }
 
-.tasks-detail__chips {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-1);
+/* Inline property cells island in the detail (status / priority / dates /
+   project / estimate / logged / tags as the shared cells). */
+.tasks-detail__properties {
 	margin-bottom: var(--space-4);
-	padding-bottom: var(--space-4);
+	padding-bottom: var(--space-2);
 	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
-}
-
-/* In the detail the user is focused on one task, so unset-field
-   affordances ("Set priority", "Schedule", "Inbox") are always visible —
-   unlike the list rows, where they're revealed on hover. */
-.tasks-detail__chips .task-row__chip--editable[data-empty="true"] {
-	display: inline-flex;
-	opacity: 0.65;
 }
 
 /* Subtask progress badge on a parent task's list row (9.14.7). */
@@ -811,64 +802,6 @@ body.is-resizing .tasks-resize {
 	background: var(--color-accent-subtle, color-mix(in srgb, var(--accent) 10%, transparent));
 }
 
-/* Tags (9.14.10). */
-.tasks-detail__tags {
-	margin-bottom: var(--space-4);
-	padding-bottom: var(--space-4);
-	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
-}
-
-.tasks-detail__tag-list {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-1);
-	margin-bottom: var(--space-1);
-}
-
-.tasks-detail__tag {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-0_5);
-	padding: 0 var(--space-0_5) 0 var(--space-2);
-	border-radius: var(--radius-full);
-	background: var(--color-accent-subtle, color-mix(in srgb, var(--accent) 12%, transparent));
-	color: var(--accent);
-	font-size: var(--text-size-sm);
-}
-
-.tasks-detail__tag-label {
-	background: none;
-	border: none;
-	color: inherit;
-	font: inherit;
-	cursor: pointer;
-	padding: 0;
-}
-
-.tasks-detail__tag-remove {
-	background: none;
-	border: none;
-	color: inherit;
-	cursor: pointer;
-	padding: 0 var(--space-1);
-	opacity: 0.7;
-}
-
-.tasks-detail__tag-remove:hover {
-	opacity: 1;
-}
-
-.tasks-detail__tag-add-input {
-	width: 100%;
-	box-sizing: border-box;
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--color-border-subtle, var(--border));
-	border-radius: var(--radius-sm);
-	background: var(--bg-elev, transparent);
-	color: inherit;
-	font: inherit;
-}
-
 .task-row__tag {
 	display: inline-flex;
 	align-items: center;
@@ -927,42 +860,10 @@ body.is-resizing .tasks-resize {
 	opacity: 1;
 }
 
-/* Time estimate / logged section (9.14.13). */
-.tasks-detail__time {
-	margin-bottom: var(--space-4);
-	padding-bottom: var(--space-4);
-	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
-}
-
-.tasks-detail__time-row {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	margin-top: var(--space-1);
-}
-
-.tasks-detail__time-label {
-	flex: 0 0 84px;
-	color: var(--color-text-secondary, var(--text-dim));
-}
-
-.tasks-detail__time-input {
-	flex: 1 1 auto;
-	min-width: 0;
-	font: inherit;
-	color: inherit;
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--color-border-subtle, var(--border));
-	border-radius: var(--radius-sm);
-	background: var(--bg-elev, transparent);
-}
-
 /* The bare detail text inputs carry no focus style of their own, so they fall
    back to the UA's native (blue) focus ring — out of step with the purple
    `--color-focus-ring` every other control (e.g. `.bs-select`) uses. Unify. */
-.tasks-detail__time-input:focus-visible,
 .tasks-detail__comment-input:focus-visible,
-.tasks-detail__tag-add-input:focus-visible,
 .tasks-detail__subtask-add-input:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: 1px;
@@ -1486,13 +1387,6 @@ body.is-resizing .tasks-resize {
 	background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.task-row[data-selected="true"] .task-row__chip--editable[data-empty="true"] {
-	/* Keep the unset-field affordances visible while inspecting so the
-	 * selected row's full editable surface is discoverable without hover. */
-	display: inline-flex;
-	opacity: 0.65;
-}
-
 /* Transient highlight ring painted by `highlightTaskRow` after a
  * cross-app `intent.open` targets this task. Border-color + box-shadow
  * fade together so the row visually anchors the user's attention for
@@ -1702,125 +1596,6 @@ body.is-resizing .tasks-resize {
 .task-row__chip[data-kind="recurring"] {
 	font-size: var(--text-size-sm);
 }
-
-/* Clickable chips reuse `.task-row__chip` for visual parity; the
-   `--editable` modifier adds button-like affordances. Empty chips are
-   dim affordances ("Set priority", "Schedule", "Inbox") that share the
-   same target so handlers don't fork. */
-.task-row__chip--editable {
-	cursor: pointer;
-	transition: border-color 80ms ease, background-color 80ms ease, color 80ms ease;
-}
-
-.task-row__chip--editable:hover {
-	border-color: var(--accent);
-	color: var(--text);
-}
-
-.task-row__chip--editable:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
-}
-
-/* Empty affordances ("Set priority", "Schedule", "Inbox") are a quiet
-   always-on rail (F-043) — visible at rest so a first-time user discovers
-   them without having to hover the exact row (and keyboard users get them
-   too), brightening when the row is hovered/focused and full on direct
-   hover. They're always shown, so there is no phantom-gap width to avoid —
-   the dashed-stub width is consistently present, not flickering in before
-   populated chips. */
-.task-row__chip--editable[data-empty="true"] {
-	display: inline-flex;
-	opacity: 0.4;
-	color: var(--text-faint);
-	background: transparent;
-	border: var(--border-width) dashed var(--border);
-	transition: opacity 80ms ease, border-color 80ms ease, color 80ms ease,
-		background-color 80ms ease;
-}
-
-.task-row:hover .task-row__chip--editable[data-empty="true"],
-.task-row:focus-within .task-row__chip--editable[data-empty="true"],
-.task-row__chip--editable[data-empty="true"]:focus-visible {
-	opacity: 0.7;
-}
-
-.task-row__chip--editable[data-empty="true"]:hover {
-	opacity: 1;
-	color: var(--text);
-	border-color: var(--accent);
-	border-style: solid;
-}
-
-/* ─── Inline date popover (chip-anchored) ─────────────────────────── */
-
-/* The two-field superset of the shared `.bs-cal-popover` (scheduled/due).
-   `glass--strong` (app-theme) owns the frosted background + border + blur —
-   matching every other calendar popover in the product. This rule owns only
-   layout + elevation, so it doesn't paint a solid fill over the glass. */
-.tasks-date-popover {
-	position: fixed;
-	z-index: 1000;
-	min-width: 260px;
-	padding: var(--space-2);
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
-	color: var(--text);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-popover, var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.2)));
-}
-
-.tasks-date-popover__tabs {
-	display: inline-flex;
-	align-self: stretch;
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-sm);
-	overflow: hidden;
-}
-
-.tasks-date-popover__tab {
-	flex: 1 1 0;
-	padding: var(--space-1);
-	font-size: var(--text-size-md);
-	color: var(--text-dim);
-	background: transparent;
-	border: 0;
-	cursor: pointer;
-	transition: background-color 80ms ease, color 80ms ease;
-}
-
-.tasks-date-popover__tab + .tasks-date-popover__tab {
-	border-inline-start: var(--border-width) solid var(--border);
-}
-
-.tasks-date-popover__tab:hover {
-	background: var(--hover);
-	color: var(--text);
-}
-
-.tasks-date-popover__tab[data-active="true"] {
-	background: var(--selected);
-	color: var(--text);
-}
-
-.tasks-date-popover__body {
-	min-height: 0;
-}
-
-.tasks-date-popover__body .bs-cal-mini {
-	padding: 0;
-}
-
-.tasks-date-popover__actions {
-	display: flex;
-	justify-content: flex-end;
-	gap: var(--space-2);
-}
-
-/* Date-popover actions use the shared `.bs-btn` primitive (secondary ·
- * data-bs-primary). */
 
 /* ─── Empty state ─────────────────────────────────────────────────── */
 

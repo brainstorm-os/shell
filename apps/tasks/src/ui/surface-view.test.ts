@@ -119,8 +119,11 @@ describe("renderSearchView — KBN-A task list", () => {
 	});
 
 	it("rows carry the builder's chip extras (tags + assignee), like board cards", () => {
-		const { rows } = mount({ tags: ["urgent"], assigneeName: "Mira Chen" });
-		expect(rows[0]?.querySelector(".task-row__tag")?.textContent).toBe("urgent");
+		const { rows } = mount({
+			tags: [{ id: "t-urgent", label: "Urgent" }],
+			assigneeName: "Mira Chen",
+		});
+		expect(rows[0]?.querySelector(".task-row__tag")?.textContent).toBe("Urgent");
 		expect(rows[0]?.querySelector(".task-row__assignee")?.textContent).toBe("Mira Chen");
 	});
 });

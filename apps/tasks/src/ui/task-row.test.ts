@@ -60,9 +60,6 @@ function mount(
 		showProjectChip: true,
 		onToggleComplete: vi.fn(),
 		onPickIcon: vi.fn(),
-		onPickPriority: vi.fn(),
-		onPickDate: vi.fn(),
-		onPickProject: vi.fn(),
 		onRenameTask: vi.fn(),
 		onOpenEdit: vi.fn(),
 		onSelectTask: vi.fn(),
@@ -100,51 +97,35 @@ describe("overdue treatment", () => {
 	});
 });
 
-describe("editable chips", () => {
-	it("priority chip renders an empty affordance when None", () => {
-		const { row } = mount(task());
-		const chip = row.querySelector<HTMLButtonElement>(
-			'.task-row__chip--editable[data-kind="priority"]',
-		);
+describe("glance-only chips", () => {
+	it("renders a glance-only priority chip (no click handler) when set", () => {
+		const { row } = mount(task({ priority: Priority.High }));
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind="priority"]');
 		expect(chip).not.toBeNull();
-		expect(chip?.dataset.empty).toBe("true");
+		expect(chip?.tagName).toBe("SPAN");
+		expect(chip?.dataset.value).toBe(Priority.High);
 	});
 
-	it("priority chip click fires onPickPriority with the chip as anchor", () => {
-		const { row, props } = mount(task({ priority: Priority.High }));
-		const chip = row.querySelector<HTMLButtonElement>(
-			'.task-row__chip--editable[data-kind="priority"]',
-		);
-		chip?.click();
-		expect(props.onPickPriority).toHaveBeenCalledTimes(1);
-		expect(props.onPickPriority).toHaveBeenCalledWith(
-			expect.objectContaining({ id: "task-1" }),
-			chip,
-		);
+	it("omits the priority chip when priority is None", () => {
+		const { row } = mount(task({ priority: Priority.None }));
+		expect(row.querySelector('.task-row__chip[data-kind="priority"]')).toBeNull();
 	});
 
-	it("date chip renders an empty affordance when no dates set", () => {
+	it("omits the date chip when no dates set", () => {
 		const { row } = mount(task());
-		const chip = row.querySelector<HTMLButtonElement>('.task-row__chip--editable[data-kind="date"]');
+		expect(row.querySelector('.task-row__chip[data-kind="date"]')).toBeNull();
+	});
+
+	it("renders a glance-only date chip when a date is set", () => {
+		const { row } = mount(task({ dueAt: 1234 }));
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind^="date"]');
 		expect(chip).not.toBeNull();
-		expect(chip?.dataset.empty).toBe("true");
+		expect(chip?.tagName).toBe("SPAN");
 	});
 
-	it("date chip click fires onPickDate", () => {
-		const { row, props } = mount(task({ dueAt: 1234 }));
-		const chip = row.querySelector<HTMLButtonElement>('.task-row__chip--editable[data-kind^="date"]');
-		chip?.click();
-		expect(props.onPickDate).toHaveBeenCalledTimes(1);
-	});
-
-	it("project chip renders Inbox affordance when projectId is null and fires onPickProject", () => {
-		const { row, props } = mount(task());
-		const chip = row.querySelector<HTMLButtonElement>(
-			'.task-row__chip--editable[data-kind="project"]',
-		);
-		expect(chip?.dataset.empty).toBe("true");
-		chip?.click();
-		expect(props.onPickProject).toHaveBeenCalledTimes(1);
+	it("omits the project chip when projectId is null", () => {
+		const { row } = mount(task());
+		expect(row.querySelector('.task-row__chip[data-kind="project"]')).toBeNull();
 	});
 
 	it("project chip renders the project name when populated", () => {
@@ -152,16 +133,17 @@ describe("editable chips", () => {
 		const { row } = mount(task({ projectId: "proj-a" }), {
 			projectsById: new Map([["proj-a", proj]]),
 		});
-		const chip = row.querySelector<HTMLButtonElement>(
-			'.task-row__chip--editable[data-kind="project"]',
-		);
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind="project"]');
 		expect(chip?.textContent).toBe("Garden");
-		expect(chip?.dataset.empty).toBeUndefined();
 	});
 
 	it("hides the project chip when showProjectChip is false", () => {
-		const { row } = mount(task(), { showProjectChip: false });
-		expect(row.querySelector('.task-row__chip--editable[data-kind="project"]')).toBeNull();
+		const proj = project("proj-a", { name: "Garden" });
+		const { row } = mount(task({ projectId: "proj-a" }), {
+			showProjectChip: false,
+			projectsById: new Map([["proj-a", proj]]),
+		});
+		expect(row.querySelector('.task-row__chip[data-kind="project"]')).toBeNull();
 	});
 
 	it("renders the project name in its own ellipsis span with a full-name title", () => {
@@ -170,9 +152,7 @@ describe("editable chips", () => {
 		const { row } = mount(task({ projectId: "proj-a" }), {
 			projectsById: new Map([["proj-a", proj]]),
 		});
-		const chip = row.querySelector<HTMLButtonElement>(
-			'.task-row__chip--editable[data-kind="project"]',
-		);
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind="project"]');
 		expect(chip?.querySelector(".task-row__chip-text")?.textContent).toBe(long);
 		expect(chip?.title).toBe(long);
 	});
@@ -239,11 +219,10 @@ describe("row selection → inspector", () => {
 		expect(props.onSelectTask).not.toHaveBeenCalled();
 	});
 
-	it("clicking a chip does NOT select the row", () => {
-		const { row, props } = mount(task({ priority: Priority.High }));
-		row.querySelector<HTMLButtonElement>('.task-row__chip--editable[data-kind="priority"]')?.click();
-		expect(props.onPickPriority).toHaveBeenCalledTimes(1);
-		expect(props.onSelectTask).not.toHaveBeenCalled();
+	it("glance chips are display-only spans (not interactive buttons)", () => {
+		const { row } = mount(task({ priority: Priority.High }));
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind="priority"]');
+		expect(chip?.tagName).toBe("SPAN");
 	});
 
 	it("reflects the selected task via data-selected", () => {
@@ -366,13 +345,19 @@ describe("renderTaskRow — time chip (9.14.13)", () => {
 });
 
 describe("renderTaskRow — tag chips (9.14.10)", () => {
-	it("renders a chip per tag and clicking fires onClickTag", () => {
+	it("renders a chip per tag (by label) and clicking fires onClickTag with the id", () => {
 		const onClickTag = vi.fn();
-		const { row } = mount(task(), { tags: ["urgent", "later"], onClickTag });
+		const { row } = mount(task(), {
+			tags: [
+				{ id: "t-urgent", label: "Urgent" },
+				{ id: "t-later", label: "Later" },
+			],
+			onClickTag,
+		});
 		const chips = [...row.querySelectorAll(".task-row__tag")].map((c) => c.textContent);
-		expect(chips).toEqual(["urgent", "later"]);
+		expect(chips).toEqual(["Urgent", "Later"]);
 		(row.querySelector(".task-row__tag") as HTMLButtonElement).click();
-		expect(onClickTag).toHaveBeenCalledWith("urgent");
+		expect(onClickTag).toHaveBeenCalledWith("t-urgent");
 	});
 
 	it("renders no chips without tags", () => {
