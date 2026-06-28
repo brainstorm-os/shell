@@ -79,6 +79,7 @@ export function parseStoredBookmark(raw: unknown): Bookmark | null {
 	if (typeof r.siteName === "string") bookmark.siteName = r.siteName;
 	if (typeof r.mediaType === "string") bookmark.mediaType = r.mediaType;
 	if (typeof r.author === "string") bookmark.author = r.author;
+	if (r.locked === true) bookmark.locked = true;
 	if (typeof r.publishedAt === "number" && Number.isFinite(r.publishedAt)) {
 		bookmark.publishedAt = r.publishedAt;
 	}

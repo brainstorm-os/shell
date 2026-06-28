@@ -38,6 +38,7 @@ import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-pick
 import { createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
 import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
 import { IconName, createIconElement } from "@brainstorm/sdk/icon";
+import { LockButton } from "@brainstorm/sdk/lock-button";
 import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
 import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -301,6 +302,12 @@ export function BookmarkDetail({
 							{bookmark.title || bookmark.url}
 						</a>
 					</h1>
+					<LockButton
+						locked={!!bookmark.locked}
+						onToggle={() => onPropertyChange({ locked: !bookmark.locked })}
+						lockLabel={t("detail.lock")}
+						unlockLabel={t("detail.unlock")}
+					/>
 				</div>
 				<a className="bm-detail__source" href={bookmark.url} target="_blank" rel="noopener noreferrer">
 					{bookmark.siteName ?? domainFromUrl(bookmark.url) ?? bookmark.url}
@@ -329,6 +336,7 @@ export function BookmarkDetail({
 						key={bookmark.id}
 						doc={doc}
 						docId={bookmark.id}
+						editable={!bookmark.locked}
 						namespace="bookmarks"
 						contentClassName="notes__contenteditable bm-detail__editor"
 						additionalNodes={FULL_EDITOR_NODES}

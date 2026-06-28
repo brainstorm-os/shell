@@ -95,6 +95,8 @@ export const BOOKMARKS_MESSAGES = {
 	// shows this as the vocabulary's name).
 	"detail.tagsDictionaryName": "Bookmark tags",
 	"detail.cover.edit": "Change cover",
+	"detail.lock": "Lock bookmark (read-only)",
+	"detail.unlock": "Unlock bookmark",
 	"detail.cover.add": "Add cover",
 	// Capture provenance + large-page warning (9.18.13).
 	"detail.provenance.machine": "Machine-extracted from the page · captured {date}",

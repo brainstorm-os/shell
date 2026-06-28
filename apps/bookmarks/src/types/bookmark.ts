@@ -23,6 +23,9 @@ export enum ContentProvenance {
 
 export type Bookmark = {
 	id: string;
+	/** Read-only lock — the bookmark's synced `locked` property. When true the
+	 *  detail body editor is read-only. */
+	locked?: boolean;
 	/** Normalized URL — see `logic/url-parse.ts::normalizeUrl`. Always
 	 *  http(s) scheme. */
 	url: string;
