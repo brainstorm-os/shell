@@ -162,6 +162,9 @@ export interface CodePaneOptions {
 	formatOnSave?: boolean;
 	/** Called when the user flips the format-on-save toggle. */
 	onFormatOnSaveChange?: (enabled: boolean) => void;
+	/** Initial read-only lock (the file's synced `locked` property). When true
+	 *  the textarea is read-only; toggle live via `setLocked`. */
+	locked?: boolean;
 	/** Open the diff view for the current buffer vs the saved baseline. The
 	 *  host owns the overlay mount + lifecycle; the pane just supplies the
 	 *  baseline + live content and the chosen layout. */
@@ -194,6 +197,9 @@ export interface CodePaneController {
 		citationIndex: CitationIndex;
 		docHandle?: CodePaneOptions["docHandle"];
 	}): void;
+	/** Toggle the read-only lock — the textarea becomes read-only (and stays
+	 *  so while folded). Drives the file's synced `locked` property. */
+	setLocked(locked: boolean): void;
 	/** Refresh the highlight overlay + citations against the current
 	 *  buffer content. Cheap (it just re-tokenises + repaints) — called
 	 *  after the language or the citation index changes. */
@@ -399,6 +405,9 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 		syntaxTheme: opts.syntaxTheme ?? SyntaxThemePreference.Auto,
 		diffMode: opts.diffMode ?? DiffViewMode.SideBySide,
 		formatOnSave: opts.formatOnSave ?? false,
+		/** Read-only lock (the file's synced `locked` property). When set the
+		 *  textarea is read-only regardless of fold state. */
+		locked: opts.locked ?? false,
 		/** Secondary multi-cursor selections (9.7.3); the primary lives in
 		 *  the textarea's own selection. */
 		extraCursors: [] as CursorRange[],
@@ -882,7 +891,7 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 		state.folds = new Set();
 		state.foldView = null;
 		state.foldDocText = "";
-		textarea.readOnly = false;
+		textarea.readOnly = state.locked;
 		overlay.setFoldBadges([]);
 	}
 
@@ -898,7 +907,7 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 			state.folds = new Set();
 			state.foldView = null;
 			state.foldDocText = "";
-			textarea.readOnly = false;
+			textarea.readOnly = state.locked;
 			if (textarea.value !== content) {
 				const caretDoc = previousView ? viewToDoc(previousView, content, caretView) : caretView;
 				textarea.value = content;
@@ -1153,6 +1162,11 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 			// text first so the textarea and overlay stay aligned.
 			if (state.foldView) applyFolds(new Set());
 			applyContent(state.binding.snapshot(), state.row.language);
+		},
+		setLocked(locked) {
+			state.locked = locked;
+			// Folded views are always read-only; otherwise mirror the lock.
+			textarea.readOnly = locked || state.foldView !== null;
 		},
 		focus() {
 			textarea.focus();

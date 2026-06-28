@@ -37,6 +37,8 @@ export type CodePaneHostHandle = {
 	toggleWrap(): void;
 	/** Best-effort reveal of a 1-based line in the open buffer. */
 	revealLine(line: number): void;
+	/** Toggle the read-only lock on the open file. */
+	setLocked(locked: boolean): void;
 };
 
 export type CodePaneHostProps = {
@@ -56,6 +58,8 @@ export type CodePaneHostProps = {
 	objectMenuContext: (row: CodeFileRow) => ObjectMenuContext;
 	openCitation: CitationOpen;
 	onContentChange: (id: string, content: string) => void;
+	/** Read-only lock (the open file's synced `locked` property). */
+	locked: boolean;
 };
 
 function CodePaneHostImpl(
@@ -108,6 +112,7 @@ function CodePaneHostImpl(
 			objectMenuContext: (current) => propsRef.current.objectMenuContext(current),
 			openCitation: (entry) => propsRef.current.openCitation(entry),
 			onContentChange: (id, content) => propsRef.current.onContentChange(id, content),
+			locked: p.locked,
 			...(handle ? { docHandle: handle } : {}),
 		});
 		controllerRef.current = controller;
@@ -139,11 +144,17 @@ function CodePaneHostImpl(
 		activeRowIdRef.current = props.row.id;
 	}, [props.row, props.citationIndex]);
 
+	// Apply the read-only lock live when the file's `locked` property changes.
+	useEffect(() => {
+		controllerRef.current?.setLocked(props.locked);
+	}, [props.locked]);
+
 	useImperativeHandle(
 		ref,
 		() => ({
 			focus: () => controllerRef.current?.focus(),
 			refresh: () => controllerRef.current?.refresh(),
+			setLocked: (l) => controllerRef.current?.setLocked(l),
 			menuContext: () => controllerRef.current?.menuContext() ?? null,
 			formatBuffer: () => controllerRef.current?.formatBuffer() ?? Promise.resolve(false),
 			canFormatBuffer: () => controllerRef.current?.canFormatBuffer() ?? false,

@@ -35,6 +35,9 @@ export interface CodeFileRow extends CodeFile {
 	 *  §Per-object icons
 	 *  everywhere). Never derived from `type`. */
 	icon: Icon | null;
+	/** Read-only lock — the file's synced `locked` property. When true the
+	 *  editor surface is read-only. */
+	locked: boolean;
 }
 
 function str(value: unknown, fallback = ""): string {
@@ -70,6 +73,7 @@ export function entityToCodeFileRow(entity: {
 		content,
 		contentKey: "content",
 		icon: parseIcon(props.icon),
+		locked: props.locked === true,
 		sizeBytes: numOrNull(props.sizeBytes),
 		lineCount: numOrNull(props.lineCount),
 		isDirty: props.isDirty === true,
@@ -98,6 +102,7 @@ export function entityToStylePackRow(entity: {
 		content: str(props.css),
 		contentKey: "css",
 		icon: parseIcon(props.icon),
+		locked: props.locked === true,
 		sizeBytes: null,
 		lineCount: null,
 		isDirty: false,

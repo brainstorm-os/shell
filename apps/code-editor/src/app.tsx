@@ -24,6 +24,7 @@ import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { type Icon as EntityIconValue, createEntityIconElement } from "@brainstorm/sdk/entity-icon";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
+import { LockButton } from "@brainstorm/sdk/lock-button";
 import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
 import {
 	ObjectMenuMoreButton,
@@ -456,6 +457,14 @@ export function CodeEditorApp(): ReactElement {
 			console.warn("[code-editor] rename failed:", err);
 		}
 	}, []);
+
+	const toggleFileLock = useCallback((): void => {
+		const row = selectedRow;
+		if (!row) return;
+		const update = getCodeEditorRuntime()?.services?.entities?.update;
+		if (!update) return;
+		void update(row.id, { locked: !row.locked });
+	}, [selectedRow]);
 
 	const renameFile = useCallback(
 		(row: CodeFileRow): void => {
@@ -897,6 +906,14 @@ export function CodeEditorApp(): ReactElement {
 						onClick={() => setRefsOpen((v) => !v)}
 						labels={{ show: t("refsToggle.show"), hide: t("refsToggle.hide") }}
 					/>
+					{selectedRow ? (
+						<LockButton
+							locked={selectedRow.locked}
+							onToggle={toggleFileLock}
+							lockLabel={t("header.lock")}
+							unlockLabel={t("header.unlock")}
+						/>
+					) : null}
 					<ObjectMenuMoreButton
 						context={headerMenuContext}
 						moreActionsLabel={t("menuMoreActions", {
@@ -947,6 +964,7 @@ export function CodeEditorApp(): ReactElement {
 							<CodePaneHost
 								ref={paneRef}
 								row={selectedRow}
+								locked={selectedRow.locked}
 								citationIndex={citationIndex}
 								resolver={getYDocResolverApi}
 								labels={{

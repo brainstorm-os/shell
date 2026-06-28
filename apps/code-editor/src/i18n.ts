@@ -68,6 +68,8 @@ export const CODE_EDITOR_MESSAGES = {
 	fileIconSelect: "Select {name}",
 	"navToggle.show": "Show files",
 	"navToggle.hide": "Hide files",
+	"header.lock": "Lock file (read-only)",
+	"header.unlock": "Unlock file",
 	"refsToggle.show": "Show references",
 	"refsToggle.hide": "Hide references",
 	quickOpenLabel: "Quick open file",
