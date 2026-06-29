@@ -1382,39 +1382,10 @@ body.is-resizing .calendar-resize {
 	flex: 0 0 auto;
 }
 
-/* Status availability — segmented radiogroup. */
-.cal-detail__segmented {
-	display: inline-flex;
-	border: var(--border-width) solid var(--border-strong);
-	border-radius: var(--radius-md);
-	overflow: hidden;
-	align-self: flex-start;
-}
-
-.cal-detail__segment {
-	appearance: none;
-	border: none;
-	background: var(--bg-elev);
-	color: var(--text-dim);
-	font: inherit;
-	padding: var(--space-1);
-	cursor: pointer;
-	border-left: var(--border-width) solid var(--border-subtle);
-}
-
-.cal-detail__segment:first-child {
-	border-left: none;
-}
-
-.cal-detail__segment[data-selected="true"] {
-	background: var(--accent);
-	color: var(--accent-fg, #fff);
-	font-weight: var(--text-weight-semibold);
-}
-
-.cal-detail__segment:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -2px;
+/* Status — the shared `.bs-select` single-select, filling the field like the
+ * other detail inputs (F-298; was a bespoke segmented radiogroup). */
+.cal-detail__status {
+	width: 100%;
 }
 
 /* Colour swatches — radiogroup of preset chips. */
