@@ -1597,26 +1597,8 @@ body.is-resizing .tasks-resize {
 	font-size: var(--text-size-sm);
 }
 
-/* ─── Empty state ─────────────────────────────────────────────────── */
-
-.tasks-empty {
-	margin-top: var(--space-8);
-	text-align: center;
-	color: var(--text-dim);
-}
-
-.tasks-empty h2 {
-	margin: 0 0 var(--space-1);
-	font-size: var(--text-size-lg);
-	font-weight: var(--text-weight-semibold);
-	color: var(--text);
-}
-
-.tasks-empty p {
-	margin: 0;
-	font-size: var(--text-size-sm);
-	color: var(--text-faint);
-}
+/* Empty surface uses the shared `<EmptyState>` Hero via the DOM twin
+ * (`createEmptyState`); its chrome lives in `@brainstorm/sdk/empty-state.css`. */
 
 /* ─── Object-menu ⋯ affordance — the SDK `bs-object-menu__host--row`
  *     modifier (applied on the <li>) owns hide-by-default /

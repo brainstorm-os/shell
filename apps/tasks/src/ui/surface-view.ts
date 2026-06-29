@@ -11,6 +11,7 @@
 
 import type { Icon } from "@brainstorm/sdk-types";
 import { Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { createEmptyState } from "@brainstorm/sdk/empty-state";
 import { IconName, createIconElement } from "@brainstorm/sdk/icon";
 import {
 	type ObjectMenuContext,
@@ -534,32 +535,36 @@ function sectionHeading(section: CompiledSection, now: number): string {
 	return t(section.titleKey, section.titleParams ?? {});
 }
 
+type EmptySpec = { icon: IconName; titleKey: string; bodyKey: string };
+// Inbox / Today / Upcoming have their own copy; every other surface (Project,
+// Board, Timeline) falls back to the Project empty, as the prior ternary did.
+const SURFACE_EMPTY: Partial<Record<TaskSurface, EmptySpec>> = {
+	[TaskSurface.Inbox]: {
+		icon: IconName.Inbox,
+		titleKey: "tasks.empty.inbox.title",
+		bodyKey: "tasks.empty.inbox.body",
+	},
+	[TaskSurface.Today]: {
+		icon: IconName.Sun,
+		titleKey: "tasks.empty.today.title",
+		bodyKey: "tasks.empty.today.body",
+	},
+	[TaskSurface.Upcoming]: {
+		icon: IconName.KindDate,
+		titleKey: "tasks.empty.upcoming.title",
+		bodyKey: "tasks.empty.upcoming.body",
+	},
+	[TaskSurface.Project]: {
+		icon: IconName.CheckCircle,
+		titleKey: "tasks.empty.project.title",
+		bodyKey: "tasks.empty.project.body",
+	},
+};
+
 function renderEmptyState(surface: TaskSurface): HTMLElement {
-	const block = document.createElement("section");
-	block.className = "tasks-empty";
-
-	const titleKey =
-		surface === TaskSurface.Inbox
-			? "tasks.empty.inbox.title"
-			: surface === TaskSurface.Today
-				? "tasks.empty.today.title"
-				: surface === TaskSurface.Upcoming
-					? "tasks.empty.upcoming.title"
-					: "tasks.empty.project.title";
-	const bodyKey =
-		surface === TaskSurface.Inbox
-			? "tasks.empty.inbox.body"
-			: surface === TaskSurface.Today
-				? "tasks.empty.today.body"
-				: surface === TaskSurface.Upcoming
-					? "tasks.empty.upcoming.body"
-					: "tasks.empty.project.body";
-
-	const title = document.createElement("h2");
-	title.textContent = t(titleKey);
-	block.appendChild(title);
-	const body = document.createElement("p");
-	body.textContent = t(bodyKey);
-	block.appendChild(body);
-	return block;
+	// Shared `<EmptyState>` Hero via the DOM twin (`createEmptyState`) so the
+	// empty surface matches the rest of the fleet (F-301).
+	const spec = SURFACE_EMPTY[surface] ?? SURFACE_EMPTY[TaskSurface.Project];
+	if (!spec) throw new Error("missing Project empty spec");
+	return createEmptyState({ icon: spec.icon, title: t(spec.titleKey), hint: t(spec.bodyKey) });
 }

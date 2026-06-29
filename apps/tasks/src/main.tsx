@@ -14,6 +14,7 @@
  */
 
 import "@brainstorm/sdk/app-theme.css";
+import "@brainstorm/sdk/empty-state.css";
 import "@brainstorm/editor/editor.css";
 import "@brainstorm/sdk/recurrence-editor.css";
 import "@brainstorm/editor/editor-theme.css";
