@@ -346,60 +346,11 @@ export function FolderAppearanceDialog({
 }
 
 /** Which bulk destination op the picker serves (9.8.12). */
+/** Bulk Move/Copy destination mode. The picker itself is the shared searchable
+ *  `openSearchPicker` (anchored to the toolbar button) — see `app.tsx`. */
 export enum BulkDestinationMode {
 	Move = "move",
 	Copy = "copy",
-}
-
-export type DestinationPickerProps = {
-	mode: BulkDestinationMode;
-	folders: readonly DestinationFolder[];
-	onPick: (folderId: string) => void;
-	onClose: () => void;
-};
-
-/** Destination-folder picker for bulk Move/Copy (9.8.12) — the full folder
- *  tree, depth-indented; invalid destinations (the moving subtree) are
- *  already excluded by `destinationFolders`. */
-export function DestinationPickerPopover({
-	mode,
-	folders,
-	onPick,
-	onClose,
-}: DestinationPickerProps) {
-	return (
-		<Popover
-			title={
-				mode === BulkDestinationMode.Move
-					? t("brainstorm.files.bulk.moveTitle")
-					: t("brainstorm.files.bulk.copyTitle")
-			}
-			onClose={onClose}
-			size={PopoverSize.Small}
-			testId="destination-picker"
-		>
-			<div className="sort-menu__items" role="menu">
-				{folders.length === 0 ? (
-					<p className="destination-picker__empty">{t("brainstorm.files.bulk.noDestinations")}</p>
-				) : (
-					folders.map((folder) => (
-						<button
-							key={folder.id}
-							type="button"
-							role="menuitem"
-							className="popover__item sort-menu__item"
-							data-testid={`destination-${folder.id}`}
-							style={{ paddingInlineStart: `${10 + folder.level * 16}px` }}
-							onClick={() => onPick(folder.id)}
-						>
-							<Icon name={IconName.Folder} size={14} />
-							<span>{folder.name}</span>
-						</button>
-					))
-				)}
-			</div>
-		</Popover>
-	);
 }
 
 export type BulkRenameProps = {

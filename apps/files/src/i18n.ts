@@ -156,6 +156,7 @@ const DEFAULTS = {
 	"brainstorm.files.bulk.moveTitle": "Move to folder",
 	"brainstorm.files.bulk.copyTitle": "Copy to folder",
 	"brainstorm.files.bulk.noDestinations": "No other folders to choose.",
+	"brainstorm.files.bulk.searchDestinations": "Search folders…",
 	"brainstorm.files.bulk.renameTitle": "Rename {n} items",
 	"brainstorm.files.bulk.renamePlaceholder": "Base name…",
 	"brainstorm.files.bulk.renamePreview": "Items become \u201c{example}\u201d, numbered in order.",

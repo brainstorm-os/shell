@@ -1930,14 +1930,8 @@ body:not([data-inspector="open"]) .inspector {
 	gap: var(--space-2);
 }
 
-/* Bulk Move/Copy destination picker + multi-rename (9.8.12). */
-.destination-picker__empty {
-	margin: 0;
-	padding: var(--space-2) var(--space-2);
-	font-size: var(--text-size-sm);
-	color: var(--text-dim);
-}
-
+/* Bulk multi-rename (9.8.12). The destination picker is now the shared
+ * `openSearchPicker` (chrome in the menu host) — no app-local list styling. */
 .bulk-rename__form {
 	display: flex;
 	flex-direction: column;

@@ -17,8 +17,9 @@ import { t } from "../i18n";
 export type BulkActionBarProps = {
 	count: number;
 	onDuplicate: () => void;
-	onMove: () => void;
-	onCopy: () => void;
+	/** `anchor` is the trigger button — the destination search-picker drops from it. */
+	onMove: (anchor: HTMLElement) => void;
+	onCopy: (anchor: HTMLElement) => void;
 	onRename: () => void;
 	onDelete: () => void;
 	onClear: () => void;
@@ -82,7 +83,7 @@ export function BulkActionBar({
 					type="button"
 					className="files-bulkbar__action"
 					data-testid="bulk-move"
-					onClick={onMove}
+					onClick={(e) => onMove(e.currentTarget)}
 				>
 					<Icon name={IconName.ArrowRight} size={16} />
 					{t("brainstorm.files.bulk.move")}
@@ -92,7 +93,7 @@ export function BulkActionBar({
 					type="button"
 					className="files-bulkbar__action"
 					data-testid="bulk-copy"
-					onClick={onCopy}
+					onClick={(e) => onCopy(e.currentTarget)}
 				>
 					<Icon name={IconName.FolderPlus} size={16} />
 					{t("brainstorm.files.bulk.copy")}

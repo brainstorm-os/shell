@@ -32,7 +32,7 @@ import { openEntity, quickLookEntity } from "@brainstorm/sdk";
 import type { StoredAsset } from "@brainstorm/sdk-types";
 import { plural } from "@brainstorm/sdk/i18n";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
+import { MenuAlign, openSearchPicker } from "@brainstorm/sdk/menus";
 import { NavButtons } from "@brainstorm/sdk/nav-history";
 import {
 	ObjectMenuMoreButton,
@@ -62,7 +62,6 @@ import {
 	BulkDestinationMode,
 	BulkRenamePopover,
 	ConfirmDialog,
-	DestinationPickerPopover,
 	FolderAppearanceDialog,
 	SmartFolderNamePopover,
 	SortMenuPopover,
@@ -326,7 +325,6 @@ export function FilesApp() {
 	}, [store]);
 
 	// ─── Bulk Move / Copy / Rename (9.8.12) ──────────────────────────────
-	const [bulkDestination, setBulkDestination] = useState<BulkDestinationMode | null>(null);
 	const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
 	const selectionInVisibleOrder = useCallback(
 		() =>
@@ -336,21 +334,48 @@ export function FilesApp() {
 			),
 		[store],
 	);
-	const onPickDestination = useCallback(
-		(destId: string) => {
-			const mode = bulkDestination;
-			setBulkDestination(null);
-			const ids = selectionInVisibleOrder();
-			if (!mode || ids.length === 0) return;
-			if (mode === BulkDestinationMode.Move) {
-				const result = store.moveIds(store.nav.current, destId, ids);
-				if (!result.ok && result.reason === "cycle") onCycle(ids[0] ?? "", destId);
-			} else {
-				store.copyIds(destId, ids);
-			}
-			store.clearSelection();
+	// Bulk move/copy destination: the shared searchable picker (`openSearchPicker`)
+	// anchored to the toolbar button, replacing the centered `<div role="menu">`
+	// folder list (F-300). Searching beats scrolling a deep folder tree.
+	const openDestinationPicker = useCallback(
+		(mode: BulkDestinationMode, anchor: HTMLElement) => {
+			const folders = destinationFolders(store.tree, new Set(store.selection.selected));
+			openSearchPicker({
+				placeholder: t("brainstorm.files.bulk.searchDestinations"),
+				ariaLabel:
+					mode === BulkDestinationMode.Move
+						? t("brainstorm.files.bulk.moveTitle")
+						: t("brainstorm.files.bulk.copyTitle"),
+				anchor,
+				filter: (query) => {
+					const needle = query.trim().toLowerCase();
+					const matches = needle
+						? folders.filter((f) => f.name.toLowerCase().includes(needle))
+						: folders;
+					if (matches.length === 0) {
+						return [{ id: "", label: t("brainstorm.files.bulk.noDestinations"), disabled: true }];
+					}
+					return matches.map((f) => ({
+						id: f.id,
+						label: f.name,
+						icon: <Icon name={IconName.Folder} size={14} />,
+					}));
+				},
+				onSelect: (destId) => {
+					if (!destId) return;
+					const ids = selectionInVisibleOrder();
+					if (ids.length === 0) return;
+					if (mode === BulkDestinationMode.Move) {
+						const result = store.moveIds(store.nav.current, destId, ids);
+						if (!result.ok && result.reason === "cycle") onCycle(ids[0] ?? "", destId);
+					} else {
+						store.copyIds(destId, ids);
+					}
+					store.clearSelection();
+				},
+			});
 		},
-		[bulkDestination, selectionInVisibleOrder, store, onCycle],
+		[selectionInVisibleOrder, store, onCycle],
 	);
 	const onBulkRename = useCallback(
 		(base: string) => {
@@ -377,13 +402,6 @@ export function FilesApp() {
 		},
 		[selectionInVisibleOrder, store],
 	);
-	// Exclude the moving selection (and implicitly its subtrees — the walk
-	// prunes at the excluded node) from the destination candidates.
-	const bulkDestinationFolders = useMemo(
-		() => (bulkDestination ? destinationFolders(store.tree, new Set(store.selection.selected)) : []),
-		[bulkDestination, store.tree, store.selection.selected],
-	);
-
 	// ─── Keyboard (shared SDK useShortcut, chords from the registry) ──────
 	const chord = (id: ActionId) => chordFor(id) ?? "";
 	useShortcut(chord(ActionId.Search), () => searchInputRef.current?.focus());
@@ -677,8 +695,8 @@ export function FilesApp() {
 					<BulkActionBar
 						count={store.selection.selected.size}
 						onDuplicate={() => store.duplicateIds(selectionInVisibleOrder())}
-						onMove={() => setBulkDestination(BulkDestinationMode.Move)}
-						onCopy={() => setBulkDestination(BulkDestinationMode.Copy)}
+						onMove={(anchor) => openDestinationPicker(BulkDestinationMode.Move, anchor)}
+						onCopy={(anchor) => openDestinationPicker(BulkDestinationMode.Copy, anchor)}
 						onRename={() => setBulkRenameOpen(true)}
 						onDelete={deleteSelected}
 						onClear={store.clearSelection}
@@ -763,15 +781,6 @@ export function FilesApp() {
 						else store.renameSmartFolderById(smartNamePrompt.folder.id, name);
 					}}
 					onClose={() => setSmartNamePrompt(null)}
-				/>
-			) : null}
-
-			{bulkDestination ? (
-				<DestinationPickerPopover
-					mode={bulkDestination}
-					folders={bulkDestinationFolders}
-					onPick={onPickDestination}
-					onClose={() => setBulkDestination(null)}
 				/>
 			) : null}
 
