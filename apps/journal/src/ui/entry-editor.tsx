@@ -49,7 +49,13 @@ import {
 	richTextTheme,
 } from "@brainstorm/editor";
 import { useYDoc, useYDocApplyPending, useYDocLoaded } from "@brainstorm/react-yjs";
-import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";
+import {
+	$getRoot,
+	$parseSerializedNode,
+	type LexicalEditor,
+	type SerializedEditorState,
+	type SerializedLexicalNode,
+} from "lexical";
 import { useMemo, useRef } from "react";
 import { useOpenCommentBlockIds } from "../store/comments-bindings";
 import { clearJournalEditor, setJournalEditor } from "./editor-bridge";
@@ -105,6 +111,9 @@ export type JournalEntryEditorProps = {
 	 *  body. `onRecoverReset` releases the spent budget on a clean hydrate. */
 	onRecoverBlank?: () => void;
 	onRecoverReset?: () => void;
+	/** Hint shown while the body is empty (e.g. the "Write…" prompt on a
+	 *  not-yet-created day). Rendered through `BrainstormEditor`'s placeholder. */
+	placeholder?: string;
 };
 
 function isLexicalState(value: unknown): value is SerializedEditorState {
@@ -184,6 +193,30 @@ function stripNotesOnlyNodes(value: SerializedEditorState): SerializedEditorStat
 	return sanitized;
 }
 
+/**
+ * Plant a sanitized seed into an EMPTY editor — MUST run inside the
+ * `editor.update()` that `CollaborationPlugin` invokes the function-variant
+ * `initialEditorState` within. The old implementation called
+ * `editor.setEditorState()` (and a nested `editor.update`/`editor.focus`) here,
+ * which is illegal inside an active update — Lexical throws (error #94), the
+ * plant is swallowed, the doc stays empty, and on the implicit-create handoff
+ * the placeholder text (the user's first word) is lost (F-299). Instead we
+ * deserialize the top-level blocks with the update-safe `$parseSerializedNode`
+ * and append them, then drop the caret at the end so typing continues
+ * uninterrupted. Returns the number of planted blocks (0 = nothing seeded).
+ */
+export function plantJournalSeed(editor: LexicalEditor, sanitized: SerializedEditorState): number {
+	const root = $getRoot();
+	if (!root.isEmpty()) return 0;
+	const children = (sanitized.root as unknown as { children?: unknown })?.children;
+	if (!Array.isArray(children) || children.length === 0) return 0;
+	const nodes = children.map((child) => $parseSerializedNode(child as SerializedLexicalNode));
+	if (nodes.length === 0) return 0;
+	root.append(...nodes);
+	$getRoot().selectEnd();
+	return nodes.length;
+}
+
 export function JournalEntryEditor({
 	noteId,
 	editable,
@@ -193,6 +226,7 @@ export function JournalEntryEditor({
 	onCommentBlockClick,
 	onRecoverBlank,
 	onRecoverReset,
+	placeholder,
 }: JournalEntryEditorProps) {
 	const doc = useYDoc(noteId);
 	const whenLoaded = useYDocLoaded(noteId);
@@ -232,32 +266,15 @@ export function JournalEntryEditor({
 		// baseline-compatible state. Journal already paints the date
 		// in its own chrome — the TitleNode loss is acceptable.
 		const sanitized = stripNotesOnlyNodes(seed);
+		// `CollaborationPlugin` calls this inside its own `editor.update()`, so the
+		// plant must use only update-safe APIs (`plantJournalSeed` appends parsed
+		// nodes + drops the caret at the end). `selectEnd()` keeps the user's
+		// caret-at-end after the implicit-create handoff so typing continues
+		// uninterrupted; it only fires on an empty doc, so navigating to a
+		// populated day never steals focus.
 		return (editor: LexicalEditor) => {
-			const root = $getRoot();
-			if (!root.isEmpty()) return;
 			try {
-				const parsed = editor.parseEditorState(sanitized);
-				editor.setEditorState(parsed);
-				// `setEditorState` clears the selection. On the implicit-create
-				// handoff (the placeholder mints the entry on the first keystroke,
-				// then `app.ts` swaps in this editor and calls `focusEditorAtEnd`),
-				// that earlier caret is placed BEFORE this plant settles — so the
-				// plant wipes it and the user's first character reads as "lost
-				// focus" the instant the entry saves. Re-assert focus + caret-at-end
-				// here, at the content-ready moment, so typing continues
-				// uninterrupted. Only runs on an empty doc (fresh entry), so
-				// navigating to a populated day never steals focus.
-				editor.focus(
-					() => {
-						editor.update(
-							() => {
-								$getRoot().selectEnd();
-							},
-							{ tag: "history-merge" },
-						);
-					},
-					{ defaultSelection: "rootEnd" },
-				);
+				plantJournalSeed(editor, sanitized);
 			} catch (error) {
 				console.warn("[journal/entry-editor] seed plant failed:", error);
 			}
@@ -273,6 +290,7 @@ export function JournalEntryEditor({
 			theme={richTextTheme}
 			contentClassName="notes__contenteditable journal__entry-editor"
 			additionalNodes={JOURNAL_EDITOR_NODES}
+			{...(placeholder ? { placeholder } : {})}
 			{...(initialEditorState ? { initialEditorState } : {})}
 			{...(whenLoaded ? { whenLoaded } : {})}
 			{...(applyPending ? { applyPending } : {})}
@@ -317,4 +335,4 @@ export function JournalEntryEditor({
  *  mention / date-mention / transclusion / bookmark / web-embed nodes the
  *  shared typeaheads create). The former hand-rolled mention SHIM is gone
  *  now that the real MentionNode ships from @brainstorm/editor. */
-const JOURNAL_EDITOR_NODES = [TitleNode, ...FULL_EDITOR_NODES];
+export const JOURNAL_EDITOR_NODES = [TitleNode, ...FULL_EDITOR_NODES];

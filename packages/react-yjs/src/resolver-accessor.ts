@@ -82,7 +82,15 @@ export function createYDocResolverAccessor(
 				}
 			},
 			persist: (entityId, update) => {
-				void applyDoc(entityId, bytesToB64(update));
+				// Symmetric with `load`: an editor can mount + emit edits before the
+				// entity's create commits (e.g. a journal day created lazily on first
+				// input). Persisting to a not-yet-created entity is benign — drop it
+				// rather than surface an unhandled rejection; the next persist after
+				// the create carries the full CRDT state. Genuine failures still throw.
+				void Promise.resolve(applyDoc(entityId, bytesToB64(update))).catch((error) => {
+					if (isNotFoundError(error)) return;
+					throw error;
+				});
 			},
 			release: (entityId) => {
 				void closeDoc(entityId);

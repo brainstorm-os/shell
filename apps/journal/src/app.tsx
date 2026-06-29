@@ -212,35 +212,6 @@ function canMutate(): boolean {
 	return Boolean(getJournalRuntime()?.services?.entities?.create);
 }
 
-/** Build a minimal Lexical state from placeholder text (split on newlines). */
-function seedFromText(text: string): unknown {
-	const lines = text.length > 0 ? text.split("\n") : [""];
-	const paragraphs = lines.map((line) => ({
-		type: "paragraph",
-		format: "",
-		indent: 0,
-		version: 1,
-		direction: null,
-		children:
-			line.length > 0
-				? [
-						{
-							type: "text",
-							format: 0,
-							version: 1,
-							text: line,
-							style: "",
-							mode: "normal",
-							detail: 0,
-						},
-					]
-				: [],
-	}));
-	return {
-		root: { type: "root", format: "", indent: 0, version: 1, direction: null, children: paragraphs },
-	};
-}
-
 enum ExportFormat {
 	Md = "md",
 	Html = "html",
@@ -572,6 +543,14 @@ export function JournalApp(): ReactElement {
 	);
 
 	// ── Templates + implicit-create handoff.
+	// Move DOM focus to the freshly-mounted editor; the caret is placed by the
+	// seed plant's `$getRoot().selectEnd()` INSIDE the Lexical/Yjs update
+	// (`plantJournalSeed`). Manipulating `window.getSelection()` ranges here
+	// instead raced the `@lexical/yjs` binding — its reconciler spliced against
+	// a collab element node that wasn't mapped yet and threw Lexical #94
+	// ("splice: could not find collab element node"), which aborted the seed and
+	// dropped the first word on a new entry (F-299). Just focus; let Lexical own
+	// selection.
 	const focusEditorAtEnd = useCallback((framesLeft = 12) => {
 		requestAnimationFrame(() => {
 			const ce = document.querySelector<HTMLElement>(".journal__entry-editor");
@@ -580,13 +559,6 @@ export function JournalApp(): ReactElement {
 				return;
 			}
 			ce.focus();
-			const sel = window.getSelection();
-			if (!sel) return;
-			const range = document.createRange();
-			range.selectNodeContents(ce);
-			range.collapse(false);
-			sel.removeAllRanges();
-			sel.addRange(range);
 		});
 	}, []);
 
@@ -1231,8 +1203,6 @@ export function JournalApp(): ReactElement {
 								journalDenormalize={journalDenormalize}
 								commentHooks={commentHooks}
 								onPlaceholderCreate={ensureEntry}
-								onSeedDenormalize={journalDenormalize}
-								focusEditorAtEnd={focusEditorAtEnd}
 								resolveTemplates={resolveTemplates}
 								onTemplate={startEntryFromTemplate}
 								onMood={setEntryMood}
@@ -1780,8 +1750,6 @@ function EntryBody({
 	journalDenormalize,
 	commentHooks,
 	onPlaceholderCreate,
-	onSeedDenormalize,
-	focusEditorAtEnd,
 	resolveTemplates,
 	onTemplate,
 	onMood,
@@ -1796,8 +1764,6 @@ function EntryBody({
 	journalDenormalize: JournalDenormalizeFn;
 	commentHooks: JournalCommentHooks;
 	onPlaceholderCreate: (date: Date) => Promise<string | null>;
-	onSeedDenormalize: JournalDenormalizeFn;
-	focusEditorAtEnd: () => void;
 	resolveTemplates: () => JournalTemplate[];
 	onTemplate: (date: Date, template: JournalTemplate) => void;
 	onMood: (entry: JournalEntry, mood: MoodId | null) => void;
@@ -1807,171 +1773,139 @@ function EntryBody({
 	const resolver = getYDocResolverApi();
 	const linkRef = useRef<HTMLButtonElement>(null);
 
-	if (!entry) {
-		if (
-			journalDayBodyMode({ hasEntry: false, canMutate: mutable }) === JournalDayBodyMode.ReadOnlyEmpty
-		) {
-			return (
-				<div className="journal__entry-body">
-					<div className="journal__empty">
-						<p>{t("noEntryYet")}</p>
-					</div>
-				</div>
-			);
-		}
+	// First edit on an entry-less day promotes it to a real entity (idempotent
+	// create with the deterministic stable id), THEN denormalises — so the body
+	// snippet write happens against a row that exists. The editor never unmounts
+	// across this promotion (same `noteId` + same JSX slot), so no keystroke is
+	// lost: the single live editor owns the whole word from the first character
+	// (F-299 — replaces the old placeholder→editor seed handoff that dropped it).
+	const lazyDenormalize = useCallback<JournalDenormalizeFn>(
+		(id, state) => {
+			void onPlaceholderCreate(focus).then((created) => {
+				if (created) journalDenormalize(id, state);
+			});
+		},
+		[focus, onPlaceholderCreate, journalDenormalize],
+	);
+
+	// Read-only empty day: nothing to edit, no create path.
+	if (
+		!entry &&
+		journalDayBodyMode({ hasEntry: false, canMutate: mutable }) === JournalDayBodyMode.ReadOnlyEmpty
+	) {
 		return (
 			<div className="journal__entry-body">
-				<ImplicitCreateBody
-					focus={focus}
-					pendingSeedRef={pendingSeedRef}
-					resolveTemplates={resolveTemplates}
-					onTemplate={onTemplate}
-					onCreate={onPlaceholderCreate}
-					onSeedDenormalize={onSeedDenormalize}
-					focusEditorAtEnd={focusEditorAtEnd}
-				/>
+				<div className="journal__empty">
+					<p>{t("noEntryYet")}</p>
+				</div>
 			</div>
 		);
 	}
 
-	const pending = pendingSeedRef.current?.get(entry.noteId);
-	if (pending !== undefined) pendingSeedRef.current?.delete(entry.noteId);
-	const seedBody = pending ?? entry.seedBody;
+	// Deterministic id for the focused day — identical before and after the
+	// lazy create, so the editor below reconciles as the SAME instance across the
+	// transition (no remount).
+	const noteId = entry ? entry.noteId : journalEntryIdForKey(dateKeyForJournal(focus));
 
-	const outgoing = snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
-	const backlinks = snapshot ? findBacklinks(snapshot, entry.noteId) : [];
+	const pending = pendingSeedRef.current?.get(noteId);
+	if (pending !== undefined) pendingSeedRef.current?.delete(noteId);
+	// Seeds (templates / periodic) only apply to an already-created entry; the
+	// empty-day typing path takes NO seed — keystrokes flow straight into the
+	// live editor, so there's nothing to seed and nothing to lose.
+	const seedBody = entry ? (pending ?? entry.seedBody) : undefined;
+
 	const entryLocked =
-		snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false;
+		entry != null &&
+		(snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false);
+	const editable = mutable && !entryLocked;
+	const onBodyDenormalize = entry ? journalDenormalize : lazyDenormalize;
+
+	const outgoing = entry && snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
+	const backlinks = entry && snapshot ? findBacklinks(snapshot, entry.noteId) : [];
 
 	return (
 		<div className="journal__entry-body">
-			<div className="journal__entry-editor-host">
+			{!entry && mutable ? (
+				<div className="journal__templates">
+					<span className="journal__templates-label">{t("templatesLabel")}</span>
+					<div className="journal__templates-chips">
+						{resolveTemplates().map((template) => (
+							<button
+								key={template.id}
+								type="button"
+								className="journal__template-chip"
+								onClick={() => onTemplate(focus, template)}
+							>
+								{template.name}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
+			{/* Focusing the writing area = intent to write, so create the entity
+			    then (before the first keystroke), not on mere navigation — keeps
+			    browsing from minting empty days while ensuring the row exists in
+			    time for content-bearing persists. Lazy create on first edit backstops. */}
+			<div
+				className="journal__entry-editor-host"
+				{...(entry ? {} : { onFocus: () => void onPlaceholderCreate(focus) })}
+			>
 				{resolver ? (
 					<EntryEditorIsland
 						resolver={resolver.resolve}
-						noteId={entry.noteId}
-						editable={mutable && !entryLocked}
+						noteId={noteId}
+						editable={editable}
 						seedBody={seedBody}
-						onDenormalize={journalDenormalize}
+						onDenormalize={onBodyDenormalize}
 						comments={commentHooks}
+						{...(entry ? {} : { placeholder: t("writeHint") })}
 					/>
 				) : (
-					<p className="journal__entry-text">{entry.preview}</p>
+					<p className="journal__entry-text">{entry?.preview ?? ""}</p>
 				)}
 			</div>
-			<div className="journal__entry-meta">
-				<span>{journalPlural(t, entry.wordCount, "wordOne", "wordOther")}</span>
-				{mutable ? (
-					<button
-						type="button"
-						className="journal__link-btn"
-						ref={linkRef}
-						onClick={() => linkRef.current && onLink(entry, linkRef.current)}
-					>
-						{t("insertLink")}
-					</button>
-				) : null}
-			</div>
-			<CheckIn entry={entry} onMood={onMood} onHabit={onHabit} />
-			{outgoing.length > 0 ? (
-				<OutgoingPanel
-					links={outgoing}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.destNoteId,
-							entityType: link.destType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
-				/>
+			{entry ? (
+				<>
+					<div className="journal__entry-meta">
+						<span>{journalPlural(t, entry.wordCount, "wordOne", "wordOther")}</span>
+						{mutable ? (
+							<button
+								type="button"
+								className="journal__link-btn"
+								ref={linkRef}
+								onClick={() => linkRef.current && onLink(entry, linkRef.current)}
+							>
+								{t("insertLink")}
+							</button>
+						) : null}
+					</div>
+					<CheckIn entry={entry} onMood={onMood} onHabit={onHabit} />
+					{outgoing.length > 0 ? (
+						<OutgoingPanel
+							links={outgoing}
+							onOpen={(link, event) =>
+								void openEntity(getJournalRuntime(), {
+									entityId: link.destNoteId,
+									entityType: link.destType,
+									mode: navModeFromEvent(event.nativeEvent),
+								})
+							}
+						/>
+					) : null}
+					{backlinks.length > 0 ? (
+						<BacklinksPanel
+							backlinks={backlinks}
+							onOpen={(link, event) =>
+								void openEntity(getJournalRuntime(), {
+									entityId: link.sourceNoteId,
+									entityType: link.sourceType,
+									mode: navModeFromEvent(event.nativeEvent),
+								})
+							}
+						/>
+					) : null}
+				</>
 			) : null}
-			{backlinks.length > 0 ? (
-				<BacklinksPanel
-					backlinks={backlinks}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.sourceNoteId,
-							entityType: link.sourceType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
-				/>
-			) : null}
-		</div>
-	);
-}
-
-// ── Implicit-create placeholder editable. ──
-function ImplicitCreateBody({
-	focus,
-	pendingSeedRef,
-	resolveTemplates,
-	onTemplate,
-	onCreate,
-	onSeedDenormalize,
-	focusEditorAtEnd,
-}: {
-	focus: Date;
-	pendingSeedRef: React.RefObject<Map<string, unknown>>;
-	resolveTemplates: () => JournalTemplate[];
-	onTemplate: (date: Date, template: JournalTemplate) => void;
-	onCreate: (date: Date) => Promise<string | null>;
-	onSeedDenormalize: JournalDenormalizeFn;
-	focusEditorAtEnd: () => void;
-}): ReactElement {
-	const placeholderRef = useRef<HTMLDivElement>(null);
-	const armedRef = useRef(false);
-	const stableId = journalEntryIdForKey(dateKeyForJournal(focus));
-
-	const onInput = useCallback(() => {
-		const el = placeholderRef.current;
-		if (!el) return;
-		const seedText = el.textContent ?? "";
-		pendingSeedRef.current?.set(stableId, seedFromText(seedText));
-		if (armedRef.current) return;
-		armedRef.current = true;
-		void onCreate(focus).then((noteId) => {
-			if (!noteId) {
-				pendingSeedRef.current?.delete(stableId);
-				armedRef.current = false;
-				return;
-			}
-			const finalSeed = seedFromText(placeholderRef.current?.textContent ?? "");
-			pendingSeedRef.current?.set(stableId, finalSeed);
-			onSeedDenormalize(noteId, finalSeed as SerializedEditorState);
-			focusEditorAtEnd();
-		});
-	}, [focus, stableId, pendingSeedRef, onCreate, onSeedDenormalize, focusEditorAtEnd]);
-
-	return (
-		<div className="journal__write">
-			<div className="journal__templates">
-				<span className="journal__templates-label">{t("templatesLabel")}</span>
-				<div className="journal__templates-chips">
-					{resolveTemplates().map((template) => (
-						<button
-							key={template.id}
-							type="button"
-							className="journal__template-chip"
-							onClick={() => onTemplate(focus, template)}
-						>
-							{template.name}
-						</button>
-					))}
-				</div>
-			</div>
-			<div
-				ref={placeholderRef}
-				className="journal__write-placeholder"
-				contentEditable
-				suppressContentEditableWarning
-				role="textbox"
-				tabIndex={0}
-				aria-label={t("writeHint")}
-				data-placeholder={t("writeHint")}
-				spellCheck
-				onInput={onInput}
-			/>
 		</div>
 	);
 }

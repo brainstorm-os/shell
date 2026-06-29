@@ -40,6 +40,9 @@ export type EntryEditorIslandProps = {
 	seedBody?: unknown;
 	onDenormalize?: JournalDenormalizeFn;
 	comments?: JournalCommentHooks;
+	/** Hint shown while the body is empty (the "Write…" prompt on an
+	 *  entry-less day before the user types). */
+	placeholder?: string;
 };
 
 export function EntryEditorIsland({
@@ -49,6 +52,7 @@ export function EntryEditorIsland({
 	seedBody,
 	onDenormalize,
 	comments,
+	placeholder,
 }: EntryEditorIslandProps) {
 	// `gapped` renders the editor away for one frame to force a full release →
 	// revive cycle (see the file header); never paints between in practice
@@ -64,6 +68,7 @@ export function EntryEditorIsland({
 					noteId={noteId}
 					editable={editable ?? true}
 					seedBody={seedBody}
+					{...(placeholder ? { placeholder } : {})}
 					onRecoverBlank={onRecoverBlank}
 					onRecoverReset={onRecoverReset}
 					{...(onDenormalize ? { onDenormalize } : {})}
