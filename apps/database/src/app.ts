@@ -258,7 +258,7 @@ import { InspectorProperties } from "./react/inspector-properties";
 // React component of the same name. Keep the component name parity in
 // the `react/` directory and disambiguate here.
 import { ListView as ListViewComponent } from "./react/list-view";
-import { EmptyState, mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
+import { StageEmpty, mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
 import { TimelineView } from "./react/timeline-view";
 import { entityIcon, entityTitle, formatDate, formatDateTime, typeLabel } from "./render/cells";
 import { IconKind } from "./types/icon";
@@ -1294,7 +1294,7 @@ function renderActiveViewInner(state: AppState): void {
 		// (a Calendar/Board with no layout property used to paint a silent void).
 		renderViewBodyReact(body, {
 			selection,
-			element: createElement(EmptyState, grouplessViewEmptyState(view.kind)),
+			element: createElement(StageEmpty, grouplessViewEmptyState(view.kind)),
 		});
 	}
 }

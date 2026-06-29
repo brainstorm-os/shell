@@ -70,8 +70,10 @@ export function SelectionBar({
 	);
 }
 
-/** Honest empty-state per the "empty vault = empty app" pattern. */
-export function EmptyState({ title, body }: { title: string; body: string }): ReactElement {
+/** Honest, deliberately-minimal stage empty per the "empty vault = empty app"
+ *  pattern — intentionally NOT the SDK's `<EmptyState>` Hero (no glyph/CTA). Named
+ *  `StageEmpty` so it doesn't shadow the SDK component name. */
+export function StageEmpty({ title, body }: { title: string; body: string }): ReactElement {
 	return (
 		<div className="db-stage__empty" role="status" aria-live="polite">
 			<p className="db-stage__empty-title">{title}</p>
@@ -108,7 +110,7 @@ export type SelectionProps = { count: number; clearLabel: string; onClear: () =>
 
 /** Mount an empty-state into the stage body. */
 export function renderEmpty(host: HTMLElement, props: { title: string; body: string }): void {
-	mountReactRoot(host, createElement(EmptyState, props));
+	mountReactRoot(host, createElement(StageEmpty, props));
 }
 
 /** Mount the active-view chrome + a React view body. */
