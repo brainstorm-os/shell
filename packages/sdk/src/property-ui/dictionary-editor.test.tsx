@@ -100,6 +100,24 @@ function render(
 	return { onCommit, onRewriteNotes, onSortModeChange };
 }
 
+/** Open row `idx`'s ⋯ menu (now the shared `openAnchoredMenu` runtime) and
+ *  invoke the action labelled `label`. The menu registers in the active store;
+ *  find it by its (unique) item label rather than a derived id. */
+function invokeRowMenuAction(h: Harness, idx: number, label: string): void {
+	act(() => {
+		h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-row-menu-btn")[idx]?.click();
+	});
+	// getAll() is the open *stack* (a just-closed menu lingers in its Closing
+	// transition), so read the top — the menu we just opened — not a flatMap of
+	// all entries (which would pick up the previous row's stale items).
+	const top = getActiveMenuStore()?.getAll().at(-1);
+	const items = (top?.param?.data as { items?: ContextMenuItem[] })?.items ?? [];
+	const action = items.find((it) => it.label === label);
+	if (!action) throw new Error(`row menu action not found: ${label}`);
+	act(() => action.onSelect?.());
+	act(() => closeContextMenu());
+}
+
 describe("DictionaryEditor", () => {
 	let h: Harness;
 	beforeEach(() => {
@@ -155,25 +173,13 @@ describe("DictionaryEditor", () => {
 
 	it("archive (row menu) sets archivedAt; delete rewrites bound notes", () => {
 		const { onCommit, onRewriteNotes } = render(h);
-		// Open the first row's (Beta) menu, archive it.
-		act(() => {
-			h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-row-menu-btn")[0]?.click();
-		});
-		const archiveBtn = [
-			...h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-menu-item"),
-		].find((b) => b.textContent === "Archive");
-		act(() => archiveBtn?.click());
+		// Open the first row's (Beta) menu via the shared runtime, archive it.
+		invokeRowMenuAction(h, 0, "Archive");
 		let next = onCommit.mock.calls.at(-1)?.[0] as Dictionary;
 		expect(next.items.find((i) => i.id === "todo")?.archivedAt).toBeDefined();
 
 		// Delete the 'doing' row (bound by n1) — rewrites that note.
-		act(() => {
-			h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-row-menu-btn")[1]?.click();
-		});
-		const delBtn = [
-			...h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-menu-item"),
-		].find((b) => b.textContent === "Delete");
-		act(() => delBtn?.click());
+		invokeRowMenuAction(h, 1, "Delete");
 		next = onCommit.mock.calls.at(-1)?.[0] as Dictionary;
 		expect(next.items.some((i) => i.id === "doing")).toBe(false);
 		expect(onRewriteNotes).toHaveBeenCalledWith([{ id: "n1", values: {} }]);
@@ -184,13 +190,7 @@ describe("DictionaryEditor", () => {
 			notes: [{ id: "n1", values: { prop_status: "doing" } }],
 		});
 		// Arm merge from 'doing' (row 1).
-		act(() => {
-			h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-row-menu-btn")[1]?.click();
-		});
-		const startMerge = [
-			...h.container.querySelectorAll<HTMLButtonElement>(".notes__dict-menu-item"),
-		].find((b) => b.textContent === "Merge into…");
-		act(() => startMerge?.click());
+		invokeRowMenuAction(h, 1, "Merge into…");
 		// 'Beta' (todo) now shows a merge-here target.
 		const target = h.container.querySelector<HTMLButtonElement>(".notes__dict-merge-target");
 		expect(target).not.toBeNull();

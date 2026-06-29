@@ -17,6 +17,7 @@
 
 import type { Dictionary, DictionaryItem, PropertyDef } from "@brainstorm/sdk-types";
 import { type JSX, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { openAnchoredMenu } from "../object-menu";
 import { SelectMenu } from "../select-menu";
 import {
 	DICTIONARY_SORT_ORDER,
@@ -358,7 +359,7 @@ function DictionaryRow({
 	onMergeInto: () => void;
 }): JSX.Element {
 	const { labels } = usePropertyUiSeams();
-	const [menuOpen, setMenuOpen] = useState(false);
+	const menuBtnRef = useRef<HTMLButtonElement>(null);
 	const colours = chipColours(item);
 	return (
 		<li className="notes__dict-row" data-picked-up={pickedUp || undefined}>
@@ -394,70 +395,31 @@ function DictionaryRow({
 			) : (
 				<div className="notes__dict-row-menu">
 					<button
+						ref={menuBtnRef}
 						type="button"
 						className="notes__dict-row-menu-btn"
 						aria-haspopup="menu"
-						aria-expanded={menuOpen}
 						aria-label={labels.dictRowMenu(item.label)}
-						onClick={() => setMenuOpen((v) => !v)}
+						onClick={() => {
+							const el = menuBtnRef.current;
+							if (!el) return;
+							const rect = el.getBoundingClientRect();
+							openAnchoredMenu(
+								{ x: rect.right, y: rect.bottom },
+								[
+									{ label: labels.dictStartMerge, onSelect: onStartMerge },
+									{ label: labels.dictArchive, onSelect: onArchive },
+									{ label: labels.dictDelete, destructive: true, onSelect: onDelete },
+								],
+								{ menuLabel: labels.dictRowMenu(item.label), anchor: el },
+							);
+						}}
 					>
 						<MoreIcon />
 					</button>
-					{menuOpen ? (
-						<div className="notes__dict-menu" role="menu">
-							<MenuItem
-								onClick={() => {
-									onStartMerge();
-									setMenuOpen(false);
-								}}
-							>
-								{labels.dictStartMerge}
-							</MenuItem>
-							<MenuItem
-								onClick={() => {
-									onArchive();
-									setMenuOpen(false);
-								}}
-							>
-								{labels.dictArchive}
-							</MenuItem>
-							<MenuItem
-								destructive
-								onClick={() => {
-									onDelete();
-									setMenuOpen(false);
-								}}
-							>
-								{labels.dictDelete}
-							</MenuItem>
-						</div>
-					) : null}
 				</div>
 			)}
 		</li>
-	);
-}
-
-function MenuItem({
-	children,
-	onClick,
-	destructive,
-}: {
-	children: ReactNode;
-	onClick: () => void;
-	destructive?: boolean;
-}): JSX.Element {
-	return (
-		<button
-			type="button"
-			role="menuitem"
-			className={
-				destructive ? "notes__dict-menu-item notes__dict-menu-item--danger" : "notes__dict-menu-item"
-			}
-			onClick={onClick}
-		>
-			{children}
-		</button>
 	);
 }
 

@@ -346,40 +346,9 @@
 	font-weight: var(--text-weight-medium);
 }
 
-.notes__dict-menu {
-	position: absolute;
-	inset-inline-end: 0;
-	top: 26px;
-	z-index: 1;
-	min-width: 140px;
-	padding: var(--space-1);
-	background: var(--bg);
-	border: var(--border-width) solid var(--border-strong);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-lg, 0 8px 24px -8px rgba(0, 0, 0, 0.4));
-	display: flex;
-	flex-direction: column;
-}
-
-.notes__dict-menu-item {
-	border: 0;
-	background: transparent;
-	color: var(--text);
-	cursor: pointer;
-	font: inherit;
-	font-size: var(--text-size-md);
-	text-align: start;
-	padding: var(--space-2) var(--space-2);
-	border-radius: var(--radius-sm);
-}
-
-.notes__dict-menu-item:hover {
-	background: var(--hover);
-}
-
-.notes__dict-menu-item--danger {
-	color: var(--danger);
-}
+/* The per-row ⋯ menu now opens through the shared fancy-menus runtime
+ * (`openAnchoredMenu`), so its chrome lives in the menu host — no app-local
+ * dropdown styling here. */
 
 .notes__dict-foot {
 	flex: 0 0 auto;
