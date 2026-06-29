@@ -173,6 +173,9 @@ function EquationView({
 						setEditing(false);
 						return;
 					}
+					// keyboard-exempt: input-local commit — Enter (without Shift on a block)
+					// commits the LaTeX field the user is editing; cancel already routes
+					// through the registry (`ActionId.CancelInlineEdit`) above.
 					if (e.key === "Enter" && (inline || !e.shiftKey)) {
 						e.preventDefault();
 						commit();
@@ -193,6 +196,9 @@ function EquationView({
 				setDraft(equation);
 				setEditing(true);
 			}}
+			// keyboard-exempt: standard activation of this `role="button"` — Enter/Space
+			// open the equation for editing (the keyboard twin of the click), not an app
+			// shortcut.
 			onKeyDown={(e: React.KeyboardEvent) => {
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();

@@ -919,6 +919,8 @@ function NewChannelPopover({
 					// biome-ignore lint/a11y/noAutofocus: focusing the first field of a just-opened dialog is the expected affordance.
 					autoFocus
 					onChange={(e) => setName(e.target.value)}
+					// keyboard-exempt: input-local commit — Enter submits the new-channel
+					// field; field-scoped, not an app shortcut.
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && valid) onCreate(name, topic);
 					}}
@@ -978,6 +980,8 @@ function IdentityPopover({
 					// biome-ignore lint/a11y/noAutofocus: focusing the only field of a just-opened dialog is the expected affordance.
 					autoFocus
 					onChange={(e) => setName(e.target.value)}
+					// keyboard-exempt: input-local commit — Enter saves the identity-name
+					// field; field-scoped, not an app shortcut.
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && valid) onSave(name);
 					}}

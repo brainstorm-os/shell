@@ -188,6 +188,9 @@ export function PersonDetail({
 								autoFocus
 								onChange={(e) => setCompanyDraft(e.target.value)}
 								onBlur={commitCompany}
+								// keyboard-exempt: input-local commit/cancel (Enter blurs to commit,
+								// Escape discards) — field-scoped, not an app shortcut. Mirrors the
+								// name-field handler above.
 								onKeyDown={(e) => {
 									if (e.key === "Enter") {
 										e.preventDefault();

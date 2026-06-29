@@ -66,6 +66,8 @@ function TabStrip() {
 						onDragOver={(e) => e.preventDefault()}
 						onDrop={() => onDrop(tab.tabId)}
 						onClick={() => window.brainstormChrome.activateTab(tab.tabId)}
+						// keyboard-exempt: standard activation of this `role="tab"` — Enter/Space
+						// activate the focused tab (the keyboard twin of the click), not an app shortcut.
 						onKeyDown={(e) => {
 							if (e.key === "Enter" || e.key === " ") {
 								e.preventDefault();

@@ -107,6 +107,8 @@ function BoardTitle({
 				aria-label={t("whiteboard.board.rename.aria")}
 				onChange={(e) => setDraft(e.target.value)}
 				onBlur={commit}
+				// keyboard-exempt: input-local rename commit/cancel — Enter commits the board
+				// name, Escape cancels; field-scoped, not an app shortcut.
 				onKeyDown={(e) => {
 					if (e.key === "Enter") {
 						e.preventDefault();

@@ -120,6 +120,10 @@ export function AppGrid({ open, onClose, onLaunch, onPin, onUnpin, pinnedAppIds 
 					placeholder={t("shell.appGrid.placeholder")}
 					aria-label={t("shell.appGrid.placeholder")}
 					onChange={setQuery}
+					// keyboard-exempt: input-local combobox bridge — Arrow Down/Right move
+					// focus from the search box into the grid (which itself uses
+					// `useCompositeKeyboard`), Enter launches the top result. Scoped to the
+					// search input, not an app shortcut.
 					onKeyDown={(e) => {
 						if ((e.key === "ArrowDown" || e.key === "ArrowRight") && filtered.length > 0) {
 							e.preventDefault();

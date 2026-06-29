@@ -184,6 +184,9 @@ export function AddPropertyPicker({
 		[results, createIndex, commitExisting],
 	);
 
+	// keyboard-exempt: input-local typeahead nav — Enter commits the highlighted
+	// row, Arrow Up/Down move the highlight within this picker's own input; not an
+	// app shortcut (same pattern as the editor typeaheads).
 	const onInputKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLInputElement>) => {
 			if (event.key === "Enter") {

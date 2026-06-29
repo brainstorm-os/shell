@@ -86,6 +86,9 @@ export function FindBar({ controller, mode = "find", labels, className }: FindBa
 					value={state.term}
 					aria-describedby={counterId}
 					onChange={(e) => controller.setTerm(e.target.value)}
+					// keyboard-exempt: input-local — Enter steps matches (Shift = previous),
+					// Escape closes the find bar; scoped to the find input the user is typing
+					// in (the DOM twin `attach-find-bar` binds Escape via `attachShortcut`).
 					onKeyDown={(e) => {
 						if (e.key === "Enter") {
 							e.preventDefault();

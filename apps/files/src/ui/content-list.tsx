@@ -877,6 +877,8 @@ function RenameInput({ store, entity, onCollision }: RenameInputProps) {
 				const collision = store.commitRename();
 				if (collision !== null) onCollision(collision);
 			}}
+			// keyboard-exempt: input-local rename commit/cancel — Enter commits, Escape
+			// cancels the inline rename field; field-scoped, not an app shortcut.
 			onKeyDown={(e) => {
 				if (e.key === "Enter") {
 					e.preventDefault();
