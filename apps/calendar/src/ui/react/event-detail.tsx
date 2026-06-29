@@ -1,8 +1,10 @@
 /**
  * Event detail / create surface (React) — the write half of the Calendar app,
  * built on the shared `<Popover>`. The object icon uses the SDK icon picker
- * (`openIconPicker`); status / colour are radiogroups; recurrence is the
- * shared `<RecurrenceEditor>`; attendees use the in-app React editor.
+ * (`openIconPicker`); status is the shared single-select `<SelectMenu>` (the
+ * same control every app uses for a one-of-N property — F-298), colour is a
+ * swatch radiogroup; recurrence is the shared `<RecurrenceEditor>`; attendees
+ * use the in-app React editor.
  *
  * Saving routes through `EventsRepository.save`, the path that exercises the
  * declared `entities.write:brainstorm/Event/v1` capability (the host owns the
@@ -440,17 +442,17 @@ export function EventDetail({
 						</Field>
 
 						<Field labelKey="calendar.detail.field.status">
-							<RadioGroup
-								className="cal-detail__segmented"
+							{/* Single-select status → the shared `<SelectMenu>`, the same control
+							    every other app uses for a one-of-N property (F-298). (Colour below
+							    stays a swatch radiogroup — a visual palette, not a dropdown.) */}
+							<SelectMenu
+								className="cal-detail__status"
 								ariaLabel={t("calendar.detail.field.status")}
 								value={statusValue}
 								onChange={(status) => patch({ statusKey: statusToStored(status) })}
 								options={EVENT_STATUSES.map((status) => ({
 									value: status,
-									className: "cal-detail__segment",
 									label: t(STATUS_LABEL_KEY[status]),
-									dataset: { "data-status": status },
-									children: t(STATUS_LABEL_KEY[status]),
 								}))}
 							/>
 						</Field>

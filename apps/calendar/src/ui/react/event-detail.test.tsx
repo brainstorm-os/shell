@@ -119,19 +119,23 @@ describe("EventDetail — fields", () => {
 	it("picking a status + colour writes them into the saved event", async () => {
 		const onResolve = vi.fn();
 		handle = await renderInto(
-			<EventDetail
-				event={makeEvent()}
-				defaultStart={Date.now()}
-				onResolve={onResolve}
-				onClose={vi.fn()}
-			/>,
+			<BrainstormMenuProvider>
+				<EventDetail
+					event={makeEvent()}
+					defaultStart={Date.now()}
+					onResolve={onResolve}
+					onClose={vi.fn()}
+				/>
+			</BrainstormMenuProvider>,
 		);
-		const tentative = document.querySelector<HTMLButtonElement>(
-			'.cal-detail__segment[data-status="tentative"]',
-		);
-		tentative?.click();
+		// Status is the shared <SelectMenu> — open it, pick "Tentative".
+		const status = document.querySelector<HTMLButtonElement>(".cal-detail__status");
+		if (!status) throw new Error("no status select");
+		await act(async () => status.click());
+		const tentative = openMenuItems("Status").find((it) => it.label === "Tentative");
+		await act(async () => tentative?.onSelect?.());
 		await flush();
-		expect(tentative?.getAttribute("aria-checked")).toBe("true");
+		expect(status.querySelector(".bs-select__value")?.textContent).toBe("Tentative");
 
 		const swatch = document.querySelector<HTMLButtonElement>(
 			'.cal-detail__swatch[data-color="amber"]',
@@ -150,16 +154,20 @@ describe("EventDetail — fields", () => {
 	it("the confirmed default + default colour persist as null", async () => {
 		const onResolve = vi.fn();
 		handle = await renderInto(
-			<EventDetail
-				event={makeEvent({ statusKey: "tentative", colorHint: "#d49241" })}
-				defaultStart={Date.now()}
-				onResolve={onResolve}
-				onClose={vi.fn()}
-			/>,
+			<BrainstormMenuProvider>
+				<EventDetail
+					event={makeEvent({ statusKey: "tentative", colorHint: "#d49241" })}
+					defaultStart={Date.now()}
+					onResolve={onResolve}
+					onClose={vi.fn()}
+				/>
+			</BrainstormMenuProvider>,
 		);
-		document
-			.querySelector<HTMLButtonElement>('.cal-detail__segment[data-status="confirmed"]')
-			?.click();
+		const status = document.querySelector<HTMLButtonElement>(".cal-detail__status");
+		if (!status) throw new Error("no status select");
+		await act(async () => status.click());
+		const confirmed = openMenuItems("Status").find((it) => it.label === "Confirmed");
+		await act(async () => confirmed?.onSelect?.());
 		await flush();
 		document.querySelector<HTMLButtonElement>(".cal-detail__swatch--none")?.click();
 		await flush();
@@ -260,53 +268,13 @@ describe("EventDetail — fields", () => {
 				onClose={vi.fn()}
 			/>,
 		);
-		expect(document.querySelector(".cal-detail__segmented")?.getAttribute("role")).toBe("radiogroup");
+		// Status is now the shared <SelectMenu> (its own a11y is SDK-tested);
+		// colour stays a swatch radiogroup.
+		expect(document.querySelector(".cal-detail__status")?.classList.contains("bs-select")).toBe(true);
 		expect(document.querySelector(".cal-detail__swatches")?.getAttribute("role")).toBe("radiogroup");
-		for (const seg of document.querySelectorAll(".cal-detail__segment")) {
-			expect(seg.getAttribute("role")).toBe("radio");
-		}
 		for (const sw of document.querySelectorAll(".cal-detail__swatch")) {
 			expect(sw.getAttribute("role")).toBe("radio");
 		}
-	});
-
-	it("KBN-A: ArrowRight on the status group moves AND selects the next radio", async () => {
-		const onResolve = vi.fn();
-		handle = await renderInto(
-			<EventDetail
-				event={makeEvent()}
-				defaultStart={Date.now()}
-				onResolve={onResolve}
-				onClose={vi.fn()}
-			/>,
-		);
-		const group = document.querySelector<HTMLElement>(".cal-detail__segmented");
-		if (!group) throw new Error("no status group");
-		const segments = [...document.querySelectorAll<HTMLElement>(".cal-detail__segment")];
-		expect(segments[0]?.getAttribute("aria-checked")).toBe("true");
-		group.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-		await flush();
-		expect(segments[1]?.getAttribute("aria-checked")).toBe("true");
-		expect(segments[0]?.getAttribute("aria-checked")).toBe("false");
-		document.querySelector<HTMLButtonElement>("[data-bs-primary]")?.click();
-		expect(onResolve.mock.calls[0]?.[0]?.event.statusKey).toBe("tentative");
-	});
-
-	it("KBN-A: the status cursor starts on the currently-selected radio", async () => {
-		handle = await renderInto(
-			<EventDetail
-				event={makeEvent({ statusKey: "tentative" })}
-				defaultStart={Date.now()}
-				onResolve={vi.fn()}
-				onClose={vi.fn()}
-			/>,
-		);
-		expect(
-			document.querySelector<HTMLElement>('.cal-detail__segment[data-status="tentative"]')?.tabIndex,
-		).toBe(0);
-		expect(
-			document.querySelector<HTMLElement>('.cal-detail__segment[data-status="confirmed"]')?.tabIndex,
-		).toBe(-1);
 	});
 
 	it("adding an attendee writes it into the saved event", async () => {
