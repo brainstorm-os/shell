@@ -125,6 +125,13 @@
         }
       ]
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "brainst0rm-os",
+        "repo": "shell"
+      }
+    ],
     "linux": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
@@ -166,6 +173,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.9.0",
     "better-sqlite3-multiple-ciphers": "12.9.0",
+    "electron-updater": "^6.3.0",
     "framer-motion": "^12.38.0",
     "imapflow": "^1.4.0",
     "linkedom": "^0.18.12",

@@ -27,7 +27,9 @@ import type {
 	RegionalState,
 } from "../shared/shell-prefs";
 import {
+	type AutoUpdateState,
 	type ReleaseInfo,
+	UPDATE_STATE_EVENT,
 	UpdateAvailability,
 	UpdateChannel,
 	type UpdateCheckResult,
@@ -1560,12 +1562,21 @@ const dev = {
 	},
 };
 
-/** 13.6 — manual-download update check (app-global, dashboard-only). */
+/** 13.6 manual-download check + 13.12 in-app auto-update (app-global,
+ *  dashboard-only). `check`/`getPrefs`/`setChannel` are the 13.6 feed path;
+ *  `getState`/`checkAuto`/`download`/`installNow`/`onStateChange` drive the
+ *  packaged-build electron-updater engine. */
 const update = {
 	check: (): Promise<UpdateCheckResult> => ipcRenderer.invoke("update:check"),
 	getPrefs: (): Promise<UpdatePrefs> => ipcRenderer.invoke("update:get-prefs"),
 	setChannel: (channel: UpdateChannel): Promise<UpdatePrefs> =>
 		ipcRenderer.invoke("update:set-channel", channel),
+	getState: (): Promise<AutoUpdateState> => ipcRenderer.invoke("update:get-state"),
+	checkAuto: (): Promise<AutoUpdateState> => ipcRenderer.invoke("update:check-auto"),
+	download: (): Promise<AutoUpdateState> => ipcRenderer.invoke("update:download"),
+	installNow: (): Promise<void> => ipcRenderer.invoke("update:install"),
+	onStateChange: (listener: (state: AutoUpdateState) => void): (() => void) =>
+		subscribe<AutoUpdateState>(UPDATE_STATE_EVENT, listener),
 };
 
 /** Welcome-2 (9.3.5.V 7d) — first-launch template gallery import. Privileged,

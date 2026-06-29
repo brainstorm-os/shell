@@ -1,19 +1,22 @@
 /**
- * 13.6 — Settings → General → "Updates" (manual-download check).
+ * Settings → General → "Updates".
  *
- * Shows the running version, the release channel (Stable / Beta), and a
- * "Check for updates" button. A check resolves to one of three states:
- * up to date · a newer version with a Download button (opens the release
- * page through the open-resolution OS-handoff chokepoint — the shell
- * never downloads or installs in v1) · couldn't check. The channel +
+ * On a packaged build the panel drives the 13.12 in-app updater
+ * (electron-updater): Check → Available → Download (with progress) →
+ * "Restart & install". On dev / unpackaged builds — where self-update can't
+ * run — it falls back to the 13.6 manual-download check, which resolves to
+ * up-to-date / a Download button that opens the release page via the
+ * OS-handoff chokepoint / couldn't-check. The channel (Stable / Beta) +
  * last-checked stamp persist app-global through `window.brainstorm.update`.
  */
 
 import { useCallback, useEffect, useId, useState } from "react";
 import {
+	type AutoUpdateState,
 	UpdateAvailability,
 	UpdateChannel,
 	type UpdateCheckResult,
+	UpdateLifecycle,
 } from "../../shared/update-wire-types";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
@@ -29,8 +32,11 @@ export function UpdatesSection() {
 	const [channel, setChannel] = useState<UpdateChannel>(UpdateChannel.Stable);
 	const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
 	const [result, setResult] = useState<UpdateCheckResult | null>(null);
+	const [autoState, setAutoState] = useState<AutoUpdateState | null>(null);
 	const [checking, setChecking] = useState(false);
 	const currentVersion = window.brainstorm.version;
+
+	const supported = autoState !== null && autoState.lifecycle !== UpdateLifecycle.Unsupported;
 
 	useEffect(() => {
 		let live = true;
@@ -39,21 +45,33 @@ export function UpdatesSection() {
 			setChannel(prefs.channel);
 			setLastCheckedAt(prefs.lastCheckedAt);
 		});
+		void window.brainstorm.update.getState().then((state) => {
+			if (live) setAutoState(state);
+		});
+		const unsubscribe = window.brainstorm.update.onStateChange((state) => {
+			setAutoState(state);
+		});
 		return () => {
 			live = false;
+			unsubscribe();
 		};
 	}, []);
 
 	const onCheck = useCallback(async () => {
 		setChecking(true);
 		try {
+			if (supported) {
+				await window.brainstorm.update.checkAuto();
+				setLastCheckedAt(new Date().toISOString());
+				return;
+			}
 			const next = await window.brainstorm.update.check();
 			setResult(next);
 			setLastCheckedAt(next.checkedAt);
 		} finally {
 			setChecking(false);
 		}
-	}, []);
+	}, [supported]);
 
 	const onChannelChange = useCallback((next: UpdateChannel) => {
 		setChannel(next);
@@ -62,9 +80,14 @@ export function UpdatesSection() {
 		void window.brainstorm.update.setChannel(next);
 	}, []);
 
-	const onDownload = useCallback((url: string) => {
+	const onOpenDownloadPage = useCallback((url: string) => {
 		void window.brainstorm.intents.dispatch({ verb: "open", payload: { url } });
 	}, []);
+
+	const inFlight =
+		checking ||
+		autoState?.lifecycle === UpdateLifecycle.Checking ||
+		autoState?.lifecycle === UpdateLifecycle.Downloading;
 
 	return (
 		<section className="settings__section">
@@ -95,12 +118,12 @@ export function UpdatesSection() {
 				<Button
 					variant={ButtonVariant.Primary}
 					size={ButtonSize.Sm}
-					disabled={checking}
+					disabled={inFlight}
 					onClick={() => {
 						void onCheck();
 					}}
 				>
-					{checking ? t("shell.settings.updates.checking") : t("shell.settings.updates.check")}
+					{inFlight ? t("shell.settings.updates.checking") : t("shell.settings.updates.check")}
 				</Button>
 				{lastCheckedAt !== null && (
 					<span className="settings__updates-last">
@@ -109,12 +132,83 @@ export function UpdatesSection() {
 				)}
 			</div>
 
-			{result !== null && <UpdateResult result={result} onDownload={onDownload} />}
+			{supported && autoState !== null ? (
+				<AutoUpdateResult
+					state={autoState}
+					onDownload={() => void window.brainstorm.update.download()}
+					onInstall={() => void window.brainstorm.update.installNow()}
+				/>
+			) : (
+				result !== null && <FeedUpdateResult result={result} onDownload={onOpenDownloadPage} />
+			)}
 		</section>
 	);
 }
 
-function UpdateResult({
+/** Packaged-build (electron-updater) lifecycle view. */
+function AutoUpdateResult({
+	state,
+	onDownload,
+	onInstall,
+}: {
+	state: AutoUpdateState;
+	onDownload: () => void;
+	onInstall: () => void;
+}) {
+	switch (state.lifecycle) {
+		case UpdateLifecycle.Available:
+			return (
+				<div className="settings__updates-result settings__updates-result--available" role="status">
+					<p className="settings__updates-headline">
+						{t("shell.settings.updates.available", { version: state.version ?? "" })}
+					</p>
+					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={onDownload}>
+						{t("shell.settings.updates.download")}
+					</Button>
+				</div>
+			);
+		case UpdateLifecycle.Downloading: {
+			const percent = state.progress?.percent ?? 0;
+			return (
+				<div className="settings__updates-result" role="status" aria-live="polite">
+					<p className="settings__updates-headline">
+						{t("shell.settings.updates.downloading", { percent })}
+					</p>
+					{/* Decorative track — progress is announced via the live-region text above. */}
+					<div className="settings__updates-progress" aria-hidden="true">
+						<div className="settings__updates-progress-bar" style={{ width: `${percent}%` }} />
+					</div>
+				</div>
+			);
+		}
+		case UpdateLifecycle.Downloaded:
+			return (
+				<div className="settings__updates-result settings__updates-result--available" role="status">
+					<p className="settings__updates-headline">
+						{t("shell.settings.updates.updateReady", { version: state.version ?? "" })}
+					</p>
+					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={onInstall}>
+						{t("shell.settings.updates.restartInstall")}
+					</Button>
+				</div>
+			);
+		case UpdateLifecycle.NotAvailable:
+			return <ResultLine messageKey="shell.settings.updates.upToDate" />;
+		case UpdateLifecycle.Error:
+			return (
+				<div className="settings__updates-result" role="status">
+					<p className="settings__updates-headline">
+						{t("shell.settings.updates.error", { message: state.error ?? "" })}
+					</p>
+				</div>
+			);
+		default:
+			return null;
+	}
+}
+
+/** 13.6 manual-download (dev / unsupported) view. */
+function FeedUpdateResult({
 	result,
 	onDownload,
 }: {
@@ -139,10 +233,18 @@ function UpdateResult({
 			</div>
 		);
 	}
-	const messageKey =
-		result.availability === UpdateAvailability.UpToDate
-			? "shell.settings.updates.upToDate"
-			: "shell.settings.updates.unknown";
+	return (
+		<ResultLine
+			messageKey={
+				result.availability === UpdateAvailability.UpToDate
+					? "shell.settings.updates.upToDate"
+					: "shell.settings.updates.unknown"
+			}
+		/>
+	);
+}
+
+function ResultLine({ messageKey }: { messageKey: string }) {
 	return (
 		<div className="settings__updates-result" role="status">
 			<p className="settings__updates-headline">{t(messageKey)}</p>

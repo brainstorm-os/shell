@@ -15,7 +15,7 @@ import {
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UpdateAvailability, UpdateChannel } from "../../shared/update-wire-types";
+import { UpdateAvailability, UpdateChannel, UpdateLifecycle } from "../../shared/update-wire-types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -25,6 +25,11 @@ type Stub = {
 		getPrefs: Mock;
 		check: Mock;
 		setChannel: Mock;
+		getState: Mock;
+		checkAuto: Mock;
+		download: Mock;
+		installNow: Mock;
+		onStateChange: Mock;
 	};
 	intents: { dispatch: Mock };
 };
@@ -40,6 +45,14 @@ beforeEach(() => {
 			getPrefs: vi.fn().mockResolvedValue({ channel: UpdateChannel.Stable, lastCheckedAt: null }),
 			check: vi.fn(),
 			setChannel: vi.fn().mockResolvedValue({ channel: UpdateChannel.Beta, lastCheckedAt: null }),
+			// Default to the unsupported (dev) state so these tests exercise the
+			// 13.6 feed-download fallback path; the auto path is covered by the
+			// AutoUpdateEngine unit tests.
+			getState: vi.fn().mockResolvedValue({ lifecycle: UpdateLifecycle.Unsupported }),
+			checkAuto: vi.fn(),
+			download: vi.fn(),
+			installNow: vi.fn(),
+			onStateChange: vi.fn().mockReturnValue(() => {}),
 		},
 		intents: { dispatch: vi.fn().mockResolvedValue({ handled: true }) },
 	};

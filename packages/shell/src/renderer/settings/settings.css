@@ -328,6 +328,22 @@
 	color: var(--color-text-secondary);
 }
 
+.settings__updates-progress {
+	margin-block: var(--space-2) var(--space-1);
+	width: 100%;
+	height: var(--space-1);
+	overflow: hidden;
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-sunken);
+}
+
+.settings__updates-progress-bar {
+	height: 100%;
+	border-radius: var(--radius-sm);
+	background: var(--color-accent-default);
+	transition: width 120ms linear;
+}
+
 .settings__hint {
 	margin: 0;
 	font-size: var(--text-size-xs);

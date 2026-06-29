@@ -51,6 +51,58 @@ export type ReleaseFeed = {
 	readonly [UpdateChannel.Beta]?: ReleaseInfo;
 };
 
+/**
+ * 13.12 — in-app auto-update (electron-updater) lifecycle.
+ *
+ * The state of the packaged-build updater the shell drives itself:
+ * detect → download (with progress) → staged → relaunch-to-install. On a
+ * non-packaged build (dev) or a platform where self-update isn't wired,
+ * the engine stays `Unsupported` and the UI falls back to the 13.6
+ * manual-download check above.
+ */
+export enum UpdateLifecycle {
+	/** No check has run yet this session. */
+	Idle = "idle",
+	/** Self-update isn't available here (dev / unpackaged build). */
+	Unsupported = "unsupported",
+	/** A check is in flight. */
+	Checking = "checking",
+	/** A newer version exists and can be downloaded (`version` set). */
+	Available = "available",
+	/** The running build is already current. */
+	NotAvailable = "not-available",
+	/** The update binary is downloading (`progress` set). */
+	Downloading = "downloading",
+	/** The update is staged on disk; relaunch installs it (`version` set). */
+	Downloaded = "downloaded",
+	/** A check/download failed (`error` set). Recoverable — retry re-checks. */
+	Error = "error",
+}
+
+/** Download progress for the `Downloading` lifecycle state. */
+export type UpdateProgress = {
+	/** 0–100, already rounded for display. */
+	readonly percent: number;
+	readonly transferred: number;
+	readonly total: number;
+	readonly bytesPerSecond: number;
+};
+
+/** The single source of truth the auto-update UI renders, pushed to the
+ *  dashboard renderer on every transition and readable on demand. */
+export type AutoUpdateState = {
+	readonly lifecycle: UpdateLifecycle;
+	/** The target release version (Available / Downloading / Downloaded). */
+	readonly version?: string;
+	/** Populated while `Downloading`. */
+	readonly progress?: UpdateProgress;
+	/** Human-readable failure summary while `Error`. */
+	readonly error?: string;
+};
+
+/** IPC event channel the main process pushes `AutoUpdateState` on. */
+export const UPDATE_STATE_EVENT = "update:state-changed";
+
 /** Result of `update:check`, mirrored into the preload for the renderer. */
 export type UpdateCheckResult = {
 	readonly availability: UpdateAvailability;

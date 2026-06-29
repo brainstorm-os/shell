@@ -41,6 +41,7 @@ import {
 	SelectiveSyncMode,
 	entityMatchesPolicy,
 } from "../shared/selective-sync-types";
+import { UPDATE_STATE_EVENT } from "../shared/update-wire-types";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
@@ -184,7 +185,7 @@ import { registerSearchHandlers } from "./ipc/search-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
 import { registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
-import { registerUpdateHandlers } from "./ipc/update-handlers";
+import { registerAutoUpdateHandlers, registerUpdateHandlers } from "./ipc/update-handlers";
 import { registerVaultHandlers } from "./ipc/vault-handlers";
 import { registerVaultLockHandlers } from "./ipc/vault-lock-handlers";
 import { registerWebPrivacyHandlers } from "./ipc/web-privacy-handlers";
@@ -255,6 +256,8 @@ import { getUiNotifyHost } from "./ui/notify-host";
 import { makeOsNotifier } from "./ui/os-notification-host";
 import { type ComposedTray, getTrayHost } from "./ui/tray-host";
 import { makeUiServiceHandler } from "./ui/ui-service";
+import { AutoUpdateEngine } from "./update/auto-update-engine";
+import { createElectronAutoUpdater, isAutoUpdateSupported } from "./update/electron-auto-updater";
 import { DEFAULT_UPDATE_FEED_URL, fetchUpdateFeedJson } from "./update/update-feed-fetch";
 import { UpdatePrefsStore, updatePrefsPath } from "./update/update-prefs-store";
 import { UpdateService } from "./update/update-service";
@@ -1176,13 +1179,34 @@ void app.whenReady().then(async () => {
 		process.env.BRAINSTORM_UPDATE_FEED_URL && process.env.BRAINSTORM_UPDATE_FEED_URL.length > 0
 			? process.env.BRAINSTORM_UPDATE_FEED_URL
 			: DEFAULT_UPDATE_FEED_URL;
+	const updatePrefsStore = new UpdatePrefsStore({
+		path: updatePrefsPath(app.getPath("userData")),
+	});
 	registerUpdateHandlers(
 		new UpdateService({
-			prefs: new UpdatePrefsStore({ path: updatePrefsPath(app.getPath("userData")) }),
+			prefs: updatePrefsStore,
 			getCurrentVersion: () => app.getVersion(),
 			fetchFeedJson: () => fetchUpdateFeedJson(updateFeedUrl),
 		}),
 	);
+
+	// 13.12 — in-app auto-update on packaged builds (electron-updater). Shares
+	// the 13.6 channel pref; pushes lifecycle state to the dashboard renderer.
+	const autoUpdateEngine = new AutoUpdateEngine({
+		updater: createElectronAutoUpdater(),
+		getChannel: async () => (await updatePrefsStore.load()).channel,
+		supported: isAutoUpdateSupported(),
+		onState: (state) => {
+			const target = dashboardWindow;
+			if (!target || target.isDestroyed()) return;
+			try {
+				target.webContents.send(UPDATE_STATE_EVENT, state);
+			} catch {
+				// Best-effort — the renderer may already be gone.
+			}
+		},
+	});
+	registerAutoUpdateHandlers(autoUpdateEngine);
 
 	const CRASH_SUBMIT_BOOT_DELAY_MS = 30_000;
 	const CRASH_SUBMIT_INTERVAL_MS = 15 * 60_000;
