@@ -4082,40 +4082,27 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	});
 }
 
-/** True when focus is in a text-entry surface — the inline filter prompt,
- *  search box, or any contenteditable — so Space stays a literal space
- *  there and only triggers Quick Look on the grid itself. */
-function isTextInputFocused(): boolean {
-	const el = document.activeElement;
-	if (!(el instanceof HTMLElement)) return false;
-	const tag = el.tagName;
-	return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
-}
-
 function bindStageKeyboard(state: AppState): void {
 	const body = document.getElementById("stage-body");
 	if (!body) return;
-	body.addEventListener("keydown", (event) => {
-		if (event.key === "Escape") {
-			event.preventDefault();
-			state.selection = clearSelection();
-			state.chrome.inspectorOpen = false;
-			applyChrome(state);
-			repaintSelection(state);
-			updateSelectionBar(state);
-			renderInspector(state);
-		}
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
-			event.preventDefault();
-			selectAllVisible(state);
-		}
-		if (event.key === " " && !isTextInputFocused()) {
-			const entity = singleSelectedEntity(state);
-			if (entity) {
-				event.preventDefault();
-				void dispatchQuickLook(entity);
-			}
-		}
+	// Bound through the SDK shortcut layer (the imperative twin of `useShortcut`),
+	// matching `bindViewTabKeyboard` below — raw `keydown`/`e.key` comparisons are
+	// a PR-blocker. The single-key chords (Escape / Space) auto-suppress while a
+	// cell editor or menu owns the keyboard (so Escape cancels the edit instead of
+	// closing the inspector, and Space types a space), which also replaces the old
+	// hand-rolled `isTextInputFocused()` guard.
+	attachShortcut(body, "Escape", () => {
+		state.selection = clearSelection();
+		state.chrome.inspectorOpen = false;
+		applyChrome(state);
+		repaintSelection(state);
+		updateSelectionBar(state);
+		renderInspector(state);
+	});
+	attachShortcut(body, "Mod+A", () => selectAllVisible(state));
+	attachShortcut(body, "Space", () => {
+		const entity = singleSelectedEntity(state);
+		if (entity) void dispatchQuickLook(entity);
 	});
 }
 
