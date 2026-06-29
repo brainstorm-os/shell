@@ -1015,27 +1015,6 @@ body.is-resizing .calendar-resize {
 	min-width: 0;
 }
 
-/* ─── Empty state ─────────────────────────────────────────────────── */
-
-.cal-empty {
-	margin-top: 96px;
-	text-align: center;
-	color: var(--text-dim);
-}
-
-.cal-empty h2 {
-	margin: 0 0 var(--space-1);
-	font-size: var(--text-size-lg);
-	font-weight: var(--text-weight-semibold);
-	color: var(--text);
-}
-
-.cal-empty p {
-	margin: 0;
-	font-size: var(--text-size-sm);
-	color: var(--text-faint);
-}
-
 /* ─── New event button ────────────────────────────────────────────── */
 
 /* 28px is the deliberate calendar header-control size (see `.cal-toolbar__tabs`):

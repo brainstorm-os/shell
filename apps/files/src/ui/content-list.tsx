@@ -13,6 +13,7 @@
 
 import { DragPayloadKind } from "@brainstorm/sdk-types";
 import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import {
 	DropSemantic,
@@ -370,29 +371,31 @@ export function ContentList({
 				onDragLeave={onOsDragLeave}
 				onDrop={onOsDrop}
 			>
-				<span className="content-empty__glyph" aria-hidden="true">
-					<Icon name={searching ? IconName.Search : IconName.Folder} size={40} />
-				</span>
-				<h2>
-					{searching ? t("brainstorm.files.empty.searchTitle") : t("brainstorm.files.empty.title")}
-				</h2>
-				<p>
-					{searching
-						? t("brainstorm.files.empty.searchBody", { query: store.searchQuery })
-						: t("brainstorm.files.empty.body")}
-				</p>
-				{searching ? null : (
-					<button
-						type="button"
-						className="bs-btn content-empty__cta"
-						data-bs-primary=""
-						data-testid="content-empty-new-folder"
-						onClick={store.newFolder}
-					>
-						<Icon name={IconName.Plus} size={15} />
-						{t("brainstorm.files.empty.newFolder")}
-					</button>
-				)}
+				<EmptyState
+					icon={searching ? IconName.Search : IconName.Folder}
+					title={searching ? t("brainstorm.files.empty.searchTitle") : t("brainstorm.files.empty.title")}
+					hint={
+						searching
+							? t("brainstorm.files.empty.searchBody", { query: store.searchQuery })
+							: t("brainstorm.files.empty.body")
+					}
+					{...(searching
+						? {}
+						: {
+								action: (
+									<button
+										type="button"
+										className="bs-btn"
+										data-bs-primary=""
+										data-testid="content-empty-new-folder"
+										onClick={store.newFolder}
+									>
+										<Icon name={IconName.Plus} size={15} />
+										{t("brainstorm.files.empty.newFolder")}
+									</button>
+								),
+							})}
+				/>
 			</div>
 		);
 	}

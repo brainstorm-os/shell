@@ -3,6 +3,8 @@
  * Tomorrow / This week / Later), with per-day sub-headings inside each bucket.
  */
 
+import { EmptyState } from "@brainstorm/sdk/empty-state";
+import { IconName } from "@brainstorm/sdk/icon";
 import { t } from "../../i18n/t";
 import type { CompiledAgendaView } from "../../logic/compile-view";
 import type { ScheduledItem } from "../../logic/scheduled-item";
@@ -33,10 +35,11 @@ export function AgendaView({ compiled, now, callbacks }: AgendaViewProps) {
 	if (compiled.buckets.length === 0) {
 		return (
 			<section className="cal-agenda">
-				<div className="cal-empty">
-					<h2>{t("calendar.agenda.empty.title")}</h2>
-					<p>{t("calendar.agenda.empty.body")}</p>
-				</div>
+				<EmptyState
+					icon={IconName.KindDate}
+					title={t("calendar.agenda.empty.title")}
+					hint={t("calendar.agenda.empty.body")}
+				/>
 			</section>
 		);
 	}

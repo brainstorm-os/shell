@@ -1326,48 +1326,16 @@ body[data-view-mode="icon-list"] .content-row__size {
 
 /* Empty state */
 
+/* Drop-target wrapper for the empty folder/search state; the Hero itself is the
+ * shared `<EmptyState>` (glyph/title/hint/CTA). Only the container sizing + the
+ * OS-drop highlight (above) live here now. */
 .content-empty {
 	margin: auto;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	text-align: center;
-	color: var(--text-faint);
 	padding: var(--space-6);
 	max-width: 360px;
-}
-
-.content-empty__glyph {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 72px;
-	height: 72px;
-	margin-bottom: var(--space-4);
-	border-radius: var(--radius-xl);
-	background: var(--bg-elev);
-	color: var(--text-faint);
-	opacity: 0.85;
-}
-
-.content-empty h2 {
-	font-size: var(--text-size-lg);
-	font-weight: var(--text-weight-semibold);
-	margin: 0 0 var(--space-1);
-	color: var(--text-dim);
-}
-
-.content-empty p {
-	margin: 0;
-	font-size: var(--text-size-sm);
-	line-height: 18px;
-}
-
-.content-empty__cta {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-	margin-top: var(--space-4);
 }
 
 /* ── Inspector ────────────────────────────────────────────────────────── */
