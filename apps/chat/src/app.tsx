@@ -468,9 +468,11 @@ export function ChatApp(): ReactElement {
 					/>
 					<PanelToggleButton
 						side={PanelSide.Right}
-						open={showMembers}
+						open={showMembers && !!activeChannel}
 						onClick={() => setShowMembers((v) => !v)}
 						labels={{ show: t("header.members.show"), hide: t("header.members.hide") }}
+						disabled={!activeChannel}
+						{...(activeChannel ? {} : { hint: t("header.members.disabled") })}
 						testId="members-toggle"
 					/>
 					<button

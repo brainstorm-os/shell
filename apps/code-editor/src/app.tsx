@@ -902,9 +902,12 @@ export function CodeEditorApp(): ReactElement {
 					/>
 					<PanelToggleButton
 						side={PanelSide.Right}
-						open={refsOpen}
+						open={refsOpen && !!selectedRow}
 						onClick={() => setRefsOpen((v) => !v)}
 						labels={{ show: t("refsToggle.show"), hide: t("refsToggle.hide") }}
+						disabled={!selectedRow}
+						{...(selectedRow ? {} : { hint: t("refsToggle.disabled") })}
+						testId="refs-toggle"
 					/>
 					{selectedRow ? (
 						<LockButton

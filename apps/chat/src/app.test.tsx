@@ -145,6 +145,28 @@ describe("ChatApp", () => {
 		expect(container.querySelector('[data-testid="no-channel"]')).not.toBeNull();
 	});
 
+	it("disables the members toggle when no channel is open (no dead button)", async () => {
+		await mount([]);
+		const toggle = container.querySelector('[data-testid="members-toggle"]') as HTMLButtonElement;
+		expect(toggle.disabled).toBe(true);
+		expect(toggle.getAttribute("aria-pressed")).toBe("false");
+		await act(async () => {
+			toggle.click();
+		});
+		// Clicking a disabled toggle must not open the members panel.
+		expect(container.querySelector(".chat")?.getAttribute("data-members-open")).toBe("false");
+	});
+
+	it("enables the members toggle once a channel is active", async () => {
+		await mount([channel("c1", "general")]);
+		const toggle = container.querySelector('[data-testid="members-toggle"]') as HTMLButtonElement;
+		expect(toggle.disabled).toBe(false);
+		await act(async () => {
+			toggle.click();
+		});
+		expect(container.querySelector(".chat")?.getAttribute("data-members-open")).toBe("true");
+	});
+
 	it("renders a selected channel's messages grouped by author", async () => {
 		await mount([
 			channel("c1", "general"),

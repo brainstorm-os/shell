@@ -72,6 +72,7 @@ export const CODE_EDITOR_MESSAGES = {
 	"header.unlock": "Unlock file",
 	"refsToggle.show": "Show references",
 	"refsToggle.hide": "Hide references",
+	"refsToggle.disabled": "Open a file to see its references",
 	quickOpenLabel: "Quick open file",
 	quickOpenPlaceholder: "Jump to a file by name…",
 	quickOpenEmpty: "No matching files",

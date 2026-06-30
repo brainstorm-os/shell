@@ -144,4 +144,29 @@ describe("new-file affordances (F-205)", () => {
 			{ timeout: 3000 },
 		);
 	});
+
+	it("disables the references toggle until a file is open (no dead button)", async () => {
+		const { runtime } = makeFakeRuntime();
+		window.brainstorm = runtime;
+		act(() => {
+			root = createRoot(container);
+			root.render(<CodeEditorApp />);
+		});
+
+		// Empty vault → no file selected → the right references toggle is a
+		// dead button unless disabled (its panel only mounts with a selection).
+		const refsToggle = await vi.waitFor(() => {
+			const el = document.querySelector<HTMLButtonElement>('[data-testid="refs-toggle"]');
+			expect(el).not.toBeNull();
+			return el as HTMLButtonElement;
+		});
+		expect(refsToggle.disabled).toBe(true);
+		// aria-pressed must reflect real visibility: the panel only mounts with a
+		// selection, so with none open it reads false even though the persisted
+		// `refsOpen` pref is true.
+		expect(refsToggle.getAttribute("aria-pressed")).toBe("false");
+		act(() => refsToggle.click());
+		// The references panel cannot be opened while no file is selected.
+		expect(document.querySelector(".editor__refs")).toBeNull();
+	});
 });

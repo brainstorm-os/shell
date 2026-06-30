@@ -12,6 +12,7 @@ export const CHAT_I18N = {
 	"app.title": "Chat",
 	"header.members.show": "Show members",
 	"header.members.hide": "Hide members",
+	"header.members.disabled": "Open a channel to see its members",
 	"header.moreActions": "More actions",
 
 	"menu.editIdentity": "Change display name…",
