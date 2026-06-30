@@ -58,6 +58,11 @@ export type SearchHit = {
 export type IndexerQuery = {
 	text: string;
 	types?: readonly string[];
+	/** Type URLs to EXCLUDE from results. Used by the Agent to keep its own
+	 *  bookkeeping objects (Conversation / Message / Memory) out of retrieval —
+	 *  without it the just-asked question, persisted + indexed as a Message,
+	 *  outranks every real note and grounding self-references. */
+	excludeTypes?: readonly string[];
 	limit?: number;
 };
 
@@ -168,8 +173,30 @@ export class SearchIndexer {
 		const matchExpr = buildMatchExpression(query.text);
 		if (!matchExpr) return [];
 		const limit = clampLimit(query.limit);
-		const typeFilter = normaliseTypes(query.types);
+		const typeFilter = buildTypeFilter(query.types, query.excludeTypes);
 
+		const hits = this.runMatch(matchExpr, limit, typeFilter);
+		if (hits.length > 0) return hits;
+
+		// Natural-language fallback: the primary expression ANDs every token, so a
+		// full-sentence query (the Agent feeds the raw user turn into `hybrid`)
+		// matches nothing — no single object contains every function + content
+		// word. When the precise AND match is empty, retry as an OR over the
+		// CONTENT words (stopwords dropped), ranked by bm25 so the most relevant
+		// objects still surface first. Only fires on a miss, so keyword-precise
+		// launcher queries that already match are untouched.
+		const orExpr = buildMatchExpression(query.text, { mode: MatchMode.Any, dropStopwords: true });
+		if (!orExpr || orExpr === matchExpr) return hits;
+		return this.runMatch(orExpr, limit, typeFilter);
+	}
+
+	/** Run one FTS5 MATCH expression and map rows to {@link SearchHit}s. Shared
+	 *  by the primary AND query and the OR natural-language fallback. */
+	private runMatch(
+		matchExpr: string,
+		limit: number,
+		typeFilter: { sql: string; params: readonly string[] },
+	): SearchHit[] {
 		// FTS5's `snippet(table, col, lhs, rhs, ellipsis, tokens)` is a built-in
 		// — col=3 is `body`, lhs/rhs wrap matches in `<mark>` / `</mark>`,
 		// ellipsis is `…`, tokens=10 trims to ~10 tokens of context.
@@ -264,6 +291,79 @@ export class SearchIndexer {
 	}
 }
 
+/** How the tokens of a multi-word query combine in the FTS5 MATCH expression.
+ *  `All` (default) ANDs them — precise, the launcher's keyword behaviour.
+ *  `Any` ORs them — the natural-language fallback when the AND match is empty. */
+export enum MatchMode {
+	All = "all",
+	Any = "any",
+}
+
+/** Common English function words dropped when {@link buildMatchExpression} runs
+ *  in the natural-language (`Any`) fallback. The Agent feeds whole user turns
+ *  into search; ANDing/ORing stopwords either matches nothing or floods the
+ *  results with low-signal hits. Kept deliberately small — only the highest-
+ *  frequency, zero-content words — so it never strips a real query term. */
+const STOPWORDS: ReadonlySet<string> = new Set([
+	"a",
+	"an",
+	"and",
+	"are",
+	"as",
+	"at",
+	"be",
+	"but",
+	"by",
+	"can",
+	"did",
+	"do",
+	"does",
+	"for",
+	"from",
+	"had",
+	"has",
+	"have",
+	"how",
+	"i",
+	"in",
+	"is",
+	"it",
+	"its",
+	"me",
+	"my",
+	"no",
+	"not",
+	"of",
+	"on",
+	"or",
+	"our",
+	"so",
+	"that",
+	"the",
+	"their",
+	"them",
+	"then",
+	"there",
+	"these",
+	"they",
+	"this",
+	"to",
+	"was",
+	"we",
+	"were",
+	"what",
+	"when",
+	"where",
+	"which",
+	"who",
+	"whom",
+	"why",
+	"will",
+	"with",
+	"you",
+	"your",
+]);
+
 /** Tokenise + escape a free-form user query into an FTS5 MATCH expression.
  *
  *   "hello world"   → `"hello" AND "world"*`
@@ -271,10 +371,17 @@ export class SearchIndexer {
  *   `"a "b" c"`     → `"a" AND "b" AND "c"*`   (internal quotes doubled)
  *   `"AND OR NEAR"` → `"AND" AND "OR" AND "NEAR"*`
  *
+ * With `mode: MatchMode.Any` the tokens are ORed instead (the NL fallback); with
+ * `dropStopwords` the high-frequency function words are removed first (only when
+ * content words remain, so an all-stopword query still matches something).
+ *
  * Empty / whitespace-only input returns null (caller short-circuits to no
  * hits). The last token gets a `*` prefix-match suffix so live-typing
  * surfaces partial matches without the user typing wildcards. */
-export function buildMatchExpression(text: string): string | null {
+export function buildMatchExpression(
+	text: string,
+	opts: { mode?: MatchMode; dropStopwords?: boolean } = {},
+): string | null {
 	if (typeof text !== "string") return null;
 	// Split on FTS5 token boundaries. The default `unicode61` tokeniser treats
 	// every character outside Unicode categories L (letter) and N (number) as
@@ -288,12 +395,21 @@ export function buildMatchExpression(text: string): string | null {
 		.filter((t) => t.length > 0);
 	if (raw.length === 0) return null;
 
-	const escaped = raw.map((t) => `"${t.replace(/"/g, '""')}"`);
+	// Drop stopwords only when content words survive — an all-stopword query
+	// ("who are they") keeps its tokens rather than degrading to no match.
+	let tokens = raw;
+	if (opts.dropStopwords) {
+		const content = raw.filter((t) => !STOPWORDS.has(t.toLowerCase()));
+		if (content.length > 0) tokens = content;
+	}
+
+	const escaped = tokens.map((t) => `"${t.replace(/"/g, '""')}"`);
+	const joiner = opts.mode === MatchMode.Any ? " OR " : " AND ";
 	const last = escaped[escaped.length - 1];
 	const lastWithPrefix = `${last}*`;
 	const head = escaped.slice(0, -1);
 	if (head.length === 0) return lastWithPrefix;
-	return `${head.join(" AND ")} AND ${lastWithPrefix}`;
+	return `${head.join(joiner)}${joiner}${lastWithPrefix}`;
 }
 
 export function clampLimit(limit: number | undefined): number {
@@ -301,15 +417,23 @@ export function clampLimit(limit: number | undefined): number {
 	return Math.min(Math.floor(limit), HARD_LIMIT);
 }
 
-function normaliseTypes(types: readonly string[] | undefined): {
-	sql: string;
-	params: readonly string[];
-} {
-	if (!types || types.length === 0) return { sql: "", params: [] };
+function buildTypeFilter(
+	includeTypes: readonly string[] | undefined,
+	excludeTypes: readonly string[] | undefined,
+): { sql: string; params: readonly string[] } {
 	// Type strings are app-declared URLs, not user input — still, parameterise
 	// to keep the query plan stable + safe.
-	const placeholders = types.map(() => "?").join(", ");
-	return { sql: `AND f.type IN (${placeholders})`, params: types };
+	const clauses: string[] = [];
+	const params: string[] = [];
+	if (includeTypes && includeTypes.length > 0) {
+		clauses.push(`AND f.type IN (${includeTypes.map(() => "?").join(", ")})`);
+		params.push(...includeTypes);
+	}
+	if (excludeTypes && excludeTypes.length > 0) {
+		clauses.push(`AND f.type NOT IN (${excludeTypes.map(() => "?").join(", ")})`);
+		params.push(...excludeTypes);
+	}
+	return { sql: clauses.join(" "), params };
 }
 
 /** The single predicate for "this entity earns a row in the index" —

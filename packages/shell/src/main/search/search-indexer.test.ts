@@ -4,6 +4,7 @@ import { SEARCH_MIGRATIONS } from "../storage/search-schema";
 import { type SqliteDatabase, open } from "../storage/sqlite";
 import {
 	type IndexableEntity,
+	MatchMode,
 	SearchIndexer,
 	buildMatchExpression,
 	isIndexable,
@@ -51,6 +52,18 @@ describe("buildMatchExpression", () => {
 		// they do NOT become FTS5 operators.
 		expect(buildMatchExpression("AND OR NEAR")).toBe('"AND" AND "OR" AND "NEAR"*');
 		expect(buildMatchExpression("(quick) *brown")).toBe('"quick" AND "brown"*');
+	});
+
+	it("ORs tokens in Any mode and drops stopwords when content words remain", () => {
+		expect(
+			buildMatchExpression("the quick brown fox", { mode: MatchMode.Any, dropStopwords: true }),
+		).toBe('"quick" OR "brown" OR "fox"*');
+		// All-stopword query keeps its tokens rather than degrading to no match.
+		expect(buildMatchExpression("who are they", { mode: MatchMode.Any, dropStopwords: true })).toBe(
+			'"who" OR "are" OR "they"*',
+		);
+		// Any mode without dropping stopwords ORs every token.
+		expect(buildMatchExpression("cat dog", { mode: MatchMode.Any })).toBe('"cat" OR "dog"*');
 	});
 
 	it("splits on punctuation the way unicode61 does (apostrophes, hyphens become boundaries)", () => {
@@ -171,6 +184,33 @@ describe("SearchIndexer — query semantics", () => {
 		}
 	});
 
+	it("excludes the given types (so the Agent never grounds on its own transcript)", async () => {
+		const { db, indexer } = await openIndexer();
+		try {
+			const MESSAGE = "brainstorm/Message/v1";
+			indexer.indexEntity(entity("note", "Northbound launch plan", "ship the launch"));
+			indexer.indexEntity({
+				entityId: "msg",
+				type: MESSAGE,
+				ownerAppId: "io.brainstorm.agent",
+				title: "",
+				body: "what is in my Northbound launch plan?",
+			});
+			// Without the filter the Message (an exact echo of the query) outranks
+			// the note; excluding it surfaces the real content instead.
+			const unfiltered = indexer.query({ text: "what is in my Northbound launch plan?" });
+			expect(unfiltered.map((h) => h.entityId)).toContain("msg");
+			const filtered = indexer.query({
+				text: "what is in my Northbound launch plan?",
+				excludeTypes: [MESSAGE],
+			});
+			expect(filtered.map((h) => h.entityId)).not.toContain("msg");
+			expect(filtered.map((h) => h.entityId)).toContain("note");
+		} finally {
+			db.close();
+		}
+	});
+
 	it("caps results at the given limit (and at 200 hard ceiling)", async () => {
 		const { db, indexer } = await openIndexer();
 		try {
@@ -202,12 +242,46 @@ describe("SearchIndexer — query semantics", () => {
 		try {
 			indexer.indexEntity(entity("e1", "cat", "a furry pet"));
 			indexer.indexEntity(entity("e2", "dog", "a loyal pet"));
-			// User typing "cat OR dog" should match LITERAL "cat" + "dog" (AND).
-			// Neither row matches both → no results, instead of FTS5 OR-disjunction
-			// returning both.
-			expect(indexer.query({ text: "cat OR dog" })).toEqual([]);
+			// "cat OR dog" must not act as an FTS5 OR operator at the precise stage:
+			// the AND of literal "cat"/"or"/"dog" matches no single doc. The
+			// natural-language fallback then ORs the content words (the "or"
+			// stopword dropped) and surfaces both — relevant hits, not a parse of
+			// the user's operators.
+			const hits = indexer.query({ text: "cat OR dog" });
+			expect(hits.map((h) => h.entityId).sort()).toEqual(["e1", "e2"]);
 			// Special chars should not crash.
 			expect(() => indexer.query({ text: '" " ! @ # $ % ^ & * ( )' })).not.toThrow();
+		} finally {
+			db.close();
+		}
+	});
+
+	it("falls back to an OR over content words when the precise AND match is empty", async () => {
+		const { db, indexer } = await openIndexer();
+		try {
+			indexer.indexEntity(entity("plan", "Northbound Q3 plan", "launch roadmap and milestones"));
+			indexer.indexEntity(entity("misc", "grocery list", "milk eggs bread"));
+			// A full natural-language turn (what the Agent feeds into search): the
+			// precise AND of every token — stopwords included — matches nothing, but
+			// the fallback surfaces the relevant note and bm25 ranks it first.
+			const hits = indexer.query({ text: "what is in my Northbound launch plan?" });
+			expect(hits.map((h) => h.entityId)).toContain("plan");
+			expect(hits[0]?.entityId).toBe("plan");
+			expect(hits.map((h) => h.entityId)).not.toContain("misc");
+		} finally {
+			db.close();
+		}
+	});
+
+	it("keeps precise AND results when they exist (NL fallback does not fire)", async () => {
+		const { db, indexer } = await openIndexer();
+		try {
+			indexer.indexEntity(entity("both", "project plan", "the quarterly project plan"));
+			indexer.indexEntity(entity("one", "project ideas", "loose ideas"));
+			// "project plan" matches `both` under AND → the OR fallback never runs,
+			// so the broader `one` (only "project") is NOT pulled in.
+			const hits = indexer.query({ text: "project plan" });
+			expect(hits.map((h) => h.entityId)).toEqual(["both"]);
 		} finally {
 			db.close();
 		}

@@ -24,12 +24,11 @@ import {
 } from "@brainstorm/sdk-types";
 import { toolCallToIntent } from "./agent-tools";
 import { withRetrievalContext } from "./retrieval";
+import { AGENT_GROUNDING_GUIDANCE } from "./transcript";
 
 /** The instruction region the agent loop seeds. Mirrors the plain-chat system
  *  prompt but names the tool affordance, so the model knows it may act. */
-export const AGENT_TOOL_SYSTEM_PROMPT =
-	"You are a helpful assistant inside the user's Brainstorm knowledge workspace. " +
-	"Answer concisely and directly. Use a tool only when it genuinely helps the user.";
+export const AGENT_TOOL_SYSTEM_PROMPT = `You are a helpful assistant inside the user's Brainstorm knowledge workspace. Answer concisely and directly. Use a tool only when it genuinely helps the user. ${AGENT_GROUNDING_GUIDANCE}`;
 
 /** Build the loop's `dispatchTool` port over the intents service. SECURITY:
  *  the offered set the loop computed already proved `call.tool`; we re-key the

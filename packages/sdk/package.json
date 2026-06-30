@@ -31,6 +31,8 @@
     "./note-references": "./src/note-references.ts",
     "./language-detect": "./src/language-detect.ts",
     "./code-highlight": "./src/code-highlight/index.ts",
+    "./markdown": "./src/markdown/index.tsx",
+    "./markdown.css": "./src/markdown/markdown.css",
     "./selection": "./src/selection.ts",
     "./codec-helpers": "./src/codec-helpers.ts",
     "./sanitize-text": "./src/sanitize-text.ts",

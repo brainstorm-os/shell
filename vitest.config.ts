@@ -260,6 +260,8 @@ export default defineConfig({
 				"packages/sdk/src/empty-state/empty-state.css",
 			),
 			"@brainstorm/sdk/empty-state": resolve(__dirname, "packages/sdk/src/empty-state/index.ts"),
+			"@brainstorm/sdk/markdown.css": resolve(__dirname, "packages/sdk/src/markdown/markdown.css"),
+			"@brainstorm/sdk/markdown": resolve(__dirname, "packages/sdk/src/markdown/index.tsx"),
 			"@brainstorm/sdk": resolve(__dirname, "packages/sdk/src/index.ts"),
 			"@brainstorm/sdk-types": resolve(__dirname, "packages/sdk-types/src/index.ts"),
 			"@brainstorm/react-yjs": resolve(__dirname, "packages/react-yjs/src/index.ts"),
