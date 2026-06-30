@@ -189,7 +189,9 @@ describe("buildObjectMenuItems", () => {
 
 	it("shows Share (after Pin, before Remove) only with onShare AND the sharing.share cap", () => {
 		const onShare = vi.fn();
-		const shareRt = runtime({ capabilities: ["intents.dispatch:open", "dashboard.pin", "sharing.share"] });
+		const shareRt = runtime({
+			capabilities: ["intents.dispatch:open", "dashboard.pin", "sharing.share"],
+		});
 		const items = buildObjectMenuItems({
 			target,
 			runtime: shareRt,
@@ -205,7 +207,12 @@ describe("buildObjectMenuItems", () => {
 	});
 
 	it("omits Share when the app lacks the sharing.share cap (even with onShare)", () => {
-		const items = buildObjectMenuItems({ target, runtime: runtime(), pinned: false, onShare: vi.fn() });
+		const items = buildObjectMenuItems({
+			target,
+			runtime: runtime(),
+			pinned: false,
+			onShare: vi.fn(),
+		});
 		expect(items.some((i) => i.id === "share")).toBe(false);
 	});
 

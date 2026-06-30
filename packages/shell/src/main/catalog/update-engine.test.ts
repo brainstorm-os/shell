@@ -180,7 +180,8 @@ describe("UpdateEngine.apply", () => {
 	it("acquires, verifies, and updates with bumped catalog provenance", async () => {
 		const { engine, updateSpy } = makeEngine();
 		const [candidate] = await engine.check();
-		const result = await engine.apply(candidate!);
+		if (!candidate) throw new Error("expected an update candidate");
+		const result = await engine.apply(candidate);
 		expect(result).toEqual({
 			id: "io.brainstorm.notes",
 			outcome: UpdateOutcome.Updated,
@@ -199,7 +200,8 @@ describe("UpdateEngine.apply", () => {
 	it("fails closed on a bad signature without calling update", async () => {
 		const { engine, updateSpy } = makeEngine({ verifyBundle: () => false });
 		const [candidate] = await engine.check();
-		const result = await engine.apply(candidate!);
+		if (!candidate) throw new Error("expected an update candidate");
+		const result = await engine.apply(candidate);
 		expect(result.outcome).toBe(UpdateOutcome.SignatureFailed);
 		expect(updateSpy).not.toHaveBeenCalled();
 	});
@@ -221,7 +223,8 @@ describe("UpdateEngine.apply", () => {
 		});
 		void engine;
 		const [candidate] = await failing.check();
-		const result = await failing.apply(candidate!);
+		if (!candidate) throw new Error("expected an update candidate");
+		const result = await failing.apply(candidate);
 		expect(result).toEqual({
 			id: "io.brainstorm.notes",
 			outcome: UpdateOutcome.UpdateFailed,

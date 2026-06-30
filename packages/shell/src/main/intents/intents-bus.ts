@@ -50,7 +50,6 @@ import {
 } from "@brainstorm/sdk-types";
 import { entityRoute } from "../../shared/route";
 import { NavigationMode } from "../../shared/window-types";
-import { sanitizeActionLabel } from "./sanitize-label";
 import type { LaunchOrchestrator } from "../apps/launch-orchestrator";
 import type { AppLauncher, AppWindow } from "../apps/launcher";
 import type {
@@ -65,6 +64,7 @@ import {
 } from "../storage/registry-repo/openers-repo";
 import type { EntityTargetResolver } from "./entity-target";
 import { deliverIntentToAppWindow } from "./intent-broadcast";
+import { sanitizeActionLabel } from "./sanitize-label";
 
 /** The curated navigation verbs the bus resolves id→type/MIME for and
  *  hands a launch/delivery channel. `open` additionally unions the

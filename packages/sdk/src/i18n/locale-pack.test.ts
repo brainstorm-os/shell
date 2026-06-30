@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-	SOURCE_LANGUAGE,
 	type LocalePackImporters,
+	SOURCE_LANGUAGE,
 	localeFallbackChain,
 	resolveLocalePack,
 } from "./common-labels";

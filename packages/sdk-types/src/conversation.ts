@@ -694,10 +694,7 @@ export function buildExtractMessages(req: AiExtractRequest): AiChatMessage[] {
 			return `- ${f.name}${type}${hint}`;
 		})
 		.join("\n");
-	const instruction =
-		"Extract the following fields from the user's text. Output ONLY a single JSON " +
-		"object with exactly these keys and no other text, no markdown fences. Use null " +
-		`for any field not present in the text.\n${fieldLines}`;
+	const instruction = `Extract the following fields from the user's text. Output ONLY a single JSON object with exactly these keys and no other text, no markdown fences. Use null for any field not present in the text.\n${fieldLines}`;
 	return [
 		{ role: MessageRole.System, content: instruction },
 		{ role: MessageRole.User, content: req.source },

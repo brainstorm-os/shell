@@ -46,7 +46,7 @@ describe("compileFormula / evaluateFormula", () => {
 	});
 
 	it("rejects an over-long expression (stack guard)", () => {
-		const c = compileFormula("1+".repeat(MAX_FORMULA_LENGTH) + "1");
+		const c = compileFormula(`${"1+".repeat(MAX_FORMULA_LENGTH)}1`);
 		expect(c.ok).toBe(false);
 	});
 

@@ -27,9 +27,7 @@
     "protocols": [
       {
         "name": "Brainstorm",
-        "schemes": [
-          "brainstorm"
-        ]
+        "schemes": ["brainstorm"]
       }
     ],
     "directories": {

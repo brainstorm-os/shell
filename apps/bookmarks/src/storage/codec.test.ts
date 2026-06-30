@@ -63,7 +63,7 @@ describe("parseStoredBookmark", () => {
 		expect(nonNumeric?.savedAt).toBe(222);
 
 		const absent: Record<string, unknown> = { ...BASE, createdAt: 333 };
-		delete absent.savedAt;
+		absent.savedAt = undefined;
 		expect(parseStoredBookmark(absent)?.savedAt).toBe(333);
 	});
 

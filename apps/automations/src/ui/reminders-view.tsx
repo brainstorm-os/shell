@@ -344,10 +344,10 @@ export function RemindersView(props: RemindersViewProps): ReactElement {
 			<Capture now={now} onAdd={props.onAdd} />
 			{reminders.length === 0 ? (
 				<EmptyState
-						tone={EmptyStateTone.Compact}
-						icon={IconName.CheckCircle}
-						title={t("reminders.empty")}
-					/>
+					tone={EmptyStateTone.Compact}
+					icon={IconName.CheckCircle}
+					title={t("reminders.empty")}
+				/>
 			) : (
 				<ul className="au-list">
 					{reminders.map((reminder) => (

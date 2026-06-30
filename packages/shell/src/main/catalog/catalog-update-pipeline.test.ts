@@ -183,7 +183,9 @@ describe("catalog update pipeline (end-to-end)", () => {
 		const catalog = await catalogWith(indexFor("2.0.0", v2.sha256, v2.signature));
 
 		// planning sees the newer version
-		const candidates = planCatalogUpdates(installed(), catalog.cachedIndex()!);
+		const cachedIndex = catalog.cachedIndex();
+		if (!cachedIndex) throw new Error("expected a cached catalog index");
+		const candidates = planCatalogUpdates(installed(), cachedIndex);
 		expect(candidates).toHaveLength(1);
 		expect(candidates[0]?.toVersion).toBe("2.0.0");
 
@@ -216,7 +218,9 @@ describe("catalog update pipeline (end-to-end)", () => {
 		expect(appsRepo.getActive(APP_ID)?.version).toBe("1.0.0");
 
 		// explicit apply (post-consent) updates it
-		const applied = await engine.apply(checked[0]!);
+		const [consentCandidate] = checked;
+		if (!consentCandidate) throw new Error("expected a checked update candidate");
+		const applied = await engine.apply(consentCandidate);
 		expect(applied.outcome).toBe(UpdateOutcome.Updated);
 		expect(appsRepo.getActive(APP_ID)?.version).toBe("2.0.0");
 	});

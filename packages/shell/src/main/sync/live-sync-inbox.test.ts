@@ -9,13 +9,13 @@
 
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { afterEach, describe, expect, it } from "vitest";
-import { XCHACHA_NONCE_BYTES, bytesToBase64 } from "../credentials/crypto";
 import { inboxChannelFor } from "../collab/inbox-channel";
+import { XCHACHA_NONCE_BYTES, bytesToBase64 } from "../credentials/crypto";
 import { MEMBER_WRAP_ALG, MEMBER_WRAP_VERSION } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { decodeFrame } from "./envelope-codec";
 import { type PipelineContext, emitWrapBootstrap } from "./envelope-pipeline";
-import { type LiveSyncEngineContext, LiveSyncEngine } from "./live-sync-engine";
+import { LiveSyncEngine, type LiveSyncEngineContext } from "./live-sync-engine";
 import type { RelayPort, RelaySurface } from "./relay-port";
 
 const ENT = "ent_secret_note";
@@ -123,7 +123,11 @@ function recipientEngine(relay: ChannelRelay): {
 		applyRemoteUpdate: async () => undefined,
 		installWrap: async () => TYPE, // HPKE unseal stubbed; returns the recovered type
 	};
-	return { engine: new LiveSyncEngine(ctx), inbox: inboxChannelFor(bytesToBase64(devicePub)), devicePub };
+	return {
+		engine: new LiveSyncEngine(ctx),
+		inbox: inboxChannelFor(bytesToBase64(devicePub)),
+		devicePub,
+	};
 }
 
 describe("Collab-C5.4 — cross-user wrap delivery over a channel-routed relay", () => {

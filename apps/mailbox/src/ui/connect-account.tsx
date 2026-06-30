@@ -155,7 +155,11 @@ export function ConnectAccountDialog(props: {
 		>
 			<form className="mb-connect" onSubmit={submit}>
 				{props.onConnectImap ? (
-					<div className="mb-connect__modes" {...modeKeyboard.containerProps} aria-label={t("connect.mode")}>
+					<div
+						className="mb-connect__modes"
+						{...modeKeyboard.containerProps}
+						aria-label={t("connect.mode")}
+					>
 						<button
 							type="button"
 							{...modeKeyboard.getItemProps(0)}

@@ -546,13 +546,7 @@ export async function seedMarketingEntities(session: VaultSession): Promise<Seed
 	// ── Bookmarks ──────────────────────────────────────────────────────
 	// A small data-URI cover (gradient + monogram) so cards aren't blank.
 	const cover = (letter: string, c1: string, c2: string) => {
-		const svg =
-			`<svg xmlns='http://www.w3.org/2000/svg' width='320' height='180'>` +
-			`<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>` +
-			`<stop offset='0' stop-color='${c1}'/><stop offset='1' stop-color='${c2}'/>` +
-			`</linearGradient></defs><rect width='320' height='180' fill='url(#g)'/>` +
-			`<text x='160' y='118' font-family='Georgia, serif' font-size='96' font-weight='700' ` +
-			`fill='rgba(255,255,255,0.92)' text-anchor='middle'>${letter}</text></svg>`;
+		const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='180'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${c1}'/><stop offset='1' stop-color='${c2}'/></linearGradient></defs><rect width='320' height='180' fill='url(#g)'/><text x='160' y='118' font-family='Georgia, serif' font-size='96' font-weight='700' fill='rgba(255,255,255,0.92)' text-anchor='middle'>${letter}</text></svg>`;
 		return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 	};
 	const bookmarks: Array<[string, Record<string, unknown>]> = [

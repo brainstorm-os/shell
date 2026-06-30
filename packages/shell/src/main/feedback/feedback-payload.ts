@@ -9,9 +9,9 @@
  * The redactor is correctness-critical: every code path that lands a
  * user-typed body / log excerpt on the wire MUST flow through
  * `redactPayload`. The redaction rules are positioned in
- * 
+ *
  * §Posture rules ("data minimisation") and
- * 
+ *
  * §The shell's own network traffic ("Feedback — Opt-in path").
  *
  * Rules enforced here:

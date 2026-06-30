@@ -591,6 +591,7 @@ export function BooksApp(): ReactElement {
 	// Re-arm the one-shot catch-up for each genuinely new selection (keyed on
 	// `selectedId`, so an `openNonce` re-open doesn't re-arm it and re-enter the
 	// loop the dedup exists to prevent).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: selectedId is an intentional trigger, not read in the body — re-arm the one-shot on each new selection
 	useEffect(() => {
 		caughtUpRef.current = null;
 	}, [selectedId]);

@@ -60,7 +60,9 @@ beforeEach(async () => {
 		keystore: { forceInsecure: true },
 		seedStarterContent: false,
 	});
-	const repo = new EntitiesRepository(await getActiveVaultSession()!.dataStores.open("entities"));
+	const session = getActiveVaultSession();
+	if (!session) throw new Error("expected an active vault session");
+	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 	repo.create({
 		id: "ent_a",
 		type: NOTE,
