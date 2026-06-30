@@ -595,7 +595,7 @@ export function FilesApp() {
 				>
 					<div className="toolbar" data-testid="toolbar">
 						<div className="toolbar__group toolbar__group--start">
-							<label className="toolbar__search">
+							<label className="toolbar__search bs-input bs-input--sm">
 								<span aria-hidden="true" className="toolbar__search-glyph">
 									<Icon name={IconName.Search} size={15} />
 								</span>

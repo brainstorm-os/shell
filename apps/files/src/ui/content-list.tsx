@@ -870,7 +870,7 @@ function RenameInput({ store, entity, onCollision }: RenameInputProps) {
 		<input
 			ref={ref}
 			type="text"
-			className="content-row__rename-input"
+			className="bs-input bs-input--sm content-row__rename-input"
 			data-testid="rename-input"
 			value={draft}
 			aria-label={t("brainstorm.files.rename.inputLabel", { name: readName(entity) })}

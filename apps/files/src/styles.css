@@ -583,14 +583,11 @@ body[data-nav-open="false"] .sidebar {
 	min-width: 0;
 }
 
+/* Composite search field: the box (height / border / surface) comes from the
+ * shared `.bs-input` face on the <label>; this rule supplies only the layout
+ * deltas (glyph gap, flex grow, max width). The inner <input> stays bare. */
 .toolbar__search {
-	display: flex;
-	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-1);
-	border-radius: var(--radius-md);
-	background: transparent;
-	border: var(--border-width) solid transparent;
 	flex: 1 1 auto;
 	max-width: 360px;
 }
@@ -746,22 +743,8 @@ body[data-nav-open="false"] .sidebar {
 	padding: var(--space-2);
 }
 
-.smart-folder-name__input {
-	width: 100%;
-	box-sizing: border-box;
-	background: var(--bg-elev);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-md);
-	padding: var(--space-2) var(--space-2);
-}
-
-.smart-folder-name__input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-}
+/* Box (height / border / surface / focus) comes from the shared `.bs-input`
+ * face; the dialog field needs no app-specific deltas. */
 
 .smart-folder-name__submit {
 	align-self: flex-end;
@@ -972,17 +955,11 @@ body[data-nav-open="false"] .sidebar {
 	white-space: nowrap;
 }
 
-.content-row__rename-input {
-	width: 100%;
-	background: var(--bg);
-	border: var(--border-width) solid var(--accent);
-	border-radius: var(--radius-sm);
-	padding: var(--space-0_5);
-	font: inherit;
-	font-size: var(--text-size-md);
-	color: var(--text);
-	outline-offset: -1px;
-	outline: 1px solid var(--color-focus-ring);
+/* Box (height / surface / focus) comes from the shared `.bs-input` face
+ * (`--sm` to stay compact in a row); the accent border is the only delta —
+ * it signals the row is in inline-rename mode. `:root` to beat the primitive. */
+:root .content-row__rename-input {
+	border-color: var(--accent);
 }
 
 .content-row__type,
@@ -1906,19 +1883,8 @@ body:not([data-inspector="open"]) .inspector {
 	gap: var(--space-2);
 }
 
-.bulk-rename__input {
-	padding: var(--space-2) var(--space-2);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-sm);
-	background: var(--bg);
-	color: var(--text);
-	font: inherit;
-}
-
-.bulk-rename__input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 1px;
-}
+/* Box (height / border / surface / focus) comes from the shared `.bs-input`
+ * face; the bulk-rename field needs no app-specific deltas. */
 
 .bulk-rename__preview {
 	margin: 0;

@@ -387,7 +387,7 @@ export function BulkRenamePopover({ count, onSubmit, onClose }: BulkRenameProps)
 			>
 				<input
 					ref={inputRef}
-					className="bulk-rename__input"
+					className="bs-input bulk-rename__input"
 					value={base}
 					onChange={(e) => setBase(e.target.value)}
 					placeholder={t("brainstorm.files.bulk.renamePlaceholder")}
@@ -450,7 +450,7 @@ export function SmartFolderNamePopover({
 			>
 				<input
 					ref={inputRef}
-					className="smart-folder-name__input"
+					className="bs-input smart-folder-name__input"
 					value={name}
 					onChange={(e) => setName(e.target.value)}
 					placeholder={placeholder}

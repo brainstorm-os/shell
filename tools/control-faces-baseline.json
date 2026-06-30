@@ -13,8 +13,6 @@
     "apps/contacts/src/ui/person-list.tsx",
     "apps/database/src/react/grid-view.tsx",
     "apps/files/src/app.tsx",
-    "apps/files/src/ui/content-list.tsx",
-    "apps/files/src/ui/dialogs.tsx",
     "apps/form-designer/src/app.tsx",
     "apps/form-designer/src/ui/invoices.tsx",
     "apps/graph/src/app.tsx",
