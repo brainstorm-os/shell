@@ -121,6 +121,7 @@ const SHARE_DIALOG_LABELS: ShareDialogLabels = {
 	canEdit: t("notes.share.canEdit"),
 	canView: t("notes.share.canView"),
 	add: t("notes.share.add"),
+	quickAddHeading: t("notes.share.quickAdd"),
 	inviteHeading: t("notes.share.inviteHeading"),
 	getCode: t("notes.share.getCode"),
 	copy: t("notes.share.copy"),

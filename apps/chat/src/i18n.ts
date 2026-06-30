@@ -77,6 +77,7 @@ export const CHAT_I18N = {
 	"share.canEdit": "Can post",
 	"share.canView": "Can read",
 	"share.add": "Add",
+	"share.quickAdd": "Add a teammate",
 	"share.inviteHeading": "Your invite code",
 	"share.getCode": "Get my code",
 	"share.copy": "Copy",

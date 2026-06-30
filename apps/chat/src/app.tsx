@@ -79,6 +79,7 @@ const SHARE_DIALOG_LABELS: ShareDialogLabels = {
 	canEdit: t("share.canEdit"),
 	canView: t("share.canView"),
 	add: t("share.add"),
+	quickAddHeading: t("share.quickAdd"),
 	inviteHeading: t("share.inviteHeading"),
 	getCode: t("share.getCode"),
 	copy: t("share.copy"),

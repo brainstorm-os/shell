@@ -12,7 +12,12 @@
  * (scarce, server-re-checked); `canManage` only gates the UI affordances.
  */
 
-import type { RosterMember, RosterService, SharingService } from "@brainstorm/sdk-types";
+import type {
+	RosterMember,
+	RosterService,
+	SharedContact,
+	SharingService,
+} from "@brainstorm/sdk-types";
 import { RosterRole } from "@brainstorm/sdk-types";
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import { Icon, IconName } from "../icon";
@@ -32,6 +37,8 @@ export type ShareDialogLabels = {
 	canEdit: string;
 	canView: string;
 	add: string;
+	/** Heading for the click-to-add known-teammates section (share-by-name). */
+	quickAddHeading: string;
 	inviteHeading: string;
 	getCode: string;
 	copy: string;
@@ -48,7 +55,10 @@ export type ShareDialogLabels = {
 export type ShareDialogProps = {
 	entityId: string;
 	entityType: string;
-	sharing: Pick<SharingService, "createInvite" | "share" | "shareCollection" | "revoke">;
+	sharing: Pick<
+		SharingService,
+		"createInvite" | "share" | "shareCollection" | "saveContact" | "listContacts" | "revoke"
+	>;
 	roster: Pick<RosterService, "members">;
 	/** True when the local user is the entity Owner — gates add / revoke. */
 	canManage: boolean;
@@ -73,6 +83,7 @@ function memberName(m: RosterMember, youLabel: string): string {
 export function ShareDialog(props: ShareDialogProps): ReactElement {
 	const { entityId, entityType, sharing, roster, canManage, labels, onClose } = props;
 	const [members, setMembers] = useState<RosterMember[]>([]);
+	const [contacts, setContacts] = useState<SharedContact[]>([]);
 	const [code, setCode] = useState("");
 	const [role, setRole] = useState<RosterRole>(EDITOR);
 	const [myCode, setMyCode] = useState<string | null>(null);
@@ -86,7 +97,14 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		} catch {
 			setError(labels.loadFailed);
 		}
-	}, [roster, entityId, labels.loadFailed]);
+		// Contacts are a convenience (share-by-name); a failure here must not block
+		// the member list or the paste-a-code path.
+		try {
+			setContacts(await sharing.listContacts());
+		} catch {
+			setContacts([]);
+		}
+	}, [roster, sharing, entityId, labels.loadFailed]);
 
 	useEffect(() => {
 		void reload();
@@ -106,6 +124,13 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		try {
 			const input = { entityId, type: entityType, invite, role };
 			await (props.collection ? sharing.shareCollection(input) : sharing.share(input));
+			// Remember this teammate so next time they're a one-click chip
+			// (best-effort — a failed save must not fail the share).
+			try {
+				await sharing.saveContact({ invite, displayName: "" });
+			} catch {
+				/* non-fatal */
+			}
 			setCode("");
 			await reload();
 		} catch {
@@ -124,6 +149,24 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		labels.shareFailed,
 		props.collection,
 	]);
+
+	const onAddContact = useCallback(
+		async (pubkey: string) => {
+			if (busy) return;
+			setBusy(true);
+			setError(null);
+			try {
+				const input = { entityId, type: entityType, contact: pubkey, role };
+				await (props.collection ? sharing.shareCollection(input) : sharing.share(input));
+				await reload();
+			} catch {
+				setError(labels.shareFailed);
+			} finally {
+				setBusy(false);
+			}
+		},
+		[busy, sharing, entityId, entityType, role, reload, labels.shareFailed, props.collection],
+	);
 
 	const onRevoke = useCallback(
 		async (pubkey: string) => {
@@ -160,6 +203,9 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		);
 	}, [myCode]);
 
+	// Known teammates not already on this entity — the click-to-add picks.
+	const knownPicks = contacts.filter((c) => !members.some((m) => m.pubkey === c.pubkey));
+
 	return (
 		<Popover title={labels.title} onClose={onClose} testId={props.testId ?? "share-dialog"}>
 			<div className="bs-share">
@@ -188,6 +234,26 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 						))}
 					</ul>
 				</section>
+
+				{canManage && knownPicks.length > 0 ? (
+					<section className="bs-share__section">
+						<h3 className="bs-share__heading">{labels.quickAddHeading}</h3>
+						<div className="bs-share__contacts">
+							{knownPicks.map((c) => (
+								<button
+									key={c.pubkey}
+									type="button"
+									className="bs-share__contact"
+									disabled={busy}
+									onClick={() => void onAddContact(c.pubkey)}
+								>
+									<Icon name={IconName.Plus} size={12} />
+									{c.displayName}
+								</button>
+							))}
+						</div>
+					</section>
+				) : null}
 
 				{canManage ? (
 					<section className="bs-share__section">
