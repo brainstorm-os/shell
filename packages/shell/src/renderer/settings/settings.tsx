@@ -217,12 +217,6 @@ export function Settings({ onClose, initialSection, onOpenBin }: SettingsProps) 
 	);
 	const [session, setSession] = useState<VaultSessionMeta | null>(null);
 	const [headerActions, setHeaderActions] = useState<ReactNode | null>(null);
-	// The panel is a `.glass--strong` surface (10px backdrop-blur) that
-	// slides in via a transform. Backdrop-filter is re-sampled against a
-	// different slice of the dashboard EVERY frame of that slide — the single
-	// most expensive paint in the shell, and it fires on every open. Suspend the
-	// blur until the entrance settles; the resting frosted look is unchanged.
-	const [entered, setEntered] = useState(false);
 
 	// Reset the header-actions slot whenever the active section changes — the
 	// previous section's `useEffect` cleanup also fires, but resetting here
@@ -321,16 +315,11 @@ export function Settings({ onClose, initialSection, onOpenBin }: SettingsProps) 
 			/>
 			<motion.div
 				{...trapProps}
-				className={
-					entered
-						? "settings__panel glass--strong"
-						: "settings__panel glass--strong settings__panel--entering"
-				}
+				className="settings__panel glass--strong"
 				initial={{ x: "100%" }}
 				animate={{ x: 0 }}
 				exit={{ x: "100%" }}
 				transition={{ type: "spring", stiffness: 360, damping: 36 }}
-				onAnimationComplete={() => setEntered(true)}
 			>
 				<aside
 					className="settings__sidebar"

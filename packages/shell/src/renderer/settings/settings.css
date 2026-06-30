@@ -33,23 +33,6 @@
 	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	pointer-events: auto;
-	/* Frost fades in (rather than popping) once the slide settles — see the
-	 * `--entering` note below. Sampling a *static* backdrop for this 180ms
-	 * transition is cheap; sampling a *moving* one every frame is not. */
-	transition: backdrop-filter 180ms ease-out, -webkit-backdrop-filter 180ms ease-out;
-}
-
-/* While the panel slides in (transform animation), its backdrop-filter would
- * be re-sampled against a different slice of the dashboard every frame — the
- * costliest paint in the shell, on every Settings open. Suspend the blur for
- * the duration of the entrance; `settings.tsx` drops `--entering` on
- * `onAnimationComplete`. Removing the class then transitions `none` → the
- * resting `blur()` via the rule above, so the frost eases in against the now-
- * stationary panel instead of snapping on. The two-class selector beats the
- * single-class `.glass--strong` backdrop-filter rule. */
-.settings__panel.settings__panel--entering {
-	backdrop-filter: none;
-	-webkit-backdrop-filter: none;
 }
 
 /* The focus-trap stamps tabIndex=-1 on the panel and focuses it on mount (and
