@@ -128,6 +128,30 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 					);
 				const readBg = () => dashboard.evaluate(() => getComputedStyle(document.body).backgroundColor);
 				const themeAttr = () => dashboard.evaluate(() => document.documentElement.dataset.theme);
+				const darkSlotTheme = () =>
+					dashboard.evaluate(async () => {
+						const bs = (
+							window as unknown as {
+								brainstorm: {
+									dashboard: {
+										snapshot: () => Promise<{ appearance: { dark: { theme: string } } } | null>;
+									};
+								};
+							}
+						).brainstorm;
+						return (await bs.dashboard.snapshot())?.appearance.dark.theme;
+					});
+				// The fresh-vault appearance (mode=light, light=Rose, dark=Midnight)
+				// is committed ASYNC by `seedNewVaultDefaults` after create. Anchor on
+				// the deterministic IPC snapshot until the dark slot is the seeded
+				// Midnight, so the toggle below can't race a half-seeded slot.
+				await expect.poll(darkSlotTheme, { timeout: 30_000 }).toBe("midnight");
+				// The renderer only refreshes vault state on mount or via its own
+				// context methods — `createVault` used raw IPC, so the dashboard window
+				// can still be on the welcome screen (which pins Midnight). Reload to
+				// deterministically enter the vault-open state before asserting the
+				// repaint. Mirrors new-vault-onboarding.spec.ts.
+				await dashboard.reload();
 				// `setAppearanceMode` resolves when the main process accepts it;
 				// the renderer repaint arrives on the snapshot push. Anchor each
 				// read on the pushed `data-theme` flip (fresh vault = Midnight in
