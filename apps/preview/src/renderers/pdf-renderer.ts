@@ -88,6 +88,10 @@ async function mount(context: PreviewMountContext): Promise<PreviewInstance> {
 	let nav: PdfNavState = { page: 1, total: doc.numPages };
 	let zoom = 1;
 	let fitZoom = 1;
+	// Until the user picks an explicit zoom, the page stays fit to the viewport
+	// — opens fit-to-width (never clipped at 100%) AND re-fits on pane resize.
+	// Manual zoom in/out opts out; "fit" opts back in.
+	let userZoomed = false;
 	let renderTask: { cancel(): void } | null = null;
 	let disposed = false;
 	// Bumped per render; a stale async link fetch (page flip / zoom mid-fetch)
@@ -131,7 +135,7 @@ async function mount(context: PreviewMountContext): Promise<PreviewInstance> {
 		const base = pdfPage.getViewport({ scale: 1 });
 		const vp = viewportSize();
 		fitZoom = fitScale(base.width, base.height, vp.w, vp.h);
-		if (zoom <= 0) zoom = fitZoom;
+		if (!userZoomed) zoom = fitZoom;
 		const dpr = typeof devicePixelRatio === "number" ? devicePixelRatio : 1;
 		renderTask?.cancel();
 		linkLayer.replaceChildren();
@@ -169,11 +173,13 @@ async function mount(context: PreviewMountContext): Promise<PreviewInstance> {
 	}
 
 	function setZoom(factor: number): void {
+		userZoomed = true;
 		zoom = clampZoom(zoom * factor);
 		void renderCurrent();
 	}
 
 	function resetZoom(): void {
+		userZoomed = false;
 		zoom = fitZoom;
 		void renderCurrent();
 	}
