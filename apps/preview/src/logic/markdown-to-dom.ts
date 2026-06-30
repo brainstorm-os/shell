@@ -1,136 +1,24 @@
 /**
- * Small, safe markdown → DOM converter. Used by the markdown renderer
- * for the 9.20.1.5 preview drop.
+ * Markdown → DOM builder for the Preview app's markdown renderer.
  *
- * Why hand-rolled: the renderer can't reach any external markdown lib
- * (size-budget cost) and inline strings + `innerHTML` are an XSS class
- * we shouldn't carry into the sandbox. This builder constructs DOM
- * nodes one at a time — every user-supplied string becomes a text node,
- * never an HTML fragment. The output tree is XSS-safe by construction.
- *
- * Subset:
- *   - Headings: `# `, `## `, `### `, `#### `
- *   - Paragraphs (blank-line separated)
- *   - Fenced code blocks (``` ```)
- *   - Bullet lists (`- ` / `* `)
- *   - Ordered lists (`1. ` etc.)
- *   - Horizontal rule: `---` on its own line
- *   - Inline: \\\`code\\\`, **bold**, *italic*, [text](url)
- *
- * Out of scope (would need a real parser): nested lists, blockquotes,
- * tables, autolinks, reference-style links, image embeds, footnotes,
- * setext headings, raw HTML.
+ * The pure parser (`parseMarkdown`, the block model, `isSafeLinkUrl`,
+ * `wordCountForMarkdown`) now lives in `@brainstorm/sdk/markdown` — shared with
+ * the Agent's React renderer (extracted at copy two). This module keeps only
+ * the DOM builder: it constructs DOM nodes one at a time so every user-supplied
+ * string becomes a text node, never an HTML fragment (XSS-safe by
+ * construction). Re-exports the parser bits so existing importers/tests are
+ * unchanged.
  */
 
-/** Safe URL schemes for `[text](url)`. Everything else becomes plain text. */
-const SAFE_LINK_PREFIXES: ReadonlyArray<string> = ["http://", "https://", "mailto:", "brainstorm:"];
+import {
+	BlockKind,
+	type MarkdownBlock,
+	isSafeLinkUrl,
+	parseMarkdown,
+	wordCountForMarkdown,
+} from "@brainstorm/sdk/markdown";
 
-/** Top-level block kinds the parser emits. Renderer translates each to a DOM node. */
-export enum BlockKind {
-	Heading = "heading",
-	Paragraph = "paragraph",
-	CodeFence = "code-fence",
-	BulletList = "bullet-list",
-	OrderedList = "ordered-list",
-	HorizontalRule = "horizontal-rule",
-}
-
-export type MarkdownBlock =
-	| { kind: BlockKind.Heading; level: 1 | 2 | 3 | 4; text: string }
-	| { kind: BlockKind.Paragraph; text: string }
-	| { kind: BlockKind.CodeFence; language: string | null; code: string }
-	| { kind: BlockKind.BulletList; items: ReadonlyArray<string> }
-	| { kind: BlockKind.OrderedList; items: ReadonlyArray<string> }
-	| { kind: BlockKind.HorizontalRule };
-
-/** Parse a markdown document into a flat block list. Pure — no DOM access. */
-export function parseMarkdown(source: string): ReadonlyArray<MarkdownBlock> {
-	const lines = source.replace(/\r\n?/g, "\n").split("\n");
-	const blocks: MarkdownBlock[] = [];
-	let i = 0;
-
-	while (i < lines.length) {
-		const line = lines[i] ?? "";
-
-		if (line.trim() === "") {
-			i++;
-			continue;
-		}
-
-		// Fenced code block
-		const fence = line.match(/^```(\w*)\s*$/);
-		if (fence) {
-			const lang = fence[1] ?? "";
-			const language = lang.trim() || null;
-			i++;
-			const start = i;
-			while (i < lines.length && !/^```\s*$/.test(lines[i] ?? "")) {
-				i++;
-			}
-			const code = lines.slice(start, i).join("\n");
-			if (i < lines.length) i++; // consume closing fence
-			blocks.push({ kind: BlockKind.CodeFence, language, code });
-			continue;
-		}
-
-		// Horizontal rule
-		if (/^---+\s*$/.test(line)) {
-			blocks.push({ kind: BlockKind.HorizontalRule });
-			i++;
-			continue;
-		}
-
-		// Heading
-		const heading = line.match(/^(#{1,4})\s+(.+?)\s*#*\s*$/);
-		if (heading) {
-			const hashes = heading[1] ?? "";
-			const level = clampHeadingLevel(hashes.length);
-			blocks.push({ kind: BlockKind.Heading, level, text: heading[2] ?? "" });
-			i++;
-			continue;
-		}
-
-		// Bullet list
-		if (/^[-*]\s+/.test(line)) {
-			const items: string[] = [];
-			while (i < lines.length && /^[-*]\s+/.test(lines[i] ?? "")) {
-				items.push((lines[i] ?? "").replace(/^[-*]\s+/, ""));
-				i++;
-			}
-			blocks.push({ kind: BlockKind.BulletList, items });
-			continue;
-		}
-
-		// Ordered list
-		if (/^\d+\.\s+/.test(line)) {
-			const items: string[] = [];
-			while (i < lines.length && /^\d+\.\s+/.test(lines[i] ?? "")) {
-				items.push((lines[i] ?? "").replace(/^\d+\.\s+/, ""));
-				i++;
-			}
-			blocks.push({ kind: BlockKind.OrderedList, items });
-			continue;
-		}
-
-		// Paragraph — slurp non-blank, non-heading, non-fence, non-list lines.
-		const para: string[] = [line];
-		i++;
-		while (i < lines.length) {
-			const next = lines[i] ?? "";
-			if (next.trim() === "") break;
-			if (/^#{1,4}\s+/.test(next)) break;
-			if (/^```/.test(next)) break;
-			if (/^[-*]\s+/.test(next)) break;
-			if (/^\d+\.\s+/.test(next)) break;
-			if (/^---+\s*$/.test(next)) break;
-			para.push(next);
-			i++;
-		}
-		blocks.push({ kind: BlockKind.Paragraph, text: para.join(" ") });
-	}
-
-	return blocks;
-}
+export { BlockKind, type MarkdownBlock, isSafeLinkUrl, parseMarkdown, wordCountForMarkdown };
 
 /** Render a parsed block list into a DOM container. Returns the
  *  container so the caller can place it anywhere. `doc` is the
@@ -292,41 +180,4 @@ export function renderInlineInto(
 		i++;
 	}
 	flushText();
-}
-
-export function isSafeLinkUrl(raw: string): boolean {
-	const url = raw.trim().toLowerCase();
-	for (const prefix of SAFE_LINK_PREFIXES) {
-		if (url.startsWith(prefix)) return true;
-	}
-	return false;
-}
-
-/** Quick word count over the parsed-block text content. Used by the
- *  inspector pane metadata. */
-export function wordCountForMarkdown(source: string): number {
-	const blocks = parseMarkdown(source);
-	let words = 0;
-	for (const block of blocks) {
-		if (block.kind === BlockKind.Heading || block.kind === BlockKind.Paragraph) {
-			words += countWords(block.text);
-		} else if (block.kind === BlockKind.BulletList || block.kind === BlockKind.OrderedList) {
-			for (const item of block.items) words += countWords(item);
-		}
-		// code fences + rules don't count toward word totals.
-	}
-	return words;
-}
-
-function countWords(text: string): number {
-	const trimmed = text.trim();
-	if (!trimmed) return 0;
-	return trimmed.split(/\s+/).length;
-}
-
-function clampHeadingLevel(n: number): 1 | 2 | 3 | 4 {
-	if (n <= 1) return 1;
-	if (n === 2) return 2;
-	if (n === 3) return 3;
-	return 4;
 }

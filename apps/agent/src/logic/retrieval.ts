@@ -101,10 +101,15 @@ export async function retrieveContext(
 	search: SearchService | null | undefined,
 	query: string,
 	topK: number = RETRIEVAL_TOP_K,
+	excludeTypes: readonly string[] = [],
 ): Promise<RetrievalContextItem[]> {
 	const text = query.trim();
 	if (!search || !text) return [];
-	const q: SearchQuery = { text, limit: topK };
+	const q: SearchQuery = {
+		text,
+		limit: topK,
+		...(excludeTypes.length > 0 ? { excludeTypes } : {}),
+	};
 	try {
 		const hits = await search.hybrid(q);
 		return hitsToContextItems(hits, topK);

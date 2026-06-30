@@ -36,6 +36,7 @@ import {
 } from "@brainstorm/sdk/composer-context";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Markdown } from "@brainstorm/sdk/markdown";
 import {
 	type ObjectMenuContext,
 	ObjectMenuMoreButton,
@@ -80,6 +81,7 @@ import {
 import { seedFromProcessIntent } from "./logic/process-intent";
 import {
 	type CitationLink,
+	RETRIEVAL_TOP_K,
 	buildRetrievalContextBlock,
 	citationsToLinks,
 	retrieveContext,
@@ -900,8 +902,13 @@ export function AgentApp(): ReactElement {
 			// NO entities.read for retrieval). Fail-soft — no service / empty / a
 			// throw all degrade to ungrounded chat. The bounded context block grounds
 			// the model so it can cite real ids; the title map resolves those ids to
-			// link labels.
-			const retrievalItems = await retrieveContext(searchSvc, text);
+			// link labels. The agent's OWN Conversation/Message/Memory objects are
+			// excluded so retrieval grounds on the user's content, never the
+			// just-asked question (persisted + indexed as a Message would otherwise
+			// outrank every real note).
+			const retrievalItems = await retrieveContext(searchSvc, text, RETRIEVAL_TOP_K, [
+				...AGENT_OWN_TYPES,
+			]);
 			const retrievalBlock = buildRetrievalContextBlock(retrievalItems);
 			const titleById = titleMapFromItems(retrievalItems);
 
@@ -1300,7 +1307,18 @@ export function AgentApp(): ReactElement {
 											))}
 										</div>
 									) : null}
-									<div className="agent__msg-body">{m.body}</div>
+									<div className="agent__msg-body">
+										{m.role === MessageRole.Assistant ? (
+											<Markdown
+												source={m.body}
+												onEntityLink={(target) =>
+													target && !/\s/.test(target) ? () => openCitation(target) : null
+												}
+											/>
+										) : (
+											m.body
+										)}
+									</div>
 									{m.attachments && m.attachments.length > 0 ? (
 										<div className="agent__attachments" data-testid="agent-attachments">
 											{m.attachments.map((a) =>

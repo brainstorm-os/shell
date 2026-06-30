@@ -7,8 +7,16 @@
 
 import { type AiChatMessage, MessageRole, isMessageRole } from "@brainstorm/sdk-types";
 
-export const AGENT_SYSTEM_PROMPT =
-	"You are a helpful assistant inside the user's Brainstorm knowledge workspace. Answer concisely and directly.";
+/** The anti-fabrication contract shared by both the plain-chat and tool-enabled
+ *  system prompts. The model is grounded ONLY on the context blocks the app
+ *  injects (the workspace map, the vault summary, retrieved objects) — without
+ *  this, asked "who are my clients" it confidently invents plausible names and
+ *  claims they came from the vault. Appended to both prompts so the guarantee
+ *  holds on every path (DRY: one source, two consumers). */
+export const AGENT_GROUNDING_GUIDANCE =
+	"Ground every statement about the user's own workspace, vault, notes, contacts, or data strictly in the context provided below — the workspace map, the vault summary, and any retrieved objects. If the information needed to answer is not present in that context, say plainly that you don't have it in the vault instead of guessing; never invent names, clients, companies, numbers, dates, or other specifics, and do not claim a detail came from the vault unless it appears in the provided context.";
+
+export const AGENT_SYSTEM_PROMPT = `You are a helpful assistant inside the user's Brainstorm knowledge workspace. Answer concisely and directly. ${AGENT_GROUNDING_GUIDANCE}`;
 
 /** The fields of a `Message/v1` entity this layer reads. */
 export type TranscriptMessage = {

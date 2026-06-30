@@ -1,0 +1,112 @@
+/**
+ * Shared `.bs-markdown` prose styling for rendered markdown (Agent replies,
+ * future note/message previews). Import once per app:
+ * `import "@brainstorm/sdk/markdown.css"`. Tokens are the app-theme aliases
+ * every app already loads via `app-theme.css`.
+ */
+
+.bs-markdown {
+	color: var(--text);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+/* Collapse the outer margins so the prose sits flush in its host bubble. */
+.bs-markdown > :first-child {
+	margin-top: 0;
+}
+.bs-markdown > :last-child {
+	margin-bottom: 0;
+}
+
+.bs-markdown__heading {
+	margin: var(--space-3) 0 var(--space-1);
+	line-height: 1.3;
+	color: var(--text);
+}
+.bs-markdown h1 {
+	font-size: var(--text-size-xl);
+	font-weight: 700;
+}
+.bs-markdown h2 {
+	font-size: var(--text-size-lg);
+	font-weight: 600;
+}
+.bs-markdown h3,
+.bs-markdown h4 {
+	font-size: var(--text-size-md);
+	font-weight: 600;
+}
+
+.bs-markdown__paragraph {
+	margin: var(--space-2) 0;
+}
+
+.bs-markdown strong {
+	color: var(--text);
+	font-weight: 600;
+}
+.bs-markdown em {
+	font-style: italic;
+}
+
+.bs-markdown__inline-code {
+	font-family: var(--text-family-code, ui-monospace, "SF Mono", "Cascadia Mono", monospace);
+	font-size: 0.92em;
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-xs);
+	padding: 0 var(--space-1);
+}
+
+.bs-markdown__code {
+	margin: var(--space-2) 0;
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-md);
+	padding: var(--space-2);
+	overflow-x: auto;
+}
+.bs-markdown__code code {
+	font-family: var(--text-family-code, ui-monospace, "SF Mono", "Cascadia Mono", monospace);
+	background: transparent;
+	border: none;
+	padding: 0;
+	font-size: 0.9em;
+	line-height: 1.5;
+	color: var(--text);
+	white-space: pre;
+}
+
+.bs-markdown__list {
+	margin: var(--space-2) 0;
+	padding-inline-start: 1.5em;
+}
+.bs-markdown__list li {
+	margin: var(--space-0_5) 0;
+}
+
+.bs-markdown__link,
+.bs-markdown__entity-link {
+	color: var(--accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* The entity-link is a button (opens an object via intent) — strip button chrome
+ * so it reads as an inline link. */
+.bs-markdown__entity-link {
+	display: inline;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	cursor: pointer;
+}
+
+.bs-markdown__rule {
+	border: 0;
+	border-top: var(--border-width) solid var(--border);
+	margin: var(--space-3) 0;
+}

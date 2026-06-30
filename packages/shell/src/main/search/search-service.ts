@@ -121,6 +121,18 @@ function requireQuery(envelope: Envelope): IndexerQuery {
 		}
 		out.types = a.types as string[];
 	}
+	if (a.excludeTypes !== undefined) {
+		if (
+			!Array.isArray(a.excludeTypes) ||
+			a.excludeTypes.some((t) => typeof t !== "string" || t.length === 0)
+		) {
+			throw makeError(
+				"Invalid",
+				"search.query: { excludeTypes } must be an array of non-empty strings",
+			);
+		}
+		out.excludeTypes = a.excludeTypes as string[];
+	}
 	if (a.limit !== undefined) {
 		if (typeof a.limit !== "number" || !Number.isFinite(a.limit)) {
 			throw makeError("Invalid", "search.query: { limit } must be a finite number");

@@ -412,6 +412,11 @@ export type SearchQuery = {
 	text: string;
 	/** Optional type-URL filter — `["io.brainstorm.notes/Note/v1", "brainstorm/Task/v1"]`. */
 	types?: readonly string[];
+	/** Optional type URLs to EXCLUDE from results (applied after `types`). Lets a
+	 *  caller ground on the vault while omitting its own bookkeeping objects —
+	 *  the Agent passes its Conversation/Message/Memory types so retrieval never
+	 *  surfaces the conversation transcript instead of real content. */
+	excludeTypes?: readonly string[];
 	/** Optional cap on returned hits. Default 50; hard ceiling 200. */
 	limit?: number;
 };
