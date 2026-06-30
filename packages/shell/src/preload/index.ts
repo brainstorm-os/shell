@@ -1607,8 +1607,20 @@ const welcome = {
 		ipcRenderer.invoke("welcome:import-template", templateId),
 };
 
+/** The running app version, resolved synchronously from the main process
+ *  (`app.getVersion()`) at preload init so the static bridge property is the
+ *  real packaged version, never a build-time placeholder. */
+function resolveAppVersion(): string {
+	try {
+		const version = ipcRenderer.sendSync("app:get-version");
+		return typeof version === "string" && version.length > 0 ? version : "0.0.0";
+	} catch {
+		return "0.0.0";
+	}
+}
+
 const brainstorm = {
-	version: "0.0.1",
+	version: resolveAppVersion(),
 	platform: process.platform,
 	windowState,
 	vaults,

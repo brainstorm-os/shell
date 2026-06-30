@@ -1180,6 +1180,12 @@ void app.whenReady().then(async () => {
 		crashQueue,
 	});
 
+	// Synchronous app-version read for the preload bridge (`brainstorm.version`),
+	// so the renderer shows the real packaged version instead of a placeholder.
+	ipcMain.on("app:get-version", (event) => {
+		event.returnValue = app.getVersion();
+	});
+
 	// 13.6 — manual-download update check (app-global). The shell's own
 	// egress to a build-time-constant release feed; results carry only a
 	// download page the renderer opens via the OS-handoff chokepoint.

@@ -126,7 +126,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "brainst0rm-os",
+        "owner": "brainstorm-os",
         "repo": "shell"
       }
     ],
