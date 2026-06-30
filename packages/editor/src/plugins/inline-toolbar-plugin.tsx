@@ -37,6 +37,8 @@ import {
 import { type EditorT, useEditorT } from "../i18n";
 import {
 	BoldIcon,
+	CommentIcon,
+	EmojiIcon,
 	EquationIcon,
 	InlineCodeIcon,
 	ItalicIcon,
@@ -590,7 +592,7 @@ function OverflowMenu({
 				{onInsertEmoji && (
 					<button type="button" role="menuitem" className="fm-row" onClick={onInsertEmoji}>
 						<span className="fm-row__icon" aria-hidden="true">
-							🙂
+							<EmojiIcon />
 						</span>
 						<span className="fm-row__name">{t("editor.inline.emoji")}</span>
 					</button>
@@ -598,7 +600,7 @@ function OverflowMenu({
 				{onComment && (
 					<button type="button" role="menuitem" className="fm-row" onClick={onComment}>
 						<span className="fm-row__icon" aria-hidden="true">
-							💬
+							<CommentIcon />
 						</span>
 						<span className="fm-row__name">{t("editor.inline.comment")}</span>
 					</button>
@@ -688,7 +690,7 @@ function ColorRow({
 								active === color ? "notes__color-swatch notes__color-swatch--active" : "notes__color-swatch"
 							}
 							title={label}
-							aria-label={`${heading}: ${label}`}
+							aria-label={t("editor.inline.color.swatchLabel", { group: heading, color: label })}
 							onClick={() => onApply(target, color)}
 						>
 							<span

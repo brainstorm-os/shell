@@ -47,6 +47,7 @@ import {
 	Quotes,
 	Rows,
 	Scissors,
+	Smiley,
 	SortAscending,
 	SortDescending,
 	Table,
@@ -202,6 +203,10 @@ export function CopyIcon(): ReactNode {
 
 export function CommentIcon(): ReactNode {
 	return <ChatCircle size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function EmojiIcon(): ReactNode {
+	return <Smiley size={SIZE} aria-hidden focusable={false} />;
 }
 
 export function CutIcon(): ReactNode {

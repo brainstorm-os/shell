@@ -74,6 +74,7 @@ export type EditorI18nKey =
 	| "editor.inline.color.text"
 	| "editor.inline.color.highlight"
 	| "editor.inline.color.default"
+	| "editor.inline.color.swatchLabel"
 	| "editor.inline.link.placeholder"
 	| "editor.inline.link.commit"
 	| "editor.inline.link.remove"
@@ -286,6 +287,7 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.inline.color.text": "Text",
 	"editor.inline.color.highlight": "Highlight",
 	"editor.inline.color.default": "Default",
+	"editor.inline.color.swatchLabel": "{group}: {color}",
 	"editor.inline.link.placeholder": "Paste or type a link…",
 	"editor.inline.link.commit": "Apply link",
 	"editor.inline.link.remove": "Remove link",

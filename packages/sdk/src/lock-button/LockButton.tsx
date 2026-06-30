@@ -33,7 +33,6 @@ export function LockButton({
 			className="header-icon-btn bs-lock-button"
 			aria-pressed={locked}
 			aria-label={label}
-			title={label}
 			data-bs-tooltip={label}
 			onClick={onToggle}
 		>

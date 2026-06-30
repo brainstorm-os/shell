@@ -1443,6 +1443,9 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			getItems: () => taskReminderSources(dataRef.current.tasks),
 			notify: (due) => {
 				const kind = taskAlertKind(due.id);
+				// `ui.notify` can reject (e.g. the capability isn't granted in this
+				// vault) — swallow it so a missing alert never surfaces as an uncaught
+				// promise rejection.
 				void notify(
 					kind === TaskAlertKind.Scheduled
 						? {
@@ -1455,7 +1458,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 								body: t("tasks.alert.due.body"),
 								dedupeKey: due.dedupeKey,
 							},
-				);
+				).catch(() => {});
 			},
 		});
 		const interval = window.setInterval(() => scheduler.tick(Date.now()), ALERT_TICK_MS);
