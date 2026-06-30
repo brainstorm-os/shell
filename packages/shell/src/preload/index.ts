@@ -1534,8 +1534,12 @@ const dev = {
 		whoami: (): Promise<CollabIdentity> => ipcRenderer.invoke("dev:collab:whoami"),
 		createInvite: (label: string): Promise<ShareInvite> =>
 			ipcRenderer.invoke("dev:collab:create-invite", label),
-		provisionEntity: (entityId: string, type: string): Promise<{ ok: boolean }> =>
-			ipcRenderer.invoke("dev:collab:provision-entity", entityId, type),
+		provisionEntity: (
+			entityId: string,
+			type: string,
+			properties?: Record<string, unknown>,
+		): Promise<{ ok: boolean }> =>
+			ipcRenderer.invoke("dev:collab:provision-entity", entityId, type, properties),
 		installShareReceiver: (entityId: string, type: string): Promise<{ ok: boolean }> =>
 			ipcRenderer.invoke("dev:collab:install-share-receiver", entityId, type),
 		share: (
@@ -1545,6 +1549,13 @@ const dev = {
 			role: AccessRole,
 		): Promise<CollabAccessView[]> =>
 			ipcRenderer.invoke("dev:collab:share", entityId, type, invite, role),
+		shareCollection: (
+			entityId: string,
+			type: string,
+			invite: ShareInvite,
+			role: AccessRole,
+		): Promise<CollabAccessView[]> =>
+			ipcRenderer.invoke("dev:collab:share-collection", entityId, type, invite, role),
 		editText: (entityId: string, text: string): Promise<{ ok: boolean }> =>
 			ipcRenderer.invoke("dev:collab:edit-text", entityId, text),
 		revoke: (entityId: string, memberB64: string): Promise<{ revoked: boolean }> =>
