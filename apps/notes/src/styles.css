@@ -2423,6 +2423,24 @@ body.bs-table-col-resizing * {
 	user-select: none;
 }
 
+/* The shared property cells are built for fixed-width table columns (width:100%,
+   flex-wrap, ellipsis). Inline in a paragraph the host has no column width, so
+   the cell collapsed to near-zero and its "Empty" placeholder wrapped mid-word
+   (date) / truncated to "Em…" (number). Let the inline trigger size to its own
+   content on one line. */
+.notes__date-field-host .bs-cell-date-trigger,
+.notes__number-field-host .bs-cell-plain {
+	width: auto;
+	max-width: none;
+	flex-wrap: nowrap;
+	overflow: visible;
+	white-space: nowrap;
+}
+.notes__date-field-host .bs-cell-date-empty,
+.notes__date-field-host .bs-cell-date-value {
+	white-space: nowrap;
+}
+
 /* Inline single-select field (B11.3) — the Select-typed sibling of the inline
    checkbox / date / number. Self-contained: a chip trigger + an anchored
    options popover, carrying its own inline vocabulary (no vault dictionary). */
@@ -2509,8 +2527,14 @@ body.bs-table-col-resizing * {
 	color: var(--text);
 }
 
+/* The add-option input lives in the menu's custom footer, whose runtime wrapper
+   carries only a top border — no padding. Give the input its own gutters (matching
+   the list's body inset) so "Add option…" doesn't hug the panel edges. */
 .notes__select-field-input {
-	margin-top: var(--space-1);
+	display: block;
+	box-sizing: border-box;
+	width: calc(100% - var(--space-2) * 2);
+	margin: var(--space-1) var(--space-2);
 	padding: var(--space-1);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-sm);

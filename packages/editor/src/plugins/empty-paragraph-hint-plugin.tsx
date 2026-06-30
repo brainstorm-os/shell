@@ -17,8 +17,10 @@ import {
 	$getSelection,
 	$isParagraphNode,
 	$isRangeSelection,
+	$isTextNode,
 	type LexicalEditor,
 	type NodeKey,
+	type ParagraphNode,
 } from "lexical";
 import { useEffect } from "react";
 import { useEditorT } from "../i18n";
@@ -92,9 +94,25 @@ function pickEmptyParagraph(editor: LexicalEditor): NodeKey | null {
 		// full "Type ‘/’ for commands" text overflows the narrow cell. Cells are
 		// already visually distinct (grid lines), so skip the hint inside them.
 		if ($isTableCellNode(top.getParent())) return;
-		if (top.getChildrenSize() === 0 || top.getTextContent().length === 0) {
+		if ($isBlankHintParagraph(top)) {
 			key = top.getKey();
 		}
 	});
 	return key;
+}
+
+/**
+ * A paragraph qualifies for the slash hint only when it's genuinely blank — no
+ * children, or only empty text nodes. An inline decorator (the Select / date /
+ * number field, an inline image / mention) contributes no text yet IS content,
+ * so a bare `getTextContent().length === 0` check wrongly counted such a
+ * paragraph as blank and painted the "Type ‘/’ for commands" ghost on top of
+ * the field's own placeholder. Must run inside an editor read.
+ */
+export function $isBlankHintParagraph(paragraph: ParagraphNode): boolean {
+	const children = paragraph.getChildren();
+	return (
+		children.length === 0 ||
+		children.every((child) => $isTextNode(child) && child.getTextContent().length === 0)
+	);
 }

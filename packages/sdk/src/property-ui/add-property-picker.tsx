@@ -347,7 +347,11 @@ const STYLES = `
 	color: var(--text-faint, #999);
 	pointer-events: none;
 }
-.bs-add-property__input {
+/* Scoped under \`.bs-add-property\` (0,2,0) so these beat the menu runtime's
+ * \`.fm-menu input\` reset (0,1,1) — the picker root carries \`fm-menu\` for its
+ * glass chrome, and that reset zeroed the input's padding, dropping the
+ * placeholder text under the absolutely-positioned search glyph. */
+.bs-add-property .bs-add-property__input {
 	width: 100%;
 	height: 30px;
 	padding: 0 var(--space-2, 8px) 0 var(--space-6, 28px);
@@ -360,7 +364,7 @@ const STYLES = `
 	outline: none;
 	transition: border-color 100ms ease, background 100ms ease;
 }
-.bs-add-property__input:focus {
+.bs-add-property .bs-add-property__input:focus {
 	border-color: color-mix(in srgb, var(--accent, #6b73f0) 55%, transparent);
 	background: var(--bg, transparent);
 }
@@ -377,7 +381,7 @@ const STYLES = `
 .bs-add-property .bs-add-property__list:focus-visible {
 	outline: none;
 }
-.bs-add-property__input::placeholder {
+.bs-add-property .bs-add-property__input::placeholder {
 	color: var(--text-faint, #999);
 }
 .bs-add-property__list {

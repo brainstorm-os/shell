@@ -149,6 +149,23 @@
 	scroll-padding-block: var(--fm-body-padding-y);
 }
 
+/* Bodied list menus — the runtime's own dropdowns AND the shared typeahead the
+ * slash / mention / emoji menus now open through (`openTypeaheadMenu`). The
+ * runtime nests the scroll container `.fm-list` INSIDE a padded `.fm-body`, so
+ * a scrolling list drew its scrollbar inset from the glass by the body padding
+ * (a dead gutter between the thumb and the panel edge). Move the inset off the
+ * body and onto the scroll container itself, so the scrollbar tracks flush to
+ * the menu edge while rows keep their breathing room. Scoped with `:has()` to
+ * bodies that directly wrap a vertical list — a custom body (e.g. the colour
+ * picker) keeps its own `.fm-body` padding untouched. */
+.fm-body:has(> .fm-list:not(.fm-list--horizontal)) {
+	padding: 0;
+}
+.fm-body > .fm-list:not(.fm-list--horizontal) {
+	padding: var(--fm-body-padding-y) var(--fm-body-padding-x);
+	scroll-padding-block: var(--fm-body-padding-y);
+}
+
 /* ─── Row polish ────────────────────────────────────────────────────────
  * Snappy hover/active transition, muted icon glyphs that brighten on the
  * active row, and a fixed icon column so labels align whether or not a
