@@ -71,6 +71,7 @@ const DEFAULTS: Record<string, string> = {
 	"notes.share.canEdit": "Can edit",
 	"notes.share.canView": "Can view",
 	"notes.share.add": "Add",
+	"notes.share.quickAdd": "Add a teammate",
 	"notes.share.inviteHeading": "Your invite code",
 	"notes.share.getCode": "Get my invite code",
 	"notes.share.copy": "Copy",

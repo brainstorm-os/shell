@@ -9,6 +9,7 @@
 import type {
 	EntitiesService,
 	RosterService,
+	SharingService,
 	StorageService,
 	VaultEntitiesService,
 } from "@brainstorm/sdk-types";
@@ -21,6 +22,7 @@ export type ChatAppRuntime = {
 		entities?: EntitiesService;
 		storage?: StorageService;
 		roster?: RosterService;
+		sharing?: SharingService;
 	} | null;
 };
 

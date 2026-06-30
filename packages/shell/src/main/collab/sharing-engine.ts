@@ -18,11 +18,17 @@
  */
 
 import * as Y from "yjs";
-import { XCHACHA_NONCE_BYTES } from "../credentials/crypto";
+import { XCHACHA_NONCE_BYTES, base64ToBytes } from "../credentials/crypto";
 import { verifySignature } from "../credentials/identity";
-import type { MemberWrapPayload } from "../credentials/member-wraps";
+import {
+	type MemberWrapPayload,
+	appendWrap,
+	findWrapForRecipient,
+	wrapDekForRecipient,
+} from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { installEntityDek } from "../entities/install-wrap";
+import { queryVaultListSource } from "../entities/vault-entities-service";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { type PipelineContext, emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
@@ -34,6 +40,7 @@ import {
 	resolveCurrentMembers,
 	revokeAccess,
 } from "./access-record";
+import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
 import { type ShareInvite, createShareInviteSigned, shareEntityWithInvite } from "./share-invite";
 
@@ -104,8 +111,15 @@ export class SharingEngine {
 	}
 
 	/** Owner-side: create the entity row + a fresh DEK and bootstrap the owner's
-	 *  own Owner grant into the doc's access log. Idempotent on an existing row. */
-	async provisionEntity(entityId: string, type: string): Promise<void> {
+	 *  own Owner grant into the doc's access log. Idempotent on an existing row.
+	 *  `properties` lets a caller seed the row (e.g. a message's `conversation`
+	 *  pointing at its channel, so the collection cascade can enumerate it);
+	 *  defaults to `{ name: entityId }`. */
+	async provisionEntity(
+		entityId: string,
+		type: string,
+		properties: Record<string, unknown> = { name: entityId },
+	): Promise<void> {
 		const dekStore = await this.ensureDekStore();
 		const repo = await this.ensureEntitiesRepo();
 		this.#types.set(entityId, type);
@@ -115,7 +129,7 @@ export class SharingEngine {
 				repo.create({
 					id: entityId,
 					type,
-					properties: { name: entityId },
+					properties,
 					createdBy: this.#session.identity.publicKeyBase64,
 					now: Date.now(),
 					dekId,
@@ -149,38 +163,209 @@ export class SharingEngine {
 		invite: ShareInvite;
 		role: AccessRole;
 	}): Promise<CollabAccessView[]> {
+		await this.#shareOne(opts.entityId, opts.type, opts.invite, opts.role);
+		return this.access(opts.entityId);
+	}
+
+	/**
+	 * Collection-sharing (design 71): share a container with the invitee AND
+	 * cascade the same grant + per-entity DEK-wrap onto every existing child of
+	 * the container. After this each child is an ordinary shared entity, so the
+	 * always-on `LiveSyncEngine` syncs them with no engine change. Children
+	 * created *later* are picked up by the create-hook auto-share, not here.
+	 *
+	 * The container type with no containment rule (a single-entity collection —
+	 * Note, Whiteboard) shares exactly like {@link share}. Returns the container's
+	 * access view.
+	 *
+	 * NOTE (design 71 §Performance, follow-up): the cascade is sequential here.
+	 * The async-off-IPC, concurrency-capped, idempotently-resumable form is a
+	 * planned refinement; this first cut proves convergence for the demo-scale
+	 * channels M1 targets. `#shareOne` is idempotent per (entity, member), so a
+	 * re-run is safe.
+	 */
+	async shareCollection(opts: {
+		entityId: string;
+		type: string;
+		invite: ShareInvite;
+		role: AccessRole;
+	}): Promise<CollabAccessView[]> {
+		await this.#shareOne(opts.entityId, opts.type, opts.invite, opts.role);
+		const rule = containmentRuleForParent(opts.type);
+		if (rule) {
+			const result = await queryVaultListSource(childrenSourceFor(rule, opts.entityId), () =>
+				this.ensureEntitiesRepo(),
+			);
+			if (result.ok) {
+				for (const childId of result.ids) {
+					await this.#shareOne(childId, rule.childType, opts.invite, opts.role);
+				}
+			}
+		}
+		return this.access(opts.entityId);
+	}
+
+	/**
+	 * Deferred re-cascade (design 71 flow-2 step 5) — re-push EVERY existing child
+	 * of a container to its current members. Call when a container's membership
+	 * grows (a new member's grant arrives, or a member's X25519 becomes known)
+	 * after children already exist: `autoShareNewChild` is idempotent per
+	 * `(child, member)` — an already-wrapped member short-circuits — so a re-run
+	 * only delivers the children the new member is still missing. No-op for a
+	 * single-entity container (no rule). The trigger (observing a container
+	 * access-record change) is wired in the sync layer; this is the mechanism.
+	 */
+	async recascadeCollection(containerId: string, containerType: string): Promise<void> {
+		const rule = containmentRuleForParent(containerType);
+		if (!rule) return;
+		const result = await queryVaultListSource(childrenSourceFor(rule, containerId), () =>
+			this.ensureEntitiesRepo(),
+		);
+		if (!result.ok) return;
+		for (const childId of result.ids) {
+			await this.autoShareNewChild(childId, rule.childType, containerId);
+		}
+	}
+
+	/**
+	 * Flow 2 (design 71) — a child was just created locally under a SHARED
+	 * container; cascade the container's membership onto it so it syncs to every
+	 * member. Recipients come from the container's **signed access record**
+	 * (`resolveCurrentMembers`), never the local wraps array, and each member's
+	 * X25519 is read from their signed grant. For each active member other than
+	 * self: grant them on the child (signed by self — the trust model is that any
+	 * member may add child entities that inherit the container's membership), wrap
+	 * the child DEK to their X25519, and emit the wrap to their inbox. A final
+	 * full-state emit converges the child. Returns the number of members the child
+	 * was shared to.
+	 *
+	 * A member whose X25519 is not yet known locally (their container grant hasn't
+	 * replicated to this device) is **skipped, not silently dropped** — the caller
+	 * is responsible for a deferred re-cascade when that grant arrives (design 71
+	 * flow-2 step 5). No-op (returns 0) when the container is solo (≤1 active
+	 * member) or this device holds no DEK for the child.
+	 */
+	async autoShareNewChild(childId: string, childType: string, containerId: string): Promise<number> {
+		const members = await this.#activeMembersWithKeys(containerId);
+		const selfPub = this.#session.identity.publicKeyBase64;
+		const recipients = members.filter((m) => m.member !== selfPub && m.x25519 !== null);
+		// Solo container (only self) ⇒ nothing to fan out, exactly like LiveSync's
+		// solo-quiet rule. (A container shared only with members we can't yet wrap
+		// to also lands here; the deferred re-cascade picks them up later.)
+		if (recipients.length === 0) return 0;
 		const dekStore = await this.ensureDekStore();
-		this.#types.set(opts.entityId, opts.type);
+		this.#types.set(childId, childType);
+		const handle = dekStore.open(childId);
+		if (!handle) return 0;
 		const exposed = this.#session.exposeIdentityForPairing();
-		const handle = dekStore.open(opts.entityId);
+		const relay = this.requireRelay();
+		let shared = 0;
+		try {
+			for (const m of recipients) {
+				const x25519 = m.x25519 as string;
+				const recipientPub = base64ToBytes(x25519);
+				const wrap = await this.#mutateAndEmitReturning(childId, (doc) => {
+					grantAccess(doc, {
+						entityId: childId,
+						member: selfPub,
+						role: AccessRole.Owner,
+						signerSecret: exposed.secretKey,
+						now: Date.now(),
+						x25519: this.#session.deviceX25519.publicKeyBase64,
+					});
+					grantAccess(doc, {
+						entityId: childId,
+						member: m.member,
+						role: m.role,
+						signerSecret: exposed.secretKey,
+						now: Date.now(),
+						x25519,
+					});
+					const existing = findWrapForRecipient(doc, recipientPub);
+					if (existing) return existing;
+					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType);
+					appendWrap(doc, w);
+					return w;
+				});
+				await emitWrapBootstrap(
+					childId,
+					wrap,
+					this.makeCtx(relay.currentPort()),
+					inboxChannelFor(m.member),
+				);
+				shared++;
+			}
+			if (shared > 0) await this.#emitFullState(childId);
+		} finally {
+			dekStore.close(handle.dek);
+		}
+		return shared;
+	}
+
+	/** The active members of `containerId` with their signed X25519 wrapping key
+	 *  (design 71) — the authenticated recipient set for a child cascade. Loads
+	 *  the persisted container doc and reads its signed access record. */
+	async #activeMembersWithKeys(
+		containerId: string,
+	): Promise<Array<{ member: string; role: AccessRole; x25519: string | null }>> {
+		const { doc } = await this.#session.ydocStore.load(containerId);
+		try {
+			return resolveCurrentMembers(doc, containerId)
+				.filter((m) => m.active)
+				.map((m) => ({ member: m.member, role: m.role, x25519: m.x25519 }));
+		} finally {
+			doc.destroy();
+		}
+	}
+
+	/**
+	 * Share ONE entity with the invitee: bootstrap the owner's own grant, append
+	 * the invitee's signed grant + HPKE-wrap the entity's DEK (C2), persist the
+	 * delta, then emit the wrap to the invitee's inbox + the full encrypted state.
+	 * The reusable unit behind both {@link share} (container only) and
+	 * {@link shareCollection} (container + each child). Idempotent: a re-share at
+	 * the same role is a no-op (`shareEntityWithInvite` returns the existing wrap).
+	 */
+	async #shareOne(
+		entityId: string,
+		type: string,
+		invite: ShareInvite,
+		role: AccessRole,
+	): Promise<void> {
+		const dekStore = await this.ensureDekStore();
+		this.#types.set(entityId, type);
+		const exposed = this.#session.exposeIdentityForPairing();
+		const handle = dekStore.open(entityId);
 		if (!handle) {
-			throw new Error(`sharing-engine: owner has no DEK for ${opts.entityId}`);
+			throw new Error(`sharing-engine: owner has no DEK for ${entityId}`);
 		}
 		let wrap: MemberWrapPayload;
 		try {
-			wrap = await this.#mutateAndEmitReturning(opts.entityId, (doc) => {
+			wrap = await this.#mutateAndEmitReturning(entityId, (doc) => {
 				// Bootstrap the OWNER's own grant (idempotent — `grantAccess`
 				// no-ops on a live grant) BEFORE granting the invitee. A normal
 				// entity (entities.create) carries no access record until its
 				// first share, so without this the record would name only the
 				// invitee — one active member — and LiveSyncEngine's `isShared`
-				// (>1 active member) would never start syncing it. The dev bridge
-				// gets this for free via its separate `provisionEntity` step.
+				// (>1 active member) would never start syncing it. The owner's own
+				// X25519 rides the grant so a peer member's later child cascade can
+				// wrap to the owner too (design 71).
 				grantAccess(doc, {
-					entityId: opts.entityId,
+					entityId,
 					member: this.#session.identity.publicKeyBase64,
 					role: AccessRole.Owner,
 					signerSecret: exposed.secretKey,
 					now: Date.now(),
+					x25519: this.#session.deviceX25519.publicKeyBase64,
 				});
 				return shareEntityWithInvite(doc, {
-					entityId: opts.entityId,
-					invite: opts.invite,
-					role: opts.role,
+					entityId,
+					invite,
+					role,
 					dek: handle.dek,
 					signerSecret: exposed.secretKey,
 					now: Date.now(),
-					type: opts.type,
+					type,
 				});
 			});
 		} finally {
@@ -192,9 +377,8 @@ export class SharingEngine {
 		// entity channel yet (they don't know its id). On receipt their live-sync
 		// engine installs the DEK, subscribes to the entity channel, then the full
 		// state below converges. The entity stays the AAD-bound real entity.
-		await emitWrapBootstrap(opts.entityId, wrap, ctx, inboxChannelFor(opts.invite.userPubB64));
-		await this.#emitFullState(opts.entityId);
-		return this.access(opts.entityId);
+		await emitWrapBootstrap(entityId, wrap, ctx, inboxChannelFor(invite.userPubB64));
+		await this.#emitFullState(entityId);
 	}
 
 	/** Owner revokes `memberB64` (signed, append-only audit) and emits the delta. */

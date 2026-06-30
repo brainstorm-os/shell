@@ -29,6 +29,7 @@ const LABELS: ShareDialogLabels = {
 	canEdit: "Can edit",
 	canView: "Can view",
 	add: "Add",
+	quickAddHeading: "Add a teammate",
 	inviteHeading: "Your invite code",
 	getCode: "Get my invite code",
 	copy: "Copy",
@@ -74,6 +75,9 @@ describe("ShareDialog", () => {
 	let sharing: {
 		createInvite: ReturnType<typeof vi.fn<SharingService["createInvite"]>>;
 		share: ReturnType<typeof vi.fn<SharingService["share"]>>;
+		shareCollection: ReturnType<typeof vi.fn<SharingService["shareCollection"]>>;
+		saveContact: ReturnType<typeof vi.fn<SharingService["saveContact"]>>;
+		listContacts: ReturnType<typeof vi.fn<SharingService["listContacts"]>>;
 		revoke: ReturnType<typeof vi.fn<SharingService["revoke"]>>;
 	};
 	let roster: { members: ReturnType<typeof vi.fn<RosterService["members"]>> };
@@ -85,6 +89,12 @@ describe("ShareDialog", () => {
 		sharing = {
 			createInvite: vi.fn<SharingService["createInvite"]>(async () => "INVITE-TOKEN-XYZ"),
 			share: vi.fn<SharingService["share"]>(async () => []),
+			shareCollection: vi.fn<SharingService["shareCollection"]>(async () => []),
+			saveContact: vi.fn<SharingService["saveContact"]>(async () => ({
+				pubkey: "p",
+				displayName: "",
+			})),
+			listContacts: vi.fn<SharingService["listContacts"]>(async () => []),
 			revoke: vi.fn<SharingService["revoke"]>(async () => []),
 		};
 		roster = {
@@ -147,6 +157,54 @@ describe("ShareDialog", () => {
 		});
 		// Reloaded after the share (initial mount + post-share).
 		expect(roster.members.mock.calls.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it("collection mode adds via sharing.shareCollection (cascade), not share", async () => {
+		await act(async () => {
+			root.render(
+				<ShareDialog
+					entityId="chan_1"
+					entityType="io.brainstorm.chat/Channel/v1"
+					collection
+					sharing={sharing}
+					roster={roster}
+					canManage
+					labels={LABELS}
+					onClose={() => undefined}
+				/>,
+			);
+		});
+		await flush();
+		const input = codeInput();
+		if (!input) throw new Error("expected code input for a manager");
+		await act(async () => typeInto(input, "PASTED-CODE"));
+		await act(async () => addBtn()?.click());
+		await flush();
+		expect(sharing.shareCollection).toHaveBeenCalledWith({
+			entityId: "chan_1",
+			type: "io.brainstorm.chat/Channel/v1",
+			invite: "PASTED-CODE",
+			role: RosterRole.Editor,
+		});
+		expect(sharing.share).not.toHaveBeenCalled();
+	});
+
+	it("share-by-name: a known non-member contact renders as a chip and shares by contact", async () => {
+		sharing.listContacts.mockResolvedValue([{ pubkey: "carol-pub", displayName: "Carol" }]);
+		roster.members.mockResolvedValue([]); // no current members → Carol is a pick
+		await mount(true);
+		const chip = [...host.querySelectorAll<HTMLButtonElement>(".bs-share__contact")].find((b) =>
+			b.textContent?.includes("Carol"),
+		);
+		if (!chip) throw new Error("expected a Carol quick-add chip");
+		await act(async () => chip.click());
+		await flush();
+		expect(sharing.share).toHaveBeenCalledWith({
+			entityId: "ent_1",
+			type: "brainstorm/Note/v1",
+			contact: "carol-pub",
+			role: RosterRole.Editor,
+		});
 	});
 
 	it("Owner revokes a non-owner member → sharing.revoke", async () => {

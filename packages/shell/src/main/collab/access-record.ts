@@ -76,6 +76,11 @@ export function roleAtLeast(a: AccessRole, b: AccessRole): boolean {
 export type ResolvedMember = {
 	/** base64 user-Ed25519 public key of the member. */
 	member: string;
+	/** base64 device X25519 wrapping key of the member, when the grant carries
+	 *  one (collection-sharing, design 71 — so the cascade can wrap a child's DEK
+	 *  to this member *authentically*, the X25519 being covered by the grant
+	 *  signature). `null` for a pre-collection-sharing grant that signed no key. */
+	x25519: string | null;
 	role: AccessRole;
 	/** base64 user-Ed25519 public key of the granter. */
 	addedBy: string;
@@ -100,9 +105,16 @@ function grantPayload(
 	role: AccessRole,
 	addedBy: string,
 	addedAt: number,
+	x25519?: string | null,
 ): Uint8Array {
+	// The X25519 segment is included ONLY when the grant carries a member
+	// wrapping key (collection-sharing, design 71). Omitting it reproduces the
+	// exact bytes of every pre-collection-sharing grant, so their signatures
+	// still verify — the presence of the stored `x25519` field on the entry tells
+	// `resolveMembers` which form to reconstruct.
+	const x = x25519 ? `${x25519}|` : "";
 	return encoder.encode(
-		`brainstorm/access/v${ACCESS_RECORD_VERSION}/grant|${entityId}|${member}|${role}|${addedBy}|${addedAt}`,
+		`brainstorm/access/v${ACCESS_RECORD_VERSION}/grant|${entityId}|${member}|${x}${role}|${addedBy}|${addedAt}`,
 	);
 }
 
@@ -170,19 +182,24 @@ export function grantAccess(
 		role: AccessRole;
 		signerSecret: Uint8Array;
 		now: number;
+		/** base64 device X25519 wrapping key for `member`, signed into the grant
+		 *  (collection-sharing, design 71). Omit for a key-less grant. */
+		x25519?: string | null;
 	},
 ): void {
 	const arr = getAccessArray(doc);
 	if (findActiveEntry(arr, opts.member) !== null) return;
+	const x25519 = opts.x25519 ?? null;
 	const addedBy = publicKeyToBase64(publicKeyFromSecret(opts.signerSecret));
 	const sig = signPayload(
 		opts.signerSecret,
-		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now),
+		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now, x25519),
 	);
 	doc.transact(() => {
 		const entry = new Y.Map<unknown>();
 		entry.set("v", ACCESS_RECORD_VERSION);
 		entry.set("member", opts.member);
+		entry.set("x25519", x25519);
 		entry.set("role", opts.role);
 		entry.set("addedBy", addedBy);
 		entry.set("addedAt", opts.now);
@@ -245,11 +262,12 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 		const addedAt = readNumber(m, "addedAt");
 		if (member === null || addedBy === null || addedAt === null || !isAccessRole(roleRaw)) continue;
 		const role = roleRaw;
+		const x25519 = readString(m, "x25519");
 		const revokedAt = readNumber(m, "revokedAt");
 		const revokedBy = readString(m, "revokedBy");
 		const grantValid = safeVerify(
 			addedBy,
-			grantPayload(entityId, member, role, addedBy, addedAt),
+			grantPayload(entityId, member, role, addedBy, addedAt, x25519),
 			readString(m, "grantSig"),
 		);
 		const revokeValid =
@@ -262,6 +280,7 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 				: false;
 		out.push({
 			member,
+			x25519,
 			role,
 			addedBy,
 			addedAt,

@@ -186,6 +186,12 @@ export default defineConfig({
 			"@brainstorm/sdk/icon": resolve(__dirname, "packages/sdk/src/icon/index.ts"),
 			"@brainstorm/sdk/typography": resolve(__dirname, "packages/sdk/src/typography/index.ts"),
 			"@brainstorm/sdk/popover": resolve(__dirname, "packages/sdk/src/popover/index.ts"),
+			// `.css` precedes the bare JS alias so the longer prefix wins.
+			"@brainstorm/sdk/share-dialog.css": resolve(
+				__dirname,
+				"packages/sdk/src/share-dialog/share-dialog.css",
+			),
+			"@brainstorm/sdk/share-dialog": resolve(__dirname, "packages/sdk/src/share-dialog/index.ts"),
 			"@brainstorm/sdk/shortcut": resolve(__dirname, "packages/sdk/src/shortcut/index.ts"),
 			"@brainstorm/sdk/nav-history": resolve(__dirname, "packages/sdk/src/nav-history/index.ts"),
 			"@brainstorm/sdk/a11y": resolve(__dirname, "packages/sdk/src/a11y/index.ts"),

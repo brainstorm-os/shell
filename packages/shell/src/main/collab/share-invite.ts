@@ -238,6 +238,11 @@ export function shareEntityWithInvite(
 		role: opts.role,
 		signerSecret: opts.signerSecret,
 		now: opts.now,
+		// Record the invitee's verified X25519 wrapping key INSIDE the signed
+		// grant (collection-sharing, design 71): a later child cascade reads it
+		// from the access record to wrap the child DEK to this member, with the
+		// key authenticated by the same signature that authorizes the member.
+		x25519: opts.invite.x25519PubB64,
 	});
 
 	if (existingWrap !== null) return existingWrap;

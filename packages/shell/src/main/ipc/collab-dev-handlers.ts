@@ -66,12 +66,19 @@ export function registerCollabDevHandlers(): () => void {
 		return bridgeForSession().createInvite(label);
 	});
 
-	ipcMain.handle("dev:collab:provision-entity", async (_event, entityId: unknown, type: unknown) => {
-		assertDevEntityId(entityId);
-		assertType(type);
-		await bridgeForSession().provisionEntity(entityId, type);
-		return { ok: true };
-	});
+	ipcMain.handle(
+		"dev:collab:provision-entity",
+		async (_event, entityId: unknown, type: unknown, properties: unknown) => {
+			assertDevEntityId(entityId);
+			assertType(type);
+			const props =
+				properties && typeof properties === "object"
+					? (properties as Record<string, unknown>)
+					: undefined;
+			await bridgeForSession().provisionEntity(entityId, type, props);
+			return { ok: true };
+		},
+	);
 
 	ipcMain.handle(
 		"dev:collab:install-share-receiver",
@@ -92,6 +99,23 @@ export function registerCollabDevHandlers(): () => void {
 				throw new Error("dev:collab:share: invite is not a well-formed ShareInvite");
 			}
 			return bridgeForSession().share({
+				entityId,
+				type,
+				invite,
+				role: parseAccessRole(role),
+			});
+		},
+	);
+
+	ipcMain.handle(
+		"dev:collab:share-collection",
+		async (_event, entityId: unknown, type: unknown, invite: unknown, role: unknown) => {
+			assertDevEntityId(entityId);
+			assertType(type);
+			if (!isShareInvite(invite)) {
+				throw new Error("dev:collab:share-collection: invite is not a well-formed ShareInvite");
+			}
+			return bridgeForSession().shareCollection({
 				entityId,
 				type,
 				invite,
@@ -139,6 +163,7 @@ export function registerCollabDevHandlers(): () => void {
 			"dev:collab:provision-entity",
 			"dev:collab:install-share-receiver",
 			"dev:collab:share",
+			"dev:collab:share-collection",
 			"dev:collab:edit-text",
 			"dev:collab:revoke",
 			"dev:collab:access",

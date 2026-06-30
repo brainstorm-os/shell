@@ -30,6 +30,7 @@ import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm/
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { Popover } from "@brainstorm/sdk/popover";
+import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
 import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
@@ -64,6 +65,31 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
 /** A pending optimistic echo of a just-sent message, keyed so it can be dropped
  *  once the persisted twin arrives over the reactive snapshot. */
 type Pending = { channelId: string; message: ChatMessage };
+
+const SHARE_DIALOG_LABELS: ShareDialogLabels = {
+	title: t("share.title"),
+	membersHeading: t("share.membersHeading"),
+	you: t("share.you"),
+	roleOwner: t("share.roleOwner"),
+	roleEditor: t("share.roleEditor"),
+	roleViewer: t("share.roleViewer"),
+	revoke: t("share.revoke"),
+	addHeading: t("share.addHeading"),
+	codePlaceholder: t("share.codePlaceholder"),
+	canEdit: t("share.canEdit"),
+	canView: t("share.canView"),
+	add: t("share.add"),
+	quickAddHeading: t("share.quickAdd"),
+	inviteHeading: t("share.inviteHeading"),
+	getCode: t("share.getCode"),
+	copy: t("share.copy"),
+	copied: t("share.copied"),
+	inviteHint: t("share.inviteHint"),
+	shareFailed: t("share.shareFailed"),
+	revokeFailed: t("share.revokeFailed"),
+	loadFailed: t("share.loadFailed"),
+	done: t("share.done"),
+};
 
 export function ChatApp(): ReactElement {
 	const services = getBrainstorm()?.services ?? null;
@@ -414,7 +440,9 @@ export function ChatApp(): ReactElement {
 	);
 
 	const moreRef = useRef<HTMLButtonElement>(null);
+	const [shareOpen, setShareOpen] = useState(false);
 	useEffect(() => closeObjectMenu, []);
+	const canShare = !!activeChannel && !!services?.sharing && !!roster;
 	const openMore = useCallback(() => {
 		const el = moreRef.current;
 		if (!el) return;
@@ -427,6 +455,15 @@ export function ChatApp(): ReactElement {
 					icon: IconName.Plus,
 					onSelect: () => setComposeNew(true),
 				},
+				...(canShare
+					? [
+							{
+								label: t("menu.share"),
+								icon: IconName.OpenExternal,
+								onSelect: () => setShareOpen(true),
+							},
+						]
+					: []),
 				{
 					label: t("menu.editIdentity"),
 					icon: IconName.Pencil,
@@ -435,7 +472,7 @@ export function ChatApp(): ReactElement {
 			],
 			{ menuLabel: t("header.moreActions"), anchor: el, align: MenuAlign.End },
 		);
-	}, []);
+	}, [canShare]);
 
 	return (
 		<div
@@ -548,6 +585,18 @@ export function ChatApp(): ReactElement {
 					current={identity.displayName}
 					onClose={() => setEditIdentity(false)}
 					onSave={persistName}
+				/>
+			) : null}
+			{shareOpen && activeChannel && services?.sharing && roster ? (
+				<ShareDialog
+					entityId={activeChannel.id}
+					entityType={CHANNEL_TYPE}
+					collection
+					sharing={services.sharing}
+					roster={roster}
+					canManage
+					labels={SHARE_DIALOG_LABELS}
+					onClose={() => setShareOpen(false)}
 				/>
 			) : null}
 		</div>

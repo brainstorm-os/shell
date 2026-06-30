@@ -70,9 +70,14 @@ export class CollabDevBridge {
 		return this.#engine.createInvite(label);
 	}
 
-	/** Owner-side: create the entity row + DEK + the owner's Owner grant. */
-	async provisionEntity(entityId: string, type: string): Promise<void> {
-		await this.#engine.provisionEntity(entityId, type);
+	/** Owner-side: create the entity row + DEK + the owner's Owner grant.
+	 *  `properties` seeds the row (e.g. a message's `conversation`). */
+	async provisionEntity(
+		entityId: string,
+		type: string,
+		properties?: Record<string, unknown>,
+	): Promise<void> {
+		await this.#engine.provisionEntity(entityId, type, properties ?? { name: entityId });
 	}
 
 	/**
@@ -121,6 +126,17 @@ export class CollabDevBridge {
 		role: AccessRole;
 	}): Promise<CollabAccessView[]> {
 		return this.#engine.share(opts);
+	}
+
+	/** Owner-side collection share — share the container + cascade onto its
+	 *  existing children (design 71). Delegates to the engine. */
+	async shareCollection(opts: {
+		entityId: string;
+		type: string;
+		invite: ShareInvite;
+		role: AccessRole;
+	}): Promise<CollabAccessView[]> {
+		return this.#engine.shareCollection(opts);
 	}
 
 	/** Append text into the doc's scratch text type and emit the delta. */

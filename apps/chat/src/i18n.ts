@@ -64,6 +64,30 @@ export const CHAT_I18N = {
 
 	"day.today": "Today",
 	"day.yesterday": "Yesterday",
+
+	"menu.share": "Share channel…",
+	"share.title": "Share channel",
+	"share.membersHeading": "People with access",
+	"share.you": "you",
+	"share.roleOwner": "Owner",
+	"share.roleEditor": "Can post",
+	"share.roleViewer": "Can read",
+	"share.revoke": "Remove",
+	"share.addHeading": "Add someone",
+	"share.codePlaceholder": "Paste an invite code",
+	"share.canEdit": "Can post",
+	"share.canView": "Can read",
+	"share.add": "Add",
+	"share.quickAdd": "Add a teammate",
+	"share.inviteHeading": "Your invite code",
+	"share.getCode": "Get my code",
+	"share.copy": "Copy",
+	"share.copied": "Copied",
+	"share.inviteHint": "Share this code with a teammate so an owner can add you.",
+	"share.shareFailed": "Couldn't share — check the code and try again.",
+	"share.revokeFailed": "Couldn't remove that person.",
+	"share.loadFailed": "Couldn't load members.",
+	"share.done": "Done",
 } as const;
 
 export type ChatMessageId = keyof typeof CHAT_I18N;

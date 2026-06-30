@@ -118,3 +118,33 @@
 	font-size: var(--text-size-sm);
 	color: var(--danger);
 }
+
+/* Share-by-name — click-to-add chips for known teammates. */
+.bs-share__contacts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+}
+
+.bs-share__contact {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	height: var(--control-height-sm, 24px);
+	padding: 0 var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: 999px;
+	background: var(--bg-elev);
+	color: var(--text);
+	font-size: var(--text-size-sm);
+	cursor: pointer;
+}
+
+.bs-share__contact:hover:not(:disabled) {
+	background: var(--hover);
+}
+
+.bs-share__contact:disabled {
+	opacity: 0.5;
+	cursor: default;
+}

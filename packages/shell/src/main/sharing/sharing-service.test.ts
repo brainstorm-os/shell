@@ -15,12 +15,13 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ShareInviteToken, SharedMember } from "@brainstorm/sdk-types";
+import type { ShareInviteToken, SharedContact, SharedMember } from "@brainstorm/sdk-types";
 import { RosterRole } from "@brainstorm/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import { CollabDevBridge, type CollabRelayLike } from "../collab/collab-dev-bridge";
+import { ContactsStore, contactsStorePath } from "../collab/contacts-store";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
@@ -113,6 +114,7 @@ describe("Collab-C5 — sharing broker service", () => {
 			getSession: () => owner,
 			getRelay: () => relayAdapter(portOwner),
 			refreshMembership: refreshSpy,
+			getContactsStore: async () => new ContactsStore({ path: contactsStorePath(dirOwner) }),
 		};
 		ownerHandler = makeSharingServiceHandler(ownerOpts);
 		guestHandler = makeSharingServiceHandler({
@@ -187,6 +189,62 @@ describe("Collab-C5 — sharing broker service", () => {
 		for (const f of relayFrames) {
 			expect(Buffer.from(f).includes(probe)).toBe(false);
 		}
+	});
+
+	it("shareCollection cascades the grant onto the channel's messages (through the service)", async () => {
+		const CHANNEL = "ent_chan_svc";
+		const CHANNEL_TYPE = "io.brainstorm.chat/Channel/v1";
+		const MSG = "ent_msg_svc";
+		const MESSAGE_TYPE = "brainstorm/Message/v1";
+		await ownerBridge.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+		await ownerBridge.provisionEntity(MSG, MESSAGE_TYPE, { conversation: CHANNEL, body: "hi team" });
+
+		const token = (await guestHandler(envelope("createInvite", ["Guest"]))) as ShareInviteToken;
+		const members = (await ownerHandler(
+			envelope("shareCollection", [
+				{ entityId: CHANNEL, type: CHANNEL_TYPE, invite: token, role: RosterRole.Editor },
+			]),
+		)) as SharedMember[];
+
+		const guestB64 = guestBridge.whoami().userPubB64;
+		// The container carries the guest as an active Editor...
+		expect(members.find((m) => m.pubkey === guestB64)?.active).toBe(true);
+		// ...and so does the message, via the cascade (owner-side access record).
+		const msgAccess = (await ownerHandler(envelope("access", [MSG]))) as SharedMember[];
+		expect(msgAccess.find((m) => m.pubkey === guestB64)?.active).toBe(true);
+		expect(msgAccess.find((m) => m.pubkey === guestB64)?.role).toBe(RosterRole.Editor);
+		expect(refreshSpy).toHaveBeenCalledWith(CHANNEL, CHANNEL_TYPE);
+	});
+
+	it("saves a contact then shares a collection by name — no pasted code at share time", async () => {
+		const CHANNEL = "ent_chan_byname";
+		const CHANNEL_TYPE = "io.brainstorm.chat/Channel/v1";
+		const MSG = "ent_msg_byname";
+		const MESSAGE_TYPE = "brainstorm/Message/v1";
+		await ownerBridge.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+		await ownerBridge.provisionEntity(MSG, MESSAGE_TYPE, { conversation: CHANNEL });
+
+		// Guest hands over their invite code once; owner saves it under a name.
+		const token = (await guestHandler(envelope("createInvite", ["Guest"]))) as ShareInviteToken;
+		const saved = (await ownerHandler(
+			envelope("saveContact", [{ invite: token, displayName: "Marcus" }]),
+		)) as SharedContact;
+		const guestB64 = guestBridge.whoami().userPubB64;
+		expect(saved).toEqual({ pubkey: guestB64, displayName: "Marcus" });
+
+		// The picker lists them by name.
+		const contacts = (await ownerHandler(envelope("listContacts", []))) as SharedContact[];
+		expect(contacts).toEqual([{ pubkey: guestB64, displayName: "Marcus" }]);
+
+		// Share the channel BY CONTACT (no token) — the cascade still reaches the message.
+		const members = (await ownerHandler(
+			envelope("shareCollection", [
+				{ entityId: CHANNEL, type: CHANNEL_TYPE, contact: guestB64, role: RosterRole.Editor },
+			]),
+		)) as SharedMember[];
+		expect(members.find((m) => m.pubkey === guestB64)?.active).toBe(true);
+		const msgAccess = (await ownerHandler(envelope("access", [MSG]))) as SharedMember[];
+		expect(msgAccess.find((m) => m.pubkey === guestB64)?.active).toBe(true);
 	});
 
 	it("re-checks the scarce sharing.share capability server-side (fail-closed)", async () => {

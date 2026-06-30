@@ -253,3 +253,61 @@ describe("access-record (Collab C1)", () => {
 		}
 	});
 });
+
+describe("access-record — signed X25519 wrapping key (collection-sharing, design 71)", () => {
+	it("carries a member's X25519 through resolve, covered by the grant signature", () => {
+		const doc = new Y.Doc();
+		const owner = person();
+		const marcus = person();
+		const marcusX25519 = "bWFyY3VzLXgyNTUxOS1wdWJrZXktYjY0LXBsYWNlaG9sZGVy";
+		grantAccess(doc, {
+			entityId: ENT,
+			member: marcus.pub,
+			role: AccessRole.Editor,
+			signerSecret: owner.secret,
+			now: 1,
+			x25519: marcusX25519,
+		});
+		const member = firstMember(resolveCurrentMembers(doc, ENT));
+		expect(member.member).toBe(marcus.pub);
+		expect(member.x25519).toBe(marcusX25519);
+		expect(member.grantValid).toBe(true);
+		expect(member.active).toBe(true);
+	});
+
+	it("rejects a tampered X25519 (the key is in the signed payload)", () => {
+		const doc = new Y.Doc();
+		const owner = person();
+		const marcus = person();
+		grantAccess(doc, {
+			entityId: ENT,
+			member: marcus.pub,
+			role: AccessRole.Editor,
+			signerSecret: owner.secret,
+			now: 1,
+			x25519: "b3JpZ2luYWwteDI1NTE5LWtleS1iNjQtdmFsdWUtaGVyZQ",
+		});
+		// Swap the stored X25519 for an attacker's — the grant signature no longer
+		// matches the reconstructed payload, so the member resolves invalid.
+		getAccessArray(doc).get(0).set("x25519", "YXR0YWNrZXItc3Vic3RpdHV0ZWQteDI1NTE5LWtleS1oZXJl");
+		const member = firstMember(resolveMembers(doc, ENT));
+		expect(member.grantValid).toBe(false);
+		expect(member.active).toBe(false);
+	});
+
+	it("a key-less grant resolves x25519=null and stays valid (back-compat)", () => {
+		const doc = new Y.Doc();
+		const owner = person();
+		const marcus = person();
+		grantAccess(doc, {
+			entityId: ENT,
+			member: marcus.pub,
+			role: AccessRole.Viewer,
+			signerSecret: owner.secret,
+			now: 1,
+		});
+		const member = firstMember(resolveCurrentMembers(doc, ENT));
+		expect(member.x25519).toBeNull();
+		expect(member.grantValid).toBe(true);
+	});
+});

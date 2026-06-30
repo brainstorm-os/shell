@@ -12,7 +12,9 @@
     "entities.write:io.brainstorm.chat/Channel/v1",
     "entities.write:brainstorm/Message/v1",
     "roster.read",
-    "roster.write"
+    "roster.write",
+    "sharing.read",
+    "sharing.share"
   ],
   "registrations": {
     "entityTypes": [

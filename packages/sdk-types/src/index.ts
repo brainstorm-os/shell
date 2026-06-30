@@ -1544,6 +1544,14 @@ export type SharedMember = {
 	revokedAt: number | null;
 };
 
+/** A saved contact — a teammate whose verified invite you've kept, so you can
+ *  share to them by a click (share-by-name) instead of re-pasting a code. */
+export type SharedContact = {
+	/** base64 sovereign Ed25519 public key — the share target + dedup key. */
+	pubkey: string;
+	displayName: string;
+};
+
 /** Collab-C5 — the app-facing window onto multi-user sharing: mint your own
  *  invite, and (as an entity Owner) grant / revoke other people's access. The
  *  crypto is the proven Stage-10 spine (per-entity DEK + HPKE member-wraps +
@@ -1561,9 +1569,31 @@ export type SharingService = {
 	share(input: {
 		entityId: string;
 		type: string;
-		invite: ShareInviteToken;
+		/** A pasted invite token, OR omit and pass `contact` (a saved pubkey). */
+		invite?: ShareInviteToken;
+		/** A saved contact's pubkey — share by name without re-pasting a code. */
+		contact?: string;
 		role: RosterRole;
 	}): Promise<SharedMember[]>;
+	/** Owner: share a COLLECTION container (a chat Channel, a Project) — grants
+	 *  the target on the container AND cascades the same grant + DEK onto every
+	 *  existing child (its messages / tasks), so the whole collection syncs.
+	 *  Children created later are auto-shared by the shell. Pass an `invite`
+	 *  token or a saved `contact` pubkey. Requires `sharing.share`. */
+	shareCollection(input: {
+		entityId: string;
+		type: string;
+		invite?: ShareInviteToken;
+		contact?: string;
+		role: RosterRole;
+	}): Promise<SharedMember[]>;
+	/** Save a teammate's pasted invite under a display name so they can later be
+	 *  shared-to by a click (share-by-name). Verifies the invite. Requires
+	 *  `sharing.read`. */
+	saveContact(input: { invite: ShareInviteToken; displayName: string }): Promise<SharedContact>;
+	/** The saved contacts directory — the share-by-name picker. Requires
+	 *  `sharing.read`. */
+	listContacts(): Promise<SharedContact[]>;
 	/** Owner: revoke `member` (base64 pubkey). Signed, append-only audit — the
 	 *  row is retained. Returns the resolved access record. Requires
 	 *  `sharing.share`. */
