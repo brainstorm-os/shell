@@ -4051,6 +4051,12 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 		},
 		...(list ? { onChangeSource: (types) => updateListSource(state, list.id, types) } : {}),
 		onCreateProperty: (seedName) => openColumnPropertyConstructor(state, view, seedName),
+		// "Add collection property" — only for collections you can manually
+		// add members to (Manual / Hybrid). Creates a list-scoped property that
+		// every member inherits (surfaced in their inspectors), not a column.
+		...(list && deriveListMode(list) !== ListMode.Query
+			? { onCreateCollectionProperty: () => openCollectionPropertyConstructor(state, list) }
+			: {}),
 		onChange: (patch) => {
 			if (patch.name) commitViewRename(state, view.id, patch.name);
 			if (patch.kind) {
@@ -4489,6 +4495,25 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			renderActiveView(state);
 			schedulePersist(state);
 			flashStatus(`Added property "${def.name || def.key}"`, "ready");
+		},
+	});
+}
+
+/* List-scoped (collection) property authoring. Mirrors the column constructor
+ * but stamps `scope = { kind: "list", target: listId }` and does NOT attach a
+ * view column — the property is surfaced on member entities via inheritance
+ * (`inheritedPropertyDefs`), not as a column on this list's grid. */
+function openCollectionPropertyConstructor(state: AppState, list: List): void {
+	openInlinePropertyForm({
+		labels: { ...INLINE_PROPERTY_FORM_LABELS, region: "New collection property" },
+		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
+		onCommit: async ({ def, dictionary }) => {
+			const scoped: PropertyDef = { ...def, scope: { kind: "list", target: list.id } };
+			if (!(await persistNewPropertyDef(scoped, dictionary))) return;
+			await loadVaultProperties(state);
+			renderActiveView(state);
+			schedulePersist(state);
+			flashStatus(`Added "${scoped.name || scoped.key}" to this collection`, "ready");
 		},
 	});
 }
