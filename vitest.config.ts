@@ -143,6 +143,8 @@ export default defineConfig({
 			"@brainstorm/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
 			"@brainstorm/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
+			"@brainstorm/sdk/entity-body-copy": resolve(__dirname, "packages/sdk/src/entity-body-copy.ts"),
+			"@brainstorm/sdk/templates": resolve(__dirname, "packages/sdk/src/templates.ts"),
 			"@brainstorm/sdk/entity-drag": resolve(__dirname, "packages/sdk/src/entity-drag.ts"),
 			"@brainstorm/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
 			"@brainstorm/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),

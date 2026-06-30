@@ -93,6 +93,8 @@
     "./export-popover": "./src/export-popover/index.ts",
     "./formula": "./src/formula/index.ts",
     "./entity-export": "./src/entity-export/index.ts",
+    "./templates": "./src/templates.ts",
+    "./entity-body-copy": "./src/entity-body-copy.ts",
     "./property-ui/pure": "./src/property-ui-pure.ts",
     "./property-ui/dictionary-editor": "./src/property-ui/dictionary-editor.tsx",
     "./property-ui": "./src/property-ui.ts",

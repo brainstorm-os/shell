@@ -86,7 +86,7 @@ export type SaveObjectAsTemplateOptions = {
  * follow-up through the editor insert path, mirroring `instantiateObjectTemplate`.
  */
 export function objectToTemplateProperties(
-	entity: Entity,
+	entity: Pick<Entity, "type" | "properties">,
 	options: SaveObjectAsTemplateOptions = {},
 ): TemplateEntityProperties {
 	const props = entity.properties as Record<string, unknown>;

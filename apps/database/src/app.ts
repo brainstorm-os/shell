@@ -55,6 +55,7 @@ import {
 	isMultiValued,
 } from "@brainstorm/sdk-types";
 import { createCountBadge } from "@brainstorm/sdk/count-badge";
+import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
 import { coverOf, createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
 import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
 import { IconName, createIconElement } from "@brainstorm/sdk/icon";
@@ -72,6 +73,16 @@ import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/prop
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
 import { attachShortcut } from "@brainstorm/sdk/shortcut";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
+import {
+	CreateOptionKind,
+	type CreateTemplateOption,
+	TEMPLATE_ENTITY_TYPE,
+	type TemplateDraft,
+	buildCreateTemplateMenu,
+	draftFromCreateOption,
+	entityToTemplate,
+	objectToTemplateProperties,
+} from "@brainstorm/sdk/templates";
 import { type VirtualListHandle, createVirtualList } from "@brainstorm/sdk/virtual-list";
 
 applyPersistedPanelWidth({
@@ -1939,10 +1950,24 @@ function bindStageObjectMenu(state: AppState): void {
 					},
 				]
 			: [];
+		// "Save as template" (B11.10): clone this object into a `Template/v1`
+		// (body + non-presentation properties). Skipped on a template row itself
+		// — a template never lists in a `byType` grid, but guard defensively.
+		const saveAsTemplateItems =
+			entity.type !== TEMPLATE_ENTITY_TYPE
+				? [
+						{
+							id: "save-as-template",
+							label: t("brainstorm.database.menu.saveAsTemplate"),
+							icon: IconName.Copy,
+							run: () => void saveObjectAsTemplate(entity),
+						},
+					]
+				: [];
 		// One shared renderer: it pre-fetches the pin state and builds the
 		// same Open / Pin·Unpin / … items every app shows, in the same
 		// glass chrome (was a private hand-rolled map onto `openContextMenu`).
-		const extraItems = [...renameItems, ...membershipItems];
+		const extraItems = [...renameItems, ...membershipItems, ...saveAsTemplateItems];
 		const runtime = getRuntime();
 		const collectionsService = runtime?.services?.entities;
 		void openObjectMenu(
@@ -2930,15 +2955,14 @@ function promptInline(
  *  two name-entry attempts produced 13 Untitleds). */
 let rowCreateInFlight = false;
 
-/** Create flow (+ New). Creates a real entity through the shared
- *  `entities` service, of the active list's type when it's a `byType`
- *  list, then reloads the vault snapshot so the new row appears and
- *  hands the keyboard to the new row's title editor (F-215) via
- *  `state.pendingTitleEdit`. */
+/** Create flow (+ New). When the active list's type has ≥1 applicable
+ *  `Template/v1`, offers a *Blank* + templates picker (B11.10 templates
+ *  foundation) anchored to the "+ New" button; with no applicable template the
+ *  behavior is unchanged — a blank object is created directly. */
 async function createEntityInActiveList(state: AppState): Promise<void> {
 	if (rowCreateInFlight) return;
-	const create = getRuntime()?.services?.entities?.create;
-	if (!create) {
+	const entities = getRuntime()?.services?.entities;
+	if (!entities?.create) {
 		flashStatus("Create needs the entities service (not exposed by this shell)", "warn");
 		return;
 	}
@@ -2948,11 +2972,74 @@ async function createEntityInActiveList(state: AppState): Promise<void> {
 		return;
 	}
 	const plan = decideRowCreate(list);
+
+	// Offer applicable object templates through the shared create-flow picker.
+	// A query failure or a shell without `entities.query` falls back to blank.
+	const templates = (
+		entities.query ? await entities.query({ type: TEMPLATE_ENTITY_TYPE }).catch(() => []) : []
+	).flatMap((e) => {
+		const template = entityToTemplate(e);
+		return template ? [template] : [];
+	});
+	const menu = buildCreateTemplateMenu(templates, plan.type);
+	if (!menu.hasTemplates) {
+		await performRowCreate(state, list, plan, { kind: CreateOptionKind.Blank });
+		return;
+	}
+
+	const trigger = document.getElementById("toolbar-new");
+	const rect = trigger?.getBoundingClientRect();
+	const point = rect ? { x: rect.left, y: rect.bottom } : { x: 0, y: 0 };
+	openAnchoredMenu(
+		point,
+		menu.options.map((option) => ({
+			label:
+				option.kind === CreateOptionKind.Blank
+					? t("brainstorm.database.create.blank")
+					: option.template.name || t("brainstorm.database.create.blank"),
+			onSelect: () => void performRowCreate(state, list, plan, option),
+		})),
+		{
+			menuLabel: t("brainstorm.database.create.pickTemplate"),
+			...(trigger ? { anchor: trigger } : {}),
+		},
+	);
+}
+
+/** Materialize the chosen create option into a real entity through the shared
+ *  `entities` service, of the active list's type when it's a `byType` list,
+ *  copying the template body (universal `root`) when a template was chosen, then
+ *  reloads the vault snapshot so the new row appears and hands the keyboard to
+ *  the new row's title editor (F-215) via `state.pendingTitleEdit`. Shared by
+ *  the no-template fast path and every picker row. */
+async function performRowCreate(
+	state: AppState,
+	list: NonNullable<ReturnType<typeof activeList>>,
+	plan: ReturnType<typeof decideRowCreate>,
+	option: CreateTemplateOption,
+): Promise<void> {
+	if (rowCreateInFlight) return;
+	const entities = getRuntime()?.services?.entities;
+	if (!entities?.create) {
+		flashStatus("Create needs the entities service (not exposed by this shell)", "warn");
+		return;
+	}
 	rowCreateInFlight = true;
 	try {
 		flashStatus("Creating…", "ready");
 		const now = Date.now();
-		const entity = await create(plan.type, { name: "Untitled", createdAt: now, updatedAt: now });
+		const baseDraft: TemplateDraft = {
+			type: plan.type,
+			properties: { name: "Untitled", createdAt: now, updatedAt: now },
+		};
+		const draft = draftFromCreateOption(option, baseDraft);
+		const entity = await entities.create(draft.type ?? plan.type, draft.properties);
+		// Copy the template's prototype body onto the new entity (the property
+		// copy already happened via `draftFromCreateOption`); the body lives in
+		// the Y.Doc, so it goes through the doc transport, not the property bag.
+		if (option.kind === CreateOptionKind.Template && entity?.id && hasBodyDocTransport(entities)) {
+			await copyEntityBody(entities, option.template.id, entity.id);
+		}
 		// A manual / custom collection has no type source to pick the row up, so
 		// pin the new generic Object into the collection's manual members.
 		if (plan.addToMembers && entity?.id) {
@@ -2981,6 +3068,34 @@ async function createEntityInActiveList(state: AppState): Promise<void> {
 		flashStatus(`Create failed — ${message}`, "warn");
 	} finally {
 		rowCreateInFlight = false;
+	}
+}
+
+/** "Save as template" (B11.10): clone `entity` into a new `Template/v1` —
+ *  non-presentation properties become the prototype, the object's body is
+ *  copied onto the template through the doc transport. `name`/`icon`/`cover`
+ *  describe the template in the picker and are not seeded onto instances. */
+async function saveObjectAsTemplate(entity: EntityRow): Promise<void> {
+	const entities = getRuntime()?.services?.entities;
+	if (!entities?.create) {
+		flashStatus("Save as template needs the entities service (not exposed by this shell)", "warn");
+		return;
+	}
+	try {
+		const now = Date.now();
+		const props = objectToTemplateProperties(entity);
+		const template = await entities.create(TEMPLATE_ENTITY_TYPE, {
+			...props,
+			createdAt: now,
+			updatedAt: now,
+		});
+		if (template?.id && hasBodyDocTransport(entities)) {
+			await copyEntityBody(entities, entity.id, template.id);
+		}
+		flashStatus(t("brainstorm.database.status.templateSaved"), "ready");
+	} catch (error) {
+		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+		flashStatus(`Save as template failed — ${message}`, "warn");
 	}
 }
 
@@ -4300,6 +4415,14 @@ type BrainstormRuntime = {
 			get(id: string): Promise<Entity | null>;
 			query(query: EntityQuery): Promise<Entity[]>;
 			delete(id: string): Promise<void>;
+			/** Rich-text body Y.Doc transport (base64 Yjs updates). Optional —
+			 *  the template create-flow / "Save as template" copy the prototype
+			 *  body through these (B11.10); absent on a host without the doc
+			 *  transport (preview / standalone-dev), where the property copy still
+			 *  works and only the body copy is skipped. */
+			loadDoc?(id: string): Promise<{ snapshotB64: string; truncatedTail: boolean }>;
+			applyDoc?(id: string, updateB64: string): Promise<unknown>;
+			closeDoc?(id: string): Promise<void>;
 		};
 		/** Vault-shared cover content store (B7.2c). Injected into the
 		 *  `<CoverPicker>` so its Image tab can upload + list. */
