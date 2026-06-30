@@ -172,6 +172,56 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 		expect(b.doc.getText("body").toString()).toBe("Northbound brief. ");
 	});
 
+	it("a local awareness update on one shared device reaches the other's applyRemoteAwareness", async () => {
+		const [pa, pb] = LoopbackRelayPort.pair(2);
+		if (!pa || !pb) throw new Error("missing ports");
+		const dekA = new FakeDekStore();
+		dekA.mint(ENT);
+		const dekB = new FakeDekStore();
+		dekB.seedFrom(dekA, ENT);
+
+		const received: Uint8Array[] = [];
+		const a = makeDevice(pa, dekA, () => true);
+		const b = makeDevice(pb, dekB, () => true, {
+			applyRemoteAwareness: (_id, _type, update) => {
+				received.push(update);
+			},
+		});
+		await a.engine.trackOpen(ENT, TYPE);
+		await b.engine.trackOpen(ENT, TYPE);
+
+		// Opaque awareness bytes (the y-protocols encode/decode lives in the
+		// renderer; the engine only seals + routes them under the entity DEK).
+		await a.engine.emitLocalAwareness(ENT, new Uint8Array([1, 2, 3, 4]));
+		await settle(a, b);
+
+		expect(received.length).toBe(1);
+		expect([...(received[0] ?? [])]).toEqual([1, 2, 3, 4]);
+	});
+
+	it("does not route awareness for an entity the receiver isn't tracking", async () => {
+		const [pa, pb] = LoopbackRelayPort.pair(2);
+		if (!pa || !pb) throw new Error("missing ports");
+		const dekA = new FakeDekStore();
+		dekA.mint(ENT);
+		const dekB = new FakeDekStore();
+		dekB.seedFrom(dekA, ENT);
+
+		const received: Uint8Array[] = [];
+		const a = makeDevice(pa, dekA, () => true);
+		const b = makeDevice(pb, dekB, () => true, {
+			applyRemoteAwareness: (_id, _type, update) => {
+				received.push(update);
+			},
+		});
+		await a.engine.trackOpen(ENT, TYPE);
+		// b does NOT trackOpen → it must not accept awareness for ENT.
+		await a.engine.emitLocalAwareness(ENT, new Uint8Array([9, 9]));
+		await settle(a, b);
+
+		expect(received.length).toBe(0);
+	});
+
 	it("concurrent edits converge both docs and do not echo back", async () => {
 		const [pa, pb] = LoopbackRelayPort.pair(2);
 		if (!pa || !pb) throw new Error("missing ports");
