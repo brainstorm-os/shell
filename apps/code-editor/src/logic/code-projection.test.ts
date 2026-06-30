@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { VaultSnapshot } from "../runtime";
 import { LanguageKey } from "../types/code-file";
-import { entityToCodeFileRow, entityToStylePackRow, projectCodeFiles } from "./code-projection";
+import {
+	entityToCodeFileRow,
+	entityToStylePackRow,
+	isCodeFileEditable,
+	projectCodeFiles,
+} from "./code-projection";
 
 function snapshot(entities: VaultSnapshot["entities"]): VaultSnapshot {
 	return { entities, links: [] };
@@ -184,5 +189,20 @@ describe("projectCodeFiles — opened StylePack", () => {
 		expect(projectCodeFiles(snapshot([pack]), "nope")).toEqual([]);
 		const deleted = ent("sp2", { css: "" }, { type: "brainstorm/StylePack/v1", deletedAt: 5 });
 		expect(projectCodeFiles(snapshot([deleted]), "sp2")).toEqual([]);
+	});
+});
+
+describe("isCodeFileEditable (gates rename/delete in the file object menu)", () => {
+	it("allows an unlocked native content file", () => {
+		expect(isCodeFileEditable({ contentKey: "content", locked: false })).toBe(true);
+	});
+
+	it("blocks a locked content file — rename/delete must not bypass the lock", () => {
+		expect(isCodeFileEditable({ contentKey: "content", locked: true })).toBe(false);
+	});
+
+	it("blocks an adapted read-only CSS/StylePack row regardless of lock", () => {
+		expect(isCodeFileEditable({ contentKey: "css", locked: false })).toBe(false);
+		expect(isCodeFileEditable({ contentKey: "css", locked: true })).toBe(false);
 	});
 });

@@ -283,7 +283,11 @@ export function BookmarkDetail({
 					aria-label={t("detail.cover.edit")}
 					aria-haspopup="dialog"
 					aria-expanded={coverPickerOpen}
-					onClick={() => setCoverPickerOpen((open) => !open)}
+					disabled={!!bookmark.locked}
+					onClick={() => {
+						if (bookmark.locked) return;
+						setCoverPickerOpen((open) => !open);
+					}}
 				>
 					<span ref={coverRef} aria-hidden="true" />
 				</button>

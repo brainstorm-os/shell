@@ -1141,7 +1141,7 @@ function renderActiveViewInner(state: AppState): void {
 	const editProperty = (entity: EntityRow, propertyId: string, value: unknown): void => {
 		// A locked record is read-only — every view's cell commit no-ops (the
 		// lock toggle itself writes through `persistEntityPatch` directly).
-		if (entity.properties?.locked === true) return;
+		if (isRecordLocked(entity)) return;
 		void persistEntityPatch(state, entity, { [propertyId]: value });
 	};
 	switch (view.kind) {
@@ -1430,7 +1430,7 @@ function renderInspector(state: AppState): void {
 	// Read-only lock — the record's synced `locked` property. The shared
 	// `editProperty` commit no-ops for a locked record, so its cells are
 	// read-only across every view; here we surface the toggle + freeze rename.
-	const recordLocked = entity.properties?.locked === true;
+	const recordLocked = isRecordLocked(entity);
 	if (lockBtn) {
 		lockBtn.hidden = false;
 		lockBtn.replaceChildren(createIconElement(IconName.Lock));
@@ -1482,8 +1482,10 @@ function renderInspector(state: AppState): void {
 	coverBtn.className = "db-inspector__cover";
 	coverBtn.dataset.bsTooltip = "Change cover";
 	coverBtn.setAttribute("aria-label", "Change cover");
+	coverBtn.disabled = recordLocked;
 	coverBtn.appendChild(createEntityCoverElement(entity, { aspect: 16 / 6 }));
 	coverBtn.addEventListener("click", () => {
+		if (recordLocked) return;
 		openCoverPicker({
 			value: coverOf(entity),
 			covers: getRuntime()?.services?.covers ?? {
@@ -1503,6 +1505,7 @@ function renderInspector(state: AppState): void {
 	iconBtn.className = "db-inspector__icon-btn";
 	iconBtn.dataset.bsTooltip = "Change icon";
 	iconBtn.setAttribute("aria-label", "Change icon");
+	iconBtn.disabled = recordLocked;
 	// Empty icon slot shows the dashed-plus add affordance (not a blank box) so
 	// it reads as "click to add an icon".
 	const iconBtnEl = createEntityIconElement(readEntityIcon(entity), {
@@ -1511,6 +1514,7 @@ function renderInspector(state: AppState): void {
 	});
 	iconBtn.appendChild(iconBtnEl ?? createAddIconGlyph());
 	iconBtn.addEventListener("click", () => {
+		if (recordLocked) return;
 		openIconPicker({
 			value: readEntityIcon(entity),
 			onChange: (icon) => void persistEntityPatch(state, entity, { icon }),
@@ -1562,8 +1566,12 @@ function renderInspector(state: AppState): void {
 				properties: () =>
 					createElement(InspectorProperties, {
 						entity,
-						onEdit: (target, propertyId, value) =>
-							void persistEntityPatch(state, target, { [propertyId]: value }),
+						// A locked record's property cells paint read-only — `EditableCell`
+						// renders the read-only paint when `onEdit` is absent.
+						onEdit: recordLocked
+							? undefined
+							: (target, propertyId, value) =>
+									void persistEntityPatch(state, target, { [propertyId]: value }),
 					}),
 			}),
 		),
@@ -2351,7 +2359,7 @@ function onMoveToGroup(
 	entity: EntityRow,
 	groupKey: string | null,
 ): void {
-	if (!view.groupBy) return;
+	if (!view.groupBy || isRecordLocked(entity)) return;
 	mutateEntityProperty(state, entity.id, view.groupBy.propertyId, groupKey ?? "");
 	renderActiveView(state);
 	renderInspector(state);
@@ -2410,7 +2418,7 @@ function onMoveToDay(state: AppState, view: ListView, entity: EntityRow, dayStar
 	// groupBy here clobbered `statusKey` with a timestamp and the pill
 	// never moved — i.e. drag looked broken.
 	const dateProp = (view.layoutOptions as CalendarLayoutOptions)?.primaryDateProperty;
-	if (!dateProp) return;
+	if (!dateProp || isRecordLocked(entity)) return;
 	mutateEntityProperty(state, entity.id, dateProp, dayStart);
 	renderActiveView(state);
 	renderInspector(state);
@@ -2428,7 +2436,7 @@ function onTimelineMove(
 	newEndMs: number | null,
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
-	if (!layout?.primaryDateProperty) return;
+	if (!layout?.primaryDateProperty || isRecordLocked(entity)) return;
 	mutateEntityProperty(state, entity.id, layout.primaryDateProperty, newStartMs);
 	if (newEndMs !== null && layout.endDateProperty) {
 		mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
@@ -2447,7 +2455,7 @@ function onTimelineResize(
 	newEndMs: number,
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
-	if (!layout?.endDateProperty) return;
+	if (!layout?.endDateProperty || isRecordLocked(entity)) return;
 	mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
 	renderActiveView(state);
 	renderInspector(state);
@@ -3340,6 +3348,16 @@ function mutateEntityProperty(
 			: e,
 	);
 	state.db = { ...state.db, entities };
+}
+
+/** A record's advisory read-only lock (its synced `locked` property). Every
+ *  write path — grid/board/calendar/timeline cell commits, cover/icon pickers,
+ *  inspector property edits, drag-to-move/resize — no-ops for a locked record.
+ *  The lock guards against accidental edits; it is NOT an access-control
+ *  boundary (any collaborator can toggle it, and a write reaching the entities
+ *  service is still capability-gated there). */
+export function isRecordLocked(entity: EntityRow): boolean {
+	return entity.properties?.locked === true;
 }
 
 /** The object's OWN icon (`properties.icon`), validated to the universal

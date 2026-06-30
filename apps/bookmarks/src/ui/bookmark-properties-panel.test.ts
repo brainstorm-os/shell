@@ -153,4 +153,15 @@ describe("BookmarkPropertiesPanel — Author / Published editing (F-204)", () =>
 		expect(row(BOOKMARK_PROP_KEY.published)?.querySelector(".bs-cell-date-value")).not.toBeNull();
 		expect(row(BOOKMARK_PROP_KEY.published)?.querySelector(".bs-cell-date-empty")).toBeNull();
 	});
+
+	it("paints every editable row read-only when the bookmark is locked", () => {
+		const onChange = vi.fn();
+		renderPanel({ ...BASE, locked: true }, onChange);
+		const trigger = row(BOOKMARK_PROP_KEY.author)?.querySelector<HTMLButtonElement>(".bs-cell-pill");
+		expect(trigger?.disabled).toBe(true);
+		// A read-only cell never opens its editor, so nothing commits.
+		act(() => trigger?.click());
+		expect(row(BOOKMARK_PROP_KEY.author)?.querySelector(".bs-cell-input")).toBeNull();
+		expect(onChange).not.toHaveBeenCalled();
+	});
 });

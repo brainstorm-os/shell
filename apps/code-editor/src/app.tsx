@@ -40,7 +40,7 @@ import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";
 import { type CodeEditorMessageKey, plural, t } from "./i18n";
 import { type CitationIndex, CitationKind, buildCitationIndex } from "./logic/citation-index";
 import { type CitationReference, collectReferences } from "./logic/citation-scan";
-import { type CodeFileRow, projectCodeFiles } from "./logic/code-projection";
+import { type CodeFileRow, isCodeFileEditable, projectCodeFiles } from "./logic/code-projection";
 import { fileName, languageLabel } from "./logic/code-view";
 import type { EditorCommand } from "./logic/command-palette";
 import { lintCode } from "./logic/diagnostics";
@@ -468,6 +468,7 @@ export function CodeEditorApp(): ReactElement {
 
 	const renameFile = useCallback(
 		(row: CodeFileRow): void => {
+			if (row.locked) return;
 			if (!getCodeEditorRuntime()?.services?.entities?.update) return;
 
 			const field = document.createElement("form");
@@ -539,6 +540,7 @@ export function CodeEditorApp(): ReactElement {
 	);
 
 	const deleteFile = useCallback(async (row: CodeFileRow): Promise<void> => {
+		if (row.locked) return;
 		const del = getCodeEditorRuntime()?.services?.entities?.delete;
 		if (!del) return;
 		try {
@@ -594,7 +596,9 @@ export function CodeEditorApp(): ReactElement {
 		(row: CodeFileRow) => {
 			const rt = getCodeEditorRuntime();
 			const entities = rt?.services?.entities;
-			const editable = row.contentKey === "content";
+			// A locked file is read-only — rename/delete drop out of its object
+			// menu (the text pane already freezes via `CodePaneHost locked`).
+			const editable = isCodeFileEditable(row);
 			return codeFileObjectMenuContext(row, rt, {
 				...(editable && entities?.update ? { onRename: () => renameFile(row) } : {}),
 				...(editable && entities?.delete ? { onDelete: () => confirmDeleteFile(row) } : {}),

@@ -40,6 +40,14 @@ export interface CodeFileRow extends CodeFile {
 	locked: boolean;
 }
 
+/** A code file accepts rename/delete only when it is a native editable content
+ *  file (not an adapted read-only CSS/StylePack row) AND not locked. The text
+ *  pane freezes on `locked` separately; this gates the object-menu actions so a
+ *  locked file can't be renamed or deleted out from under its lock. */
+export function isCodeFileEditable(row: Pick<CodeFileRow, "contentKey" | "locked">): boolean {
+	return row.contentKey === "content" && !row.locked;
+}
+
 function str(value: unknown, fallback = ""): string {
 	return typeof value === "string" ? value : fallback;
 }

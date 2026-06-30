@@ -55,12 +55,16 @@ export function BookmarkPropertiesPanel({
 	const tagsDict = useDictionary(BOOKMARK_TAGS_DICTIONARY_ID);
 	const dictionaryStore = useDictionaryStore();
 	const values = bookmarkToValues(bookmark, tagsDict);
+	// A locked bookmark is read-only — every property row paints read-only (the
+	// lock toggle itself lives in the detail header, outside this panel).
+	const locked = bookmark.locked === true;
 	const rows: PropertiesPanelRow[] = BOOKMARK_PROPERTY_DEFS
 		// Only the read-only Type row hides when the page declared no og:type;
 		// editable rows (Author / Published) render even when empty (F-204).
 		.filter((def) => isVisibleScrapeRow(def.key, bookmark))
 		.map((def) => {
 			const readOnly =
+				locked ||
 				READONLY_BOOKMARK_PROP_KEYS.has(def.key) ||
 				// Tags stay read-only until the vocabulary is loaded — editing
 				// without it would write raw item ids into the label-keyed

@@ -31,7 +31,8 @@ export function InspectorProperties({
 	onEdit,
 }: {
 	entity: EntityRow;
-	onEdit: EntityPropertyEdit;
+	/** Absent ⇒ the record is read-only (locked): every cell paints read-only. */
+	onEdit: EntityPropertyEdit | undefined;
 }): ReactElement {
 	const keys = Object.keys(entity.properties).filter((k) => !SKIP_KEYS.has(k));
 	const rows: PropertiesPanelRow[] = keys.map((key) => {
