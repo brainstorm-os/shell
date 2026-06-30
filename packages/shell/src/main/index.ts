@@ -75,6 +75,7 @@ import { makeBpRouter } from "./bp/router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
+import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
 import { buildConnectorsServiceDeps } from "./connectors/wiring";
@@ -2542,6 +2543,13 @@ void app.whenReady().then(async () => {
 			},
 			refreshMembership: (entityId, type) => {
 				void getLiveSyncEngine()?.refreshMembership(entityId, type);
+			},
+			// Share-by-name (design 71): the active vault's contacts directory,
+			// rebuilt when the session swaps (contacts are per-vault data).
+			getContactsStore: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return new ContactsStore({ path: contactsStorePath(session.vaultPath) });
 			},
 			now: () => Date.now(),
 		}),

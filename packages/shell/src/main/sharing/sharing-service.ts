@@ -28,12 +28,13 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { ShareInviteToken, SharedMember } from "@brainstorm/sdk-types";
+import type { ShareInviteToken, SharedContact, SharedMember } from "@brainstorm/sdk-types";
 import { RosterRole } from "@brainstorm/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { AccessRole } from "../collab/access-record";
+import type { ContactsStore } from "../collab/contacts-store";
 import { type ShareInvite, verifyShareInvite } from "../collab/share-invite";
 import type { CollabAccessView, CollabRelayLike } from "../collab/sharing-engine";
 import { SharingEngine } from "../collab/sharing-engine";
@@ -58,6 +59,10 @@ export type SharingServiceOptions = {
 	 *  fully-revoked one stops). Wired to `LiveSyncEngine.refreshMembership` in
 	 *  production; absent in unit tests (the loopback proves the bootstrap). */
 	readonly refreshMembership?: (entityId: string, type: string) => void;
+	/** The active vault's contacts directory (share-by-name, design 71). Absent
+	 *  ⇒ the contacts methods + the `contact` share shorthand are unavailable
+	 *  (paste-a-code still works). */
+	readonly getContactsStore?: () => Promise<ContactsStore | null>;
 	readonly now?: () => number;
 };
 
@@ -172,8 +177,58 @@ export function makeEngineHolder(options: {
 	};
 }
 
+/** Resolve a share target to a verified invite: a pasted `invite` token, or a
+ *  saved `contact` pubkey (share-by-name — the stored invite was verified on
+ *  save and is re-verified on read). Fail-closed on neither / an unknown
+ *  contact / no directory. */
+async function resolveInvite(
+	input: Record<string, unknown>,
+	options: SharingServiceOptions,
+): Promise<ShareInvite> {
+	if (typeof input.invite === "string" && input.invite.length > 0) {
+		return decodeInviteToken(input.invite);
+	}
+	if (typeof input.contact === "string" && input.contact.length > 0) {
+		const store = options.getContactsStore ? await options.getContactsStore() : null;
+		if (!store) throw makeError("Unavailable", "sharing: contacts directory unavailable");
+		const contact = await store.get(input.contact);
+		if (!contact) throw makeError("Invalid", `sharing: no saved contact for ${input.contact}`);
+		return contact.invite;
+	}
+	throw makeError("Invalid", "sharing: an invite token or a saved contact is required");
+}
+
 export function makeSharingServiceHandler(options: SharingServiceOptions): ServiceHandler {
 	const engineFor = makeEngineHolder(options);
+
+	async function requireContactsStore(): Promise<ContactsStore> {
+		const store = options.getContactsStore ? await options.getContactsStore() : null;
+		if (!store) throw makeError("Unavailable", "sharing: contacts directory unavailable");
+		return store;
+	}
+
+	/** Save a teammate's pasted invite under a display name so they can later be
+	 *  shared-to by a click (read-tier — a local directory, grants no access). */
+	async function handleSaveContact(envelope: Envelope): Promise<SharedContact> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		const input = (envelope.args[0] ?? {}) as Record<string, unknown>;
+		const invite = decodeInviteToken(input.invite);
+		const displayName = typeof input.displayName === "string" ? input.displayName : "";
+		const store = await requireContactsStore();
+		const contact = await store.add(displayName || invite.label, invite);
+		return { pubkey: contact.invite.userPubB64, displayName: contact.displayName };
+	}
+
+	/** The saved contacts directory for the share-by-name picker (read-tier). */
+	async function handleListContacts(envelope: Envelope): Promise<SharedContact[]> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		const store = options.getContactsStore ? await options.getContactsStore() : null;
+		if (!store) return [];
+		return (await store.list()).map((c) => ({
+			pubkey: c.invite.userPubB64,
+			displayName: c.displayName,
+		}));
+	}
 
 	async function handleCreateInvite(envelope: Envelope): Promise<ShareInviteToken> {
 		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
@@ -187,7 +242,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		const entityId = typeof input.entityId === "string" ? input.entityId : "";
 		const type = typeof input.type === "string" ? input.type : "";
 		if (!entityId || !type) throw makeError("Invalid", "sharing.share: entityId + type required");
-		const invite = decodeInviteToken(input.invite);
+		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
 		const view = await engineFor().share({ entityId, type, invite, role });
 		options.refreshMembership?.(entityId, type);
@@ -202,7 +257,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		if (!entityId || !type) {
 			throw makeError("Invalid", "sharing.shareCollection: entityId + type required");
 		}
-		const invite = decodeInviteToken(input.invite);
+		const invite = await resolveInvite(input, options);
 		const role = parseRole(input.role);
 		const view = await engineFor().shareCollection({ entityId, type, invite, role });
 		options.refreshMembership?.(entityId, type);
@@ -239,6 +294,10 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 				return await handleShare(envelope);
 			case "shareCollection":
 				return await handleShareCollection(envelope);
+			case "saveContact":
+				return await handleSaveContact(envelope);
+			case "listContacts":
+				return await handleListContacts(envelope);
 			case "revoke":
 				return await handleRevoke(envelope);
 			case "access":

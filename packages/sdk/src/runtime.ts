@@ -97,6 +97,7 @@ import type {
 	SelectionSnapshot,
 	SettingsService,
 	ShareInviteToken,
+	SharedContact,
 	SharedMember,
 	SharingService,
 	ShortcutDeclaration,
@@ -1012,6 +1013,10 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "share", [input], ["sharing.share"]),
 		shareCollection: (input) =>
 			callService<SharedMember[]>(bridge, "sharing", "shareCollection", [input], ["sharing.share"]),
+		saveContact: (input) =>
+			callService<SharedContact>(bridge, "sharing", "saveContact", [input], ["sharing.read"]),
+		listContacts: () =>
+			callService<SharedContact[]>(bridge, "sharing", "listContacts", [], ["sharing.read"]),
 		revoke: (input) =>
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
