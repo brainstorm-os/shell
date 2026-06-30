@@ -49,6 +49,7 @@ import { createGeminiProvider } from "./ai/gemini-provider";
 import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
 import { ProviderRegistry } from "./ai/provider-registry";
+import { maskAppWindowsForLock } from "./apps/app-window-lock";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
 import { validateManifest } from "./apps/manifest";
 import { appSelfManagesTabs } from "./apps/window-container";
@@ -2413,15 +2414,11 @@ void app.whenReady().then(async () => {
 			const launcher = launchSetup.getLauncherSync();
 			// Warm-kept (parked) renderers hold the now-locked session's data in
 			// memory — tear them down on lock rather than just hiding them (they'd
-			// otherwise be revealed by the unlock show-loop below). Visible windows
-			// are masked/revealed as before.
+			// otherwise be revealed by the unlock show-loop). Visible windows are
+			// hidden + told to conceal (the renderer-overlay backstop) and revealed
+			// on unlock — see `maskAppWindowsForLock`.
 			if (locked) launcher?.evictAllParked();
-			for (const view of launcher?.allContainers() ?? []) {
-				const base = view.container.baseWindow;
-				if (base.isDestroyed()) continue;
-				if (locked) base.hide();
-				else revealWindow(base);
-			}
+			maskAppWindowsForLock(launcher, locked, revealWindow);
 			if (locked && dashboardWindow && !dashboardWindow.isDestroyed()) dashboardWindow.focus();
 		},
 	});

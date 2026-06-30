@@ -52,6 +52,7 @@ import type {
 import { MOTION_DURATION_ENTRANCE_MS } from "@brainstorm/sdk/motion";
 import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm/tokens";
 import { contextBridge, ipcRenderer } from "electron";
+import { setAppLockOverlay } from "./app-lock-overlay";
 import { APP_THEME_STYLE_ID, appIconVarPairs, buildAppIconVarsCss } from "./app-theme";
 import { createEntitySubscriptionHub } from "./entities-subscribe";
 
@@ -158,6 +159,17 @@ const { runtime, emitter, setLocale, setFormat } = buildRuntimeWithEmitter({ han
 // Channel must match `APP_LOCALE_CHANGED_CHANNEL` in `main/ipc/dashboard-handlers.ts`.
 ipcRenderer.on("app:locale-changed", (_event, locale: string) => {
 	if (typeof locale === "string" && locale.length > 0) setLocale(locale);
+});
+
+// Stage 13.8 — conceal this app's content when the vault locks (defense-in-
+// depth). The main process also hides the whole app window (`base.hide()`, the
+// primary mask), but a sandboxed app window has no lock screen of its own, so
+// if that hide ever races / fails the user's data would stay visible. The
+// main-side `onLockChange` pushes this per app tab — the dashboard's
+// `BrowserWindow` broadcast can't reach a `BaseWindow`-hosted app view. Channel
+// must match `APP_LOCK_CHANGED_CHANNEL`.
+ipcRenderer.on("app:lock-changed", (_event, payload: { locked?: boolean }) => {
+	setAppLockOverlay(payload?.locked === true);
 });
 
 // 12.15 slice 15f — live regional-format propagation. The format context rides
