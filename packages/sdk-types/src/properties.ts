@@ -206,6 +206,13 @@ export type PropertyDef = {
 	 *  `{braces}`, e.g. `{qty} * {rate}`). Applies to `number + format=formula`;
 	 *  evaluated read-only per entity via `@brainstorm/sdk/formula`. */
 	formula?: string;
+	/** Effective domain of this def. Omitted (the default) means an unscoped
+	 *  vault-global property — today's behavior. `{ kind: "list", target }`
+	 *  makes it a **collection overlay**: every entity that is a member of the
+	 *  target List inherits this property (the book → Horror/Fantasy
+	 *  inheritance). Resolved per-render against List membership; precedence is
+	 *  entity > list > type > user > org (see `Scope`). */
+	scope?: Scope;
 };
 
 // ─── Stored-value shapes ─────────────────────────────────────────────────────

@@ -825,6 +825,11 @@ body[data-nav-open="false"] .sidebar {
 .content-row[data-view-mode="list"],
 .content-row[data-view-mode="icon-list"] {
 	box-sizing: border-box;
+	/* Reserve a leading gutter for the hover-revealed drag grip so it parks
+	 * clear of the icon/name instead of overlaying it (DND-grip-1). Tile
+	 * modes render the row as a card and hide the grip, so they keep the
+	 * base padding. */
+	padding-inline-start: var(--space-5);
 }
 .content-row[data-view-mode="list"] {
 	height: 35px;
@@ -862,35 +867,19 @@ body[data-nav-open="false"] .sidebar {
 	opacity: 0.4;
 }
 
-/* Cross-app drag grip (DND-4) — a hover-revealed handle pinned to the row's
- * left gutter; the pointer-driven shell drag session starts here, so it doesn't
- * shift the cell layout and the row body keeps its native move/copy drag. */
+/* Cross-app drag grip (DND-4) — a hover-revealed handle parked in the
+ * leading gutter reserved by the list-row's inline-start padding, CLEAR of
+ * the icon/name so it never overlays the row content (DND-grip-1). The
+ * pointer-driven shell drag session starts here. Box / cursor / transition
+ * come from the shared `.bs-drag-grip` face; here we only park it + raise it
+ * above the row body. (`.content-list` clips overflow-x, so the gutter is
+ * reserved INSIDE the row rather than floating into negative space.) */
 .content-row__drag-grip {
-	position: absolute;
-	left: -2px;
-	top: 50%;
-	transform: translateY(-50%);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 16px;
-	height: 22px;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: var(--text-faint);
-	cursor: grab;
-	opacity: 0;
-	transition: opacity 0.1s ease;
-	touch-action: none;
+	--bs-drag-grip-inset: var(--space-1);
 	z-index: 1;
 }
-.content-row:hover .content-row__drag-grip,
-.content-row__drag-grip:focus-visible {
+.content-row:hover .content-row__drag-grip {
 	opacity: 1;
-}
-.content-row[data-dragging="true"] .content-row__drag-grip {
-	cursor: grabbing;
 }
 
 /* DND-5 — drag a file OUT to the OS. Its own native-draggable handle, pinned to
@@ -1782,6 +1771,9 @@ body:not([data-inspector="open"]) .inspector {
 	display: flex;
 	align-items: flex-end;
 	padding: 0 var(--space-3, var(--space-3)) var(--space-2);
+	/* Align the label with the rows' content start (rows reserve a leading
+	 * grip gutter = margin + inline-start padding), not the bare 12px. */
+	padding-inline-start: calc(var(--space-5) + var(--space-1));
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-semibold);
 	color: var(--text-dim);

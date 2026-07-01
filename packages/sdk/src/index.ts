@@ -95,6 +95,11 @@ export {
 	removeFromList,
 } from "./collections";
 export {
+	type ScopedList,
+	inheritedPropertyDefs,
+	listsContainingEntity,
+} from "./list-scoped-properties";
+export {
 	LIST_ENTITY_TYPE,
 	type ListEntityProperties,
 	entityToList,

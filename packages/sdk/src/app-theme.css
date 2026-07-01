@@ -522,6 +522,45 @@ select {
 }
 
 /* ============================================================
+ * DRAG GRIP — shared structural primitive `.bs-drag-grip`. The
+ * hover-revealed reorder / cross-app drag handle pinned in a list or
+ * table row's LEFT gutter (the six-dot `IconName.DragHandle`). Owns
+ * the box, the grab cursor, the hidden→revealed transition and the
+ * absolute pin so every surface's grip reads + behaves identically —
+ * apps supply only the gutter offset (`--bs-drag-grip-inset`, measured
+ * from the host's inline-start) and the one row-hover reveal selector.
+ * The grip MUST clear its host's leading content — it parks in the
+ * gutter, it never paints over the first cell's glyph / title
+ * (DND-grip-1). Host element is `position: relative` (or absolute).
+ * ============================================================ */
+:root .bs-drag-grip {
+	position: absolute;
+	inset-inline-start: var(--bs-drag-grip-inset, -18px);
+	top: 50%;
+	transform: translateY(-50%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 22px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: grab;
+	opacity: 0;
+	transition: opacity var(--motion-duration-fast, 0.1s) var(--motion-easing-standard, ease);
+	touch-action: none;
+}
+:root .bs-drag-grip:focus-visible {
+	opacity: 1;
+}
+:root [data-dragging="true"] .bs-drag-grip,
+:root .bs-drag-grip:active {
+	cursor: grabbing;
+}
+
+/* ============================================================
  * BUTTONS — canonical glossy primary, same recipe as the shell
  * Button (packages/shell/src/renderer/ui/button.css): 2-colour
  * theme face, no white top band, soft tinted speculars, inset

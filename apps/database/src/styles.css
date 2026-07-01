@@ -969,39 +969,29 @@ body.is-resizing .db-inspector__resize {
 	/* Match the table so rows span the full scroll width and the row
 	 * hover/selection background covers scrolled-in columns. */
 	min-width: 100%;
+	/* Reserve a leading gutter for the hover-revealed drag grip so it parks
+	 * clear of the first cell instead of overlaying the title (DND-grip-1).
+	 * Applied to every row — head / body / foot all share `.dbv-grid__row`,
+	 * so columns stay internally aligned; the grip lives in this gutter. */
+	padding-inline-start: var(--space-4);
 }
 
-/* Cross-app drag grip (DND-4) — a hover-revealed handle pinned to the row's
- * left gutter; the pointer-driven shell drag session starts here, so it doesn't
- * shift the cell layout and the row body keeps its native reorder drag. */
+/* Cross-app drag grip (DND-4) — a hover-revealed handle parked in the leading
+ * gutter every row reserves (`.dbv-grid__row` padding-inline-start), CLEAR of
+ * the first cell so it never overlays the title glyph (DND-grip-1). The gutter
+ * is reserved INSIDE the row (not floated left) because the stage scroll
+ * container clips overflow-x — a negative offset would hide the grip's left
+ * half. The pointer-driven shell drag session starts here, and the row body
+ * keeps its native reorder drag. Box / cursor / transition come from the
+ * shared `.bs-drag-grip` face; here we only park it in the gutter. */
 .dbv-grid__drag-grip {
-	position: absolute;
-	left: 0;
-	top: 50%;
-	transform: translateY(-50%);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 16px;
-	height: 22px;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: var(--text-faint);
-	cursor: grab;
-	opacity: 0;
-	transition: opacity 0.1s ease;
-	touch-action: none;
+	--bs-drag-grip-inset: var(--space-1);
 }
-.dbv-grid__row:hover .dbv-grid__drag-grip,
-.dbv-grid__drag-grip:focus-visible {
+.dbv-grid__row:hover .dbv-grid__drag-grip {
 	opacity: 1;
 }
 .dbv-grid__row[data-dragging="true"] {
 	opacity: 0.5;
-}
-.dbv-grid__row[data-dragging="true"] .dbv-grid__drag-grip {
-	cursor: grabbing;
 }
 
 .dbv-grid[data-density="compact"] .dbv-grid__row {

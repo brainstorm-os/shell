@@ -765,7 +765,7 @@ function ContentRow({
 			>
 				<button
 					type="button"
-					className="content-row__drag-grip"
+					className="bs-drag-grip content-row__drag-grip"
 					draggable={false}
 					aria-label={t("brainstorm.files.row.dragToApp")}
 					data-bs-tooltip={t("brainstorm.files.row.dragToApp")}

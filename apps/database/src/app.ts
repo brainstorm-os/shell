@@ -36,7 +36,7 @@ import "@brainstorm/sdk/virtual-list.css";
 import "@brainstorm/sdk/property-ui/dictionary-editor.css";
 import "@brainstorm/sdk/count-badge.css";
 import { EntityCommentsPanel } from "@brainstorm/editor";
-import { openEntity, quickLookEntity } from "@brainstorm/sdk";
+import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm/sdk";
 import {
 	COLLECTION_TYPE_URL,
 	type Cover,
@@ -1578,11 +1578,13 @@ function renderInspector(state: AppState): void {
 					createElement(InspectorProperties, {
 						entity,
 						// A locked record's property cells paint read-only — `EditableCell`
-						// renders the read-only paint when `onEdit` is absent.
+						// renders the read-only paint when `onEdit` is absent (own AND
+						// inherited collection rows both go read-only).
 						onEdit: recordLocked
 							? undefined
 							: (target, propertyId, value) =>
 									void persistEntityPatch(state, target, { [propertyId]: value }),
+						inheritedDefs: inheritedPropertyDefs(entity.id, state.lists, cachedVaultProperties),
 					}),
 			}),
 		),
@@ -4183,6 +4185,12 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 		},
 		...(list ? { onChangeSource: (types) => updateListSource(state, list.id, types) } : {}),
 		onCreateProperty: (seedName) => openColumnPropertyConstructor(state, view, seedName),
+		// "Add collection property" — only for collections you can manually
+		// add members to (Manual / Hybrid). Creates a list-scoped property that
+		// every member inherits (surfaced in their inspectors), not a column.
+		...(list && deriveListMode(list) !== ListMode.Query
+			? { onCreateCollectionProperty: () => openCollectionPropertyConstructor(state, list) }
+			: {}),
 		onChange: (patch) => {
 			if (patch.name) commitViewRename(state, view.id, patch.name);
 			if (patch.kind) {
@@ -4629,6 +4637,25 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			renderActiveView(state);
 			schedulePersist(state);
 			flashStatus(`Added property "${def.name || def.key}"`, "ready");
+		},
+	});
+}
+
+/* List-scoped (collection) property authoring. Mirrors the column constructor
+ * but stamps `scope = { kind: "list", target: listId }` and does NOT attach a
+ * view column — the property is surfaced on member entities via inheritance
+ * (`inheritedPropertyDefs`), not as a column on this list's grid. */
+function openCollectionPropertyConstructor(state: AppState, list: List): void {
+	openInlinePropertyForm({
+		labels: { ...INLINE_PROPERTY_FORM_LABELS, region: "New collection property" },
+		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
+		onCommit: async ({ def, dictionary }) => {
+			const scoped: PropertyDef = { ...def, scope: { kind: "list", target: list.id } };
+			if (!(await persistNewPropertyDef(scoped, dictionary))) return;
+			await loadVaultProperties(state);
+			renderActiveView(state);
+			schedulePersist(state);
+			flashStatus(`Added "${scoped.name || scoped.key}" to this collection`, "ready");
 		},
 	});
 }

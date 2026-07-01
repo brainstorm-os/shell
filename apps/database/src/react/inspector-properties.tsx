@@ -29,12 +29,21 @@ const SKIP_KEYS: ReadonlySet<string> = new Set(["title", "name", "cover"]);
 export function InspectorProperties({
 	entity,
 	onEdit,
+	inheritedDefs = [],
 }: {
 	entity: EntityRow;
-	/** Absent ⇒ the record is read-only (locked): every cell paints read-only. */
+	/** Absent ⇒ the record is read-only (locked): every cell paints read-only.
+	 *  Passed straight to each `EditableCell`, so a locked record's inherited
+	 *  collection rows render read-only too. */
 	onEdit: EntityPropertyEdit | undefined;
+	/** Collection-scoped (list overlay) defs the entity inherits from the
+	 *  collections it belongs to — resolved by the caller via
+	 *  `inheritedPropertyDefs`. Rendered as editable rows after the entity's own
+	 *  properties; an own value for the same key wins (entity > list). */
+	inheritedDefs?: readonly PropertyDef[];
 }): ReactElement {
 	const keys = Object.keys(entity.properties).filter((k) => !SKIP_KEYS.has(k));
+	const ownKeys = new Set(keys);
 	const rows: PropertiesPanelRow[] = keys.map((key) => {
 		// One effective def drives both the label and the editing cell: a
 		// user-created property has a generated key (`prop_<…>`) but a real
@@ -55,5 +64,17 @@ export function InspectorProperties({
 			),
 		};
 	});
+	// Inherited collection properties the entity doesn't already carry a value
+	// for. Editing one writes to the entity's own bag (held on leave).
+	for (const def of inheritedDefs) {
+		if (ownKeys.has(def.key)) continue;
+		rows.push({
+			def,
+			value: readPropertyPath(entity, def.key),
+			valueNode: (
+				<EditableCell entity={entity} propertyId={def.key} def={def} layout="cell" onEdit={onEdit} />
+			),
+		});
+	}
 	return <PropertiesPanel title="" hideHeader rows={rows} entityId={entity.id} />;
 }

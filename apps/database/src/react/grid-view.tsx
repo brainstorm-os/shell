@@ -885,7 +885,7 @@ const GridRow = memo(function GridRow({
 		>
 			<button
 				type="button"
-				className="dbv-grid__drag-grip"
+				className="bs-drag-grip dbv-grid__drag-grip"
 				draggable={false}
 				aria-label={t("brainstorm.database.row.drag")}
 				data-bs-tooltip={t("brainstorm.database.row.drag")}

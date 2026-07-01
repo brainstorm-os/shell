@@ -89,6 +89,10 @@ export type ViewSettingsProps = {
 	 *  attachment via `onChange({columns: ...})`. Omitted → the
 	 *  "Create new" option is hidden (legacy column-add only). */
 	onCreateProperty?: (seedName: string) => void;
+	/** Host hook for "+ Add collection property" — present only for collections
+	 *  you can manually add members to. Creates a list-scoped property every
+	 *  member inherits (surfaced in inspectors), not a view column. */
+	onCreateCollectionProperty?: () => void;
 	/** Rollup creation (9.12.17). Present only when the list has ≥1 relation
 	 *  to roll up across; drives the relation → target-property → aggregation
 	 *  picker on the Properties page and appends the resulting computed column. */
@@ -881,6 +885,18 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 		formulaBtn.textContent = "Add formula…";
 		formulaBtn.addEventListener("click", () => navigate(SettingsPage.Formula));
 		body.appendChild(formulaBtn);
+	}
+
+	// "Add collection property…" — a property scoped to this collection that
+	// every member inherits (surfaced in member inspectors, not as a column).
+	if (props.onCreateCollectionProperty) {
+		const collBtn = document.createElement("button");
+		collBtn.type = "button";
+		collBtn.className = "db-popover__add-column";
+		collBtn.dataset.testid = "db-view-settings-add-collection-property";
+		collBtn.textContent = "Add collection property…";
+		collBtn.addEventListener("click", () => props.onCreateCollectionProperty?.());
+		body.appendChild(collBtn);
 	}
 }
 
