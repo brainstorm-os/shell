@@ -19,6 +19,7 @@ vi.mock("@brainstorm/sdk/object-menu", () => ({
 	openObjectMenu: vi.fn(),
 	closeObjectMenu: vi.fn(),
 	ObjectMenuMoreButton: () => null,
+	ObjectMenuTrigger: ({ children }: { children: unknown }) => children,
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -12,7 +12,7 @@
  */
 
 import { IconName } from "../icon/icon-registry";
-import { type ContextMenuItem, type IconParam, openContextMenu, sdkMenuIcon } from "../menus";
+import { type ContextMenuItem, blankMenuIcon, openContextMenu, sdkMenuIcon } from "../menus";
 
 export type SelectMenuOption<T extends string = string> = {
 	value: T;
@@ -35,10 +35,6 @@ export type OpenSelectMenuParams<T extends string> = {
 	onSelect(next: T): void;
 };
 
-/** Keeps the fixed icon column on rows that don't carry the check, so every
- *  label starts at the same x. One shared param so row identity is stable. */
-const BLANK_ICON: IconParam = { icon: () => null };
-
 /** Open the option list for a select control. Returns false (a no-op) when
  *  no menu host is mounted, mirroring `openContextMenu`. */
 export function openSelectMenu<T extends string>(params: OpenSelectMenuParams<T>): boolean {
@@ -53,7 +49,7 @@ export function openSelectMenu<T extends string>(params: OpenSelectMenuParams<T>
 		items.push({
 			id: `option:${index}`,
 			label: option.label,
-			icon: selected ? sdkMenuIcon(IconName.Check) : BLANK_ICON,
+			icon: selected ? sdkMenuIcon(IconName.Check) : blankMenuIcon,
 			...(selected ? { selected: true } : {}),
 			...(option.disabled === true ? { disabled: true } : {}),
 			onSelect: () => params.onSelect(option.value),
@@ -63,5 +59,7 @@ export function openSelectMenu<T extends string>(params: OpenSelectMenuParams<T>
 	return openContextMenu({ x: rect.left, y: rect.bottom }, items, {
 		menuLabel: params.menuLabel,
 		anchor: params.anchor,
+		// Never render the popup narrower than the trigger it dropped from.
+		minWidth: rect.width,
 	});
 }

@@ -52,7 +52,7 @@ function MemoryRow({
 			{editing ? (
 				<input
 					type="text"
-					className="agent-memory__edit"
+					className="bs-input bs-input--sm agent-memory__edit"
 					value={draft}
 					onChange={(e) => setDraft(e.target.value)}
 					onBlur={commit}

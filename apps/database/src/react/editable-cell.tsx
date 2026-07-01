@@ -31,6 +31,7 @@ export function EditableCell({
 	entity,
 	propertyId,
 	def,
+	suggestions,
 	layout,
 	onEdit,
 	autoEdit,
@@ -41,6 +42,10 @@ export function EditableCell({
 	/** The effective def for this column (catalog or inferred); `null` ⇒
 	 *  render read-only. Computed once per column by the view. */
 	def: PropertyDef | null;
+	/** Existing distinct values for a select-like text column — the cell edits
+	 *  them as a type-or-pick combobox (DS-cell-combobox-1). Absent ⇒ plain
+	 *  inline editor. */
+	suggestions?: readonly string[] | undefined;
 	layout: "cell" | "inline";
 	onEdit: EntityPropertyEdit | undefined;
 	/** Keyboard begin-editing signal (the grid's Enter-to-edit, 12.4); the SDK
@@ -68,6 +73,7 @@ export function EditableCell({
 			readOnly={false}
 			noteId={entity.id}
 			siblings={entity.properties}
+			{...(suggestions !== undefined ? { suggestions } : {})}
 			{...(autoEdit !== undefined ? { autoEdit } : {})}
 			{...(onAutoEditHandled !== undefined ? { onAutoEditHandled } : {})}
 		/>

@@ -2090,17 +2090,16 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 						onClick={toggleNav}
 						labels={{ show: t("tasks.header.sidebar.show"), hide: t("tasks.header.sidebar.hide") }}
 					/>
-					{openTaskRecord && propertiesSvc ? (
-						<PanelToggleButton
-							side={PanelSide.Right}
-							open={propsOpen}
-							onClick={toggleProps}
-							labels={{
-								show: t("tasks.header.inspector.show"),
-								hide: t("tasks.header.inspector.hide"),
-							}}
-						/>
-					) : null}
+					<PanelToggleButton
+						side={PanelSide.Right}
+						open={propsOpen}
+						onClick={toggleProps}
+						disabled={!openTaskRecord || !propertiesSvc}
+						labels={{
+							show: t("tasks.header.inspector.show"),
+							hide: t("tasks.header.inspector.hide"),
+						}}
+					/>
 					{openTaskRecord ? (
 						<LockButton
 							locked={!!openTaskRecord.locked}

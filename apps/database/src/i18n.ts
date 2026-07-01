@@ -79,6 +79,31 @@ const DEFAULTS = {
 	// Read-only record lock (inspector header toggle)
 	"brainstorm.database.record.lock": "Lock record (read-only)",
 	"brainstorm.database.record.unlock": "Unlock record",
+
+	// Object / list menu actions (legacy app.ts strings migrated onto t())
+	"brainstorm.database.menu.copyEmbedLink": "Copy embed link",
+	"brainstorm.database.menu.export": "Export…",
+	"brainstorm.database.menu.importContacts": "Import contacts (vCard / CSV)…",
+	"brainstorm.database.menu.addToCollectionRegion": "Add to collection",
+	// Filter menu
+	"brainstorm.database.filter.addRule": "Add filter rule",
+	"brainstorm.database.filter.addAnother": "Add another rule",
+	"brainstorm.database.filter.addNestedGroup": "Add nested group",
+	"brainstorm.database.filter.clear": "Clear filter",
+	"brainstorm.database.filter.addRuleToGroup": "Add rule to group",
+	"brainstorm.database.filter.addAnotherToGroup": "Add another rule to group",
+	"brainstorm.database.filter.removeGroup": "Remove group",
+	"brainstorm.database.filter.removeRule": "Remove filter",
+	"brainstorm.database.filter.editValue": "Edit value…",
+	"brainstorm.database.filter.dateValuePlaceholder": "a value…",
+	"brainstorm.database.filter.dateNow": "now",
+	// Sort menu
+	"brainstorm.database.sort.clear": "Clear sort",
+	// New-collection menu
+	"brainstorm.database.collection.newBlank": "Blank collection",
+	"brainstorm.database.collection.newFromObjects": "From existing objects…",
+	"brainstorm.database.collection.newFromCsv": "Import from CSV…",
+	"brainstorm.database.collection.newMenuLabel": "New collection",
 } as const;
 
 export type DatabaseManifest = typeof DEFAULTS;

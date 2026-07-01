@@ -31,6 +31,7 @@ import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/n
 import {
 	type ObjectMenuExtraItem,
 	type ObjectMenuRuntime,
+	ObjectMenuTrigger,
 	type OpenObjectMenuOptions,
 	closeObjectMenu,
 	openAnchoredMenu,
@@ -780,7 +781,9 @@ export function BooksApp(): ReactElement {
 			<header className="app-header">
 				<div className="app-header__left">
 					<NavButtons history={nav} onNavigate={applyLocation} />
-					<h1 className="app-header__title">{title}</h1>
+					<ObjectMenuTrigger context={menuContext} moreActionsLabel={t("menu.more")} noMoreButton>
+						<h1 className="app-header__title">{title}</h1>
+					</ObjectMenuTrigger>
 					{isSample ? <span className="books__preview-badge">{t("reader.previewBadge")}</span> : null}
 				</div>
 				<div className="app-header__right">

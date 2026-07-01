@@ -136,7 +136,14 @@
 	--border-subtle: var(--color-border-subtle);
 	--border-strong: var(--color-border-default);
 	--edge: var(--color-border-strong);
-	--hover: var(--color-interactive-hover);
+	/* Interactive hover follows the accent scheme, not neutral grey: a faint
+	 * accent tint (fainter than the ~12% accent-subtle SELECTED fill), derived
+	 * from `--accent` so it themes per wallpaper. Product-wide default for every
+	 * app's row / list / menu / sidebar hover — dogfood F-313 promoted it from a
+	 * Database-only override to the shared token so hovers read on-scheme
+	 * everywhere. `--color-interactive-hover` (neutral) stays available for the
+	 * rare surface that wants grey. */
+	--hover: color-mix(in srgb, var(--accent) 7%, transparent);
 	--active: var(--color-interactive-active);
 	--selected: var(--color-interactive-active);
 	--accent: var(--color-accent-default);

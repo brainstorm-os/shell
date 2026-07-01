@@ -1,8 +1,6 @@
 {
   "files": [
     "apps/agent/src/app.tsx",
-    "apps/agent/src/conversation-settings-popover.tsx",
-    "apps/agent/src/memory-popover.tsx",
     "apps/automations/src/ui/reminders-view.tsx",
     "apps/automations/src/ui/workflow-builder.tsx",
     "apps/browser/src/app.tsx",

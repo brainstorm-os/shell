@@ -438,6 +438,7 @@ export function WhiteboardApp(): ReactElement {
 				label: t("whiteboard.arrange.alignBottom"),
 				onSelect: () => e?.alignSelection(AlignKind.Bottom),
 			},
+			{ divider: true },
 			{
 				label: t("whiteboard.arrange.distributeH"),
 				onSelect: () => e?.distributeSelection(DistributeAxis.Horizontal),
@@ -446,10 +447,12 @@ export function WhiteboardApp(): ReactElement {
 				label: t("whiteboard.arrange.distributeV"),
 				onSelect: () => e?.distributeSelection(DistributeAxis.Vertical),
 			},
+			{ divider: true },
 			{ label: t("whiteboard.arrange.toFront"), onSelect: () => e?.applyZOrder(ZOrderOp.ToFront) },
 			{ label: t("whiteboard.arrange.forward"), onSelect: () => e?.applyZOrder(ZOrderOp.Forward) },
 			{ label: t("whiteboard.arrange.backward"), onSelect: () => e?.applyZOrder(ZOrderOp.Backward) },
 			{ label: t("whiteboard.arrange.toBack"), onSelect: () => e?.applyZOrder(ZOrderOp.ToBack) },
+			{ divider: true },
 			{ label: t("whiteboard.arrange.lock"), onSelect: () => e?.setSelectionLocked(true) },
 			{ label: t("whiteboard.arrange.unlock"), onSelect: () => e?.setSelectionLocked(false) },
 		];

@@ -11,6 +11,7 @@ vi.mock("@brainstorm/sdk/menus", () => ({
 	MenuAlign: { Start: "start", End: "end" },
 	openContextMenu: vi.fn(() => true),
 	sdkMenuIcon: vi.fn(() => ({ icon: () => null })),
+	blankMenuIcon: { icon: () => null },
 }));
 vi.mock("@brainstorm/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 vi.mock("@brainstorm/sdk/color-picker", () => ({ openColorPicker: vi.fn() }));

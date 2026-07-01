@@ -36,7 +36,7 @@ export { BrainstormMenuProvider, type BrainstormMenuProviderProps } from "./prov
 export { mountMenuHost, type MountMenuHostOptions } from "./mount-host";
 export { DEFAULT_MENU_LOCALE, type MenuLocale, resolveMenuLocale } from "./locale";
 export { getActiveMenuStore } from "./active-store";
-export { sdkMenuIcon } from "./sdk-icon";
+export { sdkMenuIcon, blankMenuIcon } from "./sdk-icon";
 export {
 	CONTEXT_MENU_ID,
 	CONTEXT_SUBMENU_ID,

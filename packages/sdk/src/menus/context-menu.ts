@@ -207,6 +207,10 @@ export type OpenContextMenuOptions = {
 	 *  for a right-positioned trigger so the menu's right edge sticks to the
 	 *  trigger's right edge. */
 	align?: MenuAlign;
+	/** Floor the menu's width (px). A select popup passes its trigger's width
+	 *  so the dropdown is never narrower than the control it fell from (which
+	 *  reads as detached). Omit for content-width menus. */
+	minWidth?: number;
 };
 
 // fancy-menus positions from the STATIC config (`open.config.position`), not
@@ -344,6 +348,7 @@ export function openContextMenu(
 	store.open(config.id, {
 		data: { items },
 		...(anchor ? { element: anchor } : { rect: anchorRectAt(point) }),
+		...(options?.minWidth ? { position: { minWidth: options.minWidth } } : {}),
 	});
 	if (anchor) markTriggerOpen(anchor, config.id);
 	else clearActiveTrigger();
