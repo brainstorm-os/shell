@@ -189,7 +189,7 @@ export function SortMenuPopover({
 						</button>
 					);
 				})}
-				<div className="sort-menu__divider" role="separator" tabIndex={0} />
+				<div className="sort-menu__divider" aria-hidden="true" />
 				<button
 					type="button"
 					role="menuitem"
@@ -208,7 +208,7 @@ export function SortMenuPopover({
 							: t("brainstorm.files.sort.directionDesc")}
 					</span>
 				</button>
-				<div className="sort-menu__divider" role="separator" tabIndex={0} />
+				<div className="sort-menu__divider" aria-hidden="true" />
 				<div className="sort-menu__heading" role="presentation">
 					{t("brainstorm.files.group.label")}
 				</div>
@@ -232,7 +232,7 @@ export function SortMenuPopover({
 						</button>
 					);
 				})}
-				<div className="sort-menu__divider" role="separator" tabIndex={0} />
+				<div className="sort-menu__divider" aria-hidden="true" />
 				<div className="sort-menu__heading" role="presentation">
 					{t("brainstorm.files.tileSize.label")}
 				</div>
@@ -256,7 +256,7 @@ export function SortMenuPopover({
 						</button>
 					);
 				})}
-				<div className="sort-menu__divider" role="separator" tabIndex={0} />
+				<div className="sort-menu__divider" aria-hidden="true" />
 				<div className="sort-menu__heading" role="presentation">
 					{t("brainstorm.files.columns.label")}
 				</div>
@@ -280,7 +280,7 @@ export function SortMenuPopover({
 						</button>
 					);
 				})}
-				<div className="sort-menu__divider" role="separator" tabIndex={0} />
+				<div className="sort-menu__divider" aria-hidden="true" />
 				<button
 					type="button"
 					role="menuitem"

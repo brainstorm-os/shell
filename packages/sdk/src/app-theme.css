@@ -92,20 +92,43 @@
  * opt-out. An input that genuinely wants a ring opts in explicitly below
  * (`.bs-find-bar__input:focus-visible`), and those (0,0,3,0) still win.
  * `:root …` gives this (0,0,2,0) so it beats the single-class `outline: none`
- * resets some components carry on their buttons. */
-:root :focus-visible:not([contenteditable]):not(input):not(textarea):not(select) {
+ * resets some components carry on their buttons.
+ *
+ * That last property cut BOTH ways (F-374): this rule's specificity (0,3,3 —
+ * `:root :focus-visible` + one attr `:not`, three type `:not`s) also overrode
+ * legitimate per-app `outline: none` opt-outs on COMPOSITE-WIDGET CONTAINERS and
+ * resize handles, painting a 2px inset rectangle around whole regions — a
+ * 1100×2600 grid, a full file list, a 6px resize bar. A `grid` / `listbox` /
+ * `tablist` / `tree` / `toolbar` / `menu` / `radiogroup` is a single
+ * roving-tabindex tab stop whose ARIA focus shows on the ACTIVE DESCENDANT (the
+ * selected cell / option / tab), never as a frame on the container; a resize
+ * `separator` shows a box-shadow ring (below); a scroll container opts out with
+ * `data-focus-ring="none"`. Excluding those here lets their own suppression win;
+ * the companion rule right after re-suppresses the UA-default ring (the macOS
+ * accent colour) the exclusion would otherwise expose. */
+:root
+	:focus-visible:not([contenteditable]):not(input):not(textarea):not(select):not([role="grid"]):not([role="treegrid"]):not([role="listbox"]):not([role="tree"]):not([role="tablist"]):not([role="toolbar"]):not([role="menu"]):not([role="menubar"]):not([role="radiogroup"]):not([role="tabpanel"]):not([role="separator"]):not([data-focus-ring="none"]) {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -2px;
 }
+/* Suppress the UA-default ring the exclusion above exposes on those containers.
+ * Same (0,3,3)+`:is()` = (0,4,3) shape as the ring rule so it can't be undercut,
+ * and `outline: none` is explicit so the macOS accent ring can't leak through.
+ * The active-descendant styling each widget already carries is the real focus
+ * indicator. */
+:root :focus-visible:not([contenteditable]):not(input):not(textarea):not(select):is([role="grid"], [role="treegrid"], [role="listbox"], [role="tree"], [role="tablist"], [role="toolbar"], [role="menu"], [role="menubar"], [role="radiogroup"], [role="tabpanel"], [data-focus-ring="none"]) {
+	outline: none;
+}
 
-/* F-272 — window-splitter (resize-handle) keyboard focus ring. Every resize
- * handle is `role="separator" aria-orientation="vertical"` and keyboard-operable
- * (the shared `useResizable`: ←/→ move, Home/End snap, dbl-click reset), so it
- * stays a tab stop. Per-app handle CSS suppresses the outline because a thin
- * inset outline reads poorly on a ~6px bar; give the bar a clearly-visible
- * box-shadow ring instead — one rule, every app (Files / Notes / Journal / …),
- * independent of those `outline: none` opt-outs. */
-[role="separator"][aria-orientation="vertical"]:focus-visible {
+/* F-272 / F-374 — resize-handle (window-splitter) keyboard focus ring. Every
+ * handle is a keyboard-operable `role="separator"` tab stop (the shared
+ * `useResizable`: ←/→ move, Home/End snap, dbl-click reset). A thin inset outline
+ * reads poorly on a ~6px bar, so separators are excluded from the ring rule
+ * above and get a box-shadow ring here instead — one rule, every app, no per-app
+ * opt-out to forget. `:root` lifts it over the ring rule; handles without an
+ * `aria-orientation` (e.g. Bookmarks) fall back to their own focus style. */
+:root [role="separator"]:focus-visible {
+	outline: none;
 	box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
