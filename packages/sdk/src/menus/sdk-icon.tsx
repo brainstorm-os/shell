@@ -13,6 +13,12 @@
 import type { IconComponent, IconParam } from "@react-fancy-menus/core";
 import { Icon, type IconName } from "../icon";
 
+/** A no-op icon that reserves a row's leading icon column so labels stay
+ *  aligned in a "pick one of N" list where only the selected row shows a
+ *  check. Shared by the select / multi-select / anchored menus so none of
+ *  them re-declares its own blank. */
+export const blankMenuIcon: IconParam = { icon: () => null };
+
 const CACHE = new Map<IconName, IconParam>();
 
 export function sdkMenuIcon(name: IconName): IconParam {

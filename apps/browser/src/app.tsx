@@ -719,6 +719,9 @@ export function BrowserApp(): ReactElement {
 					onSelect: () => navigateTo(visit.url),
 				});
 			}
+			// Fence the destructive Clear off from the navigable history rows so
+			// it can't be fat-fingered (mirrors the object-menu Remove fence).
+			items.push({ divider: true });
 			items.push({
 				label: t("history.clear"),
 				icon: IconName.Trash,

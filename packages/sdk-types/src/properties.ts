@@ -541,4 +541,11 @@ export type CellProps<V extends ValueType = ValueType> = {
 	 *  for hosts that render a single value in isolation; the formula cell then
 	 *  shows a "no context" state. Optional → existing cells are unaffected. */
 	siblings?: Readonly<Record<string, unknown>>;
+	/** Existing distinct values for this property across the host's collection,
+	 *  supplied by hosts that can enumerate a column (the Database grid) for
+	 *  select-like text columns that have no catalog vocabulary. A scalar text
+	 *  cell turns these into a type-or-pick combobox (filter the existing values
+	 *  or commit a new one) instead of a bare text field. Absent / empty ⇒ the
+	 *  cell stays a plain inline input, so existing consumers are unaffected. */
+	suggestions?: readonly string[];
 };

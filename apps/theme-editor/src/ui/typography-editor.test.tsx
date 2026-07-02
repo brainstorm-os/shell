@@ -10,6 +10,7 @@ import { TypographyEditor } from "./typography-editor";
 vi.mock("@brainstorm/sdk/menus", () => ({
 	openContextMenu: vi.fn(() => true),
 	sdkMenuIcon: vi.fn(() => ({ icon: () => null })),
+	blankMenuIcon: { icon: () => null },
 }));
 
 const t = (key: string) => key;

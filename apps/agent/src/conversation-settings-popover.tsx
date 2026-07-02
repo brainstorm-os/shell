@@ -182,7 +182,7 @@ export function ConversationSettingsPopover({
 							type="number"
 							min={0}
 							step={100}
-							className="agent-settings__budget-input"
+							className="bs-input"
 							defaultValue={settings.tokenBudget ?? ""}
 							placeholder={t("settings.budget.placeholder")}
 							onChange={(e) => onBudgetInput(e.target.value)}

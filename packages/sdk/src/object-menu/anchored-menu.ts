@@ -17,11 +17,12 @@
  */
 
 import { createIconElement } from "../icon/create-icon-element";
-import type { IconName } from "../icon/icon-registry";
+import { IconName } from "../icon/icon-registry";
 import {
 	type ContextMenuItem,
 	type IconParam,
 	MenuAlign,
+	blankMenuIcon,
 	closeContextMenu,
 	getActiveMenuStore,
 	openContextMenu,
@@ -48,6 +49,12 @@ export type AnchoredMenuItem = {
 	/** Tooltip (`title`) — used to explain a `disabled` row. */
 	hint?: string;
 	icon?: IconName | IconParam;
+	/** Mark this row as the current choice in a "pick one of N" group. `true`
+	 *  paints a leading check; `false` reserves a blank icon column so every
+	 *  label in the group starts at the same x (no ragged edge when only the
+	 *  selected row carries a glyph). When set, it owns the icon slot (over
+	 *  `icon`); leave undefined for ordinary action rows. */
+	selected?: boolean;
 	/** Render as a non-interactive section heading (the `label` is the
 	 *  heading) — maps straight onto the fancy-menus `RowKind.Section` row
 	 *  the context menu already supports. Skipped in keyboard nav. */
@@ -90,12 +97,16 @@ function toContextItem(item: AnchoredMenuItem, index: number): ContextMenuItem {
 		...(item.submenu ? { submenu: item.submenu.map(toContextItem) } : {}),
 		destructive: item.destructive ?? false,
 		disabled: item.disabled ?? false,
-		// A string `icon` is an SDK `IconName` → rendered through the shared
-		// `<Icon>` bridge (full glyph set + IconPack overrides); an object is a
+		// Icon slot: a `selected` flag (a "pick one of N" group) owns it — check
+		// when chosen, blank column otherwise so labels align. Else a string
+		// `icon` is an SDK `IconName` → rendered through the shared `<Icon>`
+		// bridge (full glyph set + IconPack overrides); an object is a
 		// fancy-menus `IconParam` (a Phosphor component) passed straight through.
-		...(item.icon
-			? { icon: typeof item.icon === "string" ? sdkMenuIcon(item.icon) : item.icon }
-			: {}),
+		...(item.selected !== undefined
+			? { icon: item.selected ? sdkMenuIcon(IconName.Check) : blankMenuIcon }
+			: item.icon
+				? { icon: typeof item.icon === "string" ? sdkMenuIcon(item.icon) : item.icon }
+				: {}),
 	};
 }
 

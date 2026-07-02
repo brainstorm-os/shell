@@ -1749,7 +1749,7 @@ function openAddToCollectionMenu(
 			label: list.name,
 			onSelect: () => toggleEntityInList(state, list.id, entity, true),
 		})),
-		{ menuLabel: "Add to collection" },
+		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion") },
 	);
 }
 
@@ -2131,7 +2131,7 @@ function buildHeaderExtraItems(
 	// loader). No files/entities services required — clipboard-only.
 	items.push({
 		id: "copy-block-ref",
-		label: "Copy embed link",
+		label: t("brainstorm.database.menu.copyEmbedLink"),
 		icon: IconName.Copy,
 		run: async () => {
 			if (await copyListBlockRef(list.id)) {
@@ -2171,7 +2171,7 @@ function buildHeaderExtraItems(
 			.map((c) => c.propertyId);
 		items.push({
 			id: "export",
-			label: "Export…",
+			label: t("brainstorm.database.menu.export"),
 			icon: IconName.Download,
 			run: () =>
 				void openExportPopover({
@@ -2273,7 +2273,7 @@ function buildHeaderExtraItems(
 	if (!source.types.includes(PERSON_TYPE)) return items;
 	items.push({
 		id: "import-contacts",
-		label: "Import contacts (vCard / CSV)…",
+		label: t("brainstorm.database.menu.importContacts"),
 		icon: IconName.Inbox,
 		run: () =>
 			void runImportFlow(
@@ -2651,7 +2651,10 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 	}
 
 	items.push({
-		label: draft.rules.length === 0 ? "Add filter rule" : "Add another rule",
+		label:
+			draft.rules.length === 0
+				? t("brainstorm.database.filter.addRule")
+				: t("brainstorm.database.filter.addAnother"),
 		icon: IconName.Plus,
 		onClick: () => openFilterPropertyMenu(state, anchor, view.id, draft),
 	});
@@ -2659,7 +2662,7 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 	// A new sub-group defaults to the *opposite* join — the reason to
 	// nest is almost always "… AND (x OR y)".
 	items.push({
-		label: "Add nested group",
+		label: t("brainstorm.database.filter.addNestedGroup"),
 		icon: IconName.Plus,
 		onClick: () =>
 			commitFilterDraft(state, view.id, {
@@ -2676,7 +2679,7 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 
 	if (countDraftRules(draft) > 0) {
 		items.push({
-			label: "Clear filter",
+			label: t("brainstorm.database.filter.clear"),
 			icon: IconName.Trash,
 			destructive: true,
 			onClick: () => updateViewFilters(state, view.id, null),
@@ -2733,13 +2736,16 @@ function openFilterGroupMenu(
 	}
 
 	items.push({
-		label: group.rules.length === 0 ? "Add rule to group" : "Add another rule to group",
+		label:
+			group.rules.length === 0
+				? t("brainstorm.database.filter.addRuleToGroup")
+				: t("brainstorm.database.filter.addAnotherToGroup"),
 		icon: IconName.Plus,
 		onClick: () => openFilterPropertyMenu(state, anchor, viewId, draft, groupIndex),
 	});
 
 	items.push({
-		label: "Remove group",
+		label: t("brainstorm.database.filter.removeGroup"),
 		icon: IconName.Trash,
 		destructive: true,
 		onClick: () => replaceGroup(null),
@@ -2844,10 +2850,13 @@ function openFilterOperatorMenu(
 						);
 						const refItems: MenuItem[] = [
 							{
-								label: "a value…",
+								label: t("brainstorm.database.filter.dateValuePlaceholder"),
 								onClick: () => promptInline(anchor, "", (v) => append(v.trim())),
 							},
-							{ label: "now", onClick: () => append("", { kind: "now" }) },
+							{
+								label: t("brainstorm.database.filter.dateNow"),
+								onClick: () => append("", { kind: "now" }),
+							},
 							...cols.map((c) => ({
 								label: `property: ${colLabel(c.propertyId)}`,
 								onClick: () => append("", { kind: "prop", propertyId: c.propertyId }),
@@ -3133,7 +3142,7 @@ function openSortMenu(state: AppState, anchor: HTMLElement): void {
 	});
 	if (current) {
 		items.push({
-			label: "Clear sort",
+			label: t("brainstorm.database.sort.clear"),
 			icon: IconName.Trash,
 			destructive: true,
 			onClick: () => updateViewSorts(state, view.id, []),
@@ -3291,7 +3300,7 @@ function openFilterRulePillMenu(
 	const items: MenuItem[] = [];
 	if (opNeedsValue(rule.op)) {
 		items.push({
-			label: "Edit value…",
+			label: t("brainstorm.database.filter.editValue"),
 			icon: IconName.Pencil,
 			onClick: () =>
 				pickRuleValue(anchor, rule.propertyId, rule.op, rule.value, (value) =>
@@ -3305,7 +3314,7 @@ function openFilterRulePillMenu(
 		onClick: () => openFilterPillConditionMenu(state, anchor, viewId, draft, index),
 	});
 	items.push({
-		label: "Remove filter",
+		label: t("brainstorm.database.filter.removeRule"),
 		icon: IconName.Trash,
 		destructive: true,
 		onClick: () =>
@@ -3682,19 +3691,19 @@ function beginNewList(state: AppState, anchor: HTMLElement): void {
 		{ x: rect.left, y: rect.bottom },
 		[
 			{
-				label: "Blank collection",
+				label: t("brainstorm.database.collection.newBlank"),
 				onSelect: () => createListWithSource(state, "New collection", null, []),
 			},
 			{
-				label: "From existing objects…",
+				label: t("brainstorm.database.collection.newFromObjects"),
 				onSelect: () => openExistingTypesPicker(state, anchor),
 			},
 			{
-				label: "Import from CSV…",
+				label: t("brainstorm.database.collection.newFromCsv"),
 				onSelect: () => void importCsvAsCollection(state),
 			},
 		],
-		{ menuLabel: "New collection", anchor },
+		{ menuLabel: t("brainstorm.database.collection.newMenuLabel"), anchor },
 	);
 }
 

@@ -77,6 +77,7 @@ import {
 	defaultAggregationFor,
 	formatAggregation,
 } from "../logic/aggregations";
+import { columnValueSuggestions } from "../logic/column-suggestions";
 import type { CompiledView } from "../logic/compile-view";
 import { dragItemsForRow } from "../logic/drag-items";
 import { effectiveColumnDef } from "../logic/effective-def";
@@ -227,6 +228,28 @@ export function GridView(props: GridViewProps): ReactElement {
 		}
 		return map;
 	}, [visible, compiled.rows, hasEdit]);
+
+	// Type-or-pick combobox source (DS-cell-combobox-1): the distinct existing
+	// values for each select-like editable Text column (no catalog vocabulary),
+	// so a status/select cell edits against the values already in use instead of
+	// a bare text field. `columnValueSuggestions` self-gates to enumerable
+	// columns, so prose / identifier columns stay plain text. Sourced from the
+	// UNFILTERED collection (`allRows`, else the compiled rows when the host
+	// gives no full set) — `CellProps.suggestions` is the whole collection's
+	// values, so an active filter must not shrink the pick list.
+	const suggestionRows = props.allRows ?? compiled.rows;
+	const columnSuggestions = useMemo<ReadonlyMap<string, readonly string[]>>(() => {
+		const map = new Map<string, readonly string[]>();
+		if (!hasEdit) return map;
+		for (const c of visible) {
+			if (c.propertyId === TITLE_COL || c.rollup || c.formula) continue;
+			const def = columnDefs.get(c.propertyId);
+			if (!def || def.valueType !== ValueType.Text || def.vocabulary) continue;
+			const values = columnValueSuggestions(suggestionRows, c.propertyId);
+			if (values.length > 0) map.set(c.propertyId, values);
+		}
+		return map;
+	}, [visible, columnDefs, suggestionRows, hasEdit]);
 
 	// Rollup wiring (9.12.17): the relation walks to entities of *other* types,
 	// so the lookup is built over the full vault (`allRows`), not the view's
@@ -460,6 +483,7 @@ export function GridView(props: GridViewProps): ReactElement {
 										height={virtualRow.size}
 										rowIds={rowIds}
 										columnDefs={columnDefs}
+										columnSuggestions={columnSuggestions}
 										rollupById={rollupById}
 										rollupTargetDefs={rollupTargetDefs}
 										pendingTitleEdit={pendingTitleEditId === entity.id}
@@ -731,6 +755,7 @@ type GridRowProps = {
 	height: number;
 	rowIds: ReadonlyArray<string>;
 	columnDefs: ColumnDefs;
+	columnSuggestions: ReadonlyMap<string, readonly string[]>;
 	rollupById: ReadonlyMap<string, EntityRow>;
 	rollupTargetDefs: ColumnDefs;
 	/** This row should take the keyboard on mount (F-215/F-216): the title
@@ -762,6 +787,7 @@ const GridRow = memo(function GridRow({
 	height,
 	rowIds,
 	columnDefs,
+	columnSuggestions,
 	rollupById,
 	rollupTargetDefs,
 	pendingTitleEdit,
@@ -903,6 +929,7 @@ const GridRow = memo(function GridRow({
 						entity={entity}
 						column={c}
 						def={columnDefs.get(c.propertyId) ?? null}
+						suggestions={columnSuggestions.get(c.propertyId)}
 						rollupById={rollupById}
 						rollupTargetDef={rollupTargetDefs.get(c.propertyId) ?? null}
 						cellProps={getCellProps(flat)}
@@ -923,6 +950,7 @@ function GridCell({
 	entity,
 	column,
 	def,
+	suggestions,
 	rollupById,
 	rollupTargetDef,
 	cellProps,
@@ -936,6 +964,9 @@ function GridCell({
 	entity: EntityRow;
 	column: ColumnSpec;
 	def: PropertyDef | null;
+	/** Existing distinct values for a select-like text column → the cell edits
+	 *  as a type-or-pick combobox (DS-cell-combobox-1). */
+	suggestions: readonly string[] | undefined;
 	rollupById: ReadonlyMap<string, EntityRow>;
 	rollupTargetDef: PropertyDef | null;
 	/** Composite-keyboard props for this cell's flat cursor index — `id`
@@ -1004,6 +1035,7 @@ function GridCell({
 				entity={entity}
 				propertyId={column.propertyId}
 				def={def}
+				suggestions={suggestions}
 				layout="cell"
 				onEdit={onEdit}
 				autoEdit={autoEdit}

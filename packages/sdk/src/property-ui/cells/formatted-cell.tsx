@@ -7,13 +7,14 @@
 
 import { type CellProps, PropertyFormat } from "@brainstorm/sdk-types";
 import type { JSX } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { coerceValue } from "../../properties-validate";
 import type { PropertyUiLabels } from "../seams";
 import { usePropertyUiSeams } from "../use-properties";
 import { formatScalar, isValidFormatted, parseScalar } from "./format";
 import { InlineEditInput } from "./inline-edit-input";
 import { useCellAutoEdit } from "./use-cell-auto-edit";
+import { closeValueCombobox, openValueCombobox } from "./value-combobox";
 
 export enum FormattedMode {
 	Pill = "pill",
@@ -38,9 +39,13 @@ function invalidMessage(
 
 function makeFormattedCell(mode: FormattedMode) {
 	return function FormattedCell(props: CellProps): JSX.Element {
-		const { property, value, onChange, readOnly, autoEdit, onAutoEditHandled } = props;
+		const { property, value, onChange, readOnly, autoEdit, onAutoEditHandled, suggestions } = props;
 		const { labels } = usePropertyUiSeams();
 		const [editing, setEditing] = useState(false);
+		// Sticky: once a combobox open fails (no menu host mounted) this cell
+		// falls back to the inline input for the rest of its life.
+		const [comboUnavailable, setComboUnavailable] = useState(false);
+		const buttonRef = useRef<HTMLButtonElement>(null);
 		useCellAutoEdit(autoEdit, readOnly, () => setEditing(true), onAutoEditHandled);
 		const display = formatScalar(property, value);
 		const invalid = !isValidFormatted(property.format, display);
@@ -54,9 +59,47 @@ function makeFormattedCell(mode: FormattedMode) {
 			[property, onChange],
 		);
 
+		// Select-like text column (existing distinct values, no catalog
+		// vocabulary): edit as a type-or-pick combobox over those values instead
+		// of a bare text field. Plain free-text columns get no suggestions and so
+		// keep the inline input below.
+		const hasSuggestions = !readOnly && (suggestions?.length ?? 0) > 0;
+		const comboEditing = editing && hasSuggestions && !comboUnavailable;
+		// The open-effect must depend ONLY on `comboEditing` (the open↔close
+		// transition). `onCommit` is a fresh identity every render (the host's
+		// `onChange` is an inline arrow) and `suggestions` is a fresh array every
+		// view recompile, so listing them would re-run the effect on unrelated
+		// re-renders — and its cleanup closes the picker (→ `onClose` →
+		// `setEditing(false)`), aborting the edit mid-interaction (live vault data
+		// re-renders the row constantly). Read the latest values through a ref so
+		// the picker opens once per edit and only closes when editing truly ends.
+		const comboRef = useRef({ display, suggestions, labels, property, onCommit });
+		comboRef.current = { display, suggestions, labels, property, onCommit };
+		useEffect(() => {
+			if (!comboEditing) return;
+			const anchor = buttonRef.current;
+			if (!anchor) return;
+			const c = comboRef.current;
+			const opened = openValueCombobox({
+				anchor,
+				current: c.display,
+				suggestions: c.suggestions ?? [],
+				placeholder: c.labels.tagSearchPlaceholder,
+				ariaLabel: c.labels.cellEditValueFor(c.property.name),
+				useTypedLabel: (q) => c.labels.tagCreate?.(q) ?? `"${q}"`,
+				onCommit: c.onCommit,
+				onClose: () => setEditing(false),
+			});
+			if (!opened) {
+				setComboUnavailable(true);
+				return;
+			}
+			return () => closeValueCombobox();
+		}, [comboEditing]);
+
 		const base = mode === FormattedMode.Pill ? "bs-cell-pill" : "bs-cell-plain";
 
-		if (editing && !readOnly) {
+		if (editing && !readOnly && (!hasSuggestions || comboUnavailable)) {
 			const inputClass = mode === FormattedMode.Pill ? "bs-cell-input" : "bs-cell-plain-input";
 			return (
 				<InlineEditInput
@@ -79,11 +122,13 @@ function makeFormattedCell(mode: FormattedMode) {
 
 		return (
 			<button
+				ref={buttonRef}
 				type="button"
 				className={cls}
 				onClick={() => !readOnly && setEditing(true)}
 				disabled={readOnly}
 				aria-invalid={invalid || undefined}
+				aria-expanded={comboEditing || undefined}
 				title={invalidMsg}
 				aria-label={
 					invalidMsg

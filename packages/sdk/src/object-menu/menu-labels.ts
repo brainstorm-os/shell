@@ -48,7 +48,10 @@ export const DEFAULT_OBJECT_MENU_CHROME_LABELS: ObjectMenuChromeLabels = {
 	actionGroupShare: "Share to",
 	actionGroupConvert: "Convert / Export",
 	actionGroupActions: "Actions",
-	moreContributedActions: "More actions…",
+	// Distinct from `moreActions` (the ⋯ trigger's own name) so a screen reader
+	// doesn't announce two controls in the same menu identically; still no
+	// ellipsis (it opens a submenu, not a dialog).
+	moreContributedActions: "More app actions",
 };
 
 export function resolveObjectMenuChromeLabels(

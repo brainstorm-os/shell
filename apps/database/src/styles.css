@@ -945,13 +945,13 @@ body.is-resizing .db-inspector__resize {
 	 * full width when there are only a few narrow columns. */
 	width: max-content;
 	min-width: 100%;
-	/* Align the grid's content gutter with the stage header (`.db-stage__header`
-	 * is inset 20px). Cells carry 8px of their own inline padding, so 12px here
-	 * lands the first column on the same 20px baseline as the title + toolbar
-	 * above — without this the table sits flush inside the header's gutter and
-	 * the columns read as misaligned with everything above them. The horizontal
-	 * scrollbar stays full-bleed: it lives on `.db-stage__body`, not here. */
-	padding-inline: var(--space-3);
+	/* No inline padding here: the leading inset that aligns the first column
+	 * with the stage header (inset 20px) is owned entirely by the row's grip
+	 * gutter (`.dbv-grid__row` padding-inline-start 12px) + the cell's own 8px,
+	 * which sum to 20px. A `padding-inline` here as well double-inset the grid
+	 * (the columns read 16px past everything above them) and held the row
+	 * hover/selection fill off the trailing edge. The horizontal scrollbar
+	 * stays full-bleed: it lives on `.db-stage__body`, not here. */
 }
 
 .dbv-grid__row {
@@ -972,8 +972,11 @@ body.is-resizing .db-inspector__resize {
 	/* Reserve a leading gutter for the hover-revealed drag grip so it parks
 	 * clear of the first cell instead of overlaying the title (DND-grip-1).
 	 * Applied to every row — head / body / foot all share `.dbv-grid__row`,
-	 * so columns stay internally aligned; the grip lives in this gutter. */
-	padding-inline-start: var(--space-4);
+	 * so columns stay internally aligned; the grip lives in this gutter. 12px
+	 * here + the cell's own 8px land the first column on the 20px stage-header
+	 * baseline (the grip, inset 4px / 16px box, parks within this gutter just
+	 * left of the title glyph). */
+	padding-inline-start: var(--space-3);
 }
 
 /* Cross-app drag grip (DND-4) — a hover-revealed handle parked in the leading
@@ -1129,6 +1132,23 @@ body.is-resizing .db-inspector__resize {
 .dbv-grid__cell--editable > .bs-cell-plain {
 	flex: 1;
 	max-width: none;
+	/* Allow the stretched value button to shrink below its content width —
+	 * without `min-width: 0` the flex item keeps its `min-width: auto`
+	 * (= content width), so a long value never shrinks and its inner
+	 * `text-overflow: ellipsis` can't trigger; the cell just hard-clips it.
+	 * With this the overflow ellipsizes like every other text cell. */
+	min-width: 0;
+}
+
+/* The row already paints a hover fill and the editable value button is
+ * stretched to fill the whole cell — so the button's own `:hover` would paint
+ * a SECOND translucent `--hover` over the row's, reading as a darker patch
+ * under the cursor (the cell appearing to "overlay" the row). Drop the button
+ * hover inside the grid; the row hover is the affordance. The editor's own
+ * focus ring on click is unaffected. */
+.dbv-grid__cell--editable > .bs-cell-pill:not(:disabled):hover,
+.dbv-grid__cell--editable > .bs-cell-plain:not(:disabled):hover {
+	background: transparent;
 }
 
 /* Rollup cell (9.12.17): a read-only computed aggregation. Reads like the
@@ -1255,6 +1275,8 @@ body.is-resizing .db-inspector__resize {
 	font: inherit;
 	text-align: start;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	cursor: text;
 }
 
@@ -2781,15 +2803,27 @@ body.is-resizing .dbv-tl__labels-resize {
 
 /* Add-column button — full-width dashed affordance under the column list,
  * reads as "create" without competing with the primary New button. */
+/* Divider between the property list and the add-* action group. */
+.db-popover__divider {
+	height: var(--border-width);
+	margin: var(--space-2) 0;
+	background: var(--border);
+	border: 0;
+}
+
+/* Add-* action rows ("Add column / rollup / formula") — a Plus glyph + label
+ * on the same 28px menu-row face every "pick an action" list uses, so they
+ * read as a consistent stack below the divider (no per-item top margin, no
+ * resting border, regular row height). */
 .db-popover__add-column {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
 	gap: var(--space-2);
 	width: 100%;
-	margin-top: var(--space-1);
-	padding: var(--space-2) var(--space-2);
+	min-height: 28px;
+	padding: 0 var(--space-2);
 	background: transparent;
-	border: var(--border-width) solid transparent;
+	border: 0;
 	border-radius: var(--radius-md);
 	color: var(--text-dim);
 	font: inherit;
@@ -2804,6 +2838,16 @@ body.is-resizing .dbv-tl__labels-resize {
 .db-popover__add-column:hover {
 	color: var(--text);
 	background: var(--hover);
+}
+
+/* The leading glyph reads as a quiet affordance until the row is hovered. */
+.db-popover__add-column svg {
+	flex-shrink: 0;
+	color: var(--text-faint);
+}
+
+.db-popover__add-column:hover svg {
+	color: var(--text-dim);
 }
 
 /* ── Formula authoring page ───────────────────────────────────────────── */
@@ -3150,38 +3194,11 @@ body.is-resizing .dbv-tl__labels-resize {
 	user-select: none;
 }
 
+/* The visibility toggle is the shared `.checkbox` (createCheckbox) — same
+ * chrome as every other checkbox in the product. Here we only pin it so the
+ * flex row never compresses it. */
 .db-popover__column-toggle {
-	appearance: none;
-	-webkit-appearance: none;
-	position: relative;
-	width: 16px;
-	height: 16px;
 	flex-shrink: 0;
-	margin: 0;
-	border: 1.5px solid var(--border-strong);
-	border-radius: var(--radius-sm);
-	background: transparent;
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		border-color 120ms ease;
-}
-
-.db-popover__column-toggle:checked {
-	background: var(--accent);
-	border-color: var(--accent);
-}
-
-.db-popover__column-toggle:checked::after {
-	content: "";
-	position: absolute;
-	left: 4.5px;
-	top: 1px;
-	width: 4px;
-	height: 8px;
-	border: solid #fff;
-	border-width: 0 2px 2px 0;
-	transform: rotate(45deg);
 }
 
 .db-popover__column-name {

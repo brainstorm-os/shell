@@ -16,13 +16,13 @@ import { IconName } from "../icon/icon-registry";
 import {
 	BodyKind,
 	DimmerMode,
-	type IconParam,
 	type MenuConfig,
 	type MenuCtx,
 	MenuKind,
 	RowKind,
 	SourceKind,
 	Vertical,
+	blankMenuIcon,
 	defineMenu,
 	getActiveMenuStore,
 	sdkMenuIcon,
@@ -54,10 +54,6 @@ type MultiRow = {
 };
 
 type MultiSelectMenuData = { rows: MultiRow[] };
-
-/** Keeps the fixed icon column on unchecked rows so every label starts at the
- *  same x — one shared param so row identity stays stable across updates. */
-const BLANK_ICON: IconParam = { icon: () => null };
 
 const MULTI_SELECT_MENU_ID = "bs/multi-select-menu";
 const MENU_GAP = 4;
@@ -100,7 +96,7 @@ function configFor(menuLabel: string): MenuConfig<MultiSelectMenuData> {
 						kind: RowKind.Item,
 						match: () => true,
 						name: (it: MultiRow) => it.label,
-						icon: (it: MultiRow) => (it.selected ? sdkMenuIcon(IconName.Check) : BLANK_ICON),
+						icon: (it: MultiRow) => (it.selected ? sdkMenuIcon(IconName.Check) : blankMenuIcon),
 						disabled: (it: MultiRow) => it.disabled,
 						className: (it: MultiRow) => (it.selected ? "fm-row--selected" : undefined),
 						// A toggle never dismisses — flip the row in place and report the

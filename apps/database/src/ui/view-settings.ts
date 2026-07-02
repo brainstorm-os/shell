@@ -19,6 +19,7 @@
  */
 
 import type { PropertyDef } from "@brainstorm/sdk-types";
+import { createCheckbox } from "@brainstorm/sdk/checkbox";
 import { IconName, createIconElement } from "@brainstorm/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
 import { createSelectMenu } from "@brainstorm/sdk/select-menu";
@@ -864,12 +865,9 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 	// related entities (9.12.17). Only when the list actually has a relation.
 	const rollup = props.rollup;
 	if (rollup && rollup.relations.length > 0) {
-		const adderBtn = document.createElement("button");
-		adderBtn.type = "button";
-		adderBtn.className = "db-popover__add-column";
+		const adderBtn = buildPopoverAction("Add rollup…");
 		adderBtn.dataset.testid = "db-view-settings-add-rollup";
 		adderBtn.setAttribute("aria-haspopup", "menu");
-		adderBtn.textContent = "Add rollup…";
 		adderBtn.addEventListener("click", () => openRollupRelationPicker(adderBtn, rollup));
 		body.appendChild(adderBtn);
 	}
@@ -878,11 +876,8 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 	// over the row's other properties (9.12.17). Drills into a focused authoring
 	// sub-page (free-text expression needs a form, not a menu).
 	if (props.formula) {
-		const formulaBtn = document.createElement("button");
-		formulaBtn.type = "button";
-		formulaBtn.className = "db-popover__add-column";
+		const formulaBtn = buildPopoverAction("Add formula…");
 		formulaBtn.dataset.testid = "db-view-settings-add-formula";
-		formulaBtn.textContent = "Add formula…";
 		formulaBtn.addEventListener("click", () => navigate(SettingsPage.Formula));
 		body.appendChild(formulaBtn);
 	}
@@ -1127,6 +1122,20 @@ function openRollupAggregationPicker(
 	openAnchoredMenu(anchorPoint(anchor), items, { menuLabel: "Aggregate how?", anchor });
 }
 
+/** A bottom-of-list action row ("Add column / rollup / formula"): a leading
+ *  Plus glyph + label on the shared 28px add-action face. The caller wires the
+ *  test id / aria / click behaviour. */
+function buildPopoverAction(label: string): HTMLButtonElement {
+	const btn = document.createElement("button");
+	btn.type = "button";
+	btn.className = "db-popover__add-column";
+	btn.appendChild(createIconElement(IconName.Plus, { size: 16 }));
+	const text = document.createElement("span");
+	text.textContent = label;
+	btn.appendChild(text);
+	return btn;
+}
+
 function renderColumns(
 	body: HTMLElement,
 	columns: ColumnSpec[],
@@ -1155,20 +1164,23 @@ function renderColumns(
 		handle.appendChild(createIconElement(IconName.DragHandle, { size: 16 }));
 		li.appendChild(handle);
 
-		const checkbox = document.createElement("input");
-		checkbox.type = "checkbox";
-		checkbox.className = "db-popover__column-toggle";
-		checkbox.checked = column.visible !== false;
-		checkbox.addEventListener("change", () => {
-			const next = columns.map((c, i) => (i === index ? { ...c, visible: checkbox.checked } : c));
-			onChange(next);
+		const defName = column.rollup?.name ?? nameByKey.get(column.propertyId);
+		const labelText = defName?.trim() ? defName : humanize(column.propertyId);
+
+		const toggle = createCheckbox({
+			checked: column.visible !== false,
+			ariaLabel: `Show column ${labelText}`,
+			onChange: (checked) => {
+				const next = columns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
+				onChange(next);
+			},
 		});
-		li.appendChild(checkbox);
+		toggle.element.classList.add("db-popover__column-toggle");
+		li.appendChild(toggle.element);
 
 		const label = document.createElement("span");
 		label.className = "db-popover__column-name";
-		const defName = column.rollup?.name ?? nameByKey.get(column.propertyId);
-		label.textContent = defName?.trim() ? defName : humanize(column.propertyId);
+		label.textContent = labelText;
 		li.appendChild(label);
 
 		// Remove the column from this collection (F-022). Drops it from the
@@ -1220,16 +1232,20 @@ function renderColumns(
 
 	body.appendChild(list);
 
+	// The add-* actions read as a distinct group below the property list, so a
+	// divider separates them from the reorderable rows above.
+	const divider = document.createElement("div");
+	divider.className = "db-popover__divider";
+	divider.setAttribute("role", "separator");
+	body.appendChild(divider);
+
 	// Add-column picker (9.3.5.U.b). Three groups via `buildColumnAdderOptions`:
 	// existing-vault catalog defs, data-derived properties, and the
 	// always-present "+ Create new property" affordance (omitted when the
 	// host can't accept new property defs — `onCreateProperty` undefined).
-	const adderBtn = document.createElement("button");
-	adderBtn.type = "button";
-	adderBtn.className = "db-popover__add-column";
+	const adderBtn = buildPopoverAction("Add column…");
 	adderBtn.dataset.testid = "db-view-settings-add-column";
 	adderBtn.setAttribute("aria-haspopup", "menu");
-	adderBtn.textContent = "Add column…";
 	adderBtn.addEventListener("click", () => {
 		openColumnAdderPicker({
 			anchor: adderBtn,
