@@ -3,6 +3,82 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.1.7",
+      "date": "2026-07-02",
+      "icon": "🧹",
+      "title": "A full pass over every app",
+      "summary": "A fixes release on the public beta, from a sweep across every app: status cells edit as a pick list, the calendar and preview render cleanly, chat messages stay out of the file browsers, and the assistant shows real titles instead of internal ids.",
+      "body": [
+        { "kind": "h1", "text": "Fixes across the apps" },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Database", "marks": ["bold"] },
+            { "text": " — status and select cells edit as a " },
+            { "text": "combobox", "marks": ["highlight"] },
+            { "text": ": pick a value already in the column, or type a new one." }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Calendar", "marks": ["bold"] },
+            {
+              "text": " — multi-day events draw as one clean bar in month view instead of a clipped, repeated title in every day."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Preview", "marks": ["bold"] },
+            {
+              "text": " — centers its empty state and docks the details panel on the right, like every other app."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Files", "marks": ["bold"] },
+            { "text": " & " },
+            { "text": "Database", "marks": ["bold"] },
+            { "text": " — chat messages no longer flood the vault browsers as untitled rows." }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Assistant", "marks": ["bold"] },
+            { "text": " — renders the documents it cites as clickable titles instead of raw ids." }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            { "text": "Graph", "marks": ["bold"] },
+            { "text": " — labels untitled items by type (" },
+            { "text": "Note (untitled)", "marks": ["highlight"] },
+            { "text": ") instead of internal ids." }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": "Plus tidier Agent settings, clearer empty states in Automations and Contacts, and task date chips that read correctly to screen readers."
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            { "text": "Update in place. ", "marks": ["bold"] },
+            { "text": "Existing installs update from " },
+            { "text": "Settings → Updates", "marks": ["highlight"] },
+            { "text": "." }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.0.1",
       "date": "2026-05-23",
       "icon": "🎉",

@@ -128,3 +128,41 @@ jobs:
           # second, empty duplicate draft).
           publish=${{ github.event_name == 'push' && 'always' || 'never' }}
           bunx electron-builder ${{ matrix.builder-platform }} $spec --publish "$publish" ${{ matrix.sign-args }}
+
+  # electron-builder's `--publish always` (above) CREATES the release as a
+  # DRAFT and uploads every artifact to it, but never publishes it and never
+  # writes notes — so historically each release had to be published by hand and
+  # shipped with an empty body. This job runs once, after every matrix leg has
+  # uploaded its artifacts, to generate notes from the merged PRs and flip the
+  # draft to a published "latest" release. Tag-push only; a workflow_dispatch
+  # dry-run builds nothing to publish.
+  finalize:
+    name: Publish release
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write  # to publish the release + set notes
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate notes + publish the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # GitHub auto-picks the previous release for the diff; the "What's
+          # Changed" body lists every merged PR since it. Prepend the tag's
+          # annotation subject as a one-line human summary when present.
+          gen=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq '.body')
+          summary=$(git for-each-ref "refs/tags/${TAG}" --format='%(contents:subject)')
+          { [ -n "$summary" ] && printf '%s\n\n' "$summary"; printf '%s\n' "$gen"; } > notes.md
+          # The draft already exists (electron-builder created it for this tag).
+          gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" \
+            --draft=false --latest --notes-file notes.md
