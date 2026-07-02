@@ -8,6 +8,7 @@
  * regress back to "you can only check off tasks".
  */
 
+import { RecurrenceKind } from "@brainstorm/sdk-types";
 import { SelectionModifier } from "@brainstorm/sdk/selection";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "../types/project";
@@ -123,22 +124,49 @@ describe("glance-only chips", () => {
 		expect(chip?.tagName).toBe("SPAN");
 	});
 
-	it("due and scheduled chips share ONE visible format (bare date); semantics live in tooltip + aria", () => {
+	it("due and scheduled chips share ONE visible format (bare date); semantics live in tooltip + sr-only text", () => {
 		const NOW = new Date(2026, 5, 20, 10, 0, 0, 0).getTime();
 		const JUN_27 = new Date(2026, 5, 27, 9, 0, 0, 0).getTime();
 		const chipOf = (row: HTMLElement) =>
 			row.querySelector<HTMLElement>('.task-row__chip[data-kind^="date"]');
+		const visibleTextOf = (chip: HTMLElement | null | undefined) =>
+			chip?.querySelector('[aria-hidden="true"]')?.textContent;
 
 		const due = chipOf(mount(task({ dueAt: JUN_27 }), { now: NOW }).row);
 		const scheduled = chipOf(mount(task({ id: "task-2", scheduledAt: JUN_27 }), { now: NOW }).row);
 
 		// Same visible text — no "Due " prefix on one and a bare date on the other.
-		expect(due?.textContent).toBe(scheduled?.textContent);
-		expect(due?.textContent).not.toContain("Due");
-		// The due-vs-scheduled distinction stays, via tooltip + aria-label.
-		expect(due?.title).toBe(`Due ${due?.textContent}`);
-		expect(due?.getAttribute("aria-label")).toBe(due?.title);
-		expect(scheduled?.title).toBe(`Scheduled ${scheduled?.textContent}`);
+		expect(visibleTextOf(due)).toBe(visibleTextOf(scheduled));
+		expect(visibleTextOf(due)).not.toContain("Due");
+		// The due-vs-scheduled distinction is REAL (visually-hidden) text, so
+		// screen readers announce it — NOT an aria-label, which ARIA prohibits
+		// on a generic-role <span> and screen readers ignore in browse mode.
+		expect(due?.getAttribute("aria-label")).toBeNull();
+		const srDue = due?.querySelector(".tasks-sr-only");
+		const srScheduled = scheduled?.querySelector(".tasks-sr-only");
+		expect(srDue?.textContent).toBe(`Due ${visibleTextOf(due)}`);
+		expect(srScheduled?.textContent).toBe(`Scheduled ${visibleTextOf(scheduled)}`);
+		// The visible bare date is aria-hidden so the date isn't announced twice
+		// (the sr-only phrase already contains it).
+		expect(due?.querySelector('[aria-hidden="true"]')?.textContent).not.toContain("Due");
+		// Tooltip keeps the full phrase for mouse users.
+		expect(due?.title).toBe(`Due ${visibleTextOf(due)}`);
+		expect(scheduled?.title).toBe(`Scheduled ${visibleTextOf(scheduled)}`);
+	});
+
+	it("recurrence chip announces the summary via sr-only text; the ↻ glyph is aria-hidden", () => {
+		const { row } = mount(task({ recurrence: { kind: RecurrenceKind.Daily, every: 1 } }));
+		const chip = row.querySelector<HTMLElement>('.task-row__chip[data-kind="recurring"]');
+		expect(chip).not.toBeNull();
+		// Real hidden text, not aria-label — ARIA prohibits naming a
+		// generic-role span, so screen readers would ignore an aria-label.
+		expect(chip?.getAttribute("aria-label")).toBeNull();
+		expect(chip?.querySelector(".tasks-sr-only")?.textContent).toBe("Every day");
+		// The glyph reads as garbage or nothing — hide it from AT.
+		const glyph = chip?.querySelector('[aria-hidden="true"]');
+		expect(glyph?.textContent).toBe("↻");
+		// Tooltip keeps the summary for mouse users.
+		expect(chip?.title).toBe("Every day");
 	});
 
 	it("omits the project chip when projectId is null", () => {

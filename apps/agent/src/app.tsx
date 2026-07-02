@@ -125,6 +125,10 @@ type UiMessage = {
 	/** Context the user explicitly attached to this turn (pinned documents /
 	 *  people / media) — rendered as chips on the user bubble. */
 	attachments?: MessageAttachment[];
+	/** Assistant body with `[<id>] <title>` citations rewritten to markdown
+	 *  entity links (`linkifyEntityRefs`) — precomputed once per message-list
+	 *  change so the transcript map doesn't re-linkify on every keystroke. */
+	bodyMarkdown?: string;
 };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -590,13 +594,18 @@ export function AgentApp(): ReactElement {
 	// two identical turns ("ok", "ok") stay distinct bubbles and only collapse
 	// against their own persisted twin once it arrives.
 	const displayMessages = useMemo<UiMessage[]>(() => {
-		if (!activeId) return messages;
-		const seen = new Set(messages.map(turnKey));
-		const echoes = pending
-			.filter((p) => p.convId === activeId)
-			.filter((p) => !seen.has(turnKey(p.msg)))
-			.map((p) => p.msg);
-		return echoes.length === 0 ? messages : sortMessages([...messages, ...echoes]);
+		let merged = messages;
+		if (activeId) {
+			const seen = new Set(messages.map(turnKey));
+			const echoes = pending
+				.filter((p) => p.convId === activeId)
+				.filter((p) => !seen.has(turnKey(p.msg)))
+				.map((p) => p.msg);
+			if (echoes.length > 0) merged = sortMessages([...messages, ...echoes]);
+		}
+		return merged.map((m) =>
+			m.role === MessageRole.Assistant ? { ...m, bodyMarkdown: linkifyEntityRefs(m.body) } : m,
+		);
 	}, [messages, pending, activeId]);
 
 	// Drop echoes the snapshot has caught up on, so `pending` can't grow without
@@ -1315,7 +1324,7 @@ export function AgentApp(): ReactElement {
 									<div className="agent__msg-body">
 										{m.role === MessageRole.Assistant ? (
 											<Markdown
-												source={linkifyEntityRefs(m.body)}
+												source={m.bodyMarkdown ?? m.body}
 												onEntityLink={(target) =>
 													target && !/\s/.test(target) ? () => openCitation(target) : null
 												}

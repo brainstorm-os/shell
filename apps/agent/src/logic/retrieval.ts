@@ -16,6 +16,7 @@
  */
 
 import type { SearchHit, SearchQuery, SearchService } from "@brainstorm/sdk-types";
+import { formatCitationLine } from "./citation-format";
 
 /** Top-K hits fetched per turn — bounds both the search cost and the number of
  *  ids the model can ground/cite against. */
@@ -77,7 +78,7 @@ export function buildRetrievalContextBlock(items: readonly RetrievalContextItem[
 	for (const item of items) {
 		const title = item.title.trim() || item.entityId;
 		const snippet = item.snippet ? ` — ${item.snippet}` : "";
-		lines.push(`- [${item.entityId}] ${title}${snippet}`);
+		lines.push(formatCitationLine(item.entityId, `${title}${snippet}`));
 	}
 	return lines.join("\n");
 }

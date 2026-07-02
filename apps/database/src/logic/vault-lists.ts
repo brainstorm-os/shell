@@ -19,6 +19,7 @@
 
 import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
 import { friendlyTypeName, isChildEntityType } from "@brainstorm/sdk/system-entities";
+import { plural, t } from "../i18n";
 import type { List } from "../types/list";
 import { ListSourceKind } from "../types/list-source";
 import {
@@ -33,6 +34,7 @@ import {
 	type SortKey,
 } from "../types/list-view";
 import type { EntityRow, InMemoryEntities, LinkRow } from "./in-memory-entities";
+import { isSystemList } from "./system-lists";
 
 export type VaultEntityInput = {
 	id: string;
@@ -140,7 +142,10 @@ export function buildVaultLists(
 			id: listId,
 			name: friendlyTypeName(type),
 			icon: null,
-			description: `${rows.length} ${rows.length === 1 ? "item" : "items"} · ${type}`,
+			description: t("brainstorm.database.vault.typeList.description", {
+				items: itemCountLabel(rows.length),
+				type,
+			}),
 			source: { kind: ListSourceKind.ByType, types: [type] },
 			members: { include: [], exclude: [] },
 			views: [viewId],
@@ -157,15 +162,22 @@ export function buildVaultLists(
 	// List. Parent-scoped child rows (Messages, Comments — F-318) live inside
 	// their containers and keep their dedicated type-List above, but are
 	// excluded here so they don't bury the vault's real documents.
-	const allTypes = orderedTypes.map(([t]) => t).filter((t) => !isChildEntityType(t));
-	if (allTypes.length > 0) {
-		const topLevel = entities.filter((e) => !isChildEntityType(e.type));
+	const topLevelTypes = orderedTypes.filter(([type]) => !isChildEntityType(type));
+	if (topLevelTypes.length > 0) {
+		const topLevel = topLevelTypes.flatMap(([, rows]) => rows);
 		lists.push({
 			id: ALL_VAULT_LIST_ID,
-			name: "All vault items",
+			name: t("brainstorm.database.vault.allItems"),
 			icon: null,
-			description: `${topLevel.length} ${topLevel.length === 1 ? "item" : "items"} across ${allTypes.length} ${allTypes.length === 1 ? "type" : "types"}`,
-			source: { kind: ListSourceKind.ByType, types: allTypes },
+			description: t("brainstorm.database.vault.allItems.description", {
+				items: itemCountLabel(topLevel.length),
+				types: plural(
+					topLevelTypes.length,
+					"brainstorm.database.vault.types.one",
+					"brainstorm.database.vault.types.other",
+				),
+			}),
+			source: { kind: ListSourceKind.ByType, types: topLevelTypes.map(([type]) => type) },
 			members: { include: [], exclude: [] },
 			views: [ALL_VAULT_VIEW_ID],
 			defaultViewId: ALL_VAULT_VIEW_ID,
@@ -197,18 +209,54 @@ export function relationTargetTypesFromEntities(
 		.map(([type]) => ({ type, label: friendlyTypeName(type) }));
 }
 
+/** Every list built by `buildVaultLists` is vault-derived by construction,
+ *  so the sidebar's system classification reduces to the source-type test. */
+const isBuiltSystemList = (list: List): boolean => isSystemList(list, () => true);
+
 /** First selectable `{ listId, viewId }` for a freshly-built vault set, or
  *  `null` when the vault has no entities (the caller shows the empty
- *  state). Prefers the most-populous type's List. */
+ *  state). Prefers a list that is VISIBLE in the sidebar: system-classified
+ *  type-lists (F-212/F-318) live under the collapsed-by-default System
+ *  disclosure, so defaulting to the most-populous list on a chat-heavy
+ *  vault landed on a hidden Messages row (stage full, sidebar blank). Order:
+ *  most-populous non-system List → the All-vault List → only when nothing
+ *  else exists, a system List (the caller reveals it via
+ *  `selectionNeedsSystemReveal`). */
 export function firstVaultSelection(
 	result: VaultListsResult,
 ): { listId: string; viewId: string } | null {
-	const first = result.lists[0];
-	if (!first || !first.defaultViewId) return null;
-	return { listId: first.id, viewId: first.defaultViewId };
+	const pick =
+		result.lists.find((l) => l.id !== ALL_VAULT_LIST_ID && !isBuiltSystemList(l)) ??
+		result.lists.find((l) => l.id === ALL_VAULT_LIST_ID) ??
+		result.lists[0];
+	if (!pick || !pick.defaultViewId) return null;
+	return { listId: pick.id, viewId: pick.defaultViewId };
+}
+
+/** True when the active selection resolves to a system-classified list —
+ *  its sidebar row hides under the System disclosure (collapsed by
+ *  default), so the caller must open the disclosure or the active row is
+ *  invisible. Covers both the `firstVaultSelection` fallback (child-only
+ *  vault) and a persisted selection restored onto a system list. */
+export function selectionNeedsSystemReveal(
+	lists: ReadonlyArray<List>,
+	activeListId: string,
+	isVaultDerived: (id: string) => boolean,
+): boolean {
+	const list = lists.find((l) => l.id === activeListId);
+	return list != null && isSystemList(list, isVaultDerived);
 }
 
 export { friendlyTypeName };
+
+/** "{count} item(s)" fragment shared by the vault-list descriptions. */
+function itemCountLabel(count: number): string {
+	return plural(
+		count,
+		"brainstorm.database.vault.items.one",
+		"brainstorm.database.vault.items.other",
+	);
+}
 
 /** DOM/id-safe slug for deriving stable List/View ids from a type id. */
 export function typeSlug(typeId: string): string {

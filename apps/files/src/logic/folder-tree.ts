@@ -22,6 +22,7 @@
  */
 
 import { type Entity, type EntityType, FOLDER_TYPE, readMembers, readName } from "../types/entity";
+import { type RetainedMember, mergeRetainedMembers } from "./vault-tree";
 
 export type FolderTreeListener = () => void;
 
@@ -73,6 +74,7 @@ export const CYCLE_DEPTH_LIMIT = 32;
 export class FolderTree {
 	private readonly entities = new Map<string, Entity>();
 	private readonly listeners = new Set<FolderTreeListener>();
+	private retainedHiddenMembers: ReadonlyMap<string, readonly RetainedMember[]> = new Map();
 	private idCounter = 0;
 	private readonly idPrefix: string;
 
@@ -91,6 +93,25 @@ export class FolderTree {
 			this.entities.set(entity.id, cloneEntity(entity));
 		}
 		this.notify();
+	}
+
+	/** Per-folder membership records that are live in the vault but hidden
+	 *  from the browser (child-scoped / app-internal types filtered out by
+	 *  `buildVaultFileTree`). Replaced wholesale alongside every snapshot;
+	 *  consulted only by `persistableMembers` so a full-replacement
+	 *  `members[]` write never deletes what the display merely hides. */
+	setRetainedHiddenMembers(retained: ReadonlyMap<string, readonly RetainedMember[]>): void {
+		this.retainedHiddenMembers = retained;
+	}
+
+	/** The `members[]` to WRITE for `folderId`: the rendered members merged
+	 *  with the snapshot's retained hidden ids at their original positions.
+	 *  Genuinely-dangling refs (deleted entities) were pruned at build time
+	 *  and stay pruned here. */
+	persistableMembers(folderId: string): string[] {
+		const folder = this.entities.get(folderId);
+		const rendered = folder ? readMembers(folder) : [];
+		return mergeRetainedMembers(rendered, this.retainedHiddenMembers.get(folderId));
 	}
 
 	get(id: string): Entity | undefined {

@@ -57,7 +57,7 @@ import {
 	sortEntities,
 } from "../logic/sort";
 import { collisionName, mimeFromName, sha256Hex } from "../logic/upload";
-import { buildVaultFileTree } from "../logic/vault-tree";
+import { type RetainedMembersMap, buildVaultFileTree } from "../logic/vault-tree";
 import {
 	applyViewOptionsToAllFolders,
 	readViewOptions,
@@ -1109,7 +1109,18 @@ export function useFilesStore() {
 				// across vaults, and never leaves the renderer.
 				const derived = deriveVaultKey(entities);
 				if (derived) setVaultKey((cur) => (cur === derived ? cur : derived));
-				const tree_ = buildVaultFileTree(entities, ROOT_FOLDER_ID, Date.now(), browsable);
+				// Member ids that are live but hidden by the browsability filter
+				// (Messages/Comments, app-internal rows filed into a Folder) —
+				// carried on the tree so `persistFolderMembers` writes them back
+				// instead of erasing them (hide ≠ delete).
+				const retainedHidden: RetainedMembersMap = new Map();
+				const tree_ = buildVaultFileTree(
+					entities,
+					ROOT_FOLDER_ID,
+					Date.now(),
+					browsable,
+					retainedHidden,
+				);
 				if (isInitial) {
 					// One-shot boot diagnostic — confirms vault loaded + tree built
 					// when Files appears empty. `console.warn` (not info) so it
@@ -1128,6 +1139,7 @@ export function useFilesStore() {
 					);
 				}
 				tree.applySnapshot(tree_);
+				tree.setRetainedHiddenMembers(retainedHidden);
 				if (isInitial) {
 					loadedOnceRef.current = true;
 					navHist.reset(ROOT_FOLDER_ID);
@@ -1365,11 +1377,15 @@ async function persistFolderMembers(tree: FolderTree, folderId: string): Promise
 	const runtime = typeof window !== "undefined" ? window.brainstorm : undefined;
 	const update = runtime?.services?.entities?.update;
 	if (!update) return;
-	const folder = tree.get(folderId);
-	if (!folder) return;
+	if (!tree.get(folderId)) return;
 	try {
+		// Full-replacement write, so it MUST include the snapshot's retained
+		// hidden member ids (`persistableMembers`), not just the rendered
+		// members — else hiding a Message/Comment from the browser would
+		// permanently delete its membership record on the next op (F-318
+		// data-loss guard). Genuinely-dangling refs stay pruned.
 		await update.call(runtime?.services?.entities, folderId, {
-			members: [...readMembers(folder)],
+			members: tree.persistableMembers(folderId),
 		});
 	} catch (error) {
 		console.warn(`[files] entities.update(${folderId}.members) failed:`, error);

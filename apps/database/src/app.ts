@@ -239,6 +239,7 @@ import {
 	firstVaultSelection,
 	friendlyTypeName,
 	relationTargetTypesFromEntities,
+	selectionNeedsSystemReveal,
 } from "./logic/vault-lists";
 import {
 	ViewConfigAction,
@@ -4803,6 +4804,7 @@ function repairActiveSelection(state: AppState, built: ReturnType<typeof buildVa
 	if (selectionResolves(state, state.active)) return;
 	if (selectionResolves(state, persistedUserDeltas.active)) {
 		if (persistedUserDeltas.active) state.active = persistedUserDeltas.active;
+		revealActiveSystemList(state);
 		return;
 	}
 	// Prefer landing on the user's OWN collection over a system type-list
@@ -4815,7 +4817,23 @@ function repairActiveSelection(state: AppState, built: ReturnType<typeof buildVa
 		return;
 	}
 	const fallback = firstVaultSelection(built);
-	if (fallback) state.active = fallback;
+	if (fallback) {
+		state.active = fallback;
+		revealActiveSystemList(state);
+	}
+}
+
+/** A restored / fallback selection can resolve to a system-classified list
+ *  (child-only vault → the Messages type-list; a persisted system-list
+ *  selection) whose sidebar row hides under the System disclosure, which
+ *  defaults CLOSED — the stage then shows a grid the sidebar can't explain
+ *  (F-318 fallout). Open the disclosure for this session only; the
+ *  persisted toggle pref is untouched, so a deliberate collapse still
+ *  sticks while the user browses. */
+function revealActiveSystemList(state: AppState): void {
+	if (systemSectionOpen) return;
+	if (!selectionNeedsSystemReveal(state.lists, state.active.listId, isVaultDerivedListId)) return;
+	systemSectionOpen = true;
 }
 
 /** The first user-created collection (a Blank/Manual collection — `source ===

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { FILE_TYPE, FOLDER_TYPE, ROOT_FOLDER_ID } from "../types/entity";
 import { type OpenerMeta, browsableTypeSet } from "./browsable-types";
-import { type VaultEntityInput, buildVaultFileTree } from "./vault-tree";
+import {
+	type RetainedMember,
+	type VaultEntityInput,
+	buildVaultFileTree,
+	mergeRetainedMembers,
+} from "./vault-tree";
 
 function folder(id: string, name: string, members: string[] = []): VaultEntityInput {
 	return {
@@ -191,5 +196,81 @@ describe("buildVaultFileTree", () => {
 		expect(ids.filter((id) => id.startsWith("msg_"))).toEqual([]);
 		expect(ids).toContain("note_1");
 		expect(tree.find((e) => e.id === "note_1")?.properties.name).toBe("(untitled)");
+	});
+
+	const message = (id: string): VaultEntityInput => ({
+		id,
+		type: "brainstorm/Message/v1",
+		properties: { conversation: "chan_1", role: "user", body: "hi" },
+		createdAt: 1,
+		updatedAt: 2,
+		deletedAt: null,
+	});
+
+	it("retains hidden-but-live member ids per folder instead of dropping them (display filter ≠ delete)", () => {
+		const entities: VaultEntityInput[] = [
+			folder(ROOT_FOLDER_ID, "Vault", ["msg_root", "fld_docs"]),
+			folder("fld_docs", "Docs", ["msg_1", "fil_a", "msg_2"]),
+			file("fil_a", "a.txt"),
+			message("msg_1"),
+			message("msg_2"),
+			message("msg_root"),
+		];
+		const retained = new Map<string, RetainedMember[]>();
+		const tree = buildVaultFileTree(entities, ROOT_FOLDER_ID, NOW, new Set(), retained);
+		// Hidden from the rendered listing…
+		const docs = tree.find((e) => e.id === "fld_docs");
+		expect(docs?.properties.members).toEqual(["fil_a"]);
+		expect(tree.map((e) => e.id).filter((id) => id.startsWith("msg_"))).toEqual([]);
+		// …but retained for persistence, with a position anchor.
+		expect(retained.get("fld_docs")).toEqual([
+			{ id: "msg_1", afterId: null },
+			{ id: "msg_2", afterId: "fil_a" },
+		]);
+		expect(retained.get(ROOT_FOLDER_ID)).toEqual([{ id: "msg_root", afterId: null }]);
+	});
+
+	it("still prunes genuinely-dangling member refs (deleted / unknown ids are NOT retained)", () => {
+		const entities: VaultEntityInput[] = [
+			folder(ROOT_FOLDER_ID, "Vault", ["fld_docs"]),
+			folder("fld_docs", "Docs", ["fil_gone", "missing-id", "msg_deleted", "fil_a"]),
+			file("fil_a", "a.txt"),
+			{ ...file("fil_gone", "gone.txt"), deletedAt: 999 },
+			{ ...message("msg_deleted"), deletedAt: 999 },
+		];
+		const retained = new Map<string, RetainedMember[]>();
+		const tree = buildVaultFileTree(entities, ROOT_FOLDER_ID, NOW, new Set(), retained);
+		const docs = tree.find((e) => e.id === "fld_docs");
+		expect(docs?.properties.members).toEqual(["fil_a"]);
+		expect(retained.has("fld_docs")).toBe(false);
+	});
+});
+
+describe("mergeRetainedMembers", () => {
+	it("re-inserts retained hidden ids at their anchored positions", () => {
+		const merged = mergeRetainedMembers(
+			["fil_a", "fil_b"],
+			[
+				{ id: "msg_front", afterId: null },
+				{ id: "msg_mid", afterId: "fil_a" },
+			],
+		);
+		expect(merged).toEqual(["msg_front", "fil_a", "msg_mid", "fil_b"]);
+	});
+
+	it("appends retained ids whose visible anchor left the folder, and never duplicates", () => {
+		const merged = mergeRetainedMembers(
+			["fil_b", "msg_already"],
+			[
+				{ id: "msg_orphaned", afterId: "fil_moved_away" },
+				{ id: "msg_already", afterId: null },
+			],
+		);
+		expect(merged).toEqual(["fil_b", "msg_already", "msg_orphaned"]);
+	});
+
+	it("is a no-op copy when nothing was retained", () => {
+		expect(mergeRetainedMembers(["a", "b"], undefined)).toEqual(["a", "b"]);
+		expect(mergeRetainedMembers(["a", "b"], [])).toEqual(["a", "b"]);
 	});
 });

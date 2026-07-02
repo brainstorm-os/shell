@@ -6,9 +6,18 @@
  * now share.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { EntityRow } from "../logic/in-memory-graph";
 import { NODE_LABEL_MAX_CHARS, nodeLabel, rawNodeLabel } from "./node-label";
+
+// Spy-wrap `typeDisplayName` (behavior unchanged) so the memoization test
+// can prove the untitled caption is computed once per type id, not per call
+// — the caption sits on the per-frame pan/zoom label path.
+vi.mock("@brainstorm/sdk/system-entities", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@brainstorm/sdk/system-entities")>();
+	return { ...actual, typeDisplayName: vi.fn(actual.typeDisplayName) };
+});
+import { typeDisplayName } from "@brainstorm/sdk/system-entities";
 
 function entity(props: Record<string, unknown>, id = "abcdef0123456789"): EntityRow {
 	return { id, type: "io.brainstorm.notes/Note/v1", properties: props } as EntityRow;
@@ -41,6 +50,24 @@ describe("rawNodeLabel", () => {
 	it("derives the caption's type name from the entity type id", () => {
 		const task = { ...entity({}), type: "brainstorm/Task/v1" } as EntityRow;
 		expect(rawNodeLabel(task)).toBe("Task (untitled)");
+	});
+
+	it("memoizes the untitled caption per type id — computed once, not per frame", () => {
+		// pixi-renderer calls nodeLabel per labeled node per pan/zoom frame;
+		// the fallback's typeDisplayName (split + 2 regexes + title-case) +
+		// t() interpolation must not run in that loop. A fresh type id keeps
+		// this test independent of captions other tests already warmed.
+		const probe = { ...entity({}), type: "brainstorm/MemoProbe/v1" } as EntityRow;
+		vi.mocked(typeDisplayName).mockClear();
+		const first = rawNodeLabel(probe);
+		expect(first).toBe("MemoProbe (untitled)");
+		for (let i = 0; i < 5; i += 1) expect(rawNodeLabel(probe)).toBe(first);
+		expect(typeDisplayName).toHaveBeenCalledTimes(1);
+
+		// A different type id is its own cache entry, still localized.
+		const other = { ...entity({}), type: "brainstorm/content_calendar/v1" } as EntityRow;
+		expect(rawNodeLabel(other)).toBe("Content calendar (untitled)");
+		expect(typeDisplayName).toHaveBeenCalledTimes(2);
 	});
 });
 

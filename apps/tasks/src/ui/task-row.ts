@@ -190,7 +190,7 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 			chip({
 				kind: "recurring",
 				label: "↻",
-				ariaLabel: summary,
+				srText: summary,
 				title: summary,
 			}),
 		);
@@ -389,14 +389,25 @@ export function dateChip(task: Task, now: number, overdue: boolean): HTMLSpanEle
 	el.className = "task-row__chip";
 	el.dataset.kind = overdue ? "date-overdue" : "date";
 	// One visible format for every date chip — the bare relative date. The
-	// due-vs-scheduled distinction stays discoverable via tooltip + aria.
+	// due-vs-scheduled distinction can't ride on `aria-label`: ARIA prohibits
+	// naming generic-role elements, so screen readers ignore an aria-label on
+	// a static <span> in browse mode. Instead the full "Due {date}" phrase is
+	// REAL text in a visually-hidden span, and the visible bare date is
+	// aria-hidden so the date isn't announced twice. `title` keeps the phrase
+	// as the mouse tooltip.
 	const date = formatDateRelative(dateAnchor, now);
-	el.textContent = date;
-	const semantics = t(task.dueAt !== null ? "tasks.row.due.aria" : "tasks.row.scheduled.aria", {
+	const semantics = t(task.dueAt !== null ? "tasks.row.due.sr" : "tasks.row.scheduled.sr", {
 		date,
 	});
 	el.title = semantics;
-	el.setAttribute("aria-label", semantics);
+	const sr = document.createElement("span");
+	sr.className = "tasks-sr-only";
+	sr.textContent = semantics;
+	el.appendChild(sr);
+	const visible = document.createElement("span");
+	visible.setAttribute("aria-hidden", "true");
+	visible.textContent = date;
+	el.appendChild(visible);
 	return el;
 }
 
@@ -427,7 +438,12 @@ type ChipSpec = {
 	label: string;
 	dataAttr?: string;
 	colorHint?: string | null;
-	ariaLabel?: string;
+	/** Screen-reader phrase announced in place of the visible glyph. Real
+	 *  sr-only text, not an aria-label — ARIA prohibits naming generic-role
+	 *  elements, so screen readers ignore aria-label on a static <span>.
+	 *  When set, the visible `label` is aria-hidden (glyphs like ↻ read as
+	 *  garbage or nothing). */
+	srText?: string;
 	title?: string;
 };
 
@@ -437,8 +453,18 @@ function chip(spec: ChipSpec): HTMLSpanElement {
 	el.dataset.kind = spec.kind;
 	if (spec.dataAttr) el.dataset.value = spec.dataAttr;
 	if (spec.colorHint) el.style.setProperty("--chip-color", spec.colorHint);
-	if (spec.ariaLabel) el.setAttribute("aria-label", spec.ariaLabel);
 	if (spec.title) el.title = spec.title;
-	el.textContent = spec.label;
+	if (spec.srText) {
+		const sr = document.createElement("span");
+		sr.className = "tasks-sr-only";
+		sr.textContent = spec.srText;
+		el.appendChild(sr);
+		const visible = document.createElement("span");
+		visible.setAttribute("aria-hidden", "true");
+		visible.textContent = spec.label;
+		el.appendChild(visible);
+	} else {
+		el.textContent = spec.label;
+	}
 	return el;
 }

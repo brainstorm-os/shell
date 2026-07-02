@@ -21,6 +21,18 @@
 
 import { type Entity, FILE_TYPE, FOLDER_TYPE } from "../types/entity";
 
+/** A folder member that is LIVE in the vault but hidden from the browser
+ *  (child-scoped / app-internal type filtered out of `browsableTypes`).
+ *  Hidden ≠ deleted: these ids must survive any full-replacement write of
+ *  the folder's `members[]`, else a display filter silently destroys the
+ *  user's membership record (the F-318 data-loss bug). `afterId` anchors
+ *  the id to the nearest preceding RENDERED member (null = at the front)
+ *  so `mergeRetainedMembers` can restore its position on persist. */
+export type RetainedMember = { id: string; afterId: string | null };
+
+/** Per-folder retained hidden members, keyed by folder id (root included). */
+export type RetainedMembersMap = Map<string, RetainedMember[]>;
+
 export type VaultEntityInput = {
 	id: string;
 	type: string;
@@ -46,6 +58,13 @@ function displayName(properties: Record<string, unknown>): string {
  *                 legacy files-only projection (File + Folder only); the
  *                 store fills it from `intents.suggest`. File and Folder
  *                 are always included irrespective of this set.
+ * @param retainedOut when supplied, receives the per-folder member ids that
+ *                 are live in the vault but excluded by the browsability
+ *                 filter — the ids `persistFolderMembers` must merge back
+ *                 into any full-replacement `members[]` write (hide-from-
+ *                 display must never become delete-on-persist). Genuinely
+ *                 dangling refs (deleted / unknown ids) are NOT retained —
+ *                 pruning those on persist is intended.
  * @returns `[root, ...entities]`. When the snapshot contains the real
  *          `rootId` Folder (the shell bootstrap ran) its OWN row is the
  *          root — its declared members first, then any orphan no folder
@@ -60,15 +79,23 @@ export function buildVaultFileTree(
 	rootId: string,
 	now: number = Date.now(),
 	browsableTypes?: ReadonlySet<string>,
+	retainedOut?: RetainedMembersMap,
 ): Entity[] {
 	// Files is a universal browser, but the vault snapshot is the WHOLE shared
 	// object space — including internal state/config rows no app can open. A row
 	// surfaces only when it is a File/Folder (structural) or its type is openable
 	// (`browsableTypes`, resolved from the opener registry). Member refs pointing
-	// at an excluded entity are dropped by the dangling-ref sanitiser below (it
-	// keys off the filtered `liveIds`), so nothing unbrowsable leaks as a ghost.
+	// at an excluded entity are dropped from the RENDERED members below (the
+	// sanitiser keys off the filtered `liveIds`), so nothing unbrowsable leaks as
+	// a ghost — but refs to a live-yet-hidden entity are RETAINED via
+	// `retainedOut` (hidden ≠ deleted; only refs to genuinely-gone entities are
+	// pruned for good).
 	const isBrowsable = (type: string): boolean =>
 		type === FILE_TYPE || type === FOLDER_TYPE || (browsableTypes?.has(type) ?? false);
+	const allLiveIds = new Set<string>();
+	for (const e of entities) {
+		if (e.deletedAt == null) allLiveIds.add(e.id);
+	}
 	const live = entities.filter((e) => e.deletedAt == null && isBrowsable(e.type));
 	const liveIds = new Set(live.map((e) => e.id));
 	const rootRow = live.find((e) => e.id === rootId && e.type === FOLDER_TYPE);
@@ -84,12 +111,21 @@ export function buildVaultFileTree(
 		const raw = e.properties.members;
 		const declared = Array.isArray(raw) ? raw.filter((m): m is string => typeof m === "string") : [];
 		const members: string[] = [];
+		const retained: RetainedMember[] = [];
+		const retainedIds = new Set<string>();
 		for (const m of declared) {
-			if (m === e.id || m === rootId || !liveIds.has(m) || members.includes(m)) continue;
-			members.push(m);
-			contained.add(m);
+			if (m === e.id || m === rootId || members.includes(m) || retainedIds.has(m)) continue;
+			if (liveIds.has(m)) {
+				members.push(m);
+				contained.add(m);
+			} else if (allLiveIds.has(m)) {
+				retained.push({ id: m, afterId: members.at(-1) ?? null });
+				retainedIds.add(m);
+			}
+			// else: ref to a deleted/unknown entity — genuinely dangling, pruned.
 		}
 		folderMembers.set(e.id, members);
+		if (retained.length > 0) retainedOut?.set(e.id, retained);
 	}
 
 	const mapped: Entity[] = nonRoot.map((e) => {
@@ -121,14 +157,22 @@ export function buildVaultFileTree(
 	const rootDeclaredSet = new Set<string>();
 	const rawRootMembers = rootRow?.properties.members;
 	if (Array.isArray(rawRootMembers)) {
+		const rootRetained: RetainedMember[] = [];
+		const rootRetainedIds = new Set<string>();
 		for (const m of rawRootMembers) {
-			if (typeof m !== "string" || m === rootId || !liveIds.has(m) || rootDeclaredSet.has(m)) {
+			if (typeof m !== "string" || m === rootId || rootDeclaredSet.has(m) || rootRetainedIds.has(m)) {
 				continue;
 			}
-			rootDeclared.push(m);
-			rootDeclaredSet.add(m);
-			contained.add(m);
+			if (liveIds.has(m)) {
+				rootDeclared.push(m);
+				rootDeclaredSet.add(m);
+				contained.add(m);
+			} else if (allLiveIds.has(m)) {
+				rootRetained.push({ id: m, afterId: rootDeclared.at(-1) ?? null });
+				rootRetainedIds.add(m);
+			}
 		}
+		if (rootRetained.length > 0) retainedOut?.set(rootId, rootRetained);
 	}
 	const topFolders = mapped
 		.filter((e) => e.type === FOLDER_TYPE && !contained.has(e.id))
@@ -160,4 +204,47 @@ export function buildVaultFileTree(
 				deletedAt: null,
 			};
 	return [root, ...mapped];
+}
+
+/**
+ * The `members[]` to WRITE for a folder: its rendered (browsable) members
+ * with the snapshot's retained hidden ids re-inserted at their anchored
+ * positions. This is the inverse of the display filter above — a full-
+ * replacement `entities.update({members})` must go through it so hiding a
+ * child-scoped/app-internal entity never deletes its membership record.
+ * An id whose visible anchor left the folder appends at the end (position
+ * is best-effort; membership is not). Never duplicates an id already in
+ * `rendered` (e.g. re-dropped cross-app before the next snapshot rebuild).
+ */
+export function mergeRetainedMembers(
+	rendered: readonly string[],
+	retained: readonly RetainedMember[] | undefined,
+): string[] {
+	if (!retained || retained.length === 0) return [...rendered];
+	const renderedSet = new Set(rendered);
+	const front: string[] = [];
+	const afterVisible = new Map<string, string[]>();
+	const tail: string[] = [];
+	const seen = new Set<string>();
+	for (const r of retained) {
+		if (renderedSet.has(r.id) || seen.has(r.id)) continue;
+		seen.add(r.id);
+		if (r.afterId === null) {
+			front.push(r.id);
+		} else if (renderedSet.has(r.afterId)) {
+			const bucket = afterVisible.get(r.afterId);
+			if (bucket) bucket.push(r.id);
+			else afterVisible.set(r.afterId, [r.id]);
+		} else {
+			tail.push(r.id);
+		}
+	}
+	const out = [...front];
+	for (const id of rendered) {
+		out.push(id);
+		const bucket = afterVisible.get(id);
+		if (bucket) out.push(...bucket);
+	}
+	out.push(...tail);
+	return out;
 }

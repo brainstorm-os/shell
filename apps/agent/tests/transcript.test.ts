@@ -1,5 +1,6 @@
 import { MessageRole } from "@brainstorm/sdk-types";
 import { describe, expect, it } from "vitest";
+import { formatCitationLine } from "../src/logic/citation-format";
 import {
 	AGENT_SYSTEM_PROMPT,
 	type TranscriptMessage,
@@ -79,18 +80,43 @@ describe("deriveConversationTitle", () => {
 });
 
 describe("linkifyEntityRefs (F-319)", () => {
-	it("rewrites `[id] Title` to a `[Title](id)` markdown link", () => {
+	it("rewrites the canonical `- [id] Title` list line to a `[Title](id)` markdown link", () => {
 		expect(linkifyEntityRefs("- [n_mqz1aegg_2qmlcl] Northbound Q3 plan 32834")).toBe(
 			"- [Northbound Q3 plan 32834](n_mqz1aegg_2qmlcl)",
 		);
+	});
+
+	it("round-trips the retrieval emitter's citation line format", () => {
+		const line = formatCitationLine("n_mqz1aegg_2qmlcl", "Northbound Q3 plan — a snippet");
+		expect(linkifyEntityRefs(line)).toBe("- [Northbound Q3 plan — a snippet](n_mqz1aegg_2qmlcl)");
+	});
+
+	it("round-trips a digitless (seed-shaped) id when list-anchored", () => {
+		const line = formatCitationLine("mkt_co_harbor", "Harbor & Co");
+		expect(linkifyEntityRefs(line)).toBe("- [Harbor & Co](mkt_co_harbor)");
 	});
 
 	it("labels a bare `[id]` with the id itself (citationsToLinks fallback)", () => {
 		expect(linkifyEntityRefs("see [ent_abc123].")).toBe("see [ent_abc123](ent_abc123).");
 	});
 
-	it("handles multiple refs on one line, keeping the separator text", () => {
-		expect(linkifyEntityRefs("[n_a1] Foo and [n_b2] Bar")).toBe("[Foo and](n_a1) [Bar](n_b2)");
+	it("keeps prose after a mid-sentence citation intact (id-labelled link)", () => {
+		expect(linkifyEntityRefs("see [n_abc_1] for details")).toBe("see [n_abc_1](n_abc_1) for details");
+	});
+
+	it("handles multiple refs on one line without absorbing the prose between them", () => {
+		expect(linkifyEntityRefs("[n_a1] Foo and [n_b2] Bar")).toBe(
+			"[n_a1](n_a1) Foo and [n_b2](n_b2) Bar",
+		);
+	});
+
+	it("linkifies a title line after a colon lead-in", () => {
+		expect(linkifyEntityRefs("Source: [n_a1] Quarterly Plan")).toBe("Source: [Quarterly Plan](n_a1)");
+	});
+
+	it("leaves bracketed snake_case prose tokens untouched", () => {
+		const body = "set [max_retries] and [user_id] in the config\n[max_retries] controls attempts";
+		expect(linkifyEntityRefs(body)).toBe(body);
 	});
 
 	it("leaves real markdown links, prose brackets, and headings untouched", () => {
@@ -101,5 +127,28 @@ describe("linkifyEntityRefs (F-319)", () => {
 	it("leaves fenced code blocks untouched", () => {
 		const body = "```\n[n_abc_1] not a citation\n```\n[n_abc_1] Real Title";
 		expect(linkifyEntityRefs(body)).toBe("```\n[n_abc_1] not a citation\n```\n[Real Title](n_abc_1)");
+	});
+
+	it("treats ~~~ fences like ``` fences", () => {
+		const body = "~~~\n- [n_abc_1] not a citation\n~~~";
+		expect(linkifyEntityRefs(body)).toBe(body);
+	});
+
+	it("leaves indented fences inside list items untouched", () => {
+		const body = "- item\n  ```\n  [n_abc_1] code\n  ```\nafter [n_abc_1]";
+		expect(linkifyEntityRefs(body)).toBe(
+			"- item\n  ```\n  [n_abc_1] code\n  ```\nafter [n_abc_1](n_abc_1)",
+		);
+	});
+
+	it("leaves indented (4-space) code lines untouched", () => {
+		const body = "prose\n    [n_abc_1] indented code";
+		expect(linkifyEntityRefs(body)).toBe(body);
+	});
+
+	it("leaves inline code spans untouched, still rewriting the prose around them", () => {
+		expect(linkifyEntityRefs("use `retry([n_a1])` then see [n_b2] please")).toBe(
+			"use `retry([n_a1])` then see [n_b2](n_b2) please",
+		);
 	});
 });

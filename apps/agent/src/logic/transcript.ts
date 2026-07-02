@@ -6,6 +6,7 @@
  */
 
 import { type AiChatMessage, MessageRole, isMessageRole } from "@brainstorm/sdk-types";
+import { CITATION_ID_SOURCE } from "./citation-format";
 
 /** The anti-fabrication contract shared by both the plain-chat and tool-enabled
  *  system prompts. The model is grounded ONLY on the context blocks the app
@@ -57,41 +58,81 @@ export function buildAiMessages(
 	return out;
 }
 
-/** An entity-id-shaped token: lowercase alnum segments joined by underscores
- *  (`n_mqz1aegg_2qmlcl`, `ent_abc123`, `mkt_n_positioning`). At least one
- *  underscore, so prose brackets (`[x]`, `[TODO]`, `[1]`) never match. */
-const ENTITY_REF = /\[([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\](?!\()[ \t]*([^\n[]*)/g;
+/** A whole line in the taught citation shape (`formatCitationLine`): an
+ *  optional list marker (`- `, `* `, `+ `, `1. `) or a `…: ` lead-in, the
+ *  bracketed id, then the rest of the line as the title. Title and lead-in
+ *  admit no brackets or backticks, so a line with a second ref, a markdown
+ *  link, or a code span never reaches the title branch. */
+const CITATION_LINE = new RegExp(
+	`^([ \\t]{0,3}(?:[-*+]|\\d{1,3}\\.)?[ \\t]*|[^\\[\\]\`]*:[ \\t]+)\\[(${CITATION_ID_SOURCE})\\][ \\t]+([^\\[\\]\`]*[a-zA-Z0-9][^\\[\\]\`]*?)[ \\t]*$`,
+);
+
+/** The lead-in captured by {@link CITATION_LINE} ends in an explicit anchor —
+ *  a list marker or a colon — as opposed to a plain line start. */
+const ANCHORED_PREFIX = /[-*+.:][ \t]*$/;
+
+/** A bracketed entity-id anywhere in prose (not already a markdown link). */
+const ENTITY_REF = new RegExp(`\\[(${CITATION_ID_SOURCE})\\](?!\\()`, "g");
+
+/** Inline code spans (`` `…` `` / ``` ``…`` ```) — split so refs inside them
+ *  pass through untouched. An unmatched backtick is literal text (CommonMark),
+ *  so no match there is correct. */
+const CODE_SPAN = /(`+[^`]*`+)/;
+
+/** Rewrite bare `[<id>]` refs in a prose chunk to `[<id>](<id>)` links. The id
+ *  must contain a digit: every minted id embeds a base36 timestamp/random, so
+ *  real ids pass, while prose snake_case (`[max_retries]`, `[user_id]`) stays
+ *  plain text instead of becoming a dead link. */
+function linkifyBareRefs(text: string): string {
+	return text.replace(ENTITY_REF, (match, id: string) =>
+		/[0-9]/.test(id) ? `[${id}](${id})` : match,
+	);
+}
 
 /**
  * Display-time normalization for the citation shapes models actually emit.
  * The retrieval context block lists vault objects as `- [<id>] <title>`
- * (`buildRetrievalContextBlock`), and smaller models echo that bracket format
- * verbatim in their prose instead of the `[label](id)` markdown-link protocol —
- * so the transcript showed raw node ids (F-319). Rewrite `[<id>] <title>` to
- * `[<title>](<id>)` so the shared `<Markdown>` entity-link resolver renders a
- * clickable title and the id never reaches the user's eyes. A bare `[<id>]`
- * with no trailing title keeps the id as its own label (the same fallback as
- * `citationsToLinks`). Fenced code blocks pass through untouched. Pure — safe
- * to apply identically to historical and freshly generated messages.
+ * (`formatCitationLine` via `buildRetrievalContextBlock`), and smaller models
+ * echo that bracket format verbatim in their prose instead of the
+ * `[label](id)` markdown-link protocol — so the transcript showed raw node
+ * ids (F-319). A whole line in the taught shape rewrites to `[<title>](<id>)`
+ * so the shared `<Markdown>` entity-link resolver renders a clickable title;
+ * a mid-sentence `[<id>]` keeps the id as its own label (the same fallback as
+ * `citationsToLinks`) and never absorbs the prose after it. The title branch
+ * needs an explicit anchor (list marker / colon) OR a digit in the id, and
+ * the bare branch always needs the digit — so snake_case prose tokens stay
+ * plain text. Fenced code blocks (``` or ~~~, fence chars matched), indented
+ * (4-space/tab) code lines, and inline code spans pass through untouched.
+ * Pure — safe to apply identically to historical and fresh messages.
  */
 export function linkifyEntityRefs(body: string): string {
 	const lines = body.replace(/\r\n?/g, "\n").split("\n");
-	let inFence = false;
+	let fence: string | null = null;
 	const out = lines.map((line) => {
-		if (/^```/.test(line)) {
-			inFence = !inFence;
+		const fenceMark = /^[ \t]{0,3}(```|~~~)/.exec(line)?.[1];
+		if (fenceMark) {
+			if (fence === null) fence = fenceMark;
+			else if (fence === fenceMark) fence = null;
 			return line;
 		}
-		if (inFence) return line;
-		return line.replace(ENTITY_REF, (_match, id: string, trailing: string) => {
-			const title = trailing.trim();
-			// Bare punctuation after the bracket is not a title — keep it as prose.
-			if (!/[a-z0-9]/i.test(title)) return `[${id}](${id})${trailing}`;
-			const tail = trailing.slice(trailing.trimEnd().length);
-			return `[${title}](${id})${tail}`;
-		});
+		if (fence !== null || /^(?: {4}|\t)/.test(line)) return line;
+		return linkifyLine(line);
 	});
 	return out.join("\n");
+}
+
+function linkifyLine(line: string): string {
+	const citation = CITATION_LINE.exec(line);
+	if (citation) {
+		const [, prefix = "", id = "", title = ""] = citation;
+		if (ANCHORED_PREFIX.test(prefix) || /[0-9]/.test(id)) {
+			return `${prefix}[${title}](${id})`;
+		}
+	}
+	return line
+		.split(CODE_SPAN)
+		.map((chunk, i) => (i % 2 === 1 ? chunk : linkifyBareRefs(chunk)))
+		.join("");
 }
 
 const MAX_TITLE_LEN = 60;

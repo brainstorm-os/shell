@@ -72,6 +72,15 @@ const DEFAULTS = {
 	"brainstorm.database.timeline.emptyNoDateProperty":
 		"This collection has no date property to lay out. Add a date column, then bind it under View settings → Dates.",
 
+	// Vault-derived list chrome (stage description — F-318 follow-up)
+	"brainstorm.database.vault.allItems": "All vault items",
+	"brainstorm.database.vault.allItems.description": "{items} across {types}",
+	"brainstorm.database.vault.typeList.description": "{items} · {type}",
+	"brainstorm.database.vault.items.one": "{count} item",
+	"brainstorm.database.vault.items.other": "{count} items",
+	"brainstorm.database.vault.types.one": "{count} type",
+	"brainstorm.database.vault.types.other": "{count} types",
+
 	// Sidebar System section (F-212)
 	"brainstorm.database.sidebar.system": "System",
 	"brainstorm.database.sidebar.systemToggle": "Toggle the System section",

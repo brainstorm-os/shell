@@ -27,6 +27,16 @@ import type { EntityRow } from "../logic/in-memory-graph";
  *  the pixel-precise second line of defence for whatever survives. */
 export const NODE_LABEL_MAX_CHARS = 48;
 
+/** Per-type memo for the untitled caption. `nodeLabel` runs per labeled
+ *  node per pan/zoom frame (twice, via the Pixi overlay's width pass +
+ *  text pass), and the fallback's `typeDisplayName` (split + 2 regexes +
+ *  title-case) plus `t()` interpolation is real per-frame work the old
+ *  `id.slice` fallback never did. A vault holds ~a dozen types, so the map
+ *  stays tiny. A plain Map keyed on the type id alone is safe because the
+ *  Graph `t` is module-stable — bound once over the static English
+ *  manifest, no live locale switch (see `i18n/t.ts`). */
+const untitledCaptionByType = new Map<string, string>();
+
 /** The entity's display string before truncation: first non-empty string
  *  among `name` → `title`, else a human type caption ("Note (untitled)").
  *  The old fallback painted `entity.id.slice(0, 8)` — but ids are
@@ -39,7 +49,12 @@ export function rawNodeLabel(entity: EntityRow): string {
 	for (const raw of [props.name, props.title]) {
 		if (typeof raw === "string" && raw.trim().length > 0) return raw;
 	}
-	return t("node.untitled", { type: typeDisplayName(entity.type) });
+	let caption = untitledCaptionByType.get(entity.type);
+	if (caption === undefined) {
+		caption = t("node.untitled", { type: typeDisplayName(entity.type) });
+		untitledCaptionByType.set(entity.type, caption);
+	}
+	return caption;
 }
 
 /** Resolve + hard-truncate a node label to at most `NODE_LABEL_MAX_CHARS`

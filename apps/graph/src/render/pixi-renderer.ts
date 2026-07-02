@@ -813,6 +813,10 @@ function syncLabelOverlay(
 	// hovered node gets the top priority so it never drops; the rest rank by
 	// radius (degree), so the named hubs win the space.
 	const candidates: LabelBox[] = [];
+	// Labels resolved once here feed both the width estimate and the paint
+	// loop below — visible ⊆ wanted, so every painted node already has its
+	// text and nodeLabel never runs twice per node per frame.
+	const labelTextById = new Map<string, string>();
 	for (const node of snapshot.renderNodes) {
 		if (!wanted.has(node.id)) continue;
 		const layout = snapshot.nodes.get(node.id);
@@ -820,11 +824,13 @@ function syncLabelOverlay(
 		const centerX = layout.x * t.k + t.tx;
 		const top = (layout.y + node.radius + 4) * t.k + t.ty;
 		const priority = node.id === snapshot.hoveredId ? Number.POSITIVE_INFINITY : node.radius;
+		const label = nodeLabel(node.entity);
+		labelTextById.set(node.id, label);
 		candidates.push({
 			id: node.id,
 			centerX,
 			top,
-			width: estimateLabelWidth(nodeLabel(node.entity)),
+			width: estimateLabelWidth(label),
 			height: labelLineHeightPx,
 			priority,
 		});
@@ -870,7 +876,7 @@ function syncLabelOverlay(
 		div.style.fontWeight = node.id === snapshot.hoveredId ? "700" : "500";
 		const focusAlpha = snapshot.focusAlphaByNode.get(node.id) ?? 1;
 		div.style.opacity = String(Math.min(1, node.alpha + 0.1) * focusAlpha);
-		const text = nodeLabel(node.entity);
+		const text = labelTextById.get(node.id) ?? nodeLabel(node.entity);
 		if (div.textContent !== text) div.textContent = text;
 	}
 }

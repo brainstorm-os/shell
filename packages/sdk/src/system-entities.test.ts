@@ -6,6 +6,7 @@ import {
 	SystemEntityType,
 	friendlyTypeName,
 	isChildEntityType,
+	isPlumbingEntityType,
 	isSystemEntityType,
 	typeDisplayName,
 } from "./system-entities";
@@ -73,6 +74,41 @@ describe("child entity types (F-318)", () => {
 			expect(isSystemEntityType(type), type).toBe(false);
 		}
 		expect(CHILD_ENTITY_TYPES.size).toBe(Object.values(ChildEntityType).length);
+	});
+});
+
+describe("isPlumbingEntityType (system ∨ child union)", () => {
+	it("answers true for every system type", () => {
+		for (const type of SYSTEM_ENTITY_TYPES) {
+			expect(isPlumbingEntityType(type), type).toBe(true);
+		}
+	});
+
+	it("answers true for every child type", () => {
+		for (const type of CHILD_ENTITY_TYPES) {
+			expect(isPlumbingEntityType(type), type).toBe(true);
+		}
+	});
+
+	it("keeps user content out", () => {
+		for (const type of [
+			"brainstorm/Note/v1",
+			"brainstorm/Task/v1",
+			"brainstorm/Reminder/v1",
+			"io.brainstorm.chat/Channel/v1",
+			"io.brainstorm.journal/Entry/v1",
+			"",
+		]) {
+			expect(isPlumbingEntityType(type), type).toBe(false);
+		}
+	});
+
+	it("is exactly the union of the two finer-grained predicates", () => {
+		for (const type of [...SYSTEM_ENTITY_TYPES, ...CHILD_ENTITY_TYPES, "brainstorm/Note/v1"]) {
+			expect(isPlumbingEntityType(type), type).toBe(
+				isSystemEntityType(type) || isChildEntityType(type),
+			);
+		}
 	});
 });
 

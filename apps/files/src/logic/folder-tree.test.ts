@@ -442,6 +442,63 @@ describe("FolderTree.softDelete + restore + permanentDelete", () => {
 	});
 });
 
+describe("FolderTree.persistableMembers — hidden-member retention (display filter ≠ delete)", () => {
+	const HIDDEN_MSG = "msg_hidden";
+
+	function makeTreeWithRetained(): FolderTree {
+		const tree = new FolderTree();
+		// The rendered snapshot (what buildVaultFileTree emitted): the folder's
+		// stored members were [msg_hidden, fil_a] but the Message is hidden.
+		tree.applySnapshot([
+			{
+				id: "fld",
+				type: FOLDER_TYPE,
+				properties: { name: "F", members: ["fil_a"] },
+				createdAt: 0,
+				updatedAt: 0,
+				deletedAt: null,
+			},
+			{
+				id: "fil_a",
+				type: FILE_TYPE,
+				properties: { name: "a.txt", mime: "text/plain", size: 0 },
+				createdAt: 0,
+				updatedAt: 0,
+				deletedAt: null,
+			},
+			{
+				id: "fil_b",
+				type: FILE_TYPE,
+				properties: { name: "b.txt", mime: "text/plain", size: 0 },
+				createdAt: 0,
+				updatedAt: 0,
+				deletedAt: null,
+			},
+		]);
+		tree.setRetainedHiddenMembers(new Map([["fld", [{ id: HIDDEN_MSG, afterId: null }]]]));
+		return tree;
+	}
+
+	it("round-trips a hidden member through a membership op (addMembers) instead of deleting it", () => {
+		const tree = makeTreeWithRetained();
+		const result = tree.addMembers("fld", ["fil_b"]);
+		expect(result.ok).toBe(true);
+		// The rendered members never show the hidden Message…
+		const fld = tree.get("fld");
+		if (!fld) throw new Error("unreachable");
+		expect(readMembers(fld)).toEqual(["fil_a", "fil_b"]);
+		// …but the array written back to the vault still carries it.
+		expect(tree.persistableMembers("fld")).toEqual([HIDDEN_MSG, "fil_a", "fil_b"]);
+	});
+
+	it("returns rendered members verbatim for folders with nothing retained", () => {
+		const tree = makeTreeWithRetained();
+		expect(tree.persistableMembers("nope")).toEqual([]);
+		tree.setRetainedHiddenMembers(new Map());
+		expect(tree.persistableMembers("fld")).toEqual(["fil_a"]);
+	});
+});
+
 describe("FolderTree.applySnapshot — readMembers on a Note (non-folder)", () => {
 	it("listFolderMembers on a non-folder id returns empty", () => {
 		const tree = new FolderTree();

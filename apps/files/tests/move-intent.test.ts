@@ -12,6 +12,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FolderTree } from "../src/logic/folder-tree";
+import {
+	type RetainedMember,
+	type VaultEntityInput,
+	buildVaultFileTree,
+} from "../src/logic/vault-tree";
 import { handleMoveIntent } from "../src/store/use-files-store";
 import { type Entity, FILE_TYPE, FOLDER_TYPE } from "../src/types/entity";
 
@@ -154,6 +159,67 @@ describe("handleMoveIntent — copy path", () => {
 		handleMoveIntent({ entityIds: ["f1"], toFolderId: "dst", copy: true }, tree);
 		await new Promise((r) => setTimeout(r, 0));
 		expect(update).toHaveBeenCalledWith("dst", expect.anything());
+	});
+});
+
+describe("handleMoveIntent — hidden-member retention (F-318 must not become delete-on-persist)", () => {
+	const MSG_TYPE = "brainstorm/Message/v1";
+
+	function msg(id: string): VaultEntityInput {
+		return {
+			id,
+			type: MSG_TYPE,
+			properties: { conversation: "chan_1", role: "user", body: "hi" },
+			createdAt: 0,
+			updatedAt: 0,
+			deletedAt: null,
+		};
+	}
+
+	/** The real snapshot pipeline: raw vault rows → buildVaultFileTree (which
+	 *  hides the Message from the rendered members) → tree + retained map —
+	 *  exactly what `loadFromVault` wires up. */
+	function makeTreeFromVault(rawMembers: string[]): FolderTree {
+		const raw: VaultEntityInput[] = [
+			fld("root", "root", ["dst", "fil_b"]),
+			fld("dst", "dst", rawMembers),
+			fil("fil_a", "a.txt"),
+			fil("fil_b", "b.txt"),
+			{ ...fil("fil_gone", "gone.txt"), deletedAt: 999 },
+			msg("msg_1"),
+		];
+		const retained = new Map<string, RetainedMember[]>();
+		const tree = new FolderTree();
+		tree.applySnapshot(buildVaultFileTree(raw, "root", 0, new Set(), retained));
+		tree.setRetainedHiddenMembers(retained);
+		return tree;
+	}
+
+	it("a membership op persists the folder WITH its hidden Message member (round-trip, no data loss)", async () => {
+		const update = vi.fn().mockResolvedValue(undefined);
+		stampRuntime(update);
+		const tree = makeTreeFromVault(["msg_1", "fil_a"]);
+		// The Message never renders…
+		expect(tree.get("msg_1")).toBeUndefined();
+		expect(tree.get("dst")?.properties.members).toEqual(["fil_a"]);
+		// …but a membership-touching op must not erase its stored membership.
+		handleMoveIntent({ entityIds: ["fil_b"], toFolderId: "dst", copy: true }, tree);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(update).toHaveBeenCalledTimes(1);
+		expect(update).toHaveBeenCalledWith("dst", { members: ["msg_1", "fil_a", "fil_b"] });
+	});
+
+	it("genuinely-deleted member ids are still pruned on persist", async () => {
+		const update = vi.fn().mockResolvedValue(undefined);
+		stampRuntime(update);
+		const tree = makeTreeFromVault(["msg_1", "fil_gone", "fil_a"]);
+		handleMoveIntent({ entityIds: ["fil_b"], toFolderId: "dst", copy: true }, tree);
+		await new Promise((r) => setTimeout(r, 0));
+		const call = update.mock.calls[0];
+		expect(call?.[0]).toBe("dst");
+		const members = (call?.[1] as { members: string[] }).members;
+		expect(members).toContain("msg_1");
+		expect(members).not.toContain("fil_gone");
 	});
 });
 

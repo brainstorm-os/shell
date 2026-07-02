@@ -68,6 +68,26 @@ export function isChildEntityType(entityType: string): boolean {
 	return CHILD_ENTITY_TYPES.has(entityType);
 }
 
+/**
+ * The union of the two sets above — a type that *reads as plumbing* in a
+ * type-enumerating surface, whether because the product wrote it (system)
+ * or because it only means anything inside its parent container (child).
+ * The Database sidebar's System disclosure and the Graph SHOW filter's
+ * trailing dimmed group both partition on this ONE predicate so the fleet
+ * cannot drift (Graph once partitioned on `isSystemEntityType` alone and
+ * flooded the canvas legend with "Message (untitled)" chips as user
+ * content).
+ *
+ * Contract mirrors the system set's: presentation-only — grouping and
+ * de-emphasis, never query or filtering semantics. Surfaces that need the
+ * finer distinction (Files/Database default-browse EXCLUSION applies to
+ * child types only, never system types' grouping) keep using the
+ * fine-grained predicates.
+ */
+export function isPlumbingEntityType(entityType: string): boolean {
+	return SYSTEM_ENTITY_TYPES.has(entityType) || CHILD_ENTITY_TYPES.has(entityType);
+}
+
 function pluralize(word: string): string {
 	if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
 	if (/(s|x|z|ch|sh)$/i.test(word)) return `${word}es`;

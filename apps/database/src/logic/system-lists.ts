@@ -12,7 +12,7 @@
  * lists whose every source type is infrastructure.
  */
 
-import { isChildEntityType, isSystemEntityType } from "@brainstorm/sdk/system-entities";
+import { isPlumbingEntityType } from "@brainstorm/sdk/system-entities";
 import type { List } from "../types/list";
 import { ListSourceKind } from "../types/list-source";
 
@@ -25,16 +25,17 @@ export type SidebarNavRow =
 	| { kind: SidebarRowKind.List; list: List }
 	| { kind: SidebarRowKind.SystemHeader; count: number; open: boolean };
 
-/** A vault-derived type-list whose every source type is infrastructure or
- *  parent-scoped child content (Messages, Comments — F-318): both read as
- *  plumbing next to the user's own collections, so both drop under the
- *  System disclosure. Grouping only — the lists stay fully browsable. */
+/** A vault-derived type-list whose every source type reads as plumbing —
+ *  infrastructure or parent-scoped child content (Messages, Comments —
+ *  F-318) — next to the user's own collections, so it drops under the
+ *  System disclosure. Grouping only — the lists stay fully browsable. Same
+ *  shared predicate the Graph SHOW filter partitions on. */
 export function isSystemList(list: List, isVaultDerived: (id: string) => boolean): boolean {
 	if (!isVaultDerived(list.id)) return false;
 	const source = list.source;
 	if (!source || source.kind !== ListSourceKind.ByType) return false;
 	if (source.types.length === 0) return false;
-	return source.types.every((type) => isSystemEntityType(type) || isChildEntityType(type));
+	return source.types.every(isPlumbingEntityType);
 }
 
 export function partitionSidebarLists(
