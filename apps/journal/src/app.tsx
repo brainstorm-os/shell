@@ -1432,7 +1432,7 @@ function ReminderSettings(): ReactElement {
 			{enabled ? (
 				<input
 					type="time"
-					className="journal__reminder-time"
+					className="journal__reminder-time bs-input bs-input--sm"
 					value={time}
 					aria-label={t("reminder.timeLabel")}
 					onChange={(e) => {

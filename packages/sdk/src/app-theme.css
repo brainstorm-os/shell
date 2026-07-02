@@ -551,6 +551,33 @@ select {
 	resize: vertical;
 }
 
+/* COMPOSITE field — a searchbar-style field where a leading icon (or trailing
+ * affordance) shares the box with the text control. The `.bs-input` face rides
+ * the WRAPPER (`<label>` / `<div>`), which supplies the box + the focus ring on
+ * `:focus-within`; the inner control is `.bs-input__control` — a bare, flexible
+ * slot that inherits the field's typography and adds nothing of its own. This
+ * is the sanctioned way to put an icon inside a `.bs-input` (Files / Contacts /
+ * Mailbox search bars) — the ratchet recognizes `bs-input__control` as a face
+ * token so the wrapper pattern is first-class, not a per-app opt-out. */
+:root .bs-input:focus-within {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -1px;
+}
+:root .bs-input__control {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	outline: none;
+}
+:root .bs-input__control::placeholder {
+	color: var(--color-text-tertiary);
+}
+
 /* ============================================================
  * DRAG GRIP — shared structural primitive `.bs-drag-grip`. The
  * hover-revealed reorder / cross-app drag handle pinned in a list or

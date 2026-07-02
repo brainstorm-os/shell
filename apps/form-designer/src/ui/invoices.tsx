@@ -236,7 +236,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 							<label className="invoices__field">
 								<span className="invoices__label">{t("invoice.numberLabel")}</span>
 								<input
-									className="invoices__input"
+									className="bs-input"
 									value={draft.number}
 									onChange={(e) => edit((d) => ({ ...d, number: e.target.value }))}
 								/>
@@ -258,7 +258,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 								<span className="invoices__label">{t("invoice.issueDate")}</span>
 								<input
 									type="date"
-									className="invoices__input"
+									className="bs-input"
 									value={draft.issueDate}
 									onChange={(e) => edit((d) => ({ ...d, issueDate: e.target.value }))}
 								/>
@@ -267,7 +267,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 								<span className="invoices__label">{t("invoice.dueDate")}</span>
 								<input
 									type="date"
-									className="invoices__input"
+									className="bs-input"
 									value={draft.dueDate ?? ""}
 									onChange={(e) => edit((d) => ({ ...d, dueDate: e.target.value || null }))}
 								/>
@@ -310,7 +310,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 								// biome-ignore lint/suspicious/noArrayIndexKey: line rows are positional; no stable id in the array model
 								<div className="invoices__item-edit" key={i}>
 									<input
-										className="invoices__input"
+										className="bs-input"
 										placeholder={t("invoice.item.descriptionPlaceholder")}
 										value={item.description}
 										onChange={(e) =>
@@ -324,7 +324,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 									/>
 									<input
 										type="number"
-										className="invoices__input invoices__num-col"
+										className="bs-input invoices__num-col"
 										aria-label={t("invoice.item.qty")}
 										value={item.quantity}
 										min={0}
@@ -339,7 +339,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 									/>
 									<input
 										type="number"
-										className="invoices__input invoices__num-col"
+										className="bs-input invoices__num-col"
 										aria-label={t("invoice.item.unitPrice")}
 										value={item.unitPrice}
 										min={0}
@@ -387,7 +387,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 								<span className="invoices__label">{t("invoice.tax")}</span>
 								<input
 									type="number"
-									className="invoices__input"
+									className="bs-input"
 									value={draft.taxRatePct}
 									min={0}
 									max={100}
@@ -406,7 +406,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 						<label className="invoices__field">
 							<span className="invoices__label">{t("invoice.notes")}</span>
 							<textarea
-								className="invoices__input invoices__textarea"
+								className="bs-input invoices__textarea"
 								placeholder={t("invoice.notesPlaceholder")}
 								value={draft.notes}
 								onChange={(e) => edit((d) => ({ ...d, notes: e.target.value }))}
@@ -452,19 +452,19 @@ function PartyEditor(props: {
 		<fieldset className="invoices__party">
 			<legend className="invoices__legend">{legend}</legend>
 			<input
-				className="invoices__input"
+				className="bs-input"
 				placeholder={t("invoice.party.name")}
 				value={party.name}
 				onChange={(e) => onEdit({ ...party, name: e.target.value })}
 			/>
 			<textarea
-				className="invoices__input invoices__party-address"
+				className="bs-input invoices__party-address"
 				placeholder={t("invoice.party.address")}
 				value={party.addressLines.join("\n")}
 				onChange={(e) => onEdit({ ...party, addressLines: e.target.value.split("\n") })}
 			/>
 			<input
-				className="invoices__input"
+				className="bs-input"
 				placeholder={t("invoice.party.email")}
 				value={party.email}
 				onChange={(e) => onEdit({ ...party, email: e.target.value })}

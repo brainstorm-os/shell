@@ -517,27 +517,11 @@ body.is-resizing .graph-sidebar__resize {
 	flex-shrink: 0;
 }
 
+/* Layout-only — the control face comes from the shared `.bs-input`. */
 .subject-list__name {
 	flex: 1 1 0;
 	min-width: 0;
 	width: 0;
-	padding: var(--space-1);
-	font-size: var(--text-size-md);
-	font-family: inherit;
-	color: var(--text);
-	background: var(--bg-elev, transparent);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-sm);
-}
-
-.subject-list__name:hover {
-	border-color: var(--text-faint);
-}
-
-.subject-list__name:focus {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
 }
 
 .subject-list__meta,
@@ -700,24 +684,11 @@ body.is-resizing .graph-sidebar__resize {
 	min-width: 0;
 }
 
+/* Layout-only — the control face comes from the shared `.bs-input`. */
 .where-editor__prop,
 .where-editor__val {
 	flex: 1 1 60px;
 	min-width: 0;
-	padding: var(--space-1);
-	font-size: var(--text-size-xs);
-	font-family: inherit;
-	color: var(--text);
-	background: var(--bg-elev, transparent);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-sm);
-}
-
-.where-editor__prop:focus,
-.where-editor__val:focus {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
 }
 
 /* Layout-only — the control face comes from the shared `.bs-select`. */

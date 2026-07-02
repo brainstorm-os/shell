@@ -82,7 +82,7 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 						<span className="mb-compose__label">{t("compose.from")}</span>
 						<button
 							type="button"
-							className="mb-compose__from"
+							className="bs-input mb-compose__from"
 							onClick={onPickFrom}
 							aria-haspopup="menu"
 							disabled={busy}
@@ -94,7 +94,7 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 				<label className="mb-compose__field">
 					<span className="mb-compose__label">{t("compose.to")}</span>
 					<input
-						className="mb-compose__input"
+						className="bs-input"
 						type="text"
 						value={to}
 						onChange={(e) => setTo(e.target.value)}
@@ -107,7 +107,7 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 				<label className="mb-compose__field">
 					<span className="mb-compose__label">{t("compose.cc")}</span>
 					<input
-						className="mb-compose__input"
+						className="bs-input"
 						type="text"
 						value={cc}
 						onChange={(e) => setCc(e.target.value)}
@@ -118,7 +118,7 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 				<label className="mb-compose__field">
 					<span className="mb-compose__label">{t("compose.subject")}</span>
 					<input
-						className="mb-compose__input"
+						className="bs-input"
 						type="text"
 						value={subject}
 						onChange={(e) => setSubject(e.target.value)}

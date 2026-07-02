@@ -170,7 +170,7 @@ function DueField({
 			<button
 				ref={dateBtn}
 				type="button"
-				className="au-capture__due-trigger au-menu-button"
+				className="bs-input au-capture__due-trigger"
 				aria-haspopup="dialog"
 				aria-label={t("capture.due.pickDate")}
 				onClick={openDatePicker}
@@ -262,7 +262,7 @@ function Capture({
 			<input
 				ref={subjectRef}
 				type="text"
-				className="au-capture__subject"
+				className="bs-input au-capture__subject"
 				placeholder={t("capture.subject")}
 				aria-label={t("capture.subject")}
 				value={subject}
@@ -272,7 +272,7 @@ function Capture({
 			<button
 				ref={repeatRef}
 				type="button"
-				className="au-capture__repeat au-menu-button"
+				className="bs-input au-capture__repeat"
 				aria-haspopup="menu"
 				aria-label={t("capture.repeat")}
 				onClick={openRepeat}

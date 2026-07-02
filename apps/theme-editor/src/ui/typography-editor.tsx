@@ -41,7 +41,7 @@ export function TypographyEditor({
 				<span className="te-field__label">{t("typo.name")}</span>
 				<input
 					type="text"
-					className="te-typo__name"
+					className="bs-input te-typo__name"
 					value={typo.name}
 					aria-label={t("typo.name")}
 					onChange={(e) => onName(e.target.value)}
@@ -54,7 +54,7 @@ export function TypographyEditor({
 						<span className="te-field__label">{t(`fontRole.${role}`)}</span>
 						<input
 							type="text"
-							className="te-typo__stack"
+							className="bs-input te-typo__stack"
 							value={typo.fonts[role]?.stack ?? ""}
 							spellCheck={false}
 							aria-label={t(`fontRole.${role}`)}

@@ -1199,7 +1199,7 @@ export function EditableTitle({
 		return (
 			<input
 				ref={inputRef}
-				className="dbv-grid__title-input"
+				className="dbv-grid__title-input bs-input"
 				defaultValue={raw}
 				aria-label="Name"
 				onBlur={commit}

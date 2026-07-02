@@ -327,16 +327,11 @@ body {
 	margin-bottom: var(--space-2);
 }
 
+/* Box (height / border / surface / focus) comes from the shared `.bs-input`
+ * face; only the toolbar flex fill + the medium label weight are local. */
 .te-toolbar__name {
 	flex: 1 1 auto;
 	min-width: 0;
-	height: var(--control-height-md);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-medium);
 }
 
@@ -449,17 +444,9 @@ body {
 	color: var(--color-text-secondary);
 }
 
-.te-typo__name,
-.te-typo__stack {
-	height: var(--control-height-md);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	font-family: var(--text-family-ui);
-	font-size: var(--text-size-sm);
-}
+/* Box (height / border / surface / focus) for the name + font-stack inputs
+ * comes from the shared `.bs-input` face; each stack input keeps only its
+ * per-role `font-family` (set inline from `--text-family-<role>`). */
 
 /* The density-scale picker is the shared `<SelectMenu>` (`.bs-select`); only
  * the row's compact font size is a local delta. */
@@ -568,8 +555,8 @@ body {
 /* The swatch IS the colour-picker trigger — clicking it opens the shared
  * rich `@brainstorm/sdk/color-picker` menu anchored to the swatch. */
 .te-row__swatch {
-	width: 22px;
-	height: 22px;
+	width: var(--control-height-sm);
+	height: var(--control-height-sm);
 	padding: 0;
 	border-radius: var(--radius-sm);
 	border: var(--border-width) solid var(--color-border-default);
@@ -578,16 +565,13 @@ body {
 }
 
 /* The value input takes the WHOLE remaining row width by default; it shrinks
- * only when the reset button takes up its share (overridden rows). */
-.te-row__value {
+ * only when the reset button takes up its share (overridden rows). Box (height
+ * / border / surface / focus) comes from the shared `.bs-input--sm` face; the
+ * `:root` prefix lets the monospace value font + compact size win over the
+ * primitive's own font rules, which the flush hex/rgba values need. */
+:root .te-row__value {
 	flex: 1;
 	min-width: 0;
-	height: var(--control-height-sm);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-sm);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
 	font-family: var(--text-family-code);
 	font-size: var(--text-size-xs);
 }
@@ -625,14 +609,10 @@ body {
 /* Per-component opt-in (there is no global :focus-visible outline). Uses the
  * dedicated `--color-focus-ring` token so it tracks the shell theme rather
  * than the UA default — every colour here is a token, never a raw value. */
-.te-toolbar__name:focus-visible,
 .te-toolbar__save:focus-visible,
 .te-tab:focus-visible,
 .te-banner__reset:focus-visible,
 .te-pack:focus-visible,
-.te-typo__name:focus-visible,
-.te-typo__stack:focus-visible,
-.te-row__value:focus-visible,
 .te-row__reset:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -1px;
@@ -652,15 +632,8 @@ body {
 	max-width: 640px;
 }
 
-.te-stylepack__name {
-	height: var(--control-height-md);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	font-size: var(--text-size-sm);
-}
+/* Box (height / border / surface / focus) comes from the shared `.bs-input`
+ * face; the name field needs no local delta (full-width by default). */
 
 .te-stylepack__hint {
 	margin: 0;
@@ -672,17 +645,15 @@ body {
 	gap: var(--space-1);
 }
 
-.te-stylepack__css {
+/* Box (border / surface / padding / resize / focus) comes from the shared
+ * `textarea.bs-input` (multiline) face; the `:root textarea.` prefix matches
+ * the primitive's specificity so the taller min-height + the monospace CSS
+ * font (this is a raw-CSS editor) win. */
+:root textarea.te-stylepack__css {
 	min-height: 240px;
-	padding: var(--space-2) var(--space-2);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
 	font-family: var(--text-family-code);
 	font-size: var(--text-size-sm);
 	line-height: var(--text-line-height-normal);
-	resize: vertical;
 	tab-size: 2;
 }
 
@@ -722,8 +693,6 @@ body {
 	gap: var(--space-2);
 }
 
-.te-stylepack__name:focus-visible,
-.te-stylepack__css:focus-visible,
 .te-stylepack__open:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -1px;

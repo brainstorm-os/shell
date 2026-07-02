@@ -705,7 +705,7 @@ function BuilderPane(props: {
 					<span className="fd-label">{t("builder.nameLabel")}</span>
 					<input
 						type="text"
-						className="fd-input"
+						className="fd-input bs-input"
 						value={props.name}
 						placeholder={t("builder.namePlaceholder")}
 						aria-label={t("builder.nameLabel")}
@@ -725,7 +725,7 @@ function BuilderPane(props: {
 				{props.customType ? (
 					<input
 						type="text"
-						className="fd-input"
+						className="fd-input bs-input"
 						value={props.targetType}
 						placeholder={t("builder.targetPlaceholder")}
 						aria-label={t("builder.targetPlaceholder")}
@@ -847,7 +847,7 @@ function FieldCard(props: {
 				<span className="fd-field-card__name">{propName}</span>
 				<input
 					type="text"
-					className="fd-input fd-input--sm"
+					className="fd-input bs-input bs-input--sm"
 					value={field.label ?? ""}
 					placeholder={t("builder.fieldLabelPlaceholder")}
 					aria-label={t("builder.fieldLabelAria", { name: propName })}
@@ -948,7 +948,7 @@ function FillPane(props: {
 							) : (
 								<input
 									type="text"
-									className="fd-input"
+									className="fd-input bs-input"
 									aria-label={label}
 									aria-invalid={invalid || undefined}
 									aria-describedby={invalid ? errorId : undefined}

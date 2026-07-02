@@ -112,23 +112,10 @@ button {
 	flex-shrink: 0;
 }
 
+/* Box (height / border / surface / focus / placeholder) comes from the shared
+   `.bs-input--sm` face; only the flex sizing is a layout delta here. */
 .preview__sidebar-input {
 	flex: 1;
-	min-width: 0;
-	height: var(--control-height-sm, 24px);
-	border: none;
-	background: transparent;
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-sm);
-}
-
-.preview__sidebar-input::placeholder {
-	color: var(--text-faint);
-}
-
-.preview__sidebar-input:focus {
-	outline: none;
 }
 
 .preview__sidebar-list {

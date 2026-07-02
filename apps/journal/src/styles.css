@@ -671,18 +671,11 @@ body.is-resizing .journal__props-resize {
 	color: var(--text-dim);
 }
 
-.journal__reminder-time {
+/* Layout-only — the control face comes from the shared `.bs-input`; keep the
+ * time field intrinsic-width (the face is `width: 100%`) and left-aligned. */
+:root .journal__reminder-time {
 	align-self: flex-start;
-	padding: var(--space-1, var(--space-1)) var(--space-2, var(--space-2));
-	border: var(--border-width) solid var(--color-border-subtle, var(--border));
-	border-radius: var(--radius-md);
-	background: var(--bg);
-	color: var(--text);
-}
-
-.journal__reminder-time:focus-visible {
-	outline: 2px solid var(--color-focus-ring, var(--accent));
-	outline-offset: -1px;
+	width: auto;
 }
 
 .journal__streak-flame {

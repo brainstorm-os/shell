@@ -67,7 +67,7 @@ export function FindBar({
 		<div className="browser__findbar" role="search" aria-label={t("find.open")}>
 			<input
 				ref={inputRef}
-				className="browser__findbar-input"
+				className="bs-input bs-input--sm browser__findbar-input"
 				type="text"
 				value={query}
 				onChange={(e) => onQueryChange(e.target.value)}

@@ -198,10 +198,10 @@ export function PersonSidebar({
 			aria-hidden={!open}
 			inert={!open ? true : undefined}
 		>
-			<div className="contacts-list__search">
+			<div className="contacts-list__search bs-input bs-input--sm">
 				<Icon name={IconName.Search} size={16} />
 				<input
-					className="contacts-list__search-input"
+					className="contacts-list__search-input bs-input__control"
 					type="search"
 					value={query}
 					placeholder={t("list.search.placeholder")}

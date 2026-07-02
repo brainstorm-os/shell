@@ -597,7 +597,7 @@ export function ThemeEditorApp(): ReactElement {
 							/>
 							<input
 								type="text"
-								className="te-toolbar__name"
+								className="bs-input te-toolbar__name"
 								value={theme.name}
 								placeholder={t("composite.namePlaceholder")}
 								aria-label={t("composite.name")}

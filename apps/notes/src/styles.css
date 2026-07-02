@@ -2527,21 +2527,12 @@ body.bs-table-col-resizing * {
 	color: var(--text);
 }
 
-/* The add-option input lives in the menu's custom footer, whose runtime wrapper
-   carries only a top border — no padding. Give the input its own gutters (matching
-   the list's body inset) so "Add option…" doesn't hug the panel edges. */
-.notes__select-field-input {
-	display: block;
-	box-sizing: border-box;
-	width: calc(100% - var(--space-2) * 2);
-	margin: var(--space-1) var(--space-2);
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-sm);
-	background: var(--bg-elev);
-	color: var(--text);
-	font: inherit;
-	font-size: 0.9em;
+/* The add-option input rides the shared `.bs-input--sm` face (box / height /
+   border / focus). Its wrapper carries only the gutter: the menu's custom
+   footer has no padding, so this insets "Add option…" off the panel edges
+   (matching the list's body inset). */
+.notes__select-field-add {
+	padding: var(--space-1) var(--space-2);
 }
 
 /* Bulk-colour action rows in the block action menu (B11.7) — the leading

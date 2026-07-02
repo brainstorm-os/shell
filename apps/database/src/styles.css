@@ -1280,18 +1280,20 @@ body.is-resizing .db-inspector__resize {
 	cursor: text;
 }
 
-.dbv-grid__title-input {
-	flex: 1;
+/* Inline rename editor: the border / surface / focus ring come from the shared
+ * `.bs-input` face. An in-cell editor must fill the cell exactly rather than
+ * take the face's fixed control height, so `height: 100%` + a tight in-cell
+ * padding are the documented layout deltas; `font-size: md` + medium weight
+ * match the static title label so the swap into edit mode doesn't jump.
+ * `:root` specificity overrides the face's height / padding / font-size. */
+:root .dbv-grid__title-input {
+	flex: 1 1 auto;
 	min-width: 0;
 	margin: 0;
-	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--accent);
-	border-radius: var(--radius-sm);
-	background: var(--bg);
-	color: var(--text);
-	font: inherit;
+	height: 100%;
+	padding: 0 var(--space-0_5);
+	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-medium);
-	outline: none;
 }
 
 /* Pin first column (view setting): the Name column sticks to the left edge

@@ -43,7 +43,7 @@ export function StylePackEditor({
 				<span className="te-field__label">{t("stylePack.name")}</span>
 				<input
 					type="text"
-					className="te-stylepack__name"
+					className="bs-input te-stylepack__name"
 					value={pack.name}
 					aria-label={t("stylePack.name")}
 					onChange={(e) => onName(e.target.value)}
@@ -55,7 +55,7 @@ export function StylePackEditor({
 			<label className="te-field te-stylepack__editor-field">
 				<span className="te-field__label">{t("stylePack.css")}</span>
 				<textarea
-					className="te-stylepack__css"
+					className="bs-input te-stylepack__css"
 					value={pack.css}
 					spellCheck={false}
 					autoCapitalize="off"

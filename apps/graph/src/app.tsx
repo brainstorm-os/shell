@@ -348,7 +348,7 @@ function WhereEditor({
 							// biome-ignore lint/suspicious/noArrayIndexKey: where rows are positional and have no stable id.
 							<div className="where-editor__row" key={index}>
 								<input
-									className="where-editor__prop"
+									className="where-editor__prop bs-input bs-input--sm"
 									value={row.property}
 									placeholder={t("subject.wherePropertyPlaceholder")}
 									aria-label={t("subject.wherePropertyAria", { name: subjectName })}
@@ -371,7 +371,7 @@ function WhereEditor({
 								/>
 								{!isUnaryOp(row.op) ? (
 									<input
-										className="where-editor__val"
+										className="where-editor__val bs-input bs-input--sm"
 										value={row.value}
 										placeholder={t("subject.whereValuePlaceholder")}
 										aria-label={t("subject.whereValueAria", { name: subjectName })}
@@ -948,7 +948,7 @@ function FiltersPanel({
 										style={{ background: subjectColors[name] ?? "var(--text-faint)" }}
 									/>
 									<input
-										className="subject-list__name"
+										className="subject-list__name bs-input bs-input--sm"
 										value={subj.displayName}
 										aria-label={t("subject.name", { name })}
 										onChange={(e) =>

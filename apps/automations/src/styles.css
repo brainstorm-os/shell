@@ -306,27 +306,16 @@ body {
 .au-capture__subject {
 	flex: 1 1 200px;
 	min-width: 160px;
-	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-	border-radius: var(--radius-sm);
-	border: var(--border-width) solid var(--color-border-subtle);
-	background: var(--color-surface-default, color-mix(in srgb, currentColor 4%, transparent));
-	color: var(--color-text-primary);
-	font: inherit;
 }
 
 .au-capture__repeat {
 	flex: 0 0 auto;
-	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-	border-radius: var(--radius-sm);
-	border: var(--border-width) solid var(--color-border-subtle);
-	background: var(--color-surface-default, color-mix(in srgb, currentColor 4%, transparent));
-	color: var(--color-text-primary);
-	font: inherit;
+	width: auto;
 }
 
 /* The due picker (F-229): a date trigger + quarter-hour <SelectMenu> + clear,
- * never a native datetime-local. The trigger borrows the field chrome so it
- * reads as a peer of the subject input / repeat button. */
+ * never a native datetime-local. The trigger rides `.bs-input` so it reads as
+ * a peer of the subject input / repeat button. */
 .au-capture__due {
 	flex: 0 0 auto;
 	display: flex;
@@ -336,12 +325,7 @@ body {
 
 .au-capture__due-trigger {
 	flex: 0 0 auto;
-	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-	border-radius: var(--radius-sm);
-	border: var(--border-width) solid var(--color-border-subtle);
-	background: var(--color-surface-default, color-mix(in srgb, currentColor 4%, transparent));
-	color: var(--color-text-primary);
-	font: inherit;
+	width: auto;
 }
 
 .au-capture__due-text[data-empty="true"] {
@@ -375,19 +359,6 @@ body {
 	outline-offset: 1px;
 }
 
-/* The recurrence picker is a fancy-menus trigger (never a native <select>) —
- * it borrows the input chrome above so it reads as a peer field. */
-.au-menu-button {
-	appearance: none;
-	text-align: left;
-	cursor: pointer;
-}
-
-.au-menu-button:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 1px;
-}
-
 /* The trailing row ⋯ overflow reveals on row hover / focus-within (the same
  * shared `.bs-object-menu__more` chrome every other app uses), and stays
  * visible while its menu is open (`aria-expanded`). */
@@ -402,18 +373,6 @@ body {
 .au-row__more:focus-visible,
 .au-row__more[aria-expanded="true"] {
 	opacity: 1;
-}
-
-/* The submit shares the row's input height, not the compact toolbar height. */
-.au-capture .bs-btn {
-	margin-block: var(--space-1, var(--space-1));
-}
-
-.au-capture__subject:focus-visible,
-.au-capture__due-trigger:focus-visible,
-.au-capture__repeat:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 1px;
 }
 
 /* ── status pills (reminders + runs + steps) ─────────────────── */
@@ -550,21 +509,6 @@ body {
 	color: var(--color-text-secondary);
 }
 
-.au-input {
-	width: 100%;
-	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-	border-radius: var(--radius-sm);
-	border: var(--border-width) solid var(--color-border-subtle);
-	background: var(--color-surface-default, color-mix(in srgb, currentColor 4%, transparent));
-	color: var(--color-text-primary);
-	font: inherit;
-}
-
-.au-input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 1px;
-}
-
 .au-binding {
 	display: flex;
 	gap: var(--space-2, var(--space-2));
@@ -581,12 +525,6 @@ body {
 	margin: 0;
 	color: var(--color-state-error);
 	font-size: var(--text-size-xs);
-}
-
-.au-input--multiline {
-	resize: vertical;
-	min-height: 4.5rem;
-	line-height: 1.5;
 }
 
 .au-tools {

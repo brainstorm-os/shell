@@ -601,7 +601,7 @@ export function FilesApp() {
 								</span>
 								<input
 									ref={searchInputRef}
-									className="toolbar__search-input"
+									className="toolbar__search-input bs-input__control"
 									type="search"
 									data-testid="toolbar-search-input"
 									placeholder={t("brainstorm.files.search.placeholderFolder")}

@@ -964,7 +964,7 @@ function NewChannelPopover({
 			<label className="chat__field">
 				<span className="chat__field-label">{t("newChannel.name.label")}</span>
 				<input
-					className="chat__field-input"
+					className="bs-input"
 					value={name}
 					placeholder={t("newChannel.name.placeholder")}
 					// biome-ignore lint/a11y/noAutofocus: focusing the first field of a just-opened dialog is the expected affordance.
@@ -980,7 +980,7 @@ function NewChannelPopover({
 			<label className="chat__field">
 				<span className="chat__field-label">{t("newChannel.topic.label")}</span>
 				<input
-					className="chat__field-input"
+					className="bs-input"
 					value={topic}
 					placeholder={t("newChannel.topic.placeholder")}
 					onChange={(e) => setTopic(e.target.value)}
@@ -1025,7 +1025,7 @@ function IdentityPopover({
 			<label className="chat__field">
 				<span className="chat__field-label">{t("identity.label")}</span>
 				<input
-					className="chat__field-input"
+					className="bs-input"
 					value={name}
 					placeholder={t("identity.placeholder")}
 					// biome-ignore lint/a11y/noAutofocus: focusing the only field of a just-opened dialog is the expected affordance.

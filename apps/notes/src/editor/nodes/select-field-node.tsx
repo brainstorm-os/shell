@@ -247,20 +247,22 @@ function SelectFieldOptionRow({ label, active }: { label: string; active: boolea
 function SelectFieldAddRow() {
 	const [draft, setDraft] = useState("");
 	return (
-		<input
-			className="notes__select-field-input"
-			value={draft}
-			placeholder={t("notes.select.addOption")}
-			onChange={(e) => setDraft(e.target.value)}
-			onKeyDown={(e) => {
-				// keyboard-exempt: an inline add affordance, not a registered chord.
-				if (e.key === "Enter" && draft.trim().length > 0) {
-					e.preventDefault();
-					onAddRef?.(draft);
-					setDraft("");
-				}
-			}}
-		/>
+		<div className="notes__select-field-add">
+			<input
+				className="bs-input bs-input--sm notes__select-field-input"
+				value={draft}
+				placeholder={t("notes.select.addOption")}
+				onChange={(e) => setDraft(e.target.value)}
+				onKeyDown={(e) => {
+					// keyboard-exempt: an inline add affordance, not a registered chord.
+					if (e.key === "Enter" && draft.trim().length > 0) {
+						e.preventDefault();
+						onAddRef?.(draft);
+						setDraft("");
+					}
+				}}
+			/>
+		</div>
 	);
 }
 

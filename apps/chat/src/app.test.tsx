@@ -222,7 +222,7 @@ describe("ChatApp", () => {
 		await act(async () => {
 			newBtn.click();
 		});
-		const input = document.querySelector(".chat__field-input") as HTMLInputElement;
+		const input = document.querySelector(".bs-input") as HTMLInputElement;
 		await act(async () => {
 			const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
 			setter?.call(input, "announcements");

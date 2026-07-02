@@ -175,7 +175,7 @@ function TokenRow({
 				)}
 				<input
 					type="text"
-					className="te-row__value"
+					className="bs-input bs-input--sm te-row__value"
 					value={value}
 					aria-label={name}
 					spellCheck={false}

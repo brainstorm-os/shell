@@ -49,7 +49,7 @@ const EXEMPT_INPUT_TYPES = new Set([
 	"image",
 ]);
 
-const FACE_TOKENS = ["bs-input", "bs-select"];
+const FACE_TOKENS = ["bs-input", "bs-input__control", "bs-select"];
 
 function stripComments(src) {
 	return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");

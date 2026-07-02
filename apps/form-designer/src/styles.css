@@ -183,27 +183,6 @@ body.is-resizing .fd-resize {
 	color: var(--text-dim);
 }
 
-.fd-input {
-	appearance: none;
-	width: 100%;
-	height: var(--control-height-md);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-md);
-}
-.fd-input--sm {
-	height: var(--control-height-sm);
-	font-size: var(--text-size-sm);
-}
-.fd-input:focus-visible {
-	outline: none;
-	border-color: var(--color-focus-ring);
-}
-
 .fd-select {
 	width: 100%;
 }
@@ -544,26 +523,9 @@ body.is-resizing .fd-resize {
 	color: var(--text-dim);
 }
 
-.invoices__input {
-	height: var(--control-height-md);
-	padding: 0 var(--space-2);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-sm);
-	background: var(--bg-elev);
-	color: var(--text);
-	font-size: var(--text-size-sm);
-}
-
-.invoices__input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-}
-
+/* Layout-only — the control face comes from the shared `.bs-input`. */
 .invoices__textarea {
-	height: auto;
 	min-height: 56px;
-	padding: var(--space-2);
-	resize: vertical;
 }
 
 .invoices__select {
@@ -586,9 +548,9 @@ body.is-resizing .fd-resize {
 	margin: 0;
 }
 
+/* Layout-only — the control face comes from the shared `.bs-input`. */
 .invoices__party-address {
 	min-height: 48px;
-	resize: vertical;
 }
 
 .invoices__legend {
@@ -627,7 +589,8 @@ body.is-resizing .fd-resize {
 	text-align: right;
 }
 
-input.invoices__num-col {
+/* Beat the shared `.bs-input` `text-align: left` so numbers stay right-aligned. */
+:root input.invoices__num-col {
 	text-align: right;
 }
 

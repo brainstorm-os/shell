@@ -186,14 +186,19 @@ body.is-resizing .contacts__resize {
 
 /* ── List route ──────────────────────────────────────────────────────── */
 
+/* Composite search field: the box (height / border / surface) comes from the
+ * shared `.bs-input` face on the wrapper; this rule supplies only the layout
+ * deltas (glyph gap, inset margin). The inner <input> stays bare. */
 .contacts-list__search {
-	display: flex;
 	flex: 0 0 auto;
-	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-2);
-	color: var(--text-faint);
-	border-bottom: var(--border-width) solid var(--color-border-subtle);
+	margin: var(--space-2);
+}
+
+.contacts-list__search:focus-within {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -1px;
+	border-color: transparent;
 }
 
 .contacts-list__search-input {
@@ -201,7 +206,7 @@ body.is-resizing .contacts__resize {
 	border: none;
 	background: transparent;
 	color: var(--text);
-	font-size: var(--text-size-md);
+	font: inherit;
 	outline: none;
 }
 
@@ -352,23 +357,15 @@ body.is-resizing .contacts__resize {
 
 /* ── Detail pane ─────────────────────────────────────────────────────── */
 
-/* Editable name on the card — the same face as the old static <h1>, as a
- * borderless centered input committed on blur / Enter. */
-.contacts-detail__name-input {
+/* Editable hero name on the card — committed on blur / Enter. The box
+ * (height / border / surface / focus) comes from the shared `.bs-input --lg`
+ * face; this rule supplies only the centered hero typography + width. `:root`
+ * specificity overrides the face's default font-size / text-align. */
+:root .contacts-detail__name-input {
 	width: min(100%, 28ch);
-	border: none;
-	background: transparent;
-	color: var(--text);
 	text-align: center;
 	font-size: var(--text-size-2xl);
 	font-weight: var(--text-weight-semibold);
-	outline: none;
-	border-radius: var(--radius-md);
-}
-
-.contacts-detail__name-input:hover,
-.contacts-detail__name-input:focus {
-	background: var(--bg-elev);
 }
 
 .contacts-detail__scroll {
@@ -444,13 +441,11 @@ body.is-resizing .contacts__resize {
 	color: var(--text);
 }
 
+/* Box (height / border / surface / focus) comes from the shared `.bs-input
+ * --sm` face; this rule supplies only the width delta so the inline add field
+ * doesn't span the whole card. */
 .contacts-detail__add-company-input {
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--accent);
-	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	color: var(--text);
-	outline: none;
+	width: min(100%, 24ch);
 }
 
 .contacts-detail__section {

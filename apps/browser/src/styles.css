@@ -224,18 +224,6 @@ body {
 .browser__omnibox {
 	flex: 1;
 	min-width: 0;
-	height: 32px;
-	padding: 0 var(--space-3, var(--space-3));
-	border: var(--border-width) solid var(--color-border-subtle, #e3e3e3);
-	border-radius: var(--radius-full);
-	background: var(--color-surface-default, color-mix(in srgb, currentColor 6%, transparent));
-	color: var(--color-text-primary);
-	font-size: var(--text-size-md);
-}
-
-.browser__omnibox:focus {
-	outline: none;
-	border-color: var(--color-focus-ring, #4c7dff);
 }
 
 .browser__shield {
@@ -310,19 +298,6 @@ body {
 .browser__findbar-input {
 	flex: 0 1 280px;
 	min-width: 120px;
-	height: var(--control-height-sm, 24px);
-	padding: 0 var(--space-2, var(--space-2));
-	border: var(--border-width) solid var(--color-border-subtle, #e3e3e3);
-	border-radius: var(--radius-sm);
-	background: var(--color-background-primary);
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-md);
-}
-
-.browser__findbar-input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
 }
 
 .browser__findbar-count {

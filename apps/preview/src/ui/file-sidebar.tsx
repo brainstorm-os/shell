@@ -62,7 +62,7 @@ export function FileSidebar({
 				</span>
 				<input
 					type="search"
-					className="preview__sidebar-input"
+					className="bs-input bs-input--sm preview__sidebar-input"
 					value={query}
 					placeholder={t("sidebar.filterPlaceholder")}
 					aria-label={t("sidebar.filterPlaceholder")}

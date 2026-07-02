@@ -1,27 +1,3 @@
 {
-  "files": [
-    "apps/agent/src/app.tsx",
-    "apps/automations/src/ui/reminders-view.tsx",
-    "apps/automations/src/ui/workflow-builder.tsx",
-    "apps/browser/src/app.tsx",
-    "apps/browser/src/find-bar.tsx",
-    "apps/chat/src/app.tsx",
-    "apps/contacts/src/ui/person-detail.tsx",
-    "apps/contacts/src/ui/person-list.tsx",
-    "apps/database/src/react/grid-view.tsx",
-    "apps/files/src/app.tsx",
-    "apps/form-designer/src/app.tsx",
-    "apps/form-designer/src/ui/invoices.tsx",
-    "apps/graph/src/app.tsx",
-    "apps/journal/src/app.tsx",
-    "apps/mailbox/src/ui/composer.tsx",
-    "apps/mailbox/src/ui/connect-account.tsx",
-    "apps/mailbox/src/ui/message-list.tsx",
-    "apps/notes/src/editor/nodes/select-field-node.tsx",
-    "apps/preview/src/ui/file-sidebar.tsx",
-    "apps/theme-editor/src/app.tsx",
-    "apps/theme-editor/src/ui/style-pack-editor.tsx",
-    "apps/theme-editor/src/ui/token-grid.tsx",
-    "apps/theme-editor/src/ui/typography-editor.tsx"
-  ]
+  "files": ["apps/agent/src/app.tsx", "apps/mailbox/src/ui/composer.tsx"]
 }

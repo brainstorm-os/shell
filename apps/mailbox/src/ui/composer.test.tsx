@@ -36,7 +36,7 @@ describe("Composer spellcheck surfaces (B11.16b)", () => {
 				/>,
 			);
 		});
-		const inputs = host.querySelectorAll(".mb-compose__input");
+		const inputs = host.querySelectorAll("input.bs-input");
 		const body = host.querySelector(".mb-compose__body") as HTMLTextAreaElement;
 		// Field order in the form: to, cc, subject.
 		const toEl = inputs[0] as HTMLInputElement;

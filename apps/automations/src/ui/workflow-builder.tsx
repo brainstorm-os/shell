@@ -100,7 +100,7 @@ function StepConfig({
 				<label className="au-field">
 					<span className="au-field__label">{t("builder.notify.title")}</span>
 					<input
-						className="au-input"
+						className="bs-input"
 						type="text"
 						value={step.title}
 						placeholder={t("builder.notify.titlePlaceholder")}
@@ -113,7 +113,7 @@ function StepConfig({
 				<label className="au-field">
 					<span className="au-field__label">{t("builder.intent.verb")}</span>
 					<input
-						className="au-input"
+						className="bs-input"
 						type="text"
 						value={step.verb}
 						placeholder={t("builder.intent.verbPlaceholder")}
@@ -142,7 +142,7 @@ function StepConfig({
 					<label className="au-field">
 						<span className="au-field__label">{t("builder.entity.type")}</span>
 						<input
-							className="au-input"
+							className="bs-input"
 							type="text"
 							value={step.entityType}
 							placeholder="brainstorm/Note/v1"
@@ -156,7 +156,7 @@ function StepConfig({
 				<label className="au-field">
 					<span className="au-field__label">{t("builder.wait.duration")}</span>
 					<input
-						className="au-input"
+						className="bs-input"
 						type="number"
 						min={0}
 						value={step.durationMs ?? 0}
@@ -169,7 +169,7 @@ function StepConfig({
 				<label className="au-field">
 					<span className="au-field__label">{t("builder.subworkflow.id")}</span>
 					<input
-						className="au-input"
+						className="bs-input"
 						type="text"
 						value={step.workflowId}
 						placeholder={t("builder.subworkflow.idPlaceholder")}
@@ -225,7 +225,7 @@ function StepConfig({
 					<label className="au-field">
 						<span className="au-field__label">{t("builder.ai.instructions")}</span>
 						<textarea
-							className="au-input au-input--multiline"
+							className="bs-input bs-input--multiline"
 							rows={3}
 							value={step.instructions}
 							placeholder={t("builder.ai.instructionsPlaceholder")}
@@ -235,7 +235,7 @@ function StepConfig({
 					<label className="au-field">
 						<span className="au-field__label">{t("builder.ai.provider")}</span>
 						<input
-							className="au-input"
+							className="bs-input"
 							type="text"
 							value={step.provider ?? ""}
 							placeholder={t("builder.ai.providerPlaceholder")}
@@ -284,7 +284,7 @@ function AgentStepConfig({
 			<label className="au-field">
 				<span className="au-field__label">{t("builder.ai.instructions")}</span>
 				<textarea
-					className="au-input au-input--multiline"
+					className="bs-input bs-input--multiline"
 					rows={3}
 					value={step.instructions}
 					placeholder={t("builder.ai.agentInstructionsPlaceholder")}
@@ -294,7 +294,7 @@ function AgentStepConfig({
 			<label className="au-field">
 				<span className="au-field__label">{t("builder.ai.maxIterations")}</span>
 				<input
-					className="au-input"
+					className="bs-input"
 					type="number"
 					min={1}
 					value={step.maxIterations ?? ""}
@@ -322,7 +322,7 @@ function AgentStepConfig({
 						{step.tools.map((tool, index) => (
 							<li className="au-tool" key={`tool-${index}-${tool.verb}`}>
 								<input
-									className="au-input"
+									className="bs-input"
 									type="text"
 									value={tool.verb}
 									placeholder={t("builder.ai.toolVerbPlaceholder")}
@@ -330,7 +330,7 @@ function AgentStepConfig({
 									onChange={(e) => setTool(index, { verb: e.target.value })}
 								/>
 								<input
-									className="au-input"
+									className="bs-input"
 									type="text"
 									value={tool.label}
 									placeholder={t("builder.ai.toolLabelPlaceholder")}
@@ -398,7 +398,7 @@ function BindingField({
 					onChange={(id) => onChange(bindingExpression(id === "input" ? "input" : id, memberPath))}
 				/>
 				<input
-					className="au-input au-binding__expr"
+					className="bs-input au-binding__expr"
 					type="text"
 					value={value}
 					placeholder={t("builder.binding.exprPlaceholder")}
@@ -516,7 +516,7 @@ function TriggerSection({
 					<label className="au-field">
 						<span className="au-field__label">{t("builder.trigger.entityType")}</span>
 						<input
-							className="au-input"
+							className="bs-input"
 							type="text"
 							value={trigger.entityType}
 							placeholder="brainstorm/Bookmark/v1"
@@ -664,7 +664,7 @@ export function WorkflowBuilder(props: WorkflowBuilderProps): ReactElement {
 				<label className="au-field">
 					<span className="au-field__label">{t("builder.name")}</span>
 					<input
-						className="au-input"
+						className="bs-input"
 						type="text"
 						value={state.name}
 						placeholder={t("builder.namePlaceholder")}

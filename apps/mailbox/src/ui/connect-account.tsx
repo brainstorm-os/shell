@@ -135,7 +135,7 @@ export function ConnectAccountDialog(props: {
 		<label className="mb-connect__field">
 			<span className="mb-connect__label">{t(labelKey)}</span>
 			<input
-				className="mb-connect__input"
+				className="bs-input"
 				type={opts?.type ?? "text"}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}

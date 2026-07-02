@@ -1013,7 +1013,7 @@ export function BrowserApp(): ReactElement {
 				<div className="browser__omnibox-wrap">
 					<input
 						ref={omniboxRef}
-						className="browser__omnibox"
+						className="bs-input browser__omnibox"
 						type="text"
 						value={omnibox}
 						onChange={(e) => {

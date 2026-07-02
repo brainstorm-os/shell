@@ -126,7 +126,7 @@ export function PersonDetail({
 						{initials || <Icon name={IconName.Entity} size={28} />}
 					</div>
 					<input
-						className="contacts-detail__name-input"
+						className="contacts-detail__name-input bs-input bs-input--lg"
 						value={nameDraft}
 						placeholder={t("detail.name.placeholder")}
 						aria-label={t("detail.name.aria")}
@@ -180,7 +180,7 @@ export function PersonDetail({
 							</button>
 						) : (
 							<input
-								className="contacts-detail__add-company-input"
+								className="contacts-detail__add-company-input bs-input bs-input--sm"
 								value={companyDraft}
 								placeholder={t("detail.company.add.placeholder")}
 								aria-label={t("detail.company.add")}

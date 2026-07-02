@@ -172,15 +172,17 @@ export function MessageList({
 	return (
 		<div className="mb-list">
 			<div className="mb-list__search">
-				<Icon name={IconName.Search} className="mb-list__search-icon" aria-hidden="true" />
-				<input
-					type="search"
-					className="mb-list__search-input"
-					placeholder={t("list.search.placeholder")}
-					aria-label={t("list.search.aria")}
-					value={query}
-					onChange={(e) => onQueryChange(e.target.value)}
-				/>
+				<label className="mb-list__search-field bs-input bs-input--sm">
+					<Icon name={IconName.Search} className="mb-list__search-icon" aria-hidden="true" />
+					<input
+						type="search"
+						className="mb-list__search-input bs-input__control"
+						placeholder={t("list.search.placeholder")}
+						aria-label={t("list.search.aria")}
+						value={query}
+						onChange={(e) => onQueryChange(e.target.value)}
+					/>
+				</label>
 				<button
 					type="button"
 					className={`mb-list__thread-toggle${threaded ? " is-on" : ""}`}
