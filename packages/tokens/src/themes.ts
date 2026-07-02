@@ -529,10 +529,12 @@ export const defaultLight: Tokens = {
 		},
 		text: {
 			// Light theme mirrors dark — primary = secondary (no useless
-			// grey middle tier), tertiary as a subtle alpha for hints only.
+			// grey middle tier), tertiary a subtle alpha for hints. The alpha is
+			// 0.62 (not 0.55): 0.55 rendered muted labels at 4.09:1 on the app bg,
+			// just under WCAG AA (4.5:1); 0.62 clears it (session 375 a11y audit).
 			primary: palette.gray["900"],
 			secondary: palette.gray["900"],
-			tertiary: "rgba(17, 17, 17, 0.55)",
+			tertiary: "rgba(17, 17, 17, 0.62)",
 			inverse: palette.gray["50"],
 			link: palette.blue["600"],
 		},
@@ -906,7 +908,7 @@ export const solar: Tokens = {
 		text: {
 			primary: "#1f2937",
 			secondary: "#1f2937",
-			tertiary: "rgba(31, 41, 55, 0.55)",
+			tertiary: "rgba(31, 41, 55, 0.62)",
 			inverse: "#f7f8fa",
 			link: "#ea580c",
 		},
@@ -1261,7 +1263,7 @@ export const mint: Tokens = {
 		text: {
 			primary: "#143028",
 			secondary: "#143028",
-			tertiary: "rgba(20, 48, 40, 0.55)",
+			tertiary: "rgba(20, 48, 40, 0.62)",
 			inverse: "#f2faf6",
 			link: "#0d9488",
 		},
@@ -1349,7 +1351,7 @@ export const rose: Tokens = {
 		text: {
 			primary: "#3a1f29",
 			secondary: "#3a1f29",
-			tertiary: "rgba(58, 31, 41, 0.55)",
+			tertiary: "rgba(58, 31, 41, 0.62)",
 			inverse: "#fdf4f6",
 			link: "#e11d48",
 		},
@@ -1437,7 +1439,7 @@ export const slate: Tokens = {
 		text: {
 			primary: "#1e293b",
 			secondary: "#1e293b",
-			tertiary: "rgba(30, 41, 59, 0.55)",
+			tertiary: "rgba(30, 41, 59, 0.62)",
 			inverse: "#f4f5f7",
 			link: "#4f46e5",
 		},
