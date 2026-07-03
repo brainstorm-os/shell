@@ -52,7 +52,7 @@ body > main {
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
-	color: var(--color-accent-default, #8867d0);
+	color: var(--color-accent-on-surface, #8867d0);
 }
 
 .bs-coming-soon__title {

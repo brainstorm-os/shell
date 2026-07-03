@@ -35,6 +35,14 @@ export type Tokens = {
 			default: string;
 			strong: string;
 			text: string;
+			/** Accent tuned for use as TEXT on a neutral surface (background /
+			 *  elevated). Guaranteed ≥ WCAG AA 4.5:1 on `background.primary` in
+			 *  every built-in theme (enforced by the `themes` contrast ratchet) —
+			 *  `accent.default` is a brand FILL colour and fails that bar as text in
+			 *  several themes. Use `--color-accent-on-surface` wherever accent
+			 *  colour is applied to text; keep `accent.default` for fills, borders,
+			 *  focus rings, and button faces. */
+			onSurface: string;
 		};
 		/** Glossy-button anatomy — the `Button` Glass/Primary/Destructive
 		 *  variants render a saturated theme-driven 2-colour face gradient

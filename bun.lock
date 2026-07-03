@@ -633,6 +633,9 @@
     "packages/tokens": {
       "name": "@brainstorm/tokens",
       "version": "0.0.1",
+      "devDependencies": {
+        "@brainstorm/sdk-types": "workspace:*",
+      },
     },
   },
   "packages": {

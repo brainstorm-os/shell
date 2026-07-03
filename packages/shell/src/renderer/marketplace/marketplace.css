@@ -196,7 +196,7 @@
 }
 
 .marketplace__chip--active .marketplace__chip-count {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 }
 
 /* The bar chrome itself is `.bs-searchbar` (loaded by
@@ -411,7 +411,7 @@
 
 .marketplace__update-caps {
 	font-size: var(--text-size-xs);
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 }
 
 /* Detail view */

@@ -446,6 +446,7 @@ export const defaultDark: Tokens = {
 			default: palette.blue["400"],
 			strong: palette.blue["500"],
 			text: palette.gray["900"],
+			onSurface: palette.blue["400"],
 		},
 		gloss: {
 			// A real TWO-colour face: vivid violet at the top rotating to a
@@ -543,6 +544,7 @@ export const defaultLight: Tokens = {
 			default: palette.blue["500"],
 			strong: palette.blue["600"],
 			text: "#ffffff",
+			onSurface: palette.blue["600"],
 		},
 		gloss: {
 			// Violet→blue, same hue travel as dark but a touch deeper for
@@ -638,6 +640,7 @@ export const midnight: Tokens = {
 			default: "#38bdf8",
 			strong: "#0ea5e9",
 			text: "#0a1020",
+			onSurface: "#38bdf8",
 		},
 		gloss: {
 			// Bright cyan→blue — Midnight's cooler two-colour face.
@@ -726,6 +729,7 @@ export const sepia: Tokens = {
 			default: "#b04a18",
 			strong: "#9a3d12",
 			text: "#f3ead8",
+			onSurface: "#b04a18",
 		},
 		gloss: {
 			// Warm orange→brick two-colour face; warm (cream/amber)
@@ -823,6 +827,7 @@ export const highContrast: Tokens = {
 			default: "#ffd400",
 			strong: "#ffea00",
 			text: "#000000",
+			onSurface: "#ffd400",
 		},
 		gloss: {
 			// High Contrast deliberately suppresses the soft-glass look
@@ -910,13 +915,14 @@ export const solar: Tokens = {
 			secondary: "#1f2937",
 			tertiary: "rgba(31, 41, 55, 0.62)",
 			inverse: "#f7f8fa",
-			link: "#ea580c",
+			link: "#c2410c",
 		},
 		accent: {
 			subtle: "rgba(234, 88, 12, 0.14)",
 			default: "#ea580c",
 			strong: "#c2410c",
 			text: "#ffffff",
+			onSurface: "#c2410c",
 		},
 		gloss: {
 			// Warm orange→amber two-colour face — matches Solar's accent.
@@ -1008,6 +1014,7 @@ export const forest: Tokens = {
 			default: "#34d399",
 			strong: "#10b981",
 			text: "#0c130f",
+			onSurface: "#34d399",
 		},
 		gloss: {
 			// Bright leaf-green → deep forest green two-colour face.
@@ -1096,6 +1103,7 @@ export const nord: Tokens = {
 			default: "#88c0d0",
 			strong: "#5e81ac",
 			text: "#2e3440",
+			onSurface: "#88c0d0",
 		},
 		gloss: {
 			// Frost teal → deep frost blue two-colour face.
@@ -1184,6 +1192,7 @@ export const aurora: Tokens = {
 			default: "#d946ef",
 			strong: "#c026d3",
 			text: "#160f23",
+			onSurface: "#d946ef",
 		},
 		gloss: {
 			// Orchid → magenta two-colour face — the aurora's brightest band.
@@ -1265,13 +1274,14 @@ export const mint: Tokens = {
 			secondary: "#143028",
 			tertiary: "rgba(20, 48, 40, 0.62)",
 			inverse: "#f2faf6",
-			link: "#0d9488",
+			link: "#0f766e",
 		},
 		accent: {
 			subtle: "rgba(13, 148, 136, 0.14)",
 			default: "#0d9488",
 			strong: "#0f766e",
 			text: "#ffffff",
+			onSurface: "#0f766e",
 		},
 		gloss: {
 			// Bright teal → deep teal two-colour face.
@@ -1353,13 +1363,14 @@ export const rose: Tokens = {
 			secondary: "#3a1f29",
 			tertiary: "rgba(58, 31, 41, 0.62)",
 			inverse: "#fdf4f6",
-			link: "#e11d48",
+			link: "#be123c",
 		},
 		accent: {
 			subtle: "rgba(225, 29, 72, 0.12)",
 			default: "#e11d48",
 			strong: "#be123c",
 			text: "#ffffff",
+			onSurface: "#be123c",
 		},
 		gloss: {
 			// Bright rose → deep crimson two-colour face.
@@ -1448,6 +1459,7 @@ export const slate: Tokens = {
 			default: "#4f46e5",
 			strong: "#4338ca",
 			text: "#ffffff",
+			onSurface: "#4f46e5",
 		},
 		gloss: {
 			// Indigo → deep indigo two-colour face.

@@ -258,7 +258,7 @@ body {
 
 .browser__clip--saved,
 .browser__clip--saved:hover:not(:disabled) {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	background: var(--color-accent-subtle);
 }
 

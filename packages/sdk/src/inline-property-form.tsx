@@ -529,7 +529,7 @@ const STYLES = `
 .bs-inline-property-form__tile--active {
 	border-color: transparent;
 	background: color-mix(in srgb, var(--color-accent-default, var(--accent, #6b73f0)) 18%, var(--bg-elev, transparent));
-	color: var(--color-accent-default, var(--accent, #6b73f0));
+	color: var(--color-accent-on-surface, var(--accent, #6b73f0));
 	outline: 1px solid color-mix(in srgb, var(--color-accent-default, var(--accent, #6b73f0)) 60%, transparent);
 	outline-offset: -1px;
 }

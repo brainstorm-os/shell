@@ -77,7 +77,7 @@
 }
 
 .settings__mcp-tile[data-enabled="true"] .settings__mcp-tile-status {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 }
 
 /* Config / inspector popover body. */

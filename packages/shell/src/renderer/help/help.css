@@ -358,7 +358,7 @@
 }
 
 .help__link {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	text-decoration: underline;
 	cursor: pointer;
 }

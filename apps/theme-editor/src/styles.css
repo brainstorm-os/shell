@@ -188,7 +188,7 @@ body {
 .te-mini-tile--active .te-mini-tile__face {
 	border-color: var(--color-accent-default);
 	background: var(--color-accent-subtle);
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 }
 
 .te-mini-tile__label {
@@ -273,7 +273,7 @@ body {
 
 .te-mini-nav__row--active {
 	background: var(--color-accent-subtle);
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	font-weight: var(--text-weight-medium);
 }
 
@@ -313,7 +313,7 @@ body {
 	padding: var(--space-0_5);
 	border-radius: var(--radius-full);
 	background: var(--color-accent-subtle);
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-medium);
 }

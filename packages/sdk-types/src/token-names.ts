@@ -31,6 +31,7 @@ export const CANONICAL_TOKEN_NAMES = Object.freeze([
 	"--border-width",
 	"--border-width-thick",
 	"--color-accent-default",
+	"--color-accent-on-surface",
 	"--color-accent-strong",
 	"--color-accent-subtle",
 	"--color-accent-text",
