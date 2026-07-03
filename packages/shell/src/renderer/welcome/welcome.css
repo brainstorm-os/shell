@@ -160,7 +160,7 @@
 }
 
 .welcome__tile--primary .welcome__tile-icon {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 
@@ -475,7 +475,7 @@
 }
 
 .welcome__template-card--selected .welcome__template-icon {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 

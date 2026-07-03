@@ -185,9 +185,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = Object.freeze([
 	},
 	{
 		id: "accent-text-on-accent",
-		label: "Accent text on accent",
+		label: "Accent text on accent fill",
 		foreground: "--color-accent-text",
-		background: "--color-accent-default",
+		// The fill that carries `accent.text` is `accent.onFill` (theme-correct),
+		// NOT the decorative `accent.default` — white text on the light default is
+		// sub-AA in several light themes (12.17).
+		background: "--color-accent-on-fill",
 		level: ContrastLevel.Normal,
 	},
 	{

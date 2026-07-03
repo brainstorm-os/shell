@@ -16,49 +16,19 @@ import { flattenTokens } from "./tokens";
  * its required ratio in all 12 themes. A regression (a new theme, or a token
  * tweak that darkens a background) fails here, not in the field.
  */
-/**
- * Known-deferred contrast failures, tracked so the ratchet still enforces every
- * OTHER pair + catches regressions. The ONLY entry is `accent-text-on-accent`:
- * white `accent.text` on the LIGHT accent FILL (`accent.default`) measures
- * ~3.6–3.9:1 in three light themes. This is the INVERSE of the accent-as-text
- * tail fixed here (text sits ON an accent fill, not accent used AS text) and the
- * report scoped it separately: it needs its own per-theme `accent.onFill` token
- * + a brand review of the ~12 accent-fill-with-text sites (membership badges,
- * etc.). A global `accent.default → strong` swap can't fix it — that clears the
- * light themes but breaks nord/aurora (their dark `accent.text` on the darker
- * strong fill). Remove a theme's entry when that follow-up lands; the
- * "still-deferred" assertion below fails on an accidental fix so the list can't
- * silently rot.
- */
-const KNOWN_DEFERRED: Partial<Record<ThemeName, readonly string[]>> = {
-	[ThemeName.DefaultLight]: ["accent-text-on-accent"],
-	[ThemeName.Solar]: ["accent-text-on-accent"],
-	[ThemeName.Mint]: ["accent-text-on-accent"],
-};
-
 describe("built-in theme contrast — WCAG AA ratchet", () => {
 	for (const name of Object.values(ThemeName)) {
-		it(`${name}: every non-deferred text/accent pair meets its AA bar`, () => {
+		it(`${name}: every text/accent pair meets its AA bar`, () => {
 			const flat = flattenTokens(themes[name]);
 			const issues = lintTokenContrast((token) => flat[token]);
-			const deferred = new Set(KNOWN_DEFERRED[name] ?? []);
-
-			// No failure outside the documented deferred set (catches regressions).
-			const unexpected = issues.filter((issue) => !deferred.has(issue.pairId));
-			const detail = unexpected
+			// Surface the offending pairs + ratios in the failure message. Zero
+			// deferrals — 12.16 fixed accent-as-text (`accent.onSurface`) and 12.17
+			// fixed white-text-on-accent-fill (`accent.onFill`); every pair now
+			// clears its bar in all 12 themes.
+			const detail = issues
 				.map((issue) => `${issue.pairId} ${issue.ratio.toFixed(2)}:1 < ${issue.required}:1`)
 				.join(", ");
-			expect(unexpected, `${name} has un-deferred failures: ${detail}`).toEqual([]);
-
-			// Every deferred pair must STILL be failing — an accidental fix trips
-			// this so the KNOWN_DEFERRED entry gets removed rather than rot.
-			const failingIds = new Set(issues.map((issue) => issue.pairId));
-			for (const pairId of deferred) {
-				expect(
-					failingIds.has(pairId),
-					`${name}: ${pairId} no longer fails — drop it from KNOWN_DEFERRED`,
-				).toBe(true);
-			}
+			expect(issues, `${name} fails: ${detail}`).toEqual([]);
 		});
 	}
 
