@@ -33,6 +33,7 @@ import {
 	compilePattern,
 } from "../../entities/pattern-compiler";
 import type { SqliteDatabase, SqliteStatement } from "../sqlite";
+import { AssetRefsRepository } from "./asset-refs-repo";
 
 export type EntityRow = {
 	id: string;
@@ -174,8 +175,18 @@ export class EntitiesRepository {
 	// can hold for a long time. On a multi-thousand-row snapshot rebuild that
 	// adds up to GB of native memory before any JS-side reference is dropped.
 	private readonly statements = new Map<string, SqliteStatement>();
+	private assetRefsRepo: AssetRefsRepository | null = null;
 
 	constructor(private readonly db: SqliteDatabase) {}
+
+	/** Asset-B4 — the `asset_refs` repo over this same `entities.db` handle, for
+	 *  the implicit asset-ref bind writer (`entities-service.ts`). Lazily
+	 *  constructed once so its prepared statements are reused across reconcile
+	 *  calls in a session. */
+	get assetRefs(): AssetRefsRepository {
+		if (!this.assetRefsRepo) this.assetRefsRepo = new AssetRefsRepository(this.db);
+		return this.assetRefsRepo;
+	}
 
 	/** Run `fn` inside a single SQLite transaction against `entities.db`.
 	 *  Any throw inside `fn` rolls back every write. Used to keep the

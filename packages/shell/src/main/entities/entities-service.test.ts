@@ -6,10 +6,15 @@ import { ENTITY_PROPS_MAP_NAME, UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
+import { AssetKind, AssetRefRole } from "../assets/asset-types";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
-import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import {
+	AssetsRepository,
+	EntitiesRepository,
+	EntityDeksRepository,
+} from "../storage/entities-repo";
 import { makeEntitiesServiceHandler } from "./entities-service";
 import { EntityDekStore } from "./entity-dek-store";
 import { readEntityDocProjection, writeEntityLinks, writeEntityProps } from "./entity-doc-codec";
@@ -53,6 +58,10 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 	const db = await stores.open("entities");
 	const repo = new EntitiesRepository(db);
 	const dekRepo = new EntityDeksRepository(db);
+	// Asset-B4 — a real assets repo over the same entities.db backs the
+	// asset-kind lookup; `assetKindThrows` forces the reconcile-throw path.
+	const assets = new AssetsRepository(db);
+	let assetKindThrows = false;
 	const masterKey = generateSymmetricKey();
 	const dekStore = new EntityDekStore(dekRepo, masterKey);
 	let ledger: CapabilityLedger = fakeLedger(grants);
@@ -105,8 +114,32 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDoc = fn;
 		},
+		// Asset-B4 — resolve a locally-stored asset's kind (drives + gates the
+		// implicit asset-ref bind writer).
+		getAssetKind: async (id) => {
+			if (assetKindThrows) throw new Error("boom-getAssetKind");
+			return assets.getById(id)?.kind ?? null;
+		},
 	});
+	// Asset-B4 — seed a locally-stored asset so a `brainstorm://asset/<id>`
+	// URL in an entity's properties resolves + binds.
+	const seedAsset = (assetId: string, kind: AssetKind): void => {
+		assets.create({
+			assetId,
+			dekId: `dek_${assetId}`,
+			contentHash: `hash_${assetId}`,
+			mime: "image/png",
+			byteLen: 8,
+			kind,
+			now: 500,
+		});
+	};
 	return {
+		assets,
+		seedAsset,
+		setAssetKindThrows: (v: boolean) => {
+			assetKindThrows = v;
+		},
 		vaultDir,
 		stores,
 		db,
@@ -929,5 +962,90 @@ describe("entities service — live-sync hooks (10.12)", () => {
 		expect(deliver?.targets.slice().sort()).toEqual(["io.a", "io.b"]);
 		// Crucially: NO echo — a remote apply must not re-enter the emit hook.
 		expect(e.localUpdateCalls).toHaveLength(0);
+	});
+
+	// ── Asset-B4: implicit asset-ref bind writer ────────────────────────
+	const assetUrl = (id: string) => `brainstorm://asset/${id}`;
+
+	it("create with an asset URL binds an asset_ref with the kind-derived role", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		const refs = e.repo.assetRefs.listByEntity(created.id);
+		expect(refs).toHaveLength(1);
+		expect(refs[0]?.assetId).toBe("fav1");
+		expect(refs[0]?.role).toBe(AssetRefRole.Favicon);
+	});
+
+	it("update that drops the asset URL prunes the ref", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(1);
+
+		await e.handler(env("io.x", "update", { id: created.id, patch: { faviconUrl: "" } }));
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
+	});
+
+	it("update adding a second asset binds both refs", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		e.seedAsset("cov1", AssetKind.Cover);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+
+		await e.handler(env("io.x", "update", { id: created.id, patch: { coverUrl: assetUrl("cov1") } }));
+		const refs = e.repo.assetRefs.listByEntity(created.id);
+		expect(refs.map((r) => r.assetId).sort()).toEqual(["cov1", "fav1"]);
+		expect(refs.find((r) => r.assetId === "cov1")?.role).toBe(AssetRefRole.Cover);
+	});
+
+	it("a dangling (non-local) asset URL binds no ref", async () => {
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("not-stored") },
+			}),
+		)) as { id: string };
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
+	});
+
+	it("delete removes the entity's refs (soft delete → no FK cascade)", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(1);
+
+		await e.handler(env("io.x", "delete", { id: created.id }));
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
+	});
+
+	it("a reconcile throw does not fail the entity write", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		e.setAssetKindThrows(true);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		// Write committed despite the reconcile failure; no ref bound.
+		expect(e.repo.get(created.id)).not.toBeNull();
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
 	});
 });

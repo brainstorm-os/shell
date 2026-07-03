@@ -47,7 +47,7 @@ describe("seal → open round-trip", () => {
 		it(`reassembles a ${size}-byte blob byte-identically`, async () => {
 			const dek = generateSymmetricKey();
 			const plain = new Uint8Array(randomBytes(size));
-			const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, CHUNK);
+			const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, "image/png", CHUNK);
 
 			expect(manifest.v).toBe(1);
 			expect(manifest.assetId).toBe(ASSET);
@@ -71,7 +71,7 @@ describe("seal → open round-trip", () => {
 			const dek = generateSymmetricKey();
 			const size = Math.floor(Math.random() * (5 * CHUNK));
 			const plain = new Uint8Array(randomBytes(size));
-			const { manifest, sealed } = sealAssetChunks(plain, dek, `a${i}`, CHUNK);
+			const { manifest, sealed } = sealAssetChunks(plain, dek, `a${i}`, "image/png", CHUNK);
 			const back = await openAssetChunks(manifest, dek, casFrom(sealed));
 			expect(Buffer.from(back).equals(Buffer.from(plain))).toBe(true);
 		}
@@ -82,7 +82,7 @@ describe("integrity + key binding", () => {
 	it("rejects a tampered chunk (content-address mismatch)", async () => {
 		const dek = generateSymmetricKey();
 		const plain = new Uint8Array(randomBytes(2 * CHUNK));
-		const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, CHUNK);
+		const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, "image/png", CHUNK);
 		// Flip a byte in the first sealed chunk WITHOUT changing the key it's
 		// stored under — so the address no longer matches the bytes.
 		const firstHash = manifest.chunks[0]?.hash ?? "";
@@ -105,7 +105,7 @@ describe("integrity + key binding", () => {
 		const dek = generateSymmetricKey();
 		const wrong = generateSymmetricKey();
 		const plain = new Uint8Array(randomBytes(CHUNK + 3));
-		const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, CHUNK);
+		const { manifest, sealed } = sealAssetChunks(plain, dek, ASSET, "image/png", CHUNK);
 		await expect(openAssetChunks(manifest, wrong, casFrom(sealed))).rejects.toThrow();
 	});
 
@@ -123,7 +123,7 @@ describe("integrity + key binding", () => {
 	it("throws when a manifest chunk is missing from the CAS", async () => {
 		const dek = generateSymmetricKey();
 		const plain = new Uint8Array(randomBytes(2 * CHUNK));
-		const { manifest } = sealAssetChunks(plain, dek, ASSET, CHUNK);
+		const { manifest } = sealAssetChunks(plain, dek, ASSET, "image/png", CHUNK);
 		await expect(openAssetChunks(manifest, dek, async () => null)).rejects.toThrow(/not found/);
 	});
 
@@ -165,6 +165,7 @@ describe("parseAssetChunkManifest (untrusted input)", () => {
 			new Uint8Array(randomBytes(2 * CHUNK + 1)),
 			dek,
 			ASSET,
+			"image/png",
 			CHUNK,
 		);
 		const parsed = parseAssetChunkManifest(JSON.parse(JSON.stringify(manifest)));
@@ -176,6 +177,7 @@ describe("parseAssetChunkManifest (untrusted input)", () => {
 			new Uint8Array(randomBytes(CHUNK)),
 			generateSymmetricKey(),
 			ASSET,
+			"image/png",
 			CHUNK,
 		).manifest;
 		expect(parseAssetChunkManifest(null)).toBeNull();

@@ -13,7 +13,14 @@ describe("uploadAsset → downloadAsset", () => {
 		const cas = new MemoryAssetCas();
 		const plain = new Uint8Array(randomBytes(5 * CHUNK + 3));
 
-		const { manifest, uploaded, skipped } = await uploadAsset(plain, dek, ASSET, cas, CHUNK);
+		const { manifest, uploaded, skipped } = await uploadAsset(
+			plain,
+			dek,
+			ASSET,
+			"image/png",
+			cas,
+			CHUNK,
+		);
 		expect(uploaded).toBe(manifest.chunks.length);
 		expect(skipped).toBe(0);
 		expect(cas.size).toBe(manifest.chunks.length);
@@ -25,7 +32,7 @@ describe("uploadAsset → downloadAsset", () => {
 	it("round-trips a 0-byte blob (one empty chunk)", async () => {
 		const dek = generateSymmetricKey();
 		const cas = new MemoryAssetCas();
-		const { manifest } = await uploadAsset(new Uint8Array(0), dek, ASSET, cas, CHUNK);
+		const { manifest } = await uploadAsset(new Uint8Array(0), dek, ASSET, "image/png", cas, CHUNK);
 		expect(manifest.chunks.length).toBe(1);
 		const back = await downloadAsset(manifest, dek, cas);
 		expect(back.length).toBe(0);
@@ -35,11 +42,11 @@ describe("uploadAsset → downloadAsset", () => {
 		const dek = generateSymmetricKey();
 		const cas = new MemoryAssetCas();
 		const plain = new Uint8Array(randomBytes(4 * CHUNK));
-		const first = await uploadAsset(plain, dek, ASSET, cas, CHUNK);
+		const first = await uploadAsset(plain, dek, ASSET, "image/png", cas, CHUNK);
 		expect(first.skipped).toBe(0);
 		// Re-uploading the identical asset (same id + dek + bytes) re-derives the
 		// same addresses, so every chunk is already present → all skipped.
-		const second = await uploadAsset(plain, dek, ASSET, cas, CHUNK);
+		const second = await uploadAsset(plain, dek, ASSET, "image/png", cas, CHUNK);
 		expect(second.uploaded).toBe(0);
 		expect(second.skipped).toBe(second.manifest.chunks.length);
 		expect(cas.size).toBe(first.manifest.chunks.length); // no growth
@@ -54,6 +61,7 @@ describe("integrity against an untrusted node", () => {
 			new Uint8Array(randomBytes(3 * CHUNK)),
 			dek,
 			ASSET,
+			"image/png",
 			cas,
 			CHUNK,
 		);
@@ -68,6 +76,7 @@ describe("integrity against an untrusted node", () => {
 			new Uint8Array(randomBytes(2 * CHUNK)),
 			dek,
 			ASSET,
+			"image/png",
 			cas,
 			CHUNK,
 		);
@@ -87,6 +96,7 @@ describe("integrity against an untrusted node", () => {
 			new Uint8Array(randomBytes(CHUNK + 5)),
 			dek,
 			ASSET,
+			"image/png",
 			cas,
 			CHUNK,
 		);
@@ -102,6 +112,7 @@ describe("isAssetMaterialized", () => {
 			new Uint8Array(randomBytes(3 * CHUNK)),
 			dek,
 			ASSET,
+			"image/png",
 			cas,
 			CHUNK,
 		);

@@ -197,4 +197,19 @@ describe("ActiveRelayOrchestrator", () => {
 		expect(orch.currentPort()).toBeInstanceOf(LoopbackRelayPort);
 		orch.dispose();
 	});
+
+	it("hasAssetPlane is false on loopback and true once an asset-capable port is live", async () => {
+		const assetPort = Object.assign(new FakePort("ws://asset"), {
+			requestAsset: async () => new Uint8Array(),
+		});
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => "ws://asset",
+			makeRelayPort: () => assetPort,
+		});
+		// Default loopback carries no blob plane.
+		expect(orch.hasAssetPlane()).toBe(false);
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/" });
+		expect(orch.hasAssetPlane()).toBe(true);
+		orch.dispose();
+	});
 });

@@ -27,10 +27,12 @@ import {
 	type EntityQuery,
 } from "@brainstorm/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
+import type { AssetKind } from "../assets/asset-types";
 import { LedgerUnavailableError } from "../capabilities/ledger";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
+import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
 import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekHandle, EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
@@ -104,6 +106,17 @@ export type EntitiesServiceOptions = {
 	 *  per-keystroke rich-text path) deliberately does NOT emit — only the
 	 *  property-level create/update/delete verbs do. */
 	onEntityChange?: (change: EntityChange) => void;
+	/** Asset-B4 — resolve a LOCALLY-stored asset's `kind` (favicon/cover/upload)
+	 *  for the implicit asset-ref bind writer, or null when the asset isn't
+	 *  stored in this vault. Two jobs: it gates whether a `brainstorm://asset/`
+	 *  URL in an entity's properties gets a bound `asset_refs` row (a dangling /
+	 *  remote id resolves to null and is skipped), and it derives the ref role.
+	 *  Presence of this hook is the Asset-B4 feature flag — when it's absent (a
+	 *  legacy/test construction without asset support) the bind writer is inert
+	 *  and `asset_refs` is left exactly as before. No new capability: the
+	 *  entity-write gate that already passed authorizes the reconcile
+	 *  (OQ-238 folds in). */
+	getAssetKind?: (assetId: string) => Promise<AssetKind | null>;
 	/** 10.12 — an app opened (`loadDoc`) an entity's doc. The always-on
 	 *  live-sync engine consults the entity's access record and, if shared
 	 *  (>1 active member), subscribes its relay channel so inbound edits land.
@@ -162,6 +175,50 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			options.onEntityChange({ verb, entityId, type });
 		} catch (error) {
 			console.error("[entities] onEntityChange hook failed:", error);
+		}
+	};
+
+	// Asset-B4 — reconcile the `asset_refs` bindings for an entity to the
+	// `brainstorm://asset/<id>` URLs its properties now carry. Called AFTER a
+	// property create/update commit (NOT the per-keystroke `applyDoc` path, same
+	// as `onEntityChange`). Contained exactly like the change hooks: the write
+	// already committed, so a throw here (a bad row, a dropped DB handle) must
+	// never surface as a failed write — it's logged and swallowed. Inert unless
+	// `getAssetKind` is wired (the feature flag).
+	const reconcileAssetRefs = async (
+		repo: EntitiesRepository,
+		entityId: string,
+		properties: Record<string, unknown>,
+	): Promise<void> => {
+		if (!options.getAssetKind) return;
+		try {
+			// desired = referenced ids that resolve to a locally-stored asset
+			// (a dangling / remote / not-yet-fetched id is skipped, never bound).
+			// This is REQUIRED, not just conservative: `asset_refs.asset_id` has a
+			// FK to `assets(asset_id)`, so a ref for an asset with no local row
+			// can't be inserted. A true cold device (never had the blob's row)
+			// therefore can't bind until the asset's metadata is reconstructed —
+			// the forward cold-first-fetch rung (needs a stub `assets` row from the
+			// synced manifest). Serve-on-miss here targets the metadata-present,
+			// blob-absent case (restore / selective-sync eviction), where the row
+			// + ref + DEK are local and only the encrypted blob file is missing.
+			const desired = new Map<string, ReturnType<typeof assetRefRoleForKind>>();
+			for (const assetId of extractAssetIds(properties)) {
+				const kind = await options.getAssetKind(assetId);
+				if (kind) desired.set(assetId, assetRefRoleForKind(kind));
+			}
+			const existingIds = new Set(repo.assetRefs.listByEntity(entityId).map((r) => r.assetId));
+			const now = clock();
+			for (const [assetId, role] of desired) {
+				if (!existingIds.has(assetId)) repo.assetRefs.create({ entityId, assetId, role, now });
+			}
+			// deleteRef (not deleteByEntity) so an unchanged ref keeps its
+			// `created_at` / `rehomed_at`.
+			for (const assetId of existingIds) {
+				if (!desired.has(assetId)) repo.assetRefs.deleteRef(entityId, assetId);
+			}
+		} catch (error) {
+			console.error("[entities] reconcileAssetRefs failed:", error);
 		}
 	};
 
@@ -420,6 +477,9 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 						}
 					}
 					emitChange(EntityEventVerb.Create, entityId, type);
+					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
+					// URLs the new row's properties carry (post-commit, contained).
+					await reconcileAssetRefs(repo, entityId, row.properties);
 					return compose(row);
 				} finally {
 					if (dekHandle) dekStore.close((dekHandle as EntityDekHandle).dek);
@@ -465,6 +525,10 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const updated = repo.update(id, propsForRow, clock());
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
+				// Asset-B4 — reconcile against the row's FULL post-write property
+				// set (a patch merges into existing, so pruning off just the patch
+				// would drop refs for assets the patch never touched).
+				await reconcileAssetRefs(repo, id, updated.properties);
 				return compose(updated);
 			}
 
@@ -477,6 +541,18 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				}
 				repo.softDelete(id, clock());
 				emitChange(EntityEventVerb.Delete, id, existing.type);
+				// Asset-B4 — this is a SOFT delete (the row persists), so the
+				// `asset_refs.entity_id` ON DELETE CASCADE never fires; drop the
+				// owner's refs explicitly or they'd strand and keep the asset
+				// artificially reachable for GC. Contained (post-commit); gated on
+				// the Asset-B4 feature being wired.
+				if (options.getAssetKind) {
+					try {
+						repo.assetRefs.deleteByEntity(id);
+					} catch (error) {
+						console.error("[entities] asset-ref delete-prune failed:", error);
+					}
+				}
 				return null;
 			}
 

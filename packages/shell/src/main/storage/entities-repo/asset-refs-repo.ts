@@ -90,6 +90,15 @@ export class AssetRefsRepository {
 		return Number(result.changes);
 	}
 
+	/** Asset-B4 — drop exactly the (entity, asset) binding (across every role
+	 *  row) that fell out of an entity's properties, leaving sibling refs — and
+	 *  their `created_at` / `rehomed_at` markers — untouched. The reconcile
+	 *  writer uses this for the (existing − desired) set so re-homing state on
+	 *  the refs that *stayed* is preserved. */
+	deleteRef(entityId: string, assetId: string): void {
+		this.stmt("DELETE FROM asset_refs WHERE entity_id = ? AND asset_id = ?").run(entityId, assetId);
+	}
+
 	/** Asset-B1 — every distinct (entity, asset) binding whose DEK has not yet
 	 *  been re-homed into the entity's Y.Doc. Steady state returns nothing (the
 	 *  re-home pass stamps `rehomed_at`), so the open-time drain is one query.
@@ -97,6 +106,18 @@ export class AssetRefsRepository {
 	listUnrehomedPairs(): AssetRefPair[] {
 		const rows = this.stmt(
 			"SELECT DISTINCT entity_id, asset_id FROM asset_refs WHERE rehomed_at IS NULL ORDER BY entity_id, asset_id",
+		).all() as Array<{ entity_id: string; asset_id: string }>;
+		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
+	}
+
+	/** Asset-B4 — every distinct (entity, asset) binding, for the connect-time
+	 *  upload drain (push bound-while-offline assets to the node). The manifest
+	 *  on the entity Y.Doc is the per-pair "already uploaded" marker, so this is
+	 *  deliberately unfiltered; the drain short-circuits present manifests.
+	 *  Ordered for determinism. */
+	listAllPairs(): AssetRefPair[] {
+		const rows = this.stmt(
+			"SELECT DISTINCT entity_id, asset_id FROM asset_refs ORDER BY entity_id, asset_id",
 		).all() as Array<{ entity_id: string; asset_id: string }>;
 		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
 	}
