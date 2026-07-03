@@ -70,6 +70,7 @@ import {
 	type ProxyConfig,
 	ProxyMode,
 } from "./proxy-config";
+import { collectRemoteImageSrcs, rewriteImageSrcs } from "./readable/enrich-blocks";
 
 /** Shape of the Electron session proxy-apply callback. Production
  *  passes a thin wrapper around `session.defaultSession.setProxy` (see
@@ -162,6 +163,12 @@ const READABLE_TIMEOUT_MS = 8_000;
 const FAVICON_SIZE_CAP_BYTES = 512 * 1024;
 const COVER_SIZE_CAP_BYTES = 5 * 1024 * 1024;
 const IMAGE_FETCH_TIMEOUT_MS = 8_000;
+// 9.18.9 — article-body images are ATTACKER-CONTROLLED URLs (the page lists
+// them). Cap the per-image size, the total count fetched, and the fetch
+// concurrency so a hostile page can't drive thousands of large sub-fetches.
+const ARTICLE_IMG_SIZE_CAP_BYTES = 5 * 1024 * 1024;
+const MAX_ARTICLE_IMAGES = 40;
+const ARTICLE_IMG_CONCURRENCY = 4;
 
 /** Net-1b — capability id the SDK declares when a caller wants private-
  *  network reach. The broker checks `envelope.caps` for this id and the
@@ -463,6 +470,46 @@ async function fetchAndStoreImage(
 	}
 }
 
+/**
+ * 9.18.9 — rewrite a captured article's remote image blocks to locally-stored
+ * encrypted assets. Collects up to `MAX_ARTICLE_IMAGES` distinct remote image
+ * URLs from the block tree, sub-fetches each through the SAME guard chain as
+ * favicon/cover (`fetchAndStoreImage` → SSRF/privacy/size/MIME), and rewrites
+ * the `src` to `brainstorm://asset/<id>`. Fetches run in bounded batches. An
+ * image that fails any guard keeps its remote `src` (dropped at render). No-op
+ * unless the asset store is wired (`storeImageAsset`). Never throws — a bad
+ * image never breaks the capture.
+ */
+async function enrichBlocksWithAssets(
+	blocks: SerializedBlock[],
+	options: NetworkServiceOptions,
+	allowPrivate: boolean,
+): Promise<SerializedBlock[]> {
+	if (!options.storeImageAsset) return blocks;
+	const srcs = collectRemoteImageSrcs(blocks, MAX_ARTICLE_IMAGES);
+	if (srcs.length === 0) return blocks;
+	const rewrites = new Map<string, string>();
+	for (let i = 0; i < srcs.length; i += ARTICLE_IMG_CONCURRENCY) {
+		const batch = srcs.slice(i, i + ARTICLE_IMG_CONCURRENCY);
+		const results = await Promise.all(
+			batch.map(async (src) => {
+				const url = await fetchAndStoreImage(
+					src,
+					AssetKind.Upload,
+					ARTICLE_IMG_SIZE_CAP_BYTES,
+					options,
+					allowPrivate,
+				);
+				return [src, url] as const;
+			}),
+		);
+		for (const [src, url] of results) {
+			if (url) rewrites.set(src, url);
+		}
+	}
+	return rewriteImageSrcs(blocks, rewrites);
+}
+
 /** Net-2c — `network.readable`: a superset of `preview` that also returns the
  *  cleaned page body as Lexical blocks. Reuses every Net-1 invariant by going
  *  through `executeNetworkFetch` (SSRF / size / time / audit), then forwards the
@@ -508,7 +555,12 @@ async function handleReadable(
 	let blocks: SerializedBlock[] | null = null;
 	if (options.extractReadable) {
 		const extracted = await options.extractReadable({ html, baseUrl: response.finalUrl });
-		blocks = extracted.blocks;
+		// 9.18.9 — pull the article's remote images into the encrypted asset store
+		// so they render (CSP blocks remote http images) + work offline. Same
+		// privacy scope as the page fetch.
+		blocks = extracted.blocks
+			? await enrichBlocksWithAssets(extracted.blocks, options, allowPrivate)
+			: extracted.blocks;
 	}
 	return { preview, blocks };
 }

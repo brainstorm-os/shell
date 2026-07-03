@@ -52,16 +52,23 @@ import { BOOKMARK_BLOCK_PALETTE } from "./block-palette";
 import { BookmarkPropertiesPanel } from "./bookmark-properties-panel";
 import { useDomChild } from "./use-dom-child";
 
-/** Drop `image` blocks recursively: the article's images are remote URLs the
- *  app CSP forbids (offline-first — no remote `<img>`), and a captured page's
- *  images aren't yet stored as local assets (a follow-on). The text content is
- *  the readable bulk. */
-function stripImages(blocks: SerializedBlock[]): SerializedBlock[] {
+/** Whether an image `src` points at a locally-stored encrypted asset — the only
+ *  image scheme the app CSP (`img-src 'self' data: brainstorm:`) renders. */
+function isLocalAssetSrc(src: unknown): boolean {
+	return typeof src === "string" && src.startsWith("brainstorm://asset/");
+}
+
+/** Drop only the `image` blocks the app CSP can't render — remote `http(s)`
+ *  srcs. Since 9.18.9 the capture pulls article images into the encrypted asset
+ *  store and rewrites their `src` to `brainstorm://asset/…`; those are CSP-
+ *  allowed + offline, so they're KEPT. An image whose sub-fetch failed keeps its
+ *  remote src and is dropped here (the readable text is the bulk regardless). */
+function dropRemoteImages(blocks: SerializedBlock[]): SerializedBlock[] {
 	const out: SerializedBlock[] = [];
 	for (const b of blocks) {
-		if (b.type === "image") continue;
+		if (b.type === "image" && !isLocalAssetSrc((b as { src?: unknown }).src)) continue;
 		if (Array.isArray(b.children)) {
-			out.push({ ...b, children: stripImages(b.children as SerializedBlock[]) });
+			out.push({ ...b, children: dropRemoteImages(b.children as SerializedBlock[]) });
 		} else {
 			out.push(b);
 		}
@@ -90,10 +97,10 @@ function blocksToEditorState(
 	blocks: SerializedBlock[] | undefined,
 ): SerializedEditorState | undefined {
 	if (!blocks || blocks.length === 0) return undefined;
-	const textOnly = stripImages(blocks);
-	if (textOnly.length === 0) return undefined;
+	const rendered = dropRemoteImages(blocks);
+	if (rendered.length === 0) return undefined;
 	return {
-		root: { type: "root", version: 1, direction: null, format: "", indent: 0, children: textOnly },
+		root: { type: "root", version: 1, direction: null, format: "", indent: 0, children: rendered },
 	} as unknown as SerializedEditorState;
 }
 
