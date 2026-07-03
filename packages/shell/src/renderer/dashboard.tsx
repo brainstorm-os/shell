@@ -34,6 +34,8 @@ import { DashboardIconsLayer } from "./dashboard/icons-layer";
 import { openAddWidgetMenu } from "./dashboard/widget-add-menu";
 import { DashboardWidgetsLayer } from "./dashboard/widgets-layer";
 import "./dashboard/icons-layer.css";
+import { ActivityChip } from "./dashboard/activity-chip";
+import "./dashboard/activity-chip.css";
 import { SyncStatusChip } from "./dashboard/sync-status-chip";
 import "./dashboard/sync-status-chip.css";
 import { NotificationBell } from "./dashboard/notification-center";
@@ -607,6 +609,8 @@ export function Dashboard() {
 							locale={uiLanguage}
 						/>
 					)}
+
+					<ActivityChip />
 
 					{showControl(HeaderControlId.SyncStatus) && <SyncStatusChip />}
 

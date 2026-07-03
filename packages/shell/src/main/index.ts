@@ -35,6 +35,7 @@ import {
 	shell,
 	webContents,
 } from "electron";
+import { ActivityKind, ActivityPhase } from "../activity-types";
 import { AppearanceMode, AppearanceSlot } from "../shared/appearance";
 import {
 	DEFAULT_SELECTIVE_SYNC_POLICY,
@@ -42,6 +43,8 @@ import {
 	entityMatchesPolicy,
 } from "../shared/selective-sync-types";
 import { UPDATE_STATE_EVENT } from "../shared/update-wire-types";
+import { BackgroundActivityStore } from "./activity/background-activity-store";
+import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
@@ -142,6 +145,7 @@ import { makeIconsServiceHandler } from "./icons/icons-service-handler";
 import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
+import { registerActivityHandlers } from "./ipc/activity-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
 import { registerBinHandlers } from "./ipc/bin-handlers";
@@ -1463,6 +1467,12 @@ void app.whenReady().then(async () => {
 	launchSetup.onSessionRebuilt(() => {
 		void ensurePropertiesBroadcast(() => dashboardWindow);
 	});
+	// Background-activity center — the ambient dashboard surface that shows
+	// long-running shell work (model download, reindex, …) so nothing runs
+	// silently. Subsystems below `set`/`clear` operations on it; the handlers
+	// push snapshots to the dashboard chip.
+	const activityStore = new BackgroundActivityStore();
+	registerActivityHandlers({ getDashboard: () => dashboardWindow, store: activityStore });
 	registerMarketplaceHandlers({ mainDir: __dirname });
 	registerIconsHandlers({ getDashboard: () => dashboardWindow });
 	registerCoversHandlers({ getDashboard: () => dashboardWindow });
@@ -1732,6 +1742,10 @@ void app.whenReady().then(async () => {
 			// offline-reusable). The download itself is deferred to the first embed.
 			localEmbedderLoad = loadFastembedEmbedder(join(app.getPath("userData"), "models"), (s) => {
 				semanticStatus = s;
+				// Surface the download in the ambient activity center (chip + popover).
+				const op = operationFromSemanticStatus(s);
+				if (op) activityStore.set(op);
+				else activityStore.clear(SEMANTIC_MODEL_OP_ID);
 			}).then((embedder) => {
 				// null = no prebuilt `.node` / ORT failed → lexical-only. Reflect that
 				// so the panel shows "unavailable" rather than a stuck Idle.
@@ -1799,11 +1813,25 @@ void app.whenReady().then(async () => {
 		}
 	};
 
+	const SEARCH_INDEX_OP_ID = "search-index";
+	const INDEXING_ACTIVITY_DELAY_MS = 500;
 	const rebuildSearchIndex = async (): Promise<void> => {
 		const session = getActiveVaultSession();
 		if (!session || !searchIndexer) return;
 		const ourToken = Symbol("rebuild");
 		rebuildToken = ourToken;
+		// Surface indexing in the activity center ONLY if it runs long enough to
+		// notice (a full reindex / first-session embed) — a fast per-edit reconcile
+		// finishes before this fires, so the chip never flickers on every keystroke.
+		const showActivity = setTimeout(() => {
+			activityStore.set({
+				id: SEARCH_INDEX_OP_ID,
+				kind: ActivityKind.Indexing,
+				phase: ActivityPhase.Running,
+				percent: null,
+				detail: null,
+			});
+		}, INDEXING_ACTIVITY_DELAY_MS);
 		try {
 			// 9.22.5 — entities.db is the authoritative source (every
 			// first-party app writes there since 9.3.5.x); the kv-notes
@@ -1822,6 +1850,9 @@ void app.whenReady().then(async () => {
 			if (vectorIndexer) await vectorIndexer.reconcile(entities);
 		} catch (error) {
 			console.warn(`[brainstorm] search index rebuild failed: ${(error as Error).message}`);
+		} finally {
+			clearTimeout(showActivity);
+			activityStore.clear(SEARCH_INDEX_OP_ID);
 		}
 	};
 
