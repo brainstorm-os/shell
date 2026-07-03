@@ -15,6 +15,7 @@
  * swap needs no caller reshape.
  */
 
+import { createHash } from "node:crypto";
 import type { SqliteDatabase } from "../storage/sqlite";
 import type { TextEmbedder } from "./embedder";
 import { type IndexableEntity, isIndexable, pickIndexable } from "./search-indexer";
@@ -27,6 +28,12 @@ export class VectorIndexer {
 	private readonly store: VectorStore;
 	private readonly embedder: TextEmbedder;
 	private disposed = false;
+	/** entityId → sha256 of the embed text last embedded THIS session. Lets
+	 *  `reconcile` skip re-embedding an entity whose indexable content is
+	 *  unchanged. In-session only (a fresh indexer starts empty → one full
+	 *  re-embed on vault open, which also re-homes the cache under whatever
+	 *  embedder this instance holds, so a model swap re-embeds everything). */
+	private readonly embeddedHashes = new Map<string, string>();
 
 	constructor(store: VectorStore, embedder: TextEmbedder) {
 		if (embedder.dim !== store.dim) {
@@ -62,9 +69,13 @@ export class VectorIndexer {
 		this.store.remove(entityId);
 	}
 
-	/** Atomically rebuild the whole vector index from sources. */
+	/** Atomically rebuild the whole vector index from sources — embeds EVERY
+	 *  entity. Prefer `reconcile` on the write path; this is the from-scratch
+	 *  primitive (explicit reindex / tests). Seeds the content-hash cache so a
+	 *  following `reconcile` skips the just-embedded entities. */
 	async rebuild(entities: readonly IndexableEntity[], now: number = Date.now()): Promise<void> {
 		this.assertOpen();
+		this.embeddedHashes.clear();
 		const rows = [];
 		for (const e of pickIndexable(entities)) {
 			rows.push({
@@ -74,8 +85,50 @@ export class VectorIndexer {
 				updatedAt: now,
 				embedding: await this.embedder.embed(embedText(e)),
 			});
+			this.embeddedHashes.set(e.entityId, contentHash(e));
 		}
 		this.store.rebuild(rows);
+	}
+
+	/**
+	 * Bring the vector index in line with `entities`, embedding ONLY the entities
+	 * whose indexable content changed since this indexer last saw them, and
+	 * reaping vectors for entities that vanished or went blank. The write-path
+	 * alternative to `rebuild`: the search reindex fires (debounced) on every
+	 * entity write, and with a real embedder re-embedding all N entities per
+	 * write would peg a core — here a single-entity edit re-embeds one entity.
+	 *
+	 * First call in a session (empty cache) embeds everything, matching
+	 * `rebuild`, and reaps any store rows (a prior session's) not in the current
+	 * set. `embed()` failures propagate to the caller, which isolates the vector
+	 * pass from the lexical rebuild (a stale entity is retried next reconcile).
+	 */
+	async reconcile(entities: readonly IndexableEntity[], now: number = Date.now()): Promise<void> {
+		this.assertOpen();
+		const keep = new Set<string>();
+		for (const entity of pickIndexable(entities)) {
+			keep.add(entity.entityId);
+			const hash = contentHash(entity);
+			if (this.embeddedHashes.get(entity.entityId) === hash) continue;
+			const embedding = await this.embedder.embed(embedText(entity));
+			this.store.upsert({
+				entityId: entity.entityId,
+				type: entity.type,
+				ownerAppId: entity.ownerAppId,
+				updatedAt: now,
+				embedding,
+			});
+			this.embeddedHashes.set(entity.entityId, hash);
+		}
+		// Reap anything the store or cache holds that's no longer indexable
+		// (deleted, or went blank so it fell out of `pickIndexable`).
+		const stale = this.store.snapshotIds();
+		for (const id of this.embeddedHashes.keys()) stale.add(id);
+		for (const id of stale) {
+			if (keep.has(id)) continue;
+			this.store.remove(id);
+			this.embeddedHashes.delete(id);
+		}
 	}
 
 	/** Nearest-neighbour search for `text`. Empty / token-less queries embed
@@ -107,6 +160,14 @@ export class VectorIndexer {
  *  indexes describe the same content. */
 function embedText(entity: IndexableEntity): string {
 	return `${entity.title}\n${entity.body}`.trim();
+}
+
+/** Change-detection key for `reconcile`: a sha256 of the exact text that would
+ *  be embedded. Same text ⇒ same vector, so an entity write that didn't touch
+ *  the indexable content (a property change the index doesn't surface) skips a
+ *  costly re-embed. sha256 (µs) is negligible next to an embed (ms). */
+function contentHash(entity: IndexableEntity): string {
+	return createHash("sha256").update(embedText(entity)).digest("hex");
 }
 
 function isZero(v: Float32Array): boolean {
