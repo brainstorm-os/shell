@@ -5,10 +5,16 @@ import {
 	EntityIcon,
 	type MentionComposerHandle,
 	MentionComposerPlugin,
+	MentionNode,
 	renderEditorState,
 } from "@brainstorm/editor";
 import { useVaultEntities } from "@brainstorm/react-yjs";
-import { AttachmentKind, type MessageAttachment, type RosterMember } from "@brainstorm/sdk-types";
+import {
+	AttachmentKind,
+	IconKind,
+	type MessageAttachment,
+	type RosterMember,
+} from "@brainstorm/sdk-types";
 import {
 	AttachContextButton,
 	type ComposerContextHost,
@@ -22,6 +28,8 @@ import {
 	pickFile,
 	useComposerContext,
 	useComposerObjectDrop,
+	visibleAttachments,
+	withMentionAttachments,
 } from "@brainstorm/sdk/composer-context";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { parseIcon } from "@brainstorm/sdk/entity-icon";
@@ -106,11 +114,12 @@ export function ChatApp(): ReactElement {
 	// scope its roster lookup to the active channel.
 	const [activeId, setActiveId] = useState<string | null>(null);
 
-	// Composer context rail — @-mention people / link documents / attach media to a
-	// message so it travels in the channel (the persona-agent reading it grounds on
-	// the attachments). `@` is scoped to PEOPLE so the typeahead never mixes persons
-	// and documents in one list; documents are pinned through their own affordance
-	// (`linkDocument` below). Search runs over the live snapshot (the app holds
+	// Composer context — `@`-mentions commit as INLINE chips in the draft (Slack
+	// model; the send path lifts them into wire attachments for the notifier),
+	// while linked documents / uploaded media ride the visible rail. `@` is
+	// scoped to PEOPLE so the typeahead never mixes persons and documents in one
+	// list; documents are pinned through their own affordance (`linkDocument`
+	// below). Search runs over the live snapshot (the app holds
 	// `entities.read:*`); media uploads through `storage.uploadFile` (`storage.kv`).
 	const attachments = useComposerContext();
 	const contextHost = useMemo<ComposerContextHost>(
@@ -372,6 +381,10 @@ export function ChatApp(): ReactElement {
 			// Only carry the rich body when there's actual text — an attachments-only
 			// message has no rich content to serialize.
 			const rich = text ? richBody : "";
+			// Inline `@`-mention chips ride in the rich body; lift them into Person
+			// attachments too so the mention-notifier sees them (they render inline,
+			// not as chips — `visibleAttachments`).
+			const allAtts = withMentionAttachments(rich || undefined, atts);
 			const now = new Date().toISOString();
 			const seq = nextSeq(messages);
 			const echo: ChatMessage = {
@@ -383,7 +396,7 @@ export function ChatApp(): ReactElement {
 				authorName: identity.displayName,
 				createdAt: now,
 				seq,
-				attachments: [...atts],
+				attachments: allAtts,
 			};
 			setPending((prev) => [...prev, { channelId: activeId, message: echo }]);
 			attachments.clear();
@@ -398,7 +411,7 @@ export function ChatApp(): ReactElement {
 						authorName: identity.displayName,
 						createdAt: now,
 						seq,
-						...(atts.length > 0 ? { attachments: atts } : {}),
+						...(allAtts.length > 0 ? { attachments: allAtts } : {}),
 					}),
 				);
 			} catch (err) {
@@ -661,10 +674,14 @@ function Avatar({
 	name,
 	color,
 	avatarRef,
+	size = 34,
 }: {
 	name: string;
 	color: string;
 	avatarRef?: string;
+	/** The host circle's diameter — must match the CSS size of the slot the
+	 *  avatar renders in (34 message gutter, 26 member row). */
+	size?: number;
 }): ReactElement {
 	const icon = useMemo(() => {
 		if (!avatarRef) return null;
@@ -675,9 +692,13 @@ function Avatar({
 		}
 	}, [avatarRef]);
 	if (icon) {
+		// A photo fills the circle edge-to-edge (the host's radius + overflow
+		// clip it round); a glyph (emoji / pack) stays centered with breathing
+		// room — sizing it to the circle would crop the glyph's edges.
+		const image = icon.kind === IconKind.Image;
 		return (
 			<span className="chat__avatar chat__avatar--icon" aria-hidden="true">
-				<EntityIcon icon={icon} size={28} />
+				<EntityIcon icon={icon} size={image ? size : Math.round(size * 0.8)} />
 			</span>
 		);
 	}
@@ -743,27 +764,30 @@ function MessageView({
 										{formatTime(first?.createdAt ?? "")}
 									</time>
 								</header>
-								{g.messages.map((m) => (
-									<div key={m.id} className="chat__line-wrap">
-										{m.richBody ? (
-											<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
-												{renderEditorState(m.richBody)}
-											</div>
-										) : m.body ? (
-											<p className="chat__line">{m.body}</p>
-										) : null}
-										{m.attachments.length > 0 ? (
-											<div className="chat__attachments" data-testid="message-attachments">
-												{m.attachments.map((a) => (
-													<span key={a.ref} className="chat__attachment" data-kind={a.kind}>
-														<Icon name={attachmentIcon(a.kind)} size={12} />
-														{attachmentLabel(a)}
-													</span>
-												))}
-											</div>
-										) : null}
-									</div>
-								))}
+								{g.messages.map((m) => {
+									const chips = visibleAttachments(m);
+									return (
+										<div key={m.id} className="chat__line-wrap">
+											{m.richBody ? (
+												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
+													{renderEditorState(m.richBody)}
+												</div>
+											) : m.body ? (
+												<p className="chat__line">{m.body}</p>
+											) : null}
+											{chips.length > 0 ? (
+												<div className="chat__attachments" data-testid="message-attachments">
+													{chips.map((a) => (
+														<span key={a.ref} className="chat__attachment" data-kind={a.kind}>
+															<Icon name={attachmentIcon(a.kind)} size={12} />
+															{attachmentLabel(a)}
+														</span>
+													))}
+												</div>
+											) : null}
+										</div>
+									);
+								})}
 							</div>
 						</article>
 					</div>
@@ -848,16 +872,20 @@ function Composer({
 					placeholder={placeholder}
 					ariaLabel={placeholder}
 					disabled={disabled}
+					additionalNodes={[MentionNode]}
 					onChange={(p) => {
 						draftRef.current = p;
 						setDraftEmpty(p.isEmpty);
 					}}
 					onSubmit={commit}
 				>
+					{/* Slack model: committing a person plants an inline mention chip in
+					    the draft (no rail chip); the send path lifts it into the wire
+					    attachment the notifier reads. */}
 					<MentionComposerPlugin
 						ref={mentionRef}
 						host={host}
-						onSelect={(candidate) => attachments.add(candidateToAttachment(candidate))}
+						insertNode
 						ariaLabel={t("composer.attach.search")}
 						emptyLabel={t("composer.attach.empty")}
 					/>
@@ -911,6 +939,7 @@ function MembersPanel({
 							<Avatar
 								name={m.displayName || "?"}
 								color={m.color}
+								size={26}
 								{...(m.avatarRef ? { avatarRef: m.avatarRef } : {})}
 							/>
 							<span className="chat__member-name">{name}</span>

@@ -53,7 +53,13 @@ export type NoteReference = {
 	entityId: string;
 	entityType: string;
 	kind: NoteReferenceKind;
+	/** The display label captured at insertion time (mention chips carry one);
+	 *  lets a consumer denormalise a name without resolving the entity. */
+	label?: string;
 };
+
+/** Clamp on the denormalised label lifted off a peer-writable body. */
+const REF_LABEL_MAX_LEN = 256;
 
 /** Walk a note body (a parsed `SerializedEditorState`, or its on-disk JSON
  *  form) and surface every cross-entity reference: `@`-mention chips, block
@@ -92,10 +98,15 @@ export function coerceNoteReferences(raw: unknown): NoteReference[] | null {
 }
 
 function pushEntityRef(node: unknown, out: NoteReference[], kind: NoteReferenceKind): void {
-	const ref = node as { entityId?: unknown; entityType?: unknown };
+	const ref = node as { entityId?: unknown; entityType?: unknown; label?: unknown };
 	const id = typeof ref.entityId === "string" ? ref.entityId : "";
 	const etype = typeof ref.entityType === "string" ? ref.entityType : "";
-	if (id.length > 0) out.push({ entityId: id, entityType: etype, kind });
+	const label =
+		typeof ref.label === "string" && ref.label.length > 0
+			? ref.label.slice(0, REF_LABEL_MAX_LEN)
+			: undefined;
+	if (id.length > 0)
+		out.push({ entityId: id, entityType: etype, kind, ...(label ? { label } : {}) });
 }
 
 function walk(node: unknown, out: NoteReference[], depth: number): void {

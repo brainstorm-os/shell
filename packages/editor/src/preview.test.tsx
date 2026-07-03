@@ -30,6 +30,13 @@ const state = {
 				type: "paragraph",
 				children: [{ type: "image", src: "i://1", altText: "alt", caption: "cap", width: 80 }],
 			},
+			{
+				type: "paragraph",
+				children: [
+					{ type: "text", text: "ping " },
+					{ type: "mention", entityId: "ed25519:abc", entityType: "", label: "Razor" },
+				],
+			},
 			{ type: "io.acme/kanban@v1", children: [] },
 		],
 	},
@@ -56,8 +63,15 @@ describe("renderEditorState", () => {
 		expect(html).toContain("⟦io.acme/kanban@v1⟧");
 	});
 
+	it("renders an inline mention as a chip, not the fallback", () => {
+		expect(html).toContain('class="notes__mention-chip"');
+		expect(html).toContain('data-entity-id="ed25519:abc"');
+		expect(html).toContain(">Razor<");
+		expect(html).not.toContain("⟦mention⟧");
+	});
+
 	it("parses a JSON string and tolerates malformed input", () => {
-		expect(renderEditorState(JSON.stringify(state)).length).toBe(8);
+		expect(renderEditorState(JSON.stringify(state)).length).toBe(9);
 		expect(renderEditorState("{not json")).toEqual([]);
 		expect(renderEditorState(null)).toEqual([]);
 		expect(renderEditorState({})).toEqual([]);

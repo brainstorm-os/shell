@@ -36,6 +36,19 @@ describe("extractNoteReferences", () => {
 		]);
 	});
 
+	it("carries the mention chip's denormalised label, clamped", () => {
+		const refs = extractNoteReferences(
+			body([
+				{ type: MENTION_NODE_TYPE, entityId: "a", entityType: "", label: "Razor" },
+				{ type: MENTION_NODE_TYPE, entityId: "b", entityType: "", label: "x".repeat(1000) },
+				{ type: MENTION_NODE_TYPE, entityId: "c", entityType: "", label: 42 },
+			]),
+		);
+		expect(refs[0]?.label).toBe("Razor");
+		expect(refs[1]?.label).toHaveLength(256);
+		expect(refs[2]?.label).toBeUndefined();
+	});
+
 	it("surfaces an inline transclusion as a Transclusion edge (B11.1)", () => {
 		const refs = extractNoteReferences(
 			body([{ type: INLINE_TRANSCLUSION_NODE_TYPE, entityId: "x", entityType: "T/v1" }]),

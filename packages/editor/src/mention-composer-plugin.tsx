@@ -11,9 +11,12 @@
  *   - arrow / enter / tab / escape are claimed at CRITICAL priority so they
  *     drive the typeahead BEFORE the CompactEditor's Enter-to-submit handler;
  *   - committing a row hands the chosen candidate to the consumer and rewrites
- *     the `@token`: by default it is excised (chat's rail-chip model); a consumer
- *     can supply {@link MentionComposerPluginProps.tokenText} to leave an inline
- *     `@Name` run instead (the comments model).
+ *     the `@token`: with {@link MentionComposerPluginProps.insertNode} (the
+ *     chat/agent model) the token becomes a real inline {@link MentionNode}
+ *     chip followed by a space — Slack-style, the mention lives in the text; a
+ *     consumer can instead supply {@link MentionComposerPluginProps.tokenText}
+ *     to leave a plain `@Name` run (the comments model); by default the token
+ *     is excised entirely (the legacy rail-chip model).
  *
  * The `+`/"add" affordance drives the same flow via the imperative
  * {@link MentionComposerHandle.trigger}, inserting `@` at the caret.
@@ -54,6 +57,7 @@ import {
 	useImperativeHandle,
 	useRef,
 } from "react";
+import { $createMentionNode } from "./nodes/mention-node";
 
 /** Debounce before firing the host search, so each keystroke doesn't hit the
  *  vault. Matches the shared textarea hook. */
@@ -66,23 +70,30 @@ export type MentionComposerHandle = {
 
 export type MentionComposerPluginProps = {
 	host: ComposerContextHost;
-	/** Called with the chosen candidate when a row commits. */
-	onSelect: (candidate: ContextCandidate) => void;
+	/** Called with the chosen candidate when a row commits. Optional — an
+	 *  `insertNode` consumer usually needs no side channel (the mention lives in
+	 *  the editor state and is read off the submitted rich body). */
+	onSelect?: (candidate: ContextCandidate) => void;
 	/** Accessible name for the typeahead listbox (host `t()`-resolved). */
 	ariaLabel: string;
 	/** Row label when the search returned nothing (host `t()`-resolved). */
 	emptyLabel: string;
 	/** How to rewrite the `@token` on commit. Return the replacement text (e.g.
 	 *  `"@Ada "`) to leave an inline mention run; return null (the default) to
-	 *  excise the token entirely (the rail-chip model). */
+	 *  excise the token entirely (the rail-chip model). Ignored when
+	 *  {@link insertNode} is set. */
 	tokenText?: (candidate: ContextCandidate) => string | null;
+	/** Replace the `@token` with a real inline {@link MentionNode} chip (plus a
+	 *  trailing space so typing continues naturally). The host's CompactEditor
+	 *  must register `MentionNode` via `additionalNodes`. */
+	insertNode?: boolean;
 };
 
 type ActiveMention = { nodeKey: string; match: MentionMatch; caret: number };
 
 export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionComposerPluginProps>(
 	function MentionComposerPlugin(
-		{ host, onSelect, ariaLabel, emptyLabel, tokenText },
+		{ host, onSelect, ariaLabel, emptyLabel, tokenText, insertNode },
 		ref: ForwardedRef<MentionComposerHandle>,
 	) {
 		const [editor] = useLexicalComposerContext();
@@ -114,6 +125,18 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 						const node = $getNodeByKey(active.nodeKey);
 						if ($isTextNode(node)) {
 							const cleared = clearMentionToken(node.getTextContent(), active.match, active.caret);
+							if (insertNode) {
+								node.setTextContent(cleared.text);
+								node.select(cleared.caret, cleared.caret);
+								const sel = $getSelection();
+								if ($isRangeSelection(sel)) {
+									sel.insertNodes([
+										$createMentionNode(candidate.id, candidate.entityType ?? "", candidate.label),
+									]);
+									sel.insertText(" ");
+								}
+								return;
+							}
 							const inline = tokenText?.(candidate) ?? null;
 							if (inline === null) {
 								node.setTextContent(cleared.text);
@@ -128,10 +151,10 @@ export const MentionComposerPlugin = forwardRef<MentionComposerHandle, MentionCo
 						}
 					});
 				}
-				onSelect(candidate);
+				onSelect?.(candidate);
 				close();
 			},
-			[editor, onSelect, close, tokenText],
+			[editor, onSelect, close, tokenText, insertNode],
 		);
 
 		const commitById = useCallback(

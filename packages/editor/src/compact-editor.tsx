@@ -24,6 +24,7 @@ import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import {
 	$createParagraphNode,
+	$createTextNode,
 	$getRoot,
 	COMMAND_PRIORITY_HIGH,
 	type EditorState,
@@ -72,6 +73,8 @@ export type CompactEditorHandle = {
 	clear(): void;
 	/** Move focus into the editor. */
 	focus(): void;
+	/** Replace the draft with plain text (intent seeding), caret at the end. */
+	setText(text: string): void;
 };
 
 export type CompactEditorProps = {
@@ -161,6 +164,21 @@ function CompactBehaviorPlugin({
 			submit: doSubmit,
 			clear,
 			focus: () => editor.focus(),
+			setText: (text: string) => {
+				// Discrete so a follow-up `submit()` in the same tick reads the seeded
+				// draft (Lexical otherwise batches the update to a microtask).
+				editor.update(
+					() => {
+						const root = $getRoot();
+						root.clear();
+						const paragraph = $createParagraphNode();
+						if (text) paragraph.append($createTextNode(text));
+						root.append(paragraph);
+						paragraph.selectEnd();
+					},
+					{ discrete: true },
+				);
+			},
 		}),
 		[doSubmit, clear, editor],
 	);

@@ -1,3 +1,4 @@
+import "@brainstorm/editor/editor-theme.css";
 import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/composer-context.css";
 import "@brainstorm/sdk/empty-state.css";

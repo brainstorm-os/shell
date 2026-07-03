@@ -18,7 +18,10 @@ export {
 	attachmentKey,
 	attachmentLabel,
 	candidateToAttachment,
+	inlineMentionRefs,
 	parseAttachments,
+	visibleAttachments,
+	withMentionAttachments,
 } from "./types";
 export { objectItemToAttachment } from "./object-attachment";
 export { pickFile } from "./media";

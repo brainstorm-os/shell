@@ -101,4 +101,22 @@ describe("CompactEditor — DOM", () => {
 		});
 		expect(submitted).toBe(0);
 	});
+
+	it("setText seeds the draft and submit reads it back", () => {
+		const ref = createRef<CompactEditorHandle>();
+		const submitted: string[] = [];
+		act(() => {
+			root.render(<CompactEditor ref={ref} onSubmit={(p) => submitted.push(p.text)} />);
+		});
+		act(() => {
+			ref.current?.setText("Summarize this note");
+			ref.current?.submit();
+		});
+		expect(submitted).toEqual(["Summarize this note"]);
+		act(() => {
+			ref.current?.setText("");
+			ref.current?.submit();
+		});
+		expect(submitted).toEqual(["Summarize this note"]);
+	});
 });

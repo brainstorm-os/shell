@@ -16,6 +16,7 @@ import {
 	type PersonAttachment,
 } from "@brainstorm/sdk-types";
 import { IconName } from "../icon";
+import { type NoteReference, NoteReferenceKind, extractNoteReferences } from "../note-references";
 
 /** Per-file upload ceiling for composer media — bounds the in-renderer
  *  base64 + provider payload (matches the broker's single-envelope upload cap).
@@ -82,6 +83,77 @@ export function candidateToAttachment(
 		...(label ? { label } : {}),
 		...(candidate.entityType ? { entityType: candidate.entityType } : {}),
 	};
+}
+
+/** The `@`-mention chips inlined in a message's rich body (a serialized
+ *  Lexical state, as persisted on `richBody`). Two consumers share this: the
+ *  send path lifts inline mentions into durable attachments (so the
+ *  mention-notifier / agent grounding see them without re-parsing the body),
+ *  and the transcript render hides the attachment chip whose mention already
+ *  shows inline. Fail-soft: a missing / unparseable body yields `[]`. */
+export function inlineMentionRefs(richBody: string | null | undefined): NoteReference[] {
+	if (!richBody) return [];
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(richBody);
+	} catch {
+		return [];
+	}
+	return extractNoteReferences(parsed).filter((r) => r.kind === NoteReferenceKind.Mention);
+}
+
+/** The durable attachment for an inline mention chip. A mention with no
+ *  entity type is a person keyed by sovereign pubkey (chat's roster people are
+ *  not vault entities), as is a `…/Person/v1` entity; anything else is an
+ *  entity reference. */
+function mentionToAttachment(ref: NoteReference): PersonAttachment | EntityAttachment {
+	if (ref.entityType === "" || ref.entityType.endsWith("/Person/v1")) {
+		return {
+			kind: AttachmentKind.Person,
+			ref: ref.entityId,
+			...(ref.label ? { label: ref.label } : {}),
+		};
+	}
+	return {
+		kind: AttachmentKind.Entity,
+		ref: ref.entityId,
+		...(ref.label ? { label: ref.label } : {}),
+		entityType: ref.entityType,
+	};
+}
+
+/** Lift the `@`-mention chips inlined in a rich body into durable attachments,
+ *  merged after any explicitly-attached context (existing refs win). The
+ *  mention lives in the text Slack-style, but the attachment is what the
+ *  mention-notifier and agent grounding read — it travels on the wire without
+ *  rendering as a chip (see {@link visibleAttachments}). */
+export function withMentionAttachments(
+	richBody: string | null | undefined,
+	attachments: readonly MessageAttachment[],
+): MessageAttachment[] {
+	const seen = new Set(attachments.map((a) => a.ref));
+	const lifted: MessageAttachment[] = [];
+	for (const ref of inlineMentionRefs(richBody)) {
+		if (seen.has(ref.entityId)) continue;
+		seen.add(ref.entityId);
+		lifted.push(mentionToAttachment(ref));
+	}
+	return [...attachments, ...lifted];
+}
+
+/** The attachments to render as chips under a message: one whose mention
+ *  already shows inline in the rich body is hidden (it exists only as wire
+ *  metadata). A legacy message with no inline mention keeps its chip; media is
+ *  never mention-sourced so it always shows. */
+export function visibleAttachments(message: {
+	richBody?: string;
+	attachments: readonly MessageAttachment[];
+}): MessageAttachment[] {
+	const attachments = [...message.attachments];
+	if (!message.richBody || attachments.length === 0) return attachments;
+	const inline = new Set(inlineMentionRefs(message.richBody).map((r) => r.entityId));
+	if (inline.size === 0) return attachments;
+	return attachments.filter((a) => a.kind === AttachmentKind.Media || !inline.has(a.ref));
 }
 
 /** The label to render for an attachment chip — the denormalised label, falling
