@@ -65,6 +65,11 @@ import { KeyboardSection } from "./keyboard-section";
 const MembershipSection = lazy(() =>
 	import("./membership-section").then((m) => ({ default: m.MembershipSection })),
 );
+// 14.6 — Settings → Billing. Lazy-loaded like Membership: only reachable
+// from Settings, keeps the dashboard entry chunk lean.
+const BillingSection = lazy(() =>
+	import("./billing-section").then((m) => ({ default: m.BillingSection })),
+);
 // Net-1f — Settings → Privacy → Network panel. Lazy-loaded; the panel
 // pulls the virtualizer (~6 KB raw) + the proxy editor popover + every
 // audit-table row component (~12 KB raw together) only when the user
@@ -165,6 +170,11 @@ export const SECTIONS: ReadonlyArray<{ id: SettingsSection; labelKey: string; ic
 		id: SettingsSection.Membership,
 		labelKey: "shell.settings.section.membership",
 		icon: IconName.Crown,
+	},
+	{
+		id: SettingsSection.Billing,
+		labelKey: "shell.settings.section.billing",
+		icon: IconName.CreditCard,
 	},
 	{
 		id: SettingsSection.Network,
@@ -452,6 +462,12 @@ function renderBody(
 			return (
 				<Suspense fallback={null}>
 					<MembershipSection />
+				</Suspense>
+			);
+		case SettingsSection.Billing:
+			return (
+				<Suspense fallback={null}>
+					<BillingSection />
 				</Suspense>
 			);
 		case SettingsSection.Network:
