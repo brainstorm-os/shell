@@ -165,6 +165,29 @@ export class ActiveRelayOrchestrator {
 	}
 
 	/**
+	 * 10.10 — subscribe many routing keys at once (the fresh-device bootstrap
+	 * path). Delegates to the port's `subscribeBatch` when the transport has one
+	 * (the WebSocket port coalesces into chunked `bundle:true` controls so the
+	 * durable node serves bundled backfill); otherwise falls back to per-key
+	 * subscribe. All keys join the swap-surviving subscription set either way.
+	 */
+	subscribeBatch(routingKeys: readonly string[]): void {
+		for (const key of routingKeys) this.#subscribed.add(key);
+		const port = this.#current.port as RelayPort & {
+			subscribeBatch?: (keys: readonly string[]) => void;
+		};
+		if (typeof port.subscribeBatch === "function") {
+			try {
+				port.subscribeBatch(routingKeys);
+			} catch {
+				// Disposed-port subscribe is a no-op; the reconnect re-fires.
+			}
+			return;
+		}
+		for (const key of routingKeys) maybeSubscribe(this.#current.port, key);
+	}
+
+	/**
 	 * Stage 10.14 — request the durable node's catalog for `account`. Delegates
 	 * to the current port if it supports it (the WebSocket transport does;
 	 * loopback has no server, so this rejects there). The cold-restore consumer

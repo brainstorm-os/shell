@@ -3,21 +3,26 @@ import type { CatalogEntry } from "./relay-port";
 import { RestoreEngine, type RestoreEngineContext } from "./restore-engine";
 
 /**
- * Controllable stand-in for `LiveSyncEngine` — `trackForRestore` optionally
- * "lands the wrap" for an id (via `autoLand`), `restoredType` reports it. The
- * wrap→type→row-materialize integration over real crypto lives in
- * `live-sync-engine.test.ts`; here we drive the orchestration (catalog →
- * track → quiescence → summary → reindex) deterministically.
+ * Controllable stand-in for `LiveSyncEngine` — `trackForRestoreBatch`
+ * optionally "lands the wrap" for each id (via `autoLand`), `restoredType`
+ * reports it. The wrap→type→row-materialize integration over real crypto
+ * lives in `live-sync-engine.test.ts`; here we drive the orchestration
+ * (catalog → batch track → quiescence → summary → reindex) deterministically.
  */
 class FakeEngine {
 	readonly tracked: string[] = [];
+	/** One entry per `trackForRestoreBatch` call — pins the 10.10 batching. */
+	readonly batches: string[][] = [];
 	readonly #restored = new Map<string, string>();
 	autoLand: (id: string) => string | null = () => null;
 
-	trackForRestore(id: string): void {
-		this.tracked.push(id);
-		const type = this.autoLand(id);
-		if (type) this.#restored.set(id, type);
+	trackForRestoreBatch(ids: readonly string[]): void {
+		this.batches.push([...ids]);
+		for (const id of ids) {
+			this.tracked.push(id);
+			const type = this.autoLand(id);
+			if (type) this.#restored.set(id, type);
+		}
 	}
 
 	restoredType(id: string): string | null {
@@ -65,6 +70,8 @@ describe("RestoreEngine (10.14)", () => {
 			complete: true,
 		});
 		expect(engine.tracked).toEqual(["e1", "e2"]);
+		// 10.10 — the whole catalog goes down in ONE batch call.
+		expect(engine.batches).toEqual([["e1", "e2"]]);
 	});
 
 	it("resolves complete with nothing to do on an empty catalog", async () => {

@@ -61,9 +61,18 @@ export const FRAME_CHANNEL_BYTE = 0x01;
  *  time) so a response correlates to the head of the queue without a per-request
  *  id — the node answers async + out-of-order under pipelining, so we don't. */
 export const ASSET_CHANNEL_BYTE = 0x02;
+/** 10.10 — bundled backfill (server→client only): many opaque wire frames
+ *  length-prefixed into one WebSocket message. The durable node sends these
+ *  only to a client that advertised `bundle:true` on its subscribe, so an old
+ *  client never sees the channel; an old NODE ignores the flag and keeps the
+ *  per-frame `0x01` stream (the fallback path, no negotiation round-trip). */
+export const BUNDLE_CHANNEL_BYTE = 0x03;
 
-/** JSON-tagged control message shape. */
-export type SubscribeControl = { op: "subscribe"; entityIds: string[] };
+/** JSON-tagged control message shape. `bundle` (10.10) advertises that this
+ *  client can decode `0x03` bundle messages — the durable node then serves
+ *  backfill bundled instead of one message per frame. Additive: an old node's
+ *  control parser drops unknown fields. */
+export type SubscribeControl = { op: "subscribe"; entityIds: string[]; bundle?: true };
 export type UnsubscribeControl = { op: "unsubscribe"; entityIds: string[] };
 /** Stage 10.14 — request the account's catalog (client→server). `account` is
  *  the device's wire `sender` (base64url). */
@@ -110,6 +119,9 @@ export type WebSocketCtor = new (url: string) => WebSocketLike;
 
 const OPEN_READY_STATE = 1;
 const SEND_QUEUE_CAP = 256;
+/** 10.10 — max entity ids per batched subscribe control. Keeps each control
+ *  message comfortably under the node's 64 KiB control-size cap. */
+const SUBSCRIBE_BATCH_MAX = 256;
 const STABLE_OPEN_RESET_MS = 30_000;
 const BACKOFF_SCHEDULE_MS = [500, 1_000, 2_000, 5_000, 10_000, 30_000] as const;
 const JITTER_FRACTION = 0.2;
@@ -287,7 +299,35 @@ export class WebSocketRelayPort implements RelayPort {
 		const fresh = !this.#subscriptions.has(entityId);
 		this.#subscriptions.add(entityId);
 		if (fresh && this.#state === WebSocketRelayState.Open) {
-			this.#sendControl({ op: "subscribe", entityIds: [entityId] });
+			this.#sendControl({ op: "subscribe", entityIds: [entityId], bundle: true });
+		}
+	}
+
+	/**
+	 * 10.10 — subscribe MANY routing keys at once (the fresh-device bootstrap
+	 * path: the restore engine passes the whole catalog). One chunked control
+	 * message per {@link SUBSCRIBE_BATCH_MAX} fresh ids instead of one per
+	 * entity, each advertising `bundle:true` so a durable node replies with
+	 * bundled backfill (`0x03`) instead of one message per frame. Already-
+	 * subscribed ids are skipped; an old node ignores the flag and streams
+	 * per-frame — the client needs no negotiation, both inbound shapes apply
+	 * identically.
+	 */
+	subscribeBatch(entityIds: readonly string[]): void {
+		if (this.#disposed) return;
+		const fresh: string[] = [];
+		for (const entityId of entityIds) {
+			if (!entityId || this.#subscriptions.has(entityId)) continue;
+			this.#subscriptions.add(entityId);
+			fresh.push(entityId);
+		}
+		if (fresh.length === 0 || this.#state !== WebSocketRelayState.Open) return;
+		for (let i = 0; i < fresh.length; i += SUBSCRIBE_BATCH_MAX) {
+			this.#sendControl({
+				op: "subscribe",
+				entityIds: fresh.slice(i, i + SUBSCRIBE_BATCH_MAX),
+				bundle: true,
+			});
 		}
 	}
 
@@ -512,9 +552,10 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#openedAtMs = this.#now();
 		this.#transition(WebSocketRelayState.Open);
 		// Re-emit every active subscription so the relay's routing table
-		// re-builds after a reconnect.
+		// re-builds after a reconnect. `bundle:true` lets a durable node serve
+		// the re-backfill bundled (10.10) — an old node ignores it.
 		if (this.#subscriptions.size > 0) {
-			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions] });
+			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions], bundle: true });
 		}
 		// Drain any frames queued while connecting / reconnecting.
 		this.#flushSendQueue();
@@ -555,13 +596,20 @@ export class WebSocketRelayPort implements RelayPort {
 			// Defensive copy so a listener mutating the buffer doesn't see
 			// (or cause) writes through the WebSocket's underlying buffer.
 			const copy = new Uint8Array(frame);
-			for (const listener of this.#listeners) {
-				try {
-					listener(copy);
-				} catch {
-					// A listener throwing must not block fan-out to siblings.
-				}
+			this.#dispatchFrame(copy);
+			return;
+		}
+		if (channel === BUNDLE_CHANNEL_BYTE) {
+			// 10.10 — bundled backfill: unpack and fan each sub-frame through the
+			// SAME listener path as a `0x01` message, so downstream apply is
+			// byte-identical to the unbundled stream. A malformed bundle is
+			// rejected wholly (never a partial apply of a corrupt message).
+			const frames = decodeBundlePayload(bytes.subarray(1));
+			if (!frames) {
+				this.#droppedInbound += 1;
+				return;
 			}
+			for (const frame of frames) this.#dispatchFrame(frame);
 			return;
 		}
 		if (channel === ASSET_CHANNEL_BYTE) {
@@ -596,6 +644,18 @@ export class WebSocketRelayPort implements RelayPort {
 			return;
 		}
 		this.#droppedInbound += 1;
+	}
+
+	/** Deliver one inbound frame to every listener (a listener throwing must
+	 *  not block fan-out to siblings). The frame must already be a safe copy. */
+	#dispatchFrame(frame: Uint8Array): void {
+		for (const listener of this.#listeners) {
+			try {
+				listener(frame);
+			} catch {
+				// A listener throwing must not block fan-out to siblings.
+			}
+		}
 	}
 
 	#scheduleReconnect(): void {
@@ -655,7 +715,7 @@ export class WebSocketRelayPort implements RelayPort {
 	#onAuthenticated(): void {
 		if (this.#disposed) return;
 		if (this.#subscriptions.size > 0) {
-			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions] });
+			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions], bundle: true });
 		}
 		this.#flushSendQueue();
 	}
@@ -783,7 +843,61 @@ export function isControlMessage(value: unknown): value is RelayControlMessage {
 	}
 	if (v.op !== "subscribe" && v.op !== "unsubscribe") return false;
 	if (!Array.isArray(v.entityIds)) return false;
+	if (v.op === "subscribe" && "bundle" in v && (v as { bundle?: unknown }).bundle !== true) {
+		return false;
+	}
 	return v.entityIds.every((e) => typeof e === "string" && e.length > 0);
+}
+
+/**
+ * 10.10 — encode many opaque wire frames into one bundle payload (the bytes
+ * after the `0x03` channel byte): repeated `u32-be(len) || frameBytes`, no
+ * count prefix — the lengths must consume the payload exactly. Pure framing;
+ * each sub-frame stays the opaque ciphertext envelope it always was. Mirrors
+ * `brainstorm-sync`'s `encodeBundlePayload` (the node is the producer on the
+ * live path; this encoder exists for tests + the loopback-free contract).
+ */
+export function encodeBundlePayload(frames: readonly Uint8Array[]): Uint8Array | null {
+	if (frames.length === 0) return null;
+	let total = 0;
+	for (const frame of frames) {
+		if (frame.length === 0) return null;
+		total += 4 + frame.length;
+	}
+	const out = new Uint8Array(total);
+	const view = new DataView(out.buffer);
+	let offset = 0;
+	for (const frame of frames) {
+		view.setUint32(offset, frame.length, false);
+		offset += 4;
+		out.set(frame, offset);
+		offset += frame.length;
+	}
+	return out;
+}
+
+/**
+ * 10.10 — strict decode of a bundle payload. Returns null on ANY deviation
+ * (empty payload, truncated length prefix, zero-length sub-frame, a length
+ * that over/underruns the payload) so a corrupt message is dropped wholly —
+ * never a partial apply. Each returned sub-frame is a copy, safe to hand to
+ * listeners that outlive the socket buffer.
+ */
+export function decodeBundlePayload(payload: Uint8Array): Uint8Array[] | null {
+	if (payload.length === 0) return null;
+	const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+	const frames: Uint8Array[] = [];
+	let offset = 0;
+	while (offset < payload.length) {
+		if (offset + 4 > payload.length) return null;
+		const len = view.getUint32(offset, false);
+		offset += 4;
+		if (len === 0) return null;
+		if (offset + len > payload.length) return null;
+		frames.push(new Uint8Array(payload.subarray(offset, offset + len)));
+		offset += len;
+	}
+	return frames;
 }
 
 /** SYNC-4b — read the `op` of a server→client control frame (challenge/auth-ok),

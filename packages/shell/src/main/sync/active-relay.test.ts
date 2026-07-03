@@ -116,6 +116,50 @@ describe("ActiveRelayOrchestrator", () => {
 		orch.dispose();
 	});
 
+	it("subscribeBatch delegates to a batching port and joins the swap-surviving set (10.10)", async () => {
+		class BatchingPort extends FakePort {
+			readonly batches: string[][] = [];
+			subscribeBatch(keys: readonly string[]): void {
+				this.batches.push([...keys]);
+				for (const k of keys) this.subs.add(k);
+			}
+		}
+		const port = new BatchingPort("ws://t");
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => "ws://t",
+			makeRelayPort: () => port,
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/" });
+		orch.subscribeBatch(["e1", "e2", "e3"]);
+		expect(port.batches).toEqual([["e1", "e2", "e3"]]);
+
+		// The keys survive a port swap like single subscribes do.
+		const port2 = new BatchingPort("ws://u");
+		const orch2 = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => "ws://u",
+			makeRelayPort: () => port2,
+		});
+		orch2.subscribeBatch(["a", "b"]); // still on loopback (no batch support)
+		await orch2.onSessionChanged({ vaultId: "v", vaultPath: "/" });
+		expect(port2.subs.has("a")).toBe(true);
+		expect(port2.subs.has("b")).toBe(true);
+		orch.dispose();
+		orch2.dispose();
+	});
+
+	it("subscribeBatch falls back to per-key subscribe on a non-batching port (10.10)", async () => {
+		const port = new FakePort("ws://t");
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => "ws://t",
+			makeRelayPort: () => port,
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/" });
+		orch.subscribeBatch(["e1", "e2"]);
+		expect(port.subs.has("e1")).toBe(true);
+		expect(port.subs.has("e2")).toBe(true);
+		orch.dispose();
+	});
+
 	it("reconfigure is a no-op when the resolved transport is unchanged", async () => {
 		const make = vi.fn((url: string) => new FakePort(url));
 		const orch = new ActiveRelayOrchestrator({

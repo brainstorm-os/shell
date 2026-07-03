@@ -119,6 +119,25 @@ describe("createRelayCore — connection handlers", () => {
 		expect(inbound?.subarray(1)).toEqual(frame);
 	});
 
+	it("a bundle-advertising subscribe (10.10 new client) still subscribes on this old node", () => {
+		// Forward-compat pin: the 10.10 client adds `bundle:true` to every
+		// subscribe. An old node (this test relay, and any pre-10.10
+		// brainstorm-sync) must ignore the unknown field and subscribe normally —
+		// that IS the fallback path (per-frame backfill, live fan-out unchanged).
+		const seq: string[] = ["c1", "c2"];
+		const core = createRelayCore({ mintConnId: () => seq.shift() ?? "fallback" });
+		const a = new SyntheticClient();
+		const b = new SyntheticClient();
+		core.handlers.onOpen(a);
+		core.handlers.onOpen(b);
+		core.handlers.onMessage(a, wrapControl({ op: "subscribe", entityIds: ["ent_1"] }));
+		core.handlers.onMessage(b, wrapControl({ op: "subscribe", entityIds: ["ent_1"], bundle: true }));
+		const frame = encodeFrame({ header: makeHeader() });
+		core.handlers.onMessage(a, wrapFrame(frame));
+		expect(b.received.length).toBe(1);
+		expect(b.received[0]?.[0]).toBe(FRAME_CHANNEL_BYTE);
+	});
+
 	it("malformed control message is dropped without killing the connection", () => {
 		const core = createRelayCore({ mintConnId: () => "c1" });
 		const a = new SyntheticClient();

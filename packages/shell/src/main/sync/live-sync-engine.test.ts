@@ -486,6 +486,53 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 		expect(b.engine.isTracked(ENT)).toBe(false);
 	});
 
+	it("trackForRestoreBatch batch-subscribes the whole catalog through subscribeBatch (10.10)", async () => {
+		const [pb] = LoopbackRelayPort.pair(1);
+		if (!pb) throw new Error("missing port");
+		const singles: string[] = [];
+		const batches: string[][] = [];
+		const surface: RelaySurface = {
+			currentPort: () => pb,
+			onFrame: (cb) => pb.onFrame(cb),
+			offFrame: (cb) => pb.offFrame(cb),
+			subscribe: (key) => singles.push(key),
+			subscribeBatch: (keys) => batches.push([...keys]),
+		};
+		const b = makeDevice(pb, new FakeDekStore(), () => true, { getRelay: () => surface });
+
+		b.engine.trackForRestore("pre-tracked");
+		b.engine.trackForRestoreBatch(["pre-tracked", "e1", "e2", "e3"]);
+
+		// Every id is tracked at the pending sentinel (inbound frames accepted).
+		for (const id of ["pre-tracked", "e1", "e2", "e3"]) {
+			expect(b.engine.isTracked(id)).toBe(true);
+			expect(b.engine.restoredType(id)).toBeNull();
+		}
+		// ONE batch call, already-tracked id skipped; nothing fell back to
+		// per-id subscribe beyond the engine's own inbox + the pre-track.
+		expect(batches).toEqual([["e1", "e2", "e3"]]);
+		expect(singles).not.toContain("e1");
+		// Idempotent — a second batch with nothing fresh is a no-op.
+		b.engine.trackForRestoreBatch(["e1", "e2"]);
+		expect(batches).toHaveLength(1);
+	});
+
+	it("trackForRestoreBatch falls back to per-id subscribe when the surface has no subscribeBatch (10.10)", async () => {
+		const [pb] = LoopbackRelayPort.pair(1);
+		if (!pb) throw new Error("missing port");
+		const singles: string[] = [];
+		const surface: RelaySurface = {
+			currentPort: () => pb,
+			onFrame: (cb) => pb.onFrame(cb),
+			offFrame: (cb) => pb.offFrame(cb),
+			subscribe: (key) => singles.push(key),
+		};
+		const b = makeDevice(pb, new FakeDekStore(), () => true, { getRelay: () => surface });
+		b.engine.trackForRestoreBatch(["e1", "e2"]);
+		expect(singles.filter((k) => k.startsWith("e"))).toEqual(["e1", "e2"]);
+		expect(b.engine.isTracked("e1")).toBe(true);
+	});
+
 	it("an emit failure is swallowed (online-only — a missed frame is not a failed edit)", async () => {
 		const [pa, pb] = LoopbackRelayPort.pair(2);
 		if (!pa || !pb) throw new Error("missing ports");
