@@ -28,9 +28,11 @@ beforeEach(() => {
 	// rather than fetching real bytes, keeping these chrome tests hermetic.
 	_resetPreviewRegistryForTests();
 	(window as { brainstorm?: unknown }).brainstorm = undefined;
-	// Panel-open prefs persist in localStorage; clear it so each test starts
-	// from the documented defaults instead of a previous test's toggled state.
+	// Panel-open prefs persist per storage scope (sidebar in localStorage,
+	// inspector in sessionStorage); clear both so each test starts from the
+	// documented defaults instead of a previous test's toggled state.
 	localStorage.clear();
+	sessionStorage.clear();
 });
 
 afterEach(() => {

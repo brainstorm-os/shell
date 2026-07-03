@@ -46,6 +46,7 @@ import {
 	type ObjectMenuRuntime,
 	openAnchoredMenu,
 } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { IconPickerButton } from "@brainstorm/sdk/picker-host";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
@@ -228,7 +229,7 @@ export function JournalApp(): ReactElement {
 	);
 	const [periodic, setPeriodic] = useState<PeriodicView | null>(null);
 	const [navOpen, setNavOpen] = useState(() => readPanelPref(NAV_OPEN_PREF_KEY, true));
-	const [propsOpen, setPropsOpen] = useState(() => readPanelPref(PROPS_OPEN_PREF_KEY, false));
+	const [propsOpen, setPropsOpen] = useState(() => readPanelOpen(PROPS_OPEN_PREF_KEY, false));
 
 	// Comments (B11.9) — right-panel tab + pending comment-on-selection /
 	// click-to-thread state shared between the editor island and the panel.
@@ -804,7 +805,7 @@ export function JournalApp(): ReactElement {
 		setRightPanelTab(RightPanelTab.Comments);
 		setPropsOpen((open) => {
 			if (!open) {
-				writePanelPref(PROPS_OPEN_PREF_KEY, true);
+				writePanelOpen(PROPS_OPEN_PREF_KEY, true);
 				return true;
 			}
 			return open;
@@ -1014,7 +1015,7 @@ export function JournalApp(): ReactElement {
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
-			writePanelPref(PROPS_OPEN_PREF_KEY, next);
+			writePanelOpen(PROPS_OPEN_PREF_KEY, next);
 			return next;
 		});
 	}, []);
@@ -1039,7 +1040,7 @@ export function JournalApp(): ReactElement {
 			ensureEntry: () => ensureEntry(focusRef.current),
 			onClose: () => {
 				setPropsOpen(false);
-				writePanelPref(PROPS_OPEN_PREF_KEY, false);
+				writePanelOpen(PROPS_OPEN_PREF_KEY, false);
 			},
 			getActiveTab: () => rightPanelTabRef.current,
 			onTabChange: (tab) => setRightPanelTab(tab),

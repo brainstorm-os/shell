@@ -31,6 +31,7 @@ import {
 	ObjectMenuTrigger,
 	openObjectMenu,
 } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
 import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
@@ -70,7 +71,8 @@ const translateMsg = (key: string, params?: Record<string, string>): string =>
 	t(key as CodeEditorMessageKey, params);
 
 // ── Panel + editor preferences (device-local; same localStorage path as
-// every other first-party app). ─────────────────────────────────────────
+// every other first-party app). The right-hand refs panel is the exception:
+// window-scoped via `@brainstorm/sdk/panel-state`. ──────────────────────
 const NAV_OPEN_KEY = "code-editor:nav-open";
 const REFS_OPEN_KEY = "code-editor:refs-open";
 const WRAP_KEY = "code-editor:wrap";
@@ -211,7 +213,7 @@ export function CodeEditorApp(): ReactElement {
 	const [edits, setEdits] = useState<Map<string, string>>(() => new Map());
 
 	const [navOpen, setNavOpen] = useState(() => readPanelPref(NAV_OPEN_KEY, true));
-	const [refsOpen, setRefsOpen] = useState(() => readPanelPref(REFS_OPEN_KEY, true));
+	const [refsOpen, setRefsOpen] = useState(() => readPanelOpen(REFS_OPEN_KEY, true));
 
 	// Cross-app handoff target (theme-editor → "Edit in Code Editor"). The
 	// StylePack id surfaces an adapted CSS row; `pendingOpenId` auto-selects
@@ -802,7 +804,7 @@ export function CodeEditorApp(): ReactElement {
 
 	// ── Persist panel prefs ──────────────────────────────────────────────────
 	useEffect(() => writePanelPref(NAV_OPEN_KEY, navOpen), [navOpen]);
-	useEffect(() => writePanelPref(REFS_OPEN_KEY, refsOpen), [refsOpen]);
+	useEffect(() => writePanelOpen(REFS_OPEN_KEY, refsOpen), [refsOpen]);
 
 	// ── Window-level chords routed through the shared shortcut registry. ─────
 	useEffect(() => {

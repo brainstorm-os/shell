@@ -79,6 +79,7 @@ afterEach(() => {
 	doc = null;
 	document.body.replaceChildren();
 	localStorage.clear();
+	sessionStorage.clear();
 });
 
 function key(target: EventTarget, init: KeyboardEventInit): void {

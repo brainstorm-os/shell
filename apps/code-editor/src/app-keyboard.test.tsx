@@ -19,6 +19,7 @@ let root: Root;
 
 beforeEach(() => {
 	localStorage.clear();
+	sessionStorage.clear();
 	container = document.createElement("div");
 	document.body.append(container);
 });

@@ -16,6 +16,7 @@ import { RightPanelTab } from "@brainstorm/editor";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { requestSaveBytes } from "@brainstorm/sdk/export-file";
 import { IconName } from "@brainstorm/sdk/icon";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewFile } from "./demo/dataset";
 import { type GalleryState, resolveOpenPayload, toPreviewFiles } from "./host/apply-open";
@@ -72,22 +73,14 @@ function extensionOf(name: string): string | null {
 	return name.slice(dot + 1).toLowerCase();
 }
 
-/** Right-panel open pref. Defaults CLOSED on first run (no stored value) —
- *  matches Notes/Journal/Files/Database; an opened panel persists. */
+/** Right-panel open state — window-scoped (`@brainstorm/sdk/panel-state`):
+ *  a fresh Preview window always starts with the inspector closed. */
 const INSPECTOR_PREF_KEY = "preview:inspector-open";
 function readInspectorPref(): boolean {
-	try {
-		return localStorage.getItem(INSPECTOR_PREF_KEY) === "true";
-	} catch {
-		return false;
-	}
+	return readPanelOpen(INSPECTOR_PREF_KEY, false);
 }
 function writeInspectorPref(open: boolean): void {
-	try {
-		localStorage.setItem(INSPECTOR_PREF_KEY, String(open));
-	} catch {
-		// Storage disabled — pref reverts to default on reload.
-	}
+	writePanelOpen(INSPECTOR_PREF_KEY, open);
 }
 
 /** Left library-sidebar open pref. With no stored value the sidebar defaults
