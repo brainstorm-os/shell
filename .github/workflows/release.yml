@@ -95,6 +95,12 @@ jobs:
           if [ -n "${{ matrix.rust-extra }}" ]; then rustup target add ${{ matrix.rust-extra }}; fi
           bun run --filter @brainstorm/native ${{ matrix.napi-script }}
           if [ -n "${{ matrix.napi-extra }}" ]; then bun run --filter @brainstorm/native ${{ matrix.napi-extra }}; fi
+          # 11.3 — the embedding addon (fastembed/ONNX Runtime, statically linked
+          # so the .node is self-contained, shipped like the crypto .node via the
+          # shell's extraResources). Release-only: ci.yml/verify skip it (opt-in),
+          # and the shell degrades to lexical-only search where the .node is absent.
+          bun run --filter @brainstorm/native-embed ${{ matrix.napi-script }}
+          if [ -n "${{ matrix.napi-extra }}" ]; then bun run --filter @brainstorm/native-embed ${{ matrix.napi-extra }}; fi
           bun run --filter @brainstorm/shell build
           bun run build:apps
 
