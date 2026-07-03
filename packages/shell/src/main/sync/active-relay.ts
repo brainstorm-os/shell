@@ -206,6 +206,24 @@ export class ActiveRelayOrchestrator {
 	}
 
 	/**
+	 * Stage 10.11 — routing-token rotation: ask the durable node to re-home
+	 * `from → to`. Delegates to the current port if it supports it (the
+	 * WebSocket transport does; loopback has no durable storage, so this
+	 * rejects there and the rotation coordinator treats it as local-only).
+	 */
+	requestRotate(from: string, to: string, account?: string): Promise<void> {
+		const withRotate = this.#current.port as RelayPort & {
+			requestRotate?: (from: string, to: string, account?: string) => Promise<void>;
+		};
+		if (typeof withRotate.requestRotate !== "function") {
+			return Promise.reject(
+				new Error("ActiveRelayOrchestrator.requestRotate: transport has no durable node"),
+			);
+		}
+		return account ? withRotate.requestRotate(from, to, account) : withRotate.requestRotate(from, to);
+	}
+
+	/**
 	 * Asset-B4 — send one blob-plane request frame (HAS/PUT/GET) over the live
 	 * port's asset channel and resolve with the node's response. Delegates to the
 	 * current port if it supports it (the WebSocket transport does; loopback has

@@ -28,6 +28,7 @@ import type { MemberWrapPayload } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { type EncryptedFrame, decodeFrame, encodeFrame } from "./envelope-codec";
 import {
+	EntityIdMismatch,
 	openAwarenessEnvelope,
 	openUpdateEnvelope,
 	openWrapBootstrapEnvelope,
@@ -43,12 +44,36 @@ export type PipelineResolution = {
 	type: string;
 };
 
+/** Stage 10.11 — the pipeline's view of the routing-token table (implemented
+ *  by `RoutingTokenTable`; defined structurally here so the pipeline stays
+ *  decoupled from the derivation module). */
+export type RoutingTokenResolver = {
+	/** The entity's CURRENT wire routing token, or null if none installed. */
+	tokenFor(entityId: string): string | null;
+	/** Does `routedId` route to `entityId` — current OR grace-window previous
+	 *  generation? The receive-side header ↔ row binding in token mode. */
+	isTokenFor(routedId: string, entityId: string): boolean;
+};
+
 export type PipelineContext = {
 	dekStore: EntityDekStore;
 	devicePub: Uint8Array;
 	deviceSign: (bytes: Uint8Array) => Uint8Array;
 	deviceVerify: (sig: Uint8Array, bytes: Uint8Array, senderPub: Uint8Array) => boolean;
 	resolveEntity: (routedId: string) => PipelineResolution | null;
+	/**
+	 * Stage 10.11 — routing-token mode (OQ-197). When present the wire routes
+	 * by a pseudonymous per-entity token instead of the raw entity id (see
+	 * `routing-token.ts` for the position paper): emit puts `tokenFor(id)` in
+	 * the header's `entityId` slot and FAILS CLOSED (`Unavailable`) when no
+	 * token is installed — token mode never silently leaks a raw id; receive
+	 * checks `isTokenFor(routedId, resolved.id)` so a frame routed under a
+	 * token that is not the resolved entity's (current or grace-window
+	 * previous) drops before any crypto. Absent ⇒ legacy raw-id routing
+	 * (default, wire-compatible). When present, `resolveEntity` must resolve
+	 * tokens back to entity rows (`RoutingTokenTable.resolve`).
+	 */
+	routingTokens?: RoutingTokenResolver;
 	relay: RelayPort;
 	/** Per-entity monotonic counter. 10.3a does not enforce replay-window
 	 *  dedup (OQ-194 / 10.3b); the counter exists so 10.3b can wire the
@@ -141,7 +166,7 @@ async function sealAndSend(
 		const header: RoutingHeader = {
 			v: PROTOCOL_VERSION,
 			kind,
-			entityId,
+			entityId: routedIdForEmit(entityId, ctx),
 			sender: bytesToBase64Url(ctx.devicePub),
 			seq: ctx.nextSeq(entityId),
 			nonce: bytesToBase64(nonce),
@@ -207,6 +232,7 @@ export async function receiveAndApply(
 			dek: handle.dek,
 			resolvedEntityId: resolved.id,
 			verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
+			...routedBinding(decoded.header.entityId, resolved.id, ctx),
 		});
 		await applyUpdate(plaintext);
 		ctx.onReceived?.(frame.byteLength);
@@ -245,7 +271,7 @@ export async function emitWrapBootstrap(
 	const header: RoutingHeader = {
 		v: PROTOCOL_VERSION,
 		kind: WireKind.WrapBootstrap,
-		entityId,
+		entityId: routedIdForEmit(entityId, ctx),
 		sender: bytesToBase64Url(ctx.devicePub),
 		seq: ctx.nextSeq(entityId),
 		nonce: bytesToBase64(nonce),
@@ -302,6 +328,7 @@ export async function receiveWrapBootstrap(
 		frame: decoded,
 		resolvedEntityId: resolved.id,
 		verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
+		...routedBinding(decoded.header.entityId, resolved.id, ctx),
 	});
 	await onWrapAccepted(wrap, resolved.id);
 	ctx.onReceived?.(frame.byteLength);
@@ -335,7 +362,7 @@ export async function emitAwareness(
 		const header: RoutingHeader = {
 			v: PROTOCOL_VERSION,
 			kind: WireKind.Awareness,
-			entityId,
+			entityId: routedIdForEmit(entityId, ctx),
 			sender: bytesToBase64Url(ctx.devicePub),
 			seq: ctx.nextSeq(entityId),
 			nonce: bytesToBase64(nonce),
@@ -408,6 +435,7 @@ export async function receiveAwareness(
 			dek: handle.dek,
 			resolvedEntityId: resolved.id,
 			verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
+			...routedBinding(decoded.header.entityId, resolved.id, ctx),
 		});
 		await onAwarenessUpdate(plaintext, resolved.id);
 		ctx.onReceived?.(frame.byteLength);
@@ -424,6 +452,33 @@ function named(name: string, message: string): Error {
 	const err = new Error(message);
 	err.name = name;
 	return err;
+}
+
+/** Stage 10.11 — the wire routing id for an emit. Token mode FAILS CLOSED on a
+ *  missing token (never silently leaks the raw entity id onto the wire). */
+function routedIdForEmit(entityId: string, ctx: PipelineContext): string {
+	if (!ctx.routingTokens) return entityId;
+	const token = ctx.routingTokens.tokenFor(entityId);
+	if (!token) {
+		throw named("Unavailable", `envelope-pipeline: no routing token installed for ${entityId}`);
+	}
+	return token;
+}
+
+/** Stage 10.11 — receive-side header ↔ row binding in token mode: the routed
+ *  token must be one the resolved entity actually routes under (current or
+ *  grace-window previous). Legacy mode returns {} — the seal layer's raw-id
+ *  equality check stays load-bearing there. */
+function routedBinding(
+	routedId: string,
+	resolvedEntityId: string,
+	ctx: PipelineContext,
+): { expectedRoutingId?: string } {
+	if (!ctx.routingTokens) return {};
+	if (!ctx.routingTokens.isTokenFor(routedId, resolvedEntityId)) {
+		throw new EntityIdMismatch(routedId, resolvedEntityId);
+	}
+	return { expectedRoutingId: routedId };
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {

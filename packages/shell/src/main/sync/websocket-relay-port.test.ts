@@ -23,6 +23,7 @@ import {
 	decodeCatalogResult,
 	decodeControlMessage,
 	encodeBundlePayload,
+	decodeRotateReply,
 	encodeControlMessage,
 	isControlMessage,
 	unwrapBinaryFrame,
@@ -992,6 +993,34 @@ describe("WebSocketRelayPort — inbound bundles (10.10)", () => {
 	});
 
 	it("a listener throwing on one sub-frame doesn't block the rest of the bundle", () => {
+describe("WebSocketRelayPort — requestRotate (10.11 routing-token rotation)", () => {
+	const controlReply = (message: Record<string, unknown>): Uint8Array => {
+		const body = new TextEncoder().encode(JSON.stringify(message));
+		const out = new Uint8Array(1 + body.length);
+		out[0] = CONTROL_CHANNEL_BYTE;
+		out.set(body, 1);
+		return out;
+	};
+
+	it("rejects when the relay is not open (fail-closed before the wire)", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		await expect(port.requestRotate("t-old", "t-new")).rejects.toThrow(/not open/);
+		port.close();
+	});
+
+	it("rejects invalid from/to without sending", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		Ctor.instances[0]?.open();
+		await expect(port.requestRotate("", "t-new")).rejects.toThrow(/invalid/);
+		await expect(port.requestRotate("t-old", "")).rejects.toThrow(/invalid/);
+		await expect(port.requestRotate("same", "same")).rejects.toThrow(/invalid/);
+		port.close();
+	});
+
+	it("sends the rotate verb and resolves ONLY on the node's rotated ack", async () => {
 		const Ctor = makeFakeWsCtor();
 		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
 		port.connect();
@@ -1059,5 +1088,139 @@ describe("WebSocketRelayPort — subscribeBatch (10.10)", () => {
 		const control = ws?.sent[0] ? decodeControlMessage(ws.sent[0]) : null;
 		expect(control).toEqual({ op: "subscribe", entityIds: ["e1", "e2"], bundle: true });
 		port.close();
+		const pending = port.requestRotate("t-old", "t-new", "acct-1");
+		const lastSent = ws?.sent.at(-1);
+		expect(lastSent?.[0]).toBe(CONTROL_CHANNEL_BYTE);
+		expect(decodeControlMessage(lastSent as Uint8Array)).toEqual({
+			op: "rotate",
+			from: "t-old",
+			to: "t-new",
+			account: "acct-1",
+		});
+		ws?.deliver(controlReply({ op: "rotated", from: "t-old", to: "t-new" }));
+		await expect(pending).resolves.toBeUndefined();
+		port.close();
+	});
+
+	it("rejects on the node's rotate-denied with the reason", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const pending = port.requestRotate("t-old", "t-new");
+		ws?.deliver(
+			controlReply({ op: "rotate-denied", from: "t-old", to: "t-new", reason: "conflict" }),
+		);
+		await expect(pending).rejects.toThrow(/denied \(conflict\)/);
+		port.close();
+	});
+
+	it("a stale/forged reply for a different target token is ignored", async () => {
+		const Ctor = makeFakeWsCtor();
+		const timer = manualTimer();
+		const port = new WebSocketRelayPort({
+			url: "ws://x",
+			wsImpl: Ctor,
+			setTimer: timer.setTimer,
+			clearTimer: timer.clearTimer,
+			rotateTimeoutMs: 5_000,
+		});
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const pending = port.requestRotate("t-old", "t-new");
+		// Mismatched `to` — must NOT settle the pending rotate.
+		ws?.deliver(controlReply({ op: "rotated", from: "t-old", to: "t-evil" }));
+		const rejected = expect(pending).rejects.toThrow(/no reply/);
+		expect(timer.fire()).toBe(true);
+		await rejected;
+		port.close();
+	});
+
+	it("times out when the node never acks — the pre-10.11 node compatibility path", async () => {
+		const Ctor = makeFakeWsCtor();
+		const timer = manualTimer();
+		const port = new WebSocketRelayPort({
+			url: "ws://x",
+			wsImpl: Ctor,
+			setTimer: timer.setTimer,
+			clearTimer: timer.clearTimer,
+			rotateTimeoutMs: 5_000,
+		});
+		port.connect();
+		Ctor.instances[0]?.open();
+		const pending = port.requestRotate("t-old", "t-new");
+		const rejected = expect(pending).rejects.toThrow(/no reply/);
+		expect(timer.fire()).toBe(true);
+		await rejected;
+		port.close();
+	});
+
+	it("shares an in-flight rotate for the same from→to; rejects a conflicting one", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const first = port.requestRotate("t-old", "t-new");
+		const second = port.requestRotate("t-old", "t-new");
+		await expect(port.requestRotate("t-old", "t-other")).rejects.toThrow(/different token/);
+		expect(ws?.sent.filter((b) => b[0] === CONTROL_CHANNEL_BYTE).length).toBe(1);
+		ws?.deliver(controlReply({ op: "rotated", from: "t-old", to: "t-new" }));
+		await expect(first).resolves.toBeUndefined();
+		await expect(second).resolves.toBeUndefined();
+		port.close();
+	});
+
+	it("rejects in-flight rotates when the port closes", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		Ctor.instances[0]?.open();
+		const pending = port.requestRotate("t-old", "t-new");
+		port.close();
+		await expect(pending).rejects.toThrow(/closed/);
+	});
+});
+
+describe("decodeRotateReply / rotate control codec (10.11)", () => {
+	const wire = (message: Record<string, unknown>): Uint8Array => {
+		const body = new TextEncoder().encode(JSON.stringify(message));
+		const out = new Uint8Array(1 + body.length);
+		out[0] = CONTROL_CHANNEL_BYTE;
+		out.set(body, 1);
+		return out;
+	};
+
+	it("round-trips rotated and rotate-denied", () => {
+		expect(decodeRotateReply(wire({ op: "rotated", from: "a", to: "b" }))).toEqual({
+			op: "rotated",
+			from: "a",
+			to: "b",
+		});
+		expect(
+			decodeRotateReply(wire({ op: "rotate-denied", from: "a", to: "b", reason: "conflict" })),
+		).toEqual({ op: "rotate-denied", from: "a", to: "b", reason: "conflict" });
+	});
+
+	it("rejects malformed replies", () => {
+		expect(decodeRotateReply(wire({ op: "rotated", from: "a" }))).toBeNull();
+		expect(decodeRotateReply(wire({ op: "rotated", from: "", to: "b" }))).toBeNull();
+		expect(decodeRotateReply(wire({ op: "rotate-denied", from: "a", to: "b" }))).toBeNull();
+		expect(decodeRotateReply(wire({ op: "catalog-result", from: "a", to: "b" }))).toBeNull();
+		expect(decodeRotateReply(new Uint8Array([FRAME_CHANNEL_BYTE, 1, 2]))).toBeNull();
+	});
+
+	it("isControlMessage accepts a well-formed rotate and rejects malformed ones", () => {
+		expect(isControlMessage({ op: "rotate", from: "a", to: "b" })).toBe(true);
+		expect(isControlMessage({ op: "rotate", from: "a", to: "b", account: "acc" })).toBe(true);
+		expect(isControlMessage({ op: "rotate", from: "a", to: "a" })).toBe(false);
+		expect(isControlMessage({ op: "rotate", from: "", to: "b" })).toBe(false);
+		expect(isControlMessage({ op: "rotate", from: "a" })).toBe(false);
+		expect(isControlMessage({ op: "rotate", from: "a", to: "b", account: "" })).toBe(false);
+		// Encode/decode round-trip through the shared codec.
+		const encoded = encodeControlMessage({ op: "rotate", from: "a", to: "b" });
+		expect(decodeControlMessage(encoded)).toEqual({ op: "rotate", from: "a", to: "b" });
 	});
 });

@@ -83,10 +83,16 @@ export type CatalogControl = { op: "catalog"; account: string };
  *  to this port — it's computed by an injected `onChallenge` callback so the
  *  port stays crypto-free (relay-blind). */
 export type AuthControl = { op: "auth"; token: string; account: string; sig: string };
+/** Stage 10.11 — routing-token rotation (client→server): re-home the durable
+ *  node's storage `from → to` and alias the old token for the node's grace
+ *  window. Mirrors `brainstorm-sync`'s `RotateControl`. `account` feeds the
+ *  node's catalog on an open node; a gated node uses the proven account. */
+export type RotateControl = { op: "rotate"; from: string; to: string; account?: string };
 export type RelayControlMessage =
 	| SubscribeControl
 	| UnsubscribeControl
 	| CatalogControl
+	| RotateControl
 	| AuthControl;
 
 /** SYNC-4b — the credential payload an `onChallenge` callback returns. */
@@ -99,6 +105,11 @@ export type CatalogResultMessage = {
 	account: string;
 	entities: CatalogEntry[];
 };
+
+/** Stage 10.11 — the node's rotation replies (server→client). Mirrors
+ *  `brainstorm-sync`'s `RotatedMessage` / `RotateDeniedMessage`. */
+export type RotatedMessage = { op: "rotated"; from: string; to: string };
+export type RotateDeniedMessage = { op: "rotate-denied"; from: string; to: string; reason: string };
 
 /** WebSocket-like surface — both the browser `WebSocket` and `ws` libs match. */
 export interface WebSocketLike {
@@ -139,6 +150,10 @@ export type WebSocketRelayPortOptions = {
 	now?: () => number;
 	/** Stage 10.14 — `requestCatalog` reply timeout (default 15 s). */
 	catalogTimeoutMs?: number;
+	/** Stage 10.11 — `requestRotate` reply timeout (default 15 s). A timeout is
+	 *  how a pre-10.11 node (which silently ignores the verb) surfaces: the
+	 *  caller keeps the old token — fail-closed. */
+	rotateTimeoutMs?: number;
 	/** Asset-B4 — `requestAsset` (blob chunk) reply timeout (default 30 s). */
 	assetTimeoutMs?: number;
 	/** SYNC-4b — respond to a gated node's `challenge`. Given the server nonce,
@@ -158,6 +173,7 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #clearTimer: (handle: unknown) => void;
 	readonly #now: () => number;
 	readonly #catalogTimeoutMs: number;
+	readonly #rotateTimeoutMs: number;
 	readonly #assetTimeoutMs: number;
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #emitter = new EventEmitter();
@@ -171,6 +187,17 @@ export class WebSocketRelayPort implements RelayPort {
 			reject: (error: Error) => void;
 			timer: unknown;
 			promise: Promise<CatalogEntry[]>;
+		}
+	>();
+	/** Stage 10.11 — in-flight rotate requests keyed by the OLD token. */
+	readonly #pendingRotate = new Map<
+		string,
+		{
+			to: string;
+			resolve: () => void;
+			reject: (error: Error) => void;
+			timer: unknown;
+			promise: Promise<void>;
 		}
 	>();
 	/** Asset-B4 — queued asset requests awaiting their turn (only one is in
@@ -208,6 +235,7 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
 		this.#now = opts.now ?? Date.now;
 		this.#catalogTimeoutMs = opts.catalogTimeoutMs ?? 15_000;
+		this.#rotateTimeoutMs = opts.rotateTimeoutMs ?? 15_000;
 		this.#assetTimeoutMs = opts.assetTimeoutMs ?? 30_000;
 		this.#onChallenge = opts.onChallenge ?? null;
 	}
@@ -389,6 +417,58 @@ export class WebSocketRelayPort implements RelayPort {
 	}
 
 	/**
+	 * Stage 10.11 — ask the durable node to re-home routing `from → to`
+	 * (storage migration + dual-token grace alias). Resolves on the node's
+	 * `rotated` ack; rejects on `rotate-denied`, timeout, or a not-open port.
+	 * FAIL-CLOSED CONTRACT: the caller (the rotation coordinator) flips
+	 * emission to `to` ONLY after this resolves — a pre-10.11 node silently
+	 * ignores the verb, this times out, and the old token stays in use. The
+	 * node-side migration is idempotent, so re-sending after a crash/timeout
+	 * converges. A second request for the same `from` while one is in flight
+	 * shares its outcome (same `to`) or rejects (different `to`).
+	 */
+	requestRotate(from: string, to: string, account?: string): Promise<void> {
+		if (this.#disposed) {
+			return Promise.reject(new Error("WebSocketRelayPort.requestRotate: port is closed"));
+		}
+		if (!from || !to || from === to) {
+			return Promise.reject(new Error("WebSocketRelayPort.requestRotate: invalid from/to"));
+		}
+		if (this.#state !== WebSocketRelayState.Open) {
+			return Promise.reject(
+				new Error(`WebSocketRelayPort.requestRotate: relay not open (state=${this.#state})`),
+			);
+		}
+		const inflight = this.#pendingRotate.get(from);
+		if (inflight) {
+			return inflight.to === to
+				? inflight.promise
+				: Promise.reject(
+						new Error(
+							`WebSocketRelayPort.requestRotate: rotation of ${from} already in flight to a different token`,
+						),
+					);
+		}
+		let resolve!: () => void;
+		let reject!: (error: Error) => void;
+		const promise = new Promise<void>((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
+		const timer = this.#setTimer(() => {
+			const pending = this.#pendingRotate.get(from);
+			if (!pending) return;
+			this.#pendingRotate.delete(from);
+			pending.reject(
+				new Error(`WebSocketRelayPort.requestRotate: no reply within ${this.#rotateTimeoutMs}ms`),
+			);
+		}, this.#rotateTimeoutMs);
+		this.#pendingRotate.set(from, { to, resolve, reject, timer, promise });
+		this.#sendControl({ op: "rotate", from, to, ...(account ? { account } : {}) });
+		return promise;
+	}
+
+	/**
 	 * Asset-B4 — send one blob-plane request frame (an `AssetWireKind`
 	 * HAS/PUT/GET, already built by the caller's `WireAssetCas`) on the asset
 	 * channel and resolve with the node's response frame. Serialized: each call
@@ -501,6 +581,7 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#disposed = true;
 		this.#clearReconnect();
 		this.#rejectAllCatalog("WebSocketRelayPort: port closed");
+		this.#rejectAllRotate("WebSocketRelayPort: port closed");
 		this.#rejectPendingAsset("WebSocketRelayPort: port closed");
 		this.#sendQueue = [];
 		const ws = this.#ws;
@@ -631,6 +712,11 @@ export class WebSocketRelayPort implements RelayPort {
 				this.#resolveCatalog(result);
 				return;
 			}
+			const rotateReply = decodeRotateReply(bytes);
+			if (rotateReply) {
+				this.#settleRotate(rotateReply);
+				return;
+			}
 			const op = decodeControlOp(bytes);
 			if (op === "challenge") {
 				const nonce = decodeChallengeNonce(bytes);
@@ -693,6 +779,21 @@ export class WebSocketRelayPort implements RelayPort {
 		pending.resolve(result.entities);
 	}
 
+	/** Stage 10.11 — settle the in-flight rotate matching this reply. A reply
+	 *  whose `to` doesn't match the pending request is ignored (stale/forged
+	 *  replies can't flip the coordinator). */
+	#settleRotate(reply: RotatedMessage | RotateDeniedMessage): void {
+		const pending = this.#pendingRotate.get(reply.from);
+		if (!pending || pending.to !== reply.to) return;
+		this.#pendingRotate.delete(reply.from);
+		this.#clearTimer(pending.timer);
+		if (reply.op === "rotated") {
+			pending.resolve();
+		} else {
+			pending.reject(new Error(`WebSocketRelayPort.requestRotate: denied (${reply.reason})`));
+		}
+	}
+
 	/** SYNC-4b — answer a gated node's challenge: compute the auth payload via
 	 *  the injected (crypto-aware) callback and send it back. No callback (no
 	 *  credentials) ⇒ stay silent; the node's auth deadline closes us and the
@@ -726,6 +827,14 @@ export class WebSocketRelayPort implements RelayPort {
 			pending.reject(new Error(reason));
 		}
 		this.#pendingCatalog.clear();
+	}
+
+	#rejectAllRotate(reason: string): void {
+		for (const [, pending] of this.#pendingRotate) {
+			this.#clearTimer(pending.timer);
+			pending.reject(new Error(reason));
+		}
+		this.#pendingRotate.clear();
 	}
 
 	#rejectPendingAsset(reason: string): void {
@@ -829,8 +938,20 @@ export function isControlMessage(value: unknown): value is RelayControlMessage {
 		account?: unknown;
 		token?: unknown;
 		sig?: unknown;
+		from?: unknown;
+		to?: unknown;
 	};
 	if (v.op === "catalog") return typeof v.account === "string" && v.account.length > 0;
+	if (v.op === "rotate") {
+		return (
+			typeof v.from === "string" &&
+			v.from.length > 0 &&
+			typeof v.to === "string" &&
+			v.to.length > 0 &&
+			v.from !== v.to &&
+			(v.account === undefined || (typeof v.account === "string" && v.account.length > 0))
+		);
+	}
 	if (v.op === "auth") {
 		return (
 			typeof v.token === "string" &&
@@ -947,6 +1068,28 @@ export function decodeCatalogResult(wire: Uint8Array): CatalogResultMessage | nu
 			entities.push({ entityId: entry.entityId, version: entry.version });
 		}
 		return { op: "catalog-result", account: v.account, entities };
+	} catch {
+		return null;
+	}
+}
+
+/** Stage 10.11 — decode a server→client `rotated` / `rotate-denied` control
+ *  message. Returns null for any other control frame or malformed JSON. */
+export function decodeRotateReply(wire: Uint8Array): RotatedMessage | RotateDeniedMessage | null {
+	if (wire.length < 1 || wire[0] !== CONTROL_CHANNEL_BYTE) return null;
+	try {
+		const parsed = JSON.parse(new TextDecoder().decode(wire.subarray(1))) as unknown;
+		if (!parsed || typeof parsed !== "object") return null;
+		const v = parsed as { op?: unknown; from?: unknown; to?: unknown; reason?: unknown };
+		if (typeof v.from !== "string" || v.from.length === 0) return null;
+		if (typeof v.to !== "string" || v.to.length === 0) return null;
+		if (v.op === "rotated") return { op: "rotated", from: v.from, to: v.to };
+		if (v.op === "rotate-denied") {
+			return typeof v.reason === "string"
+				? { op: "rotate-denied", from: v.from, to: v.to, reason: v.reason }
+				: null;
+		}
+		return null;
 	} catch {
 		return null;
 	}
