@@ -56,6 +56,7 @@ const DEFAULTS: Record<string, string> = {
 	"notes.objectMenu.pin": "Pin to dashboard",
 	"notes.objectMenu.unpin": "Remove from dashboard",
 	"notes.objectMenu.share": "Share…",
+	"notes.objectMenu.saveAsTemplate": "Save as template",
 	"notes.objectMenu.remove": "Delete note",
 
 	// Collab-C5 share dialog.
@@ -106,10 +107,20 @@ const DEFAULTS: Record<string, string> = {
 	"notes.command.video.label": "Video",
 	"notes.command.video.description": "Embed a video clip",
 
+	// Templates (B11.10) — `/template` slash command + "Save selection as
+	// template" block action + snippet naming.
+	"notes.command.template.label": "Template",
+	"notes.command.template.description": "Insert a saved block template",
+	"notes.command.template.pickerLabel": "Insert template",
+	"notes.command.template.untitled": "Untitled template",
+	"notes.template.defaultName": "Snippet",
+
 	// Block-action menu — Notes-only actions (the generic turn-into / align /
 	// indent / move / duplicate / delete actions come from the shared catalogue).
 	"notes.action.copyLink.label": "Copy link to block",
 	"notes.action.copyLink.description": "Copy a link that points to this block",
+	"notes.action.saveAsTemplate.label": "Save selection as template",
+	"notes.action.saveAsTemplate.description": "Save the selected blocks as a reusable template",
 
 	// Gutter affordances.
 	"notes.gutter.openMenu": "Block actions",

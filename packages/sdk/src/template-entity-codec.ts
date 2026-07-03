@@ -109,6 +109,42 @@ export function objectToTemplateProperties(
 	};
 }
 
+/** The reserved `prototype` key a block-snippet template stores its fragment
+ *  under — a `ClipboardPayload` JSON string (the same shape `serializeBlocksAsJson`
+ *  emits), inserted at the cursor through the editor's paste path (B11.10,
+ *  OQ-TPL-2). Block-snippets carry no instance-properties, so `prototype` holds
+ *  only this. */
+export const TEMPLATE_SNIPPET_KEY = "snippet";
+
+/** Build the entity properties for a **block-snippet** template from a captured
+ *  selection (`serializeBlocksAsJson` output). The snippet fragment rides
+ *  `prototype.snippet` as serialized-blocks JSON — the paste wire format — so
+ *  inserting it is the same machinery as paste (references preserved). Sibling
+ *  of `objectToTemplateProperties`; `targetType` is null (snippets aren't
+ *  instantiated into a typed entity). */
+export function blockSnippetToTemplateProperties(
+	name: string,
+	snippetJson: string,
+): TemplateEntityProperties {
+	return {
+		templateKind: TemplateKind.BlockSnippet,
+		targetType: null,
+		name,
+		icon: null,
+		cover: null,
+		prototype: { [TEMPLATE_SNIPPET_KEY]: snippetJson },
+	};
+}
+
+/** Read a block-snippet template's serialized-blocks JSON fragment, or `null`
+ *  when the template carries none / isn't a block-snippet. Feed the result to
+ *  `insertSnippet` from `@brainstorm/editor`. */
+export function snippetFromTemplate(template: Template): string | null {
+	if (template.templateKind !== TemplateKind.BlockSnippet) return null;
+	const raw = template.prototype[TEMPLATE_SNIPPET_KEY];
+	return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
 /** Reconstruct a `Template` from a `brainstorm/Template/v1` entity. Returns
  *  `null` for a non-template entity. Every field coerces to a safe default when
  *  missing / malformed so one bad row never takes down a picker. */

@@ -16,6 +16,7 @@ import {
 	BRAINSTORM_HTML_SENTINEL,
 	extractBrainstormPayloadFromHtml,
 	insertBlocks,
+	insertSnippet,
 	parseBrainstormPayload,
 	serializeBlocksAsHtml,
 	serializeBlocksAsJson,
@@ -212,5 +213,40 @@ describe("insertBlocks round-trip", () => {
 		});
 		expect(lastText).toBe("bravo");
 		expect(lastType).toBe("paragraph");
+	});
+});
+
+describe("insertSnippet", () => {
+	it("inserts a serialized-blocks snippet at the caret, replacing the empty slash block", () => {
+		const src = createEditor();
+		const keys = seedThreeParagraphs(src);
+		// The block-snippet fragment = the same JSON the clipboard/paste path uses.
+		const json = serializeBlocksAsJson(src, new Set([keys[0] as NodeKey, keys[1] as NodeKey]));
+
+		const dst = createEditor();
+		// The state after the slash-menu clears "/template": one empty paragraph
+		// with the caret parked in it.
+		dst.update(
+			() => {
+				const root = $getRoot();
+				root.clear();
+				const p = $createParagraphNode();
+				root.append(p);
+				p.selectStart();
+			},
+			{ discrete: true },
+		);
+
+		expect(insertSnippet(dst, json)).toBe(true);
+		// The empty slash paragraph is replaced (not appended-after), so the doc
+		// is exactly the snippet.
+		expect(readTopLevelTexts(dst)).toEqual(["alpha", "bravo"]);
+	});
+
+	it("returns false on malformed / empty / non-payload input (caller no-ops)", () => {
+		const editor = createEditor();
+		expect(insertSnippet(editor, "not-json")).toBe(false);
+		expect(insertSnippet(editor, JSON.stringify({ version: 1, blocks: [] }))).toBe(false);
+		expect(insertSnippet(editor, JSON.stringify({ nope: true }))).toBe(false);
 	});
 });

@@ -34,11 +34,19 @@ import {
 	createStandardBlockCommands,
 	createTransclusionCommand,
 	getBlockAnchorsController,
+	insertSnippet,
 	orderCommandsByPalette,
+	serializeBlocksAsJson,
 	swatchCssValue,
 } from "@brainstorm/editor";
-import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
+import { COLLECTION_TYPE_URL, type Entity } from "@brainstorm/sdk-types";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import {
+	TEMPLATE_ENTITY_TYPE,
+	blockSnippetToTemplateProperties,
+	entityToTemplate,
+} from "@brainstorm/sdk/templates";
 import {
 	$createParagraphNode,
 	$getNodeByKey,
@@ -63,6 +71,7 @@ import { $createNumberFieldNode } from "./nodes/number-field-node";
 import { $createPageRefNode } from "./nodes/page-ref-node";
 import { $createSelectFieldNode } from "./nodes/select-field-node";
 import { $createTableOfContentsNode } from "./nodes/toc-node";
+import { deriveSnippetName, templatesToSnippetOptions } from "./template-snippet";
 
 /** The Notes entity type — a child sub-page is just another Note. Keep
  *  in sync with the same constant in mention-node.tsx. */
@@ -227,6 +236,20 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 		// to the `io.brainstorm.books/embedded-highlight` block.
 		run: ({ editor }) => {
 			openEmbedPicker(editor, HIGHLIGHT_ENTITY_TYPE);
+		},
+	},
+	{
+		// `/template` (B11.10 surface #2) — inserts a saved block-snippet template
+		// at the caret. Opens the shared anchored-menu picker over the vault's
+		// block-snippet `Template/v1`s; a no-op (quiet console) when there are none.
+		id: "block.embed.template",
+		category: CommandCategory.Embed,
+		label: t("notes.command.template.label"),
+		description: t("notes.command.template.description"),
+		icon: <Icon name={IconName.Sparkle} />,
+		keywords: ["template", "snippet", "insert", "reuse", "boilerplate", "block"],
+		run: ({ editor }) => {
+			void openTemplateSnippetPicker(editor);
 		},
 	},
 	{
@@ -428,6 +451,22 @@ const ADD_PROPERTY_ACTION: BlockCommand = {
 	},
 };
 
+/** "Save selection as template" (B11.10 surface #2) — capture the selected
+ *  block(s) as a block-snippet `Template/v1` the `/template` command later
+ *  inserts. Fire-and-forget the create (client-minted id) so the block-action
+ *  command never awaits mid-flight — mirroring `insertSubPage`. */
+const SAVE_AS_TEMPLATE_ACTION: BlockCommand = {
+	id: "block.action.saveAsTemplate",
+	category: CommandCategory.Action,
+	label: t("notes.action.saveAsTemplate.label"),
+	description: t("notes.action.saveAsTemplate.description"),
+	icon: <Icon name={IconName.Copy} />,
+	keywords: ["template", "snippet", "save", "capture", "reuse", "block"],
+	run: ({ editor, blockKeys }) => {
+		saveSelectionAsTemplate(editor, blockKeys);
+	},
+};
+
 const sharedActions = createStandardBlockActions(editorT);
 const deleteActionIndex = sharedActions.findIndex((c) => c.id === "block.action.delete");
 
@@ -439,6 +478,7 @@ export const BLOCK_ACTIONS: readonly BlockCommand[] = [
 	...sharedActions.slice(0, deleteActionIndex),
 	COPY_LINK_ACTION,
 	ADD_PROPERTY_ACTION,
+	SAVE_AS_TEMPLATE_ACTION,
 	...sharedActions.slice(deleteActionIndex),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Text, color)),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Highlight, color)),
@@ -522,6 +562,108 @@ function openEmbedPicker(editor: LexicalEditor, typeFilter?: string): void {
 		anchor: { top: rect.top, left: rect.left, bottom: rect.bottom },
 		...(typeFilter !== undefined ? { typeFilter } : {}),
 	});
+}
+
+/** `/template`: query the vault's block-snippet templates and open the shared
+ *  anchored-menu picker over them, inserting the chosen fragment at the caret
+ *  via the editor paste path (`insertSnippet`). The slash menu has already
+ *  cleared its host paragraph, so the picker anchors at that caret and the
+ *  insert lands there. No templates → quiet no-op (never throws). */
+async function openTemplateSnippetPicker(editor: LexicalEditor): Promise<void> {
+	const entities = getBrainstorm()?.services.entities;
+	if (!entities) {
+		console.info(
+			"[notes/template] shared entities service unavailable — no snippet templates to insert.",
+		);
+		return;
+	}
+	// Capture the caret anchor point BEFORE the async query so the rect is read
+	// while the editor DOM is stable (the query resolves a tick later).
+	const point = caretMenuPoint(editor);
+	const rows = await entities.query({ type: TEMPLATE_ENTITY_TYPE }).catch(() => []);
+	const templates = rows.flatMap((row) => {
+		const template = entityToTemplate(row as Entity);
+		return template ? [template] : [];
+	});
+	const options = templatesToSnippetOptions(templates);
+	if (options.length === 0) {
+		console.info(
+			"[notes/template] no block-snippet templates yet — capture one from a block selection's “Save selection as template”.",
+		);
+		return;
+	}
+	openAnchoredMenu(
+		point,
+		options.map((option) => ({
+			label: option.name || t("notes.command.template.untitled"),
+			icon: IconName.Sparkle,
+			onSelect: () => {
+				insertSnippet(editor, option.snippet);
+			},
+		})),
+		{ menuLabel: t("notes.command.template.pickerLabel") },
+	);
+}
+
+/** "Save selection as template": serialize the selected block(s) to the paste
+ *  wire format and persist them as a block-snippet `Template/v1`, named from
+ *  the first block's text. Fire-and-forget (client-minted by the service) so
+ *  the block-action command doesn't await mid-flight. */
+function saveSelectionAsTemplate(
+	editor: LexicalEditor,
+	blockKeys: ReadonlySet<NodeKey> | undefined,
+): void {
+	if (!blockKeys || blockKeys.size === 0) return;
+	const entities = getBrainstorm()?.services.entities;
+	if (!entities) {
+		console.warn(
+			"[notes/template] shared entities service unavailable — can't save a snippet template.",
+		);
+		return;
+	}
+	const snippetJson = serializeBlocksAsJson(editor, blockKeys);
+	const name = deriveSnippetName(firstBlockText(editor, blockKeys), t("notes.template.defaultName"));
+	const now = Date.now();
+	void entities
+		.create(TEMPLATE_ENTITY_TYPE, {
+			...blockSnippetToTemplateProperties(name, snippetJson),
+			createdAt: now,
+			updatedAt: now,
+		})
+		.then(() => console.info(`[notes/template] saved snippet template “${name}”`))
+		.catch((error) => console.warn("[notes/template] save snippet template failed:", error));
+}
+
+/** The bottom-left of the caret's top-level block — the anchor point for the
+ *  `/template` picker (a cursor-style menu; no persistent trigger element). */
+function caretMenuPoint(editor: LexicalEditor): { x: number; y: number } {
+	let key: NodeKey | null = null;
+	editor.getEditorState().read(() => {
+		const sel = $getSelection();
+		if (!$isRangeSelection(sel)) return;
+		try {
+			key = sel.anchor.getNode().getTopLevelElementOrThrow().getKey();
+		} catch {
+			key = null;
+		}
+	});
+	const rect = key ? rectForKey(editor, key) : null;
+	return rect ? { x: rect.left, y: rect.bottom } : { x: 0, y: 0 };
+}
+
+/** Text of the first selected block (insertion order), for naming the snippet. */
+function firstBlockText(editor: LexicalEditor, blockKeys: ReadonlySet<NodeKey>): string {
+	let text = "";
+	editor.getEditorState().read(() => {
+		for (const key of blockKeys) {
+			const node = $getNodeByKey(key);
+			if (node) {
+				text = node.getTextContent();
+				break;
+			}
+		}
+	});
+	return text;
 }
 
 function insertSubPage(editor: LexicalEditor): void {

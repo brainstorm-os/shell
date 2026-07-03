@@ -2,11 +2,14 @@ import { type Entity, IconKind, type Template, TemplateKind } from "@brainstorm/
 import { describe, expect, it } from "vitest";
 import {
 	TEMPLATE_ENTITY_TYPE,
+	TEMPLATE_SNIPPET_KEY,
 	type TemplateDraft,
+	blockSnippetToTemplateProperties,
 	entityToTemplate,
 	instantiateObjectTemplate,
 	objectToTemplateProperties,
 	resolveDefaultTemplate,
+	snippetFromTemplate,
 	templateAppliesToType,
 	templateToEntityProperties,
 } from "./template-entity-codec";
@@ -287,5 +290,56 @@ describe("template-entity-codec", () => {
 			expect(Object.prototype.hasOwnProperty.call(draft.properties, "__proto__")).toBe(false);
 			expect(({} as Record<string, unknown>).polluted).toBeUndefined();
 		});
+	});
+});
+
+describe("block-snippet templates (B11.10 surface #2)", () => {
+	const SNIPPET = JSON.stringify({ version: 1, blocks: [{ type: "paragraph" }] });
+
+	it("blockSnippetToTemplateProperties builds a block-snippet with the fragment in prototype", () => {
+		const props = blockSnippetToTemplateProperties("Meeting notes", SNIPPET);
+		expect(props.templateKind).toBe(TemplateKind.BlockSnippet);
+		expect(props.targetType).toBeNull();
+		expect(props.name).toBe("Meeting notes");
+		expect(props.prototype[TEMPLATE_SNIPPET_KEY]).toBe(SNIPPET);
+	});
+
+	it("snippetFromTemplate reads the fragment back", () => {
+		const template: Template = {
+			id: "t1",
+			createdAt: NOW,
+			updatedAt: NOW,
+			...blockSnippetToTemplateProperties("X", SNIPPET),
+		};
+		expect(snippetFromTemplate(template)).toBe(SNIPPET);
+	});
+
+	it("snippetFromTemplate returns null for an object template or a missing fragment", () => {
+		const object: Template = {
+			id: "o1",
+			templateKind: TemplateKind.Object,
+			targetType: "brainstorm/Note/v1",
+			name: "Obj",
+			icon: null,
+			cover: null,
+			prototype: { [TEMPLATE_SNIPPET_KEY]: SNIPPET },
+			createdAt: NOW,
+			updatedAt: NOW,
+		};
+		expect(snippetFromTemplate(object)).toBeNull();
+		const empty: Template = { ...object, templateKind: TemplateKind.BlockSnippet, prototype: {} };
+		expect(snippetFromTemplate(empty)).toBeNull();
+	});
+
+	it("round-trips through the entity codec", () => {
+		const template: Template = {
+			id: "t2",
+			createdAt: NOW,
+			updatedAt: NOW,
+			...blockSnippetToTemplateProperties("RT", SNIPPET),
+		};
+		const back = entityToTemplate(asEntity(template));
+		expect(back).not.toBeNull();
+		expect(snippetFromTemplate(back as Template)).toBe(SNIPPET);
 	});
 });
