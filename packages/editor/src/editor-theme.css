@@ -691,7 +691,12 @@
    when there's no room above. */
 /* Glass + border + shadow come from the shared `.fm-menu`; this adds only the
    floating toolbar's position + horizontal layout. */
-.notes__inline-toolbar {
+/* Compound selector (0,2,0): `.fm-menu` (0,1,0) ships `flex-direction: column`
+   + `overflow: hidden`, and which stylesheet lands later in a given app's
+   bundle is luck-of-the-import-graph — in chat the runtime CSS came after this
+   file, `.fm-menu` won the tie, and the toolbar rendered as a clipped vertical
+   stack. Same fix the colour/overflow dropdowns below already carry. */
+.fm-menu.notes__inline-toolbar {
 	position: fixed;
 	z-index: 60;
 	display: flex;

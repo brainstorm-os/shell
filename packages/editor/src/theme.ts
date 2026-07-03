@@ -19,7 +19,10 @@ export const baselineTheme: EditorThemeClasses = {
 	list: {
 		ul: "bs-editor__list bs-editor__list--bullet",
 		ol: "bs-editor__list bs-editor__list--numbered",
+		checklist: "bs-editor__list--check",
 		listitem: "bs-editor__list-item",
+		listitemChecked: "bs-editor__list-item bs-editor__list-item--checked",
+		listitemUnchecked: "bs-editor__list-item bs-editor__list-item--unchecked",
 		nested: { listitem: "bs-editor__list-item--nested" },
 	},
 	text: {

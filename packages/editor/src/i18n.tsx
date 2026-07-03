@@ -60,6 +60,9 @@ export type EditorI18nKey =
 	| "editor.inline.underline"
 	| "editor.inline.strike"
 	| "editor.inline.code"
+	| "editor.inline.bulletList"
+	| "editor.inline.numberedList"
+	| "editor.inline.checkList"
 	| "editor.inline.color"
 	| "editor.inline.link"
 	| "editor.inline.editLink"
@@ -273,6 +276,9 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.inline.underline": "Underline",
 	"editor.inline.strike": "Strikethrough",
 	"editor.inline.code": "Inline code",
+	"editor.inline.bulletList": "Bulleted list",
+	"editor.inline.numberedList": "Numbered list",
+	"editor.inline.checkList": "To-do list",
 	"editor.inline.color": "Text color",
 	"editor.inline.link": "Add link",
 	"editor.inline.editLink": "Edit link",
