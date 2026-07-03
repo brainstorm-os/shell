@@ -190,4 +190,14 @@ describe("migrateWidgetRecord", () => {
 		const rec = { x: 20, y: 30, w: 40, h: 20 };
 		expect(migrateWidgetRecord(rec)).toBe(rec);
 	});
+	it("never re-migrates a current-format widget resized to the minimum footprint (F-323)", () => {
+		// WIDGET_MIN_H (6) sits ON the legacy ceiling — a min-height resize must
+		// not read as legacy and teleport the record ×10.
+		const rec = { x: 4, y: 50, w: WIDGET_MIN_W, h: WIDGET_MIN_H };
+		expect(migrateWidgetRecord(rec)).toBe(rec);
+	});
+	it("still migrates a legacy record whose height alone is tiny only when width is legacy too", () => {
+		// Legacy footprints were ≤ 4×4 icon cells; width is the discriminator.
+		expect(migrateWidgetRecord({ x: 1, y: 1, w: 4, h: 2 })).toEqual({ x: 10, y: 10, w: 40, h: 20 });
+	});
 });
