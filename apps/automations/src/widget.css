@@ -1,0 +1,121 @@
+/* Automations "recent-runs" dashboard widget (widgets round 2). Mirrors the
+ * Contacts list-contacts widget chrome; each row carries the workflow name +
+ * a tone-coloured status chip on line 1 and the trigger time on line 2. */
+.automations-widget {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+/* In-widget header: the app label + the live run / failed count. Sits above
+ * the scrolling list with a subtle divider so it reads as a toolbar. */
+.automations-widget__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	flex-shrink: 0;
+	padding: var(--space-1) var(--space-2);
+	border-bottom: var(--border-width) solid var(--border);
+}
+
+.automations-widget__label {
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.automations-widget__count {
+	flex-shrink: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.automations-widget__count--danger {
+	color: var(--danger);
+}
+
+.automations-widget__list {
+	list-style: none;
+	margin: 0;
+	padding: var(--space-1);
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.automations-widget__row {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	width: 100%;
+	padding: var(--space-1);
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.automations-widget__row:hover {
+	background: var(--hover);
+}
+
+.automations-widget__row-top {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.automations-widget__name {
+	font-size: var(--text-size-sm);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.automations-widget__name--deleted {
+	color: var(--text-dim);
+}
+
+.automations-widget__status {
+	flex-shrink: 0;
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+}
+
+.automations-widget__status--danger {
+	color: var(--danger);
+}
+
+.automations-widget__status--accent {
+	color: var(--accent);
+}
+
+.automations-widget__status--dim {
+	color: var(--text-dim);
+}
+
+.automations-widget__status--faint {
+	color: var(--text-faint);
+}
+
+.automations-widget__time {
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

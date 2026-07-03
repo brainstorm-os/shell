@@ -1,31 +1,32 @@
-/* Contacts "list-contacts" dashboard widget (Stage 7.3 / 7.3b; 9.12.13(c)).
- * Mirrors the Notes recent-notes widget chrome; the row carries a name + an
- * optional dim subtitle (role / company). */
-.contacts-widget {
+/* Chat "recent-messages" dashboard widget. Mirrors the Contacts list-contacts
+ * widget chrome; each row carries sender + #channel on line 1 and a one-line
+ * body snippet on line 2. */
+.chat-widget {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
 }
 
-/* In-widget controls: the sort select + the live people count. Sits above the
+/* Static toolbar: the app label + the live channel count. Sits above the
  * scrolling list with a subtle divider so it reads as a toolbar. */
-.contacts-widget__toolbar {
+.chat-widget__toolbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-2);
 	flex-shrink: 0;
-	padding: var(--space-1);
+	padding: var(--space-1) var(--space-2);
 	border-bottom: var(--border-width) solid var(--border);
 }
 
-.contacts-widget__toolbar .bs-select {
-	height: 26px;
+.chat-widget__label {
 	font-size: var(--text-size-sm);
+	font-weight: 500;
+	color: var(--text);
 }
 
-.contacts-widget__count {
+.chat-widget__count {
 	flex-shrink: 0;
 	color: var(--text-dim);
 	font-size: var(--text-size-xs);
@@ -33,7 +34,7 @@
 	white-space: nowrap;
 }
 
-.contacts-widget__list {
+.chat-widget__list {
 	list-style: none;
 	margin: 0;
 	padding: var(--space-1);
@@ -45,7 +46,7 @@
 	overflow-y: auto;
 }
 
-.contacts-widget__row {
+.chat-widget__row {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
@@ -60,18 +61,35 @@
 	cursor: pointer;
 }
 
-.contacts-widget__row:hover {
+.chat-widget__row:hover {
 	background: var(--hover);
 }
 
-.contacts-widget__name {
+.chat-widget__meta {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+.chat-widget__sender {
 	font-size: var(--text-size-sm);
+	font-weight: 500;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.contacts-widget__subtitle {
+.chat-widget__channel {
+	flex-shrink: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.chat-widget__snippet {
 	color: var(--text-dim);
 	font-size: var(--text-size-xs);
 	white-space: nowrap;

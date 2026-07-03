@@ -116,6 +116,33 @@ export type WidgetRootProps = {
 	launch: WidgetLaunch;
 };
 
+export type WidgetEmptyProps = {
+	/** The one-line empty message (already localized by the app). */
+	message: string;
+	/** Optional call-to-action label; rendered as a link-styled button. */
+	actionLabel?: string;
+	/** CTA handler — typically an entityType-only `open` intent, which routes
+	 *  to the type's registered opener and launches the owning app (F-381). */
+	onAction?: () => void;
+};
+
+/** The shared widget empty state (F-381): a glance tile with nothing to show
+ *  is the one moment a widget should invite action, so the message pairs with
+ *  a small inline CTA instead of dead-ending. Deliberately NOT the big
+ *  `<EmptyState>` glyph chip — oversized at widget scale (the F-283 ruling). */
+export function WidgetEmpty({ message, actionLabel, onAction }: WidgetEmptyProps) {
+	return (
+		<div className="bs-widget-empty">
+			<p className="bs-widget-empty__message">{message}</p>
+			{actionLabel && onAction ? (
+				<button type="button" className="bs-widget-empty__action" onClick={onAction}>
+					{actionLabel}
+				</button>
+			) : null}
+		</div>
+	);
+}
+
 /** The matched widget body — the only thing the native widget surface paints.
  *  Title / open / drag / options chrome lives in the shell renderer strip above
  *  this native view. Renders a graceful fallback when the launch target names a

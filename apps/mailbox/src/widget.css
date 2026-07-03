@@ -1,0 +1,112 @@
+/* Mailbox "inbox" dashboard widget. Mirrors the Contacts / Journal widget
+ * chrome: a toolbar row (Inbox + unread chip) above the glance message list.
+ * Rows carry a sender + right-aligned time line over a subject line; unread
+ * rows lead with a small accent dot. */
+.mailbox-widget {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.mailbox-widget__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	flex-shrink: 0;
+	padding: var(--space-1) var(--space-2);
+	border-bottom: var(--border-width) solid var(--border);
+}
+
+.mailbox-widget__label {
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--text);
+}
+
+.mailbox-widget__count {
+	flex-shrink: 0;
+	padding: 0 var(--space-1);
+	border-radius: var(--radius-sm);
+	background: var(--hover);
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.mailbox-widget__list {
+	list-style: none;
+	margin: 0;
+	padding: var(--space-1);
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.mailbox-widget__row {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	width: 100%;
+	padding: var(--space-1);
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.mailbox-widget__row:hover {
+	background: var(--hover);
+}
+
+.mailbox-widget__line {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+.mailbox-widget__dot {
+	flex-shrink: 0;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+.mailbox-widget__sender {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-size-sm);
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mailbox-widget__time {
+	flex-shrink: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.mailbox-widget__subject {
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mailbox-widget__subject--read {
+	color: var(--text-dim);
+}

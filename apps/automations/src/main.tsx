@@ -2,10 +2,12 @@ import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/empty-state.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
+import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AutomationsApp } from "./app";
 import "./styles.css";
+import { AutomationsWidget } from "./widget";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("automations: #root not found in index.html");
@@ -16,10 +18,23 @@ document.body.classList.remove("is-booting");
 // overflow menus resolve the published store and render themed surfaces.
 mountMenuHost();
 
-createRoot(root).render(
-	<StrictMode>
-		<AppErrorBoundary appName="automations">
-			<AutomationsApp />
-		</AppErrorBoundary>
-	</StrictMode>,
-);
+// Widget-mode: the dashboard launched this bundle as a widget. Mount the
+// compact recent-runs glance list instead of the full Automations app.
+const widgetLaunch = getWidgetLaunch();
+if (widgetLaunch) {
+	createRoot(root).render(
+		<StrictMode>
+			<AppErrorBoundary appName="automations">
+				<AutomationsWidget launch={widgetLaunch} />
+			</AppErrorBoundary>
+		</StrictMode>,
+	);
+} else {
+	createRoot(root).render(
+		<StrictMode>
+			<AppErrorBoundary appName="automations">
+				<AutomationsApp />
+			</AppErrorBoundary>
+		</StrictMode>,
+	);
+}

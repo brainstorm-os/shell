@@ -9,6 +9,7 @@
   "capabilities": [
     "mail.manage",
     "intents.dispatch:send",
+    "intents.dispatch:open",
     "entities.read:brainstorm/Email/v1",
     "entities.write:brainstorm/Email/v1",
     "entities.read:brainstorm/MailFolder/v1",
@@ -128,6 +129,7 @@
       { "verb": "compose", "entityType": "brainstorm/Email/v1", "priority": "primary" },
       { "verb": "reply", "entityType": "brainstorm/Email/v1", "priority": "primary" },
       { "verb": "forward", "entityType": "brainstorm/Email/v1", "priority": "primary" }
-    ]
+    ],
+    "widgets": [{ "id": "inbox", "name": "Inbox", "size": "medium" }]
   }
 }

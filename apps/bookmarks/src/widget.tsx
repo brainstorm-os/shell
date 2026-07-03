@@ -15,7 +15,12 @@ import "@brainstorm/sdk/select-menu.css";
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import type { VaultEntitiesService } from "@brainstorm/sdk-types";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { type WidgetLaunch, WidgetRoot, useWidgetVisible } from "@brainstorm/sdk/widget";
+import {
+	WidgetEmpty,
+	type WidgetLaunch,
+	WidgetRoot,
+	useWidgetVisible,
+} from "@brainstorm/sdk/widget";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { plural, t } from "./i18n/manifest";
@@ -28,6 +33,18 @@ import "./widget.css";
 export const BOOKMARKS_WIDGET_RECENT = "recent-bookmarks";
 
 const RECENT_LIMIT = 8;
+
+/** Server-side narrowing for the widget's entity subscription (F-384) —
+ *  module-level so the reference is stable across renders. */
+const WIDGET_QUERY = { types: [BOOKMARK_ENTITY_TYPE] } as const;
+
+/** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
+ *  registered opener and launches the full Bookmarks app. */
+function openBookmarksApp(): void {
+	const dispatch = getBrainstorm()?.services?.intents?.dispatch;
+	if (!dispatch) return;
+	void dispatch({ verb: "open", payload: { entityType: BOOKMARK_ENTITY_TYPE } });
+}
 
 /** How the glance list is ordered — the in-widget sort control's value set. */
 enum BookmarksSort {
@@ -94,7 +111,11 @@ function RecentBookmarks({
 				</span>
 			</div>
 			{bookmarks.length === 0 ? (
-				<p className="bookmarks-widget__empty">{t("widget.empty")}</p>
+				<WidgetEmpty
+					message={t("widget.empty")}
+					actionLabel={t("widget.emptyAction")}
+					onAction={openBookmarksApp}
+				/>
 			) : (
 				<ul className="bookmarks-widget__list">
 					{bookmarks.map((bookmark) => (
@@ -134,7 +155,7 @@ export function BookmarksWidget({ launch }: { launch: WidgetLaunch }) {
 	// service carries the full `list()` surface `useVaultEntities` reads.
 	const vaultEntities =
 		(runtime?.services?.vaultEntities as VaultEntitiesService | undefined) ?? null;
-	const { entities } = useVaultEntities(vaultEntities);
+	const { entities } = useVaultEntities(vaultEntities, { query: WIDGET_QUERY });
 
 	const live = useMemo(
 		() => entities.filter((e) => e.type === BOOKMARK_ENTITY_TYPE && e.deletedAt === null),

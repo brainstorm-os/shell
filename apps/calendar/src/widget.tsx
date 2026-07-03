@@ -9,7 +9,12 @@
 
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { openEntity } from "@brainstorm/sdk";
-import { type WidgetLaunch, WidgetRoot, useWidgetVisible } from "@brainstorm/sdk/widget";
+import {
+	WidgetEmpty,
+	type WidgetLaunch,
+	WidgetRoot,
+	useWidgetVisible,
+} from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n/t";
 import { addDays, startOfDay } from "./logic/date-range";
@@ -23,6 +28,19 @@ export const CALENDAR_WIDGET_TODAY_AGENDA = "today-agenda";
 export const CALENDAR_WIDGET_WEEK_AHEAD = "week-ahead";
 
 const AGENDA_LIMIT = 8;
+
+/** Server-side narrowing for the widget's entity subscription (F-384) —
+ *  module-level so the reference is stable across renders. */
+const WIDGET_QUERY = { types: [EVENT_TYPE] } as const;
+
+/** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
+ *  registered opener and launches the full Calendar app. */
+function openCalendarApp(): void {
+	const intents = getCalendarRuntime()?.services?.intents;
+	if (!intents) return;
+	void intents.dispatch({ verb: "open", payload: { entityType: EVENT_TYPE } });
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How many days the large "Week ahead" widget spans (today + the next 6). */
 const WEEK_DAYS = 7;
@@ -56,7 +74,11 @@ function TodayAgenda({ rows, total }: { rows: AgendaRow[]; total: number }) {
 				</span>
 			</div>
 			{rows.length === 0 ? (
-				<p className="calendar-widget__empty">{t("calendar.widget.empty")}</p>
+				<WidgetEmpty
+					message={t("calendar.widget.empty")}
+					actionLabel={t("calendar.widget.emptyAction")}
+					onAction={openCalendarApp}
+				/>
 			) : (
 				<ul className="calendar-widget__list">
 					{rows.map((row) => (
@@ -119,7 +141,11 @@ function WeekAhead({ groups, total, now }: { groups: DayGroup[]; total: number; 
 				</span>
 			</div>
 			{groups.length === 0 ? (
-				<p className="calendar-widget__empty">{t("calendar.widget.week.empty")}</p>
+				<WidgetEmpty
+					message={t("calendar.widget.week.empty")}
+					actionLabel={t("calendar.widget.emptyAction")}
+					onAction={openCalendarApp}
+				/>
 			) : (
 				<div className="calendar-widget__week">
 					{groups.map((group) => (
@@ -154,7 +180,9 @@ export function CalendarWidget({ launch }: { launch: WidgetLaunch }) {
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).
 	useWidgetVisible();
-	const { entities } = useVaultEntities(runtime?.services?.vaultEntities ?? null);
+	const { entities } = useVaultEntities(runtime?.services?.vaultEntities ?? null, {
+		query: WIDGET_QUERY,
+	});
 
 	// Normalise every live event once (id / title / start / all-day), shared by
 	// both the today-agenda and week-ahead widgets so neither re-walks entities.

@@ -122,6 +122,7 @@
       }
     ],
     "openers": [{ "kind": "primary", "entityType": "brainstorm/Workflow/v1" }],
-    "intents": [{ "verb": "open", "entityType": "brainstorm/Workflow/v1", "priority": "primary" }]
+    "intents": [{ "verb": "open", "entityType": "brainstorm/Workflow/v1", "priority": "primary" }],
+    "widgets": [{ "id": "recent-runs", "name": "Recent Runs", "size": "medium" }]
   }
 }

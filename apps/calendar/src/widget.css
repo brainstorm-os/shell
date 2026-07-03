@@ -80,17 +80,6 @@
 	text-overflow: ellipsis;
 }
 
-.calendar-widget__empty {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex: 1;
-	min-height: 0;
-	margin: 0;
-	color: var(--text-dim);
-	font-size: var(--text-size-sm);
-}
-
 /* "Week ahead" widget (large) — the next 7 days grouped by day. A large tile,
  * so it leans on `--widget-pad` (the SDK bumps it on a tall footprint) for
  * roomier insets than the compact glance widgets. */

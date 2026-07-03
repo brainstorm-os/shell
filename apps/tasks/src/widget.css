@@ -64,17 +64,6 @@
 	background: var(--hover);
 }
 
-.tasks-widget__empty {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex: 1;
-	min-height: 0;
-	margin: 0;
-	color: var(--text-dim);
-	font-size: var(--text-size-sm);
-}
-
 /* "Task Stats" widget (small) — a count card, not a list: a big open-task
  * number with an overdue / due-today breakdown below. Each stat is a button
  * opening its most-urgent task. */
@@ -166,16 +155,4 @@ button.tasks-stats__row:hover {
 
 .tasks-stats__row-label {
 	color: var(--text-dim);
-}
-
-.tasks-stats__empty {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex: 1;
-	min-height: 0;
-	margin: 0;
-	padding: var(--widget-pad);
-	color: var(--text-dim);
-	font-size: var(--text-size-sm);
 }

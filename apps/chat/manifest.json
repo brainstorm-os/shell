@@ -11,6 +11,7 @@
     "entities.read:*",
     "entities.write:io.brainstorm.chat/Channel/v1",
     "entities.write:brainstorm/Message/v1",
+    "intents.dispatch:open",
     "roster.read",
     "roster.write",
     "sharing.read",
@@ -55,6 +56,7 @@
     "openers": [{ "kind": "primary", "entityType": "io.brainstorm.chat/Channel/v1" }],
     "intents": [
       { "verb": "open", "entityType": "io.brainstorm.chat/Channel/v1", "priority": "primary" }
-    ]
+    ],
+    "widgets": [{ "id": "recent-messages", "name": "Recent Messages", "size": "medium" }]
   }
 }

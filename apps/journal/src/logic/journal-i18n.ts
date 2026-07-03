@@ -107,7 +107,9 @@ export type JournalI18nKey =
 	| "properties.meta.updated"
 	| "properties.meta.words"
 	| "properties.meta.dateKey"
-	| "properties.openInNotesHint";
+	| "properties.openInNotesHint"
+	| "widget.noEntryToday"
+	| "widget.writeToday";
 
 export type JournalManifest = Record<JournalI18nKey, string>;
 
@@ -204,6 +206,8 @@ export const JOURNAL_I18N: JournalManifest = Object.freeze({
 	"properties.meta.words": "Words",
 	"properties.meta.dateKey": "Date",
 	"properties.openInNotesHint": "Use Notes for advanced property editing.",
+	"widget.noEntryToday": "No entry yet today",
+	"widget.writeToday": "Write today's entry",
 });
 
 export type JournalT = TFunction<JournalManifest>;

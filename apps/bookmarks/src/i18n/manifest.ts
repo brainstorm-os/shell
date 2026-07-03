@@ -149,6 +149,7 @@ export const BOOKMARKS_MESSAGES = {
 	// widget strip; the app supplies the body — the glance list, its empty state,
 	// the in-widget sort control, and the live count.
 	"widget.empty": "No bookmarks yet",
+	"widget.emptyAction": "Open Bookmarks",
 	"widget.sort.label": "Sort bookmarks",
 	"widget.sort.recent": "Recently added",
 	"widget.sort.title": "Title (A–Z)",

@@ -4,7 +4,7 @@
  * `t()` (`createT` from `@brainstorm/sdk/i18n`) — no bare literals.
  */
 
-import { createT } from "@brainstorm/sdk/i18n";
+import { type TParams, createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
 
 export const AGENT_I18N = {
 	"app.title": "Agent",
@@ -116,8 +116,27 @@ export const AGENT_I18N = {
 		"The Agent app is missing AI access — restart the shell so it reinstalls with the `ai.use` capability granted.",
 	"error.generic": "Something went wrong generating a reply.",
 	"provenance.via": "via {model}",
+
+	"widget.label": "Agent",
+	"widget.count.one": "{count} conversation",
+	"widget.count.other": "{count} conversations",
+	"widget.empty": "No conversations yet",
+	"widget.empty.action": "Ask the Agent",
+	"widget.updated": "Updated {date}",
+	"widget.date.today": "today",
+	"widget.date.tomorrow": "tomorrow",
+	"widget.date.yesterday": "yesterday",
 } as const;
 
 export type AgentI18nKey = keyof typeof AGENT_I18N;
 
 export const t = createT(AGENT_I18N);
+
+/** Catalog-bound plural — picks `<base>.one` / `<base>.other`. The count
+ *  selection lives in the shared helper, not in component code. */
+export const plural = (
+	count: number,
+	oneKey: AgentI18nKey,
+	otherKey: AgentI18nKey,
+	params?: TParams,
+): string => sdkPlural(t, count, oneKey, otherKey, params);

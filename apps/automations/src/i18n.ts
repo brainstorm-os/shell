@@ -111,6 +111,16 @@ export const AUTOMATIONS_I18N = {
 	"transfer.importFailed": "Import failed.",
 	"transfer.invalid": "Not a valid automation bundle: {detail}",
 
+	// recent-runs dashboard widget (widgets round 2). The toolbar reuses
+	// `app.title`; the status chips reuse the 11b.13 `runs.status.*` keys.
+	"widget.empty": "No runs yet",
+	"widget.openApp": "Open Automations",
+	"widget.deletedWorkflow": "deleted workflow",
+	"widget.failedCount.one": "{count} failed",
+	"widget.failedCount.other": "{count} failed",
+	"widget.runCount.one": "{count} run",
+	"widget.runCount.other": "{count} runs",
+
 	// 11b.13 — runs view.
 	"runs.inspect": "Inspect",
 	"runs.collapse": "Collapse",

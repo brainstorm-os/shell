@@ -82,6 +82,7 @@
       }
     ],
     "openers": [{ "kind": "primary", "entityType": "brainstorm/Conversation/v1" }],
+    "widgets": [{ "id": "recent-conversations", "name": "Conversations", "size": "medium" }],
     "intents": [
       { "verb": "open", "entityType": "brainstorm/Conversation/v1", "priority": "primary" },
       {

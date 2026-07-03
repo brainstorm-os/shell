@@ -16,7 +16,12 @@ import { useVaultEntities } from "@brainstorm/react-yjs";
 import { openEntity } from "@brainstorm/sdk";
 import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import "@brainstorm/sdk/select-menu.css";
-import { type WidgetLaunch, WidgetRoot, useWidgetVisible } from "@brainstorm/sdk/widget";
+import {
+	WidgetEmpty,
+	type WidgetLaunch,
+	WidgetRoot,
+	useWidgetVisible,
+} from "@brainstorm/sdk/widget";
 import { useMemo, useState } from "react";
 import { plural, t } from "./i18n";
 import { getBrainstorm } from "./runtime";
@@ -28,6 +33,18 @@ import {
 	shapeContacts,
 } from "./widget-data";
 import "./widget.css";
+
+/** Server-side narrowing for the widget's entity subscription (F-384) —
+ *  module-level so the reference is stable across renders. */
+const WIDGET_QUERY = { types: [PERSON_TYPE] } as const;
+
+/** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
+ *  registered opener and launches the full Contacts app. */
+function openContactsApp(): void {
+	const intents = getBrainstorm()?.services?.intents;
+	if (!intents) return;
+	void intents.dispatch({ verb: "open", payload: { entityType: PERSON_TYPE } });
+}
 
 /** Open a person in the full Contacts app through the shared open verb (cap
  *  `intents.dispatch:open`). Mirrors the Notes widget's `openEntityInShell`. */
@@ -74,7 +91,11 @@ function ContactsList({
 				</span>
 			</div>
 			{contacts.length === 0 ? (
-				<p className="contacts-widget__empty">{t("widget.empty")}</p>
+				<WidgetEmpty
+					message={t("widget.empty")}
+					actionLabel={t("widget.emptyAction")}
+					onAction={openContactsApp}
+				/>
 			) : (
 				<ul className="contacts-widget__list">
 					{contacts.map((person) => (
@@ -103,7 +124,9 @@ export function ContactsWidget({ launch }: { launch: WidgetLaunch }) {
 	// the host scrolls the widget off-screen (the surface stops re-rendering).
 	useWidgetVisible();
 	const [sort, setSort] = useState<ContactsSort>(ContactsSort.Name);
-	const { entities } = useVaultEntities(runtime?.services?.vaultEntities ?? null);
+	const { entities } = useVaultEntities(runtime?.services?.vaultEntities ?? null, {
+		query: WIDGET_QUERY,
+	});
 
 	const { contacts, total } = useMemo(() => shapeContacts(entities, sort), [entities, sort]);
 

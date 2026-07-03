@@ -88,6 +88,12 @@ export const CHAT_I18N = {
 	"share.revokeFailed": "Couldn't remove that person.",
 	"share.loadFailed": "Couldn't load members.",
 	"share.done": "Done",
+
+	"widget.label": "Chat",
+	"widget.channels.one": "{count} channel",
+	"widget.channels.other": "{count} channels",
+	"widget.empty": "No messages yet",
+	"widget.openChat": "Open Chat",
 } as const;
 
 export type ChatMessageId = keyof typeof CHAT_I18N;
