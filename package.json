@@ -14,6 +14,8 @@
     "build:apps": "bun run --filter './apps/*' build",
     "build:native": "bun run --filter @brainstorm/native build:debug",
     "build:native:release": "bun run --filter @brainstorm/native build",
+    "build:native-embed": "bun run --filter @brainstorm/native-embed build:debug",
+    "build:native-embed:release": "bun run --filter @brainstorm/native-embed build",
     "preview": "bun run --filter @brainstorm/shell preview",
     "start": "bun run --filter @brainstorm/shell start",
     "typecheck": "bun run typecheck:packages && bun run typecheck:apps",

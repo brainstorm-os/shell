@@ -18,7 +18,9 @@
       "**/results/playwright-report.json",
       "packages/shell/help-corpus/corpus.json",
       "packages/native/index.js",
-      "packages/native/index.d.ts"
+      "packages/native/index.d.ts",
+      "packages/native-embed/index.js",
+      "packages/native-embed/index.d.ts"
     ]
   },
   "formatter": {

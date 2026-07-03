@@ -511,6 +511,13 @@
         "@noble/hashes": "^2.2.0",
       },
     },
+    "packages/native-embed": {
+      "name": "@brainstorm/native-embed",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@napi-rs/cli": "^3.0.0",
+      },
+    },
     "packages/react-yjs": {
       "name": "@brainstorm/react-yjs",
       "version": "0.0.1",
@@ -577,6 +584,7 @@
         "@blockprotocol/type-system": "0.2.1",
         "@brainstorm/editor": "workspace:*",
         "@brainstorm/native": "workspace:*",
+        "@brainstorm/native-embed": "workspace:*",
         "@brainstorm/react-yjs": "workspace:*",
         "@brainstorm/sdk": "workspace:*",
         "@brainstorm/sdk-types": "workspace:*",
@@ -757,6 +765,8 @@
     "@brainstorm/editor": ["@brainstorm/editor@workspace:packages/editor"],
 
     "@brainstorm/native": ["@brainstorm/native@workspace:packages/native"],
+
+    "@brainstorm/native-embed": ["@brainstorm/native-embed@workspace:packages/native-embed"],
 
     "@brainstorm/react-yjs": ["@brainstorm/react-yjs@workspace:packages/react-yjs"],
 
