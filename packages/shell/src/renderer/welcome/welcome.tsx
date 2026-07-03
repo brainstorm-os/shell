@@ -11,6 +11,7 @@ import { JoinVaultEntry } from "./join-vault-entry";
 import { MigrateEntry } from "./migrate-entry";
 import { requestMigrationImport } from "./migration-intent";
 import { TemplateGallery } from "./template-gallery";
+import { WelcomeTile } from "./welcome-tile";
 import "./welcome.css";
 
 enum WelcomeMode {
@@ -32,7 +33,10 @@ export function isVaultNameTaken(vaults: ReadonlyArray<{ name: string }>, name: 
 export function Welcome() {
 	const { allVaults, create, openByPath, pickFolder, defaultPath, checkPath, activate } = useVault();
 	const [mode, setMode] = useState<WelcomeMode>(WelcomeMode.Menu);
-	const [name, setName] = useState("Personal");
+	// Starts empty on purpose: pre-filling a name ("Personal") surfaced the
+	// duplicate-name error before the user typed anything when such a vault
+	// already existed. The suggestion lives in the placeholder instead.
+	const [name, setName] = useState("");
 	const [path, setPath] = useState("");
 	const [cloudWarning, setCloudWarning] = useState<CloudSyncWarning | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -187,37 +191,34 @@ export function Welcome() {
 
 				{mode === WelcomeMode.Menu && (
 					<div className="welcome__menu">
-						<Button
-							ref={createCtaRef}
-							variant={ButtonVariant.Primary}
-							size={ButtonSize.Lg}
-							className="welcome__cta"
-							iconLeft={IconName.Plus}
-							onClick={() => setMode(WelcomeMode.Create)}
-							disabled={busy}
-						>
-							{t("shell.welcome.createCta")}
-						</Button>
-						<Button
-							variant={ButtonVariant.Glass}
-							size={ButtonSize.Lg}
-							className="welcome__cta welcome__cta--alt"
-							iconLeft={IconName.Folder}
-							onClick={handleOpen}
-							disabled={busy}
-						>
-							{t("shell.welcome.openCta")}
-						</Button>
-						{/* Reachable before any vault exists — pairing a brand-new device
-						    is a first-run path (see join-vault-entry.tsx). */}
-						<JoinVaultEntry disabled={busy} />
-						<MigrateEntry
-							disabled={busy}
-							onStart={() => {
-								setMigrating(true);
-								setMode(WelcomeMode.Create);
-							}}
-						/>
+						<div className="welcome__tiles">
+							<WelcomeTile
+								ref={createCtaRef}
+								icon={IconName.Plus}
+								label={t("shell.welcome.createCta")}
+								primary
+								onClick={() => setMode(WelcomeMode.Create)}
+								disabled={busy}
+								testId="welcome-create-cta"
+							/>
+							<WelcomeTile
+								icon={IconName.Folder}
+								label={t("shell.welcome.openCta")}
+								onClick={handleOpen}
+								disabled={busy}
+								testId="welcome-open-cta"
+							/>
+							{/* Reachable before any vault exists — pairing a brand-new device
+							    is a first-run path (see join-vault-entry.tsx). */}
+							<JoinVaultEntry disabled={busy} />
+							<MigrateEntry
+								disabled={busy}
+								onStart={() => {
+									setMigrating(true);
+									setMode(WelcomeMode.Create);
+								}}
+							/>
+						</div>
 						{allVaults.length > 0 && (
 							<section className="welcome__recent">
 								<h2 className="welcome__recent-title">{t("shell.welcome.recentTitle")}</h2>
@@ -256,6 +257,7 @@ export function Welcome() {
 								type="text"
 								value={name}
 								onChange={(e) => setName(e.target.value)}
+								placeholder={t("shell.welcome.namePlaceholder")}
 								disabled={busy}
 								aria-invalid={nameTaken}
 								aria-describedby={nameTaken ? "welcome-name-error" : undefined}
@@ -282,7 +284,7 @@ export function Welcome() {
 									disabled={busy}
 								/>
 								<Button
-									variant={ButtonVariant.Glass}
+									variant={ButtonVariant.Neutral}
 									size={ButtonSize.Lg}
 									onClick={handleChooseFolder}
 									disabled={busy}
@@ -304,9 +306,8 @@ export function Welcome() {
 						<p className="welcome__hint">{t("shell.welcome.vaultHint")}</p>
 						<div className="welcome__actions">
 							<Button
-								variant={ButtonVariant.Glass}
+								variant={ButtonVariant.Neutral}
 								size={ButtonSize.Lg}
-								className="welcome__btn-white"
 								onClick={() => {
 									setMigrating(false);
 									setMode(WelcomeMode.Menu);
@@ -358,16 +359,15 @@ export function Welcome() {
 						/>
 						<div className="welcome__actions">
 							<Button
-								variant={ButtonVariant.Glass}
+								variant={ButtonVariant.Neutral}
 								size={ButtonSize.Lg}
-								className="welcome__btn-white"
 								onClick={() => setMode(WelcomeMode.Create)}
 								disabled={busy}
 							>
 								{t("shell.welcome.back")}
 							</Button>
 							<Button
-								variant={ButtonVariant.Glass}
+								variant={ButtonVariant.Neutral}
 								size={ButtonSize.Lg}
 								onClick={handleSkip}
 								disabled={busy}

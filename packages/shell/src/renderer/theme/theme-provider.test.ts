@@ -1,6 +1,6 @@
 /**
- * `effectiveTheme` — the welcome screen (no open vault) pins Midnight so a
- * stale palette can't clash with the brand-blue background; an open vault
+ * `effectiveTheme` — the welcome screen (no open vault) pins Rose so a
+ * stale palette can't clash with the rose-mountains splash; an open vault
  * resolves its theme from `appearance` + the live OS dark preference (the same
  * slot the app windows use), falling back to DEFAULT_THEME until a snapshot
  * arrives.
@@ -22,9 +22,9 @@ function appearance(mode: AppearanceMode, light: ThemeName, dark: ThemeName): Ap
 const SAMPLE = appearance(AppearanceMode.Auto, ThemeName.DefaultLight, ThemeName.Midnight);
 
 describe("effectiveTheme", () => {
-	it("pins Midnight on the welcome screen regardless of appearance", () => {
-		expect(effectiveTheme(false, undefined, false)).toBe(ThemeName.Midnight);
-		expect(effectiveTheme(false, SAMPLE, true)).toBe(ThemeName.Midnight);
+	it("pins Rose on the welcome screen regardless of appearance", () => {
+		expect(effectiveTheme(false, undefined, false)).toBe(ThemeName.Rose);
+		expect(effectiveTheme(false, SAMPLE, true)).toBe(ThemeName.Rose);
 	});
 
 	it("falls back to DEFAULT_THEME for an open vault before its first snapshot", () => {

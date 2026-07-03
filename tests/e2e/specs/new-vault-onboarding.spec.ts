@@ -4,10 +4,11 @@
  *
  *   1. create-vault → the welcome starter content is seeded AND the vault
  *      opens on-brand (Rose theme, light mode, the bundled wallpaper).
- *   2. welcome UI → the secondary CTAs render as white-gloss buttons (not the
- *      old hardcoded blue), the Join-vault popover shows a single title (no
- *      duplicated header), and the create form surfaces an inline error when
- *      the name collides with an existing vault.
+ *   2. welcome UI → the CTAs render as flat launcher tiles (no glossy
+ *      gradient face), the Join-vault popover shows a single title (no
+ *      duplicated header), and the create form starts with an EMPTY name and
+ *      surfaces an inline error once a typed name collides with an existing
+ *      vault.
  *
  * Reuses the perf launch harness (one Electron-launch path). Mirrors
  * `beta-smoke.spec.ts`. The in-process Vitest suites cover the same data paths
@@ -82,7 +83,9 @@ test("new vault seeds welcome content and applies Rose/light/wallpaper defaults"
 				expect(snap.theme, "theme is Rose").toBe("rose");
 				expect(snap.appearance.mode, "appearance mode is light").toBe("light");
 				expect(snap.wallpaper.kind, "wallpaper is an image").toBe("image");
-				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain("rose-peaks");
+				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain(
+					"rose-mountains",
+				);
 			});
 
 			await test.step("welcome starter content is present (searchable)", async () => {
@@ -219,7 +222,7 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 	}
 });
 
-test("welcome screen: white-gloss CTAs, single-title join popover, duplicate-name error", async () => {
+test("welcome screen: flat tile CTAs, single-title join popover, duplicate-name error", async () => {
 	const userDataDir = mkdtempSync(join(tmpdir(), "bs-e2e-welcome-ui-"));
 	try {
 		const { app } = await launchShell({ userDataDir });
@@ -251,13 +254,11 @@ test("welcome screen: white-gloss CTAs, single-title join popover, duplicate-nam
 			const joinButton = dashboard.locator('[data-testid="welcome-join-vault"]');
 			await joinButton.waitFor({ state: "visible", timeout: 30_000 });
 
-			await test.step("secondary CTAs are white-gloss, not blue", async () => {
-				// The glossy face is driven by --color-gloss-top; the welcome
-				// override sets it to white (#ffffff), never the old cyan.
-				const glossTop = await joinButton.evaluate((el) =>
-					getComputedStyle(el).getPropertyValue("--color-gloss-top").trim().toLowerCase(),
-				);
-				expect(["#ffffff", "#fff", "rgb(255, 255, 255)"]).toContain(glossTop);
+			await test.step("CTAs are flat tiles — no glossy gradient face", async () => {
+				// The menu tiles replaced the glossy Button chrome; a flat tile has
+				// no background-image (the gloss face was a linear-gradient).
+				const backgroundImage = await joinButton.evaluate((el) => getComputedStyle(el).backgroundImage);
+				expect(backgroundImage).toBe("none");
 			});
 
 			await test.step("join popover opens with a single title (no duplicate header)", async () => {
@@ -276,15 +277,23 @@ test("welcome screen: white-gloss CTAs, single-title join popover, duplicate-nam
 
 			await test.step("create form (step 1) flags a duplicate vault name inline", async () => {
 				await dashboard.getByText("Create a new vault").click();
+				// The name starts EMPTY (no "Personal" pre-fill — that surfaced the
+				// duplicate error before the user typed anything): no inline error,
+				// and the empty name gates "Continue" ("Create vault" is on step 2).
 				const error = dashboard.locator('[data-testid="welcome-name-error"]');
-				await error.waitFor({ state: "visible", timeout: 10_000 });
-				// The name/location step gates "Continue"; "Create vault" is on step 2.
+				const nameInput = dashboard.locator(".welcome__input").first();
 				const continueBtn = dashboard.getByRole("button", { name: "Continue" });
+				await nameInput.waitFor({ state: "visible", timeout: 10_000 });
+				await expect(error).toBeHidden();
+				await expect(continueBtn).toBeDisabled();
+
+				// Typing the already-taken name surfaces the inline error.
+				await nameInput.fill("Personal");
+				await error.waitFor({ state: "visible", timeout: 10_000 });
 				await expect(continueBtn).toBeDisabled();
 				await dashboard.screenshot({ path: "tests/e2e/results/welcome-name-error.png" });
 
 				// Typing a fresh name clears the error and re-enables Continue.
-				const nameInput = dashboard.locator(".welcome__input").first();
 				await nameInput.fill("Research");
 				await expect(error).toBeHidden();
 				await expect(continueBtn).toBeEnabled();

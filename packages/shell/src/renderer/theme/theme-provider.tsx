@@ -39,8 +39,8 @@ export function applyThemeVars(theme: ThemeName): void {
 
 /**
  * The theme `:root` should carry: the active vault's effective theme while a
- * vault is open, or Midnight on the welcome screen (no open vault) so a stale
- * palette can't clash with the brand-blue background. `DEFAULT_THEME` bridges
+ * vault is open, or Rose on the welcome screen (no open vault) so a stale
+ * palette can't clash with the rose-mountains splash. `DEFAULT_THEME` bridges
  * the brief gap before the first snapshot arrives.
  *
  * The effective theme is resolved HERE from `appearance` + the live OS dark
@@ -58,7 +58,7 @@ export function effectiveTheme(
 	appearance: AppearanceState | undefined,
 	prefersDark: boolean,
 ): ThemeName {
-	if (!hasVault) return ThemeName.Midnight;
+	if (!hasVault) return ThemeName.Rose;
 	if (!appearance) return DEFAULT_THEME;
 	const slot = effectiveSlotFor(appearance.mode, prefersDark);
 	return (slot === AppearanceSlot.Dark ? appearance.dark : appearance.light).theme;
@@ -71,7 +71,7 @@ type Props = {
 /**
  * The single authority for the `:root` theme variables. Reads the active theme
  * from the dashboard snapshot while a vault is open; with no open vault (the
- * welcome screen — a brand-blue background) it pins the Midnight theme so a
+ * welcome screen — the rose-mountains splash) it pins the Rose theme so a
  * stale dark/sepia/solar palette can't clash with the welcome chrome. A static
  * base (`applyThemeVars(DEFAULT_THEME)` at renderer entry) covers the
  * error-boundary fallback, which renders outside this provider's subtree.

@@ -75,20 +75,33 @@ async function flush(): Promise<void> {
 }
 
 /** Render → create menu → step 1 (name/location) → step 2 (starting point,
- *  where the starter checkbox + template gallery live). The default name +
+ *  where the starter checkbox + template gallery live). A typed name + the
  *  mocked path make step 1 valid, so the Continue submit advances. */
 async function enterCreateMode(): Promise<void> {
 	await act(async () => {
 		root.render(<Welcome />);
 	});
 	await flush();
-	const cta = host.querySelector<HTMLButtonElement>("button.welcome__cta:not(.welcome__cta--alt)");
+	const cta = host.querySelector<HTMLButtonElement>('[data-testid="welcome-create-cta"]');
 	if (!cta) throw new Error("create CTA not found");
 	await act(async () => cta.click());
+	await flush();
+	// The name field starts empty (no pre-fill) — type one so step 1 validates.
+	await typeName("Personal");
 	await flush();
 	// Advance step 1 → step 2 (Continue submits the name/location form).
 	await act(async () => submit());
 	await flush();
+}
+
+async function typeName(value: string): Promise<void> {
+	const input = host.querySelector<HTMLInputElement>("input.welcome__input");
+	if (!input) throw new Error("name input not found");
+	const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+	await act(async () => {
+		setValue?.call(input, value);
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
 }
 
 function card(id: string): HTMLButtonElement {
@@ -158,10 +171,12 @@ describe("Welcome — two-step create flow", () => {
 			root.render(<Welcome />);
 		});
 		await flush();
-		host.querySelector<HTMLButtonElement>("button.welcome__cta:not(.welcome__cta--alt)")?.click();
+		host.querySelector<HTMLButtonElement>('[data-testid="welcome-create-cta"]')?.click();
 		await flush();
 		expect(host.querySelector('[data-testid="welcome-templates"]')).toBeNull();
-		// Continue → step 2 reveals the gallery.
+		// Continue (with a typed name — the field starts empty) → step 2.
+		await typeName("Personal");
+		await flush();
 		await act(async () => submit());
 		await flush();
 		expect(host.querySelector('[data-testid="welcome-templates"]')).not.toBeNull();
