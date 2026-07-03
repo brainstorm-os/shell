@@ -107,7 +107,7 @@
 	flex-shrink: 0;
 	padding: var(--space-0_5);
 	font-size: var(--text-size-xs);
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	background: var(--color-accent-subtle);
 	border-radius: var(--radius-full);
 }

@@ -84,7 +84,7 @@
 
 .bs-find-bar__toggle[aria-pressed="true"] {
 	background: var(--color-accent-subtle, rgba(79, 140, 255, 0.22));
-	color: var(--color-accent-default, #4f8cff);
+	color: var(--color-accent-on-surface, #4f8cff);
 }
 
 .bs-find-bar__btn:disabled,

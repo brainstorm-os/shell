@@ -908,7 +908,7 @@ button {
 
 .editor__file-new:hover {
 	background: var(--color-accent-subtle, var(--hover));
-	color: var(--color-accent-default, var(--text));
+	color: var(--color-accent-on-surface, var(--text));
 }
 
 .editor__file-new:focus-visible {

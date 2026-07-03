@@ -78,7 +78,7 @@
 	background: transparent;
 	border: none;
 	padding: 0;
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	font-family: inherit;
 	font-size: var(--text-size-md);
 	cursor: pointer;

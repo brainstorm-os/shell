@@ -191,6 +191,20 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = Object.freeze([
 		level: ContrastLevel.Normal,
 	},
 	{
+		id: "accent-on-surface-on-bg",
+		label: "Accent-as-text on background",
+		foreground: "--color-accent-on-surface",
+		background: "--color-background-primary",
+		level: ContrastLevel.Normal,
+	},
+	{
+		id: "accent-on-surface-on-elevated",
+		label: "Accent-as-text on elevated surface",
+		foreground: "--color-accent-on-surface",
+		background: "--color-background-elevated",
+		level: ContrastLevel.Normal,
+	},
+	{
 		id: "inverse-on-inverse",
 		label: "Inverse text on inverse background",
 		foreground: "--color-text-inverse",
@@ -213,20 +227,43 @@ export type ContrastIssue = {
 	required: number;
 };
 
+/** The opaque base every translucent surface token is layered over. A surface
+ *  like `surface.default` = `rgba(255,255,255,0.05)` is an OVERLAY, not a
+ *  standalone background — evaluating text against its raw RGB (ignoring alpha)
+ *  treats a 5%-white overlay as pure white and wildly misreports the ratio. */
+const BASE_BACKGROUND_TOKEN = "--color-background-primary";
+
+/** Composite a possibly-translucent background colour over `base` so the
+ *  effective opaque colour is what the eye sees. Returns `bg` unchanged when it
+ *  is already opaque or either colour is unparseable. */
+function opaqueBackground(bg: string, base: string | undefined): string {
+	const c = parseColor(bg);
+	if (!c || c.a >= 1) return bg;
+	const b = base ? parseColor(base) : null;
+	if (!b) return bg;
+	const f = flatten(c, b);
+	return `rgb(${Math.round(f.r)}, ${Math.round(f.g)}, ${Math.round(f.b)})`;
+}
+
 /**
  * Lint the resolved colour tokens. `resolve(tokenName)` returns the
  * effective CSS colour (base ∪ overrides). Returns one issue per pair whose
  * computable contrast is below its required ratio; pairs with an
  * unevaluable colour are skipped. `[]` ⇒ every computable pair passes.
+ *
+ * A translucent background token is composited over `--color-background-primary`
+ * first, so an overlay surface is evaluated as its rendered opaque colour.
  */
 export function lintTokenContrast(
 	resolve: (tokenName: string) => string | undefined,
 ): ContrastIssue[] {
 	const issues: ContrastIssue[] = [];
+	const base = resolve(BASE_BACKGROUND_TOKEN);
 	for (const pair of CONTRAST_PAIRS) {
 		const fg = resolve(pair.foreground);
-		const bg = resolve(pair.background);
-		if (fg === undefined || bg === undefined) continue;
+		const bgRaw = resolve(pair.background);
+		if (fg === undefined || bgRaw === undefined) continue;
+		const bg = opaqueBackground(bgRaw, base);
 		const ratio = contrastRatio(fg, bg);
 		if (ratio === null) continue;
 		if (ratio < pair.level) {

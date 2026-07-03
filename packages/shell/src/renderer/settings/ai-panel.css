@@ -119,7 +119,7 @@
 }
 
 .settings__ai-tile[data-configured="true"] .settings__ai-tile-status {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 }
 
 /* Credential popover body. */
@@ -153,7 +153,7 @@
 }
 
 .settings__ai-key-id[data-configured="true"] .settings__ai-key-status-pill {
-	color: var(--color-accent-default);
+	color: var(--color-accent-on-surface);
 	background: var(--color-accent-subtle);
 }
 

@@ -646,7 +646,7 @@ body.is-resizing .bookmarks__resize {
 	padding: var(--space-0_5);
 	font: inherit;
 	font-weight: var(--text-weight-medium, 500);
-	color: var(--color-accent-strong, var(--text));
+	color: var(--color-accent-on-surface, var(--text));
 	background: transparent;
 	border: var(--border-width) solid var(--accent, currentColor);
 	border-radius: var(--radius-sm);
@@ -681,7 +681,7 @@ body.is-resizing .bookmarks__resize {
 	font-weight: var(--text-weight-medium, 500);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
-	color: var(--color-accent-strong, var(--text-dim));
+	color: var(--color-accent-on-surface, var(--text-dim));
 	background: var(--color-accent-subtle, var(--bg-elev));
 	padding: 1px;
 	border-radius: var(--radius-xs);
@@ -1101,7 +1101,7 @@ textarea.bookmarks__form-input {
 	margin-left: auto;
 	padding: var(--space-0_5);
 	font: inherit;
-	color: var(--color-accent-strong, var(--text));
+	color: var(--color-accent-on-surface, var(--text));
 	background: transparent;
 	border: var(--border-width) solid var(--border, currentColor);
 	border-radius: var(--radius-sm);
