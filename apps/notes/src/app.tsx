@@ -29,6 +29,7 @@ import type {
 } from "@brainstorm/sdk-types";
 import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-picker";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
+import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
 import { Icon as IconGlyph, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
 import { LockButton } from "@brainstorm/sdk/lock-button";
@@ -47,6 +48,7 @@ import { attachResizable } from "@brainstorm/sdk/resizable";
 import { Searchbar } from "@brainstorm/sdk/searchbar";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
 import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
+import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm/sdk/templates";
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
@@ -725,6 +727,33 @@ export function NotesApp() {
 	// own always-visible button made the coverless editor chrome noisy) then
 	// Export. Opening the picker is the same `setCoverPickerOpen` flow the cover
 	// band click uses; the label flips between Add / Change on whether one is set.
+	// "Save as template" (B11.10 surface #3): clone this note into an object
+	// `Template/v1` — non-presentation properties become the prototype, the
+	// note's body is copied through the doc transport. Mirrors Database's
+	// `saveObjectAsTemplate`.
+	const saveNoteAsTemplate = useCallback(
+		async (noteId: string): Promise<void> => {
+			const entities = runtime?.services.entities;
+			if (!entities) return;
+			try {
+				const entity = await entities.get(noteId);
+				if (!entity) return;
+				const now = Date.now();
+				const template = await entities.create(TEMPLATE_ENTITY_TYPE, {
+					...objectToTemplateProperties(entity),
+					createdAt: now,
+					updatedAt: now,
+				});
+				if (template?.id && hasBodyDocTransport(entities)) {
+					await copyEntityBody(entities, noteId, template.id);
+				}
+			} catch (error) {
+				console.warn("[notes/template] save note as template failed:", error);
+			}
+		},
+		[runtime],
+	);
+
 	const objectMenuExtraItems = useMemo<ObjectMenuExtraItem[] | undefined>(() => {
 		const coverItem: ObjectMenuExtraItem = {
 			id: "cover",
@@ -732,8 +761,21 @@ export function NotesApp() {
 			icon: IconName.Palette,
 			run: () => setCoverPickerOpen(true),
 		};
-		return [coverItem, ...(noteExportItems ?? [])];
-	}, [noteCover, noteExportItems]);
+		const noteId = note?.id;
+		const saveAsTemplateItem: ObjectMenuExtraItem | null = noteId
+			? {
+					id: "save-as-template",
+					label: t("notes.objectMenu.saveAsTemplate"),
+					icon: IconName.Copy,
+					run: () => void saveNoteAsTemplate(noteId),
+				}
+			: null;
+		return [
+			coverItem,
+			...(saveAsTemplateItem ? [saveAsTemplateItem] : []),
+			...(noteExportItems ?? []),
+		];
+	}, [noteCover, noteExportItems, note?.id, saveNoteAsTemplate]);
 
 	// The properties panel only makes sense with an open note. The persisted
 	// `propsOpen` preference is remembered, but the panel is never *shown*

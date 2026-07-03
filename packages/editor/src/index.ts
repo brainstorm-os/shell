@@ -76,6 +76,7 @@ export {
 	BRAINSTORM_MIME,
 	extractBrainstormPayloadFromHtml,
 	insertBlocks,
+	insertSnippet,
 	parseBrainstormPayload,
 	plainTextToSerializedBlocks,
 	serializeBlocksAsHtml,

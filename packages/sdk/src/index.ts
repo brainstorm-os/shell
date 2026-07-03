@@ -113,6 +113,7 @@ export {
 } from "./list-view-entity-codec";
 export {
 	TEMPLATE_ENTITY_TYPE,
+	TEMPLATE_SNIPPET_KEY,
 	type TemplateEntityProperties,
 	type TemplateDraft,
 	type DefaultTemplateLadder,
@@ -120,6 +121,8 @@ export {
 	entityToTemplate,
 	templateToEntityProperties,
 	objectToTemplateProperties,
+	blockSnippetToTemplateProperties,
+	snippetFromTemplate,
 	instantiateObjectTemplate,
 	resolveDefaultTemplate,
 	templateAppliesToType,

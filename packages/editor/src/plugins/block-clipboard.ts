@@ -27,7 +27,9 @@ import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
 import {
 	$getNodeByKey,
 	$getRoot,
+	$getSelection,
 	$isElementNode,
+	$isRangeSelection,
 	type LexicalEditor,
 	type LexicalNode,
 	type NodeKey,
@@ -235,6 +237,42 @@ export function insertBlocks(
 		{ discrete: true },
 	);
 	return inserted;
+}
+
+/**
+ * Insert a serialized-blocks snippet (a `ClipboardPayload` JSON string, the same
+ * shape `serializeBlocksAsJson` produces) at the caret. This is the block-snippet
+ * TEMPLATE insert path (B11.10) — deliberately the SAME machinery as paste, so a
+ * snippet's transclusion / mention / object-link nodes carry their `entityId`
+ * verbatim (OQ-TPL-2: a snippet is a reusable view of the graph, not a text
+ * macro). Returns `false` on a malformed / empty payload (caller no-ops).
+ *
+ * Lands where the caret is: the slash-menu clears the `/…` paragraph before
+ * running the command, so the caret sits in an empty top-level block — that
+ * block is replaced (not appended-at-end, which is `insertBlocks`' empty-set
+ * default) so the snippet appears in place.
+ */
+export function insertSnippet(editor: LexicalEditor, json: string): boolean {
+	let payload: unknown;
+	try {
+		payload = JSON.parse(json);
+	} catch {
+		return false;
+	}
+	if (!isValidPayload(payload) || payload.blocks.length === 0) return false;
+	let replaceKeys: ReadonlySet<NodeKey> = new Set<NodeKey>();
+	editor.getEditorState().read(() => {
+		const selection = $getSelection();
+		if (!$isRangeSelection(selection)) return;
+		try {
+			const block = selection.anchor.getNode().getTopLevelElementOrThrow();
+			if (block.getTextContent().trim() === "") replaceKeys = new Set([block.getKey()]);
+		} catch {
+			// No resolvable top-level block — fall back to append-at-end.
+		}
+	});
+	insertBlocks(editor, payload.blocks, replaceKeys);
+	return true;
 }
 
 /** Find the block immediately preceding the first selected key in
