@@ -18,7 +18,8 @@ import {
 	OPENAI_PROVIDER_ID,
 } from "@brainstorm/sdk-types";
 import { ipcMain } from "electron";
-import { type PerAppAiUsage, aggregateAiUsageByApp, readAiUsage } from "../ai/ai-usage-log";
+import { AI_BUDGET_WINDOW_MS } from "../ai/ai-quota";
+import type { AiAppUsageSummary } from "../ai/ai-usage-repo";
 import {
 	deleteAiProviderKey,
 	readAiProviderKey,
@@ -27,6 +28,7 @@ import {
 import type { CredentialStore } from "../credentials/store";
 import {
 	type AiSettings,
+	type AppAiBudget,
 	readAiSettings,
 	setAppBudget,
 	setDefaultProvider,
@@ -41,10 +43,15 @@ export const AI_GET_SETTINGS_CHANNEL = "ai-settings:get-settings" as const;
 export const AI_SET_DEFAULT_PROVIDER_CHANNEL = "ai-settings:set-default-provider" as const;
 export const AI_SET_APP_BUDGET_CHANNEL = "ai-settings:set-app-budget" as const;
 
+/** What the Settings → AI usage list renders (14.8): per-app rolling-window
+ *  aggregates from the `ai_usage` accounting table — metadata only. */
+export type AiUsageView = {
+	/** The rolling window the aggregates cover (30 days). */
+	readonly windowMs: number;
+	readonly apps: readonly AiAppUsageSummary[];
+};
+
 export type AiSettingsHandlerDeps = {
-	/** Path to the per-call AI provenance log (11.8). The usage handler reads +
-	 *  aggregates it; the raw log itself never crosses IPC. */
-	readonly aiUsagePath: string;
 	/** Apply a routing default change to the live provider registry so it takes
 	 *  effect without a vault re-open (11.9). `null` restores the built-in
 	 *  default. Optional — omitted in tests that only assert persistence. */
@@ -69,10 +76,17 @@ function storeFor(providerId: unknown): { store: CredentialStore; id: string } |
 }
 
 export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
-	ipcMain.handle(AI_USAGE_CHANNEL, async (): Promise<readonly PerAppAiUsage[]> => {
-		// Aggregate the metadata-only provenance log into a per-app summary;
-		// the raw log (which records every call) never crosses IPC.
-		return aggregateAiUsageByApp(await readAiUsage(deps.aiUsagePath));
+	ipcMain.handle(AI_USAGE_CHANNEL, async (): Promise<AiUsageView> => {
+		// 14.8 — per-app rolling-window aggregates from the active vault's
+		// `ai_usage` accounting table (metadata only; per-call rows never cross
+		// IPC). No open vault → an empty window.
+		const session = getActiveVaultSession();
+		if (!session) return { windowMs: AI_BUDGET_WINDOW_MS, apps: [] };
+		const repo = await session.aiUsageRepo();
+		return {
+			windowMs: AI_BUDGET_WINDOW_MS,
+			apps: repo.summarizeByApp(Date.now() - AI_BUDGET_WINDOW_MS),
+		};
 	});
 
 	ipcMain.handle(
@@ -126,11 +140,25 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 
 	ipcMain.handle(
 		AI_SET_APP_BUDGET_CHANNEL,
-		async (_event, appId: unknown, maxTokens: unknown): Promise<AiSettings | null> => {
+		async (_event, appId: unknown, budget: unknown): Promise<AiSettings | null> => {
 			const vaultPath = getActiveVaultSession()?.vaultPath ?? null;
 			if (!vaultPath || typeof appId !== "string" || appId.length === 0) return null;
-			const tokens = typeof maxTokens === "number" ? maxTokens : 0;
-			return setAppBudget(vaultPath, appId, tokens);
+			return setAppBudget(vaultPath, appId, coerceBudget(budget));
 		},
 	);
+}
+
+/** Accept the 14.8 `{maxTokens?, maxCredits?}` shape and the legacy bare
+ *  number (a stale pre-14.8 renderer); anything else clears the budget
+ *  (the store drops budgets with no positive unit). */
+function coerceBudget(value: unknown): AppAiBudget {
+	if (typeof value === "number") return { maxTokens: value };
+	if (value && typeof value === "object") {
+		const raw = value as { maxTokens?: unknown; maxCredits?: unknown };
+		return {
+			...(typeof raw.maxTokens === "number" ? { maxTokens: raw.maxTokens } : {}),
+			...(typeof raw.maxCredits === "number" ? { maxCredits: raw.maxCredits } : {}),
+		};
+	}
+	return {};
 }

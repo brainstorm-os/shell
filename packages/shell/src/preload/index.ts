@@ -522,30 +522,53 @@ const aiSettings = {
 		ipcRenderer.invoke("ai-settings:set-provider-key", providerId, key),
 	clearProviderKey: (providerId: string): Promise<boolean> =>
 		ipcRenderer.invoke("ai-settings:clear-provider-key", providerId),
-	/** Per-app AI usage summary (11.8 provenance, aggregated). The raw
-	 *  per-call log never crosses IPC — only this aggregate does. */
-	usage: (): Promise<
-		ReadonlyArray<{
-			appId: string;
-			calls: number;
-			errors: number;
-			totalTokens: number;
-			lastSeenMs: number;
-		}>
-	> => ipcRenderer.invoke("ai-settings:usage"),
-	/** 11.9 — routing default + per-app token budgets (non-secret per-vault
+	/** Per-app AI usage over the rolling 30-day window (14.8 accounting,
+	 *  aggregated from the `ai_usage` table). Per-call rows never cross IPC —
+	 *  only this aggregate does. */
+	usage: (): Promise<AiUsageWindowView> => ipcRenderer.invoke("ai-settings:usage"),
+	/** 11.9/14.8 — routing default + per-app budgets (non-secret per-vault
 	 *  config; keys stay in the credential store). */
 	getSettings: (): Promise<AiSettingsView> => ipcRenderer.invoke("ai-settings:get-settings"),
 	setDefaultProvider: (providerId: string | null): Promise<AiSettingsView | null> =>
 		ipcRenderer.invoke("ai-settings:set-default-provider", providerId),
-	setAppBudget: (appId: string, maxTokens: number): Promise<AiSettingsView | null> =>
-		ipcRenderer.invoke("ai-settings:set-app-budget", appId, maxTokens),
+	setAppBudget: (appId: string, budget: AiAppBudgetView): Promise<AiSettingsView | null> =>
+		ipcRenderer.invoke("ai-settings:set-app-budget", appId, budget),
 };
 
-/** Mirrors the main-side `AiSettings` shape (11.9). */
+/** A per-app budget over the rolling 30-day window (14.8). Either unit may be
+ *  set; an empty object clears the budget. Mirrors main-side `AppAiBudget`. */
+export type AiAppBudgetView = {
+	maxTokens?: number;
+	maxCredits?: number;
+};
+
+/** Mirrors the main-side `AiSettings` shape (11.9/14.8). */
 export type AiSettingsView = {
 	defaultProvider: string | null;
-	appBudgets: Record<string, { maxTokens: number }>;
+	appBudgets: Record<string, AiAppBudgetView>;
+};
+
+/** Mirrors the main-side `AiUsageView` (14.8): rolling-window per-app usage
+ *  aggregates, with a per provider/model breakdown and cost in micro-credits. */
+export type AiUsageWindowView = {
+	windowMs: number;
+	apps: ReadonlyArray<{
+		appId: string;
+		calls: number;
+		errors: number;
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+		creditsMicro: number;
+		lastSeenMs: number;
+		byProviderModel: ReadonlyArray<{
+			provider: string;
+			model: string;
+			calls: number;
+			totalTokens: number;
+			creditsMicro: number;
+		}>;
+	}>;
 };
 
 /** 14.6 — Settings → Billing panel (privileged). The refresh credential is

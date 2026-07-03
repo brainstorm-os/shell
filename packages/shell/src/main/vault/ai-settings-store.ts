@@ -6,10 +6,11 @@
  *
  * NON-secret config only — provider *keys* live in the Tier-2 `CredentialStore`
  * (11.6), never here. This holds (1) the **default provider** the broker routes
- * to when a call pins none, and (2) a **per-app token budget** map. Budget
- * *enforcement* rides 14.8 (billing/accounting); this rung persists the user's
- * intent + surfaces it in Settings so the broker can read it once enforcement
- * lands. The provenance log (11.8) already measures actual per-app spend.
+ * to when a call pins none, and (2) a **per-app budget** map (tokens and/or
+ * credits per rolling 30-day window). Since 14.8 the AI broker ENFORCES these
+ * budgets before dispatching a call (`main/ai/ai-quota.ts` reads this store;
+ * over-budget → the distinct `AiBudgetExhausted` error), metering against the
+ * `ai_usage` table in `account.db`.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -31,10 +32,13 @@ export const ROUTABLE_PROVIDER_IDS: readonly string[] = [
 	GEMINI_PROVIDER_ID,
 ];
 
-/** A per-app AI budget. `maxTokens` 0 / absent = no cap. Cost-cents budgets
- *  wait on real provider pricing (11.6); tokens is the measurable unit today. */
+/** A per-app AI budget over the rolling 30-day window (14.8). Either unit may
+ *  be set; 0 / absent = no cap on that unit; a budget row with neither is
+ *  dropped. `maxCredits` is whole credits (1 credit = 1 USD list price — see
+ *  `main/ai/model-rates.ts`). */
 export type AppAiBudget = {
-	maxTokens: number;
+	maxTokens?: number;
+	maxCredits?: number;
 };
 
 export type AiSettings = {
@@ -45,19 +49,30 @@ export type AiSettings = {
 	appBudgets: Record<string, AppAiBudget>;
 };
 
-/** Hard ceiling so a hand-edited / stale-renderer value can't install a
+/** Hard ceilings so a hand-edited / stale-renderer value can't install a
  *  nonsense budget (also bounds the number the UI must render). */
 export const MAX_APP_TOKEN_BUDGET = 100_000_000;
+export const MAX_APP_CREDIT_BUDGET = 1_000_000;
 
 export function defaultAiSettings(): AiSettings {
 	return { defaultProvider: null, appBudgets: {} };
 }
 
+function positiveCapped(value: unknown, cap: number): number | null {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+	return Math.min(Math.floor(value), cap);
+}
+
 function validateBudget(value: unknown): AppAiBudget | null {
 	if (!value || typeof value !== "object") return null;
-	const max = (value as { maxTokens?: unknown }).maxTokens;
-	if (typeof max !== "number" || !Number.isFinite(max) || max <= 0) return null;
-	return { maxTokens: Math.min(Math.floor(max), MAX_APP_TOKEN_BUDGET) };
+	const raw = value as { maxTokens?: unknown; maxCredits?: unknown };
+	const maxTokens = positiveCapped(raw.maxTokens, MAX_APP_TOKEN_BUDGET);
+	const maxCredits = positiveCapped(raw.maxCredits, MAX_APP_CREDIT_BUDGET);
+	if (maxTokens === null && maxCredits === null) return null;
+	return {
+		...(maxTokens !== null ? { maxTokens } : {}),
+		...(maxCredits !== null ? { maxCredits } : {}),
+	};
 }
 
 export function validateAiSettings(value: unknown): AiSettings {
@@ -114,16 +129,18 @@ export async function setDefaultProvider(
 	return next;
 }
 
-/** Set (maxTokens > 0) or clear (maxTokens <= 0) one app's token budget. */
+/** Set or clear one app's budget: a budget with at least one positive unit is
+ *  stored (values floored + capped); an empty/invalid budget clears the row. */
 export async function setAppBudget(
 	vaultPath: string,
 	appId: string,
-	maxTokens: number,
+	budget: AppAiBudget,
 ): Promise<AiSettings> {
 	const next = await readAiSettings(vaultPath);
 	if (appId.length === 0) return next;
-	if (Number.isFinite(maxTokens) && maxTokens > 0) {
-		next.appBudgets[appId] = { maxTokens: Math.min(Math.floor(maxTokens), MAX_APP_TOKEN_BUDGET) };
+	const valid = validateBudget(budget);
+	if (valid) {
+		next.appBudgets[appId] = valid;
 	} else {
 		delete next.appBudgets[appId];
 	}

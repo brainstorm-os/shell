@@ -358,6 +358,83 @@ describe("provenance recording (11.8)", () => {
 	});
 });
 
+describe("budget gate (14.8)", () => {
+	function gatedHandler(checkBudget: (appId: string) => Promise<void>, onUsage = vi.fn()) {
+		const reg = new ProviderRegistry();
+		const gen = vi.fn(async () => result);
+		reg.register(fakeProvider("ollama", gen));
+		const handler = makeAiServiceHandler({
+			getProvider: (id) => reg.get(id),
+			quota: { checkBudget },
+			onUsage,
+		});
+		return { handler, gen, onUsage };
+	}
+
+	const budgetError = () => {
+		const err = new Error("ai: io.brainstorm.agent exhausted its 30-day AI budget");
+		err.name = "AiBudgetExhausted";
+		return err;
+	};
+
+	it("checks the budget before dispatching generate, with the envelope's app id", async () => {
+		const checkBudget = vi.fn(async () => {});
+		const { handler, gen } = gatedHandler(checkBudget);
+		await handler(
+			baseEnvelope("generate", [{ messages: [{ role: MessageRole.User, content: "Hi" }] }]),
+		);
+		expect(checkBudget).toHaveBeenCalledExactlyOnceWith("io.brainstorm.agent");
+		expect(gen).toHaveBeenCalledOnce();
+	});
+
+	it("an exhausted budget blocks generate/transform/extract with the distinct error — the provider is never called", async () => {
+		const checkBudget = vi.fn(async () => {
+			throw budgetError();
+		});
+		const { handler, gen } = gatedHandler(checkBudget);
+		const calls: Array<[string, unknown]> = [
+			["generate", { messages: [{ role: MessageRole.User, content: "Hi" }] }],
+			["transform", { source: "text", kind: "rewrite" }],
+			["extract", { source: "text", fields: [{ name: "title" }] }],
+		];
+		for (const [method, arg] of calls) {
+			await expect(handler(baseEnvelope(method, [arg]))).rejects.toMatchObject({
+				name: "AiBudgetExhausted",
+			});
+		}
+		expect(gen).not.toHaveBeenCalled();
+	});
+
+	it("never gates cost (a free pre-send estimate)", async () => {
+		const checkBudget = vi.fn(async () => {
+			throw budgetError();
+		});
+		const { handler } = gatedHandler(checkBudget);
+		const out = await handler(
+			baseEnvelope("cost", [{ messages: [{ role: MessageRole.User, content: "12345678" }] }]),
+		);
+		expect(out).toMatchObject({ provider: "ollama" });
+		expect(checkBudget).not.toHaveBeenCalled();
+	});
+
+	it("a budget rejection still records an error provenance row", async () => {
+		const checkBudget = vi.fn(async () => {
+			throw budgetError();
+		});
+		const { handler, onUsage } = gatedHandler(checkBudget);
+		await expect(
+			handler(baseEnvelope("generate", [{ messages: [{ role: MessageRole.User, content: "x" }] }])),
+		).rejects.toMatchObject({ name: "AiBudgetExhausted" });
+		expect(onUsage).toHaveBeenCalledOnce();
+		expect(onUsage.mock.calls[0]?.[0]).toMatchObject({
+			appId: "io.brainstorm.agent",
+			verb: "generate",
+			provider: "",
+			outcome: "error",
+		});
+	});
+});
+
 describe("ProviderRegistry", () => {
 	it("first registered is the default; setDefault overrides; get(undefined) resolves it", () => {
 		const reg = new ProviderRegistry();

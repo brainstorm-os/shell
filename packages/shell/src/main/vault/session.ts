@@ -30,6 +30,7 @@
 
 import { join } from "node:path";
 import type { UnlockResult } from "../../shared/app-lock-wire-types";
+import { AiUsageRepository } from "../ai/ai-usage-repo";
 import { AssetDekStore } from "../assets/asset-dek-store";
 import { AssetStore } from "../assets/asset-store";
 import {
@@ -41,6 +42,7 @@ import {
 import { migrateMediaDir } from "../assets/vault-media-migrate";
 import { AccountRepository } from "../billing/account-repo";
 import { BillingService } from "../billing/billing-service";
+import { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { EntitlementRepository } from "../billing/entitlement-repo";
 import { applyShellGrants } from "../capabilities/default-grants";
 import { CapabilityLedger } from "../capabilities/ledger";
@@ -205,6 +207,8 @@ export class VaultSession {
 		accounts: AccountRepository;
 		entitlements: EntitlementRepository;
 	} | null = null;
+	private cachedAiUsage: AiUsageRepository | null = null;
+	private cachedCreditLedger: CreditLedgerRepository | null = null;
 	private cachedDashboard: DashboardStore | null = null;
 	private dashboardOpening: Promise<DashboardStore> | null = null;
 	private cachedProperties: PropertiesStore | null = null;
@@ -289,6 +293,27 @@ export class VaultSession {
 		const service = new BillingService(accounts, entitlements);
 		this.cachedBilling = service;
 		return service;
+	}
+
+	/** Lazily open `account.db` and return the per-app AI usage accounting repo
+	 *  (14.8). Cached — the broker's budget gate reads it on every AI call. */
+	async aiUsageRepo(): Promise<AiUsageRepository> {
+		this.assertOpen();
+		if (this.cachedAiUsage) return this.cachedAiUsage;
+		const db = await this.dataStores.open("account");
+		const repo = new AiUsageRepository(db);
+		this.cachedAiUsage = repo;
+		return repo;
+	}
+
+	/** Lazily open `account.db` and return the bundled-AI-credit ledger (14.8). */
+	async aiCreditLedger(): Promise<CreditLedgerRepository> {
+		this.assertOpen();
+		if (this.cachedCreditLedger) return this.cachedCreditLedger;
+		const db = await this.dataStores.open("account");
+		const repo = new CreditLedgerRepository(db);
+		this.cachedCreditLedger = repo;
+		return repo;
 	}
 
 	/**
@@ -870,6 +895,8 @@ export class VaultSession {
 		this.cachedLedger = null;
 		this.cachedBilling = null;
 		this.cachedBillingRepos = null;
+		this.cachedAiUsage = null;
+		this.cachedCreditLedger = null;
 		// The DEK store aliases `this.masterKey`'s backing buffer; the
 		// in-place `zero(this.masterKey)` above already wiped the bytes the
 		// store would otherwise read. Dropping the cache + the in-flight

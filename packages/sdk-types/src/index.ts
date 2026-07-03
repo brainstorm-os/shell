@@ -2385,6 +2385,7 @@ export type {
 
 // ─── Conversation / messaging (doc 55 — Agent app + Chats foundation) ───────
 export {
+	AI_BUDGET_EXHAUSTED_ERROR_KIND,
 	AI_EXTRACT_FIELD_TYPES,
 	AI_STREAM_EVENT_KINDS,
 	AI_TRANSFORM_KINDS,

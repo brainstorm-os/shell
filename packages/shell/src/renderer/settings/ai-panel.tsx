@@ -15,11 +15,12 @@ import {
 	OPENAI_PROVIDER_ID,
 } from "@brainstorm/sdk-types";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { AiSettingsView } from "../../preload";
+import type { AiAppBudgetView, AiSettingsView, AiUsageWindowView } from "../../preload";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
+import { budgetConsumedFraction, formatCredits, isBudgetExhausted } from "./ai-budget-view";
 import { McpServersSection } from "./mcp-panel";
 import { SettingRow, SettingSelect } from "./settings-controls";
 import "./ai-panel.css";
@@ -261,13 +262,7 @@ function ProviderGrid() {
 	);
 }
 
-type UsageRow = {
-	appId: string;
-	calls: number;
-	errors: number;
-	totalTokens: number;
-	lastSeenMs: number;
-};
+type UsageRow = AiUsageWindowView["apps"][number];
 
 /** 11.9 — the default-provider routing picker. `null` (Automatic) keeps the
  *  built-in local model; a cloud choice routes there (and fails closed if its
@@ -299,26 +294,46 @@ function RoutingSection({
 	);
 }
 
-/** One app's row: usage stat (if any) + the current budget, opening the budget
- *  editor popover when picked (mirrors the provider-tile → key-popover pattern
- *  so the section stays a calm read-only list, not a grid of live inputs). */
+/** The budget cell's face: tokens and/or credits ceilings, or "No budget". */
+function budgetLabel(budget: AiAppBudgetView | undefined): string {
+	if (!budget || (!budget.maxTokens && !budget.maxCredits)) {
+		return t("shell.settings.ai.budgetNone");
+	}
+	const parts: string[] = [];
+	if (budget.maxTokens) {
+		parts.push(t("shell.settings.ai.budgetCurrent", { count: budget.maxTokens }));
+	}
+	if (budget.maxCredits) {
+		parts.push(t("shell.settings.ai.budgetCurrentCredits", { count: budget.maxCredits }));
+	}
+	return parts.join(" · ");
+}
+
+/** One app's row: 30-day usage stat (if any) + the current budget, opening the
+ *  budget editor popover when picked (mirrors the provider-tile → key-popover
+ *  pattern so the section stays a calm read-only list, not a grid of live
+ *  inputs). An exhausted budget (14.8 — the broker is refusing this app's AI
+ *  calls) shows a distinct badge. */
 function BudgetRow({
 	appId,
 	usage,
-	maxTokens,
+	budget,
 	onOpen,
 }: {
 	appId: string;
 	usage: UsageRow | undefined;
-	maxTokens: number;
+	budget: AiAppBudgetView | undefined;
 	onOpen: () => void;
 }) {
+	const exhausted = isBudgetExhausted(usage, budget);
+	const consumed = budgetConsumedFraction(usage, budget);
 	return (
 		<li className="settings__ai-usage-row">
 			<button
 				type="button"
 				className="settings__ai-usage-trigger"
 				data-testid={`ai-budget-${appId}`}
+				data-exhausted={exhausted}
 				onClick={onOpen}
 			>
 				<span className="settings__ai-usage-app">{appId}</span>
@@ -326,47 +341,77 @@ function BudgetRow({
 					<span className="settings__ai-usage-stat">
 						{t("shell.settings.ai.usageCalls", { count: usage.calls })} ·{" "}
 						{t("shell.settings.ai.usageTokens", { count: usage.totalTokens })}
+						{usage.creditsMicro > 0 && (
+							<> · {t("shell.settings.ai.usageCredits", { credits: formatCredits(usage.creditsMicro) })}</>
+						)}
 					</span>
+				)}
+				{exhausted && (
+					<span className="settings__ai-budget-exhausted">{t("shell.settings.ai.budgetExhausted")}</span>
 				)}
 				<span
 					className="settings__ai-budget-value"
-					data-set={maxTokens > 0}
+					data-set={Boolean(budget?.maxTokens || budget?.maxCredits)}
 					title={t("shell.settings.ai.budgetEdit")}
 				>
-					{maxTokens > 0
-						? t("shell.settings.ai.budgetCurrent", { count: maxTokens })
-						: t("shell.settings.ai.budgetNone")}
+					{consumed !== null && !exhausted && (
+						<span className="settings__ai-budget-consumed" aria-hidden="true">
+							{Math.round(consumed * 100)}%
+						</span>
+					)}
+					{budgetLabel(budget)}
 				</span>
 			</button>
 		</li>
 	);
 }
 
-/** The per-app token-budget editor, shown in the shared popover. */
+/** Parse one budget input: empty = no cap on that unit; a positive integer
+ *  otherwise (anything else is invalid). */
+function parseBudgetDraft(draft: string): number | undefined | null {
+	if (draft.trim().length === 0) return undefined;
+	const parsed = Number.parseInt(draft, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) return null;
+	return parsed;
+}
+
+/** The per-app budget editor (14.8): a rolling 30-day token and/or credit
+ *  ceiling, shown in the shared popover. Clearing both fields clears the
+ *  budget (= unlimited). */
 function BudgetPopover({
 	appId,
-	maxTokens,
+	budget,
 	onClose,
 	onSet,
 }: {
 	appId: string;
-	maxTokens: number;
+	budget: AiAppBudgetView | undefined;
 	onClose: () => void;
-	onSet: (appId: string, maxTokens: number) => void;
+	onSet: (appId: string, budget: AiAppBudgetView) => void;
 }) {
-	const [draft, setDraft] = useState(maxTokens > 0 ? String(maxTokens) : "");
+	const hasBudget = Boolean(budget?.maxTokens || budget?.maxCredits);
+	const [tokensDraft, setTokensDraft] = useState(budget?.maxTokens ? String(budget.maxTokens) : "");
+	const [creditsDraft, setCreditsDraft] = useState(
+		budget?.maxCredits ? String(budget.maxCredits) : "",
+	);
 	const inputRef = useRef<HTMLInputElement>(null);
-	const inputId = useId();
-	const parsed = Number.parseInt(draft, 10);
-	const valid = Number.isFinite(parsed) && parsed > 0;
+	const tokensId = useId();
+	const creditsId = useId();
+	const tokens = parseBudgetDraft(tokensDraft);
+	const credits = parseBudgetDraft(creditsDraft);
+	const valid =
+		tokens !== null && credits !== null && (tokens !== undefined || credits !== undefined);
 
 	const save = () => {
 		if (!valid) return;
-		onSet(appId, parsed);
+		onSet(appId, {
+			...(tokens !== undefined ? { maxTokens: tokens } : {}),
+			...(credits !== undefined ? { maxCredits: credits } : {}),
+		});
 		onClose();
 	};
 	const clear = () => {
-		onSet(appId, 0);
+		onSet(appId, {});
 		onClose();
 	};
 
@@ -381,7 +426,7 @@ function BudgetPopover({
 			testId={`ai-budget-popover-${appId}`}
 			footer={
 				<>
-					{maxTokens > 0 && (
+					{hasBudget && (
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
@@ -392,12 +437,7 @@ function BudgetPopover({
 							{t("shell.settings.ai.budgetClear")}
 						</Button>
 					)}
-					<Button
-						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
-						onClick={save}
-						disabled={!valid || parsed === maxTokens}
-					>
+					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={save} disabled={!valid}>
 						{t("shell.settings.ai.budgetSet")}
 					</Button>
 				</>
@@ -411,28 +451,42 @@ function BudgetPopover({
 				}}
 			>
 				<p className="settings__hint">{t("shell.settings.ai.budgetHint")}</p>
-				<label className="settings__ai-key-label" htmlFor={inputId}>
+				<label className="settings__ai-key-label" htmlFor={tokensId}>
 					{t("shell.settings.ai.budgetUnit")}
 				</label>
 				<input
-					id={inputId}
+					id={tokensId}
 					ref={inputRef}
 					className="settings__input"
 					type="number"
 					min={0}
 					inputMode="numeric"
-					value={draft}
+					value={tokensDraft}
 					placeholder={t("shell.settings.ai.budgetPlaceholder")}
-					onChange={(e) => setDraft(e.target.value)}
+					onChange={(e) => setTokensDraft(e.target.value)}
 					aria-label={`${appId} ${t("shell.settings.ai.budgetUnit")}`}
+				/>
+				<label className="settings__ai-key-label" htmlFor={creditsId}>
+					{t("shell.settings.ai.budgetCreditsUnit")}
+				</label>
+				<input
+					id={creditsId}
+					className="settings__input"
+					type="number"
+					min={0}
+					inputMode="numeric"
+					value={creditsDraft}
+					placeholder={t("shell.settings.ai.budgetPlaceholder")}
+					onChange={(e) => setCreditsDraft(e.target.value)}
+					aria-label={`${appId} ${t("shell.settings.ai.budgetCreditsUnit")}`}
 				/>
 			</form>
 		</Popover>
 	);
 }
 
-/** Usage summary (11.8) + per-app token budgets (11.9). Rows are the union of
- *  apps that have made AI calls and apps that already carry a budget. */
+/** 30-day usage accounting (14.8) + per-app budgets. Rows are the union of
+ *  apps that have made AI calls in the window and apps that carry a budget. */
 function UsageAndBudgetsSection({
 	usage,
 	settings,
@@ -440,7 +494,7 @@ function UsageAndBudgetsSection({
 }: {
 	usage: readonly UsageRow[];
 	settings: AiSettingsView | null;
-	onSetBudget: (appId: string, maxTokens: number) => void;
+	onSetBudget: (appId: string, budget: AiAppBudgetView) => void;
 }) {
 	const [openAppId, setOpenAppId] = useState<string | null>(null);
 	const budgets = settings?.appBudgets ?? {};
@@ -452,6 +506,7 @@ function UsageAndBudgetsSection({
 		<div className="settings__field" data-testid="ai-budgets">
 			<div className="settings__field-head">
 				<span className="settings__field-label">{t("shell.settings.ai.budgetTitle")}</span>
+				<span className="settings__ai-usage-window">{t("shell.settings.ai.usageWindow")}</span>
 			</div>
 			<p className="settings__hint">{t("shell.settings.ai.budgetHint")}</p>
 			<ul className="settings__ai-usage-list">
@@ -460,7 +515,7 @@ function UsageAndBudgetsSection({
 						key={appId}
 						appId={appId}
 						usage={usageById.get(appId)}
-						maxTokens={budgets[appId]?.maxTokens ?? 0}
+						budget={budgets[appId]}
 						onOpen={() => setOpenAppId(appId)}
 					/>
 				))}
@@ -468,7 +523,7 @@ function UsageAndBudgetsSection({
 			{openAppId !== null && (
 				<BudgetPopover
 					appId={openAppId}
-					maxTokens={budgets[openAppId]?.maxTokens ?? 0}
+					budget={budgets[openAppId]}
 					onClose={() => setOpenAppId(null)}
 					onSet={onSetBudget}
 				/>
@@ -488,7 +543,12 @@ export function AiPanel() {
 		const bridge = window.brainstorm.aiSettings;
 		let live = true;
 		if (typeof bridge?.usage === "function") {
-			void bridge.usage().then((u) => live && setUsage(u));
+			// A stale pre-14.8 preload returns a bare array; the current shape is
+			// { windowMs, apps } — accept both so HMR skew degrades gracefully.
+			void bridge.usage().then((u) => {
+				if (!live) return;
+				setUsage(Array.isArray(u) ? [] : (u?.apps ?? []));
+			});
 		}
 		if (typeof bridge?.getSettings === "function") {
 			void bridge.getSettings().then((s) => live && setSettings(s));
@@ -504,10 +564,8 @@ export function AiPanel() {
 			.then((s) => s && setSettings(s));
 	}, []);
 
-	const setBudget = useCallback((appId: string, maxTokens: number) => {
-		void window.brainstorm.aiSettings
-			.setAppBudget?.(appId, maxTokens)
-			.then((s) => s && setSettings(s));
+	const setBudget = useCallback((appId: string, budget: AiAppBudgetView) => {
+		void window.brainstorm.aiSettings.setAppBudget?.(appId, budget).then((s) => s && setSettings(s));
 	}, []);
 
 	return (

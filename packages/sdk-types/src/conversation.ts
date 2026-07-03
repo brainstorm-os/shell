@@ -66,6 +66,12 @@ export const GLM_PROVIDER_ID = "glm";
  *  provider as OpenAI under its own base URL. Cap scope `ai.provider:mistral`. */
 export const MISTRAL_PROVIDER_ID = "mistral";
 
+/** Error kind (the app-side `error.name` / wire `error.kind`) the AI broker
+ *  returns when the calling app's rolling AI budget is exhausted (14.8).
+ *  Distinct from `Unavailable` so apps can surface "AI budget exhausted"
+ *  (with a path to Settings → AI) instead of a generic failure. */
+export const AI_BUDGET_EXHAUSTED_ERROR_KIND = "AiBudgetExhausted";
+
 /** Local alias for an entity id — a plain `string` so this contract leaf
  *  stays dependency-free and introduces no barrel cycle. */
 type ConversationEntityId = string;
