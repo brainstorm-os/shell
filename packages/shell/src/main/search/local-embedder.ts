@@ -120,7 +120,15 @@ export function makeEmbedderFromNative(
  */
 export async function loadFastembedEmbedder(cacheDir: string): Promise<FastembedEmbedder | null> {
 	try {
-		const native = (await import("@brainstorm/native-embed")) as Partial<EmbedNative>;
+		// Opaque specifier (mirrors the `bun:sqlite` / `better-sqlite3` dynamic
+		// imports in `storage/sqlite.ts`): the addon's generated `index.d.ts` only
+		// exists after the heavy ONNX-Runtime build, which the default `build:native`
+		// + CI `verify` deliberately skip. Resolving the specifier through a `const`
+		// keeps `tsc --noEmit` from demanding those types (the module is cast to
+		// `Partial<EmbedNative>` here anyway) — otherwise a fresh checkout fails
+		// typecheck on the missing declaration.
+		const specifier = "@brainstorm/native-embed";
+		const native = (await import(/* @vite-ignore */ specifier)) as Partial<EmbedNative>;
 		return makeEmbedderFromNative(native, cacheDir);
 	} catch (error) {
 		console.warn("[search] native embedder unavailable; semantic search disabled:", error);
