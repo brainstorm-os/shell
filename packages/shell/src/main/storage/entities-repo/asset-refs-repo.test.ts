@@ -76,3 +76,37 @@ describe("AssetRefsRepository.deleteRef", () => {
 		expect(e.refs.listByEntity("ent_owner")).toHaveLength(1);
 	});
 });
+
+describe("AssetRefsRepository.listAllPairs", () => {
+	let e: Awaited<ReturnType<typeof setup>>;
+	beforeEach(async () => {
+		e = await setup();
+	});
+	afterEach(async () => {
+		e.stores.close();
+		await rm(e.vaultDir, { recursive: true, force: true }).catch(() => {});
+	});
+
+	it("returns distinct (entity, asset) pairs ordered by entity then asset", () => {
+		e.entities.create({
+			id: "ent_two",
+			type: "io.x/Bookmark/v1",
+			properties: {},
+			createdBy: "io.x",
+			now: 100,
+			dekId: null,
+		});
+		// ent_owner binds asset_a under two roles (must collapse to one pair) + asset_b;
+		// ent_two also references asset_a (one asset, two owning entities).
+		e.refs.create({ entityId: "ent_owner", assetId: "asset_a", role: AssetRefRole.Favicon, now: 1 });
+		e.refs.create({ entityId: "ent_owner", assetId: "asset_a", role: AssetRefRole.Inline, now: 2 });
+		e.refs.create({ entityId: "ent_owner", assetId: "asset_b", role: AssetRefRole.Cover, now: 3 });
+		e.refs.create({ entityId: "ent_two", assetId: "asset_a", role: AssetRefRole.Cover, now: 4 });
+
+		expect(e.refs.listAllPairs()).toEqual([
+			{ entityId: "ent_owner", assetId: "asset_a" },
+			{ entityId: "ent_owner", assetId: "asset_b" },
+			{ entityId: "ent_two", assetId: "asset_a" },
+		]);
+	});
+});

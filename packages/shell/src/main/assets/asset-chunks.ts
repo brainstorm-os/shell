@@ -50,6 +50,13 @@ export type AssetChunkRef = {
 export type AssetChunkManifest = {
 	v: 1;
 	assetId: string;
+	/** The blob's MIME type — the ONLY per-asset metadata that crosses to a cold
+	 *  device (the local `assets` row doesn't exist there), so serve-on-miss
+	 *  needs it for the `Content-Type`. Peer-authored + unsigned → validated on
+	 *  read (`parseAssetChunkManifest`) to a strict token shape; the serve layer
+	 *  additionally decides which types are safe to hand back active (svg/html
+	 *  are script-capable — see the serve-on-miss wiring). */
+	mime: string;
 	/** The chunk size used; the last chunk may be smaller. */
 	chunkBytes: number;
 	/** Total plaintext size (== sum of every `rawLen`). */
@@ -57,6 +64,28 @@ export type AssetChunkManifest = {
 	/** Ordered chunks — array position IS the chunk index. */
 	chunks: AssetChunkRef[];
 };
+
+/** Fallback when a manifest carries no `mime` (older Asset-B2/B3 dogfood
+ *  manifests predate the field). `octet-stream` is inert — it never renders as
+ *  active content, so an absent/omitted mime can only under-serve, never XSS. */
+export const DEFAULT_ASSET_MIME = "application/octet-stream";
+
+/** A strict MIME `type/subtype` token: RFC-2045 `restricted-name` chars only, so
+ *  a peer manifest can't smuggle CRLF / control bytes into a response header
+ *  (`Content-Type` injection) or an over-long value. Active-content *policy*
+ *  (which valid types are safe to serve un-sniffed) is enforced separately at
+ *  the serve layer — this only bounds the syntax. */
+const MIME_TOKEN_RE = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,62}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,62}$/i;
+
+/** Validate an untrusted manifest `mime`: absent → the inert default; a valid
+ *  token → itself (lower-cased); anything else → null so the caller fails the
+ *  whole manifest closed. */
+export function normalizeManifestMime(value: unknown): string | null {
+	if (value === undefined || value === null) return DEFAULT_ASSET_MIME;
+	if (typeof value !== "string") return null;
+	if (!MIME_TOKEN_RE.test(value)) return null;
+	return value.toLowerCase();
+}
 
 /** AAD binding a chunk to its `(assetId, index)` position. NUL-separated so the
  *  id can't run into the index. */
@@ -129,6 +158,8 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 	) {
 		return null;
 	}
+	const mime = normalizeManifestMime(m.mime);
+	if (mime === null) return null;
 	if (!Array.isArray(m.chunks) || m.chunks.length === 0) return null;
 	// The chunk count is fully determined by (totalRawLen, chunkBytes); reject any
 	// padded/short count before walking the array.
@@ -152,7 +183,14 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 		chunks.push({ hash: c.hash, encLen: c.encLen, rawLen: c.rawLen });
 	}
 	if (sumRaw !== m.totalRawLen) return null;
-	return { v: 1, assetId: m.assetId, chunkBytes: m.chunkBytes, totalRawLen: m.totalRawLen, chunks };
+	return {
+		v: 1,
+		assetId: m.assetId,
+		mime,
+		chunkBytes: m.chunkBytes,
+		totalRawLen: m.totalRawLen,
+		chunks,
+	};
 }
 
 /** How many chunks a `rawLen`-byte blob splits into. Always ≥ 1 — a 0-byte
@@ -208,6 +246,7 @@ export function sealAssetChunks(
 	plaintext: Uint8Array,
 	dek: Uint8Array,
 	assetId: string,
+	mime: string,
 	chunkBytes: number = ASSET_CHUNK_BYTES,
 ): { manifest: AssetChunkManifest; sealed: Map<string, Uint8Array> } {
 	const count = chunkCount(plaintext.length, chunkBytes);
@@ -221,7 +260,7 @@ export function sealAssetChunks(
 		sealed.set(ref.hash, enc);
 	}
 	return {
-		manifest: { v: 1, assetId, chunkBytes, totalRawLen: plaintext.length, chunks },
+		manifest: { v: 1, assetId, mime, chunkBytes, totalRawLen: plaintext.length, chunks },
 		sealed,
 	};
 }

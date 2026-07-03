@@ -33,10 +33,12 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			{ cas, installManifest: store.installManifest },
 			ENTITY,
 			ASSET,
+			"image/png",
 			plain,
 			dek,
 		);
 		expect(up.manifest.assetId).toBe(ASSET);
+		expect(up.manifest.mime).toBe("image/png");
 		expect(up.uploaded).toBe(up.manifest.chunks.length);
 		expect(store.raw.size).toBe(1);
 
@@ -48,7 +50,8 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			dek,
 		);
 		expect(back).not.toBeNull();
-		expect(Buffer.from(back as Uint8Array).equals(Buffer.from(plain))).toBe(true);
+		expect(Buffer.from(back?.bytes as Uint8Array).equals(Buffer.from(plain))).toBe(true);
+		expect(back?.mime).toBe("image/png");
 	});
 
 	it("returns null when the entity carries no manifest for the asset", async () => {
@@ -78,6 +81,7 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			{ cas, installManifest: store.installManifest },
 			ENTITY,
 			ASSET,
+			"image/png",
 			new Uint8Array(randomBytes(64)),
 			dek,
 		);
@@ -96,6 +100,7 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			{ cas, installManifest: store.installManifest },
 			ENTITY,
 			ASSET,
+			"image/png",
 			new Uint8Array(randomBytes(64)),
 			dek,
 		);
@@ -118,6 +123,7 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			{ cas, installManifest: store.installManifest },
 			ENTITY,
 			ASSET,
+			"image/png",
 			plain,
 			dek,
 		);
@@ -125,6 +131,7 @@ describe("uploadBoundAsset → materializeAsset", () => {
 			{ cas, installManifest: store.installManifest },
 			ENTITY,
 			ASSET,
+			"image/png",
 			plain,
 			dek,
 		);

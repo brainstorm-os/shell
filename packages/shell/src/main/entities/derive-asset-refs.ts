@@ -10,7 +10,7 @@
  * This module is the pure half: extract the referenced asset ids from a
  * property bag, and map an asset's `kind` to the ref `role`. No I/O, no clock —
  * the reconcile writer in `entities-service.ts` supplies the DB + local-
- * existence filter.
+ * existence filter (a ref's `asset_id` FK-references a local `assets` row).
  */
 
 import { AssetKind, AssetRefRole } from "../assets/asset-types";

@@ -166,6 +166,33 @@ export class AssetStore {
 		}
 	}
 
+	/**
+	 * Asset-B4 serve-on-miss — re-seal an already-registered asset's plaintext
+	 * back into its blob file, under its EXISTING DEK. For the metadata-present,
+	 * blob-absent case (a restored DB or an evicted blob): the `assets` +
+	 * `asset_deks` rows are intact, only `<id>.enc` is gone. Unlike `writeAsset`
+	 * this mints no id/DEK and touches no rows — it just rematerialises the file
+	 * so the next `readAsset` (which verifies the AEAD under the same DEK) round-
+	 * trips. The plaintext must match the asset's `content_hash`, or the write is
+	 * refused (a lying node can't substitute different bytes for the id).
+	 */
+	async restoreBlob(assetId: string, plaintext: Uint8Array): Promise<void> {
+		const row = this.#assets.getById(assetId);
+		if (!row) throw new Error(`AssetStore.restoreBlob: asset ${assetId} has no row`);
+		if (sha256Hex(plaintext) !== row.contentHash) {
+			throw new Error(`AssetStore.restoreBlob: asset ${assetId} content hash mismatch`);
+		}
+		const handle = this.#dekStore.open(assetId);
+		if (!handle) throw new Error(`AssetStore.restoreBlob: asset ${assetId} has no DEK row`);
+		try {
+			const blob = sealBytes(handle.dek, plaintext, blobAad(assetId));
+			await this.#fs.mkdir(this.#prefixDir(assetId), { recursive: true });
+			await this.#fs.writeFile(this.#blobPath(assetId), blob);
+		} finally {
+			this.#dekStore.close(handle.dek);
+		}
+	}
+
 	/** Stamp an asset bound (no longer reap-eligible). */
 	markBound(assetId: string): boolean {
 		return this.#assets.markBound(assetId, this.#clock());

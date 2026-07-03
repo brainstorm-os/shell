@@ -54,9 +54,14 @@ import { wireExternalLinkRouting } from "./apps/external-link-routing";
 import { validateManifest } from "./apps/manifest";
 import { appSelfManagesTabs } from "./apps/window-container";
 import type { WebContentsViewHandle } from "./apps/window-container";
+import { type AssetChunkManifest, parseAssetChunkManifest } from "./assets/asset-chunks";
 import { AssetKind } from "./assets/asset-types";
+import { materializeAssetOnServe } from "./assets/materialize-on-serve";
+import { recoverAssetDek } from "./assets/recover-asset-dek";
+import { relayAssetCas } from "./assets/relay-asset-cas";
 import { resolveAssetForServe } from "./assets/serve-asset";
 import { serveVaultMedia } from "./assets/serve-media";
+import { drainPendingUploads } from "./assets/upload-on-bind";
 import { VaultMediaDomain, isSealedMedia } from "./assets/vault-media-crypto";
 import { makeAutomationsServiceHandler } from "./automations/automations-service";
 import { RegistrySchedulerStore } from "./automations/scheduler-store";
@@ -542,15 +547,211 @@ function registerBrainstormProtocol(): void {
 			const assetId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 			const store = await session.assetStore();
 			const result = await resolveAssetForServe(store, assetId);
-			if (!result.ok) return new Response(null, { status: result.status });
+			if (!result.ok) {
+				// Asset-B4 serve-on-miss: a 404 (row present, blob file absent —
+				// restored DB / evicted blob) triggers a lazy fetch from the durable
+				// node; a 400 (bad id) or a true miss (no ref) still 404s.
+				if (result.status === 404) {
+					const fetched = await materializeAssetForServe(assetId);
+					if (fetched) {
+						const headers = new Headers();
+						headers.set("Content-Type", fetched.mime);
+						headers.set("Cache-Control", "no-store");
+						// Defense-in-depth behind `serveSafeMime`: never let the browser
+						// sniff a materialised (peer-manifest-sourced) blob into a more
+						// active type than its declared Content-Type.
+						headers.set("X-Content-Type-Options", "nosniff");
+						return new Response(Buffer.from(fetched.bytes), { status: 200, headers });
+					}
+				}
+				return new Response(null, { status: result.status });
+			}
 			const headers = new Headers();
 			headers.set("Content-Type", result.mime);
 			// Decrypted vault bytes — don't let them linger in a shared cache.
 			headers.set("Cache-Control", "no-store");
+			headers.set("X-Content-Type-Options", "nosniff");
 			return new Response(Buffer.from(result.bytes), { status: 200, headers });
 		}
 		return new Response(null, { status: 404 });
 	});
+}
+
+// Asset-B4 — call a ydoc worker READ method + return its payload. Module-level
+// so the top-level `brainstorm://` serve handler (no `workersRef` in scope) can
+// reach the worker singleton, mirroring the `installAssetDekWrap` ferry.
+async function callYdocAssetRead<T>(
+	method: "readAssetManifest" | "readAssetDekWrap",
+	entityId: string,
+	assetId: string,
+): Promise<T | null> {
+	const w = workers;
+	const session = getActiveVaultSession();
+	if (!w || !session) return null;
+	const handler = w.broker.getServiceHandler("ydoc");
+	if (!handler) return null;
+	return (await handler({
+		v: 1,
+		msg: `ydoc_ar_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+		app: "io.brainstorm.shell",
+		service: "ydoc",
+		method,
+		args: [{ vaultPath: session.vaultPath, entityId, assetId }],
+		caps: [],
+	})) as T | null;
+}
+
+// Asset-B4 — install a manifest on an entity Y.Doc (the upload-done marker),
+// mirroring `installAssetDekWrap`. Crypto-free ferry; the worker is idempotent.
+async function callYdocInstallManifest(
+	entityId: string,
+	assetId: string,
+	manifest: AssetChunkManifest,
+): Promise<void> {
+	const w = workers;
+	const session = getActiveVaultSession();
+	if (!w || !session) throw new Error("no active vault session / workers");
+	const handler = w.broker.getServiceHandler("ydoc");
+	if (!handler) throw new Error("ydoc worker service unavailable");
+	await handler({
+		v: 1,
+		msg: `ydoc_im_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+		app: "io.brainstorm.shell",
+		service: "ydoc",
+		method: "installAssetManifest",
+		args: [{ vaultPath: session.vaultPath, entityId, assetId, manifest }],
+		caps: [],
+	});
+}
+
+// Asset-B4 — recover a per-asset DEK for the active session (local master-key
+// cache, else the re-homed entity-DEK wrap read off the entity Y.Doc). Shared by
+// the serve-on-miss + upload-drain deps below.
+async function recoverAssetDekForActiveSession(
+	entityId: string,
+	assetId: string,
+): Promise<Uint8Array | null> {
+	const session = getActiveVaultSession();
+	if (!session) return null;
+	return recoverAssetDek(
+		{
+			assetDekStore: await session.assetDekStore(),
+			entityDekStore: await session.entityDekStore(),
+			readAssetDekWrap: async (e, a) =>
+				(await callYdocAssetRead<{ wrap: AssetDekWrap | null }>("readAssetDekWrap", e, a))?.wrap ??
+				null,
+		},
+		entityId,
+		assetId,
+	);
+}
+
+// Asset-B4 — coalesce concurrent serve-on-miss materializations of the SAME
+// asset. Two guarantees: (1) N parallel requests for one evicted asset (e.g. an
+// image referenced many times on a page) do ONE fetch, not N; (2) it caps the
+// untrusted-manifest reassembly allocation (`downloadAsset` sizes a buffer from
+// the peer-authored `totalRawLen`, ≤2 GiB) to one in-flight buffer per asset
+// instead of one per request, so a hostile 2 GiB-claiming manifest can't be
+// amplified by firing many parallel requests at the same id.
+const assetMaterializeInFlight = new Map<
+	string,
+	Promise<{ bytes: Uint8Array; mime: string } | null>
+>();
+
+async function materializeAssetForServe(
+	assetId: string,
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
+	const existing = assetMaterializeInFlight.get(assetId);
+	if (existing) return existing;
+	const run = materializeAssetForServeOnce(assetId).finally(() => {
+		assetMaterializeInFlight.delete(assetId);
+	});
+	assetMaterializeInFlight.set(assetId, run);
+	return run;
+}
+
+// Serve-on-miss for a single asset: materialise a not-locally-present blob from
+// the node when the plain serve missed. Fail-closed: any error (or no node plane
+// / no recoverable ref) resolves to null so the caller 404s, never a partial.
+// Only the metadata-present, blob-absent case can succeed (a ref exists only
+// when the `assets` row does — the FK); a true cold device 404s harmlessly.
+async function materializeAssetForServeOnce(
+	assetId: string,
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
+	try {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		const { getActiveRelay } = await import("./sync/active-relay");
+		const relay = getActiveRelay();
+		if (!relay || !relay.hasAssetPlane()) return null;
+		const cas = relayAssetCas(relay);
+		if (!cas) return null;
+		const db = await session.dataStores.open("entities");
+		const assetRefs = new AssetRefsRepository(db);
+		const store = await session.assetStore();
+		return await materializeAssetOnServe(
+			{
+				hasAssetPlane: () => relay.hasAssetPlane(),
+				listRefEntities: (id) => [...new Set(assetRefs.listByAsset(id).map((r) => r.entityId))],
+				recoverDek: recoverAssetDekForActiveSession,
+				readManifest: async (e, a) =>
+					(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
+				cas,
+				restoreBlob: (id, bytes) => store.restoreBlob(id, bytes),
+			},
+			assetId,
+		);
+	} catch (error) {
+		console.warn(`[brainstorm] serve-on-miss failed for ${assetId}:`, error);
+		return null;
+	}
+}
+
+let assetUploadDrainInFlight = false;
+
+// Asset-B4 upload-on-bind (connect-time drain) — push every bound-but-not-yet-
+// uploaded asset's chunks to the durable node + record its manifest. Triggered
+// on relay state changes once the blob plane is live; self-guarded (no plane →
+// no-op) and idempotent (a present manifest short-circuits). A single in-flight
+// pass at a time so rapid state flips don't stack.
+async function drainAssetUploads(): Promise<void> {
+	if (assetUploadDrainInFlight) return;
+	const session = getActiveVaultSession();
+	if (!session) return;
+	const { getActiveRelay } = await import("./sync/active-relay");
+	const relay = getActiveRelay();
+	if (!relay || !relay.hasAssetPlane()) return;
+	const cas = relayAssetCas(relay);
+	if (!cas) return;
+	assetUploadDrainInFlight = true;
+	try {
+		const db = await session.dataStores.open("entities");
+		const pairs = new AssetRefsRepository(db).listAllPairs();
+		if (pairs.length === 0) return;
+		const store = await session.assetStore();
+		const r = await drainPendingUploads(
+			{
+				cas,
+				installManifest: callYdocInstallManifest,
+				manifestPresent: async (e, a) =>
+					parseAssetChunkManifest(
+						(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
+					) !== null,
+				readAsset: (a) => store.readAsset(a),
+				recoverDek: recoverAssetDekForActiveSession,
+			},
+			pairs,
+		);
+		if (r.uploaded > 0 || r.failed > 0) {
+			console.log(
+				`[brainstorm] asset upload drain: uploaded ${r.uploaded} (${r.alreadyPresent} present, ${r.notLocal} not-local, ${r.noDek} no-dek, ${r.failed} failed)`,
+			);
+		}
+	} catch (error) {
+		console.warn(`[brainstorm] asset upload drain failed: ${(error as Error).message}`);
+	} finally {
+		assetUploadDrainInFlight = false;
+	}
 }
 
 async function resolveAppIconPath(appId: string): Promise<string | null> {
@@ -1300,7 +1501,7 @@ void app.whenReady().then(async () => {
 				}
 			},
 		});
-		installActiveRelay(
+		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
 				makeRelayPort: (url) => {
 					const port = new WebSocketRelayPort({ url, onChallenge });
@@ -1309,6 +1510,12 @@ void app.whenReady().then(async () => {
 				},
 			}),
 		);
+		// Asset-B4 — drain pending asset uploads whenever the transport reaches a
+		// blob-plane-capable state (durable node connected). Self-guarded + single
+		// in-flight, so firing on every state change is safe.
+		installedRelay.on("state", () => {
+			void drainAssetUploads();
+		});
 		const bootSession = getActiveVaultSession();
 		if (bootSession) {
 			const { getActiveRelay } = await import("./sync/active-relay");

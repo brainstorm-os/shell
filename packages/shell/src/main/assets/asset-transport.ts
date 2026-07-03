@@ -43,6 +43,7 @@ export async function uploadAsset(
 	plaintext: Uint8Array,
 	dek: Uint8Array,
 	assetId: string,
+	mime: string,
 	cas: AssetCas,
 	chunkBytes: number = ASSET_CHUNK_BYTES,
 ): Promise<UploadAssetResult> {
@@ -63,7 +64,7 @@ export async function uploadAsset(
 		}
 	}
 	return {
-		manifest: { v: 1, assetId, chunkBytes, totalRawLen: plaintext.length, chunks },
+		manifest: { v: 1, assetId, mime, chunkBytes, totalRawLen: plaintext.length, chunks },
 		uploaded,
 		skipped,
 	};

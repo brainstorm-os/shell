@@ -194,6 +194,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		try {
 			// desired = referenced ids that resolve to a locally-stored asset
 			// (a dangling / remote / not-yet-fetched id is skipped, never bound).
+			// This is REQUIRED, not just conservative: `asset_refs.asset_id` has a
+			// FK to `assets(asset_id)`, so a ref for an asset with no local row
+			// can't be inserted. A true cold device (never had the blob's row)
+			// therefore can't bind until the asset's metadata is reconstructed —
+			// the forward cold-first-fetch rung (needs a stub `assets` row from the
+			// synced manifest). Serve-on-miss here targets the metadata-present,
+			// blob-absent case (restore / selective-sync eviction), where the row
+			// + ref + DEK are local and only the encrypted blob file is missing.
 			const desired = new Map<string, ReturnType<typeof assetRefRoleForKind>>();
 			for (const assetId of extractAssetIds(properties)) {
 				const kind = await options.getAssetKind(assetId);

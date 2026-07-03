@@ -110,6 +110,18 @@ export class AssetRefsRepository {
 		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
 	}
 
+	/** Asset-B4 — every distinct (entity, asset) binding, for the connect-time
+	 *  upload drain (push bound-while-offline assets to the node). The manifest
+	 *  on the entity Y.Doc is the per-pair "already uploaded" marker, so this is
+	 *  deliberately unfiltered; the drain short-circuits present manifests.
+	 *  Ordered for determinism. */
+	listAllPairs(): AssetRefPair[] {
+		const rows = this.stmt(
+			"SELECT DISTINCT entity_id, asset_id FROM asset_refs ORDER BY entity_id, asset_id",
+		).all() as Array<{ entity_id: string; asset_id: string }>;
+		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
+	}
+
 	/** Asset-B1 — stamp every role-row of a (entity, asset) pair re-homed.
 	 *  Returns the number of rows stamped. */
 	markRehomed(entityId: string, assetId: string, now: number): number {

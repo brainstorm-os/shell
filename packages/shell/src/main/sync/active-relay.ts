@@ -215,6 +215,21 @@ export class ActiveRelayOrchestrator {
 		return typeof port.requestCatalog === "function";
 	}
 
+	/**
+	 * Asset-B4 — whether the CURRENT transport can carry the blob plane (a
+	 * durable-node WebSocket port, not a loopback). `requestAsset` is always
+	 * present on the orchestrator (it rejects when unsupported), so upload-on-
+	 * bind / serve-on-miss must probe the underlying port through this before
+	 * attempting a transfer, rather than calling + catching. Mirrors
+	 * `hasDurableNode` (the asset plane rides the same WebSocket port).
+	 */
+	hasAssetPlane(): boolean {
+		const port = this.#current.port as RelayPort & {
+			requestAsset?: (frame: Uint8Array) => Promise<Uint8Array>;
+		};
+		return typeof port.requestAsset === "function";
+	}
+
 	on(event: "state", listener: (state: ActiveRelayState) => void): this {
 		this.#emitter.on(STATE_EVENT, listener);
 		return this;
