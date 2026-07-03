@@ -22,6 +22,11 @@ import type { IntentsBus } from "../intents/intents-bus";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { getActiveVaultSession } from "../vault/session";
+import {
+	filterWidgetSnapshot,
+	parseWidgetListQuery,
+	resolveWidgetListAccess,
+} from "./widget-list-query";
 
 /** The `open` intent is the only verb a widget may dispatch. */
 const WIDGET_INTENT_VERB = "open";
@@ -56,20 +61,30 @@ export function registerWidgetBridgeHandlers(deps: WidgetBridgeDeps): void {
 	);
 
 	// Proxy `vaultEntities.list()`, capability-scoped to the widget's app.
-	ipcMain.handle("widget-bridge:list-entities", async (_event, appId: unknown): Promise<unknown> => {
-		if (typeof appId !== "string") return null;
-		const session = getActiveVaultSession();
-		if (!session) return null;
-		const ledger = await session.capabilityLedger();
-		if (!ledger.has(appId, ENTITIES_READ)) {
-			console.warn(`[widget-bridge] ${appId} denied: lacks ${ENTITIES_READ}`);
-			return { error: "capability-denied" };
-		}
-		return listVaultEntities(
-			session.vaultPath,
-			async () => new EntitiesRepository(await session.dataStores.open("entities")),
-		);
-	});
+	// The optional query narrows the payload (F-384). A wildcard-read app may
+	// list everything (the query is a pure narrowing); a scoped-read app is
+	// admitted ONLY through a typed query covering its granted types — there
+	// the filter is enforcement (see resolveWidgetListAccess).
+	ipcMain.handle(
+		"widget-bridge:list-entities",
+		async (_event, appId: unknown, rawQuery?: unknown): Promise<unknown> => {
+			if (typeof appId !== "string") return null;
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			const ledger = await session.capabilityLedger();
+			const query = parseWidgetListQuery(rawQuery);
+			const access = resolveWidgetListAccess((cap) => ledger.has(appId, cap), query);
+			if (!access.allowed) {
+				console.warn(`[widget-bridge] ${appId} denied: lacks ${ENTITIES_READ} or typed grants`);
+				return { error: "capability-denied" };
+			}
+			const snapshot = await listVaultEntities(
+				session.vaultPath,
+				async () => new EntitiesRepository(await session.dataStores.open("entities")),
+			);
+			return access.enforced ? filterWidgetSnapshot(snapshot, access.enforced) : snapshot;
+		},
+	);
 
 	// Proxy an `open` intent, scoped + capability-checked to the widget's app.
 	ipcMain.handle(

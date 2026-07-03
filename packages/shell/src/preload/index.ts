@@ -950,6 +950,11 @@ const apps = {
 	 *  actions, for the Settings → Apps & contributions toggle. */
 	listContributingApps: (): Promise<string[]> => ipcRenderer.invoke("apps:list-contributing"),
 	onRunningChanged: onAppsRunningChanged,
+	/** Fires when the installed app set / registrations change (install, update,
+	 *  uninstall, dev registration refresh) — the dashboard re-reads its
+	 *  app-derived caches (widget titles + entries, icon cache) on this edge
+	 *  instead of racing the installer once at mount (F-380). */
+	onChanged: (listener: () => void): (() => void) => subscribe<void>("apps:changed", listener),
 	iconUrl: (appId: string, version?: string): string => {
 		const base = `brainstorm://app-icon/${encodeURIComponent(appId)}`;
 		return version ? `${base}?v=${encodeURIComponent(version)}` : base;
@@ -1182,9 +1187,11 @@ const dashboard = {
 		 *  appends the `?bs-widget=…` launch query). */
 		resolveEntry: (appId: string, widgetId: string): Promise<string | null> =>
 			ipcRenderer.invoke("widget-bridge:resolve-entry", appId, widgetId),
-		/** Proxy `vaultEntities.list()` for the widget's app (capability-checked). */
-		listEntities: (appId: string): Promise<unknown> =>
-			ipcRenderer.invoke("widget-bridge:list-entities", appId),
+		/** Proxy `vaultEntities.list()` for the widget's app (capability-checked).
+		 *  `query` optionally narrows the payload server-side — `{types, limit}`,
+		 *  see WidgetListQuery (F-384). */
+		listEntities: (appId: string, query?: unknown): Promise<unknown> =>
+			ipcRenderer.invoke("widget-bridge:list-entities", appId, query),
 		/** Proxy an `open` intent for the widget's app (capability-checked). */
 		openIntent: (appId: string, payload: unknown): Promise<{ handled: boolean }> =>
 			ipcRenderer.invoke("widget-bridge:open-intent", appId, payload),

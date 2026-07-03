@@ -366,8 +366,15 @@ export type SourceQueryResult =
 	| { ok: true; ids: string[] }
 	| { ok: false; error: SourceQueryError };
 
+/** Optional narrowing for `VaultEntitiesService.list()` — honoured by the
+ *  widget iframe bridge (F-384): `types` filters server-side; `limit` implies
+ *  live-only + newest-updatedAt-first. Full-runtime (app window) services may
+ *  ignore it and return the full snapshot — callers must treat it as an
+ *  optimisation, not a contract on the result set. */
+export type VaultEntitiesListQuery = { types?: readonly string[]; limit?: number };
+
 export type VaultEntitiesService = {
-	list(): Promise<VaultEntitiesSnapshot>;
+	list(query?: VaultEntitiesListQuery): Promise<VaultEntitiesSnapshot>;
 	/** Resolve a Graph pattern against the real `entities.db` store
 	 *  shell-side (single compiled SQL JOIN + cost-cap guard) and return
 	 *  the matched subgraph in the same `{entities, links}` shape `list()`

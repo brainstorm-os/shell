@@ -43,6 +43,14 @@ import "./widgets-layer.css";
 /** Height of the card's chrome header strip. */
 export const WIDGET_HEADER_PX = 30;
 
+/** Arrow-key → grid-cell delta for the focusable grips (F-383). */
+const ARROW_DELTAS: Record<string, readonly [number, number]> = {
+	ArrowLeft: [-1, 0],
+	ArrowRight: [1, 0],
+	ArrowUp: [0, -1],
+	ArrowDown: [0, 1],
+};
+
 /** Below this much pointer movement a header press is a click, not a drag. */
 const CLICK_MOVEMENT_THRESHOLD_PX = 5;
 
@@ -155,7 +163,9 @@ function useWidgetBridge(): {
 					let error: string | undefined;
 					try {
 						if (msg.service === "vaultEntities" && msg.method === "list") {
-							value = asSnapshot(await bridge.listEntities(reg.appId));
+							// args[0] is the widget's optional {types, limit} query —
+							// validated main-side (F-384).
+							value = asSnapshot(await bridge.listEntities(reg.appId, msg.args?.[0]));
 						} else if (msg.service === "intents" && msg.method === "dispatch") {
 							const intent = msg.args?.[0] as { payload?: unknown } | undefined;
 							value = await bridge.openIntent(reg.appId, intent?.payload ?? {});
@@ -316,15 +326,30 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		});
 	}, [migrated]);
 
-	// Resolve placement titles from the app-registered widget catalog.
+	// Resolve placement titles from the app-registered widget catalog — and
+	// re-resolve on `apps:changed`: the one-shot read races an app (re)install
+	// (the registry row is briefly gone mid-reinstall) and a missed title
+	// otherwise sticks as the raw kind slug until restart (F-380). The same
+	// edge bumps `appsEpoch` so every card re-resolves its iframe entry (a
+	// reinstall changes the bundle sha → fresh URL → the iframe reloads the
+	// new bundle; a placeholder card gets its first real entry).
+	const [appsEpoch, setAppsEpoch] = useState(0);
 	useEffect(() => {
 		let cancelled = false;
-		void window.brainstorm.dashboard.registeredWidgets().then((registered) => {
-			if (cancelled) return;
-			setTitles(new Map(registered.map((w) => [widgetKey(w.appId, w.widgetId), w.name])));
+		const refetch = () => {
+			void window.brainstorm.dashboard.registeredWidgets().then((registered) => {
+				if (cancelled) return;
+				setTitles(new Map(registered.map((w) => [widgetKey(w.appId, w.widgetId), w.name])));
+			});
+		};
+		refetch();
+		const off = window.brainstorm.apps.onChanged?.(() => {
+			refetch();
+			setAppsEpoch((n) => n + 1);
 		});
 		return () => {
 			cancelled = true;
+			off?.();
 		};
 	}, []);
 
@@ -467,23 +492,80 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		void window.brainstorm.apps.launch(appId);
 	}, []);
 
-	const openWidgetMenu = useCallback((anchor: HTMLElement, id: string) => {
-		// Sizing is the corner drag-resize grip's job; the menu only carries the
-		// catch-all actions (just Remove today).
-		const items: ContextMenuItem[] = [
-			{
-				id: "remove",
-				label: t("shell.widgets.menu.remove"),
-				icon: sdkMenuIcon(MenuIcon.Trash),
-				destructive: true,
-				onSelect: () => void window.brainstorm.dashboard.removeWidget(id),
-			},
-		];
-		openAnchoredMenu(anchor.getBoundingClientRect(), items, {
-			menuLabel: t("shell.widgets.menu.label"),
-			anchor,
-		});
-	}, []);
+	// Keyboard move/resize (F-383): the grips are focusable and nudge the
+	// record on the same 8px grid the pointer gestures snap to. Each nudge
+	// persists immediately — the doc echo is the source of truth, `pending`
+	// keeps the card optimistic exactly like a pointer drop.
+	const nudgeMove = useCallback(
+		(id: string, dx: number, dy: number) => {
+			const record = effectiveWidgets[id];
+			if (!record) return;
+			const x = Math.max(0, record.x + dx);
+			const y = Math.max(0, record.y + dy);
+			setPending({ id, x, y });
+			void window.brainstorm.dashboard.upsertWidget(id, { ...record, x, y });
+		},
+		[effectiveWidgets],
+	);
+
+	const nudgeResize = useCallback(
+		(id: string, dw: number, dh: number) => {
+			const record = effectiveWidgets[id];
+			if (!record) return;
+			const size = clampWidgetSize({ w: record.w + dw, h: record.h + dh });
+			setPending({ id, w: size.w, h: size.h });
+			void window.brainstorm.dashboard.upsertWidget(id, { ...record, w: size.w, h: size.h });
+		},
+		[effectiveWidgets],
+	);
+
+	const openWidgetMenu = useCallback(
+		(anchor: HTMLElement, id: string) => {
+			const record = effectiveWidgets[id];
+			if (!record) return;
+			const sizeItem = (size: WidgetSize, label: string): ContextMenuItem => {
+				const fp = widgetFootprint(size);
+				const current = record.w === fp.w && record.h === fp.h;
+				return {
+					id: `size-${size}`,
+					label,
+					selected: current,
+					...(current ? { icon: sdkMenuIcon(MenuIcon.Check) } : {}),
+					onSelect: () => {
+						setPending({ id, w: fp.w, h: fp.h });
+						void window.brainstorm.dashboard.upsertWidget(id, { ...record, w: fp.w, h: fp.h });
+					},
+				};
+			};
+			const items: ContextMenuItem[] = [
+				{ id: "size", label: t("shell.widgets.menu.size"), section: true },
+				sizeItem(WidgetSize.Small, t("shell.widgets.menu.size.small")),
+				sizeItem(WidgetSize.Medium, t("shell.widgets.menu.size.medium")),
+				sizeItem(WidgetSize.Large, t("shell.widgets.menu.size.large")),
+				{ id: "sep", label: "", divider: true },
+				{
+					id: "open-app",
+					label: t("shell.widgets.menu.openApp"),
+					icon: sdkMenuIcon(MenuIcon.OpenExternal),
+					onSelect: () => openApp(record.appId),
+				},
+				// Remove stays LAST — the ⋯ is the catch-all and its trailing edge is
+				// the destructive slot, mirroring every app's object menu.
+				{
+					id: "remove",
+					label: t("shell.widgets.menu.remove"),
+					icon: sdkMenuIcon(MenuIcon.Trash),
+					destructive: true,
+					onSelect: () => void window.brainstorm.dashboard.removeWidget(id),
+				},
+			];
+			openAnchoredMenu(anchor.getBoundingClientRect(), items, {
+				menuLabel: t("shell.widgets.menu.label"),
+				anchor,
+			});
+		},
+		[effectiveWidgets, openApp],
+	);
 
 	const entries = useMemo(() => Object.entries(effectiveWidgets), [effectiveWidgets]);
 
@@ -504,6 +586,7 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 						appId={w.appId}
 						widgetKind={w.kind}
 						title={title}
+						appsEpoch={appsEpoch}
 						left={card.x}
 						top={card.y}
 						width={card.width}
@@ -522,6 +605,8 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 						onOpenApp={openApp}
 						onToggleCollapsed={toggleCollapsed}
 						onOpenMenu={openWidgetMenu}
+						onNudgeMove={nudgeMove}
+						onNudgeResize={nudgeResize}
 						onResizePointerDown={onResizePointerDown}
 						onResizePointerMove={onResizePointerMove}
 						onResizePointerUp={onResizePointerUp}
@@ -538,6 +623,8 @@ type WidgetCardProps = {
 	appId: string;
 	widgetKind: string;
 	title: string;
+	/** Bumps on `apps:changed` — re-resolves the iframe entry (F-380). */
+	appsEpoch: number;
 	left: number;
 	top: number;
 	width: number;
@@ -553,6 +640,8 @@ type WidgetCardProps = {
 	onOpenApp: (appId: string) => void;
 	onToggleCollapsed: (id: string) => void;
 	onOpenMenu: (anchor: HTMLElement, id: string) => void;
+	onNudgeMove: (id: string, dx: number, dy: number) => void;
+	onNudgeResize: (id: string, dw: number, dh: number) => void;
 	onResizePointerDown: (e: React.PointerEvent<HTMLDivElement>, id: string) => void;
 	onResizePointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
 	onResizePointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -562,12 +651,17 @@ type WidgetCardProps = {
 // Memoised so a per-frame gesture re-render of the layer only re-renders the
 // card actually being dragged/resized — the others (and their iframes) are stable.
 const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
-	const { id, appId, widgetKind, title, collapsed, register } = props;
+	const { id, appId, widgetKind, title, appsEpoch, collapsed, register } = props;
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
 	const [src, setSrc] = useState<string | null>(null);
 
 	// Resolve the app bundle's cache-busted entry URL + append the widget launch
-	// query the iframe shim reads (`bs-widget` / id).
+	// query the iframe shim reads (`bs-widget` / id). Re-runs on `appsEpoch`
+	// (an app (re)install): a transient null during the installer window must
+	// not leave a permanent placeholder, and a changed bundle sha must reload
+	// the iframe with the new bundle (F-380). A null re-resolve keeps the last
+	// good src — a briefly-uninstalled app's widget freezes rather than blanks.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: appsEpoch is an intentional re-run key (apps:changed edge), not a body dep.
 	useEffect(() => {
 		const bridge = window.brainstorm.dashboard.widgetBridge;
 		if (!bridge) return; // stale preload — see useWidgetBridge
@@ -580,7 +674,7 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, [appId, widgetKind]);
+	}, [appId, widgetKind, appsEpoch]);
 
 	// Register the iframe's contentWindow with the parent bridge on load (so its
 	// postMessages map to this appId), and tear that down on unmount / reload.
@@ -620,8 +714,23 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 			data-testid={`dashboard-widget-${id}`}
 		>
 			<div className="dashboard-widgets__header">
+				{/* Focusable move handle (F-383): drag with the pointer, or focus and
+				    nudge with arrow keys (Shift = 4 cells). Keyboard-exempt: grip-local
+				    arrow handling on a focused element (the app-grid combobox-bridge
+				    pattern), not a global chord. */}
 				<div
 					className="dashboard-widgets__grip"
+					role="button"
+					tabIndex={0}
+					aria-label={t("shell.widgets.move", { name: title })}
+					data-bs-tooltip={t("shell.widgets.move", { name: title })}
+					onKeyDown={(e) => {
+						const delta = ARROW_DELTAS[e.key];
+						if (!delta) return;
+						e.preventDefault();
+						const step = e.shiftKey ? 4 : 1;
+						props.onNudgeMove(id, delta[0] * step, delta[1] * step);
+					}}
 					onPointerDown={(e) => props.onHeaderPointerDown(e, id)}
 					onPointerMove={props.onHeaderPointerMove}
 					onPointerUp={props.onHeaderPointerUp}
@@ -695,11 +804,22 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 							<Icon name={IconName.App} size={28} />
 						</div>
 					)}
-					{/* Resize grip — a DOM child layered over the iframe at the corner. */}
+					{/* Resize grip — a DOM child layered over the iframe at the corner.
+					    Focusable (F-383): arrow keys grow/shrink one cell (Shift = 4);
+					    keyboard-exempt, grip-local handling like the move grip. */}
 					<div
 						className="dashboard-widgets__resize"
-						aria-hidden="true"
+						role="button"
+						tabIndex={0}
+						aria-label={t("shell.widgets.resize")}
 						data-bs-tooltip={t("shell.widgets.resize")}
+						onKeyDown={(e) => {
+							const delta = ARROW_DELTAS[e.key];
+							if (!delta) return;
+							e.preventDefault();
+							const step = e.shiftKey ? 4 : 1;
+							props.onNudgeResize(id, delta[0] * step, delta[1] * step);
+						}}
 						onPointerDown={(e) => props.onResizePointerDown(e, id)}
 						onPointerMove={props.onResizePointerMove}
 						onPointerUp={props.onResizePointerUp}

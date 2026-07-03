@@ -178,12 +178,21 @@ function DashboardIconsLayerInner({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: iconTargetsKey is a refresh-trigger string derived from the current icons; the effect intentionally re-runs when the visible icon set changes.
 	useEffect(() => {
 		let cancelled = false;
-		void window.brainstorm.apps.listInstalled().then((list) => {
-			if (cancelled) return;
-			if (setAppIcons(list)) bumpIconCache((n) => n + 1);
-		});
+		const refetch = () => {
+			void window.brainstorm.apps.listInstalled().then((list) => {
+				if (cancelled) return;
+				if (setAppIcons(list)) bumpIconCache((n) => n + 1);
+			});
+		};
+		refetch();
+		// An app (re)install mid-session must refresh the cache too — a
+		// `listInstalled` that lands during the installer's uninstall→install
+		// window persists `hasIcon:false` and every icon paints initials until
+		// the next boot (F-380).
+		const off = window.brainstorm.apps.onChanged?.(refetch);
 		return () => {
 			cancelled = true;
+			off?.();
 		};
 	}, [iconTargetsKey]);
 

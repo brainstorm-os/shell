@@ -173,7 +173,9 @@ export function installWidgetIframeBridge(): WidgetLaunch | null {
 	});
 
 	const vaultEntities = {
-		list: () => rpc("vaultEntities", "list", []),
+		/** `query` ({types, limit}) narrows the payload server-side — without it
+		 *  the bridge ships the app's entire readable entity list (F-384). */
+		list: (query?: unknown) => rpc("vaultEntities", "list", query === undefined ? [] : [query]),
 		queryPattern: (pattern: unknown) => rpc("vaultEntities", "queryPattern", [pattern]),
 		querySource: (source: unknown) => rpc("vaultEntities", "querySource", [source]),
 		onChange: (listener: () => void) => {
