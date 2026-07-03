@@ -22,6 +22,7 @@
  * `finally`.
  */
 
+import { UploadQuotaDecision } from "../../shared/quota-types";
 import type { AssetCas } from "./asset-cas";
 import { type InstallManifest, uploadBoundAsset } from "./asset-sync";
 import type { AssetKind } from "./asset-types";
@@ -37,6 +38,10 @@ export enum UploadBoundOutcome {
 	NotLocal = "not-local",
 	/** The per-asset DEK couldn't be recovered for this entity. */
 	NoDek = "no-dek",
+	/** 14.7 — the product-side storage quota gate skipped the push. The local
+	 *  write/bind already succeeded; the bytes just don't leave the device
+	 *  (the next drain retries once the account is back under quota). */
+	QuotaExceeded = "quota-exceeded",
 }
 
 export type UploadOnBindDeps = {
@@ -55,6 +60,11 @@ export type UploadOnBindDeps = {
 	/** Recover the per-asset DEK the chunks are sealed under (a FRESH buffer this
 	 *  module zeroes), or null. */
 	recoverDek: (entityId: string, assetId: string) => Promise<Uint8Array | null>;
+	/** 14.7 — gate the push of `bytes` more against the hosted storage quota.
+	 *  Absent ⇒ enforcement inert (uploads always allowed) — the no-account /
+	 *  free-local default. Only ever consulted for UPLOADS; reads are never
+	 *  quota-gated. */
+	uploadQuota?: (bytes: number) => Promise<UploadQuotaDecision>;
 };
 
 /**
@@ -69,6 +79,11 @@ export async function uploadBoundAssetIfPending(
 	if (await deps.manifestPresent(entityId, assetId)) return UploadBoundOutcome.AlreadyPresent;
 	const asset = await deps.readAsset(assetId);
 	if (!asset) return UploadBoundOutcome.NotLocal;
+	// Quota gate BEFORE any crypto work: a skipped push never recovers a DEK.
+	if (deps.uploadQuota) {
+		const decision = await deps.uploadQuota(asset.bytes.length);
+		if (decision !== UploadQuotaDecision.Allowed) return UploadBoundOutcome.QuotaExceeded;
+	}
 	const dek = await deps.recoverDek(entityId, assetId);
 	if (!dek) return UploadBoundOutcome.NoDek;
 	try {
@@ -92,6 +107,8 @@ export type DrainPendingUploadsResult = {
 	alreadyPresent: number;
 	notLocal: number;
 	noDek: number;
+	/** 14.7 — pushes skipped by the storage quota gate (local data intact). */
+	quotaExceeded: number;
 	/** Pairs that threw (per-pair error logged, drain continued). */
 	failed: number;
 };
@@ -111,6 +128,7 @@ export async function drainPendingUploads(
 		alreadyPresent: 0,
 		notLocal: 0,
 		noDek: 0,
+		quotaExceeded: 0,
 		failed: 0,
 	};
 	for (const { entityId, assetId } of pairs) {
@@ -128,6 +146,9 @@ export async function drainPendingUploads(
 					break;
 				case UploadBoundOutcome.NoDek:
 					result.noDek += 1;
+					break;
+				case UploadBoundOutcome.QuotaExceeded:
+					result.quotaExceeded += 1;
 					break;
 			}
 		} catch (error) {

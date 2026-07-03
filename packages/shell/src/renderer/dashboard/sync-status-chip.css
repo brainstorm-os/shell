@@ -121,3 +121,10 @@
 	margin: 0 0 var(--space-2);
 	line-height: 1.45;
 }
+
+.sync-status-popover__warning {
+	color: var(--color-state-warning);
+	font-size: var(--text-size-xs);
+	margin: 0 0 var(--space-2);
+	line-height: 1.45;
+}

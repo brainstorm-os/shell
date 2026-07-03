@@ -30,6 +30,7 @@ import {
 	asBillingCheckoutPlan,
 	billingFail,
 } from "../../shared/billing-settings-types";
+import type { QuotaStateView } from "../../shared/quota-types";
 import type { AccountRepository } from "./account-repo";
 import type { BillingEdgeClient } from "./billing-edge-client";
 import type { EntitlementRepository } from "./entitlement-repo";
@@ -53,6 +54,9 @@ export type BillingAccountDeps = {
 	readonly getEntitlement: () => Promise<Entitlement | null>;
 	/** Bound upload bytes in the vault's asset store; null = unknown. */
 	readonly getStorageBytes: () => Promise<number | null>;
+	/** 14.7 — the aggregate quota state (`QuotaService.state()`); null when
+	 *  no vault session is open. */
+	readonly getQuotaState: () => Promise<QuotaStateView | null>;
 	readonly now?: () => number;
 };
 
@@ -71,12 +75,14 @@ export class BillingAccountService {
 		const linked = safe(() => repos.accounts.getLinked(), null);
 		const entitlement = (await this.getEntitlementSafe()) ?? freeEntitlement(linked?.id ?? null);
 		const storageBytesUsed = await this.getStorageBytesSafe();
+		const quota = await safeAsync(() => this.deps.getQuotaState(), null);
 		return {
 			account: linked
 				? { id: linked.id, email: linked.email, plan: linked.plan, linkedAt: linked.linkedAt }
 				: null,
 			entitlement,
 			storageBytesUsed,
+			quota,
 			portalUrl: this.deps.portalUrl,
 		};
 	}

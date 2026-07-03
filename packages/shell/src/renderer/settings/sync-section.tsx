@@ -114,6 +114,15 @@ export function SyncSection() {
 						<span className="sync-section__label">{t("shell.settings.sync.field.droppedInbound")}</span>
 						<span className="sync-section__value">{snapshot.droppedInbound}</span>
 					</div>
+					{snapshot.attachmentSyncPausedReason != null && (
+						<p
+							className="sync-section__quota-warning"
+							role="alert"
+							data-testid="sync-section-quota-paused"
+						>
+							{t("shell.dashboard.syncStatus.attachmentsPaused.storageQuota")}
+						</p>
+					)}
 				</div>
 			)}
 

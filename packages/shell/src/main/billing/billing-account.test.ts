@@ -7,6 +7,7 @@ import {
 	BillingCheckoutPlan,
 	BillingSettingsFailure,
 } from "../../shared/billing-settings-types";
+import { QuotaResource, type QuotaStateView, inertQuotaVerdict } from "../../shared/quota-types";
 import { DataStores } from "../storage/data-stores";
 import { AccountRepository } from "./account-repo";
 import { type BillingAccountDeps, BillingAccountService } from "./billing-account";
@@ -20,6 +21,12 @@ const SUMMARY_BODY = {
 	features: ["sync.hosted"],
 	email: "razor@example.com",
 	billingStatus: "active",
+};
+
+const QUOTA_STATE: QuotaStateView = {
+	enforced: false,
+	storage: inertQuotaVerdict(QuotaResource.AttachmentStorage),
+	egress: inertQuotaVerdict(QuotaResource.SyncEgress),
 };
 
 type Env = {
@@ -65,6 +72,7 @@ async function setup(
 		getRepos: async () => ({ accounts, entitlements }),
 		getEntitlement: async () => freeEntitlement(accounts.getLinked()?.id ?? null),
 		getStorageBytes: async () => 4096,
+		getQuotaState: async () => QUOTA_STATE,
 		now: () => 1_000_000,
 		...overrides,
 	});
@@ -89,6 +97,7 @@ describe("BillingAccountService", () => {
 				account: null,
 				entitlement: freeEntitlement(),
 				storageBytesUsed: 4096,
+				quota: QUOTA_STATE,
 				portalUrl: "https://account.example.test",
 			});
 			expect(env.requests).toEqual([]);
@@ -123,6 +132,20 @@ describe("BillingAccountService", () => {
 			});
 			try {
 				expect((await broken.service.overview())?.storageBytesUsed).toBe(null);
+			} finally {
+				broken.stores.close();
+				await rm(broken.vaultDir, { recursive: true, force: true });
+			}
+		});
+
+		it("degrades quota to null when the quota read throws (fail-soft, 14.7)", async () => {
+			const broken = await setup(undefined, {
+				getQuotaState: async () => {
+					throw new Error("quota unavailable");
+				},
+			});
+			try {
+				expect((await broken.service.overview())?.quota).toBe(null);
 			} finally {
 				broken.stores.close();
 				await rm(broken.vaultDir, { recursive: true, force: true });

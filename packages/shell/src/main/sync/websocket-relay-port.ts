@@ -191,6 +191,7 @@ export class WebSocketRelayPort implements RelayPort {
 	#sendQueue: Uint8Array[] = [];
 	#droppedSends = 0;
 	#droppedInbound = 0;
+	#gatedAdmission = false;
 	#attempt = 0;
 	#reconnectHandle: unknown = null;
 	#openedAtMs: number | null = null;
@@ -226,6 +227,14 @@ export class WebSocketRelayPort implements RelayPort {
 
 	droppedInbound(): number {
 		return this.#droppedInbound;
+	}
+
+	/** 14.7 — whether the LIVE connection completed the SYNC-4b gated-admission
+	 *  handshake (`auth-ok` received), i.e. this is a hosted/metered node. False
+	 *  on an open node (never challenges), while connecting, and after a drop —
+	 *  each fresh socket re-authenticates. */
+	gatedAdmission(): boolean {
+		return this.#state === WebSocketRelayState.Open && this.#gatedAdmission;
 	}
 
 	on(event: "state", listener: (state: WebSocketRelayState) => void): this {
@@ -550,6 +559,8 @@ export class WebSocketRelayPort implements RelayPort {
 	#onSocketOpen(): void {
 		if (this.#disposed) return;
 		this.#openedAtMs = this.#now();
+		// A fresh socket is unauthenticated until the node's `auth-ok` lands.
+		this.#gatedAdmission = false;
 		this.#transition(WebSocketRelayState.Open);
 		// Re-emit every active subscription so the relay's routing table
 		// re-builds after a reconnect. `bundle:true` lets a durable node serve
@@ -714,6 +725,7 @@ export class WebSocketRelayPort implements RelayPort {
 	 *  gated node dropped anything sent before the handshake completed. */
 	#onAuthenticated(): void {
 		if (this.#disposed) return;
+		this.#gatedAdmission = true;
 		if (this.#subscriptions.size > 0) {
 			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions], bundle: true });
 		}

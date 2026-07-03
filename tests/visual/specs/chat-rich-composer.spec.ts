@@ -101,9 +101,7 @@ test("chat composer — horizontal toolbar, lists, check items, rich send round-
 		await editable.pressSequentially("[ ] buy milk", { delay: 10 });
 		await expect(chat.locator(".chat__composer .bs-editor__list-item--unchecked")).toBeVisible();
 		await chat.keyboard.press("Enter");
-		await expect(
-			chat.locator(".chat__line--rich .bs-editor__list-item--unchecked"),
-		).toBeVisible();
+		await expect(chat.locator(".chat__line--rich .bs-editor__list-item--unchecked")).toBeVisible();
 
 		// ── 4. Markdown `1. ` → numbered list in the draft ────────────────
 		await editable.pressSequentially("1. first step", { delay: 10 });

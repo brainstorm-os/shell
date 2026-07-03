@@ -13,6 +13,7 @@
  */
 
 import type { Entitlement, PlanTier } from "./billing-types";
+import type { QuotaStateView } from "./quota-types";
 
 /** Control-plane billing lifecycle state, orthogonal to the plan tier.
  *  Values are the cross-plane wire strings (api-client §BillingStatus). */
@@ -94,6 +95,10 @@ export type BillingOverviewView = {
 	/** Bound upload bytes in the vault's encrypted asset store, or null when
 	 *  the inventory couldn't be read. */
 	readonly storageBytesUsed: number | null;
+	/** 14.7 — per-resource quota verdicts (used vs ceiling + over flag), or
+	 *  null when the quota state couldn't be read. Inert (no ceilings) when
+	 *  no account is linked. */
+	readonly quota: QuotaStateView | null;
 	/** The account-portal base URL the Manage/upgrade buttons open. */
 	readonly portalUrl: string;
 };

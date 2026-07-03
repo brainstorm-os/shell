@@ -28,6 +28,7 @@
  */
 
 import { statSync } from "node:fs";
+import type { AttachmentSyncPauseReason } from "../../shared/quota-types";
 import { ActiveRelayKind, type ActiveRelayOrchestrator } from "./active-relay";
 import { seqTrackerPath } from "./seq-tracker";
 import { type WebSocketRelayPort, WebSocketRelayState } from "./websocket-relay-port";
@@ -51,6 +52,8 @@ export type SyncStatusSnapshot = {
 	droppedInbound: number;
 	seqStateBytes: number;
 	pairKeyCount: number;
+	/** 14.7 — why attachment uploads are paused (storage quota), or null. */
+	attachmentSyncPausedReason: AttachmentSyncPauseReason | null;
 };
 
 export const RECENT_TRAFFIC_MS = 5_000;
@@ -77,6 +80,10 @@ export type SyncStatusStoreOptions = {
 	 *  pair-key count by parsing the persisted seq.json. Never exposes
 	 *  the raw keys (privacy). */
 	readSeqPairCount?: (path: string) => number;
+	/** 14.7 — the quota gate's pause signal (`QuotaService`), riding every
+	 *  snapshot so the dashboard can show "attachment sync paused: storage
+	 *  quota". Absent ⇒ never paused. */
+	getAttachmentSyncPausedReason?: () => AttachmentSyncPauseReason | null;
 };
 
 const ChangeReason = {
@@ -93,6 +100,7 @@ export class SyncStatusStore {
 	readonly #clearTimer: (handle: unknown) => void;
 	readonly #statFile: (path: string) => { size: number } | undefined;
 	readonly #readSeqPairCount: (path: string) => number;
+	readonly #getAttachmentSyncPausedReason: () => AttachmentSyncPauseReason | null;
 	readonly #listeners = new Set<(snap: SyncStatusSnapshot | null) => void>();
 	#started = false;
 	#disposed = false;
@@ -112,6 +120,7 @@ export class SyncStatusStore {
 		this.#clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
 		this.#statFile = opts.statFile ?? ((path: string) => statSync(path));
 		this.#readSeqPairCount = opts.readSeqPairCount ?? defaultReadSeqPairCount;
+		this.#getAttachmentSyncPausedReason = opts.getAttachmentSyncPausedReason ?? (() => null);
 	}
 
 	start(): void {
@@ -192,6 +201,14 @@ export class SyncStatusStore {
 		this.#emit(ChangeReason.StateEdge);
 	}
 
+	/** 14.7 — the quota pause signal flipped; re-emit immediately (a state
+	 *  edge, like a transport transition — the dashboard should paint the
+	 *  "attachment sync paused" line without waiting for traffic). */
+	notifyQuotaChanged(): void {
+		if (this.#disposed) return;
+		this.#emit(ChangeReason.StateEdge);
+	}
+
 	#scheduleCoalesced(): void {
 		if (this.#coalesceTimer !== null) return;
 		this.#coalesceTimer = this.#setTimer(() => {
@@ -254,6 +271,7 @@ export class SyncStatusStore {
 				droppedSends: 0,
 				droppedInbound: 0,
 				...this.#readSeqDiagnostics(session.vaultPath),
+				attachmentSyncPausedReason: this.#pausedReasonSafe(),
 			};
 		}
 		const transport = readTransport(this.#activeRelay);
@@ -270,7 +288,16 @@ export class SyncStatusStore {
 			droppedSends: transport?.droppedSends() ?? 0,
 			droppedInbound: transport?.droppedInbound() ?? 0,
 			...this.#readSeqDiagnostics(session.vaultPath),
+			attachmentSyncPausedReason: this.#pausedReasonSafe(),
 		};
+	}
+
+	#pausedReasonSafe(): AttachmentSyncPauseReason | null {
+		try {
+			return this.#getAttachmentSyncPausedReason();
+		} catch {
+			return null;
+		}
 	}
 
 	#deriveState(

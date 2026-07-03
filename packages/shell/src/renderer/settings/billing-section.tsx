@@ -151,6 +151,40 @@ export function PlanGroup({ overview }: { overview: BillingOverviewView }) {
 					</span>
 				}
 			/>
+			{overview.quota !== null && overview.quota.storage.limitBytes !== null && (
+				<SettingRow
+					title={t("shell.settings.billing.quota.hostedStorage")}
+					description={t("shell.settings.billing.quota.hostedStorage.hint")}
+					control={
+						<span className="settings__value-text" data-testid="billing-quota-storage">
+							{overview.quota.storage.usedBytes !== null
+								? t("shell.settings.billing.quota.usedOf", {
+										used: formatBytes(overview.quota.storage.usedBytes),
+										limit: formatBytes(overview.quota.storage.limitBytes),
+									})
+								: formatBytes(overview.quota.storage.limitBytes)}
+						</span>
+					}
+				/>
+			)}
+			{overview.quota?.storage.over && (
+				<p className="billing-section__error" role="alert" data-testid="billing-quota-over">
+					{t("shell.settings.billing.quota.overStorage")}
+				</p>
+			)}
+			{overview.quota !== null && overview.quota.egress.limitBytes !== null && (
+				<SettingRow
+					title={t("shell.settings.billing.quota.egress")}
+					description={t("shell.settings.billing.quota.egress.hint")}
+					control={
+						<span className="settings__value-text" data-testid="billing-quota-egress">
+							{t("shell.settings.billing.quota.egress.monthly", {
+								limit: formatBytes(overview.quota.egress.limitBytes),
+							})}
+						</span>
+					}
+				/>
+			)}
 			{overview.storageBytesUsed !== null && (
 				<SettingRow
 					title={t("shell.settings.billing.storageUsed")}
