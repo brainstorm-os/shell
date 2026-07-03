@@ -1,0 +1,120 @@
+/* Background-activity chip — mirrors the sync-status chip's shape so the two
+ * sit as an even pair in the header action group. Only rendered while work is
+ * in flight. */
+.activity-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	height: 28px;
+	padding: 0 var(--space-2);
+	border-radius: var(--radius-md);
+	border: var(--border-width) solid var(--color-border-subtle);
+	background: transparent;
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-xs);
+	cursor: pointer;
+	transition: background-color 120ms ease, border-color 120ms ease;
+	max-width: 200px;
+}
+
+.activity-chip:hover {
+	background: var(--color-surface-hover);
+	border-color: var(--color-border-strong);
+}
+
+.activity-chip:focus-visible {
+	outline: 2px solid var(--color-state-info);
+	outline-offset: -1px;
+	border-color: transparent;
+}
+
+.activity-chip--error {
+	color: var(--color-state-error);
+}
+
+.activity-chip__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 128px;
+}
+
+.activity-chip__percent {
+	color: var(--color-text-tertiary);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Popover ─────────────────────────────────────────────────────────────── */
+
+.activity-popover__list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.activity-popover__row {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.activity-popover__head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.activity-popover__icon {
+	display: inline-flex;
+	color: var(--color-text-secondary);
+}
+
+.activity-popover__row[data-phase="error"] .activity-popover__icon {
+	color: var(--color-state-error);
+}
+
+.activity-popover__title {
+	font-size: var(--text-size-sm);
+	color: var(--color-text-primary);
+}
+
+.activity-popover__status {
+	margin-left: auto;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+	font-variant-numeric: tabular-nums;
+}
+
+.activity-popover__row[data-phase="error"] .activity-popover__status {
+	color: var(--color-state-error);
+}
+
+.activity-popover__detail {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	line-height: 1.45;
+}
+
+.activity-popover__bar {
+	height: 4px;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-sunken);
+	overflow: hidden;
+}
+
+.activity-popover__bar-fill {
+	display: block;
+	height: 100%;
+	border-radius: var(--radius-full);
+	background: var(--color-accent-default);
+}
+
+/* No known total → the fill spans the track (reads as "working", not 0%). A
+ * known percent overrides this via the inline width. */
+.activity-popover__bar[data-indeterminate="true"] .activity-popover__bar-fill {
+	width: 100%;
+}

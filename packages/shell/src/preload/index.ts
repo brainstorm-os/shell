@@ -707,6 +707,7 @@ import type {
 } from "../main/ipc/welcome-handlers";
 import type { SemanticModelStatus } from "../main/search/embedder-status";
 export type { WelcomeTemplateSummary };
+import type { ActivitySnapshot } from "../activity-types";
 /** Sync-status surface (Stage 10.7 — sync-status panel). Privileged
  *  shell channel — apps don't see this (OQ-206 deferred app-side
  *  `sync.status:read` to v2). The dashboard chip + Settings → Sync
@@ -720,7 +721,9 @@ import { SyncState, type SyncStatusSnapshot, SyncTransportState } from "../sync-
 
 export { SyncState, SyncTransportState };
 export type { SyncStatusSnapshot };
+export type { ActivitySnapshot };
 
+const ACTIVITY_SNAPSHOT_CHANNEL = "activity:snapshot";
 const SYNC_STATUS_SNAPSHOT_CHANNEL = "sync-status:snapshot";
 const SYNC_POLICY_GET_CHANNEL = "sync-status:get-policy";
 const SYNC_POLICY_SET_CHANNEL = "sync-status:set-policy";
@@ -739,6 +742,17 @@ export type RestoreSummary = {
 
 const onSyncStatusSnapshot = (listener: SyncStatusListener): (() => void) =>
 	subscribe<SyncStatusSnapshot | null>(SYNC_STATUS_SNAPSHOT_CHANNEL, listener);
+
+/** Background-activity center (dashboard-only) — live long-running operations
+ *  (model download, reindex, …). `snapshot` pulls the current set; `on`
+ *  subscribes to main→renderer pushes. */
+const onActivitySnapshot = (listener: (snap: ActivitySnapshot) => void): (() => void) =>
+	subscribe<ActivitySnapshot>(ACTIVITY_SNAPSHOT_CHANNEL, listener);
+
+const activity = {
+	snapshot: (): Promise<ActivitySnapshot> => ipcRenderer.invoke(ACTIVITY_SNAPSHOT_CHANNEL),
+	on: onActivitySnapshot,
+};
 
 const syncStatus = {
 	snapshot: (): Promise<SyncStatusSnapshot | null> =>
@@ -1648,6 +1662,7 @@ const brainstorm = {
 	filesHandles,
 	pairing,
 	profile,
+	activity,
 	syncStatus,
 	network,
 	webPrivacy,
