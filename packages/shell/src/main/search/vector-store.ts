@@ -48,6 +48,10 @@ export interface VectorStore {
 	clear(): void;
 	/** Atomically replace the whole store with `rows`. */
 	rebuild(rows: Iterable<VectorRow>): void;
+	/** Every entity id currently in the store. Used by `VectorIndexer.reconcile`
+	 *  to reap vectors for entities that no longer exist (or went blank) without
+	 *  re-reading their embeddings. */
+	snapshotIds(): Set<string>;
 	dispose(): void;
 }
 
@@ -159,6 +163,11 @@ export class InMemoryVectorStore implements VectorStore {
 			next.set(row.entityId, { ...row, embedding: row.embedding.slice() });
 		}
 		this.rows = next;
+	}
+
+	snapshotIds(): Set<string> {
+		this.assertOpen();
+		return new Set(this.rows.keys());
 	}
 
 	dispose(): void {

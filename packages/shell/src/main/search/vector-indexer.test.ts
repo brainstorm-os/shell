@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMBEDDING_DIM, StubEmbedder } from "./embedder";
+import { EMBEDDING_DIM, StubEmbedder, type TextEmbedder } from "./embedder";
 import type { IndexableEntity } from "./search-indexer";
 import { VectorIndexer } from "./vector-indexer";
 import { InMemoryVectorStore } from "./vector-store";
@@ -91,5 +91,76 @@ describe("VectorIndexer", () => {
 		const ix = make();
 		ix.dispose();
 		await expect(ix.indexEntity(ent("a", "note", "x"))).rejects.toThrow(/disposed/);
+	});
+});
+
+class CountingEmbedder implements TextEmbedder {
+	readonly name = "counting";
+	readonly dim = EMBEDDING_DIM;
+	calls = 0;
+	readonly #inner = new StubEmbedder();
+	embed(text: string): Float32Array {
+		this.calls += 1;
+		return this.#inner.embed(text);
+	}
+}
+
+describe("VectorIndexer.reconcile (incremental, 11.3)", () => {
+	it("first reconcile embeds every entity", async () => {
+		const emb = new CountingEmbedder();
+		const ix = new VectorIndexer(new InMemoryVectorStore(EMBEDDING_DIM), emb);
+		await ix.reconcile([ent("a", "note", "alpha", "x"), ent("b", "note", "bravo", "y")]);
+		expect(ix.count()).toBe(2);
+		expect(emb.calls).toBe(2);
+	});
+
+	it("re-reconcile with UNCHANGED content embeds nothing (the per-write win)", async () => {
+		const emb = new CountingEmbedder();
+		const ix = new VectorIndexer(new InMemoryVectorStore(EMBEDDING_DIM), emb);
+		const entities = [ent("a", "note", "alpha", "x"), ent("b", "note", "bravo", "y")];
+		await ix.reconcile(entities);
+		emb.calls = 0;
+		await ix.reconcile(entities);
+		expect(emb.calls).toBe(0);
+		expect(ix.count()).toBe(2);
+	});
+
+	it("embeds ONLY the entity whose indexable content changed", async () => {
+		const emb = new CountingEmbedder();
+		const ix = new VectorIndexer(new InMemoryVectorStore(EMBEDDING_DIM), emb);
+		await ix.reconcile([ent("a", "note", "alpha", "x"), ent("b", "note", "bravo", "y")]);
+		emb.calls = 0;
+		await ix.reconcile([ent("a", "note", "alpha", "x"), ent("b", "note", "bravo", "CHANGED")]);
+		expect(emb.calls).toBe(1);
+	});
+
+	it("reaps a deleted entity", async () => {
+		const ix = make();
+		await ix.reconcile([ent("a", "note", "alpha", "x"), ent("b", "note", "bravo", "y")]);
+		await ix.reconcile([ent("a", "note", "alpha", "x")]);
+		expect(ix.count()).toBe(1);
+	});
+
+	it("reaps an entity that went blank (non-indexable)", async () => {
+		const ix = make();
+		await ix.reconcile([ent("a", "note", "alpha", "x")]);
+		expect(ix.count()).toBe(1);
+		await ix.reconcile([ent("a", "note", "", "")]);
+		expect(ix.count()).toBe(0);
+	});
+
+	it("first reconcile reaps a pre-existing store row not in the current set", async () => {
+		const store = new InMemoryVectorStore(EMBEDDING_DIM);
+		store.upsert({
+			entityId: "stale",
+			type: "note",
+			ownerAppId: "x",
+			updatedAt: 1,
+			embedding: new StubEmbedder().embed("stale from last session"),
+		});
+		const ix = new VectorIndexer(store, new StubEmbedder());
+		await ix.reconcile([ent("a", "note", "alpha", "x")]);
+		expect(store.snapshotIds().has("stale")).toBe(false);
+		expect(store.snapshotIds().has("a")).toBe(true);
 	});
 });

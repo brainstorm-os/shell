@@ -1802,7 +1802,11 @@ void app.whenReady().then(async () => {
 			if (rebuildToken !== ourToken) return; // superseded by a newer rebuild
 			if (!searchIndexer) return;
 			searchIndexer.rebuild(entities);
-			if (vectorIndexer) await vectorIndexer.rebuild(entities);
+			// 11.3 — the vector pass RECONCILES (embeds only changed entities)
+			// rather than re-embedding all N on every debounced write, which with
+			// the real model would peg a core. Lexical stays a full rebuild — FTS
+			// is cheap. First reconcile of a session embeds everything.
+			if (vectorIndexer) await vectorIndexer.reconcile(entities);
 		} catch (error) {
 			console.warn(`[brainstorm] search index rebuild failed: ${(error as Error).message}`);
 		}

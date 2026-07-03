@@ -148,6 +148,14 @@ export class SqliteVecStore implements VectorStore {
 		return row.n;
 	}
 
+	snapshotIds(): Set<string> {
+		this.assertOpen();
+		const rows = this.db.prepare("SELECT entity_id FROM entity_vec_meta").all() as {
+			entity_id: string;
+		}[];
+		return new Set(rows.map((r) => r.entity_id));
+	}
+
 	clear(): void {
 		this.assertOpen();
 		const fn = this.db.transaction(() => {
