@@ -229,6 +229,42 @@ describe("ydoc worker", () => {
 		expect(map.get("asset-m1")).toEqual(manifest);
 	});
 
+	it("listAssetManifests() returns every pair for the reconstruction pass (Asset-B5)", async () => {
+		const manifestOf = (assetId: string) => ({
+			v: 1,
+			assetId,
+			chunkBytes: 16,
+			totalRawLen: 4,
+			chunks: [{ hash: "c".repeat(64), encLen: 24, rawLen: 4 }],
+		});
+		for (const id of ["asset-l1", "asset-l2"]) {
+			const r = await handleYDocEnvelope(
+				mk("installAssetManifest", {
+					vaultPath: vaultDir,
+					entityId: "ent_list",
+					assetId: id,
+					manifest: manifestOf(id),
+				}),
+			);
+			if (!r.ok) throw new Error("expected ok");
+		}
+		const list = await handleYDocEnvelope(
+			mk("listAssetManifests", { vaultPath: vaultDir, entityId: "ent_list" }),
+		);
+		if (!list.ok) throw new Error("expected ok");
+		const pairs = (list.value as { manifests: Array<{ assetId: string; manifest: unknown }> })
+			.manifests;
+		expect(pairs.map((p) => p.assetId).sort()).toEqual(["asset-l1", "asset-l2"]);
+		expect(pairs.find((p) => p.assetId === "asset-l1")?.manifest).toEqual(manifestOf("asset-l1"));
+
+		// An entity with no manifests lists empty (not an error).
+		const none = await handleYDocEnvelope(
+			mk("listAssetManifests", { vaultPath: vaultDir, entityId: "ent_list_none" }),
+		);
+		if (!none.ok) throw new Error("expected ok");
+		expect((none.value as { manifests: unknown[] }).manifests).toEqual([]);
+	});
+
 	it("installAssetManifest() rejects a non-object manifest", async () => {
 		const reply = await handleYDocEnvelope(
 			mk("installAssetManifest", {

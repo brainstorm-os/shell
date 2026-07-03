@@ -26,6 +26,7 @@
 
 import { createHash, createHmac } from "node:crypto";
 import { XCHACHA_NONCE_BYTES, openBytes, sealBytesWithNonce } from "../credentials/crypto";
+import { AssetKind } from "./asset-types";
 
 /** Default chunk size on the wire — 4 MiB (design 70 §Chunking). */
 export const ASSET_CHUNK_BYTES = 4 * 1024 * 1024;
@@ -63,7 +64,23 @@ export type AssetChunkManifest = {
 	totalRawLen: number;
 	/** Ordered chunks — array position IS the chunk index. */
 	chunks: AssetChunkRef[];
+	/** Asset-B5 — the asset's `kind` (favicon/cover/upload), carried so a cold
+	 *  device can reconstruct a faithful `assets` row. Peer-authored ADVISORY
+	 *  metadata: validated against the enum on read; an absent or unknown value
+	 *  degrades to `upload` at reconstruction and never rejects the manifest
+	 *  (byte integrity is the chunk AEAD's job, not this label's). Optional
+	 *  because pre-B5 manifests lack it and install is idempotent-no-overwrite,
+	 *  so they never upgrade in place. */
+	kind?: AssetKind;
 };
+
+/** Validate an untrusted manifest `kind` against the enum; anything else is
+ *  treated as absent (the reconstruction default `upload` applies). */
+function parseManifestKind(value: unknown): AssetKind | undefined {
+	return typeof value === "string" && (Object.values(AssetKind) as string[]).includes(value)
+		? (value as AssetKind)
+		: undefined;
+}
 
 /** Fallback when a manifest carries no `mime` (older Asset-B2/B3 dogfood
  *  manifests predate the field). `octet-stream` is inert — it never renders as
@@ -183,6 +200,7 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 		chunks.push({ hash: c.hash, encLen: c.encLen, rawLen: c.rawLen });
 	}
 	if (sumRaw !== m.totalRawLen) return null;
+	const kind = parseManifestKind(m.kind);
 	return {
 		v: 1,
 		assetId: m.assetId,
@@ -190,6 +208,7 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 		chunkBytes: m.chunkBytes,
 		totalRawLen: m.totalRawLen,
 		chunks,
+		...(kind !== undefined ? { kind } : {}),
 	};
 }
 
@@ -248,6 +267,7 @@ export function sealAssetChunks(
 	assetId: string,
 	mime: string,
 	chunkBytes: number = ASSET_CHUNK_BYTES,
+	kind?: AssetKind,
 ): { manifest: AssetChunkManifest; sealed: Map<string, Uint8Array> } {
 	const count = chunkCount(plaintext.length, chunkBytes);
 	const chunks: AssetChunkRef[] = [];
@@ -260,7 +280,15 @@ export function sealAssetChunks(
 		sealed.set(ref.hash, enc);
 	}
 	return {
-		manifest: { v: 1, assetId, mime, chunkBytes, totalRawLen: plaintext.length, chunks },
+		manifest: {
+			v: 1,
+			assetId,
+			mime,
+			chunkBytes,
+			totalRawLen: plaintext.length,
+			chunks,
+			...(kind !== undefined ? { kind } : {}),
+		},
 		sealed,
 	};
 }

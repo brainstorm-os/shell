@@ -85,6 +85,16 @@ export class AssetsRepository {
 		return row ? rowToRecord(row) : null;
 	}
 
+	/** Asset-B5 — backfill `content_hash` on a reconstructed row, ONLY while it
+	 *  still carries the empty sentinel (the guard is in the SQL so a set hash
+	 *  can never be overwritten). Returns true when a row was updated. */
+	setContentHashIfUnset(assetId: string, contentHash: string): boolean {
+		const result = this.stmt(
+			"UPDATE assets SET content_hash = ? WHERE asset_id = ? AND content_hash = ''",
+		).run(contentHash, assetId);
+		return Number(result.changes) > 0;
+	}
+
 	/** Stamp `bound_at` so the asset is no longer a reap-eligible orphan.
 	 *  Returns true when a row was updated. */
 	markBound(assetId: string, now: number): boolean {

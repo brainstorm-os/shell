@@ -204,3 +204,90 @@ describe("AssetStore.restoreBlob (serve-on-miss rematerialise)", () => {
 		await expect(env.store.restoreBlob(assetId, different)).rejects.toThrow();
 	});
 });
+
+describe("AssetStore.registerSynced (Asset-B5 cold-device reconstruction)", () => {
+	const dekOf = () => generateSymmetricKey();
+
+	it("registers rows (sentinel hash, bound) with NO blob file; readAsset misses cleanly", async () => {
+		const dek = dekOf();
+		expect(
+			env.store.registerSynced({
+				assetId: "synced-1",
+				mime: "image/png",
+				byteLen: PNG.length,
+				kind: AssetKind.Cover,
+				dek,
+			}),
+		).toBe(true);
+		const row = env.assets.getById("synced-1");
+		expect(row?.contentHash).toBe("");
+		expect(row?.kind).toBe(AssetKind.Cover);
+		expect(row?.byteLen).toBe(PNG.length);
+		expect(row?.boundAt).not.toBeNull();
+		// Metadata-present, blob-absent — the serve-on-miss precondition.
+		expect(await env.store.readAsset("synced-1")).toBeNull();
+	});
+
+	it("is idempotent — an existing row returns false and stays untouched", async () => {
+		const { assetId } = await env.store.writeAsset({
+			bytes: PNG,
+			mime: "image/png",
+			kind: AssetKind.Favicon,
+		});
+		const before = env.assets.getById(assetId);
+		expect(
+			env.store.registerSynced({
+				assetId,
+				mime: "image/jpeg",
+				byteLen: 1,
+				kind: AssetKind.Upload,
+				dek: dekOf(),
+			}),
+		).toBe(false);
+		expect(env.assets.getById(assetId)).toEqual(before);
+	});
+
+	it("first restoreBlob backfills the sentinel hash under the SYNCED dek and round-trips", async () => {
+		const dek = dekOf();
+		const dekCopy = new Uint8Array(dek);
+		env.store.registerSynced({
+			assetId: "synced-2",
+			mime: "image/png",
+			byteLen: PNG.length,
+			kind: AssetKind.Upload,
+			dek,
+		});
+		dek.fill(0); // caller zeroes; the store sealed its own copy
+
+		await env.store.restoreBlob("synced-2", PNG);
+		const row = env.assets.getById("synced-2");
+		expect(row?.contentHash).not.toBe("");
+		const got = await env.store.readAsset("synced-2");
+		if (!got) throw new Error("expected the materialised asset to read back");
+		expect(got.bytes).toEqual(PNG);
+		// The sealed DEK is the one the manifest's chunks were sealed under.
+		const handle = env.dekStore.open("synced-2");
+		if (!handle) throw new Error("expected a DEK row");
+		expect(handle.dek).toEqual(dekCopy);
+		env.dekStore.close(handle.dek);
+	});
+
+	it("restoreBlob refuses a LENGTH mismatch on a sentinel row, and a second backfill can't overwrite", async () => {
+		env.store.registerSynced({
+			assetId: "synced-3",
+			mime: "image/png",
+			byteLen: PNG.length,
+			kind: AssetKind.Upload,
+			dek: dekOf(),
+		});
+		await expect(env.store.restoreBlob("synced-3", new Uint8Array(3))).rejects.toThrow(
+			/length mismatch/,
+		);
+		await env.store.restoreBlob("synced-3", PNG);
+		const hash = env.assets.getById("synced-3")?.contentHash;
+		// Once backfilled, different bytes are refused like any other row.
+		const different = new Uint8Array(PNG.length).fill(7);
+		await expect(env.store.restoreBlob("synced-3", different)).rejects.toThrow(/hash mismatch/);
+		expect(env.assets.getById("synced-3")?.contentHash).toBe(hash);
+	});
+});

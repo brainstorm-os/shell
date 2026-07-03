@@ -237,6 +237,7 @@ type InstallAssetManifestArgs = {
 	manifest: Record<string, unknown>;
 };
 type ReadAssetManifestArgs = { vaultPath: string; entityId: string; assetId: string };
+type ListAssetManifestsArgs = { vaultPath: string; entityId: string };
 
 const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknown> = {
 	load: async (envelope) => {
@@ -456,6 +457,22 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		if (!(map instanceof Y.Map)) return { manifest: null };
 		const manifest = map.get(args.assetId);
 		return { manifest: manifest && typeof manifest === "object" ? manifest : null };
+	},
+	// Asset-B5 — list EVERY (assetId → manifest) pair on the entity Y.Doc, for
+	// the cold-device metadata-reconstruction pass after a restore backfill
+	// (main validates each manifest; the values are opaque here). Returns []
+	// when the entity carries none.
+	listAssetManifests: async (envelope) => {
+		const args = parseArgs<ListAssetManifestsArgs>(envelope, "listAssetManifests");
+		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
+		const meta = doc.getMap<unknown>(WORKER_ENTITY_META_TOP);
+		const map = meta.get(WORKER_ENTITY_ASSET_MANIFESTS_KEY);
+		if (!(map instanceof Y.Map)) return { manifests: [] };
+		const manifests: Array<{ assetId: string; manifest: unknown }> = [];
+		map.forEach((value, assetId) => {
+			if (value && typeof value === "object") manifests.push({ assetId, manifest: value });
+		});
+		return { manifests };
 	},
 	// Asset-B4 — read the re-homed asset-DEK wrap back off the entity Y.Doc (the
 	// synced-device DEK-recovery path: a device that didn't mint the asset opens

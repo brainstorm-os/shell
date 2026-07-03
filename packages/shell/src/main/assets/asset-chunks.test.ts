@@ -12,6 +12,7 @@ import {
 	sealAssetChunks,
 	sealOneChunk,
 } from "./asset-chunks";
+import { AssetKind } from "./asset-types";
 
 const ASSET = "asset-7f3a";
 const CHUNK = 16; // tiny chunk size keeps the multi-chunk cases cheap
@@ -170,6 +171,27 @@ describe("parseAssetChunkManifest (untrusted input)", () => {
 		);
 		const parsed = parseAssetChunkManifest(JSON.parse(JSON.stringify(manifest)));
 		expect(parsed).toEqual(manifest);
+	});
+
+	it("Asset-B5: carries a validated `kind`; an unknown value degrades to absent, never rejects", () => {
+		const dek = generateSymmetricKey();
+		const { manifest } = sealAssetChunks(
+			new Uint8Array(randomBytes(CHUNK)),
+			dek,
+			ASSET,
+			"image/png",
+			CHUNK,
+			AssetKind.Cover,
+		);
+		expect(manifest.kind).toBe(AssetKind.Cover);
+		const parsed = parseAssetChunkManifest(JSON.parse(JSON.stringify(manifest)));
+		expect(parsed?.kind).toBe(AssetKind.Cover);
+		// Unknown / wrong-typed kind: advisory metadata degrades, manifest survives.
+		expect(parseAssetChunkManifest({ ...manifest, kind: "trojan" })?.kind).toBeUndefined();
+		expect(parseAssetChunkManifest({ ...manifest, kind: 7 })?.kind).toBeUndefined();
+		// Absent kind (pre-B5 manifest) parses clean.
+		const { kind: _k, ...withoutKind } = manifest;
+		expect(parseAssetChunkManifest(withoutKind)).not.toBeNull();
 	});
 
 	it("rejects malformed / lying manifests (fail closed → null)", () => {

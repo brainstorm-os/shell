@@ -16,6 +16,7 @@
 import type { AssetCas } from "./asset-cas";
 import { type AssetChunkManifest, parseAssetChunkManifest } from "./asset-chunks";
 import { type UploadAssetResult, downloadAsset, uploadAsset } from "./asset-transport";
+import type { AssetKind } from "./asset-types";
 
 export type InstallManifest = (
 	entityId: string,
@@ -41,8 +42,9 @@ export async function uploadBoundAsset(
 	mime: string,
 	plaintext: Uint8Array,
 	dek: Uint8Array,
+	kind?: AssetKind,
 ): Promise<UploadAssetResult> {
-	const result = await uploadAsset(plaintext, dek, assetId, mime, deps.cas);
+	const result = await uploadAsset(plaintext, dek, assetId, mime, deps.cas, undefined, kind);
 	await deps.installManifest(entityId, assetId, result.manifest);
 	return result;
 }

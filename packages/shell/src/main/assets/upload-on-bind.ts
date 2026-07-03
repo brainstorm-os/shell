@@ -24,6 +24,7 @@
 
 import type { AssetCas } from "./asset-cas";
 import { type InstallManifest, uploadBoundAsset } from "./asset-sync";
+import type { AssetKind } from "./asset-types";
 
 /** Why a pair didn't upload (or that it did) — surfaced in the drain tally +
  *  logs, and asserted in tests. */
@@ -45,9 +46,12 @@ export type UploadOnBindDeps = {
 	/** True if the entity already carries a valid manifest for the asset — the
 	 *  upload-done marker. Skip the upload when so. */
 	manifestPresent: (entityId: string, assetId: string) => Promise<boolean>;
-	/** Open the LOCAL plaintext + mime (null when the blob isn't on this
-	 *  device). */
-	readAsset: (assetId: string) => Promise<{ bytes: Uint8Array; mime: string } | null>;
+	/** Open the LOCAL plaintext + mime (+ the row's `kind`, carried into the
+	 *  manifest so a cold device reconstructs a faithful row — Asset-B5); null
+	 *  when the blob isn't on this device. */
+	readAsset: (
+		assetId: string,
+	) => Promise<{ bytes: Uint8Array; mime: string; kind?: AssetKind } | null>;
 	/** Recover the per-asset DEK the chunks are sealed under (a FRESH buffer this
 	 *  module zeroes), or null. */
 	recoverDek: (entityId: string, assetId: string) => Promise<Uint8Array | null>;
@@ -75,6 +79,7 @@ export async function uploadBoundAssetIfPending(
 			asset.mime,
 			asset.bytes,
 			dek,
+			asset.kind,
 		);
 		return UploadBoundOutcome.Uploaded;
 	} finally {
