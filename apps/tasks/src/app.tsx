@@ -37,6 +37,7 @@ import {
 	openObjectMenu,
 } from "@brainstorm/sdk/object-menu";
 import { ObjectMenuMoreButton } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { createIconPickerButton, openIconPicker } from "@brainstorm/sdk/picker-host";
 import { PopoverBodyPadding, createPopoverElement } from "@brainstorm/sdk/popover";
@@ -557,7 +558,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const [taskSelection, setTaskSelection] = useState<TaskSelectionState>(EMPTY_TASK_SELECTION);
 
 	const [navOpen, setNavOpen] = useState(() => readBoolPref(NAV_OPEN_KEY, true));
-	const [propsOpen, setPropsOpen] = useState(() => readBoolPref(PROPS_OPEN_KEY, false));
+	const [propsOpen, setPropsOpen] = useState(() => readPanelOpen(PROPS_OPEN_KEY, false));
 
 	// `nonce` bumps to force a content rebuild when an input the view-builders
 	// read changes outside the keyed deps (e.g. an entity-title hydration burst).
@@ -1114,7 +1115,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
-			writeBoolPref(PROPS_OPEN_KEY, next);
+			writePanelOpen(PROPS_OPEN_KEY, next);
 			return next;
 		});
 	}, []);

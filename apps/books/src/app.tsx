@@ -37,6 +37,7 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import type { PdfEngineDocument } from "@brainstorm/sdk/pdf-engine";
 import { openPdfDocument, resolvePdfOutline } from "@brainstorm/sdk/pdf-engine";
@@ -225,26 +226,17 @@ function asObjectMenuRuntime(runtime: BooksRuntime): ObjectMenuRuntime {
 	};
 }
 
-/** Right-panel open pref. Defaults CLOSED on first run (no stored value) —
- *  matches Notes/Journal/Files/Database; an opened panel persists. */
+/** Right-panel open state — window-scoped (`@brainstorm/sdk/panel-state`).
+ *  Open by default — selecting a book should surface its cover / properties
+ *  / contents inspector; only an explicit user-close (`"false"`) keeps it
+ *  shut for the rest of this window. (Defaulting closed regressed the
+ *  books-library + app.test.tsx "inspector opens on select" expectation.) */
 const INSPECTOR_PREF_KEY = "books:inspector-open";
 function readInspectorPref(): boolean {
-	// Open by default — selecting a book should surface its cover / properties
-	// / contents inspector; only an explicit user-close (`"false"`) keeps it
-	// shut. (Defaulting closed regressed the books-library + app.test.tsx
-	// "inspector opens on select" expectation.)
-	try {
-		return localStorage.getItem(INSPECTOR_PREF_KEY) !== "false";
-	} catch {
-		return true;
-	}
+	return readPanelOpen(INSPECTOR_PREF_KEY, true);
 }
 function writeInspectorPref(open: boolean): void {
-	try {
-		localStorage.setItem(INSPECTOR_PREF_KEY, String(open));
-	} catch {
-		// Storage disabled — pref reverts to default on reload.
-	}
+	writePanelOpen(INSPECTOR_PREF_KEY, open);
 }
 
 export function BooksApp(): ReactElement {

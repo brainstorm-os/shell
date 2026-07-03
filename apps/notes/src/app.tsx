@@ -40,6 +40,7 @@ import {
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
 } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { AddIconGlyph } from "@brainstorm/sdk/picker-host";
 import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
@@ -203,7 +204,7 @@ export function NotesApp() {
 	const lastOpenRef = useRef<string | null>(null);
 	const [lastViewedLoaded, setLastViewedLoaded] = useState(false);
 	const [navOpen, setNavOpen] = useState(() => readPref(NAV_PREF_KEY, true));
-	const [propsOpen, setPropsOpen] = useState(() => readPref(PROPS_PREF_KEY, false));
+	const [propsOpen, setPropsOpen] = useState(() => readPanelOpen(PROPS_PREF_KEY, false));
 	const [rightTab, setRightTab] = useState<RightTab>(RightTab.Properties);
 
 	// Live comments adapter for the open note (B11.9). Bridges the vault
@@ -236,7 +237,7 @@ export function NotesApp() {
 	const openCommentsTab = useCallback(() => {
 		setRightTab(RightTab.Comments);
 		setPropsOpen(true);
-		writePref(PROPS_PREF_KEY, true);
+		writePanelOpen(PROPS_PREF_KEY, true);
 	}, []);
 	const onCommentBlockClick = useCallback(
 		(blockId: string) => {
@@ -492,7 +493,7 @@ export function NotesApp() {
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
-			writePref(PROPS_PREF_KEY, next);
+			writePanelOpen(PROPS_PREF_KEY, next);
 			return next;
 		});
 	}, []);

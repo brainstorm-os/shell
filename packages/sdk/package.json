@@ -41,6 +41,7 @@
     "./peer-presence": "./src/peer-presence.ts",
     "./storage-repository": "./src/storage-repository.ts",
     "./last-viewed": "./src/last-viewed.ts",
+    "./panel-state": "./src/panel-state.ts",
     "./entity-icon": "./src/entity-icon.ts",
     "./tab-identity": "./src/tab-identity.ts",
     "./entity-cover": "./src/entity-cover.ts",
