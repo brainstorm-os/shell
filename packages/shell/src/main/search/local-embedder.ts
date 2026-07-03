@@ -15,12 +15,30 @@
  */
 
 import { EMBEDDING_DIM, type TextEmbedder } from "./embedder";
+import {
+	type EmbedderDownloadProgress,
+	type SemanticModelStatus,
+	applyProgress,
+	initialStatus,
+	markFailed,
+	markReady,
+	markStarted,
+} from "./embedder-status";
+
+/** Sink for live semantic-model download status (plan 11.3 progress UX). The
+ *  shell holds the latest snapshot + exposes it to Settings → Search. */
+export type StatusSink = (status: SemanticModelStatus) => void;
 
 /** The subset of `@brainstorm/native-embed` this seam uses. */
 export type EmbedNative = {
 	/** Build/load the model, downloading weights into `cacheDir` on first run.
-	 *  Idempotent; resolves when ready to embed. */
-	embedderInit(cacheDir: string): Promise<void>;
+	 *  Idempotent; resolves when ready to embed. `onProgress` (optional — older
+	 *  `.node`s omit it) is invoked per pinned file with cumulative byte
+	 *  progress so the first-run download can render a bar. */
+	embedderInit(
+		cacheDir: string,
+		onProgress?: (progress: EmbedderDownloadProgress) => void,
+	): Promise<void>;
 	/** Whether `embedderInit` has completed. */
 	embedderReady(): boolean;
 	/** The model's output dimension. */
@@ -34,23 +52,42 @@ export class FastembedEmbedder implements TextEmbedder {
 	readonly dim = EMBEDDING_DIM;
 	readonly #native: EmbedNative;
 	readonly #cacheDir: string;
+	readonly #onStatus: StatusSink;
+	#status: SemanticModelStatus = initialStatus();
 	#ready: Promise<void> | null = null;
 
-	constructor(native: EmbedNative, cacheDir: string) {
+	constructor(native: EmbedNative, cacheDir: string, onStatus?: StatusSink) {
 		this.#native = native;
 		this.#cacheDir = cacheDir;
+		this.#onStatus = onStatus ?? (() => {});
+	}
+
+	#emit(status: SemanticModelStatus): void {
+		this.#status = status;
+		this.#onStatus(status);
 	}
 
 	/** Idempotent, single-flight model init — the ~130 MB first-run download
-	 *  runs once, off the JS thread (the addon uses the libuv threadpool). */
+	 *  runs once, off the JS thread (the addon uses the libuv threadpool). Folds
+	 *  the native per-file byte progress into a live {@link SemanticModelStatus}
+	 *  so Settings → Search can render a download bar (11.3 progress UX). */
 	#ensureReady(): Promise<void> {
 		if (!this.#ready) {
-			this.#ready = this.#native.embedderInit(this.#cacheDir).catch((error) => {
-				// Reset so a transient failure (e.g. offline first-run) can retry
-				// on the next embed rather than latching a rejected promise.
-				this.#ready = null;
-				throw error;
-			});
+			this.#emit(markStarted());
+			this.#ready = this.#native
+				.embedderInit(this.#cacheDir, (progress) => {
+					this.#emit(applyProgress(this.#status, progress));
+				})
+				.then(() => {
+					this.#emit(markReady());
+				})
+				.catch((error) => {
+					// Reset so a transient failure (e.g. offline first-run) can retry
+					// on the next embed rather than latching a rejected promise.
+					this.#ready = null;
+					this.#emit(markFailed((error as Error).message ?? String(error)));
+					throw error;
+				});
 		}
 		return this.#ready;
 	}
@@ -93,6 +130,7 @@ export class FastembedEmbedder implements TextEmbedder {
 export function makeEmbedderFromNative(
 	native: Partial<EmbedNative>,
 	cacheDir: string,
+	onStatus?: StatusSink,
 ): FastembedEmbedder | null {
 	if (
 		typeof native.embedBatch !== "function" ||
@@ -108,7 +146,7 @@ export function makeEmbedderFromNative(
 		);
 		return null;
 	}
-	return new FastembedEmbedder(native as EmbedNative, cacheDir);
+	return new FastembedEmbedder(native as EmbedNative, cacheDir, onStatus);
 }
 
 /**
@@ -118,7 +156,10 @@ export function makeEmbedderFromNative(
  * Note: this does NOT trigger the model download — that happens lazily on the
  * first `embed`, so a null here is purely "the native binding is absent".
  */
-export async function loadFastembedEmbedder(cacheDir: string): Promise<FastembedEmbedder | null> {
+export async function loadFastembedEmbedder(
+	cacheDir: string,
+	onStatus?: StatusSink,
+): Promise<FastembedEmbedder | null> {
 	try {
 		// Opaque specifier (mirrors the `bun:sqlite` / `better-sqlite3` dynamic
 		// imports in `storage/sqlite.ts`): the addon's generated `index.d.ts` only
@@ -129,7 +170,7 @@ export async function loadFastembedEmbedder(cacheDir: string): Promise<Fastembed
 		// typecheck on the missing declaration.
 		const specifier = "@brainstorm/native-embed";
 		const native = (await import(/* @vite-ignore */ specifier)) as Partial<EmbedNative>;
-		return makeEmbedderFromNative(native, cacheDir);
+		return makeEmbedderFromNative(native, cacheDir, onStatus);
 	} catch (error) {
 		console.warn("[search] native embedder unavailable; semantic search disabled:", error);
 		return null;

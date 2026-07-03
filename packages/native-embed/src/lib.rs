@@ -21,7 +21,8 @@ use std::sync::{Mutex, OnceLock};
 use fastembed::{
 	InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
 };
-use napi::bindgen_prelude::{AsyncTask, Env, Error, Float32Array, Result, Status, Task};
+use napi::bindgen_prelude::{AsyncTask, Env, Error, Float32Array, Result, Status, Task, Unknown};
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 use sha2::{Digest, Sha256};
 
@@ -37,6 +38,35 @@ static MODEL: OnceLock<Mutex<TextEmbedding>> = OnceLock::new();
 
 fn generic(msg: impl Into<String>) -> Error {
 	Error::new(Status::GenericFailure, msg.into())
+}
+
+// ── First-run download progress (plan 11.3 progress UX) ─────────────────────
+
+/// A per-file byte-progress tick emitted to JS while the model weights download.
+/// `total` is 0 when the server sent no `Content-Length`. Byte counts are `f64`
+/// (JS numbers) — the largest file is ~130 MB, far inside f64's exact-int range.
+#[napi(object)]
+pub struct DownloadProgress {
+	pub file: String,
+	pub file_index: u32,
+	pub file_count: u32,
+	pub downloaded: f64,
+	pub total: f64,
+}
+
+/// The JS `(progress) => void` callback, invoked from the download thread.
+/// `CalleeHandled = false` (Fatal strategy) so JS receives just the value — the
+/// shape the shell seam's `onProgress(progress)` expects.
+type ProgressFn = ThreadsafeFunction<DownloadProgress, Unknown<'static>, DownloadProgress, Status, false>;
+
+/// Coalesce byte ticks to ~1 MB steps so a 130 MB download emits ~130 progress
+/// events, not thousands — smooth enough for a bar without spamming the JS loop.
+const PROGRESS_STEP_BYTES: u64 = 1024 * 1024;
+
+fn report(progress: &Option<ProgressFn>, tick: DownloadProgress) {
+	if let Some(tsfn) = progress {
+		tsfn.call(tick, ThreadsafeFunctionCallMode::NonBlocking);
+	}
 }
 
 // ── Pinned model integrity (security review, 2026-07-03) ────────────────────
@@ -112,7 +142,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
 /// it. Returns an error (never the bytes) on any hash mismatch — a tampered
 /// download, a MITM, or a poisoned repo all fail closed here, before the bytes
 /// reach ONNX Runtime or the tokenizer.
-fn load_pinned(cache_dir: &Path, file: &PinnedFile) -> Result<Vec<u8>> {
+fn load_pinned(
+	cache_dir: &Path,
+	file: &PinnedFile,
+	file_index: u32,
+	file_count: u32,
+	progress: &Option<ProgressFn>,
+) -> Result<Vec<u8>> {
 	let path = cache_dir.join(file.name);
 	if let Ok(bytes) = fs::read(&path) {
 		if sha256_hex(&bytes) == file.sha256 {
@@ -125,18 +161,54 @@ fn load_pinned(cache_dir: &Path, file: &PinnedFile) -> Result<Vec<u8>> {
 	let response = ureq::get(&url)
 		.call()
 		.map_err(|e| generic(format!("embedder model fetch {}: {e}", file.name)))?;
+	let total: u64 = response
+		.header("Content-Length")
+		.and_then(|s| s.parse().ok())
+		.unwrap_or(0);
+	let emit = |downloaded: u64| {
+		report(
+			progress,
+			DownloadProgress {
+				file: file.name.to_string(),
+				file_index,
+				file_count,
+				downloaded: downloaded as f64,
+				total: total as f64,
+			},
+		);
+	};
+	// Emit a 0-byte tick up front so the UI shows the file immediately, before
+	// the first megabyte lands (the model.onnx fetch dominates the wall-clock).
+	emit(0);
+
+	// Stream in chunks (rather than `read_to_end`) so progress can be reported
+	// as bytes arrive. Still bounded by `MAX_MODEL_FILE_BYTES` (the `.take`) and
+	// SHA256-verified below before the bytes ever reach ONNX Runtime.
+	let mut reader = response.into_reader().take(MAX_MODEL_FILE_BYTES + 1);
 	let mut bytes = Vec::new();
-	response
-		.into_reader()
-		.take(MAX_MODEL_FILE_BYTES + 1)
-		.read_to_end(&mut bytes)
-		.map_err(|e| generic(format!("embedder model read {}: {e}", file.name)))?;
-	if bytes.len() as u64 > MAX_MODEL_FILE_BYTES {
-		return Err(generic(format!(
-			"embedder model {} exceeds {MAX_MODEL_FILE_BYTES} bytes — refusing",
-			file.name
-		)));
+	let mut buf = [0u8; 64 * 1024];
+	let mut last_reported = 0u64;
+	loop {
+		let n = reader
+			.read(&mut buf)
+			.map_err(|e| generic(format!("embedder model read {}: {e}", file.name)))?;
+		if n == 0 {
+			break;
+		}
+		bytes.extend_from_slice(&buf[..n]);
+		if bytes.len() as u64 > MAX_MODEL_FILE_BYTES {
+			return Err(generic(format!(
+				"embedder model {} exceeds {MAX_MODEL_FILE_BYTES} bytes — refusing",
+				file.name
+			)));
+		}
+		let downloaded = bytes.len() as u64;
+		if downloaded - last_reported >= PROGRESS_STEP_BYTES {
+			last_reported = downloaded;
+			emit(downloaded);
+		}
 	}
+	emit(bytes.len() as u64);
 
 	let got = sha256_hex(&bytes);
 	if got != file.sha256 {
@@ -153,10 +225,12 @@ fn load_pinned(cache_dir: &Path, file: &PinnedFile) -> Result<Vec<u8>> {
 	Ok(bytes)
 }
 
-fn pinned(name: &str) -> &'static PinnedFile {
+fn pinned(name: &str) -> (u32, &'static PinnedFile) {
 	PINNED_FILES
 		.iter()
-		.find(|f| f.name == name)
+		.enumerate()
+		.find(|(_, f)| f.name == name)
+		.map(|(i, f)| (i as u32, f))
 		.expect("pinned model file present")
 }
 
@@ -167,6 +241,7 @@ fn pinned(name: &str) -> &'static PinnedFile {
 /// thread; subsequent runs load the verified files from `cache_dir`.
 struct InitTask {
 	cache_dir: String,
+	progress: Option<ProgressFn>,
 }
 
 impl Task for InitTask {
@@ -178,13 +253,18 @@ impl Task for InitTask {
 			return Ok(());
 		}
 		let dir = Path::new(&self.cache_dir).join("bge-small-en-v1.5");
+		let count = PINNED_FILES.len() as u32;
+		let load = |name: &str| -> Result<Vec<u8>> {
+			let (index, file) = pinned(name);
+			load_pinned(&dir, file, index, count, &self.progress)
+		};
 		let user_model = UserDefinedEmbeddingModel::new(
-			load_pinned(&dir, pinned("model.onnx"))?,
+			load("model.onnx")?,
 			TokenizerFiles {
-				tokenizer_file: load_pinned(&dir, pinned("tokenizer.json"))?,
-				config_file: load_pinned(&dir, pinned("config.json"))?,
-				special_tokens_map_file: load_pinned(&dir, pinned("special_tokens_map.json"))?,
-				tokenizer_config_file: load_pinned(&dir, pinned("tokenizer_config.json"))?,
+				tokenizer_file: load("tokenizer.json")?,
+				config_file: load("config.json")?,
+				special_tokens_map_file: load("special_tokens_map.json")?,
+				tokenizer_config_file: load("tokenizer_config.json")?,
 			},
 		)
 		.with_pooling(Pooling::Cls);
@@ -208,11 +288,22 @@ impl Task for InitTask {
 
 /// Initialise the embedder (idempotent). `cacheDir` is where model weights are
 /// downloaded + cached (the shell points this at its userData dir so the
-/// first-run download is controllable + offline-reusable). Resolves once the
+/// first-run download is controllable + offline-reusable). `onProgress`
+/// (optional) is called from the download thread with per-file byte progress so
+/// the shell can render a first-run-download bar (plan 11.3). Resolves once the
 /// model is ready to embed.
 #[napi(ts_return_type = "Promise<void>")]
-pub fn embedder_init(cache_dir: String) -> AsyncTask<InitTask> {
-	AsyncTask::new(InitTask { cache_dir })
+pub fn embedder_init(
+	cache_dir: String,
+	#[napi(
+		ts_arg_type = "(progress: { file: string; fileIndex: number; fileCount: number; downloaded: number; total: number }) => void"
+	)]
+	on_progress: Option<ThreadsafeFunction<DownloadProgress, Unknown<'static>, DownloadProgress, Status, false>>,
+) -> AsyncTask<InitTask> {
+	AsyncTask::new(InitTask {
+		cache_dir,
+		progress: on_progress,
+	})
 }
 
 /// Whether `embedderInit` has completed — a cheap synchronous probe the shell

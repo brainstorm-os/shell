@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EMBEDDING_DIM } from "./embedder";
+import { EmbedderPhase, type SemanticModelStatus } from "./embedder-status";
 import { type EmbedNative, FastembedEmbedder, makeEmbedderFromNative } from "./local-embedder";
 
 /** A fake native addon: returns deterministic flat vectors (`fill` per text) so
@@ -35,7 +36,7 @@ describe("FastembedEmbedder", () => {
 		expect(v2.length).toBe(EMBEDDING_DIM);
 		// Single-flight init: embedderInit called exactly once across embeds.
 		expect(native.embedderInit).toHaveBeenCalledTimes(1);
-		expect(native.embedderInit).toHaveBeenCalledWith("/cache");
+		expect(native.embedderInit).toHaveBeenCalledWith("/cache", expect.any(Function));
 	});
 
 	it("embed rejects on a dimension mismatch (fail-closed)", async () => {
@@ -79,6 +80,54 @@ describe("FastembedEmbedder", () => {
 		const v = await e.embed("x");
 		expect(v.length).toBe(EMBEDDING_DIM);
 		expect(calls).toBe(2);
+	});
+});
+
+describe("FastembedEmbedder — download status (11.3 progress UX)", () => {
+	it("emits Downloading → Ready across a successful first-run init", async () => {
+		const statuses: SemanticModelStatus[] = [];
+		const e = new FastembedEmbedder(fakeNative(), "/cache", (s) => statuses.push(s));
+		await e.embed("hello");
+		expect(statuses.map((s) => s.phase)).toEqual([EmbedderPhase.Downloading, EmbedderPhase.Ready]);
+		expect(statuses.at(-1)?.percent).toBe(100);
+	});
+
+	it("folds native per-file progress ticks into the status", async () => {
+		const native = fakeNative({
+			embedderInit: vi.fn(async (_dir: string, onProgress?: (p: unknown) => void) => {
+				onProgress?.({ file: "model.onnx", fileIndex: 0, fileCount: 5, downloaded: 25, total: 100 });
+				onProgress?.({ file: "model.onnx", fileIndex: 0, fileCount: 5, downloaded: 75, total: 100 });
+			}),
+		});
+		const statuses: SemanticModelStatus[] = [];
+		const e = new FastembedEmbedder(native, "/cache", (s) => statuses.push(s));
+		await e.embed("hello");
+		// started → 25% → 75% → ready
+		expect(statuses.map((s) => s.percent)).toEqual([null, 25, 75, 100]);
+		expect(statuses[1]?.file).toBe("model.onnx");
+		expect(statuses[1]?.fileNumber).toBe(1);
+	});
+
+	it("emits Failed with the error message on a failed init, then retries clean", async () => {
+		let calls = 0;
+		const native = fakeNative({
+			embedderInit: vi.fn(async () => {
+				calls += 1;
+				if (calls === 1) throw new Error("offline");
+			}),
+		});
+		const statuses: SemanticModelStatus[] = [];
+		const e = new FastembedEmbedder(native, "/cache", (s) => statuses.push(s));
+		await expect(e.embed("x")).rejects.toThrow(/offline/);
+		expect(statuses.at(-1)?.phase).toBe(EmbedderPhase.Failed);
+		expect(statuses.at(-1)?.error).toBe("offline");
+		await e.embed("x");
+		expect(statuses.at(-1)?.phase).toBe(EmbedderPhase.Ready);
+	});
+
+	it("works without a status sink (optional)", async () => {
+		const e = new FastembedEmbedder(fakeNative(), "/cache");
+		await expect(e.embed("x")).resolves.toHaveLength(EMBEDDING_DIM);
 	});
 });
 
