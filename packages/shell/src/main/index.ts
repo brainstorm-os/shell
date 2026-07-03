@@ -239,7 +239,7 @@ import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcut
 import type { ShortcutRegistry } from "./shortcuts/shortcut-registry";
 import { makeShortcutsServiceHandler } from "./shortcuts/shortcuts-service";
 import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
-import { AssetRefsRepository, EntitiesRepository } from "./storage/entities-repo";
+import { AssetRefsRepository, AssetsRepository, EntitiesRepository } from "./storage/entities-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
 import { EntityTypesRepository } from "./storage/registry-repo/entity-types-repo";
@@ -1542,6 +1542,23 @@ void app.whenReady().then(async () => {
 		}
 	};
 
+	// Asset-B4 — resolve a locally-stored asset's kind for the entities
+	// service's implicit asset-ref bind writer. Returns null when no vault is
+	// open or the id isn't a stored asset (a dangling / remote `brainstorm://
+	// asset/` URL is then skipped, never bound). Mirrors
+	// `getEntitiesRepoForActiveSession` (per-call repo over the cached
+	// entities.db handle).
+	const getAssetKindForActiveSession = async (assetId: string): Promise<AssetKind | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		try {
+			const db = await session.dataStores.open("entities");
+			return new AssetsRepository(db).getById(assetId)?.kind ?? null;
+		} catch {
+			return null;
+		}
+	};
+
 	const getSettingsRepoForActiveSession = async (): Promise<SettingsRepository | null> => {
 		const session = getActiveVaultSession();
 		if (!session) return null;
@@ -2084,6 +2101,9 @@ void app.whenReady().then(async () => {
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
 	const entitiesHandler = makeEntitiesServiceHandler({
 		onEntityChange: (change) => automationsChangeEmitter.emit(change),
+		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
+		// asset-ref bind writer (a null result skips a dangling/remote URL).
+		getAssetKind: getAssetKindForActiveSession,
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;
 		},

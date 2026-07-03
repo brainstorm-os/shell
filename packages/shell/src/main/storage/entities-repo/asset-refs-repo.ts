@@ -90,6 +90,15 @@ export class AssetRefsRepository {
 		return Number(result.changes);
 	}
 
+	/** Asset-B4 — drop exactly the (entity, asset) binding (across every role
+	 *  row) that fell out of an entity's properties, leaving sibling refs — and
+	 *  their `created_at` / `rehomed_at` markers — untouched. The reconcile
+	 *  writer uses this for the (existing − desired) set so re-homing state on
+	 *  the refs that *stayed* is preserved. */
+	deleteRef(entityId: string, assetId: string): void {
+		this.stmt("DELETE FROM asset_refs WHERE entity_id = ? AND asset_id = ?").run(entityId, assetId);
+	}
+
 	/** Asset-B1 — every distinct (entity, asset) binding whose DEK has not yet
 	 *  been re-homed into the entity's Y.Doc. Steady state returns nothing (the
 	 *  re-home pass stamps `rehomed_at`), so the open-time drain is one query.
