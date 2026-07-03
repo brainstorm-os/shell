@@ -13,6 +13,10 @@ crate-type = ["cdylib"]
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 fastembed = "4"
+# Already in the tree via fastembed/hf-hub/ort — reused (no new supply-chain
+# surface) to self-fetch the model with a pinned-SHA256 integrity check.
+ureq = "2"
+sha2 = "0.10"
 
 [build-dependencies]
 napi-build = "2"
