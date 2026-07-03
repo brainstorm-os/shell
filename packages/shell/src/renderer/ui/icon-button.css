@@ -57,7 +57,7 @@
 }
 
 .icon-button--filled:hover:not(:disabled) {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 
@@ -69,7 +69,7 @@
 }
 
 .icon-button--on:hover:not(:disabled) {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 

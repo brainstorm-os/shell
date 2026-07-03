@@ -103,7 +103,7 @@
 	font-weight: var(--text-weight-semibold);
 	line-height: var(--text-line-height-tight);
 	color: var(--color-accent-text);
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	border-radius: var(--radius-full);
 	letter-spacing: 0.02em;
 }
@@ -186,7 +186,7 @@
 }
 
 .membership__badge--recommended {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 
@@ -215,7 +215,7 @@
 }
 
 .membership__card--highlight .membership__card-icon {
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 }
 

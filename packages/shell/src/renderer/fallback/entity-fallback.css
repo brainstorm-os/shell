@@ -76,7 +76,7 @@
 .entity-fallback__action {
 	font: inherit;
 	font-size: var(--text-size-md);
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-accent-text);
 	border: var(--border-width) solid transparent;
 	border-radius: var(--radius-sm);

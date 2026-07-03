@@ -206,7 +206,7 @@
 	height: 16px;
 	padding: 0 var(--space-1);
 	border-radius: var(--radius-md);
-	background: var(--color-accent-default);
+	background: var(--color-accent-on-fill);
 	color: var(--color-on-accent, #fff);
 	font-size: 10px;
 	line-height: 16px;

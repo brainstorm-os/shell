@@ -47,6 +47,15 @@ export type Tokens = {
 			 *  colour is applied to text; keep `accent.default` for fills, borders,
 			 *  focus rings, and button faces. */
 			onSurface: string;
+			/** Accent FILL that carries `accent.text` on top (badges, chips,
+			 *  highlight tiles). The inverse of `onSurface`: guaranteed to give
+			 *  `accent.text` ≥ WCAG AA 4.5:1 in every theme (ratchet-enforced) —
+			 *  `accent.default` is too light for white text in several light themes,
+			 *  and its darker `accent.strong` is too dark for the dark-theme
+			 *  `accent.text`, so this picks the theme-correct fill. Use it wherever
+			 *  a background is `accent.*` AND foreground is `accent.text`; keep
+			 *  `accent.default` for decorative fills that carry no text. */
+			onFill: string;
 		};
 		/** Glossy-button anatomy — the `Button` Glass/Primary/Destructive
 		 *  variants render a saturated theme-driven 2-colour face gradient
