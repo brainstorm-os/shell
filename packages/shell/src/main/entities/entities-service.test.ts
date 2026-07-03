@@ -62,6 +62,8 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 	// asset-kind lookup; `assetKindThrows` forces the reconcile-throw path.
 	const assets = new AssetsRepository(db);
 	let assetKindThrows = false;
+	let assetBoundThrows = false;
+	const assetBoundCalls: Array<{ entityId: string; assetId: string }> = [];
 	const masterKey = generateSymmetricKey();
 	const dekStore = new EntityDekStore(dekRepo, masterKey);
 	let ledger: CapabilityLedger = fakeLedger(grants);
@@ -120,6 +122,11 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 			if (assetKindThrows) throw new Error("boom-getAssetKind");
 			return assets.getById(id)?.kind ?? null;
 		},
+		// Asset-B4 — record immediate per-bind upload triggers.
+		onAssetBound: (entityId, assetId) => {
+			if (assetBoundThrows) throw new Error("boom-onAssetBound");
+			assetBoundCalls.push({ entityId, assetId });
+		},
 	});
 	// Asset-B4 — seed a locally-stored asset so a `brainstorm://asset/<id>`
 	// URL in an entity's properties resolves + binds.
@@ -139,6 +146,10 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 		seedAsset,
 		setAssetKindThrows: (v: boolean) => {
 			assetKindThrows = v;
+		},
+		assetBoundCalls,
+		setAssetBoundThrows: (v: boolean) => {
+			assetBoundThrows = v;
 		},
 		vaultDir,
 		stores,
@@ -1047,5 +1058,58 @@ describe("entities service — live-sync hooks (10.12)", () => {
 		// Write committed despite the reconcile failure; no ref bound.
 		expect(e.repo.get(created.id)).not.toBeNull();
 		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
+	});
+
+	it("onAssetBound fires once per NEWLY created ref, on create and update", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		e.seedAsset("cov1", AssetKind.Cover);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		expect(e.assetBoundCalls).toEqual([{ entityId: created.id, assetId: "fav1" }]);
+
+		await e.handler(env("io.x", "update", { id: created.id, patch: { coverUrl: assetUrl("cov1") } }));
+		// Only the NEW ref fires — the pre-existing fav1 ref must not re-trigger.
+		expect(e.assetBoundCalls).toEqual([
+			{ entityId: created.id, assetId: "fav1" },
+			{ entityId: created.id, assetId: "cov1" },
+		]);
+	});
+
+	it("onAssetBound does not fire for an unchanged ref, a dangling URL, or a prune", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1") },
+			}),
+		)) as { id: string };
+		e.assetBoundCalls.length = 0;
+
+		// No-op property update — ref unchanged, no re-fire.
+		await e.handler(env("io.x", "update", { id: created.id, patch: { title: "t" } }));
+		// Dangling URL — never bound, never fired.
+		await e.handler(env("io.x", "update", { id: created.id, patch: { extraUrl: assetUrl("nope") } }));
+		// Prune — dropping the URL removes the ref, no fire.
+		await e.handler(env("io.x", "update", { id: created.id, patch: { faviconUrl: "" } }));
+		expect(e.assetBoundCalls).toHaveLength(0);
+	});
+
+	it("a throwing onAssetBound hook is contained — refs still land, write still succeeds", async () => {
+		e.seedAsset("fav1", AssetKind.Favicon);
+		e.seedAsset("cov1", AssetKind.Cover);
+		e.setAssetBoundThrows(true);
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { faviconUrl: assetUrl("fav1"), coverUrl: assetUrl("cov1") },
+			}),
+		)) as { id: string };
+		// Both refs written despite the hook throwing on each.
+		const refs = e.repo.assetRefs.listByEntity(created.id);
+		expect(refs.map((r) => r.assetId).sort()).toEqual(["cov1", "fav1"]);
 	});
 });

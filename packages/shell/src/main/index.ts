@@ -64,7 +64,12 @@ import { recoverAssetDek } from "./assets/recover-asset-dek";
 import { relayAssetCas } from "./assets/relay-asset-cas";
 import { resolveAssetForServe } from "./assets/serve-asset";
 import { serveVaultMedia } from "./assets/serve-media";
-import { drainPendingUploads } from "./assets/upload-on-bind";
+import {
+	UploadBoundOutcome,
+	type UploadOnBindDeps,
+	drainPendingUploads,
+	uploadBoundAssetIfPending,
+} from "./assets/upload-on-bind";
 import { VaultMediaDomain, isSealedMedia } from "./assets/vault-media-crypto";
 import { makeAutomationsServiceHandler } from "./automations/automations-service";
 import { RegistrySchedulerStore } from "./automations/scheduler-store";
@@ -713,6 +718,60 @@ async function materializeAssetForServeOnce(
 	}
 }
 
+// Asset-B4 — the upload dep set shared by the connect-time drain and the
+// immediate per-bind push: same ydoc ferries (manifest install/read), same
+// DEK recovery, same manifest-present short-circuit.
+function assetUploadDeps(
+	store: { readAsset: (assetId: string) => Promise<{ bytes: Uint8Array; mime: string } | null> },
+	cas: NonNullable<ReturnType<typeof relayAssetCas>>,
+): UploadOnBindDeps {
+	return {
+		cas,
+		installManifest: callYdocInstallManifest,
+		manifestPresent: async (e, a) =>
+			parseAssetChunkManifest(
+				(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
+			) !== null,
+		readAsset: (a) => store.readAsset(a),
+		recoverDek: recoverAssetDekForActiveSession,
+	};
+}
+
+// Asset-B4 — immediate upload-on-bind: push ONE freshly-bound asset the moment
+// its ref lands. The connect-time drain subsumes this for correctness (an asset
+// bound while offline uploads on the next relay state change); this is the
+// latency path so bytes reach the node while the relay is already up. Per-pair
+// in-flight dedupe stops a bind racing the drain (or a rapid double bind) from
+// double-sealing the same chunks concurrently; beyond that it's idempotent (a
+// present manifest short-circuits inside `uploadBoundAssetIfPending`).
+const assetUploadNowInFlight = new Set<string>();
+
+async function uploadBoundAssetNow(entityId: string, assetId: string): Promise<void> {
+	const key = `${entityId}::${assetId}`;
+	if (assetUploadNowInFlight.has(key)) return;
+	const session = getActiveVaultSession();
+	if (!session) return;
+	const { getActiveRelay } = await import("./sync/active-relay");
+	const relay = getActiveRelay();
+	if (!relay || !relay.hasAssetPlane()) return;
+	const cas = relayAssetCas(relay);
+	if (!cas) return;
+	assetUploadNowInFlight.add(key);
+	try {
+		const store = await session.assetStore();
+		const outcome = await uploadBoundAssetIfPending(assetUploadDeps(store, cas), entityId, assetId);
+		if (outcome === UploadBoundOutcome.Uploaded) {
+			console.log(`[brainstorm] asset uploaded on bind: ${assetId} (entity ${entityId})`);
+		}
+	} catch (error) {
+		console.warn(
+			`[brainstorm] upload-on-bind failed for ${entityId}/${assetId}: ${(error as Error).message}`,
+		);
+	} finally {
+		assetUploadNowInFlight.delete(key);
+	}
+}
+
 let assetUploadDrainInFlight = false;
 
 // Asset-B4 upload-on-bind (connect-time drain) — push every bound-but-not-yet-
@@ -735,19 +794,7 @@ async function drainAssetUploads(): Promise<void> {
 		const pairs = new AssetRefsRepository(db).listAllPairs();
 		if (pairs.length === 0) return;
 		const store = await session.assetStore();
-		const r = await drainPendingUploads(
-			{
-				cas,
-				installManifest: callYdocInstallManifest,
-				manifestPresent: async (e, a) =>
-					parseAssetChunkManifest(
-						(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
-					) !== null,
-				readAsset: (a) => store.readAsset(a),
-				recoverDek: recoverAssetDekForActiveSession,
-			},
-			pairs,
-		);
+		const r = await drainPendingUploads(assetUploadDeps(store, cas), pairs);
 		if (r.uploaded > 0 || r.failed > 0) {
 			console.log(
 				`[brainstorm] asset upload drain: uploaded ${r.uploaded} (${r.alreadyPresent} present, ${r.notLocal} not-local, ${r.noDek} no-dek, ${r.failed} failed)`,
@@ -2370,6 +2417,11 @@ void app.whenReady().then(async () => {
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
 		getAssetKind: getAssetKindForActiveSession,
+		// Asset-B4 — a fresh ref landed: push its chunks now if the blob plane
+		// is live (fire-and-forget; the connect-time drain covers the rest).
+		onAssetBound: (entityId, assetId) => {
+			void uploadBoundAssetNow(entityId, assetId);
+		},
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;
 		},

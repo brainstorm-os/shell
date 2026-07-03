@@ -117,6 +117,15 @@ export type EntitiesServiceOptions = {
 	 *  entity-write gate that already passed authorizes the reconcile
 	 *  (OQ-238 folds in). */
 	getAssetKind?: (assetId: string) => Promise<AssetKind | null>;
+	/** Asset-B4 — a NEW `asset_refs` row was just written for this pair
+	 *  (post-commit, contained like the sibling hooks). The wired consumer
+	 *  attempts an immediate chunk upload to the durable node when the blob
+	 *  plane is live. The connect-time drain already subsumes this for
+	 *  correctness — the hook is purely latency (bytes reach the node while
+	 *  the relay is up instead of on the next state change). Fires ONLY for
+	 *  refs this reconcile CREATED, never for pre-existing ones, so a no-op
+	 *  property update can't re-trigger uploads. */
+	onAssetBound?: (entityId: string, assetId: string) => void;
 	/** 10.12 — an app opened (`loadDoc`) an entity's doc. The always-on
 	 *  live-sync engine consults the entity's access record and, if shared
 	 *  (>1 active member), subscribes its relay channel so inbound edits land.
@@ -210,7 +219,16 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			const existingIds = new Set(repo.assetRefs.listByEntity(entityId).map((r) => r.assetId));
 			const now = clock();
 			for (const [assetId, role] of desired) {
-				if (!existingIds.has(assetId)) repo.assetRefs.create({ entityId, assetId, role, now });
+				if (!existingIds.has(assetId)) {
+					repo.assetRefs.create({ entityId, assetId, role, now });
+					// Contained per-invocation so a throwing hook can't abort the
+					// remaining ref writes or the prune loop below.
+					try {
+						options.onAssetBound?.(entityId, assetId);
+					} catch (error) {
+						console.error("[entities] onAssetBound hook failed:", error);
+					}
+				}
 			}
 			// deleteRef (not deleteByEntity) so an unchanged ref keeps its
 			// `created_at` / `rehomed_at`.
