@@ -1,12 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CapabilityLedger } from "../capabilities/ledger";
 import { ShortcutRegistry } from "../shortcuts/shortcut-registry";
 import { DataStores } from "../storage/data-stores";
 import { ed25519 } from "../test-support/crypto-test-helpers";
 import { AppSignatureStatus, type TrustedAppKeys, canonicalManifestBytes } from "./app-signature";
+import { resetAppsChangedTarget, setAppsChangedTarget } from "./apps-changed";
 import { AppInstaller, bundleExists } from "./installer";
 import type { AppManifest } from "./manifest";
 
@@ -55,6 +56,40 @@ async function setup() {
 	const installer = new AppInstaller(vaultDir, registryDb, ledger);
 	return { vaultDir, sourceDir, stores, registryDb, ledger, installer };
 }
+
+describe("AppInstaller — apps:changed broadcast (F-380)", () => {
+	let env: Awaited<ReturnType<typeof setup>>;
+	const send = vi.fn();
+
+	beforeEach(async () => {
+		env = await setup();
+		send.mockClear();
+		setAppsChangedTarget(() => ({ webContents: { send, isDestroyed: () => false } }) as never);
+	});
+
+	afterEach(async () => {
+		resetAppsChangedTarget();
+		env.stores.close();
+		await rm(env.vaultDir, { recursive: true, force: true });
+		await rm(env.sourceDir, { recursive: true, force: true });
+	});
+
+	it("fires on install, refreshRegistrations, and uninstall — not on a failed install", async () => {
+		await writeBundle(env.sourceDir, baseManifest, { "dist/index.html": "<html></html>" });
+		await env.installer.install({ bundleDir: env.sourceDir });
+		expect(send).toHaveBeenCalledTimes(1);
+
+		await env.installer.refreshRegistrations(baseManifest.id);
+		expect(send).toHaveBeenCalledTimes(2);
+
+		await env.installer.uninstall(baseManifest.id);
+		expect(send).toHaveBeenCalledTimes(3);
+
+		const failed = await env.installer.uninstall("io.example.gone");
+		expect(failed.ok).toBe(false);
+		expect(send).toHaveBeenCalledTimes(3);
+	});
+});
 
 describe("AppInstaller — install", () => {
 	let env: Awaited<ReturnType<typeof setup>>;

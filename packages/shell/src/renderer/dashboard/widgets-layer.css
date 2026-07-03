@@ -135,6 +135,19 @@
 	outline-offset: 1px;
 }
 
+/* Focusable grips (F-383): same accent ring as the header actions so the
+ * keyboard move/resize affordances are discoverable by Tab. The resize grip is
+ * hover-revealed for pointers; keyboard focus must reveal it too. */
+.dashboard-widgets__grip:focus-visible,
+.dashboard-widgets__resize:focus-visible {
+	outline: var(--border-width) solid var(--color-accent-default);
+	outline-offset: 1px;
+}
+
+.dashboard-widgets__resize:focus-visible {
+	opacity: 1;
+}
+
 /* The body hosts the widget iframe (or the loading placeholder). Positioned so
  * the resize grip can layer over the iframe at the corner. `overflow: hidden` on
  * the card clips the iframe to the rounded corners. */

@@ -48,6 +48,7 @@ import {
 	shouldBlockInstall,
 	verifyManifestSignature,
 } from "./app-signature";
+import { broadcastAppsChanged } from "./apps-changed";
 import { shouldCopyBundleEntry } from "./bundle-filter";
 import { DEFAULT_INSTALL_PROVENANCE, type InstallProvenance } from "./install-provenance";
 import {
@@ -223,6 +224,7 @@ export class AppInstaller {
 		}
 
 		this.mirrorShortcuts(manifest);
+		broadcastAppsChanged();
 
 		return {
 			ok: true,
@@ -324,6 +326,7 @@ export class AppInstaller {
 		}
 
 		this.mirrorShortcuts(manifest);
+		broadcastAppsChanged();
 
 		return {
 			ok: true,
@@ -409,6 +412,7 @@ export class AppInstaller {
 			this.writeRegistrations(manifest, now, blockSources);
 		})();
 		this.mirrorShortcuts(manifest);
+		broadcastAppsChanged();
 		return { ok: true, id: manifest.id, version: manifest.version };
 	}
 
@@ -428,6 +432,7 @@ export class AppInstaller {
 
 		// Bundle directory stays on disk for forensic recovery; vacuum is a
 		// separate operation (Stage 13).
+		broadcastAppsChanged();
 		return { ok: true, revokedCapabilities, orphanedTypes };
 	}
 

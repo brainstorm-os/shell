@@ -16,6 +16,7 @@
 
 import type {
 	Subscription,
+	VaultEntitiesListQuery,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
 } from "@brainstorm/sdk-types";
@@ -102,10 +103,19 @@ export function useLiveEntities<T>(
  */
 export function useVaultEntities(
 	service: VaultEntitiesService | null | undefined,
-	options: { coalesceMs?: number; onError?: (error: unknown) => void } = {},
+	options: {
+		coalesceMs?: number;
+		onError?: (error: unknown) => void;
+		/** Narrow the snapshot server-side where the service supports it (the
+		 *  widget bridge does — F-384). Pass a stable reference: a new object
+		 *  identity per render re-subscribes the store. */
+		query?: VaultEntitiesListQuery;
+	} = {},
 ): VaultEntitiesSnapshot {
 	return useLiveEntities<VaultEntitiesSnapshot>(
-		service ? { list: () => service.list(), onChange: (l) => service.onChange(l) } : null,
+		service
+			? { list: () => service.list(options.query), onChange: (l) => service.onChange(l) }
+			: null,
 		{
 			initial: EMPTY_VAULT_SNAPSHOT,
 			equals: vaultSnapshotEquals,

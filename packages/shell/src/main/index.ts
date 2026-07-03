@@ -53,6 +53,7 @@ import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
 import { ProviderRegistry } from "./ai/provider-registry";
 import { maskAppWindowsForLock } from "./apps/app-window-lock";
+import { setAppsChangedTarget } from "./apps/apps-changed";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
 import { validateManifest } from "./apps/manifest";
 import { appSelfManagesTabs } from "./apps/window-container";
@@ -1278,6 +1279,12 @@ void app.whenReady().then(async () => {
 	// staleness signal to the dashboard window too — its parent bridge forwards
 	// it to each subscribed widget iframe.
 	setVaultEntitiesStaleExtraTarget(() =>
+		dashboardWindow && !dashboardWindow.isDestroyed() ? dashboardWindow : null,
+	);
+	// App (re)installs push `apps:changed` to the dashboard so widget titles,
+	// widget iframe entries, and the app-icon cache refresh instead of racing
+	// the installer once at mount and never healing (F-380).
+	setAppsChangedTarget(() =>
 		dashboardWindow && !dashboardWindow.isDestroyed() ? dashboardWindow : null,
 	);
 	// Feedback-3 + Help-1 — bundled changelog and Help corpus served via
