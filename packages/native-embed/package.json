@@ -1,0 +1,58 @@
+{
+  "name": "@brainstorm/native-embed",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Native NAPI-RS embedding addon for Brainstorm — local semantic-search embeddings (fastembed-rs / ONNX Runtime, bge-small-en-v1.5). Isolated from @brainstorm/native so ONNX Runtime never links into the crypto binary. See docs/implementation-plan.md §11.3.",
+  "license": "UNLICENSED",
+  "main": "loader.cjs",
+  "module": "native.mjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./native.mjs",
+      "require": "./loader.cjs"
+    },
+    "./packaged-resolver.cjs": "./packaged-resolver.cjs",
+    "./index.js": "./index.js",
+    "./brainstorm-embed.*.node": "./brainstorm-embed.*.node"
+  },
+  "napi": {
+    "binaryName": "brainstorm-embed",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "aarch64-pc-windows-msvc",
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "native.mjs",
+    "loader.cjs",
+    "packaged-resolver.cjs",
+    "brainstorm-embed.*.node"
+  ],
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "build:host": "napi build --platform --release",
+    "build:darwin-x64": "napi build --platform --release --target x86_64-apple-darwin",
+    "build:darwin-arm64": "napi build --platform --release --target aarch64-apple-darwin",
+    "build:windows-x64": "napi build --platform --release --target x86_64-pc-windows-msvc",
+    "build:windows-arm64": "napi build --platform --release --target aarch64-pc-windows-msvc",
+    "build:linux-x64": "napi build --platform --release --target x86_64-unknown-linux-gnu",
+    "build:linux-arm64": "napi build --platform --release --target aarch64-unknown-linux-gnu",
+    "_build:all_doc": "Documentation only — the CI matrix (13.1c pattern) cross-compiles per-runner; local cross-compile needs the matching toolchain (cargo-zigbuild / cargo-xwin) per napi-rs --cross-compile. ONNX Runtime linking makes cross-compile heavier than the crypto crate; that packaging work is the deferred 11.3 tail.",
+    "build:all": "bun run build:darwin-x64 && bun run build:darwin-arm64 && bun run build:windows-x64 && bun run build:windows-arm64 && bun run build:linux-x64 && bun run build:linux-arm64"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

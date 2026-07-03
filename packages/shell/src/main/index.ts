@@ -232,7 +232,8 @@ import { createLaunchSetup } from "./runtime/launch-setup";
 import { SHELL_ACTION_CHANNEL, createMenuSetup } from "./runtime/menu-setup";
 import { createShortcutSetup } from "./runtime/shortcut-setup";
 import { collectIndexableEntities } from "./search/collect-indexable";
-import { StubEmbedder } from "./search/embedder";
+import type { TextEmbedder } from "./search/embedder";
+import { loadFastembedEmbedder } from "./search/local-embedder";
 import { SearchIndexer, pickIndexable } from "./search/search-indexer";
 import { makeSearchServiceHandler } from "./search/search-service";
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
@@ -1708,19 +1709,25 @@ void app.whenReady().then(async () => {
 	let searchIndexer: SearchIndexer | null = null;
 	let rebuildToken: symbol = Symbol("idle");
 
-	// 11.2 — semantic (vector) index seam, maintained in lockstep with the
-	// lexical index on the same `search.db` handle. Gated OFF for v1 beta:
-	// the only embedder available today is `StubEmbedder`, whose vectors are
-	// semantically meaningless, so populating a vector index in production
-	// would burn disk + cycles for zero user value. 11.3 swaps in the real
-	// `multilingual-e5-small` model AND flips this flag; the storage +
-	// maintenance + bench path it activates is already built and tested
-	// (vector-store / vector-indexer suites + the vector BenchEngine). The
-	// query surface (`search.semantic` / `search.hybrid`) stays gated until
-	// the hybrid-retrieval rung — 11.2 wires maintenance only, no new broker
-	// verb, no new capability.
-	const VECTOR_INDEXING_ENABLED = false;
+	// 11.3 — the real local embedding model (`bge-small-en-v1.5`, 384-d, via the
+	// `@brainstorm/native-embed` fastembed/ONNX addon). Loaded once, lazily, and
+	// DEFENSIVELY: `loadFastembedEmbedder` returns null when the native addon
+	// isn't available (a platform without a prebuilt `.node`, or ONNX Runtime
+	// failing to load), so `swapSearchIndexer` simply skips the vector index and
+	// search stays lexical-only — the same graceful-degrade posture
+	// `createVectorIndexer` uses when sqlite-vec can't load. This replaces 11.2's
+	// hardcoded gate + meaningless `StubEmbedder`; the storage + maintenance +
+	// query path it activates was already built + tested under 11.2/11.4.
 	let vectorIndexer: VectorIndexer | null = null;
+	let localEmbedderLoad: Promise<TextEmbedder | null> | null = null;
+	const getLocalEmbedder = (): Promise<TextEmbedder | null> => {
+		if (!localEmbedderLoad) {
+			// First-run model weights download into userData/models (controllable,
+			// offline-reusable). The download itself is deferred to the first embed.
+			localEmbedderLoad = loadFastembedEmbedder(join(app.getPath("userData"), "models"));
+		}
+		return localEmbedderLoad;
+	};
 
 	// B5.10 — lazy property + dictionary usage index. One per active vault
 	// session (swapped on session change); subsequent reads return the
@@ -1863,12 +1870,16 @@ void app.whenReady().then(async () => {
 		try {
 			const db = await session.dataStores.open("search");
 			searchIndexer = new SearchIndexer(db);
-			// 11.2 — construct the vector indexer on the SAME search.db handle
-			// when enabled (11.3). `createVectorIndexer` returns null when
-			// sqlite-vec can't load (e.g. a platform missing the prebuilt
-			// binary) — lexical search keeps working regardless.
-			if (VECTOR_INDEXING_ENABLED) {
-				const vector = createVectorIndexer(db, new StubEmbedder());
+			// 11.3 — construct the vector indexer on the SAME search.db handle when
+			// the real embedder loads. Two independent degrade points, both to
+			// lexical-only: the embedder is null (no native addon), OR
+			// `createVectorIndexer` returns null (sqlite-vec can't load on this
+			// platform). A vector-rebuild failure downstream is isolated —
+			// `rebuildSearchIndex` rebuilds lexical first, then vector in a
+			// swallowing catch, so an offline model download never breaks search.
+			const embedder = await getLocalEmbedder();
+			if (embedder) {
+				const vector = createVectorIndexer(db, embedder);
 				vectorIndexer = vector?.indexer ?? null;
 			}
 			await rebuildSearchIndex();
