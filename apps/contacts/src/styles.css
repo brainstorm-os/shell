@@ -213,6 +213,7 @@ body.is-resizing .contacts__resize {
 .contacts-list__controls {
 	display: flex;
 	flex: 0 0 auto;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2);
 	padding: var(--space-2);
@@ -231,6 +232,7 @@ body.is-resizing .contacts__resize {
 	background: transparent;
 	color: var(--text-dim);
 	font-size: var(--text-size-xs);
+	white-space: nowrap;
 	cursor: pointer;
 }
 
