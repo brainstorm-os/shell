@@ -22,8 +22,8 @@ import {
 	decodeBundlePayload,
 	decodeCatalogResult,
 	decodeControlMessage,
-	encodeBundlePayload,
 	decodeRotateReply,
+	encodeBundlePayload,
 	encodeControlMessage,
 	isControlMessage,
 	unwrapBinaryFrame,
@@ -993,34 +993,6 @@ describe("WebSocketRelayPort — inbound bundles (10.10)", () => {
 	});
 
 	it("a listener throwing on one sub-frame doesn't block the rest of the bundle", () => {
-describe("WebSocketRelayPort — requestRotate (10.11 routing-token rotation)", () => {
-	const controlReply = (message: Record<string, unknown>): Uint8Array => {
-		const body = new TextEncoder().encode(JSON.stringify(message));
-		const out = new Uint8Array(1 + body.length);
-		out[0] = CONTROL_CHANNEL_BYTE;
-		out.set(body, 1);
-		return out;
-	};
-
-	it("rejects when the relay is not open (fail-closed before the wire)", async () => {
-		const Ctor = makeFakeWsCtor();
-		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
-		await expect(port.requestRotate("t-old", "t-new")).rejects.toThrow(/not open/);
-		port.close();
-	});
-
-	it("rejects invalid from/to without sending", async () => {
-		const Ctor = makeFakeWsCtor();
-		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
-		port.connect();
-		Ctor.instances[0]?.open();
-		await expect(port.requestRotate("", "t-new")).rejects.toThrow(/invalid/);
-		await expect(port.requestRotate("t-old", "")).rejects.toThrow(/invalid/);
-		await expect(port.requestRotate("same", "same")).rejects.toThrow(/invalid/);
-		port.close();
-	});
-
-	it("sends the rotate verb and resolves ONLY on the node's rotated ack", async () => {
 		const Ctor = makeFakeWsCtor();
 		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
 		port.connect();
@@ -1088,6 +1060,42 @@ describe("WebSocketRelayPort — subscribeBatch (10.10)", () => {
 		const control = ws?.sent[0] ? decodeControlMessage(ws.sent[0]) : null;
 		expect(control).toEqual({ op: "subscribe", entityIds: ["e1", "e2"], bundle: true });
 		port.close();
+	});
+});
+
+describe("WebSocketRelayPort — requestRotate (10.11 routing-token rotation)", () => {
+	const controlReply = (message: Record<string, unknown>): Uint8Array => {
+		const body = new TextEncoder().encode(JSON.stringify(message));
+		const out = new Uint8Array(1 + body.length);
+		out[0] = CONTROL_CHANNEL_BYTE;
+		out.set(body, 1);
+		return out;
+	};
+
+	it("rejects when the relay is not open (fail-closed before the wire)", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		await expect(port.requestRotate("t-old", "t-new")).rejects.toThrow(/not open/);
+		port.close();
+	});
+
+	it("rejects invalid from/to without sending", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		Ctor.instances[0]?.open();
+		await expect(port.requestRotate("", "t-new")).rejects.toThrow(/invalid/);
+		await expect(port.requestRotate("t-old", "")).rejects.toThrow(/invalid/);
+		await expect(port.requestRotate("same", "same")).rejects.toThrow(/invalid/);
+		port.close();
+	});
+
+	it("sends the rotate verb and resolves ONLY on the node's rotated ack", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
 		const pending = port.requestRotate("t-old", "t-new", "acct-1");
 		const lastSent = ws?.sent.at(-1);
 		expect(lastSent?.[0]).toBe(CONTROL_CHANNEL_BYTE);
