@@ -4,10 +4,12 @@
  *
  * The owner-device push half (the mirror of `materialize-on-serve`). An asset's
  * bytes only leave the device when (a) it's referenced by an entity (an
- * `asset_refs` row exists) and (b) the live transport has the blob plane. Two
- * triggers share this one unit:
- *   - **on bind** — right after the reference lands + the relay is connected;
- *   - **on connect** — a drain over every ref for assets bound while offline.
+ * `asset_refs` row exists) and (b) the live transport has the blob plane. The
+ * wired trigger is the **connect-time drain** — `drainPendingUploads` over every
+ * ref whenever the relay reaches a blob-plane state — which subsumes per-bind
+ * for correctness (an asset bound between connects uploads on the next state
+ * change). `uploadBoundAssetIfPending` is factored out so a future immediate
+ * on-bind trigger can reuse it without a second code path.
  *
  * The manifest on the entity Y.Doc IS the "already uploaded" marker
  * (`uploadBoundAsset` installs it only after every chunk is confirmed on the

@@ -557,6 +557,10 @@ function registerBrainstormProtocol(): void {
 						const headers = new Headers();
 						headers.set("Content-Type", fetched.mime);
 						headers.set("Cache-Control", "no-store");
+						// Defense-in-depth behind `serveSafeMime`: never let the browser
+						// sniff a materialised (peer-manifest-sourced) blob into a more
+						// active type than its declared Content-Type.
+						headers.set("X-Content-Type-Options", "nosniff");
 						return new Response(Buffer.from(fetched.bytes), { status: 200, headers });
 					}
 				}
@@ -566,6 +570,7 @@ function registerBrainstormProtocol(): void {
 			headers.set("Content-Type", result.mime);
 			// Decrypted vault bytes — don't let them linger in a shared cache.
 			headers.set("Cache-Control", "no-store");
+			headers.set("X-Content-Type-Options", "nosniff");
 			return new Response(Buffer.from(result.bytes), { status: 200, headers });
 		}
 		return new Response(null, { status: 404 });
@@ -641,12 +646,36 @@ async function recoverAssetDekForActiveSession(
 	);
 }
 
-// Asset-B4 serve-on-miss — materialise a not-locally-present blob from the node
-// when the plain serve missed. Fail-closed: any error (or no node plane / no
-// recoverable ref) resolves to null so the caller 404s, never a partial. Only
-// the metadata-present, blob-absent case can succeed (a ref exists only when the
-// `assets` row does — the FK); a true cold device 404s harmlessly.
+// Asset-B4 — coalesce concurrent serve-on-miss materializations of the SAME
+// asset. Two guarantees: (1) N parallel requests for one evicted asset (e.g. an
+// image referenced many times on a page) do ONE fetch, not N; (2) it caps the
+// untrusted-manifest reassembly allocation (`downloadAsset` sizes a buffer from
+// the peer-authored `totalRawLen`, ≤2 GiB) to one in-flight buffer per asset
+// instead of one per request, so a hostile 2 GiB-claiming manifest can't be
+// amplified by firing many parallel requests at the same id.
+const assetMaterializeInFlight = new Map<
+	string,
+	Promise<{ bytes: Uint8Array; mime: string } | null>
+>();
+
 async function materializeAssetForServe(
+	assetId: string,
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
+	const existing = assetMaterializeInFlight.get(assetId);
+	if (existing) return existing;
+	const run = materializeAssetForServeOnce(assetId).finally(() => {
+		assetMaterializeInFlight.delete(assetId);
+	});
+	assetMaterializeInFlight.set(assetId, run);
+	return run;
+}
+
+// Serve-on-miss for a single asset: materialise a not-locally-present blob from
+// the node when the plain serve missed. Fail-closed: any error (or no node plane
+// / no recoverable ref) resolves to null so the caller 404s, never a partial.
+// Only the metadata-present, blob-absent case can succeed (a ref exists only
+// when the `assets` row does — the FK); a true cold device 404s harmlessly.
+async function materializeAssetForServeOnce(
 	assetId: string,
 ): Promise<{ bytes: Uint8Array; mime: string } | null> {
 	try {
