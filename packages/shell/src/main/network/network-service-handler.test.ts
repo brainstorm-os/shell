@@ -1264,6 +1264,97 @@ describe("makeNetworkServiceHandler — readable (Net-2c)", () => {
 		expect(extractReadable.mock.calls[0]?.[0]?.html).toContain("Heading");
 	});
 
+	it("9.18.9 — pulls remote article images into the encrypted asset store + rewrites their src", async () => {
+		const stored: Array<{ mime: string; originUrl?: string | null | undefined }> = [];
+		const storeImageAsset = vi.fn(
+			async (input: { bytes: Uint8Array; mime: string; kind: unknown; originUrl?: string | null }) => {
+				stored.push({ mime: input.mime, originUrl: input.originUrl });
+				return { assetId: `img-${stored.length}` };
+			},
+		);
+		const IMG_URL = "https://cdn.example.test/a.png";
+		const fetchImpl: FetchImpl = async (_ip, req) => {
+			if (req.url.endsWith(".png")) {
+				return {
+					status: 200,
+					headers: { "content-type": "image/png" },
+					body: (async function* () {
+						yield new Uint8Array([1, 2, 3]);
+					})(),
+				};
+			}
+			return {
+				status: 200,
+				headers: { "content-type": "text/html; charset=utf-8" },
+				body: (async function* () {
+					yield new TextEncoder().encode(ARTICLE_HTML);
+				})(),
+			};
+		};
+		const extractReadable = vi.fn(async () => ({
+			blocks: [
+				{ type: "image", version: 1, src: IMG_URL, altText: "", caption: "", width: "inherit" },
+				{ type: "paragraph", version: 1 },
+			],
+		}));
+		const handler = makeNetworkServiceHandler({
+			...baseReadableOpts(),
+			fetchImpl,
+			extractReadable,
+			storeImageAsset,
+		});
+		const result = (await handler(readableEnv())) as NetworkReadableResult;
+		expect(storeImageAsset).toHaveBeenCalledTimes(1);
+		expect(stored[0]).toMatchObject({ mime: "image/png", originUrl: IMG_URL });
+		expect((result.blocks?.[0] as unknown as { src: string }).src).toBe("brainstorm://asset/img-1");
+		// non-image blocks pass through untouched
+		expect(result.blocks?.[1]).toEqual({ type: "paragraph", version: 1 });
+	});
+
+	it("9.18.9 — a non-image sub-fetch (guard) leaves the image's remote src, stores nothing", async () => {
+		const storeImageAsset = vi.fn(async () => ({ assetId: "should-not-be-used" }));
+		const fetchImpl: FetchImpl = async (_ip, req) => {
+			if (req.url.endsWith(".png")) {
+				// A URL that lies about being an image — the MIME guard rejects it.
+				return {
+					status: 200,
+					headers: { "content-type": "text/html" },
+					body: (async function* () {})(),
+				};
+			}
+			return {
+				status: 200,
+				headers: { "content-type": "text/html; charset=utf-8" },
+				body: (async function* () {
+					yield new TextEncoder().encode(ARTICLE_HTML);
+				})(),
+			};
+		};
+		const extractReadable = vi.fn(async () => ({
+			blocks: [
+				{
+					type: "image",
+					version: 1,
+					src: "https://cdn.example.test/a.png",
+					altText: "",
+					caption: "",
+					width: "inherit",
+				},
+			],
+		}));
+		const handler = makeNetworkServiceHandler({
+			...baseReadableOpts(),
+			fetchImpl,
+			extractReadable,
+			storeImageAsset,
+		});
+		const result = (await handler(readableEnv())) as NetworkReadableResult;
+		expect(storeImageAsset).not.toHaveBeenCalled();
+		expect((result.blocks?.[0] as unknown as { src: string }).src).toBe(
+			"https://cdn.example.test/a.png",
+		);
+	});
+
 	it("falls back to blocks: null when no extractor is wired (metadata-only)", async () => {
 		const handler = makeNetworkServiceHandler(baseReadableOpts());
 		const result = (await handler(readableEnv())) as NetworkReadableResult;
