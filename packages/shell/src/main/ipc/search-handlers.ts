@@ -14,6 +14,7 @@
  */
 
 import { ipcMain } from "electron";
+import { type SemanticModelStatus, absentStatus } from "../search/embedder-status";
 import type { IndexStats, IndexerQuery, SearchHit, SearchIndexer } from "../search/search-indexer";
 import { runHybridQuery } from "../search/search-service";
 import type { VectorIndexer } from "../search/vector-indexer";
@@ -29,6 +30,10 @@ export const SEARCH_REINDEX_CHANNEL = "search:reindex";
  *  the panel shows coverage as "—" rather than a misleading 0%. */
 export type SearchIndexReport = IndexStats & {
 	available: number | null;
+	/** 11.3 — the on-device semantic model's download/readiness status, so the
+	 *  panel can render the first-run-download progress bar. Never null: an
+	 *  absent native addon reports `phase: Absent` (lexical-only). */
+	semantic: SemanticModelStatus;
 };
 
 export type SearchHandlerDeps = {
@@ -39,6 +44,9 @@ export type SearchHandlerDeps = {
 	 *  sqlite-vec didn't load or vector indexing is gated off — the path then
 	 *  degrades to lexical-only (today's behaviour), sharpening once 11.3 lands. */
 	getVectorIndexer?: () => VectorIndexer | null;
+	/** 11.3 — the current semantic-model download/readiness status. Optional so
+	 *  callers/tests that don't wire the embedder report `Absent` (lexical-only). */
+	getSemanticStatus?: () => SemanticModelStatus;
 	/** Rebuild the index from sources (same path as vault-activation). */
 	reindex: () => Promise<void>;
 	/** Count of indexable entities the sources hold right now; null when
@@ -81,8 +89,9 @@ export function registerSearchHandlers(deps: SearchHandlerDeps): void {
 
 /** Join the indexer's self-view with a source count. Each half degrades
  *  independently — a thrown stats read still reports coverage, a failed
- *  source scan still reports the index size. */
-async function buildReport(deps: SearchHandlerDeps): Promise<SearchIndexReport> {
+ *  source scan still reports the index size. Exported for unit testing (the
+ *  `search:stats`/`reindex` handlers themselves need `ipcMain`). */
+export async function buildReport(deps: SearchHandlerDeps): Promise<SearchIndexReport> {
 	const indexer = deps.getIndexer();
 	let stats: IndexStats = EMPTY_STATS;
 	if (indexer) {
@@ -98,7 +107,8 @@ async function buildReport(deps: SearchHandlerDeps): Promise<SearchIndexReport> 
 	} catch (error) {
 		console.warn("[brainstorm] search coverage count failed:", error);
 	}
-	return { ...stats, available };
+	const semantic = deps.getSemanticStatus?.() ?? absentStatus();
+	return { ...stats, available, semantic };
 }
 
 /** Pure validator — keeps the IPC boundary tight without leaking shape

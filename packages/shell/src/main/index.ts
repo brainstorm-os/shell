@@ -233,6 +233,7 @@ import { SHELL_ACTION_CHANNEL, createMenuSetup } from "./runtime/menu-setup";
 import { createShortcutSetup } from "./runtime/shortcut-setup";
 import { collectIndexableEntities } from "./search/collect-indexable";
 import type { TextEmbedder } from "./search/embedder";
+import { type SemanticModelStatus, absentStatus, initialStatus } from "./search/embedder-status";
 import { loadFastembedEmbedder } from "./search/local-embedder";
 import { SearchIndexer, pickIndexable } from "./search/search-indexer";
 import { makeSearchServiceHandler } from "./search/search-service";
@@ -1720,11 +1721,23 @@ void app.whenReady().then(async () => {
 	// query path it activates was already built + tested under 11.2/11.4.
 	let vectorIndexer: VectorIndexer | null = null;
 	let localEmbedderLoad: Promise<TextEmbedder | null> | null = null;
+	// 11.3 progress UX — the latest semantic-model download status, folded from
+	// the embedder's per-file byte progress. Settings → Search polls this via
+	// `search:stats` so the ~130 MB first-run download shows a live bar instead
+	// of a silent minute. `Absent` once we know the native addon can't load.
+	let semanticStatus: SemanticModelStatus = initialStatus();
 	const getLocalEmbedder = (): Promise<TextEmbedder | null> => {
 		if (!localEmbedderLoad) {
 			// First-run model weights download into userData/models (controllable,
 			// offline-reusable). The download itself is deferred to the first embed.
-			localEmbedderLoad = loadFastembedEmbedder(join(app.getPath("userData"), "models"));
+			localEmbedderLoad = loadFastembedEmbedder(join(app.getPath("userData"), "models"), (s) => {
+				semanticStatus = s;
+			}).then((embedder) => {
+				// null = no prebuilt `.node` / ORT failed → lexical-only. Reflect that
+				// so the panel shows "unavailable" rather than a stuck Idle.
+				if (!embedder) semanticStatus = absentStatus();
+				return embedder;
+			});
 		}
 		return localEmbedderLoad;
 	};
@@ -3891,6 +3904,8 @@ void app.whenReady().then(async () => {
 		// 11.4 — share the broker `search.hybrid` fusion path for the launcher's
 		// default search (degrades to lexical until 11.3 enables vector indexing).
 		getVectorIndexer: () => vectorIndexer,
+		// 11.3 progress UX — live semantic-model download status for the panel.
+		getSemanticStatus: () => semanticStatus,
 		reindex: rebuildSearchIndex,
 		// Coverage source-of-truth: the same collector + indexable predicate
 		// `rebuildSearchIndex` uses, so "indexed vs. available" can't drift

@@ -1469,6 +1469,71 @@
 	background: var(--color-accent-default);
 }
 
+/* 11.3 — semantic-model download/readiness card. Sits between the index stats
+ * and the by-type breakdown; a quiet surface panel that becomes a live bar
+ * while the ~130 MB first-run model download is in flight. */
+.search-index__semantic {
+	margin-top: var(--space-4);
+	padding: var(--space-3);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-default);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.search-index__semantic-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.search-index__semantic-icon {
+	display: inline-flex;
+	color: var(--color-text-secondary);
+}
+
+.search-index__semantic[data-phase="ready"] .search-index__semantic-icon {
+	color: var(--color-accent-default);
+}
+
+.search-index__semantic[data-phase="failed"] .search-index__semantic-icon {
+	color: var(--color-state-error);
+}
+
+.search-index__semantic-title {
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+	color: var(--color-text-primary);
+}
+
+.search-index__semantic-model {
+	margin-left: auto;
+	font-family: var(--text-family-code);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
+.search-index__semantic-detail {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	line-height: var(--text-line-height-normal);
+	margin: 0;
+}
+
+.search-index__semantic-progress {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+/* Indeterminate: no known total yet — a full-width fill reads as "working"
+ * rather than a false 0%. A known percent overrides `width` inline. */
+.search-index__semantic[data-phase="downloading"] .search-index__bar-fill {
+	width: 100%;
+}
+
 .search-index__bytype {
 	display: flex;
 	flex-direction: column;

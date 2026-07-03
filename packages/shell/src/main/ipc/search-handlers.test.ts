@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { EmbedderPhase, markReady } from "../search/embedder-status";
 import type { SearchHit, SearchIndexer } from "../search/search-indexer";
 import { runHybridQuery } from "../search/search-service";
 import type { VectorIndexer } from "../search/vector-indexer";
-import { validateQuery } from "./search-handlers";
+import { type SearchHandlerDeps, buildReport, validateQuery } from "./search-handlers";
 
 describe("validateQuery", () => {
 	it("accepts a minimal { text } query", () => {
@@ -59,6 +60,37 @@ describe("validateQuery", () => {
 
 	it("preserves the empty-text case (caller short-circuits on empty)", () => {
 		expect(validateQuery({ text: "" })).toEqual({ text: "" });
+	});
+});
+
+describe("buildReport — semantic model status (11.3)", () => {
+	const baseDeps: SearchHandlerDeps = {
+		getIndexer: () => null,
+		reindex: async () => undefined,
+		getAvailableCount: async () => null,
+	};
+
+	it("reports the wired semantic status", async () => {
+		const report = await buildReport({ ...baseDeps, getSemanticStatus: () => markReady() });
+		expect(report.semantic.phase).toBe(EmbedderPhase.Ready);
+		expect(report.semantic.percent).toBe(100);
+	});
+
+	it("defaults to Absent (lexical-only) when no embedder is wired", async () => {
+		const report = await buildReport(baseDeps);
+		expect(report.semantic.phase).toBe(EmbedderPhase.Absent);
+	});
+
+	it("still reports semantic status when the coverage scan throws", async () => {
+		const report = await buildReport({
+			...baseDeps,
+			getAvailableCount: async () => {
+				throw new Error("scan failed");
+			},
+			getSemanticStatus: () => markReady(),
+		});
+		expect(report.available).toBeNull();
+		expect(report.semantic.phase).toBe(EmbedderPhase.Ready);
 	});
 });
 

@@ -705,6 +705,7 @@ import type {
 	WelcomeImportTemplateResult,
 	WelcomeTemplateSummary,
 } from "../main/ipc/welcome-handlers";
+import type { SemanticModelStatus } from "../main/search/embedder-status";
 export type { WelcomeTemplateSummary };
 /** Sync-status surface (Stage 10.7 — sync-status panel). Privileged
  *  shell channel — apps don't see this (OQ-206 deferred app-side
@@ -1016,6 +1017,9 @@ export type SearchIndexReport = {
 	lastIndexedAt: number;
 	bytes: number;
 	available: number | null;
+	/** 11.3 — on-device semantic model download/readiness status, for the
+	 *  first-run-download progress bar. */
+	semantic: SemanticModelStatus;
 };
 
 const search = {

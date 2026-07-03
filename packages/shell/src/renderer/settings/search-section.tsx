@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { EmbedderPhase, type SemanticModelStatus } from "../../main/search/embedder-status";
 import type { SearchIndexReport } from "../../preload";
 import { t } from "../i18n/t";
 import { ConfirmVariant, confirm } from "../ui/confirm";
@@ -45,6 +46,25 @@ export function SearchSection() {
 			cancelled = true;
 		};
 	}, []);
+
+	// 11.3 — while the first-run model download is in flight, re-poll stats so
+	// the progress bar animates. Stops the moment the phase leaves Downloading
+	// (Ready / Failed / Absent are steady states). The `stats` read is cheap
+	// (a status-holder lookup + a coverage count), so a 1 s cadence is fine.
+	const downloading = report?.semantic.phase === EmbedderPhase.Downloading;
+	useEffect(() => {
+		if (!downloading) return;
+		let cancelled = false;
+		const timer = setInterval(() => {
+			void window.brainstorm.search.stats().then((next) => {
+				if (!cancelled) setReport(next);
+			});
+		}, 1000);
+		return () => {
+			cancelled = true;
+			clearInterval(timer);
+		};
+	}, [downloading]);
 
 	const onReindex = useCallback(async () => {
 		const ok = await confirm({
@@ -159,6 +179,8 @@ export function SearchSection() {
 				/>
 			</div>
 
+			<SemanticStatusCard status={report.semantic} />
+
 			<div className="search-index__bytype">
 				<h4 className="settings__section-title">{t("shell.settings.search.byType.heading")}</h4>
 				{report.byType.length === 0 ? (
@@ -189,6 +211,72 @@ export function SearchSection() {
 				)}
 			</div>
 		</section>
+	);
+}
+
+/** 11.3 — the on-device semantic model's download/readiness state. The model
+ *  (`bge-small-en-v1.5`, ~130 MB) downloads on first semantic-search use; this
+ *  is the only place a user can see that happening (or that it's ready / off).
+ *  Absent → the row is a quiet "text-only" note; Downloading → a live bar. */
+export function SemanticStatusCard({ status }: { status: SemanticModelStatus }) {
+	const { phase } = status;
+	const icon =
+		phase === EmbedderPhase.Ready
+			? IconName.CheckCircle
+			: phase === EmbedderPhase.Downloading
+				? IconName.Download
+				: phase === EmbedderPhase.Failed
+					? IconName.Warning
+					: phase === EmbedderPhase.Absent
+						? IconName.Info
+						: IconName.Sparkle;
+
+	return (
+		<div className="search-index__semantic" data-phase={phase}>
+			<span className="search-index__semantic-head">
+				<span className="search-index__semantic-icon" aria-hidden="true">
+					<Icon name={icon} size={15} />
+				</span>
+				<span className="search-index__semantic-title">
+					{t("shell.settings.search.semantic.heading")}
+				</span>
+				<span className="search-index__semantic-model">{status.model}</span>
+			</span>
+
+			{phase === EmbedderPhase.Downloading ? (
+				<div className="search-index__semantic-progress">
+					{/* Decorative — the "Downloading … X%" detail line below carries the
+					    value for assistive tech; the bar is a visual echo (matching the
+					    coverage bar above). Indeterminate (no Content-Length yet) →
+					    full-width via the data-phase rule; a known percent drives width. */}
+					<div className="search-index__bar" aria-hidden="true">
+						<span
+							className="search-index__bar-fill"
+							style={status.percent !== null ? { width: `${status.percent}%` } : undefined}
+						/>
+					</div>
+					<span className="search-index__semantic-detail">
+						{status.percent !== null
+							? t("shell.settings.search.semantic.downloadingPercent", { percent: status.percent })
+							: t("shell.settings.search.semantic.downloading")}
+						{status.totalBytes > 0 &&
+							` · ${formatBytes(status.downloadedBytes)} / ${formatBytes(status.totalBytes)}`}
+					</span>
+				</div>
+			) : (
+				<p className="search-index__semantic-detail">
+					{phase === EmbedderPhase.Ready
+						? t("shell.settings.search.semantic.ready")
+						: phase === EmbedderPhase.Failed
+							? t("shell.settings.search.semantic.failed", {
+									error: status.error ?? "",
+								})
+							: phase === EmbedderPhase.Absent
+								? t("shell.settings.search.semantic.absent")
+								: t("shell.settings.search.semantic.idle")}
+				</p>
+			)}
+		</div>
 	);
 }
 
