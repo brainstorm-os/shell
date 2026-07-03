@@ -108,6 +108,10 @@
         {
           "from": "../native/brainstorm-native.darwin-${arch}.node",
           "to": "native/brainstorm-native.darwin-${arch}.node"
+        },
+        {
+          "from": "../native-embed/brainstorm-embed.darwin-${arch}.node",
+          "to": "native/brainstorm-embed.darwin-${arch}.node"
         }
       ]
     },
@@ -122,6 +126,10 @@
         {
           "from": "../native/brainstorm-native.win32-${arch}-msvc.node",
           "to": "native/brainstorm-native.win32-${arch}-msvc.node"
+        },
+        {
+          "from": "../native-embed/brainstorm-embed.win32-${arch}-msvc.node",
+          "to": "native/brainstorm-embed.win32-${arch}-msvc.node"
         }
       ]
     },
@@ -149,6 +157,10 @@
         {
           "from": "../native/brainstorm-native.linux-${arch}-gnu.node",
           "to": "native/brainstorm-native.linux-${arch}-gnu.node"
+        },
+        {
+          "from": "../native-embed/brainstorm-embed.linux-${arch}-gnu.node",
+          "to": "native/brainstorm-embed.linux-${arch}-gnu.node"
         }
       ]
     }
