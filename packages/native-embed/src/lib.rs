@@ -13,12 +13,17 @@
 //! another 384-d model (MiniLM, multilingual-e5-small) later needs no schema
 //! change — only the `EmbeddingModel` variant here.
 
-use std::path::PathBuf;
+use std::fs;
+use std::io::Read;
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use fastembed::{
+	InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
+};
 use napi::bindgen_prelude::{AsyncTask, Env, Error, Float32Array, Result, Status, Task};
 use napi_derive::napi;
+use sha2::{Digest, Sha256};
 
 /// Output dimension of `bge-small-en-v1.5`. Pinned to the shell's
 /// `EMBEDDING_DIM` and the `entity_vec` vec0 table width — a mismatch is a
@@ -34,9 +39,132 @@ fn generic(msg: impl Into<String>) -> Error {
 	Error::new(Status::GenericFailure, msg.into())
 }
 
-/// Build the `TextEmbedding` model, downloading its weights into `cache_dir` on
-/// first run (subsequent runs load from disk). Runs on the libuv threadpool so
-/// the ~130 MB first-run download never blocks the JS thread.
+// ── Pinned model integrity (security review, 2026-07-03) ────────────────────
+//
+// fastembed's `try_new` downloads the model from HuggingFace over TLS and hands
+// it straight to ONNX Runtime — no verification against a hash WE control, so a
+// TLS-breaking position (corp MITM, CA compromise) or a compromised HF repo
+// could substitute a malicious `model.onnx` that ORT then parses IN-PROCESS.
+// Instead we fetch the exact files ourselves, verify each against a pinned
+// SHA256 BEFORE ONNX Runtime ever sees the bytes (fail-closed on any mismatch),
+// and only then build the model via `try_new_from_user_defined`. The pins are
+// the `Xenova/bge-small-en-v1.5` files at the revision below (their real hashes,
+// computed from the known-good download); changing the model means re-pinning.
+
+/// Immutable HF revision the pins below were computed against — resolve URLs
+/// point at this commit so the served bytes can't shift under us.
+const HF_MODEL_BASE: &str =
+	"https://huggingface.co/Xenova/bge-small-en-v1.5/resolve/ea104dacec62c0de699686887e3f920caeb4f3e3";
+
+/// A model file: its cache filename, its path within the HF repo, and the
+/// SHA256 the downloaded/cached bytes MUST match.
+struct PinnedFile {
+	name: &'static str,
+	repo_path: &'static str,
+	sha256: &'static str,
+}
+
+const PINNED_FILES: &[PinnedFile] = &[
+	PinnedFile {
+		name: "model.onnx",
+		repo_path: "onnx/model.onnx",
+		sha256: "828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35",
+	},
+	PinnedFile {
+		name: "tokenizer.json",
+		repo_path: "tokenizer.json",
+		sha256: "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+	},
+	PinnedFile {
+		name: "config.json",
+		repo_path: "config.json",
+		sha256: "fa73f90bf92c8cace1fbcb709626306f2bdbc9ea3e5b5f94b440df9b6aa56350",
+	},
+	PinnedFile {
+		name: "special_tokens_map.json",
+		repo_path: "special_tokens_map.json",
+		sha256: "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+	},
+	PinnedFile {
+		name: "tokenizer_config.json",
+		repo_path: "tokenizer_config.json",
+		sha256: "9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3",
+	},
+];
+
+/// Hard ceiling on any single downloaded file, so a hostile/broken server can't
+/// stream unbounded bytes to OOM the host before we get to hash-check. The model
+/// is ~130 MB; 512 MB is generous headroom.
+const MAX_MODEL_FILE_BYTES: u64 = 512 * 1024 * 1024;
+
+fn sha256_hex(bytes: &[u8]) -> String {
+	let mut hasher = Sha256::new();
+	hasher.update(bytes);
+	hasher
+		.finalize()
+		.iter()
+		.map(|b| format!("{b:02x}"))
+		.collect()
+}
+
+/// Load one pinned file: reuse the on-disk cache when its bytes already match
+/// the pin; otherwise fetch from the pinned HF URL, verify the SHA256, and cache
+/// it. Returns an error (never the bytes) on any hash mismatch — a tampered
+/// download, a MITM, or a poisoned repo all fail closed here, before the bytes
+/// reach ONNX Runtime or the tokenizer.
+fn load_pinned(cache_dir: &Path, file: &PinnedFile) -> Result<Vec<u8>> {
+	let path = cache_dir.join(file.name);
+	if let Ok(bytes) = fs::read(&path) {
+		if sha256_hex(&bytes) == file.sha256 {
+			return Ok(bytes);
+		}
+		// Present but wrong (corrupt / tampered on disk) — re-fetch below.
+	}
+
+	let url = format!("{HF_MODEL_BASE}/{}", file.repo_path);
+	let response = ureq::get(&url)
+		.call()
+		.map_err(|e| generic(format!("embedder model fetch {}: {e}", file.name)))?;
+	let mut bytes = Vec::new();
+	response
+		.into_reader()
+		.take(MAX_MODEL_FILE_BYTES + 1)
+		.read_to_end(&mut bytes)
+		.map_err(|e| generic(format!("embedder model read {}: {e}", file.name)))?;
+	if bytes.len() as u64 > MAX_MODEL_FILE_BYTES {
+		return Err(generic(format!(
+			"embedder model {} exceeds {MAX_MODEL_FILE_BYTES} bytes — refusing",
+			file.name
+		)));
+	}
+
+	let got = sha256_hex(&bytes);
+	if got != file.sha256 {
+		return Err(generic(format!(
+			"embedder model {} SHA256 mismatch (expected {}, got {got}) — refusing to load a tampered model",
+			file.name, file.sha256
+		)));
+	}
+
+	// Best-effort cache; a write failure just means we re-verify+fetch next time.
+	if fs::create_dir_all(cache_dir).is_ok() {
+		let _ = fs::write(&path, &bytes);
+	}
+	Ok(bytes)
+}
+
+fn pinned(name: &str) -> &'static PinnedFile {
+	PINNED_FILES
+		.iter()
+		.find(|f| f.name == name)
+		.expect("pinned model file present")
+}
+
+/// Build the `bge-small-en-v1.5` model from integrity-verified files (see the
+/// pinning note above), matching the built-in registry config (CLS pooling,
+/// max_length 512) so embeddings are identical to fastembed's own path. Runs on
+/// the libuv threadpool so the ~130 MB first-run download never blocks the JS
+/// thread; subsequent runs load the verified files from `cache_dir`.
 struct InitTask {
 	cache_dir: String,
 }
@@ -49,11 +177,24 @@ impl Task for InitTask {
 		if MODEL.get().is_some() {
 			return Ok(());
 		}
-		let opts = InitOptions::new(EmbeddingModel::BGESmallENV15)
-			.with_cache_dir(PathBuf::from(&self.cache_dir))
-			.with_show_download_progress(false);
-		let model =
-			TextEmbedding::try_new(opts).map_err(|e| generic(format!("embedder init: {e}")))?;
+		let dir = Path::new(&self.cache_dir).join("bge-small-en-v1.5");
+		let user_model = UserDefinedEmbeddingModel::new(
+			load_pinned(&dir, pinned("model.onnx"))?,
+			TokenizerFiles {
+				tokenizer_file: load_pinned(&dir, pinned("tokenizer.json"))?,
+				config_file: load_pinned(&dir, pinned("config.json"))?,
+				special_tokens_map_file: load_pinned(&dir, pinned("special_tokens_map.json"))?,
+				tokenizer_config_file: load_pinned(&dir, pinned("tokenizer_config.json"))?,
+			},
+		)
+		.with_pooling(Pooling::Cls);
+		// `new()` defaults to CPU execution providers; pin max_length to the
+		// built-in bge config so embeddings match fastembed's own path.
+		let model = TextEmbedding::try_new_from_user_defined(
+			user_model,
+			InitOptionsUserDefined::new().with_max_length(512),
+		)
+		.map_err(|e| generic(format!("embedder init: {e}")))?;
 		// Ignore a lost race: whichever `set` wins, the model is equivalent, and
 		// the loser is dropped here.
 		let _ = MODEL.set(Mutex::new(model));

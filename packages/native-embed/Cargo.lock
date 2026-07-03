@@ -192,6 +192,8 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "sha2",
+ "ureq",
 ]
 
 [[package]]
