@@ -104,7 +104,7 @@ describe("WireAssetCas over a loopback node", () => {
 		const dek = generateSymmetricKey();
 		const { cas } = loopback();
 		const plain = new Uint8Array(randomBytes(5 * 16 + 9));
-		const { manifest } = await uploadAsset(plain, dek, "asset-e2e", cas, 16);
+		const { manifest } = await uploadAsset(plain, dek, "asset-e2e", "image/png", cas, 16);
 		const back = await downloadAsset(manifest, dek, cas);
 		expect(Buffer.from(back).equals(Buffer.from(plain))).toBe(true);
 	});

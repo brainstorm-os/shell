@@ -170,3 +170,37 @@ describe("AssetStore", () => {
 		await expect(readFile(blobPath(env.assetsDir, assetId))).rejects.toThrow();
 	});
 });
+
+describe("AssetStore.restoreBlob (serve-on-miss rematerialise)", () => {
+	it("re-seals an evicted blob so readAsset round-trips again", async () => {
+		const { assetId } = await env.store.writeAsset({
+			bytes: PNG,
+			mime: "image/png",
+			kind: AssetKind.Favicon,
+		});
+		// Metadata-present, blob-absent: the rows stay, only the `.enc` file is gone.
+		await rm(blobPath(env.assetsDir, assetId));
+		expect(await env.store.readAsset(assetId)).toBeNull();
+
+		await env.store.restoreBlob(assetId, PNG);
+		const got = await env.store.readAsset(assetId);
+		if (!got) throw new Error("expected the restored asset to read back");
+		expect(got.bytes).toEqual(PNG);
+		expect(got.mime).toBe("image/png");
+	});
+
+	it("throws when the asset id has no row", async () => {
+		await expect(env.store.restoreBlob("nope", PNG)).rejects.toThrow();
+	});
+
+	it("throws on a content-hash mismatch (a lying node can't substitute bytes)", async () => {
+		const { assetId } = await env.store.writeAsset({
+			bytes: PNG,
+			mime: "image/png",
+			kind: AssetKind.Favicon,
+		});
+		await rm(blobPath(env.assetsDir, assetId));
+		const different = new Uint8Array([9, 9, 9, 9, 9, 9, 9, 9]);
+		await expect(env.store.restoreBlob(assetId, different)).rejects.toThrow();
+	});
+});

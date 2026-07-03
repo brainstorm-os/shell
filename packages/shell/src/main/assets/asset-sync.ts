@@ -38,10 +38,11 @@ export async function uploadBoundAsset(
 	deps: { cas: AssetCas; installManifest: InstallManifest },
 	entityId: string,
 	assetId: string,
+	mime: string,
 	plaintext: Uint8Array,
 	dek: Uint8Array,
 ): Promise<UploadAssetResult> {
-	const result = await uploadAsset(plaintext, dek, assetId, deps.cas);
+	const result = await uploadAsset(plaintext, dek, assetId, mime, deps.cas);
 	await deps.installManifest(entityId, assetId, result.manifest);
 	return result;
 }
@@ -50,20 +51,22 @@ export async function uploadBoundAsset(
  * Materialise a synced asset's bytes: read its manifest off the entity,
  * validate it (a peer authored it — fail closed), fetch + verify + open +
  * reassemble its chunks from the node under the supplied DEK. Returns the
- * plaintext, or null if the entity carries no (valid) manifest for the asset
- * (it hasn't been uploaded yet, or this device can't see it).
+ * plaintext + the manifest's (validated) mime, or null if the entity carries no
+ * (valid) manifest for the asset (it hasn't been uploaded yet, or this device
+ * can't see it).
  */
 export async function materializeAsset(
 	deps: { cas: AssetCas; readManifest: ReadManifest },
 	entityId: string,
 	assetId: string,
 	dek: Uint8Array,
-): Promise<Uint8Array | null> {
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
 	const raw = await deps.readManifest(entityId, assetId);
 	const manifest = parseAssetChunkManifest(raw);
 	if (!manifest) return null;
 	if (manifest.assetId !== assetId) {
 		throw new Error(`materializeAsset: manifest assetId ${manifest.assetId} != ${assetId}`);
 	}
-	return downloadAsset(manifest, dek, deps.cas);
+	const bytes = await downloadAsset(manifest, dek, deps.cas);
+	return { bytes, mime: manifest.mime };
 }
