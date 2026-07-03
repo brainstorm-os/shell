@@ -23,6 +23,7 @@ import {
 	openOneChunk,
 	sealOneChunk,
 } from "./asset-chunks";
+import type { AssetKind } from "./asset-types";
 
 export type UploadAssetResult = {
 	manifest: AssetChunkManifest;
@@ -46,6 +47,7 @@ export async function uploadAsset(
 	mime: string,
 	cas: AssetCas,
 	chunkBytes: number = ASSET_CHUNK_BYTES,
+	kind?: AssetKind,
 ): Promise<UploadAssetResult> {
 	const count = chunkCount(plaintext.length, chunkBytes);
 	const chunks: AssetChunkRef[] = [];
@@ -64,7 +66,15 @@ export async function uploadAsset(
 		}
 	}
 	return {
-		manifest: { v: 1, assetId, mime, chunkBytes, totalRawLen: plaintext.length, chunks },
+		manifest: {
+			v: 1,
+			assetId,
+			mime,
+			chunkBytes,
+			totalRawLen: plaintext.length,
+			chunks,
+			...(kind !== undefined ? { kind } : {}),
+		},
 		uploaded,
 		skipped,
 	};

@@ -61,6 +61,7 @@ import type { WebContentsViewHandle } from "./apps/window-container";
 import { type AssetChunkManifest, parseAssetChunkManifest } from "./assets/asset-chunks";
 import { AssetKind } from "./assets/asset-types";
 import { materializeAssetOnServe } from "./assets/materialize-on-serve";
+import { reconstructAssetMetadata } from "./assets/reconstruct-assets";
 import { recoverAssetDek } from "./assets/recover-asset-dek";
 import { relayAssetCas } from "./assets/relay-asset-cas";
 import { resolveAssetForServe } from "./assets/serve-asset";
@@ -613,6 +614,64 @@ async function callYdocAssetRead<T>(
 	})) as T | null;
 }
 
+// Asset-B5 — list every (assetId → manifest) pair on an entity Y.Doc, for the
+// cold-device metadata-reconstruction pass. Same ferry shape as the reads.
+async function callYdocListManifests(
+	entityId: string,
+): Promise<Array<{ assetId: string; manifest: unknown }>> {
+	const w = workers;
+	const session = getActiveVaultSession();
+	if (!w || !session) return [];
+	const handler = w.broker.getServiceHandler("ydoc");
+	if (!handler) return [];
+	const res = (await handler({
+		v: 1,
+		msg: `ydoc_lm_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+		app: "io.brainstorm.shell",
+		service: "ydoc",
+		method: "listAssetManifests",
+		args: [{ vaultPath: session.vaultPath, entityId }],
+		caps: [],
+	})) as { manifests?: Array<{ assetId: string; manifest: unknown }> } | null;
+	return res?.manifests ?? [];
+}
+
+// Asset-B5 — reconstruct asset metadata (assets + asset_deks + asset_refs
+// rows) from the synced manifests on a set of just-restored entities, so
+// serve-on-miss can lazily materialise their bytes. Contained: a failure is
+// logged, never fails the restore.
+async function reconstructRestoredAssets(entityIds: readonly string[]): Promise<void> {
+	if (entityIds.length === 0) return;
+	try {
+		const session = getActiveVaultSession();
+		if (!session) return;
+		const db = await session.dataStores.open("entities");
+		const assets = new AssetsRepository(db);
+		const assetRefs = new AssetRefsRepository(db);
+		const store = await session.assetStore();
+		const tally = await reconstructAssetMetadata(
+			{
+				listManifests: callYdocListManifests,
+				hasAsset: (id) => assets.getById(id) !== null,
+				recoverDek: recoverAssetDekForActiveSession,
+				registerSynced: (input) => store.registerSynced(input),
+				hasRef: (entityId, assetId) =>
+					assetRefs.listByEntity(entityId).some((r) => r.assetId === assetId),
+				createRef: (entityId, assetId, role) =>
+					assetRefs.create({ entityId, assetId, role, now: Date.now() }),
+			},
+			entityIds,
+		);
+		if (tally.created > 0 || tally.failed > 0 || tally.noDek > 0) {
+			console.log(
+				`[brainstorm] asset metadata reconstruct: created ${tally.created} (${tally.present} present, ${tally.badManifest} bad-manifest, ${tally.noDek} no-dek, ${tally.failed} failed)`,
+			);
+		}
+	} catch (error) {
+		console.warn(`[brainstorm] asset metadata reconstruct failed: ${(error as Error).message}`);
+	}
+}
+
 // Asset-B4 — install a manifest on an entity Y.Doc (the upload-done marker),
 // mirroring `installAssetDekWrap`. Crypto-free ferry; the worker is idempotent.
 async function callYdocInstallManifest(
@@ -723,7 +782,7 @@ async function materializeAssetForServeOnce(
 // immediate per-bind push: same ydoc ferries (manifest install/read), same
 // DEK recovery, same manifest-present short-circuit.
 function assetUploadDeps(
-	store: { readAsset: (assetId: string) => Promise<{ bytes: Uint8Array; mime: string } | null> },
+	store: { readAsset: UploadOnBindDeps["readAsset"] },
 	cas: NonNullable<ReturnType<typeof relayAssetCas>>,
 ): UploadOnBindDeps {
 	return {
@@ -1652,6 +1711,9 @@ void app.whenReady().then(async () => {
 					const engine = getRestoreEngine();
 					if (!engine) throw new Error("sync: restore unavailable (no session / no durable node)");
 					const summary = await engine.restore();
+					// Asset-B5 — rebuild asset metadata from the restored entities'
+					// synced manifests (bytes stay lazy; serve-on-miss fetches them).
+					await reconstructRestoredAssets(summary.entityIds);
 					await rebuildSearchIndex();
 					return summary;
 				},

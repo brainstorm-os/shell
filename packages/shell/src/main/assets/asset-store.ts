@@ -33,6 +33,11 @@ import type { AssetKind } from "./asset-types";
  *  swapping `.enc` files between two assets the attacker can both decrypt. */
 const ASSET_BLOB_AAD_PREFIX = "brainstorm/asset-blob/v1:";
 
+/** Asset-B5 — `content_hash` sentinel for a row reconstructed from a synced
+ *  manifest: the plaintext has never been on this device, so its local-only
+ *  hash is unknowable until the first materialise backfills it. */
+export const RECONSTRUCTED_CONTENT_HASH = "";
+
 export type WriteAssetInput = {
 	bytes: Uint8Array;
 	mime: string;
@@ -49,6 +54,9 @@ export type WriteAssetInput = {
 export type ReadAssetResult = {
 	bytes: Uint8Array;
 	mime: string;
+	/** The row's `kind` — carried into the upload manifest so a cold device
+	 *  reconstructs a faithful row (Asset-B5). */
+	kind: AssetKind;
 };
 
 type AssetStoreFs = {
@@ -160,10 +168,51 @@ export class AssetStore {
 				throw error;
 			}
 			const bytes = openBytes(handle.dek, blob, blobAad(assetId));
-			return { bytes, mime: row.mime };
+			return { bytes, mime: row.mime, kind: row.kind };
 		} finally {
 			this.#dekStore.close(handle.dek);
 		}
+	}
+
+	/**
+	 * Asset-B5 — register a SYNCED asset's metadata on a cold device: the
+	 * `assets` + `asset_deks` rows for an asset whose chunk manifest + re-homed
+	 * DEK arrived on the metadata plane (the entity Y.Doc) but whose bytes have
+	 * never been on this device. No blob file is written — serve-on-miss
+	 * materialises bytes on first access. `content_hash` is a LOCAL-ONLY
+	 * plaintext hash this device can't know yet, so the row carries the empty
+	 * sentinel and `restoreBlob` backfills it on first materialise; transport
+	 * integrity is the chunk AEAD under the entity-recovered DEK, exactly as on
+	 * every other synced device. Reads `dek` (caller zeroes it) and seals it
+	 * under THIS vault's master key so the local cache mirrors the synced
+	 * source of truth. Idempotent: an existing row is a no-op (returns false).
+	 */
+	registerSynced(input: {
+		assetId: string;
+		mime: string;
+		byteLen: number;
+		kind: AssetKind;
+		dek: Uint8Array;
+	}): boolean {
+		if (this.#assets.getById(input.assetId)) return false;
+		const dekId = this.#newDekId();
+		const now = this.#clock();
+		this.#transaction(() => {
+			this.#assets.create({
+				assetId: input.assetId,
+				dekId,
+				contentHash: RECONSTRUCTED_CONTENT_HASH,
+				mime: input.mime,
+				byteLen: input.byteLen,
+				kind: input.kind,
+				now,
+			});
+			// Referenced-by-construction (it came off an entity's manifest), so
+			// it's bound — never a reap-eligible orphan.
+			this.#assets.markBound(input.assetId, now);
+			this.#dekStore.seal(input.assetId, dekId, input.dek);
+		});
+		return true;
 	}
 
 	/**
@@ -174,12 +223,22 @@ export class AssetStore {
 	 * this mints no id/DEK and touches no rows — it just rematerialises the file
 	 * so the next `readAsset` (which verifies the AEAD under the same DEK) round-
 	 * trips. The plaintext must match the asset's `content_hash`, or the write is
-	 * refused (a lying node can't substitute different bytes for the id).
+	 * refused (a lying node can't substitute different bytes for the id). The one
+	 * exception: a B5-reconstructed row carries the empty sentinel (this device
+	 * has never seen the plaintext, so there is no hash to check against — the
+	 * chunk AEAD under the entity-recovered DEK already authenticated the bytes);
+	 * the first materialise verifies the LENGTH against the row and backfills the
+	 * hash, pinning every later restore.
 	 */
 	async restoreBlob(assetId: string, plaintext: Uint8Array): Promise<void> {
 		const row = this.#assets.getById(assetId);
 		if (!row) throw new Error(`AssetStore.restoreBlob: asset ${assetId} has no row`);
-		if (sha256Hex(plaintext) !== row.contentHash) {
+		if (row.contentHash === RECONSTRUCTED_CONTENT_HASH) {
+			if (plaintext.length !== row.byteLen) {
+				throw new Error(`AssetStore.restoreBlob: asset ${assetId} length mismatch`);
+			}
+			this.#assets.setContentHashIfUnset(assetId, sha256Hex(plaintext));
+		} else if (sha256Hex(plaintext) !== row.contentHash) {
 			throw new Error(`AssetStore.restoreBlob: asset ${assetId} content hash mismatch`);
 		}
 		const handle = this.#dekStore.open(assetId);
