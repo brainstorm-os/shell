@@ -65,6 +65,7 @@ describe("extractNoteReferences", () => {
 				entityId: "n_target",
 				entityType: "io.brainstorm.notes/Note/v1",
 				kind: NoteReferenceKind.Mention,
+				label: "Target",
 			},
 		]);
 	});
@@ -83,6 +84,7 @@ describe("extractNoteReferences", () => {
 				entityId: "ent_whiteboard1",
 				entityType: "io.brainstorm.whiteboard/Board/v1",
 				kind: NoteReferenceKind.Embed,
+				label: "Q3 board",
 			},
 		]);
 	});
@@ -176,7 +178,7 @@ describe("extractNoteReferences", () => {
 			},
 		};
 		expect(extractNoteReferences(body)).toEqual([
-			{ entityId: "n_deep", entityType: "T/v1", kind: NoteReferenceKind.Mention },
+			{ entityId: "n_deep", entityType: "T/v1", kind: NoteReferenceKind.Mention, label: "Deep" },
 		]);
 	});
 
@@ -217,6 +219,7 @@ describe("extractNoteReferences", () => {
 				entityId: "n_origin",
 				entityType: "io.brainstorm.notes/Note/v1",
 				kind: NoteReferenceKind.Transclusion,
+				label: "Origin doc",
 			},
 		]);
 	});

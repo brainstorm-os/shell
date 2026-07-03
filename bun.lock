@@ -24,6 +24,7 @@
       "name": "@brainstorm-app/agent",
       "version": "0.1.0",
       "dependencies": {
+        "@brainstorm/editor": "workspace:*",
         "@brainstorm/react-yjs": "workspace:*",
         "@brainstorm/sdk": "workspace:*",
         "@brainstorm/sdk-types": "workspace:*",
@@ -568,7 +569,7 @@
     },
     "packages/shell": {
       "name": "@brainstorm/shell",
-      "version": "0.0.1",
+      "version": "0.1.7",
       "dependencies": {
         "@blockprotocol/core": "0.1.4",
         "@blockprotocol/graph": "0.4.2",

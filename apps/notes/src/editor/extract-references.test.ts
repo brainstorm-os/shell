@@ -108,6 +108,7 @@ describe("extractReferences", () => {
 				entityId: "n_xyz",
 				entityType: "io.brainstorm.notes/Note/v1",
 				kind: ReferenceKind.Mention,
+				label: "Project Apollo",
 			},
 		]);
 	});
@@ -168,6 +169,7 @@ describe("extractReferences", () => {
 			entityId: "n_a",
 			entityType: "T/v1",
 			kind: ReferenceKind.Mention,
+			label: "A",
 		});
 	});
 
@@ -220,7 +222,7 @@ describe("extractReferences", () => {
 			},
 		} as unknown as SerializedEditorState;
 		expect(extractReferences(state)).toEqual([
-			{ entityId: "n_deep", entityType: "T/v1", kind: ReferenceKind.Mention },
+			{ entityId: "n_deep", entityType: "T/v1", kind: ReferenceKind.Mention, label: "Deep" },
 		]);
 	});
 
@@ -255,6 +257,7 @@ describe("extractReferences", () => {
 				entityId: "n_origin",
 				entityType: "io.brainstorm.notes/Note/v1",
 				kind: ReferenceKind.Transclusion,
+				label: "Origin doc",
 			},
 		]);
 	});

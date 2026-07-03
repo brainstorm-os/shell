@@ -6,7 +6,10 @@ import {
 	attachmentIcon,
 	attachmentLabel,
 	candidateToAttachment,
+	inlineMentionRefs,
 	parseAttachments,
+	visibleAttachments,
+	withMentionAttachments,
 } from "./types";
 
 describe("parseAttachments", () => {
@@ -83,5 +86,92 @@ describe("attachmentLabel + attachmentIcon", () => {
 		expect(attachmentIcon(AttachmentKind.Entity)).toBe(IconName.KindLink);
 		expect(attachmentIcon(AttachmentKind.Person)).toBe(IconName.Entity);
 		expect(attachmentIcon(AttachmentKind.Media)).toBe(IconName.KindFile);
+	});
+});
+
+describe("inlineMentionRefs", () => {
+	const rich = JSON.stringify({
+		root: {
+			type: "root",
+			children: [
+				{
+					type: "paragraph",
+					children: [
+						{ type: "text", text: "ping " },
+						{ type: "mention", entityId: "ed25519:abc", entityType: "", label: "Razor" },
+						{ type: "link", url: "brainstorm://entity/e9", children: [] },
+					],
+				},
+			],
+		},
+	});
+
+	it("surfaces only the mention chips from a rich body", () => {
+		expect(inlineMentionRefs(rich)).toEqual([
+			{ entityId: "ed25519:abc", entityType: "", kind: "mention", label: "Razor" },
+		]);
+	});
+
+	it("fails soft on absent / unparseable bodies", () => {
+		expect(inlineMentionRefs(undefined)).toEqual([]);
+		expect(inlineMentionRefs("")).toEqual([]);
+		expect(inlineMentionRefs("{not json")).toEqual([]);
+	});
+});
+
+describe("withMentionAttachments + visibleAttachments", () => {
+	function richWith(mentions: { entityId: string; entityType: string; label: string }[]): string {
+		return JSON.stringify({
+			root: {
+				type: "root",
+				children: [
+					{
+						type: "paragraph",
+						children: [
+							{ type: "text", text: "ping " },
+							...mentions.map((m) => ({ type: "mention", ...m })),
+						],
+					},
+				],
+			},
+		});
+	}
+
+	it("lifts inline mentions after explicit context — typeless/Person refs as Person, typed as Entity", () => {
+		const rich = richWith([
+			{ entityId: "ed25519:abc", entityType: "", label: "Razor" },
+			{ entityId: "p2", entityType: "brainstorm/Person/v1", label: "Mira" },
+			{ entityId: "e9", entityType: "brainstorm/Note/v1", label: "Spec" },
+		]);
+		const doc = { kind: AttachmentKind.Entity, ref: "e1", label: "Pinned" } as const;
+		expect(withMentionAttachments(rich, [doc])).toEqual([
+			doc,
+			{ kind: AttachmentKind.Person, ref: "ed25519:abc", label: "Razor" },
+			{ kind: AttachmentKind.Person, ref: "p2", label: "Mira" },
+			{ kind: AttachmentKind.Entity, ref: "e9", label: "Spec", entityType: "brainstorm/Note/v1" },
+		]);
+	});
+
+	it("dedupes a mention already attached explicitly and tolerates no rich body", () => {
+		const rich = richWith([{ entityId: "ed25519:abc", entityType: "", label: "Razor" }]);
+		const pinned = { kind: AttachmentKind.Person, ref: "ed25519:abc", label: "Razor" } as const;
+		expect(withMentionAttachments(rich, [pinned])).toEqual([pinned]);
+		expect(withMentionAttachments(undefined, [pinned])).toEqual([pinned]);
+	});
+
+	it("hides chips whose mention shows inline; keeps legacy chips and media", () => {
+		const rich = richWith([{ entityId: "ed25519:abc", entityType: "", label: "Razor" }]);
+		const person = { kind: AttachmentKind.Person, ref: "ed25519:abc", label: "Razor" } as const;
+		const doc = { kind: AttachmentKind.Entity, ref: "e1", label: "Pinned" } as const;
+		const media = {
+			kind: AttachmentKind.Media,
+			ref: "ed25519:abc",
+			mediaType: "image/png",
+		} as const;
+		expect(visibleAttachments({ richBody: rich, attachments: [person, doc, media] })).toEqual([
+			doc,
+			media,
+		]);
+		expect(visibleAttachments({ attachments: [person] })).toEqual([person]);
 	});
 });

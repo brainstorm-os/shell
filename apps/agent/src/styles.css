@@ -283,6 +283,20 @@ body {
 	font-style: italic;
 }
 
+/* Rich user turns (composer-authored): paragraph rhythm like the composer's —
+   the pre-wrap on the bubble would otherwise double the paragraph breaks. */
+.agent__msg-rich {
+	white-space: normal;
+}
+
+.agent__msg-rich .bs-editor__paragraph {
+	margin: 0;
+}
+
+.agent__msg-rich .bs-editor__paragraph + .bs-editor__paragraph {
+	margin-top: var(--space-1);
+}
+
 .agent__error {
 	padding: var(--space-3) var(--space-2);
 	border-radius: var(--radius-md);
@@ -300,13 +314,16 @@ body {
 	border-top: var(--border-width) solid var(--color-border-subtle);
 }
 
-.agent__input {
+.agent__input-host {
 	flex: 1;
-	resize: none;
-	/* Auto-grow with content up to ~8 lines (Chromium field-sizing; the
-	   max-height fallback still applies where unsupported). */
-	field-sizing: content;
+	min-width: 0;
+}
+
+/* The input is a CompactEditor (contenteditable), not a textarea: chrome lives
+   on the wrapper, the caret/text on the inner content. */
+.agent__input {
 	max-height: 200px;
+	overflow-y: auto;
 	min-height: var(--control-height-lg, 40px);
 	/* 9px block padding keeps the single-line height at exactly
 	   --control-height-lg (19.6px line + 18px padding + 2px border),
@@ -319,14 +336,11 @@ body {
 	font: inherit;
 	font-size: var(--text-size-md);
 	line-height: 1.4;
+	cursor: text;
 	transition: border-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-.agent__input::placeholder {
-	color: var(--color-text-tertiary);
-}
-
-.agent__input:focus {
+.agent__input:focus-within {
 	outline: none;
 	border-color: var(--color-focus-ring);
 }

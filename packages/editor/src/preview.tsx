@@ -111,6 +111,22 @@ function renderNode(node: SerializedNode, key: string): ReactNode {
 			return renderText(node, key);
 		case "linebreak":
 			return h("br", { key });
+		case "mention": {
+			// Same chip family (and classes) as `MentionNode.decorate()` so a
+			// mention reads identically in the live editor and a read-only body.
+			const label = str(node.label) || str(node.entityId);
+			return h(
+				"span",
+				{
+					key,
+					className: "notes__mention-chip",
+					"data-entity-id": str(node.entityId),
+					"data-entity-type": str(node.entityType),
+				},
+				h("span", { className: "notes__mention-at", "aria-hidden": "true" }, "@"),
+				h("span", { className: "notes__mention-label" }, label),
+			);
+		}
 		case "tab":
 			return h("span", { key }, "\t");
 		case "image": {

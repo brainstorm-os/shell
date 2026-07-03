@@ -1,3 +1,12 @@
+import {
+	CompactEditor,
+	type CompactEditorHandle,
+	type CompactEditorPayload,
+	type MentionComposerHandle,
+	MentionComposerPlugin,
+	MentionNode,
+	renderEditorState,
+} from "@brainstorm/editor";
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { type OpenCapableRuntime, openEntity } from "@brainstorm/sdk";
 import {
@@ -32,7 +41,8 @@ import {
 	parseAttachments,
 	pickFile,
 	useComposerContext,
-	useMentionTypeahead,
+	visibleAttachments,
+	withMentionAttachments,
 } from "@brainstorm/sdk/composer-context";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
@@ -46,7 +56,7 @@ import {
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, ReactElement } from "react";
+import type { ReactElement } from "react";
 import { ConversationSettingsPopover } from "./conversation-settings-popover";
 import { EscalationPrompt } from "./escalation-prompt";
 import { AGENT_I18N, type AgentI18nKey, t } from "./i18n";
@@ -125,6 +135,9 @@ type UiMessage = {
 	/** Context the user explicitly attached to this turn (pinned documents /
 	 *  people / media) — rendered as chips on the user bubble. */
 	attachments?: MessageAttachment[];
+	/** Serialized Lexical state (JSON) when the turn was authored in the rich
+	 *  composer — renders inline `@`-mention chips; falls back to `body`. */
+	richBody?: string;
 	/** Assistant body with `[<id>] <title>` citations rewritten to markdown
 	 *  entity links (`linkifyEntityRefs`) — precomputed once per message-list
 	 *  change so the transcript map doesn't re-linkify on every keystroke. */
@@ -431,7 +444,12 @@ export function AgentApp(): ReactElement {
 			return next;
 		});
 	}, []);
-	const [input, setInput] = useState("");
+	// The composer is a CompactEditor (rich draft) — the latest payload rides in
+	// a ref (reading it doesn't need a render); `draftEmpty` drives the Send
+	// button's enabled state.
+	const editorRef = useRef<CompactEditorHandle | null>(null);
+	const draftRef = useRef<CompactEditorPayload>({ state: "", text: "", isEmpty: true });
+	const [draftEmpty, setDraftEmpty] = useState(true);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -442,7 +460,7 @@ export function AgentApp(): ReactElement {
 	// phase — the host omits `attachMedia` for now, so the attach menu shows only
 	// the mention path.
 	const attachments = useComposerContext();
-	const composerRef = useRef<HTMLTextAreaElement | null>(null);
+	const mentionRef = useRef<MentionComposerHandle>(null);
 	const contextHost = useMemo<ComposerContextHost>(
 		() => ({
 			searchCandidates: async (query: string) => {
@@ -468,15 +486,6 @@ export function AgentApp(): ReactElement {
 		}),
 		[all],
 	);
-	const mention = useMentionTypeahead({
-		host: contextHost,
-		value: input,
-		setValue: setInput,
-		textareaRef: composerRef,
-		onAttach: attachments.add,
-		ariaLabel: t("composer.attach.search"),
-		emptyLabel: t("composer.attach.empty"),
-	});
 	// Side stores for attached media, keyed by the uploaded asset url. Decoded
 	// text grounds the agent (Phase 2); image bytes become a vision content part
 	// at send (Phase 3). Both are per-draft — cleared when the turn sends. The
@@ -574,10 +583,12 @@ export function AgentApp(): ReactElement {
 				const tools = toolNamesFromSteps(e.properties.toolCalls);
 				const citations = citationsFromProperty(e.properties.citations);
 				const attachments = parseAttachments(e.properties.attachments);
+				const richBody = str(e.properties.richBody);
 				return {
 					id: e.id,
 					role: str(e.properties.role),
 					body: str(e.properties.body),
+					...(richBody ? { richBody } : {}),
 					createdAt: str(e.properties.createdAt),
 					...(typeof seq === "number" ? { seq } : {}),
 					...(model ? { model } : {}),
@@ -817,7 +828,7 @@ export function AgentApp(): ReactElement {
 	const newChat = useCallback(() => {
 		setActiveId(null);
 		setError(null);
-		setInput("");
+		editorRef.current?.clear();
 		clearDraftContext();
 		setSettingsOpen(false);
 		setSaveDraft(null);
@@ -833,10 +844,16 @@ export function AgentApp(): ReactElement {
 	}, []);
 
 	const send = useCallback(async () => {
-		const text = input.trim();
+		const draft = draftRef.current;
+		const text = draft.text.trim();
+		// Only carry the rich body when there's actual text to serialize.
+		const rich = text ? draft.state : "";
 		// Snapshot the attached context before we clear the rail; a turn can be
 		// just attachments + an implicit "look at this" with no typed text.
-		const attached = attachments.attachments;
+		// Inline `@`-mention chips in the draft are lifted into attachments too —
+		// they ground the turn like pinned context, but render inline, not as
+		// chips (`visibleAttachments`).
+		const attached = withMentionAttachments(rich || undefined, attachments.attachments);
 		if ((!text && attached.length === 0) || sending || !entitiesSvc || !aiSvc) return;
 		setError(null);
 
@@ -857,7 +874,7 @@ export function AgentApp(): ReactElement {
 		}
 
 		setSending(true);
-		setInput("");
+		editorRef.current?.clear();
 		attachments.clear();
 
 		try {
@@ -887,6 +904,7 @@ export function AgentApp(): ReactElement {
 						id: `pending-user-${now}`,
 						role: MessageRole.User,
 						body: text,
+						...(rich ? { richBody: rich } : {}),
 						createdAt: now,
 						seq: userSeq,
 						...(attached.length > 0 ? { attachments: attached } : {}),
@@ -898,6 +916,7 @@ export function AgentApp(): ReactElement {
 				sender: { kind: SenderKind.User },
 				role: MessageRole.User,
 				body: text,
+				...(rich ? { richBody: rich } : {}),
 				createdAt: now,
 				seq: userSeq,
 				...(attached.length > 0 ? { attachments: attached } : {}),
@@ -1097,7 +1116,6 @@ export function AgentApp(): ReactElement {
 			}
 		}
 	}, [
-		input,
 		sending,
 		entitiesSvc,
 		aiSvc,
@@ -1121,19 +1139,6 @@ export function AgentApp(): ReactElement {
 		attachments,
 	]);
 
-	const onComposerKeyDown = useCallback(
-		(e: KeyboardEvent<HTMLTextAreaElement>) => {
-			// Enter sends; Shift+Enter inserts a newline. Single-key handling on
-			// an editable field — keyboard-exempt from the shortcut-registry rule.
-			// Never send mid-IME-composition (the Enter that confirms a candidate).
-			if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-				e.preventDefault();
-				void send();
-			}
-		},
-		[send],
-	);
-
 	// The action surface (doc 63 / AS-3): an inbound `process` contribution
 	// dispatched from another app's menu ("Summarize with the agent" / "Ask the
 	// agent about this"). A fresh window carries it on the launch context; a
@@ -1148,7 +1153,7 @@ export function AgentApp(): ReactElement {
 		setError(null);
 		setSettingsOpen(false);
 		setSaveDraft(null);
-		setInput(seed.instruction);
+		editorRef.current?.setText(seed.instruction);
 	}, []);
 	const launchIntentFiredRef = useRef(false);
 	useEffect(() => {
@@ -1300,101 +1305,111 @@ export function AgentApp(): ReactElement {
 								hint={t("chat.empty.blurb")}
 							/>
 						) : (
-							displayMessages.map((m) => (
-								<div
-									key={m.id}
-									className={`agent__msg agent__msg--${m.role === MessageRole.Assistant ? "assistant" : "user"}`}
-								>
-									<div className="agent__msg-role">
-										{m.role === MessageRole.Assistant ? t("role.assistant") : t("role.you")}
-										{m.role === MessageRole.Assistant && m.model ? (
-											<span className="agent__msg-model"> · {t("provenance.via", { model: m.model })}</span>
-										) : null}
-									</div>
-									{m.tools && m.tools.length > 0 ? (
-										<div className="agent__msg-tools" data-testid="agent-msg-tools">
-											{toolChips(m.tools).map(({ key, tool }) => (
-												<span key={key} className="agent__tool-chip">
-													<Icon name={IconName.Sparkle} size={12} />
-													{t("tool.used", { tool })}
-												</span>
-											))}
+							displayMessages.map((m) => {
+								const chips = visibleAttachments({
+									attachments: m.attachments ?? [],
+									...(m.richBody ? { richBody: m.richBody } : {}),
+								});
+								return (
+									<div
+										key={m.id}
+										className={`agent__msg agent__msg--${m.role === MessageRole.Assistant ? "assistant" : "user"}`}
+									>
+										<div className="agent__msg-role">
+											{m.role === MessageRole.Assistant ? t("role.assistant") : t("role.you")}
+											{m.role === MessageRole.Assistant && m.model ? (
+												<span className="agent__msg-model"> · {t("provenance.via", { model: m.model })}</span>
+											) : null}
 										</div>
-									) : null}
-									<div className="agent__msg-body">
-										{m.role === MessageRole.Assistant ? (
-											<Markdown
-												source={m.bodyMarkdown ?? m.body}
-												onEntityLink={(target) =>
-													target && !/\s/.test(target) ? () => openCitation(target) : null
-												}
-											/>
-										) : (
-											m.body
-										)}
-									</div>
-									{m.attachments && m.attachments.length > 0 ? (
-										<div className="agent__attachments" data-testid="agent-attachments">
-											{m.attachments.map((a) =>
-												a.kind === AttachmentKind.Media ? (
-													<span key={a.ref} className="agent__attachment">
-														<Icon name={IconName.KindFile} size={12} />
-														{attachmentLabel(a)}
+										{m.tools && m.tools.length > 0 ? (
+											<div className="agent__msg-tools" data-testid="agent-msg-tools">
+												{toolChips(m.tools).map(({ key, tool }) => (
+													<span key={key} className="agent__tool-chip">
+														<Icon name={IconName.Sparkle} size={12} />
+														{t("tool.used", { tool })}
 													</span>
-												) : (
-													<button
-														type="button"
-														key={a.ref}
-														className="agent__attachment agent__attachment--link"
-														onClick={() => openCitation(a.ref)}
-														data-bs-tooltip={t("composer.attach.open", { label: attachmentLabel(a) })}
-														aria-label={t("composer.attach.open", { label: attachmentLabel(a) })}
-													>
-														<Icon
-															name={a.kind === AttachmentKind.Person ? IconName.Entity : IconName.KindLink}
-															size={12}
-														/>
-														{attachmentLabel(a)}
-													</button>
-												),
-											)}
-										</div>
-									) : null}
-									{memoryEnabled && m.body.trim().length > 0 ? (
-										<div className="agent__msg-actions">
-											<button
-												type="button"
-												className="agent__remember"
-												onClick={() => rememberFact(m.body)}
-												title={t("memory.remember.hint")}
-												data-testid="agent-remember"
-											>
-												<Icon name={IconName.Star} size={12} />
-												{t("memory.remember")}
-											</button>
-										</div>
-									) : null}
-									{m.citations && m.citations.length > 0 ? (
-										<div className="agent__citations" data-testid="agent-citations">
-											<span className="agent__citations-label">{t("citations.label")}</span>
-											<div className="agent__citation-links">
-												{m.citations.map((c) => (
-													<button
-														type="button"
-														key={c.entityId}
-														className="agent__citation"
-														onClick={() => openCitation(c.entityId)}
-														title={t("citations.open", { title: c.label })}
-													>
-														<Icon name={IconName.KindLink} size={12} />
-														{c.label}
-													</button>
 												))}
 											</div>
+										) : null}
+										<div className="agent__msg-body">
+											{m.role === MessageRole.Assistant ? (
+												<Markdown
+													source={m.bodyMarkdown ?? m.body}
+													onEntityLink={(target) =>
+														target && !/\s/.test(target) ? () => openCitation(target) : null
+													}
+												/>
+											) : m.richBody ? (
+												<div className="bs-editor bs-editor--readonly agent__msg-rich">
+													{renderEditorState(m.richBody)}
+												</div>
+											) : (
+												m.body
+											)}
 										</div>
-									) : null}
-								</div>
-							))
+										{chips.length > 0 ? (
+											<div className="agent__attachments" data-testid="agent-attachments">
+												{chips.map((a) =>
+													a.kind === AttachmentKind.Media ? (
+														<span key={a.ref} className="agent__attachment">
+															<Icon name={IconName.KindFile} size={12} />
+															{attachmentLabel(a)}
+														</span>
+													) : (
+														<button
+															type="button"
+															key={a.ref}
+															className="agent__attachment agent__attachment--link"
+															onClick={() => openCitation(a.ref)}
+															data-bs-tooltip={t("composer.attach.open", { label: attachmentLabel(a) })}
+															aria-label={t("composer.attach.open", { label: attachmentLabel(a) })}
+														>
+															<Icon
+																name={a.kind === AttachmentKind.Person ? IconName.Entity : IconName.KindLink}
+																size={12}
+															/>
+															{attachmentLabel(a)}
+														</button>
+													),
+												)}
+											</div>
+										) : null}
+										{memoryEnabled && m.body.trim().length > 0 ? (
+											<div className="agent__msg-actions">
+												<button
+													type="button"
+													className="agent__remember"
+													onClick={() => rememberFact(m.body)}
+													title={t("memory.remember.hint")}
+													data-testid="agent-remember"
+												>
+													<Icon name={IconName.Star} size={12} />
+													{t("memory.remember")}
+												</button>
+											</div>
+										) : null}
+										{m.citations && m.citations.length > 0 ? (
+											<div className="agent__citations" data-testid="agent-citations">
+												<span className="agent__citations-label">{t("citations.label")}</span>
+												<div className="agent__citation-links">
+													{m.citations.map((c) => (
+														<button
+															type="button"
+															key={c.entityId}
+															className="agent__citation"
+															onClick={() => openCitation(c.entityId)}
+															title={t("citations.open", { title: c.label })}
+														>
+															<Icon name={IconName.KindLink} size={12} />
+															{c.label}
+														</button>
+													))}
+												</div>
+											</div>
+										) : null}
+									</div>
+								);
+							})
 						)}
 						{sending && displayMessages[displayMessages.length - 1]?.role !== MessageRole.Assistant ? (
 							<div className="agent__msg agent__msg--assistant" data-testid="agent-thinking">
@@ -1433,7 +1448,7 @@ export function AgentApp(): ReactElement {
 						}}
 					>
 						<AttachContextButton
-							onMention={mention.trigger}
+							onMention={() => mentionRef.current?.trigger()}
 							{...(storageSvc?.uploadFile ? { onUploadMedia: () => void handleUploadMedia() } : {})}
 							labels={{
 								button: t("composer.attach.button"),
@@ -1442,31 +1457,39 @@ export function AgentApp(): ReactElement {
 							}}
 							disabled={sending}
 						/>
-						<textarea
-							ref={composerRef}
-							className="agent__input"
-							value={input}
-							onChange={(e) => {
-								setInput(e.target.value);
-								mention.sync();
-							}}
-							onKeyDown={(e) => {
-								if (mention.onKeyDown(e)) return;
-								onComposerKeyDown(e);
-							}}
-							onClick={() => mention.sync()}
-							onKeyUp={() => mention.sync()}
-							onBlur={mention.blur}
-							placeholder={t("chat.placeholder")}
-							rows={1}
-							aria-label={t("chat.placeholder")}
-							data-testid="agent-input"
-						/>
+						<div data-testid="agent-input" className="agent__input-host">
+							<CompactEditor
+								ref={editorRef}
+								className="agent__input"
+								placeholder={t("chat.placeholder")}
+								ariaLabel={t("chat.placeholder")}
+								additionalNodes={[MentionNode]}
+								onChange={(p) => {
+									draftRef.current = p;
+									setDraftEmpty(p.isEmpty);
+								}}
+								onSubmit={(p) => {
+									draftRef.current = p;
+									void send();
+								}}
+							>
+								{/* Slack model: committing a person/document plants an inline
+								    mention chip in the draft; the send path lifts it into the
+								    grounding attachments. */}
+								<MentionComposerPlugin
+									ref={mentionRef}
+									host={contextHost}
+									insertNode
+									ariaLabel={t("composer.attach.search")}
+									emptyLabel={t("composer.attach.empty")}
+								/>
+							</CompactEditor>
+						</div>
 						<button
 							type="submit"
 							className="agent__send"
 							data-bs-primary=""
-							disabled={sending || (input.trim().length === 0 && attachments.attachments.length === 0)}
+							disabled={sending || (draftEmpty && attachments.attachments.length === 0)}
 							data-testid="agent-send"
 						>
 							{t("chat.send")}
