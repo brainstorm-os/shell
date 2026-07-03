@@ -5,6 +5,12 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* Short windows / tall steps (create form + template gallery): let the
+	 * whole splash scroll instead of clipping. The auto margins on
+	 * `.welcome__content` (not the flex centering above) are what keep the
+	 * TOP reachable once content overflows — centered flex children clip
+	 * their leading edge past the scroll origin. */
+	overflow-y: auto;
 	/* Splash-screen wallpaper — shipped runtime asset under the shell's
 	 * `art/` folder (NOT docs/, which is example art only). The same
 	 * rose-mountains image seeds a new vault's light slot, so the dashboard
@@ -17,7 +23,9 @@
 }
 
 .welcome__title-bar {
-	position: absolute;
+	/* Fixed (not absolute): `.welcome` scrolls when its content overflows,
+	 * and the drag strip must stay pinned to the window's top edge. */
+	position: fixed;
 	top: 0;
 	inset-inline: 0;
 	height: 36px;
@@ -30,6 +38,7 @@
 	position: relative;
 	width: 100%;
 	max-width: 400px;
+	margin: auto; /* overflow-safe centering — see `.welcome` */
 	padding: var(--space-7);
 	text-align: center;
 	display: flex;
@@ -125,10 +134,11 @@
 	border-color: var(--color-border-strong);
 }
 
-.welcome__tile:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 2px;
-}
+/* No per-tile :focus-visible ring — the tile regains focus programmatically
+ * (folder-dialog close, join/migrate popover close) and Chromium marks that
+ * restore :focus-visible, so a local rule here lit a stuck accent ring after
+ * a plain mouse click. Deliberate Tab focus still gets the global themed
+ * ring via `:root[data-kbnav] :focus-visible` (styles.css). */
 
 .welcome__tile:disabled {
 	cursor: default;
@@ -181,6 +191,10 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-1);
+	/* ~5 rows, then the list scrolls in place — with many vaults the menu
+	 * card otherwise grows past the viewport and pushes the CTAs off-screen. */
+	max-height: 210px;
+	overflow-y: auto;
 }
 
 .welcome__recent-item {
@@ -221,9 +235,17 @@
 	flex-shrink: 0;
 }
 
+/* One line, ellipsized — the fixed-width path pushed multi-word (or even
+ * short) names into a two-line wrap once real paths filled the row. The name
+ * wins the space fight (no shrink, capped at 60%); the path yields first. */
 .welcome__recent-name {
 	font-size: var(--text-size-md);
 	color: var(--color-text-primary);
+	flex-shrink: 0;
+	max-width: 60%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .welcome__recent-path {

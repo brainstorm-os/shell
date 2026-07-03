@@ -77,6 +77,7 @@ export const CANONICAL_TOKEN_NAMES = Object.freeze([
 	"--color-state-warning",
 	"--color-surface-default",
 	"--color-surface-overlay",
+	"--color-surface-raised",
 	"--color-text-inverse",
 	"--color-text-link",
 	"--color-text-primary",

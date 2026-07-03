@@ -17,6 +17,10 @@ export type Tokens = {
 		surface: {
 			default: string;
 			overlay: string;
+			/** Chip / thumbnail surface sitting ON a `default` card (icon chips,
+			 *  avatar wells) — one step stronger than `default` so it stays
+			 *  visible over cards and glass alike. */
+			raised: string;
 		};
 		border: {
 			subtle: string;
