@@ -8,9 +8,11 @@
  *      snapshot versions (`RelaySurface.requestCatalog`). The account key is
  *      the device's wire `sender` (base64url); the node recorded it from the
  *      plaintext routing header (SYNC-4a).
- *   2. **subscribe (ungated)** — `LiveSyncEngine.trackForRestore(id)` tracks
- *      each catalog entity WITHOUT the `isShared` gate (the catalog already
- *      asserts ownership) and subscribes its relay channel.
+ *   2. **subscribe (ungated)** — `LiveSyncEngine.trackForRestoreBatch(ids)`
+ *      tracks every catalog entity WITHOUT the `isShared` gate (the catalog
+ *      already asserts ownership) and batch-subscribes the relay channels in
+ *      chunked `bundle:true` controls (10.10), so a durable node streams the
+ *      backfill as bundled frames instead of one message per frame.
  *   3. **backfill applies through the live engine** — the node streams
  *      `wraps ++ snapshot ++ tail` per entity. The wrap installs the DEK and
  *      (via the engine's `installWrap` wiring) materializes the `entities.db`
@@ -53,7 +55,7 @@ export type RestoreEngineContext = {
 	/** Issue the catalog query (`RelaySurface.requestCatalog`). */
 	requestCatalog: (account: string) => Promise<CatalogEntry[]>;
 	/** The live-sync engine — drives ungated subscribe + applies the backfill. */
-	engine: Pick<LiveSyncEngine, "trackForRestore" | "restoredType" | "whenIdle">;
+	engine: Pick<LiveSyncEngine, "trackForRestoreBatch" | "restoredType" | "whenIdle">;
 	/** Progress callback fired as entities settle. Optional. */
 	onProgress?: (progress: RestoreProgress) => void;
 	/** Quiescence window: stop once no new entity has come back for this long.
@@ -101,9 +103,10 @@ export class RestoreEngine {
 			if (entries.length === 0) {
 				return { requested: 0, restored: 0, entityIds: [], complete: true };
 			}
-			for (const entry of entries) {
-				this.#ctx.engine.trackForRestore(entry.entityId);
-			}
+			// 10.10 — batch-track the whole catalog: one pass, chunked bundle:true
+			// subscribes, so a durable node streams the backfill as bundled frames
+			// (an old node falls back to the per-frame stream transparently).
+			this.#ctx.engine.trackForRestoreBatch(entries.map((entry) => entry.entityId));
 			await this.#awaitBackfill(entries);
 			// Settle the apply chain once more so the snapshot/tail behind the
 			// last-counted wrap have landed before we read rows to reindex.

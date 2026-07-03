@@ -14,12 +14,15 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	BUNDLE_CHANNEL_BYTE,
 	CONTROL_CHANNEL_BYTE,
 	FRAME_CHANNEL_BYTE,
 	WebSocketRelayPort,
 	WebSocketRelayState,
+	decodeBundlePayload,
 	decodeCatalogResult,
 	decodeControlMessage,
+	encodeBundlePayload,
 	encodeControlMessage,
 	isControlMessage,
 	unwrapBinaryFrame,
@@ -171,6 +174,14 @@ describe("encodeControlMessage / decodeControlMessage / isControlMessage", () =>
 
 	it("rejects non-array entityIds", () => {
 		expect(isControlMessage({ op: "subscribe", entityIds: "e1" })).toBe(false);
+	});
+
+	it("round-trips a bundle-advertising subscribe; rejects a non-true bundle flag (10.10)", () => {
+		const wire = encodeControlMessage({ op: "subscribe", entityIds: ["e1"], bundle: true });
+		expect(decodeControlMessage(wire)).toEqual({ op: "subscribe", entityIds: ["e1"], bundle: true });
+		expect(isControlMessage({ op: "subscribe", entityIds: ["e1"], bundle: true })).toBe(true);
+		expect(isControlMessage({ op: "subscribe", entityIds: ["e1"], bundle: "yes" })).toBe(false);
+		expect(isControlMessage({ op: "subscribe", entityIds: ["e1"], bundle: false })).toBe(false);
 	});
 
 	it("encodes + validates a catalog query (10.14)", () => {
@@ -630,7 +641,7 @@ describe("WebSocketRelayPort — subscriptions", () => {
 		const wire = ws?.sent[0];
 		expect(wire?.[0]).toBe(CONTROL_CHANNEL_BYTE);
 		const decoded = wire ? decodeControlMessage(wire) : null;
-		expect(decoded).toEqual({ op: "subscribe", entityIds: ["entity-1"] });
+		expect(decoded).toEqual({ op: "subscribe", entityIds: ["entity-1"], bundle: true });
 		port.close();
 	});
 
@@ -647,7 +658,7 @@ describe("WebSocketRelayPort — subscriptions", () => {
 		ws?.open();
 		// One bulk subscribe on open carrying the active set.
 		const control = ws?.sent[0] ? decodeControlMessage(ws.sent[0]) : null;
-		expect(control).toEqual({ op: "subscribe", entityIds: ["entity-2"] });
+		expect(control).toEqual({ op: "subscribe", entityIds: ["entity-2"], bundle: true });
 		expect(port.subscriptionsSnapshot()).toEqual(["entity-2"]);
 		port.close();
 	});
@@ -675,7 +686,7 @@ describe("WebSocketRelayPort — subscriptions", () => {
 		// First send on the new socket = the full subscription set.
 		const wire = ws2?.sent[0];
 		const control = wire ? decodeControlMessage(wire) : null;
-		expect(control).toEqual({ op: "subscribe", entityIds: ["e1", "e2"] });
+		expect(control).toEqual({ op: "subscribe", entityIds: ["e1", "e2"], bundle: true });
 		port.close();
 	});
 
@@ -887,6 +898,166 @@ describe("SYNC-4b gated handshake (onChallenge)", () => {
 		await tick();
 		const auth = (ws?.sent ?? []).map((b) => decodeControlMessage(b)).find((m) => m?.op === "auth");
 		expect(auth).toBeUndefined();
+		port.close();
+	});
+});
+
+describe("bundle payload codec (10.10)", () => {
+	it("round-trips frames byte-identically", () => {
+		const frames = [new Uint8Array([1, 2, 3]), new Uint8Array([9]), new Uint8Array(600).fill(7)];
+		const payload = encodeBundlePayload(frames);
+		expect(payload).not.toBeNull();
+		const decoded = decodeBundlePayload(payload as Uint8Array);
+		expect(decoded).not.toBeNull();
+		expect(decoded?.length).toBe(3);
+		for (let i = 0; i < frames.length; i++) {
+			expect(decoded?.[i]).toEqual(frames[i]);
+		}
+	});
+
+	it("decoded sub-frames are copies of the payload buffer", () => {
+		const payload = encodeBundlePayload([new Uint8Array([5, 6])]) as Uint8Array;
+		const first = (decodeBundlePayload(payload) as Uint8Array[])[0] as Uint8Array;
+		first[0] = 0;
+		expect((decodeBundlePayload(payload) as Uint8Array[])[0]).toEqual(new Uint8Array([5, 6]));
+	});
+
+	it("rejects malformed payloads wholly (null, never partial)", () => {
+		expect(decodeBundlePayload(new Uint8Array(0))).toBeNull(); // empty
+		expect(decodeBundlePayload(new Uint8Array([0, 0, 1]))).toBeNull(); // truncated prefix
+		expect(decodeBundlePayload(new Uint8Array([0, 0, 0, 0]))).toBeNull(); // zero-length sub-frame
+		expect(decodeBundlePayload(new Uint8Array([0, 0, 0, 5, 1, 2]))).toBeNull(); // overrun
+		const good = encodeBundlePayload([new Uint8Array([1, 2])]) as Uint8Array;
+		const trailing = new Uint8Array([...good, 9, 9]); // trailing garbage
+		expect(decodeBundlePayload(trailing)).toBeNull();
+	});
+
+	it("refuses to encode an empty bundle or an empty sub-frame", () => {
+		expect(encodeBundlePayload([])).toBeNull();
+		expect(encodeBundlePayload([new Uint8Array(0)])).toBeNull();
+	});
+});
+
+describe("WebSocketRelayPort — inbound bundles (10.10)", () => {
+	function bundleWire(frames: Uint8Array[]): Uint8Array {
+		const payload = encodeBundlePayload(frames) as Uint8Array;
+		const wire = new Uint8Array(1 + payload.length);
+		wire[0] = BUNDLE_CHANNEL_BYTE;
+		wire.set(payload, 1);
+		return wire;
+	}
+
+	it("delivers bundle sub-frames to listeners byte-identically to per-frame delivery", () => {
+		const frames = [new Uint8Array([1, 1, 1]), new Uint8Array([2, 2]), new Uint8Array([3])];
+
+		// Per-frame path: three 0x01 messages.
+		const CtorA = makeFakeWsCtor();
+		const portA = new WebSocketRelayPort({ url: "ws://a", wsImpl: CtorA });
+		portA.connect();
+		CtorA.instances[0]?.open();
+		const perFrame: Uint8Array[] = [];
+		portA.onFrame((f) => perFrame.push(f));
+		for (const f of frames) CtorA.instances[0]?.deliver(wrapBinaryFrame(f));
+		portA.close();
+
+		// Bundled path: ONE 0x03 message.
+		const CtorB = makeFakeWsCtor();
+		const portB = new WebSocketRelayPort({ url: "ws://b", wsImpl: CtorB });
+		portB.connect();
+		CtorB.instances[0]?.open();
+		const bundled: Uint8Array[] = [];
+		portB.onFrame((f) => bundled.push(f));
+		CtorB.instances[0]?.deliver(bundleWire(frames));
+		expect(portB.droppedInbound()).toBe(0);
+		portB.close();
+
+		expect(bundled.length).toBe(perFrame.length);
+		for (let i = 0; i < perFrame.length; i++) {
+			expect(bundled[i]).toEqual(perFrame[i]);
+		}
+	});
+
+	it("drops a malformed bundle wholly and counts it as droppedInbound", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const received: Uint8Array[] = [];
+		port.onFrame((f) => received.push(f));
+		ws?.deliver(new Uint8Array([BUNDLE_CHANNEL_BYTE, 0, 0, 0, 9, 1])); // overrun length
+		expect(received.length).toBe(0);
+		expect(port.droppedInbound()).toBe(1);
+		port.close();
+	});
+
+	it("a listener throwing on one sub-frame doesn't block the rest of the bundle", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const seen: number[] = [];
+		port.onFrame((f) => {
+			seen.push(f[0] as number);
+			if (f[0] === 1) throw new Error("boom");
+		});
+		ws?.deliver(bundleWire([new Uint8Array([1]), new Uint8Array([2])]));
+		expect(seen).toEqual([1, 2]);
+		port.close();
+	});
+});
+
+describe("WebSocketRelayPort — subscribeBatch (10.10)", () => {
+	it("coalesces N fresh ids into ONE bundle-advertising control message", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		const ids = Array.from({ length: 40 }, (_, i) => `ent_${i}`);
+		port.subscribeBatch(ids);
+		expect(ws?.sent.length).toBe(1);
+		const control = ws?.sent[0] ? decodeControlMessage(ws.sent[0]) : null;
+		expect(control).toEqual({ op: "subscribe", entityIds: ids, bundle: true });
+		expect(port.subscriptionsSnapshot()).toEqual(ids);
+		port.close();
+	});
+
+	it("chunks past the batch cap and skips already-subscribed / empty ids", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		port.subscribe("dup");
+		const ids = ["dup", "", ...Array.from({ length: 300 }, (_, i) => `ent_${i}`)];
+		port.subscribeBatch(ids);
+		const subs = (ws?.sent ?? [])
+			.map((b) => decodeControlMessage(b))
+			.filter(
+				(m): m is { op: "subscribe"; entityIds: string[]; bundle?: true } => m?.op === "subscribe",
+			);
+		// 1 for the single subscribe + 2 chunks (256 + 44) for the batch.
+		expect(subs.length).toBe(3);
+		expect(subs[1]?.entityIds.length).toBe(256);
+		expect(subs[2]?.entityIds.length).toBe(44);
+		expect(subs[1]?.entityIds).not.toContain("dup");
+		expect(subs[1]?.bundle).toBe(true);
+		expect(subs[2]?.bundle).toBe(true);
+		port.close();
+	});
+
+	it("before Open, holds state silently and re-emits the set on open", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		port.subscribeBatch(["e1", "e2"]);
+		const ws = Ctor.instances[0];
+		expect(ws?.sent.length).toBe(0);
+		ws?.open();
+		const control = ws?.sent[0] ? decodeControlMessage(ws.sent[0]) : null;
+		expect(control).toEqual({ op: "subscribe", entityIds: ["e1", "e2"], bundle: true });
 		port.close();
 	});
 });

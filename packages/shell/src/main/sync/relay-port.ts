@@ -56,6 +56,12 @@ export interface RelaySurface {
 	offFrame(cb: (frame: Uint8Array) => void): void;
 	subscribe?(routingKey: string): void;
 	unsubscribe?(routingKey: string): void;
+	/** 10.10 — subscribe many routing keys at once (fresh-device bootstrap).
+	 *  A batching transport (the WebSocket port) coalesces these into chunked
+	 *  `subscribe` controls carrying `bundle:true` so the durable node serves
+	 *  the backfill as bundled frames; a non-batching transport falls back to
+	 *  per-key `subscribe`. Absent ⇒ callers loop `subscribe`. */
+	subscribeBatch?(routingKeys: readonly string[]): void;
 	/** Stage 10.14 — request the durable node's catalog for `account` (the
 	 *  device's wire `sender`, base64url). Resolves with the account's entity
 	 *  ids + latest snapshot versions; rejects on timeout or a non-WebSocket
