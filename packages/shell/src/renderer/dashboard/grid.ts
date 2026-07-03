@@ -180,11 +180,15 @@ export function widgetFootprint(size: WidgetSize): GridSize {
 
 /** Migrate one stored widget record onto the 8px grid. A pre-7.3b record (tiny
  *  icon-grid footprint) is scaled up so it keeps roughly its on-screen size +
- *  position; an already-8px record is returned unchanged. Self-terminating. */
+ *  position; an already-8px record is returned unchanged. Width alone is the
+ *  discriminator: every current-format record has `w ≥ WIDGET_MIN_W (8) >
+ *  LEGACY_WIDGET_MAX_CELL`, but `WIDGET_MIN_H (6)` is NOT above the legacy
+ *  ceiling — testing height too made a widget resized to minimum height
+ *  re-enter the migration and teleport ×10 (F-323). */
 export function migrateWidgetRecord<T extends { x: number; y: number; w: number; h: number }>(
 	record: T,
 ): T {
-	if (record.w > LEGACY_WIDGET_MAX_CELL && record.h > LEGACY_WIDGET_MAX_CELL) return record;
+	if (record.w > LEGACY_WIDGET_MAX_CELL) return record;
 	return {
 		...record,
 		x: Math.max(0, Math.round(record.x)) * OLD_WIDGET_CELL_TO_UNIT,
