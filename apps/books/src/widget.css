@@ -1,0 +1,126 @@
+/* Books "currently-reading" dashboard widget. Mirrors the Contacts widget
+ * chrome; each row carries title + dim author on one line, then a thin
+ * progress bar with a percent caption (or a dim status caption in the
+ * recently-added fallback). */
+.books-widget {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.books-widget__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	flex-shrink: 0;
+	padding: var(--space-1) var(--space-2);
+	border-bottom: var(--border-width) solid var(--border);
+}
+
+.books-widget__label {
+	color: var(--text);
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+}
+
+.books-widget__count {
+	flex-shrink: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.books-widget__list {
+	list-style: none;
+	margin: 0;
+	padding: var(--space-1);
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.books-widget__row {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	padding: var(--space-1);
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.books-widget__row:hover {
+	background: var(--hover);
+}
+
+.books-widget__main {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.books-widget__title {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-size-sm);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.books-widget__author {
+	flex-shrink: 1;
+	max-width: 40%;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.books-widget__progress {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.books-widget__track {
+	flex: 1;
+	min-width: 0;
+	height: 3px;
+	border-radius: var(--radius-sm);
+	background: var(--border);
+	overflow: hidden;
+}
+
+.books-widget__fill {
+	display: block;
+	height: 100%;
+	border-radius: var(--radius-sm);
+	background: var(--accent);
+}
+
+.books-widget__percent {
+	flex-shrink: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	font-variant-numeric: tabular-nums;
+}
+
+.books-widget__caption {
+	color: var(--text-faint);
+	font-size: var(--text-size-xs);
+}

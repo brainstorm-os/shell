@@ -20,6 +20,7 @@
   ],
   "registrations": {
     "openers": [{ "kind": "primary", "entityType": "io.brainstorm.journal/Entry/v1" }],
+    "widgets": [{ "id": "today-journal", "name": "Journal", "size": "medium" }],
     "intents": [
       {
         "verb": "open",

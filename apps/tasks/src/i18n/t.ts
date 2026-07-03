@@ -18,6 +18,7 @@ const DEFAULTS = {
 	// sort control + the open-task count.
 	"tasks.widget.untitled": "Untitled task",
 	"tasks.widget.empty": "No open tasks",
+	"tasks.widget.emptyAction": "Add a task",
 	"tasks.widget.sort.label": "Sort tasks",
 	"tasks.widget.sort.updated": "Recently updated",
 	"tasks.widget.sort.title": "Title (A–Z)",

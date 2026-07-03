@@ -1,20 +1,35 @@
 import "@brainstorm/sdk/app-theme.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
+import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { JournalApp } from "./app";
 import "./types";
 import "./styles.css";
+import { JournalWidget } from "./widget";
 
 const root = document.getElementById("journal-root");
 if (!root) throw new Error("journal: #journal-root missing");
 
 document.body.classList.remove("is-booting");
 
-createRoot(root).render(
-	<StrictMode>
-		<AppErrorBoundary appName="journal">
-			<JournalApp />
-		</AppErrorBoundary>
-	</StrictMode>,
-);
+// Widget-mode: the dashboard launched this bundle as a widget. Mount the
+// compact today-journal glance instead of the full Journal app.
+const widgetLaunch = getWidgetLaunch();
+if (widgetLaunch) {
+	createRoot(root).render(
+		<StrictMode>
+			<AppErrorBoundary appName="journal">
+				<JournalWidget launch={widgetLaunch} />
+			</AppErrorBoundary>
+		</StrictMode>,
+	);
+} else {
+	createRoot(root).render(
+		<StrictMode>
+			<AppErrorBoundary appName="journal">
+				<JournalApp />
+			</AppErrorBoundary>
+		</StrictMode>,
+	);
+}

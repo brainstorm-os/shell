@@ -20,6 +20,7 @@
     "blocks.provide:io.brainstorm.books/embedded-highlight"
   ],
   "registrations": {
+    "widgets": [{ "id": "currently-reading", "name": "Currently Reading", "size": "medium" }],
     "entityTypes": [
       {
         "id": "brainstorm/Book/v1",

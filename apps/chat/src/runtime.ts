@@ -8,6 +8,7 @@
 
 import type {
 	EntitiesService,
+	IntentsService,
 	RosterService,
 	SharingService,
 	StorageService,
@@ -23,6 +24,9 @@ export type ChatAppRuntime = {
 		storage?: StorageService;
 		roster?: RosterService;
 		sharing?: SharingService;
+		/** Routes the widget's row-click / CTA `open` back to a channel (cap
+		 *  `intents.dispatch:open`). */
+		intents?: IntentsService;
 	} | null;
 };
 

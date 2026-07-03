@@ -10,7 +10,12 @@
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import "@brainstorm/sdk/select-menu.css";
-import { type WidgetLaunch, WidgetRoot, useWidgetVisible } from "@brainstorm/sdk/widget";
+import {
+	WidgetEmpty,
+	type WidgetLaunch,
+	WidgetRoot,
+	useWidgetVisible,
+} from "@brainstorm/sdk/widget";
 import { useMemo, useState } from "react";
 import { t, tCount } from "./i18n/t";
 import { TASK_TYPE } from "./storage/entities-repository";
@@ -23,6 +28,18 @@ export const TASKS_WIDGET_OPEN = "open-tasks";
 export const TASKS_WIDGET_STATS = "task-stats";
 
 const OPEN_LIMIT = 8;
+
+/** Server-side narrowing for the widget's entity subscription (F-384) —
+ *  module-level so the reference is stable across renders. */
+const WIDGET_QUERY = { types: [TASK_TYPE] } as const;
+
+/** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
+ *  registered opener and launches the full Tasks app. */
+function openTasksApp(): void {
+	const intents = getBrainstorm()?.services.intents;
+	if (!intents) return;
+	void intents.dispatch({ verb: "open", payload: { entityType: TASK_TYPE } });
+}
 
 /** How the glance list is ordered — the in-widget sort control's value set. */
 enum TasksSort {
@@ -70,7 +87,11 @@ function OpenTasks({
 				<span className="tasks-widget__count">{tCount("tasks.widget.count", total)}</span>
 			</div>
 			{tasks.length === 0 ? (
-				<p className="tasks-widget__empty">{t("tasks.widget.empty")}</p>
+				<WidgetEmpty
+					message={t("tasks.widget.empty")}
+					actionLabel={t("tasks.widget.emptyAction")}
+					onAction={openTasksApp}
+				/>
 			) : (
 				<ul className="tasks-widget__list">
 					{tasks.map((task) => (
@@ -134,7 +155,11 @@ function TaskStats({
 	if (stats.open.count === 0) {
 		return (
 			<div className="tasks-stats">
-				<p className="tasks-stats__empty">{t("tasks.widget.stats.empty")}</p>
+				<WidgetEmpty
+					message={t("tasks.widget.stats.empty")}
+					actionLabel={t("tasks.widget.emptyAction")}
+					onAction={openTasksApp}
+				/>
 			</div>
 		);
 	}
@@ -172,7 +197,9 @@ export function TasksWidget({ launch }: { launch: WidgetLaunch }) {
 	// the host scrolls the widget off-screen (the surface stops re-rendering).
 	useWidgetVisible();
 	const [sort, setSort] = useState<TasksSort>(TasksSort.Updated);
-	const { entities } = useVaultEntities(runtime?.services.vaultEntities ?? null);
+	const { entities } = useVaultEntities(runtime?.services.vaultEntities ?? null, {
+		query: WIDGET_QUERY,
+	});
 
 	const open = useMemo(
 		() =>

@@ -38,6 +38,7 @@ const DEFAULTS: Record<string, string> = {
 	// widget strip; the app supplies the body — empty-state copy + the in-widget
 	// sort control.
 	"notes.widget.empty": "No notes yet",
+	"notes.widget.emptyAction": "Write a note",
 	"notes.widget.sort.label": "Sort notes",
 	"notes.widget.sort.edited": "Recently edited",
 	"notes.widget.sort.created": "Recently created",

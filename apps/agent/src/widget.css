@@ -1,31 +1,31 @@
-/* Contacts "list-contacts" dashboard widget (Stage 7.3 / 7.3b; 9.12.13(c)).
- * Mirrors the Notes recent-notes widget chrome; the row carries a name + an
- * optional dim subtitle (role / company). */
-.contacts-widget {
+/* Agent "recent-conversations" dashboard widget. Mirrors the Contacts /
+ * Journal widget chrome: a toolbar row (label + count chip) above the
+ * scrolling conversation list; each row is a title + a dim relative
+ * "updated" stamp. */
+.agent-widget {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
 }
 
-/* In-widget controls: the sort select + the live people count. Sits above the
- * scrolling list with a subtle divider so it reads as a toolbar. */
-.contacts-widget__toolbar {
+.agent-widget__toolbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-2);
 	flex-shrink: 0;
-	padding: var(--space-1);
+	padding: var(--space-1) var(--space-2);
 	border-bottom: var(--border-width) solid var(--border);
 }
 
-.contacts-widget__toolbar .bs-select {
-	height: 26px;
+.agent-widget__label {
 	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--text);
 }
 
-.contacts-widget__count {
+.agent-widget__count {
 	flex-shrink: 0;
 	color: var(--text-dim);
 	font-size: var(--text-size-xs);
@@ -33,7 +33,7 @@
 	white-space: nowrap;
 }
 
-.contacts-widget__list {
+.agent-widget__list {
 	list-style: none;
 	margin: 0;
 	padding: var(--space-1);
@@ -45,7 +45,7 @@
 	overflow-y: auto;
 }
 
-.contacts-widget__row {
+.agent-widget__row {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
@@ -60,18 +60,18 @@
 	cursor: pointer;
 }
 
-.contacts-widget__row:hover {
+.agent-widget__row:hover {
 	background: var(--hover);
 }
 
-.contacts-widget__name {
+.agent-widget__title {
 	font-size: var(--text-size-sm);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.contacts-widget__subtitle {
+.agent-widget__updated {
 	color: var(--text-dim);
 	font-size: var(--text-size-xs);
 	white-space: nowrap;

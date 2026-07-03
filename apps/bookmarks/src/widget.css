@@ -76,14 +76,3 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-
-.bookmarks-widget__empty {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex: 1;
-	min-height: 0;
-	margin: 0;
-	color: var(--text-dim);
-	font-size: var(--text-size-sm);
-}

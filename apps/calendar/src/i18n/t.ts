@@ -18,6 +18,7 @@ export const MANIFEST = {
 	// widget strip; the app supplies the body — today's agenda glance list.
 	"calendar.widget.today.label": "Today",
 	"calendar.widget.empty": "Nothing scheduled today",
+	"calendar.widget.emptyAction": "Open Calendar",
 	"calendar.widget.count.one": "{count} event",
 	"calendar.widget.count.other": "{count} events",
 	// "Week ahead" widget (large) — the next 7 days, grouped by day.

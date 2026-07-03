@@ -10,7 +10,12 @@
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import "@brainstorm/sdk/select-menu.css";
-import { type WidgetLaunch, WidgetRoot, useWidgetVisible } from "@brainstorm/sdk/widget";
+import {
+	WidgetEmpty,
+	type WidgetLaunch,
+	WidgetRoot,
+	useWidgetVisible,
+} from "@brainstorm/sdk/widget";
 import { useMemo, useState } from "react";
 import { t, tCount } from "./i18n/t";
 import { NOTE_TYPE } from "./store/entities-repository";
@@ -21,6 +26,18 @@ import "./widget.css";
 export const NOTES_WIDGET_RECENT = "recent-notes";
 
 const RECENT_LIMIT = 8;
+
+/** Server-side narrowing for the widget's entity subscription (F-384) —
+ *  module-level so the reference is stable across renders. */
+const WIDGET_QUERY = { types: [NOTE_TYPE] } as const;
+
+/** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
+ *  registered opener and launches the full Notes app. */
+function openNotesApp(): void {
+	const intents = getBrainstorm()?.services.intents;
+	if (!intents) return;
+	void intents.dispatch({ verb: "open", payload: { entityType: NOTE_TYPE } });
+}
 
 /** How the glance list is ordered — the in-widget sort control's value set. */
 enum NotesSort {
@@ -63,7 +80,11 @@ function RecentNotes({
 				<span className="notes-widget__count">{tCount("notes.widget.count", total)}</span>
 			</div>
 			{notes.length === 0 ? (
-				<p className="notes-widget__empty">{t("notes.widget.empty")}</p>
+				<WidgetEmpty
+					message={t("notes.widget.empty")}
+					actionLabel={t("notes.widget.emptyAction")}
+					onAction={openNotesApp}
+				/>
 			) : (
 				<ul className="notes-widget__list">
 					{notes.map((note) => (
@@ -95,7 +116,9 @@ export function NotesWidget({ launch }: { launch: WidgetLaunch }) {
 	// the host scrolls the widget off-screen (the surface stops re-rendering).
 	useWidgetVisible();
 	const [sort, setSort] = useState<NotesSort>(NotesSort.Edited);
-	const { entities } = useVaultEntities(runtime?.services.vaultEntities ?? null);
+	const { entities } = useVaultEntities(runtime?.services.vaultEntities ?? null, {
+		query: WIDGET_QUERY,
+	});
 
 	const live = useMemo(
 		() => entities.filter((e) => e.type === NOTE_TYPE && e.deletedAt === null),

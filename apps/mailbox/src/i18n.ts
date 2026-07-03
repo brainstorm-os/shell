@@ -123,6 +123,14 @@ export const MAILBOX_I18N = {
 	"date.yesterday": "Yesterday",
 
 	"demo.banner": "Preview data — connect a mail account to see real mail.",
+
+	"widget.title": "Inbox",
+	"widget.unread.one": "{count} unread",
+	"widget.unread.other": "{count} unread",
+	"widget.messages.one": "{count} message",
+	"widget.messages.other": "{count} messages",
+	"widget.empty": "Inbox is empty",
+	"widget.open": "Open Mailbox",
 } as const;
 
 export type MailboxI18nKey = keyof typeof MAILBOX_I18N;

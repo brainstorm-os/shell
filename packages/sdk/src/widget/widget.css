@@ -57,3 +57,37 @@
 	color: var(--text-dim);
 	font-size: var(--text-size-sm);
 }
+
+/* Shared widget empty state (F-381): dim one-liner + a small link-styled CTA.
+ * Fills the body so the pair centres in whatever footprint the tile has. */
+.bs-widget-empty {
+	flex: 1;
+	min-height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-1);
+	padding: var(--widget-pad, var(--space-1));
+}
+
+.bs-widget-empty__message {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+	text-align: center;
+}
+
+.bs-widget-empty__action {
+	border: none;
+	background: none;
+	padding: var(--space-1);
+	color: var(--accent);
+	font-size: var(--text-size-sm);
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+}
+
+.bs-widget-empty__action:hover {
+	background: var(--hover);
+}

@@ -9,7 +9,11 @@
  * to its in-memory empty state per [[preview-drop-pattern]].
  */
 
-import type { AutomationsService, VaultEntitiesService } from "@brainstorm/sdk-types";
+import type {
+	AutomationsService,
+	IntentsService,
+	VaultEntitiesService,
+} from "@brainstorm/sdk-types";
 
 export type EntityRecord = {
 	id: string;
@@ -70,6 +74,9 @@ export type AutomationsBrainstorm = {
 		files?: FilesService;
 		/** Shell-side engine handle — runNow + host designation (11b.6/.15). */
 		automations?: AutomationsService;
+		/** Intent dispatch — the recent-runs widget's row-click → `intent.open`
+		 *  (cap `intents.dispatch:open`). */
+		intents?: IntentsService;
 	} | null;
 	on?(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
 };

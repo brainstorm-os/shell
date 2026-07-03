@@ -23,6 +23,7 @@ export const CONTACTS_I18N = {
 	"widget.sort.name": "Name",
 	"widget.sort.recent": "Recently added",
 	"widget.empty": "No contacts yet.",
+	"widget.emptyAction": "Add people",
 
 	"list.search.placeholder": "Search people",
 	"list.search.aria": "Search contacts by name, email, phone, or role",
