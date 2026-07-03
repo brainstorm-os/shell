@@ -58,6 +58,30 @@ describe("renderEditorState", () => {
 		expect(html).toContain("cap");
 	});
 
+	it("renders a check list with checked/unchecked item classes", () => {
+		const checkState = {
+			root: {
+				type: "root",
+				children: [
+					{
+						type: "list",
+						listType: "check",
+						children: [
+							{ type: "listitem", checked: true, children: [{ type: "text", text: "done" }] },
+							{ type: "listitem", checked: false, children: [{ type: "text", text: "todo" }] },
+						],
+					},
+				],
+			},
+		};
+		const checkHtml = renderToStaticMarkup(<EditorPreview state={checkState} />);
+		expect(checkHtml).toContain('<ul class="bs-editor__list bs-editor__list--check"');
+		expect(checkHtml).toContain("bs-editor__list-item--checked");
+		expect(checkHtml).toContain("bs-editor__list-item--unchecked");
+		expect(checkHtml).toContain(">done<");
+		expect(checkHtml).toContain(">todo<");
+	});
+
 	it("renders a fallback chip with the node type as the display hint", () => {
 		expect(html).toContain('data-node-type="io.acme/kanban@v1"');
 		expect(html).toContain("⟦io.acme/kanban@v1⟧");

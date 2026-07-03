@@ -88,15 +88,26 @@ function renderNode(node: SerializedNode, key: string): ReactNode {
 		case "quote":
 			return h("blockquote", { key, className: "bs-editor__quote" }, ...renderChildren(node));
 		case "list": {
-			const ordered = str(node.listType) === "number";
+			const listType = str(node.listType);
+			const ordered = listType === "number";
+			const variant = listType === "check" ? "check" : ordered ? "numbered" : "bullet";
 			return h(
 				ordered ? "ol" : "ul",
-				{ key, className: `bs-editor__list bs-editor__list--${ordered ? "numbered" : "bullet"}` },
+				{ key, className: `bs-editor__list bs-editor__list--${variant}` },
 				...renderChildren(node),
 			);
 		}
-		case "listitem":
-			return h("li", { key, className: "bs-editor__list-item" }, ...renderChildren(node));
+		case "listitem": {
+			// A check-list item carries a boolean `checked`; render the same
+			// checked/unchecked classes the live editor theme emits so a sent
+			// message shows the (non-interactive) checkbox state.
+			const checked = typeof node.checked === "boolean" ? node.checked : null;
+			const className =
+				checked === null
+					? "bs-editor__list-item"
+					: `bs-editor__list-item bs-editor__list-item--${checked ? "checked" : "unchecked"}`;
+			return h("li", { key, className }, ...renderChildren(node));
+		}
 		case "link":
 		case "autolink":
 			return h(

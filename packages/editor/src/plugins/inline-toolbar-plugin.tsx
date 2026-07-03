@@ -18,8 +18,15 @@
  */
 
 import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
+import {
+	INSERT_CHECK_LIST_COMMAND,
+	INSERT_ORDERED_LIST_COMMAND,
+	INSERT_UNORDERED_LIST_COMMAND,
+	ListNode,
+	REMOVE_LIST_COMMAND,
+} from "@lexical/list";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { mergeRegister } from "@lexical/utils";
+import { $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
 import {
 	$getSelection,
 	$isRangeSelection,
@@ -37,6 +44,7 @@ import {
 import { type EditorT, useEditorT } from "../i18n";
 import {
 	BoldIcon,
+	BulletListIcon,
 	CommentIcon,
 	EmojiIcon,
 	EquationIcon,
@@ -44,9 +52,11 @@ import {
 	ItalicIcon,
 	LinkIcon,
 	MoreIcon,
+	NumberedListIcon,
 	RefTypeIcon,
 	StrikeIcon,
 	TextColorIcon,
+	TodoListIcon,
 	UnderlineIcon,
 	UnlinkIcon,
 } from "../icons";
@@ -62,6 +72,10 @@ import { useEditorShortcut } from "./editor-shortcut";
 import { OPEN_EMOJI_BROWSE_COMMAND } from "./emoji-typeahead-plugin";
 
 export type InlineToolbarPluginProps = {
+	/** Show bulleted / numbered / to-do list toggle buttons (composer surfaces).
+	 *  Only enable when `<ListPlugin>` + `<CheckListPlugin>` are mounted — the
+	 *  buttons dispatch the `@lexical/list` insert/remove commands. */
+	lists?: boolean;
 	/** Show a "Mention" overflow row (inserts `@` for the mention typeahead).
 	 *  Only enable when `<MentionTypeaheadPlugin>` is mounted. */
 	mention?: boolean;
@@ -85,10 +99,22 @@ enum InlineFormat {
 	Code = "code",
 }
 
+/** Lexical's `ListType` values as a named vocabulary (per the no-raw-string-
+ *  discriminators rule). `as const` (not a TS enum) so members stay literal
+ *  types comparable with `ListNode.getListType()`. */
+const ListKind = {
+	Bullet: "bullet",
+	Number: "number",
+	Check: "check",
+} as const;
+type ListKind = (typeof ListKind)[keyof typeof ListKind];
+
 type ToolbarState = {
 	rect: DOMRect;
 	active: ReadonlySet<InlineFormat>;
 	linkUrl: string | null;
+	/** The selection's enclosing list type; null outside any list. */
+	listType: ListKind | null;
 	textColor: SwatchColor;
 	highlight: SwatchColor;
 };
@@ -171,10 +197,12 @@ export function InlineToolbarPlugin(props: InlineToolbarPluginProps = {}): React
 				const node = selection.anchor.getNode();
 				const parent = node.getParent();
 				const linkNode = $isLinkNode(node) ? node : $isLinkNode(parent) ? parent : null;
+				const listNode = $getNearestNodeOfType(node, ListNode);
 				next = {
 					rect,
 					active,
 					linkUrl: linkNode ? linkNode.getURL() : null,
+					listType: listNode ? listNode.getListType() : null,
 					textColor: readActiveSwatch(ColorTarget.Text),
 					highlight: readActiveSwatch(ColorTarget.Highlight),
 				};
@@ -246,6 +274,23 @@ export function InlineToolbarPlugin(props: InlineToolbarPluginProps = {}): React
 			applySwatch(editor, ColorTarget.Highlight, SwatchColor.Default);
 		}
 	}, [editor, state]);
+
+	const toggleList = useCallback(
+		(kind: ListKind) => {
+			if (state?.listType === kind) {
+				editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
+				return;
+			}
+			const command =
+				kind === ListKind.Bullet
+					? INSERT_UNORDERED_LIST_COMMAND
+					: kind === ListKind.Number
+						? INSERT_ORDERED_LIST_COMMAND
+						: INSERT_CHECK_LIST_COMMAND;
+			editor.dispatchCommand(command, undefined);
+		},
+		[editor, state],
+	);
 
 	const insertMention = useCallback(() => {
 		editor.focus();
@@ -321,6 +366,7 @@ export function InlineToolbarPlugin(props: InlineToolbarPluginProps = {}): React
 			onCloseLinkEditor={closeLinkEditor}
 			onCommitLink={commitLink}
 			onRemoveFormatting={removeFormatting}
+			{...(props.lists ? { onToggleList: toggleList } : {})}
 			{...(props.onInsertEquation ? { onInsertEquation: props.onInsertEquation } : {})}
 			{...(props.mention ? { onInsertMention: insertMention } : {})}
 			{...(props.emoji ? { onInsertEmoji: insertEmoji } : {})}
@@ -340,6 +386,7 @@ type InlineToolbarProps = {
 	onCloseLinkEditor: () => void;
 	onCommitLink: (value: string | null) => void;
 	onRemoveFormatting: () => void;
+	onToggleList?: (kind: ListKind) => void;
 	onInsertEquation?: () => void;
 	onInsertMention?: () => void;
 	onInsertEmoji?: () => void;
@@ -357,6 +404,7 @@ function InlineToolbar({
 	onCloseLinkEditor,
 	onCommitLink,
 	onRemoveFormatting,
+	onToggleList,
 	onInsertEquation,
 	onInsertMention,
 	onInsertEmoji,
@@ -448,6 +496,32 @@ function InlineToolbar({
 					>
 						<InlineCodeIcon />
 					</ToolButton>
+					{onToggleList && (
+						<>
+							<div className="notes__inline-toolbar-divider" aria-hidden="true" />
+							<ToolButton
+								label={t("editor.inline.bulletList")}
+								active={state.listType === ListKind.Bullet}
+								onSelect={() => onToggleList(ListKind.Bullet)}
+							>
+								<BulletListIcon />
+							</ToolButton>
+							<ToolButton
+								label={t("editor.inline.numberedList")}
+								active={state.listType === ListKind.Number}
+								onSelect={() => onToggleList(ListKind.Number)}
+							>
+								<NumberedListIcon />
+							</ToolButton>
+							<ToolButton
+								label={t("editor.inline.checkList")}
+								active={state.listType === ListKind.Check}
+								onSelect={() => onToggleList(ListKind.Check)}
+							>
+								<TodoListIcon />
+							</ToolButton>
+						</>
+					)}
 					<div className="notes__inline-toolbar-divider" aria-hidden="true" />
 					<div className="notes__inline-toolbar-color">
 						<ToolButton

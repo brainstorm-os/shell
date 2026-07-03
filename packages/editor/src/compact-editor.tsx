@@ -1,10 +1,14 @@
 /**
  * `<CompactEditor>` — a small, non-Yjs Lexical surface for short rich text
  * (chat messages, comments, replies). It is deliberately NOT the block
- * document editor: no slash menu, no block gutter, no headings/lists/toggles.
- * The user gets inline marks (bold / italic / underline / strike / code) and
- * links via the shared `InlineToolbarPlugin` + native chords, Enter-to-submit
- * and Shift+Enter for a newline — the messaging contract every composer uses.
+ * document editor: no slash menu, no block gutter, no headings/tables/toggles.
+ * The user gets the Slack composer vocabulary: inline marks (bold / italic /
+ * underline / strike / code) and links via the shared `InlineToolbarPlugin` +
+ * native chords, plus the message-sized blocks — bulleted / numbered / to-do
+ * lists, quote and code block — via Markdown shortcuts (`- ` `1. ` `[] ` `> `
+ * ` ``` `) and the toolbar's list toggles. Enter submits; Shift+Enter is a
+ * newline (a NEW list item when the caret is in a list) — the messaging
+ * contract every composer uses. Typed URLs auto-link.
  *
  * Unlike `<BrainstormEditor>` (always Yjs/collaboration-backed for a persisted
  * document), a CompactEditor is a transient local draft: its content is read
@@ -14,21 +18,49 @@
  * is what persists.
  */
 
+import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
+import { ListItemNode, ListNode } from "@lexical/list";
+import {
+	BOLD_ITALIC_STAR,
+	BOLD_ITALIC_UNDERSCORE,
+	BOLD_STAR,
+	BOLD_UNDERSCORE,
+	CHECK_LIST,
+	CODE,
+	INLINE_CODE,
+	ITALIC_STAR,
+	ITALIC_UNDERSCORE,
+	LINK,
+	ORDERED_LIST,
+	QUOTE,
+	STRIKETHROUGH,
+	type Transformer,
+	UNORDERED_LIST,
+} from "@lexical/markdown";
+import { AutoLinkPlugin, createLinkMatcherWithRegExp } from "@lexical/react/LexicalAutoLinkPlugin";
+import { CheckListPlugin } from "@lexical/react/LexicalCheckListPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
+import { ListPlugin } from "@lexical/react/LexicalListPlugin";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { QuoteNode } from "@lexical/rich-text";
+import { $getNearestNodeOfType } from "@lexical/utils";
 import {
 	$createParagraphNode,
 	$createTextNode,
 	$getRoot,
+	$getSelection,
+	$isRangeSelection,
 	COMMAND_PRIORITY_HIGH,
 	type EditorState,
 	FORMAT_TEXT_COMMAND,
+	INSERT_PARAGRAPH_COMMAND,
 	KEY_ENTER_COMMAND,
 	type Klass,
 	type LexicalEditor,
@@ -108,9 +140,48 @@ export type CompactEditorProps = {
 	i18nOverrides?: Partial<EditorManifest>;
 };
 
-/** The inline-only node set: links on top of the always-registered Paragraph /
- *  Text / LineBreak built-ins. Block nodes are intentionally excluded. */
-const INLINE_BASELINE_NODES: ReadonlyArray<Klass<LexicalNode>> = [LinkNode, AutoLinkNode];
+/** The composer node set: links + the Slack-sized blocks (lists / quote /
+ *  code block) on top of the always-registered Paragraph / Text / LineBreak
+ *  built-ins. Document-scale blocks (headings, tables, toggles, columns) are
+ *  intentionally excluded — a message is not a document. */
+export const COMPOSER_BASELINE_NODES: ReadonlyArray<Klass<LexicalNode>> = [
+	LinkNode,
+	AutoLinkNode,
+	ListNode,
+	ListItemNode,
+	QuoteNode,
+	CodeNode,
+];
+
+/** Markdown typing shortcuts scoped to the composer vocabulary. `CHECK_LIST`
+ *  leads so `- [ ] ` wins over `UNORDERED_LIST` (first match wins). HEADING is
+ *  deliberately absent — `# ` in a chat message is just text. */
+export const COMPOSER_MARKDOWN_TRANSFORMERS: readonly Transformer[] = [
+	CHECK_LIST,
+	UNORDERED_LIST,
+	ORDERED_LIST,
+	QUOTE,
+	CODE,
+	INLINE_CODE,
+	BOLD_ITALIC_STAR,
+	BOLD_ITALIC_UNDERSCORE,
+	BOLD_STAR,
+	BOLD_UNDERSCORE,
+	ITALIC_STAR,
+	ITALIC_UNDERSCORE,
+	STRIKETHROUGH,
+	LINK,
+];
+
+/** Typed/pasted bare URLs auto-link as you type (Slack model). Scheme-less
+ *  `www.` hosts get `https://` prepended so the link actually resolves. */
+const URL_REGEX =
+	/((https?:\/\/(www\.)?)|(www\.))[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)/;
+const AUTOLINK_MATCHERS = [
+	createLinkMatcherWithRegExp(URL_REGEX, (text) =>
+		text.startsWith("http") ? text : `https://${text}`,
+	),
+];
 
 function readPayload(editor: LexicalEditor): CompactEditorPayload {
 	const editorState = editor.getEditorState();
@@ -206,9 +277,24 @@ function CompactBehaviorPlugin({
 			editor.registerCommand(
 				KEY_ENTER_COMMAND,
 				(event: KeyboardEvent | null) => {
-					// Shift+Enter keeps Lexical's default (soft newline); IME-composition
-					// Enter (the CJK candidate confirm) never submits.
-					if (event === null || event.shiftKey || event.isComposing) return false;
+					// IME-composition Enter (the CJK candidate confirm) never submits.
+					if (event === null || event.isComposing) return false;
+					if (event.shiftKey) {
+						// Shift+Enter keeps Lexical's default (soft newline) — except in a
+						// list, where a soft newline traps the caret inside one item with
+						// no way to start the next bullet. Slack model: split into a new
+						// list item instead (Lexical's paragraph-insert exits the list
+						// when the current item is empty).
+						const inListItem = editor.getEditorState().read(() => {
+							const selection = $getSelection();
+							if (!$isRangeSelection(selection)) return false;
+							return $getNearestNodeOfType(selection.anchor.getNode(), ListItemNode) !== null;
+						});
+						if (!inListItem) return false;
+						event.preventDefault();
+						editor.dispatchCommand(INSERT_PARAGRAPH_COMMAND, undefined);
+						return true;
+					}
 					event.preventDefault();
 					doSubmit();
 					return true;
@@ -259,7 +345,9 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 				namespace: "brainstorm-compact-editor",
 				theme: mergeTheme(),
 				editable: true,
-				nodes: additionalNodes ? [...INLINE_BASELINE_NODES, ...additionalNodes] : INLINE_BASELINE_NODES,
+				nodes: additionalNodes
+					? [...COMPOSER_BASELINE_NODES, ...additionalNodes]
+					: COMPOSER_BASELINE_NODES,
 				onError: (error: Error) => {
 					console.error("[brainstorm-compact-editor]", error);
 				},
@@ -284,7 +372,11 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 						/>
 						<HistoryPlugin />
 						<LinkPlugin />
-						{toolbar ? <InlineToolbarPlugin /> : null}
+						<AutoLinkPlugin matchers={AUTOLINK_MATCHERS} />
+						<ListPlugin />
+						<CheckListPlugin />
+						<MarkdownShortcutPlugin transformers={[...COMPOSER_MARKDOWN_TRANSFORMERS]} />
+						{toolbar ? <InlineToolbarPlugin lists /> : null}
 						<CompactBehaviorPlugin
 							handleRef={ref}
 							onChange={onChange}

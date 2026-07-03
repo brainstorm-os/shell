@@ -79,3 +79,93 @@
 	color: var(--color-text-link);
 	text-decoration: underline;
 }
+
+/* ── Message-sized blocks (lists / quote / code block) ─────────────────────
+   Shared by the live composer AND read-only rich bodies: the baseline theme
+   (`mergeTheme()`) and `renderEditorState` both emit these `bs-editor__*`
+   classes, so a sent message renders exactly like the draft did. Geometry
+   mirrors the `notes__*` rules in editor-theme.css. */
+
+.bs-editor__list {
+	margin: 0;
+	padding-inline-start: 24px;
+}
+
+.bs-editor__list--check {
+	padding-inline-start: 2px;
+}
+
+.bs-editor__list-item {
+	margin: var(--space-0_5) 0;
+}
+
+/* Lexical's nested-list wrapper `<li>` must not draw its own marker (the
+   "two bullets on level 2" bug — see the notes__ twin). */
+.bs-editor__list-item--nested {
+	list-style: none;
+	text-indent: 0;
+}
+
+.bs-editor__list-item--unchecked,
+.bs-editor__list-item--checked {
+	list-style: none;
+	position: relative;
+	padding-inline-start: 22px;
+	text-indent: 0;
+}
+
+.bs-editor__list-item--unchecked::before,
+.bs-editor__list-item--checked::before {
+	content: "";
+	position: absolute;
+	inset-inline-start: 0;
+	top: 0.45em;
+	width: 14px;
+	height: 14px;
+	border: 1.5px solid var(--border-strong);
+	border-radius: var(--radius-sm);
+}
+
+.bs-editor__list-item--checked::before {
+	background: var(--accent);
+	border-color: var(--accent-strong);
+}
+
+.bs-editor__list-item--checked::after {
+	content: "";
+	position: absolute;
+	/* PHYSICAL-AXIS INTENTIONAL: checkmark glyph is geometrically rotated inside the box */
+	left: 3px;
+	top: calc(0.45em + 2px);
+	width: 8px;
+	height: 4px;
+	border-left: var(--border-width-thick) solid white;
+	border-bottom: var(--border-width-thick) solid white;
+	transform: rotate(-45deg);
+}
+
+.bs-editor__list-item--checked {
+	color: var(--text-dim);
+	text-decoration: line-through;
+}
+
+.bs-editor__quote {
+	margin: var(--space-1) 0;
+	padding: var(--space-1);
+	border-inline-start: 3px solid var(--border-strong);
+	color: var(--text-dim);
+}
+
+/* One class covers both faces: the live editor's `<code>` block and the
+   read-only renderer's `<pre>`. */
+.bs-editor__code {
+	display: block;
+	margin: var(--space-1) 0;
+	padding: var(--space-2) var(--space-3);
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+	font-size: 0.92em;
+	background: color-mix(in srgb, currentColor 8%, transparent);
+	border-radius: var(--radius-sm);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
