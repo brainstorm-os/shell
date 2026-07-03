@@ -424,6 +424,7 @@ export const defaultDark: Tokens = {
 			// the wallpaper.
 			default: "rgba(255, 255, 255, 0.05)",
 			overlay: "rgba(255, 255, 255, 0.10)",
+			raised: "rgba(255, 255, 255, 0.10)",
 		},
 		border: {
 			subtle: "rgba(231, 238, 249, 0.08)",
@@ -521,6 +522,7 @@ export const defaultLight: Tokens = {
 			// Alpha-channel raised surfaces — see dark-mode comment above.
 			default: "rgba(0, 0, 0, 0.04)",
 			overlay: "rgba(0, 0, 0, 0.08)",
+			raised: "rgba(0, 0, 0, 0.08)",
 		},
 		border: {
 			subtle: "rgba(17, 26, 46, 0.06)",
@@ -620,6 +622,7 @@ export const midnight: Tokens = {
 		surface: {
 			default: "rgba(140, 170, 255, 0.06)",
 			overlay: "rgba(140, 170, 255, 0.12)",
+			raised: "rgba(140, 170, 255, 0.12)",
 		},
 		border: {
 			subtle: "rgba(180, 200, 255, 0.08)",
@@ -708,6 +711,7 @@ export const sepia: Tokens = {
 		surface: {
 			default: "rgba(58, 46, 26, 0.05)",
 			overlay: "rgba(58, 46, 26, 0.10)",
+			raised: "rgba(58, 46, 26, 0.10)",
 		},
 		border: {
 			subtle: "rgba(58, 46, 26, 0.10)",
@@ -805,6 +809,7 @@ export const highContrast: Tokens = {
 		surface: {
 			default: "rgba(255, 255, 255, 0.08)",
 			overlay: "rgba(255, 255, 255, 0.16)",
+			raised: "rgba(255, 255, 255, 0.16)",
 		},
 		border: {
 			subtle: "rgba(255, 255, 255, 0.3)",
@@ -899,6 +904,7 @@ export const solar: Tokens = {
 		surface: {
 			default: "rgba(20, 30, 60, 0.04)",
 			overlay: "rgba(20, 30, 60, 0.08)",
+			raised: "rgba(20, 30, 60, 0.08)",
 		},
 		border: {
 			subtle: "rgba(20, 30, 60, 0.08)",
@@ -990,6 +996,7 @@ export const forest: Tokens = {
 		surface: {
 			default: "rgba(150, 255, 190, 0.05)",
 			overlay: "rgba(150, 255, 190, 0.10)",
+			raised: "rgba(150, 255, 190, 0.10)",
 		},
 		border: {
 			subtle: "rgba(190, 235, 205, 0.08)",
@@ -1078,6 +1085,7 @@ export const nord: Tokens = {
 		surface: {
 			default: "rgba(216, 222, 233, 0.06)",
 			overlay: "rgba(216, 222, 233, 0.12)",
+			raised: "rgba(216, 222, 233, 0.12)",
 		},
 		border: {
 			subtle: "rgba(216, 222, 233, 0.10)",
@@ -1166,6 +1174,7 @@ export const aurora: Tokens = {
 		surface: {
 			default: "rgba(220, 180, 255, 0.06)",
 			overlay: "rgba(220, 180, 255, 0.12)",
+			raised: "rgba(220, 180, 255, 0.12)",
 		},
 		border: {
 			subtle: "rgba(220, 190, 255, 0.10)",
@@ -1254,6 +1263,7 @@ export const mint: Tokens = {
 		surface: {
 			default: "rgba(15, 60, 50, 0.04)",
 			overlay: "rgba(15, 60, 50, 0.08)",
+			raised: "rgba(15, 60, 50, 0.08)",
 		},
 		border: {
 			subtle: "rgba(15, 60, 50, 0.08)",
@@ -1342,6 +1352,7 @@ export const rose: Tokens = {
 		surface: {
 			default: "rgba(90, 25, 45, 0.04)",
 			overlay: "rgba(90, 25, 45, 0.08)",
+			raised: "rgba(90, 25, 45, 0.08)",
 		},
 		border: {
 			subtle: "rgba(90, 25, 45, 0.08)",
@@ -1430,6 +1441,7 @@ export const slate: Tokens = {
 		surface: {
 			default: "rgba(30, 41, 59, 0.04)",
 			overlay: "rgba(30, 41, 59, 0.08)",
+			raised: "rgba(30, 41, 59, 0.08)",
 		},
 		border: {
 			subtle: "rgba(30, 41, 59, 0.08)",
