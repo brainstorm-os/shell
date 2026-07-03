@@ -33,6 +33,7 @@ import {
 	Cloud,
 	CloudSlash,
 	Copy,
+	CreditCard,
 	Crown,
 	Cube,
 	DeviceMobile,
@@ -142,6 +143,7 @@ export enum IconName {
 	Pencil = "pencil",
 	// Membership / pricing glyphs (Settings → Membership).
 	Star = "star",
+	CreditCard = "credit-card",
 	Crown = "crown",
 	Lightning = "lightning",
 	Heart = "heart",
@@ -221,6 +223,7 @@ const ICON_REGISTRY: Record<IconName, PhosphorIcon> = {
 	[IconName.Pencil]: PencilSimple,
 	// Membership glyphs.
 	[IconName.Star]: Star,
+	[IconName.CreditCard]: CreditCard,
 	[IconName.Crown]: Crown,
 	[IconName.Lightning]: Lightning,
 	[IconName.Heart]: Heart,

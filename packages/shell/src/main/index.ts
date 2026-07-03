@@ -73,6 +73,13 @@ import {
 	type AutomationsDeployment,
 	buildAutomationsDeployment,
 } from "./automations/wiring";
+import { BillingAccountService } from "./billing/billing-account";
+import { BillingEdgeClient } from "./billing/billing-edge-client";
+import {
+	accountPortalUrl,
+	billingEdgeBaseUrl,
+	makeBillingEdgePostJson,
+} from "./billing/billing-edge-fetch";
 import { makeBillingServiceHandler } from "./billing/billing-service";
 import {
 	BLOCK_FRAME_SCHEME_PRIVILEGE,
@@ -92,6 +99,11 @@ import { buildConnectorsServiceDeps } from "./connectors/wiring";
 import { makeCoversServiceHandler } from "./covers/covers-service";
 import { readAiProviderKey } from "./credentials/ai-provider-keys";
 import type { AssetDekWrap } from "./credentials/asset-dek-wrap";
+import {
+	deleteBillingCredential,
+	readBillingCredential,
+	writeBillingCredential,
+} from "./credentials/billing-refresh-credential";
 import { bytesToBase64 } from "./credentials/crypto";
 import { verifySignature } from "./credentials/identity";
 import { wrapDekForRecipient } from "./credentials/member-wraps";
@@ -148,6 +160,7 @@ import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
+import { registerBillingSettingsHandlers } from "./ipc/billing-settings-handlers";
 import { registerBinHandlers } from "./ipc/bin-handlers";
 import { registerBrokerHandler } from "./ipc/broker-handler";
 import { getCapabilityPromptHost } from "./ipc/capability-prompt";
@@ -1280,6 +1293,42 @@ void app.whenReady().then(async () => {
 		aiUsagePath,
 		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
 	});
+	// 14.6 — Settings → Billing (dashboard-privileged, not broker). The
+	// refresh credential lives in the vault's Tier-2 CredentialStore; the
+	// account link + entitlement cache live in account.db; billing-edge is
+	// the shell's own egress to a fixed first-party origin (update-feed
+	// posture). Closures resolve the active vault session per call so a
+	// vault switch never strands a stale handle.
+	registerBillingSettingsHandlers(
+		new BillingAccountService({
+			client: new BillingEdgeClient(makeBillingEdgePostJson(billingEdgeBaseUrl())),
+			portalUrl: accountPortalUrl(),
+			readCredential: async () => {
+				const session = getActiveVaultSession();
+				return session ? readBillingCredential(session.credentials) : null;
+			},
+			writeCredential: async (credential) => {
+				const session = getActiveVaultSession();
+				if (!session) throw new Error("billing: no active vault session");
+				await writeBillingCredential(session.credentials, credential);
+			},
+			deleteCredential: async () => {
+				const session = getActiveVaultSession();
+				return session ? deleteBillingCredential(session.credentials) : false;
+			},
+			getRepos: async () => (await getActiveVaultSession()?.billingRepos()) ?? null,
+			getEntitlement: async () => {
+				const session = getActiveVaultSession();
+				return session ? (await session.billingService()).getEntitlement() : null;
+			},
+			getStorageBytes: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				const store = await session.assetStore();
+				return store.listBound().reduce((total, asset) => total + asset.byteLen, 0);
+			},
+		}),
+	);
 	// MCP-3 — Settings → AI → MCP servers (dashboard-privileged, not broker).
 	// The tools inspector connects over the HTTP transport (egress broker), so it
 	// shares the network audit sink + SSRF/size/time guards; the auth secret is

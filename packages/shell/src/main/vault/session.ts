@@ -201,6 +201,10 @@ export class VaultSession {
 	private deviceEd25519Secret: Uint8Array;
 	private cachedLedger: CapabilityLedger | null = null;
 	private cachedBilling: BillingService | null = null;
+	private cachedBillingRepos: {
+		accounts: AccountRepository;
+		entitlements: EntitlementRepository;
+	} | null = null;
 	private cachedDashboard: DashboardStore | null = null;
 	private dashboardOpening: Promise<DashboardStore> | null = null;
 	private cachedProperties: PropertiesStore | null = null;
@@ -281,10 +285,29 @@ export class VaultSession {
 	async billingService(): Promise<BillingService> {
 		this.assertOpen();
 		if (this.cachedBilling) return this.cachedBilling;
-		const db = await this.dataStores.open("account");
-		const service = new BillingService(new AccountRepository(db), new EntitlementRepository(db));
+		const { accounts, entitlements } = await this.billingRepos();
+		const service = new BillingService(accounts, entitlements);
 		this.cachedBilling = service;
 		return service;
+	}
+
+	/**
+	 * The raw `account.db` repos behind `billingService()` — the 14.6
+	 * `BillingAccountService` (Settings → Billing) writes the account link /
+	 * clears the entitlement cache through these. Same lazy open, shared cache.
+	 */
+	async billingRepos(): Promise<{
+		accounts: AccountRepository;
+		entitlements: EntitlementRepository;
+	}> {
+		this.assertOpen();
+		if (this.cachedBillingRepos) return this.cachedBillingRepos;
+		const db = await this.dataStores.open("account");
+		this.cachedBillingRepos = {
+			accounts: new AccountRepository(db),
+			entitlements: new EntitlementRepository(db),
+		};
+		return this.cachedBillingRepos;
 	}
 
 	/**
@@ -846,6 +869,7 @@ export class VaultSession {
 		this.deviceEd25519Secret = new Uint8Array(0);
 		this.cachedLedger = null;
 		this.cachedBilling = null;
+		this.cachedBillingRepos = null;
 		// The DEK store aliases `this.masterKey`'s backing buffer; the
 		// in-place `zero(this.masterKey)` above already wiped the bytes the
 		// store would otherwise read. Dropping the cache + the in-flight

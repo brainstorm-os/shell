@@ -1,0 +1,108 @@
+/* Settings → Billing (14.6). Rows ride the shared `.setting-row` /
+ * `settings__*` chrome; only the billing-specific shapes live here. */
+
+.billing-section__features {
+	margin: 8px 0 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.billing-section__feature {
+	font-size: 12px;
+	color: var(--color-text-secondary);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: 999px;
+	padding: 2px 10px;
+	background: var(--color-surface-muted);
+}
+
+.billing-section__link-form {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.billing-section__link-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.billing-section__link-row .settings__input {
+	flex: 1;
+	min-width: 0;
+}
+
+.billing-section__actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.billing-section__upgrade {
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid var(--color-border-subtle);
+}
+
+.billing-section__upgrade-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.billing-section__error {
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: var(--color-state-error);
+}
+
+.billing-section__invoices {
+	margin: 8px 0 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+}
+
+.billing-section__invoice {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.billing-section__invoice:last-child {
+	border-bottom: none;
+}
+
+.billing-section__invoice-date {
+	flex: 0 0 auto;
+	min-width: 108px;
+	color: var(--color-text-primary);
+	font-size: 13px;
+}
+
+.billing-section__invoice-amount {
+	flex: 0 0 auto;
+	min-width: 88px;
+	font-variant-numeric: tabular-nums;
+	color: var(--color-text-primary);
+	font-size: 13px;
+}
+
+.billing-section__invoice-status {
+	flex: 1 1 auto;
+	color: var(--color-text-tertiary);
+	font-size: 12px;
+	text-transform: capitalize;
+}

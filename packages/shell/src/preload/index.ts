@@ -18,6 +18,14 @@ import type {
 	AppearanceState,
 } from "../shared/appearance";
 import type {
+	BillingAccountSummaryView,
+	BillingCheckoutCycle,
+	BillingCheckoutPlan,
+	BillingInvoiceView,
+	BillingOverviewView,
+	BillingSettingsResult,
+} from "../shared/billing-settings-types";
+import type {
 	ChromeState,
 	ClockPrefs,
 	DndPrefs,
@@ -538,6 +546,27 @@ const aiSettings = {
 export type AiSettingsView = {
 	defaultProvider: string | null;
 	appBudgets: Record<string, { maxTokens: number }>;
+};
+
+/** 14.6 — Settings → Billing panel (privileged). The refresh credential is
+ *  write-only across this boundary: `link` sends it once and it is sealed
+ *  into the vault's Tier-2 CredentialStore; it never comes back to any
+ *  renderer. Everything else returns narrowed views / fail-soft results. */
+const billing = {
+	overview: (): Promise<BillingOverviewView | null> =>
+		ipcRenderer.invoke("billing-settings:overview"),
+	link: (credential: string): Promise<BillingSettingsResult<BillingAccountSummaryView>> =>
+		ipcRenderer.invoke("billing-settings:link", credential),
+	unlink: (): Promise<boolean> => ipcRenderer.invoke("billing-settings:unlink"),
+	refreshSummary: (): Promise<BillingSettingsResult<BillingAccountSummaryView>> =>
+		ipcRenderer.invoke("billing-settings:refresh"),
+	invoices: (): Promise<BillingSettingsResult<readonly BillingInvoiceView[]>> =>
+		ipcRenderer.invoke("billing-settings:invoices"),
+	checkout: (
+		plan: BillingCheckoutPlan,
+		cycle: BillingCheckoutCycle,
+	): Promise<BillingSettingsResult<string>> =>
+		ipcRenderer.invoke("billing-settings:checkout", plan, cycle),
 };
 
 /** A configured MCP server + its per-device enablement (MCP-3). Mirrors the
@@ -1658,6 +1687,7 @@ const brainstorm = {
 	importExport,
 	spellcheck,
 	aiSettings,
+	billing,
 	mcpSettings,
 	filesHandles,
 	pairing,
