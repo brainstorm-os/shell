@@ -399,6 +399,7 @@
   "shell.welcome.continue": "Label for the button advancing to the next step of the first-run welcome flow. Very short.",
   "shell.welcome.createFailed": "Error shown when creating the vault fails during onboarding.",
   "shell.welcome.migrate.cta": "First-launch menu button that opens the 'Migrating from…' picker (Obsidian / Notion / files). Verb phrase, short.",
+  "shell.welcome.namePlaceholder": "Placeholder inside the empty vault-name field on the create-vault step, suggesting a typical first vault name (“Personal”). One word.",
   "shell.welcome.migrate.files": "Label for the generic-files migration source in the 'Migrating from…' picker (Markdown / HTML / CSV / JSON / JSONL).",
   "shell.welcome.migrate.hint": "Helper text in the migrate picker explaining the user first creates a vault and the import wizard then opens automatically. One short sentence.",
   "shell.welcome.migrate.notion": "Label for the Notion migration source in the 'Migrating from…' picker (Notion's Markdown & CSV / HTML export).",

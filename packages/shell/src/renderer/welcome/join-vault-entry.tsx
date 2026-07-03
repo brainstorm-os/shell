@@ -20,10 +20,10 @@ import { t } from "../i18n/t";
 const DevicesJoinFlow = lazy(() =>
 	import("../settings/devices-join-flow").then((m) => ({ default: m.DevicesJoinFlow })),
 );
-import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { IconName } from "../ui/icon";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
+import { WelcomeTile } from "./welcome-tile";
 
 export type JoinVaultEntryProps = {
 	disabled?: boolean;
@@ -33,17 +33,13 @@ export function JoinVaultEntry({ disabled = false }: JoinVaultEntryProps) {
 	const [open, setOpen] = useState(false);
 	return (
 		<>
-			<Button
-				variant={ButtonVariant.Glass}
-				size={ButtonSize.Lg}
-				className="welcome__cta welcome__cta--alt"
-				iconLeft={IconName.DeviceMobile}
+			<WelcomeTile
+				icon={IconName.DeviceMobile}
+				label={t("shell.welcome.joinVault.cta")}
 				onClick={() => setOpen(true)}
 				disabled={disabled}
-				data-testid="welcome-join-vault"
-			>
-				{t("shell.welcome.joinVault.cta")}
-			</Button>
+				testId="welcome-join-vault"
+			/>
 			<AnimatePresence>
 				{open && (
 					<Popover

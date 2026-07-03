@@ -16,6 +16,7 @@ import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { IconName } from "../ui/icon";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
+import { WelcomeTile } from "./welcome-tile";
 
 export type MigrateEntryProps = {
 	disabled?: boolean;
@@ -32,17 +33,13 @@ export function MigrateEntry({ disabled = false, onStart }: MigrateEntryProps) {
 	];
 	return (
 		<>
-			<Button
-				variant={ButtonVariant.Glass}
-				size={ButtonSize.Lg}
-				className="welcome__cta welcome__cta--alt"
-				iconLeft={IconName.Download}
+			<WelcomeTile
+				icon={IconName.Download}
+				label={t("shell.welcome.migrate.cta")}
 				onClick={() => setOpen(true)}
 				disabled={disabled}
-				data-testid="welcome-migrate"
-			>
-				{t("shell.welcome.migrate.cta")}
-			</Button>
+				testId="welcome-migrate"
+			/>
 			<AnimatePresence>
 				{open && (
 					<Popover

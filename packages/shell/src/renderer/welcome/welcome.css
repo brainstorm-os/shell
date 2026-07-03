@@ -6,11 +6,13 @@
 	align-items: center;
 	justify-content: center;
 	/* Splash-screen wallpaper — shipped runtime asset under the shell's
-	 * `art/` folder (NOT docs/, which is example art only). The gradient
-	 * overlay on top keeps the title + buttons readable on the brighter
-	 * parts of the image without obscuring the artwork. */
-	background: linear-gradient(180deg, rgba(8, 14, 24, 0.55) 0%, rgba(8, 14, 24, 0.35) 100%),
-		url("../../../art/wallpaper/stormy-sea.png") center / cover no-repeat,
+	 * `art/` folder (NOT docs/, which is example art only). The same
+	 * rose-mountains image seeds a new vault's light slot, so the dashboard
+	 * the user lands on continues the welcome scene. The soft white veil
+	 * keeps the dark ink (welcome pins the Rose theme) readable on the
+	 * image's busier lower half without washing out the artwork. */
+	background: linear-gradient(180deg, rgba(255, 246, 248, 0.16) 0%, rgba(255, 246, 248, 0.4) 100%),
+		url("../../../art/wallpaper/rose-mountains.jpg") center / cover no-repeat,
 		var(--color-background-primary);
 }
 
@@ -54,7 +56,7 @@
  * alpha rather than its bounding box; values mirror the `--shadow-lg`
  * token scale. */
 .welcome__mark {
-	filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
+	filter: drop-shadow(0 8px 24px rgba(88, 28, 52, 0.28));
 }
 
 .welcome__title {
@@ -64,7 +66,6 @@
 	letter-spacing: -0.03em;
 	line-height: 1;
 	color: var(--color-text-primary);
-	text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
 .welcome__tagline {
@@ -85,36 +86,81 @@
 	width: 100%;
 }
 
-/* Stacked primary/secondary CTAs span the menu so both are the same width
- * regardless of recent-vault presence; the shared Button primitive carries
- * the glossy chrome. */
-.welcome__cta {
+/* CTA launcher grid — four flat square tiles (icon stacked above the label)
+ * instead of four stacked glossy buttons: the gloss face read as heavy on the
+ * light rose splash and the wide stack buried the actions' peer relationship.
+ * Only the primary "Create" tile is accent-tinted (rule below). */
+.welcome__tiles {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-2);
 	width: 100%;
 }
 
-/* Secondary CTAs (Open / Join) share a white glossy face so the only
- * coloured button is the primary "Create" — the two secondaries read as
- * peers of each other and of "Back", told apart by their leading icon
- * rather than by hue. Overrides only the gloss-face stops + label ink the
- * Button primitive already reads (the sanctioned extension point, same as
- * Destructive). Literals, like the rest of the fixed splash palette. */
-.welcome__cta--alt {
-	--color-gloss-top: #ffffff;
-	--color-gloss-bottom: #e2e6ef;
-	--color-accent-text: #161a24;
+.welcome__tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	aspect-ratio: 1;
+	padding: var(--space-3);
+	/* Frosted-glass face (not surface-default, whose 4% tint vanishes over
+	 * the wallpaper) so the tiles read as cards and the hover lift shows. */
+	background: var(--color-glass-background);
+	border: var(--border-width) solid var(--color-glass-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-primary);
+	font: inherit;
+	text-align: center;
+	cursor: pointer;
+	transition: background var(--motion-duration-normal) var(--motion-easing-standard), border-color
+		var(--motion-duration-normal) var(--motion-easing-standard);
+	-webkit-app-region: no-drag;
+	app-region: no-drag;
 }
 
-/* "Back" — a white glossy face so the de-emphasised action reads as a
- * peer of, not a sibling of, the coloured primary. Overrides only the
- * tokens the Button primitive already reads (the sanctioned extension
- * point, same as Destructive / the cyan --alt above): the two gloss
- * stops + the label ink, flipped dark for contrast on white. The splash
- * palette is intentionally fixed (like the wallpaper + brand tints), so
- * these are literals rather than theme-variable tokens. */
-.welcome__btn-white {
-	--color-gloss-top: #ffffff;
-	--color-gloss-bottom: #e2e6ef;
-	--color-accent-text: #161a24;
+.welcome__tile:hover:not(:disabled) {
+	background: var(--color-glass-background-strong);
+	border-color: var(--color-border-strong);
+}
+
+.welcome__tile:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: 2px;
+}
+
+.welcome__tile:disabled {
+	cursor: default;
+	opacity: 0.6;
+}
+
+/* Icon chip mirrors the template-card glyph chip so the two tile surfaces
+ * (menu CTAs, step-2 templates) read as one family. */
+.welcome__tile-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: var(--radius-md);
+	background: var(--color-surface-raised);
+	color: var(--color-text-secondary);
+	flex-shrink: 0;
+}
+
+.welcome__tile--primary .welcome__tile-icon {
+	background: var(--color-accent-default);
+	color: var(--color-accent-text);
+}
+
+.welcome__tile--primary {
+	border-color: var(--color-accent-default);
+}
+
+.welcome__tile-label {
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-medium);
 }
 
 .welcome__recent {
@@ -156,15 +202,15 @@
 	app-region: no-drag;
 }
 
+/* Translucent white lift over the splash image — deliberately NO backdrop
+ * blur: blurring the wallpaper under each row on hover read as smearing. */
 .welcome__recent-item:hover:not(:disabled) {
-	background: rgba(40, 90, 150, 0.32);
-	border-color: rgba(140, 190, 230, 0.32);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
+	background: rgba(255, 255, 255, 0.5);
+	border-color: rgba(22, 26, 36, 0.08);
 }
 
 .welcome__recent-item:active:not(:disabled) {
-	background: rgba(60, 120, 180, 0.4);
+	background: rgba(255, 255, 255, 0.65);
 }
 
 .welcome__recent-dot {

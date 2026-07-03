@@ -310,10 +310,10 @@ if (!isDev) {
 }
 
 // Bundled brand wallpapers copied into each new vault's `dashboard/wallpapers/`
-// so a fresh vault opens on-brand. The light slot opens on the Rose pitch
-// wallpaper (the warm low-poly peaks that pairs with the default Rose theme);
-// the dark slot keeps the stormy-sea image the welcome screen uses.
-const DEFAULT_LIGHT_WALLPAPER_FILE = "rose-peaks.jpg";
+// so a fresh vault opens on-brand. The light slot opens on the rose-mountains
+// wallpaper (the warm low-poly peaks behind the welcome screen, pairing with
+// the default Rose theme); the dark slot keeps the stormy-sea image.
+const DEFAULT_LIGHT_WALLPAPER_FILE = "rose-mountains.jpg";
 const DEFAULT_DARK_WALLPAPER_FILE = "stormy-sea.png";
 // Suffix the dashboard appends to derive a wallpaper's blur-up thumbnail URL
 // (mirrors `THUMB_SUFFIX` in dashboard-handlers / wallpaper.ts).

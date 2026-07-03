@@ -64,15 +64,28 @@ async function enterCreateMode(): Promise<void> {
 		root.render(<Welcome />);
 	});
 	await flush();
-	const cta = host.querySelector<HTMLButtonElement>("button.welcome__cta:not(.welcome__cta--alt)");
+	const cta = host.querySelector<HTMLButtonElement>('[data-testid="welcome-create-cta"]');
 	if (!cta) throw new Error("create CTA not found");
 	await act(async () => {
 		cta.click();
 	});
 	await flush();
+	// The name field starts empty (no pre-fill) — type one so step 1 validates.
+	await typeName("Personal");
+	await flush();
 	// Step 1 → step 2 (the starter-content checkbox now lives on step 2).
 	await act(async () => submit());
 	await flush();
+}
+
+async function typeName(value: string): Promise<void> {
+	const input = host.querySelector<HTMLInputElement>("input.welcome__input");
+	if (!input) throw new Error("name input not found");
+	const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+	await act(async () => {
+		setValue?.call(input, value);
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
 }
 
 function checkbox(): HTMLInputElement {
