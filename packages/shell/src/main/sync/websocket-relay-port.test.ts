@@ -889,6 +889,28 @@ describe("SYNC-4b gated handshake (onChallenge)", () => {
 		port.close();
 	});
 
+	it("gatedAdmission flips on auth-ok and resets on a fresh socket (14.7)", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({
+			url: "ws://x",
+			wsImpl: Ctor,
+			onChallenge: async () => null,
+		});
+		expect(port.gatedAdmission()).toBe(false);
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		// Open but pre-auth (an open node never sends auth-ok at all).
+		expect(port.gatedAdmission()).toBe(false);
+		ws?.deliver(control({ op: "auth-ok", plan: "plus" }));
+		await tick();
+		expect(port.gatedAdmission()).toBe(true);
+		// Drop → the next connection must re-authenticate before it counts.
+		ws?.dropClose();
+		expect(port.gatedAdmission()).toBe(false);
+		port.close();
+	});
+
 	it("ignores a challenge when no onChallenge is configured (open node)", async () => {
 		const Ctor = makeFakeWsCtor();
 		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });

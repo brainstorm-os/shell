@@ -88,6 +88,7 @@ import {
 	makeBillingEdgePostJson,
 } from "./billing/billing-edge-fetch";
 import { makeBillingServiceHandler } from "./billing/billing-service";
+import { QuotaService } from "./billing/quota-service";
 import {
 	BLOCK_FRAME_SCHEME_PRIVILEGE,
 	registerBlockFrameProtocol,
@@ -791,9 +792,42 @@ async function materializeAssetForServeOnce(
 	}
 }
 
+// 14.6/14.7 — the local ingest-side storage-usage estimate: bound bytes in
+// the vault's encrypted asset store. Shared by the Settings → Billing
+// overview and the quota gate (billing-edge exposes no usage-read endpoint,
+// and `/v1/usage/ingest` is service-token-authed — hosted infra only — so
+// the shell can't query the authoritative counters).
+async function boundAssetBytesForActiveSession(): Promise<number | null> {
+	const session = getActiveVaultSession();
+	if (!session) return null;
+	const store = await session.assetStore();
+	return store.listBound().reduce((total, asset) => total + asset.byteLen, 0);
+}
+
+// 14.7 — product-side quota enforcement. All deps resolve lazily per call so
+// construction order doesn't matter and a vault switch never strands a stale
+// handle. The gate only arms against an entitlement-GATED relay (SYNC-4b
+// admission completed = hosted/metered node); open/self-hosted nodes are
+// never quota-gated, and no read path (serve-on-miss / restore / downloads)
+// consults this service.
+const quotaService = new QuotaService({
+	getEntitlement: async () => {
+		const session = getActiveVaultSession();
+		return session ? (await session.billingService()).getEntitlement() : null;
+	},
+	getStorageBytes: boundAssetBytesForActiveSession,
+	isGatedRelay: async () => {
+		const { ActiveRelayKind, getActiveRelay } = await import("./sync/active-relay");
+		const state = getActiveRelay()?.state();
+		if (!state || state.kind !== ActiveRelayKind.WebSocket) return false;
+		const port = state.port as { gatedAdmission?: () => boolean };
+		return typeof port.gatedAdmission === "function" ? port.gatedAdmission() : false;
+	},
+});
+
 // Asset-B4 — the upload dep set shared by the connect-time drain and the
 // immediate per-bind push: same ydoc ferries (manifest install/read), same
-// DEK recovery, same manifest-present short-circuit.
+// DEK recovery, same manifest-present short-circuit, same quota gate (14.7).
 function assetUploadDeps(
 	store: { readAsset: UploadOnBindDeps["readAsset"] },
 	cas: NonNullable<ReturnType<typeof relayAssetCas>>,
@@ -807,6 +841,7 @@ function assetUploadDeps(
 			) !== null,
 		readAsset: (a) => store.readAsset(a),
 		recoverDek: recoverAssetDekForActiveSession,
+		uploadQuota: (bytes) => quotaService.decideUpload(bytes),
 	};
 }
 
@@ -818,6 +853,21 @@ function assetUploadDeps(
 // double-sealing the same chunks concurrently; beyond that it's idempotent (a
 // present manifest short-circuits inside `uploadBoundAssetIfPending`).
 const assetUploadNowInFlight = new Set<string>();
+
+// 14.7 — one throttled line when the quota gate skips a per-bind push (a bulk
+// paste while over quota must not spam a warn per asset; the drain already
+// logs a single tally per pass).
+const QUOTA_SKIP_WARN_INTERVAL_MS = 5 * 60_000;
+let lastQuotaSkipWarnAtMs = 0;
+
+function warnQuotaSkipThrottled(assetId: string): void {
+	const now = Date.now();
+	if (now - lastQuotaSkipWarnAtMs < QUOTA_SKIP_WARN_INTERVAL_MS) return;
+	lastQuotaSkipWarnAtMs = now;
+	console.warn(
+		`[brainstorm] attachment upload skipped (storage quota): ${assetId} — local data intact, will retry after upgrade/cleanup`,
+	);
+}
 
 async function uploadBoundAssetNow(entityId: string, assetId: string): Promise<void> {
 	const key = `${entityId}::${assetId}`;
@@ -835,6 +885,8 @@ async function uploadBoundAssetNow(entityId: string, assetId: string): Promise<v
 		const outcome = await uploadBoundAssetIfPending(assetUploadDeps(store, cas), entityId, assetId);
 		if (outcome === UploadBoundOutcome.Uploaded) {
 			console.log(`[brainstorm] asset uploaded on bind: ${assetId} (entity ${entityId})`);
+		} else if (outcome === UploadBoundOutcome.QuotaExceeded) {
+			warnQuotaSkipThrottled(assetId);
 		}
 	} catch (error) {
 		console.warn(
@@ -868,9 +920,9 @@ async function drainAssetUploads(): Promise<void> {
 		if (pairs.length === 0) return;
 		const store = await session.assetStore();
 		const r = await drainPendingUploads(assetUploadDeps(store, cas), pairs);
-		if (r.uploaded > 0 || r.failed > 0) {
+		if (r.uploaded > 0 || r.failed > 0 || r.quotaExceeded > 0) {
 			console.log(
-				`[brainstorm] asset upload drain: uploaded ${r.uploaded} (${r.alreadyPresent} present, ${r.notLocal} not-local, ${r.noDek} no-dek, ${r.failed} failed)`,
+				`[brainstorm] asset upload drain: uploaded ${r.uploaded} (${r.alreadyPresent} present, ${r.notLocal} not-local, ${r.noDek} no-dek, ${r.quotaExceeded} quota-skipped, ${r.failed} failed)`,
 			);
 		}
 	} catch (error) {
@@ -1434,12 +1486,9 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				return session ? (await session.billingService()).getEntitlement() : null;
 			},
-			getStorageBytes: async () => {
-				const session = getActiveVaultSession();
-				if (!session) return null;
-				const store = await session.assetStore();
-				return store.listBound().reduce((total, asset) => total + asset.byteLen, 0);
-			},
+			getStorageBytes: boundAssetBytesForActiveSession,
+			// 14.7 — used-vs-ceiling rows + the over-quota warning line.
+			getQuotaState: () => quotaService.state(),
 		}),
 	);
 	// MCP-3 — Settings → AI → MCP servers (dashboard-privileged, not broker).
@@ -1729,7 +1778,10 @@ void app.whenReady().then(async () => {
 					const session = getActiveVaultSession();
 					return session ? { vaultPath: session.vaultPath } : null;
 				},
+				// 14.7 — "attachment sync paused: storage quota" rides the snapshot.
+				getAttachmentSyncPausedReason: () => quotaService.attachmentSyncPausedReason(),
 			});
+			quotaService.onChange(() => syncStatusStore.notifyQuotaChanged());
 			registerSyncStatusHandlers({
 				getDashboard: () => dashboardWindow,
 				syncStatusStore,
@@ -1768,6 +1820,9 @@ void app.whenReady().then(async () => {
 				},
 			});
 			onActiveVaultSessionChanged(() => {
+				// 14.7 — drop the previous vault's usage cache + pause signal
+				// BEFORE the snapshot re-emit reads the pause state.
+				quotaService.reset();
 				syncStatusStore.notifyVaultSessionChanged();
 			});
 		}

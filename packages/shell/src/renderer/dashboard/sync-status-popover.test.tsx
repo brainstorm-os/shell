@@ -7,6 +7,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AttachmentSyncPauseReason } from "../../sync-status-types";
 import { SyncStatusPopover, formatRelativeAge, relayUrlHost } from "./sync-status-popover";
 import { SyncState, type SyncStatusSnapshot } from "./use-sync-status";
 
@@ -22,6 +23,7 @@ function snap(partial: Partial<SyncStatusSnapshot> = {}): SyncStatusSnapshot {
 		droppedInbound: 0,
 		seqStateBytes: 0,
 		pairKeyCount: 0,
+		attachmentSyncPausedReason: null,
 		...partial,
 	};
 }
@@ -132,6 +134,29 @@ describe("<SyncStatusPopover>", () => {
 		);
 		expect(nonzero).toContain("Dropped sends");
 		expect(nonzero).toContain("17");
+	});
+
+	it("shows the quota pause line only when attachment sync is paused (14.7)", () => {
+		const paused = renderToStaticMarkup(
+			<SyncStatusPopover
+				snapshot={snap({
+					relayUrl: "wss://r.test",
+					attachmentSyncPausedReason: AttachmentSyncPauseReason.StorageQuota,
+				})}
+				derivedState={SyncState.Syncing}
+				onClose={() => undefined}
+			/>,
+		);
+		expect(paused).toContain('data-testid="sync-status-popover-quota-paused"');
+		expect(paused).toContain("Attachment sync paused");
+		const unpaused = renderToStaticMarkup(
+			<SyncStatusPopover
+				snapshot={snap({ relayUrl: "wss://r.test" })}
+				derivedState={SyncState.Syncing}
+				onClose={() => undefined}
+			/>,
+		);
+		expect(unpaused).not.toContain("sync-status-popover-quota-paused");
 	});
 
 	it("seq diagnostic renders count + bytes; no raw pubkey-shaped substring leaks", () => {

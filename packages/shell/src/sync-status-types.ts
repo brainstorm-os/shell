@@ -11,6 +11,8 @@
  * module is the wire-shape only.
  */
 
+import { AttachmentSyncPauseReason } from "./shared/quota-types";
+
 export enum SyncState {
 	LocalOnly = "local-only",
 	Syncing = "syncing",
@@ -39,4 +41,8 @@ export type SyncStatusSnapshot = {
 	droppedInbound: number;
 	seqStateBytes: number;
 	pairKeyCount: number;
+	/** 14.7 — why attachment uploads are paused (storage quota), or null. */
+	attachmentSyncPausedReason: AttachmentSyncPauseReason | null;
 };
+
+export { AttachmentSyncPauseReason };

@@ -24,6 +24,7 @@ function snap(partial: Partial<SyncStatusSnapshot>): SyncStatusSnapshot {
 		droppedInbound: 0,
 		seqStateBytes: 0,
 		pairKeyCount: 0,
+		attachmentSyncPausedReason: null,
 		...partial,
 	};
 }

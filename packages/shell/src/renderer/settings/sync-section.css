@@ -90,3 +90,11 @@
 	font-size: var(--text-size-sm);
 	text-align: right;
 }
+
+/* 14.7 — the quota pause line under the live-status rows. */
+.sync-section__quota-warning {
+	color: var(--color-state-warning);
+	font-size: var(--text-size-xs);
+	margin: var(--space-1) 0 0;
+	line-height: 1.45;
+}

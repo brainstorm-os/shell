@@ -6,6 +6,7 @@
 
 import { randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import { UploadQuotaDecision } from "../../shared/quota-types";
 import { generateSymmetricKey } from "../credentials/crypto";
 import type { AssetCas } from "./asset-cas";
 import type { AssetChunkManifest } from "./asset-chunks";
@@ -110,6 +111,67 @@ describe("uploadBoundAssetIfPending", () => {
 		expect(manifest.assetId).toBe(ASSET);
 	});
 
+	it("returns QuotaExceeded when the quota gate blocks — no DEK recovery, no upload (14.7)", async () => {
+		const { cas, puts } = fakeCas();
+		const installManifest = vi.fn(async () => undefined);
+		const recoverDek = vi.fn(async () => generateSymmetricKey());
+		const bytes = new Uint8Array(randomBytes(32));
+		const uploadQuota = vi.fn(async () => UploadQuotaDecision.OverQuota);
+		const outcome = await uploadBoundAssetIfPending(
+			{
+				cas,
+				installManifest,
+				manifestPresent: async () => false,
+				readAsset: async () => ({ bytes, mime: "image/png" }),
+				recoverDek,
+				uploadQuota,
+			},
+			ENTITY,
+			ASSET,
+		);
+		expect(outcome).toBe(UploadBoundOutcome.QuotaExceeded);
+		expect(uploadQuota).toHaveBeenCalledWith(bytes.length);
+		expect(recoverDek).not.toHaveBeenCalled();
+		expect(installManifest).not.toHaveBeenCalled();
+		expect(puts).toEqual([]);
+	});
+
+	it("skips on UsageUnknown too — fail-closed for paid writes (14.7)", async () => {
+		const outcome = await uploadBoundAssetIfPending(
+			{
+				cas: fakeCas().cas,
+				installManifest: vi.fn(async () => undefined),
+				manifestPresent: async () => false,
+				readAsset: async () => ({ bytes: new Uint8Array(randomBytes(16)), mime: "image/png" }),
+				recoverDek: async () => generateSymmetricKey(),
+				uploadQuota: async () => UploadQuotaDecision.UsageUnknown,
+			},
+			ENTITY,
+			ASSET,
+		);
+		expect(outcome).toBe(UploadBoundOutcome.QuotaExceeded);
+	});
+
+	it("uploads normally when the quota gate allows, and when it is absent (inert default, 14.7)", async () => {
+		for (const uploadQuota of [async () => UploadQuotaDecision.Allowed, undefined]) {
+			const { cas, puts } = fakeCas();
+			const outcome = await uploadBoundAssetIfPending(
+				{
+					cas,
+					installManifest: vi.fn(async () => undefined),
+					manifestPresent: async () => false,
+					readAsset: async () => ({ bytes: new Uint8Array(randomBytes(16)), mime: "image/png" }),
+					recoverDek: async () => generateSymmetricKey(),
+					...(uploadQuota ? { uploadQuota } : {}),
+				},
+				ENTITY,
+				ASSET,
+			);
+			expect(outcome).toBe(UploadBoundOutcome.Uploaded);
+			expect(puts.length).toBeGreaterThan(0);
+		}
+	});
+
 	it("zeroes the recovered DEK after an Uploaded", async () => {
 		const dek = generateSymmetricKey();
 		await uploadBoundAssetIfPending(
@@ -131,6 +193,7 @@ describe("drainPendingUploads", () => {
 	it("tallies every outcome and isolates a throwing pair", async () => {
 		const { cas } = fakeCas();
 		const dek = generateSymmetricKey();
+		let quotaBlocked = false;
 		const deps: UploadOnBindDeps = {
 			cas,
 			installManifest: vi.fn(async () => undefined),
@@ -142,6 +205,8 @@ describe("drainPendingUploads", () => {
 				if (a === "a_nodek") return null;
 				return new Uint8Array(dek);
 			},
+			uploadQuota: async () =>
+				quotaBlocked ? UploadQuotaDecision.OverQuota : UploadQuotaDecision.Allowed,
 		};
 		const pairs = [
 			{ entityId: ENTITY, assetId: "a_present" },
@@ -157,7 +222,21 @@ describe("drainPendingUploads", () => {
 			alreadyPresent: 1,
 			notLocal: 1,
 			noDek: 1,
+			quotaExceeded: 0,
 			failed: 1,
+		});
+
+		// Flip the gate: pending pairs tally as quota-skipped, present ones
+		// still short-circuit (nothing new leaves the device).
+		quotaBlocked = true;
+		const blocked = await drainPendingUploads(deps, pairs);
+		expect(blocked).toEqual({
+			uploaded: 0,
+			alreadyPresent: 1,
+			notLocal: 1,
+			noDek: 0,
+			quotaExceeded: 3,
+			failed: 0,
 		});
 	});
 });

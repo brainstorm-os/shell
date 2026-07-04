@@ -10,6 +10,7 @@
 
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { AttachmentSyncPauseReason } from "../../shared/quota-types";
 import {
 	ActiveRelayKind,
 	type ActiveRelayOrchestrator,
@@ -94,6 +95,7 @@ function makeStore(
 		vaultPath?: string | null;
 		pairCount?: number;
 		size?: number;
+		pausedReason?: () => AttachmentSyncPauseReason | null;
 	} = {},
 ) {
 	const session = options.vaultPath ? { vaultPath: options.vaultPath } : null;
@@ -104,6 +106,7 @@ function makeStore(
 		readSeqPairCount: () => options.pairCount ?? 0,
 	};
 	if (options.clock) ctor.clock = options.clock;
+	if (options.pausedReason) ctor.getAttachmentSyncPausedReason = options.pausedReason;
 	return new SyncStatusStore(ctor);
 }
 
@@ -333,6 +336,7 @@ describe("SyncStatusStore", () => {
 			"droppedInbound",
 			"seqStateBytes",
 			"pairKeyCount",
+			"attachmentSyncPausedReason",
 		].sort();
 		expect(Object.keys(snap ?? {}).sort()).toEqual(expectedKeys);
 		store.dispose();
@@ -370,6 +374,45 @@ describe("SyncStatusStore", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	it("snapshot carries the quota pause reason from the injected signal (14.7)", () => {
+		let reason: AttachmentSyncPauseReason | null = null;
+		const orch = new FakeOrchestrator(loopbackState());
+		const store = makeStore(orch, { vaultPath: "/tmp/v1", pausedReason: () => reason });
+		store.start();
+		expect(store.snapshot()?.attachmentSyncPausedReason).toBe(null);
+		reason = AttachmentSyncPauseReason.StorageQuota;
+		expect(store.snapshot()?.attachmentSyncPausedReason).toBe(AttachmentSyncPauseReason.StorageQuota);
+		store.dispose();
+	});
+
+	it("defaults the pause reason to null (no signal injected) and survives a throwing one", () => {
+		const orch = new FakeOrchestrator(loopbackState());
+		const store = makeStore(orch, { vaultPath: "/tmp/v1" });
+		expect(store.snapshot()?.attachmentSyncPausedReason).toBe(null);
+		store.dispose();
+		const throwing = makeStore(orch, {
+			vaultPath: "/tmp/v1",
+			pausedReason: () => {
+				throw new Error("quota service gone");
+			},
+		});
+		expect(throwing.snapshot()?.attachmentSyncPausedReason).toBe(null);
+		throwing.dispose();
+	});
+
+	it("notifyQuotaChanged re-emits immediately, bypassing the coalesce debounce (14.7)", () => {
+		const orch = new FakeOrchestrator(loopbackState());
+		const store = makeStore(orch, { vaultPath: "/tmp/v1" });
+		store.start();
+		const seen: unknown[] = [];
+		store.onChange((snap) => seen.push(snap));
+		store.notifyQuotaChanged();
+		expect(seen).toHaveLength(1);
+		store.dispose();
+		store.notifyQuotaChanged(); // disposed — must not throw or emit
+		expect(seen).toHaveLength(1);
 	});
 
 	it("RECENT_TRAFFIC_MS / STALE_AFTER_MS constants match OQ-208", () => {

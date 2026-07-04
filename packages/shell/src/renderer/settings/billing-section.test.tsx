@@ -14,6 +14,12 @@ import {
 } from "../../shared/billing-settings-types";
 import { EntitlementStatus, FeatureFlag, PlanTier } from "../../shared/billing-types";
 import {
+	QuotaResource,
+	type QuotaStateView,
+	inertQuotaVerdict,
+	quotaVerdict,
+} from "../../shared/quota-types";
+import {
 	BillingSection,
 	InvoicesGroup,
 	LinkForm,
@@ -52,7 +58,20 @@ const FREE_OVERVIEW: BillingOverviewView = {
 		accountId: null,
 	},
 	storageBytesUsed: 2048,
+	quota: {
+		enforced: false,
+		storage: inertQuotaVerdict(QuotaResource.AttachmentStorage),
+		egress: inertQuotaVerdict(QuotaResource.SyncEgress),
+	},
 	portalUrl: "https://account.example.test",
+};
+
+const GIB = 1024 * 1024 * 1024;
+
+const PRO_QUOTA: QuotaStateView = {
+	enforced: true,
+	storage: quotaVerdict(PlanTier.Pro, QuotaResource.AttachmentStorage, 3 * GIB),
+	egress: quotaVerdict(PlanTier.Pro, QuotaResource.SyncEgress, null),
 };
 
 const PRO_OVERVIEW: BillingOverviewView = {
@@ -64,6 +83,7 @@ const PRO_OVERVIEW: BillingOverviewView = {
 		accountId: "acct_1",
 	},
 	storageBytesUsed: null,
+	quota: PRO_QUOTA,
 	portalUrl: "https://account.example.test",
 };
 
@@ -109,6 +129,42 @@ describe("<PlanGroup>", () => {
 	it("never renders raw i18n keys", () => {
 		const html = renderToStaticMarkup(<PlanGroup overview={PRO_OVERVIEW} />);
 		expect(html).not.toContain("shell.settings.billing");
+	});
+
+	it("shows used-vs-ceiling + egress rows for a metered plan (14.7)", () => {
+		const html = renderToStaticMarkup(<PlanGroup overview={PRO_OVERVIEW} />);
+		expect(html).toContain('data-testid="billing-quota-storage"');
+		expect(html).toContain("3 GB of 200 GB");
+		expect(html).toContain('data-testid="billing-quota-egress"');
+		expect(html).toContain("Up to 100 GB per month");
+		expect(html).not.toContain('data-testid="billing-quota-over"');
+	});
+
+	it("shows the over-quota warning line when storage is over (14.7)", () => {
+		const over: BillingOverviewView = {
+			...PRO_OVERVIEW,
+			quota: {
+				enforced: true,
+				storage: quotaVerdict(PlanTier.Pro, QuotaResource.AttachmentStorage, 201 * GIB),
+				egress: quotaVerdict(PlanTier.Pro, QuotaResource.SyncEgress, null),
+			},
+		};
+		const html = renderToStaticMarkup(<PlanGroup overview={over} />);
+		expect(html).toContain('data-testid="billing-quota-over"');
+		expect(html).toContain('role="alert"');
+	});
+
+	it("renders no quota rows for the inert (unlinked) shape (14.7)", () => {
+		const html = renderToStaticMarkup(<PlanGroup overview={FREE_OVERVIEW} />);
+		expect(html).not.toContain('data-testid="billing-quota-storage"');
+		expect(html).not.toContain('data-testid="billing-quota-egress"');
+		expect(html).not.toContain('data-testid="billing-quota-over"');
+	});
+
+	it("renders no quota rows when the quota state is unavailable (14.7)", () => {
+		const html = renderToStaticMarkup(<PlanGroup overview={{ ...PRO_OVERVIEW, quota: null }} />);
+		expect(html).not.toContain('data-testid="billing-quota-storage"');
+		expect(html).not.toContain('data-testid="billing-quota-egress"');
 	});
 });
 

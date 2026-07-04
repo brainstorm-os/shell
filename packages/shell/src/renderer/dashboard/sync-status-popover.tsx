@@ -104,6 +104,15 @@ export function SyncStatusPopover({ snapshot, derivedState, onClose }: SyncStatu
 						)}
 					</>
 				)}
+				{snapshot?.attachmentSyncPausedReason != null && (
+					<p
+						className="sync-status-popover__warning"
+						role="alert"
+						data-testid="sync-status-popover-quota-paused"
+					>
+						{t("shell.dashboard.syncStatus.attachmentsPaused.storageQuota")}
+					</p>
+				)}
 				<div className="sync-status-popover__row">
 					<dt className="sync-status-popover__label">
 						{t("shell.dashboard.syncStatus.field.seqState")}
