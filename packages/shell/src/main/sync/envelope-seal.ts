@@ -41,6 +41,12 @@ export type OpenUpdateOptions = {
 	dek: Uint8Array;
 	resolvedEntityId: string;
 	verify: (sig: Uint8Array, bytes: Uint8Array) => boolean;
+	/** Stage 10.11 — routing-token mode. When the wire routes by a pseudonymous
+	 *  token instead of the raw entity id, the header's `entityId` slot carries
+	 *  the token; pass the token the RESOLVED entity is expected to route under
+	 *  (re-derived from its DEK) and the check binds header ↔ row through the
+	 *  derivation instead of raw string equality. Absent ⇒ legacy raw-id check. */
+	expectedRoutingId?: string;
 };
 
 /**
@@ -82,7 +88,7 @@ export function sealUpdateEnvelope(opts: SealUpdateOptions): EncryptedFrame {
  */
 export function openUpdateEnvelope(opts: OpenUpdateOptions): Uint8Array {
 	assertDek(opts.dek);
-	if (opts.frame.header.entityId !== opts.resolvedEntityId) {
+	if (opts.frame.header.entityId !== (opts.expectedRoutingId ?? opts.resolvedEntityId)) {
 		throw new EntityIdMismatch(opts.frame.header.entityId, opts.resolvedEntityId);
 	}
 	const headerBytes = canonicalizeRoutingHeader(opts.frame.header);
@@ -161,6 +167,8 @@ export type OpenWrapBootstrapOptions = {
 	frame: EncryptedFrame;
 	resolvedEntityId: string;
 	verify: (sig: Uint8Array, bytes: Uint8Array) => boolean;
+	/** Stage 10.11 — routing-token mode (see `OpenUpdateOptions`). */
+	expectedRoutingId?: string;
 };
 
 export function openWrapBootstrapEnvelope(opts: OpenWrapBootstrapOptions): MemberWrapPayload {
@@ -169,7 +177,7 @@ export function openWrapBootstrapEnvelope(opts: OpenWrapBootstrapOptions): Membe
 			`openWrapBootstrapEnvelope: header.kind must be ${WireKind.WrapBootstrap}, got ${opts.frame.header.kind}`,
 		);
 	}
-	if (opts.frame.header.entityId !== opts.resolvedEntityId) {
+	if (opts.frame.header.entityId !== (opts.expectedRoutingId ?? opts.resolvedEntityId)) {
 		throw new EntityIdMismatch(opts.frame.header.entityId, opts.resolvedEntityId);
 	}
 	const headerBytes = canonicalizeRoutingHeader(opts.frame.header);
@@ -258,6 +266,8 @@ export type OpenAwarenessOptions = {
 	dek: Uint8Array;
 	resolvedEntityId: string;
 	verify: (sig: Uint8Array, bytes: Uint8Array) => boolean;
+	/** Stage 10.11 — routing-token mode (see `OpenUpdateOptions`). */
+	expectedRoutingId?: string;
 };
 
 export function openAwarenessEnvelope(opts: OpenAwarenessOptions): Uint8Array {
@@ -267,7 +277,7 @@ export function openAwarenessEnvelope(opts: OpenAwarenessOptions): Uint8Array {
 		);
 	}
 	assertDek(opts.dek);
-	if (opts.frame.header.entityId !== opts.resolvedEntityId) {
+	if (opts.frame.header.entityId !== (opts.expectedRoutingId ?? opts.resolvedEntityId)) {
 		throw new EntityIdMismatch(opts.frame.header.entityId, opts.resolvedEntityId);
 	}
 	const headerBytes = canonicalizeRoutingHeader(opts.frame.header);

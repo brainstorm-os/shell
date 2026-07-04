@@ -67,6 +67,12 @@ export interface RelaySurface {
 	 *  ids + latest snapshot versions; rejects on timeout or a non-WebSocket
 	 *  transport (loopback has no server to answer). Absent ⇒ no durable node. */
 	requestCatalog?(account: string): Promise<CatalogEntry[]>;
+	/** Stage 10.11 — ask the durable node to re-home routing `from → to`
+	 *  (storage migration + dual-token grace alias). Resolves on the node's
+	 *  `rotated` ack — the rotation coordinator flips emission ONLY then
+	 *  (fail-closed). Rejects on denial / timeout / non-durable transport.
+	 *  Absent ⇒ no durable node (loopback): rotation is local-table-only. */
+	requestRotate?(from: string, to: string, account?: string): Promise<void>;
 	/** Asset-B4 — blob-plane request/response over the live port (forwards to the
 	 *  current `RelayPort.requestAsset`). Absent ⇒ no durable node / loopback. */
 	requestAsset?(frame: Uint8Array): Promise<Uint8Array>;

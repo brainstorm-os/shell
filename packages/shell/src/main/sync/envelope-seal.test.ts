@@ -489,3 +489,64 @@ describe("sealWrapBootstrapEnvelope / openWrapBootstrapEnvelope", () => {
 		).toThrow(/64-byte/);
 	});
 });
+
+describe("expectedRoutingId (10.11 routing-token mode)", () => {
+	it("opens when the header carries the expected routing token instead of the raw id", () => {
+		const dek = generateSymmetricKey();
+		const d = makeDevice();
+		const token = "tok_b64url_pseudonym";
+		const sealed = sealUpdateEnvelope({
+			dek,
+			header: header({ entityId: token }),
+			payload: new Uint8Array([1, 2, 3]),
+			sign: d.sign,
+		});
+		const plaintext = openUpdateEnvelope({
+			frame: sealed,
+			dek,
+			resolvedEntityId: "ent_seal",
+			verify: d.verify,
+			expectedRoutingId: token,
+		});
+		expect(plaintext).toEqual(new Uint8Array([1, 2, 3]));
+	});
+
+	it("rejects when the routed token is not the expected one (EntityIdMismatch)", () => {
+		const dek = generateSymmetricKey();
+		const d = makeDevice();
+		const sealed = sealUpdateEnvelope({
+			dek,
+			header: header({ entityId: "tok_actual" }),
+			payload: new Uint8Array([1]),
+			sign: d.sign,
+		});
+		expect(() =>
+			openUpdateEnvelope({
+				frame: sealed,
+				dek,
+				resolvedEntityId: "ent_seal",
+				verify: d.verify,
+				expectedRoutingId: "tok_expected",
+			}),
+		).toThrow(EntityIdMismatch);
+	});
+
+	it("absent expectedRoutingId keeps the legacy raw-id equality check load-bearing", () => {
+		const dek = generateSymmetricKey();
+		const d = makeDevice();
+		const sealed = sealUpdateEnvelope({
+			dek,
+			header: header({ entityId: "tok_actual" }),
+			payload: new Uint8Array([1]),
+			sign: d.sign,
+		});
+		expect(() =>
+			openUpdateEnvelope({
+				frame: sealed,
+				dek,
+				resolvedEntityId: "ent_seal",
+				verify: d.verify,
+			}),
+		).toThrow(EntityIdMismatch);
+	});
+});

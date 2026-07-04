@@ -30,20 +30,74 @@ export type RouteResult = {
 	delivered: number;
 	dropped: 0 | 1;
 	header: RoutingHeader | null;
+	/** Stage 10.11 — the CANONICAL routing key the frame fanned out under
+	 *  (the header key resolved through any live rotation alias). Null when
+	 *  the header was malformed. */
+	routingKey: string | null;
 };
+
+/** Stage 10.11 — a rotation alias `from → to`, live until `expiresAt` (the
+ *  dual-token grace window). Opaque strings only — relay-blind. */
+type RotationAlias = { to: string; expiresAt: number };
+
+/** Alias chains are followed at most this many hops (a rotation of a rotation
+ *  inside one grace window); a longer chain or a cycle stops resolving. */
+const MAX_ALIAS_HOPS = 8;
 
 export class FrameRouter {
 	readonly #audit: AuditLog;
 	readonly #subscriptions = new Map<string, Set<string>>();
 	readonly #connectionsByEntity = new Map<string, Set<string>>();
 	readonly #entitiesByConnection = new Map<string, Set<string>>();
+	readonly #aliases = new Map<string, RotationAlias>();
+	readonly #now: () => number;
 	#malformedDropped = 0;
 
-	constructor(audit: AuditLog) {
+	constructor(audit: AuditLog, opts: { now?: () => number } = {}) {
 		this.#audit = audit;
+		this.#now = opts.now ?? Date.now;
 	}
 
-	subscribe(connId: string, entityId: string): void {
+	/**
+	 * Stage 10.11 routing-token rotation — canonicalize a routing key through
+	 * any unexpired rotation aliases (lazily dropping expired ones). During
+	 * the grace window a subscribe / frame under the OLD token lands on the
+	 * NEW token's channel; after expiry the old token is an unknown key.
+	 */
+	resolveKey(key: string): string {
+		let current = key;
+		for (let hop = 0; hop < MAX_ALIAS_HOPS; hop++) {
+			const alias = this.#aliases.get(current);
+			if (!alias) return current;
+			if (alias.expiresAt <= this.#now()) {
+				this.#aliases.delete(current);
+				return current;
+			}
+			if (alias.to === key) return current; // cycle guard
+			current = alias.to;
+		}
+		return current;
+	}
+
+	/**
+	 * Stage 10.11 — apply a routing-token rotation: every current subscriber
+	 * of `from` is moved onto `to` (in-flight peers keep receiving frames
+	 * without a re-subscribe), and `from → to` is aliased until `expiresAt`.
+	 */
+	applyRotation(from: string, to: string, expiresAt: number): void {
+		if (from === to) return;
+		const fromSet = this.#connectionsByEntity.get(from);
+		if (fromSet) {
+			for (const connId of [...fromSet]) {
+				this.unsubscribe(connId, from);
+				this.subscribe(connId, to);
+			}
+		}
+		this.#aliases.set(from, { to, expiresAt });
+	}
+
+	subscribe(connId: string, rawEntityId: string): void {
+		const entityId = this.resolveKey(rawEntityId);
 		let set = this.#connectionsByEntity.get(entityId);
 		if (!set) {
 			set = new Set<string>();
@@ -58,7 +112,8 @@ export class FrameRouter {
 		entitySet.add(entityId);
 	}
 
-	unsubscribe(connId: string, entityId: string): void {
+	unsubscribe(connId: string, rawEntityId: string): void {
+		const entityId = this.resolveKey(rawEntityId);
 		const set = this.#connectionsByEntity.get(entityId);
 		if (set) {
 			set.delete(connId);
@@ -117,12 +172,16 @@ export class FrameRouter {
 			header = peeked.header;
 		} catch {
 			this.#malformedDropped += 1;
-			return { delivered: 0, dropped: 1, header: null };
+			return { delivered: 0, dropped: 1, header: null, routingKey: null };
 		}
 		// Collab-C5 — fan out by the optional `route` (a recipient inbox channel)
-		// when present, else the entity channel. The audit still records the real
-		// `entityId`; `route` is an opaque routing label to the blind relay.
-		const routingKey = header.route ?? header.entityId;
+		// when present, else the entity channel; 10.11 — either way the key is
+		// canonicalized through live rotation aliases, so a frame emitted under
+		// a rotated-away token during grace lands on the new token's channel.
+		const routingKey = this.resolveKey(header.route ?? header.entityId);
+		// The audit records the (canonicalized) ENTITY channel, not the routing
+		// label — the C5 contract. With routing tokens both are pseudonyms.
+		const auditKey = this.resolveKey(header.entityId);
 		const recipients = this.subscribersFor(routingKey, fromConnId);
 		let delivered = 0;
 		for (const toConnId of recipients) {
@@ -131,7 +190,7 @@ export class FrameRouter {
 				this.#audit.record({
 					fromConnId,
 					toConnId,
-					entityId: header.entityId,
+					entityId: auditKey,
 					kind: header.kind,
 					bytes: frame.length,
 				});
@@ -140,7 +199,7 @@ export class FrameRouter {
 				// A failed write must not block fan-out to siblings.
 			}
 		}
-		return { delivered, dropped: 0, header };
+		return { delivered, dropped: 0, header, routingKey };
 	}
 
 	malformedDropped(): number {
