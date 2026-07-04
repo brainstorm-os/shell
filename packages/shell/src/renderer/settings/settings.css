@@ -357,7 +357,6 @@
 }
 
 .settings__input {
-	flex: 1;
 	min-width: 0;
 	height: var(--control-height-md);
 	background: var(--color-surface-default);
@@ -2520,12 +2519,6 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-}
-
-/* `.setting-select` is the shared `.bs-select` trigger (SDK select-menu) —
- * face/focus chrome comes from the SDK; only the row layout cap lives here. */
-.setting-select {
-	max-width: 240px;
 }
 
 .setting-time {

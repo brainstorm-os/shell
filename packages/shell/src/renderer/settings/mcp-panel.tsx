@@ -202,7 +202,7 @@ function ServerPopover({
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							className="popover__footer-lead"
 							onClick={() => void remove()}
 							disabled={busy}
@@ -212,7 +212,7 @@ function ServerPopover({
 					)}
 					<Button
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={() => void save()}
 						disabled={busy || !canSave}
 					>

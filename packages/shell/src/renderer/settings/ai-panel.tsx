@@ -158,7 +158,7 @@ function ProviderKeyPopover({
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							className="popover__footer-lead"
 							onClick={() => void clear()}
 							disabled={busy}
@@ -168,7 +168,7 @@ function ProviderKeyPopover({
 					)}
 					<Button
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={() => void save()}
 						disabled={busy || draft.trim().length === 0}
 					>
