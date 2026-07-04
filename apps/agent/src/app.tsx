@@ -10,6 +10,7 @@ import {
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { type OpenCapableRuntime, openEntity } from "@brainstorm/sdk";
 import {
+	AI_BUDGET_EXHAUSTED_ERROR_KIND,
 	type AgentLoopResult,
 	type AgentLoopStep,
 	AgentStopReason,
@@ -1104,6 +1105,9 @@ export function AgentApp(): ReactElement {
 			const kind = e.kind ?? e.name ?? "";
 			if (kind === "Unavailable") setError(unavailableMessage(conversationProvider));
 			else if (kind === "CapabilityDenied") setError(t("error.capability"));
+			// 14.8 — the shell refused the call because this app's rolling AI
+			// budget is exhausted (distinct from Unavailable: the model is fine).
+			else if (kind === AI_BUDGET_EXHAUSTED_ERROR_KIND) setError(t("error.quotaExhausted"));
 			else setError(`${t("error.generic")}${e.message ? ` (${e.message})` : ""}`);
 		} finally {
 			setSending(false);

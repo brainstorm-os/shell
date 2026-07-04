@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ANTHROPIC_PROVIDER_ID, OLLAMA_PROVIDER_ID } from "@brainstorm/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	MAX_APP_CREDIT_BUDGET,
 	MAX_APP_TOKEN_BUDGET,
 	aiSettingsPath,
 	defaultAiSettings,
@@ -41,6 +42,19 @@ describe("validateAiSettings", () => {
 		expect(out.appBudgets.a).toEqual({ maxTokens: 12 });
 		expect(out.appBudgets.b).toEqual({ maxTokens: MAX_APP_TOKEN_BUDGET });
 	});
+
+	it("14.8 — keeps credit budgets (alone or with tokens), capped", () => {
+		const out = validateAiSettings({
+			appBudgets: {
+				a: { maxCredits: 25 },
+				b: { maxTokens: 100, maxCredits: MAX_APP_CREDIT_BUDGET * 2 },
+				c: { maxCredits: -3 },
+			},
+		});
+		expect(out.appBudgets.a).toEqual({ maxCredits: 25 });
+		expect(out.appBudgets.b).toEqual({ maxTokens: 100, maxCredits: MAX_APP_CREDIT_BUDGET });
+		expect(out.appBudgets.c).toBeUndefined();
+	});
 });
 
 describe("readAiSettings / writeAiSettings + mutators", () => {
@@ -72,19 +86,27 @@ describe("readAiSettings / writeAiSettings + mutators", () => {
 		);
 	});
 
-	it("setAppBudget sets, updates, and clears (<=0)", async () => {
-		await setAppBudget(dir, "io.brainstorm.agent", 1000);
+	it("setAppBudget sets, updates, and clears (empty budget)", async () => {
+		await setAppBudget(dir, "io.brainstorm.agent", { maxTokens: 1000 });
 		expect((await readAiSettings(dir)).appBudgets["io.brainstorm.agent"]).toEqual({
 			maxTokens: 1000,
 		});
-		await setAppBudget(dir, "io.brainstorm.agent", 2000);
+		await setAppBudget(dir, "io.brainstorm.agent", { maxTokens: 2000, maxCredits: 5 });
 		expect((await readAiSettings(dir)).appBudgets["io.brainstorm.agent"]).toEqual({
 			maxTokens: 2000,
+			maxCredits: 5,
 		});
-		await setAppBudget(dir, "io.brainstorm.agent", 0);
+		await setAppBudget(dir, "io.brainstorm.agent", {});
 		expect((await readAiSettings(dir)).appBudgets["io.brainstorm.agent"]).toBeUndefined();
 		// An empty app id is a no-op.
 		const before = await readAiSettings(dir);
-		expect(await setAppBudget(dir, "", 50)).toEqual(before);
+		expect(await setAppBudget(dir, "", { maxTokens: 50 })).toEqual(before);
+	});
+
+	it("setAppBudget with only credits persists a credits-only budget", async () => {
+		await setAppBudget(dir, "io.brainstorm.browser", { maxCredits: 12 });
+		expect((await readAiSettings(dir)).appBudgets["io.brainstorm.browser"]).toEqual({
+			maxCredits: 12,
+		});
 	});
 });

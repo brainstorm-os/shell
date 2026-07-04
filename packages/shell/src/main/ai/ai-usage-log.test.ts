@@ -3,13 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeFileAuditSink } from "../network/audit-log";
-import {
-	AiUsageOutcome,
-	type AiUsageRecord,
-	aggregateAiUsageByApp,
-	readAiUsage,
-	recordAiUsage,
-} from "./ai-usage-log";
+import { AiUsageOutcome, type AiUsageRecord, readAiUsage, recordAiUsage } from "./ai-usage-log";
 
 function rec(over: Partial<AiUsageRecord> = {}): AiUsageRecord {
 	return {
@@ -55,30 +49,5 @@ describe("ai-usage-log (11.8)", () => {
 		const read = await readAiUsage(path);
 		expect(read).toHaveLength(1);
 		expect(read[0]?.provider).toBe("anthropic");
-	});
-
-	it("aggregates per app — calls, errors, tokens, last-seen, provider breakdown", () => {
-		const out = aggregateAiUsageByApp([
-			rec({ appId: "app.a", ts: 100, totalTokens: 15, promptTokens: 10, completionTokens: 5 }),
-			rec({
-				appId: "app.a",
-				ts: 300,
-				provider: "ollama",
-				totalTokens: 8,
-				promptTokens: 6,
-				completionTokens: 2,
-			}),
-			rec({ appId: "app.a", ts: 200, outcome: AiUsageOutcome.Error, provider: "", totalTokens: 0 }),
-			rec({ appId: "app.b", ts: 50 }),
-		]);
-		// app.a most recent (ts 300) sorts first.
-		expect(out.map((r) => r.appId)).toEqual(["app.a", "app.b"]);
-		const a = out[0];
-		expect(a).toMatchObject({ calls: 3, errors: 1, totalTokens: 23, lastSeenMs: 300 });
-		// Provider breakdown excludes the empty-provider error row; sorted by tokens desc.
-		expect(a?.byProvider).toEqual([
-			{ provider: "anthropic", calls: 1, totalTokens: 15 },
-			{ provider: "ollama", calls: 1, totalTokens: 8 },
-		]);
 	});
 });

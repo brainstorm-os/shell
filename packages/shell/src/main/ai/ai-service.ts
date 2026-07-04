@@ -47,6 +47,12 @@ export type AiServiceOptions = {
 	 *  `entity_types.schema`). Returns `null`/`[]` for an unknown / field-less
 	 *  type → the handler fails closed. Omitted when no registry is available. */
 	resolveTypeFields?: (typeId: string) => Promise<readonly AiExtractField[] | null>;
+	/** 14.8 — the per-app budget gate, called BEFORE dispatching each
+	 *  model-calling verb (never `cost`, which is a free estimate). Over
+	 *  budget → it throws the distinct `AiBudgetExhausted` error; accounting
+	 *  store unreadable with a budget set → `Unavailable` (fail-closed).
+	 *  Omitted in tests that don't exercise quota. */
+	quota?: { checkBudget: (appId: string) => Promise<void> };
 };
 
 /** Token usage as the provider reports it (subset of `AiGenerateResult["usage"]`). */
@@ -256,6 +262,12 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 			});
 		};
 		try {
+			// 14.8 — budget gate ahead of every model-calling verb. `cost` is
+			// excluded (pre-send estimate, no tokens consumed). A rejection here
+			// still lands an error provenance row via the catch below.
+			if (options.quota && RECORDED_VERBS.has(envelope.method)) {
+				await options.quota.checkBudget(envelope.app);
+			}
 			switch (envelope.method) {
 				case "generate": {
 					const req = requireRequest(envelope);

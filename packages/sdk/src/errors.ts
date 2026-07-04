@@ -66,6 +66,16 @@ export class Invalid extends BrainstormSdkError {
 	}
 }
 
+/** 14.8 — the calling app's rolling 30-day AI budget is exhausted (Settings →
+ *  AI). Distinct from `Unavailable` so apps can surface "AI budget exhausted"
+ *  instead of a generic failure; the budget resets as usage rolls out of the
+ *  window or when the user raises/clears it. */
+export class AiBudgetExhausted extends BrainstormSdkError {
+	constructor(message: string, detail: ErrorDetail = {}) {
+		super("AiBudgetExhausted", message, detail);
+	}
+}
+
 /**
  * Reconstruct the right error subclass from a wire reply's `error` payload.
  * Unknown `kind` values fall through to a generic Error so callers always
@@ -83,6 +93,8 @@ export function makeSdkError(kind: string, message: string, detail: ErrorDetail 
 			return new Unavailable(message, detail);
 		case "Invalid":
 			return new Invalid(message, detail);
+		case "AiBudgetExhausted":
+			return new AiBudgetExhausted(message, detail);
 		default: {
 			const err = new Error(message);
 			err.name = kind || "Error";

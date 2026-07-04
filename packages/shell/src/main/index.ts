@@ -45,6 +45,7 @@ import {
 import { UPDATE_STATE_EVENT } from "../shared/update-wire-types";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
+import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
@@ -89,6 +90,7 @@ import {
 } from "./billing/billing-edge-fetch";
 import { makeBillingServiceHandler } from "./billing/billing-service";
 import { QuotaService } from "./billing/quota-service";
+import { FeatureFlag } from "./billing/plan";
 import {
 	BLOCK_FRAME_SCHEME_PRIVILEGE,
 	registerBlockFrameProtocol,
@@ -1455,7 +1457,6 @@ void app.whenReady().then(async () => {
 	// the registry exists; an already-open vault is applied post-registry below.
 	let applyAiDefaultProvider: ((id: string | null) => void) | null = null;
 	registerAiSettingsHandlers({
-		aiUsagePath,
 		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
 	});
 	// 14.6 — Settings → Billing (dashboard-privileged, not broker). The
@@ -3298,14 +3299,47 @@ void app.whenReady().then(async () => {
 	// 11.8 — per-call AI provenance. Each model-calling verb records one JSONL
 	// row (app · verb · provider/model · tokens · outcome) via the network
 	// audit's generic file sink; metadata only (never prompt/completion). The
-	// raw log stays shell-side; a per-app summary surfaces later (AI panel /
-	// budget enforcement 14.8).
+	// raw log stays shell-side (per-device diagnostics).
 	const aiUsageSink = makeFileAuditSink(aiUsagePath);
+	// 14.8 — per-app AI quota + bundled-credit accounting. Every completed call
+	// also lands one `ai_usage` row in the active vault's account.db (priced in
+	// credits via the static rate table), and the broker refuses a call BEFORE
+	// dispatch when the app's rolling 30-day usage exhausts its Settings → AI
+	// budget (distinct `AiBudgetExhausted` error, fail-closed on accounting
+	// errors). Shell-internal callers (`shell`, `_shell.*`) are exempt — see
+	// `ai-quota.ts` §shell-caller policy. `isPlatformBilled` is `false` for
+	// every provider today (all BYO/local): bundled-credit debits start only
+	// when platform-managed routing lands (TODO, /v1/usage/ingest reporter).
+	const aiQuota = new AiQuotaService({
+		getUsageRepo: async () => {
+			const session = getActiveVaultSession();
+			return session ? await session.aiUsageRepo() : null;
+		},
+		getBudgets: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return {};
+			return (await readAiSettings(session.vaultPath)).appBudgets;
+		},
+		getCreditLedger: async () => {
+			const session = getActiveVaultSession();
+			return session ? await session.aiCreditLedger() : null;
+		},
+		hasBundledCredits: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return false;
+			return (await session.billingService()).hasFeature(FeatureFlag.BundledAiCredits);
+		},
+		isPlatformBilled: () => false,
+	});
 	workers.broker.registerService(
 		"ai",
 		makeAiServiceHandler({
 			getProvider: (id) => aiProviders.get(id),
-			onUsage: (rec) => void recordAiUsage(aiUsageSink, rec),
+			quota: aiQuota,
+			onUsage: (rec) => {
+				void recordAiUsage(aiUsageSink, rec);
+				void aiQuota.recordUsage(rec);
+			},
 			// 11.5 `extract({ intoType })` — resolve a registered entity type's
 			// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
 			// an unknown type / no schema returns null → the handler fails closed.

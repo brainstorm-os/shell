@@ -3,10 +3,11 @@
  *
  * Every model-calling AI broker verb (`generate` / `transform` / `extract`)
  * lands one JSON-lines record: which app called, which verb, which
- * provider/model answered, the token usage, and the outcome. This is the
- * aggregable substrate for the Settings → AI panel's per-app usage view and
- * for budget enforcement (14.8) — the shell records it; nothing app-facing
- * reads it (the raw log never crosses IPC; a per-app summary will).
+ * provider/model answered, the token usage, and the outcome. Per-device
+ * diagnostics only — the shell records it; nothing app-facing reads it (the
+ * raw log never crosses IPC). The QUERYABLE accounting substrate (the panel's
+ * usage view + 14.8 budget enforcement) is the per-vault `ai_usage` table
+ * (`ai-usage-repo.ts`), fed from the same broker hook.
  *
  * Metadata only — never the prompt, never the completion. Reuses the network
  * audit's generic file sink (append + size rotation) so there's one JSONL
@@ -73,89 +74,6 @@ export async function readAiUsage(usagePath: string): Promise<readonly AiUsageRe
 		readUsageFile(rotatedPathFor(usagePath)),
 	]);
 	return [...archive, ...current].sort((a, b) => b.ts - a.ts);
-}
-
-export type PerAppAiProviderUsage = {
-	readonly provider: string;
-	readonly calls: number;
-	readonly totalTokens: number;
-};
-
-export type PerAppAiUsage = {
-	readonly appId: string;
-	readonly calls: number;
-	readonly errors: number;
-	readonly promptTokens: number;
-	readonly completionTokens: number;
-	readonly totalTokens: number;
-	readonly lastSeenMs: number;
-	readonly byProvider: readonly PerAppAiProviderUsage[];
-};
-
-/** Aggregate a flat record list into one row per app — calls, errors, token
- *  totals, last-seen, and a per-provider breakdown. Pure; the consumer
- *  (AI panel / budget check) pre-filters by time window. */
-export function aggregateAiUsageByApp(records: readonly AiUsageRecord[]): readonly PerAppAiUsage[] {
-	const byApp = new Map<
-		string,
-		{
-			calls: number;
-			errors: number;
-			promptTokens: number;
-			completionTokens: number;
-			totalTokens: number;
-			lastSeenMs: number;
-			providers: Map<string, { calls: number; totalTokens: number }>;
-		}
-	>();
-	for (const rec of records) {
-		let bucket = byApp.get(rec.appId);
-		if (!bucket) {
-			bucket = {
-				calls: 0,
-				errors: 0,
-				promptTokens: 0,
-				completionTokens: 0,
-				totalTokens: 0,
-				lastSeenMs: 0,
-				providers: new Map(),
-			};
-			byApp.set(rec.appId, bucket);
-		}
-		bucket.calls += 1;
-		if (rec.outcome === AiUsageOutcome.Error) bucket.errors += 1;
-		bucket.promptTokens += rec.promptTokens;
-		bucket.completionTokens += rec.completionTokens;
-		bucket.totalTokens += rec.totalTokens;
-		bucket.lastSeenMs = Math.max(bucket.lastSeenMs, rec.ts);
-		if (rec.provider.length > 0) {
-			const p = bucket.providers.get(rec.provider) ?? { calls: 0, totalTokens: 0 };
-			p.calls += 1;
-			p.totalTokens += rec.totalTokens;
-			bucket.providers.set(rec.provider, p);
-		}
-	}
-	const out: PerAppAiUsage[] = [];
-	for (const [appId, bucket] of byApp) {
-		const byProvider = Array.from(bucket.providers.entries())
-			.map(([provider, v]) => ({ provider, calls: v.calls, totalTokens: v.totalTokens }))
-			.sort((a, b) => {
-				if (b.totalTokens !== a.totalTokens) return b.totalTokens - a.totalTokens;
-				return a.provider.localeCompare(b.provider);
-			});
-		out.push({
-			appId,
-			calls: bucket.calls,
-			errors: bucket.errors,
-			promptTokens: bucket.promptTokens,
-			completionTokens: bucket.completionTokens,
-			totalTokens: bucket.totalTokens,
-			lastSeenMs: bucket.lastSeenMs,
-			byProvider,
-		});
-	}
-	out.sort((a, b) => b.lastSeenMs - a.lastSeenMs);
-	return out;
 }
 
 function isValidUsageRecord(input: unknown): input is AiUsageRecord {

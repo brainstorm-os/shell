@@ -13,6 +13,7 @@
 export { type Bridge, type BridgeEnvelope, type BridgeReply, newMessageId } from "./bridge";
 export { encodeHandshake, decodeHandshake } from "./handshake";
 export {
+	AiBudgetExhausted,
 	CapabilityDenied,
 	Conflict,
 	Invalid,

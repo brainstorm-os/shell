@@ -114,6 +114,8 @@ export const AGENT_I18N = {
 		"No AI model could be reached. Pick a provider for this conversation in settings, or set one up in Settings → AI.",
 	"error.capability":
 		"The Agent app is missing AI access — restart the shell so it reinstalls with the `ai.use` capability granted.",
+	"error.quotaExhausted":
+		"The Agent app has used up its 30-day AI budget. Raise or clear the budget in Settings → AI to keep chatting.",
 	"error.generic": "Something went wrong generating a reply.",
 	"provenance.via": "via {model}",
 

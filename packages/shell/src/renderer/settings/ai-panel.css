@@ -227,3 +227,28 @@
 .settings__ai-budget-value[data-set="true"] {
 	color: var(--color-text-secondary);
 }
+
+/* 14.8 — the window caption in the section head. */
+.settings__ai-usage-window {
+	margin-left: auto;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
+/* Fraction of the tightest ceiling consumed (hidden once exhausted — the
+ * badge takes over). */
+.settings__ai-budget-consumed {
+	margin-right: var(--space-2);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
+/* The broker is refusing this app's AI calls (over budget). */
+.settings__ai-budget-exhausted {
+	flex-shrink: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-state-error);
+	border: 1px solid var(--color-state-error);
+	border-radius: var(--radius-sm);
+	padding: 0 var(--space-1);
+}

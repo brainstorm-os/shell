@@ -375,12 +375,45 @@ function ydocOnRemote(entityId: string, callback: (updateB64: string) => void): 
 
 const ydoc = { onRemote: ydocOnRemote };
 
+/**
+ * Errors thrown inside the preload world cross `contextBridge` via a
+ * structured clone that collapses a custom Error `name` to "Error" and drops
+ * non-standard fields — so the SDK's typed error kinds (`Unavailable`,
+ * `CapabilityDenied`, `AiBudgetExhausted`, …) never reached sandboxed app
+ * code. Re-throw AI-service failures as plain clone-safe objects carrying
+ * `{ kind, name, message }` so apps can branch on the kind (14.8's per-app
+ * budget error made this observable: the Agent app must distinguish
+ * `AiBudgetExhausted` from a generic `Unavailable`).
+ */
+function cloneSafeAiErrors<T extends object>(ai: T): T {
+	const wrapped: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(ai)) {
+		wrapped[key] =
+			typeof value === "function"
+				? async (...args: unknown[]) => {
+						try {
+							return await (value as (...a: unknown[]) => Promise<unknown>)(...args);
+						} catch (error) {
+							const e = error as { name?: string; message?: string };
+							const kind = typeof e.name === "string" && e.name.length > 0 ? e.name : "Error";
+							// A plain object is the only shape whose fields survive the
+							// contextBridge structured clone (a custom Error name collapses
+							// to "Error" and extra fields drop).
+							throw { kind, name: kind, message: e.message ?? String(error) };
+						}
+					}
+				: value;
+	}
+	return wrapped as T;
+}
+
 const augmentedRuntime = {
 	...runtime,
 	ydoc,
 	spellcheck,
 	services: {
 		...runtime.services,
+		ai: cloneSafeAiErrors(runtime.services.ai),
 		properties: {
 			...runtime.services.properties,
 			onChange: (listener: () => void) => {
