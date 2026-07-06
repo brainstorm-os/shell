@@ -104,7 +104,7 @@
 
 .notes__quote {
 	margin: var(--space-2) 0;
-	padding: var(--space-1);
+	padding: var(--space-1) var(--space-2);
 	border-inline-start: 3px solid var(--border-strong);
 	color: var(--text-dim);
 }
