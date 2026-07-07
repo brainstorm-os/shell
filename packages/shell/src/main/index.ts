@@ -89,8 +89,8 @@ import {
 	makeBillingEdgePostJson,
 } from "./billing/billing-edge-fetch";
 import { makeBillingServiceHandler } from "./billing/billing-service";
-import { QuotaService } from "./billing/quota-service";
 import { FeatureFlag } from "./billing/plan";
+import { QuotaService } from "./billing/quota-service";
 import {
 	BLOCK_FRAME_SCHEME_PRIVILEGE,
 	registerBlockFrameProtocol,
