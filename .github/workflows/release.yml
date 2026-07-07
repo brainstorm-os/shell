@@ -171,4 +171,4 @@ jobs:
           { [ -n "$summary" ] && printf '%s\n\n' "$summary"; printf '%s\n' "$gen"; } > notes.md
           # The draft already exists (electron-builder created it for this tag).
           gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" \
-            --draft=false --latest --notes-file notes.md
+            --prerelease=false --draft=false --latest --notes-file notes.md
