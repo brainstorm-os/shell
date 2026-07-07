@@ -161,8 +161,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG=$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 1 --json tagName,isDraft \
+          TAG=$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 10 --json tagName,isDraft \
             --jq '[.[] | select(.isDraft)][0].tagName')
+
+          if [ -z "$TAG" ]; then
+            echo "::error::No draft release found for ${GITHUB_REPOSITORY}" >&2
+            exit 1
+          fi
+          
           # GitHub auto-picks the previous release for the diff; the "What's
           # Changed" body lists every merged PR since it. Prepend the tag's
           # annotation subject as a one-line human summary when present.
