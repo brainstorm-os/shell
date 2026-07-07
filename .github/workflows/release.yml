@@ -161,7 +161,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="v${GITHUB_REF_NAME}"
+          TAG="${GITHUB_REF_NAME}"
           # GitHub auto-picks the previous release for the diff; the "What's
           # Changed" body lists every merged PR since it. Prepend the tag's
           # annotation subject as a one-line human summary when present.
