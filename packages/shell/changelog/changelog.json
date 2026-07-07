@@ -3,26 +3,239 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.1.8",
+      "date": "2026-07-07",
+      "icon": "🔍",
+      "title": "Search that understands meaning",
+      "summary": "Semantic search arrives: an on-device model finds your notes by meaning, not just keywords. Plus a background-activity center, six new dashboard widgets, a richer chat composer with @-mentions, and editor templates.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Semantic search"
+        },
+        {
+          "kind": "p",
+          "text": [
+            {
+              "text": "Search",
+              "marks": ["bold"]
+            },
+            {
+              "text": " now finds things by "
+            },
+            {
+              "text": "meaning",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — “vacation ideas” surfaces the note titled “places to visit this summer”. The model runs entirely "
+            },
+            {
+              "text": "on your device",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ": nothing leaves your vault."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": "The model downloads once on first run, with a progress indicator — search works normally in the meantime."
+        },
+        {
+          "kind": "li",
+          "text": "Indexing is incremental: edits re-index only what changed, so big vaults stay fast."
+        },
+        {
+          "kind": "h1",
+          "text": "Around the shell"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Dashboard",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a new "
+            },
+            {
+              "text": "activity center",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " shows background work (downloads, indexing, sync) in one place."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Widgets",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — six new dashboard widgets, size presets in the widget menu, and keyboard "
+            },
+            {
+              "text": "move & resize",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chat",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a richer composer with formatting and inline "
+            },
+            {
+              "text": "@-mentions",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in chat and agent messages."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Editor",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — insert "
+            },
+            {
+              "text": "templates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " from the slash menu, and save any document as a template."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Bookmarks",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — captured articles now keep their images, stored encrypted in your vault."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Welcome",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a fresh onboarding look with the new "
+            },
+            {
+              "text": "Rose",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " theme."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Accessibility",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — accent-colored and muted text now meet "
+            },
+            {
+              "text": "WCAG AA",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " contrast in every theme."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — no reinstall needed."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.1.7",
       "date": "2026-07-02",
       "icon": "🧹",
       "title": "A full pass over every app",
       "summary": "A fixes release on the public beta, from a sweep across every app: status cells edit as a pick list, the calendar and preview render cleanly, chat messages stay out of the file browsers, and the assistant shows real titles instead of internal ids.",
       "body": [
-        { "kind": "h1", "text": "Fixes across the apps" },
+        {
+          "kind": "h1",
+          "text": "Fixes across the apps"
+        },
         {
           "kind": "li",
           "text": [
-            { "text": "Database", "marks": ["bold"] },
-            { "text": " — status and select cells edit as a " },
-            { "text": "combobox", "marks": ["highlight"] },
-            { "text": ": pick a value already in the column, or type a new one." }
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — status and select cells edit as a "
+            },
+            {
+              "text": "combobox",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ": pick a value already in the column, or type a new one."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Calendar", "marks": ["bold"] },
+            {
+              "text": "Calendar",
+              "marks": ["bold"]
+            },
             {
               "text": " — multi-day events draw as one clean bar in month view instead of a clipped, repeated title in every day."
             }
@@ -31,7 +244,10 @@
         {
           "kind": "li",
           "text": [
-            { "text": "Preview", "marks": ["bold"] },
+            {
+              "text": "Preview",
+              "marks": ["bold"]
+            },
             {
               "text": " — centers its empty state and docks the details panel on the right, like every other app."
             }
@@ -40,26 +256,51 @@
         {
           "kind": "li",
           "text": [
-            { "text": "Files", "marks": ["bold"] },
-            { "text": " & " },
-            { "text": "Database", "marks": ["bold"] },
-            { "text": " — chat messages no longer flood the vault browsers as untitled rows." }
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": " & "
+            },
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — chat messages no longer flood the vault browsers as untitled rows."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Assistant", "marks": ["bold"] },
-            { "text": " — renders the documents it cites as clickable titles instead of raw ids." }
+            {
+              "text": "Assistant",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — renders the documents it cites as clickable titles instead of raw ids."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Graph", "marks": ["bold"] },
-            { "text": " — labels untitled items by type (" },
-            { "text": "Note (untitled)", "marks": ["highlight"] },
-            { "text": ") instead of internal ids." }
+            {
+              "text": "Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — labels untitled items by type ("
+            },
+            {
+              "text": "Note (untitled)",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ") instead of internal ids."
+            }
           ]
         },
         {
@@ -70,10 +311,20 @@
           "kind": "callout",
           "icon": "🔄",
           "text": [
-            { "text": "Update in place. ", "marks": ["bold"] },
-            { "text": "Existing installs update from " },
-            { "text": "Settings → Updates", "marks": ["highlight"] },
-            { "text": "." }
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
           ]
         }
       ]
@@ -85,7 +336,10 @@
       "title": "Pre-alpha development build",
       "summary": "The very first cut of Brainstorm — a desktop knowledge OS with first-party apps for notes, tasks, files, code, journaling, whiteboards, bookmarks and more. Sandboxed, local-first, end-to-end encrypted at rest.",
       "body": [
-        { "kind": "h1", "text": "Apps in the box" },
+        {
+          "kind": "h1",
+          "text": "Apps in the box"
+        },
         {
           "kind": "p",
           "text": "Thirteen first-party apps land in this build. Each one runs in its own sandboxed renderer, talks to the shell through the capability broker, and shares a single design system."
@@ -93,117 +347,259 @@
         {
           "kind": "li",
           "text": [
-            { "text": "Notes", "marks": ["bold"] },
-            { "text": " — block editor with cross-app " },
-            { "text": "@mentions", "marks": ["highlight"] },
-            { "text": " and " },
-            { "text": "!@", "marks": ["highlight"] },
-            { "text": " transclusion." }
+            {
+              "text": "Notes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — block editor with cross-app "
+            },
+            {
+              "text": "@mentions",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "!@",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " transclusion."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Database", "marks": ["bold"] },
-            { "text": " — six view kinds: grid, list, gallery, board, calendar, timeline." }
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — six view kinds: grid, list, gallery, board, calendar, timeline."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Graph", "marks": ["bold"] },
-            { "text": " — multi-subject pattern filters with edge-accurate history animation." }
+            {
+              "text": "Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — multi-subject pattern filters with edge-accurate history animation."
+            }
           ]
         },
         {
           "kind": "li",
           "text": [
-            { "text": "Tasks", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Calendar", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Journal", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Whiteboard", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Bookmarks", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Files", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Code editor", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Preview", "marks": ["bold"] },
-            { "text": ", " },
-            { "text": "Marketplace", "marks": ["bold"] },
-            { "text": ", and " },
-            { "text": "Bin", "marks": ["bold"] },
-            { "text": "." }
+            {
+              "text": "Tasks",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Calendar",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Journal",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Whiteboard",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Bookmarks",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Code editor",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Preview",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Marketplace",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", and "
+            },
+            {
+              "text": "Bin",
+              "marks": ["bold"]
+            },
+            {
+              "text": "."
+            }
           ]
         },
-
-        { "kind": "h1", "text": "Under the hood" },
-        { "kind": "h3", "text": "Block Protocol host conformance v1" },
+        {
+          "kind": "h1",
+          "text": "Under the hood"
+        },
+        {
+          "kind": "h3",
+          "text": "Block Protocol host conformance v1"
+        },
         {
           "kind": "p",
           "text": [
             {
               "text": "BlockEmbed renders sandboxed block frames in an isolated iframe with a typed "
             },
-            { "text": "postMessage", "marks": ["highlight"] },
-            { "text": " transport so third-party blocks never touch the host directly." }
+            {
+              "text": "postMessage",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " transport so third-party blocks never touch the host directly."
+            }
           ]
         },
-        { "kind": "h3", "text": "Files service" },
+        {
+          "kind": "h3",
+          "text": "Files service"
+        },
         {
           "kind": "p",
           "text": [
-            { "text": "Apps can request " },
-            { "text": "open", "marks": ["highlight"] },
-            { "text": " / " },
-            { "text": "save", "marks": ["highlight"] },
-            { "text": " / " },
-            { "text": "read", "marks": ["highlight"] },
-            { "text": " / " },
-            { "text": "write", "marks": ["highlight"] },
-            { "text": " / " },
-            { "text": "watch", "marks": ["highlight"] },
-            { "text": " through a capability-gated service, with chunked uploads for large files." }
+            {
+              "text": "Apps can request "
+            },
+            {
+              "text": "open",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " / "
+            },
+            {
+              "text": "save",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " / "
+            },
+            {
+              "text": "read",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " / "
+            },
+            {
+              "text": "write",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " / "
+            },
+            {
+              "text": "watch",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " through a capability-gated service, with chunked uploads for large files."
+            }
           ]
         },
-        { "kind": "h3", "text": "Open resolution" },
+        {
+          "kind": "h3",
+          "text": "Open resolution"
+        },
         {
           "kind": "p",
           "text": [
-            { "text": "Per-scheme and per-extension default pinning under " },
-            { "text": "Settings → Default apps", "marks": ["highlight"] },
-            { "text": ", with an explicit " },
-            { "text": "Open with system default", "marks": ["highlight"] },
-            { "text": " option and a consent prompt for first-time OS handoff." }
+            {
+              "text": "Per-scheme and per-extension default pinning under "
+            },
+            {
+              "text": "Settings → Default apps",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", with an explicit "
+            },
+            {
+              "text": "Open with system default",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " option and a consent prompt for first-time OS handoff."
+            }
           ]
         },
-        { "kind": "h3", "text": "Cross-app navigation" },
+        {
+          "kind": "h3",
+          "text": "Cross-app navigation"
+        },
         {
           "kind": "p",
           "text": [
-            { "text": "Shared back/forward history (" },
-            { "text": "@brainstorm/sdk/nav-history", "marks": ["highlight"] },
+            {
+              "text": "Shared back/forward history ("
+            },
+            {
+              "text": "@brainstorm/sdk/nav-history",
+              "marks": ["highlight"]
+            },
             {
               "text": "), shared object menu with Pin / Unpin / Open / Remove, and a unified mention typeahead."
             }
           ]
         },
-
-        { "kind": "h1", "text": "Privacy" },
+        {
+          "kind": "h1",
+          "text": "Privacy"
+        },
         {
           "kind": "p",
           "text": "At-rest encryption per vault, sync de-risk spike, per-entity data keys generated on create, and an on-disk encryption flip with a startup contract probe. Your data never leaves the device without you knowing."
         },
-
         {
           "kind": "callout",
           "icon": "⚠️",
           "text": [
-            { "text": "Heads up — pre-alpha. ", "marks": ["bold"] },
+            {
+              "text": "Heads up — pre-alpha. ",
+              "marks": ["bold"]
+            },
             {
               "text": "The vault format may still change before 0.1.0. Keep a backup of anything you put in here."
             }
