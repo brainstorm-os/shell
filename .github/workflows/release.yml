@@ -167,6 +167,11 @@ jobs:
           # annotation subject as a one-line human summary when present.
           gen=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="$TAG" --jq '.body')
+          # actions/checkout clobbers the triggering tag with a lightweight one
+          # pointing at the commit (checkout#290), so %(contents:subject) would
+          # return the merge-commit subject (v0.1.8 shipped that way). Re-fetch
+          # the real annotated tag first.
+          git fetch origin --force "refs/tags/${TAG}:refs/tags/${TAG}"
           summary=$(git for-each-ref "refs/tags/${TAG}" --format='%(contents:subject)')
           { [ -n "$summary" ] && printf '%s\n\n' "$summary"; printf '%s\n' "$gen"; } > notes.md
           # The draft already exists (electron-builder created it for this tag).

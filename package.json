@@ -28,6 +28,7 @@
     "lint": "biome check . && node tools/check-app-reactivity.mjs && node tools/check-control-faces.mjs && bun tools/check-css-tokens.mjs && node tools/check-app-i18n.mjs",
     "lint:apps": "node tools/check-app-reactivity.mjs && node tools/check-control-faces.mjs && bun tools/check-css-tokens.mjs && node tools/check-app-i18n.mjs",
     "new-app": "bun tools/new-app.ts",
+    "release": "bun tools/release.mjs",
     "format": "biome format --write .",
     "verify": "bun run build:native && bun run typecheck && bun run lint:apps && bun run build:apps && bun --bun vitest run packages/shell/src/main/integration packages/shell/src/main/entities",
     "logs": "node tools/error-log.mjs",
