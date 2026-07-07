@@ -78,10 +78,13 @@ function changelogEntry(json, version) {
 // run prepare — so the changelog (and nothing else) may be dirty; the edit
 // rides along onto the release branch via `git switch`.
 function assertOnlyChangelogDirty() {
+	// NOTE: `run()` trims the whole output, which eats the FIRST line's
+	// leading status column — so parse each line by stripping the status
+	// token + whitespace rather than slicing a fixed width.
 	const dirty = run("git", ["status", "--porcelain"])
 		.split("\n")
 		.filter(Boolean)
-		.map((l) => l.slice(3));
+		.map((l) => l.trimStart().replace(/^\S+\s+/, ""));
 	const extra = dirty.filter((p) => p !== "packages/shell/changelog/changelog.json");
 	if (extra.length > 0) {
 		fail(
