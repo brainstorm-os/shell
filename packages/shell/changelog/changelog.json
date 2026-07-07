@@ -3,6 +3,101 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.1.9",
+      "date": "2026-07-07",
+      "icon": "🔔",
+      "title": "Reminders you can rely on",
+      "summary": "A quality release: task and calendar reminders now fire even when the app is closed, duplicate alerts are gone, synced attachments can be cleaned up server-side, and every known dependency vulnerability is patched.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Reminders"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks",
+              "marks": ["bold"]
+            },
+            {
+              "text": " & "
+            },
+            {
+              "text": "Calendar",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — due dates, scheduled starts, and event reminders now fire "
+            },
+            {
+              "text": "even when the app is closed",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Until now an alert only fired while its app window was open."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": "Opening the app no longer risks a duplicate — the shell and the app coordinate so each alert appears exactly once."
+        },
+        {
+          "kind": "li",
+          "text": "Alerts respect Do Not Disturb and per-app mutes, and land in the notification center like everything else."
+        },
+        {
+          "kind": "h1",
+          "text": "Under the hood"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sync",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — your devices now report which encrypted attachments they still use, so the sync node can safely reclaim storage from deleted files. Reclamation stays conservative: anything a recently-seen device references is kept."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Security",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — all 69 known dependency vulnerabilities patched, including the mail sender and the spreadsheet preview parser; the build toolchain moved to current majors."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.1.8",
       "date": "2026-07-07",
       "icon": "🔍",
