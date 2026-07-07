@@ -20,7 +20,9 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { CapabilityGrant, CapabilityLedger } from "../capabilities/ledger";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
+import type { UiNotification } from "../ui/notify-host";
 import { AUTOMATION_HOST_ENTITY_ID } from "./automation-host-designation";
+import { CALENDAR_APP_ID, EVENT_TYPE_URL, TASKS_APP_ID, TASK_TYPE_URL } from "./item-alerts";
 import type { PersistedFire, SchedulerStore } from "./scheduler-service";
 import { AUTOMATIONS_APP_ID, buildAutomationsDeployment } from "./wiring";
 
@@ -128,6 +130,7 @@ function deployment(over: {
 	const store = fakeEntitiesStore(over.seed ?? []);
 	const emitter = over.emitter ?? new EntityChangeEmitter();
 	const notified: Array<{ title: string }> = [];
+	const alerts: UiNotification[] = [];
 	const dep = buildAutomationsDeployment({
 		callEntities: store.callEntities,
 		// The interpreter ports' "ui" notify + entities all route here.
@@ -144,12 +147,13 @@ function deployment(over: {
 		schedulerStore: over.store ?? memorySchedulerStore(),
 		entityChanges: emitter,
 		notify: (n) => notified.push(n),
+		postAlert: (n) => alerts.push(n),
 		deviceId: over.deviceId ?? "device-A",
 		clock: () => T0,
 		// The drain loop timer is irrelevant here — ticks are driven directly.
 		intervals: { set: () => 0 as unknown as ReturnType<typeof setInterval>, clear: () => {} },
 	});
-	return { dep, store, emitter, notified };
+	return { dep, store, emitter, notified, alerts };
 }
 
 async function runsOf(store: ReturnType<typeof fakeEntitiesStore>): Promise<Row[]> {
@@ -210,6 +214,76 @@ describe("buildAutomationsDeployment — session-open hydration", () => {
 		expect(runs).toHaveLength(1);
 		expect(runs[0]?.properties.status).toBe(WorkflowRunStatus.Failed);
 		expect(String(runs[0]?.properties.error)).toContain("capability-denied");
+	});
+});
+
+describe("buildAutomationsDeployment — item alerts (9.14.9b)", () => {
+	const dueAt = T0 + 60_000; // timed instant — fires verbatim
+
+	it("fires a due task alert with the source app id + in-app dedupe key", async () => {
+		const { dep, alerts } = deployment({
+			seed: [
+				{ id: "task1", type: TASK_TYPE_URL, properties: { name: "Ship 0.1.9", dueAt } },
+				// Rows of other types must not derive alerts.
+				{ id: "note1", type: "brainstorm/Note/v1", properties: { name: "n", dueAt } },
+			],
+		});
+		await dep.start();
+		await dep.host.tick(dueAt);
+		expect(alerts).toEqual([
+			{
+				appId: TASKS_APP_ID,
+				title: "Ship 0.1.9",
+				body: "Due now",
+				kind: "info",
+				dedupeKey: `task1#due#${dueAt}`,
+			},
+		]);
+	});
+
+	it("fires an event reminder at its offset instant", async () => {
+		const start = T0 + 31 * 60_000;
+		const fireAt = start - 30 * 60_000; // T0 + 1min
+		const { dep, alerts } = deployment({
+			seed: [
+				{ id: "ev1", type: EVENT_TYPE_URL, properties: { title: "Standup", start, reminders: [30] } },
+			],
+		});
+		await dep.start();
+		await dep.host.tick(fireAt);
+		expect(alerts).toHaveLength(1);
+		expect(alerts[0]).toMatchObject({
+			appId: CALENDAR_APP_ID,
+			title: "Standup",
+			body: "Starts in 30 minutes",
+			dedupeKey: `ev1#${fireAt}`,
+		});
+	});
+
+	it("completing a task live-unregisters its alert before it fires", async () => {
+		const { dep, store, emitter, alerts } = deployment({
+			seed: [{ id: "task1", type: TASK_TYPE_URL, properties: { name: "Ship 0.1.9", dueAt } }],
+		});
+		await dep.start();
+		expect(dep.scheduler.registeredTriggerIds()).toEqual([`item-alert:task1#due#${dueAt}`]);
+
+		await store.callEntities("update", { id: "task1", patch: { completedAt: T0 } });
+		emitter.emit({ verb: EntityEventVerb.Update, entityId: "task1", type: TASK_TYPE_URL });
+		await vi.waitFor(() => {
+			expect(dep.scheduler.registeredTriggerIds()).toEqual([]);
+		});
+		await dep.host.tick(dueAt);
+		expect(alerts).toHaveLength(0);
+	});
+
+	it("fires each alert exactly once (a later tick does not re-fire)", async () => {
+		const { dep, alerts } = deployment({
+			seed: [{ id: "task1", type: TASK_TYPE_URL, properties: { name: "t", dueAt } }],
+		});
+		await dep.start();
+		await dep.host.tick(dueAt);
+		await dep.host.tick(dueAt + 60_000);
+		expect(alerts).toHaveLength(1);
 	});
 });
 

@@ -53,7 +53,13 @@ export type CalendarIntentEvent = {
  *  capability) simply means reminders persist but don't pop while the app
  *  is open. */
 export type UiService = {
-	notify?(notification: { title: string; body?: string; kind?: string }): Promise<void> | void;
+	notify?(notification: {
+		title: string;
+		body?: string;
+		kind?: string;
+		/** Cross-window/scheduler collapse key — see `UiNotification.dedupeKey`. */
+		dedupeKey?: string;
+	}): Promise<void> | void;
 };
 
 export type CalendarRuntime = {

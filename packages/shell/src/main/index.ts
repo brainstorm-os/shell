@@ -3740,6 +3740,10 @@ void app.whenReady().then(async () => {
 						title: n.title,
 						...(n.body !== undefined ? { body: n.body } : {}),
 					}),
+				// 9.14.9b — item alerts carry their own app id + dedupe key so
+				// they attribute to Tasks/Calendar and collapse with the same
+				// alert fired by an open app window.
+				postAlert: (n) => getUiNotifyHost().post(n),
 				deviceId: session.deviceEd25519.publicKeyBase64,
 				egress: automationsEgress,
 			});

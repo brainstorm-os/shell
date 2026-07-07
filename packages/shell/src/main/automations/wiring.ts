@@ -34,6 +34,7 @@ import {
 	reminderToProperties,
 } from "@brainstorm/sdk-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
+import type { UiNotification } from "../ui/notify-host";
 import {
 	AUTOMATION_HOST_ENTITY_ID,
 	AUTOMATION_HOST_TYPE_URL,
@@ -59,6 +60,7 @@ import {
 	type WorkflowEgress,
 	createBrokerInterpreterPorts,
 } from "./broker-interpreter-ports";
+import { EVENT_TYPE_URL, ITEM_ALERT_TYPES, TASK_TYPE_URL, deriveItemAlerts } from "./item-alerts";
 import { ReminderRunner } from "./reminder-runner";
 import { SchedulerService, type SchedulerStore } from "./scheduler-service";
 import type { WorkflowRunResult } from "./workflow-runner";
@@ -79,6 +81,12 @@ export type AutomationsWiringDeps = {
 	entityChanges: EntityChangeSource;
 	/** Reminder notification sink (the shared ui notify host). */
 	notify: (n: { title: string; body?: string }) => void;
+	/** 9.14.9b — item-alert sink: posts a full `UiNotification` (source
+	 *  app id + dedupe key) through the shared ui notify host, so a task /
+	 *  event alert fired shell-side collapses with the same alert fired by
+	 *  an open app window. Optional so existing wirings/tests stay valid;
+	 *  absent keeps item alerts silent. */
+	postAlert?: (notification: UiNotification) => void;
 	/** This device's pairing-layer identity (device Ed25519 pub, base64). */
 	deviceId: string;
 	/** 11b.8 — outbound HTTP for `HTTP` steps (Net-1 backed). Optional:
@@ -186,6 +194,7 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		clock,
 		entityChanges: deps.entityChanges,
 		onError,
+		...(deps.postAlert ? { postAlert: deps.postAlert } : {}),
 		...(deps.intervalMs !== undefined ? { intervalMs: deps.intervalMs } : {}),
 		...(deps.intervals ? { intervals: deps.intervals } : {}),
 	});
@@ -205,17 +214,22 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 	};
 
 	const hydrateFromEntities = async (): Promise<void> => {
-		const [workflows, triggers, reminders] = await Promise.all([
+		const [workflows, triggers, reminders, tasks, events] = await Promise.all([
 			entityRows(WORKFLOW_TYPE_URL),
 			entityRows(TRIGGER_TYPE_URL),
 			entityRows(REMINDER_TYPE_URL),
+			entityRows(TASK_TYPE_URL),
+			entityRows(EVENT_TYPE_URL),
 		]);
 		const registration = deriveScheduleRegistration({ workflows, triggers, reminders });
+		// 9.14.9b — task due/scheduled + event alerts ride the same schedule.
+		registration.itemAlerts = deriveItemAlerts(tasks, events, clock());
 		// Reconcile: entities are the source of truth, so a trigger persisted
 		// in `scheduler_fires` whose entity is gone/disabled must not linger.
 		const live = new Set([
 			...registration.workflows.map((w) => w.triggerId),
 			...registration.reminders.map((r) => r.reminderId),
+			...registration.itemAlerts.map((a) => a.alertId),
 		]);
 		for (const staleId of scheduler.registeredTriggerIds()) {
 			if (!live.has(staleId)) await scheduler.unregister(staleId);
@@ -286,7 +300,8 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		await hydrateFromEntities();
 		host.start();
 		unsubscribeRehydrate = deps.entityChanges.subscribe((change) => {
-			if (AUTOMATION_SCHEDULE_TYPES.includes(change.type)) scheduleRehydrate();
+			if (AUTOMATION_SCHEDULE_TYPES.includes(change.type) || ITEM_ALERT_TYPES.includes(change.type))
+				scheduleRehydrate();
 			else if (
 				change.type === AUTOMATION_HOST_TYPE_URL ||
 				change.entityId === AUTOMATION_HOST_ENTITY_ID
