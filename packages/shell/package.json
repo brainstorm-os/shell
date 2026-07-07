@@ -191,7 +191,7 @@
     "imapflow": "^1.4.0",
     "linkedom": "^0.18.12",
     "mailparser": "^3.9.9",
-    "nodemailer": "^8.0.11",
+    "nodemailer": "^9.0.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -214,7 +214,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "electron": "41",
     "electron-builder": "^26.0.0",
-    "electron-vite": "^2.3.0",
-    "vite": "^5.4.0"
+    "electron-vite": "^5.0.0",
+    "vite": "^6.4.3"
   }
 }

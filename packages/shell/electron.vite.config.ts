@@ -44,12 +44,17 @@ export default defineConfig(({ command }) => {
 			},
 		},
 		preload: {
-			// No `externalizeDepsPlugin` for the preload. The sandboxed preload
-			// runtime cannot resolve `require()`; every dependency the preload
-			// (or anything it imports — `@brainstorm/sdk`, `ulid`, etc.) needs
+			// No dependency externalization for the preload. The sandboxed
+			// preload runtime cannot resolve `require()`; every dependency the
+			// preload (or anything it imports — `@brainstorm/sdk`, `ulid`, etc.)
 			// must be inlined into the bundle. Electron + node built-ins are
-			// already considered external by Vite's preload preset.
+			// already considered external by Vite's preload preset. Since
+			// electron-vite 5, omitting `externalizeDepsPlugin` is NOT enough —
+			// the plugin is auto-applied unless `externalizeDeps: false` (a bare
+			// `require("@brainstorm/sdk-types")` in out/preload kills
+			// `window.brainstorm` in every sandboxed window).
 			build: {
+				externalizeDeps: false,
 				outDir: "out/preload",
 				minify,
 				sourcemap: true,
