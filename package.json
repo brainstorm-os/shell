@@ -5,7 +5,11 @@
   "description": "Brainstorm — knowledge-management product modeled as a desktop OS.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*", "tools/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
   "scripts": {
     "predev": "bun run build:native",
     "dev": "bun run --elide-lines=100 --filter @brainstorm/shell dev",
@@ -63,7 +67,7 @@
     "vite": "^6.4.3",
     "vitest": "^4.1.5"
   },
-  "overrides": {
-    "nodemailer": "^9.0.1"
+  "dependencies": {
+    "@types/imapflow": "^1.0.189"
   }
 }
