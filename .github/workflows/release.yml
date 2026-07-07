@@ -20,7 +20,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
-      fail-fast: false
+      # Stop every leg on the first failure — a broken release build should
+      # fail in minutes, not keep the other runners burning for half an hour
+      # (requested 2026-07-07 after the v0.1.9 packaging failure). A re-run
+      # of a transient single-leg flake rebuilds all legs; acceptable.
+      fail-fast: true
       # Mirror of ci.yml's matrix. Keep the two in sync; if a runner is
       # added/removed, mirror in both.
       matrix:
