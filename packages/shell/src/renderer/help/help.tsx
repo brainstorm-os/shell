@@ -195,7 +195,7 @@ export function Help({
 						{onOpenWhatsNew && (
 							<Button
 								variant={ButtonVariant.Ghost}
-								size={ButtonSize.Sm}
+								size={ButtonSize.Md}
 								iconLeft={IconName.Sparkle}
 								onClick={onOpenWhatsNew}
 								data-testid="help-open-whats-new"
@@ -205,7 +205,7 @@ export function Help({
 						)}
 						<Button
 							variant={ButtonVariant.Ghost}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() => setFeedbackOpen(true)}
 							data-testid="help-send-feedback"
 						>
