@@ -28,18 +28,30 @@ export enum AssetWireKind {
 	Has = "has",
 	Put = "put",
 	Get = "get",
+	/** Asset-B6 — a device's full-set ref report (idempotent replace). */
+	Refs = "refs",
 }
+
+/** Bounds on the Refs identity strings — mirrors the node's validation
+ *  (the account is a base64url pubkey ≤ ~64 chars; the device id is a
+ *  client-minted opaque id). */
+const MAX_ACCOUNT_CHARS = 256;
+const MAX_DEVICE_CHARS = 128;
+const HEX_HASH_CHARS = 64;
+const HEX_HASH_RE = /^[0-9a-f]{64}$/;
 
 export type AssetRequest =
 	| { kind: AssetWireKind.Has; hash: string }
 	| { kind: AssetWireKind.Put; hash: string; chunk: Uint8Array }
-	| { kind: AssetWireKind.Get; hash: string };
+	| { kind: AssetWireKind.Get; hash: string }
+	| { kind: AssetWireKind.Refs; account: string; device: string; hashes: string[] };
 
 export type AssetResponse =
 	| { kind: AssetWireKind.Has; present: boolean }
 	| { kind: AssetWireKind.Put; ok: boolean }
 	| { kind: AssetWireKind.Get; found: false }
-	| { kind: AssetWireKind.Get; found: true; chunk: Uint8Array };
+	| { kind: AssetWireKind.Get; found: true; chunk: Uint8Array }
+	| { kind: AssetWireKind.Refs; ok: boolean; count: number };
 
 function invalid(message: string): Error {
 	const err = new Error(message);
@@ -81,14 +93,59 @@ function unframe(bytes: Uint8Array): { header: Record<string, unknown>; chunk: U
 	return { header: header as Record<string, unknown>, chunk: bytes.subarray(4 + headerLen) };
 }
 
-const KINDS = new Set<string>([AssetWireKind.Has, AssetWireKind.Put, AssetWireKind.Get]);
+const KINDS = new Set<string>([
+	AssetWireKind.Has,
+	AssetWireKind.Put,
+	AssetWireKind.Get,
+	AssetWireKind.Refs,
+]);
 
 function requireHash(h: unknown): string {
 	if (typeof h !== "string" || h.length === 0) throw invalid("asset frame: missing hash");
 	return h;
 }
 
+function nonEmptyString(v: unknown, max: number): v is string {
+	return typeof v === "string" && v.length > 0 && v.length <= max;
+}
+
+/** Asset-B6 — the ref-set rides as the trailing chunk: concatenated 64-hex
+ *  ASCII addresses (a large report never bloats the JSON header). */
+function encodeRefSet(hashes: readonly string[]): Uint8Array {
+	for (const h of hashes) {
+		if (!HEX_HASH_RE.test(h)) throw invalid("asset request: ref-set entry must be 64-hex");
+	}
+	return new TextEncoder().encode(hashes.join(""));
+}
+
+function decodeRefSet(chunk: Uint8Array): string[] {
+	if (chunk.length % HEX_HASH_CHARS !== 0) {
+		throw invalid("asset request: ref-set length must be a multiple of 64");
+	}
+	const text = new TextDecoder().decode(chunk);
+	const hashes: string[] = [];
+	for (let i = 0; i < text.length; i += HEX_HASH_CHARS) {
+		const hash = text.slice(i, i + HEX_HASH_CHARS);
+		if (!HEX_HASH_RE.test(hash)) throw invalid("asset request: ref-set entry must be 64-hex");
+		hashes.push(hash);
+	}
+	return hashes;
+}
+
+/** The encoded size of a Refs frame for `count` hashes — lets the sender
+ *  refuse to build a frame past the transport's ceiling BEFORE allocating
+ *  it. Mirrors `frame()`: u32 prefix + JSON header + 64 ASCII bytes/hash. */
+export function refsFrameBytes(account: string, device: string, count: number): number {
+	const headerBytes = new TextEncoder().encode(
+		JSON.stringify({ k: AssetWireKind.Refs, account, device }),
+	).length;
+	return 4 + headerBytes + count * HEX_HASH_CHARS;
+}
+
 export function encodeAssetRequest(req: AssetRequest): Uint8Array {
+	if (req.kind === AssetWireKind.Refs) {
+		return frame({ k: req.kind, account: req.account, device: req.device }, encodeRefSet(req.hashes));
+	}
 	if (req.kind === AssetWireKind.Put) {
 		return frame({ k: req.kind, hash: req.hash }, req.chunk);
 	}
@@ -99,6 +156,20 @@ export function decodeAssetRequest(bytes: Uint8Array): AssetRequest {
 	const { header, chunk } = unframe(bytes);
 	const k = header.k;
 	if (typeof k !== "string" || !KINDS.has(k)) throw invalid(`asset request: bad kind ${String(k)}`);
+	if (k === AssetWireKind.Refs) {
+		if (!nonEmptyString(header.account, MAX_ACCOUNT_CHARS)) {
+			throw invalid("asset request: refs needs an account");
+		}
+		if (!nonEmptyString(header.device, MAX_DEVICE_CHARS)) {
+			throw invalid("asset request: refs needs a device id");
+		}
+		return {
+			kind: AssetWireKind.Refs,
+			account: header.account,
+			device: header.device,
+			hashes: decodeRefSet(chunk),
+		};
+	}
 	const hash = requireHash(header.hash);
 	if (k === AssetWireKind.Put)
 		return { kind: AssetWireKind.Put, hash, chunk: new Uint8Array(chunk) };
@@ -112,6 +183,9 @@ export function encodeAssetResponse(res: AssetResponse): Uint8Array {
 	}
 	if (res.kind === AssetWireKind.Get) return frame({ k: res.kind, found: false });
 	if (res.kind === AssetWireKind.Has) return frame({ k: res.kind, present: res.present });
+	if (res.kind === AssetWireKind.Refs) {
+		return frame({ k: res.kind, ok: res.ok, count: res.count });
+	}
 	return frame({ k: res.kind, ok: res.ok });
 }
 
@@ -120,6 +194,13 @@ export function decodeAssetResponse(bytes: Uint8Array): AssetResponse {
 	const k = header.k;
 	if (k === AssetWireKind.Has) return { kind: AssetWireKind.Has, present: header.present === true };
 	if (k === AssetWireKind.Put) return { kind: AssetWireKind.Put, ok: header.ok === true };
+	if (k === AssetWireKind.Refs) {
+		return {
+			kind: AssetWireKind.Refs,
+			ok: header.ok === true,
+			count: typeof header.count === "number" && Number.isFinite(header.count) ? header.count : 0,
+		};
+	}
 	if (k === AssetWireKind.Get) {
 		return header.found === true
 			? { kind: AssetWireKind.Get, found: true, chunk: new Uint8Array(chunk) }
@@ -172,6 +253,11 @@ export class WireAssetCas implements AssetCas {
  *  by both ends. */
 export async function serveAssetRequest(cas: AssetCas, request: Uint8Array): Promise<Uint8Array> {
 	const req = decodeAssetRequest(request);
+	if (req.kind === AssetWireKind.Refs) {
+		// The plain-CAS responder has no GC plane — same fail-shape as the
+		// node without one (the real node's copy routes to its GC hooks).
+		throw invalid("asset request: refs unsupported (no GC plane)");
+	}
 	if (req.kind === AssetWireKind.Has) {
 		return encodeAssetResponse({ kind: AssetWireKind.Has, present: await cas.has(req.hash) });
 	}
