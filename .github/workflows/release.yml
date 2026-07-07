@@ -161,7 +161,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG=$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 1 --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft)][0].tagName')
           # GitHub auto-picks the previous release for the diff; the "What's
           # Changed" body lists every merged PR since it. Prepend the tag's
           # annotation subject as a one-line human summary when present.
