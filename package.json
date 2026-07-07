@@ -8,7 +8,7 @@
   "workspaces": ["packages/*", "apps/*", "tools/*"],
   "scripts": {
     "predev": "bun run build:native",
-    "dev": "bun run --filter @brainstorm/shell dev",
+    "dev": "bun run --elide-lines=100 --filter @brainstorm/shell dev",
     "build": "bun run build:native && bun run --filter '*' build",
     "build:shell": "bun run build:native && bun run --filter @brainstorm/shell build",
     "build:apps": "bun run --filter './apps/*' build",
