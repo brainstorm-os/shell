@@ -1,6 +1,6 @@
 {
   "name": "brainstorm",
-  "version": "0.1.8",
+  "version": "0.1.7",
   "private": true,
   "description": "Brainstorm — knowledge-management product modeled as a desktop OS.",
   "license": "AGPL-3.0-or-later",
