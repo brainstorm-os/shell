@@ -644,6 +644,10 @@ export function CalendarApp() {
 						due.minutes <= 0
 							? t("calendar.reminder.notify.bodyAtStart")
 							: t("calendar.reminder.notify.body", { label: reminderOffsetLabel(due.minutes) }),
+					// Collapses with the same alert fired by another window or by
+					// the shell-side scheduler (9.14.9b) — the notify host dedupes
+					// on (appId, dedupeKey).
+					dedupeKey: due.dedupeKey,
 				});
 			},
 		});

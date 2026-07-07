@@ -26,6 +26,8 @@ import {
 	aggregateWorkflowCapabilities,
 	missingCapabilities,
 } from "@brainstorm/sdk-types";
+import type { UiNotification } from "../ui/notify-host";
+import type { ItemAlertRegistration } from "./item-alerts";
 import type { ReminderRunner } from "./reminder-runner";
 import type { SchedulerService } from "./scheduler-service";
 import { type InterpreterPorts, createCoreInterpreters } from "./step-interpreters";
@@ -66,6 +68,12 @@ export type ScheduleRegistration = {
 	 *  both the scheduler trigger id and the routing key. Optional so prior
 	 *  callers (pre-connector) need no change. */
 	syncMappings?: Array<{ mappingId: string; config: TimeTriggerConfig | null }>;
+	/** 9.14.9b — task due/scheduled + calendar event alerts derived from the
+	 *  vault's Task/Event rows, so they fire with the app closed. The
+	 *  notification is precomputed at derive time; a task/event write
+	 *  re-derives (the wiring's rehydrate), so e.g. a completed task's alert
+	 *  unregisters instead of firing stale. Optional like `syncMappings`. */
+	itemAlerts?: ItemAlertRegistration[];
 };
 
 /** Connector-4 — drives one `SyncMapping`'s pull (→ `connectors.sync`). */
@@ -90,6 +98,10 @@ export type AutomationsHostPorts = {
 	reminderRunner: ReminderRunner;
 	/** Connector-4 — the sync engine a `SyncMapping` fire routes to. */
 	connectorSync?: ConnectorSyncPort;
+	/** 9.14.9b — posts a due item alert through the shared ui notify host.
+	 *  Absent keeps item alerts registered but silent (tests / partial
+	 *  wirings), mirroring `connectorSync`'s optionality. */
+	postAlert?(notification: UiNotification): void;
 	/** Load a workflow's steps + frozen caps, or `null` if gone/disabled. */
 	loadWorkflow(workflowId: string): Promise<LoadedWorkflow | null>;
 	/** Build interpreter ports scoped to a workflow's caps (three-tier). */
@@ -116,6 +128,7 @@ const DEFAULT_INTERVAL_MS = 5_000;
 export class AutomationsHost {
 	private readonly reminderIds = new Set<string>();
 	private readonly syncMappingIds = new Set<string>();
+	private readonly itemAlertsById = new Map<string, UiNotification>();
 	private entityEvents: EntityEventTrigger[] = [];
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private unsubscribe: (() => void) | null = null;
@@ -133,6 +146,7 @@ export class AutomationsHost {
 		// routing set (a stale id could mis-route a later workflow fire).
 		this.reminderIds.clear();
 		this.syncMappingIds.clear();
+		this.itemAlertsById.clear();
 		this.entityEvents = [...registration.entityEvents];
 		for (const w of registration.workflows) {
 			if (w.config) await this.ports.scheduler.register(w.triggerId, [w.workflowId], w.config, now);
@@ -144,6 +158,10 @@ export class AutomationsHost {
 		for (const m of registration.syncMappings ?? []) {
 			this.syncMappingIds.add(m.mappingId);
 			if (m.config) await this.ports.scheduler.register(m.mappingId, [m.mappingId], m.config, now);
+		}
+		for (const a of registration.itemAlerts ?? []) {
+			this.itemAlertsById.set(a.alertId, a.notification);
+			await this.ports.scheduler.register(a.alertId, [a.alertId], a.config, now);
 		}
 	}
 
@@ -182,7 +200,14 @@ export class AutomationsHost {
 			return;
 		}
 		for (const fire of fires) {
-			if (this.syncMappingIds.has(fire.workflowId)) {
+			const alert = this.itemAlertsById.get(fire.workflowId);
+			if (alert) {
+				try {
+					this.ports.postAlert?.(alert);
+				} catch (e) {
+					this.fail(`item alert ${fire.workflowId}`, e);
+				}
+			} else if (this.syncMappingIds.has(fire.workflowId)) {
 				if (this.ports.connectorSync) {
 					await this.ports.connectorSync
 						.runSync(fire.workflowId)
