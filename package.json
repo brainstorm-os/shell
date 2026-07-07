@@ -1,11 +1,15 @@
 {
   "name": "brainstorm",
-  "version": "0.0.1",
+  "version": "0.1.8",
   "private": true,
   "description": "Brainstorm — knowledge-management product modeled as a desktop OS.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*", "tools/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
   "scripts": {
     "predev": "bun run build:native",
     "dev": "bun run --filter @brainstorm/shell dev",
