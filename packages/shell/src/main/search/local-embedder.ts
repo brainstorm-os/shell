@@ -172,7 +172,12 @@ export async function loadFastembedEmbedder(
 		const native = (await import(/* @vite-ignore */ specifier)) as Partial<EmbedNative>;
 		return makeEmbedderFromNative(native, cacheDir, onStatus);
 	} catch (error) {
-		console.warn("[search] native embedder unavailable; semantic search disabled:", error);
+		// An expected degrade in dev (the addon is release-only), so one honest
+		// line — not a 20-line MODULE_NOT_FOUND stack that reads like a crash.
+		const reason = (error as Error).message?.split("\n")[0] ?? String(error);
+		console.warn(
+			`[search] native embedder unavailable; semantic search disabled (lexical-only). ${reason} — dev: \`bun run build:native-embed:release\` to enable.`,
+		);
 		return null;
 	}
 }

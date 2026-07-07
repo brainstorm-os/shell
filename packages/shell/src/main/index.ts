@@ -64,6 +64,7 @@ import { AssetKind } from "./assets/asset-types";
 import { materializeAssetOnServe } from "./assets/materialize-on-serve";
 import { reconstructAssetMetadata } from "./assets/reconstruct-assets";
 import { recoverAssetDek } from "./assets/recover-asset-dek";
+import { RefReportOutcome, sendAssetRefReport } from "./assets/ref-report";
 import { relayAssetCas } from "./assets/relay-asset-cas";
 import { resolveAssetForServe } from "./assets/serve-asset";
 import { serveVaultMedia } from "./assets/serve-media";
@@ -926,6 +927,29 @@ async function drainAssetUploads(): Promise<void> {
 			console.log(
 				`[brainstorm] asset upload drain: uploaded ${r.uploaded} (${r.alreadyPresent} present, ${r.notLocal} not-local, ${r.noDek} no-dek, ${r.quotaExceeded} quota-skipped, ${r.failed} failed)`,
 			);
+		}
+		// Asset-B6b — after the drain converges the node's copy, report this
+		// device's FULL chunk ref-set for the node-side GC ledger. Same
+		// transport, same pairs; the sender fails closed toward retention
+		// (skip on oversize, abort on any manifest read failure).
+		const requestAsset = relay.requestAsset?.bind(relay);
+		if (requestAsset) {
+			const report = await sendAssetRefReport({
+				listPairs: () => pairs,
+				readManifest: async (e, a) =>
+					(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
+				send: requestAsset,
+				account: Buffer.from(session.identity.publicKey).toString("base64url"),
+				device: session.deviceEd25519.publicKeyBase64,
+			});
+			if (report.outcome === RefReportOutcome.Sent) {
+				console.log(
+					`[brainstorm] asset ref report: ${report.hashes} chunk refs (${report.pendingManifests} pairs pending upload)`,
+				);
+			} else if (report.outcome === RefReportOutcome.Rejected) {
+				console.warn("[brainstorm] asset ref report: node did not ack the report");
+			}
+			// TooLarge / Aborted already logged by the sender.
 		}
 	} catch (error) {
 		console.warn(`[brainstorm] asset upload drain failed: ${(error as Error).message}`);
