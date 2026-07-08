@@ -116,13 +116,15 @@ describe("renderSidebar — create project + inline rename (F-035)", () => {
 		expect(aside.querySelector(".tasks-sidebar__group--projects .tasks-sidebar__label")).toBeNull();
 	});
 
-	it("commits the typed name on Enter and cancels (keeps name) on Escape", () => {
+	it("commits the typed name on Enter and cancels (keeps name) on Escape", async () => {
 		const onRenameProject = vi.fn();
 		const aside = renderSidebar(baseProps({ renamingProjectId: "p1", onRenameProject }));
 		const input = aside.querySelector<HTMLInputElement>(".tasks-sidebar__rename-input");
 		if (!input) throw new Error("no rename input");
 		input.value = "Newsletter";
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		// The rename is deferred out of the key/blur dispatch (F-254).
+		await Promise.resolve();
 		expect(onRenameProject).toHaveBeenCalledWith("p1", "Newsletter");
 
 		const aside2 = renderSidebar(
@@ -131,6 +133,7 @@ describe("renderSidebar — create project + inline rename (F-035)", () => {
 		const input2 = aside2.querySelector<HTMLInputElement>(".tasks-sidebar__rename-input");
 		input2?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 		// Escape commits an empty string → the app keeps the existing name.
+		await Promise.resolve();
 		expect(onRenameProject).toHaveBeenLastCalledWith("p1", "");
 	});
 });
