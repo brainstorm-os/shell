@@ -101,7 +101,7 @@ import { makeBpGraphRouter } from "./bp/graph-router";
 import { makeBpHookRouter } from "./bp/hook-router";
 import { makeBpRouter } from "./bp/router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import { resolveMembers } from "./collab/access-record";
+import { isAuthorizedWriter, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
@@ -250,6 +250,7 @@ import { LinkPreviewCache } from "./network/preview-cache";
 import { schedulePreviewCachePrune } from "./network/preview-cache-scheduler";
 import { DEFAULT_ON_PRIVACY } from "./network/privacy-config";
 import { DEFAULT_PROXY_CONFIG } from "./network/proxy-config";
+import { base64UrlToBytes } from "./pairing/pairing-channel";
 import { makePlatformServiceHandler } from "./platform/platform-service";
 import { makePropertiesServiceHandler } from "./properties/properties-service";
 import { UsageIndex } from "./properties/usage-index";
@@ -2731,6 +2732,27 @@ void app.whenReady().then(async () => {
 						const { doc } = await session.ydocStore.load(entityId);
 						try {
 							return resolveMembers(doc, entityId).filter((m) => m.active).length > 1;
+						} catch {
+							return false;
+						} finally {
+							doc.destroy();
+						}
+					},
+					// Collab-C5 (F-288) — a remote update applies only if its
+					// authenticated sender is an Editor+ member of the entity;
+					// a Viewer's signed edit drops here. Reads the same persisted
+					// access record `isShared` does. Fail-closed on any error (a
+					// doc we can't read the record from doesn't get written to).
+					authorizeWriter: async (senderPubB64, entityId) => {
+						let senderKey: Uint8Array;
+						try {
+							senderKey = base64UrlToBytes(senderPubB64);
+						} catch {
+							return false;
+						}
+						const { doc } = await session.ydocStore.load(entityId);
+						try {
+							return isAuthorizedWriter(doc, entityId, senderKey);
 						} catch {
 							return false;
 						} finally {

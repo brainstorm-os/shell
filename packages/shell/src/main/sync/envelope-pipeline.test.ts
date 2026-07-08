@@ -474,6 +474,74 @@ describe("revocation enforcement (Stage 10.5c, OQ-203)", () => {
 		expect(verifyCalls.length).toBe(0); // sig-verify never ran.
 	});
 
+	it("receiveAndApply applies an update when authorizeWriter allows (Editor)", async () => {
+		const [aRelay, bRelay] = LoopbackRelayPort.pair(2);
+		if (!aRelay || !bRelay) throw new Error("missing relay ports");
+		const dekStore = new FakeDekStore();
+		dekStore.mint("ent_authz");
+		const entities = new Map([["ent_authz", { id: "ent_authz", type: "T" }]]);
+		const aCtx = makeCtx({ dekStore, relay: aRelay, entities });
+		const bCtx: PipelineContext = {
+			...makeCtx({ dekStore, relay: bRelay, entities }),
+			devicePub: aCtx.devicePub,
+			deviceSign: aCtx.deviceSign,
+			deviceVerify: (sig, bytes, senderPub) => ed25519.verify(sig, bytes, senderPub),
+			authorizeWriter: () => true,
+		};
+		let frameSeen: Uint8Array | null = null;
+		bRelay.onFrame((f) => {
+			frameSeen = f;
+		});
+		await encryptAndEmit("ent_authz", new Uint8Array([9, 9, 9]), aCtx);
+		await flushMicrotasks();
+		if (!frameSeen) throw new Error("expected a frame on B");
+		let applied: Uint8Array | null = null;
+		await receiveAndApply(frameSeen, bCtx, (plaintext) => {
+			applied = plaintext;
+		});
+		expect(applied).toEqual(new Uint8Array([9, 9, 9]));
+	});
+
+	it("receiveAndApply throws Unauthorized and never applies when authorizeWriter denies (Viewer, F-288)", async () => {
+		const [aRelay, bRelay] = LoopbackRelayPort.pair(2);
+		if (!aRelay || !bRelay) throw new Error("missing relay ports");
+		const dekStore = new FakeDekStore();
+		dekStore.mint("ent_authz");
+		const entities = new Map([["ent_authz", { id: "ent_authz", type: "T" }]]);
+		const aCtx = makeCtx({ dekStore, relay: aRelay, entities });
+		const seenSenders: string[] = [];
+		const bCtx: PipelineContext = {
+			...makeCtx({ dekStore, relay: bRelay, entities }),
+			devicePub: aCtx.devicePub,
+			deviceSign: aCtx.deviceSign,
+			deviceVerify: (sig, bytes, senderPub) => ed25519.verify(sig, bytes, senderPub),
+			authorizeWriter: (senderB64, entityId) => {
+				seenSenders.push(`${senderB64}:${entityId}`);
+				return false; // a Viewer: authenticated, but not an authorized writer.
+			},
+		};
+		let frameSeen: Uint8Array | null = null;
+		bRelay.onFrame((f) => {
+			frameSeen = f;
+		});
+		await encryptAndEmit("ent_authz", new Uint8Array([1, 2, 3]), aCtx);
+		await flushMicrotasks();
+		if (!frameSeen) throw new Error("expected a frame on B");
+		let applied = false;
+		let thrown: Error | null = null;
+		try {
+			await receiveAndApply(frameSeen, bCtx, () => {
+				applied = true;
+			});
+		} catch (error) {
+			thrown = error as Error;
+		}
+		expect(thrown?.name).toBe("Unauthorized");
+		expect(applied).toBe(false); // the plaintext was NEVER handed to applyUpdate.
+		expect(seenSenders).toHaveLength(1); // authorization consulted post-verify.
+		expect(seenSenders[0]).toContain(":ent_authz");
+	});
+
 	it("receiveAndApply passes through when isDeviceRevoked returns false", async () => {
 		const [aRelay, bRelay] = LoopbackRelayPort.pair(2);
 		if (!aRelay || !bRelay) throw new Error("missing relay ports");

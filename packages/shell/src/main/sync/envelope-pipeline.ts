@@ -94,6 +94,20 @@ export type PipelineContext = {
 	 */
 	isDeviceRevoked?: (senderPub: Uint8Array) => boolean;
 	/**
+	 * Collab-C5 (F-288) — writer-role enforcement. Consulted AFTER the
+	 * inbound envelope's signature + AEAD verify (so the sender genuinely
+	 * holds the claimed key) and BEFORE the plaintext is applied: `false`
+	 * ⇒ the update drops with an `Unauthorized` named error. This is what
+	 * makes a Viewer read-only at the DATA layer — a Viewer holds the DEK
+	 * (they can read) and can sign, so nothing else stops their write.
+	 * `senderPubB64` is the header sender (base64url); `resolvedEntityId`
+	 * is the real entity id (post routing-token resolution). Optional +
+	 * fail-open when absent (back-compat: loopback/dev/soak paths that
+	 * carry no access record skip it); production wires it to the entity's
+	 * signed access record (role ≥ Editor).
+	 */
+	authorizeWriter?: (senderPubB64: string, resolvedEntityId: string) => boolean | Promise<boolean>;
+	/**
 	 * Stage 10.7 — traffic-tick hooks for the sync-status surface. Fired
 	 * AFTER a successful `relay.send(frame)` / `applyUpdate(...)` /
 	 * `onAwarenessUpdate(...)` / `onWrapAccepted(...)`; **NOT** fired on
@@ -234,6 +248,15 @@ export async function receiveAndApply(
 			verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
 			...routedBinding(decoded.header.entityId, resolved.id, ctx),
 		});
+		// Collab-C5 (F-288) — authenticated, now authorize: a Viewer holds
+		// the DEK and a valid signature, so only the signed access record
+		// stops their write. Checked here, after verify, before apply.
+		if (ctx.authorizeWriter && !(await ctx.authorizeWriter(decoded.header.sender, resolved.id))) {
+			throw named(
+				"Unauthorized",
+				`envelope-pipeline: sender ${decoded.header.sender} is not an authorized writer of ${resolved.id}`,
+			);
+		}
 		await applyUpdate(plaintext);
 		ctx.onReceived?.(frame.byteLength);
 	} finally {

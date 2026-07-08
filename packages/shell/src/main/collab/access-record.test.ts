@@ -14,6 +14,7 @@ import {
 	getAccessArray,
 	grantAccess,
 	isActiveMember,
+	isAuthorizedWriter,
 	resolveCurrentMembers,
 	resolveMembers,
 	revokeAccess,
@@ -309,5 +310,80 @@ describe("access-record — signed X25519 wrapping key (collection-sharing, desi
 		const member = firstMember(resolveCurrentMembers(doc, ENT));
 		expect(member.x25519).toBeNull();
 		expect(member.grantValid).toBe(true);
+	});
+});
+
+describe("isAuthorizedWriter (Collab-C5 / F-288)", () => {
+	// The wire sender key is the raw Ed25519 public-key bytes; grants store it
+	// as std base64 (person().pub). We authorize by comparing decoded bytes, so
+	// tests pass the raw bytes the pipeline would decode from the header.
+	function seed(role: AccessRole) {
+		const doc = new Y.Doc();
+		const owner = generateIdentity();
+		const collaborator = generateIdentity();
+		// Owner self-grant (as SharingEngine.provisionEntity does), then the member.
+		grantAccess(doc, {
+			entityId: ENT,
+			member: publicKeyToBase64(owner.publicKey),
+			role: AccessRole.Owner,
+			signerSecret: owner.secretKey,
+			now: 1000,
+		});
+		grantAccess(doc, {
+			entityId: ENT,
+			member: publicKeyToBase64(collaborator.publicKey),
+			role,
+			signerSecret: owner.secretKey,
+			now: 2000,
+		});
+		return { doc, owner, collaborator };
+	}
+
+	it("authorizes an Editor member's writes", () => {
+		const { doc, collaborator } = seed(AccessRole.Editor);
+		expect(isAuthorizedWriter(doc, ENT, collaborator.publicKey)).toBe(true);
+	});
+
+	it("authorizes the Owner's own writes", () => {
+		const { doc, owner } = seed(AccessRole.Editor);
+		expect(isAuthorizedWriter(doc, ENT, owner.publicKey)).toBe(true);
+	});
+
+	it("DENIES a Viewer member's writes (F-288)", () => {
+		const { doc, collaborator } = seed(AccessRole.Viewer);
+		expect(isAuthorizedWriter(doc, ENT, collaborator.publicKey)).toBe(false);
+	});
+
+	it("denies a non-member (unshared entity / stranger)", () => {
+		const { doc } = seed(AccessRole.Editor);
+		const stranger = generateIdentity();
+		expect(isAuthorizedWriter(doc, ENT, stranger.publicKey)).toBe(false);
+	});
+
+	it("denies a revoked member (revoke ⇒ no writes)", () => {
+		const { doc, owner, collaborator } = seed(AccessRole.Editor);
+		revokeAccess(doc, {
+			entityId: ENT,
+			member: publicKeyToBase64(collaborator.publicKey),
+			signerSecret: owner.secretKey,
+			now: 3000,
+		});
+		expect(isAuthorizedWriter(doc, ENT, collaborator.publicKey)).toBe(false);
+	});
+
+	it("re-authorizes a Viewer promoted to Editor (revoke → re-grant, the real upgrade path)", () => {
+		const { doc, owner, collaborator } = seed(AccessRole.Viewer);
+		const memberB64 = publicKeyToBase64(collaborator.publicKey);
+		expect(isAuthorizedWriter(doc, ENT, collaborator.publicKey)).toBe(false);
+		// A live grant is idempotent, so a role change goes revoke → re-grant.
+		revokeAccess(doc, { entityId: ENT, member: memberB64, signerSecret: owner.secretKey, now: 3500 });
+		grantAccess(doc, {
+			entityId: ENT,
+			member: memberB64,
+			role: AccessRole.Editor,
+			signerSecret: owner.secretKey,
+			now: 4000,
+		});
+		expect(isAuthorizedWriter(doc, ENT, collaborator.publicKey)).toBe(true);
 	});
 });
