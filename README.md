@@ -16,6 +16,7 @@
   <a href="https://github.com/brainstorm-os/shell/releases"><img src="https://img.shields.io/github/downloads/brainstorm-os/shell/total?color=e11d48" alt="Total downloads"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/github/license/brainstorm-os/shell" alt="License: AGPL-3.0-or-later"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-555" alt="Platforms: macOS, Windows, Linux">
+  <a href="https://deepwiki.com/brainstorm-os/shell"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 <p align="center">
