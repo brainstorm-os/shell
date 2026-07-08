@@ -3,6 +3,117 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.2.0",
+      "date": "2026-07-08",
+      "icon": "👥",
+      "title": "Share your work",
+      "summary": "Invite teammates to any note or collection, give them Editor or Viewer access, and edit together — changes sync live, end-to-end encrypted, with the relay never seeing your content. Viewers are now truly read-only.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Sharing & permissions"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Share",
+              "marks": ["bold"]
+            },
+            {
+              "text": " any note or collection from its "
+            },
+            {
+              "text": "⋯ menu",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — add a teammate by their invite code or by name, and see everyone with access at a glance."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Roles",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — grant "
+            },
+            {
+              "text": "Editor",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " (can change) or "
+            },
+            {
+              "text": "Viewer",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " (read-only) access, and revoke it any time. A Viewer's edits are now blocked at the data layer, not just hidden — so read-only means read-only."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Live editing",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — once shared, edits flow both ways in real time, converging cleanly even after you've both been offline."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔒",
+          "text": [
+            {
+              "text": "Still yours alone. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Everything is encrypted per-entity on your devices; the sync relay only ever sees ciphertext, never your content or who you're working with."
+            }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": [
+            {
+              "text": "One note on removing access: revoking a teammate stops future grants and hides the entity from them, but does not yet rotate the encryption key. A removed collaborator who already has the key can still read edits made after they're removed. Full rotate-on-revoke (new key, re-shared only with remaining members) is coming in a follow-up."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.1.9",
       "date": "2026-07-07",
       "icon": "🔔",
