@@ -38,22 +38,38 @@ describe("beginInlineEdit", () => {
 		expect(label.isConnected).toBe(false);
 	});
 
-	it("commits the trimmed, changed value on Enter and restores the label", () => {
+	it("commits the trimmed, changed value on Enter and restores the label", async () => {
 		const { label } = mountLabel("Original");
 		const { input, onCommit } = open(label);
 		input.value = "  Renamed  ";
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-		expect(onCommit).toHaveBeenCalledWith("Renamed");
+		// The DOM restore is synchronous; the reactive onCommit is deferred (F-254).
 		expect(label.isConnected).toBe(true);
 		expect(label.textContent).toBe("Renamed");
+		await Promise.resolve();
+		expect(onCommit).toHaveBeenCalledWith("Renamed");
 	});
 
-	it("commits on blur", () => {
+	it("commits on blur", async () => {
 		const { label } = mountLabel("Original");
 		const { input, onCommit } = open(label);
 		input.value = "Done";
 		input.dispatchEvent(new FocusEvent("blur"));
+		await Promise.resolve();
 		expect(onCommit).toHaveBeenCalledWith("Done");
+	});
+
+	it("defers onCommit OUT of the blur dispatch, restoring the label synchronously (F-254)", async () => {
+		const { label } = mountLabel("Original");
+		const { input, onCommit } = open(label);
+		input.value = "Renamed";
+		input.dispatchEvent(new FocusEvent("blur"));
+		// The label is back in the DOM immediately; onCommit (which re-renders the
+		// host) has NOT fired inside the blur event — that's the race this avoids.
+		expect(label.isConnected).toBe(true);
+		expect(onCommit).not.toHaveBeenCalled();
+		await Promise.resolve();
+		expect(onCommit).toHaveBeenCalledWith("Renamed");
 	});
 
 	it("does not commit an unchanged value", () => {

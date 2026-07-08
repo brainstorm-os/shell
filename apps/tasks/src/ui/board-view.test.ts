@@ -120,7 +120,7 @@ describe("renderBoardView inline add (F-207)", () => {
 		expect(document.activeElement).toBe(input);
 	});
 
-	it("submitting a name creates the task with the column's status", () => {
+	it("submitting a name creates the task with the column's status", async () => {
 		const onAddTask: AddMock = vi.fn();
 		const { board } = mount({ onAddTask });
 		const inProgress = board.querySelector(
@@ -132,10 +132,12 @@ describe("renderBoardView inline add (F-207)", () => {
 		if (!input || !form) throw new Error("add form not mounted");
 		input.value = "  Ship the board fix  ";
 		submit(form);
-		expect(onAddTask).toHaveBeenCalledWith("Ship the board fix", TaskStatus.InProgress);
-		// The form folds back to the button after commit.
+		// The form folds back to the button synchronously; the add is deferred
+		// out of the blur/submit dispatch (F-254).
 		expect(inProgress.querySelector(".tasks-board__add-form")).toBeNull();
 		expect(inProgress.querySelector(".tasks-board__add-button")).not.toBeNull();
+		await Promise.resolve();
+		expect(onAddTask).toHaveBeenCalledWith("Ship the board fix", TaskStatus.InProgress);
 	});
 
 	it("an empty submit reverts without creating a task", () => {
@@ -170,7 +172,7 @@ describe("renderBoardView inline add (F-207)", () => {
 		expect(document.activeElement).toBe(button);
 	});
 
-	it("blur commits a non-empty name (same contract as inline rename)", () => {
+	it("blur commits a non-empty name (same contract as inline rename)", async () => {
 		const onAddTask: AddMock = vi.fn();
 		const { board } = mount({ onAddTask });
 		const todo = board.querySelector(`[data-status-key="${TaskStatus.Todo}"]`) as HTMLElement;
@@ -179,6 +181,7 @@ describe("renderBoardView inline add (F-207)", () => {
 		if (!input) throw new Error("add input not mounted");
 		input.value = "Captured on blur";
 		input.dispatchEvent(new Event("blur"));
+		await Promise.resolve();
 		expect(onAddTask).toHaveBeenCalledWith("Captured on blur", TaskStatus.Todo);
 	});
 });

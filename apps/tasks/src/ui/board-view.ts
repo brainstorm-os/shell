@@ -183,8 +183,12 @@ function renderColumnAdd(
 			if (settled) return;
 			settled = true;
 			const name = input.value.trim();
+			// Restore the DOM first, then defer the reactive add out of the blur
+			// dispatch (F-254 — `onAddTask` re-renders the board; running it inside
+			// blur while this form/button is swapping is the "node moved in a blur
+			// handler" race).
 			form.replaceWith(button);
-			if (name.length > 0) onAddTask(name, statusKey);
+			if (name.length > 0) queueMicrotask(() => onAddTask(name, statusKey));
 		};
 		const cancel = (): void => {
 			if (settled) return;

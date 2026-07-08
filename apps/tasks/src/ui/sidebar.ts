@@ -278,7 +278,10 @@ function renameProjectRow(
 	const commit = (name: string) => {
 		if (done) return;
 		done = true;
-		onRenameProject(project.id, name);
+		// Defer the rename out of the blur dispatch (F-254) — `onRenameProject`
+		// re-renders the sidebar (`replaceChildren`), and running it while this
+		// input is blurring is the "node moved in a blur handler" DOM race.
+		queueMicrotask(() => onRenameProject(project.id, name));
 	};
 	// Enter/Escape commit-or-cancel this editable <input>; the shortcut registry
 	// suppresses single keys in editable fields by design.

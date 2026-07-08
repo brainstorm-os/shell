@@ -33,9 +33,16 @@ export function beginInlineEdit(label: HTMLElement, opts: InlineEditOptions): vo
 		if (done) return;
 		done = true;
 		const next = input.value.trim();
-		if (next.length > 0 && next !== opts.value) opts.onCommit(next);
+		// Restore the DOM synchronously FIRST, then defer the reactive callback
+		// out of the blur dispatch (F-254). `onCommit` re-renders the host
+		// (`replaceChildren`); running it inside the blur event — while this
+		// input/label is still being swapped — is the "node moved in a blur
+		// handler" race. queueMicrotask lets the blur settle before the re-render.
 		input.replaceWith(label);
 		label.textContent = next.length > 0 ? next : opts.value;
+		if (next.length > 0 && next !== opts.value) {
+			queueMicrotask(() => opts.onCommit(next));
+		}
 	};
 	const cancel = (): void => {
 		if (done) return;
