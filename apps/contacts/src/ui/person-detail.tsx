@@ -133,7 +133,7 @@ export function PersonDetail({
 
 	const inlineRows = personPropertyRows(person, onPatch);
 
-	return (
+	const content = (
 		<div className="contacts-detail">
 			<div className="contacts-detail__scroll">
 				<div className="contacts-detail__page">
@@ -222,14 +222,12 @@ export function PersonDetail({
 
 					{propertiesRuntime ? (
 						<div className="contacts-detail__properties">
-							<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
-								<PropertiesPanel
-									title={t("detail.properties.title")}
-									rows={inlineRows}
-									entityId={person.id}
-									hideHeader
-								/>
-							</PropertiesProvider>
+							<PropertiesPanel
+								title={t("detail.properties.title")}
+								rows={inlineRows}
+								entityId={person.id}
+								hideHeader
+							/>
 						</div>
 					) : null}
 
@@ -244,15 +242,23 @@ export function PersonDetail({
 			</div>
 
 			{propertiesRuntime ? (
-				<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
-					<PersonPropertiesPanel
-						person={person}
-						open={showProperties}
-						onPatch={onPatch}
-						onClose={onToggleProperties}
-					/>
-				</PropertiesProvider>
+				<PersonPropertiesPanel
+					person={person}
+					open={showProperties}
+					onPatch={onPatch}
+					onClose={onToggleProperties}
+				/>
 			) : null}
 		</div>
+	);
+
+	// ONE provider for both property surfaces (the inline page block + the
+	// slide-over inspector) — one store, one catalog `list()` IPC, not two.
+	return propertiesRuntime ? (
+		<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
+			{content}
+		</PropertiesProvider>
+	) : (
+		content
 	);
 }

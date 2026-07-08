@@ -30,11 +30,17 @@ if (widgetLaunch) {
 		</StrictMode>,
 	);
 } else {
+	// The full app is intentionally NOT wrapped in <StrictMode>: the contact
+	// page hosts a `@lexical/yjs` body editor, and StrictMode's dev
+	// double-mount re-binds the editor to an already-applied Y.Doc whose
+	// `observeDeep` then fires no events — the body renders blank on reopen.
+	// Production is unaffected (StrictMode is a no-op there); dropping it
+	// makes dev match the shipped app. Same fix + rationale as
+	// `apps/notes/src/main.tsx` / Tasks' inspector-editor mount. The widget
+	// branch above keeps StrictMode — it mounts no editor.
 	createRoot(root).render(
-		<StrictMode>
-			<AppErrorBoundary appName="contacts">
-				<ContactsApp />
-			</AppErrorBoundary>
-		</StrictMode>,
+		<AppErrorBoundary appName="contacts">
+			<ContactsApp />
+		</AppErrorBoundary>,
 	);
 }
