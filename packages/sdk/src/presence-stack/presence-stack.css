@@ -1,0 +1,44 @@
+/* `<PresenceStack>` — overlapping avatar cluster for who's-here on a shared
+ * entity. Peer colour is applied inline (literal hex); chrome uses theme tokens. */
+
+.bs-presence {
+	display: inline-flex;
+	align-items: center;
+	flex-direction: row;
+}
+
+.bs-presence__avatar,
+.bs-presence__more {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	color: #fff;
+	/* A ring in the surface colour so overlapped avatars read as distinct. */
+	box-shadow: 0 0 0 2px var(--bg-elev);
+	overflow: hidden;
+	user-select: none;
+}
+
+/* Overlap all but the first. */
+.bs-presence__avatar:not(:first-child),
+.bs-presence__more {
+	margin-left: -6px;
+}
+
+.bs-presence__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.bs-presence__more {
+	background: var(--hover);
+	color: var(--text);
+	font-size: 9px;
+}

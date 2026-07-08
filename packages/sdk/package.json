@@ -40,6 +40,8 @@
     "./spellcheck-menu": "./src/spellcheck-menu.ts",
     "./peer-presence": "./src/peer-presence.ts",
     "./self-display-name": "./src/use-self-display-name.ts",
+    "./presence-stack": "./src/presence-stack/index.ts",
+    "./presence-stack.css": "./src/presence-stack/presence-stack.css",
     "./storage-repository": "./src/storage-repository.ts",
     "./last-viewed": "./src/last-viewed.ts",
     "./panel-state": "./src/panel-state.ts",
