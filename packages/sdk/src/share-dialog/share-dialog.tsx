@@ -266,6 +266,14 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 								aria-label={labels.codePlaceholder}
 								disabled={busy}
 								onChange={(e) => setCode(e.target.value)}
+								onKeyDown={(e) => {
+									// Enter submits the single-field add, matching every other
+									// commit-on-Enter input in the product.
+									if (e.key === "Enter" && !busy && code.trim().length > 0) {
+										e.preventDefault();
+										void onAdd();
+									}
+								}}
 							/>
 							<SelectMenu<RosterRole>
 								options={[

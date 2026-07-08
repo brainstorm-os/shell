@@ -159,6 +159,34 @@ describe("ShareDialog", () => {
 		expect(roster.members.mock.calls.length).toBeGreaterThanOrEqual(2);
 	});
 
+	it("Enter in the code field submits the add (no click needed)", async () => {
+		await mount(true);
+		const input = codeInput();
+		if (!input) throw new Error("expected code input for a manager");
+		await act(async () => typeInto(input, "PASTED-CODE"));
+		await act(async () => {
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		});
+		await flush();
+		expect(sharing.share).toHaveBeenCalledWith({
+			entityId: "ent_1",
+			type: "brainstorm/Note/v1",
+			invite: "PASTED-CODE",
+			role: RosterRole.Editor,
+		});
+	});
+
+	it("Enter with an empty code field does nothing", async () => {
+		await mount(true);
+		const input = codeInput();
+		if (!input) throw new Error("expected code input for a manager");
+		await act(async () => {
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		});
+		await flush();
+		expect(sharing.share).not.toHaveBeenCalled();
+	});
+
 	it("collection mode adds via sharing.shareCollection (cascade), not share", async () => {
 		await act(async () => {
 			root.render(
