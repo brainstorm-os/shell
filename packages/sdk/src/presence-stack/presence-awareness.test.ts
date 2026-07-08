@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { PRESENCE_STATE_KEY, awarenessToPeers, peerFromState } from "./presence-awareness";
+import { peerColor } from "../peer-presence";
+import {
+	PRESENCE_STATE_KEY,
+	awarenessToPeers,
+	buildLocalPresence,
+	peerFromState,
+} from "./presence-awareness";
 
 const payload = (id: string, name: string, color = "#2f6df6", avatarRef?: string) => ({
 	[PRESENCE_STATE_KEY]: { id, name, color, ...(avatarRef ? { avatarRef } : {}) },
@@ -67,5 +73,36 @@ describe("awarenessToPeers", () => {
 
 	it("is empty when only the local client is present", () => {
 		expect(awarenessToPeers(new Map([[1, payload("self", "Me")]]), 1)).toEqual([]);
+	});
+});
+
+describe("buildLocalPresence (publish side)", () => {
+	const self = { pubkey: "u1", displayName: "Mira", fingerprint: "ab12·cd34" };
+
+	it("builds a payload with pubkey id, display name, and a clientId-keyed color", () => {
+		const p = buildLocalPresence(self, 42);
+		expect(p.id).toBe("u1");
+		expect(p.name).toBe("Mira");
+		expect(p.color).toBe(peerColor(42));
+		expect(p.avatarRef).toBeUndefined();
+	});
+
+	it("falls back to the fingerprint when the display name is blank (never Anonymous)", () => {
+		expect(buildLocalPresence({ ...self, displayName: "   " }, 1).name).toBe("ab12·cd34");
+	});
+
+	it("passes avatarRef through when present", () => {
+		expect(buildLocalPresence({ ...self, avatarRef: "brainstorm://asset/a" }, 1).avatarRef).toBe(
+			"brainstorm://asset/a",
+		);
+	});
+
+	it("round-trips: a published payload reads back as the same peer", () => {
+		const clientId = 7;
+		const published = buildLocalPresence({ ...self, avatarRef: "brainstorm://asset/z" }, clientId);
+		// A remote peer sees our state under the presence key; awarenessToPeers on
+		// THEIR side (self = their own clientId, not ours) surfaces us unchanged.
+		const states = new Map<number, unknown>([[clientId, { [PRESENCE_STATE_KEY]: published }]]);
+		expect(awarenessToPeers(states, 999)).toEqual([published]);
 	});
 });

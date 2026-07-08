@@ -6,4 +6,10 @@ export {
 	capPresence,
 	presenceInitials,
 } from "./presence-stack";
-export { PRESENCE_STATE_KEY, awarenessToPeers, peerFromState } from "./presence-awareness";
+export {
+	type PresenceSelf,
+	PRESENCE_STATE_KEY,
+	awarenessToPeers,
+	buildLocalPresence,
+	peerFromState,
+} from "./presence-awareness";
