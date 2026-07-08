@@ -39,6 +39,7 @@
     "./spellcheck": "./src/spellcheck.ts",
     "./spellcheck-menu": "./src/spellcheck-menu.ts",
     "./peer-presence": "./src/peer-presence.ts",
+    "./self-display-name": "./src/use-self-display-name.ts",
     "./storage-repository": "./src/storage-repository.ts",
     "./last-viewed": "./src/last-viewed.ts",
     "./panel-state": "./src/panel-state.ts",
