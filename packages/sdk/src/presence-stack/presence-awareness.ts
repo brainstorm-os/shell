@@ -20,10 +20,40 @@
  * the SDK module needn't import `@brainstorm/react-yjs`.
  */
 
+import { peerColor } from "../peer-presence";
 import type { PresencePeer } from "./presence-stack";
 
 /** The awareness field a client publishes its stack presence under. */
 export const PRESENCE_STATE_KEY = "presence";
+
+/** This device's identity for the presence payload — the roster self profile
+ *  fields the builder needs. `displayName` may be blank (unset); the builder
+ *  falls back to `fingerprint` so a peer never renders as "" / "Anonymous". */
+export type PresenceSelf = {
+	/** Sovereign member pubkey (base64) — the stable `PresencePeer.id`. */
+	pubkey: string;
+	displayName: string;
+	fingerprint: string;
+	avatarRef?: string;
+};
+
+/**
+ * Build THIS device's presence payload — the PUBLISH side of the contract.
+ * The wiring rung does `awareness.setLocalStateField(PRESENCE_STATE_KEY,
+ * buildLocalPresence(self, doc.clientID))`; `awarenessToPeers` reads the same
+ * shape back on peers. `id` is the sovereign pubkey (stable across a member's
+ * tabs); `name` prefers the display name, falling back to the key fingerprint
+ * (mirrors `useSelfDisplayName` — never blank); `color` is keyed by the Yjs
+ * client id via `peerColor` (so a member's two tabs get distinct caret hues,
+ * while `capPresence` still collapses them to one avatar by `id`).
+ */
+export function buildLocalPresence(self: PresenceSelf, clientId: number): PresencePeer {
+	const name = self.displayName.trim() || self.fingerprint;
+	const color = peerColor(clientId);
+	return self.avatarRef
+		? { id: self.pubkey, name, color, avatarRef: self.avatarRef }
+		: { id: self.pubkey, name, color };
+}
 
 function readString(o: Record<string, unknown>, key: string): string | null {
 	const v = o[key];
