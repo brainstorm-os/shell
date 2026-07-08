@@ -27,6 +27,7 @@ export const CONTACTS_I18N = {
 
 	"list.search.placeholder": "Search people",
 	"list.search.aria": "Search contacts by name, email, phone, or role",
+	"list.search.clear": "Clear search",
 	"list.new": "New contact",
 	"list.people": "People",
 
@@ -84,15 +85,12 @@ export const CONTACTS_I18N = {
 	"detail.menu.delete": "Delete contact",
 	"detail.name.placeholder": "Name",
 	"detail.name.aria": "Contact name",
-	"detail.section.contact": "Contact",
-	"detail.section.related": "Related people",
 	"detail.company.label": "Company",
 	"detail.company.add": "Add company",
 	"detail.company.add.placeholder": "Company name…",
 	"detail.role.label": "Role",
-	"detail.empty.contact": "No contact details yet — add an email or phone in the properties panel.",
 	"detail.openCompany": "Open {name}",
-	"detail.openPerson": "Open {name}",
+	"detail.body.placeholder": "Write notes about this person — meetings, context, anything…",
 
 	"birthday.today": "Birthday today 🎂",
 	"birthday.tomorrow": "Birthday tomorrow",
@@ -108,7 +106,7 @@ export const CONTACTS_I18N = {
 	"prop.phone": "Phone",
 	"prop.role": "Role",
 	"prop.birthday": "Birthday",
-	"prop.bio": "Notes",
+	"prop.anniversary": "Anniversary",
 	"prop.company": "Company",
 	"prop.related": "Related people",
 

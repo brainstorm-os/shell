@@ -41,6 +41,17 @@ describe("personToValues", () => {
 		const values = personToValues(makePerson({ birthday: null }));
 		expect(PERSON_PROP_KEY.birthday in values).toBe(false);
 	});
+	it("emits a DateValue for the anniversary, omitted when unset", () => {
+		const values = personToValues(makePerson({ anniversary: 77 }));
+		expect(values[PERSON_PROP_KEY.anniversary]).toEqual({
+			at: 77,
+			granularity: DateGranularity.Date,
+		});
+		expect(PERSON_PROP_KEY.anniversary in personToValues(makePerson())).toBe(false);
+	});
+	it("has no bio row — free-form notes live in the body editor", () => {
+		expect("bio" in personToValues(makePerson())).toBe(false);
+	});
 	it("carries the company ref id (the cell resolves the title), or blank", () => {
 		expect(personToValues(makePerson())[PERSON_PROP_KEY.company]).toBe("co_1");
 		expect(personToValues(makePerson({ companyId: null }))[PERSON_PROP_KEY.company]).toBe("");
@@ -69,13 +80,13 @@ describe("applyPersonPropertyValue", () => {
 			phone: ["+1", "+2"],
 		});
 	});
-	it("trims role and passes notes through", () => {
+	it("trims role", () => {
 		expect(applyPersonPropertyValue(PERSON_PROP_KEY.role, "  Founder ")).toEqual({
 			role: "Founder",
 		});
-		expect(applyPersonPropertyValue(PERSON_PROP_KEY.bio, "line\nline")).toEqual({
-			bio: "line\nline",
-		});
+	});
+	it("rejects the removed bio key (body editor owns notes)", () => {
+		expect(applyPersonPropertyValue("bio", "line")).toBeNull();
 	});
 	it("reads the epoch out of a DateValue", () => {
 		expect(
@@ -85,6 +96,12 @@ describe("applyPersonPropertyValue", () => {
 			}),
 		).toEqual({ birthday: 99 });
 		expect(applyPersonPropertyValue(PERSON_PROP_KEY.birthday, null)).toEqual({ birthday: null });
+		expect(
+			applyPersonPropertyValue(PERSON_PROP_KEY.anniversary, {
+				at: 7,
+				granularity: DateGranularity.Date,
+			}),
+		).toEqual({ anniversary: 7 });
 	});
 	it("maps a picked company ref id back to the company property (or null)", () => {
 		expect(applyPersonPropertyValue(PERSON_PROP_KEY.company, "co_2")).toEqual({ company: "co_2" });

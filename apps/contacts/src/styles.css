@@ -186,28 +186,23 @@ body.is-resizing .contacts__resize {
 
 /* ── List route ──────────────────────────────────────────────────────── */
 
-/* Composite search field: the box (height / border / surface) comes from the
- * shared `.bs-input` face on the wrapper; this rule supplies only the layout
- * deltas (glyph gap, inset margin). The inner <input> stays bare. */
+/* Search slot — the bar itself is the shared `.bs-searchbar` (chrome + focus
+ * ring + clear ✕ all SDK-owned, like Notes). This slot owns the 44px toolbar
+ * row so the sidebar's first row sits on the shared panel-header baseline.
+ * `min-width: 0` on the flex child keeps the bar INSIDE the panel — the old
+ * bespoke field overflowed the sidebar border when focused. */
 .contacts-list__search {
+	display: flex;
+	align-items: center;
 	flex: 0 0 auto;
-	gap: var(--space-2);
-	margin: var(--space-2);
+	height: 44px;
+	padding: 0 var(--space-2);
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
-.contacts-list__search:focus-within {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
-}
-
-.contacts-list__search-input {
+.contacts-list__search > .bs-searchbar {
 	flex: 1;
-	border: none;
-	background: transparent;
-	color: var(--text);
-	font: inherit;
-	outline: none;
+	min-width: 0;
 }
 
 .contacts-list__controls {
@@ -255,17 +250,19 @@ body.is-resizing .contacts__resize {
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
+/* The list scroller carries the sidebar's inline inset so rows + group
+ * headers don't sit flush against the panel edges. */
 .contacts-list__scroll {
 	flex: 1;
 	overflow-y: auto;
-	padding: var(--space-2) 0 var(--space-8);
+	padding: var(--space-2) var(--space-2) var(--space-8);
 }
 
 .contacts-list__group-letter {
 	position: sticky;
 	top: 0;
 	margin: 0;
-	padding: var(--space-2) var(--space-4) var(--space-1);
+	padding: var(--space-2) var(--space-2) var(--space-1);
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-semibold);
 	text-transform: uppercase;
@@ -357,22 +354,22 @@ body.is-resizing .contacts__resize {
 	color: var(--text-faint);
 }
 
-/* ── Detail pane ─────────────────────────────────────────────────────── */
-
-/* Editable hero name on the card — committed on blur / Enter. The box
- * (height / border / surface / focus) comes from the shared `.bs-input --lg`
- * face; this rule supplies only the centered hero typography + width. `:root`
- * specificity overrides the face's default font-size / text-align. */
-:root .contacts-detail__name-input {
-	width: min(100%, 28ch);
-	text-align: center;
-	font-size: var(--text-size-2xl);
-	font-weight: var(--text-weight-semibold);
-}
+/* ── Detail page ─────────────────────────────────────────────────────────
+ * The Tasks-detail convention: a centered reading column with the hero on
+ * top, the inline property block under it, and the body editor below. */
 
 .contacts-detail__scroll {
 	flex: 1;
 	overflow-y: auto;
+}
+
+.contacts-detail__page {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+	max-width: 760px;
+	margin: 0 auto;
+	padding: var(--space-5) var(--space-6) var(--space-8);
 }
 
 .contacts-detail__card {
@@ -380,8 +377,63 @@ body.is-resizing .contacts__resize {
 	flex-direction: column;
 	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-8) var(--space-6) var(--space-4);
+	padding: var(--space-4) 0;
 	text-align: center;
+}
+
+/* Editable hero name — carries the shared `.bs-input` face for the ratchet,
+ * but reads as an editor PAGE TITLE, not a boxed form field (the user-facing
+ * contract: the page's text-editing elements match the editor below). The
+ * `:root` overrides strip the resting box + the typing-time focus ring — the
+ * caret is the indicator, exactly like the editor surface under it; hover
+ * hints the affordance. Committed on blur / Enter. */
+:root .contacts-detail__name-input {
+	width: min(100%, 28ch);
+	height: auto;
+	padding: var(--space-0_5) var(--space-2);
+	border-color: transparent;
+	background: transparent;
+	text-align: center;
+	font-size: var(--text-size-2xl);
+	font-weight: var(--text-weight-semibold);
+	line-height: var(--text-line-height-tight, 1.2);
+}
+
+:root .contacts-detail__name-input:focus-visible {
+	outline: none;
+	border-color: transparent;
+}
+
+:root .contacts-detail__name-input:hover:not(:focus) {
+	border-color: transparent;
+	background: var(--hover);
+}
+
+/* Inline property block — the shared cells at the top of the page (the
+ * Tasks-detail convention), separated from the body by a subtle rule. */
+.contacts-detail__properties {
+	margin-bottom: var(--space-4);
+	padding-bottom: var(--space-2);
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+
+.contacts-detail__body {
+	flex: 1 1 auto;
+	min-height: 0;
+	font-size: var(--text-size-md);
+	line-height: 1.65;
+	color: var(--text);
+	text-align: start;
+}
+
+.contacts-detail__editor {
+	outline: none;
+	min-height: 160px;
+}
+
+.contacts-detail__body-placeholder {
+	color: var(--text-faint);
+	pointer-events: none;
 }
 
 .contacts-detail__avatar {
@@ -448,88 +500,6 @@ body.is-resizing .contacts__resize {
  * doesn't span the whole card. */
 .contacts-detail__add-company-input {
 	width: min(100%, 24ch);
-}
-
-.contacts-detail__section {
-	max-width: 60ch;
-	margin: 0 auto;
-	padding: var(--space-3);
-}
-
-.contacts-detail__section-title {
-	margin: 0 0 var(--space-2);
-	font-size: var(--text-size-xs);
-	font-weight: var(--text-weight-semibold);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--text-faint);
-}
-
-.contacts-detail__methods {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-1);
-}
-
-.contacts-detail__method {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	color: var(--text-faint);
-}
-
-.contacts-detail__method-value {
-	color: var(--text);
-	font-size: var(--text-size-md);
-	text-decoration: none;
-}
-
-.contacts-detail__method-value:hover {
-	color: var(--accent);
-	text-decoration: underline;
-}
-
-.contacts-detail__chips {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-2);
-}
-
-.contacts-detail__chip {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-full);
-	background: var(--bg-elev);
-	color: var(--text);
-	font-size: var(--text-size-sm);
-	cursor: pointer;
-}
-
-.contacts-detail__chip:hover {
-	background: var(--hover);
-	border-color: var(--border-strong);
-}
-
-.contacts-detail__bio {
-	max-width: 60ch;
-	margin: 0 auto;
-	padding: var(--space-3) var(--space-6) var(--space-8);
-	font-size: var(--text-size-md);
-	line-height: var(--text-line-height-normal, 1.5);
-	color: var(--text-dim);
-	white-space: pre-wrap;
-}
-
-.contacts-detail__empty {
-	margin: 0;
-	font-size: var(--text-size-sm);
-	color: var(--text-faint);
 }
 
 /* ── Properties inspector — shared glass overlay (app owns the container) ─ */

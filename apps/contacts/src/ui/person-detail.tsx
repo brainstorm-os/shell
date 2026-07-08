@@ -1,17 +1,23 @@
 /**
- * Person detail pane — the contact "card" shown in the content column of the
- * two-pane layout: avatar + editable name, contact methods (email / phone),
- * company + role, next-birthday, related people, and the editable property
- * inspector (the SHARED `PropertiesPanel` as a glass overlay). The card body
- * is the app's own presentation; the property GRID is never hand-rolled — it
- * goes through the shared cells. Opening the company / a related person
- * routes an `open` intent to its owning app.
+ * Person detail — the contact PAGE in the content column of the two-pane
+ * layout, following the Tasks-detail convention every entity page shares:
+ * a hero (avatar + editable name + role · company + next-birthday), the
+ * contact's properties as an inline block of SHARED property cells at the
+ * top, and below it the free-form body in the SAME `BrainstormEditor`
+ * (Lexical + Yjs) Notes / Journal / Tasks / Bookmarks use.
+ *
+ * The property GRID is never hand-rolled — both the inline block and the
+ * slide-over inspector render `personPropertyRows` through the shared
+ * cells. The legacy `bio` string seeds the body on first open and is
+ * cleared after the first real edit (see `PersonBodyEditor`). Opening the
+ * company routes an `open` intent to its owning app.
  */
 
 import type { PropertiesService } from "@brainstorm/sdk-types";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { PropertiesPanel } from "@brainstorm/sdk/properties-panel";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/property-ui";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import {
 	type NextBirthday,
@@ -21,9 +27,8 @@ import {
 } from "../logic/birthday";
 import { personInitials } from "../logic/person-view";
 import type { Person } from "../types/person";
-import { PersonPropertiesPanel } from "./person-properties-panel";
-
-export type RelatedRef = { id: string; name: string };
+import { PersonBodyEditor } from "./person-body-editor";
+import { PersonPropertiesPanel, personPropertyRows } from "./person-properties-panel";
 
 // The no-selection state is `{ id: null }`, NOT bare `null`: the shared
 // NavButtons / NavHistory contract reserves JS `null` as the "nothing to
@@ -34,7 +39,6 @@ export type Location = { id: string | null };
 export type PersonDetailProps = {
 	person: Person;
 	companyName: string | null;
-	related: RelatedRef[];
 	now: number;
 	properties: PropertiesService | null;
 	/** Live vault title lookup for the company / related-people picker cells. */
@@ -47,7 +51,6 @@ export type PersonDetailProps = {
 	 *  existing entities). */
 	onCreateCompany: (name: string) => void;
 	onOpenCompany: () => void;
-	onOpenPerson: (id: string) => void;
 };
 
 function birthdayLabel(next: NextBirthday): string {
@@ -77,7 +80,6 @@ function anniversaryLabel(next: NextYearly): string {
 export function PersonDetail({
 	person,
 	companyName,
-	related,
 	now,
 	properties,
 	entityTitleSource,
@@ -87,7 +89,6 @@ export function PersonDetail({
 	onPatch,
 	onCreateCompany,
 	onOpenCompany,
-	onOpenPerson,
 }: PersonDetailProps): React.ReactElement {
 	const [companyDraft, setCompanyDraft] = useState<string | null>(null);
 
@@ -111,6 +112,18 @@ export function PersonDetail({
 	const anniversary = nextAnniversary(person.anniversary, now);
 	const initials = personInitials(person.name);
 
+	// The legacy `bio` seed is latched ONCE per mount (keyed by person id at
+	// the call site): the first-edit patch clears `bio` on the entity, and a
+	// re-render with the now-empty bio must not yank `initialEditorState` out
+	// from under the still-mounted editor.
+	const seedBio = useRef(person.bio).current;
+	const migratedRef = useRef(false);
+	const onFirstEdit = (): void => {
+		if (migratedRef.current) return;
+		migratedRef.current = true;
+		if (seedBio.trim()) onPatch({ bio: "" });
+	};
+
 	// A stable runtime object — a fresh literal each render would re-create the
 	// property store and re-issue the catalog `list()` IPC on every keystroke.
 	const propertiesRuntime = useMemo(
@@ -118,150 +131,134 @@ export function PersonDetail({
 		[properties],
 	);
 
-	return (
+	const inlineRows = personPropertyRows(person, onPatch);
+
+	const content = (
 		<div className="contacts-detail">
 			<div className="contacts-detail__scroll">
-				<div className="contacts-detail__card">
-					<div className="contacts-detail__avatar" aria-hidden="true">
-						{initials || <Icon name={IconName.Entity} size={28} />}
-					</div>
-					<input
-						className="contacts-detail__name-input bs-input bs-input--lg"
-						value={nameDraft}
-						placeholder={t("detail.name.placeholder")}
-						aria-label={t("detail.name.aria")}
-						onChange={(e) => setNameDraft(e.target.value)}
-						onBlur={commitName}
-						onKeyDown={(e) => {
-							// keyboard-exempt
-							if (e.key === "Enter") {
-								e.preventDefault();
-								e.currentTarget.blur();
-							}
-						}}
-					/>
-					{(person.role || companyName) && (
-						<p className="contacts-detail__subtitle">
-							{person.role}
-							{person.role && companyName ? " · " : ""}
-							{companyName && (
-								<button
-									type="button"
-									className="contacts-detail__company-link"
-									onClick={onOpenCompany}
-									title={t("detail.openCompany", { name: companyName })}
-								>
-									{companyName}
-								</button>
-							)}
-						</p>
-					)}
-					{birthday && (
-						<p className="contacts-detail__birthday">
-							<Icon name={IconName.KindDate} size={14} />
-							{birthdayLabel(birthday)}
-						</p>
-					)}
-					{anniversary && (
-						<p className="contacts-detail__birthday">
-							<Icon name={IconName.KindDate} size={14} />
-							{anniversaryLabel(anniversary)}
-						</p>
-					)}
-					{!companyName &&
-						(companyDraft === null ? (
-							<button
-								type="button"
-								className="contacts-detail__add-company"
-								onClick={() => setCompanyDraft("")}
-							>
-								<Icon name={IconName.Plus} size={14} />
-								{t("detail.company.add")}
-							</button>
-						) : (
-							<input
-								className="contacts-detail__add-company-input bs-input bs-input--sm"
-								value={companyDraft}
-								placeholder={t("detail.company.add.placeholder")}
-								aria-label={t("detail.company.add")}
-								// biome-ignore lint/a11y/noAutofocus: focus the field the click just opened
-								autoFocus
-								onChange={(e) => setCompanyDraft(e.target.value)}
-								onBlur={commitCompany}
-								// keyboard-exempt: input-local commit/cancel (Enter blurs to commit,
-								// Escape discards) — field-scoped, not an app shortcut. Mirrors the
-								// name-field handler above.
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										e.preventDefault();
-										e.currentTarget.blur();
-									} else if (e.key === "Escape") {
-										e.preventDefault();
-										setCompanyDraft(null);
-									}
-								}}
-							/>
-						))}
-				</div>
-
-				<section className="contacts-detail__section" aria-label={t("detail.section.contact")}>
-					{person.emails.length === 0 && person.phones.length === 0 ? (
-						<p className="contacts-detail__empty">{t("detail.empty.contact")}</p>
-					) : (
-						<ul className="contacts-detail__methods">
-							{person.emails.map((email) => (
-								<li key={`e:${email}`} className="contacts-detail__method">
-									<Icon name={IconName.KindEmail} size={16} />
-									<a className="contacts-detail__method-value" href={`mailto:${email}`}>
-										{email}
-									</a>
-								</li>
-							))}
-							{person.phones.map((phone) => (
-								<li key={`p:${phone}`} className="contacts-detail__method">
-									<Icon name={IconName.KindPhone} size={16} />
-									<a className="contacts-detail__method-value" href={`tel:${phone}`}>
-										{phone}
-									</a>
-								</li>
-							))}
-						</ul>
-					)}
-				</section>
-
-				{related.length > 0 && (
-					<section className="contacts-detail__section" aria-label={t("detail.section.related")}>
-						<h2 className="contacts-detail__section-title">{t("detail.section.related")}</h2>
-						<div className="contacts-detail__chips">
-							{related.map((ref) => (
-								<button
-									type="button"
-									key={ref.id}
-									className="contacts-detail__chip"
-									onClick={() => onOpenPerson(ref.id)}
-									title={t("detail.openPerson", { name: ref.name })}
-								>
-									<Icon name={IconName.Entity} size={14} />
-									{ref.name}
-								</button>
-							))}
+				<div className="contacts-detail__page">
+					<div className="contacts-detail__card">
+						<div className="contacts-detail__avatar" aria-hidden="true">
+							{initials || <Icon name={IconName.Entity} size={28} />}
 						</div>
-					</section>
-				)}
+						<input
+							className="contacts-detail__name-input bs-input bs-input--lg"
+							value={nameDraft}
+							placeholder={t("detail.name.placeholder")}
+							aria-label={t("detail.name.aria")}
+							onChange={(e) => setNameDraft(e.target.value)}
+							onBlur={commitName}
+							onKeyDown={(e) => {
+								// keyboard-exempt
+								if (e.key === "Enter") {
+									e.preventDefault();
+									e.currentTarget.blur();
+								}
+							}}
+						/>
+						{(person.role || companyName) && (
+							<p className="contacts-detail__subtitle">
+								{person.role}
+								{person.role && companyName ? " · " : ""}
+								{companyName && (
+									<button
+										type="button"
+										className="contacts-detail__company-link"
+										onClick={onOpenCompany}
+										title={t("detail.openCompany", { name: companyName })}
+									>
+										{companyName}
+									</button>
+								)}
+							</p>
+						)}
+						{birthday && (
+							<p className="contacts-detail__birthday">
+								<Icon name={IconName.KindDate} size={14} />
+								{birthdayLabel(birthday)}
+							</p>
+						)}
+						{anniversary && (
+							<p className="contacts-detail__birthday">
+								<Icon name={IconName.KindDate} size={14} />
+								{anniversaryLabel(anniversary)}
+							</p>
+						)}
+						{!companyName &&
+							(companyDraft === null ? (
+								<button
+									type="button"
+									className="contacts-detail__add-company"
+									onClick={() => setCompanyDraft("")}
+								>
+									<Icon name={IconName.Plus} size={14} />
+									{t("detail.company.add")}
+								</button>
+							) : (
+								<input
+									className="contacts-detail__add-company-input bs-input bs-input--sm"
+									value={companyDraft}
+									placeholder={t("detail.company.add.placeholder")}
+									aria-label={t("detail.company.add")}
+									// biome-ignore lint/a11y/noAutofocus: focus the field the click just opened
+									autoFocus
+									onChange={(e) => setCompanyDraft(e.target.value)}
+									onBlur={commitCompany}
+									// keyboard-exempt: input-local commit/cancel (Enter blurs to commit,
+									// Escape discards) — field-scoped, not an app shortcut. Mirrors the
+									// name-field handler above.
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											e.currentTarget.blur();
+										} else if (e.key === "Escape") {
+											e.preventDefault();
+											setCompanyDraft(null);
+										}
+									}}
+								/>
+							))}
+					</div>
 
-				{person.bio && <p className="contacts-detail__bio">{person.bio}</p>}
+					{propertiesRuntime ? (
+						<div className="contacts-detail__properties">
+							<PropertiesPanel
+								title={t("detail.properties.title")}
+								rows={inlineRows}
+								entityId={person.id}
+								hideHeader
+							/>
+						</div>
+					) : null}
+
+					<div className="contacts-detail__body">
+						<PersonBodyEditor
+							personId={person.id}
+							{...(seedBio.trim() ? { seedBio } : {})}
+							onFirstEdit={onFirstEdit}
+						/>
+					</div>
+				</div>
 			</div>
 
 			{propertiesRuntime ? (
-				<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
-					<PersonPropertiesPanel
-						person={person}
-						open={showProperties}
-						onPatch={onPatch}
-						onClose={onToggleProperties}
-					/>
-				</PropertiesProvider>
+				<PersonPropertiesPanel
+					person={person}
+					open={showProperties}
+					onPatch={onPatch}
+					onClose={onToggleProperties}
+				/>
 			) : null}
 		</div>
+	);
+
+	// ONE provider for both property surfaces (the inline page block + the
+	// slide-over inspector) — one store, one catalog `list()` IPC, not two.
+	return propertiesRuntime ? (
+		<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
+			{content}
+		</PropertiesProvider>
+	) : (
+		content
 	);
 }
