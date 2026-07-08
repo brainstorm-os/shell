@@ -321,6 +321,42 @@ export function activeMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 	return resolveMembers(doc, entityId).filter((m) => m.active);
 }
 
+/**
+ * Collab-C5 (F-288) — may `senderPub` WRITE to `entityId`? True iff the
+ * sender is a current, active member whose role is Editor or Owner. The
+ * sender key arrives base64**url** off the wire header while access grants
+ * store std base64, so this compares by decoded BYTES (not string equality)
+ * — a false string mismatch would silently drop a legitimate Editor's edits.
+ *
+ * Fail-closed: an unshared entity (no access record) has no members, so a
+ * remote writer resolves to nothing → denied. That is correct — a remote
+ * update can only arrive for a shared entity, and a shared entity always
+ * carries the owner's self-grant (see `SharingEngine.provisionEntity`), so a
+ * genuine owner/editor always resolves. `keyMatches` is byte-exact.
+ */
+export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint8Array): boolean {
+	for (const m of resolveCurrentMembers(doc, entityId)) {
+		if (!m.active) continue;
+		if (!roleAtLeast(m.role, AccessRole.Editor)) continue;
+		let memberKey: Uint8Array;
+		try {
+			memberKey = base64ToBytes(m.member);
+		} catch {
+			continue;
+		}
+		if (keyEquals(memberKey, senderKey)) return true;
+	}
+	return false;
+}
+
+function keyEquals(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
+}
+
 /** True if `memberB64` is a currently-active member of `entityId`. */
 export function isActiveMember(doc: Y.Doc, entityId: string, memberB64: string): boolean {
 	return activeMembers(doc, entityId).some((m) => m.member === memberB64);
