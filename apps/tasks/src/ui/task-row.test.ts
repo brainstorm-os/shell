@@ -300,12 +300,15 @@ describe("inline rename (double-click)", () => {
 		expect(input?.value).toBe("Original");
 	});
 
-	it("Enter commits the trimmed value and calls onRenameTask once", () => {
+	it("Enter commits the trimmed value and calls onRenameTask once", async () => {
 		const { row, props } = mount(task({ name: "Old" }));
 		enterRename(row);
 		const input = requireInput(row);
 		input.value = "  New name  ";
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		// F-254 — the rename is deferred out of the key/blur dispatch via
+		// queueMicrotask, so it lands on the next microtask, not synchronously.
+		await Promise.resolve();
 		expect(props.onRenameTask).toHaveBeenCalledTimes(1);
 		expect(props.onRenameTask).toHaveBeenCalledWith(
 			expect.objectContaining({ id: "task-1" }),
