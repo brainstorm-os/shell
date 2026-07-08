@@ -117,7 +117,7 @@ export function UpdatesSection() {
 			<div className="settings__updates-actions">
 				<Button
 					variant={ButtonVariant.Primary}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					disabled={inFlight}
 					onClick={() => {
 						void onCheck();

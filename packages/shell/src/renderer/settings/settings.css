@@ -286,11 +286,13 @@
 }
 
 .settings__updates-result {
-	margin-block-start: var(--space-3);
 	padding: var(--space-2);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 	background: var(--color-surface-raised);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
 }
 
 .settings__updates-result--available {
@@ -299,8 +301,7 @@
 }
 
 .settings__updates-headline {
-	margin: 0;
-	font-size: var(--text-size-sm);
+	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-medium);
 	color: var(--color-text-primary);
 }
