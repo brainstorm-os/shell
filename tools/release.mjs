@@ -276,8 +276,12 @@ function site(version, siteDirArg) {
 	const assetLines = assetSpecs(version)
 		.map((a) => `  - platform: ${a.platform}\n    label: ${a.label}\n    href: ${base}/${a.file}`)
 		.join("\n");
+	// Full timestamp (not date-only): the downloads page tiebreaks same-day
+	// releases, and a date-only value is midnight — so two releases the same
+	// day would need a time to order honestly. The page sorts by version
+	// primarily, but an honest timestamp keeps the displayed date correct too.
 	const md = `---
-date: ${new Date().toISOString().slice(0, 10)}
+date: ${new Date().toISOString().replace(/\.\d+Z$/, "Z")}
 version: "${version}"
 channel: beta
 status: published
