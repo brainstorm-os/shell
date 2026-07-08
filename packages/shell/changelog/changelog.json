@@ -3,6 +3,72 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.2.1",
+      "date": "2026-07-08",
+      "icon": "🧹",
+      "title": "Sharing polish",
+      "summary": "Small fixes on the back of the sharing release: your own name shows up instead of \"Anonymous\", a couple of rough edges smoothed, and a fix for a harmless console error in Tasks.",
+      "body": [
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Your name",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — comments you post and your row in a shared item's member list now show your "
+            },
+            {
+              "text": "display name",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " (from Settings), not \"Anonymous\". Set it in "
+            },
+            {
+              "text": "Settings → Identity",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "; until you do, it falls back to your key fingerprint."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Share dialog",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — pressing "
+            },
+            {
+              "text": "Enter",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in the invite-code field now adds the collaborator, no click needed."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — renaming a task no longer logs a harmless console error on blur."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.2.0",
       "date": "2026-07-08",
       "icon": "👥",
