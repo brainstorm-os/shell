@@ -1,6 +1,7 @@
 import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/empty-state.css";
 import "@brainstorm/editor/editor.css";
+import "@brainstorm/editor/editor-theme.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { getWidgetLaunch } from "@brainstorm/sdk/widget";

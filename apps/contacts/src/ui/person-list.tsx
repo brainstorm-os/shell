@@ -13,6 +13,7 @@ import {
 	ObjectMenuTrigger,
 	openAnchoredMenu,
 } from "@brainstorm/sdk/object-menu";
+import { Searchbar } from "@brainstorm/sdk/searchbar";
 import { useMemo, useRef } from "react";
 import { type ContactsI18nKey, t } from "../i18n";
 import { type NextBirthday, isBirthdaySoon, nextBirthday } from "../logic/birthday";
@@ -198,15 +199,13 @@ export function PersonSidebar({
 			aria-hidden={!open}
 			inert={!open ? true : undefined}
 		>
-			<div className="contacts-list__search bs-input bs-input--sm">
-				<Icon name={IconName.Search} size={16} />
-				<input
-					className="contacts-list__search-input bs-input__control"
-					type="search"
+			<div className="contacts-list__search">
+				<Searchbar
 					value={query}
+					onChange={onQueryChange}
 					placeholder={t("list.search.placeholder")}
-					aria-label={t("list.search.aria")}
-					onChange={(e) => onQueryChange(e.target.value)}
+					ariaLabel={t("list.search.aria")}
+					clearLabel={t("list.search.clear")}
 				/>
 			</div>
 
