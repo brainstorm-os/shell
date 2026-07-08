@@ -138,6 +138,7 @@ export default defineConfig({
 				__dirname,
 				"packages/sdk/src/use-self-display-name.ts",
 			),
+			"@brainstorm/sdk/presence-stack": resolve(__dirname, "packages/sdk/src/presence-stack/index.ts"),
 			"@brainstorm/sdk/storage-repository": resolve(
 				__dirname,
 				"packages/sdk/src/storage-repository.ts",
