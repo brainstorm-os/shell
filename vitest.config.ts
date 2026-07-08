@@ -134,6 +134,10 @@ export default defineConfig({
 			"@brainstorm/sdk/spellcheck-menu": resolve(__dirname, "packages/sdk/src/spellcheck-menu.ts"),
 			"@brainstorm/sdk/spellcheck": resolve(__dirname, "packages/sdk/src/spellcheck.ts"),
 			"@brainstorm/sdk/peer-presence": resolve(__dirname, "packages/sdk/src/peer-presence.ts"),
+			"@brainstorm/sdk/self-display-name": resolve(
+				__dirname,
+				"packages/sdk/src/use-self-display-name.ts",
+			),
 			"@brainstorm/sdk/storage-repository": resolve(
 				__dirname,
 				"packages/sdk/src/storage-repository.ts",

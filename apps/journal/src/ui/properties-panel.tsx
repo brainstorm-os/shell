@@ -24,15 +24,15 @@ import {
 	CommentsProvider,
 	CommentsRightPanel,
 	type RightPanelTab,
-	localPresenceName,
 } from "@brainstorm/editor";
-import type { CommentAnchor, CommentDef } from "@brainstorm/sdk-types";
+import type { CommentAnchor, CommentDef, RosterService } from "@brainstorm/sdk-types";
 import type { PropertiesPanelMeta } from "@brainstorm/sdk/properties-panel";
 import {
 	EntityPropertiesPanel,
 	PropertiesProvider,
 	type ValuesMap,
 } from "@brainstorm/sdk/property-ui";
+import { useSelfDisplayName } from "@brainstorm/sdk/self-display-name";
 import { type JSX, useCallback, useMemo } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type JournalT, journalPlural } from "../logic/journal-i18n";
@@ -97,6 +97,11 @@ export function JournalPropertiesIsland({
 	// call from `app.ts` re-runs the subtree even when the `opts` object
 	// reference is stable (it's captured once at mount).
 	void version;
+	// F-165 — a posted comment's author is your signed vault display name (or
+	// key fingerprint if unset), not the renderer-local "Anonymous".
+	const selfDisplayName = useSelfDisplayName(
+		(opts.runtime?.services as { roster?: RosterService } | undefined)?.roster ?? null,
+	);
 	const propertiesRuntime = useMemo(() => {
 		const svc = opts.runtime?.services as unknown as { properties?: unknown } | undefined;
 		if (!svc?.properties) return null;
@@ -130,7 +135,7 @@ export function JournalPropertiesIsland({
 	if (!adapter || !noteId || !opts.getActiveTab || !opts.onTabChange) return properties;
 	const pendingAnchor = opts.getPendingCommentAnchor?.() ?? null;
 	return (
-		<CommentsProvider adapter={adapter} authorName={localPresenceName()}>
+		<CommentsProvider adapter={adapter} authorName={selfDisplayName}>
 			<CommentsRightPanel
 				documentId={noteId}
 				active={opts.getActiveTab()}

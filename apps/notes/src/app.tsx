@@ -47,13 +47,13 @@ import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
 import { bindValue, clearValue } from "@brainstorm/sdk/property-ui/pure";
 import { attachResizable } from "@brainstorm/sdk/resizable";
 import { Searchbar } from "@brainstorm/sdk/searchbar";
+import { useSelfDisplayName } from "@brainstorm/sdk/self-display-name";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
 import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
 import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm/sdk/templates";
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
-import { localPresenceName } from "./editor/presence";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
@@ -218,6 +218,9 @@ export function NotesApp() {
 		runtime?.services.roster ?? null,
 		note?.id ?? null,
 	);
+	// F-165 — a posted comment's author is your signed vault display name (or
+	// your key fingerprint if unset), not the renderer-local "Anonymous".
+	const selfDisplayName = useSelfDisplayName(runtime?.services.roster ?? null);
 	// Pending comment-on-selection anchor (B11.9) — set when the editor's inline
 	// "Comment" row fires; routes the panel composer to that block. Cleared on
 	// note switch or after the comment is posted / cancelled.
@@ -1036,7 +1039,7 @@ export function NotesApp() {
 					(commentsAdapter ? (
 						<CommentsProvider
 							adapter={commentsAdapter}
-							authorName={localPresenceName()}
+							authorName={selfDisplayName}
 							mentionHost={commentMentionHost}
 						>
 							<NotesRightPanel
