@@ -90,6 +90,16 @@ export type ContactsRuntime = {
 		 *  viewing" via `@brainstorm/sdk/last-viewed`. */
 		settings?: SettingsService;
 	} | null;
+	/** Inbound Y.Doc update bridge — feeds the renderer-side resolver behind
+	 *  `useYDoc(person.id)` so a body edit from another renderer / sync source
+	 *  reaches the open contact. Present only with a live shell runtime.
+	 *  Mirrors the Notes / Journal / Tasks / Bookmarks `ydoc` bridge. */
+	ydoc?: {
+		onRemote(
+			entityId: string,
+			listener: (updateB64: string) => void,
+		): { unsubscribe?: () => void } | (() => void);
+	};
 };
 
 declare global {

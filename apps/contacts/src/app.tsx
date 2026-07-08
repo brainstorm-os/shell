@@ -13,7 +13,7 @@
  * only minted on submit, so there is no abandoned-empty ghost to clean up.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
+import { YDocProvider, useVaultEntities } from "@brainstorm/react-yjs";
 import type { VaultEntity } from "@brainstorm/sdk-types";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
@@ -26,6 +26,7 @@ import {
 	ObjectMenuTrigger,
 	openAnchoredMenu,
 } from "@brainstorm/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { Popover } from "@brainstorm/sdk/popover";
 import type { EntityTitleSource } from "@brainstorm/sdk/property-ui";
@@ -48,16 +49,18 @@ import {
 	resolveName,
 } from "./logic/person-view";
 import { type VCardContact, personToVCard } from "./logic/vcard";
+import { getContactsResolver } from "./logic/ydoc-resolver";
 import { getBrainstorm } from "./runtime";
 import { COMPANY_TYPE, PERSON_TYPE, type Person, type VaultEntityLike } from "./types/person";
 import { ComposeContact } from "./ui/compose-contact";
 import { contactObjectMenuContext } from "./ui/contact-menu";
 import { NoSelection } from "./ui/no-selection";
-import { type Location, PersonDetail, type RelatedRef } from "./ui/person-detail";
+import { type Location, PersonDetail } from "./ui/person-detail";
 import { PersonSidebar } from "./ui/person-list";
 import { exportContactsToVCard, importContactsFromVCard } from "./ui/vcard-actions";
 
 const SIDEBAR_OPEN_KEY = "contacts:sidebar-open";
+const PROPS_OPEN_KEY = "contacts:props-open";
 const GROUP_BY_KEY = "contacts:group-by";
 const SORT_BY_KEY = "contacts:sort-by";
 
@@ -197,7 +200,19 @@ export function ContactsApp(): ReactElement {
 	const nav = navRef.current;
 	const [location, setLocation] = useState<Location>({ id: null });
 	const [query, setQuery] = useState("");
-	const [showProperties, setShowProperties] = useState(true);
+	// Window-scoped (sessionStorage) with a CLOSED default — the shared
+	// right-panel convention: a fresh Contacts window opens on the page, not
+	// with the inspector already covering it.
+	const [showProperties, setShowPropertiesState] = useState<boolean>(() =>
+		readPanelOpen(PROPS_OPEN_KEY, false),
+	);
+	const setShowProperties = useCallback((update: (open: boolean) => boolean) => {
+		setShowPropertiesState((open) => {
+			const next = update(open);
+			writePanelOpen(PROPS_OPEN_KEY, next);
+			return next;
+		});
+	}, []);
 	const [sidebarOpen, setSidebarOpen] = useState<boolean>(readSidebarOpen);
 	const [grouping, setGrouping] = useState<ContactsGrouping>(readGroupingPref);
 	const [sorting, setSorting] = useState<ContactsSorting>(readSortingPref);
@@ -583,11 +598,6 @@ export function ContactsApp(): ReactElement {
 		: null;
 
 	const companyName = activePerson ? companyNameOf(activePerson.companyId) : null;
-	const related: RelatedRef[] = activePerson
-		? activePerson.linkIds
-				.map((id) => ({ id, name: resolveName(nameIndex, id) }))
-				.filter((ref): ref is RelatedRef => ref.name !== null)
-		: [];
 
 	return (
 		<div className="contacts" data-nav-open={String(sidebarOpen)}>
@@ -681,31 +691,26 @@ export function ContactsApp(): ReactElement {
 				)}
 				<main className="contacts__content">
 					{activePerson ? (
-						<PersonDetail
-							key={activePerson.id}
-							person={activePerson}
-							companyName={companyName}
-							related={related}
-							now={now}
-							properties={propertiesSvc}
-							entityTitleSource={titleSource}
-							showProperties={showProperties}
-							onToggleProperties={() => setShowProperties((v) => !v)}
-							onRenamePerson={(name) => void patchPerson(activePerson.id, { name })}
-							onPatch={(patch) => void patchPerson(activePerson.id, patch)}
-							onCreateCompany={(name) => void createCompanyFor(activePerson.id, name)}
-							onOpenCompany={() => {
-								if (activePerson.companyId) {
-									openEntityRef(intentsSvc, activePerson.companyId, COMPANY_TYPE);
-								}
-							}}
-							onOpenPerson={(id) => {
-								// A related person lives in the same vault — navigate in-app if we
-								// have it, otherwise route an open intent.
-								if (persons.some((p) => p.id === id)) select(id);
-								else openEntityRef(intentsSvc, id, PERSON_TYPE);
-							}}
-						/>
+						<YDocProvider resolver={getContactsResolver()}>
+							<PersonDetail
+								key={activePerson.id}
+								person={activePerson}
+								companyName={companyName}
+								now={now}
+								properties={propertiesSvc}
+								entityTitleSource={titleSource}
+								showProperties={showProperties}
+								onToggleProperties={() => setShowProperties((v) => !v)}
+								onRenamePerson={(name) => void patchPerson(activePerson.id, { name })}
+								onPatch={(patch) => void patchPerson(activePerson.id, patch)}
+								onCreateCompany={(name) => void createCompanyFor(activePerson.id, name)}
+								onOpenCompany={() => {
+									if (activePerson.companyId) {
+										openEntityRef(intentsSvc, activePerson.companyId, COMPANY_TYPE);
+									}
+								}}
+							/>
+						</YDocProvider>
 					) : companyFilter ? (
 						<div className="contacts__company-landing">
 							<button

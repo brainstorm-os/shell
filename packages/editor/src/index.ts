@@ -583,6 +583,11 @@ export { DEFAULT_SNIPPET_LENGTH, clipPlainText } from "./clip-plain-text";
 export { type DenormalizedBody, denormalizeBody } from "./denormalize-body";
 export { extractPlainText } from "./extract-text";
 export { extractTitle } from "./extract-title";
+export {
+	hasLegacyText,
+	plainTextToSerializedState,
+	shouldClearLegacyText,
+} from "./plain-text-state";
 export { createLocalProvider } from "./local-provider";
 export { BASELINE_NODES } from "./nodes";
 export { type PlantStateOptions, plantSerializedStateIntoDoc } from "./plant-state";

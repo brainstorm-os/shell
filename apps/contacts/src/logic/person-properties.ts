@@ -30,13 +30,15 @@ export const PERSON_PROP_KEY = {
 	company: "company",
 	role: "role",
 	birthday: "birthday",
+	anniversary: "anniversary",
 	links: "links",
-	bio: "bio",
 } as const;
 
 /** Render order. Email / phone are stored multi-value but edited as a
- *  newline-delimited Multiline field; company is resolved + read-only;
- *  role / birthday / notes are scalar editable cells. */
+ *  newline-delimited Multiline field; company / related-people are entity-ref
+ *  picker cells; role / birthday / anniversary are scalar editable cells.
+ *  Free-form notes are NOT a property row — they live in the page's body
+ *  editor (the `bio` string is only the legacy seed for it). */
 export const PERSON_PROPERTY_DEFS: readonly PropertyDef[] = [
 	{
 		key: PERSON_PROP_KEY.email,
@@ -69,19 +71,19 @@ export const PERSON_PROPERTY_DEFS: readonly PropertyDef[] = [
 		granularity: DateGranularity.Date,
 	},
 	{
+		key: PERSON_PROP_KEY.anniversary,
+		name: t("prop.anniversary"),
+		icon: null,
+		valueType: ValueType.Date,
+		granularity: DateGranularity.Date,
+	},
+	{
 		key: PERSON_PROP_KEY.links,
 		name: t("prop.related"),
 		icon: null,
 		valueType: ValueType.EntityRef,
 		allowedTypes: [PERSON_TYPE],
 		count: { min: 0, max: CARDINALITY_HARD_MAX },
-	},
-	{
-		key: PERSON_PROP_KEY.bio,
-		name: t("prop.bio"),
-		icon: null,
-		valueType: ValueType.Text,
-		display: { view: PropertyView.Multiline },
 	},
 ];
 
@@ -102,11 +104,16 @@ export function personToValues(person: Person): ValuesMap {
 		[PERSON_PROP_KEY.links]: person.linkIds.map(
 			(id) => ({ value: id }) satisfies LabeledValue<string>,
 		),
-		[PERSON_PROP_KEY.bio]: person.bio,
 	};
 	if (person.birthday !== null) {
 		values[PERSON_PROP_KEY.birthday] = {
 			at: person.birthday,
+			granularity: DateGranularity.Date,
+		} satisfies DateValue;
+	}
+	if (person.anniversary !== null) {
+		values[PERSON_PROP_KEY.anniversary] = {
+			at: person.anniversary,
 			granularity: DateGranularity.Date,
 		} satisfies DateValue;
 	}
@@ -147,11 +154,13 @@ export function applyPersonPropertyValue(
 			return { phone: splitMultiValue(next) };
 		case PERSON_PROP_KEY.role:
 			return { role: typeof next === "string" ? next.trim() : "" };
-		case PERSON_PROP_KEY.bio:
-			return { bio: typeof next === "string" ? next : "" };
 		case PERSON_PROP_KEY.birthday: {
 			const date = next && typeof next === "object" ? (next as DateValue) : null;
 			return { birthday: date && Number.isFinite(date.at) ? date.at : null };
+		}
+		case PERSON_PROP_KEY.anniversary: {
+			const date = next && typeof next === "object" ? (next as DateValue) : null;
+			return { anniversary: date && Number.isFinite(date.at) ? date.at : null };
 		}
 		case PERSON_PROP_KEY.company:
 			return { company: typeof next === "string" && next ? next : null };

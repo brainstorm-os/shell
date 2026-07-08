@@ -1,10 +1,12 @@
 /**
- * Person properties inspector — a thin adapter over the SHARED
- * `@brainstorm/sdk/properties-panel`. It maps a person's bridged fields (see
- * `logic/person-properties.ts`) to the generic `rows` the shared panel renders;
- * all chrome (glass slide-over, header, grid rows) lives in the SDK component,
- * identical to Notes / Journal / Database / Bookmarks. Company is resolved +
- * read-only; email / phone / role / birthday / notes write back.
+ * Person properties — thin adapters over the SHARED
+ * `@brainstorm/sdk/properties-panel`. `personPropertyRows` maps a person's
+ * bridged fields (see `logic/person-properties.ts`) to the generic `rows`
+ * the shared panel renders; the same rows feed BOTH surfaces: the inline
+ * block at the top of the contact page (the Tasks-detail convention) and
+ * the slide-over inspector (full list + comments). All chrome (glass
+ * slide-over, header, grid rows) lives in the SDK component, identical to
+ * Notes / Journal / Database / Bookmarks / Tasks.
  */
 
 import { EntityCommentsPanel } from "@brainstorm/editor";
@@ -20,6 +22,26 @@ import {
 import { getBrainstorm } from "../runtime";
 import type { Person } from "../types/person";
 
+/** Build the shared-cell rows for a person — one code path for the inline
+ *  page block and the slide-over inspector, so both edit identically. */
+export function personPropertyRows(
+	person: Person,
+	onPatch: (patch: Record<string, unknown>) => void,
+): PropertiesPanelRow[] {
+	const values = personToValues(person);
+	return PERSON_PROPERTY_DEFS.map((def) => {
+		const readOnly = READONLY_PERSON_PROP_KEYS.has(def.key);
+		const row: PropertiesPanelRow = { def, value: readValue(values, def), readOnly };
+		if (!readOnly) {
+			row.onChange = (next) => {
+				const patch = applyPersonPropertyValue(def.key, next);
+				if (patch) onPatch(patch);
+			};
+		}
+		return row;
+	});
+}
+
 export type PersonPropertiesPanelProps = {
 	person: Person;
 	open: boolean;
@@ -33,18 +55,7 @@ export function PersonPropertiesPanel({
 	onPatch,
 	onClose,
 }: PersonPropertiesPanelProps): React.ReactElement {
-	const values = personToValues(person);
-	const rows: PropertiesPanelRow[] = PERSON_PROPERTY_DEFS.map((def) => {
-		const readOnly = READONLY_PERSON_PROP_KEYS.has(def.key);
-		const row: PropertiesPanelRow = { def, value: readValue(values, def), readOnly };
-		if (!readOnly) {
-			row.onChange = (next) => {
-				const patch = applyPersonPropertyValue(def.key, next);
-				if (patch) onPatch(patch);
-			};
-		}
-		return row;
-	});
+	const rows = personPropertyRows(person, onPatch);
 	const services = getBrainstorm()?.services ?? null;
 	return (
 		<aside
