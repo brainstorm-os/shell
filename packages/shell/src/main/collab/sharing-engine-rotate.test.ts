@@ -12,9 +12,16 @@
  *   3. the REVOKED guest has NO wrap of the new DEK anywhere in the doc — the
  *      best key their device can recover is the old, now-superseded DEK.
  *
+ * ⚠️ SCOPE — this is the OWNER-SIDE invariant only. It confirms the DEK′ wrap
+ * exists and decrypts for a survivor; it does NOT drive the survivor's runtime
+ * `installWrap`/`installEntityDek` receive path, which the ROT-4 review found
+ * currently NO-OPS when a DEK is already installed (F-ROT-1) — so a live
+ * survivor is in fact locked out until `ROT-3a-i` (versioned/monotonic DEK
+ * install) lands. See docs/_review/2026-07-09-rot-3a-security-review.md. Do not
+ * read this file's green as "rotation works end-to-end."
+ *
  * The 10.11 token re-home (metadata forward secrecy) is dormant in production
- * (design 73 §dormancy), so this pins only the content guarantee ROT-3a ships;
- * the residual metadata gap is ROT-3b.
+ * (design 73 §dormancy); the residual metadata gap is ROT-3b.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
