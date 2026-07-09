@@ -12,13 +12,13 @@
  *   3. the REVOKED guest has NO wrap of the new DEK anywhere in the doc — the
  *      best key their device can recover is the old, now-superseded DEK.
  *
- * ⚠️ SCOPE — this is the OWNER-SIDE invariant only. It confirms the DEK′ wrap
- * exists and decrypts for a survivor; it does NOT drive the survivor's runtime
- * `installWrap`/`installEntityDek` receive path, which the ROT-4 review found
- * currently NO-OPS when a DEK is already installed (F-ROT-1) — so a live
- * survivor is in fact locked out until `ROT-3a-i` (versioned/monotonic DEK
- * install) lands. See docs/_review/2026-07-09-rot-3a-security-review.md. Do not
- * read this file's green as "rotation works end-to-end."
+ * The first test pins the OWNER-SIDE invariant (the DEK′ wrap exists + decrypts
+ * for a survivor, never for the revoked member). The second drives the REAL
+ * survivor RECEIVE path end-to-end — install the initial wrap on guest B's own
+ * vault, rotate, install the DEK′ wrap — and proves the survivor UPGRADES to
+ * DEK′ (not locked out, F-ROT-1) while a replayed pre-rotation wrap is rejected
+ * (no rollback, F-ROT-3). Both close the ROT-4 findings via `ROT-3a-i`
+ * (versioned/monotonic DEK install). See docs/_review/2026-07-09-rot-3a-security-review.md.
  *
  * The 10.11 token re-home (metadata forward secrecy) is dormant in production
  * (design 73 §dormancy); the residual metadata gap is ROT-3b.
@@ -28,7 +28,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listWraps } from "../credentials/member-wraps";
+import { type MemberWrapPayload, listWraps, wrapDekVersionOf } from "../credentials/member-wraps";
+import { installEntityDek } from "../entities/install-wrap";
+import { EntitiesRepository } from "../storage/entities-repo";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
 import { AccessRole, resolveCurrentMembers } from "./access-record";
@@ -182,6 +184,86 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 
 		dekBefore.fill(0);
 		dekAfter.fill(0);
+	});
+
+	it("END-TO-END: a live survivor's real install path UPGRADES to DEK′ and rejects a replay", async () => {
+		await engine.provisionEntity(ENTITY, ENTITY_TYPE, { name: "secret" });
+		await engine.share({
+			entityId: ENTITY,
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestA, "A"),
+			role: AccessRole.Editor,
+		});
+		await engine.share({
+			entityId: ENTITY,
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestB, "B"),
+			role: AccessRole.Editor,
+		});
+
+		// Guest B's OWN vault: materialize the entity row + its DEK store/repo, as
+		// the production receive path does, so we can run B's real install path.
+		const bStore = await guestB.entityDekStore();
+		const bRepo = new EntitiesRepository(await guestB.dataStores.open("entities"));
+		bRepo.create({
+			id: ENTITY,
+			type: ENTITY_TYPE,
+			properties: { name: "secret" },
+			createdBy: guestB.identity.publicKeyBase64,
+			now: Date.now(),
+			dekId: bStore.nextDekId(),
+		});
+
+		const bWrapAt = async (version: number): Promise<MemberWrapPayload> => {
+			const { doc } = await owner.ydocStore.load(ENTITY);
+			try {
+				const mine = guestB.deviceX25519.publicKeyBase64;
+				const w = listWraps(doc).find(
+					(x) => x.recipientPubB64 === mine && wrapDekVersionOf(x) === version,
+				);
+				if (!w) throw new Error(`no B wrap at version ${version}`);
+				return w;
+			} finally {
+				doc.destroy();
+			}
+		};
+		const bInstall = (wrap: MemberWrapPayload): boolean => {
+			const dek = guestB.unwrapMemberWrap(wrap, ENTITY);
+			try {
+				return installEntityDek(ENTITY, dek, wrapDekVersionOf(wrap), bStore, bRepo);
+			} finally {
+				dek.fill(0);
+			}
+		};
+		const bCurrentDek = (): Uint8Array => {
+			const h = bStore.open(ENTITY);
+			if (!h) throw new Error("B has no DEK");
+			const copy = new Uint8Array(h.dek);
+			bStore.close(h.dek);
+			return copy;
+		};
+
+		// B installs the initial (v1) wrap → holds the shared DEK.
+		const initialWrap = await bWrapAt(1);
+		expect(bInstall(initialWrap)).toBe(true);
+		const dekV1 = await currentDek(ENTITY);
+		expect(bytesEqual(bCurrentDek(), dekV1)).toBe(true);
+
+		// Owner revokes A → rotation mints DEK′ + re-wraps for B.
+		expect(await engine.revoke(ENTITY, guestA.identity.publicKeyBase64)).toBe(true);
+		const dekV2 = await currentDek(ENTITY);
+		expect(bytesEqual(dekV2, dekV1)).toBe(false);
+
+		// B installs the rotation (v2) wrap → UPGRADES to DEK′ (F-ROT-1 closed).
+		expect(bInstall(await bWrapAt(2))).toBe(true);
+		expect(bytesEqual(bCurrentDek(), dekV2)).toBe(true);
+
+		// A replayed pre-rotation (v1) wrap does NOT roll B back (F-ROT-3 closed).
+		expect(bInstall(initialWrap)).toBe(false);
+		expect(bytesEqual(bCurrentDek(), dekV2)).toBe(true);
+
+		dekV1.fill(0);
+		dekV2.fill(0);
 	});
 
 	it("is a no-op rotation when there is no active relay (deferred), but still records the revoke", async () => {

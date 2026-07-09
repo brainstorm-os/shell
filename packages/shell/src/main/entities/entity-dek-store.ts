@@ -38,6 +38,10 @@ import type { EntityDeksRepository } from "../storage/entities-repo";
 export type EntityDekHandle = {
 	dekId: string;
 	dek: Uint8Array;
+	/** The DEK's monotonic rotation ordinal (1 for an entity's first DEK,
+	 *  incremented on each rotate-on-revoke). Stamped into the member wrap so
+	 *  the recipient's install path can order it (ROT-3a-i). */
+	version: number;
 };
 
 /** Domain-separation prefix for the per-entity DEK AAD. Combined with the
@@ -97,10 +101,11 @@ export class EntityDekStore {
 	persist(entityId: string, dekId: string): EntityDekHandle {
 		assertNonEmptyEntityId(entityId);
 		const dek = generateSymmetricKey();
+		const version = this.#deks.maxVersionForEntity(entityId) + 1;
 		try {
 			const sealed = sealSecret(this.#masterKey, dek, entityIdAad(entityId));
-			this.#deks.create({ dekId, entityId, sealedDek: sealed, now: this.#clock() });
-			return { dekId, dek };
+			this.#deks.create({ dekId, entityId, version, sealedDek: sealed, now: this.#clock() });
+			return { dekId, dek, version };
 		} catch (error) {
 			dek.fill(0);
 			throw error;
@@ -118,17 +123,29 @@ export class EntityDekStore {
 	 *
 	 * The caller is responsible for zeroing `dek` after the returned handle
 	 * is closed. This method does NOT take ownership of the passed bytes.
+	 *
+	 * `version` is the DEK's rotation ordinal. On the survivor install path
+	 * (ROT-3a-i) it MUST be the owner-assigned ordinal recovered from the
+	 * (AAD-authenticated) wrap — never a locally-recomputed one — so a replayed
+	 * old wrap can't masquerade as newest. Omitted ⇒ `maxVersion + 1` (the soak
+	 * harness, which just needs monotonicity, not a specific ordinal).
 	 */
-	persistWithDek(entityId: string, dekId: string, dek: Uint8Array): EntityDekHandle {
+	persistWithDek(
+		entityId: string,
+		dekId: string,
+		dek: Uint8Array,
+		version?: number,
+	): EntityDekHandle {
 		assertNonEmptyEntityId(entityId);
 		if (!(dek instanceof Uint8Array) || dek.length !== 32) {
 			throw new Error("EntityDekStore.persistWithDek: dek must be a 32-byte Uint8Array");
 		}
+		const ordinal = version ?? this.#deks.maxVersionForEntity(entityId) + 1;
 		const copy = new Uint8Array(dek);
 		try {
 			const sealed = sealSecret(this.#masterKey, copy, entityIdAad(entityId));
-			this.#deks.create({ dekId, entityId, sealedDek: sealed, now: this.#clock() });
-			return { dekId, dek: copy };
+			this.#deks.create({ dekId, entityId, version: ordinal, sealedDek: sealed, now: this.#clock() });
+			return { dekId, dek: copy, version: ordinal };
 		} catch (error) {
 			copy.fill(0);
 			throw error;
@@ -155,7 +172,7 @@ export class EntityDekStore {
 		if (!row) return null;
 		const dek = openSecret(this.#masterKey, row.sealedDek, entityIdAad(entityId));
 		try {
-			return { dekId: row.dekId, dek };
+			return { dekId: row.dekId, dek, version: row.version };
 		} catch (error) {
 			dek.fill(0);
 			throw error;

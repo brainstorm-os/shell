@@ -117,7 +117,7 @@ import {
 } from "./credentials/billing-refresh-credential";
 import { bytesToBase64 } from "./credentials/crypto";
 import { verifySignature } from "./credentials/identity";
-import { wrapDekForRecipient } from "./credentials/member-wraps";
+import { wrapDekForRecipient, wrapDekVersionOf } from "./credentials/member-wraps";
 import { makeDashboardServiceHandler } from "./dashboard/dashboard-service";
 import {
 	WIDGET_FRAME_SCHEME_PRIVILEGE,
@@ -2794,7 +2794,7 @@ void app.whenReady().then(async () => {
 									dekId: null,
 								});
 							}
-							installEntityDek(entityId, dek, dekStore, repo);
+							installEntityDek(entityId, dek, wrapDekVersionOf(wrap), dekStore, repo);
 							return type;
 						} finally {
 							dek.fill(0);

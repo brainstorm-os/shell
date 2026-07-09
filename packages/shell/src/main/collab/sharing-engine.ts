@@ -25,6 +25,7 @@ import {
 	appendWrap,
 	findWrapForRecipient,
 	wrapDekForRecipient,
+	wrapDekVersionOf,
 } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { installEntityDek } from "../entities/install-wrap";
@@ -285,7 +286,7 @@ export class SharingEngine {
 					});
 					const existing = findWrapForRecipient(doc, recipientPub);
 					if (existing) return existing;
-					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType);
+					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType, handle.version);
 					appendWrap(doc, w);
 					return w;
 				});
@@ -368,6 +369,7 @@ export class SharingEngine {
 					signerSecret: exposed.secretKey,
 					now: Date.now(),
 					type,
+					dekVersion: handle.version,
 				});
 			});
 		} finally {
@@ -498,7 +500,7 @@ export class SharingEngine {
 		const dek = this.#session.unwrapMemberWrap(wrap, entityId);
 		try {
 			const repo = await this.ensureEntitiesRepo();
-			installEntityDek(entityId, dek, dekStore, repo);
+			installEntityDek(entityId, dek, wrapDekVersionOf(wrap), dekStore, repo);
 		} finally {
 			dek.fill(0);
 		}

@@ -53,7 +53,7 @@ class FakeDekStore {
 	open(entityId: string): EntityDekHandle | null {
 		const dek = this.deks.get(entityId);
 		if (!dek) return null;
-		return { dekId: "dek-id", dek: new Uint8Array(dek) };
+		return { dekId: "dek-id", dek: new Uint8Array(dek), version: 1 };
 	}
 	close(dek: Uint8Array): void {
 		dek.fill(0);
@@ -243,6 +243,7 @@ describe("bundled backfill applies identically to the per-frame stream (10.10)",
 			ENT,
 			{
 				v: MEMBER_WRAP_VERSION,
+				version: 1,
 				alg: MEMBER_WRAP_ALG,
 				recipientPubB64: "cmVjaXBpZW50",
 				encB64: "ZW5j",
