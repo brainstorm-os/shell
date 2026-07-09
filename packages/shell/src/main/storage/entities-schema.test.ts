@@ -29,11 +29,11 @@ function listTables(db: Awaited<ReturnType<typeof fresh>>): TableInfo[] {
 }
 
 describe("entities.db schema", () => {
-	it("fresh install applies v1..v7 in order and ends at version 7", async () => {
+	it("fresh install applies v1..v8 in order and ends at version 8", async () => {
 		const db = await fresh();
 		try {
-			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(7);
-			expect(getSchemaVersion(db)).toBe(7);
+			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(8);
+			expect(getSchemaVersion(db)).toBe(8);
 			const names = listTables(db).map((t) => t.name);
 			expect(names).toContain("entities");
 			expect(names).toContain("links");
@@ -51,10 +51,10 @@ describe("entities.db schema", () => {
 		const db = await fresh();
 		try {
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(7);
+			expect(getSchemaVersion(db)).toBe(8);
 			// Second pass — nothing pending, version stays at 6.
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(7);
+			expect(getSchemaVersion(db)).toBe(8);
 		} finally {
 			db.close();
 		}
@@ -78,7 +78,7 @@ describe("entities.db schema", () => {
 			insert.run("journal-ideas", NOTE, "{}", "io.brainstorm.notes", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(7);
+			expect(getSchemaVersion(db)).toBe(8);
 
 			const typeOf = (id: string) =>
 				(db.prepare("SELECT type, created_by FROM entities WHERE id = ?").get(id) as {
@@ -110,7 +110,7 @@ describe("entities.db schema", () => {
 			insert.run("p_kenji", PERSON, JSON.stringify({ name: "Kenji" }), "x", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(7);
+			expect(getSchemaVersion(db)).toBe(8);
 
 			// Two Company entities created, one per distinct name.
 			const companies = db

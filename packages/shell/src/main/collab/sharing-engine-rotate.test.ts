@@ -266,26 +266,71 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		dekV2.fill(0);
 	});
 
-	it("is a no-op rotation when there is no active relay (deferred), but still records the revoke", async () => {
-		const offlineEngine = new SharingEngine(owner, () => null);
-		await offlineEngine.provisionEntity("ent_offline", ENTITY_TYPE, { name: "offline" });
-		await offlineEngine
-			.share({
-				entityId: "ent_offline",
-				type: ENTITY_TYPE,
-				invite: inviteFrom(guestA, "A"),
-				role: AccessRole.Editor,
-			})
-			.catch(() => {
-				/* share needs a relay; provision alone is enough to seed the DEK row */
-			});
-		const before = await currentDek("ent_offline");
-		const revoked = await offlineEngine.revoke("ent_offline", guestA.identity.publicKeyBase64);
-		expect(revoked).toBe(true);
-		// No relay → rotation deferred → DEK unchanged.
-		const after = await currentDek("ent_offline");
-		expect(bytesEqual(after, before)).toBe(true);
-		before.fill(0);
-		after.fill(0);
+	it("ROT-3a-ii: an OFFLINE revoke still mints DEK′ + wraps + marks pending; reconnect drain finishes it", async () => {
+		const p0 = ports[0];
+		if (!p0) throw new Error("no port");
+		let online = true;
+		const flappy = new SharingEngine(owner, () => (online ? relayAdapter(p0) : null));
+		const ENT = "ent_flappy";
+		await flappy.provisionEntity(ENT, ENTITY_TYPE, { name: "flappy" });
+		await flappy.share({
+			entityId: ENT,
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestA, "A"),
+			role: AccessRole.Editor,
+		});
+		await flappy.share({
+			entityId: ENT,
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestB, "B"),
+			role: AccessRole.Editor,
+		});
+		const dekBefore = await currentDek(ENT);
+		const pending = await flappy.ensurePendingRotationsRepo();
+
+		// Go offline, then revoke A.
+		online = false;
+		expect(await flappy.revoke(ENT, guestA.identity.publicKeyBase64)).toBe(true);
+
+		// DURABLE half ran even offline: DEK rotated locally, survivor B's DEK′
+		// wrap is in the doc, and the entity is marked pending for wire delivery.
+		const dekAfter = await currentDek(ENT);
+		expect(bytesEqual(dekAfter, dekBefore)).toBe(false);
+		expect(await docHasWrapYielding(ENT, guestB, dekAfter)).toBe(true);
+		expect(await docHasWrapYielding(ENT, guestA, dekAfter)).toBe(false);
+		expect(pending.has(ENT)).toBe(true);
+
+		// A drain while still offline is a no-op (nothing delivered, still pending).
+		expect((await flappy.drainPendingRotations()).drained).toBe(0);
+		expect(pending.has(ENT)).toBe(true);
+
+		// Reconnect → drain delivers the deferred wire half and clears the mark.
+		online = true;
+		const res = await flappy.drainPendingRotations();
+		expect(res.drained).toBe(1);
+		expect(res.remaining).toBe(0);
+		expect(pending.has(ENT)).toBe(false);
+
+		dekBefore.fill(0);
+		dekAfter.fill(0);
+	});
+
+	it("ROT-3a-ii: an ONLINE revoke delivers immediately and leaves nothing pending", async () => {
+		await engine.provisionEntity("ent_online", ENTITY_TYPE, { name: "online" });
+		await engine.share({
+			entityId: "ent_online",
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestA, "A"),
+			role: AccessRole.Editor,
+		});
+		await engine.share({
+			entityId: "ent_online",
+			type: ENTITY_TYPE,
+			invite: inviteFrom(guestB, "B"),
+			role: AccessRole.Editor,
+		});
+		expect(await engine.revoke("ent_online", guestA.identity.publicKeyBase64)).toBe(true);
+		const pending = await engine.ensurePendingRotationsRepo();
+		expect(pending.has("ent_online")).toBe(false);
 	});
 });

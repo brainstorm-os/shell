@@ -3173,6 +3173,22 @@ void app.whenReady().then(async () => {
 		},
 	});
 
+	// ROT-3a-ii (design 73, F-ROT-4) — finish any rotate-on-revoke wire delivery
+	// that was deferred (an offline revoke, or an emit failure) whenever the
+	// transport (re)connects and once per session open. `drainPendingRotations`
+	// is self-guarded + single-in-flight, so firing on every state change is
+	// safe (mirrors `drainAssetUploads` above).
+	const drainRotations = () => {
+		if (!getActiveVaultSession()) return;
+		void autoShareEngine()
+			.drainPendingRotations()
+			.catch((error: unknown) => {
+				console.warn(`[sharing] rotation drain failed: ${(error as Error).message}`);
+			});
+	};
+	getActiveRelay()?.on("state", () => drainRotations());
+	onActiveVaultSessionChanged(() => drainRotations());
+
 	workers.broker.registerService(
 		"search",
 		makeSearchServiceHandler({

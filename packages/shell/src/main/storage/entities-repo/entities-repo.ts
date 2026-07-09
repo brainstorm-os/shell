@@ -432,6 +432,8 @@ export class EntitiesRepository {
 		// pragma is on; the explicit DELETE here mirrors the links + change_log
 		// cleanup so a hard-delete is total regardless of pragma state.
 		this.stmt("DELETE FROM entity_deks WHERE entity_id = ?").run(id);
+		// ROT-3a-ii — the deferred-rotation mark (same pragma-independent posture).
+		this.stmt("DELETE FROM pending_rotations WHERE entity_id = ?").run(id);
 		return true;
 	}
 
