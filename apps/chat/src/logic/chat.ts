@@ -321,13 +321,10 @@ export function authorColor(authorRef: string): string {
 	return AUTHOR_COLORS[idx] ?? AUTHOR_COLORS[0] ?? "#5b8def";
 }
 
-/** Up-to-two-letter initials for an avatar, from a display name. */
-export function initials(name: string): string {
-	const parts = name.trim().split(/\s+/).filter(Boolean);
-	if (parts.length === 0) return "?";
-	if (parts.length === 1) return (parts[0] ?? "").slice(0, 2).toUpperCase();
-	return `${(parts[0] ?? "").charAt(0)}${(parts[parts.length - 1] ?? "").charAt(0)}`.toUpperCase();
-}
+/** Up-to-two-letter avatar initials — the shared SDK helper (a second consumer
+ *  is `<PresenceStack>`, so it lives in `@brainstorm/sdk/presence-stack`).
+ *  Re-exported here so chat's existing importers are unchanged. */
+export { presenceInitials as initials } from "@brainstorm/sdk/presence-stack";
 
 // ─────────────────────────────── compose ───────────────────────────────
 
