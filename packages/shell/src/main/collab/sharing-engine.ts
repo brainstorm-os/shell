@@ -42,7 +42,9 @@ import {
 } from "./access-record";
 import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
+import { type RotateOnRevokePorts, rotateOnRevoke } from "./rotate-on-revoke";
 import { type ShareInvite, createShareInviteSigned, shareEntityWithInvite } from "./share-invite";
+import type { SurvivorWrap } from "./survivor-rewrap";
 
 function freshNonce(): Uint8Array {
 	const n = new Uint8Array(XCHACHA_NONCE_BYTES);
@@ -393,7 +395,73 @@ export class SharingEngine {
 				now: Date.now(),
 			});
 		});
+		if (revoked) await this.#rotateAfterRevoke(entityId);
 		return revoked;
+	}
+
+	/**
+	 * ROT-3a — rotate the entity DEK after a successful revoke so the removed
+	 * member's key no longer decrypts NEW content (content forward secrecy,
+	 * design 73). Mints DEK′, re-wraps it for the SURVIVORS only (ROT-1 excludes
+	 * the now-inactive member by construction), publishes those wraps to the
+	 * survivors' inboxes, then re-seals the snapshot under DEK′. The 10.11 token
+	 * re-home (which would ALSO give metadata forward secrecy) is dormant in
+	 * production (design 73 §dormancy), so `rotate` is a local no-op: emission
+	 * already flips to DEK′ because the store's most-recent-by-`created_at` row
+	 * IS DEK′. The revoked member stays subscribed to the entity channel and
+	 * still sees the (now-undecryptable) traffic — that residual metadata gap is
+	 * ROT-3b, gated on 10.11b.
+	 *
+	 * Delivering the survivor wraps needs an active relay; an offline revoke
+	 * records the signed removal but defers rotation (logged) to a future
+	 * reconnect hook — out of ROT-3a scope.
+	 */
+	async #rotateAfterRevoke(entityId: string): Promise<void> {
+		if (!this.#getRelay()) {
+			console.warn(`[sharing] revoke of ${entityId} not rotated: no active relay (deferred)`);
+			return;
+		}
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		let members: readonly ResolvedMember[];
+		try {
+			members = resolveCurrentMembers(doc, entityId);
+		} finally {
+			doc.destroy();
+		}
+		const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
+		const dekStore = await this.ensureDekStore();
+		const ports: RotateOnRevokePorts = {
+			mintDek: (id) => dekStore.persist(id, dekStore.nextDekId()),
+			currentMembers: () => members,
+			entityType: () => type,
+			publishWraps: (id, wraps) => this.#publishSurvivorWraps(id, wraps),
+			reSealSnapshot: (id) => this.#emitFullState(id),
+			// Token layer dormant (design 73 §dormancy): the most-recent DEK row is
+			// already DEK′, so local emission has flipped — no coordinator hop.
+			rotate: async () => {},
+			onSkipped: (id, skipped) =>
+				console.warn(
+					`[sharing] ${id}: ${skipped.length} survivor(s) had no device key — re-share needed`,
+				),
+		};
+		const { rewrapped } = await rotateOnRevoke(entityId, ports);
+		console.info(`[sharing] rotated ${entityId} on revoke: ${rewrapped} survivor wrap(s)`);
+	}
+
+	/** Publish survivor DEK′ wraps: append each into the entity doc (so a later
+	 *  new-device join can unwrap) and deliver it out-of-band to the survivor's
+	 *  inbox channel so a live survivor installs DEK′ before the next content
+	 *  frame. Mirrors the child-cascade wrap path. */
+	async #publishSurvivorWraps(entityId: string, wraps: readonly SurvivorWrap[]): Promise<void> {
+		if (wraps.length === 0) return;
+		await this.#mutateAndEmitReturning(entityId, (doc) => {
+			for (const { wrap } of wraps) appendWrap(doc, wrap);
+		});
+		const relay = this.requireRelay();
+		const ctx = this.makeCtx(relay.currentPort());
+		for (const { member, wrap } of wraps) {
+			await emitWrapBootstrap(entityId, wrap, ctx, inboxChannelFor(member));
+		}
 	}
 
 	/** The resolved access log (active + revoked audit) for `entityId`. */
