@@ -37,7 +37,7 @@ function ports(
 	return {
 		mintDek: vi.fn(() => {
 			calls.push("mint");
-			return { dek: mintedDek(), dekId: "dek2" };
+			return { dek: mintedDek(), dekId: "dek2", version: 2 };
 		}),
 		currentMembers: () => [
 			member({ member: "survivor", device: survivor }),
@@ -87,7 +87,7 @@ describe("rotateOnRevoke (ROT-2)", () => {
 		const p = ports({
 			mintDek: () => {
 				dekRef = mintedDek();
-				return { dek: dekRef, dekId: "dek2" };
+				return { dek: dekRef, dekId: "dek2", version: 2 };
 			},
 		});
 		await rotateOnRevoke(ENT, p);
@@ -102,7 +102,7 @@ describe("rotateOnRevoke (ROT-2)", () => {
 			mintDek: () => {
 				minted = true;
 				dekRef = mintedDek();
-				return { dek: dekRef, dekId: "dek2" };
+				return { dek: dekRef, dekId: "dek2", version: 2 };
 			},
 			rotate: async () => {
 				throw new Error("node denied the re-home");

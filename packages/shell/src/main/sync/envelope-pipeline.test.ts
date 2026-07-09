@@ -49,7 +49,7 @@ class FakeDekStore implements DekStoreSurface {
 	open(entityId: string): EntityDekHandle | null {
 		const dek = this.deks.get(entityId);
 		if (!dek) return null;
-		return { dekId: "dek-id", dek: new Uint8Array(dek) };
+		return { dekId: "dek-id", dek: new Uint8Array(dek), version: 1 };
 	}
 	close(dek: Uint8Array): void {
 		dek.fill(0);

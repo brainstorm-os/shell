@@ -206,6 +206,10 @@ export function shareEntityWithInvite(
 		/** Stage 10.14 — the entity's reverse-DNS type, sealed into the wrap so a
 		 *  cold device can materialize the row on restore. Optional for back-compat. */
 		type?: string;
+		/** ROT-3a-i — the DEK's rotation ordinal (from the open handle). Stamped
+		 *  into the wrap so the invitee's install path can order it against a
+		 *  later rotation. Omitted ⇒ a v1 (ordinal-1) wrap. */
+		dekVersion?: number;
 	},
 ): MemberWrapPayload {
 	// Validate everything that can fail BEFORE any mutation, so a rejected
@@ -246,7 +250,13 @@ export function shareEntityWithInvite(
 	});
 
 	if (existingWrap !== null) return existingWrap;
-	const wrap = wrapDekForRecipient(opts.dek, recipientPub, opts.entityId, opts.type);
+	const wrap = wrapDekForRecipient(
+		opts.dek,
+		recipientPub,
+		opts.entityId,
+		opts.type,
+		opts.dekVersion,
+	);
 	appendWrap(doc, wrap);
 	return wrap;
 }

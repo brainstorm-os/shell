@@ -17,6 +17,7 @@ import {
 	unwrapDekAndTypeForRecipient,
 	unwrapDekForRecipient,
 	wrapDekForRecipient,
+	wrapDekVersionOf,
 } from "./member-wraps";
 
 function freshEntity(): { doc: Y.Doc; id: string } {
@@ -76,12 +77,41 @@ describe("member-wraps schema (Stage 10.2)", () => {
 		it("stamps the schema version + algorithm + recipient pub", () => {
 			const device = generateDeviceX25519();
 			const dek = generateSymmetricKey();
+			// A bare (no-ordinal) wrap stays v1 — wire-identical to pre-ROT-3a-i.
 			const wrap = wrapDekForRecipient(dek, device.publicKey, "ent_x");
-			expect(wrap.v).toBe(MEMBER_WRAP_VERSION);
+			expect(wrap.v).toBe(1);
+			expect(wrap.version).toBeUndefined();
 			expect(wrap.alg).toBe(MEMBER_WRAP_ALG);
 			expect(wrap.recipientPubB64).toBe(Buffer.from(device.publicKey).toString("base64"));
 			expect(wrap.encB64.length).toBeGreaterThan(0);
 			expect(wrap.ctB64.length).toBeGreaterThan(0);
+		});
+
+		it("a versioned wrap stamps v2 + the ordinal, and round-trips (ROT-3a-i)", () => {
+			const device = generateDeviceX25519();
+			const dek = generateSymmetricKey();
+			const wrap = wrapDekForRecipient(dek, device.publicKey, "ent_x", undefined, 5);
+			expect(wrap.v).toBe(MEMBER_WRAP_VERSION);
+			expect(wrap.version).toBe(5);
+			expect(wrapDekVersionOf(wrap)).toBe(5);
+			const opened = unwrapDekForRecipient(wrap, device.secretKey, "ent_x");
+			expect([...opened]).toEqual([...dek]);
+		});
+
+		it("wrapDekVersionOf treats a v1 wrap as ordinal 1", () => {
+			const device = generateDeviceX25519();
+			const wrap = wrapDekForRecipient(generateSymmetricKey(), device.publicKey, "ent_x");
+			expect(wrapDekVersionOf(wrap)).toBe(1);
+		});
+
+		it("the AAD-bound ordinal is authenticated: tampering `version` fails the unwrap", () => {
+			const device = generateDeviceX25519();
+			const dek = generateSymmetricKey();
+			const wrap = wrapDekForRecipient(dek, device.publicKey, "ent_x", undefined, 3);
+			// A relay that re-labels the ordinal (to masquerade as newer) breaks the
+			// AEAD tag — the reconstructed AAD no longer matches (anti-rollback).
+			const tampered = { ...wrap, version: 99 };
+			expect(() => unwrapDekForRecipient(tampered, device.secretKey, "ent_x")).toThrow();
 		});
 
 		it("encB64 decodes to a 32-byte ephemeral pubkey; ctB64 decodes to 48 bytes (32 DEK + 16 tag)", () => {

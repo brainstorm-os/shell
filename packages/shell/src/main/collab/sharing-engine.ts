@@ -25,11 +25,12 @@ import {
 	appendWrap,
 	findWrapForRecipient,
 	wrapDekForRecipient,
+	wrapDekVersionOf,
 } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { installEntityDek } from "../entities/install-wrap";
 import { queryVaultListSource } from "../entities/vault-entities-service";
-import { EntitiesRepository } from "../storage/entities-repo";
+import { EntitiesRepository, PendingRotationsRepository } from "../storage/entities-repo";
 import { type PipelineContext, emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
 import type { VaultSession } from "../vault/session";
@@ -43,6 +44,7 @@ import {
 import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
 import { type ShareInvite, createShareInviteSigned, shareEntityWithInvite } from "./share-invite";
+import { type SurvivorWrap, rewrapDekForSurvivors } from "./survivor-rewrap";
 
 function freshNonce(): Uint8Array {
 	const n = new Uint8Array(XCHACHA_NONCE_BYTES);
@@ -85,6 +87,8 @@ export class SharingEngine {
 	readonly #appendQueues = new Map<string, Promise<unknown>>();
 	#dekStore: EntityDekStore | null = null;
 	#entitiesRepo: EntitiesRepository | null = null;
+	#pendingRepo: PendingRotationsRepository | null = null;
+	#draining = false;
 
 	constructor(session: VaultSession, getRelay: () => CollabRelayLike | null) {
 		this.#session = session;
@@ -283,7 +287,7 @@ export class SharingEngine {
 					});
 					const existing = findWrapForRecipient(doc, recipientPub);
 					if (existing) return existing;
-					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType);
+					const w = wrapDekForRecipient(handle.dek, recipientPub, childId, childType, handle.version);
 					appendWrap(doc, w);
 					return w;
 				});
@@ -366,6 +370,7 @@ export class SharingEngine {
 					signerSecret: exposed.secretKey,
 					now: Date.now(),
 					type,
+					dekVersion: handle.version,
 				});
 			});
 		} finally {
@@ -393,7 +398,146 @@ export class SharingEngine {
 				now: Date.now(),
 			});
 		});
+		if (revoked) await this.#rotateAfterRevoke(entityId);
 		return revoked;
+	}
+
+	/**
+	 * ROT-3a — rotate the entity DEK after a successful revoke so the removed
+	 * member's key no longer decrypts NEW content (content forward secrecy,
+	 * design 73). Mints DEK′, re-wraps it for the SURVIVORS only (ROT-1 excludes
+	 * the now-inactive member by construction), publishes those wraps to the
+	 * survivors' inboxes, then re-seals the snapshot under DEK′. The 10.11 token
+	 * re-home (which would ALSO give metadata forward secrecy) is dormant in
+	 * production (design 73 §dormancy), so `rotate` is a local no-op: emission
+	 * already flips to DEK′ because the store's most-recent-by-`created_at` row
+	 * IS DEK′. The revoked member stays subscribed to the entity channel and
+	 * still sees the (now-undecryptable) traffic — that residual metadata gap is
+	 * ROT-3b, gated on 10.11b.
+	 *
+	 * Delivering the survivor wraps needs an active relay; an offline revoke
+	 * records the signed removal but defers rotation (logged) to a future
+	 * reconnect hook — out of ROT-3a scope.
+	 */
+	async #rotateAfterRevoke(entityId: string): Promise<void> {
+		// The DURABLE half always runs, online or off: mint DEK′ (so emission has
+		// flipped even for offline post-revoke edits), re-wrap the survivors, and
+		// append those wraps into the doc (so a later cold/new-device join can
+		// unwrap). Only the WIRE half — delivering the inbox `WrapBootstrap` so a
+		// LIVE survivor installs DEK′ — needs a relay; when it can't complete
+		// (offline, or an emit throw) the entity is marked pending and the drain
+		// (relay-connect + boot) finishes it. This is ROT-3a-ii / F-ROT-4: revoke
+		// no longer silently loses the rotation.
+		const members = await this.#currentMembersOf(entityId);
+		const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
+		const dekStore = await this.ensureDekStore();
+		const handle = dekStore.persist(entityId, dekStore.nextDekId());
+		const version = handle.version;
+		let wraps: SurvivorWrap[];
+		let skipped: string[];
+		try {
+			({ wraps, skipped } = rewrapDekForSurvivors(handle.dek, version, members, entityId, type));
+		} finally {
+			dekStore.close(handle.dek);
+		}
+		if (skipped.length > 0) {
+			console.warn(`[sharing] ${entityId}: ${skipped.length} survivor(s) had no device key`);
+		}
+		if (wraps.length > 0) {
+			await this.#mutateAndEmitReturning(entityId, (doc) => {
+				for (const { wrap } of wraps) appendWrap(doc, wrap);
+			});
+		}
+		const pending = await this.ensurePendingRotationsRepo();
+		const delivered = await this.#deliverRotationWire(entityId, wraps);
+		if (delivered) {
+			pending.remove(entityId);
+		} else {
+			pending.mark(entityId, version, Date.now());
+		}
+		console.info(
+			`[sharing] rotated ${entityId} on revoke: v${version}, ${wraps.length} wrap(s), delivered=${delivered}`,
+		);
+	}
+
+	/** Deliver the inbox `WrapBootstrap` for each survivor wrap + re-seal the
+	 *  snapshot under DEK′ over the wire. Returns true when delivery completed
+	 *  (or there was nothing to deliver), false when it must be deferred (no
+	 *  relay, or an emit threw) — the caller then marks the entity pending. */
+	async #deliverRotationWire(entityId: string, wraps: readonly SurvivorWrap[]): Promise<boolean> {
+		const relay = this.#getRelay();
+		if (!relay) return wraps.length === 0; // nothing to send ⇒ nothing pending
+		try {
+			const ctx = this.makeCtx(relay.currentPort());
+			for (const { member, wrap } of wraps) {
+				await emitWrapBootstrap(entityId, wrap, ctx, inboxChannelFor(member));
+			}
+			await this.#emitFullState(entityId);
+			return true;
+		} catch (error) {
+			console.warn(
+				`[sharing] deferred rotation delivery for ${entityId}: ${(error as Error).message}`,
+			);
+			return false;
+		}
+	}
+
+	/** Re-derive the survivor wraps for the entity's CURRENT DEK (the drain
+	 *  path — it has no in-memory wraps). Empty when the entity has no DEK. */
+	async #rederiveSurvivorWraps(entityId: string): Promise<SurvivorWrap[]> {
+		const dekStore = await this.ensureDekStore();
+		const handle = dekStore.open(entityId);
+		if (!handle) return [];
+		try {
+			const members = await this.#currentMembersOf(entityId);
+			const type = this.#types.get(entityId) ?? (await this.ensureEntitiesRepo()).get(entityId)?.type;
+			return rewrapDekForSurvivors(handle.dek, handle.version, members, entityId, type).wraps;
+		} finally {
+			dekStore.close(handle.dek);
+		}
+	}
+
+	/**
+	 * ROT-3a-ii drain — finish the wire delivery for every entity whose rotation
+	 * was deferred (offline revoke / emit failure). Idempotent and safe to call
+	 * repeatedly; wired to relay-connect + session boot. Re-derives each entity's
+	 * survivor wraps from its CURRENT DEK (so a rotation superseded while offline
+	 * still delivers the latest key), re-emits the inbox bootstraps + full state,
+	 * and clears the pending mark on success. A row whose entity lost its DEK is
+	 * dropped (the FK cascade already removes deleted entities).
+	 */
+	async drainPendingRotations(): Promise<{ drained: number; remaining: number }> {
+		if (this.#draining) return { drained: 0, remaining: -1 };
+		this.#draining = true;
+		try {
+			const pending = await this.ensurePendingRotationsRepo();
+			const rows = pending.listAll();
+			if (rows.length === 0) return { drained: 0, remaining: 0 };
+			if (!this.#getRelay()) return { drained: 0, remaining: rows.length };
+			let drained = 0;
+			for (const { entityId } of rows) {
+				const wraps = await this.#rederiveSurvivorWraps(entityId);
+				const delivered = await this.#deliverRotationWire(entityId, wraps);
+				if (delivered) {
+					pending.remove(entityId);
+					drained++;
+				}
+			}
+			return { drained, remaining: pending.listAll().length };
+		} finally {
+			this.#draining = false;
+		}
+	}
+
+	/** The entity's active-and-inactive member set after a mutation — the input
+	 *  to the survivor re-wrap (revoked members are `active:false`, excluded). */
+	async #currentMembersOf(entityId: string): Promise<readonly ResolvedMember[]> {
+		const { doc } = await this.#session.ydocStore.load(entityId);
+		try {
+			return resolveCurrentMembers(doc, entityId);
+		} finally {
+			doc.destroy();
+		}
 	}
 
 	/** The resolved access log (active + revoked audit) for `entityId`. */
@@ -430,7 +574,7 @@ export class SharingEngine {
 		const dek = this.#session.unwrapMemberWrap(wrap, entityId);
 		try {
 			const repo = await this.ensureEntitiesRepo();
-			installEntityDek(entityId, dek, dekStore, repo);
+			installEntityDek(entityId, dek, wrapDekVersionOf(wrap), dekStore, repo);
 		} finally {
 			dek.fill(0);
 		}
@@ -490,6 +634,14 @@ export class SharingEngine {
 			this.#entitiesRepo = new EntitiesRepository(db);
 		}
 		return this.#entitiesRepo;
+	}
+
+	async ensurePendingRotationsRepo(): Promise<PendingRotationsRepository> {
+		if (!this.#pendingRepo) {
+			const db = await this.#session.dataStores.open("entities");
+			this.#pendingRepo = new PendingRotationsRepository(db);
+		}
+		return this.#pendingRepo;
 	}
 
 	// --- internals ------------------------------------------------------------

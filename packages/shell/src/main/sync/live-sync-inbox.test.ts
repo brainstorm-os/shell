@@ -90,6 +90,7 @@ async function emitWrap(surface: RelaySurface, entityId: string, route?: string)
 	} as unknown as PipelineContext;
 	const wrap = {
 		v: MEMBER_WRAP_VERSION,
+		version: 1,
 		alg: MEMBER_WRAP_ALG,
 		recipientPubB64: "cmVjaXBpZW50",
 		encB64: "ZW5j",

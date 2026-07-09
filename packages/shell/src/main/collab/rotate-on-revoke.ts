@@ -31,9 +31,11 @@ import { type SurvivorWrap, rewrapDekForSurvivors } from "./survivor-rewrap";
 
 export type RotateOnRevokePorts = {
 	/** Mint + persist a fresh DEK for the entity (becomes the current DEK).
-	 *  Returns DEK′ (the orchestrator zeroes it when done) + its id. Backed by
+	 *  Returns DEK′ (the orchestrator zeroes it when done), its id, and its
+	 *  monotonic rotation `version` — the ordinal stamped into each survivor
+	 *  wrap so the recipient's install path can order it (ROT-3a-i). Backed by
 	 *  `EntityDekStore.persist`. */
-	mintDek: (entityId: string) => { dek: Uint8Array; dekId: string };
+	mintDek: (entityId: string) => { dek: Uint8Array; dekId: string; version: number };
 	/** The entity's current members AFTER the revoke — `resolveCurrentMembers`,
 	 *  in which the removed member is already `active: false`. */
 	currentMembers: (entityId: string) => readonly ResolvedMember[];
@@ -70,11 +72,12 @@ export async function rotateOnRevoke(
 	entityId: string,
 	ports: RotateOnRevokePorts,
 ): Promise<RotateOnRevokeResult> {
-	const { dek } = ports.mintDek(entityId); // 1. persist DEK′ before anything else
+	const { dek, version } = ports.mintDek(entityId); // 1. persist DEK′ before anything else
 	try {
 		const type = ports.entityType?.(entityId);
 		const { wraps, skipped } = rewrapDekForSurvivors(
 			dek,
+			version,
 			ports.currentMembers(entityId),
 			entityId,
 			type,

@@ -38,7 +38,7 @@ class TokenTestDekStore {
 	}
 	open(entityId: string): EntityDekHandle | null {
 		const dek = this.deks.get(entityId);
-		return dek ? { dekId: "dek-id", dek: new Uint8Array(dek) } : null;
+		return dek ? { dekId: "dek-id", dek: new Uint8Array(dek), version: 1 } : null;
 	}
 	close(dek: Uint8Array): void {
 		dek.fill(0);

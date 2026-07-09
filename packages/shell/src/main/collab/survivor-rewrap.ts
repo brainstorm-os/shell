@@ -53,6 +53,7 @@ export type SurvivorRewrapResult = {
  */
 export function rewrapDekForSurvivors(
 	newDek: Uint8Array,
+	newDekVersion: number,
 	members: readonly ResolvedMember[],
 	entityId: string,
 	type?: string,
@@ -77,9 +78,7 @@ export function rewrapDekForSurvivors(
 		seenRecipients.add(m.x25519);
 		wraps.push({
 			member: m.member,
-			wrap: type
-				? wrapDekForRecipient(newDek, recipientPub, entityId, type)
-				: wrapDekForRecipient(newDek, recipientPub, entityId),
+			wrap: wrapDekForRecipient(newDek, recipientPub, entityId, type, newDekVersion),
 		});
 	}
 	return { wraps, skipped };

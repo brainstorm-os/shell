@@ -76,19 +76,31 @@ export class EntityDeksRepository {
 	}
 
 	/**
-	 * Most-recent live DEK row for an entity, or null when no row exists.
-	 * Ordering = `created_at DESC, version DESC, dek_id DESC`. The
-	 * `dek_id` tail tie-break makes the result deterministic across
-	 * `bun:sqlite` and `better-sqlite3` even when `created_at` and
-	 * `version` collide (deterministic-clock tests + 10.1's single-row
-	 * policy can both produce that case). Returning a single row is the
-	 * v1 policy; 10.2's rotation still picks the newest via the same call.
+	 * Current live DEK row for an entity, or null when no row exists.
+	 * Ordering = `version DESC, created_at DESC, dek_id DESC`. **`version` is
+	 * the primary key** — the monotonic rotation ordinal (ROT-3a-i). It must
+	 * lead so a replayed old wrap installed with a *newer* `created_at` can't
+	 * win: the anti-rollback guarantee is "highest ordinal is current", not
+	 * "most-recently written". `created_at` + `dek_id` are deterministic
+	 * tie-breaks (deterministic-clock tests + 10.1's single-row policy can tie
+	 * on version=1). 10.2 rotation picks the newest via the same call.
 	 */
 	getByEntityId(entityId: string): EntityDekRecord | null {
 		const row = this.stmt(
-			"SELECT dek_id, entity_id, version, sealed_dek_json, created_at FROM entity_deks WHERE entity_id = ? ORDER BY created_at DESC, version DESC, dek_id DESC LIMIT 1",
+			"SELECT dek_id, entity_id, version, sealed_dek_json, created_at FROM entity_deks WHERE entity_id = ? ORDER BY version DESC, created_at DESC, dek_id DESC LIMIT 1",
 		).get(entityId) as DbEntityDekRow | undefined;
 		return row ? rowToRecord(row) : null;
+	}
+
+	/** The highest DEK `version` on record for `entityId`, or 0 when none.
+	 *  The owner mint path allocates `maxVersionForEntity + 1`; the survivor
+	 *  install path compares an incoming wrap's ordinal against the current
+	 *  row (via {@link getByEntityId}). */
+	maxVersionForEntity(entityId: string): number {
+		const row = this.stmt("SELECT MAX(version) AS maxv FROM entity_deks WHERE entity_id = ?").get(
+			entityId,
+		) as { maxv: number | null } | undefined;
+		return row?.maxv ?? 0;
 	}
 
 	deleteByEntityId(entityId: string): number {

@@ -63,7 +63,7 @@ class FakeDekStore {
 	open(entityId: string): EntityDekHandle | null {
 		const dek = this.deks.get(entityId);
 		if (!dek) return null;
-		return { dekId: "dek-id", dek: new Uint8Array(dek) };
+		return { dekId: "dek-id", dek: new Uint8Array(dek), version: 1 };
 	}
 	close(dek: Uint8Array): void {
 		dek.fill(0);
@@ -402,6 +402,7 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 		// the DEK even though the entity isn't tracked.
 		await emitWrapFrom(pa, ENT, {
 			v: MEMBER_WRAP_VERSION,
+			version: 1,
 			alg: MEMBER_WRAP_ALG,
 			recipientPubB64: "cmVjaXBpZW50",
 			encB64: "ZW5j",
@@ -411,7 +412,7 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 
 		expect(installed).toHaveLength(1);
 		expect(installed[0]?.id).toBe(ENT);
-		expect(installed[0]?.wrap.v).toBe(1);
+		expect(installed[0]?.wrap.v).toBe(MEMBER_WRAP_VERSION);
 	});
 
 	it("trackForRestore + a type-carrying wrap promotes the tracked type (10.14)", async () => {
@@ -428,6 +429,7 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 
 		await emitWrapFrom(pa, ENT, {
 			v: MEMBER_WRAP_VERSION,
+			version: 1,
 			alg: MEMBER_WRAP_ALG,
 			recipientPubB64: "cmVjaXBpZW50",
 			encB64: "ZW5j",
@@ -455,6 +457,7 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 
 		await emitWrapFrom(pa, ENT, {
 			v: MEMBER_WRAP_VERSION,
+			version: 1,
 			alg: MEMBER_WRAP_ALG,
 			recipientPubB64: "cmVjaXBpZW50",
 			encB64: "ZW5j",
@@ -476,6 +479,7 @@ describe("LiveSyncEngine — always-on live sync (10.12)", () => {
 		b.engine.start();
 		await emitWrapFrom(pa, ENT, {
 			v: MEMBER_WRAP_VERSION,
+			version: 1,
 			alg: MEMBER_WRAP_ALG,
 			recipientPubB64: "r",
 			encB64: "e",

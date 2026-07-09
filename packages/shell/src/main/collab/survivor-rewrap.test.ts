@@ -41,6 +41,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 		const b = generateDeviceX25519();
 		const { wraps, skipped } = rewrapDekForSurvivors(
 			dek32(7),
+			2,
 			[member({ member: "alice", device: a }), member({ member: "bob", device: b })],
 			ENT,
 		);
@@ -53,6 +54,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 		const revoked = generateDeviceX25519();
 		const { wraps } = rewrapDekForSurvivors(
 			dek32(9),
+			2,
 			[
 				member({ member: "survivor", device: survivor }),
 				// The revoked member's row is present but inactive (revokeAccess set it).
@@ -67,7 +69,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 	it("a survivor's wrap opens to DEK′ with their device secret", () => {
 		const device = generateDeviceX25519();
 		const newDek = dek32(11);
-		const { wraps } = rewrapDekForSurvivors(newDek, [member({ member: "alice", device })], ENT);
+		const { wraps } = rewrapDekForSurvivors(newDek, 2, [member({ member: "alice", device })], ENT);
 		const opened = unwrapDekForRecipient(first(wraps).wrap, device.secretKey, ENT);
 		expect([...opened]).toEqual([...newDek]);
 	});
@@ -77,6 +79,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 		const revoked = generateDeviceX25519();
 		const { wraps } = rewrapDekForSurvivors(
 			dek32(13),
+			2,
 			[
 				member({ member: "survivor", device: survivor }),
 				member({ member: "revoked", device: revoked, active: false }),
@@ -91,6 +94,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 		const withKey = generateDeviceX25519();
 		const { wraps, skipped } = rewrapDekForSurvivors(
 			dek32(15),
+			2,
 			[
 				member({ member: "hasKey", device: withKey }),
 				member({ member: "noKey" }), // x25519 = null
@@ -105,6 +109,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 		const shared = generateDeviceX25519();
 		const { wraps } = rewrapDekForSurvivors(
 			dek32(17),
+			2,
 			[
 				member({ member: "deviceA", device: shared }),
 				member({ member: "deviceA-again", device: shared }),
@@ -116,7 +121,7 @@ describe("rewrapDekForSurvivors (ROT-1)", () => {
 
 	it("binds the wrap to the entity id (a wrap for one entity won't open under another)", () => {
 		const device = generateDeviceX25519();
-		const { wraps } = rewrapDekForSurvivors(dek32(19), [member({ member: "a", device })], ENT);
+		const { wraps } = rewrapDekForSurvivors(dek32(19), 2, [member({ member: "a", device })], ENT);
 		expect(() => unwrapDekForRecipient(first(wraps).wrap, device.secretKey, "ent_other")).toThrow();
 	});
 });

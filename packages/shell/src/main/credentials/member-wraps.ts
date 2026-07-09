@@ -31,8 +31,26 @@ import { base64ToBytes, bytesToBase64 } from "./crypto";
 import { openBase, sealBase } from "./hpke";
 
 /** Schema version stamped into every wrap. Bump only on a wire-incompatible
- *  change to the wrap payload or the AAD construction. */
-export const MEMBER_WRAP_VERSION = 1 as const;
+ *  change to the wrap payload or the AAD construction.
+ *
+ *  - `1` — bare `{recipient, enc, ct}`; AAD = prefix‖entityId. (pre-ROT-3a-i)
+ *  - `2` — adds `version` (the DEK's monotonic rotation ordinal) and BINDS it
+ *    into the AAD, so the ordinal is authenticated: a relay that replays or
+ *    re-labels an old wrap can't forge a higher ordinal without failing AEAD.
+ *    This is what makes rotate-on-revoke's accept-strictly-newer install path
+ *    rollback-safe. v1 wraps are still readable (unwrap dispatches on `v`).
+ */
+export const MEMBER_WRAP_VERSION = 2 as const;
+
+/** Schema versions this codec can READ. Writes are always the latest. */
+export type MemberWrapSchemaVersion = 1 | 2;
+
+/** The DEK rotation ordinal a wrap conveys — `version` on v2+, else 1 (a v1
+ *  wrap predates rotation, so it is the entity's first DEK by definition).
+ *  This is the value the install path compares for anti-rollback. */
+export function wrapDekVersionOf(wrap: MemberWrapPayload): number {
+	return wrap.version ?? 1;
+}
 
 /** Algorithm identifier — pins the HPKE suite at the schema layer so a
  *  future codec can detect (and refuse) a wrap minted under a different
@@ -66,7 +84,7 @@ const MEMBER_WRAP_INFO = new TextEncoder().encode("brainstorm/entity-wrap/v1");
  *  never edits in place; a rotation appends a new wrap and revokes the
  *  old). */
 export type MemberWrapPayload = {
-	v: typeof MEMBER_WRAP_VERSION;
+	v: MemberWrapSchemaVersion;
 	alg: typeof MEMBER_WRAP_ALG;
 	/** Recipient device X25519 pubkey (base64, 32 bytes). The wire-side
 	 *  unwrap path resolves this against the local device pubkey to find
@@ -81,18 +99,25 @@ export type MemberWrapPayload = {
 	 *  (base64, 48 bytes). AAD is the entity-bound prefix; see
 	 *  `entityWrapAad`. */
 	ctB64: string;
+	/** The DEK's monotonic rotation ordinal (v2+). AAD-bound, so it can't be
+	 *  tampered without breaking the AEAD tag. Absent on a v1 wrap (⇒ ordinal
+	 *  1). Read it via {@link wrapDekVersionOf}, never `wrap.version` directly. */
+	version?: number;
 };
 
 export function isMemberWrapPayload(value: unknown): value is MemberWrapPayload {
 	if (!value || typeof value !== "object") return false;
 	const w = value as Partial<MemberWrapPayload>;
-	return (
-		w.v === MEMBER_WRAP_VERSION &&
+	const baseOk =
 		w.alg === MEMBER_WRAP_ALG &&
 		typeof w.recipientPubB64 === "string" &&
 		typeof w.encB64 === "string" &&
-		typeof w.ctB64 === "string"
-	);
+		typeof w.ctB64 === "string";
+	if (!baseOk) return false;
+	if (w.v === 1) return w.version === undefined;
+	if (w.v === 2)
+		return typeof w.version === "number" && Number.isInteger(w.version) && w.version >= 1;
+	return false;
 }
 
 /** Get-or-create the per-entity meta Y.Map. Top-level types are
@@ -177,20 +202,31 @@ export function wrapDekForRecipient(
 	recipientPub: Uint8Array,
 	entityId: string,
 	type?: string,
+	version?: number,
 ): MemberWrapPayload {
 	assertDek(dek);
 	assertNonEmptyEntityId(entityId);
+	if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
+		throw new Error("wrapDekForRecipient: version must be a positive integer");
+	}
 	const framed = type ? frameTypeAndDek(type, dek) : null;
 	const plaintext = framed ?? dek;
 	try {
-		const sealed = sealBase(recipientPub, MEMBER_WRAP_INFO, entityWrapAad(entityId), plaintext);
-		return {
-			v: MEMBER_WRAP_VERSION,
+		const sealed = sealBase(
+			recipientPub,
+			MEMBER_WRAP_INFO,
+			entityWrapAad(entityId, version),
+			plaintext,
+		);
+		const base = {
 			alg: MEMBER_WRAP_ALG,
 			recipientPubB64: bytesToBase64(recipientPub),
 			encB64: bytesToBase64(sealed.enc),
 			ctB64: bytesToBase64(sealed.ct),
-		};
+		} as const;
+		// v1 (no ordinal) stays wire-identical for existing shared entities; a
+		// caller that passes `version` opts into the AAD-authenticated v2 form.
+		return version === undefined ? { v: 1, ...base } : { v: 2, version, ...base };
 	} finally {
 		framed?.fill(0); // the framed copy held the DEK bytes
 	}
@@ -232,14 +268,20 @@ export function unwrapDekAndTypeForRecipient(
 	assertNonEmptyEntityId(entityId);
 	const enc = base64ToBytes(wrap.encB64);
 	const ct = base64ToBytes(wrap.ctB64);
-	const plaintext = openBase(enc, recipientSecret, MEMBER_WRAP_INFO, entityWrapAad(entityId), ct);
+	// A v2 wrap binds its `version` into the AAD; opening reconstructs the same
+	// AAD from the (declared) version, so a tampered ordinal fails the AEAD tag.
+	const aad = wrap.v === 2 ? entityWrapAad(entityId, wrap.version) : entityWrapAad(entityId);
+	const plaintext = openBase(enc, recipientSecret, MEMBER_WRAP_INFO, aad, ct);
 	return deframeTypeAndDek(plaintext);
 }
 
-/** Canonical wrap AAD for `entityId`. Centralised so seal + open paths
- *  cannot drift; changing it invalidates every wrap in existence. */
-function entityWrapAad(entityId: string): Uint8Array {
-	return new TextEncoder().encode(MEMBER_WRAP_AAD_PREFIX + entityId);
+/** Canonical wrap AAD for `entityId`, optionally binding the DEK rotation
+ *  `version` (v2 wraps). Centralised so seal + open paths cannot drift. The
+ *  no-version form is the v1 AAD — unchanged, so existing v1 wraps still open.
+ *  Changing either form invalidates the corresponding wraps in existence. */
+function entityWrapAad(entityId: string, version?: number): Uint8Array {
+	const suffix = version === undefined ? "" : `:dekv:${version}`;
+	return new TextEncoder().encode(MEMBER_WRAP_AAD_PREFIX + entityId + suffix);
 }
 
 /** Frame an entity `type` ahead of the DEK as `[typeLen:1][typeUtf8][dek:32]`

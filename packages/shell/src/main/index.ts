@@ -117,7 +117,7 @@ import {
 } from "./credentials/billing-refresh-credential";
 import { bytesToBase64 } from "./credentials/crypto";
 import { verifySignature } from "./credentials/identity";
-import { wrapDekForRecipient } from "./credentials/member-wraps";
+import { wrapDekForRecipient, wrapDekVersionOf } from "./credentials/member-wraps";
 import { makeDashboardServiceHandler } from "./dashboard/dashboard-service";
 import {
 	WIDGET_FRAME_SCHEME_PRIVILEGE,
@@ -2794,7 +2794,7 @@ void app.whenReady().then(async () => {
 									dekId: null,
 								});
 							}
-							installEntityDek(entityId, dek, dekStore, repo);
+							installEntityDek(entityId, dek, wrapDekVersionOf(wrap), dekStore, repo);
 							return type;
 						} finally {
 							dek.fill(0);
@@ -3172,6 +3172,22 @@ void app.whenReady().then(async () => {
 			return repo?.get(entityId)?.properties ?? null;
 		},
 	});
+
+	// ROT-3a-ii (design 73, F-ROT-4) — finish any rotate-on-revoke wire delivery
+	// that was deferred (an offline revoke, or an emit failure) whenever the
+	// transport (re)connects and once per session open. `drainPendingRotations`
+	// is self-guarded + single-in-flight, so firing on every state change is
+	// safe (mirrors `drainAssetUploads` above).
+	const drainRotations = () => {
+		if (!getActiveVaultSession()) return;
+		void autoShareEngine()
+			.drainPendingRotations()
+			.catch((error: unknown) => {
+				console.warn(`[sharing] rotation drain failed: ${(error as Error).message}`);
+			});
+	};
+	getActiveRelay()?.on("state", () => drainRotations());
+	onActiveVaultSessionChanged(() => drainRotations());
 
 	workers.broker.registerService(
 		"search",

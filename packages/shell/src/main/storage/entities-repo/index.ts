@@ -12,6 +12,7 @@ import { AssetRefsRepository } from "./asset-refs-repo";
 import { AssetsRepository } from "./assets-repo";
 import { EntitiesRepository } from "./entities-repo";
 import { EntityDeksRepository } from "./entity-deks-repo";
+import { PendingRotationsRepository } from "./pending-rotations-repo";
 
 export { DEFAULT_PATTERN_COST_CEILING, EntitiesRepository } from "./entities-repo";
 export type {
@@ -32,6 +33,8 @@ export { AssetDeksRepository } from "./asset-deks-repo";
 export type { AssetDekRecord, CreateAssetDekInput } from "./asset-deks-repo";
 export { AssetRefsRepository } from "./asset-refs-repo";
 export type { AssetRefRecord, CreateAssetRefInput } from "./asset-refs-repo";
+export { PendingRotationsRepository } from "./pending-rotations-repo";
+export type { PendingRotationRecord } from "./pending-rotations-repo";
 
 export class EntitiesRepositories {
 	readonly entities: EntitiesRepository;
@@ -39,6 +42,7 @@ export class EntitiesRepositories {
 	readonly assets: AssetsRepository;
 	readonly assetDeks: AssetDeksRepository;
 	readonly assetRefs: AssetRefsRepository;
+	readonly pendingRotations: PendingRotationsRepository;
 
 	constructor(db: SqliteDatabase) {
 		this.entities = new EntitiesRepository(db);
@@ -46,5 +50,6 @@ export class EntitiesRepositories {
 		this.assets = new AssetsRepository(db);
 		this.assetDeks = new AssetDeksRepository(db);
 		this.assetRefs = new AssetRefsRepository(db);
+		this.pendingRotations = new PendingRotationsRepository(db);
 	}
 }

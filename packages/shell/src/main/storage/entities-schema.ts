@@ -263,4 +263,27 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			db.exec("ALTER TABLE asset_refs ADD COLUMN rehomed_at INTEGER");
 		},
 	},
+	{
+		version: 8,
+		description: "entities.db v8 — pending_rotations (ROT-3a-ii deferred-rotation resume)",
+		up: (db) => {
+			// ROT-3a-ii (design 73, F-ROT-4) — the durable queue of entities whose
+			// rotate-on-revoke minted a fresh DEK but couldn't finish the WIRE
+			// delivery (the survivor inbox `WrapBootstrap` + full-state re-emit)
+			// because there was no relay (offline revoke) or the emit threw. One
+			// row per entity; the drain (on relay-connect + boot) re-runs the wire
+			// delivery for each and deletes the row on success. `dek_version` is the
+			// ordinal the mint produced — carried so the drain can assert it is
+			// still current before re-emitting (a later rotation supersedes it and
+			// the stale row is dropped). LOCAL derived state — never syncs, never
+			// crosses the wire (the same posture as asset_refs.rehomed_at).
+			db.exec(`
+				CREATE TABLE pending_rotations (
+					entity_id    TEXT PRIMARY KEY REFERENCES entities(id) ON DELETE CASCADE,
+					dek_version  INTEGER NOT NULL,
+					created_at   INTEGER NOT NULL
+				);
+			`);
+		},
+	},
 ];

@@ -21,7 +21,7 @@
 import { ed25519Verify } from "@brainstorm/native";
 import * as Y from "yjs";
 import { XCHACHA_NONCE_BYTES } from "../credentials/crypto";
-import type { MemberWrapPayload } from "../credentials/member-wraps";
+import { type MemberWrapPayload, wrapDekVersionOf } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { installEntityDek } from "../entities/install-wrap";
 import { EntitiesRepository } from "../storage/entities-repo";
@@ -173,7 +173,13 @@ export class CollabVault {
 		const dek = this.session.unwrapMemberWrap(wrap, entityId);
 		try {
 			const db = await this.session.dataStores.open("entities");
-			installEntityDek(entityId, dek, this.dekStore, new EntitiesRepository(db));
+			installEntityDek(
+				entityId,
+				dek,
+				wrapDekVersionOf(wrap),
+				this.dekStore,
+				new EntitiesRepository(db),
+			);
 		} finally {
 			dek.fill(0);
 		}
