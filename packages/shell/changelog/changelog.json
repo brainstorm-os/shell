@@ -3,6 +3,81 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.3.1",
+      "date": "2026-07-10",
+      "icon": "🔔",
+      "title": "Reminders that don't slip through",
+      "summary": "A task or event reminder now fires even if the app wasn't running when it came due — it catches up the next time you open Brainstorm. Plus a fix for list numbers going missing.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Reminders survive a closed app"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks & Calendar",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — if a reminder came due while Brainstorm was "
+            },
+            {
+              "text": "closed",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", it now catches up and notifies you once the next time you open the app, instead of being silently missed."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Editor",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — "
+            },
+            {
+              "text": "numbered and bulleted lists",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " show their markers again in comment and chat composers."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.3.0",
       "date": "2026-07-10",
       "icon": "🔒",
