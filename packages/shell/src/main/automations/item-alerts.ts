@@ -26,7 +26,7 @@
  */
 
 import type { UiNotification } from "../ui/notify-host";
-import type { TimeTriggerConfig } from "./trigger-schedule";
+import { OnMissedPolicy, type TimeTriggerConfig } from "./trigger-schedule";
 
 export const TASK_TYPE_URL = "brainstorm/Task/v1";
 export const EVENT_TYPE_URL = "brainstorm/Event/v1";
@@ -84,7 +84,10 @@ function alertRegistration(
 	const dedupeKey = `${sourceId}#${fireAt}`;
 	return {
 		alertId: `${ITEM_ALERT_ID_PREFIX}${dedupeKey}`,
-		config: { oneShotAt: fireAt },
+		// FireOnce: a reminder that came due while the app was CLOSED (in the gap
+		// since the scheduler's `lastRun`) fires once on next launch (0.3.1),
+		// instead of being silently dropped.
+		config: { oneShotAt: fireAt, onMissed: OnMissedPolicy.FireOnce },
 		notification: { appId, title, body, kind: "info", dedupeKey },
 	};
 }
@@ -110,7 +113,7 @@ export function reminderOffsetLabel(minutes: number): string {
  */
 export function taskAlertRegistrations(
 	tasks: readonly Row[],
-	now: number,
+	lastRun: number,
 ): ItemAlertRegistration[] {
 	const out: ItemAlertRegistration[] = [];
 	for (const row of tasks) {
@@ -120,12 +123,12 @@ export function taskAlertRegistrations(
 		const dueAt = finiteNumber(p.dueAt);
 		const scheduledAt = finiteNumber(p.scheduledAt);
 		const dueInstant = dueAt !== null ? taskAlertInstant(dueAt) : null;
-		if (dueInstant !== null && dueInstant > now) {
+		if (dueInstant !== null && dueInstant > lastRun) {
 			out.push(alertRegistration(TASKS_APP_ID, `${row.id}#due`, dueInstant, title, "Due now"));
 		}
 		if (scheduledAt !== null) {
 			const scheduledInstant = taskAlertInstant(scheduledAt);
-			if (scheduledInstant !== dueInstant && scheduledInstant > now) {
+			if (scheduledInstant !== dueInstant && scheduledInstant > lastRun) {
 				out.push(
 					alertRegistration(
 						TASKS_APP_ID,
@@ -149,7 +152,7 @@ export function taskAlertRegistrations(
  */
 export function eventAlertRegistrations(
 	events: readonly Row[],
-	now: number,
+	lastRun: number,
 ): ItemAlertRegistration[] {
 	const out: ItemAlertRegistration[] = [];
 	for (const row of events) {
@@ -162,7 +165,7 @@ export function eventAlertRegistrations(
 			const minutes = finiteNumber(raw);
 			if (minutes === null || minutes < 0) continue;
 			const fireAt = start - Math.floor(minutes) * MINUTE_MS;
-			if (fireAt <= now) continue;
+			if (fireAt <= lastRun) continue;
 			const body = minutes <= 0 ? "Starting now" : `Starts in ${reminderOffsetLabel(minutes)}`;
 			out.push(alertRegistration(CALENDAR_APP_ID, row.id, fireAt, title, body));
 		}
@@ -174,7 +177,7 @@ export function eventAlertRegistrations(
 export function deriveItemAlerts(
 	tasks: readonly Row[],
 	events: readonly Row[],
-	now: number,
+	lastRun: number,
 ): ItemAlertRegistration[] {
-	return [...taskAlertRegistrations(tasks, now), ...eventAlertRegistrations(events, now)];
+	return [...taskAlertRegistrations(tasks, lastRun), ...eventAlertRegistrations(events, lastRun)];
 }

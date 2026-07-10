@@ -68,6 +68,28 @@ export class SchedulerFiresRepository {
 			.all() as SchedulerFireRow[];
 		return rows.map(fromRow);
 	}
+
+	/** The persisted `last_run` watermark (epoch ms) — the last instant the
+	 *  scheduler was known to be running; null when never persisted (0.3.1
+	 *  missed-fire catch-up). */
+	loadLastRun(): number | null {
+		const row = this.db.prepare("SELECT value FROM scheduler_meta WHERE key = 'last_run'").get() as
+			| { value: string }
+			| undefined;
+		if (!row) return null;
+		const n = Number(row.value);
+		return Number.isFinite(n) ? n : null;
+	}
+
+	/** Advance the `last_run` watermark (upsert). */
+	saveLastRun(ts: number): void {
+		this.db
+			.prepare(
+				`INSERT INTO scheduler_meta (key, value) VALUES ('last_run', ?)
+				ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+			)
+			.run(String(ts));
+	}
 }
 
 function fromRow(r: SchedulerFireRow): SchedulerFireRecord {

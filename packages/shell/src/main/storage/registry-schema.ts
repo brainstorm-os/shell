@@ -228,4 +228,22 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			);
 		},
 	},
+	{
+		version: 10,
+		description: "registry.db v10 — scheduler_meta kv (0.3.1 missed-fire lastRun watermark)",
+		up: (db) => {
+			// ROT/9.14.9b follow-up (0.3.1) — a tiny key/value store alongside
+			// scheduler_fires. Holds `last_run` (epoch ms): the last instant the
+			// automations scheduler was known to be running. On next launch a
+			// one-shot item-alert (task/event reminder) that came due in the closed
+			// gap `(last_run, now]` fires once as catch-up. LOCAL derived state —
+			// never syncs.
+			db.exec(`
+				CREATE TABLE scheduler_meta (
+					key   TEXT PRIMARY KEY,
+					value TEXT NOT NULL
+				);
+			`);
+		},
+	},
 ];
