@@ -85,9 +85,9 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		owner.dispose();
 		guestA.dispose();
 		guestB.dispose();
-		await rm(dirOwner, { recursive: true, force: true });
-		await rm(dirA, { recursive: true, force: true });
-		await rm(dirB, { recursive: true, force: true });
+		await rm(dirOwner, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+		await rm(dirA, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+		await rm(dirB, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
 	/** The current DEK bytes the store resolves for the entity (a copy). */

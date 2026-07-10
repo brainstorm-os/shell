@@ -48,7 +48,7 @@ describe("installEntityDek — version-monotonic install (ROT-3a-i)", () => {
 
 	afterEach(async () => {
 		session.dispose();
-		await rm(dir, { recursive: true, force: true });
+		await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
 	function currentDek(): Uint8Array {

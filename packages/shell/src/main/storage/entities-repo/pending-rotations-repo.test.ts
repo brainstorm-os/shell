@@ -42,7 +42,7 @@ describe("PendingRotationsRepository", () => {
 
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true });
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
 	it("mark + has + remove round-trips", () => {
