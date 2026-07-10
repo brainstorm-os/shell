@@ -1,7 +1,9 @@
 import { RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
+	OnMissedPolicy,
 	type ScheduledFire,
+	computeInitialFire,
 	computeNextFire,
 	dueFires,
 	earliestFireAt,
@@ -99,5 +101,50 @@ describe("earliestFireAt", () => {
 	it("returns null when nothing is armed", () => {
 		expect(earliestFireAt([fire("a", null)])).toBeNull();
 		expect(earliestFireAt([])).toBeNull();
+	});
+});
+
+describe("computeInitialFire — missed-fire catch-up (0.3.1)", () => {
+	it("arms a future one-shot normally regardless of policy", () => {
+		expect(computeInitialFire({ oneShotAt: T0 + DAY }, T0, T0 - DAY)).toBe(T0 + DAY);
+		expect(
+			computeInitialFire({ oneShotAt: T0 + DAY, onMissed: OnMissedPolicy.FireOnce }, T0, T0 - DAY),
+		).toBe(T0 + DAY);
+	});
+
+	it("Skip (default): a one-shot that came due while closed stays dormant", () => {
+		// Due at T0-5min, app was last running at T0-DAY, now T0.
+		expect(computeInitialFire({ oneShotAt: T0 - 300_000 }, T0, T0 - DAY)).toBeNull();
+		expect(
+			computeInitialFire({ oneShotAt: T0 - 300_000, onMissed: OnMissedPolicy.Skip }, T0, T0 - DAY),
+		).toBeNull();
+	});
+
+	it("FireOnce: a one-shot missed since lastRun arms at its (past) instant → dueFires catches it", () => {
+		const missed = T0 - 300_000; // came due 5 min ago, while closed
+		const armed = computeInitialFire(
+			{ oneShotAt: missed, onMissed: OnMissedPolicy.FireOnce },
+			T0,
+			T0 - DAY,
+		);
+		expect(armed).toBe(missed);
+		expect(
+			dueFires([{ triggerId: "a", workflowIds: [], config: {}, nextFireAt: armed }], T0),
+		).toHaveLength(1);
+	});
+
+	it("FireOnce: a one-shot older than lastRun is NOT caught up (exactly-once via the watermark)", () => {
+		// Already handled in a prior run: instant <= lastRun.
+		expect(
+			computeInitialFire(
+				{ oneShotAt: T0 - DAY, onMissed: OnMissedPolicy.FireOnce },
+				T0,
+				T0 - 300_000, // lastRun is AFTER the instant
+			),
+		).toBeNull();
+		// Boundary: instant exactly at lastRun is not "since" last run.
+		expect(
+			computeInitialFire({ oneShotAt: T0, onMissed: OnMissedPolicy.FireOnce }, T0 + 5, T0),
+		).toBeNull();
 	});
 });
