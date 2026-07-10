@@ -18,11 +18,26 @@
 
 import { type Recurrence, nextOccurrence } from "@brainstorm/sdk-types";
 
+/** What a one-shot trigger does when it comes due while the scheduler
+ *  wasn't running to fire it (the app was closed). `Skip` (the default,
+ *  and the only behaviour before 0.3.1) drops it — it registers dormant on
+ *  next launch. `FireOnce` catches it up: it fires exactly once on the next
+ *  launch if it came due since the scheduler last ran (the `lastRun`
+ *  watermark). Item alerts (task/event reminders) opt into `FireOnce`;
+ *  workflow Time triggers keep `Skip` (a missed 3am workflow shouldn't run
+ *  at 9am on launch). */
+export enum OnMissedPolicy {
+	Skip = "skip",
+	FireOnce = "fire-once",
+}
+
 /** A time trigger's `config`: a recurring rule, a one-shot instant, or
  *  both (earliest wins). Epoch milliseconds. */
 export type TimeTriggerConfig = {
 	recurrence?: Recurrence;
 	oneShotAt?: number;
+	/** Missed-fire policy for a one-shot (default `Skip`). See {@link OnMissedPolicy}. */
+	onMissed?: OnMissedPolicy;
 };
 
 /**
@@ -38,6 +53,38 @@ export function computeNextFire(config: TimeTriggerConfig, after: number): numbe
 	if (oneShot === null) return recurring;
 	if (recurring === null) return oneShot;
 	return Math.min(oneShot, recurring);
+}
+
+/**
+ * The instant to arm a freshly-registered/hydrated trigger with, given the
+ * persistent `lastRun` watermark (the last instant the scheduler was known
+ * to be running). Like {@link computeNextFire} for the normal (strictly-
+ * future) case, but adds **missed-fire catch-up** (0.3.1): a one-shot with
+ * `onMissed: FireOnce` whose instant fell in `(lastRun, now]` — i.e. it came
+ * due while the app was CLOSED — arms at that (past) instant so `dueFires`
+ * fires it exactly once on the next tick, instead of going dormant. `Skip`
+ * (the default) keeps the pre-0.3.1 behaviour: a past one-shot is dormant.
+ *
+ * Exactly-once falls out of the watermark: after the catch-up fires, the
+ * service advances `lastRun` past the instant, so a re-hydration on the next
+ * launch no longer sees it as missed.
+ */
+export function computeInitialFire(
+	config: TimeTriggerConfig,
+	now: number,
+	lastRun: number,
+): number | null {
+	const future = computeNextFire(config, now);
+	if (future !== null) return future;
+	if (
+		config.onMissed === OnMissedPolicy.FireOnce &&
+		config.oneShotAt !== undefined &&
+		config.oneShotAt > lastRun &&
+		config.oneShotAt <= now
+	) {
+		return config.oneShotAt;
+	}
+	return null;
 }
 
 /** A trigger registered with the scheduler: its next fire instant and the
