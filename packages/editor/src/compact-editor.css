@@ -91,6 +91,18 @@
 	padding-inline-start: 24px;
 }
 
+/* The theme (`theme.ts`) tags the <ul>/<ol> `bs-editor__list--bullet` /
+   `--numbered`, but only the `notes__` twin in editor-theme.css set the
+   marker type — so the editor's lists fell back to the UA default, which a
+   cascade reset strips, and numbers/bullets vanished. Assert them here. */
+.bs-editor__list--bullet {
+	list-style: disc;
+}
+
+.bs-editor__list--numbered {
+	list-style: decimal;
+}
+
 .bs-editor__list--check {
 	padding-inline-start: 2px;
 }
