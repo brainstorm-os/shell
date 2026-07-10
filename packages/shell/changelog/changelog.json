@@ -3,6 +3,113 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.3.0",
+      "date": "2026-07-10",
+      "icon": "🔒",
+      "title": "Removing someone really removes them",
+      "summary": "When you take a collaborator off a shared note, page, or channel, they can no longer read anything you write afterward — access removal is now enforced by encryption, not just policy. Plus a PDF crash fix.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Forward-secret revocation"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sharing",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — when you "
+            },
+            {
+              "text": "remove someone",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " from a shared item, its encryption key is rotated and re-sealed for the people who remain. The removed person is left holding only the old key, so every edit you make "
+            },
+            {
+              "text": "after",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " they're removed is unreadable to them — even if their app is still connected."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Works offline",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — remove someone while you're offline and the key rotation is queued, then completes automatically the moment you reconnect."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🕰️",
+          "text": [
+            {
+              "text": "What they already saw, they keep. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Like every honest end-to-end encrypted system, removal is forward-looking: it stops future access — it can't un-send what already synced to their device."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Preview",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — opening and closing certain "
+            },
+            {
+              "text": "PDFs",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " no longer crashes the app."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.2.1",
       "date": "2026-07-08",
       "icon": "🧹",

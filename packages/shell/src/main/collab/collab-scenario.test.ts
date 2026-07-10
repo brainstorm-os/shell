@@ -14,8 +14,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as Y from "yjs";
+import { encryptAndEmit, receiveAndApply } from "../sync/envelope-pipeline";
 import { AccessRole, resolveMembers } from "./access-record";
-import { CollabLink } from "./collab-harness";
+import { CollabLink, REMOTE_ORIGIN } from "./collab-harness";
 
 const BRIEF = "ent_northbound_brief";
 const NOTE_TYPE = "brainstorm/Note/v1";
@@ -125,5 +127,72 @@ describe("collab C4 — Mira ↔ Marcus two-vault scenarios", () => {
 		}
 		// And Marcus still decrypted it.
 		expect(link.collaborator.docs.get(BRIEF)?.getText("body").toString()).toContain(secret);
+	});
+
+	// F-286 end-to-end (the `/pentester` gate, automated over the loopback relay):
+	// after rotate-on-revoke, a revoked collaborator's REAL receive path can't
+	// decrypt post-revoke edits. Where sharing-engine-rotate.test.ts proves the
+	// SharingEngine side (revoke rotates + re-wraps survivors + versioned install),
+	// this drives the OTHER end — the envelope-pipeline `receiveAndApply` a live
+	// shell runs — and asserts the dropped-frame outcome the two-shell dogfood
+	// would show a human. Content forward secrecy, proven wire-to-doc.
+	async function deliverEdit(
+		entityId: string,
+		ownerDoc: Y.Doc,
+		beforeSV: Uint8Array,
+		targetDoc: Y.Doc,
+	): Promise<"applied" | "dropped"> {
+		const update = Y.encodeStateAsUpdate(ownerDoc, beforeSV);
+		const done = new Promise<"applied" | "dropped">((resolve) => {
+			const handler = (frame: Uint8Array): void => {
+				link.collaborator.relay.offFrame(handler);
+				void receiveAndApply(frame, link.collaborator.ctx, (plaintext) =>
+					Y.applyUpdate(targetDoc, plaintext, REMOTE_ORIGIN),
+				)
+					.then(() => resolve("applied"))
+					.catch(() => resolve("dropped"));
+			};
+			link.collaborator.relay.onFrame(handler);
+		});
+		await encryptAndEmit(entityId, update, link.owner.ctx);
+		return done;
+	}
+
+	it("F-286 E2E — after rotate-on-revoke, Marcus can't decrypt Mira's post-revoke edits", async () => {
+		const briefDoc = await link.owner.provisionEntity(BRIEF, NOTE_TYPE);
+		const body = briefDoc.getText("body");
+		body.insert(0, "Confidential pricing. ");
+		const invite = link.collaborator.invite("Marcus");
+		await link.share({ entityId: BRIEF, type: NOTE_TYPE, invite, role: AccessRole.Editor });
+		const marcusDoc = link.collaborator.docs.get(BRIEF);
+		if (!marcusDoc) throw new Error("scenario: Marcus has no doc");
+		const marcusBody = marcusDoc.getText("body");
+		expect(marcusBody.toString()).toContain("Confidential pricing");
+
+		// Baseline: a pre-revoke edit reaches Marcus (the wire works both ways).
+		let sv = Y.encodeStateVector(briefDoc);
+		body.insert(body.length, "[before revoke]");
+		expect(await deliverEdit(BRIEF, briefDoc, sv, marcusDoc)).toBe("applied");
+		expect(marcusBody.toString()).toContain("[before revoke]");
+
+		// Mira revokes Marcus AND rotates the DEK — exactly what SharingEngine.revoke
+		// does: mint DEK′ so every subsequent frame seals under a key Marcus lacks.
+		expect(link.revoke(BRIEF, link.collaborator.userPubB64)).toBe(true);
+		const dek2 = link.owner.dekStore.persist(BRIEF, link.owner.dekStore.nextDekId());
+		expect(dek2.version).toBeGreaterThan(1);
+		link.owner.dekStore.close(dek2.dek);
+
+		// Mira edits after the revoke → the frame is sealed under DEK′.
+		sv = Y.encodeStateVector(briefDoc);
+		body.insert(body.length, "[SECRET after revoke]");
+		const outcome = await deliverEdit(BRIEF, briefDoc, sv, marcusDoc);
+
+		// The guarantee, wire-to-doc: Marcus's receive path DROPS the frame (his old
+		// DEK can't open the DEK′ envelope), so the secret never lands in his doc —
+		// while Mira's own doc has it, and Marcus keeps what he already synced.
+		expect(outcome).toBe("dropped");
+		expect(body.toString()).toContain("[SECRET after revoke]");
+		expect(marcusBody.toString()).not.toContain("SECRET after revoke");
+		expect(marcusBody.toString()).toContain("[before revoke]");
 	});
 });
