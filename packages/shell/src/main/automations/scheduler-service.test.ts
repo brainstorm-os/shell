@@ -7,6 +7,7 @@ const DAY = 86_400_000;
 
 class FakeStore implements SchedulerStore {
 	rows = new Map<string, PersistedFire>();
+	lastRun: number | null = null;
 	loadAll(): PersistedFire[] {
 		return [...this.rows.values()];
 	}
@@ -15,6 +16,12 @@ class FakeStore implements SchedulerStore {
 	}
 	remove(triggerId: string): void {
 		this.rows.delete(triggerId);
+	}
+	loadLastRun(): number | null {
+		return this.lastRun;
+	}
+	saveLastRun(ts: number): void {
+		this.lastRun = ts;
 	}
 }
 
@@ -31,6 +38,44 @@ describe("SchedulerService", () => {
 		await svc.register("t1", ["wf1"], { oneShotAt: T0 + DAY }, T0);
 		expect(store.rows.get("t1")?.nextFireAt).toBe(T0 + DAY);
 		expect(svc.nextWakeAt()).toBe(T0 + DAY);
+	});
+
+	describe("missed-fire catch-up (0.3.1)", () => {
+		// A FireOnce one-shot that came due while the app was closed (in the gap
+		// since the persisted lastRun) fires exactly once on next launch.
+		it("catches up a FireOnce one-shot missed since lastRun; exactly once", async () => {
+			const { OnMissedPolicy } = await import("./trigger-schedule");
+			store.lastRun = T0 - DAY; // last ran a day ago
+			await svc.hydrate();
+			// Due 5 min ago, while closed. FireOnce → armed at the past instant.
+			await svc.register(
+				"a1",
+				["a1"],
+				{ oneShotAt: T0 - 300_000, onMissed: OnMissedPolicy.FireOnce },
+				T0,
+			);
+			expect(await svc.tick(T0)).toEqual([{ triggerId: "a1", workflowId: "a1", firedAt: T0 }]);
+			// tick advanced + persisted the watermark past the instant.
+			expect(store.lastRun).toBe(T0);
+			// Re-launch: hydrate loads the advanced watermark; re-register the same
+			// (still-overdue) alert → NOT caught up again (exactly-once).
+			await svc.hydrate();
+			await svc.register(
+				"a1",
+				["a1"],
+				{ oneShotAt: T0 - 300_000, onMissed: OnMissedPolicy.FireOnce },
+				T0 + 1000,
+			);
+			expect(await svc.tick(T0 + 1000)).toEqual([]);
+		});
+
+		it("Skip (default) one-shot missed while closed stays dormant", async () => {
+			store.lastRun = T0 - DAY;
+			await svc.hydrate();
+			await svc.register("w1", ["w1"], { oneShotAt: T0 - 300_000 }, T0);
+			expect(store.rows.get("w1")?.nextFireAt).toBeNull();
+			expect(await svc.tick(T0)).toEqual([]);
+		});
 	});
 
 	it("fires due triggers, one request per workflow, in order", async () => {
