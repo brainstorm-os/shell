@@ -738,4 +738,14 @@ describe("IntentsRepository", () => {
 		});
 		expect(env.repos.intents.findActions([], { entityType: "io.example/Note/v1" })).toEqual([]);
 	});
+
+	describe("scheduler_meta last_run watermark (0.3.1 missed-fire catch-up)", () => {
+		it("round-trips null → value → upsert", () => {
+			expect(env.repos.schedulerFires.loadLastRun()).toBeNull();
+			env.repos.schedulerFires.saveLastRun(1_700_000_000_000);
+			expect(env.repos.schedulerFires.loadLastRun()).toBe(1_700_000_000_000);
+			env.repos.schedulerFires.saveLastRun(1_700_000_050_000);
+			expect(env.repos.schedulerFires.loadLastRun()).toBe(1_700_000_050_000);
+		});
+	});
 });

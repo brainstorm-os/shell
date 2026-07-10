@@ -19,7 +19,7 @@
 import {
 	type ScheduledFire,
 	type TimeTriggerConfig,
-	computeNextFire,
+	computeInitialFire,
 	dueFires,
 	earliestFireAt,
 	rescheduleAfterFire,
@@ -49,6 +49,11 @@ export interface SchedulerStore {
 	loadAll(): Promise<PersistedFire[]> | PersistedFire[];
 	save(fire: PersistedFire): Promise<void> | void;
 	remove(triggerId: string): Promise<void> | void;
+	/** The persisted `lastRun` watermark (the last instant the scheduler was
+	 *  known to be running), or null when never persisted. Optional so a store
+	 *  predating 0.3.1 missed-fire catch-up still satisfies the port. */
+	loadLastRun?(): Promise<number | null> | number | null;
+	saveLastRun?(ts: number): Promise<void> | void;
 }
 
 function toPersisted(fire: ScheduledFire): PersistedFire {
@@ -62,11 +67,24 @@ function toPersisted(fire: ScheduledFire): PersistedFire {
 
 export class SchedulerService {
 	private readonly fires = new Map<string, ScheduledFire>();
+	/** The last instant the scheduler was known to be running (advanced each
+	 *  tick, persisted). Missed one-shots that came due in `(lastRun, now]`
+	 *  while the app was closed catch up on next launch (0.3.1). Null until the
+	 *  first hydrate/tick — treated as `now` at registration (no ancient
+	 *  back-fire on a first-ever run). */
+	private lastRun: number | null = null;
 
 	constructor(private readonly store: SchedulerStore) {}
 
+	/** The persisted `lastRun` watermark (for the item-alerts derivation, which
+	 *  filters its registrations to instants `> lastRun`). */
+	lastRunAt(): number | null {
+		return this.lastRun;
+	}
+
 	/** Re-load the persisted schedule on boot. Idempotent. */
 	async hydrate(): Promise<void> {
+		this.lastRun = (await this.store.loadLastRun?.()) ?? null;
 		this.fires.clear();
 		for (const p of await this.store.loadAll()) {
 			this.fires.set(p.triggerId, {
@@ -93,7 +111,7 @@ export class SchedulerService {
 			triggerId,
 			workflowIds: [...workflowIds],
 			config,
-			nextFireAt: computeNextFire(config, now),
+			nextFireAt: computeInitialFire(config, now, this.lastRun ?? now),
 		};
 		this.fires.set(triggerId, fire);
 		await this.store.save(toPersisted(fire));
@@ -119,6 +137,10 @@ export class SchedulerService {
 			this.fires.set(due.triggerId, rearmed);
 			await this.store.save(toPersisted(rearmed));
 		}
+		// Advance the watermark: we were running at `now`, so anything due at or
+		// before it is not "missed while closed" on the next launch.
+		this.lastRun = now;
+		await this.store.saveLastRun?.(now);
 		return requests;
 	}
 

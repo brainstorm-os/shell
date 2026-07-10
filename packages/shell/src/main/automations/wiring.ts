@@ -223,7 +223,10 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		]);
 		const registration = deriveScheduleRegistration({ workflows, triggers, reminders });
 		// 9.14.9b — task due/scheduled + event alerts ride the same schedule.
-		registration.itemAlerts = deriveItemAlerts(tasks, events, clock());
+		// 0.3.1 — register alerts whose instant is `> lastRun` (the scheduler's
+		// persisted watermark), not just `> now`: a reminder that came due while
+		// the app was closed (in the `(lastRun, now]` gap) is a FireOnce catch-up.
+		registration.itemAlerts = deriveItemAlerts(tasks, events, scheduler.lastRunAt() ?? clock());
 		// Reconcile: entities are the source of truth, so a trigger persisted
 		// in `scheduler_fires` whose entity is gone/disabled must not linger.
 		const live = new Set([

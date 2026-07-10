@@ -27,4 +27,12 @@ export class RegistrySchedulerStore implements SchedulerStore {
 	remove(triggerId: string): void {
 		this.repo.remove(triggerId);
 	}
+
+	loadLastRun(): number | null {
+		return this.repo.loadLastRun();
+	}
+
+	saveLastRun(ts: number): void {
+		this.repo.saveLastRun(ts);
+	}
 }
