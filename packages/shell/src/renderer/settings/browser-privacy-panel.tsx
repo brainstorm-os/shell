@@ -15,9 +15,10 @@
  */
 
 import { SitePermissionKind } from "@brainstorm/sdk-types";
-import { useCallback, useEffect, useState } from "react";
-import type { SitePermissionGrant, WebEgressHostSummary } from "../../preload";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
+import type { SitePermissionGrant, SiteTrustGrant, WebEgressHostSummary } from "../../preload";
 import { t } from "../i18n/t";
+import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
 import { formatRelative } from "./network-egress-panel";
@@ -39,15 +40,18 @@ function permissionLabel(kind: SitePermissionKind): string {
 export function BrowserPrivacyPanel() {
 	const [grants, setGrants] = useState<readonly SitePermissionGrant[]>([]);
 	const [egress, setEgress] = useState<readonly WebEgressHostSummary[]>([]);
+	const [trusted, setTrusted] = useState<readonly SiteTrustGrant[]>([]);
 
 	const refresh = useCallback(async () => {
 		try {
-			const [grantRows, egressRows] = await Promise.all([
+			const [grantRows, egressRows, trustRows] = await Promise.all([
 				window.brainstorm.webPrivacy.sitePermissions.list(),
 				window.brainstorm.webPrivacy.egress.summary(EGRESS_ROW_LIMIT),
+				window.brainstorm.webPrivacy.trust.list(),
 			]);
 			setGrants(grantRows);
 			setEgress(egressRows);
+			setTrusted(trustRows);
 		} catch {
 			// The groups render their empty states; a transient IPC failure
 			// must not take down the rest of the Privacy panel.
@@ -66,11 +70,135 @@ export function BrowserPrivacyPanel() {
 		[refresh],
 	);
 
+	const onTrustAdd = useCallback(
+		async (origin: string): Promise<boolean> => {
+			const ok = await window.brainstorm.webPrivacy.trust.set(origin, true);
+			if (ok) await refresh();
+			return ok;
+		},
+		[refresh],
+	);
+
+	const onTrustRevoke = useCallback(
+		async (origin: string) => {
+			await window.brainstorm.webPrivacy.trust.revoke(origin);
+			await refresh();
+		},
+		[refresh],
+	);
+
 	return (
 		<>
 			<SitePermissionsGroup grants={grants} onRevoke={onRevoke} />
+			<TrustedSitesGroup trusted={trusted} onAdd={onTrustAdd} onRevoke={onTrustRevoke} />
 			<EgressGroup rows={egress} />
 		</>
+	);
+}
+
+/** Normalize a user-typed site into a web origin (`x.com` → `https://x.com`).
+ *  Returns null for input that can't be an http(s) origin — the main-side
+ *  handler validates again, this is just for a friendlier input. */
+function toOrigin(input: string): string | null {
+	const trimmed = input.trim();
+	if (trimmed.length === 0) return null;
+	const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+	try {
+		const url = new URL(withScheme);
+		if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+		return url.origin;
+	} catch {
+		return null;
+	}
+}
+
+function TrustedSitesGroup({
+	trusted,
+	onAdd,
+	onRevoke,
+}: {
+	trusted: readonly SiteTrustGrant[];
+	onAdd: (origin: string) => Promise<boolean>;
+	onRevoke: (origin: string) => Promise<void>;
+}) {
+	const [draft, setDraft] = useState("");
+	const [error, setError] = useState(false);
+
+	const submit = useCallback(
+		async (event: FormEvent) => {
+			event.preventDefault();
+			const origin = toOrigin(draft);
+			if (!origin) {
+				setError(true);
+				return;
+			}
+			const ok = await onAdd(origin);
+			if (ok) {
+				setDraft("");
+				setError(false);
+			} else {
+				setError(true);
+			}
+		},
+		[draft, onAdd],
+	);
+
+	return (
+		<div className="network-egress__group" data-testid="browser-privacy-trust">
+			<h4 className="network-egress__group-title">{t("shell.settings.webPrivacy.trust.title")}</h4>
+			<p className="network-egress__hint">{t("shell.settings.webPrivacy.trust.summary")}</p>
+			<form className="browser-privacy__trust-add" onSubmit={(e) => void submit(e)}>
+				<input
+					className="browser-privacy__trust-input"
+					type="text"
+					inputMode="url"
+					value={draft}
+					onChange={(e) => {
+						setDraft(e.target.value);
+						setError(false);
+					}}
+					placeholder={t("shell.settings.webPrivacy.trust.addPlaceholder")}
+					aria-label={t("shell.settings.webPrivacy.trust.addLabel")}
+					aria-invalid={error}
+					data-testid="browser-privacy-trust-input"
+				/>
+				<Button type="submit" variant={ButtonVariant.Primary} size={ButtonSize.Sm}>
+					{t("shell.settings.webPrivacy.trust.add")}
+				</Button>
+			</form>
+			{error && (
+				<p className="browser-privacy__trust-error" data-testid="browser-privacy-trust-error">
+					{t("shell.settings.webPrivacy.trust.invalid")}
+				</p>
+			)}
+			{trusted.length === 0 ? (
+				<p className="network-egress__empty" data-testid="browser-privacy-trust-empty">
+					{t("shell.settings.webPrivacy.trust.empty")}
+				</p>
+			) : (
+				<ul className="browser-privacy__list">
+					{trusted.map((grant) => (
+						<li
+							key={grant.origin}
+							className="browser-privacy__row"
+							data-testid={`browser-privacy-trust-${grant.origin}`}
+						>
+							<span className="browser-privacy__origin" title={grant.origin}>
+								{grant.origin}
+							</span>
+							<span className="network-egress__pill browser-privacy__pill--allowed">
+								{t("shell.settings.webPrivacy.trust.trusted")}
+							</span>
+							<IconButton
+								icon={IconName.Close}
+								label={t("shell.settings.webPrivacy.trust.revoke")}
+								onClick={() => void onRevoke(grant.origin)}
+							/>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
 	);
 }
 

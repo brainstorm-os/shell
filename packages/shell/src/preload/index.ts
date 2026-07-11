@@ -897,9 +897,20 @@ import {
 	WEB_EGRESS_SUMMARY_CHANNEL,
 	WEB_SITE_PERMISSIONS_LIST_CHANNEL,
 	WEB_SITE_PERMISSIONS_REVOKE_CHANNEL,
+	WEB_SITE_TRUST_LIST_CHANNEL,
+	WEB_SITE_TRUST_REVOKE_CHANNEL,
+	WEB_SITE_TRUST_SET_CHANNEL,
 } from "../web-privacy-wire-types";
-import type { SitePermissionGrant, WebEgressHostSummary } from "../web-privacy-wire-types";
-export type { SitePermissionGrant, WebEgressHostSummary } from "../web-privacy-wire-types";
+import type {
+	SitePermissionGrant,
+	SiteTrustGrant,
+	WebEgressHostSummary,
+} from "../web-privacy-wire-types";
+export type {
+	SitePermissionGrant,
+	SiteTrustGrant,
+	WebEgressHostSummary,
+} from "../web-privacy-wire-types";
 
 /** Push channel that fires on every privacy / proxy override change. */
 const VAULT_NETWORK_SETTINGS_CHANGED_CHANNEL = "vault:network-settings:changed";
@@ -992,6 +1003,15 @@ const webPrivacy = {
 	egress: {
 		summary: (limit?: number): Promise<readonly WebEgressHostSummary[]> =>
 			ipcRenderer.invoke(WEB_EGRESS_SUMMARY_CHANNEL, limit),
+	},
+	// Browser-8 — per-site trust ("compatibility mode"): list / add / remove the
+	// origins that opt out of the strict blocklist + 3p-cookie strip.
+	trust: {
+		list: (): Promise<readonly SiteTrustGrant[]> => ipcRenderer.invoke(WEB_SITE_TRUST_LIST_CHANNEL),
+		set: (origin: string, trusted: boolean): Promise<boolean> =>
+			ipcRenderer.invoke(WEB_SITE_TRUST_SET_CHANNEL, origin, trusted),
+		revoke: (origin: string): Promise<boolean> =>
+			ipcRenderer.invoke(WEB_SITE_TRUST_REVOKE_CHANNEL, origin),
 	},
 };
 

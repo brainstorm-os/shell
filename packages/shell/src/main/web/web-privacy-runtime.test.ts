@@ -82,4 +82,45 @@ describe("createWebPrivacyRuntime", () => {
 		expect(rows).toEqual([{ host: "a.com", count: 4, blockedCount: 1, lastSeenMs: 9 }]);
 		await runtime.dispose();
 	});
+
+	describe("trust (Browser-8)", () => {
+		it("is strict by default and fails closed with no vault", async () => {
+			const runtime = createWebPrivacyRuntime({ getVaultPath: () => null });
+			expect(runtime.trust.isTrusted(origin)).toBe(false);
+			expect(await runtime.trust.list()).toEqual([]);
+			await runtime.dispose();
+		});
+
+		it("set persists trust and isTrusted reads it back", async () => {
+			const runtime = createWebPrivacyRuntime({ getVaultPath: () => vaultA, now: () => 42 });
+			await runtime.trust.set(origin, true);
+			expect(runtime.trust.isTrusted(origin)).toBe(true);
+			expect(await runtime.trust.list()).toEqual([{ origin, trusted: true, updatedAt: 42 }]);
+			await runtime.dispose();
+			// A fresh runtime loads it from disk.
+			const reloaded = createWebPrivacyRuntime({ getVaultPath: () => vaultA });
+			await reloaded.trust.whenLoaded();
+			expect(reloaded.trust.isTrusted(origin)).toBe(true);
+			await reloaded.dispose();
+		});
+
+		it("untrust (set false) removes it and rewrites the file", async () => {
+			const runtime = createWebPrivacyRuntime({ getVaultPath: () => vaultA });
+			await runtime.trust.set(origin, true);
+			await runtime.trust.set(origin, false);
+			expect(runtime.trust.isTrusted(origin)).toBe(false);
+			expect(await runtime.trust.list()).toEqual([]);
+			await runtime.dispose();
+		});
+
+		it("re-keys on vault switch — trust never leaks across vaults", async () => {
+			let active = vaultA;
+			const runtime = createWebPrivacyRuntime({ getVaultPath: () => active });
+			await runtime.trust.set(origin, true);
+			active = vaultB;
+			await runtime.trust.whenLoaded();
+			expect(runtime.trust.isTrusted(origin)).toBe(false);
+			await runtime.dispose();
+		});
+	});
 });
