@@ -41,6 +41,14 @@ export {
 	awarenessStore,
 } from "./awareness";
 export {
+	type LocalAwareness,
+	type PresenceTransport,
+	createLocalAwareness,
+	createSyncedAwareness,
+	createLoopbackTransports,
+	randomClientId,
+} from "./synced-awareness";
+export {
 	yDocStore,
 	yMapKeyStore,
 	yMapStore,
