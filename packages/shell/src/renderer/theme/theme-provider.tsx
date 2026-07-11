@@ -87,6 +87,21 @@ export function ThemeProvider({ children }: Props) {
 		applyThemeVars(theme);
 	}, [theme]);
 
+	// Fast-path repaint. The shell resolves its theme from the entity-pin-enriched
+	// `dashboard:snapshot`, which awaits a DB read on a pinned dashboard — so a
+	// light/dark toggle flipped the app windows instantly (they get a synchronous
+	// `app:theme-changed` push) while the shell lagged until enrichment resolved
+	// ("works in the apps, but the shell doesn't change immediately"). The main
+	// process now pushes the resolved theme name to the dashboard on that same
+	// signal; apply it the moment it arrives. Gated on an open vault so it never
+	// overrides the welcome-screen Rose pin; the snapshot-derived effect above
+	// stays the source of truth and re-applies the same value idempotently.
+	useEffect(() => {
+		const onTheme = window.brainstorm?.dashboard?.onTheme;
+		if (!onTheme || current === null) return;
+		return onTheme((pushed) => applyThemeVars(pushed));
+	}, [current]);
+
 	// Transient cross-surface theme preview (9.9.6). A sanitized payload paints
 	// preview token overrides inline (winning over the committed inline vars);
 	// `null` reverts by re-applying the committed theme (which re-sets every

@@ -927,8 +927,14 @@ export function broadcastThemeToWindows(
 	if (dashboard && !dashboard.isDestroyed()) {
 		try {
 			dashboard.setBackgroundColor(backgroundColor);
+			// The dashboard renderer resolves its theme from the entity-pin-enriched
+			// `dashboard:snapshot`, which awaits a DB read on a pinned dashboard — so
+			// the shell lagged the apps (which get this synchronous signal) on a
+			// light/dark toggle. Push the resolved name here too so ThemeProvider
+			// repaints in lockstep; the snapshot re-applies the same value idempotently.
+			dashboard.webContents.send(APP_THEME_CHANGED_CHANNEL, theme);
 		} catch (error) {
-			console.warn("[brainstorm] dashboard setBackgroundColor failed:", error);
+			console.warn("[brainstorm] dashboard theme broadcast failed:", error);
 		}
 	}
 

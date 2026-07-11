@@ -1314,6 +1314,12 @@ const dashboard = {
 		listener: (payload: { vars?: Record<string, string> } | null) => void,
 	): (() => void) =>
 		subscribe<{ vars?: Record<string, string> } | null>("app:theme-preview", listener),
+	/** Subscribe to committed-theme pushes — the same synchronous signal app
+	 *  windows get on `app:theme-changed`, so the dashboard repaints in lockstep
+	 *  with the apps instead of waiting on the async entity-pin-enriched snapshot
+	 *  (the "apps flip, shell doesn't" lag). Carries the resolved theme name. */
+	onTheme: (listener: (theme: ThemeName) => void): (() => void) =>
+		subscribe<ThemeName>("app:theme-changed", listener),
 };
 
 /** Feedback-3 — bundled curated changelog (build-time JSON). The
