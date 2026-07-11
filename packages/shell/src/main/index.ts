@@ -3183,6 +3183,12 @@ void app.whenReady().then(async () => {
 		"presence",
 		makePresenceServiceHandler({
 			getRouter: () => getPresenceRouter(),
+			// SECURITY — resolve the entity's real type from entities.db so the cap
+			// gate keys on it, not the app-supplied type (per-type read isolation).
+			resolveEntityType: async (entityId) => {
+				const repo = await getEntitiesRepoForActiveSession();
+				return repo?.get(entityId)?.type ?? null;
+			},
 			getLedger: async () => {
 				const session = getActiveVaultSession();
 				if (!session) return null;

@@ -33,6 +33,14 @@ export type PresenceServiceOptions = {
 	/** The active vault's presence router, or null when no vault/transport is up
 	 *  (fail closed). Read on every call so a session swap is transparent. */
 	readonly getRouter: () => PresenceRouter | null;
+	/** SECURITY — resolve an entity's REAL type from the vault (its `entities.db`
+	 *  row), so the capability gate keys on the authoritative type and never on
+	 *  the app-supplied `type`. Trusting the client's type would let an app that
+	 *  holds `entities.read:<cheap>` subscribe to presence for an entity of a type
+	 *  it can't read (leaking collaborators' identities + cursors). Mirrors the
+	 *  entities service, which resolves the type from the repo row. `null` ⇒ the
+	 *  entity is unknown to this vault ⇒ deny. */
+	readonly resolveEntityType: (entityId: string) => Promise<string | null>;
 	/** SECURITY — the active vault's capability ledger, re-checked server-side.
 	 *  Absent → the cap gate is skipped (unit tests that presume authorization). */
 	readonly getLedger?: () => Promise<CapabilityLedger | null>;
@@ -95,10 +103,13 @@ export function makePresenceServiceHandler(options: PresenceServiceOptions): Ser
 	async function handlePublish(envelope: Envelope): Promise<void> {
 		const input = (envelope.args[0] ?? {}) as Record<string, unknown>;
 		const entityId = typeof input.entityId === "string" ? input.entityId : "";
-		const type = typeof input.type === "string" ? input.type : "";
-		if (!entityId || !type) {
-			throw makeError("Invalid", "presence.publish: entityId + type required");
-		}
+		if (!entityId) throw makeError("Invalid", "presence.publish: entityId required");
+		// SECURITY: gate on the entity's REAL type, resolved from the vault — never
+		// the app-supplied `input.type` (which the app could forge to a type it can
+		// read while pointing `entityId` at one it can't, harvesting that entity's
+		// collaborator presence). Unknown entity ⇒ deny.
+		const type = await options.resolveEntityType(entityId);
+		if (!type) throw makeError("Invalid", "presence.publish: unknown entity");
 		await requireEntityRead(envelope, options, type);
 		requireRouter(options).publish(envelope.app, entityId, parseState(input.state));
 	}
