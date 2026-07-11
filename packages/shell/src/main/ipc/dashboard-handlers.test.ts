@@ -59,13 +59,16 @@ function makeFakeAppWindow(
 function makeFakeDashboard(destroyed = false): {
 	dashboard: BrowserWindow;
 	setBackgroundColor: ReturnType<typeof vi.fn>;
+	send: ReturnType<typeof vi.fn>;
 } {
 	const setBackgroundColor = vi.fn();
+	const send = vi.fn();
 	const dashboard = {
 		isDestroyed: () => destroyed,
 		setBackgroundColor,
+		webContents: { send, isDestroyed: () => destroyed },
 	} as unknown as BrowserWindow;
-	return { dashboard, setBackgroundColor };
+	return { dashboard, setBackgroundColor, send };
 }
 
 describe("broadcastThemeToWindows", () => {
@@ -106,6 +109,22 @@ describe("broadcastThemeToWindows", () => {
 		const { dashboard, setBackgroundColor } = makeFakeDashboard();
 		broadcastThemeToWindows(DEFAULT_THEME, dashboard, [notes.appWindow]);
 		expect(setBackgroundColor).toHaveBeenCalledWith(themes[DEFAULT_THEME].color.background.primary);
+	});
+
+	it("pushes the theme name to the dashboard renderer too, so the shell flips in lockstep with the apps", () => {
+		// Regression: the shell resolved its theme only from the async, entity-pin-
+		// enriched `dashboard:snapshot`, so a light/dark toggle flipped the apps
+		// (synchronous `app:theme-changed`) while the dashboard lagged until the DB
+		// read resolved. The dashboard must get the same synchronous signal.
+		const { dashboard, send } = makeFakeDashboard();
+		broadcastThemeToWindows(DEFAULT_THEME, dashboard, []);
+		expect(send).toHaveBeenCalledWith(APP_THEME_CHANGED_CHANNEL, DEFAULT_THEME);
+	});
+
+	it("doesn't push to a destroyed dashboard", () => {
+		const { dashboard, send } = makeFakeDashboard(true);
+		broadcastThemeToWindows(DEFAULT_THEME, dashboard, []);
+		expect(send).not.toHaveBeenCalled();
 	});
 
 	it("is a no-op for the dashboard when it's null", () => {
