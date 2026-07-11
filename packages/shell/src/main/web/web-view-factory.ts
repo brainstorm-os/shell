@@ -59,6 +59,12 @@ export type WebViewFactoryDeps = {
 	/** Browser-7 — per-host egress aggregate hook (host only, never the URL).
 	 *  `blocked` marks a blocklist cancel. */
 	recordEgress?: (host: string, blocked: boolean) => void;
+	/** Browser-8 — sync per-origin trust check. `true` for a first-party origin
+	 *  the user marked TRUSTED relaxes the tracker blocklist + third-party-cookie
+	 *  strip for that page (the login-gated-SPA escape hatch). Absent / `false` ⇒
+	 *  the strict Browser-2/4 default. Keyed by the page's FIRST PARTY, never the
+	 *  request URL. */
+	isTrustedOrigin?: (origin: string) => boolean;
 };
 
 /** Sessions whose locked-down policy (permissions + webRequest) is already
@@ -337,11 +343,23 @@ function configureSessionPolicy(
 		return kinds.every((kind) => decide(origin, kind) === true);
 	});
 
+	// Browser-8 — a page whose FIRST PARTY origin the user marked TRUSTED opts
+	// out of the strict tracker-blocklist + third-party-cookie strip (the escape
+	// hatch for login-gated SPAs). Keyed by the requesting tab's top-level origin,
+	// never the request URL; unknown / untrusted first party ⇒ strict default.
+	const trustedFirstParty = (details: { webContentsId?: number }): boolean => {
+		if (!deps.isTrustedOrigin) return false;
+		const firstParty = spec.resolveTabContext(webContentsIdOf(details))?.firstPartyUrl;
+		if (!firstParty) return false;
+		const origin = webOriginOf(firstParty);
+		return origin !== null && deps.isTrustedOrigin(origin);
+	};
+
 	// Tracker/ad blocklist (cancel only — top-level HTTPS-upgrade is done in the
 	// service, so no risky per-subresource redirect here). Every request also
 	// lands one per-host tick in the Browser-7 egress aggregate.
 	ses.webRequest.onBeforeRequest((details, callback) => {
-		const blocked = isBlockedRequest(details.url, blocklist);
+		const blocked = isBlockedRequest(details.url, blocklist) && !trustedFirstParty(details);
 		const host = networkEgressHostOf(details.url);
 		if (host.length > 0) deps.recordEgress?.(host, blocked);
 		if (blocked) {
@@ -379,6 +397,10 @@ function configureSessionPolicy(
 		const firstParty = spec.resolveTabContext(webContentsIdOf(details))?.firstPartyUrl;
 		// Unknown first-party ⇒ unattributable subresource ⇒ fail closed (strip).
 		if (!firstParty) return true;
+		// Browser-8 — a trusted first party opts out of the 3p-cookie strip so its
+		// SSO / cross-subdomain cookies flow (the reason the strict default breaks
+		// login-gated SPAs). Untrusted ⇒ the strict strip stands.
+		if (trustedFirstParty(details)) return false;
 		return isThirdPartyRequest(details.url, firstParty);
 	};
 	ses.webRequest.onBeforeSendHeaders((details, callback) => {

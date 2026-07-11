@@ -15,12 +15,17 @@
  */
 
 import type { SitePermissionKind } from "@brainstorm/sdk-types";
-import type { SitePermissionGrant, WebEgressHostSummary } from "../../web-privacy-wire-types";
+import type {
+	SitePermissionGrant,
+	SiteTrustGrant,
+	WebEgressHostSummary,
+} from "../../web-privacy-wire-types";
 import {
 	SitePermissionStore,
 	readSitePermissionGrants,
 	writeSitePermissionGrants,
 } from "./site-permissions";
+import { SiteTrustStore, readSiteTrustGrants, writeSiteTrustGrants } from "./site-trust";
 import { WebEgressAudit, readWebEgressRows, writeWebEgressRows } from "./web-egress-audit";
 
 export type WebPrivacyRuntimeOptions = {
@@ -42,12 +47,22 @@ export type WebPrivacyRuntime = {
 		record(host: string, blocked: boolean): void;
 		summary(limit?: number): Promise<WebEgressHostSummary[]>;
 	};
+	trust: {
+		/** Sync (the webRequest handler can't await) — strict default `false`
+		 *  until the vault's trust file finishes loading. */
+		isTrusted(origin: string): boolean;
+		set(origin: string, trusted: boolean): Promise<void>;
+		revokeOrigin(origin: string): Promise<boolean>;
+		list(): Promise<SiteTrustGrant[]>;
+		whenLoaded(): Promise<void>;
+	};
 	dispose(): Promise<void>;
 };
 
 type VaultState = {
 	vaultPath: string;
 	store: SitePermissionStore;
+	trust: SiteTrustStore;
 	audit: WebEgressAudit;
 	loaded: Promise<void>;
 };
@@ -65,28 +80,35 @@ export function createWebPrivacyRuntime(options: WebPrivacyRuntimeOptions): WebP
 		const previous = state;
 		if (previous) void previous.audit.dispose();
 		const store = new SitePermissionStore();
+		const trust = new SiteTrustStore();
 		const audit = new WebEgressAudit({
 			save: (rows) => writeWebEgressRows(vaultPath, rows),
 			now,
 		});
 		const loaded = (async () => {
-			const [grants, rows] = await Promise.all([
+			const [grants, trustGrants, rows] = await Promise.all([
 				readSitePermissionGrants(vaultPath),
+				readSiteTrustGrants(vaultPath),
 				readWebEgressRows(vaultPath),
 			]);
 			for (const grant of grants) {
 				store.set(grant.origin, grant.permission, grant.allow, grant.updatedAt);
 			}
+			for (const grant of trustGrants) trust.set(grant.origin, true, grant.updatedAt);
 			// Additive merge — requests recorded during the load window keep
 			// their counts.
 			audit.mergeSeed(rows);
 		})();
-		state = { vaultPath, store, audit, loaded };
+		state = { vaultPath, store, trust, audit, loaded };
 		return state;
 	};
 
 	const persistGrants = async (s: VaultState): Promise<void> => {
 		await writeSitePermissionGrants(s.vaultPath, s.store.list());
+	};
+
+	const persistTrust = async (s: VaultState): Promise<void> => {
+		await writeSiteTrustGrants(s.vaultPath, s.trust.list());
 	};
 
 	return {
@@ -129,6 +151,35 @@ export function createWebPrivacyRuntime(options: WebPrivacyRuntimeOptions): WebP
 				if (!s) return [];
 				await s.loaded;
 				return s.audit.summary(limit);
+			},
+		},
+		trust: {
+			isTrusted(origin) {
+				const s = current();
+				return s ? s.trust.isTrusted(origin) : false;
+			},
+			async set(origin, trusted) {
+				const s = current();
+				if (!s) return;
+				await s.loaded;
+				if (s.trust.set(origin, trusted, now())) await persistTrust(s);
+			},
+			async revokeOrigin(origin) {
+				const s = current();
+				if (!s) return false;
+				await s.loaded;
+				const removed = s.trust.revokeOrigin(origin);
+				if (removed) await persistTrust(s);
+				return removed;
+			},
+			async list() {
+				const s = current();
+				if (!s) return [];
+				await s.loaded;
+				return s.trust.list();
+			},
+			async whenLoaded() {
+				await current()?.loaded;
 			},
 		},
 		async dispose() {

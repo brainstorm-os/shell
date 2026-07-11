@@ -4018,6 +4018,9 @@ void app.whenReady().then(async () => {
 					allowDevTools: DEVTOOLS_ENABLED,
 					decidePermission: (origin, kind) => webPrivacy.permissions.decision(origin, kind),
 					recordEgress: (host, blocked) => webPrivacy.egress.record(host, blocked),
+					// Browser-8 — a first-party origin the user trusts relaxes the
+					// strict blocklist + 3p-cookie strip (login-gated-SPA escape hatch).
+					isTrustedOrigin: (origin) => webPrivacy.trust.isTrusted(origin),
 					// New-tab / pre-paint surface follows the active theme (the
 					// same `background.primary` the app windows paint) instead of
 					// hardcoded white.
