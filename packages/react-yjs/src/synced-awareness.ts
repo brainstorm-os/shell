@@ -121,6 +121,58 @@ export function createSyncedAwareness(
 	};
 }
 
+/** One remote device in a `PresenceHost` peer push — a stable client id + its
+ *  (already non-null) state. Departures are an absence from the next push, which
+ *  {@link createPresenceTransport} turns into an `applyRemoteState(id, null)`. */
+export type PresenceHostPeer = { clientId: number; state: AwarenessState };
+
+/**
+ * The imperative side a real presence transport binds to — provided by the host
+ * (the sandbox app runtime), per entity: publish THIS device's state, stop
+ * tracking, and receive peer snapshots. Kept dependency-free (no `window`,
+ * no y-protocols) so this module stays pure; the app wires it from the presence
+ * broker service (`publish`/`untrack`) + the `app:presence-peers` push
+ * (`onPeers`). See design 74 §architecture.
+ */
+export type PresenceHost = {
+	publish(state: AwarenessState | null): void;
+	untrack(): void;
+	onPeers(handler: (peers: PresenceHostPeer[]) => void): () => void;
+};
+
+/**
+ * Adapt a {@link PresenceHost} (the real IPC-backed presence route) to the
+ * {@link PresenceTransport} `createSyncedAwareness` consumes. `send` publishes
+ * our whole local state — the `clientID` is dropped, because the MAIN-side proxy
+ * owns the wire identity (its own y-protocols clientID), so peers are keyed by
+ * that, not ours. `subscribe` diffs each peer snapshot against the last so a
+ * client dropping out of the set becomes an `applyRemoteState(id, null)` (the
+ * y-protocols "peer left" convention); teardown clears our presence.
+ */
+export function createPresenceTransport(host: PresenceHost): PresenceTransport {
+	return {
+		send(_clientID, state) {
+			host.publish(state);
+		},
+		subscribe(handler) {
+			let seen = new Set<number>();
+			const off = host.onPeers((peers) => {
+				const next = new Set<number>();
+				for (const peer of peers) {
+					next.add(peer.clientId);
+					handler(peer.clientId, peer.state);
+				}
+				for (const id of seen) if (!next.has(id)) handler(id, null);
+				seen = next;
+			});
+			return () => {
+				off();
+				host.untrack();
+			};
+		},
+	};
+}
+
 /**
  * A connected pair of in-memory transports — each `send` delivers to the
  * OTHER's subscribers (never an echo to itself). For tests + the local

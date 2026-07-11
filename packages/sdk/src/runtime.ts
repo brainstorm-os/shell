@@ -83,6 +83,7 @@ import type {
 	PatternQueryResult,
 	PlatformCatalog,
 	PlatformService,
+	PresenceService,
 	PropertiesService,
 	PropertiesSnapshot,
 	PropertyDef,
@@ -274,6 +275,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			platform: platformProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
 			capabilities: capabilitiesProxy(bridge),
@@ -356,6 +358,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			platform: platformProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
 			capabilities: capabilitiesProxy(bridge),
@@ -1021,6 +1024,18 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
 			callService<SharedMember[]>(bridge, "sharing", "access", [entityId], ["sharing.read"]),
+	};
+}
+
+function presenceProxy(bridge: Bridge): PresenceService {
+	// PRES-2b — live presence. `publish` piggybacks on the entity read grant
+	// (`entities.read:<type>`, re-checked server-side); `untrack` needs no cap
+	// (it only clears our own presence). Peers arrive on the `presence.onPeers`
+	// push, wired separately by the app preload.
+	return {
+		publish: (input) =>
+			callService<void>(bridge, "presence", "publish", [input], [`entities.read:${input.type}`]),
+		untrack: (input) => callService<void>(bridge, "presence", "untrack", [input], []),
 	};
 }
 

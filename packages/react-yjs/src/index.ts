@@ -43,8 +43,11 @@ export {
 export {
 	type LocalAwareness,
 	type PresenceTransport,
+	type PresenceHost,
+	type PresenceHostPeer,
 	createLocalAwareness,
 	createSyncedAwareness,
+	createPresenceTransport,
 	createLoopbackTransports,
 	randomClientId,
 } from "./synced-awareness";
