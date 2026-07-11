@@ -375,6 +375,34 @@ function ydocOnRemote(entityId: string, callback: (updateB64: string) => void): 
 
 const ydoc = { onRemote: ydocOnRemote };
 
+// PRES-2b — live-presence peer pushes. The main-side PresenceRouter fans the
+// merged peer set for an entity to the app windows that published presence for
+// it; we route each push to the per-entity sink the app registered via
+// `presence.onPeers`. Channel must match APP_PRESENCE_PEERS_CHANNEL in
+// `main/sync/presence-router.ts`. Peers are opaque, untrusted state maps — the
+// render side hardens them via `peerFromState` — so the sink just forwards.
+type PresencePeer = { clientId: number; state: Record<string, unknown> };
+const presencePeerSinks = new Map<string, (peers: PresencePeer[]) => void>();
+ipcRenderer.on("app:presence-peers", (_event, payload: { entityId?: unknown; peers?: unknown }) => {
+	if (!payload || typeof payload.entityId !== "string" || !Array.isArray(payload.peers)) return;
+	const sink = presencePeerSinks.get(payload.entityId);
+	if (!sink) return;
+	try {
+		sink(payload.peers as PresencePeer[]);
+	} catch (error) {
+		console.error("[brainstorm] presence-peers apply failed:", error);
+	}
+});
+
+function presenceOnPeers(entityId: string, callback: (peers: PresencePeer[]) => void): () => void {
+	presencePeerSinks.set(entityId, callback);
+	return () => {
+		if (presencePeerSinks.get(entityId) === callback) presencePeerSinks.delete(entityId);
+	};
+}
+
+const presence = { onPeers: presenceOnPeers };
+
 /**
  * Errors thrown inside the preload world cross `contextBridge` via a
  * structured clone that collapses a custom Error `name` to "Error" and drops
@@ -410,6 +438,7 @@ function cloneSafeAiErrors<T extends object>(ai: T): T {
 const augmentedRuntime = {
 	...runtime,
 	ydoc,
+	presence,
 	spellcheck,
 	services: {
 		...runtime.services,
