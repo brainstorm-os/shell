@@ -39,6 +39,7 @@ import {
 import { ObjectMenuMoreButton } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { createIconPickerButton, openIconPicker } from "@brainstorm/sdk/picker-host";
 import { PopoverBodyPadding, createPopoverElement } from "@brainstorm/sdk/popover";
 import {
@@ -1366,6 +1367,10 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 		if (selectedTaskId !== null && openTaskRecord === null) setSelectedTaskId(null);
 	}, [selectedTaskId, openTaskRecord]);
 
+	// PRES-3 — who's-here on the open task (cross-device in the shell). Rendered
+	// in the header; empty (nothing shown) when no task is open or standalone.
+	const taskPeers = usePresence(openTaskRecord?.id ?? null, TASK_TYPE, useSelf());
+
 	// Prune copy-set ids the current list no longer paints.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: deps list every input that changes the painted set; the host is read live.
 	useEffect(() => {
@@ -2074,6 +2079,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 					) : null}
 				</div>
 				<div className="app-header__right" id="tasks-header-right">
+					{taskPeers.length > 0 && <PresenceStack peers={taskPeers} />}
 					{openTaskRecord ? null : (
 						<button
 							type="button"
