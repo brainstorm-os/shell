@@ -29,7 +29,7 @@
 	top: 0;
 	inset-inline: 0;
 	height: 36px;
-	z-index: var(--z-windowControlsOverlay);
+	z-index: var(--z-window-controls-overlay);
 	-webkit-app-region: drag;
 	app-region: drag;
 }

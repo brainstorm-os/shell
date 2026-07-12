@@ -204,7 +204,7 @@
 /* A checked row stays tinted even off-hover so the selection reads at a glance
  * across the list (the leading checkbox alone is too small to scan). */
 .bin__row--checked {
-	--bin-row-bg: var(--color-selection-subtle, var(--color-interactive-hover));
+	--bin-row-bg: var(--color-accent-subtle);
 }
 
 /* Leading selection checkbox — a bare click target wrapping the shared

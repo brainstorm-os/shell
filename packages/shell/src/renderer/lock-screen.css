@@ -28,7 +28,7 @@
 	background: var(--color-background-elevated);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-overlay, 0 12px 32px rgba(0, 0, 0, 0.32));
+	box-shadow: var(--shadow-xl);
 	text-align: center;
 }
 
@@ -61,7 +61,7 @@
 .lock-screen__error {
 	margin: 0;
 	font-size: var(--text-size-sm);
-	color: var(--color-text-danger, var(--color-text-secondary));
+	color: var(--color-state-error);
 }
 
 .lock-screen__cooldown {

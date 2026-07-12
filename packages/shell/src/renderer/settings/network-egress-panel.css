@@ -115,7 +115,7 @@
 }
 
 .network-egress__install-id code {
-	font-family: var(--font-family-mono, monospace);
+	font-family: var(--text-family-code);
 	color: var(--color-text-secondary);
 	user-select: all;
 }
@@ -131,7 +131,7 @@
 	padding: var(--space-2);
 	font-size: var(--text-size-sm);
 	color: var(--color-text-secondary);
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border-radius: var(--radius-md);
 	text-align: center;
 }
@@ -159,7 +159,7 @@
 	align-items: center;
 	gap: var(--space-1);
 	padding: var(--space-1);
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-full);
 	font-size: var(--text-size-xs);
@@ -216,7 +216,7 @@
 
 .network-egress__virtual {
 	overflow: auto;
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 }
@@ -235,7 +235,7 @@
 }
 
 .network-egress__per-app-row:hover {
-	background: var(--color-surface-3);
+	background: var(--color-surface-overlay);
 }
 
 .network-egress__per-app-text {
@@ -309,7 +309,7 @@
 .network-egress__table-header {
 	position: sticky;
 	top: 0;
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
 	height: 28px;
 	z-index: 1;
@@ -449,7 +449,7 @@
 	flex-direction: column;
 	gap: var(--space-1);
 	padding: var(--space-2);
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border-radius: var(--radius-md);
 	font-size: var(--text-size-md);
 }
@@ -461,6 +461,6 @@
 
 .network-egress__crash-line {
 	color: var(--color-text-primary);
-	font-family: var(--font-family-mono, monospace);
+	font-family: var(--text-family-code);
 	word-break: break-all;
 }

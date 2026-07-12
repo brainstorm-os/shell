@@ -55,7 +55,7 @@
 	overflow: auto;
 	padding: 10px var(--space-2);
 	text-align: left;
-	font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+	font-family: var(--text-family-code);
 	font-size: var(--text-size-xs);
 	line-height: 1.5;
 	white-space: pre-wrap;

@@ -13,7 +13,7 @@
 	margin: 0;
 	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface-subtle);
+	background: var(--color-surface-default);
 	color: var(--color-text-secondary);
 	font-size: var(--text-size-sm);
 }
@@ -25,7 +25,7 @@
 .feedback-dialog__field {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-1-5);
+	gap: var(--space-2);
 	border: none;
 	padding: 0;
 	margin: 0;
@@ -67,10 +67,10 @@
 .feedback-dialog__log {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-1-5);
+	gap: var(--space-2);
 	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface-subtle);
+	background: var(--color-surface-default);
 }
 
 .feedback-dialog__log-toggle {
@@ -100,9 +100,9 @@
 	overflow-y: auto;
 	padding: var(--space-2);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface);
+	background: var(--color-surface-default);
 	color: var(--color-text-secondary);
-	font-family: var(--font-mono);
+	font-family: var(--text-family-code);
 	font-size: var(--text-size-xs);
 	white-space: pre-wrap;
 	word-break: break-word;
@@ -113,7 +113,7 @@
 	margin: 0;
 	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-sm);
-	background: var(--color-state-error-subtle, var(--color-surface-subtle));
+	background: color-mix(in srgb, var(--color-state-error) 12%, transparent);
 	color: var(--color-state-error, var(--color-text-primary));
 	font-size: var(--text-size-sm);
 }
@@ -122,7 +122,7 @@
 	margin: 0;
 	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-sm);
-	background: var(--color-state-success-subtle, var(--color-surface-subtle));
+	background: color-mix(in srgb, var(--color-state-success) 12%, transparent);
 	color: var(--color-state-success, var(--color-text-primary));
 	font-size: var(--text-size-sm);
 }

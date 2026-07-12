@@ -36,7 +36,7 @@
 	padding: var(--space-2) var(--space-2);
 	border: var(--border-width) solid var(--color-state-warning);
 	border-radius: var(--radius-sm);
-	background: var(--color-state-warning-subtle, rgba(247, 191, 95, 0.12));
+	background: color-mix(in srgb, var(--color-state-warning) 12%, transparent);
 	color: var(--color-state-warning);
 	font-size: var(--text-size-sm);
 }

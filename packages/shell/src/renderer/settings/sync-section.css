@@ -85,7 +85,7 @@
 	padding: var(--space-1) var(--space-2);
 	border: 1px solid var(--color-border-subtle);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	color: var(--color-text-primary);
 	font-size: var(--text-size-sm);
 	text-align: right;

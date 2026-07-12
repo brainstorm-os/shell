@@ -246,7 +246,7 @@
 	height: 96px;
 	border-radius: var(--radius-sm);
 	overflow: hidden;
-	background: var(--color-surface-secondary);
+	background: var(--color-surface-raised);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -258,7 +258,7 @@
 }
 
 .marketplace__theme-preview--blank {
-	background: var(--color-surface-tertiary);
+	background: var(--color-surface-overlay);
 }
 
 /* App tiles render the shared `<AppIcon>` flush-left at the top of the
@@ -437,14 +437,14 @@
 	height: 200px;
 	border-radius: var(--radius-md);
 	overflow: hidden;
-	background: var(--color-surface-secondary);
+	background: var(--color-surface-raised);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
 .marketplace__detail-hero-preview--blank {
-	background: var(--color-surface-tertiary);
+	background: var(--color-surface-overlay);
 }
 
 .marketplace__detail-hero-icon {

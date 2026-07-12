@@ -6,7 +6,7 @@
 	margin: 0;
 	font-size: var(--text-size-md);
 	color: var(--color-text-secondary);
-	line-height: var(--line-height-relaxed, 1.5);
+	line-height: var(--text-line-height-relaxed);
 }
 
 .vault-recovery__actions {
