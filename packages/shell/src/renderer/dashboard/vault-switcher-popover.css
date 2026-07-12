@@ -26,11 +26,11 @@
 }
 
 .vault-switcher__row--selected {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 }
 
 .vault-switcher__row:focus-visible {
-	outline: var(--focus-ring);
+	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -125,11 +125,11 @@
 }
 
 .vault-switcher__add-back:hover {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 }
 
 .vault-switcher__add-back:focus-visible {
-	outline: var(--focus-ring);
+	outline: 2px solid var(--color-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -154,10 +154,10 @@
 }
 
 .vault-switcher__footer-button:hover {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 }
 
 .vault-switcher__footer-button:focus-visible {
-	outline: var(--focus-ring);
+	outline: 2px solid var(--color-focus-ring);
 	outline-offset: 2px;
 }

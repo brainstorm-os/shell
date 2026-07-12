@@ -65,7 +65,7 @@
 }
 
 .launcher-menu__snippet mark {
-	background: var(--color-state-highlight, rgba(255, 230, 100, 0.45));
+	background: color-mix(in srgb, var(--color-state-warning) 35%, transparent);
 	color: var(--color-text-primary);
 	padding: 0 var(--space-0_5);
 	border-radius: var(--radius-xs);

@@ -54,7 +54,7 @@
 	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-medium);
 	/* Per-provider accent; literal brand-ish hues, overridable below. Neutral default. */
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	color: var(--color-text-primary);
 }
 
@@ -203,7 +203,7 @@
 }
 
 .settings__ai-usage-trigger:hover {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 }
 
 .settings__ai-usage-app {

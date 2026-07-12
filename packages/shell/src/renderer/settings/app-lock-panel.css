@@ -60,7 +60,7 @@
 .app-lock__error {
 	margin: 0;
 	font-size: var(--text-size-sm);
-	color: var(--color-text-danger, var(--color-text-secondary));
+	color: var(--color-state-error);
 }
 
 .app-lock__actions {

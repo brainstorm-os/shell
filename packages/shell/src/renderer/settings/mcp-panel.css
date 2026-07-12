@@ -101,7 +101,7 @@
 .settings__mcp-args {
 	resize: vertical;
 	min-height: var(--space-8);
-	font-family: var(--font-family-mono);
+	font-family: var(--text-family-code);
 	font-size: var(--text-size-sm);
 	line-height: 1.5;
 }
@@ -157,7 +157,7 @@
 	font-size: var(--text-size-sm);
 	font-weight: var(--text-weight-medium);
 	color: var(--color-text-primary);
-	font-family: var(--font-family-mono);
+	font-family: var(--text-family-code);
 }
 
 .settings__mcp-tool-desc {
@@ -174,16 +174,16 @@
 	letter-spacing: 0.04em;
 	padding: 0 var(--space-1);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	color: var(--color-text-tertiary);
 }
 
 .settings__mcp-badge--danger {
 	background: var(--color-state-error);
-	color: var(--color-text-on-accent);
+	color: var(--color-text-inverse);
 }
 
 .settings__mcp-badge--warn {
 	background: var(--color-state-warning);
-	color: var(--color-text-on-accent);
+	color: var(--color-text-inverse);
 }

@@ -41,10 +41,16 @@ import { flattenTokens, themes } from "../packages/tokens/src/index.ts";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_PATH = join(ROOT, "tools", "css-token-baseline.json");
 
-/** CSS that loads inside app windows — the surfaces where a phantom token
- *  silently falls back. (The shell renderer manages its own vars and is
- *  out of scope here.) */
-const CSS_SCOPES = ["apps", "packages/sdk/src", "packages/editor/src"];
+/** CSS surfaces where a phantom token silently falls back. Includes the shell
+ *  renderer: a phantom there (e.g. `--font-mono` for `--text-family-code`, or a
+ *  no-fallback `--color-surface-2`) renders the wrong font / no background just
+ *  as silently as in an app window. */
+const CSS_SCOPES = [
+	"apps",
+	"packages/sdk/src",
+	"packages/editor/src",
+	"packages/shell/src/renderer",
+];
 
 /** Where runtime-injected var names can originate (setProperty, inline
  *  style objects, cssText template literals). */

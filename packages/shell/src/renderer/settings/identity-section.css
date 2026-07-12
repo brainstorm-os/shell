@@ -16,7 +16,7 @@
 	overflow: hidden;
 	border: 1px solid var(--color-border-subtle);
 	border-radius: 50%;
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	color: var(--color-text-secondary);
 	cursor: pointer;
 }
@@ -82,7 +82,7 @@
 	white-space: nowrap;
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	color: var(--color-text-secondary);
 	/* Was a phantom `--font-mono` (fell back to the UI font — the fingerprint
 	 * didn't even read as code). Use the real code family. */

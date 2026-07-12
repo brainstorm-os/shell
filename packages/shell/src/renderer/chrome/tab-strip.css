@@ -17,7 +17,7 @@ body {
 	 * strip view starts. */
 	background: var(--color-background-primary, #0f0f0f);
 	color: var(--color-text-primary, #e7e7e7);
-	font-family: var(--font-family-sans, system-ui, sans-serif);
+	font-family: var(--text-family-ui);
 	font-size: var(--text-size-sm);
 	user-select: none;
 }

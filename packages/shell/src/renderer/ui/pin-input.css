@@ -18,7 +18,7 @@
 	line-height: 1;
 	text-align: center;
 	color: var(--color-text-primary);
-	background: var(--color-background-subtle, var(--color-background-secondary));
+	background: var(--color-background-subtle);
 	border: var(--border-width) solid var(--color-border-default);
 	border-radius: var(--radius-md);
 	caret-color: transparent;

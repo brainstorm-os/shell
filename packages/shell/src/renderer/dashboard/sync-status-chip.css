@@ -15,7 +15,7 @@
 }
 
 .sync-status-chip:hover {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 	border-color: var(--color-border-strong);
 }
 

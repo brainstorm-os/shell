@@ -17,7 +17,7 @@
 	gap: var(--space-2);
 	padding: var(--space-1);
 	border-radius: var(--radius-sm);
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 }
 
 .browser-privacy__origin {
@@ -67,7 +67,7 @@
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	color: var(--color-text-tertiary);
 	font-weight: var(--text-weight-medium);
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
@@ -107,7 +107,7 @@
 	padding: 0 var(--space-2);
 	font-size: var(--text-size-md);
 	color: var(--color-text-primary);
-	background: var(--color-surface-2);
+	background: var(--color-surface-raised);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-sm);
 }

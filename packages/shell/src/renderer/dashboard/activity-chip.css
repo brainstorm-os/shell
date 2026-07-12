@@ -18,7 +18,7 @@
 }
 
 .activity-chip:hover {
-	background: var(--color-surface-hover);
+	background: var(--color-interactive-hover);
 	border-color: var(--color-border-strong);
 }
 
@@ -102,7 +102,7 @@
 .activity-popover__bar {
 	height: 4px;
 	border-radius: var(--radius-full);
-	background: var(--color-surface-sunken);
+	background: var(--color-surface-default);
 	overflow: hidden;
 }
 
