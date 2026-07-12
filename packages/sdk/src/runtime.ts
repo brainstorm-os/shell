@@ -662,6 +662,22 @@ function webViewProxy(bridge: Bridge): WebViewClient {
 				[{ method: WebViewMethod.ClearBrowsingData }],
 				browse,
 			),
+		setSiteTrust: (origin, trusted) =>
+			callService<void>(
+				bridge,
+				WEBVIEW_SERVICE,
+				WebViewMethod.SetSiteTrust,
+				[{ method: WebViewMethod.SetSiteTrust, origin, trusted }],
+				browse,
+			),
+		isSiteTrusted: (origin) =>
+			callService<boolean>(
+				bridge,
+				WEBVIEW_SERVICE,
+				WebViewMethod.IsSiteTrusted,
+				[{ method: WebViewMethod.IsSiteTrusted, origin }],
+				browse,
+			),
 		// The default proxy mints the call path but can't route the broadcast
 		// event stream — the preload overlays `onEvent` with the channel-backed
 		// shape (mirrors `files.watch`). Non-Electron bridges keep this no-op.

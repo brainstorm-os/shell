@@ -109,6 +109,8 @@ function fakeWebView(): FakeWebView {
 			return Promise.resolve();
 		},
 		clearBrowsingData: () => Promise.resolve(),
+		setSiteTrust: () => Promise.resolve(),
+		isSiteTrusted: () => Promise.resolve(false),
 		onEvent: (listener) => {
 			listeners.add(listener);
 			return () => listeners.delete(listener);

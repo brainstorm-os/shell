@@ -112,6 +112,17 @@ function normalizeOmnibox(input: string): string {
 	return `https://duckduckgo.com/?q=${encodeURIComponent(text)}`;
 }
 
+/** The http(s) web origin of a URL, or null for a blank / local / other-scheme
+ *  page (which has no site to trust). */
+function webOriginOf(url: string): string | null {
+	try {
+		const u = new URL(url);
+		return u.protocol === "http:" || u.protocol === "https:" ? u.origin : null;
+	} catch {
+		return null;
+	}
+}
+
 function clipLabel(phase: ClipPhase): string {
 	switch (phase) {
 		case ClipPhase.Saving:
@@ -634,6 +645,35 @@ export function BrowserApp(): ReactElement {
 		dataClearedTimer.current = window.setTimeout(() => setDataCleared(false), 4000);
 	}, [webView]);
 
+	// Browser-8 — the in-browser trust twin of Settings → Privacy → Trusted sites.
+	// Trusting the current origin relaxes the strict tracker + third-party-cookie
+	// blocking for it (the escape hatch for login-gated SPAs like x.com). The menu
+	// affordance reflects + toggles this; reload applies the new policy.
+	const activeOrigin = active ? webOriginOf(active.url) : null;
+	const [activeTrusted, setActiveTrusted] = useState(false);
+	useEffect(() => {
+		if (!activeOrigin || !webView) {
+			setActiveTrusted(false);
+			return;
+		}
+		let live = true;
+		void webView.isSiteTrusted(activeOrigin).then((trusted) => {
+			if (live) setActiveTrusted(trusted);
+		});
+		return () => {
+			live = false;
+		};
+	}, [activeOrigin, webView]);
+
+	const onToggleTrust = useCallback(() => {
+		if (!activeOrigin || !active) return;
+		const next = !activeTrusted;
+		setActiveTrusted(next);
+		void webView?.setSiteTrust(activeOrigin, next);
+		// Reload so the relaxed (or restored) cookie/blocklist policy takes effect.
+		void webView?.reload(active.id);
+	}, [activeOrigin, active, activeTrusted, webView]);
+
 	const onActivate = useCallback(
 		(tabId: string) => {
 			setSession((s) => activateTab(s, { tabId, now: now() }));
@@ -788,6 +828,19 @@ export function BrowserApp(): ReactElement {
 				icon: IconName.Lock,
 				onSelect: onNewPrivateTab,
 			},
+		];
+		// Browser-8 — trust the current site (only for a real web origin).
+		if (activeOrigin) {
+			items.push(
+				{ label: t("trust.section"), section: true },
+				{
+					label: activeTrusted ? t("trust.untrust") : t("trust.trust"),
+					icon: IconName.CheckCircle,
+					onSelect: onToggleTrust,
+				},
+			);
+		}
+		items.push(
 			{ label: t("menu.label"), section: true },
 			{
 				label: t("data.clear"),
@@ -795,14 +848,14 @@ export function BrowserApp(): ReactElement {
 				destructive: true,
 				onSelect: onClearBrowsingData,
 			},
-		];
+		);
 		const rect = anchor.getBoundingClientRect();
 		openAnchoredMenu({ x: rect.right, y: rect.bottom }, items, {
 			menuLabel: t("menu.label"),
 			anchor,
 			align: MenuAlign.End,
 		});
-	}, [onNewPrivateTab, onClearBrowsingData]);
+	}, [onNewPrivateTab, onClearBrowsingData, activeOrigin, activeTrusted, onToggleTrust]);
 
 	const [clipAttempt, setClipAttempt] = useState<ClipAttempt | null>(null);
 	const clipResetTimer = useRef<number | null>(null);
