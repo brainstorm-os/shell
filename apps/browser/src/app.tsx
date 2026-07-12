@@ -605,7 +605,17 @@ export function BrowserApp(): ReactElement {
 		const tabId = nextId();
 		setSession((s) => openTab(s, { tabId, now: now(), activate: true }));
 		openView(tabId, NEW_TAB_URL);
-	}, [nextId, openView, now]);
+		// HIDE the previously-active view — `open` only mounts the new one (0×0
+		// until the chrome pushes bounds), so without this the old tab shows
+		// through underneath while the new one loads. `activate` hides the others.
+		void webView?.activate(tabId);
+		// Then land the caret in the address bar so a URL can be typed immediately
+		// (rAF re-claims focus after `activate` focuses the fresh view).
+		requestAnimationFrame(() => {
+			omniboxRef.current?.focus();
+			omniboxRef.current?.select();
+		});
+	}, [nextId, openView, now, webView]);
 
 	// Browser-10 — a private (incognito) tab: throwaway per-tab partition, never
 	// persisted, never written to the cookie jar.
@@ -646,12 +656,26 @@ export function BrowserApp(): ReactElement {
 			openedTabs.current.delete(tabId);
 			void webView?.close(tabId);
 			setSession((s) => {
+				const wasActive = s.activeTabId === tabId;
 				const next = closeTab(s, { tabId, now: now() });
 				// Closing the last tab opens a fresh blank one (never an empty window).
 				if (next.tabs.length === 0) {
 					const fresh = nextId();
 					openView(fresh, NEW_TAB_URL);
 					return openTab(next, { tabId: fresh, now: now(), activate: true });
+				}
+				// Closing the ACTIVE tab hands activation to a neighbour — SHOW its
+				// view, or the window goes blank (the closed view is gone, the new
+				// active one was never brought forward). Mirror onActivate: a
+				// never-yet-opened restored tab is mounted by re-navigating its tip.
+				const newActive = next.activeTabId;
+				if (wasActive && newActive) {
+					if (openedTabs.current.has(newActive)) {
+						void webView?.activate(newActive);
+					} else {
+						const t = next.tabs.find((candidate) => candidate.id === newActive);
+						if (t) openView(newActive, t.history[t.historyIndex] ?? t.url);
+					}
 				}
 				return next;
 			});
