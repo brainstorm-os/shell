@@ -136,8 +136,28 @@ export type WhiteboardBrainstorm = {
 		bp?: BpService;
 		/** Intent dispatch (9.17.4) — opens an embedded entity in its app. */
 		intents?: IntentsService;
+		/** Live presence (PRES-2b) — publish/clear this device's cursor+selection
+		 *  for a board, gated on `entities.read:<type>`. Absent ⇒ presence stays
+		 *  single-device (standalone / preview). */
+		presence?: {
+			publish(input: {
+				entityId: string;
+				type: string;
+				state: Record<string, unknown> | null;
+			}): Promise<void>;
+			untrack(input: { entityId: string }): Promise<void>;
+		};
 	};
 	on?(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
+	/** Live-presence peer push (PRES-2b) — the merged peer set for a board the
+	 *  app published presence for. Separate from `services.presence` (the calls);
+	 *  mirrors `ydoc.onRemote`. */
+	presence?: {
+		onPeers(
+			entityId: string,
+			handler: (peers: { clientId: number; state: Record<string, unknown> }[]) => void,
+		): () => void;
+	};
 };
 
 declare global {

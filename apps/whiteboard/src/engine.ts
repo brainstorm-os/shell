@@ -120,7 +120,7 @@ import {
 	buildLocalPresence,
 	presencePeers,
 } from "./logic/presence";
-import { createLocalAwareness } from "./logic/presence-channel";
+import { createLocalAwareness, presenceAwarenessFor } from "./logic/presence-channel";
 import { plainToRich, richRunsEqual } from "./logic/rich-text";
 import { selectionSummary, shouldSelectOnFocus } from "./logic/selection-announce";
 import { SnapAxis, type SnapGuide, type SnapRect, computeSnap } from "./logic/snap";
@@ -531,11 +531,13 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		className: "whiteboard__live-region",
 	});
 
-	// ── Presence (9.17.19) ────────────────────────────────────────────────────
-	// Session-local awareness channel; a real y-protocols `Awareness` bound by
-	// the Stage-10 transport satisfies the same structural interface. Remote
-	// states arrive via `applyRemoteState` (dev hook / future inbound adapter).
-	const awareness = createLocalAwareness();
+	// ── Presence (9.17.19 · PRES-3) ───────────────────────────────────────────
+	// Awareness channel for the OPEN board. Starts as a local no-transport channel
+	// (the placeholder board / standalone / preview); `bindPresence` swaps it to
+	// the real DEK-sealed `presence` transport per open board so cursors +
+	// selection go cross-device (in the shell). Remote states arrive via
+	// `applyRemoteState` (the transport's inbound + the dev hook).
+	let awareness = createLocalAwareness();
 	const presenceName = localPresenceName();
 	let presenceCursor: Point | null = null;
 	let presenceCursorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -577,6 +579,21 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	awareness.on("change", paintPresence);
+
+	// PRES-3 — (re)bind presence to the entity id of the open board. Boards switch
+	// within a window and the real board id only lands on `openBoard` (the initial
+	// awareness above is the placeholder / standalone local channel). In the shell
+	// this swaps to the live transport (cursors go cross-device); the prior board's
+	// presence is torn down (its transport publishes a final clear + untracks). The
+	// `awareness` closures read the current binding at call time; only the `change`
+	// listener is re-attached here.
+	function bindPresence(boardEntityId: string): void {
+		awareness.off("change", paintPresence);
+		awareness.destroy();
+		awareness = presenceAwarenessFor(boardEntityId);
+		awareness.on("change", paintPresence);
+		publishPresence();
+	}
 
 	bindCanvasGestures(canvasWrap);
 	bindConnectorAuthoring(canvasWrap);
@@ -2207,6 +2224,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 			else if (wbNav.current() !== id) wbNav.push(id);
 		}
 		resetHistory();
+		bindPresence(board.id);
 		renderNavList();
 		paint();
 	}
