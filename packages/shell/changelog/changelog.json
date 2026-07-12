@@ -3,6 +3,127 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.0",
+      "date": "2026-07-12",
+      "icon": "👥",
+      "title": "See who's here",
+      "summary": "Live presence — when you share a board or a note, you now see your collaborators' cursors and avatars in real time. Plus a per-site trust switch for the browser and an instant light/dark shell.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Live presence"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Whiteboard",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — everyone on a shared board sees each other's "
+            },
+            {
+              "text": "cursors and selection",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " move live, across devices."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — an "
+            },
+            {
+              "text": "avatar stack",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in the header shows who else is viewing a note with you."
+            }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": "Presence is display-only and end-to-end encrypted like everything else — it rides the same sealed sync channel and grants no access on its own."
+        },
+        {
+          "kind": "h1",
+          "text": "Browser"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Trusted sites",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a per-site "
+            },
+            {
+              "text": "trust switch",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " (Settings → Privacy) lets login-gated sites like x.com work normally, while every other site keeps the strict tracker- and cookie-blocking default."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Appearance",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the shell now flips "
+            },
+            {
+              "text": "light/dark",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in lockstep with your open apps, instead of lagging a beat behind."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.3.1",
       "date": "2026-07-10",
       "icon": "🔔",
