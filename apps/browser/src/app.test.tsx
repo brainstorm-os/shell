@@ -60,6 +60,8 @@ function fakeWebView(): FakeWebView {
 		capture: () => Promise.resolve(null),
 		setSitePermission: noop,
 		clearBrowsingData: () => Promise.resolve(),
+		setSiteTrust: () => Promise.resolve(),
+		isSiteTrusted: () => Promise.resolve(false),
 		onEvent: () => () => {},
 	} as FakeWebView;
 }

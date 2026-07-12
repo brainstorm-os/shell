@@ -120,6 +120,11 @@ export type WebViewServiceOptions = {
 	/** Browser-10 — wipe the persistent cookie jar (encrypted store + live
 	 *  session). Absent ⇒ {@link WebViewMethod.ClearBrowsingData} is a no-op. */
 	clearBrowsingData?: () => Promise<void> | void;
+	/** Browser-8 — trust / untrust an origin (relaxes the strict tracker + cookie
+	 *  blocking for it). Absent ⇒ {@link WebViewMethod.SetSiteTrust} is a no-op. */
+	setSiteTrust?: (origin: string, trusted: boolean) => Promise<void> | void;
+	/** Browser-8 — whether an origin is trusted. Absent ⇒ always `false`. */
+	isSiteTrusted?: (origin: string) => boolean;
 };
 
 type TabEntry = {
@@ -215,6 +220,10 @@ export class WebViewService {
 				return this.options.setSitePermission?.(req.origin, req.permission, req.allow);
 			case WebViewMethod.ClearBrowsingData:
 				return this.options.clearBrowsingData?.();
+			case WebViewMethod.SetSiteTrust:
+				return this.options.setSiteTrust?.(req.origin, req.trusted);
+			case WebViewMethod.IsSiteTrusted:
+				return this.options.isSiteTrusted?.(req.origin) ?? false;
 		}
 	}
 

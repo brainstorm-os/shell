@@ -4057,6 +4057,11 @@ void app.whenReady().then(async () => {
 			clearBrowsingData: () => webCookieJar?.clear(),
 			setSitePermission: (origin, permission, allow) =>
 				webPrivacy.permissions.set(origin, permission, allow),
+			// Browser-8 — the in-browser trust twin: the sandboxed Browser (gated on
+			// `web.browse`) can trust/untrust the current origin, reaching the same
+			// per-vault trust store as Settings → Privacy.
+			setSiteTrust: (origin, trusted) => webPrivacy.trust.set(origin, trusted),
+			isSiteTrusted: (origin) => webPrivacy.trust.isTrusted(origin),
 			createView: (spec) => {
 				const view = createLockedWebView(spec, {
 					allowDevTools: DEVTOOLS_ENABLED,

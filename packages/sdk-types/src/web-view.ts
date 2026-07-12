@@ -111,6 +111,13 @@ export enum WebViewMethod {
 	 *  AND the live persistent partition's cookies). Settings → Privacy →
 	 *  "Clear browsing data". No `tabId` — it spans the whole jar. */
 	ClearBrowsingData = "clear-browsing-data",
+	/** Browser-8 — trust (or untrust) `origin`: relax the tracker blocklist +
+	 *  third-party-cookie strip for pages whose first party is that origin. The
+	 *  in-browser twin of Settings → Privacy → Trusted sites. */
+	SetSiteTrust = "set-site-trust",
+	/** Browser-8 — whether `origin` is currently trusted (drives the chrome's
+	 *  Trust / Untrust affordance). */
+	IsSiteTrusted = "is-site-trusted",
 }
 
 export type WebViewRect = { x: number; y: number; width: number; height: number };
@@ -135,7 +142,9 @@ export type WebViewRequest =
 			permission: SitePermissionKind;
 			allow: boolean;
 	  }
-	| { method: WebViewMethod.ClearBrowsingData };
+	| { method: WebViewMethod.ClearBrowsingData }
+	| { method: WebViewMethod.SetSiteTrust; origin: string; trusted: boolean }
+	| { method: WebViewMethod.IsSiteTrusted; origin: string };
 
 /** Metadata-only events the host pushes to the chrome. The page DOM, bytes,
  *  and live history never cross this boundary — only these projections. */
@@ -187,6 +196,11 @@ export interface WebViewClient {
 	): Promise<void>;
 	/** Wipe the persistent cookie jar (encrypted store + live session). */
 	clearBrowsingData(): Promise<void>;
+	/** Browser-8 — trust / untrust `origin` (relax the strict tracker + cookie
+	 *  blocking for pages it's the first party of). Reload the tab to apply. */
+	setSiteTrust(origin: string, trusted: boolean): Promise<void>;
+	/** Browser-8 — whether `origin` is currently trusted. */
+	isSiteTrusted(origin: string): Promise<boolean>;
 	/** Subscribe to metadata events; returns an unsubscribe fn. */
 	onEvent(listener: (event: WebViewEvent) => void): () => void;
 }
