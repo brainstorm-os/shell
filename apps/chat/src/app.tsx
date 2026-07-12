@@ -37,6 +37,7 @@ import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm/sdk/menus";
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { Popover } from "@brainstorm/sdk/popover";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
 import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
@@ -282,6 +283,10 @@ export function ChatApp(): ReactElement {
 
 	const activeChannel = channels.find((c) => c.id === activeId) ?? null;
 
+	// PRES-3 — who's-here on the open channel (live avatars, distinct from the
+	// channel MEMBER roster). Cross-device in the shell; empty otherwise.
+	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf());
+
 	const persisted = useMemo(
 		() => (activeId ? channelMessages(entities, activeId) : []),
 		[entities, activeId],
@@ -509,6 +514,7 @@ export function ChatApp(): ReactElement {
 					) : null}
 				</div>
 				<div className="app-header__right">
+					{channelPeers.length > 0 && <PresenceStack peers={channelPeers} />}
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={showSidebar}
