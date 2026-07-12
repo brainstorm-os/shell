@@ -1615,6 +1615,25 @@ export type SharingService = {
 	access(entityId: string): Promise<SharedMember[]>;
 };
 
+/** PRES-2b — the app-facing surface for LIVE PRESENCE (the avatar stack + remote
+ *  cursors on a shared entity). Publish this device's presence for an entity and
+ *  receive peers via the `app:presence-peers` push (surfaced separately as
+ *  `presence.onPeers`). Presence piggybacks on the entity read grant — publishing
+ *  requires `entities.read:<type>` (design 74, OQ-205: no new default cap) — and
+ *  is display-only: it grants nothing and persists nothing. */
+export type PresenceService = {
+	/** Publish THIS device's presence state for `entityId` (or `state: null` to
+	 *  clear it). Requires `entities.read:<type>`. */
+	publish(input: {
+		entityId: string;
+		type: string;
+		state: Record<string, unknown> | null;
+	}): Promise<void>;
+	/** Stop tracking `entityId` (its surface closed) — broadcasts a final clear so
+	 *  peers drop us. No capability required (only clears our own presence). */
+	untrack(input: { entityId: string }): Promise<void>;
+};
+
 // ─── UI (windows, notifications, menus, settings) ───────────────────────────
 
 export type WindowSpec = {
@@ -1940,6 +1959,7 @@ export type AppRuntime = {
 		readonly platform: PlatformService;
 		readonly roster: RosterService;
 		readonly sharing: SharingService;
+		readonly presence: PresenceService;
 		readonly ui: UiService;
 		readonly theme: ThemeService;
 		readonly capabilities: CapabilitiesService;

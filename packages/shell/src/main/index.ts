@@ -287,6 +287,12 @@ import {
 	getLiveSyncEngine,
 	installLiveSyncEngine,
 } from "./sync/live-sync-wiring";
+import { makePresenceServiceHandler } from "./sync/presence-service";
+import {
+	disposePresenceRouter,
+	getPresenceRouter,
+	installPresenceRouter,
+} from "./sync/presence-wiring";
 import { RestoreEngine } from "./sync/restore-engine";
 import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
@@ -2708,6 +2714,7 @@ void app.whenReady().then(async () => {
 	// session's engine.
 	const wireSyncEnginesForSession = (session: VaultSession | null): void => {
 		if (!session) {
+			disposePresenceRouter();
 			disposeLiveSyncEngine();
 			setRestoreEngine(null);
 			return;
@@ -2761,6 +2768,14 @@ void app.whenReady().then(async () => {
 					},
 					applyRemoteUpdate: async (entityId, _type, update) => {
 						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
+					},
+					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
+					// here") for a tracked entity. Route it into this session's presence
+					// router, which merges it into the proxy awareness and pushes the
+					// fresh peer set to the subscribed app windows. Ephemeral: never
+					// persisted. Absent router (presence not yet wired) ⇒ dropped.
+					applyRemoteAwareness: (entityId, _type, update) => {
+						getPresenceRouter()?.applyInbound(entityId, update);
 					},
 					// 10.14 — recover a per-entity DEK (+ type) from an inbound
 					// WrapBootstrap. HPKE-unwraps with the device X25519 secret (never
@@ -2831,6 +2846,12 @@ void app.whenReady().then(async () => {
 						const lastActiveMs = repo?.get(entityId)?.updatedAt ?? null;
 						return entityMatchesPolicy(policy, { pinned, lastActiveMs }, Date.now());
 					},
+				});
+				// PRES-2b — bring up this session's presence router now the engine
+				// exists (its emit reads the engine via `getLiveSyncEngine()`). Peer
+				// pushes fan out to the live app windows.
+				installPresenceRouter({
+					getAppWindows: () => launchSetup.getLauncherSync()?.allWindows() ?? [],
 				});
 				// 10.14 — bind a cold-restore orchestrator to this session. The
 				// account key is the device's wire `sender` (base64url); the
@@ -3150,6 +3171,29 @@ void app.whenReady().then(async () => {
 				return new ContactsStore({ path: contactsStorePath(session.vaultPath) });
 			},
 			now: () => Date.now(),
+		}),
+	);
+
+	// PRES-2b — the `presence` service: the sandbox surface for live presence
+	// (avatar stack + remote cursors). `publish` is re-checked against
+	// `entities.read:<type>` (OQ-205: presence piggybacks on the read grant, no
+	// new default cap); the router bridges to the LiveSyncEngine's DEK-sealed
+	// awareness path. Null router (no session) ⇒ Unavailable, fail-closed.
+	workers.broker.registerService(
+		"presence",
+		makePresenceServiceHandler({
+			getRouter: () => getPresenceRouter(),
+			// SECURITY — resolve the entity's real type from entities.db so the cap
+			// gate keys on it, not the app-supplied type (per-type read isolation).
+			resolveEntityType: async (entityId) => {
+				const repo = await getEntitiesRepoForActiveSession();
+				return repo?.get(entityId)?.type ?? null;
+			},
+			getLedger: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return await session.capabilityLedger();
+			},
 		}),
 	);
 
