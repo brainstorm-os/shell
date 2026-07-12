@@ -281,12 +281,12 @@
 }
 
 .settings__updates-last {
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 	color: var(--color-text-tertiary);
 }
 
 .settings__updates-result {
-	padding: var(--space-2);
+	padding: var(--space-3) var(--space-4);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 	background: var(--color-surface-raised);
@@ -295,9 +295,27 @@
 	gap: var(--space-2);
 }
 
+/* "Update available / ready" — the message on the left, the action on the right
+ * at its natural width (not a stretched full-bleed bar). */
 .settings__updates-result--available {
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-4);
 	border-color: var(--color-accent-default);
 	background: var(--color-accent-subtle);
+}
+
+.settings__updates-result-text {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+/* The action keeps its intrinsic width; the message column takes the slack. */
+.settings__updates-result--available > .button {
+	flex-shrink: 0;
 }
 
 .settings__updates-headline {
@@ -307,8 +325,8 @@
 }
 
 .settings__updates-notes {
-	margin: var(--space-1) 0 var(--space-2);
-	font-size: var(--text-size-xs);
+	margin: 0;
+	font-size: var(--text-size-sm);
 	color: var(--color-text-secondary);
 }
 
