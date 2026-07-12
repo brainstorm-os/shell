@@ -233,7 +233,7 @@
 
 .settings__section-title {
 	margin: 0;
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--color-text-tertiary);
@@ -251,7 +251,7 @@
 
 .settings__warning {
 	color: var(--color-state-warning);
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 }
 
 .settings__fingerprint {
@@ -348,7 +348,7 @@
 
 .settings__hint {
 	margin: 0;
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 	color: var(--color-text-tertiary);
 }
 
@@ -2529,7 +2529,7 @@
 }
 
 .setting-row__desc {
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 	color: var(--color-text-tertiary);
 }
 
