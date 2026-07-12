@@ -158,14 +158,11 @@ function AutoUpdateResult({
 	switch (state.lifecycle) {
 		case UpdateLifecycle.Available:
 			return (
-				<div className="settings__updates-result settings__updates-result--available" role="status">
-					<p className="settings__updates-headline">
-						{t("shell.settings.updates.available", { version: state.version ?? "" })}
-					</p>
-					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={onDownload}>
-						{t("shell.settings.updates.download")}
-					</Button>
-				</div>
+				<UpdateActionCard
+					headline={t("shell.settings.updates.available", { version: state.version ?? "" })}
+					actionLabel={t("shell.settings.updates.download")}
+					onAction={onDownload}
+				/>
 			);
 		case UpdateLifecycle.Downloading: {
 			const percent = state.progress?.percent ?? 0;
@@ -183,14 +180,11 @@ function AutoUpdateResult({
 		}
 		case UpdateLifecycle.Downloaded:
 			return (
-				<div className="settings__updates-result settings__updates-result--available" role="status">
-					<p className="settings__updates-headline">
-						{t("shell.settings.updates.updateReady", { version: state.version ?? "" })}
-					</p>
-					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={onInstall}>
-						{t("shell.settings.updates.restartInstall")}
-					</Button>
-				</div>
+				<UpdateActionCard
+					headline={t("shell.settings.updates.updateReady", { version: state.version ?? "" })}
+					actionLabel={t("shell.settings.updates.restartInstall")}
+					onAction={onInstall}
+				/>
 			);
 		case UpdateLifecycle.NotAvailable:
 			return <ResultLine messageKey="shell.settings.updates.upToDate" />;
@@ -218,19 +212,12 @@ function FeedUpdateResult({
 	if (result.availability === UpdateAvailability.Available && result.latest !== undefined) {
 		const latest = result.latest;
 		return (
-			<div className="settings__updates-result settings__updates-result--available" role="status">
-				<p className="settings__updates-headline">
-					{t("shell.settings.updates.available", { version: latest.version })}
-				</p>
-				{latest.notes !== undefined && <p className="settings__updates-notes">{latest.notes}</p>}
-				<Button
-					variant={ButtonVariant.Primary}
-					size={ButtonSize.Sm}
-					onClick={() => onDownload(latest.downloadUrl)}
-				>
-					{t("shell.settings.updates.download")}
-				</Button>
-			</div>
+			<UpdateActionCard
+				headline={t("shell.settings.updates.available", { version: latest.version })}
+				actionLabel={t("shell.settings.updates.download")}
+				onAction={() => onDownload(latest.downloadUrl)}
+				{...(latest.notes !== undefined ? { notes: latest.notes } : {})}
+			/>
 		);
 	}
 	return (
@@ -248,6 +235,34 @@ function ResultLine({ messageKey }: { messageKey: string }) {
 	return (
 		<div className="settings__updates-result" role="status">
 			<p className="settings__updates-headline">{t(messageKey)}</p>
+		</div>
+	);
+}
+
+/** The accent "update available / ready" card: the message (+ optional notes) on
+ *  the left, the emphasis action on the right at full control height — not a
+ *  stretched full-width bar. Shared by the auto-update Available/Downloaded
+ *  states and the manual-download feed. */
+function UpdateActionCard({
+	headline,
+	notes,
+	actionLabel,
+	onAction,
+}: {
+	headline: string;
+	notes?: string;
+	actionLabel: string;
+	onAction: () => void;
+}) {
+	return (
+		<div className="settings__updates-result settings__updates-result--available" role="status">
+			<div className="settings__updates-result-text">
+				<p className="settings__updates-headline">{headline}</p>
+				{notes !== undefined && <p className="settings__updates-notes">{notes}</p>}
+			</div>
+			<Button variant={ButtonVariant.Primary} size={ButtonSize.Md} onClick={onAction}>
+				{actionLabel}
+			</Button>
 		</div>
 	);
 }
