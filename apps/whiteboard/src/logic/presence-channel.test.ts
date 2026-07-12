@@ -90,8 +90,10 @@ describe("presenceAwarenessFor (PRES-3)", () => {
 	it("in shell → publishes local state to the presence service for the board", () => {
 		const publish = vi.fn(() => Promise.resolve());
 		const untrack = vi.fn(() => Promise.resolve());
-		let peerCb: ((peers: { clientId: number; state: Record<string, unknown> }[]) => void) | null =
-			null;
+		// Default to a no-op (not `| null`): TS widens a closure-assigned union var
+		// back to its declared type, and the app's strict tsconfig then rejects
+		// calling the `| null` half — a no-op default keeps it always callable.
+		let peerCb: (peers: { clientId: number; state: Record<string, unknown> }[]) => void = () => {};
 		setBrainstorm({
 			services: { presence: { publish, untrack } },
 			presence: {
@@ -114,7 +116,7 @@ describe("presenceAwarenessFor (PRES-3)", () => {
 		});
 
 		// An inbound peer push lands as a remote state (drives the cursor overlay).
-		peerCb?.([{ clientId: 7, state: { [PRESENCE_FIELD]: { id: "bob" } } }]);
+		peerCb([{ clientId: 7, state: { [PRESENCE_FIELD]: { id: "bob" } } }]);
 		expect(a.getStates().get(7)).toEqual({ [PRESENCE_FIELD]: { id: "bob" } });
 
 		// Tearing down clears our presence for peers (untrack for THIS board).
