@@ -551,6 +551,7 @@
       "name": "@brainstorm/sdk",
       "version": "0.0.1",
       "dependencies": {
+        "@brainstorm/react-yjs": "workspace:*",
         "@brainstorm/sdk-types": "workspace:*",
         "@phosphor-icons/core": "^2.1.1",
         "@phosphor-icons/react": "^2.1.10",
@@ -580,7 +581,7 @@
     },
     "packages/shell": {
       "name": "@brainstorm/shell",
-      "version": "0.1.9",
+      "version": "0.3.1",
       "dependencies": {
         "@blockprotocol/core": "0.1.4",
         "@blockprotocol/graph": "0.4.2",

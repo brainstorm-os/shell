@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { AwarenessState } from "./awareness";
 import {
+	type PresenceHost,
+	type PresenceHostPeer,
 	createLocalAwareness,
 	createLoopbackTransports,
 	createPresenceTransport,
 	createSyncedAwareness,
-	type PresenceHost,
-	type PresenceHostPeer,
 } from "./synced-awareness";
 
 const presence = (id: string): AwarenessState => ({ presence: { id, name: id, color: "#2f6df6" } });

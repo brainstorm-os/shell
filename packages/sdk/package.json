@@ -124,6 +124,7 @@
     "./export-popover/export-popover.css": "./src/export-popover/export-popover.css"
   },
   "dependencies": {
+    "@brainstorm/react-yjs": "workspace:*",
     "@brainstorm/sdk-types": "workspace:*",
     "@phosphor-icons/core": "^2.1.1",
     "@phosphor-icons/react": "^2.1.10",
