@@ -13,3 +13,4 @@ export {
 	buildLocalPresence,
 	peerFromState,
 } from "./presence-awareness";
+export { presenceAwarenessFor, usePresence, useSelf } from "./use-presence";

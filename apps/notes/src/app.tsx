@@ -43,6 +43,7 @@ import {
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { AddIconGlyph } from "@brainstorm/sdk/picker-host";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
 import { bindValue, clearValue } from "@brainstorm/sdk/property-ui/pure";
 import { attachResizable } from "@brainstorm/sdk/resizable";
@@ -141,6 +142,9 @@ export function NotesApp() {
 		useNotes();
 	const note = selectedId ? (notes.get(selectedId) ?? null) : null;
 	const runtime = useMemo(() => getBrainstorm(), []);
+	// PRES-3 — who's-here on the open note. Cross-device in the shell (over the
+	// presence IPC transport), empty standalone. Rendered in the header.
+	const presencePeers = usePresence(note?.id ?? null, NOTE_TYPE, useSelf());
 
 	// Blank-render recovery (see `blank-recovery-plugin.tsx`): if the editor
 	// renders zero blocks while the Y.Doc has content (an apply/observeDeep
@@ -846,6 +850,7 @@ export function NotesApp() {
 					)}
 				</div>
 				<div className="notes__header-right">
+					{presencePeers.length > 0 && <PresenceStack peers={presencePeers} />}
 					<button
 						type="button"
 						className="header-icon-btn"

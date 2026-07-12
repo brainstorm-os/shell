@@ -39,9 +39,7 @@ describe("deliverPresencePeersToApps", () => {
 	it("delivers only to windows in targetApps", () => {
 		const target = fakeAppWindow("io.brainstorm.whiteboard");
 		const other = fakeAppWindow("io.brainstorm.graph");
-		deliverPresencePeersToApps([target.win, other.win], "ent_1", peers, [
-			"io.brainstorm.whiteboard",
-		]);
+		deliverPresencePeersToApps([target.win, other.win], "ent_1", peers, ["io.brainstorm.whiteboard"]);
 		expect(target.send).toHaveBeenCalledWith(APP_PRESENCE_PEERS_CHANNEL, {
 			entityId: "ent_1",
 			peers,
