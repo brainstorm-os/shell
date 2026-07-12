@@ -1,13 +1,19 @@
+// @vitest-environment jsdom
 /**
  * Local presence channel (9.17.19): the minimal `AwarenessLike` the engine
  * runs on until the Stage-10 transport binds a real `Awareness`. Pins the
  * structural contract the downstream code depends on: change fan-out on
- * every state write, local/remote separation, null-removes, destroy.
+ * every state write, local/remote separation, null-removes, destroy. PRES-3
+ * adds `presenceAwarenessFor` (the real shell transport / local fallback).
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRESENCE_FIELD } from "./presence";
-import { createLocalAwareness, randomClientId } from "./presence-channel";
+import { createLocalAwareness, presenceAwarenessFor, randomClientId } from "./presence-channel";
+
+function setBrainstorm(bs: unknown): void {
+	(window as unknown as { brainstorm?: unknown }).brainstorm = bs;
+}
 
 describe("createLocalAwareness", () => {
 	it("starts empty with a stable clientID", () => {
@@ -68,5 +74,51 @@ describe("createLocalAwareness", () => {
 			expect(id).toBeGreaterThanOrEqual(0);
 			expect(id).toBeLessThanOrEqual(0xffffffff);
 		}
+	});
+});
+
+describe("presenceAwarenessFor (PRES-3)", () => {
+	afterEach(() => setBrainstorm(undefined));
+
+	it("no shell → a local single-device channel (nothing published)", () => {
+		setBrainstorm(undefined);
+		const a = presenceAwarenessFor("board-1");
+		a.setLocalStateField(PRESENCE_FIELD, { id: "u" });
+		expect(a.getStates().get(a.clientID)).toEqual({ [PRESENCE_FIELD]: { id: "u" } });
+	});
+
+	it("in shell → publishes local state to the presence service for the board", () => {
+		const publish = vi.fn(() => Promise.resolve());
+		const untrack = vi.fn(() => Promise.resolve());
+		let peerCb: ((peers: { clientId: number; state: Record<string, unknown> }[]) => void) | null =
+			null;
+		setBrainstorm({
+			services: { presence: { publish, untrack } },
+			presence: {
+				onPeers: (
+					_id: string,
+					cb: (p: { clientId: number; state: Record<string, unknown> }[]) => void,
+				) => {
+					peerCb = cb;
+					return () => {};
+				},
+			},
+		});
+
+		const a = presenceAwarenessFor("board-entity-1");
+		a.setLocalStateField(PRESENCE_FIELD, { id: "alice" });
+		expect(publish).toHaveBeenCalledWith({
+			entityId: "board-entity-1",
+			type: "brainstorm/Whiteboard/v1",
+			state: { [PRESENCE_FIELD]: { id: "alice" } },
+		});
+
+		// An inbound peer push lands as a remote state (drives the cursor overlay).
+		peerCb?.([{ clientId: 7, state: { [PRESENCE_FIELD]: { id: "bob" } } }]);
+		expect(a.getStates().get(7)).toEqual({ [PRESENCE_FIELD]: { id: "bob" } });
+
+		// Tearing down clears our presence for peers (untrack for THIS board).
+		a.destroy();
+		expect(untrack).toHaveBeenCalledWith({ entityId: "board-entity-1" });
 	});
 });
