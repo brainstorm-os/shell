@@ -13,10 +13,10 @@
 import type { Icon } from "@brainstorm/sdk-types";
 import { IconKind } from "@brainstorm/sdk-types";
 import { parseIcon } from "@brainstorm/sdk/entity-icon";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { initialsFor } from "../dashboard/app-icon-palette";
 import { t } from "../i18n/t";
-import { Button } from "../ui/button";
+import { Button, ButtonVariant } from "../ui/button";
 import { EntityIcon } from "../ui/entity-icon";
 import { TextField, TextFieldSize } from "../ui/text-field";
 import "./identity-section.css";
@@ -44,6 +44,14 @@ export function IdentitySection() {
 	const [draft, setDraft] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [saved, setSaved] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const copiedTimer = useRef<number | null>(null);
+	useEffect(
+		() => () => {
+			if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		let live = true;
@@ -80,6 +88,20 @@ export function IdentitySection() {
 		if (!name) return;
 		await persist(name, profile?.avatarRef ?? null);
 		setSaved(true);
+	};
+
+	const copyFingerprint = async () => {
+		const fp = profile?.fingerprint;
+		if (!fp) return;
+		try {
+			await navigator.clipboard.writeText(fp);
+			setCopied(true);
+			if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
+			copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
+		} catch {
+			// Clipboard blocked — the value is `user-select: all`, so it's still
+			// selectable to copy by hand.
+		}
 	};
 
 	// An avatar is a photo, not a glyph: clicking opens a native image-file
@@ -125,7 +147,7 @@ export function IdentitySection() {
 				</button>
 				<div className="identity-section__input">
 					<TextField
-						size={TextFieldSize.Sm}
+						size={TextFieldSize.Md}
 						value={draft}
 						maxLength={60}
 						placeholder={t("shell.settings.identity.displayNamePlaceholder")}
@@ -150,9 +172,20 @@ export function IdentitySection() {
 				{t("shell.settings.identity.fingerprint")}
 			</h4>
 			<p className="settings__hint">{t("shell.settings.identity.fingerprintHint")}</p>
-			<code className="identity-section__fingerprint">
-				{profile?.fingerprint || t("shell.settings.identity.noVault")}
-			</code>
+			<div className="identity-section__fingerprint-row">
+				<code className="identity-section__fingerprint">
+					{profile?.fingerprint || t("shell.settings.identity.noVault")}
+				</code>
+				{profile?.fingerprint ? (
+					<Button
+						variant={ButtonVariant.Neutral}
+						onClick={() => void copyFingerprint()}
+						aria-label={t("shell.settings.identity.copyFingerprint")}
+					>
+						{copied ? t("shell.settings.identity.copied") : t("shell.settings.identity.copy")}
+					</Button>
+				) : null}
+			</div>
 		</section>
 	);
 }
