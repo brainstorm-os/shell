@@ -194,11 +194,14 @@ export function getBrainstorm(): ${comp}Runtime | null {
 `,
 
 	"src/main.tsx": `import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ${comp} } from "./app";
 import "./styles.css";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("${displayName}: #root not found in index.html");

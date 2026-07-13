@@ -23,6 +23,7 @@ import { closeAnchoredMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu
 import { widgetFrameOrigin, widgetIframeQuery } from "@brainstorm/sdk/widget";
 import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm/tokens";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { launchApp } from "../analytics/track-app-launch";
 import type { DashboardWidget } from "../../preload";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
@@ -489,7 +490,7 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 	);
 
 	const openApp = useCallback((appId: string) => {
-		void window.brainstorm.apps.launch(appId);
+		launchApp(appId, "widget");
 	}, []);
 
 	// Keyboard move/resize (F-383): the grips are focusable and nudge the

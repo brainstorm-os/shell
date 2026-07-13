@@ -7,6 +7,7 @@
  */
 
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { setEditorHost } from "@brainstorm/editor";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -17,6 +18,8 @@ import { BookmarksApp } from "./app";
 import { getBrainstorm } from "./storage/runtime";
 import { mountBookmarksWidget } from "./widget";
 import "./styles.css";
+
+initAnalytics();
 
 // Widget-mode (Stage 7.3): the dashboard launched this bundle as a widget.
 // Mount the compact React widget surface (recent-bookmarks glance) instead of

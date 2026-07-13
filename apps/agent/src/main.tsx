@@ -1,4 +1,5 @@
 import "@brainstorm/editor/editor-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/composer-context.css";
 import "@brainstorm/sdk/empty-state.css";
@@ -12,6 +13,8 @@ import { AgentApp } from "./app";
 import { AgentI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { AgentWidget } from "./widget";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Agent: #root not found in index.html");

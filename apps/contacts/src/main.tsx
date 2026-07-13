@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/empty-state.css";
 import "@brainstorm/editor/editor.css";
 import "@brainstorm/editor/editor-theme.css";
@@ -15,6 +16,8 @@ import { ContactsWidget } from "./widget";
 // One shared fancy-menus host per app — every menu (object ⋯, anchored
 // overflow, row right-click) renders through it.
 mountMenuHost();
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Contacts: #root not found in index.html");

@@ -71,6 +71,7 @@ import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
 import { Segmented } from "../ui/segmented";
 import { Select, TextField, TextFieldSize } from "../ui/text-field";
+import { isPublicBeta } from "@brainstorm/sdk/analytics";
 import { BrowserPrivacyPanel } from "./browser-privacy-panel";
 import "./network-egress-panel.css";
 
@@ -254,6 +255,8 @@ export function NetworkEgressPanel() {
 			/>
 
 			<EmbedProvidersPlaceholder />
+
+			<AnalyticsBetaSection />
 
 			<FeedbackSection />
 
@@ -1288,6 +1291,21 @@ function EmbedProvidersPlaceholder() {
 					<p className="network-egress__hint">{t("shell.settings.network.embeds.placeholder")}</p>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// Section: Beta analytics disclosure
+// ---------------------------------------------------------------------
+
+function AnalyticsBetaSection() {
+	const version = window.brainstorm?.version ?? "0.0.0";
+	if (!isPublicBeta(version)) return null;
+	return (
+		<div className="network-egress__group" data-testid="network-egress-analytics">
+			<h4 className="network-egress__group-title">{t("shell.settings.network.analytics.title")}</h4>
+			<p className="network-egress__hint">{t("shell.settings.network.analytics.summary")}</p>
 		</div>
 	);
 }

@@ -203,6 +203,7 @@ export default defineConfig({
 			"@brainstorm/sdk/shortcut": resolve(__dirname, "packages/sdk/src/shortcut/index.ts"),
 			"@brainstorm/sdk/nav-history": resolve(__dirname, "packages/sdk/src/nav-history/index.ts"),
 			"@brainstorm/sdk/a11y": resolve(__dirname, "packages/sdk/src/a11y/index.ts"),
+			"@brainstorm/sdk/analytics": resolve(__dirname, "packages/sdk/src/analytics/index.ts"),
 			"@brainstorm/sdk/date-pager": resolve(__dirname, "packages/sdk/src/date-pager/index.ts"),
 			"@brainstorm/sdk/date-grid": resolve(__dirname, "packages/sdk/src/date-grid/index.ts"),
 			"@brainstorm/sdk/calendar": resolve(__dirname, "packages/sdk/src/calendar/index.ts"),

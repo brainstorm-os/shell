@@ -108,6 +108,8 @@ import { Icon, IconName } from "./ui/icon";
 import { IconButton } from "./ui/icon-button";
 import { Spinner } from "./ui/spinner";
 import { ToastKind, pushToast } from "./ui/toasts";
+import { track } from "@brainstorm/sdk/analytics";
+import { launchApp, trackAppLaunch } from "./analytics/track-app-launch";
 import { useVault } from "./vault-context";
 
 export function Dashboard() {
@@ -129,6 +131,10 @@ export function Dashboard() {
 	const [vaultSwitcherOpen, setVaultSwitcherOpen] = useState(false);
 	const [recoveredVaults, setRecoveredVaults] = useState<VaultEntry[]>([]);
 	const [launcherOpen, setLauncherOpen] = useState(false);
+
+	useEffect(() => {
+		if (settingsOpen) track("Settings Opened", { section: settingsInitialSection ?? "default" });
+	}, [settingsOpen, settingsInitialSection]);
 	// 9.8.9 — a `ui.openSearch` handoff pre-fills the palette; null = open clean.
 	const [launcherQuery, setLauncherQuery] = useState<string | null>(null);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -420,6 +426,7 @@ export function Dashboard() {
 	const activateAppIcon = useCallback((icon: DashboardIcon) => {
 		void (async () => {
 			try {
+				trackAppLaunch(icon.target, "dashboard-icon");
 				await window.brainstorm.apps.launch(icon.target);
 			} catch (error) {
 				const message = (error as Error).message ?? String(error);
@@ -492,7 +499,7 @@ export function Dashboard() {
 					}
 					const appId = resolution?.appId;
 					if (appId) {
-						void window.brainstorm.apps.launch(appId);
+						launchApp(appId, "dashboard-pin");
 						return;
 					}
 					pushToast({
@@ -504,7 +511,7 @@ export function Dashboard() {
 				.catch((error: unknown) => {
 					console.warn("[brainstorm] dashboard: pin intent.open failed:", error);
 					const appId = resolution?.appId;
-					if (appId) void window.brainstorm.apps.launch(appId);
+					if (appId) launchApp(appId, "dashboard-pin-fallback");
 				});
 		},
 		[snapshot, activateAppIcon],
@@ -856,7 +863,7 @@ export function Dashboard() {
 				<AppGrid
 					open={appGridOpen}
 					onClose={() => setAppGridOpen(false)}
-					onLaunch={(appId) => void window.brainstorm.apps.launch(appId)}
+					onLaunch={(appId) => launchApp(appId, "app-grid")}
 					onPin={onPinApp}
 					onUnpin={onUnpinApp}
 					pinnedAppIds={pinnedAppIds}

@@ -99,6 +99,11 @@ export default defineConfig(({ command }) => {
 						index: resolve(__dirname, "src/renderer/index.html"),
 						"chrome/tab-strip": resolve(__dirname, "src/renderer/chrome/tab-strip.html"),
 					},
+					output: {
+						manualChunks(id) {
+							if (id.includes("@amplitude") || id.includes("rrweb")) return "analytics";
+						},
+					},
 				},
 			},
 			resolve: {

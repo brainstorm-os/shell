@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/color-picker.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -7,6 +8,8 @@ import { createRoot } from "react-dom/client";
 import { ThemeEditorApp } from "./app";
 import { ThemeEditorI18nProvider } from "./i18n-provider";
 import "./styles.css";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("theme-editor: #root not found in index.html");

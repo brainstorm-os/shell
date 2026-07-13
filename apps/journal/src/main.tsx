@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
@@ -7,6 +8,8 @@ import { JournalApp } from "./app";
 import "./types";
 import "./styles.css";
 import { JournalWidget } from "./widget";
+
+initAnalytics();
 
 const root = document.getElementById("journal-root");
 if (!root) throw new Error("journal: #journal-root missing");

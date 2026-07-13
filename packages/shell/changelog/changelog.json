@@ -3,6 +3,135 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.3",
+      "date": "2026-07-13",
+      "icon": "📊",
+      "title": "Beta usage analytics",
+      "summary": "During the public beta, Brainstorm now collects anonymous product analytics so we can see which features people use and where they get stuck — with a clear disclosure on first launch and in Settings → Privacy.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Why we're doing this"
+        },
+        {
+          "kind": "p",
+          "text": "Brainstorm is still in public beta. To improve the product we need a picture of real usage — which apps people open, where the shell feels confusing, and which flows succeed. This patch turns on anonymous analytics for beta builds only."
+        },
+        {
+          "kind": "h1",
+          "text": "What is collected"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Anonymous product events",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — vault opened, app launched, launcher and settings opened, and similar shell-level actions. "
+            },
+            {
+              "text": "No vault contents, passwords, or note text",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " are ever sent."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Session replays",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — anonymized recordings of how you navigate the UI during beta, hosted in the "
+            },
+            {
+              "text": "EU",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", so we can spot friction in real sessions."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "What you'll see"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "First launch",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a one-time "
+            },
+            {
+              "text": "Beta usage analytics",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " popover explains the policy. Dismiss it with "
+            },
+            {
+              "text": "Got it",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "; it won't appear again on this device."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Settings → Privacy → Network",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — a standing notice while we're in beta, with the same explanation."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "When it stops"
+        },
+        {
+          "kind": "p",
+          "text": "Analytics runs only on pre-1.0 beta builds. When Brainstorm reaches version 1.0, collection turns off automatically and these notices go away."
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.2",
       "date": "2026-07-13",
       "icon": "👥",

@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/recurrence-editor.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -12,6 +13,8 @@ import "./styles.css";
 // Stand up the fancy-menus runtime so object / context / anchored menus open
 // through the shared bridge (matches the other React apps' main.tsx).
 mountMenuHost();
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("[calendar] #root not found in index.html");
