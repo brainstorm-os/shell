@@ -1,3 +1,14 @@
 {
-  "files": ["apps/mailbox/src/ui/composer.tsx"]
+  "files": [
+    "apps/mailbox/src/ui/composer.tsx",
+    "packages/shell/src/renderer/help/help-searchbar.tsx",
+    "packages/shell/src/renderer/settings/ai-panel.tsx",
+    "packages/shell/src/renderer/settings/billing-section.tsx",
+    "packages/shell/src/renderer/settings/browser-privacy-panel.tsx",
+    "packages/shell/src/renderer/settings/data-section.tsx",
+    "packages/shell/src/renderer/settings/mcp-panel.tsx",
+    "packages/shell/src/renderer/settings/notifications-section.tsx",
+    "packages/shell/src/renderer/settings/sync-section.tsx",
+    "packages/shell/src/renderer/welcome/welcome.tsx"
+  ]
 }
