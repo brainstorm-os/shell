@@ -16,6 +16,7 @@ import { useSyncStatus } from "../dashboard/use-sync-status";
 import { SyncState } from "../dashboard/use-sync-status";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
+import { TextField, TextFieldSize } from "../ui/text-field";
 import "./sync-section.css";
 
 export function SyncSection() {
@@ -201,18 +202,18 @@ function SelectiveSyncPolicyControl() {
 			{policy.mode === SelectiveSyncMode.PinnedPlusRecent && (
 				<div className="sync-section__row">
 					<span className="sync-section__label">{t("shell.settings.sync.policy.recentDays.label")}</span>
-					<input
-						type="number"
-						min={1}
-						max={3650}
-						className="sync-section__number"
-						value={policy.recentDays}
-						aria-label={t("shell.settings.sync.policy.recentDays.label")}
-						data-testid="selective-sync-recent-days"
-						onChange={(e) =>
-							apply({ ...policy, recentDays: Number(e.currentTarget.value) || policy.recentDays })
-						}
-					/>
+					<div className="sync-section__number">
+						<TextField
+							type="number"
+							size={TextFieldSize.Sm}
+							min={1}
+							max={3650}
+							value={String(policy.recentDays)}
+							aria-label={t("shell.settings.sync.policy.recentDays.label")}
+							data-testid="selective-sync-recent-days"
+							onChange={(next) => apply({ ...policy, recentDays: Number(next) || policy.recentDays })}
+						/>
+					</div>
 				</div>
 			)}
 		</div>

@@ -80,14 +80,18 @@
 	align-self: flex-start;
 }
 
+/* Fixed-width host for the shared `<TextField>` face; the box (border / padding
+ * / surface / height) comes from `.bs-input`, so this only sets the width and
+ * keeps the digits right-aligned. */
 .sync-section__number {
 	width: 5rem;
-	padding: var(--space-1) var(--space-2);
-	border: 1px solid var(--color-border-subtle);
-	border-radius: var(--radius-sm);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	font-size: var(--text-size-sm);
+}
+
+.sync-section__number .text-field {
+	width: 100%;
+}
+
+.sync-section__number .text-field__input {
 	text-align: right;
 }
 
