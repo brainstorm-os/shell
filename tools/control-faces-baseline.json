@@ -8,7 +8,6 @@
     "packages/shell/src/renderer/settings/data-section.tsx",
     "packages/shell/src/renderer/settings/mcp-panel.tsx",
     "packages/shell/src/renderer/settings/notifications-section.tsx",
-    "packages/shell/src/renderer/settings/sync-section.tsx",
     "packages/shell/src/renderer/welcome/welcome.tsx"
   ]
 }
