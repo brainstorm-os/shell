@@ -12,6 +12,7 @@ import type { CapabilityLedger } from "../capabilities/ledger";
 import { AWARENESS_DEBOUNCE_MS } from "./awareness-broadcaster";
 import type { PipelineContext } from "./envelope-pipeline";
 import { PresenceManager } from "./presence-manager";
+import type { PresenceRouter } from "./presence-router";
 import { type PresenceServiceOptions, makePresenceServiceHandler } from "./presence-service";
 
 const stub = {} as PipelineContext;
