@@ -54,24 +54,27 @@
 	width: 100%;
 	min-width: 0;
 	box-sizing: border-box;
-	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-md);
 	border: var(--border-width) solid var(--color-border-subtle);
 	background: var(--color-surface-default);
 	color: var(--color-text-primary);
 	font-family: inherit;
 	font-size: var(--text-size-md);
-	line-height: 1.4;
+	line-height: 1;
 }
 
+/* Row-heights ride the shared control-height scale (mirrors `.button--*` and
+ * `.bs-input`) so a field lines up pixel-exact beside a button of the same
+ * size — padding governs width only, never height. */
 .text-field--sm .text-field__input {
-	padding: var(--space-1);
+	height: var(--control-height-sm);
+	padding: 0 var(--space-1);
 	font-size: var(--text-size-sm);
-	min-height: 28px;
 }
 
 .text-field--md .text-field__input {
-	min-height: 32px;
+	height: var(--control-height-md);
+	padding: 0 var(--space-2);
 }
 
 /* Scoped under the size variants so it outweighs `.text-field--sm/md
@@ -84,7 +87,9 @@
 }
 
 .text-field__input--textarea {
+	height: auto;
 	min-height: 8rem;
+	padding: var(--space-2);
 	/* Parent .text-field__input is 14px; 14×1.5=21 (odd). Even-px rule:
 	 * line-heights resolve to an even integer, so icons or sibling
 	 * surfaces can sit flush at the same height (see e.g. the

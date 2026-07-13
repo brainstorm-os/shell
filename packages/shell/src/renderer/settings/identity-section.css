@@ -54,6 +54,10 @@
 	min-width: 0;
 }
 
+.identity-section__row > .button {
+	flex-shrink: 0;
+}
+
 .identity-section__saved {
 	color: var(--color-state-success);
 }
