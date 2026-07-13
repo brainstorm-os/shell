@@ -269,13 +269,17 @@ function ListItemFields({
 	}
 	return (
 		<div className="dbv-list__props">
-			{columns.map((column) => (
-				<DomSlot
-					key={column.propertyId}
-					build={() => paintPropertyValue(entity, column.propertyId, "inline")}
-					deps={[entity.id, column.propertyId, entity.properties[column.propertyId]]}
-				/>
-			))}
+			{columns.map((column) =>
+				// Title/name is the row heading — same skip as the editable strip
+				// above, else the full title paints AGAIN as the first chip.
+				column.propertyId === "title" || column.propertyId === "name" ? null : (
+					<DomSlot
+						key={column.propertyId}
+						build={() => paintPropertyValue(entity, column.propertyId, "inline")}
+						deps={[entity.id, column.propertyId, entity.properties[column.propertyId]]}
+					/>
+				),
+			)}
 		</div>
 	);
 }

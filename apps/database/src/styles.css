@@ -1358,7 +1358,15 @@ body.is-resizing .db-inspector__resize {
 	border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* Each row child is pinned to its own grid column. Without the explicit
+ * `grid-column`s, an iconless entity's `:empty → display:none` glyph drops OUT
+ * of the grid flow and auto-placement shifts everything one track left: the
+ * title lands in the `auto` track (which can't shrink below the full nowrap
+ * string), the props strip lands in `1fr` (which collapses to ~0), and the
+ * right-packed chips overflow leftward ON TOP of the title — the "chips paint
+ * over the row title" bug on every iconless row. */
 .dbv-list__glyph {
+	grid-column: 1;
 	width: 22px;
 	height: 22px;
 	border-radius: var(--radius-sm);
@@ -1374,6 +1382,7 @@ body.is-resizing .db-inspector__resize {
 }
 
 .dbv-list__title {
+	grid-column: 2;
 	font-weight: var(--text-weight-medium);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1381,6 +1390,7 @@ body.is-resizing .db-inspector__resize {
 }
 
 .dbv-list__props {
+	grid-column: 3;
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
@@ -1402,6 +1412,15 @@ body.is-resizing .db-inspector__resize {
 
 .dbv-list__props--editable > * {
 	max-width: min(28ch, 22vw);
+}
+
+/* The SDK date/link cells carry `width: 100%` for their panel/grid hosts; in
+ * this content-sized flex strip that inflates every one of them to the full
+ * 28ch cap (a 212px button for an 11-char date — and for an EMPTY value),
+ * which reads as misaligned phantom columns. Size them to their content here. */
+.dbv-list__props .bs-cell-date-trigger,
+.dbv-list__props .bs-cell-link-trigger {
+	width: auto;
 }
 
 .dbv-list__props .dbv-value {
