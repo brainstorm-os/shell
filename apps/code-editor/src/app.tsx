@@ -39,7 +39,8 @@ import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut"
 import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";
-import { type CodeEditorMessageKey, plural, t } from "./i18n";
+import { type CodeEditorMessageKey, t } from "./i18n";
+import { useCodeEditorPlural, useCodeEditorT } from "./i18n-hooks";
 import { type CitationIndex, CitationKind, buildCitationIndex } from "./logic/citation-index";
 import { type CitationReference, collectReferences } from "./logic/citation-scan";
 import { type CodeFileRow, isCodeFileEditable, projectCodeFiles } from "./logic/code-projection";
@@ -205,6 +206,9 @@ function DiagnosticsList({
 }
 
 export function CodeEditorApp(): ReactElement {
+	// Re-render when the active locale changes; imperative + child surfaces read `t`.
+	useCodeEditorT();
+	const plural = useCodeEditorPlural();
 	const runtime = useMemo(() => getCodeEditorRuntime(), []);
 	const [ready, setReady] = useState(false);
 

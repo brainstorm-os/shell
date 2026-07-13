@@ -15,7 +15,7 @@
     "dashboard.pin",
     "properties.read"
   ],
-  "i18n": { "source": "en", "locales": ["en"] },
+  "i18n": { "source": "en", "locales": ["en", "es"] },
   "registrations": {
     "entityTypes": [
       {

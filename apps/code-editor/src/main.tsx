@@ -5,6 +5,7 @@ import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { CodeEditorApp } from "./app";
+import { CodeEditorI18nProvider } from "./i18n-provider";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -19,7 +20,9 @@ mountMenuHost();
 createRoot(root).render(
 	<StrictMode>
 		<AppErrorBoundary appName="code-editor">
-			<CodeEditorApp />
+			<CodeEditorI18nProvider>
+				<CodeEditorApp />
+			</CodeEditorI18nProvider>
 		</AppErrorBoundary>
 	</StrictMode>,
 );
