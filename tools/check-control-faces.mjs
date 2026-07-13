@@ -15,10 +15,13 @@
  * Biome 1.9 can't express a custom "this element must carry that class" rule,
  * so this is a grep-grade gate with a shrinking baseline (same shape as
  * `check-app-reactivity.mjs`). A native text-like form control must carry a
- * recognized face class (`bs-input`, or `bs-select` for a select). Every app
- * file that currently has a non-compliant control is grandfathered in
- * `control-faces-baseline.json`. The gate fails when:
- *   - a NON-baselined app file gains a non-compliant control (the ratchet:
+ * recognized face class (`bs-input`, or `bs-select` for a select). It scans
+ * both the `apps/` tree AND the privileged shell renderer
+ * (`packages/shell/src/renderer`, minus its `ui/` primitive home) — Settings
+ * lives there and drifts the same way. Every file that currently has a
+ * non-compliant control is grandfathered in `control-faces-baseline.json`.
+ * The gate fails when:
+ *   - a NON-baselined file gains a non-compliant control (the ratchet:
  *     new code and new apps must compose from the primitive), or
  *   - a baselined file no longer has one (migrated — drop it from the baseline
  *     so the list can only shrink).
@@ -32,6 +35,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APPS_DIR = join(ROOT, "apps");
+/** The privileged shell renderer rides the SAME face classes (its `<TextField>`
+ *  emits `.bs-input` / `.bs-select`), so Settings controls must line up with
+ *  their neighbours just like an app's do — this is where the "input drifts from
+ *  the button beside it" complaint actually lands. Its `ui/` folder is the
+ *  primitive home (the shell's local equivalent of `packages/sdk`) where a raw
+ *  `<input>` is legitimately wrapped into a face, so it's exempt like the SDK. */
+const SHELL_RENDERER_DIR = join(ROOT, "packages/shell/src/renderer");
+const SHELL_PRIMITIVES_DIR = join(SHELL_RENDERER_DIR, "ui");
 const BASELINE_PATH = join(ROOT, "tools", "control-faces-baseline.json");
 
 /** `<input type=...>` kinds that are NOT field-faces — they get their own
@@ -90,6 +101,10 @@ const toPosix = (p) => relative(ROOT, p).split("\\").join("/");
 
 const offenders = [];
 for (const file of walk(APPS_DIR)) {
+	if (hasHandRolledControl(readFileSync(file, "utf8"))) offenders.push(toPosix(file));
+}
+for (const file of walk(SHELL_RENDERER_DIR)) {
+	if (file.startsWith(SHELL_PRIMITIVES_DIR)) continue; // the primitives' own raw inputs
 	if (hasHandRolledControl(readFileSync(file, "utf8"))) offenders.push(toPosix(file));
 }
 offenders.sort();
