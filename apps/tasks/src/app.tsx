@@ -39,9 +39,9 @@ import {
 import { ObjectMenuMoreButton } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { createIconPickerButton, openIconPicker } from "@brainstorm/sdk/picker-host";
 import { PopoverBodyPadding, createPopoverElement } from "@brainstorm/sdk/popover";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import {
 	type EntityTitleSource,
 	PropertiesProvider,

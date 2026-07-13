@@ -3,6 +3,86 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.1",
+      "date": "2026-07-13",
+      "icon": "👥",
+      "title": "Presence everywhere",
+      "summary": "Live presence avatars now show in Tasks, Chat, Journal, Calendar events, Graph, Code editor, Preview, and Books — plus browser tab fixes and Settings polish.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Presence fleet"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Collaboration",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — "
+            },
+            {
+              "text": "avatar stacks",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " now appear in every shared-entity app header: Tasks, Chat, Journal, Calendar (when editing an event), Graph, Code editor, Preview, and Books — not just Notes and Whiteboard."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes & polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Browser",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — tab switching no longer leaves a blank view or bleeds content between tabs."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Settings",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Identity section shows a copyable fingerprint chip; secondary text is easier to read; Updates card layout tidied."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.0",
       "date": "2026-07-12",
       "icon": "👥",

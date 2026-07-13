@@ -34,8 +34,8 @@ import {
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
-import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
+import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
 import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";

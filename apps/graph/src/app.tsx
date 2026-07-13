@@ -45,7 +45,6 @@ import {
 	openExportPopover,
 } from "@brainstorm/sdk/export-popover";
 import { IconName } from "@brainstorm/sdk/icon";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { MenuAlign, mountMenuHost } from "@brainstorm/sdk/menus";
 import {
 	type AnchoredMenuItem,
@@ -55,6 +54,7 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm/sdk/object-menu";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { attachResizable } from "@brainstorm/sdk/resizable";
 import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import {

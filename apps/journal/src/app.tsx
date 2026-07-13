@@ -48,8 +48,8 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { IconPickerButton } from "@brainstorm/sdk/picker-host";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
 import { attachShortcut } from "@brainstorm/sdk/shortcut";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";

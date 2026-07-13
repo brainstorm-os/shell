@@ -39,9 +39,9 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import type { PdfEngineDocument } from "@brainstorm/sdk/pdf-engine";
 import { openPdfDocument, resolvePdfOutline } from "@brainstorm/sdk/pdf-engine";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";
