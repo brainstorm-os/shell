@@ -10,9 +10,8 @@ Filter the cheatsheet by typing. Click any binding to jump to the action.
 
 ## A few essentials
 
-- `Cmd+Space` / `Ctrl+Space` — open the [launcher](concepts/search.md).
+- `Cmd+K` / `Ctrl+K` — open the [launcher](concepts/search.md) (search the whole vault).
 - `Cmd+,` / `Ctrl+,` — open Settings.
-- `Cmd+K` / `Ctrl+K` — global command palette.
 - `Cmd+F` / `Ctrl+F` — find within the current view.
 - `Cmd+W` / `Ctrl+W` — close window.
 - `Cmd+T` / `Ctrl+T` — new note (in Notes), new task (in Tasks), etc.
@@ -38,3 +37,5 @@ Each app adds its own shortcuts on top of the shell ones. They only fire while t
 ## Conflicts
 
 If two shortcuts collide, the more-specific one wins — an app's `Cmd+B` overrides the shell's `Cmd+B` while the app has focus. **Settings → Keyboard** flags conflicts in red so you can resolve them.
+
+On macOS, `Cmd+Space` is usually taken by the system for Spotlight or switching input languages — Brainstorm cannot receive it even when the app is focused. The launcher defaults to `Cmd+K` instead. You can rebind either shortcut in **Settings → Keyboard**.

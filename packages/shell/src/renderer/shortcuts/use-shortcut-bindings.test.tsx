@@ -140,7 +140,7 @@ describe("buildShortcutBindingsForTests", () => {
 		});
 		expect(b.chordFor("shell/launcher")).toBe("Mod+J");
 		expect(b.rowFor("shell/launcher")?.source).toBe(BindingSource.UserOverride);
-		expect(b.rowFor("shell/launcher")?.defaultChord).toBe("CmdOrCtrl+Space");
+		expect(b.rowFor("shell/launcher")?.defaultChord).toBe("CmdOrCtrl+K");
 		// Unknown id falls back to the seed.
 		expect(b.chordFor("editor/find")).toBe("CmdOrCtrl+F");
 	});

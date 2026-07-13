@@ -700,7 +700,7 @@ export function Dashboard() {
 						<IconButton
 							icon={IconName.Search}
 							label={t("shell.launcher.openLabel")}
-							shortcutId="shell/search"
+							shortcutId="shell/launcher"
 							onClick={() => setLauncherOpen(true)}
 						/>
 					)}
@@ -1084,7 +1084,8 @@ function handleShellAction(
 			openLauncher();
 			return;
 		// `shell/search` — same palette as the launcher; the second chord
-		// (Cmd+K) exists because macOS Spotlight swallows Cmd+Space. A
+		// (Cmd+Space) is an alternate for Windows/Linux. macOS reserves
+		// Cmd+Space for Spotlight / input-source switching. A
 		// `ui.openSearch` handoff (9.8.9) arrives here too, with the
 		// app-supplied query pre-filling the palette.
 		case "search":

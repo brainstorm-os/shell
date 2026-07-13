@@ -58,7 +58,7 @@ describe("createShortcutSetup", () => {
 			const setup = createShortcutSetup({ getDashboard: () => env.wc });
 			setup.attach(env.wc);
 
-			const prevented = env.fire({ key: " ", meta: true });
+			const prevented = env.fire({ key: "k", meta: true });
 			expect(prevented).toBe(true);
 			expect(env.sent).toEqual([{ channel: "shell:action", payload: { action: "launcher" } }]);
 		} finally {
@@ -66,7 +66,7 @@ describe("createShortcutSetup", () => {
 		}
 	});
 
-	it("Cmd+K routes the search action to the dashboard (Spotlight-proof chord)", () => {
+	it("Cmd+Space routes the search alternate to the dashboard", () => {
 		const original = Object.getOwnPropertyDescriptor(process, "platform");
 		Object.defineProperty(process, "platform", { value: "darwin" });
 		try {
@@ -74,9 +74,9 @@ describe("createShortcutSetup", () => {
 			const setup = createShortcutSetup({ getDashboard: () => env.wc });
 			setup.attach(env.wc);
 
-			// macOS Spotlight owns Cmd+Space at the OS level, so shell/search's
-			// Cmd+K is the chord that actually reaches the app on a stock Mac.
-			const prevented = env.fire({ key: "k", meta: true });
+			// shell/search's Cmd+Space alternate — reaches us in tests; on a
+			// stock Mac the OS input-source switcher usually intercepts first.
+			const prevented = env.fire({ key: " ", meta: true });
 			expect(prevented).toBe(true);
 			expect(env.sent).toEqual([{ channel: "shell:action", payload: { action: "search" } }]);
 		} finally {

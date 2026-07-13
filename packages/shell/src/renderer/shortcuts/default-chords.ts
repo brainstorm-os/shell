@@ -14,9 +14,9 @@
 
 const DEFAULT_CHORDS: Record<string, string | null> = {
 	// Shell layer (mirrors DEFAULT_SHELL_SHORTCUTS in the main registry)
-	"shell/launcher": "CmdOrCtrl+Space",
+	"shell/launcher": "CmdOrCtrl+K",
 	"shell/app-grid": "CmdOrCtrl+Shift+Space",
-	"shell/search": "CmdOrCtrl+K",
+	"shell/search": "CmdOrCtrl+Space",
 	"shell/settings": "CmdOrCtrl+,",
 	"shell/marketplace": "CmdOrCtrl+Shift+P",
 	"shell/bin": "CmdOrCtrl+Shift+B",

@@ -6,7 +6,7 @@
  *
  * The spec asks for three nested overlays. Today's reachable overlay set from
  * a default-launched shell (no seeded entities, no app windows) is:
- *   - Launcher (Cmd+Space)
+ *   - Launcher (Cmd+K)
  *   - Settings / Bin / Marketplace / Help (from the dashboard chrome buttons)
  *   - Help overlay's article links (one-level deeper)
  *

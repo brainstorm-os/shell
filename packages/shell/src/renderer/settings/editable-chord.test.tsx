@@ -46,8 +46,8 @@ const launcherRow: ShortcutBindingRow = {
 	id: "shell/launcher",
 	layer: "shell",
 	label: "Open Launcher",
-	chord: "CmdOrCtrl+Space",
-	defaultChord: "CmdOrCtrl+Space",
+	chord: "CmdOrCtrl+K",
+	defaultChord: "CmdOrCtrl+K",
 	source: BindingSource.Default,
 };
 
@@ -56,12 +56,12 @@ const overriddenLauncherRow: ShortcutBindingRow = {
 	layer: "shell",
 	label: "Open Launcher",
 	chord: "Mod+J",
-	defaultChord: "CmdOrCtrl+Space",
+	defaultChord: "CmdOrCtrl+K",
 	source: BindingSource.UserOverride,
 };
 
 const bindings = buildShortcutBindingsForTests({
-	"shell/launcher": "CmdOrCtrl+Space",
+	"shell/launcher": "CmdOrCtrl+K",
 	"shell/settings": "CmdOrCtrl+,",
 	"shell/bin": "CmdOrCtrl+Shift+B",
 });
@@ -78,7 +78,7 @@ describe("findConflict — pure", () => {
 	});
 
 	it("does not conflict with self (rebinding to current chord)", () => {
-		expect(findConflict("CmdOrCtrl+Space", "shell/launcher", bindings)).toBeNull();
+		expect(findConflict("CmdOrCtrl+K", "shell/launcher", bindings)).toBeNull();
 	});
 
 	it("returns null for an empty chord (still being captured)", () => {

@@ -87,14 +87,16 @@ export type ConflictReport = {
 
 /** Built-in shell shortcuts per §Shell layer. */
 export const DEFAULT_SHELL_SHORTCUTS: readonly Omit<ShortcutAction, "layer">[] = [
-	{ id: "shell/launcher", defaultChord: "CmdOrCtrl+Space", label: "Open Launcher" },
+	// Cmd+K — macOS reserves Cmd+Space for Spotlight / the input-source
+	// switcher, so that chord never reaches Brainstorm even when focused.
+	{ id: "shell/launcher", defaultChord: "CmdOrCtrl+K", label: "Open Launcher" },
 	// Browse-first start-menu grid of every installed app (the launcher palette
 	// above is type-to-find; this is the grid you browse + pin from).
 	{ id: "shell/app-grid", defaultChord: "CmdOrCtrl+Shift+Space", label: "Show All Apps" },
-	// Same surface as the launcher — a second chord because macOS Spotlight
-	// owns Cmd+Space at the OS level, so the launcher default never reaches
-	// us on an out-of-the-box Mac. Cmd+K is the de-facto in-app search chord.
-	{ id: "shell/search", defaultChord: "CmdOrCtrl+K", label: "Search Vault" },
+	// Same palette as the launcher — a second chord for Windows/Linux users who
+	// expect Ctrl+Space. Does not reach the app on macOS when the OS owns
+	// Cmd+Space for input switching.
+	{ id: "shell/search", defaultChord: "CmdOrCtrl+Space", label: "Search Vault" },
 	{ id: "shell/settings", defaultChord: "CmdOrCtrl+,", label: "Open Settings" },
 	{ id: "shell/marketplace", defaultChord: "CmdOrCtrl+Shift+P", label: "Open Marketplace" },
 	{ id: "shell/bin", defaultChord: "CmdOrCtrl+Shift+B", label: "Open Bin" },

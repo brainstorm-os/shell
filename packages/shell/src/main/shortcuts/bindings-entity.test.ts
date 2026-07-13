@@ -56,7 +56,7 @@ describe("shortcut-bindings flat-file → entity migration (6.7)", () => {
 		registry.registerShell();
 		registry.applyOverrides(readOverridesFromEntity(repo));
 		// Launcher keeps its shipped default — no override applied.
-		expect(registry.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+Space");
+		expect(registry.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+K");
 		expect(registry.resolve("shell/launcher")?.source).toBe("default");
 	});
 

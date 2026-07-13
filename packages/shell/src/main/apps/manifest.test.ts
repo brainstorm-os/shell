@@ -465,7 +465,7 @@ describe("validateManifest — shortcuts (6.10b)", () => {
 });
 
 describe("validateShortcutShellCollisions (6.10b)", () => {
-	const shellChords = new Set(["cmdorctrl+space", "cmdorctrl+shift+p"]);
+	const shellChords = new Set(["cmdorctrl+k", "cmdorctrl+space", "cmdorctrl+shift+p"]);
 
 	it("passes when manifest has no shortcuts", () => {
 		expect(validateShortcutShellCollisions(baseManifest, shellChords)).toBeNull();

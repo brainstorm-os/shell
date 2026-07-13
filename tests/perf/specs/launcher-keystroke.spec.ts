@@ -87,10 +87,10 @@ async function ensureVaultSeededWithContent(dashboard: Page, userDataDir: string
 }
 
 async function openLauncher(dashboard: Page): Promise<void> {
-	// CmdOrCtrl+Space per `renderer/shortcuts/default-chords.ts`. The
+	// CmdOrCtrl+K per `renderer/shortcuts/default-chords.ts`. The
 	// launcher is renderer-local React state (no programmatic-open IPC);
 	// the global shortcut is the only path.
-	const chord = process.platform === "darwin" ? "Meta+Space" : "Control+Space";
+	const chord = process.platform === "darwin" ? "Meta+KeyK" : "Control+KeyK";
 	await dashboard.keyboard.press(chord);
 	await dashboard.locator(LAUNCHER_INPUT).waitFor({ state: "visible", timeout: 10_000 });
 	// The launcher focuses its input on next rAF after mount; give that

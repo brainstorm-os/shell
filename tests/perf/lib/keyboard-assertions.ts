@@ -195,7 +195,7 @@ export async function dismissTransientOverlays(page: Page): Promise<void> {
  *  mount + focus to settle. Used by the escape-stack and arrow-composite
  *  specs. */
 export async function openLauncher(page: Page): Promise<void> {
-	const chord = process.platform === "darwin" ? "Meta+Space" : "Control+Space";
+	const chord = process.platform === "darwin" ? "Meta+KeyK" : "Control+KeyK";
 	await page.keyboard.press(chord);
 	await page.locator('[data-testid="launcher"] input.launcher__input').waitFor({
 		state: "visible",

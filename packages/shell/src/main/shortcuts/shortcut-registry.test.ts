@@ -45,7 +45,7 @@ describe("ShortcutRegistry — shell layer", () => {
 		const reg = new ShortcutRegistry();
 		reg.registerShell();
 		const resolved = reg.resolve("shell/launcher");
-		expect(resolved?.chord).toBe("CmdOrCtrl+Space");
+		expect(resolved?.chord).toBe("CmdOrCtrl+K");
 		expect(resolved?.source).toBe("default");
 	});
 
@@ -72,7 +72,7 @@ describe("ShortcutRegistry — shell layer", () => {
 		reg.registerShell();
 		reg.overrideOne("shell/launcher", "CmdOrCtrl+P");
 		reg.resetOverride("shell/launcher");
-		expect(reg.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+Space");
+		expect(reg.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+K");
 	});
 
 	it("applyOverrides bulk-loads user-stored overrides", () => {

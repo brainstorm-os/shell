@@ -1,5 +1,5 @@
 /**
- * Launcher palette — `⌘ Space` (or `Ctrl+Space`) command palette over the
+ * Launcher palette — `⌘ K` (or `Ctrl+K`) command palette over the
  * dashboard. Migrated to `@react-fancy-menus` at Stage 8.8. Surfaces two
  * sections:
  *

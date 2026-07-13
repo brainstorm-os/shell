@@ -4,7 +4,7 @@ Brainstorm has one search that reaches everywhere in your vault, and a per-app s
 
 ## The launcher
 
-`Cmd+Space` (macOS) or `Ctrl+Space` (Windows/Linux) opens the launcher from anywhere. Start typing and hits stream in across every app — notes, tasks, files, bookmarks, calendar events, people, anything stored in your vault.
+`Cmd+K` (macOS) or `Ctrl+K` (Windows/Linux) opens the launcher from anywhere. Start typing and hits stream in across every app — notes, tasks, files, bookmarks, calendar events, people, anything stored in your vault.
 
 The launcher searches:
 

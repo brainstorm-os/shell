@@ -100,8 +100,8 @@ describe("shortcuts-handlers — list", () => {
 			id: "shell/launcher",
 			layer: "shell",
 			label: "Open Launcher",
-			chord: "CmdOrCtrl+Space",
-			defaultChord: "CmdOrCtrl+Space",
+			chord: "CmdOrCtrl+K",
+			defaultChord: "CmdOrCtrl+K",
 			source: "default",
 		});
 	});
@@ -123,7 +123,7 @@ describe("shortcuts-handlers — list", () => {
 		expect(launcher).toMatchObject({
 			id: "shell/launcher",
 			chord: "Mod+J",
-			defaultChord: "CmdOrCtrl+Space",
+			defaultChord: "CmdOrCtrl+K",
 			source: "user-override",
 		});
 	});
@@ -207,7 +207,7 @@ describe("shortcuts-handlers — set override rejection paths", () => {
 	});
 
 	it("rebinding an action to its own current chord is a no-op success (self isn't a conflict)", async () => {
-		expect(await invoke(SHORTCUTS_SET_OVERRIDE_CHANNEL, "shell/launcher", "CmdOrCtrl+Space")).toEqual(
+		expect(await invoke(SHORTCUTS_SET_OVERRIDE_CHANNEL, "shell/launcher", "CmdOrCtrl+K")).toEqual(
 			{ ok: true },
 		);
 	});
@@ -227,7 +227,7 @@ describe("shortcuts-handlers — reset override", () => {
 
 		const result = await invoke(SHORTCUTS_RESET_OVERRIDE_CHANNEL, "shell/launcher");
 		expect(result).toEqual({ ok: true });
-		expect(registry.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+Space");
+		expect(registry.resolve("shell/launcher")?.chord).toBe("CmdOrCtrl+K");
 		expect(registry.resolve("shell/launcher")?.source).toBe("default");
 
 		// The persisted overrides list no longer contains the cleared entry.

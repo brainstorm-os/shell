@@ -4,7 +4,7 @@ The dashboard is what you see when no app is in focus. It's home base.
 
 ## The launcher
 
-Press `Cmd+Space` (macOS) or `Ctrl+Space` (Windows/Linux) and start typing. The launcher searches across every app — notes, tasks, files, bookmarks, people, anything you've added. Press `Enter` to open the top hit, or use arrow keys to pick one. See [Search](../concepts/search.md) for filters and scope.
+Press `Cmd+K` (macOS) or `Ctrl+K` (Windows/Linux) and start typing. The launcher searches across every app — notes, tasks, files, bookmarks, people, anything you've added. Press `Enter` to open the top hit, or use arrow keys to pick one. See [Search](../concepts/search.md) for filters and scope.
 
 ## Pins
 
