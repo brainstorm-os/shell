@@ -2,6 +2,7 @@ import "@brainstorm/sdk/app-theme.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { createRoot } from "react-dom/client";
 import { BrowserApp } from "./app";
+import { BrowserI18nProvider } from "./i18n-provider";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -10,6 +11,8 @@ if (!root) throw new Error("Web Browser: #root not found in index.html");
 // (project convention; the Browser drives an external WebContentsView).
 createRoot(root).render(
 	<AppErrorBoundary appName="browser">
-		<BrowserApp />
+		<BrowserI18nProvider>
+			<BrowserApp />
+		</BrowserI18nProvider>
 	</AppErrorBoundary>,
 );

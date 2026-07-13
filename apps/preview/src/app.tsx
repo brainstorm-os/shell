@@ -31,6 +31,7 @@ import {
 } from "./host/runtime";
 import { useVaultFiles } from "./host/use-vault-files";
 import { t } from "./i18n";
+import { usePreviewT } from "./i18n-hooks";
 import { entityToPreviewFile } from "./logic/entity-to-file";
 import { FILE_ENTITY_TYPE } from "./logic/vault-files";
 import { type PreviewContext, PreviewContextKind } from "./types/preview-context";
@@ -113,6 +114,7 @@ function initialSidebarOpen(): boolean {
 }
 
 export function PreviewApp(): ReactElement {
+	usePreviewT();
 	const [siblings, setSiblings] = useState<ReadonlyArray<PreviewFile>>(EMPTY_SIBLINGS);
 	const [cursor, setCursor] = useState(0);
 	const [context, setContext] = useState<PreviewContext | null>(null);

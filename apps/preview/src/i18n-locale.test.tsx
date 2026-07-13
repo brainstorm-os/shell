@@ -5,7 +5,7 @@ import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CODE_EDITOR_MESSAGES } from "./i18n";
+import { PREVIEW_I18N } from "./i18n";
 
 function fakeRuntime(initial: string): LocaleRuntime & { emit: (locale: string) => void } {
 	const listeners = new Set<(locale: string) => void>();
@@ -21,7 +21,7 @@ function fakeRuntime(initial: string): LocaleRuntime & { emit: (locale: string) 
 	};
 }
 
-describe("code-editor locale packs (12.15)", () => {
+describe("preview locale packs (12.15)", () => {
 	let host: HTMLDivElement;
 	let root: Root;
 
@@ -43,35 +43,35 @@ describe("code-editor locale packs (12.15)", () => {
 	}
 
 	const importers = {
-		es: async () => ({ default: { appTitle: "Editor de código", filesHeading: "Archivos" } }),
+		es: async () => ({ default: { "app.title": "Vista previa", "nav.prev": "Archivo anterior" } }),
 	};
 
 	it("applies the Spanish overlay once the pack resolves", async () => {
 		const rt = fakeRuntime("es");
 		let out = "";
 		function Probe() {
-			out = useLocalePackT(CODE_EDITOR_MESSAGES, importers, rt)("appTitle");
+			out = useLocalePackT(PREVIEW_I18N, importers, rt)("app.title");
 			return null;
 		}
 		act(() => root.render(<Probe />));
 		await flush();
-		expect(out).toBe("Editor de código");
+		expect(out).toBe("Vista previa");
 	});
 
 	it("re-derives when the runtime locale changes", async () => {
 		const rt = fakeRuntime("en");
 		let out = "";
 		function Probe() {
-			out = useLocalePackT(CODE_EDITOR_MESSAGES, importers, rt)("filesHeading");
+			out = useLocalePackT(PREVIEW_I18N, importers, rt)("nav.prev");
 			return null;
 		}
 		act(() => root.render(<Probe />));
-		expect(out).toBe("Files");
+		expect(out).toBe("Previous file");
 		await act(async () => {
 			rt.emit("es");
 			await Promise.resolve();
 		});
 		await flush();
-		expect(out).toBe("Archivos");
+		expect(out).toBe("Archivo anterior");
 	});
 });

@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Quick-Look-style multi-format media previewer. Thin sandboxed shell whose render-pane embeds a per-kind renderer module (image / video / audio / text / markdown / code / pdf). The inspector edits the previewed file's vault properties and comments.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

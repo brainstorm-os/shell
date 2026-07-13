@@ -33,6 +33,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactElement } from "react";
 import { FindBar, type FindMatchState } from "./find-bar";
 import { plural, t } from "./i18n";
+import { useBrowserT } from "./i18n-hooks";
 import {
 	BOOKMARK_ENTITY_TYPE,
 	CLIP_SAVED_RESET_MS,
@@ -165,6 +166,7 @@ function securityIconFor(state: TabSecurityState): IconName | null {
 }
 
 export function BrowserApp(): ReactElement {
+	useBrowserT();
 	const webView = useRef<WebViewClient | null>(getWebView()).current;
 	const entities = useRef<EntitiesClient | null>(getEntities()).current;
 	const network = useRef<NetworkReadableService | null>(getNetwork()).current;

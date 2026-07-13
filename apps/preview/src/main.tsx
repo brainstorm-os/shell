@@ -6,6 +6,7 @@ import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { PreviewApp } from "./app";
+import { PreviewI18nProvider } from "./i18n-provider";
 import { registerBuiltInPreviewModules } from "./logic/registry";
 import "./styles.css";
 
@@ -26,7 +27,9 @@ registerBuiltInPreviewModules();
 createRoot(root).render(
 	<StrictMode>
 		<AppErrorBoundary appName="preview">
-			<PreviewApp />
+			<PreviewI18nProvider>
+				<PreviewApp />
+			</PreviewI18nProvider>
 		</AppErrorBoundary>
 	</StrictMode>,
 );
