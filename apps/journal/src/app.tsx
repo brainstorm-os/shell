@@ -48,6 +48,7 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { IconPickerButton } from "@brainstorm/sdk/picker-host";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
 import { attachShortcut } from "@brainstorm/sdk/shortcut";
@@ -813,6 +814,8 @@ export function JournalApp(): ReactElement {
 	}, []);
 
 	const focusEntryNoteId = focusEntry?.noteId ?? null;
+	// PRES-3 — who's-here on the focused day's entry (cross-device in the shell).
+	const presencePeers = usePresence(focusEntryNoteId, JOURNAL_ENTRY_TYPE, useSelf());
 	// Read-only lock — a synced `locked` property on the entry, same model as
 	// Notes. Read from the live vault so it reflects edits from any device.
 	const focusEntryLocked = focusEntryNoteId
@@ -1101,6 +1104,7 @@ export function JournalApp(): ReactElement {
 					</span>
 				</div>
 				<div className="app-header__right">
+					{presencePeers.length > 0 && <PresenceStack peers={presencePeers} />}
 					<button
 						type="button"
 						className="header-icon-btn"

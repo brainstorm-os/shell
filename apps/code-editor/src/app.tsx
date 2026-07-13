@@ -35,6 +35,7 @@ import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
 import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";
@@ -377,6 +378,8 @@ export function CodeEditorApp(): ReactElement {
 		() => rows.find((r) => r.id === selectedId) ?? null,
 		[rows, selectedId],
 	);
+	// PRES-3 — who's-here on the open code file (cross-device in the shell).
+	const filePeers = usePresence(selectedRow?.id ?? null, CODE_FILE_ENTITY_TYPE, useSelf());
 
 	const canCreateFile = Boolean(runtime?.services?.entities?.create);
 
@@ -883,6 +886,7 @@ export function CodeEditorApp(): ReactElement {
 					)}
 				</div>
 				<div className="app-header__right">
+					{filePeers.length > 0 && <PresenceStack peers={filePeers} />}
 					<div className="app-header__meta" id="header-meta">
 						{metaText}
 					</div>

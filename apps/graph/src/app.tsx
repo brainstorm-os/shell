@@ -45,6 +45,7 @@ import {
 	openExportPopover,
 } from "@brainstorm/sdk/export-popover";
 import { IconName } from "@brainstorm/sdk/icon";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { MenuAlign, mountMenuHost } from "@brainstorm/sdk/menus";
 import {
 	type AnchoredMenuItem,
@@ -736,6 +737,8 @@ function GraphHeader({
 	snap: CanvasSnapshot | null;
 }): ReactElement {
 	const record = controller?.getState().graphRecord ?? null;
+	// PRES-3 — who's-here on the open graph (cross-device in the shell).
+	const graphPeers = usePresence(record?.id ?? null, GRAPH_TYPE, useSelf());
 
 	const toggleSidebar = (mode: SidebarMode) => {
 		if (!snap) return;
@@ -753,6 +756,7 @@ function GraphHeader({
 				<h1 className="app-header__title">{record?.name || t("header.appTitle")}</h1>
 			</div>
 			<div className="app-header__right">
+				{graphPeers.length > 0 && <PresenceStack peers={graphPeers} />}
 				<HeaderIconToggle
 					glyph={GraphIcon.Path}
 					label={t("path.button")}

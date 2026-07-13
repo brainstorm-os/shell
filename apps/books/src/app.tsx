@@ -39,6 +39,7 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import type { PdfEngineDocument } from "@brainstorm/sdk/pdf-engine";
 import { openPdfDocument, resolvePdfOutline } from "@brainstorm/sdk/pdf-engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -398,6 +399,12 @@ export function BooksApp(): ReactElement {
 		if (isSample) return sample.current;
 		return selectedId ? (books.find((b) => b.id === selectedId) ?? null) : null;
 	}, [isSample, selectedId, books]);
+	// PRES-3 — who's-here on the open book (vault rows only; not the sample).
+	const bookPeers = usePresence(
+		isSample ? null : (selectedBook?.id ?? null),
+		BOOK_ENTITY_TYPE,
+		useSelf(),
+	);
 
 	// Launch handshake + later opens on the push channel. Both are real
 	// navigations, so they go through `openBook` (history-recording).
@@ -779,6 +786,7 @@ export function BooksApp(): ReactElement {
 					{isSample ? <span className="books__preview-badge">{t("reader.previewBadge")}</span> : null}
 				</div>
 				<div className="app-header__right">
+					{bookPeers.length > 0 && <PresenceStack peers={bookPeers} />}
 					{canImport ? (
 						<button
 							type="button"

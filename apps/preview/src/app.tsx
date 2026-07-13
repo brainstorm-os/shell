@@ -16,6 +16,7 @@ import { RightPanelTab } from "@brainstorm/editor";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { requestSaveBytes } from "@brainstorm/sdk/export-file";
 import { IconName } from "@brainstorm/sdk/icon";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewFile } from "./demo/dataset";
@@ -31,6 +32,7 @@ import {
 import { useVaultFiles } from "./host/use-vault-files";
 import { t } from "./i18n";
 import { entityToPreviewFile } from "./logic/entity-to-file";
+import { FILE_ENTITY_TYPE } from "./logic/vault-files";
 import { type PreviewContext, PreviewContextKind } from "./types/preview-context";
 import { FileSidebar } from "./ui/file-sidebar";
 import { Filmstrip } from "./ui/filmstrip";
@@ -127,6 +129,8 @@ export function PreviewApp(): ReactElement {
 
 	const total = siblings.length;
 	const activeFile = total > 0 ? (siblings[cursor] ?? null) : null;
+	// PRES-3 — who's-here on the previewed file (cross-device in the shell).
+	const filePeers = usePresence(activeFile?.id ?? null, FILE_ENTITY_TYPE, useSelf());
 	const navUsable = total > 1;
 
 	// Read the live gallery in callbacks that must not close over stale state.
@@ -312,6 +316,7 @@ export function PreviewApp(): ReactElement {
 					</span>
 				</div>
 				<div className="app-header__right">
+					{filePeers.length > 0 && <PresenceStack peers={filePeers} />}
 					<HeaderActions
 						sidebarOpen={sidebarOpen}
 						onToggleSidebar={toggleSidebar}

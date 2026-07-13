@@ -19,6 +19,7 @@ import { IconName } from "@brainstorm/sdk/icon";
 import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
 import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
 import { useResizable } from "@brainstorm/sdk/resizable";
 import {
 	type MouseEvent as ReactMouseEvent,
@@ -236,6 +237,8 @@ export function CalendarApp() {
 
 	// ── Dialogs ─────────────────────────────────────────────────────────
 	const [detail, setDetail] = useState<DetailState>(null);
+	// PRES-3 — who's-here on the open Event/v1 (when editing an existing event).
+	const eventPeers = usePresence(detail?.event?.id ?? null, EVENT_TYPE, useSelf());
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [caldavOpen, setCaldavOpen] = useState(false);
 
@@ -681,6 +684,7 @@ export function CalendarApp() {
 					</div>
 				</div>
 				<div className="app-header__right">
+					{eventPeers.length > 0 && <PresenceStack peers={eventPeers} />}
 					<CalendarHeaderActions
 						viewKind={viewKind}
 						onViewKind={setView}
