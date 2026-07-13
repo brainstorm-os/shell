@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/count-badge.css";
 import "@brainstorm/sdk/empty-state.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
@@ -13,6 +14,8 @@ import { MailboxWidget } from "./widget";
 // One shared fancy-menus host per app — the header ⋯ and composer menus open
 // through openAnchoredMenu, which is a no-op without a mounted host.
 mountMenuHost();
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Mailbox: #root not found in index.html");

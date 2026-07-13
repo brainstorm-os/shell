@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/property-ui/cells.css";
 import "@brainstorm/sdk/select-menu.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
@@ -8,6 +9,8 @@ import { createRoot } from "react-dom/client";
 import { FormDesignerApp } from "./app";
 import { FormDesignerI18nProvider } from "./i18n-provider";
 import "./styles.css";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("form-designer: #root not found in index.html");

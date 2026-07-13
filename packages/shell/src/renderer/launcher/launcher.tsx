@@ -46,6 +46,8 @@ import { pushToast } from "../ui/toasts";
 import { LauncherRowKind, buildRows } from "./grouped-results";
 import type { LauncherAppRow, LauncherEntityRow, LauncherRow } from "./grouped-results";
 import "./launcher.css";
+import { track } from "@brainstorm/sdk/analytics";
+import { launchApp } from "../analytics/track-app-launch";
 import { prettyEntityType, sanitizeSnippet } from "./launcher-text";
 
 export type LauncherProps = {
@@ -232,6 +234,7 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 	initialQueryRef.current = initialQuery ?? null;
 	useEffect(() => {
 		if (!open) return;
+		track("Launcher Opened");
 		setQuery(initialQueryRef.current ?? "");
 		setEntities([]);
 		let cancelled = false;
@@ -337,7 +340,7 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 }
 
 function activateApp(row: LauncherAppRow, onClose: () => void): void {
-	void window.brainstorm.apps.launch(row.app.id);
+	launchApp(row.app.id, "launcher");
 	onClose();
 }
 
@@ -353,12 +356,12 @@ function activateEntity(row: LauncherEntityRow, onClose: () => void): void {
 		.then((result) => {
 			pushExplainerToast(result);
 			if (!result.handled && result.rung === undefined) {
-				void window.brainstorm.apps.launch(row.hit.ownerAppId);
+				launchApp(row.hit.ownerAppId, "launcher-entity-fallback");
 			}
 		})
 		.catch((error: unknown) => {
 			console.warn("[brainstorm] launcher: intent.open dispatch failed:", error);
-			void window.brainstorm.apps.launch(row.hit.ownerAppId);
+			launchApp(row.hit.ownerAppId, "launcher-entity-fallback");
 		});
 	onClose();
 }

@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/editor/editor.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";
@@ -15,6 +16,8 @@ applyPersistedPanelWidth({
 	cssVar: "--graph-sidebar-width",
 	defaultWidth: 320,
 });
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("graph: #root not found in index.html");

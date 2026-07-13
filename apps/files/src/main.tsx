@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/editor/editor.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -22,6 +23,8 @@ applyPersistedPanelWidth({
 	cssVar: "--files-inspector-width",
 	defaultWidth: 320,
 });
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Files: #root not found in index.html");

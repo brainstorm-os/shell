@@ -1,4 +1,5 @@
 import "@brainstorm/editor/editor-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/composer-context.css";
 import "@brainstorm/sdk/empty-state.css";
@@ -10,6 +11,8 @@ import { ChatApp } from "./app";
 import { ChatI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { ChatWidget } from "./widget";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Chat: #root not found in index.html");

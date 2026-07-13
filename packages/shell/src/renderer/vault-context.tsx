@@ -1,3 +1,4 @@
+import { track } from "@brainstorm/sdk/analytics";
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { CloudSyncWarning, CreateVaultOptions, VaultEntry } from "../preload";
 import type { VaultDbKind, VaultRecovery } from "../shared/vault-recovery-wire-types";
@@ -85,6 +86,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 		async (options: CreateVaultOptions) => {
 			try {
 				const entry = await window.brainstorm.vaults.create(options);
+				track("Vault Created", { vault_id: entry.id });
 				await refresh();
 				return entry;
 			} catch (error) {

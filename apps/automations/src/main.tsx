@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/empty-state.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -9,6 +10,8 @@ import { AutomationsApp } from "./app";
 import { AutomationsI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { AutomationsWidget } from "./widget";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("automations: #root not found in index.html");

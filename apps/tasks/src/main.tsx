@@ -14,6 +14,7 @@
  */
 
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/empty-state.css";
 import "@brainstorm/editor/editor.css";
 import "@brainstorm/sdk/recurrence-editor.css";
@@ -44,6 +45,8 @@ import { ensureTaskVocab } from "./properties/task-vocab";
 import { getBrainstorm } from "./storage/runtime";
 import { mountTasksWidget } from "./widget-mount";
 import "./styles.css";
+
+initAnalytics();
 
 // Widget-mode (Stage 7.3a): the dashboard launched this bundle as a widget.
 // Mount the compact widget surface (open-tasks glance list) instead of the full

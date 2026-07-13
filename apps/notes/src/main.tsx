@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/empty-state.css";
 import "@brainstorm/sdk/share-dialog.css";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
@@ -20,6 +21,8 @@ import { getBrainstorm, openEntityInShell } from "./store/runtime";
 import { getYDocResolverApi } from "./store/ydoc-resolver";
 import { NotesWidget } from "./widget";
 import "./styles.css";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Notes: #root not found in index.html");

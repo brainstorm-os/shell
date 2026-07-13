@@ -24,7 +24,12 @@ import { ErrorBoundary } from "./ui/error-boundary";
 import "./ui/error-boundary.css";
 import { installFocusNav } from "./focus-nav";
 import { installErrorBridge } from "./ui/error-bridge";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { VaultProvider } from "./vault-context";
+import { AnalyticsBetaNotice } from "./analytics/beta-notice";
+import { ShellTracking } from "./analytics/shell-tracking";
+
+initAnalytics();
 
 installErrorBridge();
 // Keyboard-nav mode: focus rings only after a deliberate plain Tab (gated in
@@ -56,6 +61,8 @@ createRoot(rootElement).render(
 					 *  bridge resolves against the live theme tokens. */}
 					<BrainstormMenuProvider>
 						<LocaleGate>
+							<AnalyticsBetaNotice />
+							<ShellTracking />
 							<App />
 						</LocaleGate>
 					</BrainstormMenuProvider>
