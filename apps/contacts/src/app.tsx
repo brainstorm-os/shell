@@ -35,6 +35,7 @@ import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { plural, t } from "./i18n";
+import { useContactsT } from "./i18n-hooks";
 import { type ComposeDraft, buildCompanyNameIndex, planCompose } from "./logic/compose";
 import { demoEntities } from "./logic/demo";
 import { openEntityRef, resolveOpenTarget } from "./logic/open";
@@ -115,6 +116,7 @@ function writeSortingPref(sorting: ContactsSorting): void {
 }
 
 export function ContactsApp(): ReactElement {
+	useContactsT();
 	const rt = getBrainstorm();
 	const vaultEntitiesSvc = rt?.services?.vaultEntities ?? null;
 	const entitiesSvc = rt?.services?.entities ?? null;

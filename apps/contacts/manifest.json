@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "People manager with relationship links, birthdays, and vCard import and export over the shared Person entity.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

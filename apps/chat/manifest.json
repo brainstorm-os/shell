@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Team chat — channels of messages in your vault. Human↔human conversation over the shared Message substrate, synced across the people you collaborate with.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

@@ -23,6 +23,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
+import { useChatT } from "./i18n-hooks";
 import { CHANNEL_TYPE } from "./logic/chat";
 import { getBrainstorm } from "./runtime";
 import {
@@ -97,6 +98,7 @@ function RecentMessages({
 }
 
 export function ChatWidget({ launch }: { launch: WidgetLaunch }) {
+	useChatT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

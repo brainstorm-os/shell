@@ -61,6 +61,7 @@ import type { ReactElement } from "react";
 import { ConversationSettingsPopover } from "./conversation-settings-popover";
 import { EscalationPrompt } from "./escalation-prompt";
 import { AGENT_I18N, type AgentI18nKey, t } from "./i18n";
+import { useAgentT } from "./i18n-hooks";
 import { curatedAgentTools, effectiveAgentCapabilities } from "./logic/agent-tools";
 import {
 	buildAttachmentsContextBlock,
@@ -319,6 +320,7 @@ const turnKey = (m: { role: string; seq?: number; id: string }): string =>
 	`${m.role}#${m.seq ?? m.id}`;
 
 export function AgentApp(): ReactElement {
+	useAgentT();
 	const rt = getBrainstorm();
 	const vaultEntities = rt?.services?.vaultEntities ?? null;
 	const entitiesSvc = rt?.services?.entities ?? null;

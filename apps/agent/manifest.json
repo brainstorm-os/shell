@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Conversational AI workspace — chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

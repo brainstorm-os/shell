@@ -23,6 +23,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
+import { useAgentT } from "./i18n-hooks";
 import { getBrainstorm } from "./runtime";
 import {
 	AGENT_WIDGET_QUERY,
@@ -99,6 +100,7 @@ function ConversationsList({
 }
 
 export function AgentWidget({ launch }: { launch: WidgetLaunch }) {
+	useAgentT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

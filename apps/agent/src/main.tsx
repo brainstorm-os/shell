@@ -9,6 +9,7 @@ import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentApp } from "./app";
+import { AgentI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { AgentWidget } from "./widget";
 
@@ -24,7 +25,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="agent">
-				<AgentWidget launch={widgetLaunch} />
+				<AgentI18nProvider>
+					<AgentWidget launch={widgetLaunch} />
+				</AgentI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -32,7 +35,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="agent">
-				<AgentApp />
+				<AgentI18nProvider>
+					<AgentApp />
+				</AgentI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);

@@ -8,6 +8,7 @@ import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ContactsApp } from "./app";
+import { ContactsI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { ContactsWidget } from "./widget";
 
@@ -25,7 +26,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="contacts">
-				<ContactsWidget launch={widgetLaunch} />
+				<ContactsI18nProvider>
+					<ContactsWidget launch={widgetLaunch} />
+				</ContactsI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -40,7 +43,9 @@ if (widgetLaunch) {
 	// branch above keeps StrictMode — it mounts no editor.
 	createRoot(root).render(
 		<AppErrorBoundary appName="contacts">
-			<ContactsApp />
+			<ContactsI18nProvider>
+				<ContactsApp />
+			</ContactsI18nProvider>
 		</AppErrorBoundary>,
 	);
 }

@@ -7,6 +7,7 @@ import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ChatApp } from "./app";
+import { ChatI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { ChatWidget } from "./widget";
 
@@ -19,5 +20,9 @@ mountMenuHost();
 // compact recent-messages glance list instead of the full Chat app.
 const widgetLaunch = getWidgetLaunch();
 createRoot(root).render(
-	<StrictMode>{widgetLaunch ? <ChatWidget launch={widgetLaunch} /> : <ChatApp />}</StrictMode>,
+	<StrictMode>
+		<ChatI18nProvider>
+			{widgetLaunch ? <ChatWidget launch={widgetLaunch} /> : <ChatApp />}
+		</ChatI18nProvider>
+	</StrictMode>,
 );

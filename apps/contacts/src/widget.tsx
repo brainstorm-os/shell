@@ -24,6 +24,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo, useState } from "react";
 import { plural, t } from "./i18n";
+import { useContactsT } from "./i18n-hooks";
 import { getBrainstorm } from "./runtime";
 import { PERSON_TYPE } from "./types/person";
 import {
@@ -119,6 +120,7 @@ function ContactsList({
 }
 
 export function ContactsWidget({ launch }: { launch: WidgetLaunch }) {
+	useContactsT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

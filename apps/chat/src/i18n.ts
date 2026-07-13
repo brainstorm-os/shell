@@ -6,101 +6,38 @@
  * `plural` helper against two catalog keys.
  */
 
-import { createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import {
+	type LocalePackImporters,
+	type TFunction,
+	type TParams,
+	createT,
+	plural as sdkPlural,
+} from "@brainstorm/sdk/i18n";
+import enCatalog from "./i18n/en.json";
 
-export const CHAT_I18N = {
-	"app.title": "Chat",
-	"header.members.show": "Show members",
-	"header.members.hide": "Hide members",
-	"header.members.disabled": "Open a channel to see its members",
-	"header.moreActions": "More actions",
-
-	"menu.editIdentity": "Change display name…",
-
-	"sidebar.channels": "Channels",
-	"sidebar.newChannel": "New channel",
-	"sidebar.empty": "No channels yet.",
-	"sidebar.show": "Show channels",
-	"sidebar.hide": "Hide channels",
-
-	"channel.empty.title": "No messages yet",
-	"channel.empty.blurb": "Say hello to start the conversation in #{name}.",
-	"channel.none.title": "Pick a channel",
-	"channel.none.blurb": "Choose a channel on the left, or create one to start chatting.",
-
-	"composer.placeholder": "Message #{name}…",
-	"composer.send": "Send",
-	"composer.attach.button": "Add context",
-	"composer.attach.mention": "Mention a person…",
-	"composer.attach.linkDocument": "Link a document…",
-	"composer.attach.linkDocument.placeholder": "Search documents…",
-	"composer.attach.linkDocument.aria": "Link a document",
-	"composer.attach.linkDocument.empty": "No documents found",
-	"composer.attach.upload": "Upload media…",
-	"composer.attach.search": "Mention a person",
-	"composer.attach.empty": "No people found",
-	"composer.attach.remove": "Remove {label}",
-
-	"members.title": "Members",
-	"members.you": "you",
-	"members.guest": "guest",
-	"members.unknown": "Unknown member",
-	"members.one": "{count} member",
-	"members.other": "{count} members",
-
-	"newChannel.title": "New channel",
-	"newChannel.name.label": "Name",
-	"newChannel.name.placeholder": "e.g. general",
-	"newChannel.topic.label": "Topic (optional)",
-	"newChannel.topic.placeholder": "What's this channel about?",
-	"newChannel.cancel": "Cancel",
-	"newChannel.create": "Create channel",
-
-	"identity.title": "Your display name",
-	"identity.label": "Display name",
-	"identity.placeholder": "How you appear to others",
-	"identity.cancel": "Cancel",
-	"identity.save": "Save",
-
-	"day.today": "Today",
-	"day.yesterday": "Yesterday",
-
-	"menu.share": "Share channel…",
-	"share.title": "Share channel",
-	"share.membersHeading": "People with access",
-	"share.you": "you",
-	"share.roleOwner": "Owner",
-	"share.roleEditor": "Can post",
-	"share.roleViewer": "Can read",
-	"share.revoke": "Remove",
-	"share.addHeading": "Add someone",
-	"share.codePlaceholder": "Paste an invite code",
-	"share.canEdit": "Can post",
-	"share.canView": "Can read",
-	"share.add": "Add",
-	"share.quickAdd": "Add a teammate",
-	"share.inviteHeading": "Your invite code",
-	"share.getCode": "Get my code",
-	"share.copy": "Copy",
-	"share.copied": "Copied",
-	"share.inviteHint": "Share this code with a teammate so an owner can add you.",
-	"share.shareFailed": "Couldn't share — check the code and try again.",
-	"share.revokeFailed": "Couldn't remove that person.",
-	"share.loadFailed": "Couldn't load members.",
-	"share.done": "Done",
-
-	"widget.label": "Chat",
-	"widget.channels.one": "{count} channel",
-	"widget.channels.other": "{count} channels",
-	"widget.empty": "No messages yet",
-	"widget.openChat": "Open Chat",
-} as const;
+export const CHAT_I18N = enCatalog as typeof enCatalog;
 
 export type ChatMessageId = keyof typeof CHAT_I18N;
 
-export const t = createT(CHAT_I18N);
+/** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
+export const LOCALE_PACK_IMPORTERS: LocalePackImporters<typeof CHAT_I18N> = {
+	es: () => import("./i18n/es.json"),
+};
 
-/** Catalog-bound plural (the sanctioned app-side plural seam). */
+let activeT: TFunction<typeof CHAT_I18N> = createT(CHAT_I18N);
+
+/** Imperative surfaces read the latest reactive `t`. */
+export function syncActiveTranslator(next: TFunction<typeof CHAT_I18N>): void {
+	activeT = next;
+}
+
+export function t(key: ChatMessageId, params?: TParams): string {
+	return activeT(key, params);
+}
+
+/** Non-React tests and standalone previews use the English manifest. */
+export const englishT = createT(CHAT_I18N);
+
 export function plural(count: number, one: ChatMessageId, other: ChatMessageId): string {
-	return sdkPlural(t, count, one, other);
+	return sdkPlural(activeT, count, one, other);
 }

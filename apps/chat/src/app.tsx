@@ -44,6 +44,7 @@ import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
 import { plural, t } from "./i18n";
+import { useChatT } from "./i18n-hooks";
 import {
 	CHANNEL_TYPE,
 	type ChatChannel,
@@ -75,32 +76,35 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
  *  once the persisted twin arrives over the reactive snapshot. */
 type Pending = { channelId: string; message: ChatMessage };
 
-const SHARE_DIALOG_LABELS: ShareDialogLabels = {
-	title: t("share.title"),
-	membersHeading: t("share.membersHeading"),
-	you: t("share.you"),
-	roleOwner: t("share.roleOwner"),
-	roleEditor: t("share.roleEditor"),
-	roleViewer: t("share.roleViewer"),
-	revoke: t("share.revoke"),
-	addHeading: t("share.addHeading"),
-	codePlaceholder: t("share.codePlaceholder"),
-	canEdit: t("share.canEdit"),
-	canView: t("share.canView"),
-	add: t("share.add"),
-	quickAddHeading: t("share.quickAdd"),
-	inviteHeading: t("share.inviteHeading"),
-	getCode: t("share.getCode"),
-	copy: t("share.copy"),
-	copied: t("share.copied"),
-	inviteHint: t("share.inviteHint"),
-	shareFailed: t("share.shareFailed"),
-	revokeFailed: t("share.revokeFailed"),
-	loadFailed: t("share.loadFailed"),
-	done: t("share.done"),
-};
+function shareDialogLabels(): ShareDialogLabels {
+	return {
+		title: t("share.title"),
+		membersHeading: t("share.membersHeading"),
+		you: t("share.you"),
+		roleOwner: t("share.roleOwner"),
+		roleEditor: t("share.roleEditor"),
+		roleViewer: t("share.roleViewer"),
+		revoke: t("share.revoke"),
+		addHeading: t("share.addHeading"),
+		codePlaceholder: t("share.codePlaceholder"),
+		canEdit: t("share.canEdit"),
+		canView: t("share.canView"),
+		add: t("share.add"),
+		quickAddHeading: t("share.quickAdd"),
+		inviteHeading: t("share.inviteHeading"),
+		getCode: t("share.getCode"),
+		copy: t("share.copy"),
+		copied: t("share.copied"),
+		inviteHint: t("share.inviteHint"),
+		shareFailed: t("share.shareFailed"),
+		revokeFailed: t("share.revokeFailed"),
+		loadFailed: t("share.loadFailed"),
+		done: t("share.done"),
+	};
+}
 
 export function ChatApp(): ReactElement {
+	useChatT();
 	const services = getBrainstorm()?.services ?? null;
 	const vaultEntities = services?.vaultEntities ?? null;
 	const entitiesSvc = services?.entities ?? null;
@@ -614,7 +618,7 @@ export function ChatApp(): ReactElement {
 					sharing={services.sharing}
 					roster={roster}
 					canManage
-					labels={SHARE_DIALOG_LABELS}
+					labels={shareDialogLabels()}
 					onClose={() => setShareOpen(false)}
 				/>
 			) : null}
