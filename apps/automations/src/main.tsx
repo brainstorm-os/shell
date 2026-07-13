@@ -6,6 +6,7 @@ import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AutomationsApp } from "./app";
+import { AutomationsI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { AutomationsWidget } from "./widget";
 
@@ -25,7 +26,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="automations">
-				<AutomationsWidget launch={widgetLaunch} />
+				<AutomationsI18nProvider>
+					<AutomationsWidget launch={widgetLaunch} />
+				</AutomationsI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -33,7 +36,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="automations">
-				<AutomationsApp />
+				<AutomationsI18nProvider>
+					<AutomationsApp />
+				</AutomationsI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);

@@ -36,6 +36,7 @@ import { useResizable } from "@brainstorm/sdk/resizable";
 import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "./i18n";
+import { useFormDesignerT } from "./i18n-hooks";
 import { toCellValue, toDbValue } from "./logic/cell-bridge";
 import {
 	DEFAULT_TARGET_TYPE,
@@ -110,6 +111,7 @@ function formsFromSnapshot(
 }
 
 export function FormDesignerApp(): ReactElement {
+	useFormDesignerT();
 	const [ready, setReady] = useState(false);
 	const [surface, setSurface] = useState<DesignerSurface>(DesignerSurface.Forms);
 	const [mode, setMode] = useState<FormMode>(FormMode.Builder);

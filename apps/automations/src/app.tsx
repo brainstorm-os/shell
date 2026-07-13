@@ -22,6 +22,7 @@ import { useVaultEntities } from "@brainstorm/react-yjs";
 import type { AutomationsHostStatus, AutomationsService, ReminderDef } from "@brainstorm/sdk-types";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type AutomationsI18nKey, t } from "./i18n";
+import { useAutomationsT } from "./i18n-hooks";
 import { type BuilderState, builderStateFromWorkflow } from "./logic/builder-model";
 import {
 	type BuilderTrigger,
@@ -114,6 +115,7 @@ type BuilderTarget =
 	  };
 
 export function AutomationsApp(): ReactElement {
+	useAutomationsT();
 	const [ready, setReady] = useState(false);
 	const [view, setView] = useState<View>(View.Workflows);
 	const [showTemplates, setShowTemplates] = useState(false);

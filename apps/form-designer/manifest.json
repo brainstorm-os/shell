@@ -21,24 +21,74 @@
         "schemaUrl": "https://brainstorm.io/schemas/form-designer/invoice/v1.json",
         "schema": {
           "type": "object",
-          "required": ["number", "issueDate", "currency", "status"],
+          "required": [
+            "number",
+            "issueDate",
+            "currency",
+            "status"
+          ],
           "properties": {
-            "number": { "type": "string" },
-            "issueDate": { "type": "string" },
-            "dueDate": { "type": ["string", "null"] },
-            "currency": { "type": "string" },
-            "from": { "type": "object" },
-            "billTo": { "type": "object" },
-            "billToRef": { "type": ["string", "null"] },
-            "lineItems": { "type": "array", "items": { "type": "object" } },
-            "taxRatePct": { "type": "number" },
-            "notes": { "type": "string" },
-            "status": { "type": "string", "enum": ["draft", "sent", "paid"] },
-            "total": { "type": "number" }
+            "number": {
+              "type": "string"
+            },
+            "issueDate": {
+              "type": "string"
+            },
+            "dueDate": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "type": "string"
+            },
+            "from": {
+              "type": "object"
+            },
+            "billTo": {
+              "type": "object"
+            },
+            "billToRef": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lineItems": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "taxRatePct": {
+              "type": "number"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "sent",
+                "paid"
+              ]
+            },
+            "total": {
+              "type": "number"
+            }
           }
         }
       }
     ]
   },
-  "entry": "dist/index.html"
+  "entry": "dist/index.html",
+  "i18n": {
+    "source": "en",
+    "locales": [
+      "en",
+      "es"
+    ]
+  }
 }

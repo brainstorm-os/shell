@@ -20,33 +20,91 @@
     "blocks.provide:io.brainstorm.books/embedded-highlight"
   ],
   "registrations": {
-    "widgets": [{ "id": "currently-reading", "name": "Currently Reading", "size": "medium" }],
+    "widgets": [
+      {
+        "id": "currently-reading",
+        "name": "Currently Reading",
+        "size": "medium"
+      }
+    ],
     "entityTypes": [
       {
         "id": "brainstorm/Book/v1",
         "schemaUrl": "https://brainstorm.io/schemas/books/book/v1.json",
         "schema": {
           "type": "object",
-          "required": ["id", "name", "format", "spineLength", "reading", "createdAt", "updatedAt"],
+          "required": [
+            "id",
+            "name",
+            "format",
+            "spineLength",
+            "reading",
+            "createdAt",
+            "updatedAt"
+          ],
           "properties": {
-            "id": { "type": "string" },
-            "name": { "type": "string" },
-            "icon": { "type": ["object", "null"] },
-            "format": { "type": "string", "enum": ["epub", "pdf"] },
-            "author": { "type": "string" },
-            "fileId": { "type": ["string", "null"] },
-            "spineLength": { "type": "number" },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "icon": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "epub",
+                "pdf"
+              ]
+            },
+            "author": {
+              "type": "string"
+            },
+            "fileId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "spineLength": {
+              "type": "number"
+            },
             "reading": {
               "type": "object",
-              "required": ["position", "progress", "lastReadAt"],
+              "required": [
+                "position",
+                "progress",
+                "lastReadAt"
+              ],
               "properties": {
-                "position": { "type": ["object", "null"] },
-                "progress": { "type": "number" },
-                "lastReadAt": { "type": ["number", "null"] }
+                "position": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "progress": {
+                  "type": "number"
+                },
+                "lastReadAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
               }
             },
-            "createdAt": { "type": "number" },
-            "updatedAt": { "type": "number" }
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            }
           }
         }
       },
@@ -55,44 +113,100 @@
         "schemaUrl": "https://brainstorm.io/schemas/books/highlight/v1.json",
         "schema": {
           "type": "object",
-          "required": ["id", "bookId", "anchor", "color", "quote", "createdAt", "updatedAt"],
+          "required": [
+            "id",
+            "bookId",
+            "anchor",
+            "color",
+            "quote",
+            "createdAt",
+            "updatedAt"
+          ],
           "properties": {
-            "id": { "type": "string" },
-            "bookId": { "type": "string" },
+            "id": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
             "anchor": {
               "type": "object",
-              "required": ["start", "end"],
+              "required": [
+                "start",
+                "end"
+              ],
               "properties": {
-                "start": { "type": "object" },
-                "end": { "type": "object" }
+                "start": {
+                  "type": "object"
+                },
+                "end": {
+                  "type": "object"
+                }
               }
             },
             "color": {
               "type": "string",
-              "enum": ["yellow", "green", "blue", "pink", "purple"]
+              "enum": [
+                "yellow",
+                "green",
+                "blue",
+                "pink",
+                "purple"
+              ]
             },
-            "quote": { "type": "string" },
-            "note": { "type": "string" },
-            "createdAt": { "type": "number" },
-            "updatedAt": { "type": "number" }
+            "quote": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            }
           }
         }
       }
     ],
     "openers": [
-      { "kind": "primary", "entityType": "brainstorm/Book/v1" },
-      { "kind": "secondary", "mime": "application/pdf" }
+      {
+        "kind": "primary",
+        "entityType": "brainstorm/Book/v1"
+      },
+      {
+        "kind": "secondary",
+        "mime": "application/pdf"
+      }
     ],
     "intents": [
-      { "verb": "open", "entityType": "brainstorm/Book/v1", "priority": "primary" },
-      { "verb": "open", "mime": "application/pdf", "priority": "secondary" }
+      {
+        "verb": "open",
+        "entityType": "brainstorm/Book/v1",
+        "priority": "primary"
+      },
+      {
+        "verb": "open",
+        "mime": "application/pdf",
+        "priority": "secondary"
+      }
     ],
     "blocks": [
       {
         "id": "io.brainstorm.books/embedded-highlight",
         "name": "Embedded highlight",
-        "entityTypes": ["brainstorm/Highlight/v1"]
+        "entityTypes": [
+          "brainstorm/Highlight/v1"
+        ]
       }
+    ]
+  },
+  "i18n": {
+    "source": "en",
+    "locales": [
+      "en",
+      "es"
     ]
   }
 }

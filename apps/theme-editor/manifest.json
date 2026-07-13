@@ -27,14 +27,39 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/theme/v1.json",
         "schema": {
           "type": "object",
-          "required": ["name", "appearance", "tokenSet", "iconPack", "typography"],
+          "required": [
+            "name",
+            "appearance",
+            "tokenSet",
+            "iconPack",
+            "typography"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "appearance": { "type": "string", "enum": ["light", "dark"] },
-            "tokenSet": { "type": "object" },
-            "iconPack": { "type": "object" },
-            "typography": { "type": "object" },
-            "stylePack": { "type": ["object", "null"] }
+            "name": {
+              "type": "string"
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ]
+            },
+            "tokenSet": {
+              "type": "object"
+            },
+            "iconPack": {
+              "type": "object"
+            },
+            "typography": {
+              "type": "object"
+            },
+            "stylePack": {
+              "type": [
+                "object",
+                "null"
+              ]
+            }
           }
         }
       },
@@ -43,11 +68,25 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/token-set/v1.json",
         "schema": {
           "type": "object",
-          "required": ["name", "appearance", "overrides"],
+          "required": [
+            "name",
+            "appearance",
+            "overrides"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "appearance": { "type": "string", "enum": ["light", "dark"] },
-            "overrides": { "type": "object" }
+            "name": {
+              "type": "string"
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ]
+            },
+            "overrides": {
+              "type": "object"
+            }
           }
         }
       },
@@ -56,11 +95,22 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/style-pack/v1.json",
         "schema": {
           "type": "object",
-          "required": ["name", "css", "mime"],
+          "required": [
+            "name",
+            "css",
+            "mime"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "css": { "type": "string" },
-            "mime": { "type": "string", "const": "text/css" }
+            "name": {
+              "type": "string"
+            },
+            "css": {
+              "type": "string"
+            },
+            "mime": {
+              "type": "string",
+              "const": "text/css"
+            }
           }
         }
       },
@@ -69,16 +119,49 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/typography/v1.json",
         "schema": {
           "type": "object",
-          "required": ["name", "scale", "fonts"],
+          "required": [
+            "name",
+            "scale",
+            "fonts"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "scale": { "type": "string", "enum": ["default", "compact", "comfortable"] },
-            "fonts": { "type": "object" }
+            "name": {
+              "type": "string"
+            },
+            "scale": {
+              "type": "string",
+              "enum": [
+                "default",
+                "compact",
+                "comfortable"
+              ]
+            },
+            "fonts": {
+              "type": "object"
+            }
           }
         }
       }
     ],
-    "openers": [{ "kind": "primary", "entityType": "brainstorm/Theme/v1" }],
-    "intents": [{ "verb": "open", "entityType": "brainstorm/Theme/v1", "priority": "primary" }]
+    "openers": [
+      {
+        "kind": "primary",
+        "entityType": "brainstorm/Theme/v1"
+      }
+    ],
+    "intents": [
+      {
+        "verb": "open",
+        "entityType": "brainstorm/Theme/v1",
+        "priority": "primary"
+      }
+    ]
+  },
+  "i18n": {
+    "source": "en",
+    "locales": [
+      "en",
+      "es"
+    ]
   }
 }

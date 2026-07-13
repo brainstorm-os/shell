@@ -45,6 +45,7 @@ import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-st
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";
+import { useBooksT } from "./i18n-hooks";
 import {
 	FILE_ENTITY_TYPE,
 	IMPORT_EXTENSIONS,
@@ -241,6 +242,7 @@ function writeInspectorPref(open: boolean): void {
 }
 
 export function BooksApp(): ReactElement {
+	useBooksT();
 	const rt = useRef<BooksRuntime | undefined>(undefined);
 	if (rt.current === undefined) rt.current = getBooksRuntime();
 	const vaultEntitiesSvc = rt.current?.services?.vaultEntities ?? null;

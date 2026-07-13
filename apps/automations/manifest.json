@@ -32,17 +32,51 @@
         "schemaUrl": "https://brainstorm.io/schemas/automations/workflow/v1.json",
         "schema": {
           "type": "object",
-          "required": ["name", "enabled", "triggerId", "steps", "capabilities"],
+          "required": [
+            "name",
+            "enabled",
+            "triggerId",
+            "steps",
+            "capabilities"
+          ],
           "properties": {
-            "name": { "type": "string" },
-            "description": { "type": "string" },
-            "icon": { "type": "string" },
-            "enabled": { "type": "boolean" },
-            "triggerId": { "type": "string" },
-            "steps": { "type": "array" },
-            "capabilities": { "type": "array", "items": { "type": "string" } },
-            "concurrency": { "type": "string", "enum": ["queue", "drop"] },
-            "tags": { "type": "array", "items": { "type": "string" } }
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "triggerId": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "array"
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "concurrency": {
+              "type": "string",
+              "enum": [
+                "queue",
+                "drop"
+              ]
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -51,7 +85,11 @@
         "schemaUrl": "https://brainstorm.io/schemas/automations/trigger/v1.json",
         "schema": {
           "type": "object",
-          "required": ["kind", "config", "enabled"],
+          "required": [
+            "kind",
+            "config",
+            "enabled"
+          ],
           "properties": {
             "kind": {
               "type": "string",
@@ -65,10 +103,18 @@
                 "startup"
               ]
             },
-            "config": { "type": "object" },
-            "enabled": { "type": "boolean" },
-            "lastFiredAt": { "type": "string" },
-            "nextFireAt": { "type": "string" }
+            "config": {
+              "type": "object"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "lastFiredAt": {
+              "type": "string"
+            },
+            "nextFireAt": {
+              "type": "string"
+            }
           }
         }
       },
@@ -77,18 +123,40 @@
         "schemaUrl": "https://brainstorm.io/schemas/automations/workflow-run/v1.json",
         "schema": {
           "type": "object",
-          "required": ["workflow", "triggeredAt", "triggeredBy", "status"],
+          "required": [
+            "workflow",
+            "triggeredAt",
+            "triggeredBy",
+            "status"
+          ],
           "properties": {
-            "workflow": { "type": "string" },
-            "triggeredAt": { "type": "string" },
-            "triggeredBy": { "type": "string" },
+            "workflow": {
+              "type": "string"
+            },
+            "triggeredAt": {
+              "type": "string"
+            },
+            "triggeredBy": {
+              "type": "string"
+            },
             "status": {
               "type": "string",
-              "enum": ["queued", "running", "succeeded", "failed", "cancelled", "timed-out"]
+              "enum": [
+                "queued",
+                "running",
+                "succeeded",
+                "failed",
+                "cancelled",
+                "timed-out"
+              ]
             },
             "stepLog": {},
-            "error": { "type": "string" },
-            "costCents": { "type": "number" }
+            "error": {
+              "type": "string"
+            },
+            "costCents": {
+              "type": "number"
+            }
           }
         }
       },
@@ -97,14 +165,29 @@
         "schemaUrl": "https://brainstorm.io/schemas/automations/reminder/v1.json",
         "schema": {
           "type": "object",
-          "required": ["subject", "dueAt"],
+          "required": [
+            "subject",
+            "dueAt"
+          ],
           "properties": {
-            "subject": { "type": "string" },
-            "target": { "type": "string" },
-            "dueAt": { "type": "string" },
-            "recurrence": { "type": "string" },
-            "snoozedUntil": { "type": "string" },
-            "completedAt": { "type": "string" }
+            "subject": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "dueAt": {
+              "type": "string"
+            },
+            "recurrence": {
+              "type": "string"
+            },
+            "snoozedUntil": {
+              "type": "string"
+            },
+            "completedAt": {
+              "type": "string"
+            }
           }
         }
       },
@@ -113,16 +196,47 @@
         "schemaUrl": "https://brainstorm.io/schemas/automations/host-designation/v1.json",
         "schema": {
           "type": "object",
-          "required": ["deviceId", "claimedAt"],
+          "required": [
+            "deviceId",
+            "claimedAt"
+          ],
           "properties": {
-            "deviceId": { "type": "string" },
-            "claimedAt": { "type": "number" }
+            "deviceId": {
+              "type": "string"
+            },
+            "claimedAt": {
+              "type": "number"
+            }
           }
         }
       }
     ],
-    "openers": [{ "kind": "primary", "entityType": "brainstorm/Workflow/v1" }],
-    "intents": [{ "verb": "open", "entityType": "brainstorm/Workflow/v1", "priority": "primary" }],
-    "widgets": [{ "id": "recent-runs", "name": "Recent Runs", "size": "medium" }]
+    "openers": [
+      {
+        "kind": "primary",
+        "entityType": "brainstorm/Workflow/v1"
+      }
+    ],
+    "intents": [
+      {
+        "verb": "open",
+        "entityType": "brainstorm/Workflow/v1",
+        "priority": "primary"
+      }
+    ],
+    "widgets": [
+      {
+        "id": "recent-runs",
+        "name": "Recent Runs",
+        "size": "medium"
+      }
+    ]
+  },
+  "i18n": {
+    "source": "en",
+    "locales": [
+      "en",
+      "es"
+    ]
   }
 }

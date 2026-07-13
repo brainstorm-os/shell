@@ -6,6 +6,7 @@ import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { FilesApp } from "./app";
+import { FilesI18nProvider } from "./i18n-provider";
 import "./styles.css";
 
 // Apply persisted panel widths BEFORE React renders, so the first paint
@@ -30,7 +31,9 @@ mountMenuHost();
 createRoot(root).render(
 	<StrictMode>
 		<AppErrorBoundary appName="files">
-			<FilesApp />
+			<FilesI18nProvider>
+				<FilesApp />
+			</FilesI18nProvider>
 		</AppErrorBoundary>
 	</StrictMode>,
 );

@@ -22,6 +22,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
+import { useMailboxT } from "./i18n-hooks";
 import { messageDateLabel } from "./logic/format";
 import { getBrainstorm } from "./runtime";
 import { EMAIL_TYPE_URL } from "./types/mail-view";
@@ -117,6 +118,7 @@ function InboxList({
 }
 
 export function MailboxWidget({ launch }: { launch: WidgetLaunch }) {
+	useMailboxT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

@@ -25,6 +25,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
+import { useAutomationsT } from "./i18n-hooks";
 import { getBrainstorm } from "./storage/runtime";
 import {
 	AUTOMATIONS_WIDGET_QUERY,
@@ -142,6 +143,7 @@ function RecentRuns({ runs, failedCount }: { runs: WidgetRun[]; failedCount: num
 }
 
 export function AutomationsWidget({ launch }: { launch: WidgetLaunch }) {
+	useAutomationsT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

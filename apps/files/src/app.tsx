@@ -44,6 +44,7 @@ import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
 import { useShortcut } from "@brainstorm/sdk/shortcut";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { type TranslationKey, t } from "./i18n";
+import { useFilesT } from "./i18n-hooks";
 import { orderedSelection } from "./logic/bulk";
 import { bulkRenamePlanAvoiding } from "./logic/bulk-rename";
 import { destinationFolders } from "./logic/destination-folders";
@@ -140,6 +141,7 @@ function folderContextFor(store: FilesStore, entity: Entity): Record<string, unk
 }
 
 export function FilesApp() {
+	useFilesT();
 	const store = useFilesStore();
 	const runtime = typeof window !== "undefined" ? window.brainstorm : undefined;
 

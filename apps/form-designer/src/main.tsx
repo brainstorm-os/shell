@@ -6,6 +6,7 @@ import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { FormDesignerApp } from "./app";
+import { FormDesignerI18nProvider } from "./i18n-provider";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -22,7 +23,9 @@ mountMenuHost();
 createRoot(root).render(
 	<StrictMode>
 		<AppErrorBoundary appName="form-designer">
-			<FormDesignerApp />
+			<FormDesignerI18nProvider>
+				<FormDesignerApp />
+			</FormDesignerI18nProvider>
 		</AppErrorBoundary>
 	</StrictMode>,
 );

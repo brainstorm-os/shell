@@ -17,6 +17,7 @@ import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "./i18n";
+import { useMailboxT } from "./i18n-hooks";
 import {
 	type ComposeSeed,
 	emptySeed,
@@ -59,6 +60,7 @@ function withFlag(flags: MailFlag[], flag: MailFlag, on: boolean): MailFlag[] {
 }
 
 export function MailboxApp(): ReactElement {
+	useMailboxT();
 	const rt = getBrainstorm();
 	const vaultEntitiesSvc = rt?.services?.vaultEntities ?? null;
 	const entitiesSvc = rt?.services?.entities ?? null;

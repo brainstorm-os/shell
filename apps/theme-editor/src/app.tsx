@@ -49,6 +49,7 @@ import {
 	useState,
 } from "react";
 import { type ThemeEditorI18nKey, t } from "./i18n";
+import { useThemeEditorT } from "./i18n-hooks";
 import {
 	appearanceOfTheme,
 	baseVarsForTheme,
@@ -154,6 +155,7 @@ function entitiesService(): EntitiesService | null {
 }
 
 export function ThemeEditorApp(): ReactElement {
+	useThemeEditorT();
 	const [ready, setReady] = useState(false);
 	const [baseTheme, setBaseTheme] = useState<ThemeName>(ThemeName.DefaultDark);
 	const [theme, setTheme] = useState<ThemeDef>(() => forkComposite(ThemeName.DefaultDark, ""));

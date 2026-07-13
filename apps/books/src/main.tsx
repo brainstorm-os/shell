@@ -7,6 +7,7 @@ import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BooksApp } from "./app";
+import { BooksI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { BooksWidget } from "./widget";
 
@@ -26,7 +27,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="books">
-				<BooksWidget launch={widgetLaunch} />
+				<BooksI18nProvider>
+					<BooksWidget launch={widgetLaunch} />
+				</BooksI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -34,7 +37,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="books">
-				<BooksApp />
+				<BooksI18nProvider>
+					<BooksApp />
+				</BooksI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);

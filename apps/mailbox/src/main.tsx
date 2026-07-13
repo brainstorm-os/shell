@@ -6,6 +6,7 @@ import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { getWidgetLaunch } from "@brainstorm/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { MailboxApp } from "./app";
+import { MailboxI18nProvider } from "./i18n-provider";
 import "./styles.css";
 import { MailboxWidget } from "./widget";
 
@@ -25,13 +26,17 @@ const widgetLaunch = getWidgetLaunch();
 if (widgetLaunch) {
 	createRoot(root).render(
 		<AppErrorBoundary appName="mailbox">
-			<MailboxWidget launch={widgetLaunch} />
+			<MailboxI18nProvider>
+				<MailboxWidget launch={widgetLaunch} />
+			</MailboxI18nProvider>
 		</AppErrorBoundary>,
 	);
 } else {
 	createRoot(root).render(
 		<AppErrorBoundary appName="mailbox">
-			<MailboxApp />
+			<MailboxI18nProvider>
+				<MailboxApp />
+			</MailboxI18nProvider>
 		</AppErrorBoundary>,
 	);
 }

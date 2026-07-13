@@ -5,124 +5,38 @@
  * no ICU) — no bare literals.
  */
 
-import { createT } from "@brainstorm/sdk/i18n";
+import {
+	type LocalePackImporters,
+	type TFunction,
+	type TParams,
+	createT,
+	plural as sdkPlural,
+} from "@brainstorm/sdk/i18n";
+import enCatalog from "./i18n/en.json";
 
-export const FORM_DESIGNER_I18N = {
-	"app.title": "Form Designer",
-	"app.moreActions": "More actions",
-
-	"sidebar.region": "Saved forms",
-	"sidebar.resize": "Resize form list",
-	"sidebar.newForm": "New form",
-	"sidebar.empty": "No forms yet — create one to collect entities.",
-	"sidebar.untitled": "Untitled form",
-	"sidebar.itemActions": "Form actions",
-	"sidebar.delete": "Delete form",
-
-	"delete.confirm.title": "Delete form?",
-	"delete.confirm.body": "Delete the form “{name}”? This can't be undone.",
-	"delete.confirm.cancel": "Cancel",
-	"delete.confirm.confirm": "Delete",
-
-	"mode.builder": "Builder",
-	"mode.fill": "Fill",
-	"mode.region": "Form mode",
-
-	"builder.nameLabel": "Form name",
-	"builder.namePlaceholder": "Name this form…",
-	"builder.targetLabel": "Creates entities of type",
-	"builder.targetPlaceholder": "Entity type URL (e.g. brainstorm/Object/v1)",
-	"builder.targetSelectLabel": "Target entity type",
-	"builder.targetCustom": "Custom type…",
-	"builder.fieldsLegend": "Fields",
-	"builder.fieldsEmpty": "No fields yet — add a property to collect.",
-	"builder.addField": "Add field",
-	"builder.addFieldHint": "Pick a property to add as a field",
-	"builder.fieldLabelPlaceholder": "Label (optional)",
-	"builder.fieldLabelAria": "Label for {name}",
-	"builder.moveUp": "Move {name} up",
-	"builder.moveDown": "Move {name} down",
-	"builder.dragHint": "Drag to reorder {name}",
-	"builder.removeField": "Remove {name}",
-	"builder.noProperties": "No properties in this vault yet — define some first.",
-
-	"fill.heading": "Fill: {name}",
-	"fill.empty": "This form has no fields yet — switch to the builder to add some.",
-	"fill.create": "Create",
-	"fill.creating": "Creating…",
-	"fill.selectForm": "Select a form on the left, or create one in the builder.",
-	"fill.required": "Required",
-	"fill.fieldRequired": "{name} is required.",
-
-	"action.save": "Save form",
-
-	"status.ready": "Ready.",
-	"status.newForm": "New form — name it, pick a type, add fields.",
-	"status.loaded": "Loaded form.",
-	"status.saving": "Saving…",
-	"status.saved": "Form saved.",
-	"status.saveFailed": "Could not save the form.",
-	"status.needsName": "Name the form before saving.",
-	"status.needsFields": "Add at least one field before saving.",
-	"status.offline": "Running outside the shell — changes are in-memory only.",
-	"status.created": "Created a new {type}.",
-	"status.createFailed": "Could not create the entity.",
-	"status.needsFill": "Fill in the required fields before creating.",
-	"status.deleted": "Form deleted.",
-	"status.deleteFailed": "Could not delete the form.",
-
-	"surface.forms": "Forms",
-	"surface.documents": "Documents",
-	"surface.region": "Designer surface",
-
-	"invoices.region": "Invoices",
-	"invoices.title": "Invoices",
-	"invoices.new": "New invoice",
-	"invoices.empty": "No invoices yet — create one to bill a client.",
-	"invoices.resize": "Resize invoice list",
-	"invoices.itemActions": "Invoice actions",
-	"invoices.delete": "Delete invoice",
-	"invoices.deleteConfirm.title": "Delete invoice?",
-	"invoices.deleteConfirm.body": "Delete invoice “{number}”? This can't be undone.",
-
-	"invoice.documentTitle": "Invoice",
-	"invoice.numberLabel": "Invoice number",
-	"invoice.issueDate": "Issue date",
-	"invoice.dueDate": "Due date",
-	"invoice.currency": "Currency",
-	"invoice.status": "Status",
-	"invoice.status.draft": "Draft",
-	"invoice.status.sent": "Sent",
-	"invoice.status.paid": "Paid",
-	"invoice.from": "From",
-	"invoice.billTo": "Bill to",
-	"invoice.party.name": "Name",
-	"invoice.party.address": "Address",
-	"invoice.party.email": "Email",
-	"invoice.lineItems": "Line items",
-	"invoice.item.description": "Description",
-	"invoice.item.descriptionPlaceholder": "What are you billing for?",
-	"invoice.item.qty": "Qty",
-	"invoice.item.unitPrice": "Unit price",
-	"invoice.item.amount": "Amount",
-	"invoice.item.add": "Add line",
-	"invoice.item.remove": "Remove line",
-	"invoice.tax": "Tax rate (%)",
-	"invoice.notes": "Notes",
-	"invoice.notesPlaceholder": "Payment terms, thank-you…",
-	"invoice.subtotal": "Subtotal",
-	"invoice.total": "Total",
-	"invoice.preview": "Preview",
-	"invoice.exportPdf": "Export PDF",
-	"invoice.exportFilter": "PDF document",
-
-	"invoice.status.exported": "Invoice saved as {name}.",
-	"invoice.status.exportCancelled": "Export cancelled.",
-	"invoice.status.exportFailed": "Could not export the invoice.",
-	"invoice.status.created": "New invoice ready — fill in the details.",
-	"invoice.status.offline": "Running outside the shell — PDF export needs the app.",
-} as const;
+export const FORM_DESIGNER_I18N = enCatalog as typeof enCatalog;
 
 export type FormDesignerI18nKey = keyof typeof FORM_DESIGNER_I18N;
 
-export const t = createT(FORM_DESIGNER_I18N);
+/** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
+export const LOCALE_PACK_IMPORTERS: LocalePackImporters<typeof FORM_DESIGNER_I18N> = {
+	es: () => import("./i18n/es.json"),
+};
+
+let activeT: TFunction<typeof FORM_DESIGNER_I18N> = createT(FORM_DESIGNER_I18N);
+
+/** Imperative surfaces read the latest reactive `t`. */
+export function syncActiveTranslator(next: TFunction<typeof FORM_DESIGNER_I18N>): void {
+	activeT = next;
+}
+
+export function t(key: FormDesignerI18nKey, params?: TParams): string {
+	return activeT(key, params);
+}
+
+/** Non-React tests and standalone previews use the English manifest. */
+export const englishT = createT(FORM_DESIGNER_I18N);
+
+export function plural(count: number, one: FormDesignerI18nKey, other: FormDesignerI18nKey): string {
+	return sdkPlural(activeT, count, one, other);
+}

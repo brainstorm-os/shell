@@ -5,135 +5,41 @@
  * `{name}` interpolation only — NO ICU (the app doesn't bundle a formatter).
  */
 
-import { type TParams, createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import {
+	type LocalePackImporters,
+	type TFunction,
+	type TParams,
+	createT,
+	plural as sdkPlural,
+} from "@brainstorm/sdk/i18n";
+import enCatalog from "./i18n/en.json";
 
-export const BOOKS_I18N = {
-	"app.title": "Books",
-	"reader.previewBadge": "Preview",
-	"reader.prevPage": "Previous page",
-	"reader.nextPage": "Next page",
-	"reader.pageStatus": "Page {page} of {total}",
-	"reader.pageStatusSpread": "Pages {from}–{to} of {total}",
-	"reader.progress": "{percent}% read",
-	"reader.smaller": "Smaller text",
-	"reader.larger": "Larger text",
-	"reader.empty": "No book open.",
-	"reader.loading": "Opening book…",
-	"reader.loadFailed": "Couldn't open this book's file.",
-	"reader.none": "Select a book from the library.",
-	"reader.emptyLibraryTitle": "Nothing to read yet",
-	"reader.emptyLibraryHint": "Import a book from the library to start reading.",
-	"reader.epubPendingTitle": "EPUB reading isn't built yet",
-	"reader.epubPending": "This book will open once the EPUB reader lands.",
-	"library.title": "Library",
-	"library.show": "Show library",
-	"library.hide": "Hide library",
-	"library.search": "Search books",
-	"library.searchClear": "Clear search",
-	"library.section.today": "Today",
-	"library.section.yesterday": "Yesterday",
-	"library.section.last7": "Previous 7 days",
-	"library.section.last30": "Previous 30 days",
-	"library.section.notStarted": "Not started",
-	"library.count.one": "{count} book",
-	"library.count.other": "{count} books",
-	"library.rowProgress": "{percent}%",
-	"library.empty": "No books yet",
-	"library.emptyHint": "Import a PDF or EPUB to start your library.",
-	"library.noResults": "No books match your search.",
-	"library.openSample": "Open the sample book",
-	"library.sampleName": "Sample book",
-	"library.importBook": "Import a book",
-	"import.dialogTitle": "Import a book",
-	"import.fileKind": "Books (PDF, EPUB)",
-	"import.failed": "Couldn't import {name}.",
-	"import.unavailable":
-		"Importing isn't available — fully quit and relaunch the app, then reopen Books.",
-	"import.pickerFailed": "Couldn't open the file picker. Try again.",
-	"import.dismiss": "Dismiss",
-	"inspector.show": "Show book info",
-	"inspector.hide": "Hide book info",
-	"inspector.title": "Book",
-	"toc.title": "Contents",
-	"toc.empty": "No table of contents.",
-	"prop.author": "Author",
-	"prop.format": "Format",
-	"prop.format.pdf": "PDF",
-	"prop.format.epub": "EPUB",
-	"prop.pages": "Pages",
-	"prop.progress": "Progress",
-	"meta.lastRead": "Last read",
-	"meta.added": "Added",
-	"meta.never": "Never",
-	"widget.label": "Reading",
-	"widget.inProgress.one": "{count} in progress",
-	"widget.inProgress.other": "{count} in progress",
-	"widget.finished": "Finished",
-	"widget.openBooks": "Open Books",
-	"menu.more": "More actions",
-	"menu.remove": "Remove from library",
-	"typography.open": "Typography",
-	"typography.title": "Typography",
-	"typography.close": "Close typography",
-	"typography.family": "Font",
-	"typography.family.system": "System",
-	"typography.family.serif": "Serif",
-	"typography.family.sans": "Sans",
-	"typography.family.mono": "Mono",
-	"typography.size": "Size",
-	"typography.leading": "Line spacing",
-	"typography.measure": "Width",
-	"typography.measureValue": "{count} ch",
-	"typography.themeLabel": "Page theme",
-	"typography.theme.app": "Match app",
-	"typography.theme.light": "Light",
-	"typography.theme.sepia": "Sepia",
-	"typography.theme.dark": "Dark",
-	"typography.increase": "Increase {label}",
-	"typography.decrease": "Decrease {label}",
-	"pdf.view.open": "View",
-	"pdf.view.title": "View",
-	"pdf.view.close": "Close view options",
-	"pdf.zoom": "Zoom",
-	"pdf.tintLabel": "Page tint",
-	"pdf.tint.light": "Light",
-	"pdf.tint.sepia": "Sepia",
-	"pdf.tint.dark": "Dark",
-	"highlight.create": "Highlight",
-	"highlight.closeMenu": "Close highlight menu",
-	"highlight.menuHint": "Pick a colour to highlight the selection.",
-	"highlight.add": "Add highlight",
-	"highlight.cancel": "Cancel",
-	"highlight.selectedText": "Selected text",
-	"highlight.colorLabel": "Highlight colour",
-	"highlight.color.yellow": "Yellow",
-	"highlight.color.green": "Green",
-	"highlight.color.blue": "Blue",
-	"highlight.color.pink": "Pink",
-	"highlight.color.purple": "Purple",
-	"highlight.addNote": "Add note",
-	"highlight.notePlaceholder": "Add a note…",
-	"highlight.saveNote": "Save note",
-	"highlight.remove": "Remove highlight",
-	"highlight.panel.open": "Highlights",
-	"highlight.panel.close": "Close highlights",
-	"highlight.panel.title": "Highlights",
-	"highlight.panel.empty": "No highlights yet. Select text to create one.",
-	"highlight.panel.one": "{count} highlight",
-	"highlight.panel.other": "{count} highlights",
-	"highlight.goTo": "Go to highlight",
-	"highlight.noteSaved": "Note",
-} as const;
+export const BOOKS_I18N = enCatalog as typeof enCatalog;
 
 export type BooksI18nKey = keyof typeof BOOKS_I18N;
 
-export const t = createT(BOOKS_I18N);
+/** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
+export const LOCALE_PACK_IMPORTERS: LocalePackImporters<typeof BOOKS_I18N> = {
+	es: () => import("./i18n/es.json"),
+};
 
-/** Catalog-bound plural — picks `<base>.one` / `<base>.other`. The count
- *  selection lives in the shared SDK helper, not in component code. */
+let activeT: TFunction<typeof BOOKS_I18N> = createT(BOOKS_I18N);
+
+/** Imperative surfaces read the latest reactive `t`. */
+export function syncActiveTranslator(next: TFunction<typeof BOOKS_I18N>): void {
+	activeT = next;
+}
+
+export function t(key: BooksI18nKey, params?: TParams): string {
+	return activeT(key, params);
+}
+
+/** Non-React tests and standalone previews use the English manifest. */
+export const englishT = createT(BOOKS_I18N);
+
 export const plural = (
 	count: number,
 	oneKey: BooksI18nKey,
 	otherKey: BooksI18nKey,
 	params?: TParams,
-): string => sdkPlural(t, count, oneKey, otherKey, params);
+): string => sdkPlural(activeT, count, oneKey, otherKey, params);

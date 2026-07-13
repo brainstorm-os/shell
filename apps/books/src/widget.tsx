@@ -22,6 +22,7 @@ import {
 } from "@brainstorm/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
+import { useBooksT } from "./i18n-hooks";
 import { getBooksRuntime } from "./runtime";
 import { BOOK_ENTITY_TYPE } from "./types/book";
 import {
@@ -106,6 +107,7 @@ function ReadingList({ books, inProgressCount }: { books: WidgetBook[]; inProgre
 }
 
 export function BooksWidget({ launch }: { launch: WidgetLaunch }) {
+	useBooksT();
 	const runtime = getBooksRuntime();
 	// Host-driven pause: a scrolled-off widget stops re-rendering.
 	useWidgetVisible();
