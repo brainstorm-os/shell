@@ -8,10 +8,6 @@ export function useBooksT(runtime?: LocaleRuntime | null): TFunction<typeof BOOK
 
 export function useBooksPlural(runtime?: LocaleRuntime | null) {
 	const translate = useBooksT(runtime);
-	return (
-		count: number,
-		oneKey: BooksI18nKey,
-		otherKey: BooksI18nKey,
-		params?: TParams,
-	): string => sdkPlural(translate, count, oneKey, otherKey, params);
+	return (count: number, oneKey: BooksI18nKey, otherKey: BooksI18nKey, params?: TParams): string =>
+		sdkPlural(translate, count, oneKey, otherKey, params);
 }

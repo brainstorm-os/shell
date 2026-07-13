@@ -1,8 +1,10 @@
 import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
 import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
-import { THEME_EDITOR_I18N, type ThemeEditorI18nKey, LOCALE_PACK_IMPORTERS } from "./i18n";
+import { LOCALE_PACK_IMPORTERS, THEME_EDITOR_I18N, type ThemeEditorI18nKey } from "./i18n";
 
-export function useThemeEditorT(runtime?: LocaleRuntime | null): TFunction<typeof THEME_EDITOR_I18N> {
+export function useThemeEditorT(
+	runtime?: LocaleRuntime | null,
+): TFunction<typeof THEME_EDITOR_I18N> {
 	return useLocalePackT(THEME_EDITOR_I18N, LOCALE_PACK_IMPORTERS, runtime);
 }
 

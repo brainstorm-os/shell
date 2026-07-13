@@ -3,6 +3,100 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.2",
+      "date": "2026-07-13",
+      "icon": "👥",
+      "title": "Presence on canvas",
+      "summary": "Graph now shows live collaborator cursors and selection rings on shared boards; Database joins the presence fleet. Twelve apps ship Spanish UI overlays when you switch language in Settings.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Presence completion"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — on a shared graph, you now see collaborators' "
+            },
+            {
+              "text": "cursors and selection rings",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " move live on the canvas, the same way Whiteboard already worked."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the header now shows the "
+            },
+            {
+              "text": "avatar stack",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " when others are viewing the same record, completing the fleet-wide presence rollout."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Localization"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Apps",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — switching to Spanish in "
+            },
+            {
+              "text": "Settings → Language",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " now updates chrome in twelve apps live (no restart): Code editor, Browser, Preview, Chat, Agent, Contacts, Mailbox, Books, Theme editor, Form designer, Automations, and Files."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.1",
       "date": "2026-07-13",
       "icon": "👥",

@@ -1,6 +1,6 @@
 import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
 import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
-import { MAILBOX_I18N, type MailboxI18nKey, LOCALE_PACK_IMPORTERS } from "./i18n";
+import { LOCALE_PACK_IMPORTERS, MAILBOX_I18N, type MailboxI18nKey } from "./i18n";
 
 export function useMailboxT(runtime?: LocaleRuntime | null): TFunction<typeof MAILBOX_I18N> {
 	return useLocalePackT(MAILBOX_I18N, LOCALE_PACK_IMPORTERS, runtime);

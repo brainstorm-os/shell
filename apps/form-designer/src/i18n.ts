@@ -37,6 +37,10 @@ export function t(key: FormDesignerI18nKey, params?: TParams): string {
 /** Non-React tests and standalone previews use the English manifest. */
 export const englishT = createT(FORM_DESIGNER_I18N);
 
-export function plural(count: number, one: FormDesignerI18nKey, other: FormDesignerI18nKey): string {
+export function plural(
+	count: number,
+	one: FormDesignerI18nKey,
+	other: FormDesignerI18nKey,
+): string {
 	return sdkPlural(activeT, count, one, other);
 }

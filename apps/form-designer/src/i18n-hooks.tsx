@@ -2,7 +2,9 @@ import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/s
 import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
 import { FORM_DESIGNER_I18N, type FormDesignerI18nKey, LOCALE_PACK_IMPORTERS } from "./i18n";
 
-export function useFormDesignerT(runtime?: LocaleRuntime | null): TFunction<typeof FORM_DESIGNER_I18N> {
+export function useFormDesignerT(
+	runtime?: LocaleRuntime | null,
+): TFunction<typeof FORM_DESIGNER_I18N> {
 	return useLocalePackT(FORM_DESIGNER_I18N, LOCALE_PACK_IMPORTERS, runtime);
 }
 
