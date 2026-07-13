@@ -136,6 +136,14 @@ export class PresenceRouter {
 		this.#manager.applyInbound(entityId, awarenessUpdate);
 	}
 
+	/** Dev/dogfood introspection — the merged remote peer states for an entity. */
+	remotePeerSnapshots(entityId: string): readonly PresencePeer[] {
+		return [...this.#manager.remoteStates(entityId)].map(([clientId, state]) => ({
+			clientId,
+			state,
+		}));
+	}
+
 	dispose(): void {
 		if (this.#disposed) return;
 		this.#disposed = true;

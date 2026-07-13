@@ -69,6 +69,8 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { PanelSide, panelToggleIcon } from "@brainstorm/sdk/panel-toggle";
 import { createAddIconGlyph } from "@brainstorm/sdk/picker-host";
+import "@brainstorm/sdk/presence-stack.css";
+import { renderPresenceHeader } from "@brainstorm/sdk/presence-stack";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/property-ui";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
 import { attachShortcut } from "@brainstorm/sdk/shortcut";
@@ -984,6 +986,11 @@ function viewKindIcon(kind: ListViewKind): DatabaseIcon {
 function renderStageHeader(state: AppState): void {
 	const list = activeList(state);
 	const view = activeView(state);
+	const presenceHost = document.getElementById("header-presence");
+	if (presenceHost) {
+		presenceHost.hidden = false;
+		renderPresenceHeader(presenceHost, list?.id ?? null, COLLECTION_TYPE_URL);
+	}
 	if (!list || !view) return;
 	const iconHost = document.getElementById("stage-icon");
 	if (iconHost) {

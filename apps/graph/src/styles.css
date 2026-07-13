@@ -831,6 +831,51 @@ body.is-resizing .graph-sidebar__resize {
 	outline-offset: -2px;
 }
 
+/* PRES-3d — remote cursors + selection rings (screen-space overlay). */
+.graph__presence {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+	z-index: 4;
+}
+
+.graph__presence-cursor {
+	position: absolute;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-0_5);
+	transform: translate(0, 0);
+}
+
+.graph__presence-pointer {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+.graph__presence-name {
+	margin-top: var(--space-3);
+	padding: var(--space-0_5);
+	border-radius: var(--radius-md);
+	color: #ffffff;
+	font-size: var(--text-size-xs);
+	line-height: 1.5;
+	white-space: nowrap;
+	max-width: 160px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.graph__presence-selection {
+	position: absolute;
+	border: var(--border-width-thick) solid;
+	border-radius: 999px;
+	opacity: 0.85;
+	box-sizing: border-box;
+}
+
 /* The keyboard-focus announcement target's sr-only clip is applied inline by
  * the shared `attachLiveRegion` (@brainstorm/sdk/a11y) — no rule needed here. */
 

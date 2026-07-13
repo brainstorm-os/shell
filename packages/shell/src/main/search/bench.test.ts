@@ -21,10 +21,22 @@ import {
 	formatBenchReport,
 	makeFts5Engine,
 	makeVectorEngine,
+	parseBenchOptions,
 	runBench,
 	summarize,
 } from "./bench";
 import { BenchQueryKind, buildBenchQueries } from "./bench-corpus";
+
+describe("parseBenchOptions", () => {
+	it("accepts numeric fields and rejects invalid size", () => {
+		expect(parseBenchOptions({ seed: 1, size: 100, runsPerQuery: 3 })).toEqual({
+			seed: 1,
+			size: 100,
+			runsPerQuery: 3,
+		});
+		expect(parseBenchOptions({ seed: 1, size: 0 })).toBeNull();
+	});
+});
 
 /* ── summarize() ─────────────────────────────────────────────────────── */
 

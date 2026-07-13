@@ -37,7 +37,7 @@
 
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { type SqliteDatabase, open } from "../storage/sqlite";
+import { type SqliteDatabase, open, openWithVecExtension } from "../storage/sqlite";
 import {
 	type BenchQuery,
 	type BenchQueryKind,
@@ -46,7 +46,7 @@ import {
 } from "./bench-corpus";
 import { EMBEDDING_DIM, StubEmbedder, type TextEmbedder } from "./embedder";
 import { type IndexableEntity, type SearchHit, SearchIndexer } from "./search-indexer";
-import { VectorIndexer } from "./vector-indexer";
+import { VectorIndexer, createVectorIndexer } from "./vector-indexer";
 import { InMemoryVectorStore, type VectorStore } from "./vector-store";
 
 /** The minimal engine surface the bench drives. Two implementations are
@@ -251,6 +251,53 @@ export async function makeFts5Engine(dbPath = ":memory:"): Promise<BenchEngine> 
  * change. Embedding the corpus is part of the timed build, exactly as it
  * will be in production.
  */
+/**
+ * sqlite-vec ANN engine adapter — the production vector backend on disk.
+ * Returns `null` when `better-sqlite3` or `sqlite-vec` can't load (Bun's
+ * test sqlite, or a platform missing the prebuilt binary). Uses the same
+ * `StubEmbedder` as `makeVectorEngine` so numbers stay comparable; 11.3's
+ * `FastembedEmbedder` slots in via the `embedder` option.
+ */
+export async function makeSqliteVecEngine(
+	dbPath = ":memory:",
+	opts?: { embedder?: TextEmbedder },
+): Promise<BenchEngine | null> {
+	const db = await openWithVecExtension(dbPath);
+	if (!db) return null;
+	const embedder = opts?.embedder ?? new StubEmbedder();
+	const built = createVectorIndexer(db, embedder);
+	if (!built) {
+		db.close();
+		return null;
+	}
+	const indexer = built.indexer;
+	return {
+		name: "vector-sqlite-vec",
+		async indexAll(entities) {
+			await indexer.rebuild(entities);
+		},
+		async query(q, limit) {
+			const hits = await indexer.query(q.text, limit, q.types);
+			return hits.map((h) => ({
+				entityId: h.entityId,
+				type: h.type,
+				ownerAppId: h.ownerAppId,
+				title: "",
+				snippet: "",
+				score: h.distance,
+				updatedAt: h.updatedAt,
+			}));
+		},
+		diskBytes() {
+			return sqliteDiskBytes(db);
+		},
+		async dispose() {
+			indexer.dispose();
+			db.close();
+		},
+	};
+}
+
 export function makeVectorEngine(opts?: {
 	store?: VectorStore;
 	embedder?: TextEmbedder;
@@ -315,6 +362,128 @@ export function formatBenchReport(report: BenchReport): string {
 			`[${b.indexBuildPerEntityMs.passes ? "PASS" : "FAIL"}]`,
 	);
 	return lines.join("\n");
+}
+
+/** `page_count * page_size` for a bench DB — mirrors `SearchIndexer.stats().bytes`. */
+export type VecRecallQueryResult = {
+	kind: BenchQueryKind;
+	recallAtK: number;
+	exactMatch: boolean;
+};
+
+export type VecRecallReport = {
+	corpus: { seed: number; size: number };
+	k: number;
+	queries: VecRecallQueryResult[];
+	minRecall: number;
+};
+
+/** Compare sqlite-vec ANN top-k against the in-memory brute-force reference.
+ *  Returns `null` when the production backend can't load. */
+export async function measureVecRecallParity(opts: {
+	seed: number;
+	size: number;
+	k?: number;
+}): Promise<VecRecallReport | null> {
+	const k = opts.k ?? 20;
+	const embedder = new StubEmbedder();
+	const corpus = makeBenchCorpus({ seed: opts.seed, size: opts.size });
+	const memory = new InMemoryVectorStore(embedder.dim);
+	const memoryIndexer = new VectorIndexer(memory, embedder);
+	await memoryIndexer.rebuild(corpus);
+
+	const db = await openWithVecExtension(":memory:");
+	if (!db) return null;
+	const built = createVectorIndexer(db, embedder);
+	if (!built) {
+		db.close();
+		return null;
+	}
+	const vecIndexer = built.indexer;
+	await vecIndexer.rebuild(corpus);
+
+	const queries: VecRecallQueryResult[] = [];
+	for (const q of buildBenchQueries()) {
+		const ref = await memoryIndexer.query(q.text, k, q.types);
+		const ann = await vecIndexer.query(q.text, k, q.types);
+		const refIds = ref.map((h) => h.entityId);
+		const annIds = ann.map((h) => h.entityId);
+		queries.push({
+			kind: q.kind,
+			recallAtK: recallAtK(refIds, annIds, k),
+			exactMatch: refIds.length === annIds.length && refIds.every((id, i) => id === annIds[i]),
+		});
+	}
+
+	vecIndexer.dispose();
+	db.close();
+
+	const minRecall = queries.reduce((min, q) => Math.min(min, q.recallAtK), 1);
+	return { corpus: { seed: opts.seed, size: opts.size }, k, queries, minRecall };
+}
+
+function recallAtK(ref: readonly string[], ann: readonly string[], k: number): number {
+	const refK = ref.slice(0, k);
+	if (refK.length === 0) return 1;
+	const annSet = new Set(ann.slice(0, k));
+	let hit = 0;
+	for (const id of refK) {
+		if (annSet.has(id)) hit += 1;
+	}
+	return hit / refK.length;
+}
+
+/** Validate bench options from an IPC payload — keeps the dev handler thin. */
+export function parseBenchOptions(raw: unknown): BenchOptions | null {
+	if (!raw || typeof raw !== "object") return null;
+	const o = raw as Record<string, unknown>;
+	const seed = typeof o.seed === "number" ? o.seed : Number.parseInt(String(o.seed ?? ""), 10);
+	const size = typeof o.size === "number" ? o.size : Number.parseInt(String(o.size ?? ""), 10);
+	if (!Number.isFinite(seed) || !Number.isFinite(size) || size <= 0) return null;
+	const runsPerQuery =
+		typeof o.runsPerQuery === "number"
+			? o.runsPerQuery
+			: o.runsPerQuery !== undefined
+				? Number.parseInt(String(o.runsPerQuery), 10)
+				: undefined;
+	const warmupRuns =
+		typeof o.warmupRuns === "number"
+			? o.warmupRuns
+			: o.warmupRuns !== undefined
+				? Number.parseInt(String(o.warmupRuns), 10)
+				: undefined;
+	const limit =
+		typeof o.limit === "number"
+			? o.limit
+			: o.limit !== undefined
+				? Number.parseInt(String(o.limit), 10)
+				: undefined;
+	return {
+		seed,
+		size,
+		...(Number.isFinite(runsPerQuery) ? { runsPerQuery: runsPerQuery as number } : {}),
+		...(Number.isFinite(warmupRuns) ? { warmupRuns: warmupRuns as number } : {}),
+		...(Number.isFinite(limit) ? { limit: limit as number } : {}),
+	};
+}
+
+export function sqliteDiskBytes(db: SqliteDatabase): number {
+	try {
+		const pages = readPragmaNumber(db.pragma("page_count"));
+		const size = readPragmaNumber(db.pragma("page_size"));
+		return pages > 0 && size > 0 ? pages * size : 0;
+	} catch {
+		return 0;
+	}
+}
+
+function readPragmaNumber(result: unknown): number {
+	let value: unknown = result;
+	if (Array.isArray(value)) value = value[0];
+	if (value && typeof value === "object") {
+		value = Object.values(value as Record<string, unknown>)[0];
+	}
+	return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 /** A monotonic-clock millisecond timestamp. Prefers `performance.now()`

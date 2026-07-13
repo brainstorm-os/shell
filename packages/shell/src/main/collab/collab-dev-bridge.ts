@@ -23,6 +23,8 @@
 import * as Y from "yjs";
 import { decodeFrame } from "../sync/envelope-codec";
 import { receiveAndApply, receiveWrapBootstrap } from "../sync/envelope-pipeline";
+import { getLiveSyncEngine } from "../sync/live-sync-wiring";
+import { getPresenceRouter } from "../sync/presence-wiring";
 import { WireKind } from "../sync/routing-header";
 import type { VaultSession } from "../vault/session";
 import { type AccessRole, isAccessRole } from "./access-record";
@@ -116,6 +118,7 @@ export class CollabDevBridge {
 			relay.onFrame(listener);
 			this.#receiver = listener;
 		}
+		void getLiveSyncEngine()?.trackOpen(entityId, type);
 	}
 
 	/** Owner-side share — delegates to the engine. */
@@ -125,7 +128,9 @@ export class CollabDevBridge {
 		invite: ShareInvite;
 		role: AccessRole;
 	}): Promise<CollabAccessView[]> {
-		return this.#engine.share(opts);
+		const members = await this.#engine.share(opts);
+		void getLiveSyncEngine()?.refreshMembership(opts.entityId, opts.type);
+		return members;
 	}
 
 	/** Owner-side collection share — share the container + cascade onto its
@@ -175,6 +180,16 @@ export class CollabDevBridge {
 		} finally {
 			doc.destroy();
 		}
+	}
+
+	/** PRES-4 dogfood — publish this shell's presence for a shared entity. */
+	publishPresence(entityId: string, appId: string, state: Record<string, unknown> | null): void {
+		getPresenceRouter()?.publish(appId, entityId, state);
+	}
+
+	/** PRES-4 dogfood — remote peer snapshots after the relay round-trip. */
+	presenceRemotePeers(entityId: string): { clientId: number; state: Record<string, unknown> }[] {
+		return [...(getPresenceRouter()?.remotePeerSnapshots(entityId) ?? [])];
 	}
 
 	dispose(): void {

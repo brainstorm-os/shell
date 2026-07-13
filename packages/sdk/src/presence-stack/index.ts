@@ -14,3 +14,4 @@ export {
 	peerFromState,
 } from "./presence-awareness";
 export { presenceAwarenessFor, usePresence, useSelf } from "./use-presence";
+export { disposePresenceHeader, renderPresenceHeader } from "./presence-header-host";

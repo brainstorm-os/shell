@@ -156,6 +156,27 @@ export function registerCollabDevHandlers(): () => void {
 		return bridgeForSession().readText(entityId);
 	});
 
+	ipcMain.handle(
+		"dev:collab:publish-presence",
+		async (_event, entityId: unknown, appId: unknown, state: unknown) => {
+			assertDevEntityId(entityId);
+			if (typeof appId !== "string" || appId.length === 0) {
+				throw new Error("dev:collab:publish-presence: appId must be a non-empty string");
+			}
+			const payload =
+				state === null || (state && typeof state === "object" && !Array.isArray(state))
+					? (state as Record<string, unknown> | null)
+					: null;
+			bridgeForSession().publishPresence(entityId, appId, payload);
+			return { ok: true };
+		},
+	);
+
+	ipcMain.handle("dev:collab:presence-remote-peers", async (_event, entityId: unknown) => {
+		assertDevEntityId(entityId);
+		return bridgeForSession().presenceRemotePeers(entityId);
+	});
+
 	return () => {
 		for (const ch of [
 			"dev:collab:whoami",
@@ -169,6 +190,8 @@ export function registerCollabDevHandlers(): () => void {
 			"dev:collab:access",
 			"dev:collab:state-vector",
 			"dev:collab:read-text",
+			"dev:collab:publish-presence",
+			"dev:collab:presence-remote-peers",
 		]) {
 			ipcMain.removeHandler(ch);
 		}

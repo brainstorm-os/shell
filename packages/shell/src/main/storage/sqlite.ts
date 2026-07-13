@@ -340,6 +340,32 @@ export async function open(path: string, options: OpenOptions = {}): Promise<Sql
 }
 
 /**
+ * Bench / integration seam: open via `better-sqlite3` with `sqlite-vec`
+ * loaded, bypassing the Bun test driver (whose sqlite build rejects dynamic
+ * extension loading). Returns `null` when the native driver or the vec
+ * extension can't load — callers skip rather than fail. Mirrors the
+ * production Electron path (`wrapBetter` + `loadVecExtension`).
+ */
+export async function openWithVecExtension(path: string): Promise<SqliteDatabase | null> {
+	try {
+		const mod = (await import("better-sqlite3")) as {
+			default: new (path: string) => BetterDb;
+		};
+		const raw = new mod.default(path);
+		const db = wrapBetter(raw);
+		if (!db.loadVecExtension?.()) {
+			db.close();
+			return null;
+		}
+		db.exec("PRAGMA journal_mode = WAL");
+		db.exec("PRAGMA synchronous = NORMAL");
+		return db;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Before opening keyed: if the file is a legacy plaintext DB, rekey it to
  * encrypted in place (atomic, idempotent). If it is already encrypted,
  * nothing happens. Absent files are created keyed by the open below.

@@ -58,6 +58,7 @@ import {
 	detectDragKind,
 	nextRefValue,
 } from "./logic/create-link";
+import { setupGraphPresence } from "./logic/graph-presence-bind";
 import { applyNodeSelection, clearNodeSelection } from "./logic/graph-selection";
 import type { NodeCoord } from "./logic/graph-view-yjs-codec";
 import { backfillCreatedAt } from "./logic/history-backfill";
@@ -261,6 +262,9 @@ export type AppState = {
 	clearHydrating: (() => void) | null;
 	runtimeReady: boolean;
 	bufferedVaultData: VaultSnapshot | null;
+	/** PRES-3d — republish selection into the canvas presence channel. */
+	presenceRepublish?: () => void;
+	presenceBindGraph?: (graphEntityId: string | null) => void;
 };
 
 /** The canvas-driven snapshot the chrome subscribes to. Stage 2's React wraps
@@ -621,6 +625,14 @@ export async function createGraphCanvasController(
 	};
 	stateRef.current = state;
 
+	const presenceBind = setupGraphPresence({
+		container,
+		getState: () => state,
+		rendererElement: renderer.element,
+	});
+	state.presenceRepublish = () => presenceBind.republish();
+	state.presenceBindGraph = (graphEntityId) => presenceBind.bindGraph(graphEntityId);
+
 	/* ── Observer store ──────────────────────────────────────────────────── */
 
 	const listeners = new Set<() => void>();
@@ -688,6 +700,7 @@ export async function createGraphCanvasController(
 				hideLinkDragLine();
 				previewMenuTrigger?.dispose();
 				previewMenuTrigger = null;
+				presenceBind.dispose();
 			},
 			{ once: true },
 		);
@@ -1075,6 +1088,7 @@ function startAnimationLoop(state: AppState, emit: () => void): void {
 				state.forceRepaint = false;
 				state.lastPaint = { k: tf.k, tx: tf.tx, ty: tf.ty, hoveredId, arrowLod };
 			}
+			if (state.graphRecord) presenceBind.paint();
 		}
 
 		if (state.disposed || state.hidden) {
@@ -2216,6 +2230,7 @@ function bindCanvasClick(state: AppState, emit: () => void): void {
 				state.selectedIds = next.selected;
 				state.selectionAnchor = next.anchor;
 				state.forceRepaint = true;
+				state.presenceRepublish?.();
 				emit();
 			}
 		}
@@ -2495,6 +2510,7 @@ function selectSingleNode(state: AppState, id: string, emit: () => void): void {
 	state.selectedIds = next.selected;
 	state.selectionAnchor = next.anchor;
 	state.forceRepaint = true;
+	state.presenceRepublish?.();
 	emit();
 }
 
@@ -2506,6 +2522,7 @@ function clearNodeSelectionInto(state: AppState): void {
 	state.selectedIds = cleared.selected;
 	state.selectionAnchor = cleared.anchor;
 	state.forceRepaint = true;
+	state.presenceRepublish?.();
 }
 
 /* ── Theme tracking ─────────────────────────────────────────────────────── */
@@ -2856,6 +2873,7 @@ async function tryLoadLaunchGraph(state: AppState): Promise<void> {
 	}
 	if (!record) return;
 	state.graphRecord = record;
+	state.presenceBindGraph?.(record.id);
 	state.pattern = record.pattern;
 	state.cutoffAt = null;
 	state.layoutNodes.clear();

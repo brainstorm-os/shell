@@ -18,6 +18,8 @@
  *     broadcasts the vault-entities staleness signal so open apps repaint.
  */
 
+import { unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ipcMain } from "electron";
 import { firstPartyAppsDir } from "../apps/first-party";
@@ -30,6 +32,14 @@ import { refreshAppRegistrations } from "../dev/refresh-app-registrations";
 import { reseedVaultContent } from "../dev/reseed-vault-content";
 import { type SeedResult, seedDemoApps } from "../dev/seed-demo-apps";
 import type { IntentsBus } from "../intents/intents-bus";
+import {
+	type BenchReport,
+	type VecRecallReport,
+	makeSqliteVecEngine,
+	measureVecRecallParity,
+	parseBenchOptions,
+	runBench,
+} from "../search/bench";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import { getActiveVaultSession } from "../vault/session";
 
@@ -62,6 +72,14 @@ export type DevReseedVaultResult =
 				linksWritten: number;
 			};
 	  }
+	| { ok: false; reason: string };
+
+export type DevSearchBenchVectorResult =
+	| { ok: true; report: BenchReport }
+	| { ok: false; reason: string };
+
+export type DevSearchVecRecallResult =
+	| { ok: true; report: VecRecallReport }
 	| { ok: false; reason: string };
 
 export function registerDevHandlers(options: DevHandlersOptions): void {
@@ -146,6 +164,49 @@ export function registerDevHandlers(options: DevHandlersOptions): void {
 				getIntents: options.getIntents,
 				broadcastVaultEntitiesStale: options.broadcastVaultEntitiesStale,
 			});
+		},
+	);
+
+	// 11.3 — real-Electron sqlite-vec ANN bench + recall parity. Runs in the
+	// main process where better-sqlite3 + sqlite-vec load (unavailable under
+	// Bun vitest / system Node when the native ABI mismatches Electron).
+	ipcMain.handle(
+		"dev:search:bench-vector",
+		async (_event, rawOpts: unknown): Promise<DevSearchBenchVectorResult> => {
+			const opts = parseBenchOptions(rawOpts);
+			if (!opts) return { ok: false, reason: "invalid bench options" };
+			const dbPath = join(tmpdir(), `bs-vec-bench-${Date.now()}.db`);
+			try {
+				const report = await runBench(async () => {
+					const engine = await makeSqliteVecEngine(dbPath);
+					if (!engine) throw new Error("sqlite-vec unavailable");
+					return engine;
+				}, opts);
+				return { ok: true, report };
+			} catch (error) {
+				return { ok: false, reason: (error as Error).message ?? String(error) };
+			} finally {
+				try {
+					unlinkSync(dbPath);
+				} catch {
+					/* best-effort temp cleanup */
+				}
+			}
+		},
+	);
+
+	ipcMain.handle(
+		"dev:search:vec-recall",
+		async (_event, rawOpts: unknown): Promise<DevSearchVecRecallResult> => {
+			const opts = parseBenchOptions(rawOpts);
+			if (!opts) return { ok: false, reason: "invalid bench options" };
+			const report = await measureVecRecallParity({
+				seed: opts.seed,
+				size: opts.size,
+				k: opts.limit ?? 20,
+			});
+			if (!report) return { ok: false, reason: "sqlite-vec unavailable" };
+			return { ok: true, report };
 		},
 	);
 }

@@ -1548,6 +1548,15 @@ export type DevReseedResult =
 	  }
 	| { ok: false; reason: string };
 
+/** Result of `dev.benchSearchVector` / `dev.vecSearchRecall` (11.3). */
+export type DevSearchBenchVectorResult =
+	| { ok: true; report: Record<string, unknown> }
+	| { ok: false; reason: string };
+
+export type DevSearchVecRecallResult =
+	| { ok: true; report: Record<string, unknown> }
+	| { ok: false; reason: string };
+
 /** Result of `dev.notes.createAndOpenScratchNote` (13.4a.2-followup).
  *  Mirrors the shell-side `CreateAndOpenScratchNoteResult` — `ok: true`
  *  carries the freshly-minted entity id (for the bench to log + correlate)
@@ -1580,6 +1589,20 @@ const dev = {
 	 *  screenshots (clients, projects, people, notes, tasks, events). */
 	seedMarketingEntities: (): Promise<{ seeded: boolean }> =>
 		ipcRenderer.invoke("dev:seed-marketing-entities"),
+	/** 11.3 — sqlite-vec ANN bench in the main process (real Electron only). */
+	benchSearchVector: (opts: {
+		seed: number;
+		size: number;
+		runsPerQuery?: number;
+		warmupRuns?: number;
+		limit?: number;
+	}): Promise<DevSearchBenchVectorResult> => ipcRenderer.invoke("dev:search:bench-vector", opts),
+	/** 11.3 — ANN recall@k vs in-memory brute-force reference. */
+	vecSearchRecall: (opts: {
+		seed: number;
+		size: number;
+		limit?: number;
+	}): Promise<DevSearchVecRecallResult> => ipcRenderer.invoke("dev:search:vec-recall", opts),
 	/** Soak harness probes (Stage 10.9a). Main-side handlers are gated by
 	 *  `BRAINSTORM_SOAK_DEBUG=1` AND `!app.isPackaged` — every call rejects
 	 *  in production. Return shape: `Uint8Array` for state vectors / DEKs
@@ -1681,6 +1704,16 @@ const dev = {
 		},
 		readText: (entityId: string): Promise<string> =>
 			ipcRenderer.invoke("dev:collab:read-text", entityId),
+		publishPresence: (
+			entityId: string,
+			appId: string,
+			state: Record<string, unknown> | null,
+		): Promise<{ ok: boolean }> =>
+			ipcRenderer.invoke("dev:collab:publish-presence", entityId, appId, state),
+		presenceRemotePeers: (
+			entityId: string,
+		): Promise<{ clientId: number; state: Record<string, unknown> }[]> =>
+			ipcRenderer.invoke("dev:collab:presence-remote-peers", entityId),
 	},
 };
 
