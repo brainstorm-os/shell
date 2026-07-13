@@ -59,6 +59,13 @@ export type TextFieldProps = CommonProps & {
 	readonly value: string;
 	readonly onChange: (next: string) => void;
 	readonly type?: "text" | "email" | "search" | "url" | "tel" | "password" | "number";
+	/** Numeric bounds/step, forwarded to the underlying `<input>`. Only
+	 *  meaningful with `type="number"` — they let a constrained numeric field
+	 *  (e.g. "keep the last N days") ride the shared face instead of dropping to
+	 *  a hand-rolled `<input type=number>` just to get `min`/`max`. */
+	readonly min?: number;
+	readonly max?: number;
+	readonly step?: number;
 	readonly placeholder?: string;
 	readonly maxLength?: number;
 	readonly autoFocus?: boolean;
@@ -88,6 +95,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 		value,
 		onChange,
 		type = "text",
+		min,
+		max,
+		step,
 		placeholder,
 		maxLength,
 		autoFocus,
@@ -141,6 +151,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 					{...(onKeyDown ? { onKeyDown } : {})}
 					{...(placeholder !== undefined ? { placeholder } : {})}
 					{...(maxLength !== undefined ? { maxLength } : {})}
+					{...(min !== undefined ? { min } : {})}
+					{...(max !== undefined ? { max } : {})}
+					{...(step !== undefined ? { step } : {})}
 					{...(autoComplete !== undefined ? { autoComplete } : {})}
 					{...(inputMode !== undefined ? { inputMode } : {})}
 					{...(name !== undefined ? { name } : {})}
