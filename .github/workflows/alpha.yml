@@ -77,6 +77,8 @@ jobs:
 
       - name: Build native + apps + shell
         shell: bash
+        env:
+          CARGO_BUILD_JOBS: 2
         run: |
           bun run --filter @brainstorm/native ${{ matrix.napi-script }}
           bun run --filter @brainstorm/shell build
