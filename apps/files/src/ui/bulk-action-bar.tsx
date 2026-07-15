@@ -9,10 +9,9 @@
  */
 
 import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { plural } from "@brainstorm/sdk/i18n";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { useState } from "react";
-import { t } from "../i18n";
+import { plural, t } from "../i18n";
 
 export type BulkActionBarProps = {
 	count: number;
@@ -54,7 +53,6 @@ export function BulkActionBar({
 
 	if (count === 0) return null;
 	const label = plural(
-		t,
 		count,
 		"brainstorm.files.bulk.count.one",
 		"brainstorm.files.bulk.count.other",

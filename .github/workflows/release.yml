@@ -95,6 +95,10 @@ jobs:
 
       - name: Build native + apps + shell
         shell: bash
+        env:
+          # Cap parallel rustc units so ubuntu-arm / smaller runners don't OOM
+          # mid-link (v0.4.3 lost the arm64 host; alpha.yml already uses 2).
+          CARGO_BUILD_JOBS: 2
         run: |
           if [ -n "${{ matrix.rust-extra }}" ]; then rustup target add ${{ matrix.rust-extra }}; fi
           bun run --filter @brainstorm/native ${{ matrix.napi-script }}

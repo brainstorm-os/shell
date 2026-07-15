@@ -6,8 +6,7 @@
 
 import type { Icon } from "@brainstorm/sdk-types";
 import { parseIcon } from "@brainstorm/sdk/entity-icon";
-import { plural } from "@brainstorm/sdk/i18n";
-import { t } from "../i18n";
+import { plural, t } from "../i18n";
 import {
 	type Entity,
 	FILE_TYPE,
@@ -31,7 +30,6 @@ export function typeLabel(entity: Entity): string {
 		const count = readMembers(entity).length;
 		if (count === 0) return t("brainstorm.files.status.itemsZero");
 		return plural(
-			t,
 			count,
 			"brainstorm.files.status.itemsCount.one",
 			"brainstorm.files.status.itemsCount.other",

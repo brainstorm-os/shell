@@ -3,6 +3,103 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.4",
+      "date": "2026-07-15",
+      "icon": "🔧",
+      "title": "Release pipeline unblocked",
+      "summary": "Fixes the Files and Graph typecheck failures that kept CI red since 0.4.3, and caps Rust parallel jobs on release runners so arm64 packaging no longer OOMs mid-build.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What was broken"
+        },
+        {
+          "kind": "p",
+          "text": "The 0.4.3 cut never fully published: CI typecheck failed on Files and Graph, and the Linux arm64 release runner dropped mid-build. This patch lands the type fixes and hardens the release workflow so packaging can finish."
+        },
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — plurals go through a catalog-bound helper so the typed translator typechecks cleanly."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — remote-presence paint is wired through app state (the animation loop no longer references an out-of-scope binding)."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Release runners",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — "
+            },
+            {
+              "text": "CARGO_BUILD_JOBS=2",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on the package matrix so arm64 hosts stay under memory pressure while linking native addons."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "📊",
+          "text": [
+            {
+              "text": "Beta analytics from 0.4.3 rides along. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "If you already had the draft analytics build, this is the first complete multi-platform publish of that work."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.3",
       "date": "2026-07-13",
       "icon": "📊",

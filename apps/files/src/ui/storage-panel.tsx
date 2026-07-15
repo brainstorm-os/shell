@@ -11,11 +11,10 @@
 
 import type { StoredAsset } from "@brainstorm/sdk-types";
 import { StoredAssetKind } from "@brainstorm/sdk-types";
-import { plural } from "@brainstorm/sdk/i18n";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
 import { type ReactElement, useEffect, useState } from "react";
-import { t } from "../i18n";
+import { plural, t } from "../i18n";
 import { formatBytes } from "./entity-view";
 import "./storage-panel.css";
 
@@ -92,7 +91,7 @@ export function StoragePanel({
 				<p className="storage-panel__summary">
 					{items === null
 						? t("brainstorm.files.storage.loading")
-						: `${plural(t, items.length, "brainstorm.files.storage.count.one", "brainstorm.files.storage.count.other")} · ${formatBytes(total)}`}
+						: `${plural(items.length, "brainstorm.files.storage.count.one", "brainstorm.files.storage.count.other")} · ${formatBytes(total)}`}
 				</p>
 				{items !== null && items.length === 0 ? (
 					<p className="storage-panel__empty">{t("brainstorm.files.storage.empty")}</p>

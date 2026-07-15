@@ -30,7 +30,6 @@
 
 import { openEntity, quickLookEntity } from "@brainstorm/sdk";
 import type { StoredAsset } from "@brainstorm/sdk-types";
-import { plural } from "@brainstorm/sdk/i18n";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign, openSearchPicker } from "@brainstorm/sdk/menus";
 import { NavButtons } from "@brainstorm/sdk/nav-history";
@@ -43,7 +42,7 @@ import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
 import { useShortcut } from "@brainstorm/sdk/shortcut";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { type TranslationKey, t } from "./i18n";
+import { type TranslationKey, plural, t } from "./i18n";
 import { useFilesT } from "./i18n-hooks";
 import { orderedSelection } from "./logic/bulk";
 import { bulkRenamePlanAvoiding } from "./logic/bulk-rename";
@@ -316,7 +315,7 @@ export function FilesApp() {
 			.filter((n): n is string => typeof n === "string");
 		setConfirm({
 			title: t("brainstorm.files.delete.title"),
-			body: plural(t, ids.length, "brainstorm.files.delete.bodyOne", "brainstorm.files.delete.bodyN", {
+			body: plural(ids.length, "brainstorm.files.delete.bodyOne", "brainstorm.files.delete.bodyN", {
 				name: names[0] ?? "",
 			}),
 			confirm: t("brainstorm.files.delete.confirm"),
