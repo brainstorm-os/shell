@@ -1755,9 +1755,22 @@ function resolveAppVersion(): string {
 	}
 }
 
+/** Stable anonymous install id for Amplitude `deviceId`. Not crypto identity,
+ *  not vault-scoped — pure entropy minted once under userData. */
+function resolveAnalyticsDeviceId(): string {
+	try {
+		const id = ipcRenderer.sendSync("app:get-analytics-device-id");
+		return typeof id === "string" && id.length > 0 ? id : "";
+	} catch {
+		return "";
+	}
+}
+
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
+	/** Anonymous per-install id for product analytics. Never a user / vault / key. */
+	analyticsDeviceId: resolveAnalyticsDeviceId(),
 	windowState,
 	vaults,
 	welcome,

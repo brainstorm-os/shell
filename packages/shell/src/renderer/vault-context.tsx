@@ -86,7 +86,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 		async (options: CreateVaultOptions) => {
 			try {
 				const entry = await window.brainstorm.vaults.create(options);
-				track("Vault Created", { vault_id: entry.id });
+				// Event name only — never send vault / identity ids to analytics.
+				track("Vault Created");
 				await refresh();
 				return entry;
 			} catch (error) {

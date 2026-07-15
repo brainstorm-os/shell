@@ -46,4 +46,11 @@ describe("apps/notes Content-Security-Policy", () => {
 		expect(policy).not.toMatch(/script-src[^;]*'unsafe-eval'/);
 		expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'/);
 	});
+
+	it("allows Amplitude EU hosts for beta analytics (connect / script / worker)", () => {
+		const policy = csp();
+		expect(policy).toMatch(/connect-src[^;]*https:\/\/\*\.eu\.amplitude\.com/);
+		expect(policy).toMatch(/script-src[^;]*https:\/\/cdn\.eu\.amplitude\.com/);
+		expect(policy).toMatch(/worker-src 'self' blob:/);
+	});
 });
