@@ -92,6 +92,10 @@ jobs:
 
       - name: Build native + apps + shell
         shell: bash
+        env:
+          # Cap parallel rustc units so arm/small runners don't OOM mid-link
+          # (same posture as alpha.yml / release.yml after v0.4.3).
+          CARGO_BUILD_JOBS: 2
         run: |
           bun run --filter @brainstorm/native ${{ matrix.napi-script }}
           bun run --filter @brainstorm/shell build

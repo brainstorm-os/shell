@@ -45,6 +45,9 @@ jobs:
 
       - name: Verify (typecheck + lint + tests)
         # `verify` already builds the native addon + all apps before testing.
+        env:
+          # Cap parallel rustc units (native build inside `verify`).
+          CARGO_BUILD_JOBS: 2
         run: bun run verify
 
       # `verify` only runs the integration+entities vitest subset (fast
@@ -82,6 +85,8 @@ jobs:
           sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2
 
       - name: Build native (host-arch)
+        env:
+          CARGO_BUILD_JOBS: 2
         run: bun run --filter @brainstorm/native build:linux-x64
 
       - name: Rebuild SQLite natives for Electron's ABI
@@ -90,6 +95,8 @@ jobs:
         run: cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers
 
       - name: Build shell + apps
+        env:
+          CARGO_BUILD_JOBS: 2
         run: bun run e2e:build
 
       - name: E2E smoke (xvfb)
