@@ -1575,6 +1575,10 @@ void app.whenReady().then(async () => {
 		path: feedbackSettingsPath(app.getPath("userData")),
 		buildTimeDefaultEndpoint: feedbackBuildTimeEndpoint,
 	});
+	// Seed the stable per-install correlation id before any renderer boots.
+	// Reused as Amplitude's anonymous `deviceId` (not vault / crypto identity).
+	const feedbackSettings = await feedbackSettingsStore.load();
+	const analyticsDeviceId = feedbackSettings.installationId;
 	const feedbackRecentLogBuffer = getSharedRecentLogBuffer();
 	const feedbackService = new FeedbackService({
 		fetcher: defaultFeedbackFetcher,
@@ -1634,6 +1638,12 @@ void app.whenReady().then(async () => {
 	// so the renderer shows the real packaged version instead of a placeholder.
 	ipcMain.on("app:get-version", (event) => {
 		event.returnValue = app.getVersion();
+	});
+
+	// Synchronous anonymous install id for beta analytics (`brainstorm.analyticsDeviceId`).
+	// Pure entropy from feedback-settings — never the device Ed25519 key or a vault id.
+	ipcMain.on("app:get-analytics-device-id", (event) => {
+		event.returnValue = analyticsDeviceId;
 	});
 
 	// 13.6 — manual-download update check (app-global). The shell's own

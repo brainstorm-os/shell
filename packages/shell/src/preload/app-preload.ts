@@ -435,8 +435,34 @@ function cloneSafeAiErrors<T extends object>(ai: T): T {
 	return wrapped as T;
 }
 
+/** Shell package version — used for beta analytics gating (`isPublicBeta`). */
+function resolveShellVersion(): string {
+	try {
+		const version = ipcRenderer.sendSync("app:get-version");
+		return typeof version === "string" && version.length > 0 ? version : "0.0.0";
+	} catch {
+		return "0.0.0";
+	}
+}
+
+/** Stable anonymous install id for Amplitude `deviceId`. Not crypto identity. */
+function resolveAnalyticsDeviceId(): string {
+	try {
+		const id = ipcRenderer.sendSync("app:get-analytics-device-id");
+		return typeof id === "string" && id.length > 0 ? id : "";
+	} catch {
+		return "";
+	}
+}
+
 const augmentedRuntime = {
 	...runtime,
+	/** Shell version (not app version) — analytics beta gate + shell_version prop. */
+	version: resolveShellVersion(),
+	/** Anonymous per-install id for product analytics. Never a user / vault / key. */
+	analyticsDeviceId: resolveAnalyticsDeviceId(),
+	/** OS platform string for anonymous product analytics (shell preload exposes this too). */
+	platform: process.platform,
 	ydoc,
 	presence,
 	spellcheck,

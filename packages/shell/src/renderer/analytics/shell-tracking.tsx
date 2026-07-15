@@ -11,13 +11,14 @@ export function ShellTracking() {
 		if (loading) return;
 		if (current) {
 			if (lastVaultId.current !== current.id) {
-				track("Vault Opened", { vault_id: current.id });
+				// Event name only — never send vault / identity ids to analytics.
+				track("Vault Opened");
 				lastVaultId.current = current.id;
 			}
 			return;
 		}
 		if (lastVaultId.current) {
-			track("Vault Closed", { vault_id: lastVaultId.current });
+			track("Vault Closed");
 			lastVaultId.current = null;
 		}
 		track("Welcome Viewed");

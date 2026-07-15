@@ -3,6 +3,103 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.5",
+      "date": "2026-07-15",
+      "icon": "🔒",
+      "title": "Analytics that actually reaches us",
+      "summary": "Beta usage analytics can talk to Amplitude again, using one anonymous install id and without sending vault ids or other identity.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What was broken"
+        },
+        {
+          "kind": "p",
+          "text": "After 0.4.3 turned on beta analytics, the shell and every app blocked Amplitude with a tight Content Security Policy. Events never left the device, and the console filled with CSP errors."
+        },
+        {
+          "kind": "h1",
+          "text": "What changed"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "CSP",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — shell and all first-party apps allow Amplitude EU hosts for connect, the engagement CDN script, and blob workers used by the SDK."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Anonymous install id",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — every renderer shares one stable per-install id as Amplitude's device id. Not your vault, email, or device key."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "No identity on the wire",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — vault ids are no longer attached to events; the API key stays private to the analytics module; IP reverse-geolocation is off."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "📊",
+          "text": [
+            {
+              "text": "Still beta-only. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Analytics runs on pre-1.0 builds only and is disclosed on first launch and under "
+            },
+            {
+              "text": "Settings → Privacy",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.4",
       "date": "2026-07-15",
       "icon": "🔧",
