@@ -11,7 +11,7 @@
     "dev": "bun run --elide-lines=100 --filter @brainstorm/shell dev",
     "build": "bun run build:native && bun run --filter '*' build",
     "build:shell": "bun run build:native && bun run --filter @brainstorm/shell build",
-    "build:apps": "bun run --filter './apps/*' build",
+    "build:apps": "fail=0; for d in apps/*/; do echo \"== $d ==\"; (cd \"$d\" && bun run build) || fail=1; done; exit $fail",
     "build:native": "bun run --filter @brainstorm/native build:debug",
     "build:native:release": "bun run --filter @brainstorm/native build",
     "build:native-embed": "bun run --filter @brainstorm/native-embed build:debug",
