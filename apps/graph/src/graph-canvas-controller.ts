@@ -265,6 +265,8 @@ export type AppState = {
 	/** PRES-3d — republish selection into the canvas presence channel. */
 	presenceRepublish?: () => void;
 	presenceBindGraph?: (graphEntityId: string | null) => void;
+	/** PRES-3d — paint remote cursors/rings each animation frame while bound. */
+	presencePaint?: () => void;
 };
 
 /** The canvas-driven snapshot the chrome subscribes to. Stage 2's React wraps
@@ -632,6 +634,7 @@ export async function createGraphCanvasController(
 	});
 	state.presenceRepublish = () => presenceBind.republish();
 	state.presenceBindGraph = (graphEntityId) => presenceBind.bindGraph(graphEntityId);
+	state.presencePaint = () => presenceBind.paint();
 
 	/* ── Observer store ──────────────────────────────────────────────────── */
 
@@ -1088,7 +1091,7 @@ function startAnimationLoop(state: AppState, emit: () => void): void {
 				state.forceRepaint = false;
 				state.lastPaint = { k: tf.k, tx: tf.tx, ty: tf.ty, hoveredId, arrowLod };
 			}
-			if (state.graphRecord) presenceBind.paint();
+			if (state.graphRecord) state.presencePaint?.();
 		}
 
 		if (state.disposed || state.hidden) {

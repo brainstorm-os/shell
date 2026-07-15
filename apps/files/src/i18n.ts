@@ -14,6 +14,7 @@ import {
 	type TFunction,
 	type TParams,
 	createT,
+	plural as sdkPlural,
 } from "@brainstorm/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
@@ -36,6 +37,16 @@ export function syncActiveTranslator(next: TFunction<FilesManifest>): void {
 
 export function t(key: TranslationKey, params?: TParams): string {
 	return activeT(key, params);
+}
+
+/** Catalog-bound plural — keeps keys typed to `FilesManifest` (unlike raw sdk `plural` + app `t`). */
+export function plural(
+	count: number,
+	oneKey: TranslationKey,
+	otherKey: TranslationKey,
+	params?: TParams,
+): string {
+	return sdkPlural(activeT, count, oneKey, otherKey, params);
 }
 
 /** Non-React tests and standalone previews use the English manifest. */
