@@ -91,7 +91,7 @@
 .notes__h2 {
 	font-size: var(--text-size-2xl);
 	font-weight: var(--text-weight-bold);
-	margin: 14px 0 var(--space-2);
+	margin: var(--space-4) 0 var(--space-2);
 	line-height: 1.25;
 }
 
@@ -115,8 +115,13 @@
  * fallbacks for the boot race), not property vocabulary colours. */
 .notes__callout {
 	--callout-accent: var(--border-strong);
-	margin: 10px 0;
-	padding: 10px;
+	/* Tone glyph (Notion-style leading icon). Stroke-based outline SVG so it
+	 * works as a `mask` tinted by `--callout-accent`; rendered through `::before`
+	 * (not a DOM child) so Lexical's child reconciliation never clobbers it. */
+	--callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E");
+	position: relative;
+	margin: var(--space-3) 0;
+	padding: var(--space-3) var(--space-4) var(--space-3) 42px;
 	border: var(--border-width) solid color-mix(in srgb, var(--callout-accent) 45%, transparent);
 	border-inline-start: 3px solid var(--callout-accent);
 	border-radius: var(--radius-md);
@@ -129,12 +134,15 @@
 }
 .notes__callout--success {
 	--callout-accent: var(--ok);
+	--callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/%3E%3Cpolyline points='22 4 12 14.01 9 11.01'/%3E%3C/svg%3E");
 }
 .notes__callout--warn {
 	--callout-accent: var(--warn);
+	--callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E");
 }
 .notes__callout--danger {
 	--callout-accent: var(--danger);
+	--callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='15' y1='9' x2='9' y2='15'/%3E%3Cline x1='9' y1='9' x2='15' y2='15'/%3E%3C/svg%3E");
 }
 
 /* Indentation lives on the <li>, NOT the <ul>/<ol>. Each list item is a
@@ -162,7 +170,7 @@
 }
 
 .notes__list-item {
-	margin-block: 3px;
+	margin-block: var(--space-1);
 	padding-inline-start: 1.5em;
 	list-style-position: inside;
 	text-indent: -1.5em;
@@ -178,7 +186,7 @@
 .notes__list-item--checked {
 	list-style: none;
 	position: relative;
-	padding-inline-start: 22px;
+	padding-inline-start: var(--space-5);
 	text-indent: 0;
 }
 
@@ -191,7 +199,7 @@
 	width: 14px;
 	height: 14px;
 	border: 1.5px solid var(--border-strong);
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-xs);
 }
 
 .notes__list-item--checked::before {
@@ -275,7 +283,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	padding: 3px;
+	padding: var(--space-1);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-sm);
 	background: var(--color-surface-overlay, var(--code-bg));
@@ -288,7 +296,7 @@
 .notes__code-toolbar-btn:hover,
 .notes__code-toolbar-btn:focus-visible {
 	color: var(--color-text-primary);
-	background: var(--color-interactive-hover);
+	background: var(--hover);
 	outline: none;
 }
 
@@ -397,8 +405,8 @@
 }
 .notes__text--code {
 	background: var(--code-bg);
-	padding: 1px;
-	border-radius: var(--radius-sm);
+	padding: var(--space-0_5);
+	border-radius: var(--radius-xs);
 	font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
 	font-size: 0.95em;
 }
@@ -465,7 +473,7 @@
 }
 
 .notes__media-edit-button:focus-visible {
-	outline: 2px solid var(--accent);
+	outline: 2px solid var(--color-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -571,7 +579,7 @@
 	padding: var(--space-2);
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: var(--space-3);
 	font-size: var(--text-size-md);
 	color: var(--text);
 }
@@ -611,7 +619,7 @@
 }
 
 .notes__media-inspector-input:focus {
-	outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+	outline: 1px solid color-mix(in srgb, var(--color-focus-ring) 50%, transparent);
 	outline-offset: 1px;
 }
 
@@ -676,7 +684,7 @@
 	background: var(--bg);
 	color: var(--text);
 	border-radius: var(--radius-sm);
-	padding: var(--space-2);
+	padding: var(--space-2) var(--space-2);
 	font-size: var(--text-size-md);
 	cursor: pointer;
 }
@@ -826,8 +834,8 @@
 	transform: translateX(-50%);
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	padding: 10px;
+	gap: var(--space-3);
+	padding: var(--space-2);
 	animation: none;
 	opacity: 1;
 	will-change: auto;
@@ -859,7 +867,7 @@
 	margin-bottom: var(--space-2);
 	color: var(--text-faint);
 	font-size: var(--text-size-xs);
-	font-weight: 600;
+	font-weight: var(--text-weight-semibold);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 }
@@ -900,11 +908,11 @@
 	justify-content: center;
 	width: 18px;
 	height: 18px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-xs);
 	border: var(--border-width) solid var(--border-strong);
 	background: var(--bg-elev);
 	font-size: var(--text-size-xs);
-	font-weight: 700;
+	font-weight: var(--text-weight-bold);
 	line-height: 1;
 }
 
@@ -921,14 +929,14 @@
 /* Table of contents + backlinks. */
 .notes__toc {
 	margin: var(--space-2) 0;
-	padding: 10px;
+	padding: var(--space-3);
 	border-inline-start: var(--border-width-thick) solid var(--border-strong);
 }
 
 .notes__toc-title {
 	color: var(--text-faint);
 	font-size: var(--text-size-xs);
-	font-weight: 600;
+	font-weight: var(--text-weight-semibold);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	margin-bottom: var(--space-2);
@@ -946,11 +954,11 @@
 }
 
 .notes__toc-item[data-level="h2"] {
-	padding-inline-start: 14px;
+	padding-inline-start: var(--space-4);
 }
 
 .notes__toc-item[data-level="h3"] {
-	padding-inline-start: 28px;
+	padding-inline-start: var(--space-6);
 }
 
 .notes__toc-link {
@@ -989,8 +997,7 @@
 	border: 0;
 	background: transparent;
 	color: var(--text-dim);
-	font-size: var(--text-size-sm);
-	font-weight: 600;
+	font-weight: var(--text-weight-medium);
 	cursor: pointer;
 }
 
@@ -1010,7 +1017,7 @@
 
 .notes__backlinks-count {
 	color: var(--text-faint);
-	font-weight: 500;
+	font-weight: var(--text-weight-medium);
 }
 
 .notes__backlinks-list {
@@ -1042,13 +1049,14 @@
 }
 
 .notes__column {
-	/* Width is proportional to flex-grow (set inline by the node); flex-basis:0
-	   makes the grow factor the whole width, so the resizer visibly retracks the
-	   columns instead of only trading the leftover beyond a fixed basis. */
+	/* Width is proportional to the column's flex-grow (set inline by the node).
+	   flex-basis:0 makes the grow factor the *whole* width, so dragging the
+	   resizer visibly retracks the columns instead of only trading the small
+	   leftover beyond a fixed basis. */
 	flex: 1 1 0;
 	min-width: 120px;
 	position: relative;
-	padding-inline-end: 10px;
+	padding-inline-end: var(--space-2);
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: column resize handle is centred in the inter-column
@@ -1080,7 +1088,7 @@
 	align-items: center;
 	gap: var(--space-2);
 	margin: var(--space-1) 0;
-	padding: 7px;
+	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-sm);
 	color: inherit;
 	text-decoration: none;
@@ -1097,7 +1105,7 @@
 }
 
 .notes__pageref-title {
-	font-weight: 500;
+	font-weight: var(--text-weight-medium);
 	border-bottom: var(--border-width) solid var(--border-subtle);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1114,10 +1122,10 @@
 
 .notes__embed-card {
 	display: grid;
-	grid-template-columns: 56px 1fr;
+	grid-template-columns: 36px 1fr;
 	align-items: center;
 	gap: var(--space-3);
-	padding: 10px var(--space-2);
+	padding: var(--space-3) var(--space-2);
 	border: var(--border-width) solid var(--border-subtle);
 	border-radius: var(--radius-md);
 	background: var(--bg-elevated, var(--bg));
@@ -1139,8 +1147,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 56px;
-	height: 56px;
+	width: 36px;
+	height: 36px;
 	border-radius: var(--radius-sm);
 	overflow: hidden;
 	background: var(--bg-elev, var(--hover));
@@ -1155,7 +1163,7 @@
 .notes__embed-card-icon-fallback {
 	width: 24px;
 	height: 24px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-xs);
 	background: var(--border-subtle);
 }
 
@@ -1204,10 +1212,10 @@
 
 .notes__embed-card-chrome {
 	display: grid;
-	grid-template-columns: 56px 1fr;
+	grid-template-columns: 36px 1fr;
 	align-items: center;
 	gap: var(--space-3);
-	padding: 10px var(--space-2);
+	padding: var(--space-3) var(--space-2);
 	border-bottom: var(--border-width) solid var(--border-subtle);
 	color: inherit;
 	text-decoration: none;
@@ -1223,7 +1231,7 @@
 
 .notes__embed-card-mount {
 	display: block;
-	min-height: 200px;
+	min-height: 44px;
 	width: 100%;
 }
 
@@ -1231,7 +1239,7 @@
 	display: block;
 	width: 100%;
 	height: 100%;
-	min-height: 200px;
+	min-height: 44px;
 	border: 0;
 	background: transparent;
 }
@@ -1284,7 +1292,7 @@
 
 .notes__equation-input:focus-visible {
 	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 50%, transparent);
 	outline-offset: -1px;
 }
 
@@ -1313,10 +1321,10 @@
 .notes__file {
 	display: inline-flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--space-3);
 	max-width: 100%;
 	margin: var(--space-2) 0;
-	padding: 10px;
+	padding: var(--space-3);
 	border: var(--border-width) solid var(--border-strong);
 	border-radius: var(--radius-md);
 	background: var(--bg-elev);
@@ -1341,7 +1349,7 @@
 }
 
 .notes__file-name {
-	font-weight: 600;
+	font-weight: var(--text-weight-semibold);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1384,7 +1392,7 @@
 }
 
 .notes__bookmark-title {
-	font-weight: 600;
+	font-weight: var(--text-weight-semibold);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1402,7 +1410,7 @@
 .notes__bookmark-host {
 	display: flex;
 	align-items: center;
-	gap: 5px;
+	gap: var(--space-1);
 	color: var(--text-faint);
 	font-size: var(--text-size-xs);
 }
@@ -1445,7 +1453,7 @@
 
 .notes__bookmark-input {
 	width: 100%;
-	padding: 7px;
+	padding: var(--space-2) var(--space-2);
 	border: var(--border-width) solid var(--border-strong);
 	border-radius: var(--radius-sm);
 	background: var(--bg);
@@ -1456,7 +1464,7 @@
 
 .notes__bookmark-input:focus-visible {
 	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 50%, transparent);
 	outline-offset: -1px;
 }
 
@@ -1487,7 +1495,7 @@
 .notes__embed {
 	position: relative;
 	width: 100%;
-	margin: 10px 0;
+	margin: var(--space-3) 0;
 	aspect-ratio: 16 / 9;
 	border-radius: var(--radius-md);
 	overflow: hidden;
@@ -1580,7 +1588,7 @@
 
 .notes__table-cell {
 	min-width: 80px;
-	padding: var(--space-2);
+	padding: var(--space-2) var(--space-2);
 	border: var(--border-width) solid var(--border-strong);
 	vertical-align: top;
 	text-align: start;
@@ -1589,7 +1597,7 @@
 
 .notes__table-cell--header {
 	background: var(--bg-elev);
-	font-weight: 600;
+	font-weight: var(--text-weight-semibold);
 }
 
 .notes__table-cell--selected {
@@ -1668,7 +1676,7 @@ body.bs-table-col-resizing * {
    plain `<hr>`. We style it directly. The selected outline+tint comes from
    `.notes__block--selected` (inherits via DOM hierarchy). */
 .notes__contenteditable hr {
-	margin: 18px 0;
+	margin: var(--space-4) 0;
 	border: 0;
 	height: 2px;
 	background: var(--border-strong);
@@ -1693,7 +1701,7 @@ body.bs-table-col-resizing * {
 	pointer-events: none;
 	background: color-mix(in srgb, var(--accent) 10%, transparent);
 	border: var(--border-width) solid color-mix(in srgb, var(--accent) 50%, transparent);
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-xs);
 	z-index: 40;
 }
 
@@ -1955,7 +1963,7 @@ body.bs-table-col-resizing * {
 
 .notes__dict-name:focus {
 	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
 	outline-offset: -1px;
 	background: var(--bg-elev);
 }
@@ -2009,7 +2017,7 @@ body.bs-table-col-resizing * {
 
 .notes__dict-search:focus {
 	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
 	outline-offset: -1px;
 }
 
@@ -2031,7 +2039,7 @@ body.bs-table-col-resizing * {
 .notes__dict-add,
 .notes__dict-io-btn {
 	height: 28px;
-	padding: 0 10px;
+	padding: 0 var(--space-2);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-sm);
 	background: var(--bg-elev);
@@ -2164,9 +2172,9 @@ body.bs-table-col-resizing * {
 }
 
 .notes__dict-grip:focus-visible {
-	outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
 	outline-offset: -1px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-xs);
 }
 
 .notes__dict-swatch {
@@ -2190,7 +2198,7 @@ body.bs-table-col-resizing * {
 
 .notes__dict-row-input:focus {
 	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
 	outline-offset: -1px;
 	background: var(--bg-elev);
 }
@@ -2280,7 +2288,7 @@ body.bs-table-col-resizing * {
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-2);
-	padding: 3px;
+	padding: var(--space-1);
 }
 
 .notes__dict-row-label {
@@ -2328,7 +2336,7 @@ body.bs-table-col-resizing * {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-0_5);
-	color: var(--accent, #2563eb);
+	color: var(--color-state-info, #2563eb);
 	font-weight: var(--text-weight-medium);
 	user-select: none;
 	vertical-align: baseline;
@@ -2398,7 +2406,7 @@ body.bs-table-col-resizing * {
 .notes__emoji-tones {
 	display: flex;
 	gap: var(--space-0_5);
-	padding: var(--space-0_5) var(--space-2) var(--space-2) 30px;
+	padding: var(--space-0_5) var(--space-2) var(--space-2) var(--space-6);
 }
 
 .notes__emoji-tone {
@@ -2411,14 +2419,14 @@ body.bs-table-col-resizing * {
 	border: none;
 	border-radius: var(--radius-sm);
 	background: transparent;
-	font-size: 17px;
+	font-size: var(--text-size-lg);
 	line-height: 1;
 	cursor: pointer;
 }
 
 .notes__emoji-tone:hover,
 .notes__emoji-tone:focus-visible {
-	background: var(--color-interactive-hover);
+	background: var(--hover);
 	outline: none;
 }
 
@@ -2678,4 +2686,49 @@ body.bs-table-col-resizing * {
 .notes__contenteditable[contenteditable="false"] {
 	cursor: default;
 	caret-color: transparent;
+}
+
+/* ── Synced from apps/notes/src/styles.css (editor-block surface) ─────────
+ * These rules style DOM the SHARED editor package emits (CalloutNode's tone
+ * icon slot, the inline-toolbar container, TitleNode) and previously lived
+ * only in the Notes app — every other editor host rendered callouts without
+ * their icon (with a blank 42px gutter), a vertically-stacked inline toolbar
+ * (`.fm-menu`'s column default), and an unstyled title. Keep in lockstep
+ * with the Notes copy until the planned de-duplication lands. */
+
+.notes__callout::before {
+	content: "";
+	position: absolute;
+	inset-inline-start: 14px;
+	top: 11px;
+	width: 18px;
+	height: 18px;
+	background-color: var(--callout-accent);
+	-webkit-mask: var(--callout-icon) center / contain no-repeat;
+	mask: var(--callout-icon) center / contain no-repeat;
+}
+
+.notes__inline-toolbar {
+	position: fixed;
+	z-index: 60;
+	display: flex;
+	/* `.fm-menu` (the runtime base we borrow for glass chrome) ships
+	   `flex-direction: column` — menus are vertical lists. The toolbar is a
+	   horizontal pill, so pin `row` explicitly; relying on the flex default
+	   lets the runtime base win the cascade and stacks the buttons vertically.
+	   Same defensive posture as the `overflow: visible` override below. */
+	flex-direction: row;
+	align-items: center;
+	gap: var(--space-0_5);
+	height: 36px;
+	padding: var(--space-1);
+	/* The toolbar borrows `.fm-menu` for its glass chrome, but `.fm-menu`
+	   ships `overflow: hidden` — which clips the colour + overflow dropdowns
+	   that anchor below it. Toolbars aren't scroll surfaces; let children
+	   spill. */
+	overflow: visible;
+}
+
+.notes__title {
+	padding-inline-start: calc(var(--doc-icon-size) + var(--doc-icon-gap));
 }
