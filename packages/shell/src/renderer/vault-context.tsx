@@ -204,7 +204,16 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 }
 
 export function useVault(): VaultContextValue {
-	const value = useContext(VaultContext);
+	const value = useVaultMaybe();
 	if (!value) throw new Error("useVault must be used inside <VaultProvider>");
 	return value;
+}
+
+/** Tolerant variant for chrome that must never take the shell down on a
+ *  missing provider — dev HMR can re-evaluate this module (recreating
+ *  `VaultContext`) while an already-mounted consumer still reads the stale
+ *  object, which `useVault` turns into a render crash. Returns null instead;
+ *  callers degrade to their no-vault behaviour until the next clean render. */
+export function useVaultMaybe(): VaultContextValue | null {
+	return useContext(VaultContext);
 }
