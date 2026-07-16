@@ -65,6 +65,15 @@ describe("normalizeNotification", () => {
 		);
 	});
 
+	it("carries a string entityId through, drops an empty one, rejects a non-string", () => {
+		expect(normalizeNotification("a", { title: "t", entityId: "ent_1" }).entityId).toBe("ent_1");
+		expect("entityId" in normalizeNotification("a", { title: "t", entityId: "   " })).toBe(false);
+		expect("entityId" in normalizeNotification("a", { title: "t" })).toBe(false);
+		expect(() => normalizeNotification("a", { title: "t", entityId: 9 })).toThrowError(
+			expect.objectContaining({ name: "Invalid" }),
+		);
+	});
+
 	it("trims and clamps an over-long title/body with an ellipsis", () => {
 		const n = normalizeNotification("a", { title: `  ${"x".repeat(500)}  `, body: "y".repeat(5000) });
 		expect(n.title.length).toBe(200);
@@ -104,6 +113,21 @@ describe("UiNotifyHost", () => {
 			ts: 1000,
 		});
 		expect(osNotified).toEqual(["Saved"]);
+	});
+
+	it("carries entityId into the history record (center click → intent.open)", () => {
+		const history: NotificationRecord[] = [];
+		const host = new UiNotifyHost();
+		host.setDeps({
+			getPreferences: () => DEFAULT_NOTIFICATIONS,
+			recordHistory: (r) => history.push(r),
+			osNotify: () => {},
+			now: () => 1000,
+		});
+		host.post({ appId: "a", title: "Due", kind: "info", entityId: "ent_1" });
+		host.post({ appId: "a", title: "Plain", kind: "info" });
+		expect(history[0]?.entityId).toBe("ent_1");
+		expect(history[1] && "entityId" in history[1]).toBe(false);
 	});
 
 	it("suppresses OS-native for a muted app but still records", () => {

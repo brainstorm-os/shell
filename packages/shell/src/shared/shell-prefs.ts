@@ -197,6 +197,9 @@ export type NotificationRecord = {
 	/** Epoch millis when posted. */
 	ts: number;
 	read: boolean;
+	/** The vault entity this notification is about; clicking the center entry
+	 *  dispatches an `intent.open` for it. Absent = inert entry. */
+	entityId?: string;
 };
 
 export const NOTIFICATION_HISTORY_CAP = 200;

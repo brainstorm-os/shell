@@ -275,6 +275,8 @@
   "shell.notifications.center.title": "Notifications",
   "shell.notifications.center.empty": "You're all caught up.",
   "shell.notifications.center.clear": "Clear all",
+  "shell.notifications.center.open": "Open {title}",
+  "shell.notifications.center.openFailed": "Couldn't open the item",
   "shell.settings.section.membership": "Membership",
   "shell.settings.membership.title": "Power up your second brain.",
   "shell.settings.membership.subtitle": "One workspace for every thought, file, and connection. Stay free forever, or unlock the deep features that turn Brainstorm into a daily driver.",

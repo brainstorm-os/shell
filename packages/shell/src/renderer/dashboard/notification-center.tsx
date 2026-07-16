@@ -19,6 +19,7 @@ import { Icon, IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
 import { Popover } from "../ui/popover";
 import { PopoverSize } from "../ui/popover-types";
+import { ToastKind, pushToast } from "../ui/toasts";
 import { AppIcon } from "./app-icon";
 
 /** Each entry leads with the posting app's real icon (initials fallback for an
@@ -29,6 +30,27 @@ const KIND_BADGE: Partial<Record<NotificationKind, IconName>> = {
 	warning: IconName.Warning,
 	error: IconName.Warning,
 };
+
+/** Center-entry click → `intent.open` for the notification's subject entity,
+ *  through the same shell-privileged dispatch the launcher palette uses. The
+ *  popover closes immediately (the open lands in the owning app's window);
+ *  a failed resolve surfaces as an error toast rather than dying silently. */
+function openNotificationEntity(entityId: string): void {
+	void window.brainstorm.intents
+		.dispatch({ verb: "open", payload: { entityId } })
+		.then((result) => {
+			if (!result.handled) {
+				pushToast({
+					kind: ToastKind.Error,
+					title: t("shell.notifications.center.openFailed"),
+					...(result.message !== undefined ? { body: result.message } : {}),
+				});
+			}
+		})
+		.catch(() => {
+			pushToast({ kind: ToastKind.Error, title: t("shell.notifications.center.openFailed") });
+		});
+}
 
 function formatTimestamp(ts: number, locale: string): string {
 	try {
@@ -129,13 +151,9 @@ export function NotificationBell({
 							{ordered.map((n) => {
 								const app = appsById.get(n.appId);
 								const badge = KIND_BADGE[n.kind];
-								return (
-									<li
-										key={n.id}
-										className={
-											n.read ? "notif-center__item" : "notif-center__item notif-center__item--unread"
-										}
-									>
+								const entityId = n.entityId;
+								const content = (
+									<>
 										<span className="notif-center__app">
 											<AppIcon
 												name={app?.name ?? n.appId}
@@ -154,6 +172,30 @@ export function NotificationBell({
 											{n.body ? <span className="notif-center__body">{n.body}</span> : null}
 											<span className="notif-center__time">{formatTimestamp(n.ts, locale)}</span>
 										</div>
+									</>
+								);
+								return (
+									<li
+										key={n.id}
+										className={
+											n.read ? "notif-center__item" : "notif-center__item notif-center__item--unread"
+										}
+									>
+										{entityId !== undefined ? (
+											<button
+												type="button"
+												className="notif-center__open"
+												aria-label={t("shell.notifications.center.open", { title: n.title })}
+												onClick={() => {
+													openNotificationEntity(entityId);
+													onClose();
+												}}
+											>
+												{content}
+											</button>
+										) : (
+											content
+										)}
 									</li>
 								);
 							})}
