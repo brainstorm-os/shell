@@ -62,13 +62,21 @@
  * Fills the body so the pair centres in whatever footprint the tile has. */
 .bs-widget-empty {
 	flex: 1;
-	min-height: 100%;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-1);
 	padding: var(--widget-pad, var(--space-1));
+}
+
+/* Only fill the tile by height when the empty state is the sole content (the
+ * body itself, or an only-child of the app's full-height root). Next to a
+ * toolbar sibling (tasks/notes/bookmarks/contacts/calendar) the wrapper is a
+ * flex column and `flex: 1` already takes the remaining space — a 100%
+ * min-height there overflows the tile and pushes the text below centre. */
+.bs-widget-empty:only-child {
+	min-height: 100%;
 }
 
 .bs-widget-empty__message {
