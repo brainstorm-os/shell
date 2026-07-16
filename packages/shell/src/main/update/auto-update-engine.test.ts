@@ -151,4 +151,109 @@ describe("AutoUpdateEngine", () => {
 			error: "signature mismatch",
 		});
 	});
+
+	describe("startPeriodicChecks", () => {
+		it("checks after the initial delay, then on every interval", async () => {
+			vi.useFakeTimers();
+			try {
+				const fake = makeFakeUpdater();
+				const engine = new AutoUpdateEngine({
+					updater: fake.updater,
+					getChannel: async () => UpdateChannel.Stable,
+					supported: true,
+				});
+				const stop = engine.startPeriodicChecks({ initialDelayMs: 1000, intervalMs: 5000 });
+
+				expect(fake.calls.check).toBe(0);
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(fake.calls.check).toBe(1);
+				// Each check leaves the engine Checking (no terminal event fired
+				// by the fake); resolve it so the next tick is eligible again.
+				fake.fire().onUpdateNotAvailable();
+				await vi.advanceTimersByTimeAsync(5000);
+				expect(fake.calls.check).toBe(2);
+				fake.fire().onUpdateNotAvailable();
+
+				stop();
+				await vi.advanceTimersByTimeAsync(20_000);
+				expect(fake.calls.check).toBe(2);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it("skips ticks while a download is in flight or an update is staged", async () => {
+			vi.useFakeTimers();
+			try {
+				const fake = makeFakeUpdater();
+				const engine = new AutoUpdateEngine({
+					updater: fake.updater,
+					getChannel: async () => UpdateChannel.Stable,
+					supported: true,
+				});
+				const stop = engine.startPeriodicChecks({ initialDelayMs: 1000, intervalMs: 5000 });
+
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(fake.calls.check).toBe(1);
+				fake.fire().onUpdateAvailable("9.9.9");
+
+				await engine.download();
+				fake.fire().onDownloadProgress({
+					percent: 10,
+					transferred: 10,
+					total: 100,
+					bytesPerSecond: 1,
+				});
+				await vi.advanceTimersByTimeAsync(5000);
+				expect(fake.calls.check).toBe(1);
+
+				fake.fire().onUpdateDownloaded("9.9.9");
+				await vi.advanceTimersByTimeAsync(50_000);
+				// A staged update must never be clobbered by a background re-check.
+				expect(fake.calls.check).toBe(1);
+				expect(engine.getState().lifecycle).toBe(UpdateLifecycle.Downloaded);
+				stop();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it("re-checks from Available so a pulled release corrects itself", async () => {
+			vi.useFakeTimers();
+			try {
+				const fake = makeFakeUpdater();
+				const engine = new AutoUpdateEngine({
+					updater: fake.updater,
+					getChannel: async () => UpdateChannel.Stable,
+					supported: true,
+				});
+				const stop = engine.startPeriodicChecks({ initialDelayMs: 1000, intervalMs: 5000 });
+
+				await vi.advanceTimersByTimeAsync(1000);
+				fake.fire().onUpdateAvailable("9.9.9");
+				await vi.advanceTimersByTimeAsync(5000);
+				expect(fake.calls.check).toBe(2);
+				stop();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it("is inert on unsupported builds", async () => {
+			vi.useFakeTimers();
+			try {
+				const fake = makeFakeUpdater();
+				const engine = new AutoUpdateEngine({
+					updater: fake.updater,
+					getChannel: async () => UpdateChannel.Stable,
+					supported: false,
+				});
+				engine.startPeriodicChecks({ initialDelayMs: 1000, intervalMs: 5000 });
+				await vi.advanceTimersByTimeAsync(60_000);
+				expect(fake.calls.check).toBe(0);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+	});
 });

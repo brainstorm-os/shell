@@ -89,5 +89,12 @@
 	-webkit-user-select: text;
 }
 
+.toast__action {
+	margin-top: var(--space-1);
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: default;
+}
+
 /* Toast close button uses the shared <IconButton> primitive. No bespoke
  * chrome here — see renderer/ui/icon-button.tsx. */

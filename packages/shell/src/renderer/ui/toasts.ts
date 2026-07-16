@@ -20,11 +20,22 @@ export enum ToastKind {
 	Error = "error",
 }
 
+/** An optional call-to-action rendered as a button inside the toast.
+ *  Pressing it runs `onPress` and dismisses the toast. */
+export type ToastAction = {
+	label: string;
+	onPress: () => void;
+};
+
 export type Toast = {
 	id: string;
 	kind: ToastKind;
 	title: string;
 	body?: string;
+	action?: ToastAction;
+	/** Sticky toasts skip the auto-dismiss timer — they stay until the user
+	 *  dismisses them (or acts). For prompts that must not slip away. */
+	sticky?: boolean;
 };
 
 type Listener = () => void;
@@ -52,8 +63,10 @@ export function pushToast(toast: Omit<Toast, "id">): string {
 	const entry: Toast = { ...toast, id };
 	toasts = [...toasts, entry];
 	emit();
-	const ttl = toast.kind === ToastKind.Error ? 9000 : 4500;
-	setTimeout(() => dismissToast(id), ttl);
+	if (!toast.sticky) {
+		const ttl = toast.kind === ToastKind.Error ? 9000 : 4500;
+		setTimeout(() => dismissToast(id), ttl);
+	}
 	return id;
 }
 

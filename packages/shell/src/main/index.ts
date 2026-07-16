@@ -1686,6 +1686,18 @@ void app.whenReady().then(async () => {
 	});
 	registerAutoUpdateHandlers(autoUpdateEngine);
 
+	// Background update checks — detect-only (download + install stay
+	// user-initiated). An Available/Downloaded transition reaches the
+	// dashboard over UPDATE_STATE_EVENT, where the update toast offers the
+	// download/restart action; without this, updates were only ever found
+	// when the user opened Settings → Updates.
+	const UPDATE_CHECK_BOOT_DELAY_MS = 60_000;
+	const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60_000;
+	autoUpdateEngine.startPeriodicChecks({
+		initialDelayMs: UPDATE_CHECK_BOOT_DELAY_MS,
+		intervalMs: UPDATE_CHECK_INTERVAL_MS,
+	});
+
 	const CRASH_SUBMIT_BOOT_DELAY_MS = 30_000;
 	const CRASH_SUBMIT_INTERVAL_MS = 15 * 60_000;
 	setTimeout(() => {
