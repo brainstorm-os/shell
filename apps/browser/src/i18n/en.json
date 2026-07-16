@@ -1,8 +1,8 @@
 {
   "comingSoon.badge": "Coming soon",
-  "comingSoon.title": "Web Browser",
+  "comingSoon.title": "Browser",
   "comingSoon.blurb": "In-app web browser with tabbed chrome, reader mode, and clip-to-vault capture as bookmarks.",
-  "app.title": "Web Browser",
+  "app.title": "Browser",
   "tab.new": "New tab",
   "tab.newAria": "Open a new tab",
   "tab.close": "Close tab",
@@ -52,6 +52,6 @@
   "security.local": "Local page",
   "shield.blocked.one": "{count} tracker blocked",
   "shield.blocked.other": "{count} trackers blocked",
-  "unavailable.title": "Web Browser",
+  "unavailable.title": "Browser",
   "unavailable.blurb": "The browser engine runs in the Brainstorm shell. Launch this app from Brainstorm to browse."
 }

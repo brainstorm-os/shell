@@ -37,22 +37,22 @@ export const FIRST_PARTY_APPS: ReadonlyArray<FirstPartyApp> = [
 	{ dir: "calendar", label: "Calendar", expectedAppId: "io.brainstorm.calendar" },
 	{ dir: "journal", label: "Journal", expectedAppId: "io.brainstorm.journal" },
 	{ dir: "preview", label: "Preview", expectedAppId: "io.brainstorm.preview" },
-	{ dir: "code-editor", label: "Code Editor", expectedAppId: "io.brainstorm.code-editor" },
+	{ dir: "code-editor", label: "Code", expectedAppId: "io.brainstorm.code-editor" },
 	{ dir: "whiteboard", label: "Whiteboard", expectedAppId: "io.brainstorm.whiteboard" },
 	{ dir: "bookmarks", label: "Bookmarks", expectedAppId: "io.brainstorm.bookmarks" },
 	// Graduated from coming-soon stubs into real apps — pinned with the built
 	// set (Theme-editor 9.9, Contacts 9.23, Automations 11b, Mailbox-1/2/3/7,
 	// Web Browser Browser-1/2/3, Books 9.21.1→.6).
-	{ dir: "theme-editor", label: "Theme Editor", expectedAppId: "io.brainstorm.theme-editor" },
+	{ dir: "theme-editor", label: "Themes", expectedAppId: "io.brainstorm.theme-editor" },
 	{ dir: "contacts", label: "Contacts", expectedAppId: "io.brainstorm.contacts" },
 	{ dir: "automations", label: "Automations", expectedAppId: "io.brainstorm.automations" },
 	{ dir: "mailbox", label: "Mailbox", expectedAppId: "io.brainstorm.mailbox" },
-	{ dir: "browser", label: "Web Browser", expectedAppId: "io.brainstorm.browser" },
+	{ dir: "browser", label: "Browser", expectedAppId: "io.brainstorm.browser" },
 	{ dir: "books", label: "Books", expectedAppId: "io.brainstorm.books" },
 	{ dir: "chat", label: "Chat", expectedAppId: "io.brainstorm.chat" },
 	// Still coming-soon stubs — registered + launchable, body is the shared
 	// `@brainstorm/sdk/coming-soon` placeholder until each real build lands.
-	{ dir: "form-designer", label: "Form Designer", expectedAppId: "io.brainstorm.form-designer" },
+	{ dir: "form-designer", label: "Forms", expectedAppId: "io.brainstorm.form-designer" },
 	{ dir: "agent", label: "Agent", expectedAppId: "io.brainstorm.agent" },
 ];
 

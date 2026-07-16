@@ -1,11 +1,11 @@
-# Code Editor
+# Code
 
-Code Editor lets you edit text and code files alongside the rest of your work — config files, scripts, snippets, drafts of code, anything you'd open in a quick editor.
+Code lets you edit text and code files alongside the rest of your work — config files, scripts, snippets, drafts of code, anything you'd open in a quick editor.
 
 ## Opening a file
 
 - **Click** a code file in [Files](./files.md).
-- **Drag** a file from your desktop into the Code Editor window.
+- **Drag** a file from your desktop into the Code window.
 - **Cmd+O** (macOS) / **Ctrl+O** (Windows/Linux) for the open dialog.
 
 Recently opened files appear in the sidebar.
@@ -30,8 +30,8 @@ The editor's colour scheme follows your global [theme](../concepts/themes.md). S
 
 ## File vs entity
 
-A file edited in Code Editor is still a [`File` entity](../concepts/entities.md). The editor reads and writes through the same vault store as [Files](./files.md); changes you make are visible there.
+A file edited in Code is still a [`File` entity](../concepts/entities.md). The editor reads and writes through the same vault store as [Files](./files.md); changes you make are visible there.
 
 ## Not an IDE
 
-Code Editor is a text editor, not an integrated development environment. There's no project model, no language server, no build system integration. For serious development, use VS Code or a similar IDE and let Brainstorm hold your notes about the code.
+Code is a text editor, not an integrated development environment. There's no project model, no language server, no build system integration. For serious development, use VS Code or a similar IDE and let Brainstorm hold your notes about the code.
