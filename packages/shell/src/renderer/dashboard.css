@@ -259,6 +259,32 @@
 	background: var(--color-surface-default);
 }
 
+/* Entries with a subject entity render their content inside an open button —
+   the row's padding moves onto it so the whole row stays the hit target. */
+.notif-center__item:has(> .notif-center__open) {
+	padding: 0;
+}
+
+.notif-center__open {
+	display: flex;
+	gap: var(--space-2);
+	align-items: flex-start;
+	width: 100%;
+	padding: var(--space-2);
+	border: none;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	border-radius: inherit;
+	cursor: pointer;
+	transition: background var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.notif-center__open:hover {
+	background: var(--color-interactive-hover);
+}
+
 /* The posting app's icon (squircle, initials fallback), with the kind glyph
    demoted to a corner badge — only present when it carries signal. */
 .notif-center__app {

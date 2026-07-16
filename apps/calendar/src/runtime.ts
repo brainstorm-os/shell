@@ -59,6 +59,8 @@ export type UiService = {
 		kind?: string;
 		/** Cross-window/scheduler collapse key — see `UiNotification.dedupeKey`. */
 		dedupeKey?: string;
+		/** Subject entity — clicking the shell notification opens it. */
+		entityId?: string;
 	}): Promise<void> | void;
 };
 

@@ -141,19 +141,41 @@ describe("installPrebuiltBundle", () => {
 		expect(env.appsRepo.getActive("io.example.fake")).not.toBeNull();
 	});
 
-	it("re-installs (uninstall + install) when the app is already registered", async () => {
+	it("skips (unchanged: true) when the registered bundle content is identical", async () => {
 		const first = await installPrebuiltBundle(fakeApp, env.bundleSrc, {
 			installer: env.installer,
 			appsRepo: env.appsRepo,
 			dashboard: env.dashboard,
 		});
 		expect(first.ok).toBe(true);
+		const before = env.appsRepo.getActive("io.example.fake");
+		const second = await installPrebuiltBundle(fakeApp, env.bundleSrc, {
+			installer: env.installer,
+			appsRepo: env.appsRepo,
+			dashboard: env.dashboard,
+		});
+		expect(second.ok && second.unchanged).toBe(true);
+		// The registry row survives untouched — no uninstall/reinstall churn
+		// (the churn is what made dashboard icons flash lettered fallbacks
+		// on every dev boot).
+		expect(env.appsRepo.getActive("io.example.fake")).toEqual(before);
+	});
+
+	it("re-installs (uninstall + install) when the registered bundle content changed", async () => {
+		const first = await installPrebuiltBundle(fakeApp, env.bundleSrc, {
+			installer: env.installer,
+			appsRepo: env.appsRepo,
+			dashboard: env.dashboard,
+		});
+		expect(first.ok).toBe(true);
+		await writeFile(join(env.bundleSrc, "dist", "index.html"), "<!doctype html>v2", "utf8");
 		const second = await installPrebuiltBundle(fakeApp, env.bundleSrc, {
 			installer: env.installer,
 			appsRepo: env.appsRepo,
 			dashboard: env.dashboard,
 		});
 		expect(second.ok).toBe(true);
+		expect(second.ok && second.unchanged).toBeFalsy();
 		expect(env.appsRepo.getActive("io.example.fake")).not.toBeNull();
 	});
 

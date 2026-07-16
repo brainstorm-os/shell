@@ -1653,6 +1653,11 @@ export type Notification = {
 	 *  the same app don't record/pop the alert twice. Omit for one-off
 	 *  notifications (always recorded). */
 	dedupeKey?: string;
+	/** The vault entity this notification is about (a task, an event, …).
+	 *  When present, clicking the entry in the shell's notification center —
+	 *  or the OS-native popup — dispatches an `intent.open` for it through
+	 *  the registered opener. Omit for notifications with no object. */
+	entityId?: string;
 };
 
 /**

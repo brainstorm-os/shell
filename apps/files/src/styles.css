@@ -1073,8 +1073,11 @@ body[data-view-mode="grid"] .content-row {
 	gap: var(--space-2);
 	padding: var(--space-4) var(--space-2);
 	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	border: var(--border-width) solid var(--border);
+	/* Borderless at rest (the Finder treatment): a persistent card border on
+	 * every tile read as an outline around each icon. The border track stays
+	 * (transparent) so hover/selection can tint it without a layout shift. */
+	background: transparent;
+	border: var(--border-width) solid transparent;
 	margin: 0;
 	/* Grid cell must be allowed to shrink below its intrinsic min-width
 	 * (= the longest child element's natural width) so auto-fill can

@@ -4313,7 +4313,19 @@ void app.whenReady().then(async () => {
 		recordHistory: (record) => {
 			getActiveVaultSession()?.dashboardStoreIfOpen()?.pushNotification(record);
 		},
-		osNotify: makeOsNotifier({ isShellFocused: () => BrowserWindow.getFocusedWindow() !== null }),
+		osNotify: makeOsNotifier({
+			isShellFocused: () => BrowserWindow.getFocusedWindow() !== null,
+			// Native-popup click → open the subject entity through the same
+			// shell-privileged intent path the launcher palette uses.
+			openEntity: (entityId) => {
+				void (async () => {
+					const bus = await launchSetup.getIntents();
+					await bus?.dispatch({ verb: "open", payload: { entityId } }, { app: SHELL_INTENT_SOURCE });
+				})().catch((error) => {
+					console.warn("[brainstorm] notification open failed", error);
+				});
+			},
+		}),
 		now: () => Date.now(),
 	});
 

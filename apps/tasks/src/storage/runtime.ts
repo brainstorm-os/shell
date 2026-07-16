@@ -117,7 +117,13 @@ export type IntentsService = {
  *  drives the due/scheduled task alerts (9.14.9). Optional; absent in
  *  preview / standalone, where the alert scheduler silently no-ops. */
 export type UiService = {
-	notify?(notification: { title: string; body?: string; dedupeKey?: string }): Promise<void>;
+	notify?(notification: {
+		title: string;
+		body?: string;
+		dedupeKey?: string;
+		/** Subject entity — clicking the shell notification opens it. */
+		entityId?: string;
+	}): Promise<void>;
 };
 
 /** Vault-entities aggregator. `onChange` drives the per-type

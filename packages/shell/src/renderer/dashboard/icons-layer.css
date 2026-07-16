@@ -22,6 +22,28 @@
 	--grid-icon-h: 104px;
 }
 
+/* While an icon is being dragged, surface the snap grid as faint hairlines so
+ * the user can see where the drop will land. Painted on a ::before (not the
+ * layer background) and faded via opacity so it can transition in/out without
+ * repainting the icons. `--grid-outer-margin` is a multiple of the unit, so
+ * the lines line up with stored cells without an extra offset. */
+.dashboard-icons::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px),
+		linear-gradient(to bottom, var(--color-border-subtle) 1px, transparent 1px);
+	background-size: var(--grid-unit) var(--grid-unit);
+	opacity: 0;
+	transition: opacity var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.dashboard-icons--dragging::before {
+	opacity: 0.35;
+}
+
 /* Each icon button is a centred column: tile + dot + label. Its width
  * (`--grid-icon-w`) and its `translate(...)` come from the container's
  * pixel dimensions, NOT from React state — the browser resolves both

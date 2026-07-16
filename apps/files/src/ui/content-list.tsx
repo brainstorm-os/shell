@@ -316,11 +316,16 @@ export function ContentList({
 	});
 
 	// `items.length` (not `items`) — re-measure when header rows appear or
-	// disappear; an identity-only change re-renders anyway.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: items.length is the intended re-measure trigger
+	// disappear; an identity-only change re-renders anyway. `columns` +
+	// `laneSpan` must also invalidate: the virtualizer caches each item's
+	// lane + start offset, and a resize / tile-size change that repacks the
+	// grid otherwise leaves stale positions behind — tiles from the old
+	// column count painted over the new layout (the "everything overlaps"
+	// grid bug).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: items.length / columns / laneSpan are the intended re-measure triggers
 	useEffect(() => {
 		virtualizer.measure();
-	}, [virtualizer, items.length]);
+	}, [virtualizer, items.length, columns, laneSpan]);
 
 	// KBN-A-files: the folder-contents list adopts the SDK composite-keyboard
 	// reducer. Vertical in List mode, 2D Grid (driven by the geometry's column

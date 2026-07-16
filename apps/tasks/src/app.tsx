@@ -1458,11 +1458,13 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 								title: t("tasks.alert.scheduled.title", { name: due.title }),
 								body: t("tasks.alert.scheduled.body"),
 								dedupeKey: due.dedupeKey,
+								entityId: due.id,
 							}
 						: {
 								title: t("tasks.alert.due.title", { name: due.title }),
 								body: t("tasks.alert.due.body"),
 								dedupeKey: due.dedupeKey,
+								entityId: due.id,
 							},
 				).catch(() => {});
 			},

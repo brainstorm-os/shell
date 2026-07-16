@@ -28,6 +28,8 @@
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
+import { hashBundleDirectory } from "../apps/app-bundle-hash";
+import { shouldCopyBundleEntry } from "../apps/bundle-filter";
 import { FIRST_PARTY_APPS, type FirstPartyApp, firstPartyAppById } from "../apps/first-party";
 import { DEV_INSTALL_PROVENANCE, type InstallProvenance } from "../apps/install-provenance";
 import { AppInstaller } from "../apps/installer";
@@ -108,7 +110,8 @@ export async function seedDemoApps(
 				result.errors.push(`${app.dir}: ${outcome.reason}`);
 				continue;
 			}
-			result.installed += 1;
+			if (outcome.unchanged) result.skipped += 1;
+			else result.installed += 1;
 			installedIds.add(outcome.id);
 			if (outcome.pinned) result.pinned += 1;
 		}
@@ -143,7 +146,7 @@ export type InstallDeps = {
 };
 
 export type InstallPrebuiltBundleResult =
-	| { ok: true; id: string; pinned: boolean }
+	| { ok: true; id: string; pinned: boolean; unchanged?: boolean }
 	| { ok: false; reason: string };
 
 /**
@@ -153,16 +156,27 @@ export type InstallPrebuiltBundleResult =
  *
  * The `bundleDir` MUST already contain `manifest.json` + `dist/` — no
  * spawn / no source build happens here. Re-install semantics: if the app
- * is already registered, uninstall first then re-install (matches the
- * dev-loop behaviour so an updated bundle on disk overrides the vault
- * copy).
+ * is already registered with the SAME bundle content hash, it is left in
+ * place (`unchanged: true`) — uninstall/reinstall of an identical bundle
+ * churned the registry every dev boot, which unpinned + re-pinned every
+ * dashboard icon and made them flash their lettered fallbacks. A changed
+ * bundle uninstalls first then re-installs, so an updated bundle on disk
+ * still overrides the vault copy.
  */
 export async function installPrebuiltBundle(
 	app: FirstPartyApp,
 	bundleDir: string,
 	deps: InstallDeps,
 ): Promise<InstallPrebuiltBundleResult> {
-	if (deps.appsRepo.getActive(app.expectedAppId)) {
+	const existing = deps.appsRepo.getActive(app.expectedAppId);
+	if (existing) {
+		const sourceHash = await hashBundleDirectory(bundleDir, (abs) =>
+			shouldCopyBundleEntry(bundleDir, abs),
+		);
+		if (sourceHash === existing.bundleSha256) {
+			const pinned = placeDashboardIcon(deps.dashboard, existing.id, app.label);
+			return { ok: true, id: existing.id, pinned, unchanged: true };
+		}
 		const uninstall = await deps.installer.uninstall(app.expectedAppId);
 		if (!uninstall.ok) return { ok: false, reason: `reinstall: ${uninstall.reason}` };
 	}

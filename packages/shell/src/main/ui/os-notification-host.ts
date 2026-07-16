@@ -18,6 +18,10 @@ export type OsNotifierOptions = {
 	/** True when a shell/app window currently has focus — used to skip the
 	 *  redundant native popup. */
 	isShellFocused: () => boolean;
+	/** Open the notification's subject entity (an `intent.open` through the
+	 *  IntentsBus) when the user clicks the native popup. Optional so
+	 *  existing wirings/tests stay valid; absent = clicks are inert. */
+	openEntity?: (entityId: string) => void;
 };
 
 /** Build the `osNotify` dependency for the `UiNotifyHost`. Returns a no-op when
@@ -32,6 +36,11 @@ export function makeOsNotifier(options: OsNotifierOptions): (notification: UiNot
 				...(notification.body !== undefined ? { body: notification.body } : {}),
 				silent: false,
 			});
+			const { entityId } = notification;
+			const { openEntity } = options;
+			if (entityId !== undefined && openEntity) {
+				native.on("click", () => openEntity(entityId));
+			}
 			native.show();
 		} catch (error) {
 			// A native-notification failure must never break the post path.

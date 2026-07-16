@@ -651,6 +651,8 @@ export function CalendarApp() {
 					// the shell-side scheduler (9.14.9b) — the notify host dedupes
 					// on (appId, dedupeKey).
 					dedupeKey: due.dedupeKey,
+					// Clicking the shell notification opens the event (intent.open).
+					entityId: due.id,
 				});
 			},
 		});

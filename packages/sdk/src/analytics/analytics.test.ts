@@ -48,7 +48,7 @@ describe("initAnalytics", () => {
 		initAnalytics();
 		await vi.waitFor(() => expect(initAll).toHaveBeenCalledTimes(1));
 
-		const [apiKey, options] = initAll.mock.calls[0] as [string, Record<string, unknown>];
+		const [apiKey, options] = initAll.mock.calls[0] as unknown as [string, Record<string, unknown>];
 		// Key stays module-private: present for init, never asserted as a public export.
 		expect(typeof apiKey).toBe("string");
 		expect(apiKey.length).toBeGreaterThan(0);
