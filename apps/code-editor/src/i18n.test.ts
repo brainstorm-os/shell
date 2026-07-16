@@ -3,7 +3,7 @@ import { CODE_EDITOR_MESSAGES, t } from "./i18n";
 
 describe("code-editor i18n", () => {
 	it("returns the English default for a known key", () => {
-		expect(t("appTitle")).toBe("Code Editor");
+		expect(t("appTitle")).toBe("Code");
 		expect(t("filesHeading")).toBe("Files");
 	});
 

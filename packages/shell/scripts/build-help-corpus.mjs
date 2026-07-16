@@ -68,7 +68,7 @@ const SECTION_TITLE_FALLBACKS = {
 	"shell.help.section.app.graph": "Graph",
 	"shell.help.section.app.whiteboard": "Whiteboard",
 	"shell.help.section.app.bookmarks": "Bookmarks",
-	"shell.help.section.app.codeEditor": "Code Editor",
+	"shell.help.section.app.codeEditor": "Code",
 	"shell.help.section.customising": "Customising",
 	"shell.help.section.privacy": "Privacy",
 };

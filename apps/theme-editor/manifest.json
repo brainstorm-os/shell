@@ -1,6 +1,6 @@
 {
   "id": "io.brainstorm.theme-editor",
-  "name": "Theme Editor",
+  "name": "Themes",
   "version": "0.1.0",
   "sdk": "1",
   "description": "Compose and save themes — token sets, icon packs, typography — with live preview across the shell and apps.",

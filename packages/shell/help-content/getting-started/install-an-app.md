@@ -1,6 +1,6 @@
 # Install an app
 
-Brainstorm ships with the core apps — Notes, Tasks, Files, Calendar, Journal, Database, Graph, Whiteboard, Bookmarks, Code Editor. To add more, open the **Marketplace** from the dashboard header.
+Brainstorm ships with the core apps — Notes, Tasks, Files, Calendar, Journal, Database, Graph, Whiteboard, Bookmarks, Code. To add more, open the **Marketplace** from the dashboard header.
 
 ## Browse and install
 

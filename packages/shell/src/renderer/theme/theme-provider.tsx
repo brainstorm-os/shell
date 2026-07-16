@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AppearanceSlot, type AppearanceState, effectiveSlotFor } from "../../shared/appearance";
 import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
-import { useVault } from "../vault-context";
+import { useVaultMaybe } from "../vault-context";
 import { typographyCssVars } from "./typography-vars";
 
 // `brainstorm/Typography/v1` render-application (Stage 8.7): the frozen
@@ -77,7 +77,10 @@ type Props = {
  * error-boundary fallback, which renders outside this provider's subtree.
  */
 export function ThemeProvider({ children }: Props) {
-	const { current } = useVault();
+	// Tolerant read: the theme is the first vault consumer in the tree, so a
+	// transiently missing context (HMR re-created it) must not crash the whole
+	// shell — fall back to the no-vault pin and recover on the next render.
+	const current = useVaultMaybe()?.current ?? null;
 	const snapshot = useDashboard();
 	const [prefersDark, setPrefersDark] = useState<boolean>(() => systemPrefersDark());
 	useEffect(() => onSystemPreferenceChange(setPrefersDark), []);

@@ -20,7 +20,7 @@ import { ThemeProvider } from "./theme-provider";
 
 // hasVault=true so effectiveTheme resolves from appearance, not the welcome pin.
 vi.mock("../vault-context", () => ({
-	useVault: () => ({ current: { id: "v1", name: "V", path: "/v" } }),
+	useVaultMaybe: () => ({ current: { id: "v1", name: "V", path: "/v" } }),
 }));
 
 type Listener<T> = (value: T) => void;

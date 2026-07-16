@@ -15,7 +15,7 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultEntry } from "../preload";
-import { VaultProvider, useVault } from "./vault-context";
+import { VaultProvider, useVault, useVaultMaybe } from "./vault-context";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -98,5 +98,21 @@ describe("<VaultProvider>", () => {
 		await flush();
 
 		expect(container.querySelector('[data-testid="current"]')?.textContent).toBe("alpha");
+	});
+});
+
+describe("useVaultMaybe", () => {
+	/** Pins the ThemeProvider crash fix: chrome using the tolerant hook renders
+	 *  (with null) outside the provider instead of throwing and taking the whole
+	 *  shell down to the error boundary. */
+	it("returns null outside <VaultProvider> without throwing", async () => {
+		function MaybeProbe() {
+			const vault = useVaultMaybe();
+			return <span data-testid="maybe">{vault === null ? "null" : "value"}</span>;
+		}
+		await act(async () => {
+			root.render(<MaybeProbe />);
+		});
+		expect(container.querySelector('[data-testid="maybe"]')?.textContent).toBe("null");
 	});
 });

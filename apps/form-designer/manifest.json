@@ -1,6 +1,6 @@
 {
   "id": "io.brainstorm.form-designer",
-  "name": "Form Designer",
+  "name": "Forms",
   "version": "0.1.0",
   "sdk": "1",
   "description": "Designer for forms and documents — composes reusable Layout entities (forms) and renders billing documents (invoices) to PDF.",

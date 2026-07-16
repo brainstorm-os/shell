@@ -1,8 +1,8 @@
 {
   "comingSoon.badge": "Próximamente",
-  "comingSoon.title": "Navegador web",
+  "comingSoon.title": "Navegador",
   "comingSoon.blurb": "Navegador web integrado con pestañas, modo lectura y captura en la bóveda como marcadores.",
-  "app.title": "Navegador web",
+  "app.title": "Navegador",
   "tab.new": "Nueva pestaña",
   "tab.newAria": "Abrir una pestaña nueva",
   "tab.close": "Cerrar pestaña",
@@ -52,6 +52,6 @@
   "security.local": "Página local",
   "shield.blocked.one": "{count} rastreador bloqueado",
   "shield.blocked.other": "{count} rastreadores bloqueados",
-  "unavailable.title": "Navegador web",
+  "unavailable.title": "Navegador",
   "unavailable.blurb": "El motor del navegador se ejecuta en el shell de Brainstorm. Abre esta app desde Brainstorm para navegar."
 }

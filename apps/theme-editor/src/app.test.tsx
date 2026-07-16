@@ -83,7 +83,7 @@ describe("ThemeEditorApp", () => {
 		await flush();
 		const header = container.querySelector('[data-testid="app-header"]');
 		expect(header?.classList.contains("app-header")).toBe(true);
-		expect(container.querySelector(".app-header__title")?.textContent).toBe("Theme Editor");
+		expect(container.querySelector(".app-header__title")?.textContent).toBe("Themes");
 		const right = container.querySelector(".app-header__right");
 		const last = right?.lastElementChild;
 		expect(last?.classList.contains("bs-object-menu__more")).toBe(true);

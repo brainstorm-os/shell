@@ -1,6 +1,6 @@
 {
   "id": "io.brainstorm.code-editor",
-  "name": "Code Editor",
+  "name": "Code",
   "version": "0.1.0",
   "sdk": "1",
   "description": "View and edit code-shaped notes (snippets, configs, REPL fragments) as `CodeFile/v1` entities. Pre-configured editor with syntax highlighting per language; opens any source-code MIME via the `open` intent. v1 is vault-resident only — no source-tree write access.",

@@ -1,6 +1,6 @@
 {
   "id": "io.brainstorm.browser",
-  "name": "Web Browser",
+  "name": "Browser",
   "version": "0.1.0",
   "sdk": "1",
   "description": "In-app web browser with tabbed chrome, reader mode, and clip-to-vault capture as bookmarks.",
