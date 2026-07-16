@@ -6,6 +6,10 @@
  *   - One stable anonymous **install** id as Amplitude `deviceId` (from the
  *     shell preload / main-process installationId). Not a user id, vault id,
  *     or device Ed25519 key.
+ *   - Packaged builds only: main hands the id out solely when
+ *     `app.isPackaged`, so dev, CI and Playwright shells — which get a fresh
+ *     `--user-data-dir` (and thus a fresh installationId) per run — never
+ *     register as Amplitude users. No id, no init.
  *   - Never sets Amplitude `userId`.
  *   - Never sends vault / identity / key material in event properties.
  *   - API key is module-private and never exported or attached to events.
@@ -57,8 +61,6 @@ const BLOCKED_EVENT_KEYS = new Set([
 	"privateKey",
 ]);
 
-const FALLBACK_DEVICE_STORAGE_KEY = "brainstorm.analytics.deviceId";
-
 let initialized = false;
 let analyticsEnabled = false;
 let initPromise: Promise<void> | null = null;
@@ -87,40 +89,14 @@ function readBridge(): AnalyticsBridge | null {
 }
 
 /**
- * Stable anonymous device id for this install. Prefer the main-process
- * installation id (same value for every renderer). Fall back to a
- * localStorage-minted UUID only when the bridge is missing (tests / edge).
+ * Stable anonymous device id for this install — the main-process
+ * installation id handed through the preload bridge. Main exposes it only
+ * in packaged builds; an empty result means analytics must stay off (no
+ * local fallback — minting an id here is exactly how ephemeral dev / CI
+ * shells would masquerade as new users).
  */
 export function resolveAnalyticsDeviceId(bridge: AnalyticsBridge | null = readBridge()): string {
-	const fromBridge = bridge?.analyticsDeviceId?.trim();
-	if (fromBridge && fromBridge.length > 0) return fromBridge;
-
-	const storage =
-		typeof window !== "undefined" && window.localStorage
-			? window.localStorage
-			: typeof localStorage !== "undefined"
-				? localStorage
-				: null;
-	if (storage) {
-		const existing = storage.getItem(FALLBACK_DEVICE_STORAGE_KEY);
-		if (existing && existing.length > 0) return existing;
-		const minted =
-			typeof window !== "undefined" &&
-			window.crypto &&
-			typeof window.crypto.randomUUID === "function"
-				? window.crypto.randomUUID()
-				: typeof crypto !== "undefined" && "randomUUID" in crypto
-					? crypto.randomUUID()
-					: `bs-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-		try {
-			storage.setItem(FALLBACK_DEVICE_STORAGE_KEY, minted);
-		} catch {
-			// private mode / quota — still return the minted id for this session
-		}
-		return minted;
-	}
-
-	return `bs-ephemeral-${Date.now().toString(36)}`;
+	return bridge?.analyticsDeviceId?.trim() ?? "";
 }
 
 function readContext(): AnalyticsContext {
@@ -206,8 +182,10 @@ export function isAnalyticsEnabled(): boolean {
 export function initAnalytics(): void {
 	if (initialized || typeof window === "undefined") return;
 	initialized = true;
-	const version = readBridge()?.version ?? "0.0.0";
-	analyticsEnabled = isPublicBeta(version);
+	const bridge = readBridge();
+	const version = bridge?.version ?? "0.0.0";
+	// Two gates: pre-1.0 public beta AND a packaged-shell install id.
+	analyticsEnabled = isPublicBeta(version) && resolveAnalyticsDeviceId(bridge).length > 0;
 	if (!analyticsEnabled) return;
 	void ensureInitialized();
 }

@@ -95,6 +95,26 @@ describe("initAnalytics", () => {
 		expect(trackFn).not.toHaveBeenCalled();
 	});
 
+	it("does not initialize without a packaged-shell install id (dev / CI / Playwright)", async () => {
+		globalThis.window = {
+			// Beta version, but main returned "" — unpackaged build.
+			brainstorm: { version: "0.4.2", platform: "darwin", analyticsDeviceId: "" },
+			localStorage: {
+				getItem: () => null,
+				setItem: () => {},
+			},
+		} as unknown as Window & typeof globalThis;
+
+		const { initAnalytics, track, isAnalyticsEnabled } = await import("./index");
+		initAnalytics();
+		track("Vault Opened", { source: "welcome" });
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(isAnalyticsEnabled()).toBe(false);
+		expect(initAll).not.toHaveBeenCalled();
+		expect(trackFn).not.toHaveBeenCalled();
+	});
+
 	it("stamps app context when running inside an app renderer", async () => {
 		globalThis.window = {
 			brainstorm: {
@@ -126,28 +146,18 @@ describe("resolveAnalyticsDeviceId", () => {
 		delete globalThis.window;
 	});
 
-	it("prefers the bridge install id over localStorage", async () => {
+	it("returns the bridge install id", async () => {
 		const { resolveAnalyticsDeviceId } = await import("./index");
 		expect(
 			resolveAnalyticsDeviceId({ analyticsDeviceId: "from-bridge" }),
 		).toBe("from-bridge");
 	});
 
-	it("mints and persists a fallback id when the bridge has none", async () => {
-		const store = new Map<string, string>();
-		globalThis.window = {
-			localStorage: {
-				getItem: (k: string) => store.get(k) ?? null,
-				setItem: (k: string, v: string) => {
-					store.set(k, v);
-				},
-			},
-			crypto: { randomUUID: () => "fallback-uuid-1" },
-		} as unknown as Window & typeof globalThis;
-
+	it("returns empty when the bridge has none — no local minting", async () => {
 		const { resolveAnalyticsDeviceId } = await import("./index");
-		expect(resolveAnalyticsDeviceId({})).toBe("fallback-uuid-1");
-		expect(resolveAnalyticsDeviceId(null)).toBe("fallback-uuid-1");
+		expect(resolveAnalyticsDeviceId({})).toBe("");
+		expect(resolveAnalyticsDeviceId(null)).toBe("");
+		expect(resolveAnalyticsDeviceId({ analyticsDeviceId: "  " })).toBe("");
 	});
 });
 

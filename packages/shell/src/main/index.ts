@@ -1642,8 +1642,12 @@ void app.whenReady().then(async () => {
 
 	// Synchronous anonymous install id for beta analytics (`brainstorm.analyticsDeviceId`).
 	// Pure entropy from feedback-settings — never the device Ed25519 key or a vault id.
+	// Packaged builds only: dev / CI / Playwright shells run with fresh
+	// `--user-data-dir`s, so each launch would mint a new installationId and
+	// register as a brand-new Amplitude user. An empty id keeps the renderer
+	// SDK from initializing analytics at all.
 	ipcMain.on("app:get-analytics-device-id", (event) => {
-		event.returnValue = analyticsDeviceId;
+		event.returnValue = app.isPackaged ? analyticsDeviceId : "";
 	});
 
 	// 13.6 — manual-download update check (app-global). The shell's own
