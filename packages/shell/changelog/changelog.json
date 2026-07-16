@@ -3,6 +3,127 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.4.6",
+      "date": "2026-07-16",
+      "icon": "🩹",
+      "title": "Fixes across the desktop",
+      "summary": "A patch release: editors outside Notes get their styles back, the Files grid stops overlapping tiles, reminders open what they are about, and four apps get shorter names.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What's fixed"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "One editor look everywhere",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Tasks, Journal, Chat and other editor hosts had drifted from Notes: callouts lost their tone icon but kept its empty gutter, the inline toolbar stacked vertically, titles were unstyled, embed cards oversized. The shared editor theme now matches Notes."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files grid",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — resizing the window or changing the tile size no longer paints tiles over each other, and tiles drop the permanent outline — hover and selection still tint them."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Widget empty states",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a widget with a toolbar no longer pushes its empty-state message below centre."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Quieter dev and test data",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — analytics only runs in packaged builds, so dev, CI and test runs stop registering as new users."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "What's new"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notifications open their subject",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — clicking a Calendar or Tasks reminder, in the notification center or the system popup, jumps straight to the event or task."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Snap grid while dragging",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the dashboard shows its alignment grid while you drag an icon, so drops land where you expect."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Shorter app names",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Form Designer, Theme Editor, Web Browser and Code Editor are now Forms, Themes, Browser and Code."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.5",
       "date": "2026-07-15",
       "icon": "🔒",
