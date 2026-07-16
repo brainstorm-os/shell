@@ -491,7 +491,7 @@ function DashboardIconsLayerInner({
 		<div
 			{...containerProps}
 			ref={setSurface}
-			className="dashboard-icons"
+			className={draggingId !== null ? "dashboard-icons dashboard-icons--dragging" : "dashboard-icons"}
 			aria-label={t("shell.dashboard.iconGrid")}
 		>
 			{entryList.map(([id, icon], index) => {
