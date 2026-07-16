@@ -740,6 +740,8 @@
   "shell.settings.updates.restartInstall": "Restart & install",
   "shell.settings.updates.error": "Update failed. {message}",
   "shell.settings.updates.upToDate": "You're on the latest version.",
+  "shell.updates.toast.availableTitle": "Update available",
+  "shell.updates.toast.readyBody": "Restart Brainstorm to finish updating.",
   "shell.settings.updates.unknown": "Couldn't check for updates. Check your connection and try again.",
   "shell.settings.security.backend": "Credentials backend",
   "shell.settings.security.appLock.title": "App lock",

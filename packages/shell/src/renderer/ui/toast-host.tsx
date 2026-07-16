@@ -7,6 +7,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useSyncExternalStore } from "react";
 import { t } from "../i18n/t";
+import { Button, ButtonSize, ButtonVariant } from "./button";
 import { Icon, IconName } from "./icon";
 import { IconButton, IconButtonSize } from "./icon-button";
 import { ToastKind, dismissToast, getSnapshot, subscribe } from "./toasts";
@@ -39,6 +40,20 @@ export function ToastHost() {
 						<div className="toast__body">
 							<p className="toast__title">{toast.title}</p>
 							{toast.body && <p className="toast__detail">{toast.body}</p>}
+							{toast.action && (
+								<div className="toast__action">
+									<Button
+										variant={ButtonVariant.Primary}
+										size={ButtonSize.Sm}
+										onClick={() => {
+											toast.action?.onPress();
+											dismissToast(toast.id);
+										}}
+									>
+										{toast.action.label}
+									</Button>
+								</div>
+							)}
 						</div>
 						<IconButton
 							icon={IconName.Close}

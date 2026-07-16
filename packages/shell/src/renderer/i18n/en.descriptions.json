@@ -370,6 +370,8 @@
   "shell.settings.themes.slate.description": "Description of the 'Slate' theme (neutral-grey surfaces, indigo accent) in the theme picker.",
   "shell.settings.themes.slate.label": "Display name of the 'Slate' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.updates.available": "Status line shown when a newer version exists. {version} is the available version number.",
+  "shell.updates.toast.availableTitle": "Title of the toast shown when a background check finds a newer version. Short.",
+  "shell.updates.toast.readyBody": "Body of the toast shown once an update is downloaded and staged; the action button relaunches the app.",
   "shell.settings.updates.channel": "Row label for the release-channel picker (Stable vs Beta). Short noun phrase.",
   "shell.settings.updates.channel.beta": "Option label for the beta (pre-release) channel. Single word.",
   "shell.settings.updates.channel.description": "One-line note under the release-channel picker: Beta gets newer, possibly less stable builds. Sentence.",

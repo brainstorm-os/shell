@@ -46,6 +46,14 @@ export type ManagedAutoUpdater = {
 	on(handlers: AutoUpdaterHandlers): void;
 };
 
+/** Timing for the background check loop (`startPeriodicChecks`). */
+export type PeriodicCheckOptions = {
+	/** Delay before the first check after boot. */
+	readonly initialDelayMs: number;
+	/** Interval between subsequent checks. */
+	readonly intervalMs: number;
+};
+
 export type AutoUpdateEngineOptions = {
 	readonly updater: ManagedAutoUpdater;
 	/** Resolve the persisted release channel (shared with 13.6 prefs). */
@@ -56,6 +64,15 @@ export type AutoUpdateEngineOptions = {
 	 *  renderer over `UPDATE_STATE_EVENT`). */
 	readonly onState?: (state: AutoUpdateState) => void;
 };
+
+/** States a background tick may re-check from. `Available` is included so
+ *  a pulled/superseded release corrects itself on the next tick. */
+const PERIODIC_CHECK_LIFECYCLES: ReadonlySet<UpdateLifecycle> = new Set([
+	UpdateLifecycle.Idle,
+	UpdateLifecycle.NotAvailable,
+	UpdateLifecycle.Available,
+	UpdateLifecycle.Error,
+]);
 
 export class AutoUpdateEngine {
 	private state: AutoUpdateState;
@@ -116,6 +133,28 @@ export class AutoUpdateEngine {
 	installNow(): void {
 		if (this.state.lifecycle !== UpdateLifecycle.Downloaded) return;
 		this.updater.quitAndInstall();
+	}
+
+	/** Run `check()` in the background: once after `initialDelayMs`, then
+	 *  every `intervalMs`. Detect-only — download and install stay explicit
+	 *  user actions. A tick is skipped while a check or download is in
+	 *  flight, and once an update is staged (`Downloaded`), so a background
+	 *  re-check can never clobber those states. Timers are unref'd; returns
+	 *  a stop function. */
+	startPeriodicChecks(options: PeriodicCheckOptions): () => void {
+		if (!this.supported) return () => {};
+		const tick = () => {
+			if (!PERIODIC_CHECK_LIFECYCLES.has(this.state.lifecycle)) return;
+			void this.check();
+		};
+		const initial = setTimeout(tick, options.initialDelayMs);
+		initial.unref?.();
+		const interval = setInterval(tick, options.intervalMs);
+		interval.unref?.();
+		return () => {
+			clearTimeout(initial);
+			clearInterval(interval);
+		};
 	}
 
 	private registerHandlers(): void {
