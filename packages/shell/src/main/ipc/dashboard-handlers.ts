@@ -213,8 +213,12 @@ async function enrichSnapshot(
 	const rawAppearance = store.snapshot().appearance;
 	const effectiveSlot = effectiveSlotFor(rawAppearance.mode, osPrefersDark());
 	const snap = store.snapshot(effectiveSlot);
-	const hasEntityPin = Object.values(snap.icons).some((i) => i.kind === "entity");
-	if (!hasEntityPin) return { ...snap, pins: {} };
+	// App pins resolve too (live registry labels), not just entity pins —
+	// the entity-only gate left app tiles on their install-time snapshot.
+	const hasResolvablePin = Object.values(snap.icons).some(
+		(i) => i.kind === "entity" || i.kind === "app",
+	);
+	if (!hasResolvablePin) return { ...snap, pins: {} };
 	const registry = await session.dataStores.open("registry");
 	const openersRepo = new OpenersRepository(registry);
 	const intentsRepo = new IntentsRepository(registry);

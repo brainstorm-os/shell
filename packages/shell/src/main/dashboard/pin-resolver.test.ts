@@ -27,7 +27,7 @@ const deps = (
 });
 
 describe("resolvePins", () => {
-	it("skips app and view icons — only entity pins get an entry", () => {
+	it("resolves entity AND app icons; view icons are skipped", () => {
 		const icons: Record<string, IconRecord> = {
 			a: { x: 0, y: 0, kind: "app", target: "io.brainstorm.notes", label: "Notes" },
 			v: { x: 1, y: 0, kind: "view", target: "view-1", label: "All People" },
@@ -37,7 +37,35 @@ describe("resolvePins", () => {
 			icons,
 			deps({ "ent-1": { type: NOTE_TYPE, properties: { title: "Hello" } } }),
 		);
-		expect(Object.keys(out)).toEqual(["e"]);
+		expect(Object.keys(out).sort()).toEqual(["a", "e"]);
+	});
+
+	it("app pins live-resolve their label from the registry — a rename reaches old pins", () => {
+		// The stored label is the install-time snapshot ("Form Designer");
+		// the registry now says "Forms" (903 dogfood: stale pre-rename labels).
+		const icons: Record<string, IconRecord> = {
+			a: { x: 0, y: 0, kind: "app", target: "io.brainstorm.form-designer", label: "Form Designer" },
+		};
+		const out = resolvePins(icons, {
+			getEntity: () => null,
+			resolveOpenerApp: () => null,
+			resolveAppName: (id) => (id === "io.brainstorm.form-designer" ? "Forms" : id),
+		});
+		expect(out.a?.label).toBe("Forms");
+		expect(out.a?.missing).toBe(false);
+	});
+
+	it("an app the registry no longer knows keeps its stored label", () => {
+		const icons: Record<string, IconRecord> = {
+			a: { x: 0, y: 0, kind: "app", target: "io.gone.app", label: "Old Friend" },
+		};
+		const out = resolvePins(icons, {
+			getEntity: () => null,
+			resolveOpenerApp: () => null,
+			// Contract: resolveAppName falls back to the id for unknown apps.
+			resolveAppName: (id) => id,
+		});
+		expect(out.a?.label).toBe("Old Friend");
 	});
 
 	it("derives label from title, icon from properties.icon, badge from opener", () => {

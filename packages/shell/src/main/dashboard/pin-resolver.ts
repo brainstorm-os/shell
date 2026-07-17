@@ -72,8 +72,15 @@ function resolveOne(record: IconRecord, deps: PinResolverDeps): PinResolution {
 }
 
 /**
- * Resolve every `kind === "entity"` icon in the dashboard's icon map to
- * its live presentation. App / view icons are skipped (no map entry).
+ * Resolve every `kind === "entity"` and `kind === "app"` icon in the
+ * dashboard's icon map to its live presentation. View icons are skipped
+ * (no map entry — their label is shell-owned chrome).
+ *
+ * App pins carry only the app id; the label re-resolves from the app
+ * registry on every read, so a manifest rename reaches pins made before
+ * it (903 dogfood: pinned tiles kept pre-rename labels forever). An app
+ * the registry no longer knows keeps its stored label — the same
+ * identifiable-tombstone stance entity pins take.
  */
 export function resolvePins(
 	icons: Record<string, IconRecord>,
@@ -81,6 +88,17 @@ export function resolvePins(
 ): Record<string, PinResolution> {
 	const out: Record<string, PinResolution> = {};
 	for (const [id, record] of Object.entries(icons)) {
+		if (record.kind === "app") {
+			const name = deps.resolveAppName(record.target);
+			out[id] = {
+				label: name !== record.target ? name : record.label || record.target,
+				icon: null,
+				appId: record.target,
+				appName: name,
+				missing: false,
+			};
+			continue;
+		}
 		if (record.kind !== "entity") continue;
 		out[id] = resolveOne(record, deps);
 	}
