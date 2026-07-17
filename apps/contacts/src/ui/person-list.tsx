@@ -15,7 +15,7 @@ import {
 } from "@brainstorm/sdk/object-menu";
 import { Searchbar } from "@brainstorm/sdk/searchbar";
 import { useMemo, useRef } from "react";
-import { type ContactsI18nKey, t } from "../i18n";
+import { type ContactsI18nKey, plural, t } from "../i18n";
 import { type NextBirthday, isBirthdaySoon, nextBirthday } from "../logic/birthday";
 import {
 	CONTACTS_GROUPINGS,
@@ -43,11 +43,14 @@ export type PersonSidebarProps = {
 	sorting: ContactsSorting;
 	/** Shared object-menu context for a row (right-click + hover ⋯). */
 	menuContextFor: (person: Person) => ObjectMenuContext;
+	/** Candidate duplicate groups (F-158). Zero hides the review affordance. */
+	duplicateCount: number;
 	onQueryChange: (q: string) => void;
 	onSelect: (id: string) => void;
 	onCreate: () => void;
 	onSetGrouping: (grouping: ContactsGrouping) => void;
 	onSetSorting: (sorting: ContactsSorting) => void;
+	onReviewDuplicates: () => void;
 };
 
 /** i18n key for each grouping axis's display label. */
@@ -160,11 +163,13 @@ export function PersonSidebar({
 	grouping,
 	sorting,
 	menuContextFor,
+	duplicateCount,
 	onQueryChange,
 	onSelect,
 	onCreate,
 	onSetGrouping,
 	onSetSorting,
+	onReviewDuplicates,
 }: PersonSidebarProps): React.ReactElement {
 	const filtered = useMemo(() => filterPersons(persons, query), [persons, query]);
 	const resolvers = useMemo<PersonViewResolvers>(
@@ -229,6 +234,25 @@ export function PersonSidebar({
 					onSet={onSetSorting}
 				/>
 			</div>
+
+			{duplicateCount > 0 && (
+				<button
+					type="button"
+					className="contacts-list__dups"
+					data-testid="contacts-dups-open"
+					aria-label={plural(
+						duplicateCount,
+						"duplicates.button.aria.one",
+						"duplicates.button.aria.other",
+						{ count: duplicateCount },
+					)}
+					onClick={onReviewDuplicates}
+				>
+					<Icon name={IconName.Copy} size={14} />
+					<span>{t("duplicates.button", { count: duplicateCount })}</span>
+					<span className="contacts-list__dups-cta">{t("duplicates.group.review")}</span>
+				</button>
+			)}
 
 			{demo && <p className="contacts-list__banner">{t("demo.banner")}</p>}
 

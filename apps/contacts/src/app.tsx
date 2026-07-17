@@ -38,6 +38,7 @@ import { plural, t } from "./i18n";
 import { useContactsT } from "./i18n-hooks";
 import { type ComposeDraft, buildCompanyNameIndex, planCompose } from "./logic/compose";
 import { demoEntities } from "./logic/demo";
+import { applyMergeToEntities, findDuplicateGroups, resolveGroups } from "./logic/duplicates";
 import { openEntityRef, resolveOpenTarget } from "./logic/open";
 import { buildPersonEmailIndex, resolvePersonIdByEmails } from "./logic/person-resolver";
 import {
@@ -55,6 +56,7 @@ import { getBrainstorm } from "./runtime";
 import { COMPANY_TYPE, PERSON_TYPE, type Person, type VaultEntityLike } from "./types/person";
 import { ComposeContact } from "./ui/compose-contact";
 import { contactObjectMenuContext } from "./ui/contact-menu";
+import { DuplicatesDialog } from "./ui/duplicates-dialog";
 import { NoSelection } from "./ui/no-selection";
 import { type Location, PersonDetail } from "./ui/person-detail";
 import { PersonSidebar } from "./ui/person-list";
@@ -219,6 +221,7 @@ export function ContactsApp(): ReactElement {
 	const [grouping, setGrouping] = useState<ContactsGrouping>(readGroupingPref);
 	const [sorting, setSorting] = useState<ContactsSorting>(readSortingPref);
 	const [composeOpen, setComposeOpen] = useState(false);
+	const [duplicatesOpen, setDuplicatesOpen] = useState(false);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 	// When the shell launches Contacts to open a Company (a company link from
 	// any app routes here, since Contacts owns the `Company/v1` opener), we land
@@ -476,6 +479,57 @@ export function ContactsApp(): ReactElement {
 
 	const companyNameOf = useCallback((id: string | null) => resolveName(nameIndex, id), [nameIndex]);
 
+	// F-158 — duplicate detection over the live person set (shared email →
+	// strong match, shared normalized name → candidate), with createdAt
+	// breaking survivor ties toward the oldest record. In vault mode the
+	// merge is the shell's `entities.merge` (links + refs repointed, losers
+	// binned); an older shell without it hides the affordance rather than
+	// offering a merge that can't keep links intact.
+	const createdAtIndex = useMemo(() => {
+		const index = new Map<string, number>();
+		for (const e of allEntities) index.set(e.id, (e as Partial<VaultEntity>).createdAt ?? 0);
+		return index;
+	}, [allEntities]);
+	const duplicateGroups = useMemo(
+		() =>
+			resolveGroups(
+				findDuplicateGroups(persons, (id) => createdAtIndex.get(id) ?? 0),
+				persons,
+			),
+		[persons, createdAtIndex],
+	);
+	const canMerge = usingVault ? Boolean(entitiesSvc?.merge) : true;
+	const duplicateCount = canMerge ? duplicateGroups.length : 0;
+
+	const mergeContacts = useCallback(
+		async (survivorId: string, loserIds: string[], patch: Record<string, unknown>) => {
+			setDuplicatesOpen(false);
+			const survivor = persons.find((p) => p.id === survivorId);
+			const mergedCount = loserIds.length + 1;
+			try {
+				if (usingVault && entitiesSvc?.merge) {
+					await entitiesSvc.merge(survivorId, loserIds, patch);
+					// Drop merged-away rows from the optimistic overlay so a
+					// not-yet-broadcast duplicate can't resurface after the merge.
+					setOptimistic((prev) => prev.filter((e) => !loserIds.includes(e.id)));
+				} else {
+					setDemo((prev) => applyMergeToEntities(prev, survivorId, loserIds, patch));
+				}
+				// If the open contact was merged away, land on the survivor.
+				if (location.id && loserIds.includes(location.id)) select(survivorId);
+				notify?.(
+					t("duplicates.merged", {
+						count: mergedCount,
+						name: survivor?.name || t("row.noName"),
+					}),
+				);
+			} catch {
+				notify?.(t("duplicates.mergeFailed"));
+			}
+		},
+		[usingVault, entitiesSvc, persons, location.id, select, notify],
+	);
+
 	// Export every visible person as a vCard document (company id → resolved name).
 	const exportVCard = useCallback(() => {
 		if (!filesSvc) return;
@@ -682,11 +736,13 @@ export function ContactsApp(): ReactElement {
 					grouping={grouping}
 					sorting={sorting}
 					menuContextFor={menuContextFor}
+					duplicateCount={duplicateCount}
 					onQueryChange={setQuery}
 					onSelect={select}
 					onCreate={() => setComposeOpen(true)}
 					onSetGrouping={setGroupingPref}
 					onSetSorting={setSortingPref}
+					onReviewDuplicates={() => setDuplicatesOpen(true)}
 				/>
 				{sidebarOpen && (
 					<div className="contacts__resize" aria-label={t("sidebar.resize")} {...handleProps} />
@@ -748,6 +804,15 @@ export function ContactsApp(): ReactElement {
 				<ComposeContact
 					onCreate={(draft) => void createContact(draft)}
 					onClose={() => setComposeOpen(false)}
+				/>
+			)}
+
+			{duplicatesOpen && (
+				<DuplicatesDialog
+					groups={duplicateGroups}
+					companyNameOf={companyNameOf}
+					onMerge={(survivorId, loserIds, patch) => void mergeContacts(survivorId, loserIds, patch)}
+					onClose={() => setDuplicatesOpen(false)}
 				/>
 			)}
 
