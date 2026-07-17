@@ -798,6 +798,11 @@ export type AnytypeImportOptions = {
 	 *  editor is non-empty. When omitted, only the property-bag snippet lands
 	 *  (tests that don't care about the editor can skip it). */
 	readonly applyDocUpdate?: ApplyDocUpdate;
+	/** Precomputed {@link parseAnytypeExport} result — the wizard parses once
+	 *  at pick time (for the preview count) and hands the plan to the run so
+	 *  the export isn't parsed twice. When omitted the run parses `files`
+	 *  itself (tests / other callers are unaffected). */
+	readonly plan?: AnytypeImportPlan;
 };
 
 export type AnytypeImportReport = {
@@ -827,11 +832,27 @@ export async function importAnytypeExport(
 	options: AnytypeImportOptions,
 	attachments: readonly AnytypeAttachment[] = [],
 ): Promise<AnytypeImportReport> {
-	const plan = parseAnytypeExport(
-		files,
-		attachments.map((a) => a.path),
-	);
+	const plan =
+		options.plan ??
+		parseAnytypeExport(
+			files,
+			attachments.map((a) => a.path),
+		);
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	// Resolve every dedupe key (objects, referenced files, collections) in one
+	// batched query up front — one map hit per row in the loops below instead
+	// of one full-table `json_extract` scan per entity.
+	const dedupeKeys: string[] = [];
+	for (const draft of plan.entities) dedupeKeys.push(`${options.source}:${draft.externalId}`);
+	for (const link of plan.fileLinks) {
+		dedupeKeys.push(`${options.source}:file:${link.fileObjectId}`);
+	}
+	for (const draft of plan.collections)
+		dedupeKeys.push(anytypeCollectionId(options.source, draft.id));
+	const existingByKey = new Map<string, string>();
+	for (const { id, value } of repo.listIdsWithPropertyIn(IMPORT_EXTERNAL_ID_PROP, dedupeKeys)) {
+		if (!existingByKey.has(value)) existingByKey.set(value, id);
+	}
 	const idByExternal = new Map<string, string>();
 	let created = 0;
 	let updated = 0;
@@ -855,7 +876,7 @@ export async function importAnytypeExport(
 		}
 		const draft = plan.entities[i] as (typeof plan.entities)[number];
 		const externalKey = `${options.source}:${draft.externalId}`;
-		const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, externalKey)[0] ?? null;
+		const existing = existingByKey.get(externalKey) ?? null;
 		const properties: Record<string, unknown> = {
 			...draft.properties,
 			title: draft.title,
@@ -881,6 +902,9 @@ export async function importAnytypeExport(
 				dekId: null,
 			});
 			idByExternal.set(draft.externalId, id);
+			// A later draft with the same external id must update, not duplicate
+			// (matches the old per-entity re-query semantics).
+			existingByKey.set(externalKey, id);
 			entityId = id;
 			created++;
 		}
@@ -909,7 +933,7 @@ export async function importAnytypeExport(
 		if (!path || !bytes) continue;
 		const name = path.slice(path.lastIndexOf("/") + 1);
 		const externalKey = `${options.source}:file:${link.fileObjectId}`;
-		const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, externalKey)[0] ?? null;
+		const existing = existingByKey.get(externalKey) ?? null;
 		const mime = servedMimeForName(name);
 		const { assetId } = await assetStore.writeAsset({ bytes, mime, kind: AssetKind.Upload });
 		assetStore.markBound(assetId);
@@ -1026,7 +1050,7 @@ export async function importAnytypeExport(
 				updatedAt: options.now,
 			};
 			const props = listToEntityProperties(collection);
-			const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, collection.id)[0] ?? null;
+			const existing = existingByKey.get(collection.id) ?? null;
 			const withMarker = { ...props, [IMPORT_EXTERNAL_ID_PROP]: collection.id };
 			if (existing !== null) {
 				repo.update(existing, withMarker, options.now);

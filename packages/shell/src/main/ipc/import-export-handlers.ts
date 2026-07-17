@@ -24,6 +24,7 @@ import { exportVaultBundle } from "../bundle/vault-export";
 import {
 	type AnytypeAttachment,
 	type AnytypeFile,
+	type AnytypeImportPlan,
 	importAnytypeExport,
 	parseAnytypeExport,
 } from "../import/anytype-import";
@@ -120,12 +121,22 @@ export type NotionSourcePreview = {
 	readonly pageCount: number;
 };
 
-/** A picked Anytype export (`.zip` or folder), loaded into memory + bound to
- *  its vault. */
+/** A picked Anytype export (`.zip` or folder), bound to its vault. The
+ *  snapshot JSONs are held as text and parsed ONCE at pick time (`plan` is
+ *  reused by the run). Binary handling differs by source: a zip is already
+ *  fully in memory, so only the plan-referenced attachments are kept
+ *  (`attachments`); a folder pick records paths only (`root` +
+ *  `referencedPaths`) and the bytes are read lazily at run time — mirroring
+ *  the Obsidian `walkVault` pattern. */
 type PendingAnytype = {
 	readonly archiveName: string;
 	readonly files: readonly AnytypeFile[];
-	readonly attachments: readonly AnytypeAttachment[];
+	readonly plan: AnytypeImportPlan;
+	/** Zip pick: plan-referenced attachment bytes, already in memory. */
+	readonly attachments: readonly AnytypeAttachment[] | null;
+	/** Folder pick: root to read `referencedPaths` from at run time. */
+	readonly root: string | null;
+	readonly referencedPaths: readonly string[];
 	readonly vaultId: string;
 };
 let pendingAnytype: PendingAnytype | null = null;
@@ -176,6 +187,56 @@ async function walkExportFolder(root: string, limits: ZipReadLimits): Promise<Wa
 		out.push({ path, bytes });
 	}
 	return out;
+}
+
+/** Recursively scan an unzipped Anytype export: read every snapshot JSON's
+ *  text into memory (same entry/total ceilings the zip reader enforces) and
+ *  collect the export-relative paths of every other file WITHOUT reading its
+ *  bytes — only the binaries the parsed plan references are read later, at
+ *  run time (mirrors the Obsidian `walkVault` pattern). Symlinks are skipped
+ *  (`isFile()` is false for them), so the walk can't escape the folder. */
+async function walkAnytypeExportFolder(
+	root: string,
+): Promise<{ files: AnytypeFile[]; attachmentPaths: string[] }> {
+	const dirents = await readdir(root, { recursive: true, withFileTypes: true });
+	const files: AnytypeFile[] = [];
+	const attachmentPaths: string[] = [];
+	let totalBytes = 0;
+	let entries = 0;
+	for (const dirent of dirents) {
+		if (!dirent.isFile()) continue;
+		const parent = (dirent as unknown as { parentPath?: string; path?: string }).parentPath ?? root;
+		const absolute = join(parent, dirent.name);
+		const path = relative(root, absolute).split(sep).join("/");
+		if (++entries > ANYTYPE_ZIP_LIMITS.maxEntries) {
+			throw new Error("import-export: export has too many files");
+		}
+		if (!ANYTYPE_JSON_EXT.test(path)) {
+			attachmentPaths.push(path);
+			continue;
+		}
+		const text = await readFile(absolute, "utf8");
+		const bytes = Buffer.byteLength(text, "utf8");
+		totalBytes += bytes;
+		if (bytes > ANYTYPE_ZIP_LIMITS.maxEntryBytes || totalBytes > ANYTYPE_ZIP_LIMITS.maxTotalBytes) {
+			throw new Error("import-export: export is too large");
+		}
+		files.push({ path, text });
+	}
+	return { files, attachmentPaths };
+}
+
+/** The export-relative binary paths the plan actually consumes at run time —
+ *  a `fileLinks` edge resolved through `fileBinaryByObject`. Everything else
+ *  in the export is never read (folder pick) or not carried past the pick
+ *  (zip pick). */
+function anytypeReferencedBinaryPaths(plan: AnytypeImportPlan): Set<string> {
+	const referenced = new Set<string>();
+	for (const link of plan.fileLinks) {
+		const path = plan.fileBinaryByObject.get(link.fileObjectId);
+		if (path) referenced.add(path);
+	}
+	return referenced;
 }
 
 function requirePendingAnytypeFor(vaultId: string): PendingAnytype {
@@ -720,39 +781,43 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		const archivePath = result.filePaths[0];
 		if (!archivePath) return null;
 		const files: AnytypeFile[] = [];
-		const attachments: AnytypeAttachment[] = [];
+		let attachmentPaths: string[] = [];
+		let zipAttachments: AnytypeAttachment[] | null = null;
 		const picked = await stat(archivePath);
 		if (picked.isDirectory()) {
-			for (const entry of await walkExportFolder(archivePath, ANYTYPE_ZIP_LIMITS)) {
-				if (ANYTYPE_JSON_EXT.test(entry.path)) {
-					files.push({ path: entry.path, text: Buffer.from(entry.bytes).toString("utf8") });
-				} else {
-					attachments.push({ path: entry.path, bytes: entry.bytes });
-				}
-			}
+			// Folder pick: snapshot JSON text only; binary bytes are read lazily
+			// at run time (only the paths the plan references).
+			const walked = await walkAnytypeExportFolder(archivePath);
+			files.push(...walked.files);
+			attachmentPaths = walked.attachmentPaths;
 		} else {
 			const bytes = new Uint8Array(await readFile(archivePath));
+			zipAttachments = [];
 			for (const entry of readZip(bytes, ANYTYPE_ZIP_LIMITS)) {
 				// Snapshot JSONs live per-kind folders or the root; binaries live in
 				// `files/` (a stray .json there is a snapshot too — the parser decides).
 				if (ANYTYPE_JSON_EXT.test(entry.path)) {
 					files.push({ path: entry.path, text: zipEntryText(entry) });
 				} else {
-					attachments.push({ path: entry.path, bytes: entry.bytes });
+					zipAttachments.push({ path: entry.path, bytes: entry.bytes });
 				}
 			}
+			attachmentPaths = zipAttachments.map((a) => a.path);
 		}
+		// Parse ONCE — the plan feeds the preview count here and the run later.
+		const plan = parseAnytypeExport(files, attachmentPaths);
+		const referenced = anytypeReferencedBinaryPaths(plan);
 		pendingAnytype = {
 			archiveName: basename(archivePath),
 			files,
-			attachments,
+			plan,
+			// Zip: the bytes are already in memory — keep only what the plan uses.
+			attachments: zipAttachments ? zipAttachments.filter((a) => referenced.has(a.path)) : null,
+			root: picked.isDirectory() ? archivePath : null,
+			referencedPaths: [...referenced],
 			vaultId: session.vaultId,
 		};
-		const objectCount = parseAnytypeExport(
-			files,
-			attachments.map((a) => a.path),
-		).entities.length;
-		return { archiveName: basename(archivePath), objectCount };
+		return { archiveName: basename(archivePath), objectCount: plan.entities.length };
 	});
 
 	ipcMain.handle(
@@ -761,6 +826,11 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			const session = requireSession();
 			const type = requireTargetType(targetType);
 			const pending = requirePendingAnytypeFor(session.vaultId);
+			// Zip pick: referenced bytes already in memory. Folder pick: read only
+			// the plan-referenced binaries now (bounded, root-confined).
+			const attachments: readonly AnytypeAttachment[] =
+				pending.attachments ??
+				(pending.root ? await readReferencedAttachments(pending.root, pending.referencedPaths) : []);
 			const applyDocUpdate = applyDocUpdateFor(session);
 			const controller = new AbortController();
 			activeRun = controller;
@@ -776,9 +846,10 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 						importedBy: IMPORT_AUTHOR,
 						signal: controller.signal,
 						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+						plan: pending.plan,
 						...(applyDocUpdate ? { applyDocUpdate } : {}),
 					},
-					pending.attachments,
+					attachments,
 				);
 				pendingAnytype = null;
 				// Surface missing media so the UI can explain why images didn't land —

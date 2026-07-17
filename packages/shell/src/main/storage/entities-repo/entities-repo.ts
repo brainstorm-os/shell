@@ -323,6 +323,38 @@ export class EntitiesRepository {
 	}
 
 	/**
+	 * Batched {@link listIdsWithProperty}: every live (id, value) pair whose
+	 * `properties.<key>` equals any of `values`, in one scan per chunk instead
+	 * of one full-table `json_extract` scan per value. The importers use this
+	 * to resolve thousands of external-id dedupe keys up front (IE-5/6/7
+	 * idempotent re-import) and then hit a Map in their per-entity loops.
+	 * Chunked + NULL-padded like `linksFromMany` so the prepared-statement
+	 * cache holds ONE entry; NULL never matches a real value. The key is
+	 * charset-validated (same rule as query paths); values are always bound.
+	 */
+	listIdsWithPropertyIn(
+		key: string,
+		values: readonly string[],
+	): Array<{ id: string; value: string }> {
+		if (values.length === 0) return [];
+		const path = jsonPath(key);
+		const chunkSize = 500;
+		const placeholders = new Array(chunkSize).fill("?").join(",");
+		const sql = `SELECT id, json_extract(properties, '${path}') AS value FROM entities
+		             WHERE json_extract(properties, '${path}') IN (${placeholders})
+		               AND deleted_at IS NULL`;
+		const out: Array<{ id: string; value: string }> = [];
+		const padding = new Array<unknown>(chunkSize);
+		for (let start = 0; start < values.length; start += chunkSize) {
+			const chunk = values.slice(start, start + chunkSize);
+			for (let i = 0; i < chunkSize; i += 1) padding[i] = i < chunk.length ? chunk[i] : null;
+			const rows = this.stmt(sql).all(...padding) as Array<{ id: string; value: string }>;
+			for (const row of rows) out.push(row);
+		}
+		return out;
+	}
+
+	/**
 	 * Distinct `assetId` values referenced by a LIVE (non-deleted) entity —
 	 * the reachable set the Files "Storage" view filters bound blobs against,
 	 * so a soft-deleted (Bin) or purged upload stops counting toward vault
