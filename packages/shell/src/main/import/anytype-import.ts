@@ -337,6 +337,15 @@ function normalizeRelationFormat(value: unknown): string | null {
 	return null;
 }
 
+/** The export's binary-filename slug: lowercase, runs of anything outside
+ *  [a-z0-9_] collapse to a single dash, edge dashes trimmed. */
+function slugStem(value: string): string {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9_]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
 /** "ot-page" → "Page" — display fallback when the type object isn't present. */
 function prettifyTypeKey(key: string): string {
 	const stem = key.replace(/^ot-/, "").replace(/[-_]+/g, " ").trim();
@@ -510,20 +519,53 @@ export function parseAnytypeExport(
 	const fileObjectIds = new Set<string>();
 	// Index every attachment path by several lookup keys so export layouts
 	// that put binaries under `files/`, `filesObjects/`, or the root still
-	// resolve: basename, full path, and stem (no extension).
+	// resolve: basename, full path, stem (no extension), and slugged stem —
+	// real with-files exports write binaries under SLUGIFIED names
+	// ("Screenshot 2026-03-20 at 09.21.27" → screenshot-2026-03-20-at-09-21-27.png:
+	// lowercased, runs outside [a-z0-9_] collapsed to a dash) and TRUNCATE
+	// long stems (observed cap 46 chars), so display names never match
+	// verbatim (F-396 — a 460MB export reported all 406 files missing).
 	const attachmentByKey = new Map<string, string>();
+	const stemsByExt = new Map<string, Array<{ stem: string; path: string }>>();
 	for (const path of attachmentPaths) {
 		const base = path.slice(path.lastIndexOf("/") + 1);
 		attachmentByKey.set(path, path);
 		attachmentByKey.set(base, path);
 		const dot = base.lastIndexOf(".");
-		if (dot > 0) attachmentByKey.set(base.slice(0, dot), path);
+		if (dot > 0) {
+			const stem = base.slice(0, dot);
+			const ext = base.slice(dot + 1).toLowerCase();
+			attachmentByKey.set(stem, path);
+			attachmentByKey.set(`slug:${slugStem(stem)}.${ext}`, path);
+			const pool = stemsByExt.get(ext) ?? [];
+			pool.push({ stem: slugStem(stem), path });
+			stemsByExt.set(ext, pool);
+		}
 	}
+	/** Slug-aware lookup: exact slugged stem+ext first, then the unique
+	 *  truncation match (the on-disk stem is a ≥8-char prefix of the full
+	 *  slugged name). Ambiguity returns nothing — never guess. */
+	const findBySlug = (stem: string, ext: string): string | undefined => {
+		const slugged = slugStem(stem);
+		if (slugged.length === 0) return undefined;
+		const exact = attachmentByKey.get(`slug:${slugged}.${ext}`);
+		if (exact) return exact;
+		const prefixed = (stemsByExt.get(ext) ?? []).filter(
+			(e) => e.stem.length >= 8 && slugged.startsWith(e.stem),
+		);
+		return prefixed.length === 1 ? prefixed[0]?.path : undefined;
+	};
 	const findBinary = (...candidates: Array<string | null | undefined>): string | undefined => {
 		for (const c of candidates) {
 			if (!c) continue;
-			const hit = attachmentByKey.get(c) ?? attachmentByKey.get(c.slice(c.lastIndexOf("/") + 1));
+			const base = c.slice(c.lastIndexOf("/") + 1);
+			const hit = attachmentByKey.get(c) ?? attachmentByKey.get(base);
 			if (hit) return hit;
+			const dot = base.lastIndexOf(".");
+			if (dot > 0) {
+				const slugHit = findBySlug(base.slice(0, dot), base.slice(dot + 1).toLowerCase());
+				if (slugHit) return slugHit;
+			}
 		}
 		return undefined;
 	};

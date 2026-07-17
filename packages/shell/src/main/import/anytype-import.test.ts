@@ -375,6 +375,53 @@ describe("parseAnytypeExport", () => {
 		expect(noted.entities[0]?.title).toBe("Typed title");
 	});
 
+	it("matches binaries through the export's filename slug + truncation (F-396)", () => {
+		const plan = parseAnytypeExport(
+			[
+				snapshotFile("f-slug", "FileObject", {
+					details: { name: "Screenshot 2026-03-20 at 09.21.27", fileExt: "png" },
+				}),
+				snapshotFile("f-trunc", "FileObject", {
+					details: {
+						name: "15649 18_15 A1.2 Mo+Mi 2025-09-10 07_00 PM-[1757531820384]",
+						fileExt: "pdf",
+					},
+				}),
+				snapshotFile("obj-f", "Page", {
+					details: { name: "Media page" },
+					blocks: [
+						{ id: "obj-f", childrenIds: ["fb1", "fb2"] },
+						{ id: "fb1", file: { targetObjectId: "f-slug", type: "Image" } },
+						{ id: "fb2", file: { targetObjectId: "f-trunc", type: "File" } },
+					],
+				}),
+			],
+			[
+				"files/screenshot-2026-03-20-at-09-21-27.png",
+				// The export truncates long stems (observed cap 46 chars).
+				"files/15649-18_15-a1-2-mo-mi-2025-09-10-07_00-pm-175.pdf",
+			],
+		);
+		expect(plan.fileBinaryByObject.get("f-slug")).toBe("files/screenshot-2026-03-20-at-09-21-27.png");
+		expect(plan.fileBinaryByObject.get("f-trunc")).toBe(
+			"files/15649-18_15-a1-2-mo-mi-2025-09-10-07_00-pm-175.pdf",
+		);
+		expect(plan.fileLinks).toHaveLength(2);
+		expect(plan.filesMissingBinary).toBe(0);
+	});
+
+	it("never guesses on an ambiguous truncation prefix", () => {
+		const plan = parseAnytypeExport(
+			[
+				snapshotFile("f-a", "FileObject", {
+					details: { name: "report final version A", fileExt: "pdf" },
+				}),
+			],
+			["files/report-f.pdf", "files/report-fi.pdf"],
+		);
+		expect(plan.fileBinaryByObject.has("f-a")).toBe(false);
+	});
+
 	it("falls back to the snippet for an unnamed object and Untitled past that", () => {
 		const unnamed = parseAnytypeExport([
 			snapshotFile("obj-x", "Page", { details: { snippet: "First line\nSecond" } }),
