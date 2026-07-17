@@ -57,8 +57,15 @@ const FILES: AnytypeFile[] = [
 	snapshotFile("rel-effort", "STRelation", {
 		details: { name: "Effort", relationKey: "bafyeffortkey" },
 	}),
+	snapshotFile("rel-due", "STRelation", {
+		details: { name: "Due date", relationKey: "dueDate", relationFormat: 4 },
+	}),
+	snapshotFile("rel-owner", "STRelation", {
+		details: { name: "Owner", relationKey: "bafyownerkey", relationFormat: 100 },
+	}),
 	snapshotFile("opt-urgent", "STRelationOption", { details: { name: "Urgent" } }),
-	snapshotFile("file-1", "FileObject", { details: { name: "diagram.png" } }),
+	// Real exports name file objects WITHOUT the extension; fileExt is separate.
+	snapshotFile("file-1", "FileObject", { details: { name: "diagram", fileExt: "png" } }),
 	snapshotFile("file-2", "FileObject", { details: { name: "missing.bin" } }),
 
 	// A page exercising blocks, marks, mentions, links, files, bookmarks.
@@ -69,6 +76,7 @@ const FILES: AnytypeFile[] = [
 			description: "Rebuild everything",
 			tag: ["opt-urgent", "opt-ghost"],
 			bafyeffortkey: 5,
+			bafyownerkey: "obj-b",
 			syncError: 3,
 			isArchived: false,
 		},
@@ -95,7 +103,7 @@ const FILES: AnytypeFile[] = [
 				marks: { marks: [{ range: { from: 4, to: 12 }, type: "Mention", param: "obj-b" }] },
 			}),
 			{ id: "b7", link: { targetBlockId: "obj-b" } },
-			{ id: "b8", file: { targetObjectId: "file-1" } },
+			{ id: "b8", file: { targetObjectId: "file-1", name: "diagram.png", type: "Image" } },
 			{ id: "b9", bookmark: { url: "https://anytype.io", title: "Anytype" } },
 			{ id: "b10", file: { targetObjectId: "file-2" } },
 			{ id: "b11", div: { style: "Line" } },
@@ -105,7 +113,7 @@ const FILES: AnytypeFile[] = [
 	// A task typed by the schema object above.
 	snapshotFile("obj-b", "Page", {
 		objectTypes: ["ot-task"],
-		details: { name: "Ship importer", done: true },
+		details: { name: "Ship importer", done: true, dueDate: 1774254674 },
 		blocks: [
 			{ id: "obj-b", childrenIds: ["c1"] },
 			text("c1", "mention a ghost", "Paragraph", {
@@ -200,6 +208,13 @@ describe("parseAnytypeExport", () => {
 		expect(b?.properties.done).toBe(true);
 	});
 
+	it("converts values by relation format: dates → ISO, object refs → names", () => {
+		const b = plan.entities.find((e) => e.externalId === "obj-b");
+		expect(b?.properties["Due date"]).toBe(new Date(1774254674 * 1000).toISOString());
+		const a = plan.entities.find((e) => e.externalId === "obj-a");
+		expect(a?.properties.Owner).toBe("Ship importer");
+	});
+
 	it("renders the block tree to markdown, skipping chrome blocks", () => {
 		const body = String(plan.entities.find((e) => e.externalId === "obj-a")?.properties.body);
 		expect(body).toContain("**bold** and [linked](https://example.com)");
@@ -208,6 +223,8 @@ describe("parseAnytypeExport", () => {
 		expect(body).toContain("- Parent item\n  - Nested item");
 		expect(body).toContain("[Anytype](https://anytype.io)");
 		expect(body).toContain("---");
+		// File blocks leave an inline trace (image syntax for images).
+		expect(body).toContain("![diagram.png](diagram.png)");
 		// The Title chrome block is details-borne, not body content.
 		expect(body).not.toContain("Project Phoenix");
 	});
@@ -227,6 +244,24 @@ describe("parseAnytypeExport", () => {
 		]);
 	});
 
+	it("matches a file block to a binary by its inline name when the object index misses", () => {
+		const loose = parseAnytypeExport(
+			[
+				snapshotFile("obj-l", "Page", {
+					details: { name: "Loose" },
+					blocks: [
+						{ id: "obj-l", childrenIds: ["f1"] },
+						{ id: "f1", file: { targetObjectId: "ghost-file", name: "loose.png", type: "Image" } },
+					],
+				}),
+			],
+			["files/loose.png"],
+		);
+		expect(loose.fileLinks).toEqual([{ fromObject: "obj-l", fileObjectId: "path:files/loose.png" }]);
+		expect(loose.fileBinaryByObject.get("path:files/loose.png")).toBe("files/loose.png");
+		expect(loose.unresolved).toEqual([]);
+	});
+
 	it("falls back to the snippet for an unnamed object and Untitled past that", () => {
 		const unnamed = parseAnytypeExport([
 			snapshotFile("obj-x", "Page", { details: { snippet: "First line\nSecond" } }),
@@ -242,6 +277,8 @@ describe("deriveTypeSchemas", () => {
 		const task = schemas.find((s) => s.type === "Task");
 		expect(task?.properties).toEqual([
 			{ key: "done", name: "done", icon: null, valueType: ValueType.Boolean },
+			// The ISO-converted date value infers as a Date property.
+			{ key: "due-date", name: "Due date", icon: null, valueType: ValueType.Date },
 		]);
 		const page = schemas.find((s) => s.type === "Seite");
 		const effort = page?.properties.find((p) => p.key === "effort");

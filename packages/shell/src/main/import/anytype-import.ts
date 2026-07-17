@@ -190,6 +190,15 @@ const SYSTEM_DETAIL_KEYS: ReadonlySet<string> = new Set([
 	"createdInContextRef",
 	"pluralName",
 	"iconName",
+	"migrationObjectContext",
+	"autoWidgetTargets",
+	"globalName",
+	"homepage",
+	"identityProfileLink",
+	"participantPermissions",
+	"participantStatus",
+	"spaceType",
+	"spaceUxType",
 	"templateIsBundled",
 ]);
 
@@ -259,6 +268,18 @@ function parseSnapshot(file: AnytypeFile): Snapshot | null {
 			: [],
 		collectionMembers: memberIds && memberIds.length > 0 ? memberIds : null,
 	};
+}
+
+/** Anytype's protobuf `RelationFormat` — the JSON export may carry the enum
+ *  as its number or its name. Normalized to the names this importer acts on;
+ *  formats it doesn't convert (status/tag resolve through options anyway)
+ *  return null. */
+function normalizeRelationFormat(value: unknown): string | null {
+	if (value === 4 || value === "date") return "date";
+	if (value === 6 || value === "checkbox") return "checkbox";
+	if (value === 100 || value === "object") return "object";
+	if (value === 5 || value === "file") return "file";
+	return null;
 }
 
 /** "ot-page" → "Page" — display fallback when the type object isn't present. */
@@ -334,7 +355,7 @@ type BlockContext = {
 	readonly lines: string[];
 	readonly onMention: (target: string) => void;
 	readonly onLinkBlock: (target: string) => void;
-	readonly onFileBlock: (fileObjectId: string) => void;
+	readonly onFileBlock: (fileObjectId: string, name: string | null, image: boolean) => void;
 	/** Numbered-list counters keyed by depth. */
 	readonly counters: Map<number, number>;
 	readonly visited: Set<string>;
@@ -391,7 +412,14 @@ function renderBlock(id: string, depth: number, ctx: BlockContext): void {
 		if (style !== "Numbered") ctx.counters.delete(depth);
 	} else if (file) {
 		const target = asString(file.targetObjectId) ?? asString(file.hash);
-		if (target) ctx.onFileBlock(target);
+		const name = asString(file.name);
+		// Keep a trace of the attachment in the body (Notion parity: the link
+		// may be dead until the asset lands, but the reference survives).
+		if (name) {
+			const targetRef = /\s/.test(name) ? `<${name}>` : name;
+			ctx.lines.push(`${file.type === "Image" ? "!" : ""}[${name}](${targetRef})`);
+		}
+		if (target) ctx.onFileBlock(target, name, file.type === "Image");
 	} else if (link) {
 		const target = asString(link.targetBlockId);
 		if (target) ctx.onLinkBlock(target);
@@ -416,11 +444,13 @@ export function parseAnytypeExport(
 		if (snapshot) snapshots.push(snapshot);
 	}
 
-	// Pass 1 — schema indices: type names, relation names, option labels, and
-	// the file-object → binary index.
+	// Pass 1 — schema indices: type names, relation names + formats, option
+	// labels, a global id → name index, and the file-object → binary index.
 	const typeNameByKey = new Map<string, string>(); // uniqueKey AND object id → name
 	const relationNameByKey = new Map<string, string>();
+	const relationFormatByKey = new Map<string, string>();
 	const optionLabelById = new Map<string, string>();
+	const nameById = new Map<string, string>();
 	const fileBinaryByObject = new Map<string, string>();
 	const fileObjectIds = new Set<string>();
 	const attachmentByBasename = new Map<string, string>();
@@ -429,6 +459,7 @@ export function parseAnytypeExport(
 	}
 	for (const snap of snapshots) {
 		const name = asString(snap.details.name);
+		if (name) nameById.set(snap.id, name);
 		if (snap.sbType === "STType") {
 			if (name) {
 				typeNameByKey.set(snap.id, name);
@@ -442,11 +473,19 @@ export function parseAnytypeExport(
 		} else if (snap.sbType === "STRelation") {
 			const key = asString(snap.details.relationKey);
 			if (key && name) relationNameByKey.set(key, name);
+			const format = normalizeRelationFormat(snap.details.relationFormat);
+			if (key && format) relationFormatByKey.set(key, format);
 		} else if (snap.sbType === "STRelationOption") {
 			if (name) optionLabelById.set(snap.id, name);
 		} else if (FILE_SB_TYPES.has(snap.sbType)) {
 			fileObjectIds.add(snap.id);
-			const binary = name ? attachmentByBasename.get(name) : undefined;
+			// The file object's display name usually lacks the extension the
+			// binary carries (`fileExt` is a separate detail) — try both.
+			const ext = asString(snap.details.fileExt);
+			const binary = name
+				? (attachmentByBasename.get(name) ??
+					(ext ? attachmentByBasename.get(`${name}.${ext}`) : undefined))
+				: undefined;
 			if (binary) fileBinaryByObject.set(snap.id, binary);
 		}
 	}
@@ -462,12 +501,22 @@ export function parseAnytypeExport(
 		return true;
 	});
 	const objectIds = new Set(importable.map((s) => s.id));
-	const resolveOption = (value: unknown): unknown => {
-		if (typeof value === "string") return optionLabelById.get(value) ?? value;
-		if (Array.isArray(value)) {
-			return value.map((v) => (typeof v === "string" ? (optionLabelById.get(v) ?? v) : v));
-		}
-		return value;
+	// Value conversion per the relation's declared format: unix-second dates →
+	// ISO strings, object/file references → their display names; everything
+	// else resolves tag/select option ids to labels and passes through.
+	const resolveValue = (key: string, value: unknown): unknown => {
+		const format = relationFormatByKey.get(key);
+		const one = (v: unknown): unknown => {
+			if (format === "date" && typeof v === "number" && Number.isFinite(v)) {
+				return new Date(v * 1000).toISOString();
+			}
+			if ((format === "object" || format === "file") && typeof v === "string") {
+				return nameById.get(v) ?? v;
+			}
+			if (typeof v === "string") return optionLabelById.get(v) ?? v;
+			return v;
+		};
+		return Array.isArray(value) ? value.map(one) : one(value);
 	};
 
 	const entities: AnytypeEntityDraft[] = [];
@@ -494,6 +543,23 @@ export function parseAnytypeExport(
 			else if (fileObjectIds.has(target)) filesMissingBinary++;
 			else unresolved.push({ from: snap.id, target });
 		};
+		const addFileLink = (target: string, name: string | null): void => {
+			// A file block that misses the object index can still match an export
+			// binary by its inline file name (the block carries name/mime/size).
+			if (!fileObjectIds.has(target) && !fileBinaryByObject.has(target) && name) {
+				const path = attachmentByBasename.get(name);
+				if (path) {
+					const pseudoId = `path:${path}`;
+					fileBinaryByObject.set(pseudoId, path);
+					const key = `${snap.id}→${pseudoId}`;
+					if (seenLink.has(key)) return;
+					seenLink.add(key);
+					fileLinks.push({ fromObject: snap.id, fileObjectId: pseudoId });
+					return;
+				}
+			}
+			addLink(target);
+		};
 
 		const byId = new Map(snap.blocks.map((b) => [asString(b.id) ?? "", b] as const));
 		const ctx: BlockContext = {
@@ -501,7 +567,7 @@ export function parseAnytypeExport(
 			lines: [],
 			onMention: addLink,
 			onLinkBlock: addLink,
-			onFileBlock: addLink,
+			onFileBlock: addFileLink,
 			counters: new Map(),
 			visited: new Set(),
 		};
@@ -517,12 +583,17 @@ export function parseAnytypeExport(
 		const properties: Record<string, unknown> = {};
 		for (const [key, raw] of Object.entries(snap.details)) {
 			if (SYSTEM_DETAIL_KEYS.has(key) || key === "name") continue;
-			const value = resolveOption(raw);
+			const value = resolveValue(key, raw);
 			if (value === null || value === undefined || value === "") continue;
+			if (Array.isArray(value) && value.length === 0) continue;
 			properties[relationNameByKey.get(key) ?? key] = value;
 		}
-		const typeKey = snap.objectTypes[0] ?? asString(snap.details.type);
-		const anytypeType = typeKey ? (typeNameByKey.get(typeKey) ?? prettifyTypeKey(typeKey)) : null;
+		const typeCandidates = [snap.objectTypes[0], asString(snap.details.type)].filter(
+			(k): k is string => typeof k === "string" && k.length > 0,
+		);
+		const mapped = typeCandidates.map((k) => typeNameByKey.get(k)).find((n) => n !== undefined);
+		const first = typeCandidates[0];
+		const anytypeType = mapped ?? (first !== undefined ? prettifyTypeKey(first) : null);
 		if (anytypeType) properties.anytypeType = anytypeType;
 		if (body.length > 0) properties.body = body;
 
