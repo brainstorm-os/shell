@@ -21,18 +21,16 @@
  * so the plant is automatic, deterministic, and idempotent across opens
  * (Notes' migrate-body and Journal both no-op against a non-empty doc).
  *
- * Minimum-viable surface: baseline Lexical nodes plus the journal-side
- * passthroughs (`JOURNAL_PASSTHROUGH_NODES` — `title`, `mention`,
- * `horizontalrule`, table cells). The passthroughs are *required*: the
- * seeded journal `.ydoc` plants a TitleNode at root[0], and without a
- * registered "title" class `@lexical/yjs`'s binding throws
- * `Node title is not registered` mid-sync and the contenteditable
- * renders empty. No MentionTypeahead, no SlashMenu, no TablesPlugin —
- * power users open the day in Notes for the full rich-text suite;
- * Journal-in-place keeps the chrome light so the calendar context
- * isn't crowded. Snippet recompute relies on Notes' `migrate-body` boot
- * pass for now — same path that already heals every other note in the
- * vault.
+ * The day body mounts the full shared editor (`<FullEditorPlugins>` over
+ * `JOURNAL_EDITOR_NODES`): slash menu (curated by `JOURNAL_BLOCK_PALETTE`),
+ * mentions, transclusion ("Reference"), and the `/embed` entity card —
+ * the same capability floor as Notes/Tasks (F-070). The TitleNode
+ * registration is *required*: the seeded journal `.ydoc` plants a
+ * TitleNode at root[0], and without a registered "title" class
+ * `@lexical/yjs`'s binding throws `Node title is not registered`
+ * mid-sync and the contenteditable renders empty. Snippet recompute
+ * relies on Notes' `migrate-body` boot pass for now — same path that
+ * already heals every other note in the vault.
  */
 
 import {
@@ -128,15 +126,14 @@ function isLexicalState(value: unknown): value is SerializedEditorState {
  *  register. Stripped before `parseEditorState` so a state planted by
  *  Notes' richer editor doesn't blow up the journal mount with an
  *  unknown-class error. The shared `@brainstorm/editor` extraction
- *  promoted Title/Toggle/Callout/Columns into this build, so those
- *  types no longer need stripping; what's still Notes-only is what
- *  hasn't moved yet (property blocks, mentions w/o typeahead, embeds,
- *  transclusions, backlinks, equations, code-block specials). */
+ *  promoted Title/Toggle/Callout/Columns — and, with F-070 embed parity,
+ *  `block-embed` — into this build, so those types no longer need
+ *  stripping; what's still Notes-only is what hasn't moved yet (property
+ *  blocks, backlinks, equations, code-block specials). */
 const NOTES_ONLY_NODE_TYPES: ReadonlySet<string> = new Set([
 	"backlinks",
 	"property-block",
 	"property-list-block",
-	"block-embed",
 	"toggle-summary",
 	"toggle-children",
 	"checklist",

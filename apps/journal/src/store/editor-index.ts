@@ -37,6 +37,8 @@ export function wireEditorIndex(): void {
 	}
 	const intentsSvc = getJournalRuntime()?.services?.intents;
 	const storageSvc = getJournalRuntime()?.services?.storage;
+	const blocksSvc = getJournalRuntime()?.services?.blocks;
+	const bpSvc = getJournalRuntime()?.services?.bp;
 	setEditorHost({
 		...(intentsSvc
 			? {
@@ -56,6 +58,18 @@ export function wireEditorIndex(): void {
 		...(storageSvc
 			? { uploadFile: (filename, bytes, mime) => storageSvc.uploadFile(filename, bytes, mime) }
 			: {}),
+		// The shared `/embed` entity card resolves + mounts live blocks through
+		// these ("blocks.read" is a default-minimum grant; `bp.dispatch` is
+		// uncapped structural routing). Absent in preview → chrome card only.
+		...(blocksSvc
+			? {
+					blocks: {
+						forType: (entityType: string) => blocksSvc.forType(entityType),
+						source: (blockId: string) => blocksSvc.source(blockId),
+					},
+				}
+			: {}),
+		...(bpSvc ? { bp: bpSvc } : {}),
 	});
 }
 

@@ -218,9 +218,9 @@ const DEFAULTS: Record<string, string> = {
 	"notes.bookmarkSuggest.accept": "Convert to bookmark card",
 	"notes.bookmarkSuggest.dismiss": "Keep as link",
 
-	// `/embed` slash command + entity picker (B9.4.1 snapshot card).
-	"notes.command.embed.label": "Embed",
-	"notes.command.embed.description": "Insert a preview card pointing at another vault object",
+	// The generic `/embed` command + picker + card strings live in the editor
+	// package now (`editor.block.embedEntity` / `editor.embed.*`) — hoisted with
+	// BlockEmbedNode for F-070 embed parity. Only the type-scoped variants stay.
 	// `/database` slash command (9.12.12) — same picker, scoped to Lists.
 	"notes.command.database.label": "Database",
 	"notes.command.database.description": "Embed a live database list inline",
@@ -230,16 +230,6 @@ const DEFAULTS: Record<string, string> = {
 	// `/book` slash command — the embed picker scoped to book Highlights (9.21.7).
 	"notes.command.book.label": "Book highlight",
 	"notes.command.book.description": "Embed a highlight from one of your books",
-	"notes.embed.menu.emptyFiltered": "No matching objects in your vault yet",
-	"notes.embed.menu.region": "Embed an object",
-	"notes.embed.menu.results": "Object results",
-	"notes.embed.menu.search": "Search vault objects",
-	"notes.embed.menu.placeholder": "Search objects to embed…",
-	"notes.embed.menu.empty": "Type to find an object in your vault",
-	"notes.embed.menu.noResults": "Nothing matches “{query}”",
-	"notes.embed.untitled": "Untitled",
-	"notes.embed.typeUnknown": "Object",
-	"notes.embed.providedBy": "{type} · provided by {app}",
 
 	// Empty paragraph hint.
 	"notes.placeholder.empty": "Type ‘/’ for commands",

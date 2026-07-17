@@ -135,6 +135,19 @@ export type EditorI18nKey =
 	// the typeahead opens for picking the page to embed.
 	| "editor.block.transclusion"
 	| "editor.block.transclusion.description"
+	// Entity embed — the `/embed` preview-card command (BlockEmbedNode +
+	// BlockEmbedPickerPlugin). Host-gated alongside transclusion: surfaced
+	// when the editor has an entity context.
+	| "editor.block.embedEntity"
+	| "editor.block.embedEntity.description"
+	| "editor.embed.untitled"
+	| "editor.embed.typeUnknown"
+	| "editor.embed.providedBy"
+	| "editor.embed.menu.placeholder"
+	| "editor.embed.menu.region"
+	| "editor.embed.menu.empty"
+	| "editor.embed.menu.emptyFiltered"
+	| "editor.embed.menu.noResults"
 	| "editor.action.align.left"
 	| "editor.action.align.center"
 	| "editor.action.align.right"
@@ -346,6 +359,16 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.block.columns3.description": "Side-by-side three-column layout",
 	"editor.block.transclusion": "Reference",
 	"editor.block.transclusion.description": "Embed a live view of another page",
+	"editor.block.embedEntity": "Embed",
+	"editor.block.embedEntity.description": "Insert a preview card pointing at another vault object",
+	"editor.embed.untitled": "Untitled",
+	"editor.embed.typeUnknown": "Object",
+	"editor.embed.providedBy": "{type} · provided by {app}",
+	"editor.embed.menu.placeholder": "Search objects to embed…",
+	"editor.embed.menu.region": "Embed an object",
+	"editor.embed.menu.empty": "Type to find an object in your vault",
+	"editor.embed.menu.emptyFiltered": "No matching objects in your vault yet",
+	"editor.embed.menu.noResults": "Nothing matches “{query}”",
 	"editor.action.align.left": "Align left",
 	"editor.action.align.center": "Align center",
 	"editor.action.align.right": "Align right",

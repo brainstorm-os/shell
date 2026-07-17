@@ -196,6 +196,7 @@ export {
 	FullEditorPlugins,
 } from "./plugins/full-editor-plugins";
 export {
+	createEntityEmbedCommand,
 	createStandardBlockActions,
 	createStandardBlockCommands,
 	createTransclusionCommand,
@@ -261,6 +262,7 @@ export {
 	type SerializedFileBlockNode,
 } from "./nodes/file-block-node";
 export {
+	type EditorBlocksHost,
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
@@ -411,6 +413,28 @@ export {
 	INSERT_EMBED_COMMAND,
 	EmbedPlugin,
 } from "./plugins/embed-plugin";
+export {
+	BLOCK_EMBED_DOM_FLAG,
+	BLOCK_EMBED_DOM_FLAG_VALUE,
+	BLOCK_EMBED_NODE_TYPE,
+	SHELL_ENTITY_CARD_BLOCK_ID,
+	type SerializedBlockEmbedNode,
+	$createBlockEmbedNode,
+	$isBlockEmbedNode,
+	BlockEmbedNode,
+	BlockEmbedView,
+} from "./nodes/block-embed-node";
+export {
+	type EmbedPickerTarget,
+	embedPickerStore,
+	openEntityEmbedPicker,
+	useEmbedPickerTarget,
+} from "./plugins/embed-picker-store";
+export {
+	type BlockEmbedPickerPluginProps,
+	BlockEmbedPickerPlugin,
+} from "./plugins/block-embed-picker-plugin";
+export { type EmbedInsertion, applyEmbedInsertion } from "./plugins/embed-insert";
 export {
 	EmbedKind,
 	type UrlClassification,

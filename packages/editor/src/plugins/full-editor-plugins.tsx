@@ -11,10 +11,11 @@
  * `<BrainstormEditor>` and import `@brainstorm/editor/editor-theme.css`
  * once at app boot so the blocks are styled.
  *
- * Deeper Notes-coupled features (mentions, transclusion, block-embeds,
- * link-markup, media, property blocks, backlinks) layer in as later
- * extraction stages land; each is exposed as an opt-in flag here so an
- * app turns it on the moment its host adapter supplies the data.
+ * Mentions, transclusion, entity embeds (`/embed` → `BlockEmbedNode`),
+ * and media are all shared now — each behind a flag (defaulting on when
+ * the host provides an entity context / stays on for media) so an app
+ * turns one off only as a deliberate product choice. Still-Notes-only:
+ * link-markup, property blocks, backlinks.
  *
  * Every extra is on by default but individually switchable, so a light
  * surface (e.g. a comment box) can drop the code stack while still
@@ -34,7 +35,8 @@ import type { BlockCommand } from "../block-command";
 import type { SelectionCommentAnchor } from "../comments/selection-anchor";
 import { useEditorT } from "../i18n";
 import { createMediaBlockCommands } from "../media-commands";
-import { createTransclusionCommand } from "../standard-commands";
+import { createEntityEmbedCommand, createTransclusionCommand } from "../standard-commands";
+import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
 import { CodeBlockPlugin } from "./code-block-plugin";
 import { CodeBlockToolbarPlugin } from "./code-block-toolbar-plugin";
 import { CodeHighlightPlugin } from "./code-highlight-plugin";
@@ -100,6 +102,10 @@ export type FullEditorPluginsProps = {
 	/** Override: force `!@`-transclusion typeahead on/off (defaults to on
 	 *  when `currentEntityId` is provided). */
 	transclusion?: boolean;
+	/** Override: force the `/embed` entity-card command + picker on/off
+	 *  (defaults to on when `currentEntityId` is provided — same host gate
+	 *  as transclusion, F-070 embed parity). */
+	entityEmbed?: boolean;
 	/** Host-specific plugins/decorators rendered inside the selection
 	 *  provider alongside the shared set (e.g. the app's AutosavePlugin,
 	 *  TitlePlugin, mention/transclusion typeaheads). */
@@ -124,22 +130,28 @@ export function FullEditorPlugins({
 	currentEntityId,
 	mentions,
 	transclusion,
+	entityEmbed,
 	children,
 }: FullEditorPluginsProps): ReactNode {
 	const hasEntity = currentEntityId !== undefined;
 	const entityId = currentEntityId ?? null;
 	const showMentions = mentions ?? hasEntity;
 	const showTransclusion = transclusion ?? hasEntity;
+	const showEntityEmbed = entityEmbed ?? hasEntity;
 	const t = useEditorT();
-	// When transclusion is on, the "Reference" command (opens the `!@` typeahead)
-	// joins the slash menu — the shared affordance for embedding a live page in
-	// any app's editor, gated on the host providing an entity context.
+	// When transclusion / entity-embed are on, the "Embed" command (opens the
+	// anchored entity picker) and the "Reference" command (opens the `!@`
+	// typeahead) join the slash menu — the shared affordances for embedding
+	// another vault object in any app's editor, gated on the host providing
+	// an entity context. Order mirrors Notes' catalogue: Embed before
+	// Reference.
 	const mergedCommands = useMemo<readonly BlockCommand[]>(() => {
 		const extras = extraCommands ? [...extraCommands] : [];
 		if (media) extras.push(...createMediaBlockCommands(t));
+		if (showEntityEmbed) extras.push(createEntityEmbedCommand(t));
 		if (showTransclusion) extras.push(createTransclusionCommand(t));
 		return extras;
-	}, [t, extraCommands, showTransclusion, media]);
+	}, [t, extraCommands, showTransclusion, showEntityEmbed, media]);
 	return (
 		<StandardEditingPlugins
 			autoFocus={autoFocus}
@@ -177,6 +189,7 @@ export function FullEditorPlugins({
 			) : null}
 			{showMentions ? <MentionTypeaheadPlugin currentNoteId={entityId} /> : null}
 			{showTransclusion ? <TransclusionTypeaheadPlugin currentNoteId={entityId} /> : null}
+			{showEntityEmbed ? <BlockEmbedPickerPlugin currentNoteId={entityId} /> : null}
 			{children}
 		</StandardEditingPlugins>
 	);

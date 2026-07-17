@@ -18,6 +18,7 @@
  */
 
 import type { NavigationMode } from "@brainstorm/sdk";
+import type { BpService } from "@brainstorm/sdk-types";
 
 /** Result shape of the shell's `storage.uploadFile` surface. */
 export type EditorUploadResult = {
@@ -36,6 +37,16 @@ export type EditorUploadFn = (
 	mime?: string,
 ) => Promise<EditorUploadResult>;
 
+/** The slice of the shell's `services.blocks` registry the shared
+ *  block-embed decorator needs: resolve the providing app's live block for
+ *  an entity type, and fetch a block's bundle source for the sandboxed
+ *  iframe mount. Mirrors `BlocksService.forType` / `.source` (both behind
+ *  the default-minimum `blocks.read` grant). */
+export type EditorBlocksHost = {
+	forType: (entityType: string) => Promise<string | null>;
+	source: (blockId: string) => Promise<string | null>;
+};
+
 export type EditorHost = {
 	/** Navigate to an entity (link-markup click, mention chip, backlink,
 	 *  page-ref). Wraps the shell's open-entity intent. `mode` carries the
@@ -50,6 +61,15 @@ export type EditorHost = {
 	}) => void;
 	/** Upload media bytes (drag-drop / paste / media inspector). */
 	uploadFile?: EditorUploadFn;
+	/** Block registry lookups for the `/embed` entity card (`BlockEmbedNode`):
+	 *  `forType` upgrades the fallback card to the providing app's live block,
+	 *  `source` fetches that block's bundle. Unwired → the card renders the
+	 *  generic chrome (still navigable) and never mounts an iframe. */
+	blocks?: EditorBlocksHost;
+	/** Block-Protocol graph transport handed to `<BpBlockMount bp>` so a live
+	 *  embedded block can query/update entities through the host broker.
+	 *  Unwired → the block mounts without graph traffic. */
+	bp?: BpService;
 };
 
 let host: EditorHost = {};

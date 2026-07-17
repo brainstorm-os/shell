@@ -106,6 +106,8 @@ function bootstrapTasksApp(): void {
 
 	const intentsSvc = runtime?.services.intents;
 	const storageSvc = runtime?.services.storage;
+	const blocksSvc = runtime?.services.blocks;
+	const bpSvc = runtime?.services.bp;
 	setEditorHost({
 		...(intentsSvc
 			? {
@@ -125,6 +127,18 @@ function bootstrapTasksApp(): void {
 		...(storageSvc
 			? { uploadFile: (filename, bytes, mime) => storageSvc.uploadFile(filename, bytes, mime) }
 			: {}),
+		// The shared `/embed` entity card resolves + mounts live blocks through
+		// these ("blocks.read" is a default-minimum grant; `bp.dispatch` is
+		// uncapped structural routing). Absent in preview → chrome card only.
+		...(blocksSvc
+			? {
+					blocks: {
+						forType: (entityType: string) => blocksSvc.forType(entityType),
+						source: (blockId: string) => blocksSvc.source(blockId),
+					},
+				}
+			: {}),
+		...(bpSvc ? { bp: bpSvc } : {}),
 	});
 
 	// Ensure the vault catalog carries the Task→Person assignee EntityRef def

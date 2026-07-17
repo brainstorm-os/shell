@@ -25,6 +25,7 @@ import { $getRoot } from "lexical";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setEditorHost } from "../plugins/editor-host";
 import { $createBlockEmbedNode, BlockEmbedNode } from "./block-embed-node";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,18 +37,19 @@ beforeEach(() => {
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
-	// `BlockEmbedView` fetches the block bundle via `services.blocks.source`
-	// before it mounts the live iframe — stub a runtime that returns a tiny
-	// valid bundle so the BlockProtocol path can light up under jsdom.
-	(window as unknown as { brainstorm?: unknown }).brainstorm = {
-		services: { blocks: { source: async () => "/* test block bundle */" } },
-	};
+	// `BlockEmbedView` fetches the block bundle via the editor host's
+	// `blocks.source` before it mounts the live iframe — stub a host that
+	// returns a tiny valid bundle so the BlockProtocol path can light up
+	// under jsdom.
+	setEditorHost({
+		blocks: { source: async () => "/* test block bundle */", forType: async () => null },
+	});
 });
 
 afterEach(async () => {
 	await act(async () => root.unmount());
 	container.remove();
-	(window as unknown as { brainstorm?: unknown }).brainstorm = undefined;
+	setEditorHost({});
 });
 
 function ComposerHost({
@@ -204,14 +206,12 @@ describe("BlockEmbedView + registry bridge", () => {
 		// the SAME persisted node (still holding SHELL_ENTITY_CARD_BLOCK_ID) must
 		// re-resolve and light up the live block, not stay a static card.
 		const DB_BLOCK = "io.brainstorm.database/embedded-list";
-		(window as unknown as { brainstorm?: unknown }).brainstorm = {
-			services: {
-				blocks: {
-					source: async () => "/* test block bundle */",
-					forType: async (type: string) => (type === "brainstorm/List/v1" ? DB_BLOCK : null),
-				},
+		setEditorHost({
+			blocks: {
+				source: async () => "/* test block bundle */",
+				forType: async (type: string) => (type === "brainstorm/List/v1" ? DB_BLOCK : null),
 			},
-		};
+		});
 		const resolver: BpResolver = async (blockId) =>
 			blockId === DB_BLOCK ? { appId: "io.brainstorm.database", name: "embedded-list" } : null;
 		const registry = createBlockRendererRegistry({
@@ -235,11 +235,9 @@ describe("BlockEmbedView + registry bridge", () => {
 	it("leaves a fallback-card embed as a card when no type provider exists", async () => {
 		// The re-resolution must NOT manufacture a live mount for a type nobody
 		// provides — a Note embed stays the generic card.
-		(window as unknown as { brainstorm?: unknown }).brainstorm = {
-			services: {
-				blocks: { source: async () => "/* bundle */", forType: async () => null },
-			},
-		};
+		setEditorHost({
+			blocks: { source: async () => "/* bundle */", forType: async () => null },
+		});
 		const registry = createBlockRendererRegistry({
 			builtInCustomNodes: DEFAULT_BUILTIN_CUSTOM_NODES,
 			bpResolver: async () => null,

@@ -29,12 +29,14 @@ import {
 	TodoListIcon,
 	applySwatchToBlocks,
 	createEditorT,
+	createEntityEmbedCommand,
 	createMediaBlockCommands,
 	createStandardBlockActions,
 	createStandardBlockCommands,
 	createTransclusionCommand,
 	getBlockAnchorsController,
 	insertSnippet,
+	openEntityEmbedPicker,
 	orderCommandsByPalette,
 	serializeBlocksAsJson,
 	swatchCssValue,
@@ -62,7 +64,6 @@ import { newNoteId } from "../store/note";
 import { getBrainstorm } from "../store/runtime";
 import { AddPropertyTargetKind, addPropertyStore } from "./add-property-store";
 import { copyBlockLink } from "./block-link";
-import { embedPickerStore } from "./embed-picker-store";
 import { $createBookmarkNode } from "./nodes/bookmark-node";
 import { $createCheckboxFieldNode } from "./nodes/checkbox-field-node";
 import { $createDateFieldNode } from "./nodes/date-field-node";
@@ -184,17 +185,12 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 			insertSubPage(editor);
 		},
 	},
-	{
-		id: "block.embed.entity",
-		category: CommandCategory.Embed,
-		label: t("notes.command.embed.label"),
-		description: t("notes.command.embed.description"),
-		icon: <EmbedIcon />,
-		keywords: ["embed", "preview", "page", "entity", "card", "reference", "insert"],
-		run: ({ editor }) => {
-			openEmbedPicker(editor);
-		},
-	},
+	// The generic "/embed" preview-card command is the SHARED catalogue's
+	// `block.embed.entity` (`createEntityEmbedCommand`) — the exact command
+	// `<FullEditorPlugins>` mounts for Journal / Tasks (F-070 embed parity).
+	// Notes does not re-author it; the type-scoped variants below reuse the
+	// same shared picker with a narrowed list.
+	createEntityEmbedCommand(editorT),
 	{
 		// 9.12.12 — `/database`: the same entity picker scoped to
 		// `brainstorm/List/v1`, so the chosen List mounts inline as the
@@ -207,7 +203,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 		icon: <EmbedIcon />,
 		keywords: ["database", "list", "collection", "table", "grid", "view", "rows"],
 		run: ({ editor }) => {
-			openEmbedPicker(editor, COLLECTION_TYPE_URL);
+			openEntityEmbedPicker(editor, COLLECTION_TYPE_URL);
 		},
 	},
 	{
@@ -221,7 +217,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 		// scoped to saved Graph entities; the registry resolves the chosen one
 		// to the `io.brainstorm.graph/embedded-graph` block.
 		run: ({ editor }) => {
-			openEmbedPicker(editor, GRAPH_ENTITY_TYPE);
+			openEntityEmbedPicker(editor, GRAPH_ENTITY_TYPE);
 		},
 	},
 	{
@@ -235,7 +231,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 		// scoped to saved Highlight entities; the registry resolves the chosen one
 		// to the `io.brainstorm.books/embedded-highlight` block.
 		run: ({ editor }) => {
-			openEmbedPicker(editor, HIGHLIGHT_ENTITY_TYPE);
+			openEntityEmbedPicker(editor, HIGHLIGHT_ENTITY_TYPE);
 		},
 	},
 	{
@@ -536,32 +532,6 @@ function pickAnchorBlock(keys: ReadonlySet<NodeKey> | undefined): NodeKey | null
 	// fallback `for…of` is safe for both.
 	for (const key of keys) return key;
 	return null;
-}
-
-/** Open the entity picker for the `/embed` slash command. The slash
- *  plugin has already cleared the host paragraph by the time `run`
- *  fires, so the selection sits inside an empty top-level block — its
- *  key + bounding rect anchor the picker. */
-function openEmbedPicker(editor: LexicalEditor, typeFilter?: string): void {
-	let paragraphKey: NodeKey | null = null;
-	editor.getEditorState().read(() => {
-		const sel = $getSelection();
-		if (!$isRangeSelection(sel)) return;
-		try {
-			paragraphKey = sel.anchor.getNode().getTopLevelElementOrThrow().getKey();
-		} catch {
-			paragraphKey = null;
-		}
-	});
-	if (!paragraphKey) return;
-	const el = editor.getElementByKey(paragraphKey);
-	if (!el) return;
-	const rect = el.getBoundingClientRect();
-	embedPickerStore.open({
-		paragraphKey,
-		anchor: { top: rect.top, left: rect.left, bottom: rect.bottom },
-		...(typeFilter !== undefined ? { typeFilter } : {}),
-	});
 }
 
 /** `/template`: query the vault's block-snippet templates and open the shared

@@ -46,10 +46,12 @@ describe("editor capability parity (Notes ⊇ shared full editor)", () => {
 	it("offers every generic command the shared full editor exposes by default", () => {
 		const mountedIds = new Set(BLOCK_COMMANDS.map((c) => c.id));
 		// The command ids `<FullEditorPlugins>` mounts with its defaults:
-		// the standard catalogue + media + the host-gated transclusion command.
+		// the standard catalogue + media + the host-gated entity-embed and
+		// transclusion commands.
 		const sharedFullIds = [
 			...createStandardBlockCommands(t).map((c) => c.id),
 			...MEDIA_COMMAND_IDS,
+			"block.embed.entity",
 			"block.transclusion",
 		];
 		for (const id of sharedFullIds) {

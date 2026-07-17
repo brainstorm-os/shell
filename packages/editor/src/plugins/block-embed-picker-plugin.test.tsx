@@ -1,21 +1,22 @@
 // @vitest-environment jsdom
 /**
- * The `/embed` (+ `/database` / `/graph`) picker now renders through the shared
- * `openSearchPicker` runtime, so keyboard operability (the original F-209
- * concern — arrows / Enter / Escape with the search input focused) is the
- * runtime's job, proven once in `packages/sdk/src/menus/search-picker.test.tsx`.
+ * The `/embed` (+ Notes' type-scoped `/database` / `/graph`) picker renders
+ * through the shared `openSearchPicker` runtime, so keyboard operability (the
+ * original F-209 concern — arrows / Enter / Escape with the search input
+ * focused) is the runtime's job, proven once in
+ * `packages/sdk/src/menus/search-picker.test.tsx`.
  *
- * What stays notes-specific, and is proven here through the picker's store
+ * What stays plugin-specific, and is proven here through the picker's store
  * contract:
- *   - the entity source loads once per open and the current note is excluded
- *     (a note can't embed itself),
+ *   - the entity source (the injected entity-index) loads once per open and
+ *     the current entity is excluded (a document can't embed itself),
  *   - a typed query filters the rows; no match shows a single disabled
  *     empty-state row,
  *   - committing a row inserts a `BlockEmbedNode` for that entity and closes
  *     the host store.
  */
 
-import { BASELINE_NODES } from "@brainstorm/editor";
+import type { VaultEntity } from "@brainstorm/sdk-types";
 import {
 	BrainstormMenuProvider,
 	SEARCH_PICKER_ID,
@@ -28,11 +29,12 @@ import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotesBrainstorm } from "../store/runtime";
+import { BASELINE_NODES } from "../nodes";
+import { $isBlockEmbedNode } from "../nodes/block-embed-node";
+import { FULL_EDITOR_NODES } from "../standard-nodes";
 import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
 import { embedPickerStore } from "./embed-picker-store";
-import { $isBlockEmbedNode } from "./nodes/block-embed-node";
-import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";
+import { setEntityIndexSource } from "./entity-index";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,11 +42,23 @@ const COLLECTION_TYPE = "brainstorm/List/v1";
 const CURRENT_NOTE = "current-note";
 const NOTE_TYPE = "io.brainstorm.notes/Note/v1";
 
-const ENTITIES = [
-	{ id: "col-alpha", type: COLLECTION_TYPE, properties: { title: "Alpha board" } },
-	{ id: "col-beta", type: COLLECTION_TYPE, properties: { title: "Beta board" } },
+function entity(id: string, type: string, title: string): VaultEntity {
+	return {
+		id,
+		type,
+		properties: { title },
+		createdAt: 0,
+		updatedAt: 0,
+		deletedAt: null,
+		ownerAppId: "test",
+	};
+}
+
+const ENTITIES: readonly VaultEntity[] = [
+	entity("col-alpha", COLLECTION_TYPE, "Alpha board"),
+	entity("col-beta", COLLECTION_TYPE, "Beta board"),
 	// The open note itself — must be excluded from the picker.
-	{ id: CURRENT_NOTE, type: NOTE_TYPE, properties: { title: "This note" } },
+	entity(CURRENT_NOTE, NOTE_TYPE, "This note"),
 ];
 
 let container: HTMLDivElement;
@@ -64,13 +78,12 @@ beforeEach(() => {
 	// flushes (the async entity snapshot) are unaffected.
 	vi.useFakeTimers();
 	Element.prototype.scrollIntoView = () => {};
-	window.brainstorm = {
-		services: {
-			vaultEntities: {
-				list: () => Promise.resolve({ entities: ENTITIES }),
-			},
-		},
-	} as unknown as NotesBrainstorm;
+	// The plugin loads its candidates through the injected entity-index
+	// source (`fetchEntities`) — no app runtime involved.
+	setEntityIndexSource({
+		list: () => Promise.resolve({ entities: ENTITIES }),
+		onChange: () => ({ unsubscribe: () => {} }),
+	});
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -87,7 +100,7 @@ afterEach(() => {
 	container.remove();
 	editorRoot.remove();
 	capturedEditor = null;
-	window.brainstorm = undefined;
+	setEntityIndexSource(null);
 	vi.useRealTimers();
 });
 
@@ -100,7 +113,7 @@ async function mountWithOpenPicker(): Promise<LexicalEditor> {
 				<LexicalComposer
 					initialConfig={{
 						namespace: "embed-picker-test",
-						nodes: [...BASELINE_NODES, ...NOTES_ADDITIONAL_NODES],
+						nodes: [...BASELINE_NODES, ...FULL_EDITOR_NODES],
 						onError: (e) => {
 							throw e;
 						},
