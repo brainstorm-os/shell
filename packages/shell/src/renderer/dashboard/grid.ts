@@ -198,6 +198,32 @@ export function migrateWidgetRecord<T extends { x: number; y: number; w: number;
 	};
 }
 
+/** Highest origin cell that still leaves `minCells` widget cells between the
+ *  origin and the surface edge (`surfacePx` wide/tall). */
+function maxWidgetOriginCell(surfacePx: number, minCells: number): number {
+	return Math.floor((surfacePx - GRID_OUTER_MARGIN) / WIDGET_UNIT) - minCells;
+}
+
+/** Clamp a widget's stored origin back onto the surface: the card's top-left
+ *  must start far enough inside that at least a minimum footprint
+ *  (`WIDGET_MIN_W`×`WIDGET_MIN_H` cells — header grip included) is visible and
+ *  reachable. Rescues records stranded off-surface — the F-379 ×10 teleport
+ *  baked origins like row 500 (≈4000px below an 800px fold) into the store,
+ *  and nothing ever pulled them back, so the widget was unreachable forever.
+ *  Position-only (`w`/`h` untouched — a card may legitimately overhang an
+ *  edge); identity-preserving when already on-surface; a zero/unknown surface
+ *  clamps nothing (pre-layout mount must not yank every card to the origin). */
+export function clampWidgetOrigin<T extends { x: number; y: number }>(
+	record: T,
+	surface: GridPoint,
+): T {
+	if (surface.x <= 0 || surface.y <= 0) return record;
+	const x = Math.max(0, Math.min(record.x, maxWidgetOriginCell(surface.x, WIDGET_MIN_W)));
+	const y = Math.max(0, Math.min(record.y, maxWidgetOriginCell(surface.y, WIDGET_MIN_H)));
+	if (x === record.x && y === record.y) return record;
+	return { ...record, x, y };
+}
+
 /** Snap a window-content point to the nearest widget cell (origin-relative). */
 export function widgetPointToCell(point: GridPoint): GridCell {
 	return {

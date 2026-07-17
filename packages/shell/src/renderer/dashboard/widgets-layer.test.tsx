@@ -86,6 +86,62 @@ describe("DashboardWidgetsLayer — apps:changed refresh (F-380)", () => {
 		expect(host.querySelector(".dashboard-widgets__title")?.textContent).toBe("Recent Notes");
 	});
 
+	it("renders a record stranded off-surface back inside the viewport (F-379)", async () => {
+		// The pre-7.3b migration bug baked ×10 positions into stored records
+		// (session 375: left 336px / top 4016px on an 800px screen). PR #92
+		// stopped the re-migration, but an already-baked record still rendered
+		// thousands of pixels below the fold with no way to reach it. The layer
+		// must clamp the display origin back into the surface (jsdom window:
+		// 1024×768).
+		const stranded: DashboardWidget = { ...WIDGET, x: 40, y: 500, w: 27, h: 20 };
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_1: stranded }} />);
+		});
+		await flush();
+
+		const card = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_1"]');
+		if (!card) throw new Error("no card");
+		const top = Number.parseFloat(card.style.top);
+		const left = Number.parseFloat(card.style.left);
+		// At least a minimum footprint of the card (header grip included) must
+		// start inside the 768px-tall surface — not 4016px below the fold.
+		expect(top).toBeLessThanOrEqual(768 - 48);
+		// The horizontal origin was already on-surface — it must not move.
+		expect(left).toBe(336);
+	});
+
+	it("keeps a widget in place when shrunk to the minimum footprint, through the persistence echo (F-379)", async () => {
+		// Mira's original gesture: shrink as small as it goes. The position must
+		// survive both the optimistic update AND the store echo round-trip (the
+		// old bug teleported the card only once the echoed record re-entered the
+		// legacy migration).
+		const placed: DashboardWidget = { ...WIDGET, x: 4, y: 50, w: 8, h: 7 };
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_1: placed }} />);
+		});
+		await flush();
+
+		const key = (el: Element, key: string, shiftKey = false) =>
+			act(() => {
+				el.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true }));
+			});
+		const resize = host.querySelector(".dashboard-widgets__resize");
+		if (!resize) throw new Error("no resize grip");
+		for (let i = 0; i < 5; i++) key(resize, "ArrowUp", true);
+		const final = upserts.at(-1)?.record;
+		expect(final).toMatchObject({ x: 4, y: 50, w: 8, h: 6 });
+		if (!final) throw new Error("no upsert");
+
+		// Echo the persisted record back through the snapshot prop.
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_1: final }} />);
+		});
+		await flush();
+		const card = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_1"]');
+		expect(card?.style.left).toBe("48px"); // 16 + 4*8
+		expect(card?.style.top).toBe("416px"); // 16 + 50*8
+	});
+
 	it("arrow keys on the focused grips nudge move/resize on the 8px grid (F-383)", async () => {
 		await act(async () => {
 			root.render(<DashboardWidgetsLayer widgets={{ widget_1: WIDGET }} />);
