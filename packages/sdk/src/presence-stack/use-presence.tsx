@@ -87,13 +87,24 @@ export function presenceAwarenessFor(entityId: string, type: string): LocalAware
 	const publish = bs?.services?.presence;
 	const push = bs?.presence;
 	if (!publish || !push) return createLocalAwareness();
+	// Presence is display-only — a refused publish (entity unknown to the
+	// vault, capability denied, session mid-swap) must degrade to "no avatar
+	// stack", never bubble as an unhandled rejection / pageerror (F-393: the
+	// broker's `presence.publish: unknown entity` surfaced as a renderer
+	// pageerror). Log once per awareness so a genuine wiring bug stays visible.
+	let warned = false;
+	const swallow = (error: unknown): void => {
+		if (warned) return;
+		warned = true;
+		console.warn(`[presence] publish for ${entityId} unavailable:`, error);
+	};
 	return createSyncedAwareness(
 		createPresenceTransport({
 			publish: (state) => {
-				void publish.publish({ entityId, type, state });
+				void publish.publish({ entityId, type, state }).catch(swallow);
 			},
 			untrack: () => {
-				void publish.untrack({ entityId });
+				void publish.untrack({ entityId }).catch(swallow);
 			},
 			onPeers: (handler) => push.onPeers(entityId, handler),
 		}),

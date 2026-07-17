@@ -64,6 +64,33 @@ describe("presenceAwarenessFor", () => {
 			state: { presence: { id: "alice" } },
 		});
 	});
+
+	it("swallows a refused publish instead of surfacing a pageerror (F-393)", async () => {
+		// The broker rejects publishes it can't gate (`presence.publish:
+		// unknown entity`, capability denied, session swap). Presence is
+		// display-only, so the rejection must degrade to a single warn —
+		// never an unhandled rejection crashing the renderer console.
+		const publish = vi.fn(() => Promise.reject(new Error("presence.publish: unknown entity")));
+		const untrack = vi.fn(() => Promise.reject(new Error("presence: no active vault session")));
+		setBrainstorm({
+			services: { presence: { publish, untrack } },
+			presence: { onPeers: () => () => {} },
+		});
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			const synced = presenceAwarenessFor("list_vault_all", TYPE);
+			synced.setLocalStateField("presence", { id: "alice" });
+			synced.setLocalStateField("presence", { id: "alice2" });
+			synced.destroy();
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(publish).toHaveBeenCalled();
+			// One warn per awareness, not one per publish attempt.
+			expect(warn).toHaveBeenCalledTimes(1);
+		} finally {
+			warn.mockRestore();
+		}
+	});
 });
 
 function Harness({ entityId }: { entityId: string | null }) {
