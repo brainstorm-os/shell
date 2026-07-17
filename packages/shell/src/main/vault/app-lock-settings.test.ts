@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	DEFAULT_AUTO_LOCK_MINUTES,
 	appLockSettingsPath,
@@ -31,7 +32,7 @@ describe("readAppLockSettings / writeAppLockSettings", () => {
 		dir = await mkdtemp(join(tmpdir(), "brainstorm-als-"));
 	});
 	afterEach(async () => {
-		await rm(dir, { recursive: true, force: true });
+		await removeTestDir(dir);
 	});
 
 	it("round-trips a written value", async () => {

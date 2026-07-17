@@ -456,13 +456,43 @@ type BetterStmt = {
 function wrapBun(db: BunDb): SqliteDatabase {
 	// bun:sqlite exposes no `open` flag — track it in the wrapper closure.
 	let open = true;
+	// Track every live prepared statement so `close()` can finalize them
+	// first. bun:sqlite's `close()` follows `sqlite3_close_v2` semantics: a
+	// connection with un-finalized statements becomes a "zombie" whose OS
+	// file handle is only released when the last statement is GC'd. The
+	// repos cache prepared statements for their lifetime, so on Windows the
+	// still-open handle makes a post-test `rm(vaultDir)` fail with EBUSY
+	// (Linux/macOS allow unlinking open files, which is why the leak only
+	// surfaced as a Windows-runner flake). Finalizing here makes `close()`
+	// actually release the file, deterministically, on every platform.
+	const statements = new Set<BunStmt>();
 	return {
 		exec: (sql) => db.exec(sql),
-		prepare: (sql) => wrapBunStmt(db.prepare(sql)),
-		pragma: (sql) => db.prepare(`PRAGMA ${sql}`).all(),
+		prepare: (sql) => {
+			const stmt = db.prepare(sql);
+			statements.add(stmt);
+			return wrapBunStmt(stmt);
+		},
+		pragma: (sql) => {
+			// Finalize eagerly — pragma statements are one-shot, never cached.
+			const stmt = db.prepare(`PRAGMA ${sql}`);
+			try {
+				return stmt.all();
+			} finally {
+				stmt.finalize();
+			}
+		},
 		transaction: (fn) => db.transaction(fn),
 		close: () => {
 			open = false;
+			for (const stmt of statements) {
+				try {
+					stmt.finalize();
+				} catch {
+					/* already finalized */
+				}
+			}
+			statements.clear();
 			db.close();
 		},
 		isOpen: () => open,

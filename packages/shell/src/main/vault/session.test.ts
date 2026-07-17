@@ -1,10 +1,11 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CREDENTIALS_FILENAME } from "../credentials/store";
 import { PropertiesStore } from "../properties/properties-store";
 import { EntitiesRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { ROOT_FOLDER_ENTITY_ID, ROOT_FOLDER_TYPE, VaultSession } from "./session";
 
 describe("VaultSession", () => {
@@ -15,7 +16,7 @@ describe("VaultSession", () => {
 	});
 
 	afterEach(async () => {
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	it("create() provisions identity + master via the insecure backend", async () => {

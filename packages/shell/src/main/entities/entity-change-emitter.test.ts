@@ -5,7 +5,7 @@
  * never fail the data path; the payload carries identifiers only.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EntityEventVerb } from "@brainstorm/sdk-types";
@@ -15,6 +15,7 @@ import type { CapabilityLedger } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { makeEntitiesServiceHandler } from "./entities-service";
 import { type EntityChange, EntityChangeEmitter } from "./entity-change-emitter";
 import { EntityDekStore } from "./entity-dek-store";
@@ -103,9 +104,7 @@ describe("entities service — post-commit change hook", () => {
 
 	afterEach(async () => {
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
-			() => {},
-		);
+		await removeTestDir(vaultDir);
 	});
 
 	it("emits Create/Update/Delete with identifiers only, post-commit", async () => {

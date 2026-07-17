@@ -195,8 +195,10 @@ export class CollabVault {
 		return doc ? roleOf(doc, entityId, memberB64) : null;
 	}
 
-	dispose(): void {
-		this.session.dispose();
+	/** Resolves once the session has fully released its file handles —
+	 *  await before rm'ing the vault dir (EBUSY on Windows otherwise). */
+	dispose(): Promise<void> {
+		return this.session.dispose();
 	}
 }
 
@@ -360,11 +362,12 @@ export class CollabLink {
 		throw new Error(`collab-harness: ${entityId} did not converge within ${timeoutMs}ms`);
 	}
 
-	dispose(): void {
+	/** Resolves once both vaults have fully released their file handles —
+	 *  await before rm'ing the vault dirs (EBUSY on Windows otherwise). */
+	async dispose(): Promise<void> {
 		for (const off of this.liveDisposers.splice(0)) off();
 		this.owner.relay.close();
 		this.collaborator.relay.close();
-		this.owner.dispose();
-		this.collaborator.dispose();
+		await Promise.all([this.owner.dispose(), this.collaborator.dispose()]);
 	}
 }

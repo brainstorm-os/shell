@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { VaultMediaDomain, isSealedMedia } from "../assets/vault-media-crypto";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { VaultSession } from "./session";
 
 let vaultDir: string;
@@ -17,8 +18,10 @@ beforeEach(async () => {
 	});
 });
 afterEach(async () => {
-	session.dispose();
-	await rm(vaultDir, { recursive: true, force: true });
+	// Await the full teardown so no handle inside `vaultDir` is still open
+	// when the recursive rm runs (open handles → EBUSY on Windows).
+	await session.dispose();
+	await removeTestDir(vaultDir);
 });
 
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);

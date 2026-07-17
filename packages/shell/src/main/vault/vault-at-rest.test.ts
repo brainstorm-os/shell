@@ -1,9 +1,10 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeSqlcipherDb } from "../storage/at-rest-fake-driver";
 import { AtRestMode } from "../storage/at-rest-mode";
+import { removeTestDir } from "../test-support/remove-test-dir";
 
 let USER_DATA_DIR = "";
 
@@ -22,7 +23,7 @@ describe("vault.json atRestMode stamp + reconcile", () => {
 	});
 
 	afterEach(async () => {
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	async function loadVaultModule(opts: { encryptedDriver: boolean }) {

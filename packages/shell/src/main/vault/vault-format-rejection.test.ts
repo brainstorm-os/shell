@@ -16,10 +16,11 @@
  * the two assertions back-to-back.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 
 let USER_DATA_DIR = "";
 
@@ -42,7 +43,7 @@ describe("vault format pre-freeze + future-major rejection", () => {
 	afterEach(async () => {
 		// biome-ignore lint/performance/noDelete: same reason as above
 		delete process.env.BRAINSTORM_ALLOW_PRE_FREEZE_VAULTS;
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	async function freshShell(): Promise<{

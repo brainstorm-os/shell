@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { EntityDekStore } from "./entity-dek-store";
 import { retroWrapNullDeks } from "./retro-wrap-deks";
 
@@ -54,9 +55,7 @@ describe("EntitiesRepository — listMissingDekIds + stampDekId", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
-			() => {},
-		);
+		await removeTestDir(env.vaultDir);
 	});
 
 	it("listMissingDekIds returns [] on an empty vault", () => {
@@ -122,9 +121,7 @@ describe("retroWrapNullDeks", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
-			() => {},
-		);
+		await removeTestDir(env.vaultDir);
 	});
 
 	it("empty vault → wrapped 0 / skipped 0, idempotent", async () => {

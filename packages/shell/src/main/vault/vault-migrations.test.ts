@@ -12,10 +12,11 @@
  *   7. Bad input (`format` missing / non-string) fails-loud.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { freezeFixture, writeVaultJsonFixture } from "./__fixtures__/build-vault";
 import {
 	VAULT_MIGRATIONS,
@@ -84,7 +85,7 @@ describe("migrateVaultToCurrent (empty list)", () => {
 		vaultPath = join(workDir, "vault");
 	});
 	afterEach(async () => {
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	it("returns from=to=current with empty applied[]", async () => {
@@ -130,7 +131,7 @@ describe("migrateVaultToCurrent (with stub migrations via dynamic mock)", () => 
 		vaultPath = join(workDir, "vault");
 	});
 	afterEach(async () => {
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	/**

@@ -134,6 +134,15 @@ export default defineConfig({
 			"@brainstorm/sdk/spellcheck-menu": resolve(__dirname, "packages/sdk/src/spellcheck-menu.ts"),
 			"@brainstorm/sdk/spellcheck": resolve(__dirname, "packages/sdk/src/spellcheck.ts"),
 			"@brainstorm/sdk/peer-presence": resolve(__dirname, "packages/sdk/src/peer-presence.ts"),
+			// `.css` must precede the bare `…/presence-stack` (JS) alias — the
+			// prefix matcher otherwise falls through to the bare `@brainstorm/sdk`
+			// entry and rewrites to `…/index.ts/presence-stack.css`, which is the
+			// exact "Failed to resolve import" that red-flagged the database
+			// app's boot-smoke suite (its app.ts imports this stylesheet).
+			"@brainstorm/sdk/presence-stack.css": resolve(
+				__dirname,
+				"packages/sdk/src/presence-stack/presence-stack.css",
+			),
 			"@brainstorm/sdk/self-display-name": resolve(
 				__dirname,
 				"packages/sdk/src/use-self-display-name.ts",
@@ -155,6 +164,11 @@ export default defineConfig({
 			"@brainstorm/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
 			"@brainstorm/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),
 			"@brainstorm/sdk/cover-picker": resolve(__dirname, "packages/sdk/src/cover-picker/index.ts"),
+			// `.css` before the bare JS alias (same ordering rule as above).
+			"@brainstorm/sdk/color-picker.css": resolve(
+				__dirname,
+				"packages/sdk/src/color-picker/color-picker.css",
+			),
 			"@brainstorm/sdk/color-picker": resolve(__dirname, "packages/sdk/src/color-picker/index.ts"),
 			"@brainstorm/sdk/picker-host": resolve(__dirname, "packages/sdk/src/picker-host.tsx"),
 			"@brainstorm/sdk/recurrence-labels": resolve(
@@ -163,6 +177,11 @@ export default defineConfig({
 			),
 			"@brainstorm/sdk/recurrence-edit": resolve(__dirname, "packages/sdk/src/recurrence-edit.ts"),
 			"@brainstorm/sdk/reminder-schedule": resolve(__dirname, "packages/sdk/src/reminder-schedule.ts"),
+			// `.css` before the bare JS alias (same ordering rule as above).
+			"@brainstorm/sdk/recurrence-editor.css": resolve(
+				__dirname,
+				"packages/sdk/src/recurrence-editor/recurrence-editor.css",
+			),
 			"@brainstorm/sdk/recurrence-editor": resolve(
 				__dirname,
 				"packages/sdk/src/recurrence-editor/index.ts",
@@ -174,12 +193,19 @@ export default defineConfig({
 				__dirname,
 				"packages/sdk/src/contributed-actions/index.ts",
 			),
+			// `.css` before the bare JS alias (same ordering rule as above).
+			"@brainstorm/sdk/menus.css": resolve(__dirname, "packages/sdk/src/menus/menus.css"),
 			"@brainstorm/sdk/menus": resolve(__dirname, "packages/sdk/src/menus/index.ts"),
 			// `.css` must precede the bare `…/tooltip` (JS) alias — the prefix
 			// matcher would otherwise rewrite it to `…/tooltip/index.ts.css`.
 			"@brainstorm/sdk/tooltip.css": resolve(__dirname, "packages/sdk/src/tooltip/tooltip.css"),
 			"@brainstorm/sdk/tooltip": resolve(__dirname, "packages/sdk/src/tooltip/index.ts"),
 			"@brainstorm/sdk/widget": resolve(__dirname, "packages/sdk/src/widget/index.tsx"),
+			// `.css` before the bare JS alias (same ordering rule as above).
+			"@brainstorm/sdk/select-menu.css": resolve(
+				__dirname,
+				"packages/sdk/src/select-menu/select-menu.css",
+			),
 			"@brainstorm/sdk/select-menu": resolve(__dirname, "packages/sdk/src/select-menu/index.ts"),
 			// `.css` alias before the base so the matcher doesn't rewrite it to
 			// `…/composer-context/index.ts.css`.

@@ -1,8 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { YDocStore } from "../storage/ydoc-store";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { VAULT_PROPERTIES_DOC_ID, VaultPropertiesStore } from "./vault-properties-store";
 
 describe("VaultPropertiesStore", () => {
@@ -13,7 +14,7 @@ describe("VaultPropertiesStore", () => {
 	});
 
 	afterEach(async () => {
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	it("opens with the canonical doc id and exposes a DevicesStore", async () => {

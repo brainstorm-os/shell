@@ -9,11 +9,12 @@
  * Both are pinned here directly on the store.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EntitiesRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { VaultSession } from "../vault/session";
 import type { EntityDekStore } from "./entity-dek-store";
 import { installEntityDek } from "./install-wrap";
@@ -47,8 +48,11 @@ describe("installEntityDek — version-monotonic install (ROT-3a-i)", () => {
 	});
 
 	afterEach(async () => {
-		session.dispose();
-		await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+		// Await the FULL teardown (dispose's promise covers the async store
+		// closes) so no handle inside `dir` is still open when rm runs —
+		// an open handle turns the recursive rm into EBUSY on Windows.
+		await session.dispose();
+		await removeTestDir(dir);
 	});
 
 	function currentDek(): Uint8Array {
