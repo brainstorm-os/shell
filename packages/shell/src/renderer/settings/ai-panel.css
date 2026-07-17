@@ -166,10 +166,6 @@
 	margin-bottom: calc(-1 * var(--space-1));
 }
 
-.settings__ai-key-form .settings__input {
-	width: 100%;
-}
-
 .settings__ai-usage-list {
 	list-style: none;
 	margin: var(--space-1) 0 0;

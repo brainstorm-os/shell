@@ -77,6 +77,12 @@
 	padding: 0 var(--space-2);
 }
 
+/* Lg — the onboarding/hero scale; pairs with `.button--lg` (40px). */
+.text-field--lg .text-field__input {
+	height: var(--control-height-lg);
+	padding: 0 var(--space-2);
+}
+
 /* Scoped under the size variants so it outweighs `.text-field--sm/md
  * .text-field__input { padding: … }` (which sets the `padding` shorthand and
  * would otherwise reset the icon gap, dropping the placeholder under the
@@ -135,6 +141,20 @@
 .text-field__input:disabled {
 	cursor: not-allowed;
 	opacity: 0.6;
+}
+
+/* Invalid state (the primitive stamps `aria-invalid` whenever `error` is
+ * passed): the border — and the focus ring that replaces it — turn to the
+ * error color. The `:hover` arm keeps the error border winning over the
+ * higher-specificity hover recolor above. */
+.text-field__input[aria-invalid="true"],
+.text-field__input[aria-invalid="true"]:hover:not(:disabled):not(:focus-visible) {
+	border-color: var(--color-state-error);
+}
+
+.text-field__input[aria-invalid="true"]:focus,
+.text-field__input[aria-invalid="true"]:focus-visible {
+	outline-color: var(--color-state-error);
 }
 
 .text-field__input::placeholder {

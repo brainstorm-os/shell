@@ -32,7 +32,9 @@
 	gap: 8px;
 }
 
-.billing-section__link-row .settings__input {
+/* The credential field is the shared `<TextField>` face (F-304) — only the
+ * flex-fill layout delta lives here. */
+.billing-section__link-row .text-field {
 	flex: 1;
 	min-width: 0;
 }

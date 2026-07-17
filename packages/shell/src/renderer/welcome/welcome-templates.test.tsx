@@ -95,7 +95,7 @@ async function enterCreateMode(): Promise<void> {
 }
 
 async function typeName(value: string): Promise<void> {
-	const input = host.querySelector<HTMLInputElement>("input.welcome__input");
+	const input = host.querySelector<HTMLInputElement>("input.text-field__input");
 	if (!input) throw new Error("name input not found");
 	const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
 	await act(async () => {

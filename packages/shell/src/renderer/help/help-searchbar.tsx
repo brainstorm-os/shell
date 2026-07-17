@@ -13,6 +13,7 @@
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import type { HelpHit } from "../../preload";
 import { t } from "../i18n/t";
+import { TextField, TextFieldSize } from "../ui/text-field";
 
 export type HelpSearchbarProps = {
 	readonly onPick: (hit: HelpHit) => void;
@@ -62,12 +63,12 @@ export function HelpSearchbar({ onPick, search, inputRef }: HelpSearchbarProps) 
 
 	return (
 		<div className="help__searchbar" role="search">
-			<input
-				ref={inputRef}
+			<TextField
+				ref={inputRef ?? null}
 				type="search"
-				className="help__search-input"
+				size={TextFieldSize.Md}
 				value={text}
-				onChange={(event) => setText(event.target.value)}
+				onChange={setText}
 				placeholder={t("shell.help.search.placeholder")}
 				aria-label={t("shell.help.search.label")}
 				data-testid="help-search-input"

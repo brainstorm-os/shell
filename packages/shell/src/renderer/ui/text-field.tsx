@@ -31,6 +31,8 @@ import "./text-field.css";
 export enum TextFieldSize {
 	Sm = "sm",
 	Md = "md",
+	/** 40px — the onboarding/hero scale (pairs with `ButtonSize.Lg`). */
+	Lg = "lg",
 }
 
 type CommonProps = {
@@ -58,7 +60,7 @@ type CommonProps = {
 export type TextFieldProps = CommonProps & {
 	readonly value: string;
 	readonly onChange: (next: string) => void;
-	readonly type?: "text" | "email" | "search" | "url" | "tel" | "password" | "number";
+	readonly type?: "text" | "email" | "search" | "url" | "tel" | "password" | "number" | "time";
 	/** Numeric bounds/step, forwarded to the underlying `<input>`. Only
 	 *  meaningful with `type="number"` — they let a constrained numeric field
 	 *  (e.g. "keep the last N days") ride the shared face instead of dropping to
@@ -71,6 +73,10 @@ export type TextFieldProps = CommonProps & {
 	readonly autoFocus?: boolean;
 	readonly autoComplete?: string;
 	readonly inputMode?: "text" | "search" | "email" | "url" | "tel" | "numeric" | "decimal";
+	/** Opt out of spellcheck for non-prose content (commands, keys, origins) —
+	 *  lets those fields ride the shared face instead of dropping to a raw
+	 *  `<input>` just to silence the squiggles. */
+	readonly spellCheck?: boolean;
 	readonly onBlur?: () => void;
 	/** Forwarded to the underlying `<input>` — e.g. a launcher search box that
 	 *  hands focus into a results list on ArrowDown / launches on Enter. */
@@ -103,6 +109,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 		autoFocus,
 		autoComplete,
 		inputMode,
+		spellCheck,
 		onBlur,
 		onKeyDown,
 		iconLeft,
@@ -156,6 +163,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 					{...(step !== undefined ? { step } : {})}
 					{...(autoComplete !== undefined ? { autoComplete } : {})}
 					{...(inputMode !== undefined ? { inputMode } : {})}
+					{...(spellCheck !== undefined ? { spellCheck } : {})}
 					{...(name !== undefined ? { name } : {})}
 					{...(hintId ? { "aria-describedby": hintId } : {})}
 					{...(error !== undefined ? { "aria-invalid": true } : {})}
@@ -185,6 +193,8 @@ export type TextAreaProps = CommonProps & {
 	readonly maxLength?: number;
 	readonly rows?: number;
 	readonly autoComplete?: string;
+	/** Opt out of spellcheck for non-prose content (argv lines, config). */
+	readonly spellCheck?: boolean;
 	readonly resize?: "none" | "vertical" | "both";
 };
 
@@ -207,6 +217,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
 		maxLength,
 		rows = 6,
 		autoComplete,
+		spellCheck,
 		resize = "vertical",
 	},
 	ref,
@@ -242,6 +253,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
 				{...(placeholder !== undefined ? { placeholder } : {})}
 				{...(maxLength !== undefined ? { maxLength } : {})}
 				{...(autoComplete !== undefined ? { autoComplete } : {})}
+				{...(spellCheck !== undefined ? { spellCheck } : {})}
 				{...(name !== undefined ? { name } : {})}
 				{...(hintId ? { "aria-describedby": hintId } : {})}
 				{...(error !== undefined ? { "aria-invalid": true } : {})}

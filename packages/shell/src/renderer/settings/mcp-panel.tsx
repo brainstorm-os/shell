@@ -22,6 +22,7 @@ import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
+import { TextArea, TextField } from "../ui/text-field";
 import { SettingSelect } from "./settings-controls";
 import "./mcp-panel.css";
 
@@ -231,23 +232,21 @@ function ServerPopover({
 				<label className="settings__mcp-label" htmlFor="mcp-id">
 					{t("shell.settings.mcp.idLabel")}
 				</label>
-				<input
+				<TextField
 					id="mcp-id"
-					className="settings__input"
 					value={id}
 					disabled={editing}
 					placeholder={t("shell.settings.mcp.idPlaceholder")}
-					onChange={(e) => setId(e.target.value)}
+					onChange={setId}
 				/>
 				<label className="settings__mcp-label" htmlFor="mcp-name">
 					{t("shell.settings.mcp.nameLabel")}
 				</label>
-				<input
+				<TextField
 					id="mcp-name"
-					className="settings__input"
 					value={name}
 					placeholder={t("shell.settings.mcp.namePlaceholder")}
-					onChange={(e) => setName(e.target.value)}
+					onChange={setName}
 				/>
 				<label className="settings__mcp-label" htmlFor="mcp-transport">
 					{t("shell.settings.mcp.transportLabel")}
@@ -264,25 +263,23 @@ function ServerPopover({
 						<label className="settings__mcp-label" htmlFor="mcp-command">
 							{t("shell.settings.mcp.commandLabel")}
 						</label>
-						<input
+						<TextField
 							id="mcp-command"
-							className="settings__input"
 							value={command}
 							spellCheck={false}
 							placeholder={t("shell.settings.mcp.commandPlaceholder")}
-							onChange={(e) => setCommand(e.target.value)}
+							onChange={setCommand}
 						/>
 						<label className="settings__mcp-label" htmlFor="mcp-args">
 							{t("shell.settings.mcp.argsLabel")}
 						</label>
-						<textarea
+						<TextArea
 							id="mcp-args"
-							className="settings__input settings__mcp-args"
 							value={argsText}
 							spellCheck={false}
 							rows={3}
 							placeholder={t("shell.settings.mcp.argsPlaceholder")}
-							onChange={(e) => setArgsText(e.target.value)}
+							onChange={setArgsText}
 						/>
 						<p className="settings__mcp-spawn-note">{t("shell.settings.mcp.spawnConsentNote")}</p>
 					</>
@@ -291,13 +288,12 @@ function ServerPopover({
 						<label className="settings__mcp-label" htmlFor="mcp-url">
 							{t("shell.settings.mcp.urlLabel")}
 						</label>
-						<input
+						<TextField
 							id="mcp-url"
-							className="settings__input"
 							type="url"
 							value={url}
 							placeholder="https://example.com/mcp"
-							onChange={(e) => setUrl(e.target.value)}
+							onChange={setUrl}
 						/>
 						<Checkbox
 							checked={requiresAuth}
@@ -305,8 +301,7 @@ function ServerPopover({
 							label={t("shell.settings.mcp.requiresAuth")}
 						/>
 						{requiresAuth && (
-							<input
-								className="settings__input"
+							<TextField
 								type="password"
 								autoComplete="off"
 								spellCheck={false}
@@ -316,7 +311,7 @@ function ServerPopover({
 										? t("shell.settings.mcp.authReplacePlaceholder")
 										: t("shell.settings.mcp.authPlaceholder")
 								}
-								onChange={(e) => setSecret(e.target.value)}
+								onChange={setSecret}
 								aria-label={t("shell.settings.mcp.authLabel")}
 							/>
 						)}

@@ -21,6 +21,7 @@ import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
+import { TextField, TextFieldSize } from "../ui/text-field";
 import { formatRelative } from "./network-egress-panel";
 import "./browser-privacy-panel.css";
 
@@ -148,29 +149,33 @@ function TrustedSitesGroup({
 			<h4 className="network-egress__group-title">{t("shell.settings.webPrivacy.trust.title")}</h4>
 			<p className="network-egress__hint">{t("shell.settings.webPrivacy.trust.summary")}</p>
 			<form className="browser-privacy__trust-add" onSubmit={(e) => void submit(e)}>
-				<input
-					className="browser-privacy__trust-input"
+				<TextField
+					size={TextFieldSize.Sm}
 					type="text"
 					inputMode="url"
+					spellCheck={false}
 					value={draft}
-					onChange={(e) => {
-						setDraft(e.target.value);
+					onChange={(next) => {
+						setDraft(next);
 						setError(false);
 					}}
 					placeholder={t("shell.settings.webPrivacy.trust.addPlaceholder")}
 					aria-label={t("shell.settings.webPrivacy.trust.addLabel")}
-					aria-invalid={error}
+					{...(error
+						? {
+								error: (
+									<span data-testid="browser-privacy-trust-error">
+										{t("shell.settings.webPrivacy.trust.invalid")}
+									</span>
+								),
+							}
+						: {})}
 					data-testid="browser-privacy-trust-input"
 				/>
 				<Button type="submit" variant={ButtonVariant.Primary} size={ButtonSize.Sm}>
 					{t("shell.settings.webPrivacy.trust.add")}
 				</Button>
 			</form>
-			{error && (
-				<p className="browser-privacy__trust-error" data-testid="browser-privacy-trust-error">
-					{t("shell.settings.webPrivacy.trust.invalid")}
-				</p>
-			)}
 			{trusted.length === 0 ? (
 				<p className="network-egress__empty" data-testid="browser-privacy-trust-empty">
 					{t("shell.settings.webPrivacy.trust.empty")}

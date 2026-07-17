@@ -375,22 +375,8 @@
 	color: var(--color-text-primary);
 }
 
-.settings__input {
-	min-width: 0;
-	height: var(--control-height-md);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	padding: 0 var(--space-2);
-	font: inherit;
-}
-
-.settings__input:focus-visible {
-	outline: var(--focus-ring-outline);
-	outline-offset: var(--focus-ring-offset-inset);
-	border-color: transparent;
-}
+/* Text fields in settings ride the shared `<TextField>` face (F-304) — the
+ * old `.settings__input` box lived here; the primitive owns it now. */
 
 .settings__dropzone {
 	display: flex;
@@ -2540,25 +2526,5 @@
 	gap: var(--space-2);
 }
 
-.setting-time {
-	font: inherit;
-	font-size: var(--text-size-sm);
-	color: var(--color-text-primary);
-	background: var(--color-surface-raised);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	padding: var(--space-1);
-	max-width: 240px;
-}
-
-/* Canonical "outline replaces border" focus chrome (not the outside-sandwich):
- * the ring sits where the border was. Matches the shared TextField primitive. */
-.setting-time:focus-visible {
-	outline: var(--focus-ring-outline);
-	outline-offset: var(--focus-ring-offset-inset);
-	border-color: transparent;
-}
-
-.setting-time:disabled {
-	opacity: 0.5;
-}
+/* The DND time pickers ride the shared `<TextField>` face at Sm (F-304) —
+ * box, focus chrome, and disabled state come from the primitive. */

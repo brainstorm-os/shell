@@ -281,7 +281,7 @@ test("welcome screen: flat tile CTAs, single-title join popover, duplicate-name 
 				// duplicate error before the user typed anything): no inline error,
 				// and the empty name gates "Continue" ("Create vault" is on step 2).
 				const error = dashboard.locator('[data-testid="welcome-name-error"]');
-				const nameInput = dashboard.locator(".welcome__input").first();
+				const nameInput = dashboard.locator(".welcome__form .text-field__input").first();
 				const continueBtn = dashboard.getByRole("button", { name: "Continue" });
 				await nameInput.waitFor({ state: "visible", timeout: 10_000 });
 				await expect(error).toBeHidden();
