@@ -3,6 +3,163 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.5.0",
+      "date": "2026-07-17",
+      "icon": "🚚",
+      "title": "Switch in, stay current",
+      "summary": "Bring your whole Anytype space with you — pages, properties, tags, collections and links arrive as native objects — and Brainstorm now finds its own updates and offers them as a click.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What's new"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Anytype import",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Settings → Backup & Migration accepts an Anytype export (folder or zip). Pages arrive with their full editor structure — headings, lists, checkboxes, links, images — plus their original dates; relations become properties, tags stay tags, collections become Lists, and linked objects stay linked. Importing the same export again updates instead of duplicating."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Automatic update checks",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Brainstorm checks for new versions in the background and shows a toast with a Download button when one is available; one more click restarts into it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Duplicate contacts, merged",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Contacts finds people who appear more than once (same email or name) and merges them into one card, keeping every email, phone and link. Merged-away duplicates go to the Bin, so a merge is reversible."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Embeds everywhere",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the Journal and Tasks editors now offer the same embed and transclusion blocks as Notes."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Import wizards grew up",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a finished import explains anything it skipped and offers “Import another…” right there."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "What's fixed"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Renames reach your pins",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — pinned app tiles now always show the app's current name."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files stays frameless",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — gallery tiles lost their leftover boxes, and a new guard keeps every Files view frame-free for good."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Widgets can't vanish",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a widget that ended up off-screen (an old resize bug) now pulls itself back onto the dashboard."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Faster, calmer imports",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — big imports parse once, read only the files they need, and no longer slow down as your vault grows."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "One control height",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — text fields across the entire app now sit on the shared control scale."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — and from now on, Brainstorm will tell you when the next one is ready."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.4.6",
       "date": "2026-07-16",
       "icon": "🩹",
