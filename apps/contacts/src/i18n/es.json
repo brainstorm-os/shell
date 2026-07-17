@@ -116,5 +116,25 @@
   "vcard.exportFailed": "No se pudieron exportar los contactos.",
   "vcard.importNone": "No se encontraron contactos en esos archivos.",
   "vcard.imported": "Se importaron {count} contactos.",
-  "vcard.importFailed": "No se pudieron importar los contactos."
+  "vcard.importFailed": "No se pudieron importar los contactos.",
+
+  "duplicates.button": "Duplicados ({count})",
+  "duplicates.button.aria.one": "Revisar {count} grupo de duplicados",
+  "duplicates.button.aria.other": "Revisar {count} grupos de duplicados",
+  "duplicates.title": "Revisar duplicados",
+  "duplicates.intro": "Estos contactos parecen ser la misma persona. Fusiona un grupo para combinar sus datos — los enlaces de otras apps pasan al contacto conservado.",
+  "duplicates.empty": "No se encontraron duplicados.",
+  "duplicates.match.email": "Mismo correo",
+  "duplicates.match.name": "Mismo nombre",
+  "duplicates.group.members.one": "{count} contacto",
+  "duplicates.group.members.other": "{count} contactos",
+  "duplicates.group.review": "Revisar",
+  "duplicates.survivor.legend": "Conservar este contacto",
+  "duplicates.survivor.suggested": "Sugerido",
+  "duplicates.survivor.hint": "Las demás copias se fusionan en el contacto conservado: correos, teléfonos y datos se combinan; las tareas, notas y enlaces que apuntaban a un duplicado se trasladan; los duplicados van a la papelera, desde donde se pueden restaurar.",
+  "duplicates.back": "Volver a los grupos",
+  "duplicates.close": "Cerrar",
+  "duplicates.merge": "Fusionar {count} contactos",
+  "duplicates.merged": "Se fusionaron {count} contactos en «{name}».",
+  "duplicates.mergeFailed": "No se pudieron fusionar los contactos."
 }

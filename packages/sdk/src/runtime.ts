@@ -48,6 +48,7 @@ import type {
 	DropResult,
 	EntitiesService,
 	Entity,
+	EntityMergeResult,
 	EntityQuery,
 	ExportService,
 	FileHandle,
@@ -803,6 +804,14 @@ function entitiesProxy(bridge: Bridge): EntitiesService {
 			),
 		update: (id, patch) => callService<Entity>(bridge, "entities", "update", [{ id, patch }], []),
 		delete: (id) => callService<void>(bridge, "entities", "delete", [{ id }], []),
+		merge: (survivorId, loserIds, patch) =>
+			callService<EntityMergeResult>(
+				bridge,
+				"entities",
+				"merge",
+				[patch === undefined ? { survivorId, loserIds } : { survivorId, loserIds, patch }],
+				[],
+			),
 		loadDoc: (id) =>
 			callService<{ snapshotB64: string; truncatedTail: boolean }>(
 				bridge,

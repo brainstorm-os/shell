@@ -24,6 +24,7 @@ import {
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
+	type EntityMergeResult,
 	type EntityQuery,
 } from "@brainstorm/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
@@ -36,6 +37,12 @@ import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
 import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekHandle, EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
+import { rewriteEntityRefs } from "./merge-refs";
+
+/** Upper bound on losers per `entities.merge` call — a duplicate group is a
+ *  handful of rows; a pathological request must not pin the main process in
+ *  the per-loser referrer scan. */
+const MERGE_MAX_LOSERS = 100;
 
 export type EntitiesServiceOptions = {
 	/** The entities repo for the active vault, or null when no vault is
@@ -321,6 +328,36 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		}
 	};
 
+	// Y.Doc-first (Phase 2) property write, shared by `update` and `merge`:
+	// when the doc transport is wired, route the patch through the canonical
+	// doc and materialise its projection into the row — the doc is the source
+	// of truth, the row a derived index. `seedProps` hands the worker the
+	// row's full current property set for lazy hydration (Phase 5): the doc
+	// seeds from it ONLY when its property map is still empty, so a legacy /
+	// seeded row becomes a complete doc before the patch lands. Falls back to
+	// a direct row write in legacy/test contexts with no ydoc wired. Returns
+	// the updated row, or null when the id vanished under us.
+	const writePropsThroughDoc = async (
+		repo: EntitiesRepository,
+		row: EntityRow,
+		patch: Record<string, unknown>,
+	): Promise<EntityRow | null> => {
+		let propsForRow: Record<string, unknown> = patch;
+		const vaultPath = options.getVaultPath?.() ?? null;
+		if (options.ydoc && vaultPath && Object.keys(patch).length > 0) {
+			const res = (await options.ydoc("setEntityState", {
+				vaultPath,
+				entityId: row.id,
+				props: patch,
+				seedProps: row.properties,
+			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
+			if (res?.projection?.properties) propsForRow = res.projection.properties;
+			// 10.12 — emit the property write through live-sync if shared.
+			emitLocalDoc(row.id, row.type, res?.updateB64);
+		}
+		return repo.update(row.id, propsForRow, clock());
+	};
+
 	// 10.12 — the system-only remote-apply path. NOT registered on the broker
 	// (an app must never be able to apply an ungated Y.Doc update): handed to
 	// the live-sync wiring via `bindApplyRemoteDoc`. The engine only calls it
@@ -514,33 +551,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				}
 				const patch =
 					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {};
-				// Y.Doc-first (Phase 2): when the doc transport is wired, route
-				// the property write through the canonical doc and materialise
-				// its projection into the row — the doc is the source of truth,
-				// the row a derived index. The row write merges (preserving any
-				// property not yet migrated into the doc). Falls back to a direct
-				// row write only in legacy/test contexts with no ydoc wired.
-				let propsForRow: Record<string, unknown> = patch;
-				const updateVaultPath = options.getVaultPath?.() ?? null;
-				if (options.ydoc && updateVaultPath && Object.keys(patch).length > 0) {
-					const res = (await options.ydoc("setEntityState", {
-						vaultPath: updateVaultPath,
-						entityId: id,
-						props: patch,
-						// Lazy hydration (Phase 5): hand the worker the row's full
-						// current property set. It seeds the Y.Doc from this ONLY
-						// when the doc's property map is still empty — i.e. the
-						// entity was seeded / legacy-backfilled straight into
-						// entities.db and this is its first Y.Doc write. That makes
-						// the doc a complete source of truth before the patch, so a
-						// later sync carries the whole object, not just `patch`.
-						seedProps: existing.properties,
-					})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
-					if (res?.projection?.properties) propsForRow = res.projection.properties;
-					// 10.12 — emit the property write through live-sync if shared.
-					emitLocalDoc(id, existing.type, res?.updateB64);
-				}
-				const updated = repo.update(id, propsForRow, clock());
+				const updated = await writePropsThroughDoc(repo, existing, patch);
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
 				// Asset-B4 — reconcile against the row's FULL post-write property
@@ -572,6 +583,112 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					}
 				}
 				return null;
+			}
+
+			// ── F-158: duplicate merge ─────────────────────────────────
+			// One shell-side operation, because repointing incoming refs
+			// means touching OTHER entities (a Task's assignee, a note's
+			// aboutEntityId) the calling app may hold no read/write grant
+			// for. Keeping it here keeps that rewrite CONSTRAINED: the only
+			// mutation ever applied to a referrer is swapping one entity id
+			// of the merged type for another of the same type — the app
+			// supplies ids, never referrer contents, and gets back only
+			// identifiers + counts. Gated by `entities.write:<type>` on the
+			// merged type (the same authority a delete needs). Losers are
+			// SOFT-deleted (Bin, recoverable); a re-merge of already-binned
+			// ids is an idempotent no-op.
+			case "merge": {
+				const a = arg(envelope);
+				const survivorId = String(a.survivorId ?? "");
+				const rawLoserIds = Array.isArray(a.loserIds) ? a.loserIds : [];
+				const patch =
+					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : null;
+				const survivor = repo.get(survivorId);
+				if (!survivor) throw named("Invalid", `entities.merge: survivor ${survivorId} not found`);
+				if (!can(EntityAccess.Write, survivor.type)) {
+					throw named("Denied", `entities.merge: no entities.write for ${survivor.type}`);
+				}
+				const loserIds: string[] = [];
+				for (const raw of rawLoserIds) {
+					if (typeof raw !== "string" || raw === "" || raw === survivorId) continue;
+					if (!loserIds.includes(raw)) loserIds.push(raw);
+				}
+				if (loserIds.length === 0) throw named("Invalid", "entities.merge: no losers given");
+				if (loserIds.length > MERGE_MAX_LOSERS) {
+					throw named("Invalid", `entities.merge: more than ${MERGE_MAX_LOSERS} losers`);
+				}
+				// Only LIVE losers of the SAME type merge — an id already in the
+				// Bin (or never existing) is skipped, which is what makes a
+				// repeated merge of the same group safe. A different-type id is
+				// a caller bug, surfaced loudly.
+				const losers: EntityRow[] = [];
+				for (const id of loserIds) {
+					const row = repo.get(id);
+					if (!row) continue;
+					if (row.type !== survivor.type) {
+						throw named("Invalid", `entities.merge: ${id} is ${row.type}, not ${survivor.type}`);
+					}
+					losers.push(row);
+				}
+				// Field-level union (computed app-side, where the conflict UI
+				// lives) lands on the survivor through the standard Y.Doc-first
+				// write path.
+				if (patch && Object.keys(patch).length > 0) {
+					const updated = await writePropsThroughDoc(repo, survivor, patch);
+					if (updated) {
+						emitChange(EntityEventVerb.Update, survivorId, survivor.type);
+						await reconcileAssetRefs(repo, survivorId, updated.properties);
+					}
+				}
+				const loserIdSet = new Set(losers.map((l) => l.id));
+				let refsRewritten = 0;
+				let linksRepointed = 0;
+				if (losers.length > 0) {
+					// Referrer union across losers. The losers themselves are
+					// excluded (they're about to be binned); the survivor is NOT
+					// (its own `links` may list a loser — the rewrite drops the
+					// would-be self-ref).
+					const referrerIds = new Set<string>();
+					for (const loser of losers) {
+						for (const id of repo.listReferrerIds(loser.id)) {
+							if (!loserIdSet.has(id)) referrerIds.add(id);
+						}
+					}
+					for (const refId of referrerIds) {
+						const row = repo.get(refId);
+						if (!row) continue;
+						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
+						if (!refPatch) continue;
+						const updated = await writePropsThroughDoc(repo, row, refPatch);
+						if (!updated) continue;
+						refsRewritten += 1;
+						emitChange(EntityEventVerb.Update, row.id, row.type);
+						// No reconcileAssetRefs here: an id swap can't add or drop a
+						// `brainstorm://asset/` URL.
+					}
+					for (const loser of losers) {
+						// Repoint BEFORE the soft-delete — softDelete stamps every
+						// still-incident link deleted, so the order is load-bearing.
+						linksRepointed += repo.repointLinks(loser.id, survivorId, clock());
+						repo.softDelete(loser.id, clock());
+						emitChange(EntityEventVerb.Delete, loser.id, loser.type);
+						// Same containment as `delete`: drop the binned loser's
+						// asset refs so its blobs stop counting as reachable.
+						if (options.getAssetKind) {
+							try {
+								repo.assetRefs.deleteByEntity(loser.id);
+							} catch (error) {
+								console.error("[entities] asset-ref merge-prune failed:", error);
+							}
+						}
+					}
+				}
+				return {
+					survivorId,
+					mergedIds: losers.map((l) => l.id),
+					linksRepointed,
+					refsRewritten,
+				} satisfies EntityMergeResult;
 			}
 
 			// ── 9.3.2b: rich-text Y.Doc replica transport ──────────────

@@ -251,6 +251,20 @@ export type Subscription = {
 	unsubscribe(): void;
 };
 
+/** Outcome summary of an `entities.merge` (F-158 duplicate merge). Carries
+ *  only identifiers + counts — never the contents of referrer entities the
+ *  calling app may not be able to read. */
+export type EntityMergeResult = {
+	survivorId: EntityId;
+	/** Loser ids that were actually merged this call (already-deleted /
+	 *  missing ids are skipped — a re-merge is an idempotent no-op). */
+	mergedIds: EntityId[];
+	/** Stored `links`-table rows whose endpoint moved to the survivor. */
+	linksRepointed: number;
+	/** Referrer entities whose property refs were rewritten to the survivor. */
+	refsRewritten: number;
+};
+
 export type EntitiesService = {
 	get(id: EntityId): Promise<Entity | null>;
 	subscribe(query: EntityQuery, onUpdate: (entities: Entity[]) => void): Subscription;
@@ -260,6 +274,17 @@ export type EntitiesService = {
 	create(type: string, properties: Record<string, unknown>, id?: EntityId): Promise<Entity>;
 	update(id: EntityId, patch: Record<string, unknown>): Promise<Entity>;
 	delete(id: EntityId): Promise<void>;
+	/** Merge duplicate entities of ONE type into a survivor (F-158): applies
+	 *  `patch` to the survivor, repoints every stored link + property ref that
+	 *  targeted a loser onto the survivor, then soft-deletes the losers (they
+	 *  land in the Bin, recoverable). Shell-side + capability-gated by
+	 *  `entities.write:<type>`; idempotent on re-merge. Optional — an older
+	 *  shell runtime may not expose it, so callers feature-detect. */
+	merge?(
+		survivorId: EntityId,
+		loserIds: EntityId[],
+		patch?: Record<string, unknown>,
+	): Promise<EntityMergeResult>;
 	query(query: EntityQuery): Promise<Entity[]>;
 	/** 9.3.2b — rich-text Y.Doc transport (base64 Yjs updates; no yjs
 	 *  types cross this boundary so sdk-types stays yjs-free). The preload

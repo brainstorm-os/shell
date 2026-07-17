@@ -564,3 +564,158 @@ body.is-resizing .contacts__resize {
 	justify-content: flex-end;
 	gap: var(--space-2);
 }
+
+/* ── Duplicates review (F-158) ───────────────────────────────────────────
+ * Sidebar affordance + the review dialog's group list / survivor picker.
+ * Chrome (backdrop, panel, header, footer) is the shared `<Popover>`; the
+ * buttons are `.bs-btn`; only the list rows are app-specific. */
+
+.contacts-list__dups {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	width: 100%;
+	padding: var(--space-2);
+	border: none;
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+	background: var(--bg-elev);
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+	cursor: pointer;
+	text-align: start;
+}
+
+.contacts-list__dups:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.contacts-list__dups svg {
+	flex: 0 0 auto;
+	color: var(--accent);
+}
+
+.contacts-list__dups-cta {
+	margin-inline-start: auto;
+	color: var(--accent);
+	font-weight: var(--text-weight-medium);
+}
+
+.contacts-dups__intro,
+.contacts-dups__hint {
+	margin: 0 0 var(--space-3);
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+}
+
+.contacts-dups__hint {
+	margin: var(--space-3) 0 0;
+	color: var(--text-faint);
+}
+
+.contacts-dups__empty {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	color: var(--text-faint);
+}
+
+.contacts-dups__groups {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.contacts-dups__group {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+}
+
+.contacts-dups__group-text,
+.contacts-dups__member-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.contacts-dups__group-name {
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-medium);
+	color: var(--text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.contacts-dups__group-meta {
+	font-size: var(--text-size-xs);
+	color: var(--text-faint);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.contacts-dups__fieldset {
+	margin: 0;
+	padding: 0;
+	border: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.contacts-dups__legend {
+	padding: 0 0 var(--space-2);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+	color: var(--text);
+}
+
+.contacts-dups__member {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	cursor: pointer;
+}
+
+.contacts-dups__member:hover {
+	background: var(--hover);
+}
+
+.contacts-dups__member--keep {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+
+.contacts-dups__member input[type="radio"] {
+	flex: 0 0 auto;
+	accent-color: var(--accent);
+}
+
+.contacts-dups__badge {
+	flex: 0 0 auto;
+	padding: 2px var(--space-2);
+	border-radius: var(--radius-full);
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-size: var(--text-size-xs);
+	font-weight: var(--text-weight-medium);
+}
+
+.contacts-dups__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	width: 100%;
+}

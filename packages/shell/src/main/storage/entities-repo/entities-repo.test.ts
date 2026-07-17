@@ -318,3 +318,76 @@ describe("EntitiesRepository", () => {
 		]);
 	});
 });
+
+// ── F-158: merge support — referrer scan + link repoint ─────────────────────
+describe("EntitiesRepository merge support (F-158)", () => {
+	let env: Awaited<ReturnType<typeof setup>>;
+	beforeEach(async () => {
+		env = await setup();
+	});
+	afterEach(async () => {
+		env.stores.close();
+		await rm(env.vaultDir, { recursive: true, force: true });
+	});
+
+	const seed = (id: string, properties: Record<string, unknown>) =>
+		env.repo.create({ id, type: "io.x/T/v1", properties, createdBy: "io.x", now: 1000, dekId: null });
+
+	it("listReferrerIds finds live entities whose properties carry the id, excluding self + deleted", () => {
+		seed("ent_target", { name: "Dana" });
+		seed("ent_ref1", { assignee: "ent_target" });
+		seed("ent_ref2", { people: ["ent_other", "ent_target"] });
+		seed("ent_ref3", { note: "no refs here" });
+		seed("ent_ref4", { assignee: "ent_target" });
+		env.repo.softDelete("ent_ref4", 2000);
+
+		expect(env.repo.listReferrerIds("ent_target")).toEqual(["ent_ref1", "ent_ref2"]);
+	});
+
+	it("repointLinks moves incident links, collapsing self-loops and duplicates", () => {
+		seed("ent_s", {});
+		seed("ent_l", {});
+		seed("ent_t", {});
+		env.repo.putLink({
+			id: "k1",
+			sourceEntityId: "ent_t",
+			destEntityId: "ent_l",
+			linkType: "a",
+			createdAt: 1,
+		});
+		env.repo.putLink({
+			id: "k2",
+			sourceEntityId: "ent_l",
+			destEntityId: "ent_t",
+			linkType: "b",
+			createdAt: 1,
+		});
+		env.repo.putLink({
+			id: "k3",
+			sourceEntityId: "ent_s",
+			destEntityId: "ent_l",
+			linkType: "c",
+			createdAt: 1,
+		});
+		env.repo.putLink({
+			id: "k4",
+			sourceEntityId: "ent_t",
+			destEntityId: "ent_s",
+			linkType: "a",
+			createdAt: 1,
+		});
+
+		const touched = env.repo.repointLinks("ent_l", "ent_s", 3000);
+		expect(touched).toBe(3);
+		// k1 collapsed (duplicate of k4); k2 moved; k3 collapsed (self-loop).
+		expect(env.repo.linksFrom("ent_t").map((l) => l.id)).toEqual(["k4"]);
+		expect(env.repo.linksFrom("ent_s").map((l) => l.id)).toEqual(["k2"]);
+		expect(env.repo.linksFrom("ent_l")).toEqual([]);
+	});
+
+	it("repointLinks is a no-op for an entity with no live incident links", () => {
+		seed("ent_s", {});
+		seed("ent_l", {});
+		expect(env.repo.repointLinks("ent_l", "ent_s", 3000)).toBe(0);
+	});
+});
