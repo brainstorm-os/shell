@@ -29,6 +29,7 @@ import {
 	parseAnytypeExport,
 	renderTextRun,
 } from "./anytype-import";
+import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
 
 function snapshotFile(id: string, sbType: string, data: Record<string, unknown>): AnytypeFile {
 	const details = { id, ...(data.details as Record<string, unknown> | undefined) };
@@ -321,6 +322,44 @@ describe("parseAnytypeExport", () => {
 		expect(m?.properties.url).toBe("https://x.io");
 	});
 
+	it("mirrors user relations into a def-keyed `values` bag (F-394)", () => {
+		// The shared property panel reads per-entity values from
+		// `properties.values`, keyed by PropertyDef.key — the same slug
+		// deriveTypeSchemas mints. Without this bag the imported tags were
+		// stored top-level but the Notes panel showed "No properties yet".
+		const a = plan.entities.find((e) => e.externalId === "obj-a");
+		expect(a?.properties.values).toEqual({
+			description: "Rebuild everything",
+			tags: ["Urgent", "opt-ghost"],
+			effort: 5,
+			owner: "Ship importer",
+		});
+		const b = plan.entities.find((e) => e.externalId === "obj-b");
+		expect(b?.properties.values).toEqual({
+			done: true,
+			"due-date": new Date(1774254674 * 1000).toISOString(),
+		});
+	});
+
+	it("keeps bookkeeping + entity meta out of the values bag", () => {
+		const withDates = parseAnytypeExport([
+			snapshotFile("obj-meta", "Page", {
+				details: {
+					name: "Meta",
+					iconEmoji: "📚",
+					createdDate: 1_700_000_000,
+					lastModifiedDate: 1_700_000_100,
+				},
+			}),
+		]);
+		const e = withDates.entities.find((x) => x.externalId === "obj-meta");
+		// icon/createdAt/updatedAt are entity-level meta (panel meta rows /
+		// entity chrome), never panel property rows — no values bag at all.
+		expect(e?.properties.icon).toBe("📚");
+		expect(e?.properties.createdAt).toBe(1_700_000_000_000);
+		expect(e?.properties.values).toBeUndefined();
+	});
+
 	it("titles a name-less Note from its Title block before the snippet", () => {
 		const noted = parseAnytypeExport([
 			snapshotFile("obj-n", "Page", {
@@ -357,6 +396,39 @@ describe("deriveTypeSchemas", () => {
 		const page = schemas.find((s) => s.type === "Seite");
 		const effort = page?.properties.find((p) => p.key === "effort");
 		expect(effort?.valueType).toBe(ValueType.Number);
+	});
+
+	it("declares array-valued relations multi so tags render as tag lists", () => {
+		const schemas = deriveTypeSchemas(parseAnytypeExport(FILES, ATTACHMENTS));
+		const page = schemas.find((s) => s.type === "Seite");
+		const tags = page?.properties.find((p) => p.key === "tags");
+		expect(tags?.valueType).toBe(ValueType.Text);
+		expect(tags?.count?.max).toBeGreaterThan(1);
+	});
+
+	it("never derives defs for the values bag or entity meta keys", () => {
+		const schemas = deriveTypeSchemas(
+			parseAnytypeExport([
+				snapshotFile("obj-meta2", "Page", {
+					objectTypes: ["ot-page"],
+					details: {
+						name: "Meta",
+						type: "ot-page",
+						iconEmoji: "📚",
+						description: "keeps this one",
+						createdDate: 1_700_000_000,
+						lastModifiedDate: 1_700_000_100,
+					},
+				}),
+				snapshotFile("t-page2", "STType", { details: { name: "Seite" }, key: "page" }),
+			]),
+		);
+		const keys = schemas.flatMap((s) => s.properties.map((p) => p.key));
+		expect(keys).toContain("description");
+		expect(keys).not.toContain("values");
+		expect(keys).not.toContain("icon");
+		expect(keys).not.toContain("createdat");
+		expect(keys).not.toContain("updatedat");
 	});
 });
 
@@ -421,6 +493,45 @@ describe("importAnytypeExport (vault binding)", () => {
 		expect(second.created).toBe(0);
 		expect(second.filesCreated).toBe(0);
 		expect(second.updated).toBe(3);
+	});
+
+	it("persists the def-keyed values bag and registers matching defs (F-394)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		await importAnytypeExport(session, FILES, opts, attachments);
+
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [aId] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:obj-a`);
+		const a = aId ? repo.get(aId) : null;
+		const values = a?.properties.values as Record<string, unknown> | undefined;
+		expect(values?.tags).toEqual(["Urgent", "opt-ghost"]);
+		// Every values key has a registered PropertyDef, so the panel renders it.
+		const store = await session.propertiesStore();
+		const defs = store.snapshot().properties;
+		for (const key of Object.keys(values ?? {})) {
+			expect(defs[key], `def for ${key}`).toBeDefined();
+		}
+		expect(Object.keys(values ?? {}).length).toBeGreaterThan(0);
+	});
+
+	it("never clobbers an established catalog def with an inferred one", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const store = await session.propertiesStore();
+		store.setProperty({
+			key: "tags",
+			name: "Tags (curated)",
+			icon: null,
+			valueType: ValueType.Text,
+			count: { min: 0, max: 25 },
+		});
+
+		const report = await importAnytypeExport(session, FILES, opts, attachments);
+		const after = store.snapshot().properties.tags;
+		expect(after?.name).toBe("Tags (curated)");
+		expect(after?.count).toEqual({ min: 0, max: 25 });
+		// The pre-seeded key is skipped; the rest still registered.
+		expect(report.propertiesRegistered).toBeGreaterThan(0);
 	});
 
 	it("aborts cleanly mid-run", async () => {

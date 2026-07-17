@@ -23,7 +23,12 @@
  */
 
 import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm/sdk";
-import type { List, MemberInclude, PropertyDef } from "@brainstorm/sdk-types";
+import {
+	CARDINALITY_HARD_MAX,
+	type List,
+	type MemberInclude,
+	type PropertyDef,
+} from "@brainstorm/sdk-types";
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
@@ -666,6 +671,22 @@ export function parseAnytypeExport(
 		if (createdMs !== null) properties.createdAt = createdMs;
 		if (updatedMs !== null) properties.updatedAt = updatedMs;
 
+		// F-394 — mirror the user-facing relations into the `values` bag the
+		// shared property panel reads (`@brainstorm/sdk/property-ui` value-store:
+		// per-entity property values live under `properties.values`, keyed by
+		// PropertyDef.key). Notes' Properties panel renders exactly the keys in
+		// that bag that have a registered PropertyDef, so without this the
+		// imported tags/relations were stored but never surfaced. Keys are the
+		// same slug {@link propertyKey} that {@link deriveTypeSchemas} mints, so
+		// value keys and registered defs always agree. Top-level keys stay as-is
+		// (Database columns, search snippets, and timestamps read those).
+		const values: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(properties)) {
+			if (NON_SCHEMA_KEYS.has(key)) continue;
+			values[propertyKey(key)] = value;
+		}
+		if (Object.keys(values).length > 0) properties.values = values;
+
 		// Anytype Notes carry no `name`; the Title chrome block (when the user
 		// typed one) outranks the snippet-derived fallback.
 		const titleBlock = snap.blocks.find((b) => asString(asRecord(b.text)?.style) === "Title");
@@ -706,11 +727,19 @@ export function parseAnytypeExport(
 	};
 }
 
-/** Draft properties that are the importer's own bookkeeping, not user schema. */
+/** Draft properties that are the importer's own bookkeeping or entity-level
+ *  chrome/meta, not user schema: they never become PropertyDefs and never land
+ *  in the `values` bag (`createdAt`/`updatedAt` are entity timestamps the
+ *  panel already shows as meta rows; `icon` is the entity's icon; `values` is
+ *  the bag itself). */
 const NON_SCHEMA_KEYS: ReadonlySet<string> = new Set([
 	"anytypeType",
 	"body",
 	"title",
+	"values",
+	"icon",
+	"createdAt",
+	"updatedAt",
 	IMPORT_EXTERNAL_ID_PROP,
 ]);
 
@@ -751,12 +780,23 @@ export function deriveTypeSchemas(plan: AnytypeImportPlan): AnytypeTypeSchema[] 
 				names.push(name);
 			}
 		}
-		const properties: PropertyDef[] = names.map((name) => ({
-			key: propertyKey(name),
-			name,
-			icon: null,
-			valueType: inferValueType(drafts.map((d) => d.properties[name])),
-		}));
+		const properties: PropertyDef[] = names.map((name) => {
+			const samples = drafts.map((d) => d.properties[name]);
+			// Anytype tag/multi-relations arrive as arrays — declare the def
+			// multi-valued (value-store's coerceValue then wraps the bare
+			// elements into the labeled envelope) and infer the element type,
+			// so an imported tag list renders as tags instead of a mangled
+			// scalar text cell.
+			const present = samples.filter((v) => v !== null && v !== undefined && v !== "");
+			const isMulti = present.length > 0 && present.every((v) => Array.isArray(v));
+			const def: PropertyDef = {
+				key: propertyKey(name),
+				name,
+				icon: null,
+				valueType: inferValueType(isMulti ? present.flat() : samples),
+			};
+			return isMulti ? { ...def, count: { min: 0, max: CARDINALITY_HARD_MAX } } : def;
+		});
 		schemas.push({ type, properties });
 	}
 	return schemas;
@@ -1024,8 +1064,14 @@ export async function importAnytypeExport(
 		const schemas = deriveTypeSchemas(plan);
 		if (schemas.length > 0) {
 			const store = await session.propertiesStore();
+			// Register only keys the catalog doesn't have yet — an established
+			// def (canonical `tags`, a user-tuned vocabulary/format) must never
+			// be clobbered by an inferred import guess. Values still land under
+			// the shared key, so they surface through the existing def.
+			const existingDefs = store.snapshot().properties;
 			for (const schema of schemas) {
 				for (const def of schema.properties) {
+					if (existingDefs[def.key]) continue;
 					store.setProperty(def);
 					propertiesRegistered++;
 				}
