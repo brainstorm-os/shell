@@ -860,6 +860,10 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 								{
 									externalId: "media",
 									reason: `${report.filesMissingBinary} file(s) referenced but binaries were not in the export (Anytype JSON export typically omits file bytes)`,
+									// F-395 — renderer-side i18n for the known media-missing
+									// condition; `reason` above stays as the fallback text.
+									reasonKey: "shell.settings.backupMigration.report.mediaMissing",
+									reasonArgs: { count: report.filesMissingBinary },
 								},
 							]
 						: [];

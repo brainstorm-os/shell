@@ -122,3 +122,34 @@
 	font-weight: var(--text-weight-medium);
 	color: var(--color-text-tertiary);
 }
+
+/* F-395 — the done state's failure detail: each `failed` row expands into its
+ * actual reason (i18n'd for shell-known conditions) instead of a bare count,
+ * and the run-again action sits content-width like the idle action. */
+.backup-migration__failed {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.backup-migration__failed-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	line-height: 1.45;
+	color: var(--color-text-secondary);
+}
+
+.backup-migration__failed-icon {
+	flex-shrink: 0;
+	margin-top: 2px;
+	color: var(--color-state-warning);
+}
+
+.backup-migration__done-actions {
+	display: flex;
+}

@@ -28,7 +28,7 @@ import type {
 	ImportRunReport,
 	ImportSourcePreview,
 } from "../../preload";
-import { t } from "../i18n/t";
+import { t, tIfKey } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Icon, IconName } from "../ui/icon";
@@ -191,6 +191,71 @@ function ImportFlowPopover({
 				{children}
 			</div>
 		</Popover>
+	);
+}
+
+/** Render one failure row's explanation. A shell-known condition carries a
+ *  `reasonKey` the renderer localizes; anything else falls back to the
+ *  report's literal `reason` (per-record engine failures are dynamic text). */
+function failureText(failure: ImportRunReport["failed"][number]): string {
+	if (failure.reasonKey) {
+		const translated = tIfKey(failure.reasonKey, failure.reasonArgs);
+		if (translated !== failure.reasonKey) return translated;
+	}
+	return failure.externalId && !failure.reasonKey
+		? `${failure.externalId}: ${failure.reason}`
+		: failure.reason;
+}
+
+/**
+ * Shared done state for every import flow (F-395): the summary line, the
+ * expanded failure reasons (a bare "1 failed" count was a dead end), and the
+ * run-again affordance (the done state previously stranded the user — the
+ * pick button only came back after leaving the Settings section).
+ * Exported for tests.
+ */
+export function ImportDoneState({
+	report,
+	onAgain,
+	againLabel,
+	testId,
+}: {
+	report: ImportRunReport;
+	onAgain: () => void;
+	againLabel: string;
+	testId: string;
+}) {
+	return (
+		<div className="backup-migration__stack" data-testid={testId}>
+			<p className="settings__hint">
+				<Icon name={IconName.CheckCircle} size={14} />{" "}
+				{t("shell.settings.backupMigration.import.done", {
+					created: report.created,
+					updated: report.updated,
+					failed: report.failed.length,
+				})}
+			</p>
+			{report.failed.length > 0 && (
+				<ul className="backup-migration__failed" data-testid={`${testId}-failed`}>
+					{report.failed.map((failure, index) => (
+						<li className="backup-migration__failed-row" key={`${failure.externalId ?? "row"}-${index}`}>
+							<Icon className="backup-migration__failed-icon" name={IconName.Warning} size={14} />
+							<span>{failureText(failure)}</span>
+						</li>
+					))}
+				</ul>
+			)}
+			<div className="backup-migration__done-actions">
+				<Button
+					variant={ButtonVariant.Neutral}
+					size={ButtonSize.Sm}
+					onClick={onAgain}
+					data-testid={`${testId}-again`}
+				>
+					{againLabel}
+				</Button>
+			</div>
+		</div>
 	);
 }
 
@@ -445,19 +510,12 @@ function ImportSection() {
 			</AnimatePresence>
 
 			{phase.kind === "done" && (
-				<div className="backup-migration__stack" data-testid="backup-migration-import-done">
-					<p className="settings__hint">
-						<Icon name={IconName.CheckCircle} size={14} />{" "}
-						{t("shell.settings.backupMigration.import.done", {
-							created: phase.report.created,
-							updated: phase.report.updated,
-							failed: phase.report.failed.length,
-						})}
-					</p>
-					<Button variant={ButtonVariant.Neutral} size={ButtonSize.Sm} onClick={reset}>
-						{t("shell.settings.backupMigration.import.again")}
-					</Button>
-				</div>
+				<ImportDoneState
+					report={phase.report}
+					onAgain={reset}
+					againLabel={t("shell.settings.backupMigration.import.again")}
+					testId="backup-migration-import-done"
+				/>
 			)}
 
 			{error && (
@@ -580,14 +638,12 @@ function ObsidianSection() {
 			</AnimatePresence>
 
 			{phase.kind === "done" && (
-				<p className="settings__hint" data-testid="backup-migration-obsidian-done">
-					<Icon name={IconName.CheckCircle} size={14} />{" "}
-					{t("shell.settings.backupMigration.import.done", {
-						created: phase.report.created,
-						updated: phase.report.updated,
-						failed: phase.report.failed.length,
-					})}
-				</p>
+				<ImportDoneState
+					report={phase.report}
+					onAgain={() => setPhase({ kind: "idle" })}
+					againLabel={t("shell.settings.backupMigration.obsidian.again")}
+					testId="backup-migration-obsidian-done"
+				/>
 			)}
 
 			{error && (
@@ -708,14 +764,12 @@ function AnytypeSection() {
 			</AnimatePresence>
 
 			{phase.kind === "done" && (
-				<p className="settings__hint" data-testid="backup-migration-anytype-done">
-					<Icon name={IconName.CheckCircle} size={14} />{" "}
-					{t("shell.settings.backupMigration.import.done", {
-						created: phase.report.created,
-						updated: phase.report.updated,
-						failed: phase.report.failed.length,
-					})}
-				</p>
+				<ImportDoneState
+					report={phase.report}
+					onAgain={() => setPhase({ kind: "idle" })}
+					againLabel={t("shell.settings.backupMigration.anytype.again")}
+					testId="backup-migration-anytype-done"
+				/>
 			)}
 
 			{error && (
@@ -834,14 +888,12 @@ function NotionSection() {
 			</AnimatePresence>
 
 			{phase.kind === "done" && (
-				<p className="settings__hint" data-testid="backup-migration-notion-done">
-					<Icon name={IconName.CheckCircle} size={14} />{" "}
-					{t("shell.settings.backupMigration.import.done", {
-						created: phase.report.created,
-						updated: phase.report.updated,
-						failed: phase.report.failed.length,
-					})}
-				</p>
+				<ImportDoneState
+					report={phase.report}
+					onAgain={() => setPhase({ kind: "idle" })}
+					againLabel={t("shell.settings.backupMigration.notion.again")}
+					testId="backup-migration-notion-done"
+				/>
 			)}
 
 			{error && (

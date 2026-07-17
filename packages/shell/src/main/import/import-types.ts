@@ -76,12 +76,24 @@ export type ImportPlan = {
 	readonly warnings: readonly string[];
 };
 
+/** One failure row surfaced by the wizard's done state (F-395). `reason` is
+ *  the always-present human-readable fallback; when the failure is a known
+ *  shell-owned condition, `reasonKey`/`reasonArgs` name a renderer i18n
+ *  message so the explanation localizes (the renderer falls back to `reason`
+ *  for keys it doesn't know). */
+export type ImportFailure = {
+	readonly externalId: string | null;
+	readonly reason: string;
+	readonly reasonKey?: string;
+	readonly reasonArgs?: Readonly<Record<string, string | number>>;
+};
+
 export type ImportRunReport = {
 	readonly created: number;
 	readonly updated: number;
 	/** Drafts not committed because the run was cancelled (`signal` aborted). */
 	readonly skipped: number;
-	readonly failed: ReadonlyArray<{ readonly externalId: string | null; readonly reason: string }>;
+	readonly failed: ReadonlyArray<ImportFailure>;
 	/** True when an abort cut the run short (some drafts were `skipped`). */
 	readonly cancelled?: boolean;
 };
