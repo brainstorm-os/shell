@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PrivacyMode } from "../network/privacy-config";
 import { ProxyMode } from "../network/proxy-config";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	NETWORK_SETTINGS_FILENAME,
 	networkSettingsPath,
@@ -19,7 +20,7 @@ describe("vault-network-settings-store", () => {
 	});
 
 	afterEach(async () => {
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	describe("read default-on-first-read", () => {

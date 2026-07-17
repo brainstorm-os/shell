@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	addWordToList,
 	coerceWordList,
@@ -44,7 +45,7 @@ describe("readSpellcheckDictionary / writeSpellcheckDictionary", () => {
 		dir = await mkdtemp(join(tmpdir(), "bs-spell-"));
 	});
 	afterEach(async () => {
-		await rm(dir, { recursive: true, force: true });
+		await removeTestDir(dir);
 	});
 
 	it("returns [] when the file is absent", async () => {

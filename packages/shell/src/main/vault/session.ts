@@ -881,8 +881,18 @@ export class VaultSession {
 		};
 	}
 
-	dispose(): void {
-		if (this.disposed) return;
+	/**
+	 * Tear the session down. All key material is zeroed and every SQLite
+	 * handle is closed *synchronously* before this returns; the returned
+	 * promise additionally settles once the async YDoc-backed stores
+	 * (dashboard / vault-properties) have flushed and closed. Callers that
+	 * only need the security guarantees may ignore the promise (all
+	 * existing call sites do); callers that need the vault directory fully
+	 * released — e.g. a test about to `rm(vaultDir)` on Windows, where a
+	 * still-open handle turns the rm into EBUSY — must await it.
+	 */
+	dispose(): Promise<void> {
+		if (this.disposed) return Promise.resolve();
 		this.disposed = true;
 		zero(this.masterKey);
 		zero(this.identitySecret);
@@ -914,21 +924,35 @@ export class VaultSession {
 		this.cachedNetworkSettings = null;
 		this.networkSettingsOpening = null;
 		this.networkSettingsListeners.clear();
+		// Collect (not fire-and-forget) the async store closes so the
+		// returned promise settles only once their outstanding writes are
+		// flushed and their file handles released. Failures are logged, never
+		// thrown — dispose must always complete the key zeroing above.
+		const pendingCloses: Promise<void>[] = [];
 		if (this.cachedDashboard) {
 			const store = this.cachedDashboard;
 			this.cachedDashboard = null;
-			// fire-and-forget — flushes outstanding writes before resolving
-			void store.close();
+			// flushes outstanding writes before resolving
+			pendingCloses.push(
+				store.close().catch((error) => {
+					console.warn("[brainstorm] dispose: dashboard store close failed:", error);
+				}),
+			);
 		}
 		if (this.cachedProperties) {
 			const store = this.cachedProperties;
 			this.cachedProperties = null;
-			void store.close();
+			pendingCloses.push(
+				store.close().catch((error) => {
+					console.warn("[brainstorm] dispose: properties store close failed:", error);
+				}),
+			);
 		}
 		this.dataStores.close();
 		// PassphraseBackend.dispose exists; other backends are no-ops.
 		const maybeDispose = (this.backend as { dispose?: () => void }).dispose;
 		if (typeof maybeDispose === "function") maybeDispose.call(this.backend);
+		return Promise.all(pendingCloses).then(() => undefined);
 	}
 
 	private assertOpen(): void {
@@ -971,7 +995,11 @@ export function setActiveVaultSession(session: VaultSession | null): void {
 		`[brainstorm] setActiveVaultSession: ${session ? `set to ${session.vaultId}` : "cleared"}`,
 	);
 	if (active && active !== session) {
-		active.dispose();
+		// Deliberately not awaited — the sync teardown (key zeroing + SQLite
+		// close) completes before dispose returns; only the YDoc store
+		// flushes ride the promise, and a session *switch* must not block on
+		// them.
+		void active.dispose();
 	}
 	active = session;
 	// Stage 10.5c — notify the live-transport orchestrator of the session
@@ -1020,7 +1048,9 @@ export function onActiveVaultSessionChanged(
 
 export function closeActiveVaultSession(): void {
 	if (!active) return;
-	active.dispose();
+	// See setActiveVaultSession — the security-relevant teardown is
+	// synchronous; the promise only tracks YDoc store flushes.
+	void active.dispose();
 	active = null;
 	// Notify subscribers of the teardown exactly as a switch does (the active
 	// session went to null). Without this, close + the hard-lock path (which

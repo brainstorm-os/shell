@@ -28,12 +28,13 @@
  * such a run depends on.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { EntitiesRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { packDirToTar, unpackTarToDir } from "./__fixtures__/tar";
 
 let USER_DATA_DIR = "";
@@ -86,7 +87,7 @@ describe("vault directory portability round-trip", () => {
 	});
 
 	afterEach(async () => {
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	it("recovers identity, master key, entities + Yjs doc after a tar → untar move", async () => {

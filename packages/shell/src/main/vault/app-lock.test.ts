@@ -1,8 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAppLockPin } from "../credentials/app-lock-pin";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { APP_LOCK_ATTEMPT_CAP } from "./app-lock-policy";
 import {
 	AppLockMode,
@@ -30,7 +31,7 @@ describe("app-lock — lock/unlock state machine (13.8b)", () => {
 		vi.useRealTimers();
 		resetAppLockStateForTests();
 		closeActiveVaultSession();
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	it("maps backends to modes (passphrase → soft, others → hard)", () => {

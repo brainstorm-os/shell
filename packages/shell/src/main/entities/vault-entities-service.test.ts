@@ -5,12 +5,13 @@
  * fault-isolation invariant ("`list()` must never reject").
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import type { QueryPatternResult } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { MENTION_NODE_TYPE } from "./extract-note-references";
 import type { SharedEntitiesRepo } from "./vault-entities-service";
 import {
@@ -359,9 +360,7 @@ describe("vault-entities-service — temp vault lifecycle (smoke)", () => {
 		vaultPath = await mkdtemp(join(tmpdir(), "vault-entities-"));
 	});
 	afterEach(async () => {
-		await rm(vaultPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
-			() => {},
-		);
+		await removeTestDir(vaultPath);
 	});
 
 	it("no repo + a real vault path → empty snapshot (kv is no longer scanned)", async () => {

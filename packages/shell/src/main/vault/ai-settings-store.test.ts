@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ANTHROPIC_PROVIDER_ID, OLLAMA_PROVIDER_ID } from "@brainstorm/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	MAX_APP_CREDIT_BUDGET,
 	MAX_APP_TOKEN_BUDGET,
@@ -63,7 +64,7 @@ describe("readAiSettings / writeAiSettings + mutators", () => {
 		dir = await mkdtemp(join(tmpdir(), "brainstorm-ai-settings-"));
 	});
 	afterEach(async () => {
-		await rm(dir, { recursive: true, force: true });
+		await removeTestDir(dir);
 	});
 
 	it("default-on-first-read writes the default", async () => {

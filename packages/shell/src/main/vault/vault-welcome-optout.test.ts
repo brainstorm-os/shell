@@ -6,10 +6,11 @@
  * seeder runs on first open.
  */
 
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { WELCOME_SEED_VERSION } from "../welcome/welcome-content";
 import { WELCOME_SEED_FILENAME } from "../welcome/welcome-seed-store";
 
@@ -33,7 +34,7 @@ describe("createVault — Welcome-1b starter-content opt-out", () => {
 	afterEach(async () => {
 		const { closeActiveVaultSession } = await import("./session");
 		closeActiveVaultSession();
-		await rm(workDir, { recursive: true, force: true });
+		await removeTestDir(workDir);
 	});
 
 	function stampPath(): string {

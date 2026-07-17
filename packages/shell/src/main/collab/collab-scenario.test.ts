@@ -10,12 +10,13 @@
  */
 
 import { Buffer } from "node:buffer";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { encryptAndEmit, receiveAndApply } from "../sync/envelope-pipeline";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { AccessRole, resolveMembers } from "./access-record";
 import { CollabLink, REMOTE_ORIGIN } from "./collab-harness";
 
@@ -37,9 +38,9 @@ describe("collab C4 — Mira ↔ Marcus two-vault scenarios", () => {
 	});
 
 	afterEach(async () => {
-		link.dispose();
-		await rm(dirMira, { recursive: true, force: true });
-		await rm(dirMarcus, { recursive: true, force: true });
+		await link.dispose();
+		await removeTestDir(dirMira);
+		await removeTestDir(dirMarcus);
 	});
 
 	it("Mira shares a brief; Marcus reads it, is an active Editor, and both co-edit to convergence", async () => {

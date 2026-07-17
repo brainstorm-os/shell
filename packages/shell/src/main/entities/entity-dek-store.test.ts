@@ -13,13 +13,14 @@
  *   - Forward-pin: AAD recompute path for 10.3 — see test docstring.
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateSymmetricKey, openSecret } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { type EntityDekHandle, EntityDekStore } from "./entity-dek-store";
 
 const ENTITY_DEK_AAD_PREFIX = "brainstorm/entity-dek/v1:";
@@ -63,9 +64,7 @@ describe("EntityDekStore", () => {
 	});
 	afterEach(async () => {
 		env.stores.close();
-		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
-			() => {},
-		);
+		await removeTestDir(env.vaultDir);
 	});
 
 	it("persist returns a 32-byte DEK + a fresh dekId, persists the wrap row", () => {

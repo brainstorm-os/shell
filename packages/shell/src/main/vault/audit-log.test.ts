@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { appendAuditEvent, auditLogPath } from "./audit-log";
 
 describe("audit log", () => {
@@ -12,7 +13,7 @@ describe("audit log", () => {
 	});
 
 	afterEach(async () => {
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	it("composes the log path under <vault>/logs/audit.log", () => {

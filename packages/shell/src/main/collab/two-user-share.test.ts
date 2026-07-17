@@ -11,10 +11,11 @@
  */
 
 import { Buffer } from "node:buffer";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { AccessRole } from "./access-record";
 import { CollabLink } from "./collab-harness";
 
@@ -36,9 +37,9 @@ describe("collab C3 — two different users share + collaborate end to end", () 
 	});
 
 	afterEach(async () => {
-		link.dispose();
-		await rm(dirOwner, { recursive: true, force: true });
-		await rm(dirCollab, { recursive: true, force: true });
+		await link.dispose();
+		await removeTestDir(dirOwner);
+		await removeTestDir(dirCollab);
 	});
 
 	it("owner shares via invite; collaborator decrypts, is an active member, both edit + converge; relay sees ciphertext", async () => {

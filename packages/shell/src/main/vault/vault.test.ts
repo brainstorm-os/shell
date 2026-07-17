@@ -1,7 +1,8 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { removeTestDir } from "../test-support/remove-test-dir";
 
 vi.mock("electron", () => ({
 	app: {
@@ -37,7 +38,7 @@ describe("activateVault", () => {
 	});
 
 	afterEach(async () => {
-		await rm(registryDir, { recursive: true, force: true });
+		await removeTestDir(registryDir);
 	});
 
 	it("drops the entry from the registry when the vault folder is gone", async () => {
