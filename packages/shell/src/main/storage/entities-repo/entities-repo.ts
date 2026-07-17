@@ -492,6 +492,56 @@ export class EntitiesRepository {
 		return rows.map(rowToEntity);
 	}
 
+	/**
+	 * Live entity ids whose serialized property bag contains `targetId` —
+	 * the candidate referrer set for the F-158 merge's ref rewrite. Entity
+	 * ids are opaque unique strings, so a raw `instr` over the JSON blob is
+	 * a safe superset filter (the pure `rewriteEntityRefs` walk upstream
+	 * only rewrites exact value equality); `instr` with a bound needle also
+	 * sidesteps LIKE-escaping. The target itself is excluded.
+	 */
+	listReferrerIds(targetId: string): string[] {
+		const rows = this.stmt(
+			"SELECT id FROM entities WHERE deleted_at IS NULL AND id != ? AND instr(properties, ?) > 0 ORDER BY created_at, id",
+		).all(targetId, targetId) as Array<{ id: string }>;
+		return rows.map((r) => r.id);
+	}
+
+	/**
+	 * Repoint every LIVE link incident to `fromId` onto `toId` (the F-158
+	 * merge's link rewrite). A link whose rewrite would self-loop
+	 * (`toId → toId`), or that duplicates an existing live
+	 * (source, dest, linkType) triple, is soft-deleted instead of moved —
+	 * graph integrity over row preservation. Runs in one transaction;
+	 * returns the number of rows touched (moved + collapsed).
+	 */
+	repointLinks(fromId: string, toId: string, now: number): number {
+		return this.transaction(() => {
+			const rows = this.stmt(
+				"SELECT id, source_entity_id, dest_entity_id, link_type, created_at FROM links WHERE (source_entity_id = ? OR dest_entity_id = ?) AND deleted_at IS NULL",
+			).all(fromId, fromId) as DbLinkRow[];
+			let touched = 0;
+			for (const row of rows) {
+				const source = row.source_entity_id === fromId ? toId : row.source_entity_id;
+				const dest = row.dest_entity_id === fromId ? toId : row.dest_entity_id;
+				const duplicate = this.stmt(
+					"SELECT id FROM links WHERE source_entity_id = ? AND dest_entity_id = ? AND link_type = ? AND deleted_at IS NULL AND id != ? LIMIT 1",
+				).get(source, dest, row.link_type, row.id) as { id: string } | undefined;
+				if (source === dest || duplicate) {
+					this.stmt("UPDATE links SET deleted_at = ? WHERE id = ?").run(now, row.id);
+				} else {
+					this.stmt("UPDATE links SET source_entity_id = ?, dest_entity_id = ? WHERE id = ?").run(
+						source,
+						dest,
+						row.id,
+					);
+				}
+				touched += 1;
+			}
+			return touched;
+		});
+	}
+
 	putLink(link: EntityLink): void {
 		this.stmt(
 			"INSERT OR REPLACE INTO links (id, source_entity_id, dest_entity_id, link_type, created_at, deleted_at) VALUES (?, ?, ?, ?, ?, NULL)",

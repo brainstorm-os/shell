@@ -1113,3 +1113,189 @@ describe("entities service — live-sync hooks (10.12)", () => {
 		expect(refs.map((r) => r.assetId).sort()).toEqual(["cov1", "fav1"]);
 	});
 });
+
+// ── F-158: entities.merge ───────────────────────────────────────────────────
+describe("entities.merge (F-158 duplicate merge)", () => {
+	const PERSON = "brainstorm/Person/v1";
+	const TASK = "io.x/Task/v1";
+
+	let e: Awaited<ReturnType<typeof setup>>;
+	beforeEach(async () => {
+		e = await setup();
+	});
+	afterEach(async () => {
+		e.stores.close();
+		await rm(e.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+	});
+
+	type MergeResult = {
+		survivorId: string;
+		mergedIds: string[];
+		linksRepointed: number;
+		refsRewritten: number;
+	};
+
+	async function createEntity(type: string, properties: Record<string, unknown>): Promise<string> {
+		const created = (await e.handler(env("io.x", "create", { type, properties }))) as {
+			id: string;
+		};
+		return created.id;
+	}
+
+	async function merge(
+		survivorId: string,
+		loserIds: string[],
+		patch?: Record<string, unknown>,
+	): Promise<MergeResult> {
+		return (await e.handler(
+			env("io.x", "merge", patch ? { survivorId, loserIds, patch } : { survivorId, loserIds }),
+		)) as MergeResult;
+	}
+
+	it("applies the survivor patch, soft-deletes losers into the Bin, and reports them", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana Whitfield" });
+		const loser = await createEntity(PERSON, {
+			name: "Dana Whitfield",
+			email: ["dana@x.com"],
+		});
+		const result = await merge(survivor, [loser], { email: ["dana@x.com"] });
+
+		expect(result).toEqual({
+			survivorId: survivor,
+			mergedIds: [loser],
+			linksRepointed: 0,
+			refsRewritten: 0,
+		});
+		expect(e.repo.get(survivor)?.properties).toMatchObject({ email: ["dana@x.com"] });
+		// The loser is gone from the live set but recoverable from the Bin.
+		expect(e.repo.get(loser)).toBeNull();
+		expect(e.repo.listDeleted().map((r) => r.id)).toContain(loser);
+		expect(e.repo.restore(loser, 2000)).toBe(true);
+		expect(e.repo.get(loser)).not.toBeNull();
+	});
+
+	it("repoints stored links from losers to the survivor, collapsing self-loops + duplicates", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const loser = await createEntity(PERSON, { name: "Dana W." });
+		const task = await createEntity(TASK, { title: "Prep" });
+		// task → loser (moves), loser → task (moves), survivor → loser
+		// (would self-loop after repoint → collapsed), task → survivor
+		// (pre-existing duplicate of the repointed task → loser).
+		e.repo.putLink({
+			id: "l1",
+			sourceEntityId: task,
+			destEntityId: loser,
+			linkType: "t/assn",
+			createdAt: 1,
+		});
+		e.repo.putLink({
+			id: "l2",
+			sourceEntityId: loser,
+			destEntityId: task,
+			linkType: "p/owns",
+			createdAt: 1,
+		});
+		e.repo.putLink({
+			id: "l3",
+			sourceEntityId: survivor,
+			destEntityId: loser,
+			linkType: "p/knows",
+			createdAt: 1,
+		});
+		e.repo.putLink({
+			id: "l4",
+			sourceEntityId: task,
+			destEntityId: survivor,
+			linkType: "t/assn",
+			createdAt: 1,
+		});
+
+		const result = await merge(survivor, [loser]);
+		expect(result.linksRepointed).toBe(3);
+
+		const fromTask = e.repo.linksFrom(task);
+		// l1 collapsed as a duplicate of l4 — exactly one task → survivor link.
+		expect(fromTask.filter((l) => l.destEntityId === survivor)).toHaveLength(1);
+		expect(fromTask.some((l) => l.destEntityId === loser)).toBe(false);
+		// l2 moved: survivor → task.
+		expect(e.repo.linksFrom(survivor).map((l) => l.destEntityId)).toEqual([task]);
+		// l3 (survivor → loser) would self-loop — collapsed, not moved.
+		expect(e.repo.linksFrom(survivor).some((l) => l.destEntityId === survivor)).toBe(false);
+	});
+
+	it("rewrites property refs in referrers of OTHER types (scalar, array, envelope)", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const loserA = await createEntity(PERSON, { name: "Dana W" });
+		const loserB = await createEntity(PERSON, { name: "D. Whitfield" });
+		const task = await createEntity(TASK, { title: "Prep", assignee: loserA });
+		const note = await createEntity("io.x/Note/v1", {
+			title: "Minutes",
+			people: [loserA, loserB, survivor],
+			author: { value: loserB, label: "D. Whitfield" },
+		});
+
+		const result = await merge(survivor, [loserA, loserB]);
+		expect(result.refsRewritten).toBe(2);
+		expect(e.repo.get(task)?.properties).toMatchObject({ assignee: survivor });
+		expect(e.repo.get(note)?.properties).toMatchObject({
+			// Both losers collapse onto the already-present survivor.
+			people: [survivor],
+			author: { value: survivor, label: "D. Whitfield" },
+		});
+	});
+
+	it("drops a would-be self-ref when the survivor's own properties list a loser", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const other = await createEntity(PERSON, { name: "Sam" });
+		const loser = await createEntity(PERSON, { name: "Dana W" });
+		await e.handler(env("io.x", "update", { id: survivor, patch: { links: [loser, other] } }));
+
+		await merge(survivor, [loser]);
+		expect(e.repo.get(survivor)?.properties).toMatchObject({ links: [other] });
+	});
+
+	it("is idempotent — re-merging already-binned losers is a no-op", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const loser = await createEntity(PERSON, { name: "Dana W" });
+		const task = await createEntity(TASK, { title: "Prep", assignee: loser });
+
+		const first = await merge(survivor, [loser]);
+		expect(first.mergedIds).toEqual([loser]);
+		expect(first.refsRewritten).toBe(1);
+
+		const second = await merge(survivor, [loser]);
+		expect(second).toEqual({
+			survivorId: survivor,
+			mergedIds: [],
+			linksRepointed: 0,
+			refsRewritten: 0,
+		});
+		expect(e.repo.get(task)?.properties).toMatchObject({ assignee: survivor });
+		expect(e.repo.get(loser)).toBeNull();
+	});
+
+	it("denies without entities.write on the merged type", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const loser = await createEntity(PERSON, { name: "Dana W" });
+		e.setLedger(fakeLedger(["entities.read:*"]));
+		await expect(merge(survivor, [loser])).rejects.toMatchObject({ name: "Denied" });
+		expect(e.repo.get(loser)).not.toBeNull();
+	});
+
+	it("rejects a loser of a different type (Invalid), leaving everything live", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		const task = await createEntity(TASK, { title: "Prep" });
+		await expect(merge(survivor, [task])).rejects.toMatchObject({ name: "Invalid" });
+		expect(e.repo.get(task)).not.toBeNull();
+	});
+
+	it("rejects a missing survivor and an empty loser list", async () => {
+		const survivor = await createEntity(PERSON, { name: "Dana" });
+		await expect(merge("ent_nope", [survivor])).rejects.toMatchObject({ name: "Invalid" });
+		await expect(merge(survivor, [])).rejects.toMatchObject({ name: "Invalid" });
+		// The survivor itself in the loser list never counts as a loser.
+		await expect(merge(survivor, [survivor])).rejects.toMatchObject({ name: "Invalid" });
+	});
+});

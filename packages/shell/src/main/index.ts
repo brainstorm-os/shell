@@ -2969,7 +2969,10 @@ void app.whenReady().then(async () => {
 		if (
 			envelope.method === "create" ||
 			envelope.method === "update" ||
-			envelope.method === "delete"
+			envelope.method === "delete" ||
+			// F-158 — a merge rewrites referrers + bins losers: same staleness
+			// + reindex fan-out as any other entity write.
+			envelope.method === "merge"
 		) {
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 			scheduleSearchReindex();
