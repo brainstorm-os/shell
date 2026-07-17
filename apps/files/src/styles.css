@@ -1205,8 +1205,12 @@ body[data-view-mode="gallery"] .content-row {
 	gap: 0;
 	padding: 0;
 	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	border: var(--border-width) solid var(--border);
+	/* Borderless at rest — same Finder treatment f9e55cb gave Grid: the
+	 * always-on card border + elevated surface framed every tile. The border
+	 * track stays (transparent) so hover/selection tint it without a layout
+	 * shift; the media band's own surface still delineates the thumb. */
+	background: transparent;
+	border: var(--border-width) solid transparent;
 	margin: 0;
 	overflow: hidden;
 	transition: transform var(--motion-duration-fast, 120ms) ease, box-shadow
@@ -1220,6 +1224,9 @@ body[data-view-mode="gallery"] .content-row:hover {
 }
 
 body[data-view-mode="gallery"] .content-row[data-selected="true"] {
+	/* The rest-state card surface is transparent now, so selection supplies
+	 * its own wash (matching Grid) on top of the accent ring. */
+	background: var(--active);
 	border-color: var(--accent);
 	box-shadow: 0 0 0 1px var(--accent);
 }
