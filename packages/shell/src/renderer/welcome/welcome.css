@@ -14,10 +14,10 @@
 	/* Splash-screen wallpaper — shipped runtime asset under the shell's
 	 * `art/` folder (NOT docs/, which is example art only). The same
 	 * rose-mountains image seeds a new vault's light slot, so the dashboard
-	 * the user lands on continues the welcome scene. The soft white veil
-	 * keeps the dark ink (welcome pins the Rose theme) readable on the
-	 * image's busier lower half without washing out the artwork. */
-	background: linear-gradient(180deg, rgba(255, 246, 248, 0.16) 0%, rgba(255, 246, 248, 0.4) 100%),
+	 * the user lands on continues the welcome scene. A light veil keeps the
+	 * dark ink (welcome pins the Rose theme) readable on the busier lower
+	 * half without washing the low-poly facets into mud. */
+	background: linear-gradient(180deg, rgba(255, 246, 248, 0.1) 0%, rgba(255, 246, 248, 0.28) 100%),
 		url("../../../art/wallpaper/rose-mountains.jpg") center / cover no-repeat,
 		var(--color-background-primary);
 }
@@ -46,10 +46,11 @@
 	align-items: center;
 }
 
-/* The create form carries the template gallery, which needs room to lay its
- * use-case tiles out as a real multi-column grid (at 400px they collapse to a
- * single scrolling column). Widen only this step — the menu stays compact. */
-.welcome__content--create {
+/* Create + Start steps need room for the path row and the template gallery
+ * (at 400px the use-case tiles collapse to a single scrolling column). The
+ * menu stays compact. Class was `--create` when both lived on one step;
+ * Start now owns the gallery so both wide steps share `--wide`. */
+.welcome__content--wide {
 	max-width: 620px;
 }
 
@@ -437,13 +438,17 @@
 	height: 100%;
 	padding: var(--space-3) var(--space-2);
 	text-align: center;
-	background: var(--color-surface-default);
-	border: var(--border-width) solid var(--color-border-default);
+	/* Frosted glass (not surface-default at ~4% alpha) — over the wallpaper
+	 * the surface tint vanished and the cards read as bare text on the art. */
+	background: var(--color-glass-background);
+	border: var(--border-width) solid var(--color-glass-border);
 	border-radius: var(--radius-md);
 	color: var(--color-text-primary);
 	cursor: pointer;
 	transition: background var(--motion-duration-normal) var(--motion-easing-standard), border-color
 		var(--motion-duration-normal) var(--motion-easing-standard);
+	-webkit-app-region: no-drag;
+	app-region: no-drag;
 }
 
 /* Use-case glyph — a rounded chip so the tile reads icon-first; tints to the
@@ -461,6 +466,7 @@
 }
 
 .welcome__template-card:hover:not(:disabled) {
+	background: var(--color-glass-background-strong);
 	border-color: var(--color-border-strong);
 }
 
@@ -471,7 +477,7 @@
 
 .welcome__template-card--selected {
 	border-color: var(--color-accent-default);
-	background: var(--color-accent-subtle);
+	background: var(--color-glass-background-strong);
 }
 
 .welcome__template-card--selected .welcome__template-icon {
@@ -504,8 +510,9 @@
 .welcome__actions {
 	display: flex;
 	gap: var(--space-2);
-	justify-content: flex-end;
+	justify-content: center;
 	margin-top: var(--space-2);
+	width: 100%;
 }
 
 .welcome__error {

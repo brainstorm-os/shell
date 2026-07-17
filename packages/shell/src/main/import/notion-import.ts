@@ -30,9 +30,11 @@ import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
+import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { inferValueType } from "./import-map";
 import { parseTable } from "./import-parse";
 import { IMPORT_EXTERNAL_ID_PROP, ImportFormat } from "./import-types";
+import { bodyMarkdownFromProperties, plantImportMarkdownBody } from "./plant-import-body";
 
 /** One extracted text file from the Notion export (`.md`, `.csv`, or `.html`).
  *  `path` is export-relative (e.g. `Workspace/Tasks abc123.../Do it def456....md`). */
@@ -346,7 +348,7 @@ export function notionCollectionId(source: string, database: string): string {
 }
 
 export type NotionImportOptions = {
-	/** Vault entity type the pages + database rows map onto (e.g. `brainstorm/Note/v1`). */
+	/** Vault entity type the pages + database rows map onto (e.g. `io.brainstorm.notes/Note/v1`). */
 	readonly targetType: string;
 	/** Stable source id namespacing the dedupe key (e.g. `notion:my-workspace`). */
 	readonly source: string;
@@ -355,6 +357,8 @@ export type NotionImportOptions = {
 	/** Streaming controls (doc 45 §Streaming): page-import progress + cancel. */
 	readonly onProgress?: (done: number, total: number) => void;
 	readonly signal?: AbortSignal;
+	/** Plant markdown `body` into each page's universal-body Y.Doc. */
+	readonly applyDocUpdate?: ApplyDocUpdate;
 };
 
 export type NotionImportReport = {
@@ -418,9 +422,11 @@ export async function importNotionExport(
 			title: draft.title,
 			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
 		};
+		let entityId: string;
 		if (existing !== null) {
 			repo.update(existing, properties, options.now);
 			idByPath.set(draft.externalId, existing);
+			entityId = existing;
 			updated++;
 		} else {
 			const id = `ent_${ulid()}`;
@@ -433,7 +439,18 @@ export async function importNotionExport(
 				dekId: null,
 			});
 			idByPath.set(draft.externalId, id);
+			entityId = id;
 			created++;
+		}
+		if (options.applyDocUpdate) {
+			const md = bodyMarkdownFromProperties(properties);
+			if (md) {
+				try {
+					await plantImportMarkdownBody(entityId, md, options.applyDocUpdate);
+				} catch {
+					// Non-fatal — row + snippet still land.
+				}
+			}
 		}
 		options.onProgress?.(i + 1, total);
 		if ((i + 1) % NOTION_YIELD_EVERY === 0) await Promise.resolve();

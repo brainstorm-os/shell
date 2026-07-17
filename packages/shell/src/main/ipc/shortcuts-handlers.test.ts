@@ -207,9 +207,9 @@ describe("shortcuts-handlers — set override rejection paths", () => {
 	});
 
 	it("rebinding an action to its own current chord is a no-op success (self isn't a conflict)", async () => {
-		expect(await invoke(SHORTCUTS_SET_OVERRIDE_CHANNEL, "shell/launcher", "CmdOrCtrl+K")).toEqual(
-			{ ok: true },
-		);
+		expect(await invoke(SHORTCUTS_SET_OVERRIDE_CHANNEL, "shell/launcher", "CmdOrCtrl+K")).toEqual({
+			ok: true,
+		});
 	});
 
 	it("rejects a non-string non-null chord (malformed call)", async () => {

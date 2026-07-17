@@ -95,7 +95,8 @@ export type ObsidianSourcePreview = {
 	readonly noteCount: number;
 };
 
-/** A picked Notion export `.zip`, extracted into memory + bound to its vault. */
+/** A picked Notion export (`.zip` or unzipped folder), loaded into memory +
+ *  bound to its vault. */
 type PendingNotion = {
 	readonly archiveName: string;
 	readonly files: readonly NotionFile[];
@@ -104,7 +105,8 @@ type PendingNotion = {
 };
 let pendingNotion: PendingNotion | null = null;
 
-/** Limits on a Notion `.zip` extraction (zip-slip + zip-bomb defence). */
+/** Limits on a Notion export extraction (zip-slip + zip-bomb defence; same
+ *  bounds apply to a folder walk of an unzipped export). */
 const NOTION_ZIP_LIMITS: ZipReadLimits = {
 	maxEntries: 100_000,
 	maxEntryBytes: 256 * 1024 * 1024,
@@ -112,13 +114,14 @@ const NOTION_ZIP_LIMITS: ZipReadLimits = {
 };
 const NOTION_TEXT_EXT = /\.(md|markdown|csv|html|htm)$/i;
 
-/** Preview after a Notion `.zip` pick. */
+/** Preview after a Notion export pick. */
 export type NotionSourcePreview = {
 	readonly archiveName: string;
 	readonly pageCount: number;
 };
 
-/** A picked Anytype export `.zip`, extracted into memory + bound to its vault. */
+/** A picked Anytype export (`.zip` or folder), loaded into memory + bound to
+ *  its vault. */
 type PendingAnytype = {
 	readonly archiveName: string;
 	readonly files: readonly AnytypeFile[];
@@ -127,7 +130,8 @@ type PendingAnytype = {
 };
 let pendingAnytype: PendingAnytype | null = null;
 
-/** Limits on an Anytype `.zip` extraction (zip-slip + zip-bomb defence). */
+/** Limits on an Anytype export extraction (zip-slip + zip-bomb defence; same
+ *  bounds apply to a folder walk of an unzipped export). */
 const ANYTYPE_ZIP_LIMITS: ZipReadLimits = {
 	maxEntries: 100_000,
 	maxEntryBytes: 256 * 1024 * 1024,
@@ -135,11 +139,44 @@ const ANYTYPE_ZIP_LIMITS: ZipReadLimits = {
 };
 const ANYTYPE_JSON_EXT = /\.(pb\.json|json)$/i;
 
-/** Preview after an Anytype `.zip` pick. */
+/** Preview after an Anytype export pick. */
 export type AnytypeSourcePreview = {
 	readonly archiveName: string;
 	readonly objectCount: number;
 };
+
+/** One file from an export folder walk — path is vault-relative with `/`
+ *  separators (matches zip entry paths). */
+type WalkedExportEntry = {
+	readonly path: string;
+	readonly bytes: Uint8Array;
+};
+
+/** Recursively read every regular file under `root`, applying the same
+ *  entry/total byte ceilings the zip reader enforces. Symlinks are skipped
+ *  (`isFile()` is false for them), so the walk can't escape the chosen folder. */
+async function walkExportFolder(root: string, limits: ZipReadLimits): Promise<WalkedExportEntry[]> {
+	const dirents = await readdir(root, { recursive: true, withFileTypes: true });
+	const out: WalkedExportEntry[] = [];
+	let totalBytes = 0;
+	let entries = 0;
+	for (const dirent of dirents) {
+		if (!dirent.isFile()) continue;
+		const parent = (dirent as unknown as { parentPath?: string; path?: string }).parentPath ?? root;
+		const absolute = join(parent, dirent.name);
+		const path = relative(root, absolute).split(sep).join("/");
+		if (++entries > limits.maxEntries) {
+			throw new Error("import-export: export has too many files");
+		}
+		const bytes = new Uint8Array(await readFile(absolute));
+		totalBytes += bytes.length;
+		if (bytes.length > limits.maxEntryBytes || totalBytes > limits.maxTotalBytes) {
+			throw new Error("import-export: export is too large");
+		}
+		out.push({ path, bytes });
+	}
+	return out;
+}
 
 function requirePendingAnytypeFor(vaultId: string): PendingAnytype {
 	if (!pendingAnytype) throw new Error("import-export: no Anytype export picked");
@@ -266,6 +303,10 @@ export type ImportMappingEdit = {
 
 export type ImportExportHandlersOptions = {
 	getDashboard: () => BrowserWindow | null;
+	/** Plant imported markdown into each entity's universal-body Y.Doc.
+	 *  Mirrors the Welcome-2 template channel — without this, Notes opens
+	 *  blank because editors bind to the Y.Doc, not `properties.body`. */
+	makeApplyDocUpdate?: (vaultPath: string) => (entityId: string, updateB64: string) => Promise<void>;
 };
 
 function formatFromExt(path: string): ImportFormat | null {
@@ -343,6 +384,11 @@ function requireTargetType(targetType: unknown): string {
 }
 
 export function registerImportExportHandlers(options: ImportExportHandlersOptions): void {
+	/** Resolve the applyDocUpdate for the active session, or undefined when the
+	 *  host didn't wire a ydoc planter (tests). */
+	const applyDocUpdateFor = (session: { vaultPath: string }) =>
+		options.makeApplyDocUpdate?.(session.vaultPath);
+
 	ipcMain.handle("import-export:pick-source", async (): Promise<ImportSourcePreview | null> => {
 		const session = requireSession();
 		const win = options.getDashboard();
@@ -430,6 +476,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			const pending = requirePendingFor(session.vaultId);
 			const knownProps = await knownPropsFor(session);
 			const mapping = resolveMapping(pending, type, parseEdits(edits), knownProps);
+			const applyDocUpdate = applyDocUpdateFor(session);
 			const controller = new AbortController();
 			activeRun = controller;
 			const win = options.getDashboard();
@@ -502,6 +549,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			const attachments = await readReferencedAttachments(pending.root, referenced);
 			const now = Date.now();
 			const source = `obsidian:${pending.folderName}`;
+			const applyDocUpdate = applyDocUpdateFor(session);
 			const controller = new AbortController();
 			activeRun = controller;
 			const win = options.getDashboard();
@@ -518,6 +566,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 						importedBy: IMPORT_AUTHOR,
 						signal: controller.signal,
 						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+						...(applyDocUpdate ? { applyDocUpdate } : {}),
 					},
 					attachments,
 				);
@@ -568,9 +617,13 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 	ipcMain.handle("import-export:pick-notion", async (): Promise<NotionSourcePreview | null> => {
 		const session = requireSession();
 		const win = options.getDashboard();
+		// Notion's "Markdown & CSV" export is a .zip, but users often unzip it
+		// first (or get a folder from a third-party tool). Accept both — same
+		// shape as Anytype. macOS shows one combined picker; elsewhere the
+		// file picker wins and a folder export is picked via "Open".
 		const dialogOptions = {
-			title: "Choose a Notion export (.zip)",
-			properties: ["openFile" as const],
+			title: "Choose a Notion export (.zip or folder)",
+			properties: ["openFile" as const, "openDirectory" as const],
 			filters: [{ name: "Notion export", extensions: ["zip"] }],
 		};
 		const result = win
@@ -579,15 +632,25 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		if (result.canceled || result.filePaths.length === 0) return null;
 		const archivePath = result.filePaths[0];
 		if (!archivePath) return null;
-		const bytes = new Uint8Array(await readFile(archivePath));
-		const entries = readZip(bytes, NOTION_ZIP_LIMITS);
 		const files: NotionFile[] = [];
 		const attachments: NotionAttachment[] = [];
-		for (const entry of entries) {
-			if (NOTION_TEXT_EXT.test(entry.path)) {
-				files.push({ path: entry.path, text: zipEntryText(entry) });
-			} else {
-				attachments.push({ path: entry.path, bytes: entry.bytes });
+		const picked = await stat(archivePath);
+		if (picked.isDirectory()) {
+			for (const entry of await walkExportFolder(archivePath, NOTION_ZIP_LIMITS)) {
+				if (NOTION_TEXT_EXT.test(entry.path)) {
+					files.push({ path: entry.path, text: Buffer.from(entry.bytes).toString("utf8") });
+				} else {
+					attachments.push({ path: entry.path, bytes: entry.bytes });
+				}
+			}
+		} else {
+			const bytes = new Uint8Array(await readFile(archivePath));
+			for (const entry of readZip(bytes, NOTION_ZIP_LIMITS)) {
+				if (NOTION_TEXT_EXT.test(entry.path)) {
+					files.push({ path: entry.path, text: zipEntryText(entry) });
+				} else {
+					attachments.push({ path: entry.path, bytes: entry.bytes });
+				}
 			}
 		}
 		pendingNotion = {
@@ -606,6 +669,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			const session = requireSession();
 			const type = requireTargetType(targetType);
 			const pending = requirePendingNotionFor(session.vaultId);
+			const applyDocUpdate = applyDocUpdateFor(session);
 			const controller = new AbortController();
 			activeRun = controller;
 			const win = options.getDashboard();
@@ -620,6 +684,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 						importedBy: IMPORT_AUTHOR,
 						signal: controller.signal,
 						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+						...(applyDocUpdate ? { applyDocUpdate } : {}),
 					},
 					pending.attachments,
 				);
@@ -642,7 +707,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		const win = options.getDashboard();
 		// Anytype's desktop export lands as a folder or (with "zip archive" on)
 		// a .zip — accept both. macOS shows one combined picker; elsewhere the
-		// file picker wins and a folder export is zipped by the user first.
+		// file picker wins and a folder export is picked via "Open".
 		const dialogOptions = {
 			title: "Choose an Anytype export (.zip or folder)",
 			properties: ["openFile" as const, "openDirectory" as const],
@@ -658,38 +723,16 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		const attachments: AnytypeAttachment[] = [];
 		const picked = await stat(archivePath);
 		if (picked.isDirectory()) {
-			// Folder export: walk it with the same bounds the zip reader enforces.
-			// Symlinks are skipped (`isFile()` is false), so the walk stays inside.
-			const dirents = await readdir(archivePath, { recursive: true, withFileTypes: true });
-			let totalBytes = 0;
-			let entries = 0;
-			for (const dirent of dirents) {
-				if (!dirent.isFile()) continue;
-				const parent =
-					(dirent as unknown as { parentPath?: string; path?: string }).parentPath ?? archivePath;
-				const absolute = join(parent, dirent.name);
-				const path = relative(archivePath, absolute).split(sep).join("/");
-				if (++entries > ANYTYPE_ZIP_LIMITS.maxEntries) {
-					throw new Error("import-export: Anytype export has too many files");
-				}
-				const bytes = new Uint8Array(await readFile(absolute));
-				totalBytes += bytes.length;
-				if (
-					bytes.length > ANYTYPE_ZIP_LIMITS.maxEntryBytes ||
-					totalBytes > ANYTYPE_ZIP_LIMITS.maxTotalBytes
-				) {
-					throw new Error("import-export: Anytype export is too large");
-				}
-				if (ANYTYPE_JSON_EXT.test(path)) {
-					files.push({ path, text: Buffer.from(bytes).toString("utf8") });
+			for (const entry of await walkExportFolder(archivePath, ANYTYPE_ZIP_LIMITS)) {
+				if (ANYTYPE_JSON_EXT.test(entry.path)) {
+					files.push({ path: entry.path, text: Buffer.from(entry.bytes).toString("utf8") });
 				} else {
-					attachments.push({ path, bytes });
+					attachments.push({ path: entry.path, bytes: entry.bytes });
 				}
 			}
 		} else {
 			const bytes = new Uint8Array(await readFile(archivePath));
-			const entries = readZip(bytes, ANYTYPE_ZIP_LIMITS);
-			for (const entry of entries) {
+			for (const entry of readZip(bytes, ANYTYPE_ZIP_LIMITS)) {
 				// Snapshot JSONs live per-kind folders or the root; binaries live in
 				// `files/` (a stray .json there is a snapshot too — the parser decides).
 				if (ANYTYPE_JSON_EXT.test(entry.path)) {
@@ -718,6 +761,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			const session = requireSession();
 			const type = requireTargetType(targetType);
 			const pending = requirePendingAnytypeFor(session.vaultId);
+			const applyDocUpdate = applyDocUpdateFor(session);
 			const controller = new AbortController();
 			activeRun = controller;
 			const win = options.getDashboard();
@@ -732,15 +776,27 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 						importedBy: IMPORT_AUTHOR,
 						signal: controller.signal,
 						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+						...(applyDocUpdate ? { applyDocUpdate } : {}),
 					},
 					pending.attachments,
 				);
 				pendingAnytype = null;
+				// Surface missing media so the UI can explain why images didn't land —
+				// Anytype's JSON export often omits binary file contents.
+				const missing =
+					report.filesMissingBinary > 0
+						? [
+								{
+									externalId: "media",
+									reason: `${report.filesMissingBinary} file(s) referenced but binaries were not in the export (Anytype JSON export typically omits file bytes)`,
+								},
+							]
+						: [];
 				return {
 					created: report.created + report.filesCreated,
 					updated: report.updated,
 					skipped: report.skippedArchived + report.skippedSystem,
-					failed: [],
+					failed: missing,
 					...(report.cancelled ? { cancelled: true } : {}),
 				};
 			} finally {

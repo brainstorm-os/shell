@@ -17,9 +17,11 @@
  * `<Icon>` primitives; outline-on-border focus per the shared rule.
  */
 
+import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { isPlumbingEntityType, typeDisplayName } from "@brainstorm/sdk/system-entities";
 import { AnimatePresence } from "framer-motion";
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
 	ImportMappingEdit,
 	ImportPlan,
@@ -34,6 +36,10 @@ import { Popover } from "../ui/popover";
 import { PopoverSize } from "../ui/popover-types";
 import { TextField, TextFieldSize } from "../ui/text-field";
 import "./backup-migration-panel.css";
+
+/** Default import target — the Notes app's primary type. Prefer this when
+ *  present in the registry so the picker never opens on a blank value. */
+const DEFAULT_IMPORT_TARGET_TYPE = "io.brainstorm.notes/Note/v1";
 
 /** One editable mapping row in the wizard (carries the inferred valueType for
  *  display alongside the user-editable property + include). */
@@ -74,8 +80,80 @@ function SectionHead({ icon, title, hint }: { icon: IconName; title: string; hin
 	);
 }
 
+/** Labelled type picker: registered vault entity types as human names
+ *  ("Note", "Task"), not raw ids. Loads once on mount; excludes plumbing
+ *  types (views, workflows, history) that users never create by hand. */
+function TargetTypePicker({
+	value,
+	onChange,
+	hint,
+	testId,
+}: {
+	value: string;
+	onChange: (next: string) => void;
+	hint: string;
+	testId: string;
+}) {
+	const [types, setTypes] = useState<readonly string[]>([]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void window.brainstorm.properties.entityTypes().then((list) => {
+			if (cancelled) return;
+			// Always offer the Notes default so a brand-new vault (or a
+			// race before first-party apps finish seeding) still has a
+			// sensible choice even if the registry is empty for a beat.
+			const merged = new Set<string>(list);
+			merged.add(DEFAULT_IMPORT_TARGET_TYPE);
+			if (value) merged.add(value);
+			setTypes([...merged]);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [value]);
+
+	const options = useMemo(() => {
+		return types
+			.filter((id) => !isPlumbingEntityType(id))
+			.sort((a, b) =>
+				typeDisplayName(a).localeCompare(typeDisplayName(b), undefined, { sensitivity: "base" }),
+			)
+			.map((id) => ({ value: id, label: typeDisplayName(id) }));
+	}, [types]);
+
+	// Seed a default once options arrive if the host still has an empty value.
+	useEffect(() => {
+		if (value) return;
+		if (options.some((o) => o.value === DEFAULT_IMPORT_TARGET_TYPE)) {
+			onChange(DEFAULT_IMPORT_TARGET_TYPE);
+			return;
+		}
+		const first = options[0];
+		if (first) onChange(first.value);
+	}, [value, options, onChange]);
+
+	return (
+		<div className="backup-migration__type-field">
+			<span className="backup-migration__type-label" id={`${testId}-label`}>
+				{t("shell.settings.backupMigration.import.targetTypeLabel")}
+			</span>
+			<SelectMenu
+				className="backup-migration__type-select"
+				value={value || null}
+				options={options}
+				onChange={onChange}
+				ariaLabel={t("shell.settings.backupMigration.import.targetTypeLabel")}
+				placeholder={t("shell.settings.backupMigration.import.targetTypePlaceholder")}
+				data-testid={testId}
+			/>
+			<p className="settings__hint">{hint}</p>
+		</div>
+	);
+}
+
 /** Shared chrome for the three import flows: the configuration form (source
- *  line + target-type field + flow-specific extras) opens in the shared
+ *  line + target-type picker + flow-specific extras) opens in the shared
  *  `<Popover>` over the cards, so a flow never expands its card inline. */
 function ImportFlowPopover({
 	title,
@@ -104,14 +182,11 @@ function ImportFlowPopover({
 		<Popover title={title} onClose={onClose} size={PopoverSize.Medium} footer={footer}>
 			<div className="backup-migration__stack" data-testid={formTestId}>
 				<p className="settings__hint">{sourceLine}</p>
-				<TextField
-					label={t("shell.settings.backupMigration.import.targetTypeLabel")}
-					size={TextFieldSize.Sm}
+				<TargetTypePicker
 					value={targetType}
 					onChange={onTargetType}
-					placeholder="brainstorm/Note/v1"
 					hint={targetTypeHint}
-					data-testid={targetTypeTestId}
+					testId={targetTypeTestId}
 				/>
 				{children}
 			</div>
@@ -179,7 +254,7 @@ function ExportSection() {
 
 function ImportSection() {
 	const [phase, setPhase] = useState<ImportPhase>({ kind: "idle" });
-	const [targetType, setTargetType] = useState("");
+	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
 	const [rows, setRows] = useState<readonly MappingRow[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -187,7 +262,7 @@ function ImportSection() {
 
 	const reset = useCallback(() => {
 		setPhase({ kind: "idle" });
-		setTargetType("");
+		setTargetType(DEFAULT_IMPORT_TARGET_TYPE);
 		setRows([]);
 		setError(null);
 		setProgress(null);
@@ -405,7 +480,7 @@ type ObsidianPhase =
 
 function ObsidianSection() {
 	const [phase, setPhase] = useState<ObsidianPhase>({ kind: "idle" });
-	const [targetType, setTargetType] = useState("brainstorm/Note/v1");
+	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -535,7 +610,7 @@ type AnytypePhase =
 
 function AnytypeSection() {
 	const [phase, setPhase] = useState<AnytypePhase>({ kind: "idle" });
-	const [targetType, setTargetType] = useState("brainstorm/Note/v1");
+	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -663,7 +738,7 @@ type NotionPhase =
 
 function NotionSection() {
 	const [phase, setPhase] = useState<NotionPhase>({ kind: "idle" });
-	const [targetType, setTargetType] = useState("brainstorm/Note/v1");
+	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 

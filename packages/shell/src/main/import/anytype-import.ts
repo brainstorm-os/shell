@@ -29,8 +29,38 @@ import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
+import type { ApplyDocUpdate } from "../welcome/seed-deps";
+import { anytypeBlocksToLexical, anytypeDateToMs } from "./anytype-blocks-to-lexical";
 import { inferValueType } from "./import-map";
 import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
+import { type ImportedBodyState, plantImportSerializedBody } from "./plant-import-body";
+
+/** Deep-clone a Lexical state, rewriting `image.src` values that match a
+ *  known file name to their AssetStore URL. Returns null when nothing changed. */
+function rewriteImageSrcs(
+	state: ImportedBodyState,
+	srcByName: ReadonlyMap<string, string>,
+): ImportedBodyState | null {
+	if (srcByName.size === 0) return null;
+	let changed = false;
+	const walk = (node: Record<string, unknown>): Record<string, unknown> => {
+		const next: Record<string, unknown> = { ...node };
+		if (next.type === "image" && typeof next.src === "string") {
+			const mapped =
+				srcByName.get(next.src) ?? srcByName.get(next.src.slice(next.src.lastIndexOf("/") + 1));
+			if (mapped && mapped !== next.src) {
+				next.src = mapped;
+				changed = true;
+			}
+		}
+		if (Array.isArray(next.children)) {
+			next.children = (next.children as Record<string, unknown>[]).map(walk);
+		}
+		return next;
+	};
+	const root = walk(state.root as unknown as Record<string, unknown>);
+	return changed ? ({ ...state, root } as unknown as ImportedBodyState) : null;
+}
 
 /** One extracted `.pb.json` snapshot from the Anytype export. `path` is
  *  export-relative; `text` is the raw JSON. */
@@ -48,12 +78,15 @@ export type AnytypeAttachment = {
 
 export type AnytypeEntityDraft = {
 	readonly title: string;
-	/** Resolved details (relation key → value) + `body` markdown when present. */
+	/** Resolved details (relation key → value) + `body` snippet when present. */
 	readonly properties: Record<string, unknown>;
 	/** Resolved display name of the object's Anytype type (e.g. "Task"). */
 	readonly anytypeType: string | null;
 	/** The Anytype object id — stable key for idempotent re-import. */
 	readonly externalId: string;
+	/** Lexical editor state built from Anytype blocks — planted into the
+	 *  universal-body Y.Doc so Notes opens with real structure (not markdown). */
+	readonly bodyState: ImportedBodyState | null;
 };
 
 export type AnytypeLinkSpec = {
@@ -159,6 +192,9 @@ const SYSTEM_DETAIL_KEYS: ReadonlySet<string> = new Set([
 	"lastUsedDate",
 	"lastOpenedDate",
 	"lastModifiedBy",
+	/** Extracted into `createdAt` / `updatedAt` (ms) — not generic properties. */
+	"createdDate",
+	"lastModifiedDate",
 	"addedDate",
 	"creator",
 	"restrictions",
@@ -201,6 +237,20 @@ const SYSTEM_DETAIL_KEYS: ReadonlySet<string> = new Set([
 	"spaceUxType",
 	"templateIsBundled",
 ]);
+
+/** Anytype system relation → Brainstorm canonical property. Values matched
+ *  here land under the vault's own keys (the ones apps read), never under the
+ *  relation's display name — `description` stays `description`, `iconEmoji`
+ *  becomes the entity `icon`, `tag` feeds the cross-app `tags` array, a
+ *  bookmark's `source` becomes `url`. createdDate/lastModifiedDate are
+ *  handled separately (entity `createdAt`/`updatedAt`). */
+const SYSTEM_PROPERTY_MAP: Readonly<Record<string, string>> = {
+	description: "description",
+	iconEmoji: "icon",
+	tag: "tags",
+	source: "url",
+	done: "done",
+};
 
 /** Block ids Anytype reserves for chrome (title/description live in details). */
 const CHROME_BLOCK_IDS: ReadonlySet<string> = new Set([
@@ -453,10 +503,25 @@ export function parseAnytypeExport(
 	const nameById = new Map<string, string>();
 	const fileBinaryByObject = new Map<string, string>();
 	const fileObjectIds = new Set<string>();
-	const attachmentByBasename = new Map<string, string>();
+	// Index every attachment path by several lookup keys so export layouts
+	// that put binaries under `files/`, `filesObjects/`, or the root still
+	// resolve: basename, full path, and stem (no extension).
+	const attachmentByKey = new Map<string, string>();
 	for (const path of attachmentPaths) {
-		attachmentByBasename.set(path.slice(path.lastIndexOf("/") + 1), path);
+		const base = path.slice(path.lastIndexOf("/") + 1);
+		attachmentByKey.set(path, path);
+		attachmentByKey.set(base, path);
+		const dot = base.lastIndexOf(".");
+		if (dot > 0) attachmentByKey.set(base.slice(0, dot), path);
 	}
+	const findBinary = (...candidates: Array<string | null | undefined>): string | undefined => {
+		for (const c of candidates) {
+			if (!c) continue;
+			const hit = attachmentByKey.get(c) ?? attachmentByKey.get(c.slice(c.lastIndexOf("/") + 1));
+			if (hit) return hit;
+		}
+		return undefined;
+	};
 	for (const snap of snapshots) {
 		const name = asString(snap.details.name);
 		if (name) nameById.set(snap.id, name);
@@ -480,12 +545,16 @@ export function parseAnytypeExport(
 		} else if (FILE_SB_TYPES.has(snap.sbType)) {
 			fileObjectIds.add(snap.id);
 			// The file object's display name usually lacks the extension the
-			// binary carries (`fileExt` is a separate detail) — try both.
+			// binary carries (`fileExt` is a separate detail) — try both, plus
+			// the object id itself (some exports name the binary after it).
 			const ext = asString(snap.details.fileExt);
-			const binary = name
-				? (attachmentByBasename.get(name) ??
-					(ext ? attachmentByBasename.get(`${name}.${ext}`) : undefined))
-				: undefined;
+			const binary = findBinary(
+				name,
+				ext && name ? `${name}.${ext}` : null,
+				snap.id,
+				ext ? `${snap.id}.${ext}` : null,
+				asString(snap.details.fileId),
+			);
 			if (binary) fileBinaryByObject.set(snap.id, binary);
 		}
 	}
@@ -547,7 +616,7 @@ export function parseAnytypeExport(
 			// A file block that misses the object index can still match an export
 			// binary by its inline file name (the block carries name/mime/size).
 			if (!fileObjectIds.has(target) && !fileBinaryByObject.has(target) && name) {
-				const path = attachmentByBasename.get(name);
+				const path = findBinary(name);
 				if (path) {
 					const pseudoId = `path:${path}`;
 					fileBinaryByObject.set(pseudoId, path);
@@ -562,23 +631,17 @@ export function parseAnytypeExport(
 		};
 
 		const byId = new Map(snap.blocks.map((b) => [asString(b.id) ?? "", b] as const));
-		const ctx: BlockContext = {
-			byId,
-			lines: [],
+		// Root children: prefer the smartblock root's childrenIds; fall back to
+		// every non-chrome block id in file order when the root is missing.
+		const rootChildren = byId.has(snap.id)
+			? stringArray(byId.get(snap.id)?.childrenIds)
+			: snap.blocks.map((b) => asString(b.id) ?? "").filter((id) => id.length > 0 && id !== snap.id);
+		const { state: bodyState, snippet } = anytypeBlocksToLexical(byId, rootChildren, {
 			onMention: addLink,
 			onLinkBlock: addLink,
 			onFileBlock: addFileLink,
-			counters: new Map(),
-			visited: new Set(),
-		};
-		// The root block carries the object's own id; render its subtree. Fall
-		// back to rendering every root-less block in file order.
-		if (byId.has(snap.id)) {
-			for (const child of stringArray(byId.get(snap.id)?.childrenIds)) renderBlock(child, 0, ctx);
-		} else {
-			for (const block of snap.blocks) renderBlock(asString(block.id) ?? "", 0, ctx);
-		}
-		const body = ctx.lines.join("\n").trim();
+			nameOf: (id) => nameById.get(id) ?? null,
+		});
 
 		const properties: Record<string, unknown> = {};
 		for (const [key, raw] of Object.entries(snap.details)) {
@@ -586,7 +649,7 @@ export function parseAnytypeExport(
 			const value = resolveValue(key, raw);
 			if (value === null || value === undefined || value === "") continue;
 			if (Array.isArray(value) && value.length === 0) continue;
-			properties[relationNameByKey.get(key) ?? key] = value;
+			properties[SYSTEM_PROPERTY_MAP[key] ?? relationNameByKey.get(key) ?? key] = value;
 		}
 		const typeCandidates = [snap.objectTypes[0], asString(snap.details.type)].filter(
 			(k): k is string => typeof k === "string" && k.length > 0,
@@ -595,13 +658,29 @@ export function parseAnytypeExport(
 		const first = typeCandidates[0];
 		const anytypeType = mapped ?? (first !== undefined ? prettifyTypeKey(first) : null);
 		if (anytypeType) properties.anytypeType = anytypeType;
-		if (body.length > 0) properties.body = body;
+		// Search snippet (plain text) — the editor body is the Lexical state.
+		if (snippet.length > 0) properties.body = snippet;
+		// Notes/Journal read these property-bag timestamps when present.
+		const createdMs = anytypeDateToMs(snap.details.createdDate);
+		const updatedMs = anytypeDateToMs(snap.details.lastModifiedDate) ?? createdMs;
+		if (createdMs !== null) properties.createdAt = createdMs;
+		if (updatedMs !== null) properties.updatedAt = updatedMs;
 
+		// Anytype Notes carry no `name`; the Title chrome block (when the user
+		// typed one) outranks the snippet-derived fallback.
+		const titleBlock = snap.blocks.find((b) => asString(asRecord(b.text)?.style) === "Title");
 		const title =
 			asString(snap.details.name) ??
+			asString(asRecord(titleBlock?.text)?.text) ??
 			asString(snap.details.snippet)?.split("\n")[0]?.trim() ??
 			"Untitled";
-		entities.push({ title, properties, anytypeType, externalId: snap.id });
+		entities.push({
+			title,
+			properties,
+			anytypeType,
+			externalId: snap.id,
+			bodyState: snippet.length > 0 ? bodyState : null,
+		});
 
 		if (snap.collectionMembers) {
 			collections.push({
@@ -684,13 +763,30 @@ export function deriveTypeSchemas(plan: AnytypeImportPlan): AnytypeTypeSchema[] 
 }
 
 /** Stable id for an Anytype Collection's `List/v1` — idempotent re-import
- *  updates the same List rather than minting a duplicate. */
+ *  updates the same List rather than minting a duplicate.
+ *
+ *  Must stay inside {@link SAFE_ENTITY_ID_RE} (`[A-Za-z0-9_-]{1,128}`): the
+ *  earlier `anytype-list:${source}:${id}` shape used colons / dots and was
+ *  rejected by `entities.create`, so collection minting silently no-oped
+ *  (the outer try/catch treats schema/list failures as non-fatal). */
 export function anytypeCollectionId(source: string, collectionId: string): string {
-	return `anytype-list:${source}:${collectionId}`;
+	// FNV-1a 32-bit — deterministic, no crypto dep, short hex digest.
+	let h = 0x811c9dc5;
+	const input = `${source}\0${collectionId}`;
+	for (let i = 0; i < input.length; i++) {
+		h ^= input.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	const digest = (h >>> 0).toString(16).padStart(8, "0");
+	// Keep a short readable stem of the Anytype object id (usually `bafy…`)
+	// so the List is greppable in entities.db, then the digest for uniqueness.
+	const stem = collectionId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 48);
+	const id = stem.length > 0 ? `anytype-list-${stem}-${digest}` : `anytype-list-${digest}`;
+	return id.length <= 128 ? id : id.slice(0, 128);
 }
 
 export type AnytypeImportOptions = {
-	/** Vault entity type the objects map onto (e.g. `brainstorm/Note/v1`). */
+	/** Vault entity type the objects map onto (e.g. `io.brainstorm.notes/Note/v1`). */
 	readonly targetType: string;
 	/** Stable source id namespacing the dedupe key (e.g. `anytype:my-space`). */
 	readonly source: string;
@@ -698,6 +794,10 @@ export type AnytypeImportOptions = {
 	readonly importedBy: string;
 	readonly onProgress?: (done: number, total: number) => void;
 	readonly signal?: AbortSignal;
+	/** Plant markdown `body` into each entity's universal-body Y.Doc so the
+	 *  editor is non-empty. When omitted, only the property-bag snippet lands
+	 *  (tests that don't care about the editor can skip it). */
+	readonly applyDocUpdate?: ApplyDocUpdate;
 };
 
 export type AnytypeImportReport = {
@@ -761,9 +861,13 @@ export async function importAnytypeExport(
 			title: draft.title,
 			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
 		};
+		const createdMs = typeof properties.createdAt === "number" ? properties.createdAt : options.now;
+		const updatedMs = typeof properties.updatedAt === "number" ? properties.updatedAt : createdMs;
+		let entityId: string;
 		if (existing !== null) {
-			repo.update(existing, properties, options.now);
+			repo.update(existing, properties, updatedMs);
 			idByExternal.set(draft.externalId, existing);
+			entityId = existing;
 			updated++;
 		} else {
 			const id = `ent_${ulid()}`;
@@ -772,11 +876,22 @@ export async function importAnytypeExport(
 				type: options.targetType,
 				properties,
 				createdBy: options.importedBy,
-				now: options.now,
+				now: createdMs,
+				updatedAt: updatedMs,
 				dekId: null,
 			});
 			idByExternal.set(draft.externalId, id);
+			entityId = id;
 			created++;
+		}
+		// Editor body lives in the Y.Doc — plant the Lexical state built from
+		// Anytype blocks (not markdown, which mangled structure).
+		if (options.applyDocUpdate && draft.bodyState) {
+			try {
+				await plantImportSerializedBody(entityId, draft.bodyState, options.applyDocUpdate);
+			} catch {
+				// Non-fatal: row + snippet still land; body plant retries on re-import.
+			}
 		}
 		options.onProgress?.(i + 1, total);
 		if ((i + 1) % ANYTYPE_YIELD_EVERY === 0) await Promise.resolve();
@@ -824,10 +939,36 @@ export async function importAnytypeExport(
 		}
 	}
 
+	// Re-plant bodies with image srcs rewritten to `brainstorm://asset/…` once
+	// the AssetStore has the binaries. Initial plant used file names as src.
+	if (options.applyDocUpdate && idByFileObject.size > 0) {
+		const srcByName = new Map<string, string>();
+		for (const [, fileEntityId] of idByFileObject) {
+			const file = repo.get(fileEntityId);
+			const assetUrl =
+				typeof file?.properties.attachment === "string" ? file.properties.attachment : null;
+			const name = typeof file?.properties.name === "string" ? file.properties.name : null;
+			if (assetUrl && name) srcByName.set(name, assetUrl);
+		}
+		for (const draft of plan.entities) {
+			if (!draft.bodyState) continue;
+			const entityId = idByExternal.get(draft.externalId);
+			if (!entityId) continue;
+			const rewritten = rewriteImageSrcs(draft.bodyState, srcByName);
+			if (!rewritten) continue;
+			try {
+				await plantImportSerializedBody(entityId, rewritten, options.applyDocUpdate);
+			} catch {
+				// Non-fatal — asset entities exist even if the re-plant fails.
+			}
+		}
+	}
+
 	// Deterministic link ids so a re-import upserts rather than duplicates.
 	const seen = new Set<string>();
 	let linked = 0;
 	const writeLink = (sourceId: string, destId: string): void => {
+		// Link row ids are not entity ids — they may use `:` separators.
 		const id = `ln:anytype:${sourceId}:${destId}`;
 		if (seen.has(id)) return;
 		seen.add(id);

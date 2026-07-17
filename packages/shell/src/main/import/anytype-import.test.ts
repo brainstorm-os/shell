@@ -200,8 +200,9 @@ describe("parseAnytypeExport", () => {
 		expect(a?.anytypeType).toBe("Seite");
 		expect(a?.properties.syncError).toBeUndefined();
 		expect(a?.properties.Effort).toBe(5);
-		// Known option resolves to its label; an unknown id passes through.
-		expect(a?.properties.tag).toEqual(["Urgent", "opt-ghost"]);
+		// Known option resolves to its label; an unknown id passes through —
+		// and the system dictionary lands it under the cross-app `tags` key.
+		expect(a?.properties.tags).toEqual(["Urgent", "opt-ghost"]);
 		expect(a?.properties.description).toBe("Rebuild everything");
 		const b = plan.entities.find((e) => e.externalId === "obj-b");
 		expect(b?.anytypeType).toBe("Task");
@@ -215,18 +216,59 @@ describe("parseAnytypeExport", () => {
 		expect(a?.properties.Owner).toBe("Ship importer");
 	});
 
-	it("renders the block tree to markdown, skipping chrome blocks", () => {
-		const body = String(plan.entities.find((e) => e.externalId === "obj-a")?.properties.body);
-		expect(body).toContain("**bold** and [linked](https://example.com)");
-		expect(body).toContain("## Milestones");
-		expect(body).toContain("- [x] Ship it");
-		expect(body).toContain("- Parent item\n  - Nested item");
-		expect(body).toContain("[Anytype](https://anytype.io)");
-		expect(body).toContain("---");
-		// File blocks leave an inline trace (image syntax for images).
-		expect(body).toContain("![diagram.png](diagram.png)");
-		// The Title chrome block is details-borne, not body content.
-		expect(body).not.toContain("Project Phoenix");
+	it("maps Anytype blocks to Lexical state (not markdown), skipping chrome", () => {
+		const a = plan.entities.find((e) => e.externalId === "obj-a");
+		expect(a?.bodyState).not.toBeNull();
+		const children = (a?.bodyState?.root as { children?: Array<Record<string, unknown>> })?.children;
+		expect(Array.isArray(children)).toBe(true);
+		const types = (children ?? []).map((c) => c.type);
+		// Structured Lexical nodes from the fixture (paragraph, H2, checkbox
+		// list, bullet list, image, bookmark, hr) — not a single markdown dump.
+		expect(types).toContain("paragraph");
+		expect(types).toContain("heading");
+		expect(types).toContain("list");
+		expect(types).toContain("image");
+		expect(types).toContain("horizontalrule");
+		// Snippet is plain text for search — no markdown markers.
+		const snippet = String(a?.properties.body ?? "");
+		expect(snippet).toContain("bold");
+		expect(snippet).toContain("Milestones");
+		expect(snippet).not.toContain("**bold**");
+		// Title chrome is details-borne, not body content.
+		expect(snippet).not.toContain("Project Phoenix");
+	});
+
+	it("maps createdDate/lastModifiedDate to createdAt/updatedAt ms", () => {
+		// Fixture obj-b has dueDate as relation; dates come from details when set.
+		// Synthetic: re-parse a page that carries the timestamp fields.
+		const withDates = parseAnytypeExport([
+			{
+				path: "dated.pb.json",
+				text: JSON.stringify({
+					sbType: "Page",
+					snapshot: {
+						data: {
+							details: {
+								id: "obj-dated",
+								name: "Dated",
+								createdDate: 1_700_000_000,
+								lastModifiedDate: 1_700_000_100,
+							},
+							blocks: [
+								{ id: "obj-dated", childrenIds: ["p1"] },
+								{
+									id: "p1",
+									text: { text: "hi", style: "Paragraph", marks: { marks: [] } },
+								},
+							],
+						},
+					},
+				}),
+			},
+		]);
+		const e = withDates.entities.find((x) => x.externalId === "obj-dated");
+		expect(e?.properties.createdAt).toBe(1_700_000_000_000);
+		expect(e?.properties.updatedAt).toBe(1_700_000_100_000);
 	});
 
 	it("collects the link graph: mention + link block collapse to one edge", () => {
@@ -260,6 +302,38 @@ describe("parseAnytypeExport", () => {
 		expect(loose.fileLinks).toEqual([{ fromObject: "obj-l", fileObjectId: "path:files/loose.png" }]);
 		expect(loose.fileBinaryByObject.get("path:files/loose.png")).toBe("files/loose.png");
 		expect(loose.unresolved).toEqual([]);
+	});
+
+	it("maps system relations to canonical keys ahead of display renames", () => {
+		const mapped = parseAnytypeExport([
+			snapshotFile("rel-tag", "STRelation", {
+				details: { name: "Tag", relationKey: "tag", relationFormat: 11 },
+			}),
+			snapshotFile("obj-m", "Page", {
+				details: { name: "Mapped", iconEmoji: "📚", tag: ["opt-x"], source: "https://x.io" },
+			}),
+		]);
+		const m = mapped.entities[0];
+		// The "Tag" display rename must NOT win over the canonical `tags` key.
+		expect(m?.properties.tags).toEqual(["opt-x"]);
+		expect(m?.properties.Tag).toBeUndefined();
+		expect(m?.properties.icon).toBe("📚");
+		expect(m?.properties.url).toBe("https://x.io");
+	});
+
+	it("titles a name-less Note from its Title block before the snippet", () => {
+		const noted = parseAnytypeExport([
+			snapshotFile("obj-n", "Page", {
+				details: { snippet: "First body line\nmore" },
+				blocks: [
+					{ id: "obj-n", childrenIds: ["header", "p1"] },
+					{ id: "header", childrenIds: ["title"] },
+					text("title", "Typed title", "Title"),
+					text("p1", "First body line", "Paragraph"),
+				],
+			}),
+		]);
+		expect(noted.entities[0]?.title).toBe("Typed title");
 	});
 
 	it("falls back to the snippet for an unnamed object and Untitled past that", () => {
@@ -335,8 +409,13 @@ describe("importAnytypeExport (vault binding)", () => {
 
 		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 		const collectionId = anytypeCollectionId(opts.source, "obj-col");
+		// Collection ids must stay inside SAFE_ENTITY_ID_RE — colons / dots
+		// used to make entities.create throw and collectionsCreated silently
+		// counted a no-op mint.
+		expect(collectionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
 		const list = repo.get(collectionId);
 		expect(list?.type).toBe(LIST_ENTITY_TYPE);
+		expect(list).not.toBeNull();
 
 		const second = await importAnytypeExport(session, FILES, opts, attachments);
 		expect(second.created).toBe(0);
@@ -355,5 +434,28 @@ describe("importAnytypeExport (vault binding)", () => {
 		});
 		expect(report.cancelled).toBe(true);
 		expect(report.created).toBe(0);
+	});
+
+	it("plants markdown bodies into the Y.Doc when applyDocUpdate is provided", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const planted = new Map<string, string>();
+		const report = await importAnytypeExport(
+			session,
+			FILES,
+			{
+				...opts,
+				applyDocUpdate: async (entityId, updateB64) => {
+					planted.set(entityId, updateB64);
+				},
+			},
+			[{ path: "files/diagram.png", bytes: new Uint8Array([1, 2, 3, 4]) }],
+		);
+		expect(report.created).toBeGreaterThan(0);
+		// Every entity with a body should have received a plant.
+		expect(planted.size).toBeGreaterThan(0);
+		for (const b64 of planted.values()) {
+			expect(b64.length).toBeGreaterThan(8);
+		}
 	});
 });

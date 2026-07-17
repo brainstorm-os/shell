@@ -180,7 +180,9 @@ export function Welcome() {
 			<div className="welcome__title-bar" />
 			<div
 				className={
-					mode === WelcomeMode.Create ? "welcome__content welcome__content--create" : "welcome__content"
+					mode === WelcomeMode.Create || mode === WelcomeMode.Start
+						? "welcome__content welcome__content--wide"
+						: "welcome__content"
 				}
 			>
 				<div className="welcome__brand">
