@@ -29,6 +29,7 @@ export function MigrateEntry({ disabled = false, onStart }: MigrateEntryProps) {
 	const sources: ReadonlyArray<{ key: string; label: string }> = [
 		{ key: "obsidian", label: t("shell.welcome.migrate.obsidian") },
 		{ key: "notion", label: t("shell.welcome.migrate.notion") },
+		{ key: "anytype", label: t("shell.welcome.migrate.anytype") },
 		{ key: "files", label: t("shell.welcome.migrate.files") },
 	];
 	return (

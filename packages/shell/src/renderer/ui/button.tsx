@@ -8,11 +8,12 @@
  *                  surface" treatment. Use this by default.
  *   Primary      — solid accent fill, reserved for the single most
  *                  important action in a surface (rare).
- *   Neutral      — flat inverse-surface fill (light on dark themes,
+ *   Neutral      — glossy inverse-surface fill (light on dark themes,
  *                  dark on light themes) used as the non-accent partner
  *                  in confirm dialogs and other "Cancel vs Primary"
- *                  pairs. Deliberately gloss-free — its job is to
- *                  recede next to a glossy accent button.
+ *                  pairs. Same specular treatment as Glass/Primary, but
+ *                  a different face colour so it recedes next to the
+ *                  accent CTA without reading as a flat black chip.
  *   Ghost        — invisible until hover; for tertiary actions inside
  *                  dense surfaces (toolbars, lists).
  *   Destructive  — accent for irreversible actions (delete, revoke).

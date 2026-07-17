@@ -96,27 +96,7 @@
 	color: var(--color-state-error);
 }
 
-/* Neutral — flat solid surface, gloss-free. Inverts with the theme so it
- * reads as "white" on dark themes and as a dark chip on light themes, giving
- * a strong-but-non-emphasized partner to the glossy accent button (the
- * Cancel ↔ Confirm pair in a dialog). The drop-shadow matches the layer
- * count of the glossy variants so hovers can interpolate cleanly. */
-.button--neutral {
-	background: var(--color-background-inverse);
-	color: var(--color-text-inverse);
-	border-color: transparent;
-	box-shadow: 0 2px 8px rgba(9, 12, 60, 0.14), 0 1px 3px rgba(9, 12, 60, 0.1);
-}
-
-.button--neutral:hover:not(:disabled) {
-	box-shadow: 0 4px 14px rgba(9, 12, 60, 0.2), 0 2px 5px rgba(9, 12, 60, 0.12);
-}
-
-.button--neutral:active:not(:disabled) {
-	box-shadow: 0 1px 3px rgba(9, 12, 60, 0.18), 0 1px 2px rgba(9, 12, 60, 0.1);
-}
-
-/* Glossy solid fills — shared by Glass, Primary and Destructive.
+/* Glossy solid fills — shared by Glass, Primary, Neutral and Destructive.
  *
  * The FACE is a saturated theme-driven TWO-colour gradient,
  * `--gloss-top` → `--gloss-bottom`, top-to-bottom. There is deliberately
@@ -129,14 +109,17 @@
  *   • .button__gloss::after  — bottom contact line          (shine-bottom)
  *
  * Glass + Primary share the same theme-accent face (the gradient is
- * theme-dependent — every theme defines its own two stops). Destructive
- * derives a red face from `state.error`. Hover is animated by the
- * speculars + box-shadow ONLY — the face gradient is held constant
+ * theme-dependent — every theme defines its own two stops). Neutral uses
+ * the inverse surface (dark chip on light themes, light on dark) so it
+ * recedes next to the accent CTA without reading as a flat slab.
+ * Destructive derives a red face from `state.error`. Hover is animated
+ * by the speculars + box-shadow ONLY — the face gradient is held constant
  * (CSS can't interpolate between two `linear-gradient()`s; swapping it
  * on :hover would snap). `overflow: hidden` clips the blurred speculars
  * so they hug the inner border. */
 .button--glass,
 .button--primary,
+.button--neutral,
 .button--destructive {
 	position: relative;
 	z-index: 1;
@@ -164,6 +147,15 @@
 	--gloss-bottom: var(--color-gloss-bottom);
 }
 
+/* Neutral face rides the inverse surface (dark on light themes, light on
+ * dark) with a short top-to-bottom lift so the same specular stack reads
+ * as polished rather than a flat chip. Ink is always the inverse text. */
+.button--neutral {
+	--gloss-top: color-mix(in srgb, var(--color-background-inverse) 78%, white);
+	--gloss-bottom: var(--color-background-inverse);
+	color: var(--color-text-inverse);
+}
+
 /* Destructive face derives from the error token (top lifted toward
  * white, bottom dropped toward black) so the gloss has somewhere to
  * travel; reuses the shared speculars. */
@@ -178,6 +170,8 @@
 .button--glass > .button__icon,
 .button--primary > .button__label,
 .button--primary > .button__icon,
+.button--neutral > .button__label,
+.button--neutral > .button__icon,
 .button--destructive > .button__label,
 .button--destructive > .button__icon {
 	position: relative;
@@ -190,6 +184,9 @@
 .button--primary::before,
 .button--primary > .button__gloss::before,
 .button--primary > .button__gloss::after,
+.button--neutral::before,
+.button--neutral > .button__gloss::before,
+.button--neutral > .button__gloss::after,
 .button--destructive::before,
 .button--destructive > .button__gloss::before,
 .button--destructive > .button__gloss::after {
@@ -212,6 +209,7 @@
  * reads as a faint sheen, never an opaque top band. */
 .button--glass::before,
 .button--primary::before,
+.button--neutral::before,
 .button--destructive::before {
 	top: -4px;
 	width: 56%;
@@ -224,6 +222,7 @@
 /* Bottom reflected glow. */
 .button--glass > .button__gloss::before,
 .button--primary > .button__gloss::before,
+.button--neutral > .button__gloss::before,
 .button--destructive > .button__gloss::before {
 	bottom: -4px;
 	width: 60%;
@@ -236,6 +235,7 @@
 /* Bottom contact hairline. */
 .button--glass > .button__gloss::after,
 .button--primary > .button__gloss::after,
+.button--neutral > .button__gloss::after,
 .button--destructive > .button__gloss::after {
 	bottom: 0;
 	width: 72%;
@@ -252,6 +252,7 @@
  * colour for the lift glow; the two insets are held constant. */
 .button--glass:hover:not(:disabled),
 .button--primary:hover:not(:disabled),
+.button--neutral:hover:not(:disabled),
 .button--destructive:hover:not(:disabled) {
 	box-shadow:
 		0 8px 20px -2px var(--gloss-bottom),
@@ -263,12 +264,14 @@
 
 .button--glass:hover:not(:disabled)::before,
 .button--primary:hover:not(:disabled)::before,
+.button--neutral:hover:not(:disabled)::before,
 .button--destructive:hover:not(:disabled)::before {
 	opacity: 0.85;
 }
 
 .button--glass:hover:not(:disabled) > .button__gloss::before,
 .button--primary:hover:not(:disabled) > .button__gloss::before,
+.button--neutral:hover:not(:disabled) > .button__gloss::before,
 .button--destructive:hover:not(:disabled) > .button__gloss::before {
 	opacity: 0.9;
 	transform: translateX(-50%) scale(1.25);
@@ -276,6 +279,7 @@
 
 .button--glass:hover:not(:disabled) > .button__gloss::after,
 .button--primary:hover:not(:disabled) > .button__gloss::after,
+.button--neutral:hover:not(:disabled) > .button__gloss::after,
 .button--destructive:hover:not(:disabled) > .button__gloss::after {
 	opacity: 1;
 }
@@ -286,6 +290,9 @@
 .button--primary:disabled::before,
 .button--primary:disabled > .button__gloss::before,
 .button--primary:disabled > .button__gloss::after,
+.button--neutral:disabled::before,
+.button--neutral:disabled > .button__gloss::before,
+.button--neutral:disabled > .button__gloss::after,
 .button--destructive:disabled::before,
 .button--destructive:disabled > .button__gloss::before,
 .button--destructive:disabled > .button__gloss::after {
@@ -342,7 +349,7 @@
 	font-size: 1.15em;
 }
 
-.button:not(.button--glass):not(.button--primary):not(.button--destructive) {
+.button:not(.button--glass):not(.button--primary):not(.button--neutral):not(.button--destructive) {
 	position: relative;
 }
 

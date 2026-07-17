@@ -79,6 +79,24 @@
 	gap: var(--space-2);
 }
 
+/* Target-type picker — labelled select of friendly type names (Note, Task),
+ * not a free-text raw entity-type id. */
+.backup-migration__type-field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.backup-migration__type-label {
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+	color: var(--color-text-secondary);
+}
+
+.backup-migration__type-select {
+	width: 100%;
+}
+
 .backup-migration__progress {
 	display: flex;
 	gap: var(--space-2);

@@ -22,8 +22,10 @@ import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
+import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { parseFrontmatter } from "./import-parse";
 import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
+import { bodyMarkdownFromProperties, plantImportMarkdownBody } from "./plant-import-body";
 
 /** One source markdown file. `path` is vault-relative (e.g. `notes/Idea.md`). */
 export type ObsidianFile = {
@@ -205,7 +207,7 @@ export function parseObsidianVault(
 }
 
 export type ObsidianImportOptions = {
-	/** Vault entity type the notes map onto (e.g. `brainstorm/Note/v1`). */
+	/** Vault entity type the notes map onto (e.g. `io.brainstorm.notes/Note/v1`). */
 	readonly targetType: string;
 	/** Stable source id namespacing the dedupe key (e.g. `obsidian:my-vault`). */
 	readonly source: string;
@@ -214,6 +216,8 @@ export type ObsidianImportOptions = {
 	/** Streaming controls (doc 45 §Streaming): note-import progress + cancel. */
 	readonly onProgress?: (done: number, total: number) => void;
 	readonly signal?: AbortSignal;
+	/** Plant markdown `body` into each note's universal-body Y.Doc. */
+	readonly applyDocUpdate?: ApplyDocUpdate;
 };
 
 export type ObsidianImportReport = {
@@ -273,9 +277,11 @@ export async function importObsidianVault(
 			...(draft.tags.length > 0 ? { tags: draft.tags } : {}),
 			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
 		};
+		let entityId: string;
 		if (existing !== null) {
 			repo.update(existing, properties, options.now);
 			idByNote.set(draft.noteName, existing);
+			entityId = existing;
 			updated++;
 		} else {
 			const id = `ent_${ulid()}`;
@@ -288,7 +294,18 @@ export async function importObsidianVault(
 				dekId: null,
 			});
 			idByNote.set(draft.noteName, id);
+			entityId = id;
 			created++;
+		}
+		if (options.applyDocUpdate) {
+			const md = bodyMarkdownFromProperties(properties);
+			if (md) {
+				try {
+					await plantImportMarkdownBody(entityId, md, options.applyDocUpdate);
+				} catch {
+					// Non-fatal — row + snippet still land.
+				}
+			}
 		}
 		options.onProgress?.(i + 1, total);
 		if ((i + 1) % OBSIDIAN_YIELD_EVERY === 0) await Promise.resolve();

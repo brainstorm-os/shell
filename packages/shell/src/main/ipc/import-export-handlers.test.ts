@@ -289,6 +289,30 @@ describe("IE-3 import handlers", () => {
 		expect(repo.query({ type: [TYPE] })).toHaveLength(3);
 	});
 
+	it("imports a Notion export folder (unzipped Markdown & CSV)", async () => {
+		const PID = "abcdef0123456789abcdef0123456789";
+		const folder = join(workDir, "notion-folder-export");
+		await mkdir(folder, { recursive: true });
+		await writeFile(join(folder, `Projects ${PID}.md`), "# Projects\n\nOur work.\n");
+		await writeFile(
+			join(folder, `Tasks ${"3".repeat(32)}.csv`),
+			"Name,Status\nShip it,Done\nTest it,Open\n",
+		);
+		showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [folder] });
+
+		const preview = (await invoke("import-export:pick-notion")) as {
+			pageCount: number;
+			archiveName: string;
+		};
+		expect(preview.archiveName).toBe("notion-folder-export");
+		expect(preview.pageCount).toBe(3);
+
+		const report = (await invoke("import-export:run-notion", TYPE)) as { created: number };
+		expect(report.created).toBe(3);
+		const repo = await entitiesRepo();
+		expect(repo.query({ type: [TYPE] })).toHaveLength(3);
+	});
+
 	it("exports the vault to a .bsbundle the codec can unpack", async () => {
 		const out = join(workDir, "vault.bsbundle");
 		showSaveDialog.mockResolvedValue({ canceled: false, filePath: out });

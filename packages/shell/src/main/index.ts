@@ -1745,7 +1745,25 @@ void app.whenReady().then(async () => {
 	registerMarketplaceHandlers({ mainDir: __dirname });
 	registerIconsHandlers({ getDashboard: () => dashboardWindow });
 	registerCoversHandlers({ getDashboard: () => dashboardWindow });
-	registerImportExportHandlers({ getDashboard: () => dashboardWindow });
+	registerImportExportHandlers({
+		getDashboard: () => dashboardWindow,
+		// Plant imported markdown into each entity's universal-body Y.Doc so
+		// Notes / Journal editors are non-empty (they bind to the Y.Doc, not
+		// properties.body). Same ydoc-worker path as Welcome seed / templates.
+		makeApplyDocUpdate: (vaultPath) => async (entityId, updateB64) => {
+			const handler = workers?.broker.getServiceHandler("ydoc");
+			if (!handler) throw new Error("ydoc worker service unavailable");
+			await handler({
+				v: 1,
+				msg: `import_${entityId}`,
+				app: "io.brainstorm.shell",
+				service: "ydoc",
+				method: "applyUpdate",
+				args: [{ vaultPath, entityId, updateB64 }],
+				caps: [],
+			});
+		},
+	});
 	registerFilesHandlesHandlers({ getDashboard: () => dashboardWindow });
 	// Stage 10.5c — install the live-transport singleton BEFORE the pairing
 	// handlers register (the pairing handlers read from it). The default
@@ -4680,6 +4698,12 @@ void app.whenReady().then(async () => {
 					.then((result) => {
 						if (!result.ok) {
 							console.warn(`[brainstorm] dev: content reseed failed: ${result.reason}`);
+							return;
+						}
+						if (result.skipped === "no-prior-seed") {
+							// Fresh / user vault — leave empty. Project seed is
+							// opt-in via `seed-cli --vault` or the dashboard
+							// "Reseed vault" dev menu.
 							return;
 						}
 						const drained = result.drained;
