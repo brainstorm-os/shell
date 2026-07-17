@@ -17,6 +17,7 @@ import { useDashboard } from "../dashboard/use-dashboard";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import { TextField, TextFieldSize } from "../ui/text-field";
 import { SettingRow } from "./settings-controls";
 
 export function NotificationsSection() {
@@ -80,15 +81,15 @@ export function NotificationsSection() {
 					title={t("shell.settings.notifications.dnd.start")}
 					htmlFor={startId}
 					control={
-						<input
+						<TextField
 							id={startId}
 							type="time"
-							className="setting-time"
+							size={TextFieldSize.Sm}
 							value={notifications.dnd.start}
 							disabled={!notifications.dnd.enabled}
 							aria-label={t("shell.settings.notifications.dnd.start")}
-							onChange={(event) => {
-								void dashboard.setDnd({ start: event.target.value });
+							onChange={(next) => {
+								void dashboard.setDnd({ start: next });
 							}}
 						/>
 					}
@@ -97,15 +98,15 @@ export function NotificationsSection() {
 					title={t("shell.settings.notifications.dnd.end")}
 					htmlFor={endId}
 					control={
-						<input
+						<TextField
 							id={endId}
 							type="time"
-							className="setting-time"
+							size={TextFieldSize.Sm}
 							value={notifications.dnd.end}
 							disabled={!notifications.dnd.enabled}
 							aria-label={t("shell.settings.notifications.dnd.end")}
-							onChange={(event) => {
-								void dashboard.setDnd({ end: event.target.value });
+							onChange={(next) => {
+								void dashboard.setDnd({ end: next });
 							}}
 						/>
 					}

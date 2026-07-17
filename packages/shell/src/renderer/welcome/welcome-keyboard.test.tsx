@@ -72,7 +72,7 @@ describe("Welcome — KBN-S-welcome focus management", () => {
 	it("focuses the name field when entering the create step", async () => {
 		await mount();
 		click(buttonByText(t("shell.welcome.createCta")));
-		const nameInput = host.querySelector<HTMLInputElement>(".welcome__input");
+		const nameInput = host.querySelector<HTMLInputElement>(".text-field__input");
 		expect(document.activeElement).toBe(nameInput);
 	});
 

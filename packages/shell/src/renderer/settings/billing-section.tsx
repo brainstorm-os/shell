@@ -34,6 +34,7 @@ import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { ConfirmVariant, confirm } from "../ui/confirm";
 import { IconName } from "../ui/icon";
+import { TextField } from "../ui/text-field";
 import { SettingRow, SettingSelect } from "./settings-controls";
 import "./billing-section.css";
 
@@ -238,15 +239,14 @@ export function LinkForm({
 				{t("shell.settings.billing.link.label")}
 			</label>
 			<div className="billing-section__link-row">
-				<input
+				<TextField
 					id={inputId}
-					className="settings__input"
 					type="password"
 					autoComplete="off"
 					spellCheck={false}
 					value={draft}
 					placeholder={t("shell.settings.billing.link.placeholder")}
-					onChange={(e) => setDraft(e.target.value)}
+					onChange={setDraft}
 					disabled={busy}
 				/>
 				<Button

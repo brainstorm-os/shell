@@ -26,6 +26,7 @@
  *   - Outline-on-border focus mirrors `feedback_focus_outline_replaces_border`.
  */
 
+import { isPublicBeta } from "@brainstorm/sdk/analytics";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type ChangeEvent,
@@ -71,7 +72,6 @@ import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
 import { Segmented } from "../ui/segmented";
 import { Select, TextField, TextFieldSize } from "../ui/text-field";
-import { isPublicBeta } from "@brainstorm/sdk/analytics";
 import { BrowserPrivacyPanel } from "./browser-privacy-panel";
 import "./network-egress-panel.css";
 

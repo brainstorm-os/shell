@@ -20,6 +20,7 @@ import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
+import { TextField } from "../ui/text-field";
 import { budgetConsumedFraction, formatCredits, isBudgetExhausted } from "./ai-budget-view";
 import { McpServersSection } from "./mcp-panel";
 import { SettingRow, SettingSelect } from "./settings-controls";
@@ -197,10 +198,9 @@ function ProviderKeyPopover({
 				<label className="settings__ai-key-label" htmlFor={inputId}>
 					{t("shell.settings.ai.keyLabel")}
 				</label>
-				<input
+				<TextField
 					id={inputId}
 					ref={inputRef}
-					className="settings__input"
 					type="password"
 					autoComplete="off"
 					spellCheck={false}
@@ -208,7 +208,7 @@ function ProviderKeyPopover({
 					placeholder={
 						configured ? t("shell.settings.ai.replacePlaceholder") : t("shell.settings.ai.keyPlaceholder")
 					}
-					onChange={(e) => setDraft(e.target.value)}
+					onChange={setDraft}
 					aria-label={t("shell.settings.ai.keyLabel")}
 				/>
 			</form>
@@ -454,30 +454,28 @@ function BudgetPopover({
 				<label className="settings__ai-key-label" htmlFor={tokensId}>
 					{t("shell.settings.ai.budgetUnit")}
 				</label>
-				<input
+				<TextField
 					id={tokensId}
 					ref={inputRef}
-					className="settings__input"
 					type="number"
 					min={0}
 					inputMode="numeric"
 					value={tokensDraft}
 					placeholder={t("shell.settings.ai.budgetPlaceholder")}
-					onChange={(e) => setTokensDraft(e.target.value)}
+					onChange={setTokensDraft}
 					aria-label={`${appId} ${t("shell.settings.ai.budgetUnit")}`}
 				/>
 				<label className="settings__ai-key-label" htmlFor={creditsId}>
 					{t("shell.settings.ai.budgetCreditsUnit")}
 				</label>
-				<input
+				<TextField
 					id={creditsId}
-					className="settings__input"
 					type="number"
 					min={0}
 					inputMode="numeric"
 					value={creditsDraft}
 					placeholder={t("shell.settings.ai.budgetPlaceholder")}
-					onChange={(e) => setCreditsDraft(e.target.value)}
+					onChange={setCreditsDraft}
 					aria-label={`${appId} ${t("shell.settings.ai.budgetCreditsUnit")}`}
 				/>
 			</form>

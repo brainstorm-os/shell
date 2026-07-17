@@ -1,10 +1,11 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import type { CloudSyncWarning, WelcomeTemplateSummary } from "../../preload";
 import { t } from "../i18n/t";
 import { BrandMark } from "../ui/brand-mark";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { IconName } from "../ui/icon";
+import { TextField, TextFieldSize } from "../ui/text-field";
 import { ToastKind, pushToast } from "../ui/toasts";
 import { useVault } from "../vault-context";
 import { JoinVaultEntry } from "./join-vault-entry";
@@ -73,6 +74,8 @@ export function Welcome() {
 	// dashboard takes focus.
 	const createCtaRef = useRef<HTMLButtonElement>(null);
 	const nameInputRef = useRef<HTMLInputElement>(null);
+	const nameFieldId = useId();
+	const pathFieldId = useId();
 	const startHeadingRef = useRef<HTMLHeadingElement>(null);
 	const prevModeRef = useRef<WelcomeMode>(mode);
 	useEffect(() => {
@@ -251,38 +254,41 @@ export function Welcome() {
 
 				{mode === WelcomeMode.Create && (
 					<form className="welcome__form" onSubmit={goToStart}>
-						<label className="welcome__field">
-							<span className="welcome__label">{t("shell.welcome.nameLabel")}</span>
-							<input
+						<div className="welcome__field">
+							<label className="welcome__label" htmlFor={nameFieldId}>
+								{t("shell.welcome.nameLabel")}
+							</label>
+							<TextField
+								id={nameFieldId}
 								ref={nameInputRef}
-								className={nameTaken ? "welcome__input welcome__input--error" : "welcome__input"}
+								size={TextFieldSize.Lg}
 								type="text"
 								value={name}
-								onChange={(e) => setName(e.target.value)}
+								onChange={setName}
 								placeholder={t("shell.welcome.namePlaceholder")}
 								disabled={busy}
-								aria-invalid={nameTaken}
-								aria-describedby={nameTaken ? "welcome-name-error" : undefined}
+								{...(nameTaken
+									? {
+											error: (
+												<span role="alert" data-testid="welcome-name-error">
+													{t("shell.welcome.nameTaken", { name: trimmedName })}
+												</span>
+											),
+										}
+									: {})}
 							/>
-							{nameTaken && (
-								<span
-									className="welcome__field-error"
-									id="welcome-name-error"
-									role="alert"
-									data-testid="welcome-name-error"
-								>
-									{t("shell.welcome.nameTaken", { name: trimmedName })}
-								</span>
-							)}
-						</label>
-						<label className="welcome__field">
-							<span className="welcome__label">{t("shell.welcome.locationLabel")}</span>
+						</div>
+						<div className="welcome__field">
+							<label className="welcome__label" htmlFor={pathFieldId}>
+								{t("shell.welcome.locationLabel")}
+							</label>
 							<div className="welcome__path-row">
-								<input
-									className="welcome__input"
+								<TextField
+									id={pathFieldId}
+									size={TextFieldSize.Lg}
 									type="text"
 									value={path}
-									onChange={(e) => setPath(e.target.value)}
+									onChange={setPath}
 									disabled={busy}
 								/>
 								<Button
@@ -294,7 +300,7 @@ export function Welcome() {
 									{t("shell.welcome.chooseFolder")}
 								</Button>
 							</div>
-						</label>
+						</div>
 						{cloudWarning && (
 							<div className="welcome__cloud-warning" role="alert" data-testid="welcome-cloud-warning">
 								<strong>

@@ -87,9 +87,8 @@
 	gap: var(--space-2);
 }
 
-.settings__mcp-form .settings__input {
-	width: 100%;
-}
+/* Fields are the shared `<TextField>`/`<TextArea>` faces (F-304); the box
+ * comes from the primitive, the column layout stretches them full-width. */
 
 .settings__mcp-label {
 	font-size: var(--text-size-sm);
@@ -97,9 +96,10 @@
 	color: var(--color-text-secondary);
 }
 
-/* stdio argv editor — one argument per line, monospace for path legibility. */
-.settings__mcp-args {
-	resize: vertical;
+/* stdio argv editor — one argument per line, monospace for path legibility.
+ * Typography-only delta on the shared `<TextArea>` face (the box is the
+ * primitive's); it's the form's only textarea. */
+.settings__mcp-form .text-field__input--textarea {
 	min-height: var(--space-8);
 	font-family: var(--text-family-code);
 	font-size: var(--text-size-sm);

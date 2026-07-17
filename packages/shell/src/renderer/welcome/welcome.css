@@ -297,53 +297,24 @@
 	color: var(--color-text-secondary);
 }
 
-/* Height comes from the shared control-height scale (Lg, 40px) so inputs
- * line up pixel-exact with the Lg Buttons beside/after them (Choose…,
- * Back, Create vault) — padding governs width only, mirroring the Button
- * primitive's own sizing contract. */
-.welcome__input {
-	height: var(--control-height-lg);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	border: var(--border-width) solid var(--color-border-default);
-	border-radius: var(--radius-md);
-	padding: 0 var(--space-2);
-	font: inherit;
+/* Fields are the shared `<TextField>` face at Lg (F-304) so inputs line up
+ * pixel-exact with the Lg Buttons beside/after them (Choose…, Back, Create
+ * vault); box / focus ring / error chrome come from the primitive. The only
+ * welcome-specific delta: the window's title area is a drag region, so the
+ * inputs must opt out to stay clickable. */
+.welcome__form .text-field__input {
 	-webkit-app-region: no-drag;
 	app-region: no-drag;
 }
 
 /* Grow is scoped to the path-row only. `.welcome__field` is a flex
- * COLUMN, so a global `flex: 1` on the input would make flex-basis: 0%
- * govern its HEIGHT (main axis) and override `height` — collapsing the
- * Vault-name field to min-content. In the row, main axis is width, so
- * grow there fills the space beside "Choose…" without touching height. */
-.welcome__path-row .welcome__input {
+ * COLUMN, so a global `flex: 1` on the field would make flex-basis: 0%
+ * govern its HEIGHT (main axis) — collapsing the Vault-name field to
+ * min-content. In the row, main axis is width, so grow there fills the
+ * space beside "Choose…" without touching height. */
+.welcome__path-row .text-field {
 	flex: 1;
 	min-width: 0;
-}
-
-/* Ring SITS on the border position (inset by the 1px border, border made
- * transparent) so the focused box is the exact same size as the unfocused
- * one — no "sandwich". Per docs/foundations/35-code-conventions.md. */
-.welcome__input:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
-}
-
-.welcome__input--error {
-	border-color: var(--color-state-error);
-}
-
-.welcome__input--error:focus-visible {
-	outline-color: var(--color-state-error);
-}
-
-.welcome__field-error {
-	margin-top: var(--space-1);
-	color: var(--color-state-error);
-	font-size: var(--text-size-sm);
 }
 
 .welcome__path-row {

@@ -162,25 +162,8 @@
 	min-width: 0;
 }
 
-.help__search-input {
-	width: 100%;
-	height: 32px;
-	padding: 0 var(--space-2);
-	border-radius: var(--radius-md);
-	border: var(--border-width) solid var(--color-border-default);
-	background: var(--color-surface-default);
-	color: var(--color-text-primary);
-	font: inherit;
-	font-size: var(--text-size-md);
-	outline: none;
-}
-
-.help__search-input:focus,
-.help__search-input:focus-visible {
-	outline: 2px solid var(--color-border-focus, var(--color-accent-default));
-	outline-offset: -1px;
-	border-color: transparent;
-}
+/* The search field itself is the shared `<TextField>` face (F-304) — box,
+ * focus ring, and height come from the primitive, not this sheet. */
 
 .help__search-results {
 	position: absolute;
