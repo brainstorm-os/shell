@@ -394,6 +394,17 @@ export async function importNotionExport(
 		attachments.map((a) => a.path),
 	);
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	// Resolve every page + attachment dedupe key in one batched query up front —
+	// one map hit per row in the loops below instead of one full-table
+	// `json_extract` scan per entity. (Collection ids are batched separately in
+	// the best-effort tail.)
+	const dedupeKeys: string[] = [];
+	for (const draft of plan.entities) dedupeKeys.push(`${options.source}:${draft.externalId}`);
+	for (const path of plan.referencedAttachments) dedupeKeys.push(`${options.source}:file:${path}`);
+	const existingByKey = new Map<string, string>();
+	for (const { id, value } of repo.listIdsWithPropertyIn(IMPORT_EXTERNAL_ID_PROP, dedupeKeys)) {
+		if (!existingByKey.has(value)) existingByKey.set(value, id);
+	}
 	const idByPath = new Map<string, string>(); // externalId → vault entity id
 	let created = 0;
 	let updated = 0;
@@ -416,7 +427,7 @@ export async function importNotionExport(
 		}
 		const draft = plan.entities[i] as (typeof plan.entities)[number];
 		const externalKey = `${options.source}:${draft.externalId}`;
-		const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, externalKey)[0] ?? null;
+		const existing = existingByKey.get(externalKey) ?? null;
 		const properties: Record<string, unknown> = {
 			...draft.properties,
 			title: draft.title,
@@ -439,6 +450,9 @@ export async function importNotionExport(
 				dekId: null,
 			});
 			idByPath.set(draft.externalId, id);
+			// A later draft with the same external id must update, not duplicate
+			// (matches the old per-entity re-query semantics).
+			existingByKey.set(externalKey, id);
 			entityId = id;
 			created++;
 		}
@@ -465,7 +479,7 @@ export async function importNotionExport(
 		if (!bytes) continue;
 		const name = basename(path);
 		const externalKey = `${options.source}:file:${path}`;
-		const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, externalKey)[0] ?? null;
+		const existing = existingByKey.get(externalKey) ?? null;
 		const mime = servedMimeForName(name);
 		const { assetId } = await assetStore.writeAsset({ bytes, mime, kind: AssetKind.Upload });
 		assetStore.markBound(assetId);
@@ -544,6 +558,15 @@ export async function importNotionExport(
 				ids.push(id);
 				rowIdsByDb.set(draft.database, ids);
 			}
+			// One batched lookup for every database's List id (same pattern as the
+			// page/attachment keys above).
+			const existingCollectionByKey = new Map<string, string>();
+			for (const { id, value } of repo.listIdsWithPropertyIn(
+				IMPORT_EXTERNAL_ID_PROP,
+				schemas.map((s) => notionCollectionId(options.source, s.database)),
+			)) {
+				if (!existingCollectionByKey.has(value)) existingCollectionByKey.set(value, id);
+			}
 			for (const schema of schemas) {
 				for (const def of schema.properties) {
 					store.setProperty(def);
@@ -568,7 +591,7 @@ export async function importNotionExport(
 					updatedAt: options.now,
 				};
 				const props = listToEntityProperties(collection);
-				const existing = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, collection.id)[0] ?? null;
+				const existing = existingCollectionByKey.get(collection.id) ?? null;
 				const withMarker = { ...props, [IMPORT_EXTERNAL_ID_PROP]: collection.id };
 				if (existing !== null) {
 					repo.update(existing, withMarker, options.now);

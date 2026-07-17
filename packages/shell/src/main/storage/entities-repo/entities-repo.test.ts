@@ -106,6 +106,26 @@ describe("EntitiesRepository", () => {
 		);
 	});
 
+	it("listIdsWithPropertyIn batches value lookups, filters soft-deleted, ignores empty input", () => {
+		seed({ id: "a", properties: { ext: "k1" } });
+		seed({ id: "b", properties: { ext: "k2" } });
+		seed({ id: "c", properties: { ext: "k3" } });
+		seed({ id: "d", properties: { other: "k1" } });
+		env.repo.softDelete("c", 2000);
+		expect(env.repo.listIdsWithPropertyIn("ext", [])).toEqual([]);
+		// Over-chunk-size input (chunk = 500) exercises the padded second chunk.
+		const values = ["k1", ...Array.from({ length: 502 }, (_, i) => `miss-${i}`), "k2", "k3"];
+		const pairs = env.repo
+			.listIdsWithPropertyIn("ext", values)
+			.sort((x, y) => x.id.localeCompare(y.id));
+		expect(pairs).toEqual([
+			{ id: "a", value: "k1" },
+			{ id: "b", value: "k2" },
+		]);
+		// Agrees with the single-value form.
+		expect(env.repo.listIdsWithProperty("ext", "k1")).toEqual(["a"]);
+	});
+
 	it("softDelete cascades to incident links and is idempotent", () => {
 		seed();
 		seed({ id: "ent_2", properties: {} });
