@@ -9,14 +9,19 @@ import { describe, expect, it } from "vitest";
  * marker-less <li> carrying the `nested.listitem` theme class
  * (`notes__list-item--nested`). If that wrapper itself draws a list
  * marker, it stacks a bullet on top of the inner list's first item.
- * The fix is structural and lives entirely in styles.css, so the guard
- * is a stylesheet-contract test (jsdom cannot compute list markers).
+ * The fix is structural and lives entirely in CSS, so the guard is a
+ * stylesheet-contract test (jsdom cannot compute list markers). It reads
+ * the sheets the app actually loads: the shared editor theme plus the
+ * app's own styles.css.
  */
 
-const css = readFileSync(fileURLToPath(new URL("../styles.css", import.meta.url)), "utf8").replace(
-	/\/\*[\s\S]*?\*\//g,
-	"",
-);
+const css = [
+	"../../../../packages/editor/src/editor-theme.css",
+	"../styles.css",
+]
+	.map((rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8"))
+	.join("\n")
+	.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** Returns the body of the first rule whose selector list is exactly
  *  `selector` (whitespace-normalised). */

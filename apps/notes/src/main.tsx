@@ -5,6 +5,7 @@ import "@brainstorm/sdk/share-dialog.css";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
 import "@brainstorm/editor/editor.css";
+import "@brainstorm/editor/editor-theme.css";
 import { setEditorHost, setEntityIndexSource } from "@brainstorm/editor";
 import { YDocProvider } from "@brainstorm/react-yjs";
 import {
