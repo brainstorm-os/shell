@@ -15,7 +15,7 @@
  * on each pick and cleared after a committed run.
  */
 
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import type { ValueType } from "@brainstorm/sdk-types";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
@@ -640,9 +640,12 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 	ipcMain.handle("import-export:pick-anytype", async (): Promise<AnytypeSourcePreview | null> => {
 		const session = requireSession();
 		const win = options.getDashboard();
+		// Anytype's desktop export lands as a folder or (with "zip archive" on)
+		// a .zip — accept both. macOS shows one combined picker; elsewhere the
+		// file picker wins and a folder export is zipped by the user first.
 		const dialogOptions = {
-			title: "Choose an Anytype export (.zip)",
-			properties: ["openFile" as const],
+			title: "Choose an Anytype export (.zip or folder)",
+			properties: ["openFile" as const, "openDirectory" as const],
 			filters: [{ name: "Anytype export", extensions: ["zip"] }],
 		};
 		const result = win
@@ -651,17 +654,49 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		if (result.canceled || result.filePaths.length === 0) return null;
 		const archivePath = result.filePaths[0];
 		if (!archivePath) return null;
-		const bytes = new Uint8Array(await readFile(archivePath));
-		const entries = readZip(bytes, ANYTYPE_ZIP_LIMITS);
 		const files: AnytypeFile[] = [];
 		const attachments: AnytypeAttachment[] = [];
-		for (const entry of entries) {
-			// Snapshot JSONs live at the root; `files/` holds attachment binaries
-			// (a stray .json under files/ is a snapshot too — the parser decides).
-			if (ANYTYPE_JSON_EXT.test(entry.path)) {
-				files.push({ path: entry.path, text: zipEntryText(entry) });
-			} else {
-				attachments.push({ path: entry.path, bytes: entry.bytes });
+		const picked = await stat(archivePath);
+		if (picked.isDirectory()) {
+			// Folder export: walk it with the same bounds the zip reader enforces.
+			// Symlinks are skipped (`isFile()` is false), so the walk stays inside.
+			const dirents = await readdir(archivePath, { recursive: true, withFileTypes: true });
+			let totalBytes = 0;
+			let entries = 0;
+			for (const dirent of dirents) {
+				if (!dirent.isFile()) continue;
+				const parent =
+					(dirent as unknown as { parentPath?: string; path?: string }).parentPath ?? archivePath;
+				const absolute = join(parent, dirent.name);
+				const path = relative(archivePath, absolute).split(sep).join("/");
+				if (++entries > ANYTYPE_ZIP_LIMITS.maxEntries) {
+					throw new Error("import-export: Anytype export has too many files");
+				}
+				const bytes = new Uint8Array(await readFile(absolute));
+				totalBytes += bytes.length;
+				if (
+					bytes.length > ANYTYPE_ZIP_LIMITS.maxEntryBytes ||
+					totalBytes > ANYTYPE_ZIP_LIMITS.maxTotalBytes
+				) {
+					throw new Error("import-export: Anytype export is too large");
+				}
+				if (ANYTYPE_JSON_EXT.test(path)) {
+					files.push({ path, text: Buffer.from(bytes).toString("utf8") });
+				} else {
+					attachments.push({ path, bytes });
+				}
+			}
+		} else {
+			const bytes = new Uint8Array(await readFile(archivePath));
+			const entries = readZip(bytes, ANYTYPE_ZIP_LIMITS);
+			for (const entry of entries) {
+				// Snapshot JSONs live per-kind folders or the root; binaries live in
+				// `files/` (a stray .json there is a snapshot too — the parser decides).
+				if (ANYTYPE_JSON_EXT.test(entry.path)) {
+					files.push({ path: entry.path, text: zipEntryText(entry) });
+				} else {
+					attachments.push({ path: entry.path, bytes: entry.bytes });
+				}
 			}
 		}
 		pendingAnytype = {
@@ -704,7 +739,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 				return {
 					created: report.created + report.filesCreated,
 					updated: report.updated,
-					skipped: report.skippedArchived,
+					skipped: report.skippedArchived + report.skippedSystem,
 					failed: [],
 					...(report.cancelled ? { cancelled: true } : {}),
 				};

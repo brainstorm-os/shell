@@ -52,13 +52,14 @@ const text = (
 
 const FILES: AnytypeFile[] = [
 	// Schema objects — consumed for names, never imported.
-	snapshotFile("t-page", "STType", { details: { name: "Page", uniqueKey: "ot-page" } }),
+	snapshotFile("t-page", "STType", { details: { name: "Seite" }, key: "page" }),
 	snapshotFile("t-task", "STType", { details: { name: "Task", uniqueKey: "ot-task" } }),
 	snapshotFile("rel-effort", "STRelation", {
 		details: { name: "Effort", relationKey: "bafyeffortkey" },
 	}),
 	snapshotFile("opt-urgent", "STRelationOption", { details: { name: "Urgent" } }),
 	snapshotFile("file-1", "FileObject", { details: { name: "diagram.png" } }),
+	snapshotFile("file-2", "FileObject", { details: { name: "missing.bin" } }),
 
 	// A page exercising blocks, marks, mentions, links, files, bookmarks.
 	snapshotFile("obj-a", "Page", {
@@ -68,10 +69,14 @@ const FILES: AnytypeFile[] = [
 			description: "Rebuild everything",
 			tag: ["opt-urgent", "opt-ghost"],
 			bafyeffortkey: 5,
+			syncError: 3,
 			isArchived: false,
 		},
 		blocks: [
-			{ id: "obj-a", childrenIds: ["header", "b1", "b2", "b3", "b4", "b6", "b7", "b8", "b9"] },
+			{
+				id: "obj-a",
+				childrenIds: ["header", "b1", "b2", "b3", "b4", "b6", "b7", "b8", "b9", "b10", "b11"],
+			},
 			{ id: "header", childrenIds: ["title"] },
 			text("title", "Project Phoenix", "Title"),
 			text("b1", "bold and linked", "Paragraph", {
@@ -92,6 +97,8 @@ const FILES: AnytypeFile[] = [
 			{ id: "b7", link: { targetBlockId: "obj-b" } },
 			{ id: "b8", file: { targetObjectId: "file-1" } },
 			{ id: "b9", bookmark: { url: "https://anytype.io", title: "Anytype" } },
+			{ id: "b10", file: { targetObjectId: "file-2" } },
+			{ id: "b11", div: { style: "Line" } },
 		],
 	}),
 
@@ -105,6 +112,12 @@ const FILES: AnytypeFile[] = [
 				marks: { marks: [{ range: { from: 0, to: 7 }, type: "Object", param: "obj-ghost" }] },
 			}),
 		],
+	}),
+
+	// A template — space chrome, skipped by its objectTypes.
+	snapshotFile("obj-t", "Page", {
+		objectTypes: ["ot-template", "ot-task"],
+		details: { name: "Task template" },
 	}),
 
 	// Archived — skipped entirely.
@@ -170,11 +183,14 @@ describe("parseAnytypeExport", () => {
 	it("imports objects, skips schema/system/archived snapshots", () => {
 		expect(plan.entities.map((e) => e.externalId).sort()).toEqual(["obj-a", "obj-b", "obj-col"]);
 		expect(plan.skippedArchived).toBe(1);
+		expect(plan.skippedSystem).toBe(1);
 	});
 
 	it("resolves type names, relation names, and option labels", () => {
 		const a = plan.entities.find((e) => e.externalId === "obj-a");
-		expect(a?.anytypeType).toBe("Page");
+		// "ot-page" resolves through the STType's data.key, not name-prettifying.
+		expect(a?.anytypeType).toBe("Seite");
+		expect(a?.properties.syncError).toBeUndefined();
 		expect(a?.properties.Effort).toBe(5);
 		// Known option resolves to its label; an unknown id passes through.
 		expect(a?.properties.tag).toEqual(["Urgent", "opt-ghost"]);
@@ -191,6 +207,7 @@ describe("parseAnytypeExport", () => {
 		expect(body).toContain("- [x] Ship it");
 		expect(body).toContain("- Parent item\n  - Nested item");
 		expect(body).toContain("[Anytype](https://anytype.io)");
+		expect(body).toContain("---");
 		// The Title chrome block is details-borne, not body content.
 		expect(body).not.toContain("Project Phoenix");
 	});
@@ -200,6 +217,8 @@ describe("parseAnytypeExport", () => {
 		expect(plan.fileLinks).toEqual([{ fromObject: "obj-a", fileObjectId: "file-1" }]);
 		expect(plan.fileBinaryByObject.get("file-1")).toBe("files/diagram.png");
 		expect(plan.unresolved).toEqual([{ from: "obj-b", target: "obj-ghost" }]);
+		// A known file object with no binary in the export is counted, not dangling.
+		expect(plan.filesMissingBinary).toBe(1);
 	});
 
 	it("keeps Collection membership filtered to exported objects", () => {
@@ -224,7 +243,7 @@ describe("deriveTypeSchemas", () => {
 		expect(task?.properties).toEqual([
 			{ key: "done", name: "done", icon: null, valueType: ValueType.Boolean },
 		]);
-		const page = schemas.find((s) => s.type === "Page");
+		const page = schemas.find((s) => s.type === "Seite");
 		const effort = page?.properties.find((p) => p.key === "effort");
 		expect(effort?.valueType).toBe(ValueType.Number);
 	});
@@ -271,6 +290,8 @@ describe("importAnytypeExport (vault binding)", () => {
 		// obj-a→obj-b + obj-a→file.
 		expect(first.linked).toBe(2);
 		expect(first.skippedArchived).toBe(1);
+		expect(first.skippedSystem).toBe(1);
+		expect(first.filesMissingBinary).toBe(1);
 		expect(first.unresolved).toBe(1);
 		expect(first.collectionsCreated).toBe(1);
 		expect(first.propertiesRegistered).toBeGreaterThan(0);

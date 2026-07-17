@@ -86,6 +86,11 @@ export type AnytypeImportPlan = {
 	readonly unresolved: ReadonlyArray<{ readonly from: string; readonly target: string }>;
 	/** Objects skipped as archived or deleted. */
 	readonly skippedArchived: number;
+	/** Space-chrome objects (dashboard, profile, templates…) skipped. */
+	readonly skippedSystem: number;
+	/** References to file objects whose binary isn't in the export (Anytype's
+	 *  protobuf/JSON export can omit files) — reported, never fatal. */
+	readonly filesMissingBinary: number;
 };
 
 export const ANYTYPE_LINK_TYPE = "brainstorm/anytype/links-to";
@@ -110,6 +115,16 @@ const SYSTEM_SB_TYPES: ReadonlySet<string> = new Set([
 	"Home",
 	"AccountOld",
 	"MissingObject",
+]);
+
+/** Object types that are space chrome, not user content — skipped. */
+const SYSTEM_OBJECT_TYPES: ReadonlySet<string> = new Set([
+	"ot-dashboard",
+	"ot-space",
+	"ot-spaceView",
+	"ot-participant",
+	"ot-profile",
+	"ot-template",
 ]);
 
 /** File-bearing snapshot kinds — consumed as the attachment index. */
@@ -168,6 +183,13 @@ const SYSTEM_DETAIL_KEYS: ReadonlySet<string> = new Set([
 	"chatId",
 	"syncDate",
 	"syncStatus",
+	"syncError",
+	"importType",
+	"apiObjectKey",
+	"createdInContext",
+	"createdInContextRef",
+	"pluralName",
+	"iconName",
 	"templateIsBundled",
 ]);
 
@@ -182,6 +204,8 @@ const CHROME_BLOCK_IDS: ReadonlySet<string> = new Set([
 type Snapshot = {
 	readonly sbType: string;
 	readonly id: string;
+	/** `data.key` — on STType snapshots, the type key ("page" → `ot-page`). */
+	readonly key: string | null;
 	readonly details: Record<string, unknown>;
 	readonly objectTypes: readonly string[];
 	readonly blocks: readonly Record<string, unknown>[];
@@ -227,6 +251,7 @@ function parseSnapshot(file: AnytypeFile): Snapshot | null {
 	return {
 		sbType: asString(root.sbType) ?? "Page",
 		id,
+		key: asString(data.key),
 		details,
 		objectTypes: stringArray(data.objectTypes),
 		blocks: Array.isArray(data.blocks)
@@ -336,7 +361,9 @@ function renderBlock(id: string, depth: number, ctx: BlockContext): void {
 	const file = asRecord(block.file);
 	const link = asRecord(block.link);
 	const bookmark = asRecord(block.bookmark);
-	if (text) {
+	if (asRecord(block.div)) {
+		ctx.lines.push("---");
+	} else if (text) {
 		const style = asString(text.style) ?? "Paragraph";
 		const raw = typeof text.text === "string" ? text.text : "";
 		const rendered = renderTextRun(raw, parseMarks(text), ctx.onMention);
@@ -395,6 +422,7 @@ export function parseAnytypeExport(
 	const relationNameByKey = new Map<string, string>();
 	const optionLabelById = new Map<string, string>();
 	const fileBinaryByObject = new Map<string, string>();
+	const fileObjectIds = new Set<string>();
 	const attachmentByBasename = new Map<string, string>();
 	for (const path of attachmentPaths) {
 		attachmentByBasename.set(path.slice(path.lastIndexOf("/") + 1), path);
@@ -406,22 +434,33 @@ export function parseAnytypeExport(
 				typeNameByKey.set(snap.id, name);
 				const unique = asString(snap.details.uniqueKey);
 				if (unique) typeNameByKey.set(unique, name);
+				if (snap.key) {
+					typeNameByKey.set(snap.key, name);
+					typeNameByKey.set(`ot-${snap.key}`, name);
+				}
 			}
 		} else if (snap.sbType === "STRelation") {
 			const key = asString(snap.details.relationKey);
 			if (key && name) relationNameByKey.set(key, name);
 		} else if (snap.sbType === "STRelationOption") {
 			if (name) optionLabelById.set(snap.id, name);
-		} else if (FILE_SB_TYPES.has(snap.sbType) && name) {
-			const binary = attachmentByBasename.get(name);
+		} else if (FILE_SB_TYPES.has(snap.sbType)) {
+			fileObjectIds.add(snap.id);
+			const binary = name ? attachmentByBasename.get(name) : undefined;
 			if (binary) fileBinaryByObject.set(snap.id, binary);
 		}
 	}
 
 	// Pass 2 — importable objects.
-	const importable = snapshots.filter(
-		(s) => !SYSTEM_SB_TYPES.has(s.sbType) && !FILE_SB_TYPES.has(s.sbType),
-	);
+	let skippedSystem = 0;
+	const importable = snapshots.filter((s) => {
+		if (SYSTEM_SB_TYPES.has(s.sbType) || FILE_SB_TYPES.has(s.sbType)) return false;
+		if (s.objectTypes.some((t) => SYSTEM_OBJECT_TYPES.has(t))) {
+			skippedSystem++;
+			return false;
+		}
+		return true;
+	});
 	const objectIds = new Set(importable.map((s) => s.id));
 	const resolveOption = (value: unknown): unknown => {
 		if (typeof value === "string") return optionLabelById.get(value) ?? value;
@@ -438,6 +477,7 @@ export function parseAnytypeExport(
 	const collections: AnytypeCollectionDraft[] = [];
 	const seenLink = new Set<string>();
 	let skippedArchived = 0;
+	let filesMissingBinary = 0;
 
 	for (const snap of importable) {
 		if (snap.details.isArchived === true || snap.details.isDeleted === true) {
@@ -451,6 +491,7 @@ export function parseAnytypeExport(
 			if (objectIds.has(target)) links.push({ from: snap.id, to: target });
 			else if (fileBinaryByObject.has(target))
 				fileLinks.push({ fromObject: snap.id, fileObjectId: target });
+			else if (fileObjectIds.has(target)) filesMissingBinary++;
 			else unresolved.push({ from: snap.id, target });
 		};
 
@@ -510,6 +551,8 @@ export function parseAnytypeExport(
 		collections,
 		unresolved: unresolved.filter((u) => draftIds.has(u.from)),
 		skippedArchived,
+		skippedSystem,
+		filesMissingBinary,
 	};
 }
 
@@ -593,6 +636,8 @@ export type AnytypeImportReport = {
 	readonly linked: number;
 	readonly unresolved: number;
 	readonly skippedArchived: number;
+	readonly skippedSystem: number;
+	readonly filesMissingBinary: number;
 	readonly collectionsCreated: number;
 	readonly propertiesRegistered: number;
 	readonly cancelled?: boolean;
@@ -630,6 +675,8 @@ export async function importAnytypeExport(
 				linked: 0,
 				unresolved: plan.unresolved.length,
 				skippedArchived: plan.skippedArchived,
+				skippedSystem: plan.skippedSystem,
+				filesMissingBinary: plan.filesMissingBinary,
 				collectionsCreated: 0,
 				propertiesRegistered: 0,
 				cancelled: true,
@@ -794,6 +841,8 @@ export async function importAnytypeExport(
 		linked,
 		unresolved: plan.unresolved.length,
 		skippedArchived: plan.skippedArchived,
+		skippedSystem: plan.skippedSystem,
+		filesMissingBinary: plan.filesMissingBinary,
 		collectionsCreated,
 		propertiesRegistered,
 	};
