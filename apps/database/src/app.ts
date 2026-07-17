@@ -176,6 +176,7 @@ import {
 } from "./logic/compile-cache";
 import { copyListBlockRef } from "./logic/copy-list-block-ref";
 import { readEntityIcon } from "./logic/entity-icon";
+import { synthesizeFallbackViews } from "./logic/fallback-view";
 import {
 	FILTER_OPERATORS,
 	type FilterCompareTo,
@@ -989,7 +990,13 @@ function renderStageHeader(state: AppState): void {
 	const presenceHost = document.getElementById("header-presence");
 	if (presenceHost) {
 		presenceHost.hidden = false;
-		renderPresenceHeader(presenceHost, list?.id ?? null, COLLECTION_TYPE_URL);
+		// Presence publishes are gated main-side by resolving the id against
+		// `entities.db` — vault-derived pseudo-lists (`list_vault_*`) are NOT
+		// entities, so publishing them threw `presence.publish: unknown entity`
+		// as a renderer pageerror (F-393). Only entity-backed Lists (user
+		// collections, imported `List/v1` rows) publish; type-lists stay inert.
+		const presenceListId = list && !isVaultDerivedListId(list.id) ? list.id : null;
+		renderPresenceHeader(presenceHost, presenceListId, COLLECTION_TYPE_URL);
 	}
 	if (!list || !view) return;
 	const iconHost = document.getElementById("stage-icon");
@@ -4776,6 +4783,15 @@ function applyVaultSnapshot(state: AppState, snapshot: VaultSnapshot): void {
 		...built.views.map((v) => mergeOverlay(v, persistedUserDeltas.viewOverrides[v.id])),
 		...persistedUserDeltas.views.filter((v) => !isVaultDerivedViewId(v.id)),
 	];
+	// F-393 — a `List/v1` minted without views (an imported Anytype
+	// collection, any cross-app producer) must still open: synthesize a
+	// stable-id Grid over its members. Vault-derived id ⇒ regenerated here
+	// every rebuild, user tweaks ride `viewOverrides` like the type-lists.
+	state.views.push(
+		...synthesizeFallbackViews(state.lists, state.views, state.db.entities).map((v) =>
+			mergeOverlay(v, persistedUserDeltas.viewOverrides[v.id]),
+		),
+	);
 
 	repairActiveSelection(state, built);
 
@@ -5099,6 +5115,11 @@ async function loadPersistedState(state: AppState): Promise<void> {
 	};
 	for (const list of userLists) state.lists.push(list);
 	for (const view of userViews) state.views.push(view);
+	// F-393 — a user List persisted without views (imported collections) needs
+	// its synthesized fallback Grid before the vault snapshot lands too, so a
+	// restored selection / early click can already open it. Recomputed with
+	// real member columns on every `applyVaultSnapshot` (same stable id).
+	state.views.push(...synthesizeFallbackViews(state.lists, state.views, state.db.entities));
 
 	if (restoredActive) {
 		const view = state.views.find((v) => v.id === restoredActive.viewId);
