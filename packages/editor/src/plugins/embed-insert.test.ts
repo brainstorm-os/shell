@@ -2,8 +2,8 @@
 import { createHeadlessEditor } from "@lexical/headless";
 import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";
 import { describe, expect, it } from "vitest";
+import { $isBlockEmbedNode, BlockEmbedNode } from "../nodes/block-embed-node";
 import { applyEmbedInsertion } from "./embed-insert";
-import { $isBlockEmbedNode, BlockEmbedNode } from "./nodes/block-embed-node";
 
 function editor(): LexicalEditor {
 	return createHeadlessEditor({

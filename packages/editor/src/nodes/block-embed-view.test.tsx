@@ -9,10 +9,10 @@
  * shared `dispatchOpenEntity` path (same as the transclusion card).
  */
 
-import { setEditorHost } from "@brainstorm/editor";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setEditorHost } from "../plugins/editor-host";
 import { BlockEmbedView, SHELL_ENTITY_CARD_BLOCK_ID } from "./block-embed-node";
 
 const ENTITY = "n_target";

@@ -17,6 +17,7 @@ import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import type { Klass, LexicalNode } from "lexical";
 import { AudioBlockNode } from "./nodes/audio-block-node";
+import { BlockEmbedNode } from "./nodes/block-embed-node";
 import { BookmarkNode } from "./nodes/bookmark-node";
 import { CalloutNode } from "./nodes/callout-node";
 import { ColumnNode, ColumnsNode } from "./nodes/columns-node";
@@ -65,5 +66,6 @@ export const FULL_EDITOR_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	InlineTransclusionNode,
 	BookmarkNode,
 	WebEmbedNode,
+	BlockEmbedNode,
 	...MEDIA_NODES,
 ];

@@ -18,7 +18,6 @@ const NOTES_ONLY_COMMAND_IDS = [
 	"block.property.add",
 	"block.embed.toc",
 	"block.embed.subpage",
-	"block.embed.entity",
 	"block.embed.equation",
 	"block.embed.checkbox",
 	"block.embed.date",
@@ -62,6 +61,16 @@ describe("Notes block commands (shared-catalogue composition)", () => {
 		const ref = BLOCK_COMMANDS.find((c) => c.id === "block.transclusion");
 		expect(ref).toBeTruthy();
 		expect(ref?.label).toBe("Reference");
+	});
+
+	it("includes the shared host-gated Embed (entity card) command — not a Notes fork", () => {
+		// F-070 embed parity: `/embed` is `createEntityEmbedCommand` from the
+		// shared catalogue — same id, label, and description Journal / Tasks
+		// mount via `<FullEditorPlugins>`.
+		const embed = BLOCK_COMMANDS.find((c) => c.id === "block.embed.entity");
+		expect(embed).toBeTruthy();
+		expect(embed?.label).toBe("Embed");
+		expect(embed?.description).toBe("Insert a preview card pointing at another vault object");
 	});
 
 	it("includes the toggle-heading family from the shared catalogue", () => {

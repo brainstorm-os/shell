@@ -12,7 +12,7 @@
  * falls back to the in-memory demo dataset per [[preview-drop-pattern]].
  */
 
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
+import type { BpService, VaultEntitiesService } from "@brainstorm/sdk-types";
 import type { SaveFileService } from "@brainstorm/sdk/export-file";
 import type { NoteLike } from "./logic/journal-projection";
 
@@ -62,6 +62,16 @@ export type StorageService = {
 		bytes: Uint8Array,
 		mime?: string,
 	): Promise<{ url: string; hash: string; ext: string; size: number; mime: string }>;
+};
+
+/** Block-registry slice (`blocks.read`, a default-minimum grant) — backs
+ *  the shared editor's `/embed` entity card: `forType` resolves the
+ *  providing app's live block for an entity type, `source` fetches its
+ *  bundle for the sandboxed mount. Optional; absent in preview /
+ *  standalone, where the embed renders the generic chrome card. */
+export type BlocksService = {
+	forType(entityType: string): Promise<string | null>;
+	source(blockId: string): Promise<string | null>;
 };
 
 /** Dashboard pin surface — used by the shared object menu to label and
@@ -144,6 +154,12 @@ export type JournalRuntime = {
 		/** File-upload surface — backs the shared editor's media blocks
 		 *  (drag-drop / paste / `/image`). Optional; absent in preview. */
 		storage?: StorageService;
+		/** Block-registry lookups for the shared editor's `/embed` card.
+		 *  Optional; absent in preview / standalone. */
+		blocks?: BlocksService;
+		/** Block-Protocol dispatch for a live embedded block's graph traffic.
+		 *  Optional; absent in preview / standalone. */
+		bp?: BpService;
 	};
 	ydoc?: YDocBridge;
 };

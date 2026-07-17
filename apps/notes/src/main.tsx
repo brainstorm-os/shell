@@ -79,6 +79,8 @@ function mountFullApp(mountRoot: HTMLElement): void {
 	// Notes runtime.
 	const intents = runtime?.services.intents;
 	const storage = runtime?.services.storage;
+	const blocksSvc = runtime?.services.blocks;
+	const bpSvc = runtime?.services.bp;
 	setEditorHost({
 		...(intents
 			? {
@@ -98,6 +100,18 @@ function mountFullApp(mountRoot: HTMLElement): void {
 		...(storage
 			? { uploadFile: (filename, bytes, mime) => storage.uploadFile(filename, bytes, mime) }
 			: {}),
+		// The shared BlockEmbedNode / embed picker resolve + mount live blocks
+		// through these ("blocks.read" is a default-minimum grant; `bp.dispatch`
+		// is uncapped structural routing).
+		...(blocksSvc
+			? {
+					blocks: {
+						forType: (entityType) => blocksSvc.forType(entityType),
+						source: (blockId) => blocksSvc.source(blockId),
+					},
+				}
+			: {}),
+		...(bpSvc ? { bp: bpSvc } : {}),
 	});
 
 	const blocksService = runtime?.services.blocks;

@@ -62,6 +62,7 @@ import {
 } from "./icons";
 import { duplicateBlocks, moveBlocksDown, moveBlocksUp } from "./plugins/block-ops";
 import { INSERT_COLUMNS_COMMAND } from "./plugins/columns-plugin";
+import { openEntityEmbedPicker } from "./plugins/embed-picker-store";
 import { INSERT_TOGGLE_COMMAND } from "./plugins/toggle-plugin";
 import { TURN_INTO_COMMAND } from "./plugins/turn-into-plugin";
 
@@ -325,6 +326,28 @@ export function createTransclusionCommand(t: EditorT): BlockCommand {
 				const sel = $getSelection();
 				if ($isRangeSelection(sel)) sel.insertText("!@");
 			});
+		},
+	};
+}
+
+/** Slash command that opens the entity-embed picker — the shared "insert a
+ *  preview card of another vault object" affordance (`BlockEmbedNode`).
+ *  Host-gated like `createTransclusionCommand`: `<FullEditorPlugins>` adds
+ *  it whenever the editor has an entity context, and Notes interleaves the
+ *  same command into its bespoke catalogue — one id (`block.embed.entity`),
+ *  one wording, everywhere (F-070). The slash menu clears the `/<query>`
+ *  and leaves the caret in an empty block before `run`, so the picker
+ *  anchors against that paragraph and the chosen entity replaces it. */
+export function createEntityEmbedCommand(t: EditorT): BlockCommand {
+	return {
+		id: "block.embed.entity",
+		category: CommandCategory.Embed,
+		label: t("editor.block.embedEntity"),
+		description: t("editor.block.embedEntity.description"),
+		icon: <EmbedIcon />,
+		keywords: ["embed", "preview", "page", "entity", "card", "reference", "insert"],
+		run: ({ editor }) => {
+			openEntityEmbedPicker(editor);
 		},
 	};
 }

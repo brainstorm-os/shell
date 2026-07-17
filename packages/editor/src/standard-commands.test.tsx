@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CommandCategory } from "./block-command";
 import { createEditorT } from "./i18n";
 import {
+	createEntityEmbedCommand,
 	createStandardBlockActions,
 	createStandardBlockCommands,
 	createTransclusionCommand,
@@ -68,6 +69,23 @@ describe("standard block commands", () => {
 		expect(ref.keywords).toContain("embed");
 		expect(ref.keywords).toContain("transclude");
 		expect(typeof ref.run).toBe("function");
+	});
+
+	it("exposes an entity-embed command (host-gated, not in the base set)", () => {
+		// Like "Reference", the "/embed" preview-card command is added by
+		// FullEditorPlugins only when the host provides an entity context —
+		// it must NOT leak into the always-on base catalogue (F-070 embed
+		// parity: one shared command, same id Notes has always persisted).
+		const base = createStandardBlockCommands(t);
+		expect(base.some((c) => c.id === "block.embed.entity")).toBe(false);
+		const embed = createEntityEmbedCommand(t);
+		expect(embed.id).toBe("block.embed.entity");
+		expect(embed.label).toBe("Embed");
+		expect(embed.description).toBe("Insert a preview card pointing at another vault object");
+		expect(embed.category).toBe(CommandCategory.Embed);
+		expect(embed.keywords).toContain("embed");
+		expect(embed.keywords).toContain("card");
+		expect(typeof embed.run).toBe("function");
 	});
 
 	it("orderCommandsByPalette filters + reorders to the declared palette (F-070 rung b)", () => {

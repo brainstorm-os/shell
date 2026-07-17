@@ -56,6 +56,7 @@ import {
 	BlankRecoveryPlugin,
 	type BlockAnchorReveal,
 	BlockAnchorsPlugin,
+	BlockEmbedPickerPlugin,
 	BlockGutterPlugin,
 	BlockSelectionPlugin,
 	BrainstormEditor,
@@ -97,7 +98,6 @@ import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { type MutableRefObject, useMemo, useRef } from "react";
 import { AddPropertyMenuPlugin } from "./add-property-menu-plugin";
 import { BacklinksPlugin } from "./backlinks-plugin";
-import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
 import { BookmarkSuggestPlugin } from "./bookmark-suggest-plugin";
 import { BLOCK_ACTIONS, BLOCK_COMMANDS } from "./commands";
 import { CommentHighlightPlugin } from "./comment-highlight-plugin";
