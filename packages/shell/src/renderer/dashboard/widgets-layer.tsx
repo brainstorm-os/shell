@@ -23,16 +23,18 @@ import { closeAnchoredMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu
 import { widgetFrameOrigin, widgetIframeQuery } from "@brainstorm/sdk/widget";
 import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm/tokens";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { launchApp } from "../analytics/track-app-launch";
 import type { DashboardWidget } from "../../preload";
+import { launchApp } from "../analytics/track-app-launch";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { AppIcon } from "./app-icon";
 import {
+	type GridPoint,
 	WIDGET_MIN_H,
 	WIDGET_MIN_W,
 	WIDGET_UNIT,
 	WidgetSize,
+	clampWidgetOrigin,
 	clampWidgetSize,
 	migrateWidgetRecord,
 	widgetFootprint,
@@ -240,6 +242,39 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 	const [titles, setTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
 	const bridge = useWidgetBridge();
 
+	// Surface size in CSS pixels, for the stranded-record rescue clamp
+	// (`clampWidgetOrigin`, F-379). Initialised from the window (the surface is
+	// an `inset: 0` overlay of it) and kept live via a rAF-coalesced
+	// ResizeObserver, mirroring the icons layer; a zero layout box (hidden /
+	// pre-layout) falls back to the window box rather than clamping against 0.
+	const [surface, setSurface] = useState<GridPoint>(() => ({
+		x: window.innerWidth,
+		y: window.innerHeight,
+	}));
+	useEffect(() => {
+		const el = surfaceRef.current;
+		if (!el || typeof ResizeObserver === "undefined") return;
+		let raf = 0;
+		const apply = () => {
+			raf = 0;
+			const rect = el.getBoundingClientRect();
+			const next =
+				rect.width > 0 && rect.height > 0
+					? { x: rect.width, y: rect.height }
+					: { x: window.innerWidth, y: window.innerHeight };
+			setSurface((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
+		};
+		const schedule = () => {
+			if (raf === 0) raf = requestAnimationFrame(apply);
+		};
+		const observer = new ResizeObserver(schedule);
+		observer.observe(el);
+		return () => {
+			observer.disconnect();
+			if (raf !== 0) cancelAnimationFrame(raf);
+		};
+	}, []);
+
 	// Pre-7.3b widgets stored their footprint in coarse icon-grid cells; migrate
 	// onto the 8px widget grid on read (self-terminating) and persist once.
 	const migrated = useMemo(() => {
@@ -272,20 +307,34 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 	);
 
 	const effectiveWidgets = useMemo(() => {
-		if (!pending) return migrated;
-		const record = migrated[pending.id];
-		if (!record) return migrated;
-		return {
-			...migrated,
-			[pending.id]: {
-				...record,
-				...(pending.x !== undefined ? { x: pending.x } : {}),
-				...(pending.y !== undefined ? { y: pending.y } : {}),
-				...(pending.w !== undefined ? { w: pending.w } : {}),
-				...(pending.h !== undefined ? { h: pending.h } : {}),
-			},
-		};
-	}, [migrated, pending]);
+		const record = pending ? migrated[pending.id] : undefined;
+		const merged: Record<string, DashboardWidget> =
+			pending && record
+				? {
+						...migrated,
+						[pending.id]: {
+							...record,
+							...(pending.x !== undefined ? { x: pending.x } : {}),
+							...(pending.y !== undefined ? { y: pending.y } : {}),
+							...(pending.w !== undefined ? { w: pending.w } : {}),
+							...(pending.h !== undefined ? { h: pending.h } : {}),
+						},
+					}
+				: migrated;
+		// Rescue clamp (F-379): a record whose stored origin sits off-surface
+		// (the ×10-teleport bug baked such positions in) renders unreachable
+		// forever without this. Applied to the view-model — display, gesture
+		// origins, and subsequent writes all use the clamped cells, so touching
+		// a rescued widget persists its on-surface position.
+		let changed = false;
+		const out: Record<string, DashboardWidget> = {};
+		for (const [id, w] of Object.entries(merged)) {
+			const clamped = clampWidgetOrigin(w, surface);
+			out[id] = clamped;
+			if (clamped !== w) changed = true;
+		}
+		return changed ? out : merged;
+	}, [migrated, pending, surface]);
 
 	const toggleCollapsed = useCallback(
 		(id: string) => {
@@ -415,14 +464,13 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 			const cell = widgetPointToCell({ x: drag.originX + dx, y: drag.originY + dy });
 			const record = effectiveWidgets[drag.id];
 			if (record) {
-				const x = Math.max(0, cell.col);
-				const y = Math.max(0, cell.row);
-				setPending({ id: drag.id, x, y });
-				void window.brainstorm.dashboard.upsertWidget(drag.id, { ...record, x, y });
+				const target = clampWidgetOrigin({ ...record, x: cell.col, y: cell.row }, surface);
+				setPending({ id: drag.id, x: target.x, y: target.y });
+				void window.brainstorm.dashboard.upsertWidget(drag.id, target);
 			}
 			endDrag();
 		},
-		[effectiveWidgets, endDrag],
+		[effectiveWidgets, endDrag, surface],
 	);
 
 	const endResize = useCallback(() => {
@@ -501,12 +549,14 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		(id: string, dx: number, dy: number) => {
 			const record = effectiveWidgets[id];
 			if (!record) return;
-			const x = Math.max(0, record.x + dx);
-			const y = Math.max(0, record.y + dy);
-			setPending({ id, x, y });
-			void window.brainstorm.dashboard.upsertWidget(id, { ...record, x, y });
+			const target = clampWidgetOrigin(
+				{ ...record, x: Math.max(0, record.x + dx), y: Math.max(0, record.y + dy) },
+				surface,
+			);
+			setPending({ id, x: target.x, y: target.y });
+			void window.brainstorm.dashboard.upsertWidget(id, target);
 		},
-		[effectiveWidgets],
+		[effectiveWidgets, surface],
 	);
 
 	const nudgeResize = useCallback(

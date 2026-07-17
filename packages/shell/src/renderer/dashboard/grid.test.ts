@@ -11,6 +11,7 @@ import {
 	WidgetSize,
 	cellToPoint,
 	clampCell,
+	clampWidgetOrigin,
 	clampWidgetSize,
 	firstFreeCell,
 	getCellSize,
@@ -199,5 +200,50 @@ describe("migrateWidgetRecord", () => {
 	it("still migrates a legacy record whose height alone is tiny only when width is legacy too", () => {
 		// Legacy footprints were ≤ 4×4 icon cells; width is the discriminator.
 		expect(migrateWidgetRecord({ x: 1, y: 1, w: 4, h: 2 })).toEqual({ x: 10, y: 10, w: 40, h: 20 });
+	});
+});
+
+describe("clampWidgetOrigin", () => {
+	const SURFACE = { x: 1024, y: 768 };
+	const maxCol = Math.floor((SURFACE.x - GRID_OUTER_MARGIN) / WIDGET_UNIT) - WIDGET_MIN_W;
+	const maxRow = Math.floor((SURFACE.y - GRID_OUTER_MARGIN) / WIDGET_UNIT) - WIDGET_MIN_H;
+
+	it("returns an on-surface record untouched (identity-preserving)", () => {
+		const rec = { x: 4, y: 50, w: 40, h: 20 };
+		expect(clampWidgetOrigin(rec, SURFACE)).toBe(rec);
+	});
+
+	it("pulls a record stranded below the fold back onto the surface (F-379)", () => {
+		// The baked ×10-teleport geometry from session 375: row 500 ≈ 4000px
+		// below the fold. Position-only — footprint untouched.
+		const rescued = clampWidgetOrigin({ x: 40, y: 500, w: 27, h: 20 }, SURFACE);
+		expect(rescued).toEqual({ x: 40, y: maxRow, w: 27, h: 20 });
+		// At least a minimum footprint's pocket starts inside the surface.
+		expect(GRID_OUTER_MARGIN + rescued.y * WIDGET_UNIT).toBeLessThanOrEqual(
+			SURFACE.y - WIDGET_MIN_H * WIDGET_UNIT,
+		);
+	});
+
+	it("clamps a stranded horizontal origin too", () => {
+		expect(clampWidgetOrigin({ x: 400, y: 2, w: 20, h: 20 }, SURFACE)).toEqual({
+			x: maxCol,
+			y: 2,
+			w: 20,
+			h: 20,
+		});
+	});
+
+	it("floors at the origin when the surface is smaller than the minimum pocket", () => {
+		expect(clampWidgetOrigin({ x: 12, y: 12, w: 20, h: 20 }, { x: 40, y: 40 })).toEqual({
+			x: 0,
+			y: 0,
+			w: 20,
+			h: 20,
+		});
+	});
+
+	it("clamps nothing against an unknown (zero) surface", () => {
+		const rec = { x: 40, y: 500, w: 27, h: 20 };
+		expect(clampWidgetOrigin(rec, { x: 0, y: 0 })).toBe(rec);
 	});
 });
