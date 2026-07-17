@@ -21,6 +21,12 @@ import type { ValueType } from "@brainstorm/sdk-types";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { BundleExportScopeKind } from "../bundle/bundle-format";
 import { exportVaultBundle } from "../bundle/vault-export";
+import {
+	type AnytypeAttachment,
+	type AnytypeFile,
+	importAnytypeExport,
+	parseAnytypeExport,
+} from "../import/anytype-import";
 import { inferMapping } from "../import/import-map";
 import { parseTable } from "../import/import-parse";
 import {
@@ -111,6 +117,38 @@ export type NotionSourcePreview = {
 	readonly archiveName: string;
 	readonly pageCount: number;
 };
+
+/** A picked Anytype export `.zip`, extracted into memory + bound to its vault. */
+type PendingAnytype = {
+	readonly archiveName: string;
+	readonly files: readonly AnytypeFile[];
+	readonly attachments: readonly AnytypeAttachment[];
+	readonly vaultId: string;
+};
+let pendingAnytype: PendingAnytype | null = null;
+
+/** Limits on an Anytype `.zip` extraction (zip-slip + zip-bomb defence). */
+const ANYTYPE_ZIP_LIMITS: ZipReadLimits = {
+	maxEntries: 100_000,
+	maxEntryBytes: 256 * 1024 * 1024,
+	maxTotalBytes: MAX_OBSIDIAN_TOTAL_BYTES,
+};
+const ANYTYPE_JSON_EXT = /\.(pb\.json|json)$/i;
+
+/** Preview after an Anytype `.zip` pick. */
+export type AnytypeSourcePreview = {
+	readonly archiveName: string;
+	readonly objectCount: number;
+};
+
+function requirePendingAnytypeFor(vaultId: string): PendingAnytype {
+	if (!pendingAnytype) throw new Error("import-export: no Anytype export picked");
+	if (pendingAnytype.vaultId !== vaultId) {
+		pendingAnytype = null;
+		throw new Error("import-export: the active vault changed — pick the export again");
+	}
+	return pendingAnytype;
+}
 
 function requirePendingNotionFor(vaultId: string): PendingNotion {
 	if (!pendingNotion) throw new Error("import-export: no Notion export picked");
@@ -599,6 +637,83 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		},
 	);
 
+	ipcMain.handle("import-export:pick-anytype", async (): Promise<AnytypeSourcePreview | null> => {
+		const session = requireSession();
+		const win = options.getDashboard();
+		const dialogOptions = {
+			title: "Choose an Anytype export (.zip)",
+			properties: ["openFile" as const],
+			filters: [{ name: "Anytype export", extensions: ["zip"] }],
+		};
+		const result = win
+			? await dialog.showOpenDialog(win, dialogOptions)
+			: await dialog.showOpenDialog(dialogOptions);
+		if (result.canceled || result.filePaths.length === 0) return null;
+		const archivePath = result.filePaths[0];
+		if (!archivePath) return null;
+		const bytes = new Uint8Array(await readFile(archivePath));
+		const entries = readZip(bytes, ANYTYPE_ZIP_LIMITS);
+		const files: AnytypeFile[] = [];
+		const attachments: AnytypeAttachment[] = [];
+		for (const entry of entries) {
+			// Snapshot JSONs live at the root; `files/` holds attachment binaries
+			// (a stray .json under files/ is a snapshot too — the parser decides).
+			if (ANYTYPE_JSON_EXT.test(entry.path)) {
+				files.push({ path: entry.path, text: zipEntryText(entry) });
+			} else {
+				attachments.push({ path: entry.path, bytes: entry.bytes });
+			}
+		}
+		pendingAnytype = {
+			archiveName: basename(archivePath),
+			files,
+			attachments,
+			vaultId: session.vaultId,
+		};
+		const objectCount = parseAnytypeExport(
+			files,
+			attachments.map((a) => a.path),
+		).entities.length;
+		return { archiveName: basename(archivePath), objectCount };
+	});
+
+	ipcMain.handle(
+		"import-export:run-anytype",
+		async (_event, targetType: unknown): Promise<ImportRunReport> => {
+			const session = requireSession();
+			const type = requireTargetType(targetType);
+			const pending = requirePendingAnytypeFor(session.vaultId);
+			const controller = new AbortController();
+			activeRun = controller;
+			const win = options.getDashboard();
+			try {
+				const report = await importAnytypeExport(
+					session,
+					pending.files,
+					{
+						targetType: type,
+						source: `anytype:${pending.archiveName}`,
+						now: Date.now(),
+						importedBy: IMPORT_AUTHOR,
+						signal: controller.signal,
+						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+					},
+					pending.attachments,
+				);
+				pendingAnytype = null;
+				return {
+					created: report.created + report.filesCreated,
+					updated: report.updated,
+					skipped: report.skippedArchived,
+					failed: [],
+					...(report.cancelled ? { cancelled: true } : {}),
+				};
+			} finally {
+				if (activeRun === controller) activeRun = null;
+			}
+		},
+	);
+
 	ipcMain.handle("import-export:export-vault", async (): Promise<{ path: string } | null> => {
 		const session = requireSession();
 		const win = options.getDashboard();
@@ -625,5 +740,6 @@ export function __resetPendingImportForTests(): void {
 	pendingImport = null;
 	pendingObsidian = null;
 	pendingNotion = null;
+	pendingAnytype = null;
 	activeRun = null;
 }

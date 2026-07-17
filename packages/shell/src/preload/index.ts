@@ -450,6 +450,7 @@ export type {
 	ImportMappingEdit,
 	ObsidianSourcePreview,
 	NotionSourcePreview,
+	AnytypeSourcePreview,
 	ImportPlan,
 	ImportRunReport,
 };
@@ -495,6 +496,10 @@ const importExport = {
 		ipcRenderer.invoke("import-export:pick-notion"),
 	runNotion: (targetType: string): Promise<ImportRunReport> =>
 		ipcRenderer.invoke("import-export:run-notion", targetType),
+	pickAnytype: (): Promise<AnytypeSourcePreview | null> =>
+		ipcRenderer.invoke("import-export:pick-anytype"),
+	runAnytype: (targetType: string): Promise<ImportRunReport> =>
+		ipcRenderer.invoke("import-export:run-anytype", targetType),
 	cancel: (): Promise<void> => ipcRenderer.invoke("import-export:cancel"),
 	onProgress: (handler: (progress: { done: number; total: number }) => void): (() => void) =>
 		subscribe<{ done: number; total: number }>("import-export:progress", handler),
@@ -744,6 +749,7 @@ import type { CollabAccessView, CollabIdentity } from "../main/collab/collab-dev
 import type { ShareInvite } from "../main/collab/share-invite";
 import type { ImportPlan, ImportRunReport } from "../main/import/import-types";
 import type {
+	AnytypeSourcePreview,
 	ImportMappingEdit,
 	ImportMappingPreview,
 	ImportSourcePreview,

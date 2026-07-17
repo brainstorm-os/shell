@@ -53,6 +53,7 @@ export function BackupMigrationPanel() {
 			<ImportSection />
 			<ObsidianSection />
 			<NotionSection />
+			<AnytypeSection />
 		</section>
 	);
 }
@@ -505,6 +506,134 @@ function ObsidianSection() {
 
 			{phase.kind === "done" && (
 				<p className="settings__hint" data-testid="backup-migration-obsidian-done">
+					<Icon name={IconName.CheckCircle} size={14} />{" "}
+					{t("shell.settings.backupMigration.import.done", {
+						created: phase.report.created,
+						updated: phase.report.updated,
+						failed: phase.report.failed.length,
+					})}
+				</p>
+			)}
+
+			{error && (
+				<p className="settings__error" role="alert">
+					{error}
+				</p>
+			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// Anytype export import (IE-7)
+// ---------------------------------------------------------------------
+
+type AnytypePhase =
+	| { kind: "idle" }
+	| { kind: "picked"; archiveName: string; objectCount: number }
+	| { kind: "done"; report: ImportRunReport };
+
+function AnytypeSection() {
+	const [phase, setPhase] = useState<AnytypePhase>({ kind: "idle" });
+	const [targetType, setTargetType] = useState("brainstorm/Note/v1");
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const onPick = useCallback(async () => {
+		setBusy(true);
+		setError(null);
+		try {
+			const source = await window.brainstorm.importExport.pickAnytype();
+			if (!source) return;
+			setPhase({ kind: "picked", archiveName: source.archiveName, objectCount: source.objectCount });
+		} catch (e) {
+			setError(
+				e instanceof Error ? e.message : t("shell.settings.backupMigration.anytype.pickFailed"),
+			);
+		} finally {
+			setBusy(false);
+		}
+	}, []);
+
+	const onRun = useCallback(async () => {
+		const type = targetType.trim();
+		if (type.length === 0) {
+			setError(t("shell.settings.backupMigration.import.typeRequired"));
+			return;
+		}
+		setBusy(true);
+		setError(null);
+		try {
+			const report = await window.brainstorm.importExport.runAnytype(type);
+			setPhase({ kind: "done", report });
+		} catch (e) {
+			setError(e instanceof Error ? e.message : t("shell.settings.backupMigration.anytype.runFailed"));
+		} finally {
+			setBusy(false);
+		}
+	}, [targetType]);
+
+	return (
+		<div className="backup-migration__group" data-testid="backup-migration-anytype">
+			<SectionHead
+				icon={IconName.Archive}
+				title={t("shell.settings.backupMigration.anytype.title")}
+				hint={t("shell.settings.backupMigration.anytype.hint")}
+			/>
+
+			{phase.kind === "idle" && (
+				<Button
+					variant={ButtonVariant.Primary}
+					size={ButtonSize.Md}
+					iconLeft={IconName.Archive}
+					loading={busy}
+					onClick={() => void onPick()}
+					data-testid="backup-migration-anytype-pick"
+				>
+					{t("shell.settings.backupMigration.anytype.pick")}
+				</Button>
+			)}
+
+			<AnimatePresence>
+				{phase.kind === "picked" && (
+					<ImportFlowPopover
+						title={t("shell.settings.backupMigration.anytype.title")}
+						formTestId="backup-migration-anytype-form"
+						sourceLine={t("shell.settings.backupMigration.anytype.source", {
+							archive: phase.archiveName,
+							count: phase.objectCount,
+						})}
+						targetType={targetType}
+						onTargetType={setTargetType}
+						targetTypeHint={t("shell.settings.backupMigration.anytype.targetTypeHint")}
+						targetTypeTestId="backup-migration-anytype-type"
+						onClose={() => setPhase({ kind: "idle" })}
+						footer={
+							<>
+								<Button
+									variant={ButtonVariant.Neutral}
+									size={ButtonSize.Sm}
+									onClick={() => setPhase({ kind: "idle" })}
+								>
+									{t("shell.settings.backupMigration.import.cancel")}
+								</Button>
+								<Button
+									variant={ButtonVariant.Primary}
+									size={ButtonSize.Sm}
+									loading={busy}
+									onClick={() => void onRun()}
+									data-testid="backup-migration-anytype-run"
+								>
+									{t("shell.settings.backupMigration.anytype.run")}
+								</Button>
+							</>
+						}
+					/>
+				)}
+			</AnimatePresence>
+
+			{phase.kind === "done" && (
+				<p className="settings__hint" data-testid="backup-migration-anytype-done">
 					<Icon name={IconName.CheckCircle} size={14} />{" "}
 					{t("shell.settings.backupMigration.import.done", {
 						created: phase.report.created,
