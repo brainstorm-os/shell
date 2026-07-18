@@ -64,6 +64,12 @@ export type ImapFetchedMessageLike = {
 export type ImapClientLike = {
 	connect(): Promise<void>;
 	logout(): Promise<void>;
+	/** EventEmitter seam — imapflow reports post-connect socket failures
+	 *  (timeouts, resets) as `'error'` EVENTS outside any command promise;
+	 *  an unlistened `'error'` escalates to an uncaughtException and kills
+	 *  the worker (F-434). Optional so test fixtures without events still
+	 *  satisfy the seam. */
+	on?(event: "error", handler: (error: Error) => void): unknown;
 	list(): Promise<ImapListEntryLike[]>;
 	status(path: string, query: { unseen: boolean }): Promise<{ unseen?: number }>;
 	getMailboxLock(path: string): Promise<ImapLockLike>;
@@ -187,6 +193,16 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 				port: input.incoming.port,
 				secure: input.incoming.tls,
 				auth,
+			});
+			// Lifetime 'error' listener (F-434): a socket timeout on an idle or
+			// half-torn-down connection must drop the cached client so the next
+			// call reconnects — never crash the worker as an unhandled 'error'.
+			client.on?.("error", (error) => {
+				console.warn(`[mailbox:imap] connection error: ${error.message}`);
+				if (imap === client) {
+					imap = null;
+					imapReady = null;
+				}
 			});
 			imapReady = client
 				.connect()
