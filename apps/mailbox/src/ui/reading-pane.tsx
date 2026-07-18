@@ -52,44 +52,44 @@ export function ReadingPane({
 
 	return (
 		<div className="mb-reading">
-			<div className="mb-reading__toolbar">
-				{showBack ? (
-					<button type="button" className="mb-iconbtn" onClick={onBack} aria-label={t("reading.back")}>
-						<Icon name={IconName.CaretLeft} />
-					</button>
-				) : null}
-				{onReply ? (
-					<button type="button" className="mb-reading__action" onClick={onReply}>
-						{t("reading.reply")}
-					</button>
-				) : null}
-				{onForward ? (
-					<button type="button" className="mb-reading__action" onClick={onForward}>
-						{t("reading.forward")}
-					</button>
-				) : null}
-				<div className="mb-reading__toolbar-spacer" />
-				<button
-					type="button"
-					className={`mb-iconbtn${message.flagged ? " is-on" : ""}`}
-					onClick={onToggleFlag}
-					aria-pressed={message.flagged}
-					aria-label={message.flagged ? t("reading.unflag") : t("reading.flag")}
-				>
-					<Icon name={IconName.Star} />
-				</button>
-				<button
-					type="button"
-					className="mb-iconbtn"
-					onClick={onToggleRead}
-					aria-label={message.unread ? t("reading.markRead") : t("reading.markUnread")}
-				>
-					<Icon name={IconName.Read} />
-				</button>
-			</div>
-
 			<div className="mb-reading__head">
-				<h2 className="mb-reading__subject">{message.subject || t("list.noSubject")}</h2>
+				<div className="mb-reading__titlerow">
+					{showBack ? (
+						<button type="button" className="mb-iconbtn" onClick={onBack} aria-label={t("reading.back")}>
+							<Icon name={IconName.CaretLeft} />
+						</button>
+					) : null}
+					<h2 className="mb-reading__subject">{message.subject || t("list.noSubject")}</h2>
+					<div className="mb-reading__actions">
+						{onReply ? (
+							<button type="button" className="bs-btn bs-btn--sm bs-btn--secondary" onClick={onReply}>
+								{t("reading.reply")}
+							</button>
+						) : null}
+						{onForward ? (
+							<button type="button" className="bs-btn bs-btn--sm bs-btn--secondary" onClick={onForward}>
+								{t("reading.forward")}
+							</button>
+						) : null}
+						<button
+							type="button"
+							className={`mb-iconbtn${message.flagged ? " is-on" : ""}`}
+							onClick={onToggleFlag}
+							aria-pressed={message.flagged}
+							aria-label={message.flagged ? t("reading.unflag") : t("reading.flag")}
+						>
+							<Icon name={IconName.Star} />
+						</button>
+						<button
+							type="button"
+							className="mb-iconbtn"
+							onClick={onToggleRead}
+							aria-label={message.unread ? t("reading.markRead") : t("reading.markUnread")}
+						>
+							<Icon name={IconName.Read} />
+						</button>
+					</div>
+				</div>
 				<div className="mb-reading__meta">
 					<span className="mb-reading__sender">{sender}</span>
 					<span className="mb-reading__date">{messageDateLabel(message.receivedAt, now)}</span>

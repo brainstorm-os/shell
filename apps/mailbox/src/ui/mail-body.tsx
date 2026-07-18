@@ -42,7 +42,11 @@ export function MailBody({ bodyHtmlSafe, bodyText, resetKey }: MailBodyProps): R
 			{hasRemote && !showRemote ? (
 				<div className="mb-body__remote-banner">
 					<span>{t("body.remote.blocked")}</span>
-					<button type="button" className="mb-body__remote-btn" onClick={() => setShowRemote(true)}>
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--secondary mb-body__remote-show"
+						onClick={() => setShowRemote(true)}
+					>
 						{t("body.remote.show")}
 					</button>
 				</div>
