@@ -255,7 +255,7 @@ export function ImportDoneState({
 			<div className="backup-migration__done-actions">
 				<Button
 					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={onAgain}
 					data-testid={`${testId}-again`}
 				>
@@ -297,7 +297,7 @@ function SectionRunState({
 				</p>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={cancelImportRun}
 					data-testid={stopTestId}
 				>
@@ -320,7 +320,7 @@ function SectionRunState({
 		return (
 			<p className="settings__error" role="alert">
 				{run.error}{" "}
-				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Sm} onClick={dismissImportRun}>
+				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissImportRun}>
 					{againLabel}
 				</Button>
 			</p>
@@ -510,13 +510,13 @@ function ImportSection() {
 						onClose={reset}
 						footer={
 							<>
-								<Button variant={ButtonVariant.Neutral} size={ButtonSize.Sm} onClick={reset}>
+								<Button variant={ButtonVariant.Neutral} size={ButtonSize.Md} onClick={reset}>
 									{t("shell.settings.backupMigration.import.cancel")}
 								</Button>
 								{phase.kind === "picked" ? (
 									<Button
 										variant={ButtonVariant.Primary}
-										size={ButtonSize.Sm}
+										size={ButtonSize.Md}
 										loading={busy}
 										onClick={() => void onPlan()}
 										data-testid="backup-migration-import-preview"
@@ -526,7 +526,7 @@ function ImportSection() {
 								) : (
 									<Button
 										variant={ButtonVariant.Primary}
-										size={ButtonSize.Sm}
+										size={ButtonSize.Md}
 										loading={busy}
 										onClick={() => void onRun()}
 										data-testid="backup-migration-import-run"
@@ -657,14 +657,14 @@ function ObsidianSection() {
 							<>
 								<Button
 									variant={ButtonVariant.Neutral}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									onClick={() => setPhase({ kind: "idle" })}
 								>
 									{t("shell.settings.backupMigration.import.cancel")}
 								</Button>
 								<Button
 									variant={ButtonVariant.Primary}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									loading={busy}
 									onClick={() => void onRun()}
 									data-testid="backup-migration-obsidian-run"
@@ -779,14 +779,14 @@ function AnytypeSection() {
 							<>
 								<Button
 									variant={ButtonVariant.Neutral}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									onClick={() => setPhase({ kind: "idle" })}
 								>
 									{t("shell.settings.backupMigration.import.cancel")}
 								</Button>
 								<Button
 									variant={ButtonVariant.Primary}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									loading={busy}
 									onClick={() => void onRun()}
 									data-testid="backup-migration-anytype-run"
@@ -899,14 +899,14 @@ function NotionSection() {
 							<>
 								<Button
 									variant={ButtonVariant.Neutral}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									onClick={() => setPhase({ kind: "idle" })}
 								>
 									{t("shell.settings.backupMigration.import.cancel")}
 								</Button>
 								<Button
 									variant={ButtonVariant.Primary}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									loading={busy}
 									onClick={() => void onRun()}
 									data-testid="backup-migration-notion-run"

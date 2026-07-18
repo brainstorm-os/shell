@@ -82,7 +82,7 @@ textarea {
 :root[data-platform="win32"] ::-webkit-scrollbar-thumb,
 :root[data-platform="linux"] ::-webkit-scrollbar-thumb {
 	background: var(--color-border-strong);
-	border-radius: 8px;
+	border-radius: var(--radius-md);
 	border: 3px solid transparent;
 	background-clip: padding-box;
 }

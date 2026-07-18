@@ -175,7 +175,7 @@ function TrustedSitesGroup({
 				<Button
 					type="submit"
 					variant={ButtonVariant.Primary}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					disabled={draft.trim().length === 0}
 				>
 					{t("shell.settings.webPrivacy.trust.add")}

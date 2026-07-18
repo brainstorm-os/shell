@@ -544,7 +544,7 @@ function SignOutButton() {
 	return (
 		<Button
 			variant={ButtonVariant.Ghost}
-			size={ButtonSize.Sm}
+			size={ButtonSize.Md}
 			iconLeft={IconName.SignOut}
 			onClick={() => {
 				void onSignOut();

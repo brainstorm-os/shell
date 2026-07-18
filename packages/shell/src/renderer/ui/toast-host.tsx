@@ -44,7 +44,7 @@ export function ToastHost() {
 								<div className="toast__action">
 									<Button
 										variant={ButtonVariant.Primary}
-										size={ButtonSize.Sm}
+										size={ButtonSize.Md}
 										onClick={() => {
 											toast.action?.onPress();
 											dismissToast(toast.id);

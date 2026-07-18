@@ -140,7 +140,7 @@ export function DevicesSection({ initialView = DevicesViewState.List }: DevicesS
 				<p className="settings__error" role="alert">
 					{error}
 				</p>
-				<Button onClick={() => void refresh()} size={ButtonSize.Sm}>
+				<Button onClick={() => void refresh()} size={ButtonSize.Md}>
 					{t("shell.settings.devices.add.tryAgain")}
 				</Button>
 				{pairingOverlay}
@@ -181,7 +181,7 @@ export function DevicesSection({ initialView = DevicesViewState.List }: DevicesS
 				</Button>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => setView(DevicesViewState.Join)}
 					data-testid="devices-section-join"
 				>

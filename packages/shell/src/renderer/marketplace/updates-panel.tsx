@@ -87,7 +87,7 @@ function UpdateRow({
 					</span>
 				) : null}
 			</div>
-			<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={apply}>
+			<Button variant={ButtonVariant.Primary} size={ButtonSize.Md} onClick={apply}>
 				{t("shell.marketplace.updates.apply")}
 			</Button>
 		</li>

@@ -80,12 +80,6 @@
 /* Row-heights come from the shared control-height scale so a button lines
  * up pixel-exact next to any input/select of the same size and can never
  * drift; padding governs width only (border-box). */
-.button--sm {
-	height: var(--control-height-sm);
-	padding: 0 var(--space-2);
-	font-size: var(--text-size-xs);
-}
-
 .button--md {
 	height: var(--control-height-md);
 	padding: 0 var(--space-2);

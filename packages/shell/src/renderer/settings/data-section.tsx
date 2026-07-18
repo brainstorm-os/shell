@@ -769,7 +769,7 @@ function PropertyConstructor({
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							iconLeft={IconName.Trash}
 							onClick={onDelete}
 						>
@@ -777,12 +777,12 @@ function PropertyConstructor({
 						</Button>
 					)}
 					<span className="data__form-actions-spacer" />
-					<Button variant={ButtonVariant.Neutral} size={ButtonSize.Sm} onClick={onClose}>
+					<Button variant={ButtonVariant.Neutral} size={ButtonSize.Md} onClick={onClose}>
 						{t("shell.settings.data.properties.cancel")}
 					</Button>
 					<Button
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						disabled={!canSubmit}
 						onClick={() => {
 							void onSave();
@@ -1191,7 +1191,7 @@ function VocabularyEditor({
 				/>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.Plus}
 					onClick={addItem}
 					disabled={draft.trim().length === 0}

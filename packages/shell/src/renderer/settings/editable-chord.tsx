@@ -238,18 +238,18 @@ export function EditableChord({
 				<div className="keyboard__capture-actions">
 					<Button
 						variant={ButtonVariant.Ghost}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={cancelCapture}
 						disabled={busy}
 					>
 						{t("shell.settings.keyboard.cancel")}
 					</Button>
-					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Sm} onClick={clearChord} loading={busy}>
+					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={clearChord} loading={busy}>
 						{t("shell.settings.keyboard.clear")}
 					</Button>
 					<Button
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={commitStage}
 						loading={busy}
 						disabled={!canSave}
@@ -288,7 +288,7 @@ export function EditableChord({
 			{isOverridden ? (
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={resetToDefault}
 					loading={busy}
 					title={t("shell.settings.keyboard.resetAria", { label: translatedLabel })}

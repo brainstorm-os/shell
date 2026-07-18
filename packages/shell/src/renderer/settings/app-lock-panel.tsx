@@ -119,20 +119,20 @@ export function AppLockPanel() {
 			</p>
 
 			<div className="app-lock__actions">
-				<Button variant={ButtonVariant.Glass} size={ButtonSize.Sm} onClick={() => setEditing(true)}>
+				<Button variant={ButtonVariant.Glass} size={ButtonSize.Md} onClick={() => setEditing(true)}>
 					{hasPin
 						? t("shell.settings.security.appLock.changePin")
 						: t("shell.settings.security.appLock.setPin")}
 				</Button>
 				{hasPin && (
 					<>
-						<Button variant={ButtonVariant.Neutral} size={ButtonSize.Sm} onClick={lockNow}>
+						<Button variant={ButtonVariant.Neutral} size={ButtonSize.Md} onClick={lockNow}>
 							{t("shell.settings.security.appLock.lockNow")}
 						</Button>
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() => {
 								void remove();
 							}}
@@ -180,12 +180,12 @@ export function AppLockPanel() {
 						testId="app-lock-pin-popover"
 						footer={
 							<>
-								<Button variant={ButtonVariant.Neutral} size={ButtonSize.Sm} onClick={resetForm}>
+								<Button variant={ButtonVariant.Neutral} size={ButtonSize.Md} onClick={resetForm}>
 									{t("shell.actions.cancel")}
 								</Button>
 								<Button
 									variant={ButtonVariant.Primary}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									disabled={busy}
 									onClick={() => void save()}
 								>

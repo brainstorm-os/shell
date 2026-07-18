@@ -153,7 +153,7 @@ export function NotificationsSection() {
 				<div className="setting-row__control">
 					<Button
 						variant={ButtonVariant.Neutral}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						disabled={snapshot.notificationHistory.length === 0}
 						onClick={() => {
 							void dashboard.clearNotificationHistory();
