@@ -2,6 +2,7 @@ import "@brainstorm/sdk/app-theme.css";
 import "@brainstorm/sdk/segmented.css";
 import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/count-badge.css";
+import "@brainstorm/sdk/select-menu.css";
 import "@brainstorm/sdk/empty-state.css";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";

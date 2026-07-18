@@ -7,9 +7,11 @@
  * sensitive is kept in this renderer beyond the form state itself.
  */
 
+import { SyncWindow } from "@brainstorm/sdk-types";
 import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
 import { Checkbox } from "@brainstorm/sdk/checkbox";
 import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import { SelectMenu } from "@brainstorm/sdk/select-menu";
 import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { t } from "../i18n";
@@ -26,6 +28,8 @@ export type ConnectImapInput = {
 	secret: string;
 	incoming: { host: string; port: number; tls: boolean };
 	outgoing: { host: string; port: number; tls: boolean };
+	/** How far back the first sync reaches (`SyncWindow` value). */
+	syncWindow: string;
 };
 
 /** Which account family the form collects. Local UI state only — the wire
@@ -57,6 +61,10 @@ export function ConnectAccountDialog(props: {
 	const [smtpHost, setSmtpHost] = useState("");
 	const [smtpPort, setSmtpPort] = useState(String(SMTPS_PORT));
 	const [smtpTls, setSmtpTls] = useState(true);
+	// Days90 default — the service's own 30d default surprised the owner with a
+	// "handful of messages" first sync (F-440); the picker makes the window a
+	// visible choice.
+	const [syncWindow, setSyncWindow] = useState<SyncWindow>(SyncWindow.Days90);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +134,7 @@ export function ConnectAccountDialog(props: {
 				secret: password.trim(),
 				incoming: { host: imapHost.trim(), port: Number(imapPort), tls: imapTls },
 				outgoing: { host: smtpHost.trim(), port: Number(smtpPort), tls: smtpTls },
+				syncWindow,
 			}),
 		);
 	};
@@ -225,6 +234,21 @@ export function ConnectAccountDialog(props: {
 								checked={imapTls}
 								onChange={setImapTls}
 								disabled={busy}
+							/>
+						</div>
+						<div className="mb-connect__field">
+							<span className="mb-connect__label">{t("connect.imap.window")}</span>
+							<SelectMenu
+								value={syncWindow}
+								onChange={(next) => setSyncWindow(next)}
+								ariaLabel={t("connect.imap.window")}
+								disabled={busy}
+								options={[
+									{ value: SyncWindow.Days30, label: t("connect.imap.window.30d") },
+									{ value: SyncWindow.Days90, label: t("connect.imap.window.90d") },
+									{ value: SyncWindow.Year1, label: t("connect.imap.window.1y") },
+									{ value: SyncWindow.All, label: t("connect.imap.window.all") },
+								]}
 							/>
 						</div>
 						<div className="mb-connect__hostrow">
