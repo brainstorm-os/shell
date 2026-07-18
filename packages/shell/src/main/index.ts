@@ -355,8 +355,7 @@ if (!isDev) {
 // so a fresh vault opens on-brand. The light slot opens on the green-valley
 // wallpaper (low-poly meadow + peaks, pairing with the Default Light theme —
 // the Rose pairing read too pink as a light default); the dark slot keeps the
-// stormy-sea image. rose-mountains stays bundled as a catalog option (it is
-// still the welcome-screen splash).
+// stormy-sea image. rose-mountains stays bundled as a catalog option.
 const DEFAULT_LIGHT_WALLPAPER_FILE = "green-valley.png";
 const DEFAULT_DARK_WALLPAPER_FILE = "stormy-sea.png";
 const EXTRA_BUNDLED_WALLPAPER_FILES = ["rose-mountains.jpg"] as const;

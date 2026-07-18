@@ -148,7 +148,7 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 				await expect.poll(darkSlotTheme, { timeout: 30_000 }).toBe("midnight");
 				// The renderer only refreshes vault state on mount or via its own
 				// context methods — `createVault` used raw IPC, so the dashboard window
-				// can still be on the welcome screen (which pins Rose). Reload to
+				// can still be on the welcome screen (which pins Default Light). Reload to
 				// deterministically enter the vault-open state before asserting the
 				// repaint. Mirrors new-vault-onboarding.spec.ts.
 				await dashboard.reload();
