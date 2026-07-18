@@ -31,9 +31,9 @@ const execFileP = promisify(execFile);
 const ROOT = new URL("..", import.meta.url).pathname;
 // The design docs live in the sibling harness repo (../harness/docs).
 const SOURCE = [
-	join(ROOT, "docs/art/icon/icon10.png"),
-	join(ROOT, "../harness/docs/art/icon/icon10.png"),
-	join(ROOT, "../docs/art/icon/icon10.png"),
+	join(ROOT, "docs/art/icon/icon11.png"),
+	join(ROOT, "../harness/docs/art/icon/icon11.png"),
+	join(ROOT, "../docs/art/icon/icon11.png"),
 ].find((p) => existsSync(p));
 const ART_DIR = join(ROOT, "packages/shell/art");
 const ICONSET_DIR = join(ART_DIR, "icon.iconset");
@@ -59,10 +59,10 @@ function flatGlyphSvg() {
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <linearGradient id="boltGrad" x1="0.2" y1="0.05" x2="0.85" y2="0.95">
-      <stop offset="0%" stop-color="#fda4af"/>
-      <stop offset="40%" stop-color="#fb7185"/>
-      <stop offset="75%" stop-color="#f43f5e"/>
-      <stop offset="100%" stop-color="#e11d48"/>
+      <stop offset="0%" stop-color="#a8b2ff"/>
+      <stop offset="40%" stop-color="#8b95ff"/>
+      <stop offset="75%" stop-color="#6b73f0"/>
+      <stop offset="100%" stop-color="#5b62e0"/>
     </linearGradient>
   </defs>
   <g transform="translate(512 512) scale(${GLYPH_SCALE}) translate(-512 -512)">

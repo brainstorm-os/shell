@@ -3,7 +3,7 @@
  * production-built shell under Electron (no mocks, real `window.brainstorm`):
  *
  *   1. create-vault → the welcome starter content is seeded AND the vault
- *      opens on-brand (Rose theme, light mode, the bundled wallpaper).
+ *      opens on-brand (Default Light theme, light mode, the bundled wallpaper).
  *   2. welcome UI → the CTAs render as flat launcher tiles (no glossy
  *      gradient face), the Join-vault popover shows a single title (no
  *      duplicated header), and the create form starts with an EMPTY name and
@@ -29,8 +29,8 @@ type Snapshot = {
 
 /** Poll the dashboard snapshot until the fresh-vault defaults have landed.
  *  `seedNewVaultDefaults` runs after the welcome seed in the same vault-open
- *  pass, so a Rose snapshot also means the starter content is committed. The
- *  fresh-vault default is Rose theme in LIGHT mode (Midnight is the dark slot). */
+ *  pass, so a Default Light snapshot also means the starter content is committed. The
+ *  fresh-vault default is Default Light theme in LIGHT mode (Midnight is the dark slot). */
 async function waitForDefaultSnapshot(dashboard: Page): Promise<Snapshot> {
 	return await dashboard.evaluate(async () => {
 		const bs = (
@@ -41,17 +41,17 @@ async function waitForDefaultSnapshot(dashboard: Page): Promise<Snapshot> {
 		const deadline = Date.now() + 30_000;
 		while (Date.now() < deadline) {
 			const snap = await bs.dashboard.snapshot();
-			// A fresh vault is Rose-by-default before the seed runs, so also wait
+			// A fresh vault is Default-Light-by-default before the seed runs, so also wait
 			// for the seed to commit light mode — that's the "fully seeded" signal.
-			if (snap && snap.theme === "rose" && snap.appearance.mode === "light") return snap;
+			if (snap && snap.theme === "default-light" && snap.appearance.mode === "light") return snap;
 			await new Promise((r) => setTimeout(r, 200));
 		}
 		const last = await bs.dashboard.snapshot();
-		throw new Error(`snapshot never reached rose/light default; last=${JSON.stringify(last)}`);
+		throw new Error(`snapshot never reached default-light/light default; last=${JSON.stringify(last)}`);
 	});
 }
 
-test("new vault seeds welcome content and applies Rose/light/wallpaper defaults", async () => {
+test("new vault seeds welcome content and applies Default Light/light/wallpaper defaults", async () => {
 	const userDataDir = mkdtempSync(join(tmpdir(), "bs-e2e-newvault-"));
 	try {
 		const { app } = await launchShell({ userDataDir });
@@ -78,13 +78,13 @@ test("new vault seeds welcome content and applies Rose/light/wallpaper defaults"
 				);
 			});
 
-			await test.step("vault opens on Rose + light + bundled wallpaper", async () => {
+			await test.step("vault opens on Default Light + light + bundled wallpaper", async () => {
 				const snap = await waitForDefaultSnapshot(dashboard);
-				expect(snap.theme, "theme is Rose").toBe("rose");
+				expect(snap.theme, "theme is Default Light").toBe("default-light");
 				expect(snap.appearance.mode, "appearance mode is light").toBe("light");
 				expect(snap.wallpaper.kind, "wallpaper is an image").toBe("image");
 				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain(
-					"rose-mountains",
+					"green-valley",
 				);
 			});
 
@@ -150,7 +150,7 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				},
 				{ dir: userDataDir },
 			);
-			// Anchor on the IPC snapshot first: the async seed commits rose/light
+			// Anchor on the IPC snapshot first: the async seed commits default-light/light
 			// there before the renderer repaints `data-theme`, so on a slow runner
 			// the bare attr poll can time out otherwise.
 			await waitForDefaultSnapshot(dashboard);
@@ -158,10 +158,10 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
 					timeout: 30_000,
 				})
-				.toBe("rose");
+				.toBe("default-light");
 
 			// Force Alpha to DARK so its theme (Midnight) differs from Bravo's fresh
-			// default (Rose) and the switch is observable on data-theme. Confirm via
+			// default (Default Light) and the switch is observable on data-theme. Confirm via
 			// the (deterministic) IPC snapshot, then reload so the renderer settles
 			// cleanly on Alpha-dark before the switch — keeps the setup from racing
 			// Alpha's still-running vault-open pass.
@@ -213,7 +213,7 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
 					timeout: 30_000,
 				})
-				.toBe("rose");
+				.toBe("default-light");
 		} finally {
 			await app.close();
 		}

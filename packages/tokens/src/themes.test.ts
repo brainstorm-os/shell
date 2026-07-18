@@ -87,7 +87,7 @@ describe("themes catalog", () => {
 	});
 
 	it("DEFAULT_THEME_BY_APPEARANCE picks a built-in default per scheme", () => {
-		expect(DEFAULT_THEME_BY_APPEARANCE[ThemeAppearance.Light]).toBe(ThemeName.Rose);
+		expect(DEFAULT_THEME_BY_APPEARANCE[ThemeAppearance.Light]).toBe(ThemeName.DefaultLight);
 		expect(DEFAULT_THEME_BY_APPEARANCE[ThemeAppearance.Dark]).toBe(ThemeName.DefaultDark);
 		// And both are real themes.
 		for (const id of Object.values(DEFAULT_THEME_BY_APPEARANCE)) {

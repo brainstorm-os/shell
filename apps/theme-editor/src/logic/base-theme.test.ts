@@ -53,6 +53,6 @@ describe("detectThemeByBackground", () => {
 describe("defaultThemeForScheme", () => {
 	it("picks the default theme per scheme", () => {
 		expect(defaultThemeForScheme(true)).toBe(ThemeName.DefaultDark);
-		expect(defaultThemeForScheme(false)).toBe(ThemeName.Rose);
+		expect(defaultThemeForScheme(false)).toBe(ThemeName.DefaultLight);
 	});
 });

@@ -1574,7 +1574,7 @@ export function isThemeName(value: unknown): value is ThemeName {
 	return typeof value === "string" && (Object.values(ThemeName) as string[]).includes(value);
 }
 
-export const DEFAULT_THEME: ThemeName = ThemeName.Rose;
+export const DEFAULT_THEME: ThemeName = ThemeName.DefaultLight;
 
 /**
  * Scheme a theme renders against — drives the Settings → Appearance slot
@@ -1707,7 +1707,7 @@ export function themeAppearance(name: ThemeName): ThemeAppearance {
 /** Default theme for a given scheme — used as the seed for the opposite
  *  slot during migration from the pre-pair-slots world. */
 export const DEFAULT_THEME_BY_APPEARANCE: Record<ThemeAppearance, ThemeName> = {
-	[ThemeAppearance.Light]: ThemeName.Rose,
+	[ThemeAppearance.Light]: ThemeName.DefaultLight,
 	[ThemeAppearance.Dark]: ThemeName.DefaultDark,
 };
 
