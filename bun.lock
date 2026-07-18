@@ -317,6 +317,7 @@
       "name": "@brainstorm-app/mailbox",
       "version": "0.1.0",
       "dependencies": {
+        "@brainstorm/editor": "workspace:*",
         "@brainstorm/react-yjs": "workspace:*",
         "@brainstorm/sdk": "workspace:*",
         "@brainstorm/sdk-types": "workspace:*",
@@ -477,6 +478,7 @@
         "@brainstorm/sdk-types": "workspace:*",
         "@lexical/code": "^0.21.0",
         "@lexical/headless": "^0.21.0",
+        "@lexical/html": "^0.21.0",
         "@lexical/link": "^0.21.0",
         "@lexical/list": "^0.21.0",
         "@lexical/markdown": "^0.21.0",
@@ -582,7 +584,7 @@
     },
     "packages/shell": {
       "name": "@brainstorm/shell",
-      "version": "0.4.2",
+      "version": "0.5.3",
       "dependencies": {
         "@blockprotocol/core": "0.1.4",
         "@blockprotocol/graph": "0.4.2",

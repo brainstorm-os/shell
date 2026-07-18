@@ -37,7 +37,8 @@ describe("Composer spellcheck surfaces (B11.16b)", () => {
 			);
 		});
 		const inputs = host.querySelectorAll("input.bs-input");
-		const body = host.querySelector(".mb-compose__body") as HTMLTextAreaElement;
+		// The body is the shared CompactEditor surface (Mailbox-11) — always prose.
+		const body = host.querySelector(".mb-compose__editor .bs-compact-editor__content");
 		// Field order in the form: to, cc, subject.
 		const toEl = inputs[0] as HTMLInputElement;
 		const ccEl = inputs[1] as HTMLInputElement;
@@ -46,7 +47,8 @@ describe("Composer spellcheck surfaces (B11.16b)", () => {
 		expect(toEl.getAttribute("spellcheck")).toBe("false");
 		expect(ccEl.getAttribute("spellcheck")).toBe("false");
 		expect(subjectEl.getAttribute("spellcheck")).toBe("true");
-		expect(body.getAttribute("spellcheck")).toBe("true");
+		expect(body).not.toBeNull();
+		expect(body?.getAttribute("spellcheck")).toBe("true");
 	});
 });
 

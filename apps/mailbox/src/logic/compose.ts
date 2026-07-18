@@ -134,6 +134,7 @@ export function parseRecipients(input: string): string[] {
 export function sendPayloadFromSeed(
 	seed: ComposeSeed,
 	accountRef: string,
+	bodyHtml?: string,
 ): Record<string, unknown> | null {
 	const to = parseRecipients(seed.to);
 	if (to.length === 0 || accountRef.length === 0) return null;
@@ -145,6 +146,7 @@ export function sendPayloadFromSeed(
 		...(cc.length > 0 ? { cc } : {}),
 		...(subject.length > 0 ? { subject } : {}),
 		bodyText: seed.body,
+		...(bodyHtml !== undefined && bodyHtml.length > 0 ? { bodyHtml } : {}),
 		submissionId: seed.submissionId,
 		...(seed.inReplyTo !== undefined ? { inReplyTo: seed.inReplyTo } : {}),
 		...(seed.references !== undefined ? { references: seed.references } : {}),

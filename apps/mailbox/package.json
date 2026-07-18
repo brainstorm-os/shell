@@ -8,6 +8,7 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
+    "@brainstorm/editor": "workspace:*",
     "@brainstorm/react-yjs": "workspace:*",
     "@brainstorm/sdk": "workspace:*",
     "@brainstorm/sdk-types": "workspace:*",

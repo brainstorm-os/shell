@@ -6,11 +6,16 @@
  * fancy-menus runtime (no native select).
  */
 
+import {
+	CompactEditor,
+	type CompactEditorHandle,
+	type CompactEditorPayload,
+} from "@brainstorm/editor";
 import { MenuAlign } from "@brainstorm/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
 import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
 import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellcheck";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";
 import { type ComposeSeed, parseRecipients, sendPayloadFromSeed } from "../logic/compose";
@@ -30,8 +35,17 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 	const [to, setTo] = useState(seed.to);
 	const [cc, setCc] = useState(seed.cc);
 	const [subject, setSubject] = useState(seed.subject);
-	const [body, setBody] = useState(seed.body);
+	const [body, setBody] = useState<CompactEditorPayload | null>(null);
 	const [busy, setBusy] = useState(false);
+	const editorRef = useRef<CompactEditorHandle>(null);
+	// Seed once — reply/forward quotes arrive as plain text on the seed; the
+	// editor is the live draft from then on.
+	const seededRef = useRef(false);
+	useEffect(() => {
+		if (seededRef.current) return;
+		seededRef.current = true;
+		if (seed.body.length > 0) editorRef.current?.setText(seed.body);
+	}, [seed.body]);
 	const [error, setError] = useState<string | null>(null);
 
 	const account = accounts.find((a) => a.id === accountRef) ?? null;
@@ -57,7 +71,11 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 	const submit = (event: FormEvent): void => {
 		event.preventDefault();
 		if (!canSend) return;
-		const payload = sendPayloadFromSeed({ ...seed, to, cc, subject, body }, accountRef);
+		const payload = sendPayloadFromSeed(
+			{ ...seed, to, cc, subject, body: body?.text ?? "" },
+			accountRef,
+			body !== null && !body.isEmpty ? body.html : undefined,
+		);
 		if (!payload) return;
 		setBusy(true);
 		setError(null);
@@ -126,17 +144,22 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 						disabled={busy}
 					/>
 				</label>
-				<label className="mb-compose__field">
-					<span className="mb-compose__label">{t("compose.body")}</span>
-					<textarea
-						className="mb-compose__body"
-						value={body}
-						onChange={(e) => setBody(e.target.value)}
-						rows={10}
-						spellCheck={spellcheckForSurface(TextSurfaceKind.Prose)}
+				<div className="mb-compose__field">
+					<span className="mb-compose__label" id="mb-compose-body-label">
+						{t("compose.body")}
+					</span>
+					{/* Rich body (Mailbox-11): the shared CompactEditor surface — sends
+					    multipart/alternative (payload.html + payload.text). Enter stays a
+					    paragraph break; Send is the explicit submit. */}
+					<CompactEditor
+						ref={editorRef}
+						className="mb-compose__editor"
+						ariaLabel={t("compose.body")}
+						submitOnEnter={false}
 						disabled={busy}
+						onChange={setBody}
 					/>
-				</label>
+				</div>
 				{error ? (
 					<p className="mb-compose__error" role="alert">
 						{t("compose.error", { message: error })}
