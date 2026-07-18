@@ -119,7 +119,11 @@ export function ConnectAccountDialog(props: {
 			props.onConnectImap({
 				address: address.trim(),
 				...(user.length > 0 ? { username: user } : {}),
-				secret: password,
+				// Trim paste artifacts (trailing newline/space from a password
+				// manager or the provider's app-password page) — servers reject
+				// them as plain wrong credentials, surfacing as an
+				// unexplainable "authentication failed".
+				secret: password.trim(),
 				incoming: { host: imapHost.trim(), port: Number(imapPort), tls: imapTls },
 				outgoing: { host: smtpHost.trim(), port: Number(smtpPort), tls: smtpTls },
 			}),
@@ -156,14 +160,14 @@ export function ConnectAccountDialog(props: {
 			<form className="mb-connect" onSubmit={submit}>
 				{props.onConnectImap ? (
 					<div
-						className="mb-connect__modes"
+						className="bs-segmented mb-connect__modes"
 						{...modeKeyboard.containerProps}
 						aria-label={t("connect.mode")}
 					>
 						<button
 							type="button"
 							{...modeKeyboard.getItemProps(0)}
-							className={`mb-connect__mode${mode === ConnectMode.Gmail ? " is-on" : ""}`}
+							className={`bs-segmented__tab${mode === ConnectMode.Gmail ? " is-active" : ""}`}
 							onClick={() => setMode(ConnectMode.Gmail)}
 							disabled={busy}
 						>
@@ -172,7 +176,7 @@ export function ConnectAccountDialog(props: {
 						<button
 							type="button"
 							{...modeKeyboard.getItemProps(1)}
-							className={`mb-connect__mode${mode === ConnectMode.Imap ? " is-on" : ""}`}
+							className={`bs-segmented__tab${mode === ConnectMode.Imap ? " is-active" : ""}`}
 							onClick={() => setMode(ConnectMode.Imap)}
 							disabled={busy}
 						>

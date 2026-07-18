@@ -257,7 +257,13 @@ export function MailboxApp(): ReactElement {
 				}
 				setSyncNote(t("sync.done", { created, updated }));
 			} catch (err) {
-				setSyncNote(t("sync.error", { message: err instanceof Error ? err.message : String(err) }));
+				const message = err instanceof Error ? err.message : String(err);
+				// The driver maps credential rejections to "authentication failed"
+				// (DriverErrorKind.Denied) — surface the actionable hint instead of
+				// the raw wire error (owner hit this with a pasted app password).
+				setSyncNote(
+					/authentication failed/i.test(message) ? t("sync.errorAuth") : t("sync.error", { message }),
+				);
 			} finally {
 				syncRunRef.current = false;
 				setSyncBusy(false);

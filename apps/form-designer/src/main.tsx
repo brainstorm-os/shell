@@ -1,4 +1,5 @@
 import "@brainstorm/sdk/app-theme.css";
+import "@brainstorm/sdk/segmented.css";
 import { initAnalytics } from "@brainstorm/sdk/analytics";
 import "@brainstorm/sdk/property-ui/cells.css";
 import "@brainstorm/sdk/select-menu.css";

@@ -25,34 +25,8 @@
 }
 
 /* ── Mode toggle in the header right group ─────────────────────────── */
-.fd-mode {
-	display: inline-flex;
-	gap: var(--space-1);
-	padding: var(--space-1);
-	border-radius: var(--radius-md);
-	background: var(--bg-subtle);
-}
-.fd-mode__tab {
-	appearance: none;
-	border: none;
-	background: transparent;
-	color: var(--text-dim);
-	font: inherit;
-	font-weight: var(--text-weight-medium);
-	font-size: var(--text-size-sm);
-	height: var(--control-height-sm);
-	padding: 0 var(--space-2);
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-}
-.fd-mode__tab:hover {
-	background: var(--hover);
-	color: var(--text);
-}
-.fd-mode__tab--active {
-	background: var(--bg-elev);
-	color: var(--text);
-}
+/* Mode switches wear the shared `.bs-segmented` face
+ * (@brainstorm/sdk/segmented.css). */
 
 /* ── Saved-forms sidebar (a left nav track) ────────────────────────── */
 .fd-sidebar {

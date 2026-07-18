@@ -112,6 +112,7 @@ export default defineConfig({
 				"packages/sdk/src/property-ui/dictionary-editor.tsx",
 			),
 			"@brainstorm/sdk/property-ui": resolve(__dirname, "packages/sdk/src/property-ui.ts"),
+			"@brainstorm/sdk/segmented.css": resolve(__dirname, "packages/sdk/src/segmented/segmented.css"),
 			"@brainstorm/sdk/resizable": resolve(__dirname, "packages/sdk/src/resizable.ts"),
 			"@brainstorm/sdk/searchbar": resolve(__dirname, "packages/sdk/src/searchbar/index.ts"),
 			"@brainstorm/sdk/perf": resolve(__dirname, "packages/sdk/src/perf.ts"),

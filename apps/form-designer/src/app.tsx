@@ -460,12 +460,16 @@ export function FormDesignerApp(): ReactElement {
 					<h1 className="app-header__title">{t("app.title")}</h1>
 				</div>
 				<div className="app-header__right">
-					<div className="fd-mode" {...surfaceKeyboard.containerProps} aria-label={t("surface.region")}>
+					<div
+						className="bs-segmented"
+						{...surfaceKeyboard.containerProps}
+						aria-label={t("surface.region")}
+					>
 						<button
 							type="button"
 							{...surfaceKeyboard.getItemProps(0)}
 							className={
-								surface === DesignerSurface.Forms ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"
+								surface === DesignerSurface.Forms ? "bs-segmented__tab is-active" : "bs-segmented__tab"
 							}
 							onClick={() => setSurface(DesignerSurface.Forms)}
 						>
@@ -475,7 +479,7 @@ export function FormDesignerApp(): ReactElement {
 							type="button"
 							{...surfaceKeyboard.getItemProps(1)}
 							className={
-								surface === DesignerSurface.Documents ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"
+								surface === DesignerSurface.Documents ? "bs-segmented__tab is-active" : "bs-segmented__tab"
 							}
 							onClick={() => setSurface(DesignerSurface.Documents)}
 						>
@@ -483,11 +487,11 @@ export function FormDesignerApp(): ReactElement {
 						</button>
 					</div>
 					{surface === DesignerSurface.Forms && (
-						<div className="fd-mode" {...modeKeyboard.containerProps} aria-label={t("mode.region")}>
+						<div className="bs-segmented" {...modeKeyboard.containerProps} aria-label={t("mode.region")}>
 							<button
 								type="button"
 								{...modeKeyboard.getItemProps(0)}
-								className={mode === FormMode.Builder ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"}
+								className={mode === FormMode.Builder ? "bs-segmented__tab is-active" : "bs-segmented__tab"}
 								onClick={() => {
 									setInvalidFields(new Set());
 									setMode(FormMode.Builder);
@@ -498,7 +502,7 @@ export function FormDesignerApp(): ReactElement {
 							<button
 								type="button"
 								{...modeKeyboard.getItemProps(1)}
-								className={mode === FormMode.Fill ? "fd-mode__tab fd-mode__tab--active" : "fd-mode__tab"}
+								className={mode === FormMode.Fill ? "bs-segmented__tab is-active" : "bs-segmented__tab"}
 								onClick={() => setMode(FormMode.Fill)}
 							>
 								{t("mode.fill")}
