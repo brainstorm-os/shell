@@ -44,6 +44,16 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	/* Glass card under the whole step — the copy sat bare on the wallpaper
+	 * and drowned in the green-valley scene (owner report 2026-07-18). Same
+	 * recipe as the dashboard .glass--strong surface; the card, not each
+	 * text run, is what buys readability on ANY wallpaper. */
+	background: var(--color-glass-background-strong);
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	border: var(--border-width) solid var(--color-glass-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-lg);
 }
 
 /* Create + Start steps need room for the path row and the template gallery
