@@ -1411,7 +1411,11 @@
 
 .search-index__stats {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	/* 220px min: at the default settings-panel width (~620px) a 160px min
+	 * resolved to 3 columns, stranding the 4th tile alone on row two with a
+	 * hole beside it. 220px wraps 2×2 there and still lays 4-up when the
+	 * panel is wide enough. */
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 	gap: var(--space-2);
 	margin-top: var(--space-1);
 }

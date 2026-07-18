@@ -39,9 +39,9 @@ export function applyThemeVars(theme: ThemeName): void {
 
 /**
  * The theme `:root` should carry: the active vault's effective theme while a
- * vault is open, or Rose on the welcome screen (no open vault) so a stale
- * palette can't clash with the rose-mountains splash. `DEFAULT_THEME` bridges
- * the brief gap before the first snapshot arrives.
+ * vault is open, or Default Light on the welcome screen (no open vault) so a
+ * stale palette can't clash with the green-valley splash. `DEFAULT_THEME`
+ * bridges the brief gap before the first snapshot arrives.
  *
  * The effective theme is resolved HERE from `appearance` + the live OS dark
  * preference — NOT read off the broadcast `snapshot.theme`. The store can't know
@@ -58,7 +58,7 @@ export function effectiveTheme(
 	appearance: AppearanceState | undefined,
 	prefersDark: boolean,
 ): ThemeName {
-	if (!hasVault) return ThemeName.Rose;
+	if (!hasVault) return ThemeName.DefaultLight;
 	if (!appearance) return DEFAULT_THEME;
 	const slot = effectiveSlotFor(appearance.mode, prefersDark);
 	return (slot === AppearanceSlot.Dark ? appearance.dark : appearance.light).theme;
@@ -71,9 +71,9 @@ type Props = {
 /**
  * The single authority for the `:root` theme variables. Reads the active theme
  * from the dashboard snapshot while a vault is open; with no open vault (the
- * welcome screen — the rose-mountains splash) it pins the Rose theme so a
- * stale dark/sepia/solar palette can't clash with the welcome chrome. A static
- * base (`applyThemeVars(DEFAULT_THEME)` at renderer entry) covers the
+ * welcome screen — the green-valley splash) it pins the Default Light theme so
+ * a stale dark/sepia/solar palette can't clash with the welcome chrome. A
+ * static base (`applyThemeVars(DEFAULT_THEME)` at renderer entry) covers the
  * error-boundary fallback, which renders outside this provider's subtree.
  */
 export function ThemeProvider({ children }: Props) {
@@ -97,7 +97,7 @@ export function ThemeProvider({ children }: Props) {
 	// ("works in the apps, but the shell doesn't change immediately"). The main
 	// process now pushes the resolved theme name to the dashboard on that same
 	// signal; apply it the moment it arrives. Gated on an open vault so it never
-	// overrides the welcome-screen Rose pin; the snapshot-derived effect above
+	// overrides the welcome-screen Default Light pin; the snapshot-derived effect above
 	// stays the source of truth and re-applies the same value idempotently.
 	useEffect(() => {
 		const onTheme = window.brainstorm?.dashboard?.onTheme;

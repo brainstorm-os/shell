@@ -13,12 +13,12 @@
 	overflow-y: auto;
 	/* Splash-screen wallpaper — shipped runtime asset under the shell's
 	 * `art/` folder (NOT docs/, which is example art only). The same
-	 * rose-mountains image seeds a new vault's light slot, so the dashboard
+	 * green-valley image seeds a new vault's light slot, so the dashboard
 	 * the user lands on continues the welcome scene. A light veil keeps the
-	 * dark ink (welcome pins the Rose theme) readable on the busier lower
+	 * dark ink (welcome pins Default Light) readable on the busier lower
 	 * half without washing the low-poly facets into mud. */
-	background: linear-gradient(180deg, rgba(255, 246, 248, 0.1) 0%, rgba(255, 246, 248, 0.28) 100%),
-		url("../../../art/wallpaper/rose-mountains.jpg") center / cover no-repeat,
+	background: linear-gradient(180deg, rgba(247, 249, 255, 0.1) 0%, rgba(247, 249, 255, 0.28) 100%),
+		url("../../../art/wallpaper/green-valley.png") center / cover no-repeat,
 		var(--color-background-primary);
 }
 

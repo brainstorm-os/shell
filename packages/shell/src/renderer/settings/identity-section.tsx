@@ -18,6 +18,7 @@ import { initialsFor } from "../dashboard/app-icon-palette";
 import { t } from "../i18n/t";
 import { Button, ButtonVariant } from "../ui/button";
 import { EntityIcon } from "../ui/entity-icon";
+import { IconName, Icon as UiIcon } from "../ui/icon";
 import { TextField, TextFieldSize } from "../ui/text-field";
 import "./identity-section.css";
 
@@ -114,10 +115,8 @@ export function IdentitySection() {
 		await persist(name, JSON.stringify({ kind: IconKind.Image, value: uploaded.url }));
 	};
 
-	const initials = useMemo(
-		() => initialsFor(draft.trim() || profile?.displayName || ""),
-		[draft, profile?.displayName],
-	);
+	const avatarName = draft.trim() || profile?.displayName || "";
+	const initials = useMemo(() => initialsFor(avatarName), [avatarName]);
 
 	return (
 		<section className="settings__section identity-section">
@@ -142,7 +141,16 @@ export function IdentitySection() {
 						icon={icon}
 						size={32}
 						className="identity-section__avatar-img"
-						fallback={<span className="identity-section__initials">{initials}</span>}
+						fallback={
+							avatarName.length === 0 ? (
+								// No photo AND no name yet: initials degrade to a bare "•",
+								// which read as a broken empty circle. The camera glyph says
+								// what the button does — pick a photo.
+								<UiIcon name={IconName.Camera} size={16} />
+							) : (
+								<span className="identity-section__initials">{initials}</span>
+							)
+						}
 					/>
 				</button>
 				<div className="identity-section__input">
