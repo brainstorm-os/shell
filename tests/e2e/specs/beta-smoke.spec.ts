@@ -141,11 +141,11 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 						).brainstorm;
 						return (await bs.dashboard.snapshot())?.appearance.dark.theme;
 					});
-				// The fresh-vault appearance (mode=light, light=Default Light, dark=Midnight)
+				// The fresh-vault appearance (mode=light, light=Default Light, dark=Default Dark)
 				// is committed ASYNC by `seedNewVaultDefaults` after create. Anchor on
 				// the deterministic IPC snapshot until the dark slot is the seeded
-				// Midnight, so the toggle below can't race a half-seeded slot.
-				await expect.poll(darkSlotTheme, { timeout: 30_000 }).toBe("midnight");
+				// Default Dark, so the toggle below can't race a half-seeded slot.
+				await expect.poll(darkSlotTheme, { timeout: 30_000 }).toBe("default-dark");
 				// The renderer only refreshes vault state on mount or via its own
 				// context methods — `createVault` used raw IPC, so the dashboard window
 				// can still be on the welcome screen (which pins Default Light). Reload to
@@ -154,11 +154,11 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 				await dashboard.reload();
 				// `setAppearanceMode` resolves when the main process accepts it;
 				// the renderer repaint arrives on the snapshot push. Anchor each
-				// read on the pushed `data-theme` flip (fresh vault = Midnight in
+				// read on the pushed `data-theme` flip (fresh vault = Default Dark in
 				// dark, Default Light in light — same contract as
 				// new-vault-onboarding.spec.ts).
 				await setMode("dark");
-				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("midnight");
+				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("default-dark");
 				const dark = await readBg();
 				await setMode("light");
 				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("default-light");

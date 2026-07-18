@@ -187,7 +187,7 @@ export function osHandoffConsentKey(signature: string): string {
 }
 
 const DEFAULT_LIGHT_WALLPAPER: Wallpaper = { kind: "solid", value: "#f5f3ef" };
-const DEFAULT_DARK_WALLPAPER: Wallpaper = { kind: "solid", value: "#14161b" };
+const DEFAULT_DARK_WALLPAPER: Wallpaper = { kind: "solid", value: "#161616" };
 
 const DEFAULT_LIGHT_PAIR: AppearancePair = {
 	theme: DEFAULT_THEME_BY_APPEARANCE[ThemeAppearance.Light],
