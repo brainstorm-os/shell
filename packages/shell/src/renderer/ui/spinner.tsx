@@ -4,10 +4,10 @@
  *
  * Any control that fires an async request and any region whose content is
  * loading shows this — nothing async sits visually idle while work is in
- * flight. It is monochrome by contract (renders in `currentColor`), so on
- * a button it is automatically the button's text colour and elsewhere the
- * surrounding text colour. No surface re-implements loader chrome — every
- * consumer goes through this primitive. Per CLAUDE.md DRY rule.
+ * flight. It renders as a rotating ring in the theme's border tone
+ * (`--color-border-default`), so it reads correctly on every theme and
+ * surface. No surface re-implements loader chrome — every consumer goes
+ * through this primitive. Per CLAUDE.md DRY rule.
  *
  * Usage:
  *   <Spinner />                          inline, tracks font size
@@ -48,8 +48,10 @@ export function Spinner({
 	className,
 	"data-testid": testId,
 }: SpinnerProps) {
+	// fontSize mirrors the pixel size so the em-scaled ring thickness
+	// grows with region-level loaders instead of staying hairline.
 	const style: CSSProperties | undefined =
-		size === undefined ? undefined : { width: size, height: size };
+		size === undefined ? undefined : { width: size, height: size, fontSize: size };
 	const a11y = decorative
 		? ({ "aria-hidden": true } as const)
 		: ({ role: "status", "aria-label": label ?? t("shell.common.loading") } as const);
@@ -59,11 +61,6 @@ export function Spinner({
 			style={style}
 			data-testid={testId}
 			{...a11y}
-		>
-			<svg viewBox="0 0 100 100" aria-hidden="true">
-				<circle className="spinner__arc spinner__arc--outer" cx="50" cy="50" r="40" />
-				<circle className="spinner__arc spinner__arc--inner" cx="50" cy="50" r="30" />
-			</svg>
-		</span>
+		/>
 	);
 }

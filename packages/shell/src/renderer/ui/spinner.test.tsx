@@ -7,9 +7,8 @@ describe("Spinner", () => {
 		const html = renderToStaticMarkup(<Spinner />);
 		expect(html).toContain('role="status"');
 		expect(html).toContain('aria-label="Loading…"');
-		// Dual concentric arcs (r=40 / r=30) per the design-system spec.
-		expect(html).toContain('r="40"');
-		expect(html).toContain('r="30"');
+		// Pure CSS ring — no SVG markup per the design-system spec.
+		expect(html).not.toContain("<svg");
 	});
 
 	it("tracks font size by default (no inline width/height)", () => {
