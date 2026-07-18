@@ -23,6 +23,8 @@ export type ConnectAccountInput = {
 };
 
 export type ConnectImapInput = {
+	/** Reconnect-in-place (Mailbox-13): the existing account being repaired. */
+	accountRef?: string;
 	address: string;
 	username?: string;
 	secret: string;
@@ -30,6 +32,16 @@ export type ConnectImapInput = {
 	outgoing: { host: string; port: number; tls: boolean };
 	/** How far back the first sync reaches (`SyncWindow` value). */
 	syncWindow: string;
+};
+
+/** Prefill for reconnect-in-place (Mailbox-13) — the failing account's
+ *  stored coordinates; the user only re-enters the password. */
+export type ReconnectSeed = {
+	accountRef: string;
+	address: string;
+	incoming: { host: string; port: number; tls: boolean };
+	outgoing: { host: string; port: number; tls: boolean };
+	syncWindow?: string;
 };
 
 /** Which account family the form collects. Local UI state only — the wire
@@ -47,24 +59,32 @@ export function ConnectAccountDialog(props: {
 	onClose: () => void;
 	onConnect: (input: ConnectAccountInput) => Promise<void>;
 	onConnectImap?: (input: ConnectImapInput) => Promise<void>;
+	/** Present ⇒ the dialog repairs an existing IMAP account: coordinates
+	 *  prefilled, mode locked to IMAP, submit targets the same entity. */
+	reconnect?: ReconnectSeed;
 }): ReactElement {
-	const [mode, setMode] = useState<ConnectMode>(ConnectMode.Gmail);
+	const seed = props.reconnect;
+	const [mode, setMode] = useState<ConnectMode>(seed ? ConnectMode.Imap : ConnectMode.Gmail);
 	const [clientId, setClientId] = useState("");
 	const [clientSecret, setClientSecret] = useState("");
 	const [label, setLabel] = useState("");
-	const [address, setAddress] = useState("");
+	const [address, setAddress] = useState(seed?.address ?? "");
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
-	const [imapHost, setImapHost] = useState("");
-	const [imapPort, setImapPort] = useState(String(IMAPS_PORT));
-	const [imapTls, setImapTls] = useState(true);
-	const [smtpHost, setSmtpHost] = useState("");
-	const [smtpPort, setSmtpPort] = useState(String(SMTPS_PORT));
-	const [smtpTls, setSmtpTls] = useState(true);
+	const [imapHost, setImapHost] = useState(seed?.incoming.host ?? "");
+	const [imapPort, setImapPort] = useState(String(seed?.incoming.port ?? IMAPS_PORT));
+	const [imapTls, setImapTls] = useState(seed?.incoming.tls ?? true);
+	const [smtpHost, setSmtpHost] = useState(seed?.outgoing.host ?? "");
+	const [smtpPort, setSmtpPort] = useState(String(seed?.outgoing.port ?? SMTPS_PORT));
+	const [smtpTls, setSmtpTls] = useState(seed?.outgoing.tls ?? true);
 	// Days90 default — the service's own 30d default surprised the owner with a
 	// "handful of messages" first sync (F-440); the picker makes the window a
 	// visible choice.
-	const [syncWindow, setSyncWindow] = useState<SyncWindow>(SyncWindow.Days90);
+	const [syncWindow, setSyncWindow] = useState<SyncWindow>(
+		seed !== undefined && (Object.values(SyncWindow) as string[]).includes(seed.syncWindow ?? "")
+			? (seed.syncWindow as SyncWindow)
+			: SyncWindow.Days90,
+	);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -125,6 +145,7 @@ export function ConnectAccountDialog(props: {
 		const user = username.trim();
 		run(
 			props.onConnectImap({
+				...(seed !== undefined ? { accountRef: seed.accountRef } : {}),
 				address: address.trim(),
 				...(user.length > 0 ? { username: user } : {}),
 				// Trim paste artifacts (trailing newline/space from a password
@@ -161,13 +182,13 @@ export function ConnectAccountDialog(props: {
 
 	return (
 		<Popover
-			title={t("connect.title")}
+			title={t(seed !== undefined ? "connect.title.reconnect" : "connect.title")}
 			onClose={props.onClose}
 			size={PopoverSize.Medium}
 			testId="mb-connect"
 		>
 			<form className="mb-connect" onSubmit={submit}>
-				{props.onConnectImap ? (
+				{props.onConnectImap && seed === undefined ? (
 					<div
 						className="bs-segmented mb-connect__modes"
 						{...modeKeyboard.containerProps}

@@ -82,6 +82,8 @@ export type FolderRailProps = {
 	/** Vault mode only — absent in the demo set, which hides the account ⋯. */
 	onSyncAccount?: (accountId: string) => void;
 	onRemoveAccount?: (accountId: string) => void;
+	/** Reconnect-in-place (Mailbox-13) — IMAP accounts only. */
+	onEditAccount?: (accountId: string) => void;
 };
 
 export function FolderRail({
@@ -92,6 +94,7 @@ export function FolderRail({
 	onSelect,
 	onSyncAccount,
 	onRemoveAccount,
+	onEditAccount,
 }: FolderRailProps): ReactElement {
 	// Real folders that are not inbox-role (inbox is the unified smart view).
 	const nonInbox = folders.filter((f) => f.role !== FolderRole.Inbox);
@@ -131,6 +134,15 @@ export function FolderRail({
 										label: t("account.syncNow"),
 										icon: IconName.Reload,
 										onSelect: () => onSyncAccount(account.id),
+									},
+								]
+							: []),
+						...(onEditAccount && account.imap
+							? [
+									{
+										label: t("account.edit"),
+										icon: IconName.Pencil,
+										onSelect: () => onEditAccount(account.id),
 									},
 								]
 							: []),

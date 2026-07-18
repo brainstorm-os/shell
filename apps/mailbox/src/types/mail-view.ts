@@ -25,11 +25,16 @@ export type VaultEntityLike = {
 	properties: Record<string, unknown>;
 };
 
-/** A configured account, projected for the folder rail's grouping. */
+export type MailHostView = { host: string; port: number; tls: boolean };
+
+/** A configured account, projected for the folder rail's grouping and the
+ *  reconnect-in-place prefill (Mailbox-13). */
 export type AccountView = {
 	id: string;
 	address: string;
 	displayName: string;
+	/** Present on IMAP accounts — seeds the reconnect dialog. */
+	imap?: { incoming: MailHostView; outgoing: MailHostView; syncWindow?: string };
 };
 
 /** A folder/label row in the rail. `id` is the real `MailFolder/v1` entity
