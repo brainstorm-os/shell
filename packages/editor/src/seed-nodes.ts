@@ -31,6 +31,7 @@ import {
 const TITLE_NODE_TYPE = "title";
 const MENTION_NODE_TYPE = "mention";
 const HORIZONTAL_RULE_NODE_TYPE = "horizontalrule";
+const IMAGE_BLOCK_NODE_TYPE = "image-block";
 
 export type SerializedSeedMentionNode = SerializedLexicalNode & {
 	entityId: string;
@@ -139,6 +140,87 @@ export class SeedHorizontalRuleNode extends DecoratorNode<null> {
 	}
 }
 
+export type SerializedSeedImageBlockNode = SerializedLexicalNode & {
+	src: string;
+	alt: string;
+	caption: string;
+	alignment: string;
+	widthPercent: number;
+};
+
+/** Stand-in for the `image-block` media node (the resizable/aligned image
+ *  the runtime editor renders). DecoratorNode kind must match the real
+ *  `ImageBlockNode` for the same Yjs-encoding reason as the mention stand-in
+ *  above; the serialized shape mirrors `SerializedImageBlockNode` v2 so the
+ *  runtime hydrates alignment + widthPercent exactly as planted. */
+export class SeedImageBlockNode extends DecoratorNode<null> {
+	__src: string;
+	__alt: string;
+	__caption: string;
+	__alignment: string;
+	__widthPercent: number;
+	constructor(
+		src: string,
+		alt: string,
+		caption: string,
+		alignment: string,
+		widthPercent: number,
+		key?: string,
+	) {
+		super(key);
+		this.__src = src;
+		this.__alt = alt;
+		this.__caption = caption;
+		this.__alignment = alignment;
+		this.__widthPercent = widthPercent;
+	}
+	static override getType(): string {
+		return IMAGE_BLOCK_NODE_TYPE;
+	}
+	static override clone(node: SeedImageBlockNode): SeedImageBlockNode {
+		return new SeedImageBlockNode(
+			node.__src,
+			node.__alt,
+			node.__caption,
+			node.__alignment,
+			node.__widthPercent,
+			node.__key,
+		);
+	}
+	static override importJSON(json: SerializedSeedImageBlockNode): SeedImageBlockNode {
+		return new SeedImageBlockNode(
+			json.src,
+			json.alt ?? "",
+			json.caption ?? "",
+			json.alignment ?? "center",
+			typeof json.widthPercent === "number" ? json.widthPercent : 100,
+		);
+	}
+	override exportJSON(): SerializedSeedImageBlockNode {
+		return {
+			type: IMAGE_BLOCK_NODE_TYPE,
+			version: 2,
+			src: this.__src,
+			alt: this.__alt,
+			caption: this.__caption,
+			alignment: this.__alignment,
+			widthPercent: this.__widthPercent,
+		};
+	}
+	override isInline(): false {
+		return false;
+	}
+	override createDOM(): HTMLElement {
+		throw new Error("SeedImageBlockNode: createDOM not implemented (headless)");
+	}
+	override updateDOM(): false {
+		return false;
+	}
+	override decorate(): null {
+		return null;
+	}
+}
+
 /** The custom stand-in nodes a seed plant needs on top of `BASELINE_NODES`
  *  (title + mention + horizontalrule). Table nodes are not here — consumers
  *  that emit tables append `@lexical/table`'s real classes at the call site. */
@@ -146,4 +228,5 @@ export const SEED_STANDIN_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	SeedTitleNode,
 	SeedMentionNode,
 	SeedHorizontalRuleNode,
+	SeedImageBlockNode,
 ];

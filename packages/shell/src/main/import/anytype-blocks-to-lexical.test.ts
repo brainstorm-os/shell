@@ -86,7 +86,7 @@ describe("anytypeBlocksToLexical", () => {
 			"list",
 			"quote",
 			"horizontalrule",
-			"image",
+			"image-block",
 		]);
 		// Consecutive Marked items collapsed into one bullet list.
 		const bullet = children.find((c) => c.type === "list" && c.listType === "bullet") as {
@@ -97,7 +97,7 @@ describe("anytypeBlocksToLexical", () => {
 			children: Array<{ checked?: boolean }>;
 		};
 		expect(check.children[0]?.checked).toBe(true);
-		const img = children.find((c) => c.type === "image") as { src: string; altText: string };
+		const img = children.find((c) => c.type === "image-block") as { src: string; alt: string };
 		expect(img.src).toBe("pic.png");
 		expect(snippet).toContain("Title");
 		expect(snippet).toContain("Hello world");
