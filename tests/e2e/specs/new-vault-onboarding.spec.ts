@@ -30,7 +30,7 @@ type Snapshot = {
 /** Poll the dashboard snapshot until the fresh-vault defaults have landed.
  *  `seedNewVaultDefaults` runs after the welcome seed in the same vault-open
  *  pass, so a Default Light snapshot also means the starter content is committed. The
- *  fresh-vault default is Default Light theme in LIGHT mode (Midnight is the dark slot). */
+ *  fresh-vault default is Default Light theme in LIGHT mode (Default Dark is the dark slot). */
 async function waitForDefaultSnapshot(dashboard: Page): Promise<Snapshot> {
 	return await dashboard.evaluate(async () => {
 		const bs = (
@@ -160,7 +160,7 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				})
 				.toBe("default-light");
 
-			// Force Alpha to DARK so its theme (Midnight) differs from Bravo's fresh
+			// Force Alpha to DARK so its theme (Default Dark) differs from Bravo's fresh
 			// default (Default Light) and the switch is observable on data-theme. Confirm via
 			// the (deterministic) IPC snapshot, then reload so the renderer settles
 			// cleanly on Alpha-dark before the switch — keeps the setup from racing
@@ -190,11 +190,11 @@ test("switching vaults repaints the dashboard (no stale theme from the previous 
 				.poll(() => dashboard.evaluate(() => document.documentElement.dataset.theme), {
 					timeout: 30_000,
 				})
-				.toBe("midnight");
+				.toBe("default-dark");
 
 			// Vault B: a brand-new vault. The active session switches to B; the
 			// dashboard window is NOT remounted, so only the main-side rebind +
-			// push can repaint it. Without the fix this stays "midnight" (Alpha's
+			// push can repaint it. Without the fix this stays "default-dark" (Alpha's
 			// forced dark theme).
 			await dashboard.evaluate(
 				async ({ dir }) => {

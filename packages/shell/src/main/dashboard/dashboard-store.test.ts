@@ -32,7 +32,7 @@ describe("DashboardStore", () => {
 	it("opens with the dark slot active by default (Auto mode + Dark fallback)", async () => {
 		const store = await DashboardStore.open(yStore);
 		const snap = store.snapshot();
-		expect(snap.wallpaper).toEqual({ kind: "solid", value: "#14161b" });
+		expect(snap.wallpaper).toEqual({ kind: "solid", value: "#161616" });
 		expect(snap.theme).toBe(ThemeName.DefaultDark);
 		expect(snap.appearance.mode).toBe(AppearanceMode.Auto);
 		expect(snap.appearance.light.theme).toBe(ThemeName.DefaultLight);
@@ -49,7 +49,7 @@ describe("DashboardStore", () => {
 		expect(light.theme).toBe(ThemeName.DefaultLight);
 		expect(light.wallpaper.value).toBe("#f5f3ef");
 		expect(dark.theme).toBe(ThemeName.DefaultDark);
-		expect(dark.wallpaper.value).toBe("#14161b");
+		expect(dark.wallpaper.value).toBe("#161616");
 		await store.close();
 	});
 
@@ -214,7 +214,7 @@ describe("DashboardStore", () => {
 		const snap = store.snapshot(AppearanceSlot.Light);
 		expect(snap.appearance.light.wallpaper.value).toBe("wallpapers/forest.jpg");
 		// Dark slot wallpaper is untouched.
-		expect(snap.appearance.dark.wallpaper.value).toBe("#14161b");
+		expect(snap.appearance.dark.wallpaper.value).toBe("#161616");
 		await store.close();
 	});
 

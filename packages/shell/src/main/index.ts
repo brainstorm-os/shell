@@ -2368,8 +2368,8 @@ void app.whenReady().then(async () => {
 
 	// On the open that first created the vault, give it a polished out-of-box
 	// appearance: the Default Light theme in an explicit Light mode, with the
-	// bundled green-valley wallpaper. Both slots are seeded (the dark slot keeps
-	// Midnight + the stormy-sea image) so toggling appearance lands on a
+	// bundled green-valley wallpaper. Both slots are seeded (the dark slot gets
+	// Default Dark + the stormy-sea image) so toggling appearance lands on a
 	// well-formed pair. Scoped to the fresh-vault open (the same
 	// `ensureRootFolder().created` signal as the welcome seed) so an existing
 	// vault's chosen appearance is never overwritten.
@@ -2414,10 +2414,10 @@ void app.whenReady().then(async () => {
 						: { kind: "solid", value: "#f7f7f7" },
 				});
 				dashboard.setAppearancePair(AppearanceSlot.Dark, {
-					theme: ThemeName.Midnight,
+					theme: ThemeName.DefaultDark,
 					wallpaper: darkReady
 						? imageWallpaper(DEFAULT_DARK_WALLPAPER_FILE)
-						: { kind: "solid", value: "#14161b" },
+						: { kind: "solid", value: "#161616" },
 				});
 			});
 			await dashboard.flush();
@@ -2613,7 +2613,7 @@ void app.whenReady().then(async () => {
 		// the dashboard window persists across a vault switch (not remounted),
 		// so without this the renderer keeps the previous vault's theme /
 		// wallpaper / pinned icons. Runs on every open, after seeding, so a
-		// freshly-seeded vault paints its Midnight/wallpaper/app-icon state.
+		// freshly-seeded vault paints its seeded theme/wallpaper/app-icon state.
 		await rebindDashboardToActiveVault();
 		// 6.10f — the registry was rebuilt for this vault (overrides from the
 		// new vault's `brainstorm/ShortcutBindings/v1` entity + that vault's
@@ -2626,7 +2626,7 @@ void app.whenReady().then(async () => {
 			// the renderer's VaultProvider only refreshes `current` on mount + its
 			// own React create/open/activate calls, so a switch it didn't initiate
 			// (a main-side activation, or a raw-IPC create) leaves `current` stale —
-			// which pins the theme to the welcome-screen Midnight (effectiveTheme's
+			// which pins the theme to the welcome-screen default (effectiveTheme's
 			// `!hasVault` gate) and the welcome/dashboard routing to the wrong
 			// surface. Push a signal so the renderer re-reads the live session.
 			dashboardWindow.webContents.send("vaults:active-changed");
