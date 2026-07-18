@@ -62,9 +62,11 @@ import { getBrainstorm } from "../store/runtime";
 import {
 	LinkClickAction,
 	buildEntityLinkUrl,
+	findBinaryLinkFromEvent,
 	findEntityLinkFromEvent,
 	findMentionFromEvent,
 	resolveLinkClick,
+	triggerBinaryLinkDownload,
 } from "./link-markup-ops";
 import { entityDisplayName, filterEntities } from "./mention-ops";
 import { dispatchOpenEntity } from "./open-entity-dispatch";
@@ -307,7 +309,9 @@ export function applyLinkMarkup(
 /** Attach a single capture-phase click listener to the editor's root
  *  element. For clicks landing on an `<a>` whose href resolves to a
  *  `brainstorm://entity/<id>` URI, preventDefault and route through the
- *  intents bus. External `https://` links fall through. */
+ *  intents bus; a binary `brainstorm://asset/…` / `brainstorm://app-file/…`
+ *  href triggers a download instead (will-navigate would drop it).
+ *  External `https://` links fall through. */
 function useLinkClickInterceptor(editor: LexicalEditor, currentNoteId: string | null): void {
 	useEffect(() => {
 		const root = editor.getRootElement();
@@ -343,6 +347,18 @@ function useLinkClickInterceptor(editor: LexicalEditor, currentNoteId: string | 
 					mode,
 					...(decision.blockId ? { blockId: decision.blockId } : {}),
 				});
+				return;
+			}
+			// An imported PDF / uploaded file link (`brainstorm://asset/…`,
+			// `brainstorm://app-file/…`): plain navigation is dropped by the
+			// app view's will-navigate guard, so save it via the same
+			// `<a download>` path the FileBlockNode chip uses. The link text
+			// carries the display filename for imported files.
+			const binary = findBinaryLinkFromEvent(event.target, root);
+			if (binary) {
+				event.preventDefault();
+				event.stopPropagation();
+				triggerBinaryLinkDownload(binary.url, binary.anchor.textContent);
 				return;
 			}
 			const mention = findMentionFromEvent(event.target, root);

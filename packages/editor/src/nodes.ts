@@ -13,6 +13,9 @@
 
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
+// Side-effect: widen `LinkNode.sanitizeUrl` to the app's `brainstorm://`
+// scheme before any editor registers the node set (see link-sanitizer.ts).
+import "./link-sanitizer";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { Klass, LexicalNode } from "lexical";

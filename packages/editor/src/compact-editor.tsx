@@ -20,6 +20,9 @@
 
 import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
+// Side-effect: widen `LinkNode.sanitizeUrl` to the app's `brainstorm://`
+// scheme (compact editors register their own node list — see link-sanitizer.ts).
+import "./link-sanitizer";
 import { ListItemNode, ListNode } from "@lexical/list";
 import {
 	BOLD_ITALIC_STAR,

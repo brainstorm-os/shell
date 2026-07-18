@@ -614,6 +614,7 @@ export {
 } from "./plain-text-state";
 export { createLocalProvider } from "./local-provider";
 export { BASELINE_NODES } from "./nodes";
+export { ALLOWED_LINK_PROTOCOLS, sanitizeLinkUrl } from "./link-sanitizer";
 export { type PlantStateOptions, plantSerializedStateIntoDoc } from "./plant-state";
 export {
 	SEED_STANDIN_NODES,
