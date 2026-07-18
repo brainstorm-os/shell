@@ -297,7 +297,7 @@ function SectionRunState({
 				</p>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={cancelImportRun}
 					data-testid={stopTestId}
 				>
@@ -320,7 +320,7 @@ function SectionRunState({
 		return (
 			<p className="settings__error" role="alert">
 				{run.error}{" "}
-				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Sm} onClick={dismissImportRun}>
+				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissImportRun}>
 					{againLabel}
 				</Button>
 			</p>
