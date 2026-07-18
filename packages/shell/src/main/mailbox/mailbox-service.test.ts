@@ -3,6 +3,7 @@ import {
 	CONNECTOR_TYPE_URL,
 	FolderRole,
 	MAIL_ACCOUNT_TYPE_URL,
+	MAIL_FOLDER_TYPE_URL,
 	MailProtocol,
 	SyncWindow,
 } from "@brainstorm/sdk-types";
@@ -182,6 +183,99 @@ describe("mail.connectGmail", () => {
 		await expect(handler(envelope("connectGmail", { clientId: "cid" }))).rejects.toMatchObject({
 			name: "Denied",
 		});
+	});
+});
+
+describe("mail.loadOlder (Mailbox-12)", () => {
+	function seedAccount(store: ReturnType<typeof makeFakeStore>): { id: string } {
+		store.insert(CONNECTOR_TYPE_URL, {
+			connectorAppId: MAILBOX_APP_ID,
+			oauth: { clientId: "cid" },
+		});
+		return store.insert(MAIL_ACCOUNT_TYPE_URL, {
+			address: "me@example.com",
+			protocol: MailProtocol.GmailApi,
+			authKind: AuthKind.OAuth2,
+			syncWindow: SyncWindow.Days30,
+			enabled: true,
+			connectorAccountRef: "conn-acc-1",
+		});
+	}
+
+	it("walks each stored folder one backfill page, persists the cursor state, closes the driver", async () => {
+		const fetchSpecs: unknown[] = [];
+		const store = makeFakeStore();
+		const { deps } = makeDeps(store);
+		const driver = makeFakeDriver({
+			fetch: (spec) => {
+				fetchSpecs.push(spec);
+				return Promise.resolve({
+					messages: [
+						{
+							messageId: "<old-1@mail.gmail.com>",
+							from: "Old Sender <old@x.com>",
+							to: "me@example.com",
+							subject: "from the archive",
+							receivedAt: 1_600_000_000_000,
+							bodyText: "ancient",
+							flags: [],
+							folderPath: "INBOX",
+						},
+					],
+				});
+			},
+		});
+		const closeSpy = vi.spyOn(driver, "close");
+		(deps.transport as { driverFor: unknown }).driverFor = () => driver;
+		const account = seedAccount(store);
+		// A stored folder row from a prior sync — the walk resumes over these.
+		store.insert(MAIL_FOLDER_TYPE_URL, {
+			accountRef: account.id,
+			path: "INBOX",
+			role: "inbox",
+			unreadCount: 0,
+		});
+		const handler = makeMailServiceHandler(deps);
+		const result = (await handler(envelope("loadOlder", { accountRef: account.id }))) as {
+			created: number;
+			done: boolean;
+		};
+		expect(result.created).toBe(1);
+		// Fake returned no nextCursor ⇒ folder exhausted ⇒ done.
+		expect(result.done).toBe(true);
+		expect(fetchSpecs[0]).toMatchObject({ folderPath: "INBOX", walk: "backfill" });
+		const folder = [...store.rows.values()].find((r) => r.type === MAIL_FOLDER_TYPE_URL);
+		expect(folder?.properties.backfillDone).toBe(true);
+		const email = [...store.rows.values()].find(
+			(r) => r.type === EMAIL_TYPE && r.properties.messageId === "<old-1@mail.gmail.com>",
+		);
+		expect(email).toBeDefined();
+		expect(closeSpy).toHaveBeenCalled();
+	});
+
+	it("shares the per-account latch with syncNow", async () => {
+		const store = makeFakeStore();
+		const { deps, driver } = makeDeps(store);
+		const account = seedAccount(store);
+		store.insert(MAIL_FOLDER_TYPE_URL, {
+			accountRef: account.id,
+			path: "INBOX",
+			role: "inbox",
+			unreadCount: 0,
+		});
+		let release: (() => void) | undefined;
+		driver.fetch = () =>
+			new Promise((resolve) => {
+				release = () => resolve({ messages: [] });
+			});
+		const handler = makeMailServiceHandler(deps);
+		const first = handler(envelope("syncNow", { accountRef: account.id }));
+		await new Promise((r) => setTimeout(r, 0));
+		await expect(handler(envelope("loadOlder", { accountRef: account.id }))).rejects.toMatchObject({
+			message: expect.stringContaining("already running"),
+		});
+		release?.();
+		await first;
 	});
 });
 

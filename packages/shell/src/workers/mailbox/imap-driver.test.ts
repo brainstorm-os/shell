@@ -10,6 +10,7 @@
 
 import { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
 import { describe, expect, it, vi } from "vitest";
+import { FetchWalk } from "../../main/mailbox/mail-driver";
 import {
 	type ImapClientLike,
 	type ImapDriverInput,
@@ -125,6 +126,42 @@ const msg = (uid: number, id: string, flags?: string[]): FakeMessage => ({
 	uid,
 	source: `Message-ID: <${id}@example.com>\r\n\r\nbody-${id}`,
 	...(flags ? { flags } : {}),
+});
+
+describe("makeImapSmtpDriver — backfill walk (Mailbox-12)", () => {
+	it("pages older mail newest-first below the cursor and signals exhaustion", async () => {
+		const fake = makeFakeImap({
+			uidValidity: 7n,
+			messages: { INBOX: [msg(10, "j"), msg(20, "k"), msg(30, "l"), msg(40, "m")] },
+		});
+		const { driver } = makeDriver({ imap: fake.client });
+
+		const page1 = await driver.fetch({ folderPath: "INBOX", walk: FetchWalk.Backfill, limit: 2 });
+		expect(page1.messages.map((m) => m.messageId)).toEqual(["<m@example.com>", "<l@example.com>"]);
+		expect(page1.nextCursor).toBe("7:30");
+
+		const page2 = await driver.fetch({
+			folderPath: "INBOX",
+			walk: FetchWalk.Backfill,
+			cursor: page1.nextCursor as string,
+			limit: 2,
+		});
+		expect(page2.messages.map((m) => m.messageId)).toEqual(["<k@example.com>", "<j@example.com>"]);
+		expect(page2.nextCursor).toBeUndefined();
+	});
+
+	it("a UIDVALIDITY mismatch restarts the walk from the top instead of trusting the dead cursor", async () => {
+		const fake = makeFakeImap({ uidValidity: 9n, messages: { INBOX: [msg(5, "x"), msg(6, "y")] } });
+		const { driver } = makeDriver({ imap: fake.client });
+		const page = await driver.fetch({
+			folderPath: "INBOX",
+			walk: FetchWalk.Backfill,
+			cursor: "8:6",
+			limit: 10,
+		});
+		expect(page.messages).toHaveLength(2);
+		expect(page.nextCursor).toBeUndefined();
+	});
 });
 
 describe("makeImapSmtpDriver", () => {

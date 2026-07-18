@@ -54,19 +54,34 @@ export type RawMessage = {
 	attachmentNames?: string[];
 };
 
+/** Which way a fetch walks the folder (Mailbox-12). */
+export enum FetchWalk {
+	/** Newest-first within the window; `cursor` resumes past the last seen
+	 *  message (the scheduled-sync walk). */
+	Forward = "forward",
+	/** Progressively OLDER mail, ignoring `sinceMs` — the user asked for
+	 *  history beyond the window. `cursor` is the older-walk resume token;
+	 *  absent starts at the newest and walks down. */
+	Backfill = "backfill",
+}
+
 /** A bounded fetch request for one folder — the selective/incremental sync
- *  unit (doc 20). `sinceMs` bounds the initial backfill by `syncWindow`;
- *  `cursor` resumes an incremental pull; `limit` caps a single page. */
+ *  unit (doc 20). `sinceMs` bounds the initial walk by `syncWindow`
+ *  (Forward only); `cursor` resumes a walk in the direction of `walk`;
+ *  `limit` caps a single page. */
 export type FetchSpec = {
 	folderPath: string;
 	sinceMs?: number;
 	cursor?: string;
+	/** Defaults to {@link FetchWalk.Forward}. */
+	walk?: FetchWalk;
 	limit: number;
 };
 
 export type FetchResult = {
 	messages: RawMessage[];
-	/** Opaque resume token persisted on the folder; absent ⇒ caught up. */
+	/** Opaque resume token for the SAME walk direction, persisted by the
+	 *  caller; absent ⇒ that walk is caught up / exhausted. */
 	nextCursor?: string;
 };
 

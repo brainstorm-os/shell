@@ -27,6 +27,7 @@ import {
 	syncWindowDays,
 } from "@brainstorm/sdk-types";
 import type { MailDriver, OutboundMessage } from "./mail-driver";
+import { FetchWalk } from "./mail-driver";
 import { projectFolder, projectMessage } from "./mail-projection";
 import { resolvePersonRef } from "./person-resolver";
 
@@ -34,6 +35,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Single-page fetch cap for a bounded window (the engine pages until a
  *  folder is caught up; `all` is additionally capped by message count). */
 const DEFAULT_PAGE_LIMIT = 500;
+/** One backfill call is a user gesture — keep the page small enough to feel
+ *  responsive (a page can be hundreds of per-message provider calls). */
+const BACKFILL_PAGE_LIMIT = 200;
 
 /** The account fields the engine needs (token-free — the secret was already
  *  injected into the driver by the caller). */
@@ -43,6 +47,24 @@ export type SyncAccount = {
 };
 
 export type ExistingEmail = { id: string; flags: MailFlag[]; folderRefs: string[] };
+
+/** A stored folder row + its persisted older-walk state (Mailbox-12). */
+export type BackfillFolder = {
+	id: string;
+	path: string;
+	backfillCursor?: string;
+	backfillDone?: boolean;
+};
+
+export type MailBackfillResult = {
+	accountRef: string;
+	created: number;
+	updated: number;
+	/** Every folder's older-walk is exhausted — nothing left to load. */
+	done: boolean;
+	startedAt: string;
+	finishedAt: string;
+};
 
 export type MailSyncPorts = {
 	driver: MailDriver;
@@ -57,6 +79,11 @@ export type MailSyncPorts = {
 	/** Optional address→`Person/v1` index for participant resolution
 	 *  (Mailbox-7). Built once per sync; absent ⇒ no resolution. */
 	loadPersonIndex?(): Promise<ReadonlyMap<string, string>>;
+	/** Stored folder rows for an account, with the persisted backfill state
+	 *  (Mailbox-12). Absent ⇒ backfill unsupported by the host. */
+	listAccountFolders?(accountRef: string): Promise<BackfillFolder[]>;
+	/** Test/tuning override for the per-folder backfill page (default 200). */
+	backfillPageLimit?: number;
 	now(): number;
 };
 
@@ -118,32 +145,10 @@ export class MailSyncEngine {
 				...(sinceMs !== null ? { sinceMs } : {}),
 				limit,
 			});
-			for (const message of messages) {
-				if (budget <= 0) break;
-				const existing = await this.ports.findEmailByMessageId(account.id, message.messageId);
-				if (existing) {
-					// Server is authoritative for flags only; never clobber tags / body.
-					// A message reachable from multiple folders/labels (Gmail) must
-					// accumulate every folderRef — `folderRefs` is count {1,∞}.
-					const nextFlags = message.flags ?? existing.flags;
-					const patch: Record<string, unknown> = { flags: nextFlags };
-					if (!existing.folderRefs.includes(folderRef)) {
-						patch.folderRefs = [...existing.folderRefs, folderRef];
-					}
-					await this.ports.updateEntity(existing.id, patch);
-					updated += 1;
-				} else {
-					const def = projectMessage(
-						account.id,
-						message,
-						folderRef,
-						resolvePerson ? { resolvePerson } : undefined,
-					);
-					await this.ports.createEntity(EMAIL_TYPE_URL, this.toProps(def));
-					created += 1;
-				}
-				budget -= 1;
-			}
+			const page = await this.upsertPage(account.id, messages, folderRef, resolvePerson, budget);
+			created += page.created;
+			updated += page.updated;
+			budget -= page.created + page.updated;
 		}
 
 		return {
@@ -151,6 +156,98 @@ export class MailSyncEngine {
 			folders: folderIds.size,
 			created,
 			updated,
+			startedAt,
+			finishedAt: new Date(this.ports.now()).toISOString(),
+		};
+	}
+
+	/** Shared idempotent message upsert (Message-ID keyed). Server is
+	 *  authoritative for existence + flags; vault-owned tags/body untouched.
+	 *  A message reachable from multiple folders/labels (Gmail) accumulates
+	 *  every folderRef — `folderRefs` is count {1,∞}. */
+	private async upsertPage(
+		accountRef: string,
+		messages: readonly Parameters<typeof projectMessage>[1][],
+		folderRef: string,
+		resolvePerson: ((address: string) => string | undefined) | undefined,
+		budget: number,
+	): Promise<{ created: number; updated: number }> {
+		let created = 0;
+		let updated = 0;
+		for (const message of messages) {
+			if (created + updated >= budget) break;
+			const existing = await this.ports.findEmailByMessageId(accountRef, message.messageId);
+			if (existing) {
+				const nextFlags = message.flags ?? existing.flags;
+				const patch: Record<string, unknown> = { flags: nextFlags };
+				if (!existing.folderRefs.includes(folderRef)) {
+					patch.folderRefs = [...existing.folderRefs, folderRef];
+				}
+				await this.ports.updateEntity(existing.id, patch);
+				updated += 1;
+			} else {
+				const def = projectMessage(
+					accountRef,
+					message,
+					folderRef,
+					resolvePerson ? { resolvePerson } : undefined,
+				);
+				await this.ports.createEntity(EMAIL_TYPE_URL, this.toProps(def));
+				created += 1;
+			}
+		}
+		return { created, updated };
+	}
+
+	/** One user-initiated "load older" pass (Mailbox-12): one bounded page per
+	 *  not-yet-exhausted folder, walking OLDER via the driver's opaque
+	 *  backfill cursor; the cursor persists on the folder entity so the next
+	 *  press resumes where this one stopped. `sinceMs` is deliberately absent
+	 *  — the user asked for history beyond the account window. */
+	async backfillAccount(account: SyncAccount): Promise<MailBackfillResult> {
+		const startedAt = new Date(this.ports.now()).toISOString();
+		if (!this.ports.listAccountFolders) {
+			throw new Error("backfillAccount: host provides no listAccountFolders port");
+		}
+		const personIndex = this.ports.loadPersonIndex ? await this.ports.loadPersonIndex() : null;
+		const resolvePerson = personIndex
+			? (address: string): string | undefined => resolvePersonRef(personIndex, address)
+			: undefined;
+
+		const folders = await this.ports.listAccountFolders(account.id);
+		let created = 0;
+		let updated = 0;
+		let done = true;
+		for (const folder of folders) {
+			if (folder.backfillDone === true) continue;
+			const { messages, nextCursor } = await this.ports.driver.fetch({
+				folderPath: folder.path,
+				walk: FetchWalk.Backfill,
+				...(folder.backfillCursor !== undefined ? { cursor: folder.backfillCursor } : {}),
+				limit: this.ports.backfillPageLimit ?? BACKFILL_PAGE_LIMIT,
+			});
+			const page = await this.upsertPage(
+				account.id,
+				messages,
+				folder.id,
+				resolvePerson,
+				Number.POSITIVE_INFINITY,
+			);
+			created += page.created;
+			updated += page.updated;
+			if (nextCursor !== undefined) {
+				await this.ports.updateEntity(folder.id, { backfillCursor: nextCursor });
+				done = false;
+			} else {
+				await this.ports.updateEntity(folder.id, { backfillDone: true });
+			}
+		}
+
+		return {
+			accountRef: account.id,
+			created,
+			updated,
+			done,
 			startedAt,
 			finishedAt: new Date(this.ports.now()).toISOString(),
 		};

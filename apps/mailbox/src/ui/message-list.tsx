@@ -7,6 +7,7 @@
 import { CountBadge, CountBadgeTone } from "@brainstorm/sdk/count-badge";
 import { EmptyState, EmptyStateTone } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { plural, t } from "../i18n";
 import { messageDateLabel } from "../logic/format";
@@ -158,7 +159,17 @@ export type MessageListProps = {
 	/** The last sync errored — the empty state must not promise mail "once it
 	 *  syncs" while the sync itself is broken. */
 	syncFailed?: boolean;
+	/** Server-side "load older" (Mailbox-12). Absent ⇒ demo mode / no
+	 *  accounts — the bottom affordance only reveals local rows. */
+	onLoadOlder?: () => void;
+	loadingOlder?: boolean;
+	/** Every folder's older-walk is exhausted — nothing more on the server. */
+	olderExhausted?: boolean;
 };
+
+/** Rows rendered before the bottom affordance must reveal more — keeps the
+ *  DOM bounded on large mailboxes (virtualization proper is a follow-up). */
+const PAGE_SIZE = 200;
 
 export function MessageList({
 	messages,
@@ -173,8 +184,20 @@ export function MessageList({
 	onToggleThreaded,
 	onToggleThreadExpand,
 	syncFailed,
+	onLoadOlder,
+	loadingOlder,
+	olderExhausted,
 }: MessageListProps): ReactElement {
 	const empty = threaded ? threads.length === 0 : messages.length === 0;
+	const totalRows = threaded ? threads.length : messages.length;
+	const [visibleRows, setVisibleRows] = useState(PAGE_SIZE);
+	// A selection/search change can shrink the list — never strand the cap
+	// above what exists +1 page (keeps "reveal" meaningful after refilter).
+	useEffect(() => {
+		setVisibleRows((v) => Math.min(Math.max(v, PAGE_SIZE), Math.max(totalRows, PAGE_SIZE)));
+	}, [totalRows]);
+	const hiddenLocal = Math.max(0, totalRows - visibleRows);
+	const showFooter = !empty && (hiddenLocal > 0 || onLoadOlder !== undefined);
 	return (
 		<div className="mb-list">
 			<div className="mb-list__search">
@@ -219,7 +242,7 @@ export function MessageList({
 						)}
 					</li>
 				) : threaded ? (
-					threads.map((thread) => (
+					threads.slice(0, visibleRows).map((thread) => (
 						<li key={thread.threadKey}>
 							{/* A single-message "conversation" is just a message — the
 							    thread chrome (expander, count, "1 message" meta) forced a
@@ -245,7 +268,7 @@ export function MessageList({
 						</li>
 					))
 				) : (
-					messages.map((message) => (
+					messages.slice(0, visibleRows).map((message) => (
 						<li key={message.id}>
 							<MessageRow
 								message={message}
@@ -257,6 +280,30 @@ export function MessageList({
 					))
 				)}
 			</ul>
+			{showFooter ? (
+				<div className="mb-list__footer">
+					{hiddenLocal > 0 ? (
+						<button
+							type="button"
+							className="bs-btn bs-btn--sm bs-btn--secondary"
+							onClick={() => setVisibleRows((v) => v + PAGE_SIZE)}
+						>
+							{t("list.older.reveal")}
+						</button>
+					) : olderExhausted ? (
+						<span className="mb-list__footer-done">{t("list.older.done")}</span>
+					) : onLoadOlder !== undefined ? (
+						<button
+							type="button"
+							className="bs-btn bs-btn--sm bs-btn--secondary"
+							onClick={onLoadOlder}
+							disabled={loadingOlder === true}
+						>
+							{loadingOlder === true ? t("list.older.loading") : t("list.older.load")}
+						</button>
+					) : null}
+				</div>
+			) : null}
 		</div>
 	);
 }

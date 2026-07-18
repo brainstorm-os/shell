@@ -39,6 +39,22 @@ describe("projection from entities", () => {
 		expect(accountsFromEntities([legacy])).toHaveLength(1);
 	});
 
+	it("projects the folder backfill state (Mailbox-12)", () => {
+		const projected = foldersFromEntities([
+			{
+				id: "f1",
+				type: "brainstorm/MailFolder/v1",
+				properties: { accountRef: "a", path: "INBOX", role: "inbox", backfillDone: true },
+			},
+			{
+				id: "f2",
+				type: "brainstorm/MailFolder/v1",
+				properties: { accountRef: "a", path: "Archive", role: "archive" },
+			},
+		]);
+		expect(projected.map((f) => f.backfillDone)).toEqual([true, false]);
+	});
+
 	it("sorts messages newest-first", () => {
 		const times = messagesFromEntities(entities).map((m) => m.receivedAt);
 		expect(times).toEqual([...times].sort((a, b) => b - a));

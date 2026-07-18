@@ -41,6 +41,8 @@ export type FolderView = {
 	path: string;
 	role: FolderRole;
 	unreadCount: number;
+	/** The older-walk for this folder is exhausted (Mailbox-12). */
+	backfillDone: boolean;
 };
 
 /** A message, projected from an `Email/v1` property bag into typed UI shape. */

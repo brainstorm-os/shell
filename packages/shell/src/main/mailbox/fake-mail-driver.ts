@@ -18,6 +18,7 @@ import type {
 	RawMessage,
 	SubmitResult,
 } from "./mail-driver";
+import { FetchWalk } from "./mail-driver";
 
 export type FakeServerState = {
 	folders: RawFolder[];
@@ -45,6 +46,18 @@ export class FakeMailDriver implements MailDriver {
 	async fetch(spec: FetchSpec): Promise<FetchResult> {
 		this.assertOpen();
 		const all = this.state.messages[spec.folderPath] ?? [];
+		if (spec.walk === FetchWalk.Backfill) {
+			// Older-walk model: an offset cursor over the newest-first ordering;
+			// `sinceMs` ignored (the walk deliberately exceeds the window).
+			const sorted = [...all].sort((a, b) => b.receivedAt - a.receivedAt);
+			const offset = spec.cursor !== undefined ? Number(spec.cursor) || 0 : 0;
+			const page = sorted.slice(offset, offset + spec.limit).map((m) => ({ ...m }));
+			const nextOffset = offset + page.length;
+			return {
+				messages: page,
+				...(nextOffset < sorted.length ? { nextCursor: String(nextOffset) } : {}),
+			};
+		}
 		const filtered = all
 			.filter((m) => (spec.sinceMs === undefined ? true : m.receivedAt >= spec.sinceMs))
 			.sort((a, b) => b.receivedAt - a.receivedAt)

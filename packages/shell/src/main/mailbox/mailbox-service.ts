@@ -46,7 +46,12 @@ import type { RedirectProvider } from "../connectors/oauth-redirect";
 import type { CredentialStore } from "../credentials/store";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo/entities-repo";
 import type { DriverCredentials, MailDriver } from "./mail-driver";
-import { MailSyncEngine, type MailSyncResult, type SendResult } from "./mail-sync-engine";
+import {
+	type MailBackfillResult,
+	MailSyncEngine,
+	type MailSyncResult,
+	type SendResult,
+} from "./mail-sync-engine";
 import { PERSON_TYPE, buildPersonIndex } from "./person-resolver";
 import type { WorkerMailTransport } from "./worker-mail-transport";
 
@@ -252,6 +257,20 @@ export function createMailService(deps: MailServiceDeps): MailServiceApi {
 		}
 	};
 
+	// Backfill shares the per-account slot with sync — both drive the same
+	// find-then-create upsert path.
+	const loadOlder = async (accountRef: string): Promise<MailBackfillResult> => {
+		if (syncInFlight.has(accountRef)) {
+			throw makeError("Unavailable", "mail.loadOlder: a sync is already running for this account");
+		}
+		syncInFlight.add(accountRef);
+		try {
+			return await runBackfill(deps, accountRef);
+		} finally {
+			syncInFlight.delete(accountRef);
+		}
+	};
+
 	const send = async (raw: unknown): Promise<SendResult> => {
 		const input = validateMailSendInput(raw);
 		if (sendInFlight.has(input.submissionId)) {
@@ -275,6 +294,11 @@ export function createMailService(deps: MailServiceDeps): MailServiceApi {
 				await requireServiceCapability(envelope, deps.getLedger, MAIL_MANAGE_CAP, "mail");
 				const arg = objectArg(envelope);
 				return await syncAccount(requireString(arg.accountRef, "accountRef", "syncNow"));
+			}
+			case "loadOlder": {
+				await requireServiceCapability(envelope, deps.getLedger, MAIL_MANAGE_CAP, "mail");
+				const arg = objectArg(envelope);
+				return await loadOlder(requireString(arg.accountRef, "accountRef", "loadOlder"));
 			}
 			case "disconnect":
 				return await handleDisconnect(envelope, deps);
@@ -609,6 +633,28 @@ function makeEnginePorts(
 		updateEntity: async (id: string, patch: Record<string, unknown>) => {
 			await deps.callEntities(MAILBOX_APP_ID, "update", { id, patch });
 		},
+		listAccountFolders: () => {
+			const folders: {
+				id: string;
+				path: string;
+				backfillCursor?: string;
+				backfillDone?: boolean;
+			}[] = [];
+			for (const id of repo.idsByTypes([MAIL_FOLDER_TYPE_URL])) {
+				const row = repo.get(id);
+				if (!row || row.properties.accountRef !== accountRef) continue;
+				const path = optionalString(row.properties.path);
+				if (path === undefined) continue;
+				const backfillCursor = optionalString(row.properties.backfillCursor);
+				folders.push({
+					id: row.id,
+					path,
+					...(backfillCursor !== undefined ? { backfillCursor } : {}),
+					...(row.properties.backfillDone === true ? { backfillDone: true } : {}),
+				});
+			}
+			return Promise.resolve(folders);
+		},
 		loadPersonIndex: () => {
 			const persons: { id: string; type: string; properties: Record<string, unknown> }[] = [];
 			for (const id of repo.idsByTypes([PERSON_TYPE])) {
@@ -637,6 +683,23 @@ async function runSync(deps: MailServiceDeps, accountRef: string): Promise<MailS
 		return await engine.syncAccount({ id: accountRef, syncWindow });
 	} finally {
 		// Always drop the worker-side driver (and the injected secret).
+		await driver.close().catch(() => {});
+	}
+}
+
+async function runBackfill(deps: MailServiceDeps, accountRef: string): Promise<MailBackfillResult> {
+	const resolved = await resolveMailAccount(deps, accountRef, "loadOlder");
+	if (resolved.row.properties.enabled !== true) {
+		throw makeError("Invalid", "mail.loadOlder: account is disabled");
+	}
+	const driver = await connectDriver(deps, resolved);
+	try {
+		const engine = new MailSyncEngine(makeEnginePorts(deps, resolved.repo, accountRef, driver));
+		const syncWindow = isSyncWindow(resolved.row.properties.syncWindow)
+			? resolved.row.properties.syncWindow
+			: SyncWindow.Days30;
+		return await engine.backfillAccount({ id: accountRef, syncWindow });
+	} finally {
 		await driver.close().catch(() => {});
 	}
 }

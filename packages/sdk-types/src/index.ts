@@ -638,6 +638,16 @@ export type ConnectorsService = {
 
 // ─── Mail service (shell-side transport + sync — doc 53, Mailbox-5) ─────────
 
+/** Summary of one backfill pass, returned by `mail.loadOlder`. */
+export type MailBackfillSummary = {
+	accountRef: string;
+	created: number;
+	updated: number;
+	done: boolean;
+	startedAt: string;
+	finishedAt: string;
+};
+
 /** Summary of one account sync, returned by `mail.syncNow`. */
 export type MailSyncSummary = {
 	accountRef: string;
@@ -680,6 +690,9 @@ export type MailService = {
 	}): Promise<{ accountId: string; address: string }>;
 	/** Run a full folder + message sync for one account now. */
 	syncNow(input: { accountRef: string }): Promise<MailSyncSummary>;
+	/** One bounded "load older" pass (Mailbox-12): walks each folder one page
+	 *  further into history; `done` when every folder is exhausted. */
+	loadOlder(input: { accountRef: string }): Promise<MailBackfillSummary>;
 	/** Revoke the account's token (Tier 2 delete) and disable the account. */
 	disconnect(input: { accountRef: string }): Promise<{ ok: true }>;
 };

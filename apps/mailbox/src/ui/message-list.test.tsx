@@ -65,6 +65,67 @@ function renderList(messages: MessageView[], onSelect: (id: string) => void): vo
 	});
 }
 
+describe("MessageList paging footer (Mailbox-12)", () => {
+	it("caps rendered rows and reveals more locally before offering the server", () => {
+		const many = Array.from({ length: 250 }, (_, i) => message(`m-${i}`, `t-${i}`, `subject ${i}`));
+		const onLoadOlder = vi.fn();
+		const threads = groupThreads(many);
+		act(() => {
+			root.render(
+				<MessageList
+					messages={many}
+					threads={threads}
+					threaded
+					expandedThreads={new Set()}
+					activeId={null}
+					now={1_700_000_000_000}
+					query=""
+					onQueryChange={() => {}}
+					onSelect={() => {}}
+					onToggleThreaded={() => {}}
+					onToggleThreadExpand={() => {}}
+					onLoadOlder={onLoadOlder}
+				/>,
+			);
+		});
+		expect(host.querySelectorAll(".mb-row").length).toBe(200);
+		const reveal = host.querySelector<HTMLButtonElement>(".mb-list__footer button");
+		expect(reveal?.textContent).toBe("Show older messages");
+		act(() => reveal?.click());
+		expect(host.querySelectorAll(".mb-row").length).toBe(250);
+		// Local rows exhausted — the same slot now pulls from the server.
+		const load = host.querySelector<HTMLButtonElement>(".mb-list__footer button");
+		expect(load?.textContent).toBe("Load older mail");
+		act(() => load?.click());
+		expect(onLoadOlder).toHaveBeenCalledTimes(1);
+	});
+
+	it("shows the exhausted note instead of the button once every folder is done", () => {
+		const few = [message("m-1", "t-1", "only")];
+		act(() => {
+			root.render(
+				<MessageList
+					messages={few}
+					threads={groupThreads(few)}
+					threaded
+					expandedThreads={new Set()}
+					activeId={null}
+					now={1_700_000_000_000}
+					query=""
+					onQueryChange={() => {}}
+					onSelect={() => {}}
+					onToggleThreaded={() => {}}
+					onToggleThreadExpand={() => {}}
+					onLoadOlder={() => {}}
+					olderExhausted
+				/>,
+			);
+		});
+		expect(host.querySelector(".mb-list__footer button")).toBeNull();
+		expect(host.querySelector(".mb-list__footer-done")?.textContent).toBe("All mail loaded");
+	});
+});
+
 describe("MessageList threaded rendering", () => {
 	it("opens a single-message thread on the FIRST click — no expand step", () => {
 		const onSelect = vi.fn();

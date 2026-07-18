@@ -301,6 +301,43 @@ export function MailboxApp(): ReactElement {
 		void syncAccounts(accounts.map((a) => a.id));
 	}, [syncAccounts, accounts]);
 
+	// Mailbox-12: one bounded older-page per account per press; the folder
+	// cursors persist server-side state, so repeated presses walk deeper.
+	const [loadingOlder, setLoadingOlder] = useState(false);
+	const onLoadOlder = useCallback(() => {
+		if (!mailSvc || accounts.length === 0 || loadingOlder) return;
+		setLoadingOlder(true);
+		void (async () => {
+			try {
+				let created = 0;
+				let allDone = true;
+				for (const account of accounts) {
+					const result = await mailSvc.loadOlder({ accountRef: account.id });
+					created += result.created;
+					if (!result.done) allDone = false;
+				}
+				setSyncNote({
+					kind: SyncNoteKind.Info,
+					text: t(allDone ? "sync.olderDone" : "sync.olderMore", { created }),
+				});
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				setSyncNote(
+					/authentication failed/i.test(message)
+						? { kind: SyncNoteKind.Error, text: t("sync.errorAuth"), reconnect: true }
+						: { kind: SyncNoteKind.Error, text: t("sync.error", { message }) },
+				);
+			} finally {
+				setLoadingOlder(false);
+			}
+		})();
+	}, [mailSvc, accounts, loadingOlder]);
+
+	const olderExhausted = useMemo(
+		() => folders.length > 0 && folders.every((f) => f.backfillDone),
+		[folders],
+	);
+
 	const onSyncAccount = useCallback(
 		(accountId: string) => {
 			void syncAccounts([accountId]);
@@ -513,6 +550,9 @@ export function MailboxApp(): ReactElement {
 						onToggleThreaded={toggleThreaded}
 						onToggleThreadExpand={toggleThreadExpand}
 						syncFailed={syncNote?.kind === SyncNoteKind.Error}
+						{...(usingVault && mailSvc && accounts.length > 0
+							? { onLoadOlder, loadingOlder, olderExhausted }
+							: {})}
 					/>
 					<ReadingPane
 						message={activeMessage}
