@@ -426,6 +426,7 @@ select {
 :root .bs-btn--lg {
 	height: var(--control-height-lg, 40px);
 	padding: 0 var(--space-4);
+	border-radius: var(--radius-md);
 }
 
 /* Secondary — bordered, transparent until hover. The default dialog / toolbar

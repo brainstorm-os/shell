@@ -472,7 +472,7 @@ export function MailboxApp(): ReactElement {
 						action={
 							<button
 								type="button"
-								className="bs-btn"
+								className="bs-btn bs-btn--lg"
 								data-bs-primary
 								onClick={() => setConnectOpen(true)}
 							>
