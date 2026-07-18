@@ -87,6 +87,7 @@
     "./menus": "./src/menus/index.ts",
     "./tooltip": "./src/tooltip/index.ts",
     "./select-menu": "./src/select-menu/index.ts",
+    "./segmented.css": "./src/segmented/segmented.css",
     "./select-menu.css": "./src/select-menu/select-menu.css",
     "./layout-resolver": "./src/layout-resolver.ts",
     "./widget": "./src/widget/index.tsx",

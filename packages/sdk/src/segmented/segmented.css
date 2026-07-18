@@ -1,0 +1,58 @@
+/**
+ * Segmented control — the shared face for a small exclusive mode switch
+ * (Forms' Builder/Fill, Mailbox's Google/IMAP). A recessed track carrying
+ * flat tabs; the active tab lifts on the elevated surface. Extracted at
+ * copy two (fd-mode + mb-connect__mode) per the DRY rule — a third
+ * hand-rolled pill face is rejected.
+ *
+ * Markup contract:
+ *   <div class="bs-segmented" role="tablist|group">
+ *     <button class="bs-segmented__tab is-active" …>Label</button>
+ *   </div>
+ * Active state: `.is-active` (or aria-pressed="true" — both styled).
+ * Keyboard/roving focus stays with the consumer.
+ */
+
+.bs-segmented {
+	display: inline-flex;
+	gap: var(--space-1);
+	padding: var(--space-1);
+	border-radius: var(--radius-md);
+	background: var(--bg-subtle);
+}
+
+.bs-segmented__tab {
+	appearance: none;
+	border: none;
+	background: transparent;
+	color: var(--text-dim);
+	font: inherit;
+	font-weight: var(--text-weight-medium);
+	font-size: var(--text-size-sm);
+	height: var(--control-height-sm);
+	padding: 0 var(--space-2);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+}
+
+.bs-segmented__tab:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.bs-segmented__tab.is-active,
+.bs-segmented__tab[aria-pressed="true"] {
+	background: var(--bg-elev);
+	color: var(--text);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.bs-segmented__tab:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -2px;
+}
+
+.bs-segmented__tab:disabled {
+	opacity: 0.5;
+	cursor: default;
+}

@@ -37,6 +37,7 @@
   "sync.running": "Syncing…",
   "sync.done": "Sync finished — {created} new, {updated} updated.",
   "sync.error": "Sync failed: {message}",
+  "sync.errorAuth": "Sync failed: the mail server rejected the credentials. Check the username and app password (most providers require an app-specific password, not your account password), then reconnect the account.",
   "sync.dismiss": "Dismiss sync status",
   "cta.title": "No mail account yet",
   "cta.blurb": "Connect your Google account to sync mail into this vault.",
