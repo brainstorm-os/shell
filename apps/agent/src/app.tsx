@@ -58,6 +58,7 @@ import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
 import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
+import { AddToNotePopover } from "./add-to-note-popover";
 import { ConversationSettingsPopover } from "./conversation-settings-popover";
 import { EscalationPrompt } from "./escalation-prompt";
 import { AGENT_I18N, type AgentI18nKey, t } from "./i18n";
@@ -81,6 +82,12 @@ import {
 	providerForRequest,
 	resolveProvider,
 } from "./logic/conversation-settings";
+import {
+	type AddToNoteMode,
+	type NoteCandidate,
+	buildAddToNoteMarkdown,
+	buildInsertIntentEnvelope,
+} from "./logic/insert-to-note";
 import {
 	MEMORY_ENABLED_KEY,
 	type MemoryItem,
@@ -708,6 +715,50 @@ export function AgentApp(): ReactElement {
 			});
 		},
 		[entitiesSvc, memoryEnabled, activeId],
+	);
+
+	// F-241 / doc 75 — "Add to note": file an assistant reply (or a link to
+	// this chat) into a user-picked note via the cap-checked `insert` intent.
+	// The Agent never writes note bytes — the dispatch crosses the broker's
+	// `intents.dispatch:insert` ledger gate and Notes performs the append in
+	// its own sandbox. `addToNoteFor` holds the source message id while the
+	// picker is open; `insertNotice` is the transient success confirmation.
+	const [addToNoteFor, setAddToNoteFor] = useState<string | null>(null);
+	const [insertNotice, setInsertNotice] = useState<string | null>(null);
+	useEffect(() => {
+		if (!insertNotice) return;
+		const timer = window.setTimeout(() => setInsertNotice(null), 5000);
+		return () => window.clearTimeout(timer);
+	}, [insertNotice]);
+	const addToNote = useCallback(
+		async (messageId: string, note: NoteCandidate, mode: AddToNoteMode) => {
+			setAddToNoteFor(null);
+			const intentsSvc = rt?.services?.intents;
+			const conv = conversations.find((c) => c.id === activeId) ?? null;
+			const message = displayMessages.find((m) => m.id === messageId) ?? null;
+			if (!intentsSvc || !conv || !message) {
+				setError(t("insert.failed"));
+				return;
+			}
+			const markdown = buildAddToNoteMarkdown({
+				mode,
+				replyMarkdown: message.bodyMarkdown ?? message.body,
+				conversationId: conv.id,
+				conversationTitle: str(conv.properties.title) || t("chat.untitled"),
+			});
+			try {
+				const result = await intentsSvc.dispatch(buildInsertIntentEnvelope(note.id, markdown));
+				if (result?.handled) {
+					setInsertNotice(t("insert.success", { note: note.title }));
+				} else {
+					setError(t("insert.failed"));
+				}
+			} catch (err) {
+				console.warn("[agent] insert dispatch failed:", err);
+				setError(t("insert.failed"));
+			}
+		},
+		[rt, conversations, activeId, displayMessages],
 	);
 
 	const editMemory = useCallback(
@@ -1380,18 +1431,33 @@ export function AgentApp(): ReactElement {
 												)}
 											</div>
 										) : null}
-										{memoryEnabled && m.body.trim().length > 0 ? (
+										{(memoryEnabled || (m.role === MessageRole.Assistant && activeConv !== null)) &&
+										m.body.trim().length > 0 ? (
 											<div className="agent__msg-actions">
-												<button
-													type="button"
-													className="agent__remember"
-													onClick={() => rememberFact(m.body)}
-													title={t("memory.remember.hint")}
-													data-testid="agent-remember"
-												>
-													<Icon name={IconName.Star} size={12} />
-													{t("memory.remember")}
-												</button>
+												{m.role === MessageRole.Assistant && activeConv ? (
+													<button
+														type="button"
+														className="agent__remember"
+														onClick={() => setAddToNoteFor(m.id)}
+														title={t("insert.action.hint")}
+														data-testid="agent-add-to-note"
+													>
+														<Icon name={IconName.KindFile} size={12} />
+														{t("insert.action")}
+													</button>
+												) : null}
+												{memoryEnabled ? (
+													<button
+														type="button"
+														className="agent__remember"
+														onClick={() => rememberFact(m.body)}
+														title={t("memory.remember.hint")}
+														data-testid="agent-remember"
+													>
+														<Icon name={IconName.Star} size={12} />
+														{t("memory.remember")}
+													</button>
+												) : null}
 											</div>
 										) : null}
 										{m.citations && m.citations.length > 0 ? (
@@ -1433,6 +1499,13 @@ export function AgentApp(): ReactElement {
 						<div ref={endRef} />
 					</div>
 
+					{insertNotice ? (
+						<div className="agent__error-row">
+							<div className="agent__notice" role="status" data-testid="agent-insert-notice">
+								{insertNotice}
+							</div>
+						</div>
+					) : null}
 					{error ? (
 						<div className="agent__error-row">
 							<div className="agent__error" role="alert" data-testid="agent-error">
@@ -1530,6 +1603,14 @@ export function AgentApp(): ReactElement {
 					onEdit={editMemory}
 					onDelete={deleteMemory}
 					onClearAll={clearAllMemories}
+				/>
+			) : null}
+
+			{addToNoteFor ? (
+				<AddToNotePopover
+					entities={all}
+					onClose={() => setAddToNoteFor(null)}
+					onPick={(note, mode) => void addToNote(addToNoteFor, note, mode)}
 				/>
 			) : null}
 

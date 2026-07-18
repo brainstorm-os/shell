@@ -55,9 +55,11 @@ import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm/sd
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
+import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
+import { decideInsertIntent, refusalNoticeKey } from "./logic/insert-request";
 import { PropertiesPanel } from "./properties/properties-panel";
 import {
 	notesCommitMatcher,
@@ -289,6 +291,43 @@ export function NotesApp() {
 		const openId = note?.id;
 		setAnchorReveal((prev) => (prev && openId && prev.noteId !== openId ? null : prev));
 	}, [note?.id]);
+	// Inbound `insert` intent (F-241 / doc 75 — the Agent → Notes seam). A
+	// validated request selects the target note and rides into the editor's
+	// InsertAtEndPlugin; a refusal (malformed / unknown note / locked) sets a
+	// transient, aria-announced notice — never a silent drop. Cleared when the
+	// user navigates to a different note before the apply.
+	const [insertRequest, setInsertRequest] = useState<InsertAtEndRequest | null>(null);
+	const [insertNotice, setInsertNotice] = useState<string | null>(null);
+	useEffect(() => {
+		const openId = note?.id;
+		setInsertRequest((prev) => (prev && openId && prev.noteId !== openId ? null : prev));
+	}, [note?.id]);
+	useEffect(() => {
+		if (!insertNotice) return;
+		const timer = window.setTimeout(() => setInsertNotice(null), 6000);
+		return () => window.clearTimeout(timer);
+	}, [insertNotice]);
+	const handleInsertIntent = useCallback(
+		(verb: string, payload: Record<string, unknown> | undefined) => {
+			const decision = decideInsertIntent(verb, payload, {
+				hasNote: (id) => notes.has(id),
+				isLocked: (id) => notes.get(id)?.locked ?? false,
+			});
+			if (!decision) return false;
+			if (decision.kind === "refuse") {
+				setInsertNotice(t(refusalNoticeKey(decision.refusal)));
+				return true;
+			}
+			select(decision.noteId);
+			setInsertRequest((prev) => ({
+				noteId: decision.noteId,
+				markdown: decision.markdown,
+				nonce: (prev?.nonce ?? 0) + 1,
+			}));
+			return true;
+		},
+		[notes, select],
+	);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [coverPickerOpen, setCoverPickerOpen] = useState(false);
 	// Collab-C5 — the note id whose share dialog is open (null = closed).
@@ -446,17 +485,22 @@ export function NotesApp() {
 	// window, so `runtime.launch` doesn't update — the `app:intent`
 	// channel re-emits a lifecycle event we subscribe to here.
 	//
-	// Two intents land here today:
+	// Three intents land here today:
 	//   - `open` { entityId } — focus the named note if present
 	//   - `compose` { title? } — idempotent on title: if a note with
 	//     that exact title exists, select it; otherwise create one
 	//     seeded with the title. Used by Journal's "Start today's
 	//     journal" button and (eventually) Bookmarks' paste-URL flow.
+	//   - `insert` { entityId, markdown, … } — F-241 / doc 75: append
+	//     agent-dispatched markdown at the end of the named note
+	//     (fail-closed validation + locked-note refusal in
+	//     `decideInsertIntent`).
 	useEffect(() => {
 		if (!runtime) return;
 		const sub = runtime.on("intent", (event) => {
 			if (event.type !== "intent") return;
 			const intent = event.intent;
+			if (handleInsertIntent(intent.verb, intent.payload)) return;
 			if (intent.verb === "open") {
 				const entityId = intent.payload?.entityId;
 				if (typeof entityId !== "string") return;
@@ -487,7 +531,20 @@ export function NotesApp() {
 			}
 		});
 		return () => sub.unsubscribe();
-	}, [runtime, notes, select, openEntity, create]);
+	}, [runtime, notes, select, openEntity, create, handleInsertIntent]);
+
+	// Cold-launch `insert` (F-241) — Notes wasn't running, so the intent rides
+	// the launch context (`reason: "intent"`) instead of the `app:intent`
+	// push. Handled once, after the store is ready (the fail-closed decision
+	// needs the notes map to resolve the target + its lock state).
+	const launchInsertHandled = useRef(false);
+	useEffect(() => {
+		if (!ready || launchInsertHandled.current) return;
+		const launch = runtime?.launch;
+		if (launch?.reason !== "intent" || !launch.intent) return;
+		launchInsertHandled.current = true;
+		handleInsertIntent(launch.intent.verb, launch.intent.payload);
+	}, [ready, runtime, handleInsertIntent]);
 
 	const toggleNav = useCallback(() => {
 		setNavOpen((open) => {
@@ -614,6 +671,25 @@ export function NotesApp() {
 			update(note.id, patch);
 		},
 		[note, update],
+	);
+
+	// F-241 — insert applied (or failed) in the editor. The append is a
+	// programmatic Y.Doc write, so the autosave's real-interaction gate won't
+	// re-derive the sidebar snippet / bodyRefs; refresh them here from the
+	// live editor state (the same diffed denormalise path a user edit takes —
+	// this is what projects an inserted `brainstorm://entity/…` link into the
+	// note→conversation graph edge).
+	const onInsertDone = useCallback(
+		(applied: boolean) => {
+			setInsertRequest(null);
+			if (!applied) {
+				setInsertNotice(t("notes.insert.refused.malformed"));
+				return;
+			}
+			const state = editorHandleRef.current?.getEditorState().toJSON();
+			if (state) onBodyChange(state);
+		},
+		[onBodyChange],
 	);
 
 	const editorNoteContext = useMemo(
@@ -949,6 +1025,19 @@ export function NotesApp() {
 			/>
 
 			<main className="notes__main" aria-live="polite">
+				{insertNotice ? (
+					<div className="notes__insert-notice" role="status" data-testid="notes-insert-notice">
+						<span>{insertNotice}</span>
+						<button
+							type="button"
+							className="notes__insert-notice-dismiss"
+							onClick={() => setInsertNotice(null)}
+							aria-label={t("notes.insert.notice.dismiss")}
+						>
+							<IconGlyph name={IconName.Close} size={12} />
+						</button>
+					</div>
+				) : null}
 				{error ? (
 					<div className="notes__error">
 						<p>{error}</p>
@@ -1005,6 +1094,10 @@ export function NotesApp() {
 										locked={locked}
 										anchorReveal={anchorReveal && anchorReveal.noteId === note.id ? anchorReveal : null}
 										onAnchorDone={onAnchorDone}
+										insertRequest={
+											insertRequest && insertRequest.noteId === note.id && !locked ? insertRequest : null
+										}
+										onInsertDone={onInsertDone}
 									/>
 								)}
 							</div>

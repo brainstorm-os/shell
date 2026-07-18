@@ -104,5 +104,18 @@
   "widget.updated": "Updated {date}",
   "widget.date.today": "today",
   "widget.date.tomorrow": "tomorrow",
-  "widget.date.yesterday": "yesterday"
+  "widget.date.yesterday": "yesterday",
+  "insert.action": "Add to note",
+  "insert.action.hint": "Insert this reply into a note, or link this chat from one",
+  "insert.title": "Add to note",
+  "insert.mode.label": "What to add",
+  "insert.mode.reply": "Insert reply",
+  "insert.mode.link": "Link this chat",
+  "insert.hint.reply": "Appends this reply at the end of the note, with a link back to this conversation.",
+  "insert.hint.link": "Appends a link to this conversation at the end of the note.",
+  "insert.search.placeholder": "Search notes…",
+  "insert.search.label": "Search notes",
+  "insert.empty": "No notes match.",
+  "insert.success": "Added to “{note}”",
+  "insert.failed": "Couldn't add to the note."
 }

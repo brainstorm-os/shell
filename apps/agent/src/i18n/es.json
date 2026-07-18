@@ -96,7 +96,6 @@
   "error.quotaExhausted": "La app Agent ha agotado su presupuesto de IA de 30 días. Aumenta o borra el presupuesto en Ajustes → IA para seguir chateando.",
   "error.generic": "Algo salió mal al generar una respuesta.",
   "provenance.via": "vía {model}",
-
   "widget.label": "Agent",
   "widget.count.one": "{count} conversación",
   "widget.count.other": "{count} conversaciones",
@@ -105,5 +104,18 @@
   "widget.updated": "Actualizado {date}",
   "widget.date.today": "hoy",
   "widget.date.tomorrow": "mañana",
-  "widget.date.yesterday": "ayer"
+  "widget.date.yesterday": "ayer",
+  "insert.action": "Añadir a una nota",
+  "insert.action.hint": "Inserta esta respuesta en una nota o enlaza este chat desde una",
+  "insert.title": "Añadir a una nota",
+  "insert.mode.label": "Qué añadir",
+  "insert.mode.reply": "Insertar respuesta",
+  "insert.mode.link": "Enlazar este chat",
+  "insert.hint.reply": "Añade esta respuesta al final de la nota, con un enlace de vuelta a esta conversación.",
+  "insert.hint.link": "Añade un enlace a esta conversación al final de la nota.",
+  "insert.search.placeholder": "Buscar notas…",
+  "insert.search.label": "Buscar notas",
+  "insert.empty": "Ninguna nota coincide.",
+  "insert.success": "Añadido a «{note}»",
+  "insert.failed": "No se pudo añadir a la nota."
 }

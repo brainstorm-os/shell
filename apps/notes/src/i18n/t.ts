@@ -26,6 +26,12 @@ const DEFAULTS: Record<string, string> = {
 	"notes.sidebar.hide": "Hide notes list",
 	"notes.sidebar.region": "Notes list",
 	"notes.sidebar.resize": "Resize notes list",
+	// F-241 — inbound `insert` intent notices (refusals are never silent).
+	"notes.insert.refused.malformed": "Couldn't insert into the note — the request was invalid.",
+	"notes.insert.refused.unknownNote": "Couldn't insert — that note doesn't exist.",
+	"notes.insert.refused.locked": "Couldn't insert — the note is locked.",
+	"notes.insert.notice.dismiss": "Dismiss",
+
 	"notes.search.placeholder": "Search notes…",
 	"notes.search.clear": "Clear search",
 	"notes.search.empty": "No notes match your search.",

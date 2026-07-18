@@ -2217,6 +2217,97 @@ describe("IntentsBus send-family verbs (Mailbox-4)", () => {
 	});
 });
 
+describe("IntentsBus — insert delivery (F-241 / doc 75 Agent → Notes seam)", () => {
+	let env: Awaited<ReturnType<typeof setup>>;
+	beforeEach(async () => {
+		env = await setup();
+	});
+	afterEach(async () => {
+		env.stores.close();
+		await rm(env.vaultDir, { recursive: true, force: true });
+	});
+
+	const NOTE_TYPE = "io.brainstorm.notes/Note/v1";
+
+	function registerInsertHandler() {
+		env.repos.intents.insert({
+			appId: "io.example.editor",
+			verb: "insert",
+			entityType: NOTE_TYPE,
+			mime: null,
+			format: null,
+			kind: null,
+			blockId: null,
+			label: null,
+			priority: "primary",
+			registeredAt: 1,
+		});
+	}
+
+	it("insert launches the registered handler with the full intent riding the launch context", async () => {
+		registerInsertHandler();
+		const payload = {
+			entityId: "note-1",
+			entityType: NOTE_TYPE,
+			position: "end",
+			markdown: "## Reply",
+		};
+		const result = await env.bus.dispatch({ verb: "insert", payload }, { app: "io.example.agent" });
+		expect(result.handled).toBe(true);
+		expect(result.handled && result.handler.appId).toBe("io.example.editor");
+		expect(env.launches[0]?.launch).toEqual({
+			reason: "intent",
+			intent: { verb: "insert", payload, source: "io.example.agent" },
+		});
+	});
+
+	it("pushes the insert intent over app:intent when the handler is already running", async () => {
+		registerInsertHandler();
+		const send = vi.fn();
+		const existing = {
+			appId: "io.example.editor",
+			windowId: "main",
+			tabId: "tab-1",
+			webContentsId: 7,
+			parked: false,
+			webContents: { isDestroyed: () => false, send } as unknown as AppWindow["webContents"],
+			container: {} as AppWindow["container"],
+		};
+		const launcher = {
+			getExistingWindow: () => existing,
+		} as unknown as AppLauncher;
+		const { orchestrator } = makeOrchestrator();
+		(orchestrator.launch as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+		const bus = new IntentsBus({ intents: env.repos.intents, orchestrator, launcher });
+		const payload = { entityId: "note-1", entityType: NOTE_TYPE, position: "end", markdown: "x" };
+		const result = await bus.dispatch({ verb: "insert", payload }, { app: "io.example.agent" });
+		expect(result.handled).toBe(true);
+		expect(send).toHaveBeenCalledWith("app:intent", {
+			verb: "insert",
+			payload,
+			source: "io.example.agent",
+		});
+	});
+
+	it("insert for an unregistered target type fails closed with no-handler", async () => {
+		registerInsertHandler();
+		const result = await env.bus.dispatch(
+			{
+				verb: "insert",
+				payload: {
+					entityId: "task-1",
+					entityType: "io.brainstorm.tasks/Task/v1",
+					position: "end",
+					markdown: "x",
+				},
+			},
+			{ app: "io.example.agent" },
+		);
+		expect(result.handled).toBe(false);
+		expect(result.handled === false && result.reason).toBe("no-handler");
+	});
+});
+
 describe("IntentsBus — suggestActions (action surface, doc 63)", () => {
 	let env: Awaited<ReturnType<typeof setup>>;
 	beforeEach(async () => {

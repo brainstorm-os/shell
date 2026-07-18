@@ -2938,3 +2938,14 @@ export {
 	groupContributedActions,
 	groupForVerb,
 } from "./contributed-actions";
+
+// The Agent → Notes seam (F-241 / doc 75) — the target-addressed `insert`
+// intent payload contract shared by dispatcher (Agent) and handler (Notes).
+export {
+	INSERT_INTENT_VERB,
+	INSERT_MARKDOWN_MAX,
+	InsertPosition,
+	type NoteInsertPayload,
+	buildNoteInsertPayload,
+	parseNoteInsertPayload,
+} from "./insert-intent";

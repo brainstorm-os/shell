@@ -1,11 +1,14 @@
 {
   "id": "io.brainstorm.agent",
   "name": "Agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "sdk": "1",
-  "description": "Conversational AI workspace — chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
+  "description": "Conversational AI workspace \u2014 chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
   "icon": "icon.svg",
-  "i18n": { "source": "en", "locales": ["en", "es"] },
+  "i18n": {
+    "source": "en",
+    "locales": ["en", "es"]
+  },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",
@@ -24,7 +27,8 @@
     "entities.write:brainstorm/Memory/v1",
     "entities.write:brainstorm/Trigger/v1",
     "entities.write:brainstorm/Workflow/v1",
-    "intents.dispatch:open"
+    "intents.dispatch:open",
+    "intents.dispatch:insert"
   ],
   "registrations": {
     "entityTypes": [
@@ -35,16 +39,46 @@
           "type": "object",
           "required": ["title", "memoryMode"],
           "properties": {
-            "title": { "type": "string" },
-            "memoryMode": { "type": "string", "enum": ["per-conversation", "long-term"] },
-            "provider": { "type": "string" },
-            "model": { "type": "string" },
-            "toolGrants": { "type": "array", "items": { "type": "string" } },
-            "tokenBudget": { "type": "number" },
-            "tokensSpent": { "type": "number" },
-            "costCents": { "type": "number" },
-            "tags": { "type": "array", "items": { "type": "string" } },
-            "participants": { "type": "array", "items": { "type": "object" } }
+            "title": {
+              "type": "string"
+            },
+            "memoryMode": {
+              "type": "string",
+              "enum": ["per-conversation", "long-term"]
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "toolGrants": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tokenBudget": {
+              "type": "number"
+            },
+            "tokensSpent": {
+              "type": "number"
+            },
+            "costCents": {
+              "type": "number"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "participants": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
           }
         }
       },
@@ -55,15 +89,37 @@
           "type": "object",
           "required": ["conversation", "role", "body", "createdAt"],
           "properties": {
-            "conversation": { "type": "string" },
-            "role": { "type": "string", "enum": ["system", "user", "assistant", "tool"] },
-            "body": { "type": "string" },
-            "sender": { "type": "object" },
-            "citations": { "type": "array", "items": { "type": "string" } },
-            "toolCalls": { "type": "array" },
-            "aiProvenance": { "type": "object" },
-            "createdAt": { "type": "string" },
-            "seq": { "type": "number" }
+            "conversation": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string",
+              "enum": ["system", "user", "assistant", "tool"]
+            },
+            "body": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "object"
+            },
+            "citations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "toolCalls": {
+              "type": "array"
+            },
+            "aiProvenance": {
+              "type": "object"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "seq": {
+              "type": "number"
+            }
           }
         }
       },
@@ -74,18 +130,41 @@
           "type": "object",
           "required": ["text", "createdAt"],
           "properties": {
-            "text": { "type": "string" },
-            "createdAt": { "type": "string" },
-            "updatedAt": { "type": "string" },
-            "source": { "type": "string" }
+            "text": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
           }
         }
       }
     ],
-    "openers": [{ "kind": "primary", "entityType": "brainstorm/Conversation/v1" }],
-    "widgets": [{ "id": "recent-conversations", "name": "Conversations", "size": "medium" }],
+    "openers": [
+      {
+        "kind": "primary",
+        "entityType": "brainstorm/Conversation/v1"
+      }
+    ],
+    "widgets": [
+      {
+        "id": "recent-conversations",
+        "name": "Conversations",
+        "size": "medium"
+      }
+    ],
     "intents": [
-      { "verb": "open", "entityType": "brainstorm/Conversation/v1", "priority": "primary" },
+      {
+        "verb": "open",
+        "entityType": "brainstorm/Conversation/v1",
+        "priority": "primary"
+      },
       {
         "verb": "process",
         "kind": "summarize",
