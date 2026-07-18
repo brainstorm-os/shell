@@ -4,9 +4,12 @@ import {
 	BRAINSTORM_ENTITY_LINK_PREFIX,
 	LinkClickAction,
 	buildEntityLinkUrl,
+	findBinaryLinkFromEvent,
 	findEntityLinkFromEvent,
 	findMentionFromEvent,
+	isBrainstormBinaryUrl,
 	resolveLinkClick,
+	triggerBinaryLinkDownload,
 } from "./link-markup-ops";
 
 describe("buildEntityLinkUrl", () => {
@@ -250,5 +253,71 @@ describe("findMentionFromEvent", () => {
 		expect(findMentionFromEvent(sibling, root)).toBeNull();
 		sibling.remove();
 		cleanup(root);
+	});
+});
+
+describe("binary brainstorm:// link routing (imported PDF / uploaded file anchors)", () => {
+	function makeRoot(html: string): HTMLDivElement {
+		const root = document.createElement("div");
+		root.innerHTML = html;
+		document.body.append(root);
+		return root;
+	}
+
+	it("recognises asset and app-file URLs, and nothing else", () => {
+		expect(isBrainstormBinaryUrl("brainstorm://asset/a_9f3")).toBe(true);
+		expect(isBrainstormBinaryUrl("brainstorm://app-file/notes/abc.pdf")).toBe(true);
+		// Bare hosts, entity URIs and external links are not binary content.
+		expect(isBrainstormBinaryUrl("brainstorm://asset/")).toBe(false);
+		expect(isBrainstormBinaryUrl("brainstorm://entity/n_1")).toBe(false);
+		expect(isBrainstormBinaryUrl("https://example.com/a.pdf")).toBe(false);
+		expect(isBrainstormBinaryUrl("about:blank")).toBe(false);
+	});
+
+	it("finds the nearest binary anchor from a click target inside it", () => {
+		const root = makeRoot('<p><a href="brainstorm://asset/a_9f3"><span>report.pdf</span></a></p>');
+		const span = root.querySelector("span");
+		if (!span) throw new Error("seed missing");
+		const match = findBinaryLinkFromEvent(span, root);
+		expect(match?.url).toBe("brainstorm://asset/a_9f3");
+		expect(match?.anchor.textContent).toBe("report.pdf");
+		root.remove();
+	});
+
+	it("ignores entity links, external links, and anchors outside the root", () => {
+		const root = makeRoot(
+			'<a href="brainstorm://entity/n_1">entity</a><a href="https://x.test/a.pdf">ext</a>',
+		);
+		for (const a of root.querySelectorAll("a")) {
+			expect(findBinaryLinkFromEvent(a, root)).toBeNull();
+		}
+		const outside = document.createElement("a");
+		outside.setAttribute("href", "brainstorm://asset/a_1");
+		document.body.append(outside);
+		expect(findBinaryLinkFromEvent(outside, root)).toBeNull();
+		outside.remove();
+		root.remove();
+	});
+
+	it("downloads via a transient <a download> carrying the display filename", () => {
+		// The Electron will-navigate guard drops brainstorm:// navigations, so
+		// the interceptor must go through the download pipeline instead — the
+		// same contract FileBlockNode's chip uses.
+		const clicked: Array<{ href: string; download: string }> = [];
+		const onClick = (event: MouseEvent) => {
+			const a = event.target as HTMLAnchorElement;
+			clicked.push({ href: a.getAttribute("href") ?? "", download: a.download });
+			event.preventDefault(); // keep jsdom from attempting a navigation
+		};
+		document.addEventListener("click", onClick, true);
+		triggerBinaryLinkDownload("brainstorm://asset/a_9f3", "  report.pdf  ");
+		triggerBinaryLinkDownload("brainstorm://app-file/notes/abc.bin", null);
+		document.removeEventListener("click", onClick, true);
+		expect(clicked).toEqual([
+			{ href: "brainstorm://asset/a_9f3", download: "report.pdf" },
+			{ href: "brainstorm://app-file/notes/abc.bin", download: "" },
+		]);
+		// The transient anchor must not leak into the document.
+		expect(document.querySelector('a[href^="brainstorm://"]')).toBeNull();
 	});
 });

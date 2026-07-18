@@ -105,6 +105,58 @@ export function findEntityLinkFromEvent(
 	};
 }
 
+/** `brainstorm://` hosts that serve raw binary content (the shell's
+ *  protocol handler, packages/shell `src/main/index.ts`): `asset/` is a
+ *  sealed imported binary (the Anytype/Obsidian media pass rewrites a
+ *  PDF's `link.url` to it), `app-file/` a content-addressed upload. A
+ *  link anchor to either can't just navigate — the app view's
+ *  will-navigate guard (`wireExternalLinkRouting`) blocks every non-http
+ *  navigation — so the click interceptor downloads it instead, the same
+ *  `<a download>` path the editor's file chip (`FileBlockNode`) uses. */
+const BRAINSTORM_BINARY_PREFIXES = ["brainstorm://asset/", "brainstorm://app-file/"] as const;
+
+/** True when the URL points at binary-serving `brainstorm://` content
+ *  (an asset or uploaded app file) rather than an entity. */
+export function isBrainstormBinaryUrl(url: string): boolean {
+	return BRAINSTORM_BINARY_PREFIXES.some(
+		(prefix) => url.startsWith(prefix) && url.length > prefix.length,
+	);
+}
+
+/** Walk up from a DOM event target to the nearest `<a>` whose href is a
+ *  binary-serving `brainstorm://` URL (imported PDF / uploaded file link).
+ *  Bounded by `root` like {@link findEntityLinkFromEvent}. Returns the
+ *  anchor + its href, or `null`. */
+export function findBinaryLinkFromEvent(
+	target: EventTarget | null,
+	root: Element,
+): { anchor: HTMLAnchorElement; url: string } | null {
+	if (!(target instanceof Element)) return null;
+	const anchor = target.closest("a");
+	if (!anchor || !root.contains(anchor)) return null;
+	const href = anchor.getAttribute("href") ?? "";
+	if (!isBrainstormBinaryUrl(href)) return null;
+	return { anchor: anchor as HTMLAnchorElement, url: href };
+}
+
+/** Trigger a save of a binary `brainstorm://` URL by clicking a transient
+ *  `<a download>` — the same mechanism `FileBlockNode`'s chip relies on
+ *  ("renders an `<a download>` so the shell handles the save"). A plain
+ *  in-page navigation would be dropped by the Electron will-navigate
+ *  guard; the download attribute routes it to the download pipeline
+ *  instead. `name` (the link's text — the display filename for imported
+ *  files) becomes the suggested filename when present. */
+export function triggerBinaryLinkDownload(url: string, name?: string | null): void {
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = name?.trim() || "";
+	a.rel = "noopener noreferrer";
+	a.style.display = "none";
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+}
+
 /** Walk up from a click target to the nearest `MentionNode` chip and read
  *  its entity coordinates. `MentionNode.createDOM` stamps both
  *  `data-entity-id` and `data-entity-type` on its outer span (the inner

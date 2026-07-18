@@ -7,7 +7,7 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "sideEffects": ["*.css", "**/*.css"],
+  "sideEffects": ["*.css", "**/*.css", "**/link-sanitizer.ts"],
   "exports": {
     ".": "./src/index.ts",
     "./editor.css": "./src/editor.css",
