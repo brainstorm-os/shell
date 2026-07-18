@@ -1169,11 +1169,7 @@ function renderActiveViewInner(state: AppState): void {
 	const editProperty = (entity: EntityRow, propertyId: string, value: unknown): void => {
 		// A locked record is read-only — every view's cell commit no-ops (the
 		// lock toggle itself writes through `persistEntityPatch` directly).
-<<<<<<< Updated upstream
 		if (isRecordLocked(entity)) return;
-=======
-		if (entity.properties?.locked === true) return;
->>>>>>> Stashed changes
 		void persistEntityPatch(state, entity, { [propertyId]: value });
 	};
 	switch (view.kind) {
@@ -1465,22 +1461,14 @@ function renderInspector(state: AppState): void {
 	// Read-only lock — the record's synced `locked` property. The shared
 	// `editProperty` commit no-ops for a locked record, so its cells are
 	// read-only across every view; here we surface the toggle + freeze rename.
-<<<<<<< Updated upstream
 	const recordLocked = isRecordLocked(entity);
-=======
-	const recordLocked = entity.properties?.locked === true;
->>>>>>> Stashed changes
 	if (lockBtn) {
 		lockBtn.hidden = false;
 		lockBtn.replaceChildren(createIconElement(IconName.Lock));
 		lockBtn.setAttribute("aria-pressed", String(recordLocked));
-<<<<<<< Updated upstream
 		const lockLabel = recordLocked
 			? t("brainstorm.database.record.unlock")
 			: t("brainstorm.database.record.lock");
-=======
-		const lockLabel = recordLocked ? "Unlock record" : "Lock record (read-only)";
->>>>>>> Stashed changes
 		lockBtn.setAttribute("aria-label", lockLabel);
 		lockBtn.setAttribute("data-bs-tooltip", lockLabel);
 		lockBtn.onclick = () => {

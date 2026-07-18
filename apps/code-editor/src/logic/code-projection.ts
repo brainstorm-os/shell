@@ -38,7 +38,6 @@ export interface CodeFileRow extends CodeFile {
 	/** Read-only lock — the file's synced `locked` property. When true the
 	 *  editor surface is read-only. */
 	locked: boolean;
-<<<<<<< Updated upstream
 }
 
 /** A code file accepts rename/delete only when it is a native editable content
@@ -47,8 +46,6 @@ export interface CodeFileRow extends CodeFile {
  *  locked file can't be renamed or deleted out from under its lock. */
 export function isCodeFileEditable(row: Pick<CodeFileRow, "contentKey" | "locked">): boolean {
 	return row.contentKey === "content" && !row.locked;
-=======
->>>>>>> Stashed changes
 }
 
 function str(value: unknown, fallback = ""): string {
