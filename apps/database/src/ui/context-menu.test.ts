@@ -113,12 +113,21 @@ describe("Database per-object stage menu is the shared object menu (B-1 parity)"
 	});
 
 	it("routes the per-object menu through openObjectMenu with the documented contract shape", () => {
+		// DND-6 — the right-click listener and the Shift+F10 chord share ONE
+		// builder (`openRowObjectMenu(state, entity, point)`), so the click point
+		// flows through `point` rather than an inline `{x: event.clientX, …}`.
 		expect(APP_SRC).toMatch(
-			/openObjectMenu\(\s*\{\s*x:\s*event\.clientX,\s*y:\s*event\.clientY\s*\}/,
+			/openRowObjectMenu\(state,\s*entity,\s*\{\s*x:\s*event\.clientX,\s*y:\s*event\.clientY\s*\}\s*\)/,
 		);
+		expect(APP_SRC).toMatch(/openObjectMenu\(point,\s*\{/);
 		expect(APP_SRC).toMatch(
-			/target:\s*\{\s*entityId,\s*entityType:\s*entity\.type\s*\}\s*,\s*runtime,/,
+			/target:\s*\{\s*entityId:\s*entity\.id,\s*entityType:\s*entity\.type\s*\}\s*,\s*runtime,/,
 		);
+	});
+
+	it("DND-6 — the keyboard chord opens the same row menu for the selection anchor", () => {
+		expect(APP_SRC).toMatch(/attachShortcut\(body,\s*"Shift\+F10"/);
+		expect(APP_SRC).toMatch(/openRowObjectMenu\(state,\s*entity,\s*\{\s*x:\s*rect\.left/);
 	});
 
 	it("does NOT hand-roll the object menu via the private context-menu adapter", () => {

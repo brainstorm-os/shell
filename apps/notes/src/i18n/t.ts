@@ -94,6 +94,16 @@ const DEFAULTS: Record<string, string> = {
 	"notes.objectMenu.addToCollection": "Add to collection…",
 	"notes.objectMenu.collectionsRegion": "Collections",
 	"notes.objectMenu.noCollections": "No collections yet",
+	// DND-6 — "Link to note…" keyboard twin of dropping this note into an
+	// open editor (same reference semantic, target picked from a list).
+	"notes.objectMenu.linkToNote": "Link to note…",
+	"notes.linkPicker.aria": "Link into note",
+	"notes.linkPicker.placeholder": "Search notes…",
+	"notes.linkPicker.empty": "No other notes.",
+	// DND-6 — live-region announcement when references land in a note (drop
+	// or keyboard twin): the operation is announced, not the ghost's motion.
+	"notes.a11y.entityLinked.one": "Linked {count} object into “{note}”",
+	"notes.a11y.entityLinked.other": "Linked {count} objects into “{note}”",
 	"notes.export.markdown": "Export as Markdown",
 	"notes.export.html": "Export as HTML",
 	"notes.export.pdf": "Export as PDF",
@@ -519,7 +529,7 @@ export function t(key: string, params?: TranslationParams): string {
 /** Pick the singular or plural form based on count. Tiny English-only
  *  ruleset (one for exactly 1, otherwise other). When the locale layer
  *  arrives this delegates to `Intl.PluralRules`. */
-export function tCount(baseKey: string, count: number): string {
+export function tCount(baseKey: string, count: number, params?: TranslationParams): string {
 	const suffix = count === 1 ? "one" : "other";
-	return t(`${baseKey}.${suffix}`, { count });
+	return t(`${baseKey}.${suffix}`, { count, ...params });
 }

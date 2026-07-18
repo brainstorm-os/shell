@@ -118,6 +118,16 @@ describe("useDropTarget — native transport", () => {
 		act(() => handle?.dropProps.onDrop(nativeEvent(true)));
 		expect(onDrop).not.toHaveBeenCalled();
 	});
+
+	it("exposes aria-dropeffect while hovered and clears it on leave (DND-6)", () => {
+		mount({ accepts: () => true, dropEffectFor: () => DropEffect.Move, onDrop: vi.fn() });
+		expect(handle?.dropProps["aria-dropeffect"]).toBeUndefined();
+		act(() => handle?.dropProps.onDragOver(nativeEvent(true)));
+		expect(handle?.dropProps["aria-dropeffect"]).toBe(DropEffect.Move);
+		const leave = { ...nativeEvent(true), currentTarget: null, relatedTarget: null };
+		act(() => handle?.dropProps.onDragLeave(leave));
+		expect(handle?.dropProps["aria-dropeffect"]).toBeUndefined();
+	});
 });
 
 describe("useDropTarget — cross-app transport", () => {

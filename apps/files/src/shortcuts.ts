@@ -35,6 +35,9 @@ export const ActionId = {
 	Cut: "brainstorm.files/cut",
 	Paste: "brainstorm.files/paste",
 	Duplicate: "brainstorm.files/duplicate",
+	/** DND-6 — keyboard twin of the move drag: opens the destination picker
+	 *  for the current selection (same commit path as a drop). */
+	MoveTo: "brainstorm.files/move-to",
 	Pin: "brainstorm.files/pin",
 	SelectAll: "brainstorm.files/select-all",
 	Back: "brainstorm.files/back",
@@ -67,6 +70,7 @@ const DEFAULT_CHORDS: Record<ActionId, string | null> = {
 	[ActionId.Cut]: "CmdOrCtrl+X",
 	[ActionId.Paste]: "CmdOrCtrl+V",
 	[ActionId.Duplicate]: "CmdOrCtrl+D",
+	[ActionId.MoveTo]: "CmdOrCtrl+Shift+M",
 	[ActionId.Pin]: "CmdOrCtrl+Shift+D",
 	[ActionId.SelectAll]: "CmdOrCtrl+A",
 	[ActionId.Back]: "CmdOrCtrl+[",

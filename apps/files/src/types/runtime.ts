@@ -131,6 +131,21 @@ export type BrainstormRuntime = {
 			/** Storage inventory across every vault store (9.x) — backs the
 			 *  "Storage" overlay. `files.read`-gated. */
 			listStorageInventory?(): Promise<ReadonlyArray<StoredAsset>>;
+			/** Save dialog + write-back (DND-6 — the keyboard twin of the DND-5
+			 *  drag-out). `files.write`-gated; absent on older shells. Shapes
+			 *  mirror the `@brainstorm/sdk-types` `FilesService` subset. */
+			requestSave?(opts?: {
+				readonly title?: string;
+				readonly filters?: ReadonlyArray<{
+					readonly name: string;
+					readonly extensions: readonly string[];
+				}>;
+				readonly suggestedName?: string;
+			}): Promise<{ handleId: string; displayName: string } | null>;
+			write?(
+				handle: { handleId: string; displayName: string },
+				data: Uint8Array | ArrayBuffer,
+			): Promise<void>;
 		};
 		/** Cross-app DnD host (DND-5). Only `exportFile` (drag a file OUT to the
 		 *  OS via `webContents.startDrag`) is consumed here. Cap `dnd.exportFile`

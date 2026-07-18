@@ -62,6 +62,13 @@ describe("useDragSource suppressNativeDragRef", () => {
 		expect(row.draggable).toBe(true);
 	});
 
+	it("marks the handle grabbable to AT via aria-grabbed=false at rest (DND-6)", () => {
+		act(() => root.render(<Harness />));
+		const grip = container.querySelector<HTMLButtonElement>('[data-testid="grip"]');
+		if (!grip) throw new Error("not mounted");
+		expect(grip.getAttribute("aria-grabbed")).toBe("false");
+	});
+
 	it("restores the ancestor on pointercancel too", () => {
 		act(() => root.render(<Harness />));
 		const row = container.querySelector<HTMLDivElement>('[data-testid="row"]');

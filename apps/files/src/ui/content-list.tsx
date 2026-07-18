@@ -168,8 +168,10 @@ function geometryFor(mode: ViewMode, containerWidth: number, tileSize: TileSize)
  *  protocol (the same source thumbnails use). PREFETCHED on pointerdown so the
  *  bytes are ready by `dragstart`: `webContents.startDrag` must reach main while
  *  the OS drag gesture is still live, so the slow part (the fetch) must NOT sit
- *  in the `dragstart` critical path. Returns null on missing service/asset. */
-async function fetchExportBytes(entity: Entity): Promise<Uint8Array | null> {
+ *  in the `dragstart` critical path. Returns null on missing service/asset.
+ *  Exported for the DND-6 "Save to disk…" keyboard twin (same byte source as
+ *  the drag-out grip). */
+export async function fetchExportBytes(entity: Entity): Promise<Uint8Array | null> {
 	const assetId = entity.properties.assetId;
 	if (typeof assetId !== "string" || assetId === "") return null;
 	try {
@@ -195,6 +197,9 @@ export type ContentListProps = {
 	onCycle: (movingId: string, destId: string) => void;
 	onEditIcon: (folderId: string) => void;
 	onEditCover: (folderId: string) => void;
+	/** DND-6 — see `ContentRowProps.onMoveTo` / `.onSaveToDisk`. */
+	onMoveTo: (entity: Entity, anchor: HTMLElement | null) => void;
+	onSaveToDisk: ((entity: Entity) => void) | undefined;
 };
 
 export function ContentList({
@@ -205,6 +210,8 @@ export function ContentList({
 	onCycle,
 	onEditIcon,
 	onEditCover,
+	onMoveTo,
+	onSaveToDisk,
 }: ContentListProps) {
 	const rows = store.visibleRows;
 	const mode = store.viewMode;
@@ -486,6 +493,8 @@ export function ContentList({
 								onCycle={onCycle}
 								onEditIcon={onEditIcon}
 								onEditCover={onEditCover}
+								onMoveTo={onMoveTo}
+								onSaveToDisk={onSaveToDisk}
 							/>
 						</div>
 					);
@@ -504,6 +513,13 @@ type ContentRowProps = {
 	onCycle: (movingId: string, destId: string) => void;
 	onEditIcon: (folderId: string) => void;
 	onEditCover: (folderId: string) => void;
+	/** DND-6 — object-menu twin of the move drag. `anchor` is the row element
+	 *  (the destination picker drops from it); null falls back to the content
+	 *  region. */
+	onMoveTo: (entity: Entity, anchor: HTMLElement | null) => void;
+	/** DND-6 — keyboard twin of the DND-5 drag-out grip. Absent when the
+	 *  runtime has no save surface (older shells). */
+	onSaveToDisk: ((entity: Entity) => void) | undefined;
 };
 
 /** Legacy cell class per column — `__type`/`__modified` predate the
@@ -617,6 +633,8 @@ function ContentRow({
 	onCycle,
 	onEditIcon,
 	onEditCover,
+	onMoveTo,
+	onSaveToDisk,
 }: ContentRowProps) {
 	const selected = store.selection.selected.has(entity.id);
 	const rowRef = useRef<HTMLDivElement | null>(null);
@@ -668,7 +686,19 @@ function ContentRow({
 		store.rename.entityId === entity.id;
 
 	const menuContext = () =>
-		filesObjectMenuContext({ entity, store, runtime, onEditIcon, onEditCover });
+		filesObjectMenuContext({
+			entity,
+			store,
+			runtime,
+			onEditIcon,
+			onEditCover,
+			// DND-6 twins: move for every row; save-to-disk only for a stored
+			// file (the same gate the DND-5 export grip applies).
+			onMoveTo: () => onMoveTo(entity, rowRef.current),
+			...(onSaveToDisk && !isFolder && typeof entity.properties.assetId === "string"
+				? { onSaveToDisk: () => onSaveToDisk(entity) }
+				: {}),
+		});
 
 	function onRowClick(event: React.MouseEvent) {
 		if (renaming) return;

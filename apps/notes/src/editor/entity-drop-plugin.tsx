@@ -23,7 +23,9 @@
  * (the least-destructive default); intra-renderer Alt-drop still transcludes.
  */
 
+import { useYDocLoaded } from "@brainstorm/react-yjs";
 import { DragPayloadKind, DropEffect } from "@brainstorm/sdk-types";
+import { announce } from "@brainstorm/sdk/a11y";
 import {
 	type EntityDragPayload,
 	dataTransferHasEntity,
@@ -43,16 +45,28 @@ import {
 	type LexicalNode,
 } from "lexical";
 import { useEffect } from "react";
+import { t, tCount } from "../i18n/t";
 import { $createMentionNode } from "./nodes/mention-node";
 import { $createTransclusionNode } from "./nodes/transclusion-node";
+import { drainPendingEntityLinks, onPendingEntityLinks } from "./pending-link";
 
 export type EntityDropPluginProps = {
 	/** The open note's id — a drop of this same entity is rejected (no
 	 *  self-reference), mirroring the mention / transclusion pickers. */
 	currentNoteId: string;
+	/** The open note's display title — names the target in the DND-6
+	 *  live-region announcement ("Linked 2 objects into “Roadmap”"). */
+	noteTitle: string;
 };
 
-export function EntityDropPlugin({ currentNoteId }: EntityDropPluginProps): null {
+/** DND-6 — announce the reference operation (not the drag motion) through the
+ *  shared live region. Untitled notes announce under the list's fallback. */
+function announceLinked(count: number, noteTitle: string): void {
+	const note = noteTitle.trim() || t("notes.list.untitled");
+	announce(tCount("notes.a11y.entityLinked", count, { note }));
+}
+
+export function EntityDropPlugin({ currentNoteId, noteTitle }: EntityDropPluginProps): null {
 	const [editor] = useLexicalComposerContext();
 
 	// Cross-app transport (DND-3): a drag from ANOTHER app's window. The shell
@@ -65,7 +79,10 @@ export function EntityDropPlugin({ currentNoteId }: EntityDropPluginProps): null
 		dropEffectFor: () => DropEffect.Link,
 		onDrop: (payload) => {
 			const items = payload.items.filter((item) => item.entityId !== currentNoteId);
-			if (items.length > 0) appendEntityReferences(editor, items);
+			if (items.length > 0) {
+				appendEntityReferences(editor, items);
+				announceLinked(items.length, noteTitle);
+			}
 		},
 	});
 
@@ -88,6 +105,7 @@ export function EntityDropPlugin({ currentNoteId }: EntityDropPluginProps): null
 				event.preventDefault();
 				if (payload.entityId === currentNoteId) return true;
 				insertEntityReference(editor, payload, event.altKey);
+				announceLinked(1, noteTitle);
 				return true;
 			},
 			COMMAND_PRIORITY_HIGH,
@@ -97,7 +115,42 @@ export function EntityDropPlugin({ currentNoteId }: EntityDropPluginProps): null
 			removeDragover();
 			removeDrop();
 		};
-	}, [editor, currentNoteId]);
+	}, [editor, currentNoteId, noteTitle]);
+
+	return null;
+}
+
+/**
+ * DND-6 — drains the "Link to note…" queue (`pending-link.ts`) into this
+ * note once its Y.Doc snapshot has merged, appending the same MentionNode
+ * blocks a drop produces (one transaction, one undo step, one announcement).
+ * Waiting on `whenLoaded` matters: appending into a still-empty replica
+ * would race the snapshot merge and duplicate content (see `useYDocLoaded`).
+ */
+export function PendingEntityLinkPlugin({ currentNoteId, noteTitle }: EntityDropPluginProps): null {
+	const [editor] = useLexicalComposerContext();
+	const whenLoaded = useYDocLoaded(currentNoteId);
+
+	useEffect(() => {
+		let alive = true;
+		const insert = (): void => {
+			const items = drainPendingEntityLinks(currentNoteId).filter(
+				(item) => item.entityId !== currentNoteId,
+			);
+			if (items.length === 0) return;
+			void Promise.resolve(whenLoaded).then(() => {
+				if (!alive) return;
+				appendEntityReferences(editor, items);
+				announceLinked(items.length, noteTitle);
+			});
+		};
+		insert(); // queued before this note mounted (the picker → open flow)
+		const off = onPendingEntityLinks(currentNoteId, insert);
+		return () => {
+			alive = false;
+			off();
+		};
+	}, [editor, currentNoteId, whenLoaded, noteTitle]);
 
 	return null;
 }

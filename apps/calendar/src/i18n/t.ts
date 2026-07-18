@@ -98,6 +98,15 @@ export const MANIFEST = {
 	// `brainstorm://entity/…` ref so a document can embed it as a live block.
 	"calendar.event.copyBlockRef": "Copy as block",
 	"calendar.event.copyBlockRef.done": "Event link copied — paste it into a document",
+	// DND-6 — "Move to date…" keyboard twin of the chip reschedule drag (and
+	// of a cross-app date drop): same date-picker popover the bulk flow uses,
+	// same write path as the drag.
+	"calendar.menu.moveToDate": "Move to date…",
+	"calendar.moveOne.title": "Move “{title}”",
+	// DND-6 — live-region operation announcements.
+	"calendar.a11y.rescheduled": "Moved “{title}” to {date}",
+	"calendar.a11y.scheduled.one": "Scheduled {count} object on {date}",
+	"calendar.a11y.scheduled.other": "Scheduled {count} objects on {date}",
 	// Recurrence summary (feeds the shared summarizeRecurrence keystone)
 	"calendar.recurrence.daily": "Every day",
 	"calendar.recurrence.everyNDays": "Every {n} days",
@@ -273,7 +282,11 @@ export const t = createT(MANIFEST);
 
 /** Catalog-bound plural — the ONE sanctioned `count === 1` selection
  *  (per CLAUDE.md app-side plural rule). */
-export const plural = (count: number, one: TKey, other: TKey): string =>
-	sdkPlural(t, count, one, other);
+export const plural = (
+	count: number,
+	one: TKey,
+	other: TKey,
+	params?: Record<string, string | number>,
+): string => sdkPlural(t, count, one, other, params);
 
 export type TranslationParams = Record<string, string | number>;
