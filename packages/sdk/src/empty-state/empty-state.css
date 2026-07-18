@@ -71,3 +71,13 @@
 	align-items: center;
 	gap: var(--space-2);
 }
+
+/* Hero CTAs carry the lg control face BY DEFAULT — enforced here so call
+ * sites can't drift back to the md/radius-sm face one app at a time
+ * (owner report 2026-07-18: Mailbox + Code-editor shipped unsized CTAs).
+ * Compact-tone actions keep the standard face. */
+.bs-empty-state--hero .bs-empty-state__action .bs-btn {
+	height: var(--control-height-lg, 40px);
+	padding: 0 var(--space-4);
+	border-radius: var(--radius-md);
+}
