@@ -68,7 +68,7 @@ import "./styles.css";
 
 const DEFAULT_NAME = "You";
 
-const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", isEmpty: true };
+const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 

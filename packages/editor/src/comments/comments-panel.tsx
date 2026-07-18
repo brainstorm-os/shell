@@ -31,7 +31,7 @@ import { MentionComposerPlugin } from "../mention-composer-plugin";
 import { renderEditorState } from "../preview";
 import { useComments } from "./comments-context";
 
-const EMPTY_DRAFT: CompactEditorPayload = { state: "", text: "", isEmpty: true };
+const EMPTY_DRAFT: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 
 /** Sentinel block id for a comment anchored to the document as a whole (the
  *  panel's new-comment box), distinct from a block-anchored comment. */

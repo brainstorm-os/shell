@@ -58,7 +58,7 @@ function mount(opts: { insertNode?: boolean; onSelect?: (c: ContextCandidate) =>
 	payload: () => CompactEditorPayload;
 } {
 	const mention = createRef<MentionComposerHandle>();
-	let last: CompactEditorPayload = { state: "", text: "", isEmpty: true };
+	let last: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 	act(() => {
 		root.render(
 			<CompactEditor

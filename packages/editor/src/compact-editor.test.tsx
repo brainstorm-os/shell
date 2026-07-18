@@ -112,6 +112,83 @@ describe("CompactEditor — DOM", () => {
 		expect(submitted).toBe(0);
 	});
 
+	it("payload carries a semantic HTML rendering with theme chrome stripped (Mailbox-11)", () => {
+		const ref = createRef<CompactEditorHandle>();
+		const payloads: { html: string; text: string }[] = [];
+		let captured: LexicalEditor | null = null;
+		act(() => {
+			root.render(
+				<CompactEditor ref={ref} onSubmit={(p) => payloads.push({ html: p.html, text: p.text })}>
+					<CaptureEditor
+						onReady={(e) => {
+							captured = e;
+						}}
+					/>
+				</CompactEditor>,
+			);
+		});
+		act(() => {
+			(captured as LexicalEditor | null)?.update(
+				() => {
+					const p = $createParagraphNode();
+					p.append($createTextNode("plain "), $createTextNode("bold").toggleFormat("bold"));
+					$getRoot().clear().append(p);
+				},
+				{ discrete: true },
+			);
+			ref.current?.submit();
+		});
+		const html = payloads[0]?.html ?? "";
+		expect(html).toContain("<p");
+		expect(html).toContain("plain ");
+		expect(html).toMatch(/<(strong|b)[^>]*>bold<\/(strong|b)>/);
+		expect(html).not.toContain("class=");
+		expect(html).not.toContain('dir="');
+	});
+
+	it("submitOnEnter={false} keeps Enter a newline — submit only via the handle", () => {
+		const ref = createRef<CompactEditorHandle>();
+		let submitted = 0;
+		let captured: LexicalEditor | null = null;
+		act(() => {
+			root.render(
+				<CompactEditor
+					ref={ref}
+					submitOnEnter={false}
+					onSubmit={() => {
+						submitted++;
+					}}
+				>
+					<CaptureEditor
+						onReady={(e) => {
+							captured = e;
+						}}
+					/>
+				</CompactEditor>,
+			);
+		});
+		act(() => {
+			ref.current?.setText("draft");
+			(captured as LexicalEditor | null)?.dispatchCommand(KEY_ENTER_COMMAND, enterEvent(false));
+		});
+		expect(submitted).toBe(0);
+		act(() => ref.current?.submit());
+		expect(submitted).toBe(1);
+	});
+
+	it("setText preserves multi-line seeds exactly (quoted reply bodies)", () => {
+		const ref = createRef<CompactEditorHandle>();
+		const texts: string[] = [];
+		act(() => {
+			root.render(<CompactEditor ref={ref} onSubmit={(p) => texts.push(p.text)} />);
+		});
+		act(() => {
+			ref.current?.setText("Dana wrote:\n> line one\n> line two");
+			ref.current?.submit();
+		});
+		expect(texts).toEqual(["Dana wrote:\n> line one\n> line two"]);
+	});
+
 	it("setText seeds the draft and submit reads it back", () => {
 		const ref = createRef<CompactEditorHandle>();
 		const submitted: string[] = [];

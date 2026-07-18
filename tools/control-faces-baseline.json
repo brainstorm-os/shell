@@ -1,10 +1,6 @@
 {
-  "files": [
-    "apps/mailbox/src/ui/composer.tsx",
-    "packages/shell/src/renderer/settings/data-section.tsx"
-  ],
+  "files": ["packages/shell/src/renderer/settings/data-section.tsx"],
   "whyStillBaselined": {
-    "apps/mailbox/src/ui/composer.tsx": "By design: the compose BODY textarea is the primary email-editor surface, deliberately not a .bs-input metadata field (see the mb-compose__body comment in apps/mailbox/src/styles.css); the To/Cc/Subject fields already ride .bs-input.",
-    "packages/shell/src/renderer/settings/data-section.tsx": "By design: the dictionary-item rename fields (data__vocab-input) are borderless-at-rest inline list-row editors — a boxed face on every vocabulary row would add chrome the sheet deliberately hides until hover/focus; the property-form header field (data__form-name) is the borderless-title-style name input of that popover."
+    "packages/shell/src/renderer/settings/data-section.tsx": "By design: the dictionary-item rename fields (data__vocab-input) are borderless-at-rest inline list-row editors \u2014 a boxed face on every vocabulary row would add chrome the sheet deliberately hides until hover/focus; the property-form header field (data__form-name) is the borderless-title-style name input of that popover."
   }
 }

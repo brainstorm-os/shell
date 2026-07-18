@@ -116,6 +116,18 @@ describe("sendPayloadFromSeed", () => {
 		});
 	});
 
+	it("carries bodyHtml when the composer produced rich content (Mailbox-11)", () => {
+		const seed = { ...emptySeed("acc-1"), to: "a@b.co", body: "hello bold" };
+		const payload = sendPayloadFromSeed(seed, "acc-1", "<p>hello <strong>bold</strong></p>");
+		expect(payload).toMatchObject({
+			bodyText: "hello bold",
+			bodyHtml: "<p>hello <strong>bold</strong></p>",
+		});
+		// No html (plain draft) ⇒ no bodyHtml key at all.
+		expect(sendPayloadFromSeed(seed, "acc-1")).not.toHaveProperty("bodyHtml");
+		expect(sendPayloadFromSeed(seed, "acc-1", "")).not.toHaveProperty("bodyHtml");
+	});
+
 	it("returns null without a valid recipient or account", () => {
 		expect(sendPayloadFromSeed({ ...emptySeed(), to: "not-an-address" }, "acc-1")).toBeNull();
 		expect(sendPayloadFromSeed({ ...emptySeed(), to: "a@b.co" }, "")).toBeNull();

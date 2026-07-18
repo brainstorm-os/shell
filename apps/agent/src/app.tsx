@@ -458,7 +458,7 @@ export function AgentApp(): ReactElement {
 	// a ref (reading it doesn't need a render); `draftEmpty` drives the Send
 	// button's enabled state.
 	const editorRef = useRef<CompactEditorHandle | null>(null);
-	const draftRef = useRef<CompactEditorPayload>({ state: "", text: "", isEmpty: true });
+	const draftRef = useRef<CompactEditorPayload>({ state: "", text: "", html: "", isEmpty: true });
 	const [draftEmpty, setDraftEmpty] = useState(true);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);

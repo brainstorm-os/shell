@@ -19,6 +19,7 @@
  */
 
 import { CodeNode } from "@lexical/code";
+import { $generateHtmlFromNodes } from "@lexical/html";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 // Side-effect: widen `LinkNode.sanitizeUrl` to the app's `brainstorm://`
 // scheme (compact editors register their own node list — see link-sanitizer.ts).
@@ -55,13 +56,13 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { QuoteNode } from "@lexical/rich-text";
 import { $getNearestNodeOfType } from "@lexical/utils";
 import {
+	$createLineBreakNode,
 	$createParagraphNode,
 	$createTextNode,
 	$getRoot,
 	$getSelection,
 	$isRangeSelection,
 	COMMAND_PRIORITY_HIGH,
-	type EditorState,
 	FORMAT_TEXT_COMMAND,
 	INSERT_PARAGRAPH_COMMAND,
 	KEY_ENTER_COMMAND,
@@ -95,6 +96,9 @@ export type CompactEditorPayload = {
 	state: string;
 	/** Plain-text flattening, newlines preserved (the plain body). */
 	text: string;
+	/** Semantic HTML rendering (strong/em/ul/blockquote/a…), theme classes
+	 *  stripped — usable outside the app's stylesheet (HTML mail). */
+	html: string;
 	/** No meaningful content (whitespace-only). */
 	isEmpty: boolean;
 };
@@ -130,6 +134,10 @@ export type CompactEditorProps = {
 	/** Fires on every edit so the host can reflect empty/non-empty state
 	 *  (e.g. enable a Send button). */
 	onChange?: (payload: CompactEditorPayload) => void;
+	/** Enter submits (the messaging contract, default). `false` keeps Enter a
+	 *  paragraph break — the mail-composer contract, where submit is an
+	 *  explicit button/`handle.submit()`. */
+	submitOnEnter?: boolean;
 	/** Enter (or `handle.submit()`) fires this with the current payload. The
 	 *  surface is NOT auto-cleared — the host calls `handle.clear()` once the
 	 *  send succeeds, so a rejected/failed send keeps the draft. */
@@ -186,11 +194,21 @@ const AUTOLINK_MATCHERS = [
 	),
 ];
 
+/** Lexical's HTML export carries theme class names and `dir` attributes that
+ *  mean nothing outside the app stylesheet (an HTML mail body, a clipboard
+ *  paste target) — strip them, keeping the semantic tags. */
+export function stripEditorChrome(html: string): string {
+	return html.replace(/\s(?:class|dir)="[^"]*"/g, "");
+}
+
 function readPayload(editor: LexicalEditor): CompactEditorPayload {
 	const editorState = editor.getEditorState();
 	const state = JSON.stringify(editorState.toJSON());
-	const text = editorState.read(() => $getRoot().getTextContent());
-	return { state, text, isEmpty: text.trim().length === 0 };
+	const { text, html } = editorState.read(() => ({
+		text: $getRoot().getTextContent(),
+		html: stripEditorChrome($generateHtmlFromNodes(editor)),
+	}));
+	return { state, text, html, isEmpty: text.trim().length === 0 };
 }
 
 /** Behaviour bridge — lives inside the composer so it has the editor instance.
@@ -202,12 +220,14 @@ function CompactBehaviorPlugin({
 	onSubmit,
 	disabled,
 	autoFocus,
+	submitOnEnter,
 }: {
 	handleRef: ForwardedRef<CompactEditorHandle>;
 	onChange: ((payload: CompactEditorPayload) => void) | undefined;
 	onSubmit: ((payload: CompactEditorPayload) => void) | undefined;
 	disabled: boolean;
 	autoFocus: boolean;
+	submitOnEnter: boolean;
 }): null {
 	const [editor] = useLexicalComposerContext();
 
@@ -265,13 +285,8 @@ function CompactBehaviorPlugin({
 
 	useEffect(() => {
 		if (!onChange) return;
-		return editor.registerUpdateListener(({ editorState }: { editorState: EditorState }) => {
-			const text = editorState.read(() => $getRoot().getTextContent());
-			onChange({
-				state: JSON.stringify(editorState.toJSON()),
-				text,
-				isEmpty: text.trim().length === 0,
-			});
+		return editor.registerUpdateListener(() => {
+			onChange(readPayload(editor));
 		});
 	}, [editor, onChange]);
 
@@ -280,6 +295,7 @@ function CompactBehaviorPlugin({
 			editor.registerCommand(
 				KEY_ENTER_COMMAND,
 				(event: KeyboardEvent | null) => {
+					if (!submitOnEnter) return false;
 					// IME-composition Enter (the CJK candidate confirm) never submits.
 					if (event === null || event.isComposing) return false;
 					if (event.shiftKey) {
@@ -304,7 +320,7 @@ function CompactBehaviorPlugin({
 				},
 				COMMAND_PRIORITY_HIGH,
 			),
-		[editor, doSubmit],
+		[editor, doSubmit, submitOnEnter],
 	);
 
 	useEffect(() => {
@@ -333,6 +349,7 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 			autoFocus = false,
 			disabled = false,
 			toolbar = true,
+			submitOnEnter = true,
 			onChange,
 			onSubmit,
 			additionalNodes,
@@ -386,6 +403,7 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 							onSubmit={onSubmit}
 							disabled={disabled}
 							autoFocus={autoFocus}
+							submitOnEnter={submitOnEnter}
 						/>
 						{children}
 					</div>
