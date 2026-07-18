@@ -37,6 +37,10 @@ export type OpenSelectMenuParams<T extends string> = {
 
 /** Open the option list for a select control. Returns false (a no-op) when
  *  no menu host is mounted, mirroring `openContextMenu`. */
+/** Readable floor for a select popup — fits "✓ label" for typical option
+ *  sets even when the trigger is a short chip. */
+const SELECT_MENU_MIN_WIDTH = 200;
+
 export function openSelectMenu<T extends string>(params: OpenSelectMenuParams<T>): boolean {
 	const items: ContextMenuItem[] = [];
 	let group: string | undefined;
@@ -59,7 +63,10 @@ export function openSelectMenu<T extends string>(params: OpenSelectMenuParams<T>
 	return openContextMenu({ x: rect.left, y: rect.bottom }, items, {
 		menuLabel: params.menuLabel,
 		anchor: params.anchor,
-		// Never render the popup narrower than the trigger it dropped from.
-		minWidth: rect.width,
+		// Never narrower than the trigger — and never narrower than a readable
+		// floor either: the runtime's virtualized rows can't grow the surface,
+		// so a short trigger ("Gallery ⌄", ~80px) rendered every option label
+		// as "G…" (F-406). The surface width IS min-width in practice.
+		minWidth: Math.max(rect.width, SELECT_MENU_MIN_WIDTH),
 	});
 }
