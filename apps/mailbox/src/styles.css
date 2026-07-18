@@ -101,15 +101,40 @@ body {
 }
 
 .mb-rail__heading {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
 	padding: var(--space-2) var(--space-2) var(--space-1);
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-semibold);
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--text-faint, var(--text));
+}
+
+.mb-rail__heading-label {
+	flex: 1;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Reveal-on-hover like list-row grips — the ⋯ is chrome, not content. */
+.mb-rail__heading-menu {
+	opacity: 0;
+}
+
+.mb-rail__heading:hover .mb-rail__heading-menu,
+.mb-rail__heading-menu:focus-visible,
+.mb-rail__heading-menu[aria-expanded="true"] {
+	opacity: 1;
+}
+
+.mb-rail__hint {
+	padding: 0 var(--space-2) var(--space-1);
+	font-size: var(--text-size-xs);
+	color: var(--text-faint, var(--text));
 }
 
 .mb-rail__item {
@@ -582,12 +607,22 @@ body {
 	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
 }
 
+/* The note must stay fully readable — an ellipsized error hid the actionable
+ * half of the auth hint (owner report 2026-07-18). Wrap instead of truncate. */
 .mb-syncbar__text {
 	flex: 1;
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+
+.mb-syncbar--error {
+	background: var(--danger-bg);
+	border-bottom-color: var(--danger-border);
+}
+
+.mb-syncbar__action {
+	flex-shrink: 0;
 }
 
 /* ── Connect-account CTA + dialog (Mailbox-5) ────────────────────────── */

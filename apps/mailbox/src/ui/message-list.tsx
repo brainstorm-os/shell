@@ -153,6 +153,9 @@ export type MessageListProps = {
 	onSelect: (id: string) => void;
 	onToggleThreaded: () => void;
 	onToggleThreadExpand: (threadKey: string) => void;
+	/** The last sync errored — the empty state must not promise mail "once it
+	 *  syncs" while the sync itself is broken. */
+	syncFailed?: boolean;
 };
 
 export function MessageList({
@@ -167,6 +170,7 @@ export function MessageList({
 	onSelect,
 	onToggleThreaded,
 	onToggleThreadExpand,
+	syncFailed,
 }: MessageListProps): ReactElement {
 	const empty = threaded ? threads.length === 0 : messages.length === 0;
 	return (
@@ -206,9 +210,9 @@ export function MessageList({
 						) : (
 							<EmptyState
 								tone={EmptyStateTone.Compact}
-								icon={IconName.Inbox}
+								icon={syncFailed ? IconName.Warning : IconName.Inbox}
 								title={t("list.empty.title")}
-								hint={t("list.empty.blurb")}
+								hint={syncFailed ? t("list.empty.errorBlurb") : t("list.empty.blurb")}
 							/>
 						)}
 					</li>
