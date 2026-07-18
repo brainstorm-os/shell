@@ -2,9 +2,14 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- img/font/media allow https:: an about:srcdoc iframe INHERITS this page
+		     policy, so the mail body's own opt-in CSP ("Show remote content") can
+		     never be more permissive than here — without https: the opt-in was a
+		     silent no-op (F-439). Default-blocking is still enforced by the frame's
+		     own CSP; this page renders no remote content outside that frame. -->
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: brainstorm:; script-src 'self' https://cdn.eu.amplitude.com; frame-src 'self'; connect-src 'self' data: blob: https://*.eu.amplitude.com; worker-src 'self' blob:"
+			content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: brainstorm: https:; font-src 'self' data: https:; media-src 'self' data: https:; script-src 'self' https://cdn.eu.amplitude.com; frame-src 'self'; connect-src 'self' data: blob: https://*.eu.amplitude.com; worker-src 'self' blob:"
 		/>
 		<title>Mailbox</title>
 	</head>
