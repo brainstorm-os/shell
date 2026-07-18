@@ -25,6 +25,7 @@ import {
 	type AnytypeAttachment,
 	type AnytypeFile,
 	type AnytypeImportPlan,
+	anytypeImportSource,
 	importAnytypeExport,
 	parseAnytypeExport,
 } from "../import/anytype-import";
@@ -368,6 +369,10 @@ export type ImportExportHandlersOptions = {
 	 *  Mirrors the Welcome-2 template channel — without this, Notes opens
 	 *  blank because editors bind to the Y.Doc, not `properties.body`. */
 	makeApplyDocUpdate?: (vaultPath: string) => (entityId: string, updateB64: string) => Promise<void>;
+	/** Read an entity's CURRENT body-doc snapshot (base64 full-state, ydoc
+	 *  worker `snapshot`). Importers use it to REPLACE an existing body on
+	 *  re-import instead of appending a duplicate copy (F-398). */
+	makeLoadDocSnapshot?: (vaultPath: string) => (entityId: string) => Promise<string | null>;
 };
 
 function formatFromExt(path: string): ImportFormat | null {
@@ -832,6 +837,7 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 				pending.attachments ??
 				(pending.root ? await readReferencedAttachments(pending.root, pending.referencedPaths) : []);
 			const applyDocUpdate = applyDocUpdateFor(session);
+			const loadDocSnapshot = options.makeLoadDocSnapshot?.(session.vaultPath);
 			const controller = new AbortController();
 			activeRun = controller;
 			const win = options.getDashboard();
@@ -841,13 +847,17 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 					pending.files,
 					{
 						targetType: type,
-						source: `anytype:${pending.archiveName}`,
+						// F-400 — keyed on the export's stable space id, not the
+						// timestamped archive filename (which changes every re-export
+						// and duplicated the whole space).
+						source: anytypeImportSource(pending.plan, pending.archiveName),
 						now: Date.now(),
 						importedBy: IMPORT_AUTHOR,
 						signal: controller.signal,
 						onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
 						plan: pending.plan,
 						...(applyDocUpdate ? { applyDocUpdate } : {}),
+						...(loadDocSnapshot ? { loadDocSnapshot } : {}),
 					},
 					attachments,
 				);
