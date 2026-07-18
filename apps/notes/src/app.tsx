@@ -34,7 +34,10 @@ import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body
 import { Icon as IconGlyph, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
 import { LockButton } from "@brainstorm/sdk/lock-button";
+<<<<<<< Updated upstream
 import { openSearchPicker } from "@brainstorm/sdk/menus";
+=======
+>>>>>>> Stashed changes
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
 import { type NoteReference, extractNoteReferences } from "@brainstorm/sdk/note-references";
 import {

@@ -378,7 +378,11 @@ export function EventDetail({
 						</button>
 						<input
 							type="text"
+<<<<<<< Updated upstream
 							className="bs-input bs-input--lg cal-detail__input--title"
+=======
+							className="cal-detail__input cal-detail__input--title"
+>>>>>>> Stashed changes
 							value={draft.title}
 							placeholder={t("calendar.detail.field.titlePlaceholder")}
 							aria-label={t("calendar.detail.field.title")}
@@ -434,7 +438,11 @@ export function EventDetail({
 						<Field labelKey="calendar.detail.field.location">
 							<input
 								type="text"
+<<<<<<< Updated upstream
 								className="bs-input cal-detail__input"
+=======
+								className="cal-detail__input"
+>>>>>>> Stashed changes
 								value={draft.location ?? ""}
 								placeholder={t("calendar.detail.field.locationPlaceholder")}
 								onChange={(e) => patch({ location: e.target.value })}
@@ -442,17 +450,29 @@ export function EventDetail({
 						</Field>
 
 						<Field labelKey="calendar.detail.field.status">
+<<<<<<< Updated upstream
 							{/* Single-select status → the shared `<SelectMenu>`, the same control
 							    every other app uses for a one-of-N property (F-298). (Colour below
 							    stays a swatch radiogroup — a visual palette, not a dropdown.) */}
 							<SelectMenu
 								className="cal-detail__status"
+=======
+							<RadioGroup
+								className="cal-detail__segmented"
+>>>>>>> Stashed changes
 								ariaLabel={t("calendar.detail.field.status")}
 								value={statusValue}
 								onChange={(status) => patch({ statusKey: statusToStored(status) })}
 								options={EVENT_STATUSES.map((status) => ({
 									value: status,
+<<<<<<< Updated upstream
 									label: t(STATUS_LABEL_KEY[status]),
+=======
+									className: "cal-detail__segment",
+									label: t(STATUS_LABEL_KEY[status]),
+									dataset: { "data-status": status },
+									children: t(STATUS_LABEL_KEY[status]),
+>>>>>>> Stashed changes
 								}))}
 							/>
 						</Field>
@@ -522,7 +542,11 @@ export function EventDetail({
 
 						<Field labelKey="calendar.detail.field.description">
 							<textarea
+<<<<<<< Updated upstream
 								className="bs-input cal-detail__textarea"
+=======
+								className="cal-detail__textarea"
+>>>>>>> Stashed changes
 								rows={3}
 								value={draft.description ?? ""}
 								placeholder={t("calendar.detail.field.descriptionPlaceholder")}

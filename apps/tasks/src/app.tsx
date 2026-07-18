@@ -1824,6 +1824,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const inspectorHandleRef = useRef<TaskInspectorHandle | null>(null);
 	const inspectorHostRef = useRef<HTMLElement | null>(null);
 	const inspectorTaskIdRef = useRef<string | null>(null);
+	const inspectorLockedRef = useRef<boolean>(false);
 	const propertyHandleRef = useRef<TaskDetailPropertiesHandle | null>(null);
 	const propertyHostRef = useRef<HTMLElement | null>(null);
 	const inspectorLockedRef = useRef<boolean>(false);
@@ -2109,6 +2110,20 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 							hide: t("tasks.header.inspector.hide"),
 						}}
 					/>
+					{openTaskRecord ? (
+						<LockButton
+							locked={!!openTaskRecord.locked}
+							onToggle={() =>
+								patchTask(openTaskRecord.id, (x) => ({
+									...x,
+									locked: !x.locked,
+									updatedAt: nowAnchor(),
+								}))
+							}
+							lockLabel={t("tasks.header.lock")}
+							unlockLabel={t("tasks.header.unlock")}
+						/>
+					) : null}
 					{openTaskRecord ? (
 						<LockButton
 							locked={!!openTaskRecord.locked}
