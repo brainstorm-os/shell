@@ -27,7 +27,8 @@ export type AnytypeBlockHandlers = {
 
 type SerializedNode = {
 	type: string;
-	version: 1;
+	// image-block serializes at v2; every other emitted node is v1.
+	version: 1 | 2;
 	[key: string]: unknown;
 };
 

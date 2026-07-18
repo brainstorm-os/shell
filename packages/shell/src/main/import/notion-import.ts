@@ -31,6 +31,7 @@ import { servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
+import { yieldToEventLoop } from "./import-engine";
 import { inferValueType } from "./import-map";
 import { parseTable } from "./import-parse";
 import { IMPORT_EXTERNAL_ID_PROP, ImportFormat } from "./import-types";
@@ -467,7 +468,7 @@ export async function importNotionExport(
 			}
 		}
 		options.onProgress?.(i + 1, total);
-		if ((i + 1) % NOTION_YIELD_EVERY === 0) await Promise.resolve();
+		if ((i + 1) % NOTION_YIELD_EVERY === 0) await yieldToEventLoop();
 	}
 
 	const assetStore = await session.assetStore();

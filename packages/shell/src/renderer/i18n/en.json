@@ -1359,5 +1359,9 @@
   "shell.feedback.logPreviewLoading": "Loading log preview…",
   "shell.feedback.send": "Send",
   "shell.feedback.success": "Thanks — your report id is {requestId}.",
-  "shell.feedback.errorUnknown": "Something went wrong. Try again later."
+  "shell.feedback.errorUnknown": "Something went wrong. Try again later.",
+  "shell.settings.backupMigration.notify.title": "Import finished",
+  "shell.settings.backupMigration.notify.body": "{created, plural, one {# item} other {# items}} created, {updated, plural, one {# updated} other {# updated}}. Open Settings → Backup & Migration for the report.",
+  "shell.settings.backupMigration.import.running": "Import running…",
+  "shell.settings.backupMigration.import.runBusy": "Another import is already running — wait for it to finish (or stop it) first."
 }

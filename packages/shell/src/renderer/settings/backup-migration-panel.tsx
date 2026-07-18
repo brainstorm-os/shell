@@ -35,6 +35,14 @@ import { Icon, IconName } from "../ui/icon";
 import { Popover } from "../ui/popover";
 import { PopoverSize } from "../ui/popover-types";
 import { TextField, TextFieldSize } from "../ui/text-field";
+import {
+	ImportRunSection,
+	ImportRunStatus,
+	cancelImportRun,
+	dismissImportRun,
+	startImportRun,
+	useImportRun,
+} from "./import-run-store";
 import "./backup-migration-panel.css";
 
 /** Default import target — the Notes app's primary type. Prefer this when
@@ -48,8 +56,7 @@ type MappingRow = ImportMappingEdit & { readonly valueType: string };
 type ImportPhase =
 	| { kind: "idle" }
 	| { kind: "picked"; source: ImportSourcePreview }
-	| { kind: "planned"; source: ImportSourcePreview; plan: ImportPlan }
-	| { kind: "done"; report: ImportRunReport };
+	| { kind: "planned"; source: ImportSourcePreview; plan: ImportPlan };
 
 export function BackupMigrationPanel() {
 	return (
@@ -259,6 +266,69 @@ export function ImportDoneState({
 	);
 }
 
+/** The section's slice of the ONE background run: progress + stop while
+ *  running, the report when done, the error when failed — rendered from the
+ *  module-level store so navigating away and back keeps the state. */
+function SectionRunState({
+	section,
+	againLabel,
+	doneTestId,
+	progressTestId,
+	stopTestId,
+}: {
+	section: ImportRunSection;
+	againLabel: string;
+	doneTestId: string;
+	progressTestId: string;
+	stopTestId: string;
+}) {
+	const run = useImportRun();
+	if (run.section !== section) return null;
+	if (run.status === ImportRunStatus.Running) {
+		return (
+			<div className="backup-migration__progress" data-testid={progressTestId}>
+				<p className="settings__hint" role="status">
+					{run.progress
+						? t("shell.settings.backupMigration.import.progress", {
+								done: run.progress.done,
+								total: run.progress.total,
+							})
+						: t("shell.settings.backupMigration.import.running")}
+				</p>
+				<Button
+					variant={ButtonVariant.Ghost}
+					size={ButtonSize.Sm}
+					onClick={cancelImportRun}
+					data-testid={stopTestId}
+				>
+					{t("shell.settings.backupMigration.import.stop")}
+				</Button>
+			</div>
+		);
+	}
+	if (run.status === ImportRunStatus.Done && run.report) {
+		return (
+			<ImportDoneState
+				report={run.report}
+				onAgain={dismissImportRun}
+				againLabel={againLabel}
+				testId={doneTestId}
+			/>
+		);
+	}
+	if (run.status === ImportRunStatus.Failed && run.error) {
+		return (
+			<p className="settings__error" role="alert">
+				{run.error}{" "}
+				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Sm} onClick={dismissImportRun}>
+					{againLabel}
+				</Button>
+			</p>
+		);
+	}
+	return null;
+}
+
 // ---------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------
@@ -322,7 +392,6 @@ function ImportSection() {
 	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
 	const [rows, setRows] = useState<readonly MappingRow[]>([]);
 	const [busy, setBusy] = useState(false);
-	const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	const reset = useCallback(() => {
@@ -330,7 +399,6 @@ function ImportSection() {
 		setTargetType(DEFAULT_IMPORT_TARGET_TYPE);
 		setRows([]);
 		setError(null);
-		setProgress(null);
 	}, []);
 
 	const editsFor = useCallback(
@@ -384,28 +452,22 @@ function ImportSection() {
 		}
 	}, [phase, targetType]);
 
-	const onRun = useCallback(async () => {
+	// The run is a BACKGROUND task owned by the import-run store: starting it
+	// closes the flow popover immediately, and progress / the report render
+	// via <SectionRunState> — surviving navigation away from Settings.
+	const onRun = useCallback(() => {
 		if (phase.kind !== "planned") return;
 		const type = targetType.trim();
-		setBusy(true);
+		const edits = editsFor();
 		setError(null);
-		setProgress({ done: 0, total: phase.plan.total });
-		const stopProgress = window.brainstorm.importExport.onProgress(setProgress);
-		try {
-			const report = await window.brainstorm.importExport.run(type, editsFor());
-			setPhase({ kind: "done", report });
-		} catch (e) {
-			setError(e instanceof Error ? e.message : t("shell.settings.backupMigration.import.runFailed"));
-		} finally {
-			stopProgress();
-			setProgress(null);
-			setBusy(false);
+		if (
+			!startImportRun(ImportRunSection.Csv, () => window.brainstorm.importExport.run(type, edits))
+		) {
+			setError(t("shell.settings.backupMigration.import.runBusy"));
+			return;
 		}
-	}, [phase, targetType, editsFor]);
-
-	const onCancelRun = useCallback(() => {
-		void window.brainstorm.importExport.cancel();
-	}, []);
+		reset();
+	}, [phase, targetType, editsFor, reset]);
 
 	const updateRow = useCallback((column: string, patch: Partial<MappingRow>) => {
 		setRows((prev) => prev.map((r) => (r.column === column ? { ...r, ...patch } : r)));
@@ -487,36 +549,17 @@ function ImportSection() {
 								<MappingEditor rows={rows} onChange={updateRow} />
 							</>
 						)}
-						{progress && (
-							<div className="backup-migration__progress" data-testid="backup-migration-import-progress">
-								<p className="settings__hint">
-									{t("shell.settings.backupMigration.import.progress", {
-										done: progress.done,
-										total: progress.total,
-									})}
-								</p>
-								<Button
-									variant={ButtonVariant.Ghost}
-									size={ButtonSize.Sm}
-									onClick={onCancelRun}
-									data-testid="backup-migration-import-stop"
-								>
-									{t("shell.settings.backupMigration.import.stop")}
-								</Button>
-							</div>
-						)}
 					</ImportFlowPopover>
 				)}
 			</AnimatePresence>
 
-			{phase.kind === "done" && (
-				<ImportDoneState
-					report={phase.report}
-					onAgain={reset}
-					againLabel={t("shell.settings.backupMigration.import.again")}
-					testId="backup-migration-import-done"
-				/>
-			)}
+			<SectionRunState
+				section={ImportRunSection.Csv}
+				againLabel={t("shell.settings.backupMigration.import.again")}
+				doneTestId="backup-migration-import-done"
+				progressTestId="backup-migration-import-progress"
+				stopTestId="backup-migration-import-stop"
+			/>
 
 			{error && (
 				<p className="settings__error" role="alert">
@@ -531,10 +574,7 @@ function ImportSection() {
 // Obsidian vault import (IE-5)
 // ---------------------------------------------------------------------
 
-type ObsidianPhase =
-	| { kind: "idle" }
-	| { kind: "picked"; folderName: string; noteCount: number }
-	| { kind: "done"; report: ImportRunReport };
+type ObsidianPhase = { kind: "idle" } | { kind: "picked"; folderName: string; noteCount: number };
 
 function ObsidianSection() {
 	const [phase, setPhase] = useState<ObsidianPhase>({ kind: "idle" });
@@ -558,24 +598,24 @@ function ObsidianSection() {
 		}
 	}, []);
 
-	const onRun = useCallback(async () => {
+	// Background run via the import-run store — the popover closes at start
+	// and progress/report render through <SectionRunState>.
+	const onRun = useCallback(() => {
 		const type = targetType.trim();
 		if (type.length === 0) {
 			setError(t("shell.settings.backupMigration.import.typeRequired"));
 			return;
 		}
-		setBusy(true);
 		setError(null);
-		try {
-			const report = await window.brainstorm.importExport.runObsidian(type);
-			setPhase({ kind: "done", report });
-		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("shell.settings.backupMigration.obsidian.runFailed"),
-			);
-		} finally {
-			setBusy(false);
+		if (
+			!startImportRun(ImportRunSection.Obsidian, () =>
+				window.brainstorm.importExport.runObsidian(type),
+			)
+		) {
+			setError(t("shell.settings.backupMigration.import.runBusy"));
+			return;
 		}
+		setPhase({ kind: "idle" });
 	}, [targetType]);
 
 	return (
@@ -637,14 +677,13 @@ function ObsidianSection() {
 				)}
 			</AnimatePresence>
 
-			{phase.kind === "done" && (
-				<ImportDoneState
-					report={phase.report}
-					onAgain={() => setPhase({ kind: "idle" })}
-					againLabel={t("shell.settings.backupMigration.obsidian.again")}
-					testId="backup-migration-obsidian-done"
-				/>
-			)}
+			<SectionRunState
+				section={ImportRunSection.Obsidian}
+				againLabel={t("shell.settings.backupMigration.obsidian.again")}
+				doneTestId="backup-migration-obsidian-done"
+				progressTestId="backup-migration-obsidian-progress"
+				stopTestId="backup-migration-obsidian-stop"
+			/>
 
 			{error && (
 				<p className="settings__error" role="alert">
@@ -659,10 +698,7 @@ function ObsidianSection() {
 // Anytype export import (IE-7)
 // ---------------------------------------------------------------------
 
-type AnytypePhase =
-	| { kind: "idle" }
-	| { kind: "picked"; archiveName: string; objectCount: number }
-	| { kind: "done"; report: ImportRunReport };
+type AnytypePhase = { kind: "idle" } | { kind: "picked"; archiveName: string; objectCount: number };
 
 function AnytypeSection() {
 	const [phase, setPhase] = useState<AnytypePhase>({ kind: "idle" });
@@ -686,22 +722,22 @@ function AnytypeSection() {
 		}
 	}, []);
 
-	const onRun = useCallback(async () => {
+	// Background run via the import-run store — the popover closes at start
+	// and progress/report render through <SectionRunState>.
+	const onRun = useCallback(() => {
 		const type = targetType.trim();
 		if (type.length === 0) {
 			setError(t("shell.settings.backupMigration.import.typeRequired"));
 			return;
 		}
-		setBusy(true);
 		setError(null);
-		try {
-			const report = await window.brainstorm.importExport.runAnytype(type);
-			setPhase({ kind: "done", report });
-		} catch (e) {
-			setError(e instanceof Error ? e.message : t("shell.settings.backupMigration.anytype.runFailed"));
-		} finally {
-			setBusy(false);
+		if (
+			!startImportRun(ImportRunSection.Anytype, () => window.brainstorm.importExport.runAnytype(type))
+		) {
+			setError(t("shell.settings.backupMigration.import.runBusy"));
+			return;
 		}
+		setPhase({ kind: "idle" });
 	}, [targetType]);
 
 	return (
@@ -763,14 +799,13 @@ function AnytypeSection() {
 				)}
 			</AnimatePresence>
 
-			{phase.kind === "done" && (
-				<ImportDoneState
-					report={phase.report}
-					onAgain={() => setPhase({ kind: "idle" })}
-					againLabel={t("shell.settings.backupMigration.anytype.again")}
-					testId="backup-migration-anytype-done"
-				/>
-			)}
+			<SectionRunState
+				section={ImportRunSection.Anytype}
+				againLabel={t("shell.settings.backupMigration.anytype.again")}
+				doneTestId="backup-migration-anytype-done"
+				progressTestId="backup-migration-anytype-progress"
+				stopTestId="backup-migration-anytype-stop"
+			/>
 
 			{error && (
 				<p className="settings__error" role="alert">
@@ -785,10 +820,7 @@ function AnytypeSection() {
 // Notion export import (IE-6)
 // ---------------------------------------------------------------------
 
-type NotionPhase =
-	| { kind: "idle" }
-	| { kind: "picked"; archiveName: string; pageCount: number }
-	| { kind: "done"; report: ImportRunReport };
+type NotionPhase = { kind: "idle" } | { kind: "picked"; archiveName: string; pageCount: number };
 
 function NotionSection() {
 	const [phase, setPhase] = useState<NotionPhase>({ kind: "idle" });
@@ -810,22 +842,22 @@ function NotionSection() {
 		}
 	}, []);
 
-	const onRun = useCallback(async () => {
+	// Background run via the import-run store — the popover closes at start
+	// and progress/report render through <SectionRunState>.
+	const onRun = useCallback(() => {
 		const type = targetType.trim();
 		if (type.length === 0) {
 			setError(t("shell.settings.backupMigration.import.typeRequired"));
 			return;
 		}
-		setBusy(true);
 		setError(null);
-		try {
-			const report = await window.brainstorm.importExport.runNotion(type);
-			setPhase({ kind: "done", report });
-		} catch (e) {
-			setError(e instanceof Error ? e.message : t("shell.settings.backupMigration.notion.runFailed"));
-		} finally {
-			setBusy(false);
+		if (
+			!startImportRun(ImportRunSection.Notion, () => window.brainstorm.importExport.runNotion(type))
+		) {
+			setError(t("shell.settings.backupMigration.import.runBusy"));
+			return;
 		}
+		setPhase({ kind: "idle" });
 	}, [targetType]);
 
 	return (
@@ -887,14 +919,13 @@ function NotionSection() {
 				)}
 			</AnimatePresence>
 
-			{phase.kind === "done" && (
-				<ImportDoneState
-					report={phase.report}
-					onAgain={() => setPhase({ kind: "idle" })}
-					againLabel={t("shell.settings.backupMigration.notion.again")}
-					testId="backup-migration-notion-done"
-				/>
-			)}
+			<SectionRunState
+				section={ImportRunSection.Notion}
+				againLabel={t("shell.settings.backupMigration.notion.again")}
+				doneTestId="backup-migration-notion-done"
+				progressTestId="backup-migration-notion-progress"
+				stopTestId="backup-migration-notion-stop"
+			/>
 
 			{error && (
 				<p className="settings__error" role="alert">
