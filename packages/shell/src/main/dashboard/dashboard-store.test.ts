@@ -35,7 +35,7 @@ describe("DashboardStore", () => {
 		expect(snap.wallpaper).toEqual({ kind: "solid", value: "#14161b" });
 		expect(snap.theme).toBe(ThemeName.DefaultDark);
 		expect(snap.appearance.mode).toBe(AppearanceMode.Auto);
-		expect(snap.appearance.light.theme).toBe(ThemeName.Rose);
+		expect(snap.appearance.light.theme).toBe(ThemeName.DefaultLight);
 		expect(snap.appearance.dark.theme).toBe(ThemeName.DefaultDark);
 		expect(snap.icons).toEqual({});
 		expect(snap.widgets).toEqual({});
@@ -46,7 +46,7 @@ describe("DashboardStore", () => {
 		const store = await DashboardStore.open(yStore);
 		const light = store.snapshot(AppearanceSlot.Light);
 		const dark = store.snapshot(AppearanceSlot.Dark);
-		expect(light.theme).toBe(ThemeName.Rose);
+		expect(light.theme).toBe(ThemeName.DefaultLight);
 		expect(light.wallpaper.value).toBe("#f5f3ef");
 		expect(dark.theme).toBe(ThemeName.DefaultDark);
 		expect(dark.wallpaper.value).toBe("#14161b");
@@ -64,7 +64,7 @@ describe("DashboardStore", () => {
 		expect(snap.appearance.dark.theme).toBe(ThemeName.Midnight);
 		// Light slot stays at the built-in default — a dark theme cannot
 		// corrupt the light slot.
-		expect(snap.appearance.light.theme).toBe(ThemeName.Rose);
+		expect(snap.appearance.light.theme).toBe(ThemeName.DefaultLight);
 		await reopened.close();
 	});
 
@@ -185,7 +185,7 @@ describe("DashboardStore", () => {
 		await store.flush();
 		const snap = store.snapshot();
 		expect(snap.theme).toBe(ThemeName.DefaultDark);
-		expect(snap.appearance.light.theme).toBe(ThemeName.Rose);
+		expect(snap.appearance.light.theme).toBe(ThemeName.DefaultLight);
 		expect(snap.appearance.dark.theme).toBe(ThemeName.DefaultDark);
 		await store.close();
 	});
@@ -483,7 +483,7 @@ describe("DashboardStore", () => {
 		});
 		expect(result.dark.theme).toBe(ThemeName.Midnight);
 		expect(result.dark.wallpaper.value).toBe("#0a0a0a");
-		expect(result.light.theme).toBe(ThemeName.Rose);
+		expect(result.light.theme).toBe(ThemeName.DefaultLight);
 	});
 
 	it("applyLegacyMigration: legacy wallpaper without a theme lands in Dark", () => {
@@ -494,7 +494,7 @@ describe("DashboardStore", () => {
 		expect(result.dark.wallpaper.value).toBe("wallpapers/x.jpg");
 		expect(result.dark.theme).toBe(ThemeName.DefaultDark);
 		expect(result.light).toEqual({
-			theme: ThemeName.Rose,
+			theme: ThemeName.DefaultLight,
 			wallpaper: { kind: "solid", value: "#f5f3ef" },
 		});
 	});

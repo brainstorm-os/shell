@@ -352,11 +352,14 @@ if (!isDev) {
 }
 
 // Bundled brand wallpapers copied into each new vault's `dashboard/wallpapers/`
-// so a fresh vault opens on-brand. The light slot opens on the rose-mountains
-// wallpaper (the warm low-poly peaks behind the welcome screen, pairing with
-// the default Rose theme); the dark slot keeps the stormy-sea image.
-const DEFAULT_LIGHT_WALLPAPER_FILE = "rose-mountains.jpg";
+// so a fresh vault opens on-brand. The light slot opens on the green-valley
+// wallpaper (low-poly meadow + peaks, pairing with the Default Light theme —
+// the Rose pairing read too pink as a light default); the dark slot keeps the
+// stormy-sea image. rose-mountains stays bundled as a catalog option (it is
+// still the welcome-screen splash).
+const DEFAULT_LIGHT_WALLPAPER_FILE = "green-valley.png";
 const DEFAULT_DARK_WALLPAPER_FILE = "stormy-sea.png";
+const EXTRA_BUNDLED_WALLPAPER_FILES = ["rose-mountains.jpg"] as const;
 // Suffix the dashboard appends to derive a wallpaper's blur-up thumbnail URL
 // (mirrors `THUMB_SUFFIX` in dashboard-handlers / wallpaper.ts).
 const WALLPAPER_THUMB_SUFFIX = ".thumb.jpg";
@@ -2365,12 +2368,12 @@ void app.whenReady().then(async () => {
 	};
 
 	// On the open that first created the vault, give it a polished out-of-box
-	// appearance: the Rose theme in an explicit Light mode, with the bundled
-	// pitch wallpaper. Both slots are seeded (the dark slot keeps Midnight +
-	// the stormy-sea image) so toggling appearance lands on a well-formed pair.
-	// Scoped to the fresh-vault open (the same `ensureRootFolder().created`
-	// signal as the welcome seed) so an existing vault's chosen appearance is
-	// never overwritten.
+	// appearance: the Default Light theme in an explicit Light mode, with the
+	// bundled green-valley wallpaper. Both slots are seeded (the dark slot keeps
+	// Midnight + the stormy-sea image) so toggling appearance lands on a
+	// well-formed pair. Scoped to the fresh-vault open (the same
+	// `ensureRootFolder().created` signal as the welcome seed) so an existing
+	// vault's chosen appearance is never overwritten.
 	const seedNewVaultDefaults = async (): Promise<void> => {
 		const session = getActiveVaultSession();
 		if (!session) return;
@@ -2380,7 +2383,7 @@ void app.whenReady().then(async () => {
 			const wallpaperDir = join(session.vaultPath, "dashboard", "wallpapers");
 			// Copy the assets BEFORE touching the store so the store writes below
 			// run back-to-back (no await between them) — an observer never sees a
-			// half-applied "Rose theme but no wallpaper" state.
+			// half-applied "themed but no wallpaper" state.
 			const copyWallpaper = async (file: string): Promise<boolean> => {
 				try {
 					await copyFile(join(artDir, "wallpaper", file), join(wallpaperDir, file));
@@ -2394,6 +2397,9 @@ void app.whenReady().then(async () => {
 			await mkdir(wallpaperDir, { recursive: true });
 			const lightReady = await copyWallpaper(DEFAULT_LIGHT_WALLPAPER_FILE);
 			const darkReady = await copyWallpaper(DEFAULT_DARK_WALLPAPER_FILE);
+			// Non-slot bundled wallpapers land in the vault catalog too so the
+			// Settings picker offers them without an upload.
+			for (const file of EXTRA_BUNDLED_WALLPAPER_FILES) await copyWallpaper(file);
 			// Store the resolvable vault-protocol URL, not a bare filename (which
 			// resolves to the renderer root and 404s — F-007).
 			const imageWallpaper = (file: string) => ({
@@ -2403,10 +2409,10 @@ void app.whenReady().then(async () => {
 			await dashboard.batch(() => {
 				dashboard.setAppearanceMode(AppearanceMode.Light);
 				dashboard.setAppearancePair(AppearanceSlot.Light, {
-					theme: ThemeName.Rose,
+					theme: ThemeName.DefaultLight,
 					wallpaper: lightReady
 						? imageWallpaper(DEFAULT_LIGHT_WALLPAPER_FILE)
-						: { kind: "solid", value: "#fdf4f6" },
+						: { kind: "solid", value: "#f7f7f7" },
 				});
 				dashboard.setAppearancePair(AppearanceSlot.Dark, {
 					theme: ThemeName.Midnight,
