@@ -355,7 +355,7 @@ select {
 :root[data-platform="win32"] ::-webkit-scrollbar-thumb,
 :root[data-platform="linux"] ::-webkit-scrollbar-thumb {
 	background: var(--color-border-strong);
-	border-radius: 8px;
+	border-radius: var(--radius-md);
 	/* A transparent border + padding-box clip is the only way to inset a
 	 * webkit thumb, so it reads as a slim pill instead of a full-width bar. */
 	border: 3px solid transparent;

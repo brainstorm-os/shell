@@ -41,7 +41,7 @@ export function ListingDetail({ listing, onBack, onChanged }: ListingDetailProps
 			<header className="marketplace__detail-header">
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.Close}
 					onClick={onBack}
 				>

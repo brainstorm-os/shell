@@ -194,7 +194,7 @@ export function DevicesAddFlow({ onClose, onPaired, embedded = false }: DevicesA
 					<>
 						<Button
 							variant={ButtonVariant.Ghost}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() => {
 								void onCancel();
 							}}
@@ -205,7 +205,7 @@ export function DevicesAddFlow({ onClose, onPaired, embedded = false }: DevicesA
 						{state === DevicesAddState.Waiting && (
 							<Button
 								variant={ButtonVariant.Glass}
-								size={ButtonSize.Sm}
+								size={ButtonSize.Md}
 								onClick={onAdvanceToHandshake}
 								data-testid="devices-add-advance"
 							>
@@ -235,7 +235,7 @@ export function DevicesAddFlow({ onClose, onPaired, embedded = false }: DevicesA
 					<>
 						<Button
 							variant={ButtonVariant.Ghost}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={onClose}
 							data-testid="devices-add-close"
 						>

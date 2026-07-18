@@ -386,7 +386,7 @@ button.fm-row {
 .fm-menu .break-all { word-break: break-all; }
 
 /* Radius */
-.fm-menu .rounded { border-radius: 0.25rem; }
+.fm-menu .rounded { border-radius: var(--radius-sm); }
 .fm-menu .rounded-md { border-radius: var(--fm-row-radius, 0.375rem); }
 
 /* Borders */

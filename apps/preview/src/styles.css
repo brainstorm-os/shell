@@ -617,7 +617,7 @@ button {
 	position: absolute;
 	pointer-events: auto;
 	cursor: pointer;
-	border-radius: 2px;
+	border-radius: var(--radius-xs);
 	transition: background-color var(--motion-duration-fast, 120ms) ease;
 }
 

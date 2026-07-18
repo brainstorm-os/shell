@@ -194,7 +194,7 @@ export function GrantsPanel() {
 								</span>
 								<Button
 									variant={ButtonVariant.Destructive}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									onClick={() => {
 										void onRevoke(openEntry.id, openEntry.name, grant.capability, grant.scope);
 									}}

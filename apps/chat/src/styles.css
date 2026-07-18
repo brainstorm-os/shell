@@ -62,7 +62,7 @@ body {
 	width: 28px;
 	height: 28px;
 	border: none;
-	border-radius: 7px;
+	border-radius: var(--radius-md);
 	background: transparent;
 	color: var(--text-dim);
 	cursor: pointer;
@@ -168,7 +168,7 @@ body {
 	width: 100%;
 	padding: 6px 8px;
 	border: none;
-	border-radius: 7px;
+	border-radius: var(--radius-md);
 	background: transparent;
 	color: var(--text-dim);
 	font-size: 14px;
@@ -258,7 +258,7 @@ body {
 	gap: 10px;
 	padding: 6px 12px;
 	margin: 0 6px;
-	border-radius: 8px;
+	border-radius: var(--radius-md);
 	transition: background 120ms ease;
 }
 
@@ -331,7 +331,7 @@ body {
 	font-size: 0.92em;
 	background: color-mix(in srgb, currentColor 10%, transparent);
 	padding: 0.08em 0.32em;
-	border-radius: 4px;
+	border-radius: var(--radius-sm);
 }
 
 .chat__line--rich a {
@@ -381,7 +381,7 @@ body {
 .chat__composer-wrap--drop {
 	outline: 2px dashed var(--accent);
 	outline-offset: -2px;
-	border-radius: 8px;
+	border-radius: var(--radius-md);
 	background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
@@ -411,7 +411,7 @@ body {
 	min-height: 40px;
 	padding: 9px;
 	border: 1px solid var(--border);
-	border-radius: 10px;
+	border-radius: var(--radius-md);
 	background: var(--bg-elev);
 	color: var(--text);
 	font: inherit;
@@ -434,7 +434,7 @@ body {
 	align-items: center;
 	justify-content: center;
 	border: none;
-	border-radius: 10px;
+	border-radius: var(--radius-md);
 	background: var(--accent);
 	color: var(--accent-fg);
 	cursor: pointer;
@@ -516,7 +516,7 @@ body {
 	align-items: center;
 	gap: 8px;
 	padding: 4px 6px;
-	border-radius: 7px;
+	border-radius: var(--radius-md);
 	font-size: 13px;
 	color: var(--text);
 	transition: background 120ms ease;
@@ -545,7 +545,7 @@ body {
 	border: none;
 	background: var(--selected);
 	color: var(--text-dim);
-	border-radius: 5px;
+	border-radius: var(--radius-sm);
 	padding: 1px;
 	font-size: 11px;
 	cursor: pointer;

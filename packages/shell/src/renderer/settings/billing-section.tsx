@@ -251,7 +251,7 @@ export function LinkForm({
 				/>
 				<Button
 					variant={ButtonVariant.Primary}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					disabled={busy || draft.trim().length === 0}
 					loading={busy}
 					data-testid="billing-link-submit"
@@ -270,7 +270,7 @@ export function LinkForm({
 			<div className="billing-section__actions">
 				<Button
 					variant={ButtonVariant.Glass}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.ArrowUpRight}
 					onClick={onOpenPortal}
 					data-testid="billing-open-portal"
@@ -366,7 +366,7 @@ export function LinkedAccount({
 					/>
 					<Button
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						disabled={busy}
 						loading={busy}
 						onClick={() => onCheckout(plan, cycle)}
@@ -379,7 +379,7 @@ export function LinkedAccount({
 			<div className="billing-section__actions">
 				<Button
 					variant={ButtonVariant.Glass}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.ArrowUpRight}
 					onClick={onOpenPortal}
 					data-testid="billing-open-portal"
@@ -388,7 +388,7 @@ export function LinkedAccount({
 				</Button>
 				<Button
 					variant={ButtonVariant.Glass}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					disabled={busy}
 					onClick={onRefresh}
 					data-testid="billing-refresh"
@@ -398,7 +398,7 @@ export function LinkedAccount({
 				<Button
 					variant={ButtonVariant.Ghost}
 					danger
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					disabled={busy}
 					onClick={onUnlink}
 					data-testid="billing-unlink"
@@ -428,7 +428,7 @@ export function InvoicesGroup({
 					<p className="settings__hint">{failureMessage(failure)}</p>
 					<Button
 						variant={ButtonVariant.Glass}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						iconLeft={IconName.ArrowUpRight}
 						onClick={() => openExternalUrl(portalUrl)}
 					>
@@ -453,7 +453,7 @@ export function InvoicesGroup({
 							{invoice.hostedInvoiceUrl !== null && (
 								<Button
 									variant={ButtonVariant.Ghost}
-									size={ButtonSize.Sm}
+									size={ButtonSize.Md}
 									iconLeft={IconName.ArrowUpRight}
 									onClick={() => openExternalUrl(invoice.hostedInvoiceUrl as string)}
 								>
@@ -624,7 +624,7 @@ export function BillingSection() {
 						<div className="billing-section__actions">
 							<Button
 								variant={ButtonVariant.Primary}
-								size={ButtonSize.Sm}
+								size={ButtonSize.Md}
 								disabled
 								data-testid="billing-checkout-disabled"
 							>

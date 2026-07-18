@@ -247,7 +247,7 @@ export function DevicesJoinFlow({ onClose, onJoined, embedded = false }: Devices
 				{state === DevicesJoinState.Capture && (
 					<Button
 						variant={ButtonVariant.Ghost}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={() => {
 							void onCancel();
 						}}
@@ -260,7 +260,7 @@ export function DevicesJoinFlow({ onClose, onJoined, embedded = false }: Devices
 					<>
 						<Button
 							variant={ButtonVariant.Ghost}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() => {
 								void onDontMatch();
 							}}
@@ -295,7 +295,7 @@ export function DevicesJoinFlow({ onClose, onJoined, embedded = false }: Devices
 					<>
 						<Button
 							variant={ButtonVariant.Ghost}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={onClose}
 							data-testid="devices-join-close"
 						>
@@ -543,7 +543,7 @@ function ScanPane({
 				<div className="devices-join__permission-actions">
 					<Button
 						variant={ButtonVariant.Ghost}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={() => setCameraDenied(true)}
 						data-testid="devices-join-permission-deny"
 					>

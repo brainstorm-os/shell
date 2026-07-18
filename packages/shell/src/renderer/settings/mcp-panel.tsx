@@ -108,7 +108,7 @@ function ToolsInspector({ serverId }: { serverId: string }) {
 			{hasRugPull && (
 				<Button
 					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => void window.brainstorm.mcpSettings.approve(serverId).then(refresh)}
 				>
 					{t("shell.settings.mcp.approveChanges")}
@@ -354,7 +354,7 @@ export function McpServersSection() {
 						<ServerTile server={server} onOpen={() => setOpenId(server.id)} />
 						<Button
 							variant={server.enabledHere ? ButtonVariant.Ghost : ButtonVariant.Neutral}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() =>
 								void window.brainstorm.mcpSettings.setEnabled(server.id, !server.enabledHere).then(refresh)
 							}

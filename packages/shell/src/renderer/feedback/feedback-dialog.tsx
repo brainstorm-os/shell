@@ -368,7 +368,7 @@ export function FeedbackDialog({
 					<Button
 						type="button"
 						variant={ButtonVariant.Ghost}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						onClick={onClose}
 						data-testid="feedback-cancel"
 					>
@@ -377,7 +377,7 @@ export function FeedbackDialog({
 					<Button
 						type="submit"
 						variant={ButtonVariant.Primary}
-						size={ButtonSize.Sm}
+						size={ButtonSize.Md}
 						loading={state.kind === "submitting"}
 						disabled={
 							formInvalid ||

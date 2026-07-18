@@ -134,7 +134,7 @@ export function FileHandlesPanel() {
 						</span>
 						<Button
 							variant={ButtonVariant.Destructive}
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							onClick={() => {
 								void onRevoke(handle);
 							}}

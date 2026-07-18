@@ -288,7 +288,7 @@ function RestoreControl() {
 			) : (
 				<Button
 					variant={ButtonVariant.Primary}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					loading={phase === RestorePhase.Running}
 					onClick={runRestore}
 					data-testid="restore-run"

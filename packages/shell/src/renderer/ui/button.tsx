@@ -18,7 +18,9 @@
  *                  dense surfaces (toolbars, lists).
  *   Destructive  — accent for irreversible actions (delete, revoke).
  *
- * Sizes mirror IconButton (Sm 24, Md 32, Lg 40 row-height).
+ * Sizes mirror IconButton (Md 32, Lg 40 row-height). Sm was removed
+ * 2026-07-18 (owner call: the 24px face read cramped everywhere) — dense
+ * surfaces use Md; genuinely icon-only tight spots use IconButton.
  *
  * No surface re-implements button chrome — every consumer goes through
  * this primitive. Per CLAUDE.md DRY rule.
@@ -40,7 +42,6 @@ export enum ButtonVariant {
 }
 
 export enum ButtonSize {
-	Sm = "sm",
 	Md = "md",
 	Lg = "lg",
 }
@@ -109,7 +110,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 	if (danger) classes.push("button--danger");
 	if (loading) classes.push("button--loading");
 	if (className) classes.push(className);
-	const iconSize = size === ButtonSize.Sm ? 14 : size === ButtonSize.Lg ? 20 : 16;
+	const iconSize = size === ButtonSize.Md ? 14 : size === ButtonSize.Lg ? 20 : 16;
 	const shortcut = useShortcutLabel(shortcutId ?? "");
 	const showHint = shortcutId !== undefined && shortcut !== null;
 	return (

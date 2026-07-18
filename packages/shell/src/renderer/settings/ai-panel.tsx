@@ -430,14 +430,14 @@ function BudgetPopover({
 						<Button
 							variant={ButtonVariant.Ghost}
 							danger
-							size={ButtonSize.Sm}
+							size={ButtonSize.Md}
 							className="popover__footer-lead"
 							onClick={clear}
 						>
 							{t("shell.settings.ai.budgetClear")}
 						</Button>
 					)}
-					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} onClick={save} disabled={!valid}>
+					<Button variant={ButtonVariant.Primary} size={ButtonSize.Md} onClick={save} disabled={!valid}>
 						{t("shell.settings.ai.budgetSet")}
 					</Button>
 				</>

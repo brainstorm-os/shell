@@ -165,7 +165,7 @@ export function NetworkEgressPanel() {
 				<p className="settings__error" role="alert">
 					{load.kind === "error" ? load.message : t("shell.settings.network.loadFailed")}
 				</p>
-				<Button onClick={() => void refresh()} size={ButtonSize.Sm}>
+				<Button onClick={() => void refresh()} size={ButtonSize.Md}>
 					{t("shell.settings.network.retry")}
 				</Button>
 			</section>
@@ -302,7 +302,7 @@ function ActiveProxySection({
 				<h4 className="network-egress__group-title">{t("shell.settings.network.proxy.title")}</h4>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={onEdit}
 					data-testid="network-egress-proxy-edit"
 				>
@@ -580,10 +580,10 @@ function ProxyEditorPopover({
 					</p>
 				)}
 				<div className="network-egress__editor-footer">
-					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Sm} onClick={onClose} type="button">
+					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={onClose} type="button">
 						{t("shell.settings.network.proxy.editor.cancel")}
 					</Button>
-					<Button variant={ButtonVariant.Primary} size={ButtonSize.Sm} loading={saving} type="submit">
+					<Button variant={ButtonVariant.Primary} size={ButtonSize.Md} loading={saving} type="submit">
 						{t("shell.settings.network.proxy.editor.save")}
 					</Button>
 				</div>
@@ -762,7 +762,7 @@ function AllowlistEditor({
 				<Button
 					type="submit"
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.Plus}
 				>
 					{t("shell.settings.network.privacy.allowlist.add")}
@@ -864,7 +864,7 @@ function AutomationEgressSection() {
 				<Button
 					type="submit"
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.Plus}
 					disabled={busy || input.trim().length === 0}
 				>
@@ -1047,7 +1047,7 @@ function RecentSection({
 				</div>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					iconLeft={IconName.Download}
 					onClick={onExport}
 					data-testid="network-egress-recent-export"
@@ -1427,7 +1427,7 @@ function FeedbackSection() {
 			<div className="network-egress__feedback-actions">
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => setDialogOpen(true)}
 					disabled={!settings?.enabled || settings.endpoint === null}
 					data-testid="network-egress-feedback-open"
@@ -1563,7 +1563,7 @@ function CrashReporterRow({
 			<div className="network-egress__feedback-actions">
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => void onSubmitNow()}
 					disabled={submitDisabled}
 					loading={submitting}
@@ -1573,7 +1573,7 @@ function CrashReporterRow({
 				</Button>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => setReviewOpen(true)}
 					disabled={pending === null || pending.count === 0}
 					data-testid="network-egress-crash-review"
@@ -1663,7 +1663,7 @@ function CrashPendingPopover({
 			<div className="network-egress__editor-footer">
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={onClose}
 					data-testid="network-egress-crash-popover-close"
 				>
@@ -1671,7 +1671,7 @@ function CrashPendingPopover({
 				</Button>
 				<Button
 					variant={ButtonVariant.Destructive}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => void onClear()}
 					disabled={rows !== null && rows.length === 0}
 					data-testid="network-egress-crash-popover-clear"
@@ -1739,7 +1739,7 @@ function PreviewCacheSection({
 				</div>
 				<Button
 					variant={ButtonVariant.Ghost}
-					size={ButtonSize.Sm}
+					size={ButtonSize.Md}
 					onClick={() => void onClear()}
 					disabled={stats.entryCount === 0}
 					data-testid="network-egress-cache-clear"
