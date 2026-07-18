@@ -1151,14 +1151,21 @@ body.is-resizing .db-inspector__resize {
 	background: transparent;
 }
 
-/* Rollup cell (9.12.17): a read-only computed aggregation. Reads like the
- * footer value (tabular numerals) and is visibly non-editable (no hover
- * affordance, muted) so it never looks like a typo-able field. */
-.dbv-grid__rollup-value {
+/* Computed cell (9.12.17): a read-only rollup / formula value, shared by the
+ * grid and the card views (board / gallery / list). Reads like the footer
+ * value (tabular numerals) and is visibly non-editable (no hover affordance,
+ * muted) so it never looks like a typo-able field. */
+.dbv-computed__value {
 	font-variant-numeric: tabular-nums;
 	color: var(--text-faint);
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* A formula compile / evaluation error — a muted ⚠ chip; the message rides
+ * the title tooltip. */
+.dbv-computed__error {
+	color: var(--text-faint);
 }
 
 /* Wrap toggle (view settings). Default is single-line + ellipsis;

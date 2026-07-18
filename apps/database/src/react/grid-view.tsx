@@ -26,13 +26,7 @@
  * scope for this rung. React migration of cell internals is follow-up.
  */
 
-import {
-	type ColumnFormula,
-	type ColumnRollup,
-	type ObjectDragItem,
-	type PropertyDef,
-	ValueType,
-} from "@brainstorm/sdk-types";
+import { type ObjectDragItem, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
 import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { useDragSource } from "@brainstorm/sdk/object-dnd";
@@ -81,7 +75,6 @@ import { columnValueSuggestions } from "../logic/column-suggestions";
 import type { CompiledView } from "../logic/compile-view";
 import { dragItemsForRow } from "../logic/drag-items";
 import { effectiveColumnDef } from "../logic/effective-def";
-import { type CompiledFormula, compileFormula } from "../logic/formula";
 import {
 	cellActivationOpensRecord,
 	cellColOf,
@@ -91,15 +84,11 @@ import {
 	flatCellIndex,
 } from "../logic/grid-cell-nav";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";
-import {
-	columnRollupToSpec,
-	computeRollup,
-	entitiesById,
-	parseAggregationKind,
-} from "../logic/rollup";
+import { parseAggregationKind } from "../logic/rollup";
 import { entityIcon, entityTitle } from "../render/cells";
 import type { ColumnSpec, GridLayoutOptions } from "../types/list-view";
 import { humanize } from "../ui/humanize";
+import { FormulaCell, RollupCell, useRollupLookups } from "./computed-cells";
 import { DomSlot } from "./dom-slot";
 import { EditableCell, type EntityPropertyEdit } from "./editable-cell";
 import { useStableCallback } from "./use-stable-callback";
@@ -255,17 +244,11 @@ export function GridView(props: GridViewProps): ReactElement {
 	// so the lookup is built over the full vault (`allRows`), not the view's
 	// filtered rows. The target property's def comes from those linked entities
 	// (the source rows don't carry it) so the cell formats in the target's units.
-	const allRows = props.allRows;
-	const rollupById = useMemo(() => entitiesById(allRows ?? compiled.rows), [allRows, compiled.rows]);
-	const rollupTargetDefs = useMemo<ColumnDefs>(() => {
-		const map = new Map<string, PropertyDef | null>();
-		const source = allRows ?? compiled.rows;
-		for (const c of visible) {
-			if (!c.rollup) continue;
-			map.set(c.propertyId, effectiveColumnDef(c.rollup.targetPropertyKey, source));
-		}
-		return map;
-	}, [visible, allRows, compiled.rows]);
+	const { byId: rollupById, targetDefs: rollupTargetDefs } = useRollupLookups(
+		visible,
+		props.allRows,
+		compiled.rows,
+	);
 
 	const [activeColumn, setActiveColumn] = useState<string | null>(null);
 	const sensors = useSensors(
@@ -1043,56 +1026,6 @@ function GridCell({
 			/>
 		</div>
 	);
-}
-
-/** A computed rollup value (9.12.17), rendered read-only: walk the row's
- *  relation to its linked entities, aggregate their target property, and
- *  format the result in the target property's own units. */
-export function RollupCell({
-	rollup,
-	entity,
-	byId,
-	targetDef,
-}: {
-	rollup: ColumnRollup;
-	entity: EntityRow;
-	byId: ReadonlyMap<string, EntityRow>;
-	targetDef: PropertyDef | null;
-}): ReactElement {
-	const result = computeRollup(entity, columnRollupToSpec(rollup), byId);
-	return (
-		<span className="dbv-grid__rollup-value">
-			{formatAggregation(result, targetDef ?? undefined)}
-		</span>
-	);
-}
-
-/** Read-only formula column cell (9.12.17): compiles the column's expression
- *  once and evaluates it against this row's properties. A compile / evaluation
- *  error renders as a muted `⚠` chip carrying the message as a tooltip rather
- *  than a value. */
-export function FormulaCell({
-	formula,
-	entity,
-}: {
-	formula: ColumnFormula;
-	entity: EntityRow;
-}): ReactElement {
-	const compiled = useMemo<{ ok: true; formula: CompiledFormula } | { ok: false; error: string }>(
-		() => compileFormula(formula.expression),
-		[formula.expression],
-	);
-	const result = compiled.ok
-		? compiled.formula.evaluate((key) => entity.properties[key])
-		: { ok: false as const, error: compiled.error };
-	if (!result.ok) {
-		return (
-			<span className="dbv-grid__formula-error" title={result.error}>
-				⚠
-			</span>
-		);
-	}
-	return <span className="dbv-grid__formula-value">{result.value.toLocaleString()}</span>;
 }
 
 /** Hover-revealed "Open" affordance in the title cell (F-023, Notion

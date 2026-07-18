@@ -23,6 +23,7 @@ import { effectiveColumnDef } from "../logic/effective-def";
 import type { EntityRow } from "../logic/in-memory-entities";
 import type { ColumnSpec } from "../types/list-view";
 import { humanize } from "../ui/humanize";
+import { ComputedCell, computedColumnLabel } from "./computed-cells";
 import { EditableCell, type EntityPropertyEdit } from "./editable-cell";
 
 export type ColumnDefs = ReadonlyMap<string, PropertyDef | null>;
@@ -67,6 +68,12 @@ export function useEditableColumnDefs(
 		if (!hasEdit) return map;
 		for (const c of columns) {
 			if (c.visible === false || isTitleColumn(c.propertyId)) continue;
+			// A computed column (rollup / formula) has a synthetic propertyId no
+			// entity carries — never editable, nothing to infer.
+			if (c.rollup || c.formula) {
+				map.set(c.propertyId, null);
+				continue;
+			}
 			map.set(c.propertyId, effectiveColumnDef(c.propertyId, rows));
 		}
 		return map;
@@ -104,6 +111,19 @@ export function CardFields({
 		>
 			{columns.map((c) => {
 				if (c.visible === false || isTitleColumn(c.propertyId)) return null;
+				// Computed columns (rollup / formula, 9.12.17) render read-only —
+				// the same shared cells the grid mounts, labeled by the column's
+				// own name (the synthetic propertyId would humanize to noise).
+				if (c.rollup || c.formula) {
+					return (
+						<div className="dbv-card__field" data-computed="true" key={c.propertyId}>
+							<dt className="dbv-card__field-label">{computedColumnLabel(c)}</dt>
+							<dd className="dbv-card__field-value">
+								<ComputedCell column={c} entity={entity} />
+							</dd>
+						</div>
+					);
+				}
 				const def = columnDefs.get(c.propertyId) ?? null;
 				const label = def?.name?.trim() ? def.name : humanize(c.propertyId);
 				return (
