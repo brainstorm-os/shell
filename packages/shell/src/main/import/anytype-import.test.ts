@@ -421,6 +421,62 @@ describe("parseAnytypeExport", () => {
 		expect(plan.filesMissingBinary).toBe(0);
 	});
 
+	it("binds a name-less file object through details.source and synthesizes its display name", () => {
+		// Pasted screenshots have no name and no fileExt — the slug matcher can
+		// never bind them, but the export states the binary path in `source`.
+		const plan = parseAnytypeExport(
+			[
+				snapshotFile("f-nameless", "FileObject", {
+					details: {
+						name: "",
+						fileExt: "",
+						fileMimeType: "image/png",
+						source: "files/untitled_2s",
+					},
+				}),
+				snapshotFile("obj-p", "Page", {
+					details: { name: "Pasted media" },
+					blocks: [
+						{ id: "obj-p", childrenIds: ["fb1"] },
+						{ id: "fb1", file: { targetObjectId: "f-nameless", type: "Image" } },
+					],
+				}),
+			],
+			["files/untitled_2s"],
+		);
+		expect(plan.fileBinaryByObject.get("f-nameless")).toBe("files/untitled_2s");
+		expect(plan.fileNameByObject.get("f-nameless")).toBe("untitled_2s.png");
+		expect(plan.filesMissingBinary).toBe(0);
+	});
+
+	it("source binding beats the slug matcher when same-second screenshots collide", () => {
+		// Two screenshots taken in the same second slug to the same stem; the
+		// export disambiguates on disk with a suffix. The slug matcher bound
+		// BOTH objects to the suffix-less file (silent wrong-content); `source`
+		// keeps each object on its own binary.
+		const details = { name: "Screenshot 2026-02-23 at 09.53.10", fileExt: "png" };
+		const plan = parseAnytypeExport(
+			[
+				snapshotFile("f-one", "FileObject", {
+					details: { ...details, source: "files/screenshot-2026-02-23-at-09-53-10.png" },
+				}),
+				snapshotFile("f-two", "FileObject", {
+					details: { ...details, source: "files/screenshot-2026-02-23-at-09-53-10_a.png" },
+				}),
+			],
+			[
+				"files/screenshot-2026-02-23-at-09-53-10.png",
+				"files/screenshot-2026-02-23-at-09-53-10_a.png",
+			],
+		);
+		expect(plan.fileBinaryByObject.get("f-one")).toBe(
+			"files/screenshot-2026-02-23-at-09-53-10.png",
+		);
+		expect(plan.fileBinaryByObject.get("f-two")).toBe(
+			"files/screenshot-2026-02-23-at-09-53-10_a.png",
+		);
+	});
+
 	it("never guesses on an ambiguous truncation prefix", () => {
 		const plan = parseAnytypeExport(
 			[
@@ -698,6 +754,36 @@ describe("importAnytypeExport (vault binding)", () => {
 		expect(second.created).toBe(0);
 		expect(second.filesCreated).toBe(0);
 		expect(second.updated).toBe(3);
+	});
+
+	it("seals a name-less pasted screenshot with a synthesized name + image mime", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const files = [
+			snapshotFile("f-paste", "FileObject", {
+				details: { name: "", fileExt: "", fileMimeType: "image/png", source: "files/untitled_2s" },
+			}),
+			snapshotFile("obj-img", "Page", {
+				details: { name: "Pasted media" },
+				blocks: [
+					{ id: "obj-img", childrenIds: ["fb1"] },
+					{ id: "fb1", file: { targetObjectId: "f-paste", type: "Image" } },
+				],
+			}),
+		];
+		const atts = [{ path: "files/untitled_2s", bytes: new Uint8Array([137, 80, 78, 71]) }];
+		const report = await importAnytypeExport(session, files, opts, atts);
+		expect(report.filesCreated).toBe(1);
+		expect(report.filesMissingBinary).toBe(0);
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [fileId] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:file:f-paste`);
+		const file = fileId ? repo.get(fileId) : null;
+		// Extension-less on-disk basename would have sealed as
+		// application/octet-stream — an <img> the renderer refuses to paint.
+		expect(file?.properties.name).toBe("untitled_2s.png");
+		expect(file?.properties.mime).toBe("image/png");
+		// The Files gallery/grid thumbnail gate reads assetMime, not mime.
+		expect(file?.properties.assetMime).toBe("image/png");
 	});
 
 	it("persists the def-keyed values bag and registers matching defs (F-394)", async () => {

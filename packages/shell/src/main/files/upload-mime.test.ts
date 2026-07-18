@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { UPLOAD_FALLBACK_MIME, isPreviewableImageMime, servedMimeForName } from "./upload-mime";
+import {
+	UPLOAD_FALLBACK_MIME,
+	extensionForMime,
+	isPreviewableImageMime,
+	servedMimeForName,
+} from "./upload-mime";
 
 describe("servedMimeForName", () => {
 	it("maps preview-safe extensions case-insensitively", () => {
@@ -21,6 +26,21 @@ describe("servedMimeForName", () => {
 		expect(servedMimeForName("README")).toBe(UPLOAD_FALLBACK_MIME);
 		expect(servedMimeForName("weird.")).toBe(UPLOAD_FALLBACK_MIME);
 		expect(servedMimeForName(".bashrc")).toBe(UPLOAD_FALLBACK_MIME);
+	});
+});
+
+describe("extensionForMime", () => {
+	it("maps preview-safe mimes to a canonical extension", () => {
+		expect(extensionForMime("image/png")).toBe("png");
+		expect(extensionForMime("image/jpeg")).toBe("jpg");
+		expect(extensionForMime("application/pdf")).toBe("pdf");
+	});
+
+	it("returns null for unsafe, unknown, and missing mimes", () => {
+		expect(extensionForMime("image/svg+xml")).toBeNull();
+		expect(extensionForMime("text/html")).toBeNull();
+		expect(extensionForMime(UPLOAD_FALLBACK_MIME)).toBeNull();
+		expect(extensionForMime(null)).toBeNull();
 	});
 });
 

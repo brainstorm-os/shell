@@ -36,7 +36,7 @@ import {
 } from "@brainstorm/sdk-types";
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
-import { servedMimeForName } from "../files/upload-mime";
+import { extensionForMime, servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
@@ -721,23 +721,39 @@ export function parseAnytypeExport(
 			if (name) optionLabelById.set(snap.id, name);
 		} else if (FILE_SB_TYPES.has(snap.sbType)) {
 			fileObjectIds.add(snap.id);
-			// The file object's display name usually lacks the extension the
-			// binary carries (`fileExt` is a separate detail) — try both, plus
-			// the object id itself (some exports name the binary after it).
+			// `details.source` IS the export-relative binary path — the export
+			// states the mapping outright (457/457 exact on the real export, incl.
+			// name-less pasted screenshots the slug matcher can never bind). The
+			// slug/truncation chain below stays only for exports without `source`.
 			const ext = asString(snap.details.fileExt);
-			const binary = findBinary(
-				name,
-				ext && name ? `${name}.${ext}` : null,
-				snap.id,
-				ext ? `${snap.id}.${ext}` : null,
-				asString(snap.details.fileId),
-			);
+			const sourcePath = asString(snap.details.source);
+			const binary =
+				(sourcePath ? attachmentByKey.get(sourcePath) : undefined) ??
+				findBinary(
+					name,
+					ext && name ? `${name}.${ext}` : null,
+					snap.id,
+					ext ? `${snap.id}.${ext}` : null,
+					asString(snap.details.fileId),
+				);
 			if (binary) fileBinaryByObject.set(snap.id, binary);
 			// Keep the DISPLAY name (with its extension) so the File entity is
-			// named what the user called it, not the export's slugged stem.
+			// named what the user called it, not the export's slugged stem. A
+			// name-less object (pasted screenshot) gets the binary's basename,
+			// completed with an extension from `fileExt`/`fileMimeType` so the
+			// sealed asset serves a real mime (an extension-less `untitled_2s`
+			// would serve application/octet-stream and break <img> rendering).
 			if (name) {
 				const withExt =
 					ext && !name.toLowerCase().endsWith(`.${ext.toLowerCase()}`) ? `${name}.${ext}` : name;
+				fileNameByObject.set(snap.id, withExt);
+			} else if (binary) {
+				const base = binary.slice(binary.lastIndexOf("/") + 1);
+				const mimeExt = ext || extensionForMime(asString(snap.details.fileMimeType));
+				const withExt =
+					mimeExt && !base.toLowerCase().endsWith(`.${mimeExt.toLowerCase()}`)
+						? `${base}.${mimeExt}`
+						: base;
 				fileNameByObject.set(snap.id, withExt);
 			}
 		}
@@ -1295,7 +1311,11 @@ export async function importAnytypeExport(
 			typeof existingRow?.properties.assetId === "string" ? existingRow.properties.assetId : null;
 		const prevSize =
 			typeof existingRow?.properties.size === "number" ? existingRow.properties.size : null;
-		const mime = servedMimeForName(binaryName);
+		// Mime from the display name, which always carries the truthful
+		// extension when one is known (`fileExt`/`fileMimeType`) — the on-disk
+		// basename can be extension-less (`files/untitled_2s`) and would
+		// collapse an image to application/octet-stream.
+		const mime = servedMimeForName(name);
 		let assetId: string;
 		if (prevAssetId !== null && prevSize === bytes.length) {
 			// Same-size existing asset (Anytype file objects are content-addressed
@@ -1312,6 +1332,10 @@ export async function importAnytypeExport(
 		const properties: Record<string, unknown> = {
 			name,
 			mime,
+			// The Files tile gate reads `assetMime` (the upload path's contract:
+			// served mime beside assetId) — without it an imported image never
+			// renders a thumbnail, only the extension chip.
+			assetMime: mime,
 			size: bytes.length,
 			assetId,
 			attachment: `brainstorm://asset/${assetId}`,
