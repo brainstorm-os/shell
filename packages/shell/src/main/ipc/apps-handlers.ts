@@ -86,16 +86,24 @@ export function registerAppsHandlers(options: AppsHandlersOptions): void {
 		// This means the icon-picker never offers a broken app for pinning.
 		const alive: typeof records = [];
 		const orphans: typeof records = [];
-		await Promise.all(
+		// Partition AFTER the parallel fs checks settle — pushing inside the
+		// Promise.all callbacks ordered the result by fs-completion (racy), so
+		// every consumer (per-app notification list, icon picker) got the apps
+		// in a different order per call. The flags array preserves the repo's
+		// ORDER BY.
+		const orphaned = await Promise.all(
 			records.map(async (record) => {
 				try {
 					await access(join(record.bundleDir, "manifest.json"));
-					alive.push(record);
+					return false;
 				} catch {
-					orphans.push(record);
+					return true;
 				}
 			}),
 		);
+		records.forEach((record, i) => {
+			(orphaned[i] ? orphans : alive).push(record);
+		});
 		if (orphans.length > 0) {
 			const ledger = await session.capabilityLedger();
 			const shortcutRegistry = getActiveShortcutRegistry();

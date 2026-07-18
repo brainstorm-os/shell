@@ -372,7 +372,7 @@ function PropertiesPanel({
 					<Icon name={IconName.KindText} size={32} weight="duotone" />
 				</div>
 				<h4 className="data__empty-title">{t("shell.settings.data.properties.empty")}</h4>
-				<p className="data__empty-hint">{t("shell.settings.data.summary")}</p>
+				<p className="data__empty-hint">{t("shell.settings.data.properties.emptyHint")}</p>
 				<div className="data__empty-action">
 					<Button iconLeft={IconName.Plus} variant={ButtonVariant.Primary} onClick={onAdd}>
 						{t("shell.settings.data.properties.add")}

@@ -610,6 +610,7 @@
   "shell.settings.data.tab.dictionaries": "Dictionaries",
   "shell.settings.data.properties.heading": "Properties",
   "shell.settings.data.properties.empty": "No properties yet.",
+  "shell.settings.data.properties.emptyHint": "Create your first property — pick a kind and name it once, and every app's inspector can offer it.",
   "shell.settings.data.properties.add": "New property",
   "shell.settings.data.properties.namePlaceholder": "Name",
   "shell.settings.data.properties.kindLabel": "Kind",

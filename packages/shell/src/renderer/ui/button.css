@@ -37,6 +37,36 @@
 	opacity: 0.55;
 }
 
+/* Filled faces keep their mid-luminance gradient at FULL opacity and
+ * desaturate instead. 55% opacity over a light panel washed the face out
+ * to near-background while the label stayed `--color-accent-text` (white
+ * on most themes) — a disabled Save/Upgrade read as blank chrome on the
+ * light themes. Greying the face preserves the label↔face contrast; the
+ * dropped shadows + speculars keep it reading inert. */
+.button--glass:disabled,
+.button--primary:disabled,
+.button--neutral:disabled,
+.button--destructive:disabled {
+	opacity: 0.9;
+	filter: saturate(0.25);
+	box-shadow: none;
+}
+
+.button--glass:disabled::before,
+.button--glass:disabled > .button__gloss::before,
+.button--glass:disabled > .button__gloss::after,
+.button--primary:disabled::before,
+.button--primary:disabled > .button__gloss::before,
+.button--primary:disabled > .button__gloss::after,
+.button--neutral:disabled::before,
+.button--neutral:disabled > .button__gloss::before,
+.button--neutral:disabled > .button__gloss::after,
+.button--destructive:disabled::before,
+.button--destructive:disabled > .button__gloss::before,
+.button--destructive:disabled > .button__gloss::after {
+	opacity: 0;
+}
+
 .button:active:not(:disabled) {
 	transform: scale(0.97);
 }
