@@ -3,6 +3,96 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.6.0",
+      "date": "2026-07-19",
+      "icon": "🗄️",
+      "title": "Your whole mail history",
+      "summary": "Load older mail on demand — the synced window extends in place, page by page, and fixing a broken account no longer means removing it.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Mailbox"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Load older mail",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a button at the bottom of the list walks every folder deeper into history, past the sync window you chose. Your position is remembered, so each press resumes where the last one stopped — all the way back to your oldest mail."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A list that scales",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — big mailboxes render in pages ("
+            },
+            {
+              "text": "Show older messages",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " reveals more), so thousands of messages stay fast."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Reconnect without losing anything",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a failed account's "
+            },
+            {
+              "text": "Reconnect…",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " opens pre-filled with its stored settings: type the new password and you're back, keeping all synced mail. The sidebar's account menu also gains "
+            },
+            {
+              "text": "Edit connection…",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.4",
       "date": "2026-07-18",
       "icon": "📬",
