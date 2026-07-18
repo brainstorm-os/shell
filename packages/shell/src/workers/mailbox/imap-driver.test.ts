@@ -128,6 +128,27 @@ const msg = (uid: number, id: string, flags?: string[]): FakeMessage => ({
 });
 
 describe("makeImapSmtpDriver", () => {
+	it("survives a post-connect socket 'error' event and reconnects on the next call (F-434)", async () => {
+		const fake = makeFakeImap();
+		let errorHandler: ((error: Error) => void) | undefined;
+		const client: ImapClientLike = {
+			...fake.client,
+			on: (_event, handler) => {
+				errorHandler = handler;
+			},
+		};
+		const { driver } = makeDriver({ imap: client });
+		await driver.listFolders();
+		expect(errorHandler).toBeDefined();
+		expect(fake.calls.connect).toBe(1);
+		// The idle socket times out — imapflow emits 'error' with no command
+		// in flight (the uncaughtException that killed the worker). Must not
+		// throw; must drop the cached connection so the next call redials.
+		errorHandler?.(new Error("Socket timeout"));
+		await driver.listFolders();
+		expect(fake.calls.connect).toBe(2);
+	});
+
 	it("requires a username", () => {
 		expect(() =>
 			makeImapSmtpDriver({
