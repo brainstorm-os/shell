@@ -48,6 +48,7 @@ import {
 	ConnectAccountDialog,
 	type ConnectAccountInput,
 	type ConnectImapInput,
+	type ReconnectSeed,
 } from "./ui/connect-account";
 import { FolderRail } from "./ui/folder-rail";
 import { MessageList } from "./ui/message-list";
@@ -71,6 +72,8 @@ type SyncNote = {
 	/** Auth failures offer the reconnect escape hatch inline — the banner's
 	 *  "reconnect the account" advice was previously a dead end. */
 	reconnect?: boolean;
+	/** The account whose sync failed — seeds reconnect-in-place (Mailbox-13). */
+	reconnectAccountRef?: string;
 };
 
 const SYNC_NOTE_TTL_MS = 6000;
@@ -99,6 +102,7 @@ export function MailboxApp(): ReactElement {
 	const [threaded, setThreaded] = useState(true);
 	const [expandedThreads, setExpandedThreads] = useState<ReadonlySet<string>>(() => new Set());
 	const [connectOpen, setConnectOpen] = useState(false);
+	const [reconnectSeed, setReconnectSeed] = useState<ReconnectSeed | null>(null);
 	const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null);
 	const [syncBusy, setSyncBusy] = useState(false);
 	const [syncNote, setSyncNote] = useState<SyncNote | null>(null);
@@ -270,10 +274,12 @@ export function MailboxApp(): ReactElement {
 			syncRunRef.current = true;
 			setSyncBusy(true);
 			setSyncNote({ kind: SyncNoteKind.Info, text: t("sync.running") });
+			let failingAccount: string | undefined;
 			try {
 				let created = 0;
 				let updated = 0;
 				for (const id of accountIds) {
+					failingAccount = id;
 					const result = await mailSvc.syncNow({ accountRef: id });
 					created += result.created;
 					updated += result.updated;
@@ -286,7 +292,12 @@ export function MailboxApp(): ReactElement {
 				// the raw wire error (owner hit this with a pasted app password).
 				setSyncNote(
 					/authentication failed/i.test(message)
-						? { kind: SyncNoteKind.Error, text: t("sync.errorAuth"), reconnect: true }
+						? {
+								kind: SyncNoteKind.Error,
+								text: t("sync.errorAuth"),
+								reconnect: true,
+								...(failingAccount !== undefined ? { reconnectAccountRef: failingAccount } : {}),
+							}
 						: { kind: SyncNoteKind.Error, text: t("sync.error", { message }) },
 				);
 			} finally {
@@ -348,6 +359,27 @@ export function MailboxApp(): ReactElement {
 	// `mail.disconnect` retires the account (credential deleted, row disabled);
 	// synced mail keeps its entities, so no confirm step — mirrors Calendar's
 	// CalDAV disconnect.
+	// Mailbox-13: open the dialog pre-filled with the account's stored
+	// coordinates so only the password needs re-entering.
+	const openReconnect = useCallback(
+		(accountId: string) => {
+			const account = accounts.find((a) => a.id === accountId);
+			if (!account?.imap) {
+				setConnectOpen(true);
+				return;
+			}
+			setReconnectSeed({
+				accountRef: account.id,
+				address: account.address,
+				incoming: account.imap.incoming,
+				outgoing: account.imap.outgoing,
+				...(account.imap.syncWindow !== undefined ? { syncWindow: account.imap.syncWindow } : {}),
+			});
+			setConnectOpen(true);
+		},
+		[accounts],
+	);
+
 	const onRemoveAccount = useCallback(
 		(accountId: string) => {
 			if (!mailSvc) return;
@@ -492,7 +524,13 @@ export function MailboxApp(): ReactElement {
 						<button
 							type="button"
 							className="bs-btn bs-btn--secondary mb-syncbar__action"
-							onClick={() => setConnectOpen(true)}
+							onClick={() => {
+								if (syncNote.reconnectAccountRef !== undefined) {
+									openReconnect(syncNote.reconnectAccountRef);
+								} else {
+									setConnectOpen(true);
+								}
+							}}
 						>
 							{t("sync.reconnect")}
 						</button>
@@ -535,7 +573,9 @@ export function MailboxApp(): ReactElement {
 						selection={selection}
 						unifiedUnread={unifiedUnread}
 						onSelect={onSelectFolder}
-						{...(usingVault && mailSvc ? { onSyncAccount, onRemoveAccount } : {})}
+						{...(usingVault && mailSvc
+							? { onSyncAccount, onRemoveAccount, onEditAccount: openReconnect }
+							: {})}
 					/>
 					<MessageList
 						messages={visible}
@@ -567,9 +607,13 @@ export function MailboxApp(): ReactElement {
 			)}
 			{connectOpen ? (
 				<ConnectAccountDialog
-					onClose={() => setConnectOpen(false)}
+					onClose={() => {
+						setConnectOpen(false);
+						setReconnectSeed(null);
+					}}
 					onConnect={onConnect}
 					onConnectImap={onConnectImap}
+					{...(reconnectSeed !== null ? { reconnect: reconnectSeed } : {})}
 				/>
 			) : null}
 			{composeSeed ? (

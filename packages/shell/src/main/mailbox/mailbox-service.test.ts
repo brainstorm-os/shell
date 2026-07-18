@@ -454,6 +454,54 @@ describe("mail.connectImap", () => {
 		expect(new TextDecoder().decode(sealed)).toContain("app-password-1");
 	});
 
+	it("reconnect-in-place: an accountRef re-seals the secret and updates the SAME entity (Mailbox-13)", async () => {
+		const { deps, store } = makeDeps();
+		const creds = makeFakeCredentials();
+		deps.getCredentials = () => creds.store;
+		const handler = makeMailServiceHandler(deps);
+		const first = (await handler(envelope("connectImap", IMAP_CONNECT_ARG))) as {
+			accountId: string;
+		};
+		const rowsBefore = [...store.rows.values()].filter(
+			(r) => r.type === MAIL_ACCOUNT_TYPE_URL,
+		).length;
+
+		const result = (await handler(
+			envelope("connectImap", {
+				...IMAP_CONNECT_ARG,
+				accountRef: first.accountId,
+				secret: "rotated-password-2",
+				incoming: { host: "imap2.example.com", port: 993, tls: true },
+			}),
+		)) as { accountId: string };
+		expect(result.accountId).toBe(first.accountId);
+		const rowsAfter = [...store.rows.values()].filter((r) => r.type === MAIL_ACCOUNT_TYPE_URL);
+		expect(rowsAfter.length).toBe(rowsBefore); // updated, not duplicated
+		const row = store.rows.get(first.accountId);
+		expect((row?.properties.incoming as { host: string }).host).toBe("imap2.example.com");
+		expect(row?.properties.enabled).toBe(true);
+		const sealed = creds.entries.get(`${MAILBOX_APP_ID}/mail-account:${first.accountId}`);
+		expect(new TextDecoder().decode(sealed)).toContain("rotated-password-2");
+	});
+
+	it("reconnect-in-place rejects an unknown or non-IMAP account", async () => {
+		const { deps, store } = makeDeps();
+		const creds = makeFakeCredentials();
+		deps.getCredentials = () => creds.store;
+		const gmail = store.insert(MAIL_ACCOUNT_TYPE_URL, {
+			address: "me@example.com",
+			protocol: MailProtocol.GmailApi,
+			enabled: true,
+		});
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("connectImap", { ...IMAP_CONNECT_ARG, accountRef: "ent-missing" })),
+		).rejects.toMatchObject({ name: "Invalid" });
+		await expect(
+			handler(envelope("connectImap", { ...IMAP_CONNECT_ARG, accountRef: gmail.id })),
+		).rejects.toMatchObject({ message: expect.stringContaining("not an IMAP account") });
+	});
+
 	it("disables the account when sealing the secret fails", async () => {
 		const { deps, store } = makeDeps();
 		const creds = makeFakeCredentials();

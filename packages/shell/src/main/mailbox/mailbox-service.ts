@@ -435,6 +435,36 @@ async function handleConnectImap(
 	const syncWindow = isSyncWindow(arg.syncWindow) ? arg.syncWindow : SyncWindow.Days30;
 	const store = requireCredentialStore(deps, method);
 
+	// Reconnect-in-place (Mailbox-13): an accountRef targets an EXISTING IMAP
+	// account — re-seal the secret under the same credential key and update
+	// the host config on the same entity, so synced mail and folder state
+	// survive a password/host fix. The row is server-side resolved and
+	// type/protocol-checked — the client's word is never trusted.
+	const reconnectRef = optionalString(arg.accountRef);
+	if (reconnectRef !== undefined) {
+		const repo = await requireRepo(deps);
+		const row = requireAccountRow(repo, reconnectRef, method);
+		if (row.properties.protocol !== MailProtocol.Imap) {
+			throw makeError("Invalid", `mail.${method}: account is not an IMAP account`);
+		}
+		await store.set(
+			{ app: MAILBOX_APP_ID, key: mailAccountCredentialKey(reconnectRef) },
+			new TextEncoder().encode(JSON.stringify({ secret, username })),
+		);
+		await deps.callEntities(MAILBOX_APP_ID, "update", {
+			id: reconnectRef,
+			patch: {
+				address,
+				...(displayName !== undefined ? { displayName } : {}),
+				incoming,
+				outgoing,
+				syncWindow,
+				enabled: true,
+			},
+		});
+		return { accountId: reconnectRef, address };
+	}
+
 	const account = (await deps.callEntities(MAILBOX_APP_ID, "create", {
 		type: MAIL_ACCOUNT_TYPE_URL,
 		properties: {

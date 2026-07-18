@@ -41,6 +41,13 @@ function flagArray(v: unknown): MailFlag[] {
 	return Array.isArray(v) ? v.filter((x): x is MailFlag => isMailFlag(x)) : [];
 }
 
+function hostView(v: unknown): { host: string; port: number; tls: boolean } | null {
+	if (!v || typeof v !== "object") return null;
+	const raw = v as Record<string, unknown>;
+	if (typeof raw.host !== "string" || typeof raw.port !== "number") return null;
+	return { host: raw.host, port: raw.port, tls: raw.tls === true };
+}
+
 export function accountsFromEntities(entities: readonly VaultEntityLike[]): AccountView[] {
 	return (
 		entities
@@ -49,10 +56,16 @@ export function accountsFromEntities(entities: readonly VaultEntityLike[]): Acco
 			.filter((e) => e.type === MAIL_ACCOUNT_TYPE_URL && e.properties.enabled !== false)
 			.map((e) => {
 				const address = str(e.properties.address);
+				const incoming = hostView(e.properties.incoming);
+				const outgoing = hostView(e.properties.outgoing);
+				const syncWindow = str(e.properties.syncWindow);
 				return {
 					id: e.id,
 					address,
 					displayName: str(e.properties.displayName) || address,
+					...(incoming && outgoing
+						? { imap: { incoming, outgoing, ...(syncWindow ? { syncWindow } : {}) } }
+						: {}),
 				};
 			})
 	);

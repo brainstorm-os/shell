@@ -680,6 +680,10 @@ export type MailService = {
 	 *  `tls: false` = mandatory STARTTLS upgrade — plain cleartext is never
 	 *  an option (doc 53). */
 	connectImap(input: {
+		/** Reconnect-in-place (Mailbox-13): target an EXISTING IMAP account —
+		 *  re-seals the credential + updates host config on the same entity
+		 *  (synced mail survives). Absent ⇒ create a new account. */
+		accountRef?: string;
 		address: string;
 		displayName?: string;
 		username?: string;
