@@ -3,6 +3,181 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.5.4",
+      "date": "2026-07-18",
+      "icon": "📬",
+      "title": "Mailbox grows up",
+      "summary": "The Mailbox becomes a real mail client — rich HTML compose, visible and removable accounts, working remote images, your choice of sync history — and the built-in Browser stops tripping login anti-bot walls.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Mailbox"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Rich compose",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the message body is now a real editor ("
+            },
+            {
+              "text": "bold, lists, quotes, links",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ") and mail sends as proper HTML with a plain-text fallback."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Accounts you can manage",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — every account shows in the sidebar with "
+            },
+            {
+              "text": "Sync",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Remove",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " actions; a failed sync shows a readable error with a "
+            },
+            {
+              "text": "Reconnect…",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " button instead of a dead end."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "One click to open a mail",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — single messages no longer pretend to be conversations; folder names drop the "
+            },
+            {
+              "text": "INBOX/",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " server prefix; blocked remote images stop painting broken icons."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "“Show remote content” works now",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the opt-in was silently blocked by a second security policy; images actually appear."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Choose your sync history",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — connecting an IMAP account now asks how far back to sync ("
+            },
+            {
+              "text": "30 days to All time",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "), and a flaky mail server can no longer crash the sync engine."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Browser & polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Logins work on strict sites",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the built-in Browser now presents a standard Chrome identity, so anti-bot walls (X.com and friends) stop rejecting sign-ins and posts."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Design-system tightening",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — corner radii come from tokens everywhere, hero buttons share one enforced size, and disabled buttons keep their finish."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Anytype import fidelity",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — layout routing and image widths carry over; big imports run in the background without blocking the app."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.3",
       "date": "2026-07-18",
       "icon": "🖼️",
