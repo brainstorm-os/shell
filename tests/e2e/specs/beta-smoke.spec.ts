@@ -141,7 +141,7 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 						).brainstorm;
 						return (await bs.dashboard.snapshot())?.appearance.dark.theme;
 					});
-				// The fresh-vault appearance (mode=light, light=Rose, dark=Midnight)
+				// The fresh-vault appearance (mode=light, light=Default Light, dark=Midnight)
 				// is committed ASYNC by `seedNewVaultDefaults` after create. Anchor on
 				// the deterministic IPC snapshot until the dark slot is the seeded
 				// Midnight, so the toggle below can't race a half-seeded slot.
@@ -155,13 +155,13 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 				// `setAppearanceMode` resolves when the main process accepts it;
 				// the renderer repaint arrives on the snapshot push. Anchor each
 				// read on the pushed `data-theme` flip (fresh vault = Midnight in
-				// dark, Rose in light — same contract as
+				// dark, Default Light in light — same contract as
 				// new-vault-onboarding.spec.ts).
 				await setMode("dark");
 				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("midnight");
 				const dark = await readBg();
 				await setMode("light");
-				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("rose");
+				await expect.poll(themeAttr, { timeout: 15_000 }).toBe("default-light");
 				const light = await readBg();
 				expect(dark, "dark and light backgrounds differ").not.toBe(light);
 			});
