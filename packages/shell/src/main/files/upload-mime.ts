@@ -54,6 +54,18 @@ export function servedMimeForName(name: string): string {
 	return SERVED_MIME_BY_EXTENSION[ext] ?? UPLOAD_FALLBACK_MIME;
 }
 
+/** Reverse lookup over the same preview-safe map: mime → canonical extension
+ *  (first matching entry wins, e.g. image/jpeg → jpg). Null for mimes the
+ *  asset protocol never serves — a name never gains an extension that the
+ *  served-mime map would refuse anyway. */
+export function extensionForMime(mime: string | null | undefined): string | null {
+	if (!mime) return null;
+	for (const [ext, served] of Object.entries(SERVED_MIME_BY_EXTENSION)) {
+		if (served === mime) return ext;
+	}
+	return null;
+}
+
 /** True when the served mime is a raster image the gallery can `<img>`. */
 export function isPreviewableImageMime(mime: string): boolean {
 	return mime.startsWith("image/");
