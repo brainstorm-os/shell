@@ -1332,6 +1332,10 @@ export async function importAnytypeExport(
 		const properties: Record<string, unknown> = {
 			name,
 			mime,
+			// The Files tile gate reads `assetMime` (the upload path's contract:
+			// served mime beside assetId) — without it an imported image never
+			// renders a thumbnail, only the extension chip.
+			assetMime: mime,
 			size: bytes.length,
 			assetId,
 			attachment: `brainstorm://asset/${assetId}`,

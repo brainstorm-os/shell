@@ -782,6 +782,8 @@ describe("importAnytypeExport (vault binding)", () => {
 		// application/octet-stream — an <img> the renderer refuses to paint.
 		expect(file?.properties.name).toBe("untitled_2s.png");
 		expect(file?.properties.mime).toBe("image/png");
+		// The Files gallery/grid thumbnail gate reads assetMime, not mime.
+		expect(file?.properties.assetMime).toBe("image/png");
 	});
 
 	it("persists the def-keyed values bag and registers matching defs (F-394)", async () => {
