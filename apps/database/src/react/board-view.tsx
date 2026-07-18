@@ -53,6 +53,12 @@ import { resolveVocabularyColor as vocabularyColor } from "../logic/property-res
 import { entityIcon, entityTitle, renderCell } from "../render/cells";
 import type { BoardLayoutOptions, ColumnSpec, GroupBy } from "../types/list-view";
 import { CardEditProvider, CardFields, useCardEdit, useEditableColumnDefs } from "./card-fields";
+import {
+	ComputedCellsProvider,
+	cardChips,
+	useComputedCells,
+	useRollupLookups,
+} from "./computed-cells";
 import { DomSlot } from "./dom-slot";
 import type { EntityPropertyEdit } from "./editable-cell";
 
@@ -67,6 +73,11 @@ const NO_MODIFIERS: SelectionModifiers = { shiftKey: false, metaKey: false };
 export type BoardViewProps = {
 	compiled: CompiledView;
 	columns: ReadonlyArray<ColumnSpec>;
+	/** The full live vault entity set — rollup columns walk a relation to
+	 *  entities of *other* types, which aren't in `compiled.rows`. Omitted
+	 *  (e.g. no rollup columns) means rollups resolve against the view's own
+	 *  rows only. Mirrors the grid's prop of the same name. */
+	allRows?: ReadonlyArray<EntityRow>;
 	layout: BoardLayoutOptions;
 	groupBy: GroupBy;
 	subtitleProperty: string | null;
@@ -131,6 +142,7 @@ export function BoardView(props: BoardViewProps): ReactElement {
 	} = props;
 	const columnDefs = useEditableColumnDefs(columns, compiled.rows, onEdit !== undefined);
 	const cardEdit = onEdit ? { onEdit, columnDefs } : null;
+	const rollupLookups = useRollupLookups(columns, props.allRows, compiled.rows);
 
 	const baseGroups = compiled.groups.length
 		? (compiled.groups as Group[])
@@ -170,41 +182,43 @@ export function BoardView(props: BoardViewProps): ReactElement {
 	const rootStyle = { "--dbv-board-col-w": `${layout.columnWidth}px` } as CSSProperties;
 
 	return (
-		<CardEditProvider value={cardEdit}>
-			<div className="dbv-board" style={rootStyle}>
-				<DndContext
-					sensors={sensors}
-					collisionDetection={closestCenter}
-					modifiers={[restrictToHorizontalAxis]}
-					onDragStart={handleDragStart}
-					onDragEnd={handleDragEnd}
-					onDragCancel={handleDragCancel}
-				>
-					<div className="dbv-board__stage">
-						<SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-							{visible.map((group) => (
-								<BoardColumn
-									key={keyOf(group.key)}
-									group={group}
-									groupBy={groupBy}
-									columns={columns}
-									layout={layout}
-									subtitleProperty={subtitleProperty}
-									selectedIds={selectedIds}
-									allRows={compiled.rows}
-									onSelect={onSelect}
-									onOpen={onOpen}
-									onMoveToGroup={onMoveToGroup}
-									onDropObject={onDropObject}
-									isActive={activeKey === keyOf(group.key)}
-									reorderEnabled={!!onReorderGroups}
-								/>
-							))}
-						</SortableContext>
-					</div>
-				</DndContext>
-			</div>
-		</CardEditProvider>
+		<ComputedCellsProvider value={rollupLookups}>
+			<CardEditProvider value={cardEdit}>
+				<div className="dbv-board" style={rootStyle}>
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						modifiers={[restrictToHorizontalAxis]}
+						onDragStart={handleDragStart}
+						onDragEnd={handleDragEnd}
+						onDragCancel={handleDragCancel}
+					>
+						<div className="dbv-board__stage">
+							<SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
+								{visible.map((group) => (
+									<BoardColumn
+										key={keyOf(group.key)}
+										group={group}
+										groupBy={groupBy}
+										columns={columns}
+										layout={layout}
+										subtitleProperty={subtitleProperty}
+										selectedIds={selectedIds}
+										allRows={compiled.rows}
+										onSelect={onSelect}
+										onOpen={onOpen}
+										onMoveToGroup={onMoveToGroup}
+										onDropObject={onDropObject}
+										isActive={activeKey === keyOf(group.key)}
+										reorderEnabled={!!onReorderGroups}
+									/>
+								))}
+							</SortableContext>
+						</div>
+					</DndContext>
+				</div>
+			</CardEditProvider>
+		</ComputedCellsProvider>
 	);
 }
 
@@ -495,16 +509,11 @@ function BoardCard({
 	}, []);
 
 	const cardEdit = useCardEdit();
-	const chips =
-		layout.cardPreview === "rich" && !cardEdit
-			? columns
-					.filter((c) => c.visible !== false)
-					.map((column) => ({
-						id: column.propertyId,
-						data: renderCell(entity, column.propertyId),
-					}))
-					.filter((c) => c.data.kind !== "empty")
-			: [];
+	const lookups = useComputedCells();
+	const chips = useMemo(
+		() => (layout.cardPreview === "rich" && !cardEdit ? cardChips(entity, columns, lookups) : []),
+		[layout.cardPreview, cardEdit, columns, entity, lookups],
+	);
 
 	return (
 		// kbn-onclick-exempt: role + roving tabindex come from `itemProps` (spread); keyboard activation is the column container's `useCompositeKeyboard` reducer
@@ -541,21 +550,21 @@ function BoardCard({
 			) : null}
 			{chips.length > 0 ? (
 				<div className="dbv-board__card-chips">
-					{chips.map(({ id, data }) => (
+					{chips.map(({ id, text, color }) => (
 						<span
 							key={id}
 							className="dbv-card__chip"
 							style={
-								data.color
+								color
 									? {
-											background: `color-mix(in srgb, ${data.color} 18%, transparent)`,
-											color: data.color,
-											borderColor: `color-mix(in srgb, ${data.color} 38%, transparent)`,
+											background: `color-mix(in srgb, ${color} 18%, transparent)`,
+											color,
+											borderColor: `color-mix(in srgb, ${color} 38%, transparent)`,
 										}
 									: undefined
 							}
 						>
-							{data.text}
+							{text}
 						</span>
 					))}
 				</div>

@@ -36,6 +36,12 @@ import type { EntityRow } from "../logic/in-memory-entities";
 import { coverBackgroundFor, entityIcon, entityTitle, renderCell } from "../render/cells";
 import type { ColumnSpec, GalleryLayoutOptions } from "../types/list-view";
 import { CardFields, type ColumnDefs, useEditableColumnDefs } from "./card-fields";
+import {
+	ComputedCellsProvider,
+	cardChips,
+	useComputedCells,
+	useRollupLookups,
+} from "./computed-cells";
 import { DomSlot } from "./dom-slot";
 import type { EntityPropertyEdit } from "./editable-cell";
 import { useStableCallback } from "./use-stable-callback";
@@ -71,6 +77,10 @@ const NO_MODIFIERS: SelectionModifiers = { shiftKey: false, metaKey: false };
 export type GalleryViewProps = {
 	compiled: CompiledView;
 	columns: ReadonlyArray<ColumnSpec>;
+	/** The full live vault entity set — rollup columns walk a relation to
+	 *  entities of *other* types, which aren't in `compiled.rows`. Mirrors the
+	 *  grid's prop of the same name. */
+	allRows?: ReadonlyArray<EntityRow>;
 	layout: GalleryLayoutOptions;
 	coverProperty: string | null;
 	subtitleProperty: string | null;
@@ -91,6 +101,7 @@ export function GalleryView(props: GalleryViewProps): ReactElement {
 	const onEdit = useStableCallback(props.onEdit ?? (() => {}));
 
 	const columnDefs = useEditableColumnDefs(columns, compiled.rows, hasEdit);
+	const rollupLookups = useRollupLookups(columns, props.allRows, compiled.rows);
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -173,57 +184,59 @@ export function GalleryView(props: GalleryViewProps): ReactElement {
 	}
 
 	return (
-		<div ref={scrollRef} className="dbv-gallery" style={rootStyle}>
-			<div
-				{...containerProps}
-				ref={(node) => {
-					viewportRef.current = node;
-					containerProps.ref(node);
-				}}
-				className="dbv-gallery__virtual"
-				style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}
-			>
-				{rowVirtualizer.getVirtualItems().map((virtualRow) => {
-					const rowCards = rows[virtualRow.index];
-					if (!rowCards) return null;
-					return (
-						<div
-							key={virtualRow.key}
-							className="dbv-gallery__row"
-							data-index={virtualRow.index}
-							ref={rowVirtualizer.measureElement}
-							style={{
-								position: "absolute",
-								top: 0,
-								left: 0,
-								right: 0,
-								transform: `translateY(${virtualRow.start}px)`,
-								display: "grid",
-								gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-								gap: `${GRID_GAP}px`,
-								paddingBottom: `${GRID_GAP}px`,
-							}}
-						>
-							{rowCards.map((entity, offset) => (
-								<GalleryCard
-									key={entity.id}
-									entity={entity}
-									columns={columns}
-									columnDefs={columnDefs}
-									coverProperty={coverProperty}
-									subtitleProperty={subtitleProperty}
-									selected={selectedIds.has(entity.id)}
-									itemProps={getItemProps(virtualRow.index * cols + offset)}
-									onSelect={onSelect}
-									onOpen={onOpen}
-									onEdit={hasEdit ? onEdit : undefined}
-								/>
-							))}
-						</div>
-					);
-				})}
+		<ComputedCellsProvider value={rollupLookups}>
+			<div ref={scrollRef} className="dbv-gallery" style={rootStyle}>
+				<div
+					{...containerProps}
+					ref={(node) => {
+						viewportRef.current = node;
+						containerProps.ref(node);
+					}}
+					className="dbv-gallery__virtual"
+					style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}
+				>
+					{rowVirtualizer.getVirtualItems().map((virtualRow) => {
+						const rowCards = rows[virtualRow.index];
+						if (!rowCards) return null;
+						return (
+							<div
+								key={virtualRow.key}
+								className="dbv-gallery__row"
+								data-index={virtualRow.index}
+								ref={rowVirtualizer.measureElement}
+								style={{
+									position: "absolute",
+									top: 0,
+									left: 0,
+									right: 0,
+									transform: `translateY(${virtualRow.start}px)`,
+									display: "grid",
+									gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+									gap: `${GRID_GAP}px`,
+									paddingBottom: `${GRID_GAP}px`,
+								}}
+							>
+								{rowCards.map((entity, offset) => (
+									<GalleryCard
+										key={entity.id}
+										entity={entity}
+										columns={columns}
+										columnDefs={columnDefs}
+										coverProperty={coverProperty}
+										subtitleProperty={subtitleProperty}
+										selected={selectedIds.has(entity.id)}
+										itemProps={getItemProps(virtualRow.index * cols + offset)}
+										onSelect={onSelect}
+										onOpen={onOpen}
+										onEdit={hasEdit ? onEdit : undefined}
+									/>
+								))}
+							</div>
+						);
+					})}
+				</div>
 			</div>
-		</div>
+		</ComputedCellsProvider>
 	);
 }
 
@@ -281,9 +294,8 @@ const GalleryCard = memo(function GalleryCard({
 	const editableColumns = columns.filter(
 		(c) => c.visible !== false && c.propertyId !== "title" && c.propertyId !== "name",
 	);
-	const chips = editableColumns
-		.map((column) => ({ id: column.propertyId, data: renderCell(entity, column.propertyId) }))
-		.filter((c) => c.data.kind !== "empty");
+	const lookups = useComputedCells();
+	const chips = onEdit ? [] : cardChips(entity, editableColumns, lookups);
 
 	return (
 		// kbn-onclick-exempt: role + roving tabindex come from `itemProps` (spread); keyboard activation is the container's `useCompositeKeyboard` reducer
@@ -321,17 +333,17 @@ const GalleryCard = memo(function GalleryCard({
 					/>
 				) : (
 					<div className="dbv-card__chips">
-						{chips.map(({ id, data }) => {
-							const chipStyle: CSSProperties = data.color
+						{chips.map(({ id, text, color }) => {
+							const chipStyle: CSSProperties = color
 								? {
-										background: `color-mix(in srgb, ${data.color} 18%, transparent)`,
-										color: data.color,
-										borderColor: `color-mix(in srgb, ${data.color} 38%, transparent)`,
+										background: `color-mix(in srgb, ${color} 18%, transparent)`,
+										color,
+										borderColor: `color-mix(in srgb, ${color} 38%, transparent)`,
 									}
 								: {};
 							return (
 								<span key={id} className="dbv-card__chip" style={chipStyle}>
-									{data.text}
+									{text}
 								</span>
 							);
 						})}

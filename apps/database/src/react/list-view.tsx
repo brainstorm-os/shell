@@ -32,6 +32,7 @@ import type { EntityRow } from "../logic/in-memory-entities";
 import { entityIcon, entityTitle, paintPropertyValue } from "../render/cells";
 import type { ColumnSpec, ListLayoutOptions } from "../types/list-view";
 import { CardEditProvider, useCardEdit, useEditableColumnDefs } from "./card-fields";
+import { ComputedCell, ComputedCellsProvider, useRollupLookups } from "./computed-cells";
 import { DomSlot } from "./dom-slot";
 import { EditableCell, type EntityPropertyEdit } from "./editable-cell";
 import { useStableCallback } from "./use-stable-callback";
@@ -52,6 +53,10 @@ const NO_MODIFIERS: SelectionModifiers = { shiftKey: false, metaKey: false };
 export type ListViewProps = {
 	compiled: CompiledView;
 	columns: ReadonlyArray<ColumnSpec>;
+	/** The full live vault entity set — rollup columns walk a relation to
+	 *  entities of *other* types, which aren't in `compiled.rows`. Mirrors the
+	 *  grid's prop of the same name. */
+	allRows?: ReadonlyArray<EntityRow>;
 	layout: ListLayoutOptions;
 	selectedIds: ReadonlySet<string>;
 	onSelect: (entity: EntityRow, modifiers: SelectionModifiers) => void;
@@ -68,6 +73,7 @@ export function ListView(props: ListViewProps): ReactElement {
 	const onOpen = useStableCallback(props.onOpen);
 	const columnDefs = useEditableColumnDefs(columns, compiled.rows, onEdit !== undefined);
 	const cardEdit = onEdit ? { onEdit, columnDefs } : null;
+	const rollupLookups = useRollupLookups(columns, props.allRows, compiled.rows);
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const rowHeight = DENSITY_ROW_HEIGHT[layout.density];
@@ -117,30 +123,32 @@ export function ListView(props: ListViewProps): ReactElement {
 	};
 
 	return (
-		<CardEditProvider value={cardEdit}>
-			<div ref={scrollRef} className="dbv-list" data-density={layout.density}>
-				<ul {...containerProps} className="dbv-list__items" style={listStyle}>
-					{rowVirtualizer.getVirtualItems().map((virtualRow) => {
-						const entity = compiled.rows[virtualRow.index];
-						if (!entity) return null;
-						return (
-							<ListItem
-								key={entity.id}
-								entity={entity}
-								columns={visible}
-								showIcon={layout.showIcon}
-								selected={selectedIds.has(entity.id)}
-								translateY={virtualRow.start}
-								height={virtualRow.size}
-								itemProps={getItemProps(virtualRow.index)}
-								onSelect={onSelect}
-								onOpen={onOpen}
-							/>
-						);
-					})}
-				</ul>
-			</div>
-		</CardEditProvider>
+		<ComputedCellsProvider value={rollupLookups}>
+			<CardEditProvider value={cardEdit}>
+				<div ref={scrollRef} className="dbv-list" data-density={layout.density}>
+					<ul {...containerProps} className="dbv-list__items" style={listStyle}>
+						{rowVirtualizer.getVirtualItems().map((virtualRow) => {
+							const entity = compiled.rows[virtualRow.index];
+							if (!entity) return null;
+							return (
+								<ListItem
+									key={entity.id}
+									entity={entity}
+									columns={visible}
+									showIcon={layout.showIcon}
+									selected={selectedIds.has(entity.id)}
+									translateY={virtualRow.start}
+									height={virtualRow.size}
+									itemProps={getItemProps(virtualRow.index)}
+									onSelect={onSelect}
+									onOpen={onOpen}
+								/>
+							);
+						})}
+					</ul>
+				</div>
+			</CardEditProvider>
+		</ComputedCellsProvider>
 	);
 }
 
@@ -252,8 +260,14 @@ function ListItemFields({
 				onMouseDown={stop}
 				onKeyDown={stop}
 			>
-				{columns.map((column) =>
-					column.propertyId === "title" || column.propertyId === "name" ? null : (
+				{columns.map((column) => {
+					if (column.propertyId === "title" || column.propertyId === "name") return null;
+					// Computed columns (rollup / formula, 9.12.17) are never
+					// editable — same read-only cell as the read-only strip.
+					if (column.rollup || column.formula) {
+						return <ComputedCell key={column.propertyId} column={column} entity={entity} />;
+					}
+					return (
 						<EditableCell
 							key={column.propertyId}
 							entity={entity}
@@ -262,24 +276,28 @@ function ListItemFields({
 							layout="inline"
 							onEdit={cardEdit.onEdit}
 						/>
-					),
-				)}
+					);
+				})}
 			</div>
 		);
 	}
 	return (
 		<div className="dbv-list__props">
-			{columns.map((column) =>
+			{columns.map((column) => {
 				// Title/name is the row heading — same skip as the editable strip
 				// above, else the full title paints AGAIN as the first chip.
-				column.propertyId === "title" || column.propertyId === "name" ? null : (
+				if (column.propertyId === "title" || column.propertyId === "name") return null;
+				if (column.rollup || column.formula) {
+					return <ComputedCell key={column.propertyId} column={column} entity={entity} />;
+				}
+				return (
 					<DomSlot
 						key={column.propertyId}
 						build={() => paintPropertyValue(entity, column.propertyId, "inline")}
 						deps={[entity.id, column.propertyId, entity.properties[column.propertyId]]}
 					/>
-				),
-			)}
+				);
+			})}
 		</div>
 	);
 }

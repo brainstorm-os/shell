@@ -1218,6 +1218,7 @@ function renderActiveViewInner(state: AppState): void {
 			reactBody = createElement(ListViewComponent, {
 				compiled: compiledView,
 				columns: view.columns,
+				allRows: state.db.entities,
 				layout: view.layoutOptions as ListLayoutOptions,
 				selectedIds: state.selection.selectedIds,
 				onSelect: handleSelect,
@@ -1230,6 +1231,7 @@ function renderActiveViewInner(state: AppState): void {
 			reactBody = createElement(GalleryView, {
 				compiled: compiledView,
 				columns: view.columns,
+				allRows: state.db.entities,
 				layout: view.layoutOptions as GalleryLayoutOptions,
 				coverProperty: view.coverProperty,
 				subtitleProperty: view.cardSubtitleProperty,
@@ -1246,6 +1248,7 @@ function renderActiveViewInner(state: AppState): void {
 			reactBody = createElement(BoardView, {
 				compiled: compiledView,
 				columns: view.columns,
+				allRows: state.db.entities,
 				layout: view.layoutOptions as BoardLayoutOptions,
 				groupBy,
 				subtitleProperty: view.cardSubtitleProperty,

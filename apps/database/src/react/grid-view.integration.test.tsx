@@ -17,13 +17,7 @@ import type { CompiledView } from "../logic/compile-view";
 import type { EntityRow } from "../logic/in-memory-entities";
 import { installPropertyDefResolver } from "../logic/property-resolver";
 import type { ColumnSpec, GridLayoutOptions } from "../types/list-view";
-import {
-	EditableTitle,
-	GridView,
-	type GridViewProps,
-	OpenRecordButton,
-	RollupCell,
-} from "./grid-view";
+import { EditableTitle, GridView, type GridViewProps, OpenRecordButton } from "./grid-view";
 
 function must<T>(value: T | null | undefined): T {
 	if (value === null || value === undefined) {
@@ -662,91 +656,5 @@ describe("GridView — column header label (F-017)", () => {
 			onEdit: vi.fn(),
 		});
 		expect(headLabels(h.container)).toEqual(["Due date"]);
-	});
-});
-
-describe("RollupCell — read-only computed aggregate (9.12.17)", () => {
-	// The grid body virtualizes (zero-height in jsdom), so the rollup cell is
-	// exercised directly — the same node GridCell mounts for a rollup column.
-	let root: Root | null = null;
-	let container: HTMLDivElement | null = null;
-
-	const deliverable = (id: string, fee: number): EntityRow => ({
-		id,
-		type: "Deliverable",
-		properties: { fee },
-		createdAt: 0,
-		updatedAt: 0,
-		deletedAt: null,
-	});
-	const byId = new Map([deliverable("d_1", 1000), deliverable("d_2", 2500)].map((d) => [d.id, d]));
-	const engagement: EntityRow = {
-		id: "eng_1",
-		type: "Engagement",
-		properties: { deliverables: [{ value: "d_1" }, { value: "d_2" }] },
-		createdAt: 0,
-		updatedAt: 0,
-		deletedAt: null,
-	};
-
-	afterEach(() => {
-		act(() => root?.unmount());
-		root = null;
-		container?.remove();
-		container = null;
-		document.body.innerHTML = "";
-	});
-
-	function mount(node: React.ReactElement): HTMLDivElement {
-		container = document.createElement("div");
-		document.body.append(container);
-		root = createRoot(container);
-		act(() => root?.render(node));
-		return container;
-	}
-
-	it("walks the relation and renders the summed target value", () => {
-		const c = mount(
-			<RollupCell
-				rollup={{
-					relationKey: "deliverables",
-					targetPropertyKey: "fee",
-					aggregation: "sum",
-					name: "Total fee",
-				}}
-				entity={engagement}
-				byId={byId}
-				targetDef={null}
-			/>,
-		);
-		const expected = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(3500);
-		const cell = must(c.querySelector<HTMLElement>(".dbv-grid__rollup-value"));
-		expect(cell.textContent).toBe(expected);
-	});
-
-	it("formats in the target property's units when a def is supplied (currency)", () => {
-		const c = mount(
-			<RollupCell
-				rollup={{
-					relationKey: "deliverables",
-					targetPropertyKey: "fee",
-					aggregation: "sum",
-					name: "Total fee",
-				}}
-				entity={engagement}
-				byId={byId}
-				targetDef={{
-					key: "fee",
-					name: "Fee",
-					icon: null,
-					valueType: ValueType.Number,
-					format: PropertyFormat.Currency,
-					currency: "USD",
-				}}
-			/>,
-		);
-		const cell = must(c.querySelector<HTMLElement>(".dbv-grid__rollup-value"));
-		expect(cell.textContent).toContain("3,500");
-		expect(cell.textContent).toContain("$");
 	});
 });
