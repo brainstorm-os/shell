@@ -239,7 +239,7 @@ describe("parseAnytypeExport", () => {
 		expect(types).toContain("paragraph");
 		expect(types).toContain("heading");
 		expect(types).toContain("list");
-		expect(types).toContain("image");
+		expect(types).toContain("image-block");
 		expect(types).toContain("horizontalrule");
 		// Snippet is plain text for search — no markdown markers.
 		const snippet = String(a?.properties.body ?? "");
@@ -470,6 +470,60 @@ describe("parseAnytypeExport", () => {
 		expect(plan.fileBinaryByObject.get("f-two")).toBe(
 			"files/screenshot-2026-02-23-at-09-53-10_a.png",
 		);
+	});
+
+	it("imports an image block as a resizable image-block with Anytype's width fraction", () => {
+		const plan = parseAnytypeExport(
+			[
+				snapshotFile("f-img", "FileObject", {
+					details: { name: "diagram", fileExt: "png", source: "files/diagram.png" },
+				}),
+				snapshotFile("obj-img", "Page", {
+					details: { name: "Media page" },
+					blocks: [
+						{ id: "obj-img", childrenIds: ["b1"] },
+						{
+							id: "b1",
+							fields: { width: 0.1951219512195122 },
+							file: { targetObjectId: "f-img", type: "Image" },
+						},
+					],
+				}),
+			],
+			["files/diagram.png"],
+		);
+		const body = plan.entities[0]?.bodyState?.root as unknown as {
+			children: Array<Record<string, unknown>>;
+		};
+		const img = body.children.find((c) => c.type === "image-block");
+		expect(img, "image-block node emitted (not bare image)").toBeDefined();
+		expect(img?.widthPercent).toBe(20);
+		expect(img?.alignment).toBe("center");
+	});
+
+	it("a Collection-layout object mints a List draft only — no Note twin (owner report)", () => {
+		const plan = parseAnytypeExport([
+			snapshotFile("obj-col", "Page", {
+				details: { name: "Stunden", layout: 14 },
+				collections: { objects: ["obj-a"] },
+			}),
+			snapshotFile("obj-a", "Page", { details: { name: "Stunde 1" } }),
+		]);
+		expect(plan.collections).toHaveLength(1);
+		expect(plan.collections[0]?.name).toBe("Stunden");
+		expect(plan.collections[0]?.memberIds).toEqual(["obj-a"]);
+		expect(plan.entities.map((e) => e.title)).toEqual(["Stunde 1"]);
+	});
+
+	it("chrome layouts (dashboard/space/participant) never mint entities", () => {
+		const plan = parseAnytypeExport([
+			snapshotFile("obj-dash", "Page", { details: { name: "", layout: 7 } }),
+			snapshotFile("obj-space", "Page", { details: { name: "Deutsch", layout: 10 } }),
+			snapshotFile("obj-person", "Page", { details: { name: "Mr. Razor", layout: 19 } }),
+			snapshotFile("obj-real", "Page", { details: { name: "Real page" } }),
+		]);
+		expect(plan.entities.map((e) => e.title)).toEqual(["Real page"]);
+		expect(plan.skippedSystem).toBe(3);
 	});
 
 	it("never guesses on an ambiguous truncation prefix", () => {

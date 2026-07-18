@@ -27,7 +27,8 @@ export type AnytypeBlockHandlers = {
 
 type SerializedNode = {
 	type: string;
-	version: 1;
+	// image-block serializes at v2; every other emitted node is v1.
+	version: 1 | 2;
 	[key: string]: unknown;
 };
 
@@ -148,14 +149,27 @@ function hr(): SerializedNode {
 	return { type: "horizontalrule", version: 1 };
 }
 
-function imageNode(src: string, alt: string): SerializedNode {
+/** Anytype stores a media block's display width in `fields.width` as a
+ *  FRACTION of the editor width (0..1]; absent means full width. Clamp to
+ *  the editor's media range so a corrupt value can't zero the image. */
+function widthPercentOf(fields: unknown): number {
+	const width = asRecord(fields)?.width;
+	if (typeof width !== "number" || !Number.isFinite(width) || width <= 0) return 100;
+	return Math.min(100, Math.max(10, Math.round(width * 100)));
+}
+
+/** Emit the editor's resizable `image-block` (NOT the bare inline `image`
+ *  node, which renders at natural size — imported screenshots showed up
+ *  page-width huge). Width carries over from the Anytype block. */
+function imageNode(src: string, alt: string, widthPercent = 100): SerializedNode {
 	return {
-		type: "image",
-		version: 1,
+		type: "image-block",
+		version: 2,
 		src,
-		altText: alt,
+		alt,
 		caption: "",
-		width: "inherit",
+		alignment: "center",
+		widthPercent,
 	};
 }
 
@@ -370,7 +384,7 @@ export function anytypeBlocksToLexical(
 			const isImage = file.type === "Image";
 			if (target) handlers.onFileBlock(target, name, isImage);
 			const src = (target ? handlers.fileSrcOf?.(target, name) : null) ?? name ?? target ?? "";
-			if (isImage && src) return imageNode(src, name ?? src);
+			if (isImage && src) return imageNode(src, name ?? src, widthPercentOf(block.fields));
 			if (name || src) {
 				return paragraph([linkNode(src || name || "#", [textNode(name ?? src)])]);
 			}

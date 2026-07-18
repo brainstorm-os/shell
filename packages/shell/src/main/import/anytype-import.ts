@@ -41,6 +41,7 @@ import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { anytypeBlocksToLexical, anytypeDateToMs } from "./anytype-blocks-to-lexical";
+import { yieldToEventLoop } from "./import-engine";
 import { inferValueType } from "./import-map";
 import { IMPORT_BODY_HASH_PROP, IMPORT_EXTERNAL_ID_PROP } from "./import-types";
 import {
@@ -127,7 +128,7 @@ export function rewriteBodyAssetSrcs(
 ): ImportedBodyState {
 	const walk = (node: Record<string, unknown>): Record<string, unknown> => {
 		const next: Record<string, unknown> = { ...node };
-		if (next.type === "image" && typeof next.src === "string") {
+		if ((next.type === "image" || next.type === "image-block") && typeof next.src === "string") {
 			const mapped = resolveAssetSrc(index, next.src);
 			if (mapped) next.src = mapped;
 		}
@@ -289,6 +290,27 @@ const SYSTEM_OBJECT_TYPES: ReadonlySet<string> = new Set([
 	"ot-participant",
 	"ot-profile",
 	"ot-template",
+]);
+
+/** Anytype `details.layout` — the object-KIND discriminator (subset we act
+ *  on; values are the wire protocol's ObjectLayout enum). */
+enum AnytypeObjectLayout {
+	Dashboard = 7,
+	Space = 10,
+	Collection = 14,
+	Date = 17,
+	SpaceView = 18,
+	Participant = 19,
+}
+
+/** Chrome layouts that must never mint an entity (space plumbing that can
+ *  slip past the sbType/objectType filters). */
+const CHROME_LAYOUTS: ReadonlySet<number> = new Set([
+	AnytypeObjectLayout.Dashboard,
+	AnytypeObjectLayout.Space,
+	AnytypeObjectLayout.Date,
+	AnytypeObjectLayout.SpaceView,
+	AnytypeObjectLayout.Participant,
 ]);
 
 /** File-bearing snapshot kinds — consumed as the attachment index. */
@@ -902,6 +924,27 @@ export function parseAnytypeExport(
 		const hasBodyContent =
 			snippet.length > 0 ||
 			(bodyChildren ?? []).some((c) => c.type !== "paragraph" && c.type !== "text");
+		const layout =
+			typeof snap.details.layout === "number"
+				? snap.details.layout
+				: typeof snap.details.resolvedLayout === "number"
+					? snap.details.resolvedLayout
+					: null;
+		if (layout !== null && CHROME_LAYOUTS.has(layout)) {
+			skippedSystem++;
+			continue;
+		}
+		// A Collection object IS its List — minting a Note twin as well put a
+		// second "Stunden" in the notes list (owner report 2026-07-18). The
+		// membership draft carries the name; no entity row.
+		if (layout === AnytypeObjectLayout.Collection) {
+			collections.push({
+				id: snap.id,
+				name: title,
+				memberIds: (snap.collectionMembers ?? []).filter((m) => objectIds.has(m)),
+			});
+			continue;
+		}
 		entities.push({
 			title,
 			properties,
@@ -1294,8 +1337,12 @@ export async function importAnytypeExport(
 	const assetStore = await session.assetStore();
 	const bytesByPath = new Map(attachments.map((a) => [a.path, a.bytes]));
 	const idByFileObject = new Map<string, string>();
+	let sealed = 0;
 	for (const link of plan.fileLinks) {
 		if (options.signal?.aborted) return cancelledReport();
+		// Sealing is the heaviest phase (crypto over whole binaries) — yield
+		// every few files so open windows keep painting during a big import.
+		if (++sealed % 8 === 0) await yieldToEventLoop();
 		if (idByFileObject.has(link.fileObjectId)) continue;
 		const path = plan.fileBinaryByObject.get(link.fileObjectId);
 		const bytes = path ? bytesByPath.get(path) : undefined;
@@ -1453,7 +1500,7 @@ export async function importAnytypeExport(
 			}
 		}
 		options.onProgress?.(i + 1, total);
-		if ((i + 1) % ANYTYPE_YIELD_EVERY === 0) await Promise.resolve();
+		if ((i + 1) % ANYTYPE_YIELD_EVERY === 0) await yieldToEventLoop();
 	}
 
 	// Deterministic link ids so a re-import upserts rather than duplicates.

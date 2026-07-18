@@ -23,6 +23,14 @@ import {
  *  utility-worker batching rung lands). */
 const YIELD_EVERY = 50;
 
+/** REAL event-loop yield. `await Promise.resolve()` only drains microtasks —
+ *  IPC, input, and paint never run, so a big import froze every window
+ *  (owner report 2026-07-18). setImmediate parks until the next macrotask
+ *  turn, letting the main process breathe between batches. */
+export function yieldToEventLoop(): Promise<void> {
+	return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 function dedupeKey(draft: EntityDraft, source: string): string | null {
 	return draft.externalId === null ? null : externalKeyOf(source, draft.externalId);
 }
@@ -87,7 +95,7 @@ export async function runImport(
 			});
 		}
 		onProgress?.(i + 1, total);
-		if ((i + 1) % YIELD_EVERY === 0) await Promise.resolve();
+		if ((i + 1) % YIELD_EVERY === 0) await yieldToEventLoop();
 	}
 	const skipped = total - i;
 	return { created, updated, skipped, failed, ...(cancelled ? { cancelled: true } : {}) };
