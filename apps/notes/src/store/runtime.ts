@@ -83,7 +83,14 @@ export type DashboardService = {
 
 export type NotesBrainstorm = {
 	app: { id: string; version: string; sdkVersion: string };
-	launch: { reason: string; entityId?: string };
+	/** `intent` rides a cold-launch dispatch (`reason: "intent"`) — the
+	 *  composer/action-surface delivery channel; F-241's `insert` arrives
+	 *  this way when Notes wasn't running. */
+	launch: {
+		reason: string;
+		entityId?: string;
+		intent?: { verb: string; payload?: Record<string, unknown>; source?: string };
+	};
 	/** Granted capabilities — the shared object menu reads this to gate
 	 *  the Pin toggle on `dashboard.pin` (default-minimum, normally
 	 *  present). */

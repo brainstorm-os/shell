@@ -17,7 +17,7 @@ import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { DataStores } from "../storage/data-stores";
 import { applyDefaultAppGrants, applyShellGrants } from "./default-grants";
-import { CapabilityLedger } from "./ledger";
+import { CapabilityLedger, GrantedVia } from "./ledger";
 
 async function setup() {
 	const vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-cap-enforce-"));
@@ -143,5 +143,57 @@ describe("capability enforcement (end-to-end)", () => {
 			"src",
 		);
 		expect(events).toEqual([{ kind: "CapabilityDenied", app: "io.example.app" }]);
+	});
+
+	// F-241 / doc 75 — the Agent → Notes seam's capability gate. The write
+	// chain's broker chokepoint is the verb-scoped `intents.dispatch:insert`
+	// grant: NOT in the default-minimum set (only `:open` is), so an app that
+	// wasn't explicitly granted it — sideloaded agent, revoked grant — is
+	// denied before the intents bus ever runs.
+	describe("intents.dispatch:insert gate (F-241)", () => {
+		function dispatchInsert(app: string) {
+			return env.broker.dispatch(
+				makeEnvelope({
+					msg: `m_${Math.random().toString(36).slice(2, 8)}`,
+					app,
+					service: "intents",
+					method: "dispatch",
+					args: [
+						{
+							verb: "insert",
+							payload: { entityId: "note-1", entityType: "io.brainstorm.notes/Note/v1" },
+						},
+					],
+					caps: ["intents.dispatch:insert"],
+				}),
+				"src",
+			);
+		}
+
+		beforeEach(() => {
+			env.broker.registerService("intents", () => ({ handled: true }));
+		});
+
+		it("denies an insert dispatch without the verb-scoped grant (default grants carry only :open)", async () => {
+			const reply = await dispatchInsert("io.example.app");
+			expect(reply.ok).toBe(false);
+			expect(reply.ok === false && reply.error.kind).toBe("CapabilityDenied");
+		});
+
+		it("allows the insert dispatch once the grant is recorded, and denies again after revoke", async () => {
+			env.ledger.grant({
+				appId: "io.example.app",
+				capability: "intents.dispatch",
+				scope: "insert",
+				grantedVia: GrantedVia.Install,
+			});
+			const granted = await dispatchInsert("io.example.app");
+			expect(granted.ok).toBe(true);
+
+			env.ledger.revoke("io.example.app", "intents.dispatch", "insert");
+			const revoked = await dispatchInsert("io.example.app");
+			expect(revoked.ok).toBe(false);
+			expect(revoked.ok === false && revoked.error.kind).toBe("CapabilityDenied");
+		});
 	});
 });

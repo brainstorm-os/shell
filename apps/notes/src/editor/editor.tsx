@@ -108,6 +108,7 @@ import { EntityDropPlugin } from "./entity-drop-plugin";
 import { EQUATION_TRANSFORMER } from "./equation-transformer";
 import { FormatChordsPlugin } from "./format-chords-plugin";
 import { InlineToolbarPlugin } from "./inline-toolbar-plugin";
+import { InsertAtEndPlugin, type InsertAtEndRequest } from "./insert-at-end-plugin";
 import { LinkMarkupPlugin } from "./link-markup-plugin";
 import { MediaDropPlugin } from "./media-drop-plugin";
 import { MediaInspectorPlugin } from "./media-inspector-plugin";
@@ -159,6 +160,12 @@ export type EditorProps = {
 	 *  (also called on timeout, so the host always clears the request). */
 	anchorReveal?: BlockAnchorReveal | null;
 	onAnchorDone?: () => void;
+	/** Pending validated `insert` intent (F-241 / doc 75) — appended at the
+	 *  end of the document once the Y.Doc hydrates, then `onInsertDone`
+	 *  fires (the host clears the request + refreshes the denormalised
+	 *  snippet/refs). Only ever passed for the open, unlocked target note. */
+	insertRequest?: InsertAtEndRequest | null;
+	onInsertDone?: (applied: boolean) => void;
 };
 
 export function Editor({
@@ -172,6 +179,8 @@ export function Editor({
 	locked = false,
 	anchorReveal = null,
 	onAnchorDone,
+	insertRequest = null,
+	onInsertDone,
 }: EditorProps) {
 	const doc = useYDoc(noteId);
 	const whenLoaded = useYDocLoaded(noteId);
@@ -280,6 +289,13 @@ export function Editor({
 							reveal={anchorReveal}
 							{...(onAnchorDone ? { onRevealDone: onAnchorDone } : {})}
 						/>
+						{onInsertDone && (
+							<InsertAtEndPlugin
+								request={insertRequest}
+								{...(whenLoaded ? { whenLoaded } : {})}
+								onDone={onInsertDone}
+							/>
+						)}
 						<FindPlugin />
 						<BlockContextMenuPlugin />
 						<MarqueePlugin />
