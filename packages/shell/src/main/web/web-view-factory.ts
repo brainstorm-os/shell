@@ -19,12 +19,13 @@
  */
 
 import { type SitePermissionKind, TabLoadState, WebViewEventKind } from "@brainstorm/sdk-types";
-import { type Session, WebContentsView } from "electron";
+import { app, type Session, WebContentsView } from "electron";
 import { TabChord, type WebContentsViewHandle, tabChordFor } from "../apps/window-container";
 import { networkEgressHostOf } from "../network/audit-log";
 import { sitePermissionKindsFor, webOriginOf } from "./site-permissions";
 import {
 	DEFAULT_TRACKER_BLOCKLIST,
+	chromeEquivalentUserAgent,
 	isBlockedRequest,
 	isNavigationAllowed,
 	isThirdPartyRequest,
@@ -298,6 +299,11 @@ function configureSessionPolicy(
 ): void {
 	if (configuredSessions.has(ses)) return;
 	configuredSessions.add(ses);
+
+	// Present the Chrome-equivalent UA: the default's `Electron/…` +
+	// `Brainstorm/…` tokens read as automation to anti-bot walls (X's Castle
+	// 403s login/write APIs), breaking real interactive sign-ins (F-429).
+	ses.setUserAgent(chromeEquivalentUserAgent(ses.getUserAgent(), app.name));
 
 	const decide = deps.decidePermission ?? (() => null);
 	const trackerCounts = new Map<string, number>();

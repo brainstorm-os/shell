@@ -60,6 +60,23 @@ export function upgradeToHttps(url: string): string | null {
 	return parsed.toString();
 }
 
+/**
+ * The session UA with the embedded-browser tokens removed (`Electron/x.y.z`
+ * and the app's own `<name>/x.y.z`), leaving what the same Chromium would send
+ * as Chrome. Anti-bot systems (X's Castle, Google sign-in) treat the Electron
+ * token as an automation signal and 403 login/write flows even for a fully
+ * interactive user — the page capabilities are identical either way, so the
+ * honest-Chromium UA is the correct presentation (F-429).
+ */
+export function chromeEquivalentUserAgent(defaultUserAgent: string, appName?: string): string {
+	let ua = defaultUserAgent.replace(/\sElectron\/\S+/gi, "");
+	if (appName) {
+		const escaped = appName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		ua = ua.replace(new RegExp(`\\s${escaped}/\\S+`, "gi"), "");
+	}
+	return ua.replace(/ {2,}/g, " ").trim();
+}
+
 /** Whether a request to `url` matches the tracker/ad blocklist and should be
  *  cancelled. An unparseable URL is never blocked (let the engine reject it). */
 export function isBlockedRequest(url: string, blocklist: readonly string[]): boolean {
