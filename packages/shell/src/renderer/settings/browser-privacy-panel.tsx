@@ -172,7 +172,12 @@ function TrustedSitesGroup({
 						: {})}
 					data-testid="browser-privacy-trust-input"
 				/>
-				<Button type="submit" variant={ButtonVariant.Primary} size={ButtonSize.Sm}>
+				<Button
+					type="submit"
+					variant={ButtonVariant.Primary}
+					size={ButtonSize.Sm}
+					disabled={draft.trim().length === 0}
+				>
 					{t("shell.settings.webPrivacy.trust.add")}
 				</Button>
 			</form>

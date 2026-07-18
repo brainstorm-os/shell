@@ -291,6 +291,11 @@ function ActiveProxySection({
 	onEdit: () => void;
 }) {
 	const modeLabel = proxyModeLabel(state.proxy.mode);
+	// The resolved-kind hint earns its place only when it says something the
+	// mode pill doesn't (e.g. mode "System proxy" resolved to "PAC script").
+	// Repeating the same string right-aligned under the Edit button read as a
+	// duplicated/broken row.
+	const resolved = resolvedProxyHint(state.resolvedProxyKind);
 	return (
 		<div className="network-egress__group" data-testid="network-egress-proxy">
 			<div className="network-egress__group-header">
@@ -306,7 +311,7 @@ function ActiveProxySection({
 			</div>
 			<div className="network-egress__row">
 				<span className="network-egress__pill">{modeLabel}</span>
-				<span className="network-egress__resolved">{resolvedProxyHint(state.resolvedProxyKind)}</span>
+				{resolved !== modeLabel && <span className="network-egress__resolved">{resolved}</span>}
 			</div>
 			{state.proxy.mode === NetworkProxyMode.System && (
 				<p className="network-egress__hint">{t("shell.settings.network.proxy.systemNote")}</p>
