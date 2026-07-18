@@ -21,12 +21,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/form-designer/invoice/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "number",
-            "issueDate",
-            "currency",
-            "status"
-          ],
+          "required": ["number", "issueDate", "currency", "status"],
           "properties": {
             "number": {
               "type": "string"
@@ -35,10 +30,7 @@
               "type": "string"
             },
             "dueDate": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": ["string", "null"]
             },
             "currency": {
               "type": "string"
@@ -50,10 +42,7 @@
               "type": "object"
             },
             "billToRef": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": ["string", "null"]
             },
             "lineItems": {
               "type": "array",
@@ -69,11 +58,7 @@
             },
             "status": {
               "type": "string",
-              "enum": [
-                "draft",
-                "sent",
-                "paid"
-              ]
+              "enum": ["draft", "sent", "paid"]
             },
             "total": {
               "type": "number"
@@ -86,9 +71,6 @@
   "entry": "dist/index.html",
   "i18n": {
     "source": "en",
-    "locales": [
-      "en",
-      "es"
-    ]
+    "locales": ["en", "es"]
   }
 }

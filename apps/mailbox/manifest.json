@@ -27,13 +27,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/mailbox/mail-account/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "address",
-            "protocol",
-            "authKind",
-            "syncWindow",
-            "enabled"
-          ],
+          "required": ["address", "protocol", "authKind", "syncWindow", "enabled"],
           "properties": {
             "address": {
               "type": "string"
@@ -43,41 +37,21 @@
             },
             "protocol": {
               "type": "string",
-              "enum": [
-                "imap",
-                "jmap",
-                "gmail-api",
-                "ms-graph"
-              ]
+              "enum": ["imap", "jmap", "gmail-api", "ms-graph"]
             },
             "authKind": {
               "type": "string",
-              "enum": [
-                "oauth2",
-                "app-password",
-                "basic"
-              ]
+              "enum": ["oauth2", "app-password", "basic"]
             },
             "incoming": {
-              "type": [
-                "object",
-                "null"
-              ]
+              "type": ["object", "null"]
             },
             "outgoing": {
-              "type": [
-                "object",
-                "null"
-              ]
+              "type": ["object", "null"]
             },
             "syncWindow": {
               "type": "string",
-              "enum": [
-                "30d",
-                "90d",
-                "1y",
-                "all"
-              ]
+              "enum": ["30d", "90d", "1y", "all"]
             },
             "enabled": {
               "type": "boolean"
@@ -134,12 +108,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/connector/account/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "connectorRef",
-            "externalAccountLabel",
-            "scopesGranted",
-            "authState"
-          ],
+          "required": ["connectorRef", "externalAccountLabel", "scopesGranted", "authState"],
           "properties": {
             "connectorRef": {
               "type": "string"
@@ -155,11 +124,7 @@
             },
             "authState": {
               "type": "string",
-              "enum": [
-                "active",
-                "expired",
-                "revoked"
-              ]
+              "enum": ["active", "expired", "revoked"]
             },
             "lastAuthAt": {
               "type": "string"
@@ -172,11 +137,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/mailbox/mail-folder/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "accountRef",
-            "path",
-            "role"
-          ],
+          "required": ["accountRef", "path", "role"],
           "properties": {
             "accountRef": {
               "type": "string"
@@ -186,15 +147,7 @@
             },
             "role": {
               "type": "string",
-              "enum": [
-                "inbox",
-                "sent",
-                "drafts",
-                "archive",
-                "trash",
-                "spam",
-                "custom"
-              ]
+              "enum": ["inbox", "sent", "drafts", "archive", "trash", "spam", "custom"]
             },
             "unreadCount": {
               "type": "number"
@@ -207,13 +160,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/mailbox/email/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "accountRef",
-            "folderRefs",
-            "messageId",
-            "from",
-            "receivedAt"
-          ],
+          "required": ["accountRef", "folderRefs", "messageId", "from", "receivedAt"],
           "properties": {
             "accountRef": {
               "type": "string"
@@ -314,9 +261,6 @@
   },
   "i18n": {
     "source": "en",
-    "locales": [
-      "en",
-      "es"
-    ]
+    "locales": ["en", "es"]
   }
 }

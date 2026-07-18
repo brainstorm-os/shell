@@ -4,14 +4,10 @@
  * the browser blocks telemetry (and floods the console).
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-	AMPLITUDE_EU_CONNECT_SRC,
-	AMPLITUDE_EU_SCRIPT_SRC,
-	AMPLITUDE_WORKER_SRC,
-} from "./csp";
+import { AMPLITUDE_EU_CONNECT_SRC, AMPLITUDE_EU_SCRIPT_SRC, AMPLITUDE_WORKER_SRC } from "./csp";
 
 /** Repo root: packages/sdk/src/analytics → ../../../.. */
 const REPO_ROOT = resolve(__dirname, "../../../..");

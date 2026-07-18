@@ -27,23 +27,14 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/theme/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "name",
-            "appearance",
-            "tokenSet",
-            "iconPack",
-            "typography"
-          ],
+          "required": ["name", "appearance", "tokenSet", "iconPack", "typography"],
           "properties": {
             "name": {
               "type": "string"
             },
             "appearance": {
               "type": "string",
-              "enum": [
-                "light",
-                "dark"
-              ]
+              "enum": ["light", "dark"]
             },
             "tokenSet": {
               "type": "object"
@@ -55,10 +46,7 @@
               "type": "object"
             },
             "stylePack": {
-              "type": [
-                "object",
-                "null"
-              ]
+              "type": ["object", "null"]
             }
           }
         }
@@ -68,21 +56,14 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/token-set/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "name",
-            "appearance",
-            "overrides"
-          ],
+          "required": ["name", "appearance", "overrides"],
           "properties": {
             "name": {
               "type": "string"
             },
             "appearance": {
               "type": "string",
-              "enum": [
-                "light",
-                "dark"
-              ]
+              "enum": ["light", "dark"]
             },
             "overrides": {
               "type": "object"
@@ -95,11 +76,7 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/style-pack/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "name",
-            "css",
-            "mime"
-          ],
+          "required": ["name", "css", "mime"],
           "properties": {
             "name": {
               "type": "string"
@@ -119,22 +96,14 @@
         "schemaUrl": "https://brainstorm.io/schemas/theme/typography/v1.json",
         "schema": {
           "type": "object",
-          "required": [
-            "name",
-            "scale",
-            "fonts"
-          ],
+          "required": ["name", "scale", "fonts"],
           "properties": {
             "name": {
               "type": "string"
             },
             "scale": {
               "type": "string",
-              "enum": [
-                "default",
-                "compact",
-                "comfortable"
-              ]
+              "enum": ["default", "compact", "comfortable"]
             },
             "fonts": {
               "type": "object"
@@ -159,9 +128,6 @@
   },
   "i18n": {
     "source": "en",
-    "locales": [
-      "en",
-      "es"
-    ]
+    "locales": ["en", "es"]
   }
 }

@@ -103,13 +103,13 @@ function warmOverlayChunks(): void {
 		void load().catch(() => {});
 	}
 }
+import { track } from "@brainstorm/sdk/analytics";
+import { launchApp, trackAppLaunch } from "./analytics/track-app-launch";
 import { ConfirmVariant, confirm } from "./ui/confirm";
 import { Icon, IconName } from "./ui/icon";
 import { IconButton } from "./ui/icon-button";
 import { Spinner } from "./ui/spinner";
 import { ToastKind, pushToast } from "./ui/toasts";
-import { track } from "@brainstorm/sdk/analytics";
-import { launchApp, trackAppLaunch } from "./analytics/track-app-launch";
 import { useVault } from "./vault-context";
 
 export function Dashboard() {

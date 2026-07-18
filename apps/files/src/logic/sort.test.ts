@@ -85,9 +85,21 @@ describe("sort", () => {
 
 describe("untitled-last name sort (F-424)", () => {
 	const named = (id: string, name: string): Entity =>
-		({ id, type: "brainstorm/File/v1", properties: { name }, createdAt: 1, updatedAt: 1 }) as unknown as Entity;
+		({
+			id,
+			type: "brainstorm/File/v1",
+			properties: { name },
+			createdAt: 1,
+			updatedAt: 1,
+		}) as unknown as Entity;
 	const untitled = (id: string): Entity =>
-		({ id, type: "brainstorm/Note/v1", properties: {}, createdAt: 1, updatedAt: 1 }) as unknown as Entity;
+		({
+			id,
+			type: "brainstorm/Note/v1",
+			properties: {},
+			createdAt: 1,
+			updatedAt: 1,
+		}) as unknown as Entity;
 
 	it("sinks untitled entities below named ones ascending", () => {
 		const out = sortEntities(

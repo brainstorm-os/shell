@@ -15,7 +15,11 @@
  *     binding wrapper).
  */
 
-import { BASELINE_NODES, SEED_STANDIN_NODES, plantSerializedStateIntoDoc } from "@brainstorm/editor";
+import {
+	BASELINE_NODES,
+	SEED_STANDIN_NODES,
+	plantSerializedStateIntoDoc,
+} from "@brainstorm/editor";
 import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm/react-yjs";
 import { REDO_COMMAND, UNDO_COMMAND } from "lexical";
 import { type ReactNode, act } from "react";
@@ -880,12 +884,7 @@ describe("Editor — imported (planted) docs keep their title across open cycles
 				const surface = mount(null);
 				await surface.render(
 					<YDocProvider resolver={resolver.resolve}>
-						<Editor
-							noteId={noteId}
-							storedTitle={title}
-							onChange={() => {}}
-							noteContext={noteContext()}
-						/>
+						<Editor noteId={noteId} storedTitle={title} onChange={() => {}} noteContext={noteContext()} />
 					</YDocProvider>,
 				);
 				// Settle transforms + collab sync.
