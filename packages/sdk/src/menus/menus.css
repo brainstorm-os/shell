@@ -478,3 +478,19 @@ button.fm-row {
 	align-items: center;
 	gap: var(--fm-row-gap, 8px);
 }
+
+/* F-406 — an empty icon slot must still RESERVE the icon column so a
+ * "pick one of N" menu keeps its labels aligned: only the SELECTED row shows
+ * a check, and the blank slots on its siblings collapsed to zero width
+ * (labels flush-left, misaligned with the checked row). The runtime's own
+ * defensive `.fm-row__icon:empty { display: none }` is the collapse — the
+ * extra `.fm-menu` qualifier out-specifies it, and the fixed square matches
+ * the runtime's IconView defaultSize (14px). The menu surface itself cannot
+ * size to content (rows are absolutely positioned by the virtualizer), so
+ * the width fix lives in the select openers' minWidth floor, not CSS. */
+.fm-menu .fm-row__icon:empty {
+	display: inline-flex;
+	flex: 0 0 auto;
+	inline-size: 14px;
+	block-size: 14px;
+}

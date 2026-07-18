@@ -47,7 +47,9 @@ async function waitForDefaultSnapshot(dashboard: Page): Promise<Snapshot> {
 			await new Promise((r) => setTimeout(r, 200));
 		}
 		const last = await bs.dashboard.snapshot();
-		throw new Error(`snapshot never reached default-light/light default; last=${JSON.stringify(last)}`);
+		throw new Error(
+			`snapshot never reached default-light/light default; last=${JSON.stringify(last)}`,
+		);
 	});
 }
 
@@ -83,9 +85,7 @@ test("new vault seeds welcome content and applies Default Light/light/wallpaper 
 				expect(snap.theme, "theme is Default Light").toBe("default-light");
 				expect(snap.appearance.mode, "appearance mode is light").toBe("light");
 				expect(snap.wallpaper.kind, "wallpaper is an image").toBe("image");
-				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain(
-					"green-valley",
-				);
+				expect(snap.wallpaper.value, "wallpaper is the bundled brand asset").toContain("green-valley");
 			});
 
 			await test.step("welcome starter content is present (searchable)", async () => {

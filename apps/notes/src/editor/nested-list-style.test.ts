@@ -15,10 +15,7 @@ import { describe, expect, it } from "vitest";
  * app's own styles.css.
  */
 
-const css = [
-	"../../../../packages/editor/src/editor-theme.css",
-	"../styles.css",
-]
+const css = ["../../../../packages/editor/src/editor-theme.css", "../styles.css"]
 	.map((rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8"))
 	.join("\n")
 	.replace(/\/\*[\s\S]*?\*\//g, "");

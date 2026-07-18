@@ -34,7 +34,6 @@ if (!match) {
 	process.exit(1);
 }
 
-// biome-ignore lint/security/noGlobalEval: trusted local app manifest literal extracted from i18n.ts
 const manifest = Function(`"use strict"; return (${match[1]});`)();
 const i18nDir = join(appDir, "src", "i18n");
 mkdirSync(i18nDir, { recursive: true });

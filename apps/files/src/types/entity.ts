@@ -85,6 +85,13 @@ export function readName(entity: Entity): string {
 	return typeof name === "string" && name.length > 0 ? name : "(untitled)";
 }
 
+/** True when the entity carries a real display name (the "(untitled)"
+ *  fallback is presentation, not data — sorts treat it specially). */
+export function hasDisplayName(entity: Entity): boolean {
+	const name = entity.properties.name;
+	return typeof name === "string" && name.trim().length > 0;
+}
+
 /** Byte size of a file, or 0 for folders / anything without a numeric size —
  *  so a size sort places sizeless rows together at one end. */
 export function readSize(entity: Entity): number {

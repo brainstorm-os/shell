@@ -464,14 +464,9 @@ describe("parseAnytypeExport", () => {
 					details: { ...details, source: "files/screenshot-2026-02-23-at-09-53-10_a.png" },
 				}),
 			],
-			[
-				"files/screenshot-2026-02-23-at-09-53-10.png",
-				"files/screenshot-2026-02-23-at-09-53-10_a.png",
-			],
+			["files/screenshot-2026-02-23-at-09-53-10.png", "files/screenshot-2026-02-23-at-09-53-10_a.png"],
 		);
-		expect(plan.fileBinaryByObject.get("f-one")).toBe(
-			"files/screenshot-2026-02-23-at-09-53-10.png",
-		);
+		expect(plan.fileBinaryByObject.get("f-one")).toBe("files/screenshot-2026-02-23-at-09-53-10.png");
 		expect(plan.fileBinaryByObject.get("f-two")).toBe(
 			"files/screenshot-2026-02-23-at-09-53-10_a.png",
 		);

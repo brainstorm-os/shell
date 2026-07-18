@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { track } from "@brainstorm/sdk/analytics";
+import { useEffect, useRef } from "react";
 import { useVault } from "../vault-context";
 
 /** Observes shell routing + vault lifecycle and emits Amplitude events. */

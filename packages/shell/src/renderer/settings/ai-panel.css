@@ -107,8 +107,15 @@
 	color: var(--color-text-primary);
 	max-width: 100%;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* Wrap to two lines instead of a single-line ellipsis — the fixed tile
+	 * truncated "Anthropic (Claude)" mid-parenthesis ("Anthropic (Clau…",
+	 * F-416), and any localized name can outgrow one line. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	text-align: center;
 }
 
 .settings__ai-tile-status {

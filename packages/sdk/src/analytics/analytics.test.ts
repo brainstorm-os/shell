@@ -27,6 +27,7 @@ describe("initAnalytics", () => {
 
 	afterEach(() => {
 		// @ts-expect-error test cleanup
+		// biome-ignore lint/performance/noDelete: the stub must be truly absent — an undefined-valued `window` property still changes `in`/own-key checks
 		delete globalThis.window;
 	});
 
@@ -143,14 +144,13 @@ describe("initAnalytics", () => {
 describe("resolveAnalyticsDeviceId", () => {
 	afterEach(() => {
 		// @ts-expect-error test cleanup
+		// biome-ignore lint/performance/noDelete: the stub must be truly absent — an undefined-valued `window` property still changes `in`/own-key checks
 		delete globalThis.window;
 	});
 
 	it("returns the bridge install id", async () => {
 		const { resolveAnalyticsDeviceId } = await import("./index");
-		expect(
-			resolveAnalyticsDeviceId({ analyticsDeviceId: "from-bridge" }),
-		).toBe("from-bridge");
+		expect(resolveAnalyticsDeviceId({ analyticsDeviceId: "from-bridge" })).toBe("from-bridge");
 	});
 
 	it("returns empty when the bridge has none — no local minting", async () => {

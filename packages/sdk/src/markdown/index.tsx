@@ -14,7 +14,8 @@
  *   - Bullet (`-`/`*`) + ordered (`1.`) lists · `---` rule
  *   - Inline: `code`, **bold**, *italic*, [text](url)
  *
- * Out of scope (would need a real parser): nested lists, blockquotes, tables,
+ * Out of scope (would need a real parser): true nested lists (indented items
+ * flatten to one level, F-425), blockquotes, tables,
  * autolinks, reference links, images, footnotes, setext headings, raw HTML.
  */
 
@@ -41,6 +42,11 @@ export type MarkdownBlock =
 	| { kind: BlockKind.BulletList; items: ReadonlyArray<string> }
 	| { kind: BlockKind.OrderedList; items: ReadonlyArray<string> }
 	| { kind: BlockKind.HorizontalRule };
+
+/** A list item marker, tolerating up to 8 spaces of leading indent (nested
+ *  items flatten to their list's level — no real nesting; see header). */
+const BULLET_ITEM_RE = /^\s{0,8}[-*]\s+/;
+const ORDERED_ITEM_RE = /^\s{0,8}\d+\.\s+/;
 
 /** Parse a markdown document into a flat block list. Pure — no DOM access. */
 export function parseMarkdown(source: string): ReadonlyArray<MarkdownBlock> {
@@ -89,22 +95,25 @@ export function parseMarkdown(source: string): ReadonlyArray<MarkdownBlock> {
 			continue;
 		}
 
-		// Bullet list
-		if (/^[-*]\s+/.test(line)) {
+		// Bullet list. Leading indent is tolerated (an item nested under an
+		// ordered item, e.g. LLM output) and flattens to this list's level —
+		// far better than the pre-F-425 behavior of slurping indented "- x"
+		// lines into the paragraph as inline dashes.
+		if (BULLET_ITEM_RE.test(line)) {
 			const items: string[] = [];
-			while (i < lines.length && /^[-*]\s+/.test(lines[i] ?? "")) {
-				items.push((lines[i] ?? "").replace(/^[-*]\s+/, ""));
+			while (i < lines.length && BULLET_ITEM_RE.test(lines[i] ?? "")) {
+				items.push((lines[i] ?? "").replace(BULLET_ITEM_RE, ""));
 				i++;
 			}
 			blocks.push({ kind: BlockKind.BulletList, items });
 			continue;
 		}
 
-		// Ordered list
-		if (/^\d+\.\s+/.test(line)) {
+		// Ordered list (same indent tolerance as bullets).
+		if (ORDERED_ITEM_RE.test(line)) {
 			const items: string[] = [];
-			while (i < lines.length && /^\d+\.\s+/.test(lines[i] ?? "")) {
-				items.push((lines[i] ?? "").replace(/^\d+\.\s+/, ""));
+			while (i < lines.length && ORDERED_ITEM_RE.test(lines[i] ?? "")) {
+				items.push((lines[i] ?? "").replace(ORDERED_ITEM_RE, ""));
 				i++;
 			}
 			blocks.push({ kind: BlockKind.OrderedList, items });
@@ -119,8 +128,8 @@ export function parseMarkdown(source: string): ReadonlyArray<MarkdownBlock> {
 			if (next.trim() === "") break;
 			if (/^#{1,4}\s+/.test(next)) break;
 			if (/^```/.test(next)) break;
-			if (/^[-*]\s+/.test(next)) break;
-			if (/^\d+\.\s+/.test(next)) break;
+			if (BULLET_ITEM_RE.test(next)) break;
+			if (ORDERED_ITEM_RE.test(next)) break;
 			if (/^---+\s*$/.test(next)) break;
 			para.push(next);
 			i++;

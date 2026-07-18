@@ -7,8 +7,8 @@
  */
 
 import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { setEditorHost } from "@brainstorm/editor";
+import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm/sdk/menus";
 import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";

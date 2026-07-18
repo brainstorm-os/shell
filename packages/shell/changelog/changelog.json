@@ -3,9 +3,134 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.5.3",
+      "date": "2026-07-18",
+      "icon": "🖼️",
+      "title": "Imports made whole",
+      "summary": "The Anytype import now lands every file — pasted screenshots included, none swapped — and the rough edges around it are gone: gallery tiles render properly, imported notes recover their titles, menus fit their labels, and IMAP setup stops eating app passwords.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Import fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Every file lands",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the Anytype importer now reads the export's own file map, so all attachments bind exactly: name-less pasted screenshots import instead of showing broken images, and screenshots taken in the same second no longer swap content. Re-running an import repairs an existing vault in place."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Titles heal themselves",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — imported notes that opened with an empty title now adopt their name on first open."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Across the apps"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Gallery and Grid tiles fill their cells edge to edge, image files show real thumbnails, and untitled items sort to the end instead of walling the top of the view."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Mailbox",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — connecting an IMAP account trims pasted app passwords (a stray trailing space read as wrong credentials), a failed sync now says what to check, and the connect dialog wears the shared segmented controls."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Agent",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — nested bullet lists in answers render as real lists instead of inline dashes."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Interface"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Menus that fit",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — option dropdowns are wide enough for their labels, with the checkmark column aligned; no more “G…” guessing games."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Settings",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — AI provider names wrap to two lines instead of truncating mid-word."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.2",
       "date": "2026-07-18",
-      "icon": "\ud83c\udfa8",
+      "icon": "🎨",
       "title": "A new coat of indigo",
       "summary": "Brainstorm drops the pink: Default Light and Default Dark are now the out-of-box themes, with a new violet-indigo app icon, a fresh default wallpaper, and a matching welcome screen. Plus a round of Settings polish.",
       "body": [
@@ -18,12 +143,10 @@
           "text": [
             {
               "text": "New default themes",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 fresh vaults now open in Default Light (neutral, violet-indigo accent) and toggle into Default Dark. Rose and Midnight stay in the theme catalog \u2014 your current choice is untouched."
+              "text": " — fresh vaults now open in Default Light (neutral, violet-indigo accent) and toggle into Default Dark. Rose and Midnight stay in the theme catalog — your current choice is untouched."
             }
           ]
         },
@@ -32,12 +155,10 @@
           "text": [
             {
               "text": "New app icon",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 the bolt now sits on a violet-indigo tile, in your dock, tray, and installer."
+              "text": " — the bolt now sits on a violet-indigo tile, in your dock, tray, and installer."
             }
           ]
         },
@@ -46,12 +167,10 @@
           "text": [
             {
               "text": "Green-valley wallpaper",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 a new bundled low-poly landscape is the light-mode default for new vaults, and joins the wallpaper catalog alongside rose-mountains and stormy-sea."
+              "text": " — a new bundled low-poly landscape is the light-mode default for new vaults, and joins the wallpaper catalog alongside rose-mountains and stormy-sea."
             }
           ]
         },
@@ -60,12 +179,10 @@
           "text": [
             {
               "text": "Welcome, in daylight",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 the welcome screen now opens on the green-valley scene in Default Light."
+              "text": " — the welcome screen now opens on the green-valley scene in Default Light."
             }
           ]
         },
@@ -78,12 +195,10 @@
           "text": [
             {
               "text": "Settings polish",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 disabled buttons keep readable labels on light themes, the avatar shows a camera glyph until you have a name or photo, empty trusted-site entries can't be added, proxy details no longer repeat themselves, and the search-index stats tiles align in a clean grid."
+              "text": " — disabled buttons keep readable labels on light themes, the avatar shows a camera glyph until you have a name or photo, empty trusted-site entries can't be added, proxy details no longer repeat themselves, and the search-index stats tiles align in a clean grid."
             }
           ]
         },
@@ -92,12 +207,10 @@
           "text": [
             {
               "text": "Steadier app lists",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 installed-app lists (notifications, icon picker) no longer shuffle their order between visits."
+              "text": " — installed-app lists (notifications, icon picker) no longer shuffle their order between visits."
             }
           ]
         },
@@ -106,12 +219,10 @@
           "text": [
             {
               "text": "Simpler loading spinner",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
-              "text": " \u2014 one themed ring everywhere, correctly scaled at every size."
+              "text": " — one themed ring everywhere, correctly scaled at every size."
             }
           ]
         }
