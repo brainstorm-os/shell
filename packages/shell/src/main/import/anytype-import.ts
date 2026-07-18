@@ -25,9 +25,14 @@
 import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm/sdk";
 import {
 	CARDINALITY_HARD_MAX,
+	DateGranularity,
+	type Dictionary,
+	type DictionaryItem,
 	type List,
 	type MemberInclude,
 	type PropertyDef,
+	ValueType,
+	isMultiValued,
 } from "@brainstorm/sdk-types";
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
@@ -37,26 +42,98 @@ import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { anytypeBlocksToLexical, anytypeDateToMs } from "./anytype-blocks-to-lexical";
 import { inferValueType } from "./import-map";
-import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
-import { type ImportedBodyState, plantImportSerializedBody } from "./plant-import-body";
+import { IMPORT_BODY_HASH_PROP, IMPORT_EXTERNAL_ID_PROP } from "./import-types";
+import {
+	type ImportedBodyState,
+	type LoadDocSnapshot,
+	plantImportSerializedBody,
+} from "./plant-import-body";
 
-/** Deep-clone a Lexical state, rewriting `image.src` values that match a
- *  known file name to their AssetStore URL. Returns null when nothing changed. */
-function rewriteImageSrcs(
+/**
+ * Body-src → AssetStore-URL matcher (F-397). Body image srcs / file-link
+ * urls carry whatever the block had — the Anytype DISPLAY name
+ * ("Screenshot 2026-03-06 at 09.38.18.png"), the file OBJECT id (`bafy…`),
+ * or the export's slugged on-disk name — while the sealed File entities are
+ * keyed by file object id + binary path. The index carries every alias plus
+ * the same slug/truncation fallback the F-396 attachment matcher uses, so a
+ * display-name src still resolves to its sealed asset.
+ */
+export type AssetSrcIndex = {
+	readonly direct: ReadonlyMap<string, string>;
+	/** ext → slugged on-disk stems (for the unique-truncation-prefix match). */
+	readonly stemsByExt: ReadonlyMap<string, ReadonlyArray<{ stem: string; url: string }>>;
+};
+
+export type AssetSrcAlias = {
+	/** `brainstorm://asset/<id>` URL the aliases resolve to. */
+	readonly url: string;
+	/** Every name this asset may appear under in a body src: file object id,
+	 *  display name (with/without extension), binary path + basename. */
+	readonly aliases: readonly string[];
+};
+
+export function buildAssetSrcIndex(entries: readonly AssetSrcAlias[]): AssetSrcIndex {
+	const direct = new Map<string, string>();
+	const stemsByExt = new Map<string, Array<{ stem: string; url: string }>>();
+	for (const entry of entries) {
+		for (const alias of entry.aliases) {
+			if (!alias) continue;
+			const base = alias.slice(alias.lastIndexOf("/") + 1);
+			if (!direct.has(alias)) direct.set(alias, entry.url);
+			if (!direct.has(base)) direct.set(base, entry.url);
+			const dot = base.lastIndexOf(".");
+			if (dot > 0) {
+				const stem = slugStem(base.slice(0, dot));
+				const ext = base.slice(dot + 1).toLowerCase();
+				if (stem.length === 0) continue;
+				const slugKey = `slug:${stem}.${ext}`;
+				if (!direct.has(slugKey)) direct.set(slugKey, entry.url);
+				const pool = stemsByExt.get(ext) ?? [];
+				pool.push({ stem, url: entry.url });
+				stemsByExt.set(ext, pool);
+			}
+		}
+	}
+	return { direct, stemsByExt };
+}
+
+/** Resolve one body src through the index: exact/basename first, then the
+ *  slugged stem+ext, then the unique truncation prefix (the on-disk stem is
+ *  a ≥8-char prefix of the full slugged name). Ambiguity returns null —
+ *  never guess. */
+export function resolveAssetSrc(index: AssetSrcIndex, src: string): string | null {
+	const base = src.slice(src.lastIndexOf("/") + 1);
+	const direct = index.direct.get(src) ?? index.direct.get(base);
+	if (direct) return direct;
+	const dot = base.lastIndexOf(".");
+	if (dot <= 0) return null;
+	const slugged = slugStem(base.slice(0, dot));
+	const ext = base.slice(dot + 1).toLowerCase();
+	if (slugged.length === 0) return null;
+	const exact = index.direct.get(`slug:${slugged}.${ext}`);
+	if (exact) return exact;
+	const prefixed = (index.stemsByExt.get(ext) ?? []).filter(
+		(e) => e.stem.length >= 8 && slugged.startsWith(e.stem),
+	);
+	return prefixed.length === 1 ? (prefixed[0]?.url ?? null) : null;
+}
+
+/** Deep-clone a Lexical state, rewriting `image.src` AND `link.url` values
+ *  that match a sealed asset to its `brainstorm://asset/…` URL — images
+ *  render inline, non-image file blocks (PDFs…) link to their File asset. */
+export function rewriteBodyAssetSrcs(
 	state: ImportedBodyState,
-	srcByName: ReadonlyMap<string, string>,
-): ImportedBodyState | null {
-	if (srcByName.size === 0) return null;
-	let changed = false;
+	index: AssetSrcIndex,
+): ImportedBodyState {
 	const walk = (node: Record<string, unknown>): Record<string, unknown> => {
 		const next: Record<string, unknown> = { ...node };
 		if (next.type === "image" && typeof next.src === "string") {
-			const mapped =
-				srcByName.get(next.src) ?? srcByName.get(next.src.slice(next.src.lastIndexOf("/") + 1));
-			if (mapped && mapped !== next.src) {
-				next.src = mapped;
-				changed = true;
-			}
+			const mapped = resolveAssetSrc(index, next.src);
+			if (mapped) next.src = mapped;
+		}
+		if (next.type === "link" && typeof next.url === "string") {
+			const mapped = resolveAssetSrc(index, next.url);
+			if (mapped) next.url = mapped;
 		}
 		if (Array.isArray(next.children)) {
 			next.children = (next.children as Record<string, unknown>[]).map(walk);
@@ -64,7 +141,47 @@ function rewriteImageSrcs(
 		return next;
 	};
 	const root = walk(state.root as unknown as Record<string, unknown>);
-	return changed ? ({ ...state, root } as unknown as ImportedBodyState) : null;
+	return { ...state, root } as unknown as ImportedBodyState;
+}
+
+/** Prepend a `title` node (the same shape the Welcome seeder plants) so an
+ *  imported doc opens with its name in the editor's `h1.notes__title`
+ *  instead of a blank line (F-402). */
+export function withTitleNode(state: ImportedBodyState | null, title: string): ImportedBodyState {
+	const titleNode = {
+		type: "title",
+		version: 1,
+		format: "",
+		indent: 0,
+		direction: null,
+		children: [
+			{ type: "text", version: 1, detail: 0, format: 0, mode: "normal", style: "", text: title },
+		],
+	};
+	const emptyParagraph = {
+		type: "paragraph",
+		version: 1,
+		format: "",
+		indent: 0,
+		direction: null,
+		children: [
+			{ type: "text", version: 1, detail: 0, format: 0, mode: "normal", style: "", text: "" },
+		],
+	};
+	const root = state?.root as unknown as Record<string, unknown> | undefined;
+	const bodyChildren = Array.isArray(root?.children)
+		? (root.children as Record<string, unknown>[])
+		: [emptyParagraph];
+	return {
+		root: {
+			type: "root",
+			version: 1,
+			format: "",
+			indent: 0,
+			direction: null,
+			children: [titleNode, ...bodyChildren],
+		},
+	} as unknown as ImportedBodyState;
 }
 
 /** One extracted `.pb.json` snapshot from the Anytype export. `path` is
@@ -119,6 +236,15 @@ export type AnytypeImportPlan = {
 	readonly fileLinks: readonly AnytypeFileLink[];
 	/** File object id → export-relative binary path (`files/<name>`). */
 	readonly fileBinaryByObject: ReadonlyMap<string, string>;
+	/** File object id → the user-facing display name (extension included when
+	 *  the object carries `fileExt`). File entities keep the names the user
+	 *  gave them, not the export's slugged truncated on-disk names. */
+	readonly fileNameByObject: ReadonlyMap<string, string>;
+	/** The space's own id (`details.spaceId`, majority across snapshots) —
+	 *  the STABLE identity for idempotent re-import. Anytype timestamps every
+	 *  export FILENAME, so keying dedupe on the archive name duplicates the
+	 *  whole space on the next re-export (F-400). */
+	readonly spaceId: string | null;
 	readonly collections: readonly AnytypeCollectionDraft[];
 	/** Link/mention targets not present in the export (dangling edges). */
 	readonly unresolved: ReadonlyArray<{ readonly from: string; readonly target: string }>;
@@ -516,7 +642,9 @@ export function parseAnytypeExport(
 	const optionLabelById = new Map<string, string>();
 	const nameById = new Map<string, string>();
 	const fileBinaryByObject = new Map<string, string>();
+	const fileNameByObject = new Map<string, string>();
 	const fileObjectIds = new Set<string>();
+	const spaceIdCounts = new Map<string, number>();
 	// Index every attachment path by several lookup keys so export layouts
 	// that put binaries under `files/`, `filesObjects/`, or the root still
 	// resolve: basename, full path, stem (no extension), and slugged stem —
@@ -572,6 +700,8 @@ export function parseAnytypeExport(
 	for (const snap of snapshots) {
 		const name = asString(snap.details.name);
 		if (name) nameById.set(snap.id, name);
+		const snapSpace = asString(snap.details.spaceId);
+		if (snapSpace) spaceIdCounts.set(snapSpace, (spaceIdCounts.get(snapSpace) ?? 0) + 1);
 		if (snap.sbType === "STType") {
 			if (name) {
 				typeNameByKey.set(snap.id, name);
@@ -603,7 +733,18 @@ export function parseAnytypeExport(
 				asString(snap.details.fileId),
 			);
 			if (binary) fileBinaryByObject.set(snap.id, binary);
+			// Keep the DISPLAY name (with its extension) so the File entity is
+			// named what the user called it, not the export's slugged stem.
+			if (name) {
+				const withExt =
+					ext && !name.toLowerCase().endsWith(`.${ext.toLowerCase()}`) ? `${name}.${ext}` : name;
+				fileNameByObject.set(snap.id, withExt);
+			}
 		}
+	}
+	let spaceId: string | null = null;
+	for (const [candidate, count] of spaceIdCounts) {
+		if (spaceId === null || count > (spaceIdCounts.get(spaceId) ?? 0)) spaceId = candidate;
 	}
 
 	// Pass 2 — importable objects.
@@ -667,6 +808,7 @@ export function parseAnytypeExport(
 				if (path) {
 					const pseudoId = `path:${path}`;
 					fileBinaryByObject.set(pseudoId, path);
+					fileNameByObject.set(pseudoId, name);
 					const key = `${snap.id}→${pseudoId}`;
 					if (seenLink.has(key)) return;
 					seenLink.add(key);
@@ -737,12 +879,19 @@ export function parseAnytypeExport(
 			asString(asRecord(titleBlock?.text)?.text) ??
 			asString(snap.details.snippet)?.split("\n")[0]?.trim() ??
 			"Untitled";
+		// A body counts when it carries text OR non-text blocks (an image-only
+		// page has an empty snippet but must still plant its media).
+		const bodyChildren = (bodyState.root as unknown as { children?: Array<Record<string, unknown>> })
+			.children;
+		const hasBodyContent =
+			snippet.length > 0 ||
+			(bodyChildren ?? []).some((c) => c.type !== "paragraph" && c.type !== "text");
 		entities.push({
 			title,
 			properties,
 			anytypeType,
 			externalId: snap.id,
-			bodyState: snippet.length > 0 ? bodyState : null,
+			bodyState: hasBodyContent ? bodyState : null,
 		});
 
 		if (snap.collectionMembers) {
@@ -761,6 +910,8 @@ export function parseAnytypeExport(
 		links: links.filter((l) => draftIds.has(l.from) && draftIds.has(l.to)),
 		fileLinks: fileLinks.filter((l) => draftIds.has(l.fromObject)),
 		fileBinaryByObject,
+		fileNameByObject,
+		spaceId,
 		collections,
 		unresolved: unresolved.filter((u) => draftIds.has(u.from)),
 		skippedArchived,
@@ -783,6 +934,7 @@ const NON_SCHEMA_KEYS: ReadonlySet<string> = new Set([
 	"createdAt",
 	"updatedAt",
 	IMPORT_EXTERNAL_ID_PROP,
+	IMPORT_BODY_HASH_PROP,
 ]);
 
 export type AnytypeTypeSchema = {
@@ -867,6 +1019,104 @@ export function anytypeCollectionId(source: string, collectionId: string): strin
 	return id.length <= 128 ? id : id.slice(0, 128);
 }
 
+/** The dedupe `source` for an Anytype import. Prefers the export's own
+ *  space id (`details.spaceId` — stable across re-exports) over the archive
+ *  name, which Anytype timestamps on EVERY export ("Anytype.20260717.130907.7"
+ *  vs "Anytype.20260717.145135.3.zip") — keying on it duplicated the whole
+ *  space per re-export (F-400). Archive name stays the last-resort fallback
+ *  for exports that carry no spaceId. */
+export function anytypeImportSource(plan: AnytypeImportPlan, archiveName: string): string {
+	return `anytype:${plan.spaceId ?? archiveName}`;
+}
+
+/** Stable Dictionary id for an imported multi-value (tag-like) property.
+ *  Source-independent on purpose: the same vault re-importing the same
+ *  property key reuses one vocabulary. */
+export function anytypeDictionaryId(defKey: string): string {
+	const stem = defKey.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 48);
+	return stem.length > 0 ? `anytype-vocab-${stem}` : "anytype-vocab-field";
+}
+
+/** Whether a def stores the multi-value `LabeledValue[]` envelope (mirrors
+ *  the sdk `isMultiShape` the panel's `coerceValue`/`readValue` use). */
+function isMultiShapeDef(def: PropertyDef): boolean {
+	if (def.valueType === ValueType.RichText || def.valueType === ValueType.Boolean) return false;
+	return isMultiValued(def.count);
+}
+
+/** ISO string / epoch → the `{ at, granularity }` DateValue shape the
+ *  value-store expects; null when unparseable. */
+function toDateValue(raw: unknown): { at: number; granularity: DateGranularity } | null {
+	const ms = anytypeDateToMs(raw);
+	if (ms === null) return null;
+	const hasTime = typeof raw === "string" && /[T ]\d{2}:\d{2}/.test(raw) && !/T00:00:00/.test(raw);
+	return { at: ms, granularity: hasTime ? DateGranularity.DateTime : DateGranularity.Date };
+}
+
+function coerceScalarForDef(def: PropertyDef, raw: unknown): unknown {
+	switch (def.valueType) {
+		case ValueType.Text:
+		case ValueType.EntityRef:
+			return typeof raw === "string" ? raw : String(raw);
+		case ValueType.Number: {
+			if (typeof raw === "number") return raw;
+			const n = Number(raw);
+			return Number.isFinite(n) ? n : raw;
+		}
+		case ValueType.Date:
+			return raw !== null && typeof raw === "object" ? raw : (toDateValue(raw) ?? raw);
+		default:
+			return raw;
+	}
+}
+
+/**
+ * Coerce a draft's `values` bag into the shape each REGISTERED def stores
+ * (F-401): the panel's `readValue`/`coerceValue` replace any value that
+ * doesn't match the def's shape with the shape's empty, so an imported
+ * `["Kapitel 9"]` under a scalar `tags` def rendered "Empty" — and an ISO
+ * date string under a Date def did the same. Multi defs keep bare-scalar
+ * arrays (`coerceValue` wraps them into the labeled envelope); scalar defs
+ * get arrays flattened (Text joins, others take the first element); Date
+ * defs get `{ at, granularity }`.
+ */
+export function coerceValuesForDefs(
+	values: Record<string, unknown>,
+	defs: Readonly<Record<string, PropertyDef>>,
+): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const [key, raw] of Object.entries(values)) {
+		const def = defs[key];
+		if (!def || raw === null || raw === undefined) {
+			out[key] = raw;
+			continue;
+		}
+		if (isMultiShapeDef(def)) {
+			const arr = Array.isArray(raw) ? raw : [raw];
+			out[key] = arr.map((v) => coerceScalarForDef(def, v));
+		} else if (Array.isArray(raw)) {
+			out[key] =
+				def.valueType === ValueType.Text
+					? raw.map((v) => (typeof v === "string" ? v : String(v))).join(", ")
+					: coerceScalarForDef(def, raw[0]);
+		} else {
+			out[key] = coerceScalarForDef(def, raw);
+		}
+	}
+	return out;
+}
+
+/** FNV-1a 32-bit hex digest — deterministic, no crypto dep. Used for the
+ *  planted-body content hash that makes re-planting skip unchanged bodies. */
+function fnv1aHex(input: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < input.length; i++) {
+		h ^= input.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 export type AnytypeImportOptions = {
 	/** Vault entity type the objects map onto (e.g. `io.brainstorm.notes/Note/v1`). */
 	readonly targetType: string;
@@ -880,6 +1130,10 @@ export type AnytypeImportOptions = {
 	 *  editor is non-empty. When omitted, only the property-bag snippet lands
 	 *  (tests that don't care about the editor can skip it). */
 	readonly applyDocUpdate?: ApplyDocUpdate;
+	/** Read an entity's CURRENT body-doc snapshot so a re-import REPLACES the
+	 *  body instead of appending a duplicate (F-398). Wired to the ydoc
+	 *  worker's `snapshot`; only consulted for entities that already exist. */
+	readonly loadDocSnapshot?: LoadDocSnapshot;
 	/** Precomputed {@link parseAnytypeExport} result — the wizard parses once
 	 *  at pick time (for the preview count) and hands the plan to the run so
 	 *  the export isn't parsed twice. When omitted the run parses `files`
@@ -935,32 +1189,185 @@ export async function importAnytypeExport(
 	for (const { id, value } of repo.listIdsWithPropertyIn(IMPORT_EXTERNAL_ID_PROP, dedupeKeys)) {
 		if (!existingByKey.has(value)) existingByKey.set(value, id);
 	}
-	const idByExternal = new Map<string, string>();
 	let created = 0;
 	let updated = 0;
+	let filesCreated = 0;
+	const cancelledReport = (): AnytypeImportReport => ({
+		created,
+		updated,
+		filesCreated,
+		linked: 0,
+		unresolved: plan.unresolved.length,
+		skippedArchived: plan.skippedArchived,
+		skippedSystem: plan.skippedSystem,
+		filesMissingBinary: plan.filesMissingBinary,
+		collectionsCreated: 0,
+		propertiesRegistered: 0,
+		cancelled: true,
+	});
+	if (options.signal?.aborted) return cancelledReport();
 
+	// IE-2 Map tail, moved AHEAD of the entity loop (F-401): register per-type
+	// PropertyDefs (multi-value tag-likes get a minted vocabulary Dictionary so
+	// they render as tag chips), then coerce every draft's `values` bag to the
+	// shape the EFFECTIVE catalog def stores — a value in the wrong shape
+	// renders "Empty" in the shared panel. Best-effort: a registration failure
+	// never blocks the committed rows.
+	let propertiesRegistered = 0;
+	let effectiveDefs: Record<string, PropertyDef> = {};
+	try {
+		const schemas = deriveTypeSchemas(plan);
+		const store = await session.propertiesStore();
+		// Register only keys the catalog doesn't have yet — an established def
+		// (canonical `tags`, a user-tuned vocabulary/format) must never be
+		// clobbered by an inferred import guess. Values still land under the
+		// shared key (coerced to ITS shape), so they surface either way.
+		const snapshot = store.snapshot();
+		const existingDefs = { ...snapshot.properties };
+		for (const schema of schemas) {
+			for (const def of schema.properties) {
+				if (existingDefs[def.key]) continue;
+				let final = def;
+				if (def.valueType === ValueType.Text && isMultiValued(def.count)) {
+					// Anytype tag options ARE a vocabulary — mint (or extend) a
+					// Dictionary from the observed labels so the def renders through
+					// the Tag cells instead of the scalar pill.
+					const dictionaryId = anytypeDictionaryId(def.key);
+					const labels: string[] = [];
+					const seenLabels = new Set<string>();
+					for (const draft of plan.entities) {
+						const bag = draft.properties.values as Record<string, unknown> | undefined;
+						const raw = bag?.[def.key];
+						if (!Array.isArray(raw)) continue;
+						for (const v of raw) {
+							if (typeof v !== "string" || v.length === 0 || seenLabels.has(v)) continue;
+							seenLabels.add(v);
+							labels.push(v);
+						}
+					}
+					const existingDict = snapshot.dictionaries[dictionaryId];
+					const items: DictionaryItem[] = [...(existingDict?.items ?? [])];
+					const have = new Set(items.map((it) => it.id));
+					for (const label of labels) {
+						if (have.has(label)) continue;
+						items.push({ id: label, label, icon: null, sortIndex: items.length });
+					}
+					const dict: Dictionary = {
+						id: dictionaryId,
+						name: existingDict?.name ?? def.name,
+						items,
+					};
+					store.setDictionary(dict);
+					final = { ...def, vocabulary: { dictionaryId } };
+				}
+				store.setProperty(final);
+				existingDefs[final.key] = final;
+				propertiesRegistered++;
+			}
+		}
+		effectiveDefs = existingDefs;
+	} catch {
+		// Schema minting is a refinement — values then pass through un-coerced.
+	}
+
+	// Referenced file binaries → File/v1 entities FIRST, so the body plants
+	// below can point image/file blocks at their sealed assets in one pass.
+	// F-399: an EXISTING File entity keeps its asset — re-sealing every binary
+	// on an update run grew the vault by the export's size each time and left
+	// the previous run's assets bound-but-orphaned.
+	const assetStore = await session.assetStore();
+	const bytesByPath = new Map(attachments.map((a) => [a.path, a.bytes]));
+	const idByFileObject = new Map<string, string>();
+	for (const link of plan.fileLinks) {
+		if (options.signal?.aborted) return cancelledReport();
+		if (idByFileObject.has(link.fileObjectId)) continue;
+		const path = plan.fileBinaryByObject.get(link.fileObjectId);
+		const bytes = path ? bytesByPath.get(path) : undefined;
+		if (!path || !bytes) continue;
+		const binaryName = path.slice(path.lastIndexOf("/") + 1);
+		// The File entity keeps the user's display name; the slugged on-disk
+		// name is only the fallback (F-397 follow-on).
+		const name = plan.fileNameByObject.get(link.fileObjectId) ?? binaryName;
+		const externalKey = `${options.source}:file:${link.fileObjectId}`;
+		const existing = existingByKey.get(externalKey) ?? null;
+		const existingRow = existing !== null ? repo.get(existing) : null;
+		const prevAssetId =
+			typeof existingRow?.properties.assetId === "string" ? existingRow.properties.assetId : null;
+		const prevSize =
+			typeof existingRow?.properties.size === "number" ? existingRow.properties.size : null;
+		const mime = servedMimeForName(binaryName);
+		let assetId: string;
+		if (prevAssetId !== null && prevSize === bytes.length) {
+			// Same-size existing asset (Anytype file objects are content-addressed
+			// `bafy…` ids, so same id + size ⇒ same bytes): keep it, write nothing.
+			assetId = prevAssetId;
+		} else {
+			({ assetId } = await assetStore.writeAsset({ bytes, mime, kind: AssetKind.Upload }));
+			assetStore.markBound(assetId);
+			if (prevAssetId !== null && prevAssetId !== assetId) {
+				// The replaced asset would otherwise stay bound-but-orphaned.
+				await assetStore.deleteAsset(prevAssetId).catch(() => {});
+			}
+		}
+		const properties: Record<string, unknown> = {
+			name,
+			mime,
+			size: bytes.length,
+			assetId,
+			attachment: `brainstorm://asset/${assetId}`,
+			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
+		};
+		if (existing !== null) {
+			repo.update(existing, properties, options.now);
+			idByFileObject.set(link.fileObjectId, existing);
+		} else {
+			const id = `ent_${ulid()}`;
+			repo.create({
+				id,
+				type: FILE_TYPE,
+				properties,
+				createdBy: options.importedBy,
+				now: options.now,
+				dekId: null,
+			});
+			idByFileObject.set(link.fileObjectId, id);
+			existingByKey.set(externalKey, id);
+			filesCreated++;
+		}
+	}
+
+	// Src index for the body plants: every alias a body src may carry (file
+	// object id, display name, slugged on-disk name — with the F-396 slug +
+	// truncation fallback) → the sealed `brainstorm://asset/…` URL.
+	const srcAliases: AssetSrcAlias[] = [];
+	for (const [fileObjectId, fileEntityId] of idByFileObject) {
+		const file = repo.get(fileEntityId);
+		const url = typeof file?.properties.attachment === "string" ? file.properties.attachment : null;
+		if (!url) continue;
+		const path = plan.fileBinaryByObject.get(fileObjectId);
+		const aliases = [
+			fileObjectId,
+			plan.fileNameByObject.get(fileObjectId),
+			path,
+			path ? path.slice(path.lastIndexOf("/") + 1) : undefined,
+		].filter((a): a is string => typeof a === "string" && a.length > 0);
+		srcAliases.push({ url, aliases });
+	}
+	const srcIndex = buildAssetSrcIndex(srcAliases);
+
+	const idByExternal = new Map<string, string>();
 	const total = plan.entities.length;
 	for (let i = 0; i < total; i++) {
-		if (options.signal?.aborted) {
-			return {
-				created,
-				updated,
-				filesCreated: 0,
-				linked: 0,
-				unresolved: plan.unresolved.length,
-				skippedArchived: plan.skippedArchived,
-				skippedSystem: plan.skippedSystem,
-				filesMissingBinary: plan.filesMissingBinary,
-				collectionsCreated: 0,
-				propertiesRegistered: 0,
-				cancelled: true,
-			};
-		}
+		if (options.signal?.aborted) return cancelledReport();
 		const draft = plan.entities[i] as (typeof plan.entities)[number];
 		const externalKey = `${options.source}:${draft.externalId}`;
 		const existing = existingByKey.get(externalKey) ?? null;
+		const existingRow = existing !== null ? repo.get(existing) : null;
+		const values = draft.properties.values as Record<string, unknown> | undefined;
 		const properties: Record<string, unknown> = {
 			...draft.properties,
+			// F-401 — store panel values in the shape their registered def reads.
+			...(values ? { values: coerceValuesForDefs(values, effectiveDefs) } : {}),
 			title: draft.title,
 			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
 		};
@@ -991,83 +1398,38 @@ export async function importAnytypeExport(
 			created++;
 		}
 		// Editor body lives in the Y.Doc — plant the Lexical state built from
-		// Anytype blocks (not markdown, which mangled structure).
-		if (options.applyDocUpdate && draft.bodyState) {
-			try {
-				await plantImportSerializedBody(entityId, draft.bodyState, options.applyDocUpdate);
-			} catch {
-				// Non-fatal: row + snippet still land; body plant retries on re-import.
+		// Anytype blocks (not markdown, which mangled structure), with a Title
+		// node on top (F-402) and image/file srcs pointing at their sealed
+		// assets (F-397). The planted-state hash makes the plant idempotent:
+		// an unchanged body on re-import is skipped outright; a changed one
+		// REPLACES the existing doc content via `loadDocSnapshot` (F-398).
+		if (options.applyDocUpdate) {
+			const planted = withTitleNode(
+				draft.bodyState ? rewriteBodyAssetSrcs(draft.bodyState, srcIndex) : null,
+				draft.title,
+			);
+			const bodyHash = fnv1aHex(JSON.stringify(planted));
+			const prevHash =
+				typeof existingRow?.properties[IMPORT_BODY_HASH_PROP] === "string"
+					? existingRow.properties[IMPORT_BODY_HASH_PROP]
+					: null;
+			if (existing === null || prevHash !== bodyHash) {
+				try {
+					await plantImportSerializedBody(
+						entityId,
+						planted,
+						options.applyDocUpdate,
+						existing !== null ? options.loadDocSnapshot : undefined,
+					);
+					// Stamp only after a successful plant so a failed one retries.
+					repo.update(entityId, { [IMPORT_BODY_HASH_PROP]: bodyHash }, updatedMs);
+				} catch {
+					// Non-fatal: row + snippet still land; body plant retries on re-import.
+				}
 			}
 		}
 		options.onProgress?.(i + 1, total);
 		if ((i + 1) % ANYTYPE_YIELD_EVERY === 0) await Promise.resolve();
-	}
-
-	// Referenced file binaries → File/v1 entities (only ones a page references).
-	const assetStore = await session.assetStore();
-	const bytesByPath = new Map(attachments.map((a) => [a.path, a.bytes]));
-	const idByFileObject = new Map<string, string>();
-	let filesCreated = 0;
-	for (const link of plan.fileLinks) {
-		if (idByFileObject.has(link.fileObjectId)) continue;
-		const path = plan.fileBinaryByObject.get(link.fileObjectId);
-		const bytes = path ? bytesByPath.get(path) : undefined;
-		if (!path || !bytes) continue;
-		const name = path.slice(path.lastIndexOf("/") + 1);
-		const externalKey = `${options.source}:file:${link.fileObjectId}`;
-		const existing = existingByKey.get(externalKey) ?? null;
-		const mime = servedMimeForName(name);
-		const { assetId } = await assetStore.writeAsset({ bytes, mime, kind: AssetKind.Upload });
-		assetStore.markBound(assetId);
-		const properties: Record<string, unknown> = {
-			name,
-			mime,
-			size: bytes.length,
-			assetId,
-			attachment: `brainstorm://asset/${assetId}`,
-			[IMPORT_EXTERNAL_ID_PROP]: externalKey,
-		};
-		if (existing !== null) {
-			repo.update(existing, properties, options.now);
-			idByFileObject.set(link.fileObjectId, existing);
-		} else {
-			const id = `ent_${ulid()}`;
-			repo.create({
-				id,
-				type: FILE_TYPE,
-				properties,
-				createdBy: options.importedBy,
-				now: options.now,
-				dekId: null,
-			});
-			idByFileObject.set(link.fileObjectId, id);
-			filesCreated++;
-		}
-	}
-
-	// Re-plant bodies with image srcs rewritten to `brainstorm://asset/…` once
-	// the AssetStore has the binaries. Initial plant used file names as src.
-	if (options.applyDocUpdate && idByFileObject.size > 0) {
-		const srcByName = new Map<string, string>();
-		for (const [, fileEntityId] of idByFileObject) {
-			const file = repo.get(fileEntityId);
-			const assetUrl =
-				typeof file?.properties.attachment === "string" ? file.properties.attachment : null;
-			const name = typeof file?.properties.name === "string" ? file.properties.name : null;
-			if (assetUrl && name) srcByName.set(name, assetUrl);
-		}
-		for (const draft of plan.entities) {
-			if (!draft.bodyState) continue;
-			const entityId = idByExternal.get(draft.externalId);
-			if (!entityId) continue;
-			const rewritten = rewriteImageSrcs(draft.bodyState, srcByName);
-			if (!rewritten) continue;
-			try {
-				await plantImportSerializedBody(entityId, rewritten, options.applyDocUpdate);
-			} catch {
-				// Non-fatal — asset entities exist even if the re-plant fails.
-			}
-		}
 	}
 
 	// Deterministic link ids so a re-import upserts rather than duplicates.
@@ -1098,27 +1460,10 @@ export async function importAnytypeExport(
 		if (sourceId && destId) writeLink(sourceId, destId);
 	}
 
-	// IE-2 Map tail — per-type PropertyDefs + each Collection as a List/v1.
-	// Best-effort: a failure here never invalidates the committed objects.
+	// Each Collection as a List/v1. Best-effort: a failure here never
+	// invalidates the committed objects.
 	let collectionsCreated = 0;
-	let propertiesRegistered = 0;
 	try {
-		const schemas = deriveTypeSchemas(plan);
-		if (schemas.length > 0) {
-			const store = await session.propertiesStore();
-			// Register only keys the catalog doesn't have yet — an established
-			// def (canonical `tags`, a user-tuned vocabulary/format) must never
-			// be clobbered by an inferred import guess. Values still land under
-			// the shared key, so they surface through the existing def.
-			const existingDefs = store.snapshot().properties;
-			for (const schema of schemas) {
-				for (const def of schema.properties) {
-					if (existingDefs[def.key]) continue;
-					store.setProperty(def);
-					propertiesRegistered++;
-				}
-			}
-		}
 		for (const draft of plan.collections) {
 			const include: MemberInclude[] = draft.memberIds
 				.map((m) => idByExternal.get(m))

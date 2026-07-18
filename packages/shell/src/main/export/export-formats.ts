@@ -12,7 +12,7 @@
  * is clean authored content, not engine bookkeeping.
  */
 
-import { IMPORT_EXTERNAL_ID_PROP } from "../import/import-types";
+import { IMPORT_BODY_HASH_PROP, IMPORT_EXTERNAL_ID_PROP } from "../import/import-types";
 
 export enum ExportFormat {
 	Json = "json",
@@ -28,7 +28,7 @@ export type ExportEntity = {
 };
 
 /** Properties never written to an export (engine bookkeeping, not user content). */
-const OMITTED_PROPS = new Set([IMPORT_EXTERNAL_ID_PROP]);
+const OMITTED_PROPS = new Set([IMPORT_EXTERNAL_ID_PROP, IMPORT_BODY_HASH_PROP]);
 /** The property used as the document body in Markdown export. */
 const BODY_PROP = "body";
 

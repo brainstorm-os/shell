@@ -20,8 +20,8 @@ import {
 	SEED_STANDIN_NODES,
 	plantSerializedStateIntoDoc,
 } from "@brainstorm/editor";
-import { Doc, encodeStateAsUpdate } from "yjs";
-import { bytesToBase64 } from "../credentials/crypto";
+import { Doc, XmlText, applyUpdate, encodeStateAsUpdate, encodeStateVector } from "yjs";
+import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 
 /** The serialized-state shape `plantSerializedStateIntoDoc` accepts — derived
@@ -315,20 +315,49 @@ export function markdownToSerializedState(markdown: string): ImportedBodyState {
 	} as unknown as ImportedBodyState;
 }
 
+/** Load the CURRENT full-state snapshot of an entity's universal-body Y.Doc
+ *  (base64 of `Y.encodeStateAsUpdate`), or null when the doc doesn't exist
+ *  yet. Wired to the ydoc worker's `snapshot` method in production; importer
+ *  callers use it to REPLACE an existing body on re-import instead of
+ *  appending a duplicate (F-398). */
+export type LoadDocSnapshot = (entityId: string) => Promise<string | null>;
+
 /** Plant a Lexical `ImportedBodyState` into `entityId`'s universal-body
- *  Y.Doc (the path Anytype/block-native importers use). */
+ *  Y.Doc (the path Anytype/block-native importers use).
+ *
+ *  Replace semantics (F-398): a fresh `Doc()`'s update merged into a
+ *  non-empty existing doc APPENDS a second copy of the whole body (two
+ *  independent Yjs histories concatenate). When `loadDocSnapshot` is
+ *  provided, the current doc state is loaded first, the shared `root`
+ *  XmlText (the `@lexical/yjs` binding root) is cleared, the new state is
+ *  planted, and only the DIFF (deletes + inserts) is shipped through
+ *  `applyDocUpdate` — a deterministic replace. Without `loadDocSnapshot`
+ *  the old plant-into-empty-doc behavior is preserved (callers that only
+ *  ever plant fresh entities). */
 export async function plantImportSerializedBody(
 	entityId: string,
 	state: ImportedBodyState,
 	applyDocUpdate: ApplyDocUpdate,
+	loadDocSnapshot?: LoadDocSnapshot,
 ): Promise<void> {
 	const doc = new Doc();
 	try {
+		if (loadDocSnapshot) {
+			const snapshotB64 = await loadDocSnapshot(entityId);
+			if (snapshotB64) applyUpdate(doc, base64ToBytes(snapshotB64));
+		}
+		const before = encodeStateVector(doc);
+		// The `@lexical/yjs` binding root is `doc.get("root", XmlText)` — clear
+		// any existing body so the plant below replaces instead of appending.
+		const root = doc.get("root", XmlText);
+		if (root.length > 0) {
+			doc.transact(() => root.delete(0, root.length));
+		}
 		plantSerializedStateIntoDoc(doc, state, {
 			nodes: PLANT_NODES,
 			namespace: `bs-import-${entityId}`,
 		});
-		await applyDocUpdate(entityId, bytesToBase64(encodeStateAsUpdate(doc)));
+		await applyDocUpdate(entityId, bytesToBase64(encodeStateAsUpdate(doc, before)));
 	} finally {
 		doc.destroy();
 	}

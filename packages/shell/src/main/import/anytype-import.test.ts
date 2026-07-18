@@ -15,7 +15,9 @@ let USER_DATA_DIR = "";
 vi.mock("electron", () => ({ app: { getPath: () => USER_DATA_DIR } }));
 
 import { LIST_ENTITY_TYPE } from "@brainstorm/sdk";
-import { ValueType } from "@brainstorm/sdk-types";
+import { DateGranularity, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import * as Y from "yjs";
+import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
 import { __resetAtRestProbeForTests } from "../storage/at-rest-mode";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { __setSqlcipherDriverForTests } from "../storage/sqlite";
@@ -24,12 +26,20 @@ import { createVault } from "../vault/vault";
 import {
 	type AnytypeFile,
 	anytypeCollectionId,
+	anytypeDictionaryId,
+	anytypeImportSource,
+	buildAssetSrcIndex,
+	coerceValuesForDefs,
 	deriveTypeSchemas,
 	importAnytypeExport,
 	parseAnytypeExport,
 	renderTextRun,
+	resolveAssetSrc,
+	rewriteBodyAssetSrcs,
+	withTitleNode,
 } from "./anytype-import";
 import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
+import type { ImportedBodyState } from "./plant-import-body";
 
 function snapshotFile(id: string, sbType: string, data: Record<string, unknown>): AnytypeFile {
 	const details = { id, ...(data.details as Record<string, unknown> | undefined) };
@@ -80,6 +90,7 @@ const FILES: AnytypeFile[] = [
 			bafyownerkey: "obj-b",
 			syncError: 3,
 			isArchived: false,
+			spaceId: "spc-fixture",
 		},
 		blocks: [
 			{
@@ -114,7 +125,7 @@ const FILES: AnytypeFile[] = [
 	// A task typed by the schema object above.
 	snapshotFile("obj-b", "Page", {
 		objectTypes: ["ot-task"],
-		details: { name: "Ship importer", done: true, dueDate: 1774254674 },
+		details: { name: "Ship importer", done: true, dueDate: 1774254674, spaceId: "spc-fixture" },
 		blocks: [
 			{ id: "obj-b", childrenIds: ["c1"] },
 			text("c1", "mention a ghost", "Paragraph", {
@@ -479,6 +490,153 @@ describe("deriveTypeSchemas", () => {
 	});
 });
 
+describe("anytypeImportSource (F-400)", () => {
+	it("derives the dedupe source from the export's stable spaceId", () => {
+		const plan = parseAnytypeExport(FILES, ATTACHMENTS);
+		expect(plan.spaceId).toBe("spc-fixture");
+		// The archive filename is timestamped per export — it must NOT key the
+		// dedupe when the space id is available.
+		expect(anytypeImportSource(plan, "Anytype.20260717.145135.3.zip")).toBe("anytype:spc-fixture");
+	});
+
+	it("falls back to the archive name when no snapshot carries a spaceId", () => {
+		const plan = parseAnytypeExport([
+			snapshotFile("obj-solo", "Page", { details: { name: "Solo" } }),
+		]);
+		expect(plan.spaceId).toBeNull();
+		expect(anytypeImportSource(plan, "Anytype.zip")).toBe("anytype:Anytype.zip");
+	});
+});
+
+describe("asset src rewriting (F-397)", () => {
+	const index = buildAssetSrcIndex([
+		{
+			url: "brainstorm://asset/a1",
+			aliases: [
+				"bafyscreenshot1",
+				"Screenshot 2026-03-06 at 09.38.18.png",
+				"files/screenshot-2026-03-06-at-09-38-18.png",
+			],
+		},
+		{
+			url: "brainstorm://asset/a2",
+			aliases: [
+				"bafypdf1",
+				"15649 18_15 A1.2 Mo+Mi 2025-09-10 07_00 PM-[1757531820384].pdf",
+				// The export truncates long slugged stems (~46 chars).
+				"files/15649-18_15-a1-2-mo-mi-2025-09-10-07_00-pm-175.pdf",
+			],
+		},
+	]);
+
+	it("resolves display names, object ids, and slugged on-disk names", () => {
+		// The body src carries the Anytype DISPLAY name — the F-396 slug rule
+		// must apply on BOTH sides (this was the F-397 blocker).
+		expect(resolveAssetSrc(index, "Screenshot 2026-03-06 at 09.38.18.png")).toBe(
+			"brainstorm://asset/a1",
+		);
+		expect(resolveAssetSrc(index, "bafyscreenshot1")).toBe("brainstorm://asset/a1");
+		expect(resolveAssetSrc(index, "screenshot-2026-03-06-at-09-38-18.png")).toBe(
+			"brainstorm://asset/a1",
+		);
+		// A display name whose slug is a truncation of exactly one on-disk stem.
+		expect(
+			resolveAssetSrc(index, "15649 18_15 A1.2 Mo+Mi 2025-09-10 07_00 PM-[1757531820384].pdf"),
+		).toBe("brainstorm://asset/a2");
+		expect(resolveAssetSrc(index, "nope.png")).toBeNull();
+	});
+
+	it("rewrites image srcs AND file-block link urls to asset URLs", () => {
+		const state = {
+			root: {
+				type: "root",
+				version: 1,
+				children: [
+					{ type: "image", version: 1, src: "Screenshot 2026-03-06 at 09.38.18.png", altText: "" },
+					{
+						type: "paragraph",
+						version: 1,
+						children: [
+							{
+								type: "link",
+								version: 1,
+								url: "15649 18_15 A1.2 Mo+Mi 2025-09-10 07_00 PM-[1757531820384].pdf",
+								children: [{ type: "text", version: 1, text: "the pdf" }],
+							},
+						],
+					},
+				],
+			},
+		} as unknown as ImportedBodyState;
+		const out = rewriteBodyAssetSrcs(state, index);
+		const children = (out.root as unknown as { children: Array<Record<string, unknown>> }).children;
+		expect(children[0]?.src).toBe("brainstorm://asset/a1");
+		const link = (children[1]?.children as Array<Record<string, unknown>>)[0];
+		expect(link?.url).toBe("brainstorm://asset/a2");
+	});
+});
+
+describe("withTitleNode (F-402)", () => {
+	it("prepends a title node carrying the entity title", () => {
+		const body = {
+			root: {
+				type: "root",
+				version: 1,
+				children: [{ type: "paragraph", version: 1, children: [] }],
+			},
+		} as unknown as ImportedBodyState;
+		const out = withTitleNode(body, "Stunde 8");
+		const children = (out.root as unknown as { children: Array<Record<string, unknown>> }).children;
+		expect(children[0]?.type).toBe("title");
+		const text = (children[0]?.children as Array<Record<string, unknown>>)[0];
+		expect(text?.text).toBe("Stunde 8");
+		expect(children[1]?.type).toBe("paragraph");
+	});
+
+	it("builds a title-only body when the draft has no body state", () => {
+		const out = withTitleNode(null, "Untitled note");
+		const children = (out.root as unknown as { children: Array<Record<string, unknown>> }).children;
+		expect(children).toHaveLength(2);
+		expect(children[0]?.type).toBe("title");
+	});
+});
+
+describe("coerceValuesForDefs (F-401)", () => {
+	const defs: Record<string, PropertyDef> = {
+		tags: {
+			key: "tags",
+			name: "tags",
+			icon: null,
+			valueType: ValueType.Text,
+			count: { min: 0, max: 50 },
+		},
+		"tags-scalar": { key: "tags-scalar", name: "tags", icon: null, valueType: ValueType.Text },
+		"due-date": { key: "due-date", name: "Due date", icon: null, valueType: ValueType.Date },
+	};
+
+	it("keeps arrays for multi defs and joins them for scalar text defs", () => {
+		const out = coerceValuesForDefs(
+			{ tags: ["Kapitel 9", "A2"], "tags-scalar": ["Kapitel 9", "A2"] },
+			defs,
+		);
+		expect(out.tags).toEqual(["Kapitel 9", "A2"]);
+		// A pre-existing SCALAR def must not render "Empty" — the value takes
+		// the def's shape (this was the 905b symptom).
+		expect(out["tags-scalar"]).toBe("Kapitel 9, A2");
+	});
+
+	it("converts ISO date strings to the { at, granularity } DateValue shape", () => {
+		const iso = new Date(1774254674 * 1000).toISOString();
+		const out = coerceValuesForDefs({ "due-date": iso }, defs);
+		expect(out["due-date"]).toEqual({ at: 1774254674000, granularity: DateGranularity.DateTime });
+	});
+
+	it("passes through keys with no registered def", () => {
+		const out = coerceValuesForDefs({ mystery: ["x"] }, defs);
+		expect(out.mystery).toEqual(["x"]);
+	});
+});
+
 describe("importAnytypeExport (vault binding)", () => {
 	let workDir = "";
 
@@ -592,6 +750,151 @@ describe("importAnytypeExport (vault binding)", () => {
 		});
 		expect(report.cancelled).toBe(true);
 		expect(report.created).toBe(0);
+	});
+
+	/** In-memory doc store standing in for the ydoc worker: applyUpdate
+	 *  merges, loadDocSnapshot returns the current full state. */
+	const makeDocStore = () => {
+		const docs = new Map<string, Y.Doc>();
+		let applied = 0;
+		return {
+			docs,
+			appliedCount: () => applied,
+			applyDocUpdate: async (entityId: string, updateB64: string) => {
+				const doc = docs.get(entityId) ?? new Y.Doc();
+				docs.set(entityId, doc);
+				Y.applyUpdate(doc, base64ToBytes(updateB64));
+				applied++;
+			},
+			loadDocSnapshot: async (entityId: string) => {
+				const doc = docs.get(entityId);
+				return doc ? bytesToBase64(Y.encodeStateAsUpdate(doc)) : null;
+			},
+			rootText: (entityId: string) => {
+				const doc = docs.get(entityId);
+				return doc ? doc.get("root", Y.XmlText).toString() : "";
+			},
+		};
+	};
+
+	const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+	it("re-imports do not duplicate bodies; unchanged bodies are not re-planted (F-398)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const store = makeDocStore();
+		const run = () =>
+			importAnytypeExport(
+				session,
+				FILES,
+				{ ...opts, applyDocUpdate: store.applyDocUpdate, loadDocSnapshot: store.loadDocSnapshot },
+				attachments,
+			);
+		await run();
+		const afterFirst = store.appliedCount();
+		expect(afterFirst).toBeGreaterThan(0);
+		await run();
+		// Identical export → every plant is hash-skipped: no new doc updates.
+		expect(store.appliedCount()).toBe(afterFirst);
+
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [aId] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:obj-a`);
+		const body = store.rootText(aId ?? "");
+		// One copy of the body — the old plant-into-fresh-doc merge appended a
+		// full duplicate per run (h2 9→18→…, F-398).
+		expect(count(body, "Milestones")).toBe(1);
+		// The Title node is planted (F-402) — imported notes open titled.
+		expect(count(body, "Project Phoenix")).toBe(1);
+	});
+
+	it("a changed body REPLACES the planted doc content instead of appending", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const store = makeDocStore();
+		const fixture = (heading: string): AnytypeFile[] => [
+			snapshotFile("obj-r", "Page", {
+				details: { name: "Replace me", spaceId: "spc-r" },
+				blocks: [{ id: "obj-r", childrenIds: ["h1"] }, text("h1", heading, "Header2")],
+			}),
+		];
+		const run = (heading: string) =>
+			importAnytypeExport(session, fixture(heading), {
+				...opts,
+				source: "anytype:spc-r",
+				applyDocUpdate: store.applyDocUpdate,
+				loadDocSnapshot: store.loadDocSnapshot,
+			});
+		await run("First version");
+		await run("Second version");
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [id] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, "anytype:spc-r:obj-r");
+		const body = store.rootText(id ?? "");
+		expect(count(body, "Second version")).toBe(1);
+		expect(count(body, "First version")).toBe(0);
+	});
+
+	it("an update run keeps existing assets instead of re-sealing them (F-399)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const fileEntity = async () => {
+			const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+			const [id] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:file:file-1`);
+			return id ? repo.get(id) : null;
+		};
+		const encCount = async () => {
+			const { readdir } = await import("node:fs/promises");
+			const entries = await readdir(join(workDir, "vault", "data", "assets"), {
+				recursive: true,
+			}).catch(() => [] as string[]);
+			return entries.filter((e) => String(e).endsWith(".enc")).length;
+		};
+		await importAnytypeExport(session, FILES, opts, attachments);
+		const first = await fileEntity();
+		const firstCount = await encCount();
+		expect(typeof first?.properties.assetId).toBe("string");
+		expect(firstCount).toBeGreaterThan(0);
+		// The File entity keeps the user's display name, not the slugged stem.
+		expect(first?.properties.name).toBe("diagram.png");
+
+		await importAnytypeExport(session, FILES, opts, attachments);
+		const second = await fileEntity();
+		expect(second?.properties.assetId).toBe(first?.properties.assetId);
+		// No new blobs on an update run — the vault must not grow per re-import.
+		expect(await encCount()).toBe(firstCount);
+	});
+
+	it("registers multi-value tag defs with a minted vocabulary (F-401)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		await importAnytypeExport(session, FILES, opts, attachments);
+		const store = await session.propertiesStore();
+		const snap = store.snapshot();
+		const tags = snap.properties.tags;
+		const dictionaryId = anytypeDictionaryId("tags");
+		expect(tags?.vocabulary).toEqual({ dictionaryId });
+		expect(tags?.count?.max).toBeGreaterThan(1);
+		const dict = snap.dictionaries[dictionaryId];
+		expect(dict?.items.map((i) => i.id)).toEqual(["Urgent", "opt-ghost"]);
+	});
+
+	it("coerces imported values to an ESTABLISHED scalar def's shape (F-401)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const store = await session.propertiesStore();
+		// The 905b vault state: a scalar `tags` def registered by an earlier
+		// build — the array value rendered "Empty" under it.
+		store.setProperty({ key: "tags", name: "tags", icon: null, valueType: ValueType.Text });
+		await importAnytypeExport(session, FILES, opts, attachments);
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [aId] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:obj-a`);
+		const a = aId ? repo.get(aId) : null;
+		const values = a?.properties.values as Record<string, unknown> | undefined;
+		expect(values?.tags).toBe("Urgent, opt-ghost");
+		// Date-typed defs get the { at, granularity } shape the panel reads.
+		const [bId] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:obj-b`);
+		const b = bId ? repo.get(bId) : null;
+		const bValues = b?.properties.values as Record<string, unknown> | undefined;
+		expect(bValues?.["due-date"]).toMatchObject({ at: 1774254674000 });
 	});
 
 	it("plants markdown bodies into the Y.Doc when applyDocUpdate is provided", async () => {

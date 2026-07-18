@@ -124,6 +124,11 @@ export type ImportWriteDeps = {
  *  continuous sync cursor. */
 export const IMPORT_EXTERNAL_ID_PROP = "importExternalId";
 
+/** Content hash (FNV-1a hex) of the LAST successfully planted body state for
+ *  an imported entity. Re-imports compare against it to skip re-planting an
+ *  unchanged body (and to know a changed one must REPLACE, not append). */
+export const IMPORT_BODY_HASH_PROP = "importBodyHash";
+
 /** Compose the namespaced external key stored in {@link IMPORT_EXTERNAL_ID_PROP}. */
 export function externalKeyOf(source: string, externalId: string): string {
 	return `${source}:${externalId}`;

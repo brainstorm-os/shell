@@ -6,8 +6,12 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { makeEnvelope } from "../../ipc/envelope";
 import { handleYDocEnvelope } from "../../workers/ydoc/index";
-import { base64ToBytes } from "../credentials/crypto";
-import { markdownToSerializedState, plantImportMarkdownBody } from "./plant-import-body";
+import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
+import {
+	markdownToSerializedState,
+	plantImportMarkdownBody,
+	plantImportSerializedBody,
+} from "./plant-import-body";
 
 describe("markdownToSerializedState", () => {
 	it("emits paragraphs, headings, lists, and checklists", () => {
@@ -77,5 +81,34 @@ describe("plantImportMarkdownBody", () => {
 			called = true;
 		});
 		expect(called).toBe(false);
+	});
+});
+
+describe("plantImportSerializedBody replace semantics (F-398)", () => {
+	const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+	it("appends without loadDocSnapshot, replaces with it", async () => {
+		const doc = new Y.Doc();
+		const applyDocUpdate = async (_id: string, b64: string) => {
+			Y.applyUpdate(doc, base64ToBytes(b64));
+		};
+		const loadDocSnapshot = async () => bytesToBase64(Y.encodeStateAsUpdate(doc));
+		const state = (text: string) => markdownToSerializedState(`# ${text}`);
+
+		await plantImportSerializedBody("ent_r", state("first body"), applyDocUpdate);
+		expect(count(doc.get("root", Y.XmlText).toString(), "first body")).toBe(1);
+
+		// The legacy path (no snapshot): a second plant APPENDS a full copy —
+		// this is exactly the F-398 duplication.
+		await plantImportSerializedBody("ent_r", state("first body"), applyDocUpdate);
+		expect(count(doc.get("root", Y.XmlText).toString(), "first body")).toBe(2);
+
+		// With the snapshot seam the plant REPLACES: one copy of the new body,
+		// zero of the old.
+		await plantImportSerializedBody("ent_r", state("second body"), applyDocUpdate, loadDocSnapshot);
+		const after = doc.get("root", Y.XmlText).toString();
+		expect(count(after, "second body")).toBe(1);
+		expect(count(after, "first body")).toBe(0);
+		doc.destroy();
 	});
 });

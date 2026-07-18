@@ -1763,6 +1763,23 @@ void app.whenReady().then(async () => {
 				caps: [],
 			});
 		},
+		// Current body-doc snapshot for the re-import REPLACE path (F-398) —
+		// the importer clears + re-plants against this state and ships the diff.
+		makeLoadDocSnapshot: (vaultPath) => async (entityId) => {
+			const handler = workers?.broker.getServiceHandler("ydoc");
+			if (!handler) throw new Error("ydoc worker service unavailable");
+			const value = await handler({
+				v: 1,
+				msg: `import_snap_${entityId}`,
+				app: "io.brainstorm.shell",
+				service: "ydoc",
+				method: "snapshot",
+				args: [{ vaultPath, entityId }],
+				caps: [],
+			});
+			const snapshotB64 = (value as { snapshotB64?: unknown } | null)?.snapshotB64;
+			return typeof snapshotB64 === "string" && snapshotB64.length > 0 ? snapshotB64 : null;
+		},
 	});
 	registerFilesHandlesHandlers({ getDashboard: () => dashboardWindow });
 	// Stage 10.5c — install the live-transport singleton BEFORE the pairing
