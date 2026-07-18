@@ -3,6 +3,121 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.5.2",
+      "date": "2026-07-18",
+      "icon": "\ud83c\udfa8",
+      "title": "A new coat of indigo",
+      "summary": "Brainstorm drops the pink: Default Light and Default Dark are now the out-of-box themes, with a new violet-indigo app icon, a fresh default wallpaper, and a matching welcome screen. Plus a round of Settings polish.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What's new"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "New default themes",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 fresh vaults now open in Default Light (neutral, violet-indigo accent) and toggle into Default Dark. Rose and Midnight stay in the theme catalog \u2014 your current choice is untouched."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "New app icon",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 the bolt now sits on a violet-indigo tile, in your dock, tray, and installer."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Green-valley wallpaper",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 a new bundled low-poly landscape is the light-mode default for new vaults, and joins the wallpaper catalog alongside rose-mountains and stormy-sea."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Welcome, in daylight",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 the welcome screen now opens on the green-valley scene in Default Light."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "What's fixed"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Settings polish",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 disabled buttons keep readable labels on light themes, the avatar shows a camera glyph until you have a name or photo, empty trusted-site entries can't be added, proxy details no longer repeat themselves, and the search-index stats tiles align in a clean grid."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Steadier app lists",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 installed-app lists (notifications, icon picker) no longer shuffle their order between visits."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Simpler loading spinner",
+              "marks": [
+                "bold"
+              ]
+            },
+            {
+              "text": " \u2014 one themed ring everywhere, correctly scaled at every size."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.1",
       "date": "2026-07-18",
       "icon": "🖼️",
