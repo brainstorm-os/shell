@@ -30,6 +30,12 @@
 
 import { openEntity, quickLookEntity } from "@brainstorm/sdk";
 import type { StoredAsset } from "@brainstorm/sdk-types";
+import { LiveRegion, announce } from "@brainstorm/sdk/a11y";
+import {
+	SaveDispositionKind,
+	requestSaveBytes,
+	suggestedFilename,
+} from "@brainstorm/sdk/export-file";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign, openSearchPicker } from "@brainstorm/sdk/menus";
 import { NavButtons } from "@brainstorm/sdk/nav-history";
@@ -56,7 +62,7 @@ import { type FilesStore, useFilesStore } from "./store/use-files-store";
 import { type Entity, FILE_TYPE, FOLDER_TYPE, readName } from "./types/entity";
 import { Caret, CaretDirection } from "./ui/affordance";
 import { BulkActionBar } from "./ui/bulk-action-bar";
-import { ContentList } from "./ui/content-list";
+import { ContentList, fetchExportBytes } from "./ui/content-list";
 import {
 	AppearanceTarget,
 	BulkDestinationMode,
@@ -164,6 +170,8 @@ export function FilesApp() {
 
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const newBtnRef = useRef<HTMLButtonElement>(null);
+	// Anchor for keyboard-invoked pickers with no triggering element (DND-6).
+	const contentRef = useRef<HTMLElement | null>(null);
 
 	// The header "New" picker — a "pick one of N" choice, so it opens through
 	// the shared anchored fancy-menu (dropping from the + button), not a
@@ -338,9 +346,16 @@ export function FilesApp() {
 	// Bulk move/copy destination: the shared searchable picker (`openSearchPicker`)
 	// anchored to the toolbar button, replacing the centered `<div role="menu">`
 	// folder list (F-300). Searching beats scrolling a deep folder tree.
+	//
+	// DND-6 — the same picker is the keyboard twin of the pointer move drag:
+	// the object-menu "Move to folder…" and the Mod+Shift+M chord route here
+	// with an explicit `ids` set (default: the current selection), and the
+	// commit path is the identical `store.moveIds` the drop performs.
 	const openDestinationPicker = useCallback(
-		(mode: BulkDestinationMode, anchor: HTMLElement) => {
-			const folders = destinationFolders(store.tree, new Set(store.selection.selected));
+		(mode: BulkDestinationMode, anchor: Element, explicitIds?: string[]) => {
+			const ids = explicitIds ?? selectionInVisibleOrder();
+			if (ids.length === 0) return;
+			const folders = destinationFolders(store.tree, new Set(ids));
 			openSearchPicker({
 				placeholder: t("brainstorm.files.bulk.searchDestinations"),
 				ariaLabel:
@@ -364,8 +379,6 @@ export function FilesApp() {
 				},
 				onSelect: (destId) => {
 					if (!destId) return;
-					const ids = selectionInVisibleOrder();
-					if (ids.length === 0) return;
 					if (mode === BulkDestinationMode.Move) {
 						const result = store.moveIds(store.nav.current, destId, ids);
 						if (!result.ok && result.reason === "cycle") onCycle(ids[0] ?? "", destId);
@@ -377,6 +390,51 @@ export function FilesApp() {
 			});
 		},
 		[selectionInVisibleOrder, store, onCycle],
+	);
+
+	// DND-6 — ids the object-menu "Move to folder…" twin operates on: the whole
+	// selection when the row is part of it, else just that row (the exact rule
+	// the pointer drag applies in `onDragStart`).
+	const idsForRowTwin = useCallback(
+		(entity: Entity): string[] =>
+			store.selection.selected.has(entity.id) ? selectionInVisibleOrder() : [entity.id],
+		[store, selectionInVisibleOrder],
+	);
+
+	// DND-6 — "Save to disk…": the keyboard twin of the DND-5 drag-out grip.
+	// Same byte source (`fetchExportBytes`), delivered through the Files-host
+	// save dialog instead of an OS drag. Announces the outcome either way.
+	const saveEntityToDisk = useCallback(
+		async (entity: Entity) => {
+			const files = runtime?.services?.files;
+			if (!files?.requestSave || !files.write) return;
+			const name = readName(entity);
+			const dot = name.lastIndexOf(".");
+			const extension = dot > 0 ? name.slice(dot + 1) : "";
+			const disposition = await requestSaveBytes(
+				{
+					requestSave: (opts) => files.requestSave?.(opts) ?? Promise.resolve(null),
+					write: (handle, data) => files.write?.(handle, data) ?? Promise.resolve(),
+				},
+				{
+					suggestedName: extension
+						? suggestedFilename(name.slice(0, dot), extension)
+						: suggestedFilename(name, "bin"),
+					filters: extension ? [{ name: extension.toUpperCase(), extensions: [extension] }] : [],
+					encode: async () => {
+						const bytes = await fetchExportBytes(entity);
+						if (!bytes) throw new Error("files/save-to-disk: asset bytes unavailable");
+						return bytes;
+					},
+				},
+			);
+			if (disposition.kind === SaveDispositionKind.Saved) {
+				announce(t("brainstorm.files.a11y.saved", { name: disposition.handle.displayName }));
+			} else if (disposition.kind === SaveDispositionKind.Failed) {
+				announce(t("brainstorm.files.a11y.saveFailed", { name }));
+			}
+		},
+		[runtime],
 	);
 	const onBulkRename = useCallback(
 		(base: string) => {
@@ -418,6 +476,11 @@ export function FilesApp() {
 	useShortcut(chord(ActionId.Duplicate), () =>
 		store.duplicateIds(Array.from(store.selection.selected)),
 	);
+	// DND-6 — the chord twin of the move drag: destination picker over the
+	// current selection, anchored to the content region.
+	useShortcut(chord(ActionId.MoveTo), () => {
+		if (contentRef.current) openDestinationPicker(BulkDestinationMode.Move, contentRef.current);
+	});
 	useShortcut(chord(ActionId.SelectAll), store.selectAllVisible);
 	useShortcut(chord(ActionId.Back), store.navigateBackOnce);
 	useShortcut(chord(ActionId.Forward), store.navigateForwardOnce);
@@ -441,6 +504,9 @@ export function FilesApp() {
 
 	return (
 		<>
+			{/* DND-6 — screen-reader surface for operation announcements (move /
+			    copy / membership add / save-to-disk). One per renderer. */}
+			<LiveRegion />
 			<header className="app-header" data-testid="app-header">
 				<div className="app-header__left">
 					<NavButtons
@@ -590,6 +656,7 @@ export function FilesApp() {
 				</aside>
 
 				<section
+					ref={contentRef}
 					className="content"
 					data-testid="content"
 					aria-label={t("brainstorm.files.content.label")}
@@ -691,6 +758,18 @@ export function FilesApp() {
 						onCycle={onCycle}
 						onEditIcon={(folderId) => setAppearance({ target: AppearanceTarget.Icon, folderId })}
 						onEditCover={(folderId) => setAppearance({ target: AppearanceTarget.Cover, folderId })}
+						onMoveTo={(entity, anchor) =>
+							openDestinationPicker(
+								BulkDestinationMode.Move,
+								anchor ?? contentRef.current ?? document.body,
+								idsForRowTwin(entity),
+							)
+						}
+						onSaveToDisk={
+							runtime?.services?.files?.requestSave && runtime.services.files.write
+								? (entity) => void saveEntityToDisk(entity)
+								: undefined
+						}
 					/>
 
 					<BulkActionBar

@@ -41,8 +41,13 @@ export type UseDragSourceSpec = DragSourceSpec & {
 };
 
 export type DragSourceHandle = {
-	/** Spread on the drag-handle element. */
-	dragHandleProps: { onPointerDown: (event: SourcePointerEvent) => void };
+	/** Spread on the drag-handle element. Carries `aria-grabbed` (DND-6 a11y
+	 *  twin) — `false` at rest marks the element as draggable to AT, `true`
+	 *  while the shell drag session is live. */
+	dragHandleProps: {
+		onPointerDown: (event: SourcePointerEvent) => void;
+		"aria-grabbed": boolean;
+	};
 	/** True between drag begin and end — drive a "being dragged" affordance off it. */
 	dragging: boolean;
 };
@@ -91,5 +96,5 @@ export function useDragSource(spec: UseDragSourceSpec): DragSourceHandle {
 		[machine],
 	);
 
-	return { dragHandleProps: { onPointerDown }, dragging };
+	return { dragHandleProps: { onPointerDown, "aria-grabbed": dragging }, dragging };
 }

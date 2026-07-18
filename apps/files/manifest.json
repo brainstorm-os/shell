@@ -15,6 +15,7 @@
     "intents.dispatch:quick-look",
     "intents.dispatch:move",
     "files.read",
+    "files.write",
     "search.open"
   ],
   "registrations": {

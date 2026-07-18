@@ -28,6 +28,15 @@ export type FilesObjectMenuInput = {
 	runtime: BrainstormRuntime | undefined;
 	onEditIcon: (folderId: string) => void;
 	onEditCover: (folderId: string) => void;
+	/** DND-6 — the object-menu twin of the intra-app move drag: opens the
+	 *  same searchable destination picker the bulk bar uses and performs the
+	 *  identical `store.moveIds`. Omitted on the header's current-folder menu
+	 *  (you don't move the folder you're standing in from its own menu). */
+	onMoveTo?: () => void;
+	/** DND-6 — the keyboard twin of the DND-5 drag-out grip: the Files-host
+	 *  save dialog writes the stored bytes to disk. Present only for stored
+	 *  files when the runtime exposes `files.requestSave`/`write`. */
+	onSaveToDisk?: () => void;
 };
 
 /** App-owned extra items (between Pin and Remove): Rename / Duplicate and,
@@ -38,6 +47,8 @@ function filesExtraItems({
 	store,
 	onEditIcon,
 	onEditCover,
+	onMoveTo,
+	onSaveToDisk,
 }: FilesObjectMenuInput): ObjectMenuExtraItem[] {
 	const isFolder = entity.type === FOLDER_TYPE;
 	return [
@@ -56,6 +67,29 @@ function filesExtraItems({
 			icon: IconName.Copy,
 			run: () => store.duplicateIds([entity.id]),
 		},
+		// DND-6 — keyboard/menu twins of the two pointer drags on a row: the
+		// intra-app move drag ("Move to folder…") and the DND-5 OS drag-out
+		// ("Save to disk…"). Both invoke the exact operation the drop would.
+		...(onMoveTo
+			? [
+					{
+						id: "move-to",
+						label: t("brainstorm.files.menu.moveTo"),
+						icon: IconName.ArrowRight,
+						run: onMoveTo,
+					},
+				]
+			: []),
+		...(onSaveToDisk
+			? [
+					{
+						id: "save-to-disk",
+						label: t("brainstorm.files.menu.saveToDisk"),
+						icon: IconName.Download,
+						run: onSaveToDisk,
+					},
+				]
+			: []),
 		...(isFolder
 			? [
 					{

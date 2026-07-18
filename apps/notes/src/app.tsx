@@ -27,12 +27,14 @@ import type {
 	PropertyValueByValueType,
 	ValueType,
 } from "@brainstorm/sdk-types";
+import { LiveRegion } from "@brainstorm/sdk/a11y";
 import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-picker";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
 import { Icon as IconGlyph, IconName } from "@brainstorm/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
 import { LockButton } from "@brainstorm/sdk/lock-button";
+import { openSearchPicker } from "@brainstorm/sdk/menus";
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
 import { type NoteReference, extractNoteReferences } from "@brainstorm/sdk/note-references";
 import {
@@ -56,6 +58,7 @@ import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
 import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
+import { queuePendingEntityLinks } from "./editor/pending-link";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
@@ -202,6 +205,41 @@ export function NotesApp() {
 			});
 		},
 		[select],
+	);
+	// DND-6 — "Link to note…" keyboard twin of dragging a note row into an
+	// editor. Picks the TARGET note from a searchable list, queues the mention
+	// for the editor's `PendingEntityLinkPlugin`, and opens the target — the
+	// plugin appends the same MentionNode block a drop produces (and announces).
+	const onLinkInto = useCallback(
+		(source: { id: string; title: string }, anchor: Element | null) => {
+			const listTitle = (n: StoredNote): string => n.title.trim() || t("notes.list.untitled");
+			const candidates = [...notes.values()]
+				.filter((n) => n.id !== source.id)
+				.sort((a, b) => b.updatedAt - a.updatedAt);
+			openSearchPicker({
+				placeholder: t("notes.linkPicker.placeholder"),
+				ariaLabel: t("notes.linkPicker.aria"),
+				...(anchor ? { anchor } : {}),
+				filter: (query) => {
+					const needle = query.trim().toLowerCase();
+					const matches = needle
+						? candidates.filter((n) => listTitle(n).toLowerCase().includes(needle))
+						: candidates;
+					if (matches.length === 0) {
+						return [{ id: "", label: t("notes.linkPicker.empty"), disabled: true }];
+					}
+					return matches.map((n) => ({ id: n.id, label: listTitle(n) }));
+				},
+				onSelect: (targetId) => {
+					if (!targetId) return;
+					queuePendingEntityLinks(targetId, [
+						{ entityId: source.id, entityType: NOTE_TYPE, label: source.title },
+					]);
+					onSelectNote(targetId);
+				},
+			});
+		},
+		[notes, onSelectNote],
 	);
 	// The note the user last had open, recalled from the per-device settings
 	// service (`@brainstorm/sdk/last-viewed`) — async, so the boot restore
@@ -883,6 +921,8 @@ export function NotesApp() {
 
 	const shell = (
 		<div className="notes" data-nav-open={navOpen} data-props-open={propsVisible}>
+			{/* DND-6 — screen-reader surface for drop / link-twin announcements. */}
+			<LiveRegion />
 			<header className="app-header notes__header">
 				<div className="notes__header-left">
 					<NavButtons history={nav} onNavigate={onHistoryNavigate} />
@@ -1013,6 +1053,7 @@ export function NotesApp() {
 					emptyLabel={searching ? t("notes.search.empty") : undefined}
 					runtime={runtime}
 					onRemoveNote={onRemoveNote}
+					onLinkInto={onLinkInto}
 				/>
 			</aside>
 			<div

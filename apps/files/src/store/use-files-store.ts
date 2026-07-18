@@ -19,9 +19,10 @@
  */
 
 import { useOptionalYDocResolver } from "@brainstorm/react-yjs";
+import { announce } from "@brainstorm/sdk/a11y";
 import { type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { t } from "../i18n";
+import { plural, t } from "../i18n";
 import { type BreadcrumbSegment, deriveBreadcrumbs } from "../logic/breadcrumbs";
 import {
 	type OpenerMeta,
@@ -863,6 +864,19 @@ export function useFilesStore() {
 			if (!result.ok || result.movedIds.length === 0) return result;
 			void persistFolderMembers(tree, sourceId);
 			void persistFolderMembers(tree, destId);
+			// DND-6 — announce the operation, not the gesture: the same message
+			// covers the pointer drag, the bulk-bar picker, and the object-menu
+			// "Move to folder…" twin (all funnel through this store call).
+			announce(
+				plural(
+					result.movedIds.length,
+					"brainstorm.files.a11y.moved.one",
+					"brainstorm.files.a11y.moved.other",
+					{
+						folder: tree.getName(destId) ?? "",
+					},
+				),
+			);
 			return result;
 		},
 		[tree],
@@ -877,6 +891,17 @@ export function useFilesStore() {
 			const result = tree.copy(destId, ids);
 			if (!result.ok || result.copiedIds.length === 0) return result;
 			void persistFolderMembers(tree, destId);
+			// DND-6 — screen-reader announcement (see `moveIds`).
+			announce(
+				plural(
+					result.copiedIds.length,
+					"brainstorm.files.a11y.copied.one",
+					"brainstorm.files.a11y.copied.other",
+					{
+						folder: tree.getName(destId) ?? "",
+					},
+				),
+			);
 			return result;
 		},
 		[tree],
@@ -894,6 +919,18 @@ export function useFilesStore() {
 			const result = tree.addMembers(destId, ids);
 			if (!result.ok || result.addedIds.length === 0) return result;
 			void persistFolderMembers(tree, destId);
+			// DND-6 — announce the cross-app drop's membership add ("Added 2 items
+			// to “Projects”"); the shell ghost is decorative, the operation speaks.
+			announce(
+				plural(
+					result.addedIds.length,
+					"brainstorm.files.a11y.added.one",
+					"brainstorm.files.a11y.added.other",
+					{
+						folder: tree.getName(destId) ?? "",
+					},
+				),
+			);
 			return result;
 		},
 		[tree],

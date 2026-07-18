@@ -13,6 +13,9 @@ export type BulkRescheduleProps = {
 	count: number;
 	/** Pre-filled target (the batch's current earliest day). */
 	defaultDayStart: number;
+	/** Popover title override — the DND-6 single-item "Move to date…" twin
+	 *  names the item instead of the "{count} events" batch phrasing. */
+	title?: string;
 	onMove(targetDayStart: number): void;
 	onClose(): void;
 };
@@ -29,7 +32,13 @@ function msToDateInput(ms: number): string {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function BulkReschedule({ count, defaultDayStart, onMove, onClose }: BulkRescheduleProps) {
+export function BulkReschedule({
+	count,
+	defaultDayStart,
+	title,
+	onMove,
+	onClose,
+}: BulkRescheduleProps) {
 	const [value, setValue] = useState(msToDateInput(defaultDayStart));
 
 	const move = (): void => {
@@ -41,7 +50,7 @@ export function BulkReschedule({ count, defaultDayStart, onMove, onClose }: Bulk
 
 	return (
 		<Popover
-			title={t("calendar.bulk.title", { count })}
+			title={title ?? t("calendar.bulk.title", { count })}
 			onClose={onClose}
 			size={PopoverSize.Small}
 			bodyPadding={PopoverBodyPadding.Comfortable}

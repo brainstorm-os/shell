@@ -15,6 +15,7 @@ import "./types";
 import { useVaultEntities } from "@brainstorm/react-yjs";
 import { openEntity } from "@brainstorm/sdk";
 import type { ObjectDragPayload } from "@brainstorm/sdk-types";
+import { LiveRegion, announce } from "@brainstorm/sdk/a11y";
 import { IconName } from "@brainstorm/sdk/icon";
 import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
 import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
@@ -30,7 +31,7 @@ import {
 	useState,
 } from "react";
 import { DEMO_ITEMS, DEMO_NOW } from "./demo/dataset";
-import { t } from "./i18n/t";
+import { plural, t } from "./i18n/t";
 import { bulkShiftToDate } from "./logic/bulk-reschedule";
 import { type CalendarSource, discoverSources } from "./logic/calendar-sources";
 import {
@@ -51,7 +52,7 @@ import {
 	vaultSnapshotToScheduledItems,
 } from "./logic/from-vault-entities";
 import { createReminderScheduler } from "./logic/reminder-schedule";
-import { rescheduleEvent } from "./logic/reschedule";
+import { rescheduleEvent, shiftToDay } from "./logic/reschedule";
 import { dropDateValue, resolveDropDateKey } from "./logic/resolve-drop-date-key";
 import {
 	EVENT_SOURCE_KEY,
@@ -234,6 +235,9 @@ export function CalendarApp() {
 	// ── Selection (Cmd/Ctrl-click owned events) ─────────────────────────
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [bulkOpen, setBulkOpen] = useState(false);
+	// DND-6 — the item whose "Move to date…" popover (the keyboard twin of the
+	// chip reschedule drag) is open; null = closed.
+	const [moveDateItem, setMoveDateItem] = useState<ScheduledItem | null>(null);
 
 	// ── Dialogs ─────────────────────────────────────────────────────────
 	const [detail, setDetail] = useState<DetailState>(null);
@@ -459,10 +463,21 @@ export function CalendarApp() {
 
 	const onReschedule = useCallback(
 		(item: ScheduledItem, newStart: number) => {
+			// DND-6 — one announcement for every reschedule route: the chip drag,
+			// the "Move to date…" menu twin, and a cross-app SetProperty rewrite
+			// all land here. The operation is announced, not the drag motion.
+			const announceMoved = (): void =>
+				announce(
+					t("calendar.a11y.rescheduled", {
+						title: item.title,
+						date: new Date(newStart).toLocaleDateString(undefined, { dateStyle: "medium" }),
+					}),
+				);
 			if (item.sourceKey === EVENT_SOURCE_KEY) {
 				const owned = eventsRef.current.get(item.sourceEntityId);
 				if (!owned) return;
 				applyDetailResult({ kind: EventDetailOutcome.Saved, event: rescheduleEvent(owned, newStart) });
+				announceMoved();
 				return;
 			}
 			// Property-derived items rewrite the *same* date property they were
@@ -474,7 +489,10 @@ export function CalendarApp() {
 			if (!entitiesSvc) return;
 			void entitiesSvc
 				.update(item.sourceEntityId, { [parsed.propertyKey]: newStart })
-				.then(() => setEventsVersion((v) => v + 1))
+				.then(() => {
+					setEventsVersion((v) => v + 1);
+					announceMoved();
+				})
 				.catch((error: unknown) => console.warn("[calendar] reschedule failed", error));
 		},
 		[applyDetailResult, storageRuntime],
@@ -495,6 +513,7 @@ export function CalendarApp() {
 			if (!entitiesSvc) return;
 			const byId = new Map(entitiesRef.current.map((e) => [e.id, e]));
 			const dateKeys = dateKeyInfoRef.current.keys;
+			const writes: Promise<unknown>[] = [];
 			for (const item of payload.items) {
 				const entity = byId.get(item.entityId);
 				if (!entity || entity.deletedAt !== null) continue;
@@ -502,11 +521,30 @@ export function CalendarApp() {
 				const value = dropDateValue(entity.properties[key], dayStart);
 				// Refresh only when the write actually lands — a fail-closed
 				// capability rejection must not paint the day as if it accepted.
-				void entitiesSvc
-					.update(item.entityId, { [key]: value })
-					.then(() => setEventsVersion((v) => v + 1))
-					.catch((error: unknown) => console.warn("[calendar] object-drop failed", error));
+				writes.push(
+					entitiesSvc
+						.update(item.entityId, { [key]: value })
+						.then(() => {
+							setEventsVersion((v) => v + 1);
+							return true;
+						})
+						.catch((error: unknown) => {
+							console.warn("[calendar] object-drop failed", error);
+							return false;
+						}),
+				);
 			}
+			// DND-6 — announce the landed SetProperty drop (count only reflects
+			// the writes that actually committed).
+			void Promise.all(writes).then((results) => {
+				const landed = results.filter((ok) => ok === true).length;
+				if (landed === 0) return;
+				announce(
+					plural(landed, "calendar.a11y.scheduled.one", "calendar.a11y.scheduled.other", {
+						date: new Date(dayStart).toLocaleDateString(undefined, { dateStyle: "medium" }),
+					}),
+				);
+			});
 		},
 		[storageRuntime],
 	);
@@ -538,6 +576,35 @@ export function CalendarApp() {
 			// A read-only source (a birthday) must not offer Delete — that would
 			// nuke the underlying person, not a calendar placement.
 			const canDelete = isOwnedEvent || !item.readonly;
+			// DND-6 — "Move to date…" twin, gated exactly like the chip drag
+			// (recurring instances + read-only sources aren't draggable either).
+			const canMove = !item.isRecurringInstance && !item.readonly;
+			const extraItems = [
+				...(canMove
+					? [
+							{
+								id: "move-to-date",
+								label: t("calendar.menu.moveToDate"),
+								icon: IconName.ArrowRight,
+								run: () => setMoveDateItem(item),
+							},
+						]
+					: []),
+				...(isOwnedEvent
+					? [
+							{
+								id: "copy-block-ref",
+								label: t("calendar.event.copyBlockRef"),
+								icon: IconName.Copy,
+								run: async () => {
+									if (await copyEventBlockRef(item.sourceEntityId)) {
+										runtime?.services?.ui?.notify?.({ title: t("calendar.event.copyBlockRef.done") });
+									}
+								},
+							},
+						]
+					: []),
+			];
 			return {
 				target: {
 					entityId: item.sourceEntityId,
@@ -545,22 +612,7 @@ export function CalendarApp() {
 				},
 				runtime,
 				labels: { remove: t("calendar.menu.delete") },
-				...(isOwnedEvent
-					? {
-							extraItems: [
-								{
-									id: "copy-block-ref",
-									label: t("calendar.event.copyBlockRef"),
-									icon: IconName.Copy,
-									run: async () => {
-										if (await copyEventBlockRef(item.sourceEntityId)) {
-											runtime?.services?.ui?.notify?.({ title: t("calendar.event.copyBlockRef.done") });
-										}
-									},
-								},
-							],
-						}
-					: {}),
+				...(extraItems.length > 0 ? { extraItems } : {}),
 				...(canDelete ? { onRemove: () => deleteItem(item) } : {}),
 			};
 		},
@@ -671,6 +723,8 @@ export function CalendarApp() {
 
 	return (
 		<>
+			{/* DND-6 — screen-reader surface for reschedule / drop announcements. */}
+			<LiveRegion />
 			<header className="app-header">
 				<div className="app-header__left">
 					<NavButtons history={navHist} onNavigate={applyNavLoc} />
@@ -827,6 +881,19 @@ export function CalendarApp() {
 					})()}
 					onMove={(target) => void bulkMove(target)}
 					onClose={() => setBulkOpen(false)}
+				/>
+			) : null}
+
+			{/* DND-6 — "Move to date…" twin: the same date popover the bulk flow
+			    uses, committing through the SAME `onReschedule` path as the chip
+			    drag (wall-clock time preserved via `shiftToDay`). */}
+			{moveDateItem ? (
+				<BulkReschedule
+					count={1}
+					title={t("calendar.moveOne.title", { title: moveDateItem.title })}
+					defaultDayStart={startOfDay(moveDateItem.start)}
+					onMove={(target) => onReschedule(moveDateItem, shiftToDay(moveDateItem.start, target))}
+					onClose={() => setMoveDateItem(null)}
 				/>
 			) : null}
 		</>

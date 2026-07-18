@@ -24,6 +24,20 @@ describe("BulkReschedule (F-229 — themed date picker, no native input)", () =>
 		expect(trigger.querySelector<HTMLElement>(".cal-detail__date-text")?.dataset.empty).toBe("false");
 	});
 
+	it("DND-6 — a `title` override names the single item (the Move-to-date twin)", async () => {
+		const defaultDay = new Date(2026, 4, 10, 0, 0).getTime();
+		handle = await renderInto(
+			<BulkReschedule
+				count={1}
+				title={'Move "Standup"'}
+				defaultDayStart={defaultDay}
+				onMove={vi.fn()}
+				onClose={vi.fn()}
+			/>,
+		);
+		expect(document.body.textContent).toContain('Move "Standup"');
+	});
+
 	it("pre-fills the default day and emits the day chosen in the popover on Move", async () => {
 		const onMove = vi.fn();
 		const defaultDay = new Date(2026, 4, 10, 0, 0).getTime();

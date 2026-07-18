@@ -30,6 +30,7 @@ import { type NavigationMode, navModeFromEvent } from "@brainstorm/sdk";
 import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
 import { groupByDateBucket } from "@brainstorm/sdk/date-buckets";
 import { setEntityDragData } from "@brainstorm/sdk/entity-drag";
+import { IconName } from "@brainstorm/sdk/icon";
 import { ObjectMenuTrigger } from "@brainstorm/sdk/object-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useMemo, useRef } from "react";
@@ -79,6 +80,10 @@ export type NotesListProps = {
 	/** Delete the note — wired as the menu's app-owned destructive
 	 *  action. The app owns the actual removal + any confirm. */
 	onRemoveNote: (id: string) => void | Promise<void>;
+	/** DND-6 — "Link to note…" keyboard twin of dragging this row into an
+	 *  editor: opens the target-note picker anchored to `anchor`. Omitted →
+	 *  no menu item (e.g. a host without the twin flow). */
+	onLinkInto?: (source: { id: string; title: string }, anchor: Element | null) => void;
 };
 
 export function NotesList({
@@ -89,6 +94,7 @@ export function NotesList({
 	emptyLabel,
 	runtime,
 	onRemoveNote,
+	onLinkInto,
 }: NotesListProps) {
 	const flatRows = useMemo<FlatRow[]>(() => {
 		if (order) {
@@ -242,6 +248,20 @@ export function NotesList({
 										noteTitle: title,
 										runtime,
 										onRemove: () => onRemoveNote(note.id),
+										// DND-6 — the keyboard/menu twin of dragging this row
+										// into an editor (reference semantic, target picked).
+										...(onLinkInto
+											? {
+													extraItems: [
+														{
+															id: "link-to-note",
+															label: t("notes.objectMenu.linkToNote"),
+															icon: IconName.KindLink,
+															run: () => onLinkInto({ id: note.id, title }, scrollRef.current),
+														},
+													],
+												}
+											: {}),
 									})
 								}
 							>

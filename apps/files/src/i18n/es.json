@@ -173,7 +173,17 @@
   "brainstorm.files.menu.more": "Más acciones",
   "brainstorm.files.menu.duplicate": "Duplicar",
   "brainstorm.files.menu.rename": "Renombrar",
+  "brainstorm.files.menu.moveTo": "Mover a carpeta…",
+  "brainstorm.files.menu.saveToDisk": "Guardar en disco…",
   "brainstorm.files.appearance.editIcon": "Cambiar icono",
   "brainstorm.files.appearance.editCover": "Cambiar portada",
-  "brainstorm.files.toast.openFallback": "No hay ninguna app registrada para {type}; solo vista previa."
+  "brainstorm.files.toast.openFallback": "No hay ninguna app registrada para {type}; solo vista previa.",
+  "brainstorm.files.a11y.moved.one": "Se movió {count} elemento a “{folder}”",
+  "brainstorm.files.a11y.moved.other": "Se movieron {count} elementos a “{folder}”",
+  "brainstorm.files.a11y.copied.one": "Se copió {count} elemento a “{folder}”",
+  "brainstorm.files.a11y.copied.other": "Se copiaron {count} elementos a “{folder}”",
+  "brainstorm.files.a11y.added.one": "Se añadió {count} elemento a “{folder}”",
+  "brainstorm.files.a11y.added.other": "Se añadieron {count} elementos a “{folder}”",
+  "brainstorm.files.a11y.saved": "Se guardó “{name}”",
+  "brainstorm.files.a11y.saveFailed": "No se pudo guardar “{name}”"
 }

@@ -54,6 +54,7 @@ import {
 	type VaultEntity,
 	isMultiValued,
 } from "@brainstorm/sdk-types";
+import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm/sdk/a11y";
 import { createCountBadge } from "@brainstorm/sdk/count-badge";
 import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
 import { coverOf, createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
@@ -1932,94 +1933,138 @@ function bindStageObjectMenu(state: AppState): void {
 		const entity = state.db.entities.find((e) => e.id === entityId);
 		if (!entity) return;
 		event.preventDefault();
-		// 9.12.5 — member-override affordance on the row menu (
-		// database/10 §Removing an entity from a List): a user list's row
-		// offers "Hide from list" when the source matches it (→ exclude) or
-		// "Remove from list" when it's only pinned in (→ drop include).
-		// Vault-derived type-Lists are read-only membership (the membership
-		// IS the type), so they get no item.
-		const list = activeList(state);
-		// Which app-owned items this row gets — pure + unit-tested
-		// (`logic/row-menu.ts`): Rename where the grid title editor exists
-		// (F-216), membership toggle on user lists only, Delete always (F-217).
-		const plan = rowMenuPlan({
-			entityType: entity.type,
-			viewKind: activeView(state)?.kind,
-			listId: list?.id,
-			isVaultDerived: isVaultDerivedListId,
-		});
-		const membershipItems =
-			plan.offerMembershipToggle && list
-				? [
-						{
-							id: "remove-from-list",
-							label: sourceMatches(entity.id, list, state.db)
-								? `Hide from "${list.name}"`
-								: `Remove from "${list.name}"`,
-							icon: IconName.Close,
-							run: () => toggleEntityInList(state, list.id, entity, false),
-						},
-					]
-				: [];
-		const renameItems = plan.offerRename
+		openRowObjectMenu(state, entity, { x: event.clientX, y: event.clientY });
+	});
+}
+
+/** DND-6 — the board-card "Move to column…" twin: the object-menu isomorph
+ *  of dragging a card between Kanban columns. Offered only on a Board view
+ *  with a `groupBy`; each compiled column is a submenu row performing the
+ *  SAME `onMoveToGroup` property write the pointer drop does. */
+function moveToColumnItems(state: AppState, entity: EntityRow) {
+	const view = activeView(state);
+	if (!view || view.kind !== ListViewKind.Board || !view.groupBy) return [];
+	const compiled = compileActive(state);
+	if (!compiled) return [];
+	const compiledView = compileViewCached(
+		compiled.view,
+		compiled.entities,
+		groupLabelResolver(state),
+		groupOrderResolver(state),
+	);
+	if (compiledView.groups.length === 0) return [];
+	return [
+		{
+			id: "move-to-column",
+			label: t("brainstorm.database.menu.moveToColumn"),
+			icon: IconName.ArrowRight,
+			run: () => {},
+			submenu: compiledView.groups.map((group) => ({
+				id: `move-to-column:${group.key ?? ""}`,
+				label: group.key === null ? t("brainstorm.database.menu.moveToColumn.none") : group.label,
+				run: () => onMoveToGroup(state, view, entity, group.key),
+			})),
+		},
+	];
+}
+
+/** Build + open the shared row object menu at `point`. One implementation for
+ *  BOTH entry paths: the delegated right-click (`bindStageObjectMenu`) and the
+ *  DND-6 keyboard chord (Shift+F10 on the selection anchor). */
+function openRowObjectMenu(
+	state: AppState,
+	entity: EntityRow,
+	point: { x: number; y: number },
+): void {
+	// 9.12.5 — member-override affordance on the row menu (
+	// database/10 §Removing an entity from a List): a user list's row
+	// offers "Hide from list" when the source matches it (→ exclude) or
+	// "Remove from list" when it's only pinned in (→ drop include).
+	// Vault-derived type-Lists are read-only membership (the membership
+	// IS the type), so they get no item.
+	const list = activeList(state);
+	// Which app-owned items this row gets — pure + unit-tested
+	// (`logic/row-menu.ts`): Rename where the grid title editor exists
+	// (F-216), membership toggle on user lists only, Delete always (F-217).
+	const plan = rowMenuPlan({
+		entityType: entity.type,
+		viewKind: activeView(state)?.kind,
+		listId: list?.id,
+		isVaultDerived: isVaultDerivedListId,
+	});
+	const membershipItems =
+		plan.offerMembershipToggle && list
 			? [
 					{
-						id: "rename",
-						label: t("brainstorm.database.menu.rename"),
-						icon: IconName.Pencil,
-						run: () => beginRowTitleEdit(state, entity.id),
+						id: "remove-from-list",
+						label: sourceMatches(entity.id, list, state.db)
+							? `Hide from "${list.name}"`
+							: `Remove from "${list.name}"`,
+						icon: IconName.Close,
+						run: () => toggleEntityInList(state, list.id, entity, false),
 					},
 				]
 			: [];
-		// "Save as template" (B11.10): clone this object into a `Template/v1`
-		// (body + non-presentation properties). Skipped on a template row itself
-		// — a template never lists in a `byType` grid, but guard defensively.
-		const saveAsTemplateItems =
-			entity.type !== TEMPLATE_ENTITY_TYPE
-				? [
-						{
-							id: "save-as-template",
-							label: t("brainstorm.database.menu.saveAsTemplate"),
-							icon: IconName.Copy,
-							run: () => void saveObjectAsTemplate(entity),
-						},
-					]
-				: [];
-		// One shared renderer: it pre-fetches the pin state and builds the
-		// same Open / Pin·Unpin / … items every app shows, in the same
-		// glass chrome (was a private hand-rolled map onto `openContextMenu`).
-		const extraItems = [...renameItems, ...membershipItems, ...saveAsTemplateItems];
-		const runtime = getRuntime();
-		const collectionsService = runtime?.services?.entities;
-		void openObjectMenu(
-			{ x: event.clientX, y: event.clientY },
-			{
-				target: { entityId, entityType: entity.type },
-				runtime,
-				labels: {
-					remove: t("brainstorm.database.menu.delete"),
-					addToCollection: t("brainstorm.database.menu.addToCollection"),
-					collectionsRegion: t("brainstorm.database.menu.collectionsRegion"),
-					noCollections: t("brainstorm.database.menu.noCollections"),
+	const renameItems = plan.offerRename
+		? [
+				{
+					id: "rename",
+					label: t("brainstorm.database.menu.rename"),
+					icon: IconName.Pencil,
+					run: () => beginRowTitleEdit(state, entity.id),
 				},
-				// F-217 — the app-owned destructive slot actually DELETES the
-				// entity (after a confirm); "Remove from list" above only
-				// unpins it, which left orphan Objects in the vault.
-				onRemove: () => confirmDeleteEntity(state, entity),
-				// DND-6 — the keyboard/a11y twin of "drop onto a collection": the
-				// shared "Add to collection…" picker writes the same manual
-				// membership (Database already holds `entities.write:List/v1`).
-				...(collectionsService
-					? {
-							collections: {
-								service: collectionsService as unknown as CollectionsEntitiesService,
-								appId: runtime?.app?.id ?? "io.brainstorm.database",
-							},
-						}
-					: {}),
-				...(extraItems.length > 0 ? { extraItems } : {}),
-			},
-		);
+			]
+		: [];
+	// "Save as template" (B11.10): clone this object into a `Template/v1`
+	// (body + non-presentation properties). Skipped on a template row itself
+	// — a template never lists in a `byType` grid, but guard defensively.
+	const saveAsTemplateItems =
+		entity.type !== TEMPLATE_ENTITY_TYPE
+			? [
+					{
+						id: "save-as-template",
+						label: t("brainstorm.database.menu.saveAsTemplate"),
+						icon: IconName.Copy,
+						run: () => void saveObjectAsTemplate(entity),
+					},
+				]
+			: [];
+	// One shared renderer: it pre-fetches the pin state and builds the
+	// same Open / Pin·Unpin / … items every app shows, in the same
+	// glass chrome (was a private hand-rolled map onto `openContextMenu`).
+	const extraItems = [
+		...renameItems,
+		...membershipItems,
+		...moveToColumnItems(state, entity),
+		...saveAsTemplateItems,
+	];
+	const runtime = getRuntime();
+	const collectionsService = runtime?.services?.entities;
+	void openObjectMenu(point, {
+		target: { entityId: entity.id, entityType: entity.type },
+		runtime,
+		labels: {
+			remove: t("brainstorm.database.menu.delete"),
+			addToCollection: t("brainstorm.database.menu.addToCollection"),
+			collectionsRegion: t("brainstorm.database.menu.collectionsRegion"),
+			noCollections: t("brainstorm.database.menu.noCollections"),
+		},
+		// F-217 — the app-owned destructive slot actually DELETES the
+		// entity (after a confirm); "Remove from list" above only
+		// unpins it, which left orphan Objects in the vault.
+		onRemove: () => confirmDeleteEntity(state, entity),
+		// DND-6 — the keyboard/a11y twin of "drop onto a collection": the
+		// shared "Add to collection…" picker writes the same manual
+		// membership (Database already holds `entities.write:List/v1`).
+		...(collectionsService
+			? {
+					collections: {
+						service: collectionsService as unknown as CollectionsEntitiesService,
+						appId: runtime?.app?.id ?? "io.brainstorm.database",
+					},
+				}
+			: {}),
+		...(extraItems.length > 0 ? { extraItems } : {}),
 	});
 }
 
@@ -4259,6 +4304,19 @@ function bindStageKeyboard(state: AppState): void {
 		const entity = singleSelectedEntity(state);
 		if (entity) void dispatchQuickLook(entity);
 	});
+	// DND-6 — keyboard entry to the row object menu (the twin surface for
+	// Add-to-collection / Move-to-column): Shift+F10 (the platform context-menu
+	// chord) opens the menu for the selection anchor, at the row's rect.
+	attachShortcut(body, "Shift+F10", (event) => {
+		const anchorId = state.selection.anchorId;
+		if (!anchorId) return;
+		const entity = state.db.entities.find((e) => e.id === anchorId);
+		if (!entity) return;
+		event.preventDefault();
+		const row = body.querySelector<HTMLElement>(`[data-entity-id="${CSS.escape(anchorId)}"]`);
+		const rect = (row ?? body).getBoundingClientRect();
+		openRowObjectMenu(state, entity, { x: rect.left + 16, y: rect.bottom });
+	});
 }
 
 /** F2 on a focused view tab starts the inline rename — the keyboard twin of
@@ -4312,7 +4370,19 @@ function selectAllVisible(state: AppState): void {
 
 /* ── Status pill ───────────────────────────────────────────────────────── */
 
+/** DND-6 — imperative live region (the plain-DOM twin of `<LiveRegion>`):
+ *  every status flash (board move, calendar move, cross-app drop landing,
+ *  collection add) is announced to assistive tech, not just painted. Lazy so
+ *  headless tests without a body never allocate it. */
+let statusLiveRegion: LiveRegionHandle | null = null;
+function announceStatus(text: string): void {
+	if (typeof document === "undefined" || !document.body) return;
+	statusLiveRegion ??= attachLiveRegion(document.body, { className: "db-status-live" });
+	statusLiveRegion.announce(text);
+}
+
 function flashStatus(text: string, kind: "ready" | "warn"): void {
+	announceStatus(text);
 	const pill = document.getElementById("status-pill");
 	if (!pill) return;
 	pill.hidden = false;

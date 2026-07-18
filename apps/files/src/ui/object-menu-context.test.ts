@@ -119,6 +119,47 @@ describe("filesObjectMenuContext (shared by content rows + the header breadcrumb
 		expect(deleteIds).toHaveBeenCalledWith(["f_9"]);
 	});
 
+	it("DND-6 — 'Move to folder…' twin appears when `onMoveTo` is supplied and runs it", () => {
+		const onMoveTo = vi.fn();
+		const ctx = filesObjectMenuContext({
+			entity: file("x_1", "notes.txt"),
+			store: fakeStore(),
+			runtime: fakeRuntime(),
+			onEditIcon: noop,
+			onEditCover: noop,
+			onMoveTo,
+		});
+		const item = (ctx.extraItems ?? []).find((i) => i.id === "move-to");
+		expect(item).toBeDefined();
+		item?.run();
+		expect(onMoveTo).toHaveBeenCalledTimes(1);
+	});
+
+	it("DND-6 — 'Save to disk…' twin appears only when `onSaveToDisk` is supplied", () => {
+		const onSaveToDisk = vi.fn();
+		const withSave = filesObjectMenuContext({
+			entity: file("x_1", "notes.txt"),
+			store: fakeStore(),
+			runtime: fakeRuntime(),
+			onEditIcon: noop,
+			onEditCover: noop,
+			onSaveToDisk,
+		});
+		const item = (withSave.extraItems ?? []).find((i) => i.id === "save-to-disk");
+		expect(item).toBeDefined();
+		item?.run();
+		expect(onSaveToDisk).toHaveBeenCalledTimes(1);
+
+		const withoutSave = filesObjectMenuContext({
+			entity: file("x_2", "other.txt"),
+			store: fakeStore(),
+			runtime: fakeRuntime(),
+			onEditIcon: noop,
+			onEditCover: noop,
+		});
+		expect((withoutSave.extraItems ?? []).map((i) => i.id)).not.toContain("save-to-disk");
+	});
+
 	it("Edit icon / Edit cover route to the supplied callbacks for the folder", () => {
 		const onEditIcon = vi.fn();
 		const onEditCover = vi.fn();

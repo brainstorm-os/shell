@@ -29,6 +29,11 @@ const DEFAULTS = {
 	"brainstorm.database.menu.collectionsRegion": "Collections",
 	"brainstorm.database.menu.noCollections": "No collections yet",
 
+	// Move-to-column keyboard twin (DND-6 — the object-menu isomorph of the
+	// board card drag; same `groupBy` property write as a column drop)
+	"brainstorm.database.menu.moveToColumn": "Move to column…",
+	"brainstorm.database.menu.moveToColumn.none": "No value",
+
 	// View tab strip (9.12.9)
 	"brainstorm.database.view.new": "New view",
 	// View body empty states (grid / gallery / list / board)

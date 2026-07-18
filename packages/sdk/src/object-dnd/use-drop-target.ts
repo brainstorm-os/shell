@@ -48,11 +48,15 @@ type NativeDragEvent = {
 };
 
 export type DropTargetHandle = {
-	/** Spread on the drop-zone element for the native intra-renderer transport. */
+	/** Spread on the drop-zone element for the native intra-renderer transport.
+	 *  Carries `aria-dropeffect` while an accepted drag hovers the zone (DND-6
+	 *  a11y twin — the `DropEffect` values are the ARIA tokens verbatim), so a
+	 *  screen reader hears what a drop would do before it happens. */
 	dropProps: {
 		onDragOver: (event: NativeDragEvent) => void;
 		onDragLeave: (event: NativeDragEvent) => void;
 		onDrop: (event: NativeDragEvent) => void;
+		"aria-dropeffect"?: DropEffect;
 	};
 	/** Attach to the SAME drop-zone element so the cross-app registry can hit-test
 	 *  the within-window drop point against this target's rect — required when a
@@ -86,6 +90,10 @@ export function useDropTarget(spec: DropTargetSpec): DropTargetHandle {
 	const specRef = useRef(spec);
 	specRef.current = spec;
 	const [isOver, setIsOver] = useState(false);
+	// The negotiated effect while an accepted drag hovers this target (either
+	// transport) — surfaces as `aria-dropeffect` on `dropProps` (DND-6). Null
+	// when nothing hovers.
+	const [overEffect, setOverEffect] = useState<DropEffect | null>(null);
 	// The drop-zone element (set via `dropRef`) — lets the cross-app registry
 	// route a within-window point to the right one of several sibling targets.
 	const elementRef = useRef<HTMLElement | null>(null);
@@ -100,14 +108,27 @@ export function useDropTarget(spec: DropTargetSpec): DropTargetHandle {
 	// Cross-app transport: register a target that reads the latest spec via ref so
 	// the registration is stable (no re-bind churn on every render).
 	useEffect(() => {
+		// Whether the registry currently routes the session to this target. The
+		// registry calls `onActiveChange(true)` BEFORE it asks `dropEffectFor`, so
+		// the effect is published from the `dropEffectFor` wrapper below (it runs
+		// on every hover frame while active) rather than from the activation.
+		let active = false;
 		const target: CrossAppDropTarget = {
 			accepts: (info) => specRef.current.accepts(info),
-			dropEffectFor: (info) => effectFor(info),
+			dropEffectFor: (info) => {
+				const effect = effectFor(info);
+				if (active) setOverEffect(effect);
+				return effect;
+			},
 			onDrop: (payload, info, effect) => specRef.current.onDrop(payload, info, effect),
 			// Positioned when a `dropRef` is attached (live rect); a target that
 			// never attaches one returns null → window-level (Notes editor).
 			getRect: () => elementRef.current?.getBoundingClientRect() ?? null,
-			onActiveChange: setIsOver,
+			onActiveChange: (next) => {
+				active = next;
+				setIsOver(next);
+				if (!next) setOverEffect(null);
+			},
 		};
 		return crossAppDropRegistry().register(target);
 	}, [effectFor]);
@@ -127,6 +148,7 @@ export function useDropTarget(spec: DropTargetSpec): DropTargetHandle {
 			event.preventDefault();
 			if (event.dataTransfer) event.dataTransfer.dropEffect = toDomDropEffect(effect);
 			setIsOver(true);
+			setOverEffect(effect);
 		},
 		[effectFor],
 	);
@@ -138,6 +160,7 @@ export function useDropTarget(spec: DropTargetSpec): DropTargetHandle {
 		const related = event.relatedTarget;
 		if (related instanceof Node && event.currentTarget?.contains(related)) return;
 		setIsOver(false);
+		setOverEffect(null);
 	}, []);
 
 	const onDrop = useCallback(
@@ -153,10 +176,20 @@ export function useDropTarget(spec: DropTargetSpec): DropTargetHandle {
 			if (!specRef.current.accepts(info)) return;
 			event.preventDefault();
 			setIsOver(false);
+			setOverEffect(null);
 			specRef.current.onDrop(payload, info, effectFor(info));
 		},
 		[effectFor],
 	);
 
-	return { dropProps: { onDragOver, onDragLeave, onDrop }, dropRef, isOver };
+	return {
+		dropProps: {
+			onDragOver,
+			onDragLeave,
+			onDrop,
+			...(overEffect !== null ? { "aria-dropeffect": overEffect } : {}),
+		},
+		dropRef,
+		isOver,
+	};
 }

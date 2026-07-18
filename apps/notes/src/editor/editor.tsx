@@ -104,7 +104,7 @@ import { CommentHighlightPlugin } from "./comment-highlight-plugin";
 import { BlockContextMenuPlugin } from "./context-menu-plugin";
 import { DevBenchPlugin } from "./dev-bench-plugin";
 import { EMOJI_SHORTCODE_TRANSFORMER } from "./emoji-transformer";
-import { EntityDropPlugin } from "./entity-drop-plugin";
+import { EntityDropPlugin, PendingEntityLinkPlugin } from "./entity-drop-plugin";
 import { EQUATION_TRANSFORMER } from "./equation-transformer";
 import { FormatChordsPlugin } from "./format-chords-plugin";
 import { InlineToolbarPlugin } from "./inline-toolbar-plugin";
@@ -305,7 +305,8 @@ export function Editor({
 						<CodeLineNumbersPlugin />
 						<MediaDropPlugin />
 						<BookmarkSuggestPlugin currentNoteId={noteId} />
-						<EntityDropPlugin currentNoteId={noteId} />
+						<EntityDropPlugin currentNoteId={noteId} noteTitle={storedTitle} />
+						<PendingEntityLinkPlugin currentNoteId={noteId} noteTitle={storedTitle} />
 						<MediaInspectorPlugin />
 						<AddPropertyMenuPlugin />
 						{editorHandleRef && <EditorHandlePlugin handleRef={editorHandleRef} />}
