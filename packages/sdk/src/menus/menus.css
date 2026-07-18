@@ -478,3 +478,17 @@ button.fm-row {
 	align-items: center;
 	gap: var(--fm-row-gap, 8px);
 }
+
+/* F-406 — an empty icon slot must still RESERVE the icon column. The runtime
+ * always renders `.fm-row__icon`, but a blank icon (the select menus'
+ * `blankMenuIcon` on unselected rows) collapses it to zero width, so a
+ * "pick one of N" menu measures its surface against check-less rows and the
+ * one CHECKED row's label ellipsizes into "G…" while its siblings sit
+ * flush-left, misaligned. `:empty` scopes the reservation to blank slots —
+ * rows with a real icon keep their intrinsic footprint. 14px matches the
+ * runtime's IconView defaultSize. */
+.fm-row__icon:empty {
+	flex: 0 0 auto;
+	inline-size: 14px;
+	block-size: 14px;
+}
