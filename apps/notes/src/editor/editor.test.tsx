@@ -15,12 +15,13 @@
  *     binding wrapper).
  */
 
+import { BASELINE_NODES, SEED_STANDIN_NODES, plantSerializedStateIntoDoc } from "@brainstorm/editor";
 import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm/react-yjs";
 import { REDO_COMMAND, UNDO_COMMAND } from "lexical";
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Doc, XmlText, applyUpdate, encodeStateAsUpdate } from "yjs";
+import { Doc, XmlText, applyUpdate, encodeStateAsUpdate } from "yjs";
 import { Editor } from "./editor";
 import type { SerializedMentionNode } from "./nodes/mention-node";
 
@@ -790,5 +791,216 @@ describe("Editor (N3) — selection / IME parity proxy: remote edits don't tear 
 		expect(editableAfter).toBe(editableBefore);
 
 		await surface.unmount();
+	});
+});
+
+describe("Editor — imported (planted) docs keep their title across open cycles (F-423)", () => {
+	// The importer plants `{type:"title"}` via the SeedTitleNode stand-in and
+	// the runtime editor hydrates the REAL TitleNode over the same Yjs body.
+	// The dogfood vault showed an imported note whose planted title survived
+	// the first open but was EMPTY on the next cold open — so this repro
+	// mounts the editor over a genuinely-planted doc TWICE and asserts the
+	// title text is still in the CRDT after each cycle.
+	function plantedResolver(noteId: string, title: string) {
+		const source = new Doc();
+		plantSerializedStateIntoDoc(
+			source,
+			{
+				root: {
+					type: "root",
+					version: 1,
+					format: "",
+					indent: 0,
+					direction: null,
+					children: [
+						{
+							type: "title",
+							version: 1,
+							format: "",
+							indent: 0,
+							direction: null,
+							children: [
+								{
+									type: "text",
+									version: 1,
+									detail: 0,
+									format: 0,
+									mode: "normal",
+									style: "",
+									text: title,
+								},
+							],
+						},
+						{
+							type: "heading",
+							version: 1,
+							tag: "h1",
+							format: "",
+							indent: 0,
+							direction: null,
+							children: [
+								{
+									type: "text",
+									version: 1,
+									detail: 0,
+									format: 0,
+									mode: "normal",
+									style: "",
+									text: "Hausaufgabe 03.06.2026",
+								},
+							],
+						},
+					],
+				},
+			} as never,
+			{ nodes: [...BASELINE_NODES, ...SEED_STANDIN_NODES], namespace: `test-plant-${noteId}` },
+		);
+		const snapshot = encodeStateAsUpdate(source);
+		source.destroy();
+		const docs = new Map<string, Doc>();
+		const api = createYDocResolver({
+			load: async () => snapshot,
+			persist: () => {},
+			release: () => {},
+		});
+		const wrappedResolve: typeof api.resolve = (id) => {
+			const handle = api.resolve(id);
+			docs.set(id, handle.doc);
+			return handle;
+		};
+		return { resolve: wrappedResolve, docs, dispose: api.dispose };
+	}
+
+	it("keeps the planted title text after two mount/unmount cycles", async () => {
+		const noteId = "n_imported_planted";
+		const title = "Stunde 27 | Natasha";
+		const resolver = plantedResolver(noteId, title);
+		try {
+			for (let cycle = 0; cycle < 2; cycle++) {
+				const surface = mount(null);
+				await surface.render(
+					<YDocProvider resolver={resolver.resolve}>
+						<Editor
+							noteId={noteId}
+							storedTitle={title}
+							onChange={() => {}}
+							noteContext={noteContext()}
+						/>
+					</YDocProvider>,
+				);
+				// Settle transforms + collab sync.
+				await act(async () => {
+					await Promise.resolve();
+				});
+				const doc = resolver.docs.get(noteId);
+				expect(doc).toBeDefined();
+				if (!doc) return;
+				const body = getUniversalBody(doc);
+				expect(body.toString(), `title text present in CRDT (cycle ${cycle})`).toContain(title);
+				// Exactly one title element, and it still carries the text.
+				const delta = body.toDelta() as ReadonlyArray<{ insert?: unknown }>;
+				const titles = delta.filter(
+					(op) =>
+						op.insert instanceof XmlText &&
+						(op.insert.getAttributes() as { __type?: unknown }).__type === "title",
+				);
+				expect(titles.length, `one title element (cycle ${cycle})`).toBe(1);
+				const titleText = (titles[0]?.insert as XmlText | undefined)?.toString() ?? "";
+				expect(titleText, `title element text (cycle ${cycle})`).toContain(title);
+				await surface.unmount();
+			}
+		} finally {
+			resolver.dispose();
+		}
+	});
+});
+
+describe("Editor — title heal on legacy title-less planted docs (F-423)", () => {
+	it("fills an empty planted title from storedTitle at open", async () => {
+		// Pre-F-402 import shape: body content, NO title node at all.
+		const noteId = "n_imported_titleless";
+		const source = new Doc();
+		plantSerializedStateIntoDoc(
+			source,
+			{
+				root: {
+					type: "root",
+					version: 1,
+					format: "",
+					indent: 0,
+					direction: null,
+					children: [
+						{
+							type: "heading",
+							version: 1,
+							tag: "h1",
+							format: "",
+							indent: 0,
+							direction: null,
+							children: [
+								{
+									type: "text",
+									version: 1,
+									detail: 0,
+									format: 0,
+									mode: "normal",
+									style: "",
+									text: "Hausaufgabe 03.06.2026",
+								},
+							],
+						},
+					],
+				},
+			} as never,
+			{ nodes: [...BASELINE_NODES, ...SEED_STANDIN_NODES], namespace: "test-plant-titleless" },
+		);
+		const snapshot = encodeStateAsUpdate(source);
+		source.destroy();
+		const docs = new Map<string, Doc>();
+		const api = createYDocResolver({
+			load: async () => snapshot,
+			persist: () => {},
+			release: () => {},
+		});
+		const wrappedResolve: typeof api.resolve = (id) => {
+			const handle = api.resolve(id);
+			docs.set(id, handle.doc);
+			return handle;
+		};
+		try {
+			const surface = mount(null);
+			await surface.render(
+				<YDocProvider resolver={wrappedResolve}>
+					<Editor
+						noteId={noteId}
+						storedTitle="Stunde 27 | Natasha"
+						onChange={() => {}}
+						noteContext={noteContext()}
+					/>
+				</YDocProvider>,
+			);
+			await act(async () => {
+				await Promise.resolve();
+			});
+			const doc = docs.get(noteId);
+			expect(doc).toBeDefined();
+			if (!doc) return;
+			const body = getUniversalBody(doc);
+			const delta = body.toDelta() as ReadonlyArray<{ insert?: unknown }>;
+			const titles = delta.filter(
+				(op) =>
+					op.insert instanceof XmlText &&
+					(op.insert.getAttributes() as { __type?: unknown }).__type === "title",
+			);
+			expect(titles.length, "invariant prepends exactly one title").toBe(1);
+			expect((titles[0]?.insert as XmlText | undefined)?.toString() ?? "").toContain(
+				"Stunde 27 | Natasha",
+			);
+			// The body heading is untouched.
+			expect(body.toString()).toContain("Hausaufgabe 03.06.2026");
+			await surface.unmount();
+		} finally {
+			api.dispose();
+		}
 	});
 });
