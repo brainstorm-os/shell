@@ -1,6 +1,6 @@
 import { MailFlag } from "@brainstorm/sdk-types";
 import { describe, expect, it } from "vitest";
-import { EMAIL_TYPE_URL, FolderRole } from "../types/mail-view";
+import { EMAIL_TYPE_URL, FolderRole, MAIL_ACCOUNT_TYPE_URL } from "../types/mail-view";
 import { demoEntities } from "./demo";
 import {
 	accountsFromEntities,
@@ -25,6 +25,18 @@ describe("projection from entities", () => {
 			FolderRole.Archive,
 		]);
 		expect(messagesFromEntities(entities).length).toBeGreaterThan(0);
+	});
+
+	it("hides disconnected accounts (enabled: false) but keeps enabled and legacy rows", () => {
+		const account = entities.find((e) => e.type === MAIL_ACCOUNT_TYPE_URL);
+		expect(account).toBeDefined();
+		if (!account) return;
+		const disabled = { ...account, properties: { ...account.properties, enabled: false } };
+		expect(accountsFromEntities([disabled])).toHaveLength(0);
+		// Rows created before the flag existed have no `enabled` — still shown.
+		const legacy = { ...account, properties: { ...account.properties } };
+		delete legacy.properties.enabled;
+		expect(accountsFromEntities([legacy])).toHaveLength(1);
 	});
 
 	it("sorts messages newest-first", () => {

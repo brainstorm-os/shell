@@ -3,7 +3,9 @@
  *  list (`FolderSelection`). */
 
 import { Icon, IconName } from "@brainstorm/sdk/icon";
-import type { ReactElement } from "react";
+import { MenuAlign } from "@brainstorm/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import type { MouseEvent as ReactMouseEvent, ReactElement } from "react";
 import { t } from "../i18n";
 import {
 	type AccountView,
@@ -74,6 +76,9 @@ export type FolderRailProps = {
 	selection: FolderSelection;
 	unifiedUnread: number;
 	onSelect: (selection: FolderSelection) => void;
+	/** Vault mode only — absent in the demo set, which hides the account ⋯. */
+	onSyncAccount?: (accountId: string) => void;
+	onRemoveAccount?: (accountId: string) => void;
 };
 
 export function FolderRail({
@@ -82,6 +87,8 @@ export function FolderRail({
 	selection,
 	unifiedUnread,
 	onSelect,
+	onSyncAccount,
+	onRemoveAccount,
 }: FolderRailProps): ReactElement {
 	// Real folders that are not inbox-role (inbox is the unified smart view).
 	const nonInbox = folders.filter((f) => f.role !== FolderRole.Inbox);
@@ -111,10 +118,58 @@ export function FolderRail({
 			</div>
 			{accounts.map((account) => {
 				const accountFolders = byAccount.get(account.id) ?? [];
-				if (accountFolders.length === 0) return null;
+				const hasMenu = Boolean(onSyncAccount || onRemoveAccount);
+				const openAccountMenu = (event: ReactMouseEvent<HTMLButtonElement>): void => {
+					const button = event.currentTarget;
+					const items: AnchoredMenuItem[] = [
+						...(onSyncAccount
+							? [
+									{
+										label: t("account.syncNow"),
+										icon: IconName.Reload,
+										onSelect: () => onSyncAccount(account.id),
+									},
+								]
+							: []),
+						...(onRemoveAccount
+							? [
+									{
+										label: t("account.remove"),
+										icon: IconName.Trash,
+										onSelect: () => onRemoveAccount(account.id),
+									},
+								]
+							: []),
+					];
+					const r = button.getBoundingClientRect();
+					openAnchoredMenu({ x: r.left, y: r.bottom + 4 }, items, {
+						menuLabel: t("account.menu", { name: account.displayName }),
+						anchor: button,
+						align: MenuAlign.End,
+					});
+				};
 				return (
 					<div className="mb-rail__group" key={account.id}>
-						<div className="mb-rail__heading">{account.displayName}</div>
+						<div className="mb-rail__heading">
+							<span className="mb-rail__heading-label">{account.displayName}</span>
+							{hasMenu ? (
+								<button
+									type="button"
+									className="bs-object-menu__more mb-rail__heading-menu"
+									aria-haspopup="menu"
+									aria-label={t("account.menu", { name: account.displayName })}
+									data-bs-tooltip={t("account.menu", { name: account.displayName })}
+									onClick={openAccountMenu}
+								>
+									<span className="bs-object-menu__more-dot" />
+									<span className="bs-object-menu__more-dot" />
+									<span className="bs-object-menu__more-dot" />
+								</button>
+							) : null}
+						</div>
+						{accountFolders.length === 0 ? (
+							<div className="mb-rail__hint">{t("folders.notSynced")}</div>
+						) : null}
 						{accountFolders.map((folder) => (
 							<RailItem
 								key={folder.id}

@@ -59,6 +59,20 @@ function withFlag(flags: MailFlag[], flag: MailFlag, on: boolean): MailFlag[] {
 	return on ? [...flags, flag] : flags.filter((f) => f !== flag);
 }
 
+const SyncNoteKind = {
+	Info: "info",
+	Error: "error",
+} as const;
+type SyncNoteKind = (typeof SyncNoteKind)[keyof typeof SyncNoteKind];
+
+type SyncNote = {
+	kind: SyncNoteKind;
+	text: string;
+	/** Auth failures offer the reconnect escape hatch inline — the banner's
+	 *  "reconnect the account" advice was previously a dead end. */
+	reconnect?: boolean;
+};
+
 export function MailboxApp(): ReactElement {
 	useMailboxT();
 	const rt = getBrainstorm();
@@ -85,7 +99,7 @@ export function MailboxApp(): ReactElement {
 	const [connectOpen, setConnectOpen] = useState(false);
 	const [composeSeed, setComposeSeed] = useState<ComposeSeed | null>(null);
 	const [syncBusy, setSyncBusy] = useState(false);
-	const [syncNote, setSyncNote] = useState<string | null>(null);
+	const [syncNote, setSyncNote] = useState<SyncNote | null>(null);
 	// Re-entry latch as a ref, not state: two clicks before a re-render would
 	// both see stale `syncBusy === false` and double-launch the sync.
 	const syncRunRef = useRef(false);
@@ -185,7 +199,7 @@ export function MailboxApp(): ReactElement {
 					(result as { message?: string } | null)?.message ?? t("compose.error", { message: "" });
 				throw new Error(message);
 			}
-			setSyncNote(t("compose.sent"));
+			setSyncNote({ kind: SyncNoteKind.Info, text: t("compose.sent") });
 		},
 		[intentsSvc],
 	);
@@ -246,7 +260,7 @@ export function MailboxApp(): ReactElement {
 			if (!mailSvc || accountIds.length === 0 || syncRunRef.current) return;
 			syncRunRef.current = true;
 			setSyncBusy(true);
-			setSyncNote(t("sync.running"));
+			setSyncNote({ kind: SyncNoteKind.Info, text: t("sync.running") });
 			try {
 				let created = 0;
 				let updated = 0;
@@ -255,14 +269,16 @@ export function MailboxApp(): ReactElement {
 					created += result.created;
 					updated += result.updated;
 				}
-				setSyncNote(t("sync.done", { created, updated }));
+				setSyncNote({ kind: SyncNoteKind.Info, text: t("sync.done", { created, updated }) });
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
 				// The driver maps credential rejections to "authentication failed"
 				// (DriverErrorKind.Denied) — surface the actionable hint instead of
 				// the raw wire error (owner hit this with a pasted app password).
 				setSyncNote(
-					/authentication failed/i.test(message) ? t("sync.errorAuth") : t("sync.error", { message }),
+					/authentication failed/i.test(message)
+						? { kind: SyncNoteKind.Error, text: t("sync.errorAuth"), reconnect: true }
+						: { kind: SyncNoteKind.Error, text: t("sync.error", { message }) },
 				);
 			} finally {
 				syncRunRef.current = false;
@@ -275,6 +291,30 @@ export function MailboxApp(): ReactElement {
 	const onSyncNow = useCallback(() => {
 		void syncAccounts(accounts.map((a) => a.id));
 	}, [syncAccounts, accounts]);
+
+	const onSyncAccount = useCallback(
+		(accountId: string) => {
+			void syncAccounts([accountId]);
+		},
+		[syncAccounts],
+	);
+
+	// `mail.disconnect` retires the account (credential deleted, row disabled);
+	// synced mail keeps its entities, so no confirm step — mirrors Calendar's
+	// CalDAV disconnect.
+	const onRemoveAccount = useCallback(
+		(accountId: string) => {
+			if (!mailSvc) return;
+			void mailSvc
+				.disconnect({ accountRef: accountId })
+				.then(() => setSyncNote({ kind: SyncNoteKind.Info, text: t("account.removed") }))
+				.catch((err: unknown) => {
+					const message = err instanceof Error ? err.message : String(err);
+					setSyncNote({ kind: SyncNoteKind.Error, text: t("sync.error", { message }) });
+				});
+		},
+		[mailSvc],
+	);
 
 	const onConnect = useCallback(
 		async (input: ConnectAccountInput) => {
@@ -396,8 +436,21 @@ export function MailboxApp(): ReactElement {
 			</header>
 			{!usingVault ? <div className="mb-demo-banner">{t("demo.banner")}</div> : null}
 			{syncNote ? (
-				<div className="mb-syncbar" role="status" aria-busy={syncBusy}>
-					<span className="mb-syncbar__text">{syncNote}</span>
+				<div
+					className={`mb-syncbar${syncNote.kind === SyncNoteKind.Error ? " mb-syncbar--error" : ""}`}
+					role={syncNote.kind === SyncNoteKind.Error ? "alert" : "status"}
+					aria-busy={syncBusy}
+				>
+					<span className="mb-syncbar__text">{syncNote.text}</span>
+					{syncNote.reconnect && !syncBusy ? (
+						<button
+							type="button"
+							className="bs-btn bs-btn--secondary mb-syncbar__action"
+							onClick={() => setConnectOpen(true)}
+						>
+							{t("sync.reconnect")}
+						</button>
+					) : null}
 					{!syncBusy ? (
 						<button
 							type="button"
@@ -436,6 +489,7 @@ export function MailboxApp(): ReactElement {
 						selection={selection}
 						unifiedUnread={unifiedUnread}
 						onSelect={onSelectFolder}
+						{...(usingVault && mailSvc ? { onSyncAccount, onRemoveAccount } : {})}
 					/>
 					<MessageList
 						messages={visible}
@@ -449,6 +503,7 @@ export function MailboxApp(): ReactElement {
 						onSelect={selectMessage}
 						onToggleThreaded={toggleThreaded}
 						onToggleThreadExpand={toggleThreadExpand}
+						syncFailed={syncNote?.kind === SyncNoteKind.Error}
 					/>
 					<ReadingPane
 						message={activeMessage}
