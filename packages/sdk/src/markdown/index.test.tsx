@@ -95,3 +95,25 @@ describe("<Markdown>", () => {
 		expect(host.textContent).toContain("<img");
 	});
 });
+
+describe("indented list items (F-425)", () => {
+	it("parses dash items indented under an ordered item as a real bullet list", () => {
+		const blocks = parseMarkdown(
+			["1. **Documents:**", "   - [A](e1) - one", "   - [B](e2) - two"].join("\n"),
+		);
+		expect(blocks.map((b) => b.kind)).toEqual([BlockKind.OrderedList, BlockKind.BulletList]);
+		const bullets = blocks[1] as { items: ReadonlyArray<string> };
+		expect(bullets.items).toEqual(["[A](e1) - one", "[B](e2) - two"]);
+	});
+
+	it("breaks a paragraph at an indented list item instead of slurping it inline", () => {
+		const blocks = parseMarkdown(["Key points below:", "  - first", "  - second"].join("\n"));
+		expect(blocks.map((b) => b.kind)).toEqual([BlockKind.Paragraph, BlockKind.BulletList]);
+		expect((blocks[0] as { text: string }).text).toBe("Key points below:");
+	});
+
+	it("parses indented ordered items too", () => {
+		const blocks = parseMarkdown(["- outer", "  1. inner one", "  2. inner two"].join("\n"));
+		expect(blocks.map((b) => b.kind)).toEqual([BlockKind.BulletList, BlockKind.OrderedList]);
+	});
+});
