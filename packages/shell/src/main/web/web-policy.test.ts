@@ -2,6 +2,7 @@ import { TabSecurityState } from "@brainstorm/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TRACKER_BLOCKLIST,
+	chromeEquivalentUserAgent,
 	isBlockedRequest,
 	isNavigationAllowed,
 	isThirdPartyRequest,
@@ -53,6 +54,34 @@ describe("isBlockedRequest", () => {
 
 	it("blocks nothing against an empty list", () => {
 		expect(isBlockedRequest("https://ads.doubleclick.net/", [])).toBe(false);
+	});
+});
+
+describe("chromeEquivalentUserAgent", () => {
+	const electronUa =
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Brainstorm/0.5.3 Chrome/136.0.7103.115 Electron/36.3.2 Safari/537.36";
+
+	it("strips the Electron and app-name tokens, keeping Chrome's shape", () => {
+		expect(chromeEquivalentUserAgent(electronUa, "Brainstorm")).toBe(
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.115 Safari/537.36",
+		);
+	});
+
+	it("is a no-op on a UA that already has neither token", () => {
+		const chrome =
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+		expect(chromeEquivalentUserAgent(chrome, "Brainstorm")).toBe(chrome);
+	});
+
+	it("escapes regex metacharacters in the app name", () => {
+		const ua = "Mozilla/5.0 My.App/1.0 Chrome/1.0 Electron/2.0 Safari/537.36";
+		expect(chromeEquivalentUserAgent(ua, "My.App")).toBe("Mozilla/5.0 Chrome/1.0 Safari/537.36");
+	});
+
+	it("works without an app name", () => {
+		expect(chromeEquivalentUserAgent("Mozilla/5.0 Chrome/1.0 Electron/2.0 Safari/537.36")).toBe(
+			"Mozilla/5.0 Chrome/1.0 Safari/537.36",
+		);
 	});
 });
 
