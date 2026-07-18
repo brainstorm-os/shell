@@ -814,11 +814,8 @@ export function JournalApp(): ReactElement {
 	}, []);
 
 	const focusEntryNoteId = focusEntry?.noteId ?? null;
-<<<<<<< Updated upstream
 	// PRES-3 — who's-here on the focused day's entry (cross-device in the shell).
 	const presencePeers = usePresence(focusEntryNoteId, JOURNAL_ENTRY_TYPE, useSelf());
-=======
->>>>>>> Stashed changes
 	// Read-only lock — a synced `locked` property on the entry, same model as
 	// Notes. Read from the live vault so it reflects edits from any device.
 	const focusEntryLocked = focusEntryNoteId
@@ -1815,7 +1812,6 @@ function EntryBody({
 	// transition (no remount).
 	const noteId = entry ? entry.noteId : journalEntryIdForKey(dateKeyForJournal(focus));
 
-<<<<<<< Updated upstream
 	const pending = pendingSeedRef.current?.get(noteId);
 	if (pending !== undefined) pendingSeedRef.current?.delete(noteId);
 	// Seeds (templates / periodic) only apply to an already-created entry; the
@@ -1831,12 +1827,6 @@ function EntryBody({
 
 	const outgoing = entry && snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
 	const backlinks = entry && snapshot ? findBacklinks(snapshot, entry.noteId) : [];
-=======
-	const outgoing = snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
-	const backlinks = snapshot ? findBacklinks(snapshot, entry.noteId) : [];
-	const entryLocked =
-		snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false;
->>>>>>> Stashed changes
 
 	return (
 		<div className="journal__entry-body">
@@ -1868,13 +1858,8 @@ function EntryBody({
 				{resolver ? (
 					<EntryEditorIsland
 						resolver={resolver.resolve}
-<<<<<<< Updated upstream
 						noteId={noteId}
 						editable={editable}
-=======
-						noteId={entry.noteId}
-						editable={mutable && !entryLocked}
->>>>>>> Stashed changes
 						seedBody={seedBody}
 						onDenormalize={onBodyDenormalize}
 						comments={commentHooks}

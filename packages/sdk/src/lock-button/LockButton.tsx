@@ -33,10 +33,6 @@ export function LockButton({
 			className="header-icon-btn bs-lock-button"
 			aria-pressed={locked}
 			aria-label={label}
-<<<<<<< Updated upstream
-=======
-			title={label}
->>>>>>> Stashed changes
 			data-bs-tooltip={label}
 			onClick={onToggle}
 		>
