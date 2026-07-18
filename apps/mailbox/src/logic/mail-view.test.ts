@@ -34,8 +34,8 @@ describe("projection from entities", () => {
 		const disabled = { ...account, properties: { ...account.properties, enabled: false } };
 		expect(accountsFromEntities([disabled])).toHaveLength(0);
 		// Rows created before the flag existed have no `enabled` — still shown.
-		const legacy = { ...account, properties: { ...account.properties } };
-		delete legacy.properties.enabled;
+		const { enabled: _dropped, ...legacyProps } = account.properties;
+		const legacy = { ...account, properties: legacyProps };
 		expect(accountsFromEntities([legacy])).toHaveLength(1);
 	});
 

@@ -29,6 +29,13 @@ describe("buildFrameSrcDoc", () => {
 		expect(doc).toContain("img-src data: cid: https:");
 	});
 
+	it("hides remote <img> elements in blocked mode instead of painting broken glyphs", () => {
+		const blocked = buildFrameSrcDoc("<p>hi</p>", false);
+		expect(blocked).toContain('img[src^="http" i]');
+		const shown = buildFrameSrcDoc("<p>hi</p>", true);
+		expect(shown).not.toContain('img[src^="http" i]');
+	});
+
 	it("strips author script / base / meta-http-equiv overrides", () => {
 		const hostile =
 			'<base href="https://evil.com/"><meta http-equiv="refresh" content="0;url=https://evil.com"><script>steal()</script><p>body</p>';

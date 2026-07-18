@@ -60,11 +60,18 @@ export function buildFrameSrcDoc(bodyHtmlSafe: string, showRemote: boolean): str
 	const csp = showRemote
 		? "default-src 'none'; img-src data: cid: https:; style-src 'unsafe-inline'; font-src data: https:; media-src data: https:"
 		: "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:";
+	// In blocked mode the CSP suppresses the fetch but the engine still paints
+	// a broken-image glyph per remote <img> — hide those; inline data:/cid:
+	// images stay visible.
+	const blockedStyle = showRemote
+		? ""
+		: '<style>img[src^="http" i], img[srcset], source[srcset] { display: none; }</style>';
 	return [
 		"<!doctype html><html><head>",
 		'<meta charset="utf-8">',
 		`<meta http-equiv="Content-Security-Policy" content="${csp}">`,
 		`<style>${FRAME_STYLE}</style>`,
+		blockedStyle,
 		"</head><body>",
 		body,
 		"</body></html>",

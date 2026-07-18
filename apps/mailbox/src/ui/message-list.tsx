@@ -219,14 +219,27 @@ export function MessageList({
 				) : threaded ? (
 					threads.map((thread) => (
 						<li key={thread.threadKey}>
-							<ThreadRow
-								thread={thread}
-								now={now}
-								activeId={activeId}
-								expanded={expandedThreads.has(thread.threadKey)}
-								onToggleExpand={() => onToggleThreadExpand(thread.threadKey)}
-								onSelect={onSelect}
-							/>
+							{/* A single-message "conversation" is just a message — the
+							    thread chrome (expander, count, "1 message" meta) forced a
+							    click-to-expand + click-to-open double step (owner report
+							    2026-07-18). */}
+							{thread.count === 1 ? (
+								<MessageRow
+									message={thread.latest}
+									now={now}
+									active={thread.latest.id === activeId}
+									onSelect={() => onSelect(thread.latest.id)}
+								/>
+							) : (
+								<ThreadRow
+									thread={thread}
+									now={now}
+									activeId={activeId}
+									expanded={expandedThreads.has(thread.threadKey)}
+									onToggleExpand={() => onToggleThreadExpand(thread.threadKey)}
+									onSelect={onSelect}
+								/>
+							)}
 						</li>
 					))
 				) : (

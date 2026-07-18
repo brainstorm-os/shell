@@ -5,7 +5,7 @@
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign } from "@brainstorm/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import type { MouseEvent as ReactMouseEvent, ReactElement } from "react";
+import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";
 import {
 	type AccountView,
@@ -34,7 +34,10 @@ const ROLE_LABEL: Partial<Record<FolderRole, () => string>> = {
 
 function folderLabel(folder: FolderView): string {
 	const named = ROLE_LABEL[folder.role];
-	return named ? named() : folder.path;
+	if (named) return named();
+	// Servers report hierarchical paths ("INBOX/Social") — the INBOX/ prefix
+	// is transport detail, not a name the rail should show.
+	return folder.path.replace(/^INBOX\//i, "");
 }
 
 function selectionMatches(a: FolderSelection, b: FolderSelection): boolean {

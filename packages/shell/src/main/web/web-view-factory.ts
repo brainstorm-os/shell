@@ -19,7 +19,7 @@
  */
 
 import { type SitePermissionKind, TabLoadState, WebViewEventKind } from "@brainstorm/sdk-types";
-import { app, type Session, WebContentsView } from "electron";
+import { type Session, WebContentsView, app } from "electron";
 import { TabChord, type WebContentsViewHandle, tabChordFor } from "../apps/window-container";
 import { networkEgressHostOf } from "../network/audit-log";
 import { sitePermissionKindsFor, webOriginOf } from "./site-permissions";
@@ -302,7 +302,7 @@ function configureSessionPolicy(
 
 	// Present the Chrome-equivalent UA: the default's `Electron/…` +
 	// `Brainstorm/…` tokens read as automation to anti-bot walls (X's Castle
-	// 403s login/write APIs), breaking real interactive sign-ins (F-429).
+	// 403s login/write APIs), breaking real interactive sign-ins (F-433).
 	ses.setUserAgent(chromeEquivalentUserAgent(ses.getUserAgent(), app.name));
 
 	const decide = deps.decidePermission ?? (() => null);
