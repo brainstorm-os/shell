@@ -41,8 +41,12 @@
  * desaturate instead. 55% opacity over a light panel washed the face out
  * to near-background while the label stayed `--color-accent-text` (white
  * on most themes) — a disabled Save/Upgrade read as blank chrome on the
- * light themes. Greying the face preserves the label↔face contrast; the
- * dropped shadows + speculars keep it reading inert. */
+ * light themes (F-410). Greying the face preserves the label↔face
+ * contrast; the dropped OUTER shadow keeps it reading inert. The shine
+ * layers stay — DIMMED, not deleted: zeroing them collapsed the glossy
+ * face to a flat single-colour slab in disabled/loading states (owner
+ * report 2026-07-18); the muted speculars keep the material identity
+ * while the desaturation still says "inactive". */
 .button--glass:disabled,
 .button--primary:disabled,
 .button--neutral:disabled,
@@ -64,7 +68,7 @@
 .button--destructive:disabled::before,
 .button--destructive:disabled > .button__gloss::before,
 .button--destructive:disabled > .button__gloss::after {
-	opacity: 0;
+	opacity: 0.45;
 }
 
 .button:active:not(:disabled) {
