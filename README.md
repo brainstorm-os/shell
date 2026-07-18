@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://getbrainstorm.online"><img src="https://getbrainstorm.online/favicon.svg" width="72" alt="Brainstorm logo"></a>
+  <a href="https://getbrainstorm.online"><img src="https://getbrainstorm.online/favicon.svg?v=indigo" width="72" alt="Brainstorm logo"></a>
 </p>
 
 <h1 align="center">Brainstorm</h1>
@@ -12,8 +12,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/brainstorm-os/shell/releases/latest"><img src="https://img.shields.io/github/v/release/brainstorm-os/shell?label=beta&color=e11d48" alt="Latest release"></a>
-  <a href="https://github.com/brainstorm-os/shell/releases"><img src="https://img.shields.io/github/downloads/brainstorm-os/shell/total?color=e11d48" alt="Total downloads"></a>
+  <a href="https://github.com/brainstorm-os/shell/releases/latest"><img src="https://img.shields.io/github/v/release/brainstorm-os/shell?label=beta&color=5b62e0" alt="Latest release"></a>
+  <a href="https://github.com/brainstorm-os/shell/releases"><img src="https://img.shields.io/github/downloads/brainstorm-os/shell/total?color=5b62e0" alt="Total downloads"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/github/license/brainstorm-os/shell" alt="License: AGPL-3.0-or-later"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-555" alt="Platforms: macOS, Windows, Linux">
   <a href="https://deepwiki.com/brainstorm-os/shell"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
@@ -28,8 +28,8 @@
 </p>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/desktop.webp">
-  <img src="https://getbrainstorm.online/screenshots/desktop.webp" alt="The Brainstorm desktop — wallpaper, app icons, widgets, and open app windows" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/desktop.webp?v=indigo">
+  <img src="https://getbrainstorm.online/screenshots/desktop.webp?v=indigo" alt="The Brainstorm desktop — wallpaper, app icons, widgets, and open app windows" width="100%">
 </picture>
 
 Your screen becomes a real desktop: a wallpaper, app icons, windows. Each icon is its own sandboxed app — Notes, Database, Graph, Calendar, Mailbox, twenty in all — and every app works from **one set of objects living in a folder on your disk**. A note you write here is a row there and a node in the graph. Never a copy, never an export.
@@ -67,20 +67,20 @@ Each app runs sandboxed in its own window, declares the capabilities it needs, a
   <tr>
     <td width="33%">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/agent.webp">
-        <img src="https://getbrainstorm.online/screenshots/agent.webp" alt="Agent — chat over the AI broker with cited vault objects">
+        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/agent.webp?v=indigo">
+        <img src="https://getbrainstorm.online/screenshots/agent.webp?v=indigo" alt="Agent — chat over the AI broker with cited vault objects">
       </picture>
     </td>
     <td width="33%">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/database.webp">
-        <img src="https://getbrainstorm.online/screenshots/database.webp" alt="Database — the whole vault as grid, board, calendar, or timeline">
+        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/database.webp?v=indigo">
+        <img src="https://getbrainstorm.online/screenshots/database.webp?v=indigo" alt="Database — the whole vault as grid, board, calendar, or timeline">
       </picture>
     </td>
     <td width="33%">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/graph.webp">
-        <img src="https://getbrainstorm.online/screenshots/graph.webp" alt="Graph — every object and typed link on a live WebGL canvas">
+        <source media="(prefers-color-scheme: dark)" srcset="https://getbrainstorm.online/screenshots/midnight/graph.webp?v=indigo">
+        <img src="https://getbrainstorm.online/screenshots/graph.webp?v=indigo" alt="Graph — every object and typed link on a live WebGL canvas">
       </picture>
     </td>
   </tr>
