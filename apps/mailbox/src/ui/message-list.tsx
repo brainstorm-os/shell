@@ -46,10 +46,10 @@ function MessageRow({ message, now, active, nested = false, onSelect }: RowProps
 					{message.flagged ? (
 						<Icon name={IconName.Star} className="mb-row__flag" aria-hidden="true" />
 					) : null}
-					{subject}
+					<span className="mb-row__text">{subject}</span>
 				</span>
 				<span className="mb-row__snippet">
-					{message.bodyText.slice(0, 140)}
+					<span className="mb-row__text">{message.bodyText.slice(0, 140)}</span>
 					{message.attachments.length > 0 ? (
 						<Icon name={IconName.KindFile} className="mb-row__attach" aria-label={t("list.attachment")} />
 					) : null}
@@ -104,13 +104,15 @@ function ThreadRow({
 						{thread.flagged ? (
 							<Icon name={IconName.Star} className="mb-row__flag" aria-hidden="true" />
 						) : null}
-						{subject}
+						<span className="mb-row__text">{subject}</span>
 						<CountBadge count={thread.count} tone={CountBadgeTone.Accent} />
 					</span>
 					<span className="mb-row__snippet">
-						{plural(thread.count, "list.thread.count.one", "list.thread.count.other", {
-							count: thread.count,
-						})}
+						<span className="mb-row__text">
+							{plural(thread.count, "list.thread.count.one", "list.thread.count.other", {
+								count: thread.count,
+							})}
+						</span>
 						{thread.hasAttachments ? (
 							<Icon
 								name={IconName.KindFile}

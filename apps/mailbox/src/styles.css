@@ -31,8 +31,7 @@ body {
 .mb-rail__item:focus-visible,
 .mb-row:focus-visible,
 .mb-iconbtn:focus-visible,
-.mb-list__thread-toggle:focus-visible,
-.mb-body__remote-btn:focus-visible {
+.mb-list__thread-toggle:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -2px;
 }
@@ -321,6 +320,14 @@ body {
 	white-space: nowrap;
 }
 
+.mb-row__text {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .mb-row__flag {
 	flex: 0 0 auto;
 	width: 13px;
@@ -453,19 +460,6 @@ body {
 	opacity: 0.75;
 }
 
-.mb-reading__toolbar {
-	display: flex;
-	align-items: center;
-	gap: var(--space-1);
-	height: 44px;
-	padding: 0 var(--space-2);
-	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
-}
-
-.mb-reading__toolbar-spacer {
-	flex: 1;
-}
-
 .mb-iconbtn {
 	display: inline-flex;
 	align-items: center;
@@ -503,10 +497,28 @@ body {
 	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
 }
 
+.mb-reading__titlerow {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+	margin-bottom: var(--space-2);
+}
+
 .mb-reading__subject {
-	margin: 0 0 var(--space-2);
+	flex: 1;
+	min-width: 0;
+	margin: 0;
 	font-size: var(--text-size-lg);
 	font-weight: var(--text-weight-bold, 700);
+}
+
+/* Actions live on the subject line — a dedicated toolbar band wasted 44px
+ * and left two icons floating in an empty strip (owner report 2026-07-18). */
+.mb-reading__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	flex-shrink: 0;
 }
 
 .mb-reading__meta {
@@ -549,23 +561,14 @@ body {
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
-	padding: var(--space-2);
+	padding: var(--space-2) var(--space-3);
 	background: var(--warn-bg, var(--hover));
 	border-bottom: var(--border-width) solid var(--color-border-subtle, var(--border));
 }
 
-.mb-body__remote-btn {
+.mb-body__remote-show {
 	margin-left: auto;
-	padding: var(--space-1);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	color: var(--text);
-	cursor: pointer;
-}
-
-.mb-body__remote-btn:hover {
-	background: var(--hover);
+	flex-shrink: 0;
 }
 
 .mb-body__frame {
@@ -736,27 +739,6 @@ body {
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-2);
-}
-
-.mb-reading__action {
-	padding: var(--space-1);
-	border: 1px solid var(--color-border-subtle, var(--border));
-	border-radius: var(--radius-md);
-	background: transparent;
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-sm);
-	height: var(--control-height-sm);
-	cursor: pointer;
-}
-
-.mb-reading__action:hover {
-	background: var(--hover);
-}
-
-.mb-reading__action:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -2px;
 }
 
 /* ── Connect dialog — Gmail / IMAP mode toggle + host rows ──────────────── */
