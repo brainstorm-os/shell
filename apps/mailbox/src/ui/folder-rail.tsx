@@ -34,7 +34,10 @@ const ROLE_LABEL: Partial<Record<FolderRole, () => string>> = {
 
 function folderLabel(folder: FolderView): string {
 	const named = ROLE_LABEL[folder.role];
-	return named ? named() : folder.path;
+	if (named) return named();
+	// Servers report hierarchical paths ("INBOX/Social") — the INBOX/ prefix
+	// is transport detail, not a name the rail should show.
+	return folder.path.replace(/^INBOX\//i, "");
 }
 
 function selectionMatches(a: FolderSelection, b: FolderSelection): boolean {

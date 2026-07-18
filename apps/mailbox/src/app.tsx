@@ -73,6 +73,8 @@ type SyncNote = {
 	reconnect?: boolean;
 };
 
+const SYNC_NOTE_TTL_MS = 6000;
+
 export function MailboxApp(): ReactElement {
 	useMailboxT();
 	const rt = getBrainstorm();
@@ -103,6 +105,13 @@ export function MailboxApp(): ReactElement {
 	// Re-entry latch as a ref, not state: two clicks before a re-render would
 	// both see stale `syncBusy === false` and double-launch the sync.
 	const syncRunRef = useRef(false);
+
+	// Success/status notes dismiss themselves; errors stay until acted on.
+	useEffect(() => {
+		if (!syncNote || syncNote.kind !== SyncNoteKind.Info || syncBusy) return;
+		const timer = setTimeout(() => setSyncNote(null), SYNC_NOTE_TTL_MS);
+		return () => clearTimeout(timer);
+	}, [syncNote, syncBusy]);
 
 	const now = useRef(Date.now()).current;
 
