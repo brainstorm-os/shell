@@ -66,7 +66,7 @@ export function upgradeToHttps(url: string): string | null {
  * as Chrome. Anti-bot systems (X's Castle, Google sign-in) treat the Electron
  * token as an automation signal and 403 login/write flows even for a fully
  * interactive user — the page capabilities are identical either way, so the
- * honest-Chromium UA is the correct presentation (F-429).
+ * honest-Chromium UA is the correct presentation (F-433).
  */
 export function chromeEquivalentUserAgent(defaultUserAgent: string, appName?: string): string {
 	let ua = defaultUserAgent.replace(/\sElectron\/\S+/gi, "");

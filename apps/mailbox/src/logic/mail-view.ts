@@ -42,18 +42,20 @@ function flagArray(v: unknown): MailFlag[] {
 }
 
 export function accountsFromEntities(entities: readonly VaultEntityLike[]): AccountView[] {
-	return entities
-		// `enabled: false` is how `mail.disconnect` retires an account (the row
-		// survives so synced mail keeps its accountRef) — hide it from the UI.
-		.filter((e) => e.type === MAIL_ACCOUNT_TYPE_URL && e.properties.enabled !== false)
-		.map((e) => {
-			const address = str(e.properties.address);
-			return {
-				id: e.id,
-				address,
-				displayName: str(e.properties.displayName) || address,
-			};
-		});
+	return (
+		entities
+			// `enabled: false` is how `mail.disconnect` retires an account (the row
+			// survives so synced mail keeps its accountRef) — hide it from the UI.
+			.filter((e) => e.type === MAIL_ACCOUNT_TYPE_URL && e.properties.enabled !== false)
+			.map((e) => {
+				const address = str(e.properties.address);
+				return {
+					id: e.id,
+					address,
+					displayName: str(e.properties.displayName) || address,
+				};
+			})
+	);
 }
 
 export function foldersFromEntities(entities: readonly VaultEntityLike[]): FolderView[] {

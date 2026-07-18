@@ -5,7 +5,7 @@
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign } from "@brainstorm/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import type { MouseEvent as ReactMouseEvent, ReactElement } from "react";
+import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";
 import {
 	type AccountView,
