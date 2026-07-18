@@ -7,7 +7,7 @@
  * reorder + per-folder ordering can land without changing this surface.
  */
 
-import { type Entity, readName, readSize } from "../types/entity";
+import { type Entity, hasDisplayName, readName, readSize } from "../types/entity";
 
 export enum SortKey {
 	Manual = "manual",
@@ -47,6 +47,15 @@ export function sortEntities(
 	if (key === SortKey.Manual) return copy;
 	const sign = direction === SortDirection.Asc ? 1 : -1;
 	copy.sort((a, b) => {
+		// Untitled entities sink below named ones in a NAME sort, in BOTH
+		// directions (outside the sign flip) — "(untitled)" is a display
+		// fallback, and its "(" collating first put a wall of anonymous
+		// tiles at the top of every vault view (F-424).
+		if (key === SortKey.Name) {
+			const aNamed = hasDisplayName(a);
+			const bNamed = hasDisplayName(b);
+			if (aNamed !== bNamed) return aNamed ? -1 : 1;
+		}
 		const cmp = compareBy(a, b, key);
 		return cmp * sign;
 	});

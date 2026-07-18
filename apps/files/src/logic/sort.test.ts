@@ -82,3 +82,28 @@ describe("sort", () => {
 		expect(out.map((e) => e.id)).toEqual(["b", "a", "d", "c"]);
 	});
 });
+
+describe("untitled-last name sort (F-424)", () => {
+	const named = (id: string, name: string): Entity =>
+		({ id, type: "brainstorm/File/v1", properties: { name }, createdAt: 1, updatedAt: 1 }) as Entity;
+	const untitled = (id: string): Entity =>
+		({ id, type: "brainstorm/Note/v1", properties: {}, createdAt: 1, updatedAt: 1 }) as Entity;
+
+	it("sinks untitled entities below named ones ascending", () => {
+		const out = sortEntities(
+			[untitled("u1"), named("a", "alpha"), untitled("u2"), named("z", "zulu")],
+			SortKey.Name,
+			SortDirection.Asc,
+		);
+		expect(out.map((e) => e.id)).toEqual(["a", "z", "u1", "u2"]);
+	});
+
+	it("keeps untitled entities last even descending", () => {
+		const out = sortEntities(
+			[untitled("u1"), named("a", "alpha"), named("z", "zulu")],
+			SortKey.Name,
+			SortDirection.Desc,
+		);
+		expect(out.map((e) => e.id)).toEqual(["z", "a", "u1"]);
+	});
+});
