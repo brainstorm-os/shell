@@ -3,6 +3,127 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.5.1",
+      "date": "2026-07-18",
+      "icon": "🖼️",
+      "title": "Your files land, your numbers roll up",
+      "summary": "Anytype imports now bring the actual files into your documents — and Database learns rollups, the Agent can write into notes, and every drag has a keyboard twin.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "What's new"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Rollups in Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a new column kind that aggregates across a relation (count, sum, average, min, max) — and computed columns now show on cards and lists, not just the grid."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Agent → Notes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — an \"Add to note\" button on Agent replies inserts the answer into a note you pick (or links the chat), with provenance both ways. Only you can trigger it — never the model on its own."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Keyboard for every drag",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Move to folder, Link to note, Move to column, Move to date: every drag-and-drop now has a menu + shortcut twin, announced to screen readers."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "What's fixed"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Imported files really arrive",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — images render inside your imported documents and PDFs link to their files (an import that found 0 of 457 files now lands all the export carries)."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Re-import is truly an update",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — running the same import twice no longer duplicates note bodies or grows your vault by hundreds of MB, and a re-export under Anytype's new filename updates the same objects."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Imported tags and titles",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — tag values show in the Properties panel and imported notes open with their title in the editor."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Brainstorm links are clickable",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — links between your own objects and files no longer render as dead anchors."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "You'll be offered this one. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "If you're on 0.5.0, the update toast will bring 0.5.1 to you — or grab it in "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.0",
       "date": "2026-07-17",
       "icon": "🚚",
