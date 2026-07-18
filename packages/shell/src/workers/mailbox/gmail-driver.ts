@@ -23,6 +23,7 @@ import type {
 	RawMessage,
 	SubmitResult,
 } from "../../main/mailbox/mail-driver";
+import { FetchWalk } from "../../main/mailbox/mail-driver";
 import {
 	DriverErrorKind,
 	assertOutboundHeadersSafe,
@@ -344,7 +345,11 @@ export function makeGmailDriver(input: GmailDriverInput): MailDriver {
 			params.set("labelIds", labelId);
 			params.set("maxResults", String(Math.min(spec.limit, MAX_PAGE_SIZE)));
 			if (spec.cursor !== undefined) params.set("pageToken", spec.cursor);
-			if (spec.sinceMs !== undefined) params.set("q", `after:${Math.floor(spec.sinceMs / 1000)}`);
+			// Backfill (Mailbox-12): Gmail's list already walks newest→older via
+			// pageToken, so the older-walk is the same call minus the window bound.
+			if (spec.walk !== FetchWalk.Backfill && spec.sinceMs !== undefined) {
+				params.set("q", `after:${Math.floor(spec.sinceMs / 1000)}`);
+			}
 			const list = (await request(
 				"fetch",
 				`${USERS_ME}/messages?${params.toString()}`,

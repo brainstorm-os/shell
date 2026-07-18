@@ -76,6 +76,19 @@ function makePorts(state: FakeServerState): {
 			const row = rows.get(id);
 			if (row) row.properties = { ...row.properties, ...patch };
 		},
+		async listAccountFolders(accountRef) {
+			return [...rows.values()]
+				.filter((r) => r.type === MAIL_FOLDER_TYPE_URL && accountMatches(r, accountRef))
+				.map((r) => ({
+					id: r.id,
+					path: String(r.properties.path),
+					...(typeof r.properties.backfillCursor === "string"
+						? { backfillCursor: r.properties.backfillCursor }
+						: {}),
+					...(r.properties.backfillDone === true ? { backfillDone: true } : {}),
+				}));
+		},
+		backfillPageLimit: 1,
 		now: () => FIXED_NOW,
 	};
 
@@ -207,6 +220,55 @@ describe("MailSyncEngine.syncAccount", () => {
 		const { ports, emails } = makePorts(state);
 		await new MailSyncEngine(ports).syncAccount({ id: "acct-1", syncWindow: SyncWindow.Days30 });
 		expect(emails().some((e) => e.properties.messageId === "<old@x>")).toBe(false);
+	});
+});
+
+describe("MailSyncEngine.backfillAccount (Mailbox-12)", () => {
+	it("walks older pages per press, persists the cursor, and flags exhaustion", async () => {
+		const { ports, emails, folders } = makePorts(serverState());
+		const engine = new MailSyncEngine(ports);
+		await engine.syncAccount(account); // folders + both messages exist
+
+		// Page 1 (limit 1): newest again — dedupes to updated, cursor persists.
+		const first = await engine.backfillAccount(account);
+		expect(first.created).toBe(0);
+		expect(first.updated).toBe(1);
+		expect(first.done).toBe(false);
+		const inbox = folders().find((f) => f.properties.path === "INBOX");
+		expect(inbox?.properties.backfillCursor).toBe("1");
+		expect(inbox?.properties.backfillDone).toBeUndefined();
+
+		// Page 2: the older message — walk exhausts, done persisted.
+		const second = await engine.backfillAccount(account);
+		expect(second.done).toBe(true);
+		expect(folders().every((f) => f.properties.backfillDone === true)).toBe(true);
+		expect(emails().length).toBe(2);
+
+		// Page 3: nothing left — every folder skipped, still done.
+		const third = await engine.backfillAccount(account);
+		expect(third.created + third.updated).toBe(0);
+		expect(third.done).toBe(true);
+	});
+
+	it("creates genuinely older mail the windowed sync never fetched", async () => {
+		const state = serverState();
+		state.messages.INBOX?.push({
+			messageId: "<ancient@x>",
+			from: "Old <old@x.com>",
+			to: "you@x.com",
+			subject: "Ancient",
+			receivedAt: FIXED_NOW - 365 * 24 * 60 * 60 * 1000,
+			flags: [],
+			folderPath: "INBOX",
+		});
+		const { ports, emails } = makePorts(state);
+		const engine = new MailSyncEngine(ports);
+		await engine.syncAccount({ id: account.id, syncWindow: SyncWindow.Days30 });
+		expect(emails().some((e) => e.properties.messageId === "<ancient@x>")).toBe(false);
+
+		let result = await engine.backfillAccount(account);
+		while (!result.done) result = await engine.backfillAccount(account);
+		expect(emails().some((e) => e.properties.messageId === "<ancient@x>")).toBe(true);
 	});
 });
 

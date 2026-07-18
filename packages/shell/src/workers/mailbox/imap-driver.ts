@@ -29,6 +29,7 @@ import type {
 	RawMessage,
 	SubmitResult,
 } from "../../main/mailbox/mail-driver";
+import { FetchWalk } from "../../main/mailbox/mail-driver";
 import {
 	DriverErrorKind,
 	assertOutboundHeadersSafe,
@@ -263,6 +264,31 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 		},
 
 		async fetch(spec: FetchSpec): Promise<FetchResult> {
+			const fetchUids = async (
+				c: ImapClientLike,
+				picked: readonly number[],
+				uidValidity: string,
+			): Promise<RawMessage[]> => {
+				const out: RawMessage[] = [];
+				for (const uid of picked) {
+					const fetched = await c.fetchOne(
+						uid,
+						{ source: true, flags: true, internalDate: true },
+						{ uid: true },
+					);
+					if (!fetched || !fetched.source) continue;
+					const parsed = await parseSource(fetched.source);
+					out.push(
+						rawMessageFromParsed(parsed, {
+							folderPath: spec.folderPath,
+							flags: imapFlagsToMailFlags(fetched.flags ?? []),
+							fallbackMessageId: `<imap-${uidValidity}-${uid}@brainstorm.local>`,
+							receivedAtFallback: fetched.internalDate?.getTime() ?? now(),
+						}),
+					);
+				}
+				return out;
+			};
 			const client = await ensureImap();
 			let lock: ImapLockLike | null = null;
 			try {
@@ -277,6 +303,31 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 				// A UIDVALIDITY mismatch voids the cursor entirely — its lastUid
 				// belongs to the dead UID space and must not seed the new one.
 				const cursor = parsedCursor && parsedCursor.uidValidity === uidValidity ? parsedCursor : null;
+
+				if (spec.walk === FetchWalk.Backfill) {
+					// Older-walk (Mailbox-12): newest N strictly below the cursor's
+					// floor; `sinceMs` deliberately ignored — the user asked for
+					// mail beyond the window. A voided cursor restarts from the top
+					// (idempotent upserts absorb the overlap).
+					const floor = cursor ? cursor.lastUid : Number.POSITIVE_INFINITY;
+					if (floor <= 1) {
+						return { messages: [] };
+					}
+					const found =
+						floor === Number.POSITIVE_INFINITY
+							? await client.search({ all: true }, { uid: true })
+							: await client.search({ uid: `1:${floor - 1}` }, { uid: true });
+					const below = (found || []).filter((u) => u < floor);
+					const picked = selectNewestUids(below, spec.limit);
+					const messages = await fetchUids(client, picked, uidValidity);
+					const lowest = picked.reduce((min, u) => (u < min ? u : min), Number.POSITIVE_INFINITY);
+					const remaining = below.some((u) => u < lowest);
+					return {
+						messages,
+						...(remaining ? { nextCursor: formatImapCursor({ uidValidity, lastUid: lowest }) } : {}),
+					};
+				}
+
 				let uids: number[];
 				if (cursor) {
 					// Incremental: everything after the last seen UID. The `n:*`
@@ -293,24 +344,7 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 
 				const highestUid = uids.reduce((max, u) => (u > max ? u : max), cursor?.lastUid ?? 0);
 				const picked = selectNewestUids(uids, spec.limit);
-				const messages: RawMessage[] = [];
-				for (const uid of picked) {
-					const fetched = await client.fetchOne(
-						uid,
-						{ source: true, flags: true, internalDate: true },
-						{ uid: true },
-					);
-					if (!fetched || !fetched.source) continue;
-					const parsed = await parseSource(fetched.source);
-					messages.push(
-						rawMessageFromParsed(parsed, {
-							folderPath: spec.folderPath,
-							flags: imapFlagsToMailFlags(fetched.flags ?? []),
-							fallbackMessageId: `<imap-${uidValidity}-${uid}@brainstorm.local>`,
-							receivedAtFallback: fetched.internalDate?.getTime() ?? now(),
-						}),
-					);
-				}
+				const messages = await fetchUids(client, picked, uidValidity);
 
 				return {
 					messages,

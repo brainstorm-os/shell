@@ -596,6 +596,18 @@ body {
 	font-size: var(--text-size-sm);
 }
 
+.mb-list__footer {
+	display: flex;
+	justify-content: center;
+	padding: var(--space-3);
+	border-top: var(--border-width) solid var(--color-border-subtle, var(--border));
+}
+
+.mb-list__footer-done {
+	font-size: var(--text-size-xs);
+	color: var(--text-faint, var(--text));
+}
+
 /* ── Sync status bar (Mailbox-5) ─────────────────────────────────────── */
 
 .mb-syncbar {

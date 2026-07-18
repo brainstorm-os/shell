@@ -73,6 +73,7 @@ export function foldersFromEntities(entities: readonly VaultEntityLike[]): Folde
 				path: str(e.properties.path),
 				role,
 				unreadCount: typeof unread === "number" && Number.isFinite(unread) ? unread : 0,
+				backfillDone: e.properties.backfillDone === true,
 			};
 		});
 }
