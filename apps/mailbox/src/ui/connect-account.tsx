@@ -234,7 +234,9 @@ export function ConnectAccountDialog(props: {
 					</>
 				) : (
 					<>
-						<p className="mb-connect__help">{t("connect.imap.help")}</p>
+						<p className="mb-connect__help">
+							{t(seed !== undefined ? "connect.imap.help.reconnect" : "connect.imap.help")}
+						</p>
 						{field("connect.imap.address", address, setAddress, {
 							placeholder: t("connect.imap.address.placeholder"),
 							required: true,

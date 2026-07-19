@@ -24,6 +24,7 @@
   "connect.mode.gmail": "Google",
   "connect.mode.imap": "IMAP / SMTP",
   "connect.imap.help": "Introduce los datos de tu servidor de correo y tu contraseña. Algunos proveedores (Gmail, iCloud, Yahoo, Fastmail) rechazan la contraseña de la cuenta por IMAP — genera una contraseña de aplicación en su página de seguridad y úsala en su lugar. La contraseña se almacena de forma segura en el almacén de claves de esta bóveda; TLS es obligatorio — la conexión se actualiza mediante STARTTLS en un puerto sin TLS.",
+  "connect.imap.help.reconnect": "Actualiza los datos de conexión — vuelve a introducir la contraseña para guardar.",
   "connect.imap.address": "Dirección de correo",
   "connect.imap.address.placeholder": "tu@ejemplo.com",
   "connect.imap.username": "Nombre de usuario",
