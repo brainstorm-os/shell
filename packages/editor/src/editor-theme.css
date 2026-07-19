@@ -2732,3 +2732,27 @@ body.bs-table-col-resizing * {
 .notes__title {
 	padding-inline-start: calc(var(--doc-icon-size) + var(--doc-icon-gap));
 }
+
+/* ── Image figures (F-442) ──────────────────────────────────────────────
+ * The <figure> ships UNSTYLED without these: the UA default
+ * `margin: 1em 40px` pushes wide images past the content column, and an
+ * imported fixed pixel width (IE-10e carries Anytype's stored size) rides
+ * uncapped off the pane edge. Geometry is clamped HERE so every editor
+ * host inherits it; the inline width stays as the preferred size. */
+.bs-editor__image {
+	margin: var(--space-3) 0;
+	max-width: 100%;
+}
+
+.bs-editor__image img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	border-radius: var(--radius-sm);
+}
+
+.bs-editor__image-caption {
+	margin-top: var(--space-1);
+	font-size: var(--text-size-sm);
+	color: var(--text-dim, var(--text));
+}
