@@ -45,7 +45,9 @@ export const BOOKMARKS_MESSAGES = {
 
 	"empty.inbox": "No bookmarks in the inbox.",
 	"empty.read": "No read bookmarks yet.",
+	"empty.read.hint": "Mark a bookmark as read and it appears here.",
 	"empty.archive": "No archived bookmarks.",
+	"empty.archive.hint": "Archive a bookmark from its ⋯ menu and it lands here.",
 	"empty.tags.named": "No bookmarks tagged {tag}.",
 	"empty.tags.none": "No bookmarks yet — add tags as you save links.",
 	"empty.collection": "No bookmarks match this collection.",
