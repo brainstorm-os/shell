@@ -36,6 +36,7 @@ import {
 	senderLabel,
 	unifiedUnreadCount,
 } from "./logic/mail-view";
+import { SyncErrorClass, classifySyncError } from "./logic/sync-error";
 import { getBrainstorm } from "./runtime";
 import {
 	EMAIL_TYPE_URL,
@@ -287,19 +288,22 @@ export function MailboxApp(): ReactElement {
 				setSyncNote({ kind: SyncNoteKind.Info, text: t("sync.done", { created, updated }) });
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
-				// The driver maps credential rejections to "authentication failed"
-				// (DriverErrorKind.Denied) — surface the actionable hint instead of
-				// the raw wire error (owner hit this with a pasted app password).
-				setSyncNote(
-					/authentication failed/i.test(message)
-						? {
-								kind: SyncNoteKind.Error,
-								text: t("sync.errorAuth"),
-								reconnect: true,
-								...(failingAccount !== undefined ? { reconnectAccountRef: failingAccount } : {}),
-							}
-						: { kind: SyncNoteKind.Error, text: t("sync.error", { message }) },
-				);
+				// Repairable failure classes (credentials, connectivity) speak
+				// human and carry the reconnect affordance — Edit connection fixes
+				// a dead host exactly like a bad password (F-445, session 908).
+				const errorClass = classifySyncError(message);
+				const repairable = errorClass !== SyncErrorClass.Other;
+				setSyncNote({
+					kind: SyncNoteKind.Error,
+					text:
+						errorClass === SyncErrorClass.Auth
+							? t("sync.errorAuth")
+							: errorClass === SyncErrorClass.Connect
+								? t("sync.errorConnect")
+								: t("sync.error", { message }),
+					...(repairable ? { reconnect: true } : {}),
+					...(repairable && failingAccount !== undefined ? { reconnectAccountRef: failingAccount } : {}),
+				});
 			} finally {
 				syncRunRef.current = false;
 				setSyncBusy(false);

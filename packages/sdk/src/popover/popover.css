@@ -54,10 +54,16 @@
 	display: flex;
 	flex-direction: column;
 	color: var(--color-text-primary, inherit);
-	background: var(
-		--color-glass-background,
-		var(--color-background-elevated, #1c1c1f)
-	);
+	/* A veil of the elevated surface over the glass: pure glass let saturated
+	 * page content (a hero CTA) bleed through as blobs BEHIND form fields
+	 * (F-446, Marcus session 908). Keeps the frosted look, restores surface
+	 * legibility. */
+	background:
+		linear-gradient(
+			color-mix(in srgb, var(--color-background-elevated, #1c1c1f) 52%, transparent),
+			color-mix(in srgb, var(--color-background-elevated, #1c1c1f) 52%, transparent)
+		),
+		var(--color-glass-background, var(--color-background-elevated, #1c1c1f));
 	backdrop-filter: blur(var(--glass-blur, 24px)) saturate(var(--glass-saturate, 1.4));
 	-webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(var(--glass-saturate, 1.4));
 	border: var(--border-width) solid var(--color-glass-border, rgba(127, 127, 127, 0.28));
