@@ -30,6 +30,7 @@ import "./types";
 import { type LiveEntitiesSource, YDocProvider, useLiveEntities } from "@brainstorm/react-yjs";
 import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
 import { CountBadge } from "@brainstorm/sdk/count-badge";
+import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
 import type {
@@ -1457,12 +1458,16 @@ function MainPane(props: MainPaneProps) {
 			{header}
 			{banner}
 			{visibleBookmarks.length === 0 ? (
-				<div className="bookmarks__empty">
-					<p>{emptyMessage()}</p>
-					<button type="button" className="bs-btn" data-bs-primary="" onClick={props.onAdd}>
-						{t("action.addBookmark")}
-					</button>
-				</div>
+				<EmptyState
+					className="bookmarks__empty"
+					icon={IconName.KindLink}
+					title={emptyMessage()}
+					action={
+						<button type="button" className="bs-btn" data-bs-primary="" onClick={props.onAdd}>
+							{t("action.addBookmark")}
+						</button>
+					}
+				/>
 			) : (
 				<TagBoards
 					bookmarks={visibleBookmarks}

@@ -7,6 +7,7 @@
  */
 
 import "@brainstorm/sdk/app-theme.css";
+import "@brainstorm/sdk/empty-state.css";
 import { setEditorHost } from "@brainstorm/editor";
 import { initAnalytics } from "@brainstorm/sdk/analytics";
 import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
