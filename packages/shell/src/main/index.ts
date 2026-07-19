@@ -1577,6 +1577,9 @@ void app.whenReady().then(async () => {
 		path: feedbackSettingsPath(app.getPath("userData")),
 		buildTimeDefaultEndpoint: feedbackBuildTimeEndpoint,
 	});
+	// Dev/CI: lets a localhost collector receive the loop end-to-end.
+	// Release builds never set this env; the Net-1b SSRF floor still applies.
+	const feedbackAllowPrivate = process.env.BRAINSTORM_FEEDBACK_ALLOW_PRIVATE === "1";
 	// Seed the stable per-install correlation id before any renderer boots.
 	// Reused as Amplitude's anonymous `deviceId` (not vault / crypto identity).
 	const feedbackSettings = await feedbackSettingsStore.load();
@@ -1591,6 +1594,7 @@ void app.whenReady().then(async () => {
 		},
 		settingsStore: feedbackSettingsStore,
 		getVaultPath: () => getActiveVaultSession()?.vaultPath ?? null,
+		allowPrivateEndpoint: feedbackAllowPrivate,
 	});
 	// Feedback-2 — opt-in crash reporter. Shell-only service (never
 	// broker-exposed). Three pieces wire up here:
@@ -1621,6 +1625,7 @@ void app.whenReady().then(async () => {
 			auditSink: makeFileAuditSink(networkAuditPath),
 		},
 		getBootStartMs: () => crashBootStartMs,
+		allowPrivateEndpoint: feedbackAllowPrivate,
 	});
 	const { crashReporter: electronCrashReporter } = await import("electron");
 	installCrashHooks({

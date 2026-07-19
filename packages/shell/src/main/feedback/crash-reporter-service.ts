@@ -92,6 +92,9 @@ export type CrashReporterServiceOptions = {
 	readonly executeOptions?: ExecuteOptions;
 	readonly now?: () => number;
 	readonly getBootStartMs?: () => number;
+	/** Dev/CI only (`BRAINSTORM_FEEDBACK_ALLOW_PRIVATE=1`) — see
+	 *  `FeedbackServiceOptions.allowPrivateEndpoint`. */
+	readonly allowPrivateEndpoint?: boolean;
 };
 
 export class CrashReporterService {
@@ -106,6 +109,7 @@ export class CrashReporterService {
 	private readonly executeOptions: ExecuteOptions | undefined;
 	private readonly now: () => number;
 	private readonly bootStartMs: number;
+	private readonly allowPrivateEndpoint: boolean;
 	private localCounter: LocalCrashCounter = { count: 0, lastCapturedAt: null };
 
 	constructor(options: CrashReporterServiceOptions) {
@@ -120,6 +124,7 @@ export class CrashReporterService {
 		this.executeOptions = options.executeOptions;
 		this.now = options.now ?? Date.now;
 		this.bootStartMs = options.getBootStartMs?.() ?? this.now();
+		this.allowPrivateEndpoint = options.allowPrivateEndpoint ?? false;
 	}
 
 	/** Assemble a payload, redact, then enqueue (or count locally if the
@@ -202,6 +207,7 @@ export class CrashReporterService {
 						body,
 						sizeCapBytes: CRASH_POST_SIZE_CAP_BYTES,
 						timeoutMs: CRASH_POST_TIMEOUT_MS,
+						...(this.allowPrivateEndpoint ? { allowPrivate: true } : {}),
 					},
 					this.executeOptions,
 				);

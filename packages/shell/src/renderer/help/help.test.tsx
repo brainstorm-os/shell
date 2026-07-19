@@ -368,6 +368,29 @@ describe("<Help>", () => {
 		expect(onOpenWhatsNew).toHaveBeenCalledTimes(1);
 	});
 
+	it("Report-on-GitHub opens the public tracker through the external-link path", async () => {
+		const fetchCorpus = vi.fn().mockResolvedValue(makeCorpus());
+		const fetchArticle = vi.fn(async () => makeCorpus().articles[0] ?? null);
+		const search = vi.fn().mockResolvedValue([]);
+		const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+		act(() =>
+			root.render(
+				<Help
+					onClose={() => undefined}
+					fetchCorpus={fetchCorpus}
+					fetchArticle={fetchArticle}
+					search={search}
+				/>,
+			),
+		);
+		await flushPromises();
+		const button = container.querySelector<HTMLButtonElement>('[data-testid="help-report-github"]');
+		expect(button).not.toBeNull();
+		act(() => button?.click());
+		expect(openSpy).toHaveBeenCalledWith("https://github.com/brainstorm-os/shell/issues/new/choose");
+		openSpy.mockRestore();
+	});
+
 	it("hides the What's-new entry point when onOpenWhatsNew is not wired", async () => {
 		const fetchCorpus = vi.fn().mockResolvedValue(makeCorpus());
 		const fetchArticle = vi.fn(async () => makeCorpus().articles[0] ?? null);

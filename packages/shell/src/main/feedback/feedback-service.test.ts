@@ -188,6 +188,26 @@ describe("FeedbackService", () => {
 		expect(parsed.contactEmail).toBe("me@self.example");
 	});
 
+	it("passes allowPrivate only when allowPrivateEndpoint is set (dev/CI localhost loop)", async () => {
+		await store.patch({ enabled: true, endpoint: "https://admin.example/api/feedback" });
+		const recorded: Recorded[] = [];
+		const makeService = (allowPrivateEndpoint: boolean) =>
+			new FeedbackService({
+				fetcher: async (req) => {
+					recorded.push({ request: req, opts: makeExecOptions() });
+					return { status: 200, headers: {}, body: new Uint8Array(), finalUrl: req.url };
+				},
+				executeOptions: makeExecOptions(),
+				settingsStore: store,
+				getVaultPath: () => "",
+				allowPrivateEndpoint,
+			});
+		await makeService(false).submit(makePayload());
+		await makeService(true).submit(makePayload());
+		expect(recorded[0]?.request.allowPrivate).toBeUndefined();
+		expect(recorded[1]?.request.allowPrivate).toBe(true);
+	});
+
 	it("strips contactEmail under Anonymous even if the caller set it", async () => {
 		await store.patch({ enabled: true, endpoint: "https://admin.example/api/feedback" });
 		const recorded: Recorded[] = [];
