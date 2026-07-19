@@ -144,6 +144,11 @@ export function BookmarkDetail({
 	captureState,
 	onCapture,
 }: BookmarkDetailProps): React.ReactElement {
+	// A source label that just repeats the title (domain-titled captures) is
+	// noise — fall back to the full URL, which stays a useful link face
+	// (F-448, Marcus session 909/909b).
+	const sourceName = bookmark.siteName ?? domainFromUrl(bookmark.url) ?? bookmark.url;
+	const sourceLabel = sourceName === bookmark.title ? bookmark.url : sourceName;
 	// The editable body lives in the bookmark entity's `UniversalBody/v1` Y.Doc,
 	// resolved + persisted through the shared `entities.applyDoc` transport every
 	// body-bearing entity uses. `useUniversalBody` subscribes to the body root so
@@ -321,7 +326,7 @@ export function BookmarkDetail({
 					/>
 				</div>
 				<a className="bm-detail__source" href={bookmark.url} target="_blank" rel="noopener noreferrer">
-					{bookmark.siteName ?? domainFromUrl(bookmark.url) ?? bookmark.url}
+					{sourceLabel}
 				</a>
 				{captureState === CaptureState.Capturing ? (
 					<p className="bm-detail__capturing" role="status" aria-live="polite">
