@@ -466,17 +466,11 @@ body.is-resizing .bookmarks__resize {
 	font-size: var(--text-size-sm);
 }
 
+/* Empty surface is the shared `<EmptyState>` (hero) — only the pane
+ * centering stays local (F-444). */
 .bookmarks__empty {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: var(--space-3);
-	color: var(--text-faint);
-	padding: var(--space-6);
-}
-
-.bookmarks__empty p {
-	margin: 0;
+	flex: 1;
+	justify-content: center;
 }
 
 /* ── Cards ───────────────────────────────────────────────────────────── */
