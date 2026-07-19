@@ -44,6 +44,41 @@ describe("anytypeBlocksToLexical", () => {
 		onFileBlock: () => {},
 	};
 
+	it("a numbered run split across layout-Div wrappers stays ONE list (F-443)", () => {
+		const byId = new Map<string, Record<string, unknown>>([
+			["root", { id: "root", childrenIds: ["w1", "w2", "w3"] }],
+			["w1", { id: "w1", layout: { style: "Div" }, childrenIds: ["n1", "n2"] }],
+			["w2", { id: "w2", layout: { style: "Div" }, childrenIds: ["n3"] }],
+			["w3", { id: "w3", layout: { style: "Div" }, childrenIds: ["n4"] }],
+			["n1", textBlock("n1", "einen Termin haben", "Numbered")],
+			["n2", textBlock("n2", "einen Termin frei", "Numbered")],
+			["n3", textBlock("n3", "bitte heute kommen", "Numbered")],
+			["n4", textBlock("n4", "ist dringend", "Numbered")],
+		]);
+		const { state } = anytypeBlocksToLexical(byId, ["w1", "w2", "w3"], handlers);
+		const children = (state.root as { children: Array<Record<string, unknown>> }).children;
+		const lists = children.filter((c) => c.type === "list");
+		expect(lists).toHaveLength(1);
+		expect((lists[0]?.children as unknown[]).length).toBe(4);
+	});
+
+	it("Row/Column layouts keep their own numbering scope (client parity)", () => {
+		const byId = new Map<string, Record<string, unknown>>([
+			["root", { id: "root", childrenIds: ["row"] }],
+			["row", { id: "row", layout: { style: "Row" }, childrenIds: ["colA", "colB"] }],
+			["colA", { id: "colA", layout: { style: "Column" }, childrenIds: ["a1"] }],
+			["colB", { id: "colB", layout: { style: "Column" }, childrenIds: ["b1"] }],
+			["a1", textBlock("a1", "left one", "Numbered")],
+			["b1", textBlock("b1", "right one", "Numbered")],
+		]);
+		const { state } = anytypeBlocksToLexical(byId, ["row"], handlers);
+		const children = (state.root as { children: Array<Record<string, unknown>> }).children;
+		const lists = children.filter((c) => c.type === "list");
+		// Two separate single-item lists — each column restarts at 1, as the
+		// Anytype client does.
+		expect(lists).toHaveLength(2);
+	});
+
 	it("emits heading, paragraph, lists, checkbox, quote, hr, image", () => {
 		const byId = new Map<string, Record<string, unknown>>([
 			["root", { id: "root", childrenIds: ["h", "p", "ul1", "ul2", "c", "q", "hr", "img"] }],

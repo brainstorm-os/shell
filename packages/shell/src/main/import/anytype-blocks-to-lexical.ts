@@ -414,7 +414,30 @@ export function anytypeBlocksToLexical(
 		return convertChildren(stringArray(block.childrenIds));
 	};
 
-	function convertChildren(ids: readonly string[]): SerializedNode[] {
+	/** Anytype's client splices layout-`Div` wrappers inline BEFORE numbering
+	 *  (`updateNumbersTree`'s `unwrap`): a numbered run split across invisible
+	 *  Div wrappers is ONE consecutive run. Mirror it here or each wrapper
+	 *  opens a fresh grouping scope and every item renders as "1." (F-443).
+	 *  Row/Column layouts deliberately keep their own scope — the client
+	 *  restarts numbering per cell too. */
+	function flattenLayoutDivs(ids: readonly string[]): string[] {
+		const out: string[] = [];
+		for (const id of ids) {
+			if (visited.has(id) || CHROME_BLOCK_IDS.has(id)) continue;
+			const block = byId.get(id);
+			const layout = block ? asRecord(block.layout) : null;
+			if (layout && asString(layout.style) === "Div" && block) {
+				visited.add(id);
+				out.push(...flattenLayoutDivs(stringArray(block.childrenIds)));
+			} else {
+				out.push(id);
+			}
+		}
+		return out;
+	}
+
+	function convertChildren(rawIds: readonly string[]): SerializedNode[] {
+		const ids = flattenLayoutDivs(rawIds);
 		const out: SerializedNode[] = [];
 		let i = 0;
 		while (i < ids.length) {
