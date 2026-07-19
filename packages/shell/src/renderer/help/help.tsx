@@ -29,6 +29,11 @@ import { HelpSearchbar } from "./help-searchbar";
 import { HelpSidebar } from "./help-sidebar";
 import { useHelpRoute } from "./use-help-route";
 
+/** Public tracker for the zero-infra feedback path — opens through the
+ *  external-link ladder (`wireExternalLinkRouting` denies the popup and
+ *  routes the URL), so the user lands on the prefilled issue templates. */
+const GITHUB_ISSUES_URL = "https://github.com/brainstorm-os/shell/issues/new/choose";
+
 export type HelpProps = {
 	readonly onClose: () => void;
 	readonly initialTopicId?: string | null;
@@ -203,6 +208,15 @@ export function Help({
 								{t("shell.help.openWhatsNew")}
 							</Button>
 						)}
+						<Button
+							variant={ButtonVariant.Ghost}
+							size={ButtonSize.Md}
+							iconLeft={IconName.ArrowUpRight}
+							onClick={() => window.open(GITHUB_ISSUES_URL)}
+							data-testid="help-report-github"
+						>
+							{t("shell.help.reportOnGithub")}
+						</Button>
 						<Button
 							variant={ButtonVariant.Ghost}
 							size={ButtonSize.Md}

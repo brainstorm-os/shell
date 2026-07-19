@@ -87,6 +87,7 @@ export type FeedbackDialogProps = {
 	/** Test hooks; production wires `window.brainstorm.feedback.*`. */
 	readonly submit?: (payload: FeedbackPayload) => Promise<{ ok: true; requestId: string }>;
 	readonly fetchSettings?: () => Promise<FeedbackSettings>;
+	readonly updateSettings?: (patch: { enabled: boolean }) => Promise<FeedbackSettings>;
 	readonly fetchRecentLog?: () => Promise<string>;
 	readonly clientVersion?: string;
 	readonly clientPlatform?: string;
@@ -105,6 +106,7 @@ export function FeedbackDialog({
 	initialKind = FeedbackKind.Bug,
 	submit,
 	fetchSettings,
+	updateSettings,
 	fetchRecentLog,
 	clientVersion,
 	clientPlatform,
@@ -123,9 +125,17 @@ export function FeedbackDialog({
 	const [settings, setSettings] = useState<FeedbackSettings | null>(null);
 	const [state, setState] = useState<SubmitState>({ kind: "idle" });
 
+	const [enabling, setEnabling] = useState(false);
+
 	const settingsFetcher = useMemo(
 		() => fetchSettings ?? (async () => window.brainstorm.feedback.settings.get()),
 		[fetchSettings],
+	);
+	const settingsUpdater = useMemo(
+		() =>
+			updateSettings ??
+			(async (patch: { enabled: boolean }) => window.brainstorm.feedback.settings.set(patch)),
+		[updateSettings],
 	);
 	const submitter = useMemo(
 		() => submit ?? (async (payload: FeedbackPayload) => window.brainstorm.feedback.submit(payload)),
@@ -251,7 +261,22 @@ export function FeedbackDialog({
 			<form className="feedback-dialog" onSubmit={onSubmit} data-testid="feedback-form">
 				{optInBanner && (
 					<p className="feedback-dialog__banner" role="alert">
-						{t("shell.feedback.optInBanner")}
+						{t("shell.feedback.optInBanner")}{" "}
+						<Button
+							variant={ButtonVariant.Neutral}
+							size={ButtonSize.Md}
+							loading={enabling}
+							onClick={() => {
+								setEnabling(true);
+								settingsUpdater({ enabled: true })
+									.then((s) => setSettings(s))
+									.catch(() => {})
+									.finally(() => setEnabling(false));
+							}}
+							data-testid="feedback-enable"
+						>
+							{t("shell.feedback.enableNow")}
+						</Button>
 					</p>
 				)}
 				{endpointMissingBanner && (

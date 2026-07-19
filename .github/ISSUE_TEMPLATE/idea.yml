@@ -1,0 +1,16 @@
+name: Idea / feature request
+description: Something Brainstorm should be able to do
+labels: ["feedback", "idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like Brainstorm to do, and what would it help you accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle this today?
+      description: The workaround or tool you currently use, if any.

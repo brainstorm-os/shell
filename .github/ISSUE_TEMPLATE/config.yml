@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: In-app feedback
+    url: https://github.com/brainstorm-os/shell#readme
+    about: "Prefer not to use GitHub? Brainstorm's Help → Send feedback sends a redacted report directly (opt-in)."

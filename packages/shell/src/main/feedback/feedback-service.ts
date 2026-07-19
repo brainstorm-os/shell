@@ -106,6 +106,11 @@ export type FeedbackServiceOptions = {
 	 *  vaults between opening the dialog and clicking Send). */
 	readonly getVaultPath: () => string | null;
 	readonly now?: () => number;
+	/** Dev/CI only (`BRAINSTORM_FEEDBACK_ALLOW_PRIVATE=1`): sets Net-1b
+	 *  `allowPrivate` on the endpoint POST so a localhost collector can
+	 *  receive the loop end-to-end. The SSRF floor still applies; release
+	 *  builds never set the env. */
+	readonly allowPrivateEndpoint?: boolean;
 };
 
 export class FeedbackService {
@@ -114,6 +119,7 @@ export class FeedbackService {
 	private readonly settingsStore: FeedbackSettingsStore;
 	private readonly getVaultPath: () => string | null;
 	private readonly now: () => number;
+	private readonly allowPrivateEndpoint: boolean;
 
 	constructor(options: FeedbackServiceOptions) {
 		this.fetcher = options.fetcher;
@@ -121,6 +127,7 @@ export class FeedbackService {
 		this.settingsStore = options.settingsStore;
 		this.getVaultPath = options.getVaultPath;
 		this.now = options.now ?? Date.now;
+		this.allowPrivateEndpoint = options.allowPrivateEndpoint ?? false;
 	}
 
 	async submit(payload: FeedbackPayload): Promise<FeedbackSubmitResult> {
@@ -168,6 +175,7 @@ export class FeedbackService {
 					body,
 					sizeCapBytes: FEEDBACK_POST_SIZE_CAP_BYTES,
 					timeoutMs: FEEDBACK_POST_TIMEOUT_MS,
+					...(this.allowPrivateEndpoint ? { allowPrivate: true } : {}),
 				},
 				this.executeOptions,
 			);

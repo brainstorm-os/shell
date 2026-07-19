@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Brainstorm broke or behaved wrong
+labels: ["feedback", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Brainstorm better. Please don't include vault
+        content or anything private — describe the behavior, not your data.
+  - type: input
+    id: version
+    attributes:
+      label: Brainstorm version
+      description: Settings → What's new shows the current version.
+      placeholder: "0.6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, console errors (Help → Send feedback can attach a redacted log excerpt automatically).

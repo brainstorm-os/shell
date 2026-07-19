@@ -231,6 +231,37 @@ describe("submitPending", () => {
 		expect(await queue.count()).toBe(0);
 	});
 
+	it("passes allowPrivate on the POST only when allowPrivateEndpoint is set", async () => {
+		const flags: (boolean | undefined)[] = [];
+		const fetcher: Fetcher = async (req) => {
+			flags.push(req.allowPrivate);
+			return { status: 200, headers: {}, body: new Uint8Array(), finalUrl: req.url };
+		};
+		for (const allowPrivateEndpoint of [false, true]) {
+			const svc = new CrashReporterService({
+				queue,
+				settingsStore: store,
+				getVaultPath: () => "/Users/alice/Vault",
+				clientVersion: "test-build",
+				clientPlatform: "darwin",
+				readRecentLog: () => "log",
+				newRequestId: () => `req_${flags.length}`,
+				fetcher,
+				executeOptions: {
+					fetchImpl: async () => {
+						throw new Error("not used — fetcher is injected");
+					},
+					lookupHost: async () => [],
+					auditSink: async () => {},
+				},
+				allowPrivateEndpoint,
+			});
+			await svc.capture({ kind: CrashKind.UncaughtException, message: "boom" });
+			await svc.submitPending();
+		}
+		expect(flags).toEqual([undefined, true]);
+	});
+
 	it("drops 4xx responses and removes them from the queue", async () => {
 		const fetcher: Fetcher = async () => ({
 			status: 400,

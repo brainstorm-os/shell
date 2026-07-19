@@ -230,6 +230,36 @@ describe("<FeedbackDialog>", () => {
 		expect(banners.length).toBeGreaterThan(0);
 	});
 
+	it("banner Enable button flips the opt-in in place — no Settings round-trip", async () => {
+		const updateSettings = vi.fn().mockResolvedValue(makeEnabledSettings({ enabled: true }));
+		act(() =>
+			root.render(
+				<FeedbackDialog
+					onClose={() => undefined}
+					submit={vi.fn()}
+					fetchSettings={vi.fn().mockResolvedValue(makeEnabledSettings({ enabled: false }))}
+					updateSettings={updateSettings}
+					fetchRecentLog={vi.fn().mockResolvedValue("")}
+				/>,
+			),
+		);
+		await flushPromises();
+		const enableBtn = $('[data-testid="feedback-enable"]') as HTMLButtonElement;
+		expect(enableBtn).not.toBeNull();
+		act(() => enableBtn.click());
+		await flushPromises();
+		expect(updateSettings).toHaveBeenCalledWith({ enabled: true });
+		expect($('[data-testid="feedback-enable"]')).toBeNull();
+		const title = $('[data-testid="feedback-title"]') as HTMLInputElement;
+		const body = $('[data-testid="feedback-body"]') as HTMLTextAreaElement;
+		act(() => {
+			changeInput(title, "A title");
+			changeInput(body, "A body");
+		});
+		const submitBtn = $('[data-testid="feedback-submit"]') as HTMLButtonElement;
+		expect(submitBtn.disabled).toBe(false);
+	});
+
 	it("renders the endpoint-missing banner when endpoint is null", async () => {
 		act(() =>
 			root.render(
