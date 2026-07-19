@@ -158,7 +158,11 @@ export function BookmarkCard({
 	listItemProps,
 }: BookmarkCardProps) {
 	const cardSurface = surfaceFor(bookmark);
-	const source = bookmark.siteName ?? domainFromUrl(bookmark.url);
+	const rawSource = bookmark.siteName ?? domainFromUrl(bookmark.url);
+	// A captured title that IS the domain ("example.com / example.com") makes
+	// the meta row pure repetition — show the domain only when it adds
+	// information (F-448, Marcus session 909).
+	const source = rawSource && rawSource !== bookmark.title ? rawSource : null;
 	const kind = classifyMediaType(bookmark.mediaType);
 	const showSurfacePill = surface === BookmarkSurface.Tags && cardSurface !== BookmarkSurface.Inbox;
 
