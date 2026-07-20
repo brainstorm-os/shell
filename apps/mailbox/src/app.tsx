@@ -8,7 +8,8 @@
  */
 
 import { useVaultEntities } from "@brainstorm/react-yjs";
-import { MailFlag, SendIntentVerb } from "@brainstorm/sdk-types";
+import { openEntity } from "@brainstorm/sdk";
+import { FILE_ENTITY_TYPE, MailFlag, SendIntentVerb } from "@brainstorm/sdk-types";
 import { EmptyState } from "@brainstorm/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm/sdk/icon";
 import { MenuAlign } from "@brainstorm/sdk/menus";
@@ -398,6 +399,29 @@ export function MailboxApp(): ReactElement {
 		[mailSvc],
 	);
 
+	// Fetch-then-open (Mailbox-6). The service is idempotent per part, so a
+	// re-click reuses the existing File entity instead of re-downloading.
+	const onOpenAttachment = useCallback(
+		async (partRef: string) => {
+			if (!mailSvc || !intentsSvc || !activeId) {
+				throw new Error("attachments unavailable");
+			}
+			const file = await mailSvc.fetchAttachment({ emailRef: activeId, partRef });
+			await openEntity(
+				{
+					services: {
+						intents: {
+							dispatch: (intent) =>
+								intentsSvc.dispatch(intent as Parameters<typeof intentsSvc.dispatch>[0]),
+						},
+					},
+				},
+				{ entityId: file.fileRef, entityType: FILE_ENTITY_TYPE },
+			);
+		},
+		[mailSvc, intentsSvc, activeId],
+	);
+
 	const onConnect = useCallback(
 		async (input: ConnectAccountInput) => {
 			if (!mailSvc) throw new Error(t("sync.error", { message: "mail service unavailable" }));
@@ -606,6 +630,7 @@ export function MailboxApp(): ReactElement {
 						onToggleRead={toggleRead}
 						onToggleFlag={toggleFlag}
 						{...(canCompose ? { onReply, onForward } : {})}
+						{...(mailSvc && intentsSvc ? { onOpenAttachment } : {})}
 					/>
 				</div>
 			)}

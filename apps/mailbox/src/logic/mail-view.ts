@@ -5,7 +5,13 @@
  * vault (the demo path uses the exact same functions).
  */
 
-import { type MailAddress, MailFlag, formatMailAddress, isMailFlag } from "@brainstorm/sdk-types";
+import {
+	type MailAddress,
+	type MailAttachmentPart,
+	MailFlag,
+	formatMailAddress,
+	isMailFlag,
+} from "@brainstorm/sdk-types";
 import {
 	type AccountView,
 	EMAIL_TYPE_URL,
@@ -33,6 +39,27 @@ function addrArray(v: unknown): MailAddress[] {
 		if (item && typeof item === "object" && typeof (item as MailAddress).address === "string") {
 			out.push(item as MailAddress);
 		}
+	}
+	return out;
+}
+
+/** A part with no `partRef` can never be fetched, so it is dropped rather
+ *  than rendered as a chip that would always fail. */
+function attachmentPartArray(v: unknown): MailAttachmentPart[] {
+	if (!Array.isArray(v)) return [];
+	const out: MailAttachmentPart[] = [];
+	for (const item of v) {
+		if (!item || typeof item !== "object") continue;
+		const candidate = item as Record<string, unknown>;
+		if (typeof candidate.partRef !== "string" || candidate.partRef.length === 0) continue;
+		if (typeof candidate.filename !== "string" || candidate.filename.length === 0) continue;
+		const part: MailAttachmentPart = {
+			partRef: candidate.partRef,
+			filename: candidate.filename,
+		};
+		if (typeof candidate.mimeType === "string") part.mimeType = candidate.mimeType;
+		if (typeof candidate.sizeBytes === "number") part.sizeBytes = candidate.sizeBytes;
+		out.push(part);
 	}
 	return out;
 }
@@ -115,6 +142,7 @@ export function toMessageView(e: VaultEntityLike): MessageView {
 		bodyText: str(e.properties.bodyText),
 		bodyHtmlSafe: str(e.properties.bodyHtmlSafe),
 		attachments: strArray(e.properties.attachments),
+		attachmentParts: attachmentPartArray(e.properties.attachmentParts),
 		flags,
 		tags: strArray(e.properties.tags),
 		unread: flags.includes(MailFlag.Unread),

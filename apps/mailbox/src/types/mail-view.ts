@@ -12,11 +12,12 @@ import {
 	MAIL_ACCOUNT_TYPE_URL,
 	MAIL_FOLDER_TYPE_URL,
 	type MailAddress,
+	type MailAttachmentPart,
 	MailFlag,
 } from "@brainstorm/sdk-types";
 
 export { EMAIL_TYPE_URL, MAIL_ACCOUNT_TYPE_URL, MAIL_FOLDER_TYPE_URL, FolderRole, MailFlag };
-export type { MailAddress };
+export type { MailAddress, MailAttachmentPart };
 
 /** The minimal entity shape Mailbox consumes from the vault snapshot. */
 export type VaultEntityLike = {
@@ -64,7 +65,12 @@ export type MessageView = {
 	receivedAt: number;
 	bodyText: string;
 	bodyHtmlSafe: string;
+	/** `File/v1` refs for parts whose bytes are already in the vault. */
 	attachments: string[];
+	/** What the server says the message carries (Mailbox-6). Present without
+	 *  any download — chips render from this, and fetching a part on demand
+	 *  is what mints its `File/v1`. */
+	attachmentParts: MailAttachmentPart[];
 	flags: MailFlag[];
 	tags: string[];
 	unread: boolean;

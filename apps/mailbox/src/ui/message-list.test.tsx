@@ -37,6 +37,7 @@ function message(id: string, threadKey: string, subject: string): MessageView {
 		bodyText: "body",
 		bodyHtmlSafe: "",
 		attachments: [],
+		attachmentParts: [],
 		flags: [],
 		tags: [],
 		unread: false,

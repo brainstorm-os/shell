@@ -118,6 +118,7 @@ export default defineConfig({
 			"@brainstorm/sdk/perf": resolve(__dirname, "packages/sdk/src/perf.ts"),
 			"@brainstorm/sdk/date-buckets": resolve(__dirname, "packages/sdk/src/date-buckets.ts"),
 			"@brainstorm/sdk/date-formatters": resolve(__dirname, "packages/sdk/src/date-formatters.ts"),
+			"@brainstorm/sdk/format-bytes": resolve(__dirname, "packages/sdk/src/format-bytes.ts"),
 			"@brainstorm/sdk/find-replace": resolve(__dirname, "packages/sdk/src/find-replace/index.ts"),
 			"@brainstorm/sdk/frustum-cull": resolve(__dirname, "packages/sdk/src/frustum-cull.ts"),
 			"@brainstorm/sdk/in-memory-entities": resolve(
