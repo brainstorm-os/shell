@@ -663,3 +663,172 @@ describe("mail.disconnect (imap)", () => {
 		expect(store.rows.get(accountId)?.properties.enabled).toBe(false);
 	});
 });
+
+describe("mail.fetchAttachment", () => {
+	const PART = "m1:att-1";
+
+	function makeAssetStore() {
+		const written: { bytes: Uint8Array; mime: string }[] = [];
+		const bound: string[] = [];
+		const store = {
+			writeAsset: vi.fn(async (input: { bytes: Uint8Array; mime: string }) => {
+				written.push({ bytes: input.bytes, mime: input.mime });
+				return { assetId: `asset-${written.length}`, contentHash: "hash" };
+			}),
+			markBound: vi.fn((assetId: string) => {
+				bound.push(assetId);
+				return true;
+			}),
+		};
+		return { store, written, bound };
+	}
+
+	function seed(store: ReturnType<typeof makeFakeStore>, parts: unknown) {
+		store.insert(CONNECTOR_TYPE_URL, {
+			connectorAppId: MAILBOX_APP_ID,
+			oauth: { clientId: "cid" },
+		});
+		const account = store.insert(MAIL_ACCOUNT_TYPE_URL, {
+			address: "me@example.com",
+			protocol: MailProtocol.GmailApi,
+			authKind: AuthKind.OAuth2,
+			syncWindow: SyncWindow.Days30,
+			enabled: true,
+			connectorAccountRef: "conn-acc-1",
+		});
+		const folder = store.insert(MAIL_FOLDER_TYPE_URL, {
+			accountRef: account.id,
+			path: "INBOX",
+			role: "inbox",
+			unreadCount: 0,
+		});
+		const email = store.insert(EMAIL_TYPE, {
+			accountRef: account.id,
+			folderRefs: [folder.id],
+			messageId: "<msg-1@mail.gmail.com>",
+			from: [],
+			to: [],
+			receivedAt: 1,
+			flags: [],
+			attachmentParts: parts,
+		});
+		return { account, folder, email };
+	}
+
+	function setup(parts: unknown = [{ partRef: PART, filename: "report.pdf" }]) {
+		const store = makeFakeStore();
+		const { deps, driver } = makeDeps(store);
+		const assets = makeAssetStore();
+		deps.getAssetStore = async () =>
+			assets.store as unknown as NonNullable<
+				Awaited<ReturnType<NonNullable<MailServiceDeps["getAssetStore"]>>>
+			>;
+		const fetchAttachment = vi.fn(async () => ({ bytes: new Uint8Array([1, 2, 3, 4]) }));
+		driver.fetchAttachment = fetchAttachment;
+		const ids = seed(store, parts);
+		return { store, deps, assets, driver, fetchAttachment, ...ids };
+	}
+
+	it("fetches the part, binds an asset, and links a File entity onto the email", async () => {
+		const { store, deps, assets, fetchAttachment, email } = setup();
+		const handler = makeMailServiceHandler(deps);
+		const result = (await handler(
+			envelope("fetchAttachment", { emailRef: email.id, partRef: PART }),
+		)) as { fileRef: string; mime: string; size: number; alreadyFetched: boolean };
+
+		// Folder + account came from the stored email, not the caller.
+		expect(fetchAttachment).toHaveBeenCalledWith({ folderPath: "INBOX", partRef: PART });
+		expect(result.size).toBe(4);
+		expect(result.mime).toBe("application/pdf");
+		expect(result.alreadyFetched).toBe(false);
+		expect(assets.bound).toEqual(["asset-1"]);
+
+		const file = store.rows.get(result.fileRef);
+		// F-421: without assetMime the Files tile never renders a thumbnail.
+		expect(file?.properties.assetMime).toBe("application/pdf");
+		expect(file?.properties.assetId).toBe("asset-1");
+		expect(store.rows.get(email.id)?.properties.attachments).toEqual([result.fileRef]);
+	});
+
+	it("refuses a part the email does not declare, without reaching the driver", async () => {
+		const { deps, fetchAttachment, email } = setup();
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("fetchAttachment", { emailRef: email.id, partRef: "m9:evil" })),
+		).rejects.toMatchObject({ message: expect.stringContaining("no such attachment") });
+		expect(fetchAttachment).not.toHaveBeenCalled();
+	});
+
+	it("refuses a ref that is not an email", async () => {
+		const { deps, fetchAttachment, folder } = setup();
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("fetchAttachment", { emailRef: folder.id, partRef: PART })),
+		).rejects.toMatchObject({ message: expect.stringContaining("no such email") });
+		expect(fetchAttachment).not.toHaveBeenCalled();
+	});
+
+	it("replays an already-fetched part without re-downloading or minting a second file", async () => {
+		const { store, deps, assets, fetchAttachment, email } = setup();
+		const handler = makeMailServiceHandler(deps);
+		const first = (await handler(
+			envelope("fetchAttachment", { emailRef: email.id, partRef: PART }),
+		)) as { fileRef: string };
+		const second = (await handler(
+			envelope("fetchAttachment", { emailRef: email.id, partRef: PART }),
+		)) as { fileRef: string; alreadyFetched: boolean };
+
+		expect(second.fileRef).toBe(first.fileRef);
+		expect(second.alreadyFetched).toBe(true);
+		expect(fetchAttachment).toHaveBeenCalledTimes(1);
+		expect(assets.written).toHaveLength(1);
+		expect(store.rows.get(email.id)?.properties.attachments).toEqual([first.fileRef]);
+	});
+
+	it("reports Unavailable when the account's driver cannot address parts", async () => {
+		const { deps, email } = setup();
+		// A driver from before the seam existed: no `fetchAttachment` at all.
+		deps.transport = { ...deps.transport, driverFor: () => makeFakeDriver() };
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("fetchAttachment", { emailRef: email.id, partRef: PART })),
+		).rejects.toMatchObject({ message: expect.stringContaining("unsupported") });
+	});
+
+	it("denies the call when the app lacks mail.manage, before any fetch", async () => {
+		const { deps, fetchAttachment, email } = setup();
+		const has = vi.fn().mockReturnValue(false);
+		deps.getLedger = () =>
+			Promise.resolve({ has } as unknown as Awaited<
+				ReturnType<NonNullable<MailServiceDeps["getLedger"]>>
+			>);
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("fetchAttachment", { emailRef: email.id, partRef: PART })),
+		).rejects.toMatchObject({ message: expect.stringContaining(`lacks ${MAIL_MANAGE_CAP}`) });
+		expect(has).toHaveBeenCalledWith(MAILBOX_APP_ID, MAIL_MANAGE_CAP);
+		expect(fetchAttachment).not.toHaveBeenCalled();
+	});
+
+	it("closes the driver even when the fetch fails", async () => {
+		const { deps, driver, email } = setup();
+		const closeSpy = vi.spyOn(driver, "close");
+		driver.fetchAttachment = vi.fn().mockRejectedValue(new Error("wire blew up"));
+		const handler = makeMailServiceHandler(deps);
+		await expect(
+			handler(envelope("fetchAttachment", { emailRef: email.id, partRef: PART })),
+		).rejects.toBeDefined();
+		expect(closeSpy).toHaveBeenCalled();
+	});
+
+	it("ignores malformed entries in the stored parts list", async () => {
+		const { deps, fetchAttachment, email } = setup([
+			null,
+			{ filename: "no-ref.pdf" },
+			{ partRef: PART, filename: "report.pdf" },
+		]);
+		const handler = makeMailServiceHandler(deps);
+		await handler(envelope("fetchAttachment", { emailRef: email.id, partRef: PART }));
+		expect(fetchAttachment).toHaveBeenCalledTimes(1);
+	});
+});

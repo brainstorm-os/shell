@@ -648,6 +648,17 @@ export type MailBackfillSummary = {
 	finishedAt: string;
 };
 
+/** The `File/v1` entity an attachment's bytes landed in, returned by
+ *  `mail.fetchAttachment`. `alreadyFetched` marks the idempotent replay —
+ *  the part was materialised earlier and no new bytes moved. */
+export type MailAttachmentFile = {
+	fileRef: string;
+	name: string;
+	mime: string;
+	size: number;
+	alreadyFetched: boolean;
+};
+
 /** Summary of one account sync, returned by `mail.syncNow`. */
 export type MailSyncSummary = {
 	accountRef: string;
@@ -697,6 +708,14 @@ export type MailService = {
 	/** One bounded "load older" pass (Mailbox-12): walks each folder one page
 	 *  further into history; `done` when every folder is exhausted. */
 	loadOlder(input: { accountRef: string }): Promise<MailBackfillSummary>;
+	/** Fetch one of an email's attachments into a `File/v1` entity on user
+	 *  demand (Mailbox-6). `partRef` must be one the email itself declares in
+	 *  `attachmentParts` — the shell resolves the account and folder from the
+	 *  stored email, never from the caller. Idempotent per part. */
+	fetchAttachment(input: {
+		emailRef: string;
+		partRef: string;
+	}): Promise<MailAttachmentFile>;
 	/** Revoke the account's token (Tier 2 delete) and disable the account. */
 	disconnect(input: { accountRef: string }): Promise<{ ok: true }>;
 };

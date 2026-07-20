@@ -27,8 +27,10 @@ import {
 	AuthKind,
 	CONNECTOR_TYPE_URL,
 	EMAIL_TYPE_URL,
+	FILE_ENTITY_TYPE,
 	MAIL_ACCOUNT_TYPE_URL,
 	MAIL_FOLDER_TYPE_URL,
+	type MailAttachmentPart,
 	type MailFlag,
 	type MailHostConfig,
 	MailProtocol,
@@ -38,12 +40,15 @@ import {
 } from "@brainstorm/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import type { AssetStore } from "../assets/asset-store";
+import { AssetKind } from "../assets/asset-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import { requireServiceCapability } from "../connectors/connectors-service";
 import { type ConnectorEgress, decodeJsonResponse } from "../connectors/egress";
 import type { OAuthBroker, ProviderConfig } from "../connectors/oauth-broker";
 import type { RedirectProvider } from "../connectors/oauth-redirect";
 import type { CredentialStore } from "../credentials/store";
+import { servedMimeForName } from "../files/upload-mime";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo/entities-repo";
 import type { DriverCredentials, MailDriver } from "./mail-driver";
 import {
@@ -96,6 +101,9 @@ export type MailServiceDeps = {
 	 *  keeps its custody inside the OAuth broker. */
 	getCredentials?: () => CredentialStore | null;
 	getLedger?: () => Promise<CapabilityLedger | null>;
+	/** Asset custody for fetched attachments (Mailbox-6) — bytes land as an
+	 *  encrypted asset bound to the `File/v1` entity, never on the email. */
+	getAssetStore?: () => Promise<AssetStore | null>;
 	now?: () => number;
 };
 
@@ -271,6 +279,25 @@ export function createMailService(deps: MailServiceDeps): MailServiceApi {
 		}
 	};
 
+	// Two concurrent fetches of one part would both miss the already-fetched
+	// check and mint a File entity each, orphaning an asset.
+	const attachmentInFlight = new Set<string>();
+	const fetchAttachment = async (
+		emailRef: string,
+		partRef: string,
+	): Promise<FetchAttachmentResultView> => {
+		const slot = `${emailRef} ${partRef}`;
+		if (attachmentInFlight.has(slot)) {
+			throw makeError("Unavailable", "mail.fetchAttachment: this attachment is already fetching");
+		}
+		attachmentInFlight.add(slot);
+		try {
+			return await runFetchAttachment(deps, emailRef, partRef);
+		} finally {
+			attachmentInFlight.delete(slot);
+		}
+	};
+
 	const send = async (raw: unknown): Promise<SendResult> => {
 		const input = validateMailSendInput(raw);
 		if (sendInFlight.has(input.submissionId)) {
@@ -299,6 +326,14 @@ export function createMailService(deps: MailServiceDeps): MailServiceApi {
 				await requireServiceCapability(envelope, deps.getLedger, MAIL_MANAGE_CAP, "mail");
 				const arg = objectArg(envelope);
 				return await loadOlder(requireString(arg.accountRef, "accountRef", "loadOlder"));
+			}
+			case "fetchAttachment": {
+				await requireServiceCapability(envelope, deps.getLedger, MAIL_MANAGE_CAP, "mail");
+				const arg = objectArg(envelope);
+				return await fetchAttachment(
+					requireString(arg.emailRef, "emailRef", "fetchAttachment"),
+					requireString(arg.partRef, "partRef", "fetchAttachment"),
+				);
 			}
 			case "disconnect":
 				return await handleDisconnect(envelope, deps);
@@ -790,4 +825,155 @@ async function handleDisconnect(envelope: Envelope, deps: MailServiceDeps): Prom
 		patch: { enabled: false },
 	});
 	return { ok: true };
+}
+
+export type FetchAttachmentResultView = {
+	/** The `File/v1` entity now holding the bytes. */
+	fileRef: string;
+	name: string;
+	mime: string;
+	size: number;
+	/** True when the part had already been fetched and no new bytes moved. */
+	alreadyFetched: boolean;
+};
+
+/** The server path of the first folder the email still lives in — a message
+ *  can carry several labels (Gmail), any of which can address the part. */
+function folderPathForEmail(repo: EntitiesRepository, email: EntityRow): string | null {
+	const refs = Array.isArray(email.properties.folderRefs) ? email.properties.folderRefs : [];
+	for (const ref of refs) {
+		if (typeof ref !== "string") continue;
+		const folder = repo.get(ref);
+		if (folder?.type !== MAIL_FOLDER_TYPE_URL) continue;
+		const path = optionalString(folder.properties.path);
+		if (path) return path;
+	}
+	return null;
+}
+
+function readAttachmentParts(value: unknown): MailAttachmentPart[] {
+	if (!Array.isArray(value)) return [];
+	const parts: MailAttachmentPart[] = [];
+	for (const entry of value) {
+		if (!entry || typeof entry !== "object") continue;
+		const candidate = entry as Record<string, unknown>;
+		const partRef = optionalString(candidate.partRef);
+		const filename = optionalString(candidate.filename);
+		if (!partRef || !filename) continue;
+		const part: MailAttachmentPart = { partRef, filename };
+		const mimeType = optionalString(candidate.mimeType);
+		if (mimeType) part.mimeType = mimeType;
+		if (typeof candidate.sizeBytes === "number") part.sizeBytes = candidate.sizeBytes;
+		parts.push(part);
+	}
+	return parts;
+}
+
+/**
+ * Materialise one attachment into a `File/v1` entity (Mailbox-6).
+ *
+ * Everything the fetch acts on is resolved from the stored `Email/v1` row —
+ * the caller supplies only which email and which of *its* parts. A `partRef`
+ * that the email does not itself declare is refused, so holding
+ * `entities.write:Email/v1` cannot be turned into "fetch an arbitrary part of
+ * any message in the mailbox"; the account and folder likewise come from the
+ * row, never from the caller.
+ */
+async function runFetchAttachment(
+	deps: MailServiceDeps,
+	emailRef: string,
+	partRef: string,
+): Promise<FetchAttachmentResultView> {
+	const repo = await requireRepo(deps);
+	const email = repo.get(emailRef);
+	if (!email || email.type !== EMAIL_TYPE_URL) {
+		throw makeError("Invalid", "mail.fetchAttachment: no such email");
+	}
+	const part = readAttachmentParts(email.properties.attachmentParts).find(
+		(p) => p.partRef === partRef,
+	);
+	if (!part) {
+		throw makeError("Invalid", "mail.fetchAttachment: this email declares no such attachment");
+	}
+
+	const assetStore = (await deps.getAssetStore?.()) ?? null;
+	if (!assetStore) {
+		throw makeError("Unavailable", "mail.fetchAttachment: asset store unavailable");
+	}
+
+	// Re-fetching an already-materialised part would orphan the previous asset,
+	// so the existing File entity wins.
+	const existingRefs = Array.isArray(email.properties.attachments)
+		? email.properties.attachments.filter((r): r is string => typeof r === "string")
+		: [];
+	for (const ref of existingRefs) {
+		const file = repo.get(ref);
+		if (file && optionalString(file.properties.mailPartRef) === partRef) {
+			return {
+				fileRef: ref,
+				name: optionalString(file.properties.name) ?? part.filename,
+				mime: optionalString(file.properties.mime) ?? servedMimeForName(part.filename),
+				size: typeof file.properties.size === "number" ? file.properties.size : 0,
+				alreadyFetched: true,
+			};
+		}
+	}
+
+	const accountRef = optionalString(email.properties.accountRef);
+	if (!accountRef) {
+		throw makeError("Invalid", "mail.fetchAttachment: email has no account");
+	}
+	const folderPath = folderPathForEmail(repo, email);
+	if (!folderPath) {
+		throw makeError("Invalid", "mail.fetchAttachment: email has no resolvable folder");
+	}
+
+	const resolved = await resolveMailAccount(deps, accountRef, "fetchAttachment");
+	if (resolved.row.properties.enabled !== true) {
+		throw makeError("Invalid", "mail.fetchAttachment: account is disabled");
+	}
+	const driver = await connectDriver(deps, resolved);
+	let bytes: Uint8Array;
+	try {
+		if (!driver.fetchAttachment) {
+			throw makeError("Unavailable", "mail.fetchAttachment: unsupported for this account");
+		}
+		({ bytes } = await driver.fetchAttachment({ folderPath, partRef }));
+	} finally {
+		await driver.close().catch(() => {});
+	}
+
+	// Mime comes from the filename, not the server's claim — the served type
+	// decides how the renderer treats the bytes (F-421: `assetMime` or the
+	// Files tile never renders a thumbnail).
+	const mime = servedMimeForName(part.filename);
+	const { assetId } = await assetStore.writeAsset({ bytes, mime, kind: AssetKind.Upload });
+	assetStore.markBound(assetId);
+
+	const created = (await deps.callEntities(MAILBOX_APP_ID, "create", {
+		type: FILE_ENTITY_TYPE,
+		properties: {
+			name: part.filename,
+			mime,
+			assetMime: mime,
+			size: bytes.length,
+			assetId,
+			attachment: `brainstorm://asset/${assetId}`,
+			mailPartRef: partRef,
+			mailEmailRef: emailRef,
+		},
+	})) as { id: string };
+
+	await deps.callEntities(MAILBOX_APP_ID, "update", {
+		id: emailRef,
+		patch: { attachments: [...existingRefs, created.id] },
+	});
+
+	return {
+		fileRef: created.id,
+		name: part.filename,
+		mime,
+		size: bytes.length,
+		alreadyFetched: false,
+	};
 }
