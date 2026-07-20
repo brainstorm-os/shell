@@ -2685,6 +2685,7 @@ export type {
 	EmailDef,
 	MailAccountDef,
 	MailAddress,
+	MailAttachmentPart,
 	MailFolderDef,
 	MailHostConfig,
 	MailIssue,

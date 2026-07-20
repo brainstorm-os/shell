@@ -21,6 +21,8 @@ import { createRequire } from "node:module";
 import { MailProtocol } from "@brainstorm/sdk-types";
 import type {
 	DriverCredentials,
+	FetchAttachmentResult,
+	FetchAttachmentSpec,
 	FetchResult,
 	FetchSpec,
 	MailDriver,
@@ -29,7 +31,7 @@ import type {
 	RawMessage,
 	SubmitResult,
 } from "../../main/mailbox/mail-driver";
-import { FetchWalk } from "../../main/mailbox/mail-driver";
+import { FetchWalk, MAX_ATTACHMENT_BYTES } from "../../main/mailbox/mail-driver";
 import {
 	DriverErrorKind,
 	assertOutboundHeadersSafe,
@@ -42,6 +44,7 @@ import {
 	formatImapCursor,
 	imapFlagsToMailFlags,
 	parseImapCursor,
+	parseImapPartRef,
 	rawMessageFromParsed,
 	selectNewestUids,
 } from "./imap-projection";
@@ -284,6 +287,8 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 							flags: imapFlagsToMailFlags(fetched.flags ?? []),
 							fallbackMessageId: `<imap-${uidValidity}-${uid}@brainstorm.local>`,
 							receivedAtFallback: fetched.internalDate?.getTime() ?? now(),
+							uid,
+							uidValidity,
 						}),
 					);
 				}
@@ -351,6 +356,56 @@ export function makeImapSmtpDriver(input: ImapDriverInput): MailDriver {
 					...(highestUid > 0
 						? { nextCursor: formatImapCursor({ uidValidity, lastUid: highestUid }) }
 						: {}),
+				};
+			} catch (error) {
+				throw toDriverError(error);
+			} finally {
+				lock?.release();
+			}
+		},
+
+		async fetchAttachment(spec: FetchAttachmentSpec): Promise<FetchAttachmentResult> {
+			const addr = parseImapPartRef(spec.partRef);
+			if (!addr) {
+				throw driverError(DriverErrorKind.Invalid, "imap: malformed attachment part reference");
+			}
+			const limit = Math.min(spec.maxBytes ?? MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_BYTES);
+			const client = await ensureImap();
+			let lock: ImapLockLike | null = null;
+			try {
+				lock = await client.getMailboxLock(spec.folderPath);
+				const mailbox = client.mailbox;
+				const uidValidity =
+					mailbox && typeof mailbox === "object" && mailbox.uidValidity !== undefined
+						? mailbox.uidValidity.toString()
+						: "0";
+				// A recreated mailbox reuses uids for different messages, so a stale
+				// part ref must fail rather than return some other message's bytes.
+				if (uidValidity !== addr.uidValidity) {
+					throw driverError(
+						DriverErrorKind.Invalid,
+						"imap: attachment reference is stale (uidValidity changed)",
+					);
+				}
+				const fetched = await client.fetchOne(addr.uid, { source: true }, { uid: true });
+				if (!fetched || !fetched.source) {
+					throw driverError(DriverErrorKind.Invalid, "imap: message no longer available");
+				}
+				const parsed = await parseSource(fetched.source);
+				const attachment = (parsed.attachments ?? [])[addr.index];
+				if (!attachment?.content) {
+					throw driverError(DriverErrorKind.Invalid, "imap: attachment part not found");
+				}
+				const bytes = attachment.content;
+				if (bytes.length > limit) {
+					throw driverError(
+						DriverErrorKind.Invalid,
+						`imap: attachment exceeds ${limit} bytes (got ${bytes.length})`,
+					);
+				}
+				return {
+					bytes,
+					...(attachment.contentType !== undefined ? { mimeType: attachment.contentType } : {}),
 				};
 			} catch (error) {
 				throw toDriverError(error);

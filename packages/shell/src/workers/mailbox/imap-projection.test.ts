@@ -81,6 +81,8 @@ const meta = {
 	flags: [MailFlag.Unread],
 	fallbackMessageId: "<imap-1-99@brainstorm.local>",
 	receivedAtFallback: 1_700_000_000_000,
+	uid: 99,
+	uidValidity: "1",
 };
 
 async function parse(eml: string): Promise<ParsedSourceLike> {
@@ -115,9 +117,11 @@ describe("rawMessageFromParsed (real mailparser fixtures)", () => {
 		expect(raw.bodyHtml).toContain("<b>good</b>");
 	});
 
-	it("surfaces attachment names and keeps the body part", async () => {
+	it("surfaces attachment metadata addressed by uid and keeps the body part", async () => {
 		const raw = rawMessageFromParsed(await parse(ATTACHMENT_EML), meta);
-		expect(raw.attachmentNames).toEqual(["deck.pdf"]);
+		expect(raw.attachmentParts).toEqual([
+			expect.objectContaining({ filename: "deck.pdf", partRef: "1:99:0" }),
+		]);
 		expect(raw.bodyText).toContain("Deck attached.");
 	});
 

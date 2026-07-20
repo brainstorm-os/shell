@@ -8,6 +8,7 @@
  * cached UID per RFC 3501 §2.3.1.1 — the cursor fails closed to a re-walk).
  */
 
+import type { MailAttachmentPart } from "@brainstorm/sdk-types";
 import { FolderRole, MailFlag } from "@brainstorm/sdk-types";
 import type { RawMessage } from "../../main/mailbox/mail-driver";
 
@@ -93,7 +94,14 @@ export type ParsedSourceLike = {
 	date?: Date;
 	text?: string;
 	html?: string | false;
-	attachments?: { filename?: string }[];
+	attachments?: {
+		filename?: string;
+		contentType?: string;
+		size?: number;
+		/** Decoded bytes — only read by the on-demand attachment fetch; the
+		 *  sync projection ignores it so a page of mail never retains bodies. */
+		content?: Uint8Array;
+	}[];
 };
 
 function addressHeaderText(
@@ -124,7 +132,32 @@ export type ParsedMessageMeta = {
 	/** IMAP INTERNALDATE in epoch ms, used when the Date header is missing
 	 *  or unparseable. */
 	receivedAtFallback: number;
+	/** Addressing pair for a later attachment fetch (Mailbox-6). `uidValidity`
+	 *  rides along so a mailbox that was recreated server-side invalidates the
+	 *  stored part refs instead of silently fetching a different message. */
+	uid: number;
+	uidValidity: string;
 };
+
+/** IMAP part address: the attachment's index within the re-parsed source,
+ *  qualified by the uid it belongs to. */
+export function imapPartRef(uidValidity: string, uid: number, index: number): string {
+	return `${uidValidity}:${uid}:${index}`;
+}
+
+export function parseImapPartRef(
+	partRef: string,
+): { uidValidity: string; uid: number; index: number } | null {
+	const parts = partRef.split(":");
+	if (parts.length !== 3) return null;
+	const [uidValidity, uidText, indexText] = parts as [string, string, string];
+	const uid = Number(uidText);
+	const index = Number(indexText);
+	if (uidValidity.length === 0) return null;
+	if (!Number.isSafeInteger(uid) || uid <= 0) return null;
+	if (!Number.isSafeInteger(index) || index < 0) return null;
+	return { uidValidity, uid, index };
+}
 
 /** A parsed RFC 822 source + IMAP fetch metadata → the driver-contract
  *  `RawMessage` (header strings stay raw; the shared `mail-projection`
@@ -137,9 +170,19 @@ export function rawMessageFromParsed(
 	const cc = addressHeaderText(parsed.cc);
 	const references = referencesList(parsed.references);
 	const dateMs = parsed.date?.getTime();
-	const attachmentNames = (parsed.attachments ?? [])
-		.map((a) => a.filename)
-		.filter((name): name is string => typeof name === "string" && name.length > 0);
+	// Index is the position in the parsed list, so the fetch path must re-parse
+	// with the same parser to address the same part.
+	const attachmentParts: MailAttachmentPart[] = [];
+	(parsed.attachments ?? []).forEach((a, index) => {
+		if (typeof a.filename !== "string" || a.filename.length === 0) return;
+		const part: MailAttachmentPart = {
+			partRef: imapPartRef(meta.uidValidity, meta.uid, index),
+			filename: a.filename,
+		};
+		if (a.contentType !== undefined) part.mimeType = a.contentType;
+		if (typeof a.size === "number") part.sizeBytes = a.size;
+		attachmentParts.push(part);
+	});
 	const html = typeof parsed.html === "string" && parsed.html.length > 0 ? parsed.html : undefined;
 	return {
 		messageId: parsed.messageId ?? meta.fallbackMessageId,
@@ -154,6 +197,6 @@ export function rawMessageFromParsed(
 		...(html !== undefined ? { bodyHtml: html } : {}),
 		flags: meta.flags,
 		folderPath: meta.folderPath,
-		...(attachmentNames.length > 0 ? { attachmentNames } : {}),
+		...(attachmentParts.length > 0 ? { attachmentParts } : {}),
 	};
 }

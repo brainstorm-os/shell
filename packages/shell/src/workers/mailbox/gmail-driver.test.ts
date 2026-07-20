@@ -205,7 +205,7 @@ describe("makeGmailDriver", () => {
 				bodyHtml: "<p>html body</p>",
 				flags: [MailFlag.Unread, MailFlag.Flagged],
 				folderPath: "INBOX",
-				attachmentNames: ["report.pdf"],
+				attachmentParts: [{ partRef: "m1:att-1", filename: "report.pdf", mimeType: "application/pdf" }],
 			});
 		});
 
@@ -232,7 +232,7 @@ describe("makeGmailDriver", () => {
 			expect(messages[0]?.flags).toEqual([]);
 			expect(messages[0]?.bodyText).toBe("hi");
 			expect(messages[0]?.bodyHtml).toBeUndefined();
-			expect(messages[0]?.attachmentNames).toBeUndefined();
+			expect(messages[0]?.attachmentParts).toBeUndefined();
 		});
 
 		it("returns nextPageToken as nextCursor", async () => {
@@ -398,5 +398,42 @@ describe("makeGmailDriver", () => {
 		await driver.fetch({ folderPath: "INBOX", limit: 5 });
 		expect(requests.filter((r) => new URL(r.url).pathname.endsWith("/labels"))).toHaveLength(2);
 		expect(requests.length).toBeGreaterThan(warmCount);
+	});
+
+	describe("fetchAttachment", () => {
+		const ATT_PATH = "/gmail/v1/users/me/messages/m1/attachments/att-1";
+
+		it("fetches the addressed part and decodes its bytes", async () => {
+			const { driver, requests } = makeDriver((url) => {
+				if (url.pathname === ATT_PATH) {
+					return { size: 5, data: Buffer.from("hello", "utf8").toString("base64url") };
+				}
+				return labelRoutes(url) ?? {};
+			});
+			const out = await driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "m1:att-1" });
+			expect(Buffer.from(out?.bytes ?? new Uint8Array()).toString("utf8")).toBe("hello");
+			expect(requests.some((r) => new URL(r.url).pathname === ATT_PATH)).toBe(true);
+		});
+
+		it("rejects a malformed part reference without calling the API", async () => {
+			const { driver, requests } = makeDriver((url) => labelRoutes(url) ?? {});
+			await expect(
+				driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "no-separator" }),
+			).rejects.toThrow(/malformed/);
+			expect(requests).toHaveLength(0);
+		});
+
+		it("refuses bytes past the cap even when the server under-declares size", async () => {
+			const { driver } = makeDriver((url) => {
+				if (url.pathname === ATT_PATH) {
+					// Declares 1 byte, returns 100 — the cap must follow what arrived.
+					return { size: 1, data: Buffer.alloc(100, 0x41).toString("base64url") };
+				}
+				return labelRoutes(url) ?? {};
+			});
+			await expect(
+				driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "m1:att-1", maxBytes: 10 }),
+			).rejects.toThrow(/exceeds/);
+		});
 	});
 });

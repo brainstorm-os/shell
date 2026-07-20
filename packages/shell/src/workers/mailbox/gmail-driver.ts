@@ -12,9 +12,12 @@
  */
 
 import { Buffer } from "node:buffer";
+import type { MailAttachmentPart } from "@brainstorm/sdk-types";
 import { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
 import type {
 	DriverCredentials,
+	FetchAttachmentResult,
+	FetchAttachmentSpec,
 	FetchResult,
 	FetchSpec,
 	MailDriver,
@@ -23,7 +26,7 @@ import type {
 	RawMessage,
 	SubmitResult,
 } from "../../main/mailbox/mail-driver";
-import { FetchWalk } from "../../main/mailbox/mail-driver";
+import { FetchWalk, MAX_ATTACHMENT_BYTES } from "../../main/mailbox/mail-driver";
 import {
 	DriverErrorKind,
 	assertOutboundHeadersSafe,
@@ -84,7 +87,7 @@ type GmailLabelList = { labels?: GmailLabel[] };
 type GmailMessageRef = { id?: string };
 type GmailMessageList = { messages?: GmailMessageRef[]; nextPageToken?: string };
 type GmailHeader = { name?: string; value?: string };
-type GmailPartBody = { data?: string; attachmentId?: string };
+type GmailPartBody = { data?: string; attachmentId?: string; size?: number };
 type GmailPart = {
 	mimeType?: string;
 	filename?: string;
@@ -118,25 +121,49 @@ function headerValue(headers: GmailHeader[] | undefined, name: string): string |
 	return undefined;
 }
 
-type BodyAccumulator = { text?: string; html?: string; attachmentNames: string[] };
+type BodyAccumulator = { text?: string; html?: string; attachments: MailAttachmentPart[] };
 
-function walkParts(part: GmailPart | undefined, out: BodyAccumulator): void {
+/** Gmail addresses an attachment by (message id, attachment id), so the
+ *  `partRef` carries both — the fetch needs no other state. */
+function gmailPartRef(messageId: string, attachmentId: string): string {
+	return `${messageId}:${attachmentId}`;
+}
+
+function parseGmailPartRef(partRef: string): { messageId: string; attachmentId: string } | null {
+	const split = partRef.indexOf(":");
+	if (split <= 0 || split === partRef.length - 1) return null;
+	return {
+		messageId: partRef.slice(0, split),
+		attachmentId: partRef.slice(split + 1),
+	};
+}
+
+function walkParts(part: GmailPart | undefined, out: BodyAccumulator, messageId: string): void {
 	if (!part) return;
 	const isAttachment = (part.filename ?? "").length > 0;
-	if (isAttachment && part.filename) out.attachmentNames.push(part.filename);
+	const attachmentId = part.body?.attachmentId;
+	if (isAttachment && part.filename && attachmentId) {
+		const meta: MailAttachmentPart = {
+			partRef: gmailPartRef(messageId, attachmentId),
+			filename: part.filename,
+		};
+		if (part.mimeType !== undefined) meta.mimeType = part.mimeType;
+		if (typeof part.body?.size === "number") meta.sizeBytes = part.body.size;
+		out.attachments.push(meta);
+	}
 	const data = part.body?.data;
 	if (!isAttachment && data !== undefined && data.length > 0) {
 		const mime = (part.mimeType ?? "").toLowerCase();
 		if (mime === MIME_TEXT_PLAIN && out.text === undefined) out.text = decodeBase64Url(data);
 		else if (mime === MIME_TEXT_HTML && out.html === undefined) out.html = decodeBase64Url(data);
 	}
-	for (const child of part.parts ?? []) walkParts(child, out);
+	for (const child of part.parts ?? []) walkParts(child, out, messageId);
 }
 
 function projectMessage(message: GmailMessage, folderPath: string): RawMessage {
 	const headers = message.payload?.headers;
-	const body: BodyAccumulator = { attachmentNames: [] };
-	walkParts(message.payload, body);
+	const body: BodyAccumulator = { attachments: [] };
+	walkParts(message.payload, body, message.id ?? "");
 
 	const from = headerValue(headers, "From") ?? "";
 	const to = headerValue(headers, "To");
@@ -167,7 +194,7 @@ function projectMessage(message: GmailMessage, folderPath: string): RawMessage {
 		...(body.html !== undefined ? { bodyHtml: body.html } : {}),
 		flags,
 		folderPath,
-		...(body.attachmentNames.length > 0 ? { attachmentNames: body.attachmentNames } : {}),
+		...(body.attachments.length > 0 ? { attachmentParts: body.attachments } : {}),
 	};
 }
 
@@ -365,6 +392,30 @@ export function makeGmailDriver(input: GmailDriverInput): MailDriver {
 				messages,
 				...(list.nextPageToken !== undefined ? { nextCursor: list.nextPageToken } : {}),
 			};
+		},
+
+		async fetchAttachment(spec: FetchAttachmentSpec): Promise<FetchAttachmentResult> {
+			const parsed = parseGmailPartRef(spec.partRef);
+			if (!parsed) {
+				throw driverError(DriverErrorKind.Invalid, "gmail: malformed attachment part reference");
+			}
+			const limit = Math.min(spec.maxBytes ?? MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_BYTES);
+			const body = (await request(
+				"fetchAttachment",
+				`${USERS_ME}/messages/${encodeURIComponent(parsed.messageId)}/attachments/${encodeURIComponent(parsed.attachmentId)}`,
+			)) as GmailPartBody;
+			if (body.data === undefined) {
+				throw driverError(DriverErrorKind.Invalid, "gmail: attachment response carried no data");
+			}
+			const bytes = Buffer.from(body.data, "base64url");
+			// The declared `size` is not trusted — only what actually arrived.
+			if (bytes.length > limit) {
+				throw driverError(
+					DriverErrorKind.Invalid,
+					`gmail: attachment exceeds ${limit} bytes (got ${bytes.length})`,
+				);
+			}
+			return { bytes: new Uint8Array(bytes) };
 		},
 
 		async submit(message: OutboundMessage): Promise<SubmitResult> {

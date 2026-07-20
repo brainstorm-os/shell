@@ -92,10 +92,8 @@ export function projectMessage(
 		const safe = sanitizeMailHtml(raw.bodyHtml);
 		if (safe.length > 0) def.bodyHtmlSafe = safe;
 	}
-	if (raw.attachmentNames && raw.attachmentNames.length > 0) {
-		// v1 surfaces names as a placeholder ref list; the chunked-upload path
-		// (9.10) replaces these with real file entity ids.
-		def.attachments = raw.attachmentNames.map((name) => `pending:${name}`);
+	if (raw.attachmentParts && raw.attachmentParts.length > 0) {
+		def.attachmentParts = raw.attachmentParts;
 	}
 	if (extra?.submissionId) def.submissionId = extra.submissionId;
 	return def;

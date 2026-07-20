@@ -84,8 +84,11 @@ describe("projectMessage", () => {
 		expect(def.submissionId).toBe("sub-1");
 	});
 
-	it("maps attachment names to pending refs", () => {
-		const def = projectMessage("a", raw({ attachmentNames: ["report.pdf"] }), "f");
-		expect(def.attachments).toEqual(["pending:report.pdf"]);
+	it("carries attachment part metadata through and mints no file refs at sync", () => {
+		const parts = [{ partRef: "m1:att-1", filename: "report.pdf", mimeType: "application/pdf" }];
+		const def = projectMessage("a", raw({ attachmentParts: parts }), "f");
+		expect(def.attachmentParts).toEqual(parts);
+		// Sync is metadata-only — a File entity exists only once bytes are fetched.
+		expect(def.attachments).toBeUndefined();
 	});
 });
