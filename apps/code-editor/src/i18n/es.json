@@ -24,7 +24,7 @@
   "bufferLabel": "Fuente de {name}",
   "referencesRegion": "Referencias del plan",
   "referencesHeading": "Referencias",
-  "referencesEmpty": "No hay ids de iteración ni preguntas abiertas en este archivo.",
+  "referencesEmpty": "No hay referencias en este archivo.",
   "referenceOpen": "Abrir {code} — {title}",
   "referenceOccurrences": "{count} apariciones (primera en la línea {line})",
   "referenceCount": "×{count}",

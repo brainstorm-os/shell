@@ -24,7 +24,7 @@
   "bufferLabel": "Source of {name}",
   "referencesRegion": "Plan references",
   "referencesHeading": "References",
-  "referencesEmpty": "No plan or open-question ids referenced in this file.",
+  "referencesEmpty": "Nothing referenced in this file.",
   "referenceOpen": "Open {code} — {title}",
   "referenceOccurrences": "{count} occurrences (first on line {line})",
   "referenceCount": "×{count}",

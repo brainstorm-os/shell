@@ -1462,11 +1462,19 @@ function MainPane(props: MainPaneProps) {
 					className="bookmarks__empty"
 					icon={IconName.KindLink}
 					title={emptyMessage()}
-					action={
-						<button type="button" className="bs-btn" data-bs-primary="" onClick={props.onAdd}>
-							{t("action.addBookmark")}
-						</button>
-					}
+					{...(surface === BookmarkSurface.Read || surface === BookmarkSurface.Archive
+						? {
+								// Adding a bookmark lands in the INBOX — offering it here
+								// promised the wrong repair (F-450, Marcus session 909).
+								hint: t(surface === BookmarkSurface.Read ? "empty.read.hint" : "empty.archive.hint"),
+							}
+						: {
+								action: (
+									<button type="button" className="bs-btn" data-bs-primary="" onClick={props.onAdd}>
+										{t("action.addBookmark")}
+									</button>
+								),
+							})}
 				/>
 			) : (
 				<TagBoards

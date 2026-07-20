@@ -354,6 +354,16 @@ export function CodeEditorApp(): ReactElement {
 		if (pending && rows.some((r) => r.id === pending)) {
 			pendingOpenIdRef.current = null;
 			selectFile(pending);
+			const renameTarget = pendingRenameIdRef.current;
+			if (renameTarget === pending) {
+				// Fresh create (F-451): arm the inline rename on the new row instead
+				// of focusing the buffer — naming beats another immortal untitled-N.
+				pendingRenameIdRef.current = null;
+				focusBufferOnOpenRef.current = false;
+				const row = rows.find((r) => r.id === pending);
+				if (row) requestAnimationFrame(() => renameFileRef.current?.(row));
+				return;
+			}
 			if (focusBufferOnOpenRef.current) {
 				focusBufferOnOpenRef.current = false;
 				requestAnimationFrame(() => paneRef.current?.focus());
@@ -450,6 +460,10 @@ export function CodeEditorApp(): ReactElement {
 			if (created?.id) {
 				pendingOpenIdRef.current = created.id;
 				focusBufferOnOpenRef.current = true;
+				// Creation invites a name — arm the existing inline rename for the
+				// new row once it renders; an untitled-N should be the fallback,
+				// not the destiny (F-451, Marcus session 910).
+				pendingRenameIdRef.current = created.id;
 			}
 		} catch (error) {
 			console.warn("[code-editor] new file failed:", error);
@@ -474,6 +488,9 @@ export function CodeEditorApp(): ReactElement {
 		if (!update) return;
 		void update(row.id, { locked: !row.locked });
 	}, [selectedRow]);
+
+	const pendingRenameIdRef = useRef<string | null>(null);
+	const renameFileRef = useRef<((row: CodeFileRow) => void) | null>(null);
 
 	const renameFile = useCallback(
 		(row: CodeFileRow): void => {
@@ -547,6 +564,7 @@ export function CodeEditorApp(): ReactElement {
 		},
 		[applyRename],
 	);
+	renameFileRef.current = renameFile;
 
 	const deleteFile = useCallback(async (row: CodeFileRow): Promise<void> => {
 		if (row.locked) return;

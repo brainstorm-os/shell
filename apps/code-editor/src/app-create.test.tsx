@@ -56,6 +56,7 @@ function makeFakeRuntime() {
 				applyDoc: () => undefined,
 				closeDoc: () => undefined,
 				create,
+				update: async () => undefined,
 			},
 		},
 	} as unknown as CodeEditorRuntime;
@@ -118,7 +119,8 @@ describe("new-file affordances (F-205)", () => {
 		);
 
 		// The vault round-trip re-projects, auto-selects the fresh file, and
-		// focuses its buffer so typing flows immediately.
+		// arms the inline rename on it — creation invites a name instead of
+		// committing another immortal untitled-N (F-451, Marcus session 910).
 		await vi.waitFor(
 			() => {
 				const current = document.querySelector('.editor__file[aria-current="true"]');
@@ -126,9 +128,20 @@ describe("new-file affordances (F-205)", () => {
 			},
 			{ timeout: 3000 },
 		);
-		const buffer = document.querySelector<HTMLTextAreaElement>(".editor__buffer");
-		expect(buffer).not.toBeNull();
-		await vi.waitFor(() => expect(document.activeElement).toBe(buffer), { timeout: 3000 });
+		await vi.waitFor(
+			() => {
+				const rename = document.querySelector<HTMLInputElement>(".editor__rename-input");
+				expect(rename).not.toBeNull();
+				expect(document.activeElement).toBe(rename);
+			},
+			{ timeout: 3000 },
+		);
+		// Escape keeps the default name and the file stays selected.
+		act(() => {
+			document.activeElement?.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+			);
+		});
 
 		// Second create (header button this time) allocates the next free name.
 		act(() => headerBtn?.click());
