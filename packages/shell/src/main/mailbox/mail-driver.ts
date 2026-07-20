@@ -16,7 +16,7 @@
  * engine import it without pulling heavy deps into the worker bundle.
  */
 
-import type { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
+import type { FolderRole, MailAttachmentPart, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
 
 /** A server folder/label as the driver sees it. `role` is the driver's best
  *  guess (e.g. IMAP `\Sent` special-use, Gmail label); the projection
@@ -49,9 +49,10 @@ export type RawMessage = {
 	flags?: MailFlag[];
 	/** The folder/label this message was fetched from. */
 	folderPath: string;
-	/** Attachment file names (the chunked-upload path projects them into file
-	 *  entities later — doc 53 / 9.10; v1 surfaces the names). */
-	attachmentNames?: string[];
+	/** Server-declared attachment metadata — names, types, and the
+	 *  driver-issued part address. Sync stays metadata-only; bytes come later
+	 *  via {@link MailDriver.fetchAttachment} on user demand (Mailbox-6). */
+	attachmentParts?: MailAttachmentPart[];
 };
 
 /** Which way a fetch walks the folder (Mailbox-12). */
@@ -106,6 +107,33 @@ export type SubmitResult = {
 	receivedAt: number;
 };
 
+/** Hard ceiling on a single attachment fetch. The server's declared size is
+ *  advisory (a lying server must not size our buffer), so drivers enforce
+ *  this against bytes actually received and abort past it. */
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+/** Locate one attachment for a bounded, on-demand fetch (Mailbox-6). The
+ *  `partRef` is the token the SAME driver minted during projection. */
+export type FetchAttachmentSpec = {
+	/** Folder to select before addressing the part (IMAP); provider-API
+	 *  drivers whose `partRef` is globally addressable ignore it. */
+	folderPath: string;
+	/** The token this driver minted during projection. It encodes whatever
+	 *  the protocol needs to reach the part (Gmail: message id + attachment
+	 *  id; IMAP: uid + MIME part path), so no protocol state travels with the
+	 *  caller. */
+	partRef: string;
+	/** Caller-supplied ceiling, clamped to {@link MAX_ATTACHMENT_BYTES}. */
+	maxBytes?: number;
+};
+
+export type FetchAttachmentResult = {
+	bytes: Uint8Array;
+	/** Server-declared content type, if any — advisory (see
+	 *  {@link MailAttachmentPart.mimeType}). */
+	mimeType?: string;
+};
+
 /** The protocol engine for one account. Implementations own the long-lived
  *  socket(s); the engine/worker treat them as opaque. */
 export type MailDriver = {
@@ -113,6 +141,10 @@ export type MailDriver = {
 	listFolders(): Promise<RawFolder[]>;
 	fetch(spec: FetchSpec): Promise<FetchResult>;
 	submit(message: OutboundMessage): Promise<SubmitResult>;
+	/** Fetch one attachment's bytes on demand. Optional: a driver that cannot
+	 *  address parts simply omits it and the service reports `Unavailable`
+	 *  rather than the app having to probe by protocol. */
+	fetchAttachment?(spec: FetchAttachmentSpec): Promise<FetchAttachmentResult>;
 	/** Release sockets / handles. Idempotent. */
 	close(): Promise<void>;
 };

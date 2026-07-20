@@ -8,10 +8,12 @@
  * reach the driver RPC.
  */
 
+import { Buffer } from "node:buffer";
 import type { MailProtocol } from "@brainstorm/sdk-types";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope, type EnvelopeReply } from "../../ipc/envelope";
 import type {
 	DriverCredentials,
+	FetchAttachmentSpec,
 	FetchResult,
 	FetchSpec,
 	MailDriver,
@@ -19,6 +21,9 @@ import type {
 	RawFolder,
 	SubmitResult,
 } from "./mail-driver";
+
+/** Attachment bytes travel base64 in the JSON envelope (see `fetchAttachment`). */
+export type WireAttachmentResult = { bytesBase64: string; mimeType?: string };
 
 /** The slice of `ResilientWorker` this adapter needs (injectable for tests). */
 export type MailboxWorkerBridge = {
@@ -78,6 +83,19 @@ export function createWorkerMailTransport(bridge: MailboxWorkerBridge): WorkerMa
 				call("fetch", { accountId, spec }, FETCH_TIMEOUT_MS) as Promise<FetchResult>,
 			submit: (message: OutboundMessage) =>
 				call("submit", { accountId, message }, CALL_TIMEOUT_MS) as Promise<SubmitResult>,
+			fetchAttachment: async (spec: FetchAttachmentSpec) => {
+				const reply = (await call(
+					"fetchAttachment",
+					{ accountId, spec },
+					FETCH_TIMEOUT_MS,
+				)) as WireAttachmentResult;
+				// Bytes cross the worker boundary base64-encoded: structured clone
+				// would ship a Uint8Array, but the envelope is JSON on the wire.
+				return {
+					bytes: new Uint8Array(Buffer.from(reply.bytesBase64, "base64")),
+					...(reply.mimeType !== undefined ? { mimeType: reply.mimeType } : {}),
+				};
+			},
 			close: async () => {
 				await call("close", { accountId }, CALL_TIMEOUT_MS);
 			},

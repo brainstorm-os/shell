@@ -72,6 +72,7 @@ import type {
 	LifecycleHandler,
 	LinkPreview,
 	ListSource,
+	MailAttachmentFile,
 	MailBackfillSummary,
 	MailService,
 	MailSyncSummary,
@@ -1106,6 +1107,8 @@ function mailProxy(bridge: Bridge): MailService {
 			callService<MailSyncSummary>(bridge, "mail", "syncNow", [input], ["mail.manage"]),
 		loadOlder: (input) =>
 			callService<MailBackfillSummary>(bridge, "mail", "loadOlder", [input], ["mail.manage"]),
+		fetchAttachment: (input) =>
+			callService<MailAttachmentFile>(bridge, "mail", "fetchAttachment", [input], ["mail.manage"]),
 		disconnect: (input) =>
 			callService<{ ok: true }>(bridge, "mail", "disconnect", [input], ["mail.manage"]),
 	};

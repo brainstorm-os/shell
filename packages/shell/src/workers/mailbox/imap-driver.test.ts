@@ -334,4 +334,63 @@ describe("makeImapSmtpDriver", () => {
 		expect(fake.calls.logout).toBe(1);
 		expect(close).toHaveBeenCalledTimes(1);
 	});
+
+	describe("fetchAttachment", () => {
+		const attachmentParse = async (source: Uint8Array): Promise<ParsedSourceLike> => ({
+			from: { text: "dana@example.com" },
+			text: new TextDecoder().decode(source),
+			attachments: [
+				{ filename: "deck.pdf", contentType: "application/pdf", content: new Uint8Array([1, 2, 3]) },
+			],
+		});
+
+		function attachmentDriver(uidValidity: bigint) {
+			const fake = makeFakeImap({
+				uidValidity,
+				messages: { INBOX: [{ uid: 42, source: "body" }] },
+			});
+			const { driver } = makeDriver({
+				imap: fake.client,
+				input: { io: { makeImapClient: () => fake.client, parseSource: attachmentParse } },
+			});
+			return driver;
+		}
+
+		it("returns the addressed part's bytes and server content type", async () => {
+			const driver = attachmentDriver(5n);
+			const out = await driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "5:42:0" });
+			expect(Array.from(out?.bytes ?? [])).toEqual([1, 2, 3]);
+			expect(out?.mimeType).toBe("application/pdf");
+		});
+
+		it("refuses a part reference whose uidValidity no longer matches the mailbox", async () => {
+			// The mailbox was recreated server-side (5 → 6): uid 42 is now a
+			// different message, so the stale ref must fail, never return bytes.
+			const driver = attachmentDriver(6n);
+			await expect(
+				driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "5:42:0" }),
+			).rejects.toThrow(/stale/);
+		});
+
+		it("rejects a malformed part reference", async () => {
+			const driver = attachmentDriver(5n);
+			await expect(driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "5:42" })).rejects.toThrow(
+				/malformed/,
+			);
+		});
+
+		it("refuses a part larger than the caller's cap", async () => {
+			const driver = attachmentDriver(5n);
+			await expect(
+				driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "5:42:0", maxBytes: 2 }),
+			).rejects.toThrow(/exceeds/);
+		});
+
+		it("reports a part index the message does not have", async () => {
+			const driver = attachmentDriver(5n);
+			await expect(
+				driver.fetchAttachment?.({ folderPath: "INBOX", partRef: "5:42:9" }),
+			).rejects.toThrow(/not found/);
+		});
+	});
 });

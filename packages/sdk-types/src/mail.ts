@@ -159,6 +159,23 @@ export type MailAddress = {
 	personRef?: MailEntityId;
 };
 
+/** Where an attachment lives on the server, so its bytes can be fetched
+ *  lazily on user demand instead of eagerly at sync (Mailbox-6). The shape
+ *  is protocol-neutral: IMAP addresses a part by the message uid + MIME part
+ *  path, Gmail by its opaque `attachmentId`, so each driver reads back only
+ *  the token it minted and no cross-driver decoding exists. */
+export type MailAttachmentPart = {
+	/** Driver-issued address for this part — opaque above the driver. */
+	partRef: string;
+	filename: string;
+	/** Server-declared content type. Advisory: the fetch path re-derives a
+	 *  served mime from the filename rather than trusting a server string. */
+	mimeType?: string;
+	/** Server-declared size. Advisory only — the fetch is bounded
+	 *  independently, since a lying server must not size our buffer. */
+	sizeBytes?: number;
+};
+
 // ──────────────────────── entity payloads ────────────────────────
 
 /** `brainstorm/MailAccount/v1` — one configured account. **Holds no
@@ -217,8 +234,16 @@ export type EmailDef = {
 	/** Sanitised HTML, rendered through the embed sandbox (no scripts, no
 	 *  remote fetch until "Show remote content"). Immutable. */
 	bodyHtmlSafe?: string;
-	/** Each attachment is a file entity (doc 30). */
+	/** Each attachment is a `File/v1` entity (doc 30) — populated only once
+	 *  its bytes have actually been fetched into the vault. Empty on a
+	 *  freshly-synced message even when it *has* attachments; read
+	 *  `attachmentParts` for what the message carries. */
 	attachments?: MailEntityId[];
+	/** What the server says this message carries, captured at sync so the
+	 *  reading pane can show chips without downloading anything (Mailbox-6:
+	 *  sync stays metadata-only). Fetching a part mints a `File/v1` and
+	 *  appends it to `attachments`. */
+	attachmentParts?: MailAttachmentPart[];
 	flags: MailFlag[];
 	tags?: MailEntityId[];
 	/** Client-stamped id for an outbound message — the Sent-folder

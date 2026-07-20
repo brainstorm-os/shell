@@ -3860,6 +3860,10 @@ void app.whenReady().then(async () => {
 		transport: createWorkerMailTransport(workers.mailboxBridge),
 		getCredentials: () => getActiveVaultSession()?.credentials ?? null,
 		getLedger: connectorsGetLedger,
+		getAssetStore: async () => {
+			const session = getActiveVaultSession();
+			return session ? await session.assetStore() : null;
+		},
 	});
 	workers.broker.registerService("mail", mailServiceApi.handler);
 	// Mailbox-2 — session-open registration: enabled accounts sync on vault

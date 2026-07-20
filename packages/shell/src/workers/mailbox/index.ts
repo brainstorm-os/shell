@@ -26,11 +26,13 @@
  * `process.parentPort`. No SQLite/Yjs/Electron-renderer types cross here.
  */
 
+import { Buffer } from "node:buffer";
 import { MailProtocol } from "@brainstorm/sdk-types";
 import type { Envelope, EnvelopeReply } from "../../ipc/envelope";
 import { makeErrorReply, makeOkReply, validateEnvelope } from "../../ipc/envelope";
 import type {
 	DriverCredentials,
+	FetchAttachmentSpec,
 	FetchSpec,
 	MailDriver,
 	OutboundMessage,
@@ -154,6 +156,23 @@ const handlers: Record<string, Handler> = {
 			message: OutboundMessage;
 		};
 		return requireDriver(accountId).submit(message);
+	},
+
+	fetchAttachment: async (envelope) => {
+		requireShell(envelope);
+		const { accountId, spec } = envelope.args[0] as {
+			accountId: string;
+			spec: FetchAttachmentSpec;
+		};
+		const driver = requireDriver(accountId);
+		if (!driver.fetchAttachment) {
+			throw workerError("Unavailable", "this account's protocol cannot fetch attachments");
+		}
+		const result = await driver.fetchAttachment(spec);
+		return {
+			bytesBase64: Buffer.from(result.bytes).toString("base64"),
+			...(result.mimeType !== undefined ? { mimeType: result.mimeType } : {}),
+		};
 	},
 
 	close: async (envelope) => {
