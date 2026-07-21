@@ -206,6 +206,56 @@ describe("CompactEditor — DOM", () => {
 		});
 		expect(submitted).toEqual(["Summarize this note"]);
 	});
+
+	it("setHtml seeds a rich quote and submit reads back HTML + text", () => {
+		const ref = createRef<CompactEditorHandle>();
+		let payload: { html: string; text: string } | null = null;
+		act(() => {
+			root.render(
+				<CompactEditor
+					ref={ref}
+					onSubmit={(p) => {
+						payload = { html: p.html, text: p.text };
+					}}
+				/>,
+			);
+		});
+		act(() => {
+			ref.current?.setHtml(
+				"<p>Dana wrote:</p><blockquote><p>the <strong>plan</strong></p></blockquote>",
+			);
+			ref.current?.submit();
+		});
+		const captured = payload as { html: string; text: string } | null;
+		// The mark survives the HTML round-trip (would be lost by setText) —
+		// Lexical exports bold as <strong>/<b>, so match the tag not exact chrome.
+		expect(captured?.html).toMatch(/<(strong|b)[ >]/);
+		expect(captured?.html).toContain("plan");
+		expect(captured?.html).toContain("<blockquote>");
+		expect(captured?.text).toContain("Dana wrote:");
+		expect(captured?.text).toContain("the plan");
+	});
+
+	it("setHtml puts the caret above the quote so typing lands before it", () => {
+		const ref = createRef<CompactEditorHandle>();
+		let html = "";
+		act(() => {
+			root.render(
+				<CompactEditor
+					ref={ref}
+					onSubmit={(p) => {
+						html = p.html;
+					}}
+				/>,
+			);
+		});
+		act(() => {
+			ref.current?.setHtml("<blockquote><p>original</p></blockquote>");
+		});
+		// A leading blank paragraph precedes the quote — the reply-cursor line.
+		act(() => ref.current?.submit());
+		expect(html.indexOf("<p")).toBeLessThan(html.indexOf("<blockquote>"));
+	});
 });
 
 function CaptureEditor({ onReady }: { onReady: (e: LexicalEditor) => void }) {

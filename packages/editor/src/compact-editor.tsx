@@ -19,7 +19,7 @@
  */
 
 import { CodeNode } from "@lexical/code";
-import { $generateHtmlFromNodes } from "@lexical/html";
+import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 // Side-effect: widen `LinkNode.sanitizeUrl` to the app's `brainstorm://`
 // scheme (compact editors register their own node list — see link-sanitizer.ts).
@@ -61,6 +61,7 @@ import {
 	$createTextNode,
 	$getRoot,
 	$getSelection,
+	$isElementNode,
 	$isRangeSelection,
 	COMMAND_PRIORITY_HIGH,
 	FORMAT_TEXT_COMMAND,
@@ -114,6 +115,12 @@ export type CompactEditorHandle = {
 	focus(): void;
 	/** Replace the draft with plain text (intent seeding), caret at the end. */
 	setText(text: string): void;
+	/** Replace the draft with semantic HTML (reply/forward quoting — the
+	 *  original message's already-sanitised `bodyHtmlSafe` inside a
+	 *  blockquote), caret at the start so the user types above the quote.
+	 *  Only Lexical-representable structure survives (paragraphs, marks,
+	 *  lists, links, quote, code); anything else flattens to text. */
+	setHtml(html: string): void;
 };
 
 export type CompactEditorProps = {
@@ -201,6 +208,27 @@ export function stripEditorChrome(html: string): string {
 	return html.replace(/\s(?:class|dir)="[^"]*"/g, "");
 }
 
+/** `$generateNodesFromDOM` can hand back inline nodes (text, links, line
+ *  breaks) at the top level, which are illegal as direct root children.
+ *  Group runs of inline nodes into paragraphs and pass block nodes through. */
+function nodesForRoot(nodes: readonly LexicalNode[]): LexicalNode[] {
+	const out: LexicalNode[] = [];
+	let inlineRun: ReturnType<typeof $createParagraphNode> | null = null;
+	for (const node of nodes) {
+		if ($isElementNode(node)) {
+			inlineRun = null;
+			out.push(node);
+		} else {
+			if (!inlineRun) {
+				inlineRun = $createParagraphNode();
+				out.push(inlineRun);
+			}
+			inlineRun.append(node);
+		}
+	}
+	return out;
+}
+
 function readPayload(editor: LexicalEditor): CompactEditorPayload {
 	const editorState = editor.getEditorState();
 	const state = JSON.stringify(editorState.toJSON());
@@ -269,6 +297,22 @@ function CompactBehaviorPlugin({
 						if (text) paragraph.append($createTextNode(text));
 						root.append(paragraph);
 						paragraph.selectEnd();
+					},
+					{ discrete: true },
+				);
+			},
+			setHtml: (html: string) => {
+				editor.update(
+					() => {
+						const root = $getRoot();
+						root.clear();
+						const dom = new DOMParser().parseFromString(html, "text/html");
+						const parsed = nodesForRoot($generateNodesFromDOM(editor, dom));
+						// A leading blank paragraph is the reply-cursor line — the user
+						// types above the quote, mirroring every mail client.
+						const lead = $createParagraphNode();
+						root.append(lead, ...parsed);
+						lead.selectStart();
 					},
 					{ discrete: true },
 				);

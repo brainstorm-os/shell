@@ -79,6 +79,35 @@ describe("Composer send dispatch", () => {
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
+	it("sends an HTML-quoted reply body when the seed carries bodyHtml (Mailbox-11)", async () => {
+		const onSend = vi.fn(async (_payload: Record<string, unknown>) => {});
+		act(() => {
+			root.render(
+				<Composer
+					seed={{
+						...emptySeed(account.id),
+						to: "dana@example.test",
+						subject: "Re: Plan",
+						body: "\n\nDana wrote:\n> the plan",
+						bodyHtml: "<p>Dana wrote:</p><blockquote><p>the <strong>plan</strong></p></blockquote>",
+					}}
+					accounts={[account]}
+					onClose={() => {}}
+					onSend={onSend}
+				/>,
+			);
+		});
+		const form = host.querySelector("form") as HTMLFormElement;
+		await act(async () => {
+			form.requestSubmit();
+		});
+		expect(onSend).toHaveBeenCalledTimes(1);
+		const payload = onSend.mock.calls[0]?.[0] ?? {};
+		expect(String(payload.bodyHtml)).toContain("<blockquote>");
+		expect(String(payload.bodyHtml)).toMatch(/<(strong|b)[ >]/);
+		expect(String(payload.bodyText)).toContain("the plan");
+	});
+
 	it("does not dispatch without a recipient", () => {
 		const onSend = vi.fn(async () => {});
 		act(() => {

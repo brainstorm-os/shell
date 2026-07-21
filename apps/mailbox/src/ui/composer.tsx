@@ -38,14 +38,19 @@ export function Composer({ seed, accounts, onClose, onSend }: ComposerProps): Re
 	const [body, setBody] = useState<CompactEditorPayload | null>(null);
 	const [busy, setBusy] = useState(false);
 	const editorRef = useRef<CompactEditorHandle>(null);
-	// Seed once — reply/forward quotes arrive as plain text on the seed; the
-	// editor is the live draft from then on.
+	// Seed once — the editor is the live draft from then on. An HTML quote
+	// (reply/forward of an HTML message, Mailbox-11) seeds the rich surface so
+	// the quote keeps its formatting; otherwise the plain-text quote seeds.
 	const seededRef = useRef(false);
 	useEffect(() => {
 		if (seededRef.current) return;
 		seededRef.current = true;
-		if (seed.body.length > 0) editorRef.current?.setText(seed.body);
-	}, [seed.body]);
+		if (seed.bodyHtml !== undefined && seed.bodyHtml.length > 0) {
+			editorRef.current?.setHtml(seed.bodyHtml);
+		} else if (seed.body.length > 0) {
+			editorRef.current?.setText(seed.body);
+		}
+	}, [seed.body, seed.bodyHtml]);
 	const [error, setError] = useState<string | null>(null);
 
 	const account = accounts.find((a) => a.id === accountRef) ?? null;
