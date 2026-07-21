@@ -1,3 +1,35 @@
+import type {
+	AppearanceMode,
+	AppearancePair,
+	AppearanceSlot,
+	AppearanceState,
+} from "@brainstorm-os/protocol/appearance";
+import type {
+	BillingAccountSummaryView,
+	BillingCheckoutCycle,
+	BillingCheckoutPlan,
+	BillingInvoiceView,
+	BillingOverviewView,
+	BillingSettingsResult,
+} from "@brainstorm-os/protocol/billing-settings-types";
+import type {
+	ChromeState,
+	ClockPrefs,
+	DndPrefs,
+	LocaleState,
+	NotificationRecord,
+	NotificationsState,
+	RegionalState,
+} from "@brainstorm-os/protocol/shell-prefs";
+import {
+	type AutoUpdateState,
+	type ReleaseInfo,
+	UPDATE_STATE_EVENT,
+	UpdateAvailability,
+	UpdateChannel,
+	type UpdateCheckResult,
+	type UpdatePrefs,
+} from "@brainstorm-os/protocol/update-wire-types";
 import {
 	type Dictionary,
 	type OpenRefusal,
@@ -11,38 +43,6 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
-import type {
-	AppearanceMode,
-	AppearancePair,
-	AppearanceSlot,
-	AppearanceState,
-} from "../shared/appearance";
-import type {
-	BillingAccountSummaryView,
-	BillingCheckoutCycle,
-	BillingCheckoutPlan,
-	BillingInvoiceView,
-	BillingOverviewView,
-	BillingSettingsResult,
-} from "../shared/billing-settings-types";
-import type {
-	ChromeState,
-	ClockPrefs,
-	DndPrefs,
-	LocaleState,
-	NotificationRecord,
-	NotificationsState,
-	RegionalState,
-} from "../shared/shell-prefs";
-import {
-	type AutoUpdateState,
-	type ReleaseInfo,
-	UPDATE_STATE_EVENT,
-	UpdateAvailability,
-	UpdateChannel,
-	type UpdateCheckResult,
-	type UpdatePrefs,
-} from "../shared/update-wire-types";
 
 export type { AppearanceMode, AppearancePair, AppearanceSlot, AppearanceState };
 export type { ReleaseInfo, UpdateCheckResult, UpdatePrefs };
@@ -765,17 +765,24 @@ import type {
 } from "../main/ipc/welcome-handlers";
 import type { SemanticModelStatus } from "../main/search/embedder-status";
 export type { WelcomeTemplateSummary };
-import type { ActivitySnapshot } from "../activity-types";
+import type { ActivitySnapshot } from "@brainstorm-os/protocol/activity-types";
 /** Sync-status surface (Stage 10.7 — sync-status panel). Privileged
  *  shell channel — apps don't see this (OQ-206 deferred app-side
  *  `sync.status:read` to v2). The dashboard chip + Settings → Sync
  *  section consume it. Enums + snapshot shape live in
  *  `sync-status-types.ts` so renderer value-imports don't drag preload
  *  (and therefore `electron`) into the renderer bundle. */
-import type { LockChangedPayload, UnlockResult } from "../shared/app-lock-wire-types";
-import type { SelectiveSyncPolicy } from "../shared/selective-sync-types";
-import type { VaultActivateResult, VaultDbKind } from "../shared/vault-recovery-wire-types";
-import { SyncState, type SyncStatusSnapshot, SyncTransportState } from "../sync-status-types";
+import type { LockChangedPayload, UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
+import type { SelectiveSyncPolicy } from "@brainstorm-os/protocol/selective-sync-types";
+import {
+	SyncState,
+	type SyncStatusSnapshot,
+	SyncTransportState,
+} from "@brainstorm-os/protocol/sync-status-types";
+import type {
+	VaultActivateResult,
+	VaultDbKind,
+} from "@brainstorm-os/protocol/vault-recovery-wire-types";
 
 export { SyncState, SyncTransportState };
 export type { SyncStatusSnapshot };
@@ -878,7 +885,7 @@ export {
 	NetworkAuditOutcome,
 	NetworkPrivacyMode,
 	NetworkProxyMode,
-} from "../network-wire-types";
+} from "@brainstorm-os/protocol/network-wire-types";
 export type {
 	NetworkAuditRecord,
 	NetworkAuditRequest,
@@ -890,7 +897,7 @@ export type {
 	NetworkProxyConfig,
 	NetworkProxyEndpoint,
 	VaultNetworkSettings,
-} from "../network-wire-types";
+} from "@brainstorm-os/protocol/network-wire-types";
 import type {
 	NetworkAuditRecord,
 	NetworkAuditRequest,
@@ -898,7 +905,7 @@ import type {
 	NetworkCacheStats,
 	NetworkPerAppSummary,
 	VaultNetworkSettings,
-} from "../network-wire-types";
+} from "@brainstorm-os/protocol/network-wire-types";
 import {
 	WEB_EGRESS_SUMMARY_CHANNEL,
 	WEB_SITE_PERMISSIONS_LIST_CHANNEL,
@@ -906,17 +913,17 @@ import {
 	WEB_SITE_TRUST_LIST_CHANNEL,
 	WEB_SITE_TRUST_REVOKE_CHANNEL,
 	WEB_SITE_TRUST_SET_CHANNEL,
-} from "../web-privacy-wire-types";
+} from "@brainstorm-os/protocol/web-privacy-wire-types";
 import type {
 	SitePermissionGrant,
 	SiteTrustGrant,
 	WebEgressHostSummary,
-} from "../web-privacy-wire-types";
+} from "@brainstorm-os/protocol/web-privacy-wire-types";
 export type {
 	SitePermissionGrant,
 	SiteTrustGrant,
 	WebEgressHostSummary,
-} from "../web-privacy-wire-types";
+} from "@brainstorm-os/protocol/web-privacy-wire-types";
 
 /** Push channel that fires on every privacy / proxy override change. */
 const VAULT_NETWORK_SETTINGS_CHANGED_CHANNEL = "vault:network-settings:changed";
@@ -936,7 +943,7 @@ export {
 	FeedbackKind,
 	FeedbackSensitivity,
 	RendererReason,
-} from "../feedback-wire-types";
+} from "@brainstorm-os/protocol/feedback-wire-types";
 export type {
 	CrashPayload,
 	CrashPendingSummary,
@@ -945,7 +952,7 @@ export type {
 	FeedbackSettings,
 	FeedbackSettingsPatch,
 	FeedbackSubmitResult,
-} from "../feedback-wire-types";
+} from "@brainstorm-os/protocol/feedback-wire-types";
 import type {
 	CrashPayload,
 	CrashPendingSummary,
@@ -954,7 +961,7 @@ import type {
 	FeedbackSettings,
 	FeedbackSettingsPatch,
 	FeedbackSubmitResult,
-} from "../feedback-wire-types";
+} from "@brainstorm-os/protocol/feedback-wire-types";
 
 const feedback = {
 	settings: {
@@ -1444,12 +1451,12 @@ export {
 	SetOverrideErrorReason,
 	type SetOverrideResult,
 	type ShortcutBindingRow,
-} from "../shortcut-binding-types";
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 import type {
 	ResetOverrideResult,
 	SetOverrideResult,
 	ShortcutBindingRow,
-} from "../shortcut-binding-types";
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 
 const SHORTCUTS_BINDINGS_CHANGED_CHANNEL = "shortcuts:bindings-changed";
 const onShortcutsBindingsChanged = (listener: () => void): (() => void) =>
@@ -1482,8 +1489,8 @@ export {
 	type WindowBounds,
 	type WindowEntry,
 	WindowState,
-} from "../shared/window-types";
-import type { MonitorSummary, TilePreset, WindowEntry } from "../shared/window-types";
+} from "@brainstorm-os/protocol/window-types";
+import type { MonitorSummary, TilePreset, WindowEntry } from "@brainstorm-os/protocol/window-types";
 
 const WINDOWS_CHANGED_CHANNEL = "windows:changed";
 const onWindowsChanged = (listener: (entries: WindowEntry[]) => void): (() => void) =>

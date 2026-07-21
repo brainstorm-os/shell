@@ -14,7 +14,10 @@
  * here automatically.
  */
 
-import type { ResetOverrideResult, SetOverrideResult } from "../../shortcut-binding-types";
+import type {
+	ResetOverrideResult,
+	SetOverrideResult,
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 import { t } from "../i18n/t";
 import { formatChord, isMacPlatform } from "../shortcuts/chord-display";
 import { SHORTCUT_GROUPS } from "../shortcuts/shortcut-groups";

@@ -11,7 +11,7 @@
  * module is the wire-shape only.
  */
 
-import { AttachmentSyncPauseReason } from "./shared/quota-types";
+import { AttachmentSyncPauseReason } from "./quota-types";
 
 export enum SyncState {
 	LocalOnly = "local-only",

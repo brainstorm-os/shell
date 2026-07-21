@@ -15,23 +15,23 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm-os/sdk-types";
-import { type ThemeName, isThemeName, themes } from "@brainstorm-os/tokens";
-import { type BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme } from "electron";
 import {
 	AppearanceSlot,
 	effectiveSlotFor,
 	isAppearanceMode,
 	isAppearanceSlot,
-} from "../../shared/appearance";
-import { regionalToFormatContext, sameFormatContext } from "../../shared/format-context";
+} from "@brainstorm-os/protocol/appearance";
+import { regionalToFormatContext, sameFormatContext } from "@brainstorm-os/protocol/format-context";
 import {
 	type ClockPrefs,
 	type DndPrefs,
 	type HeaderControlId,
 	type RegionalState,
 	isHeaderControlId,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm-os/sdk-types";
+import { type ThemeName, isThemeName, themes } from "@brainstorm-os/tokens";
+import { type BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme } from "electron";
 import { resolveAppName } from "../apps/app-name";
 import { type AppWindow, isAppWindowLive } from "../apps/launcher";
 import { type MediaSeal, VaultMediaDomain, isSealedMedia } from "../assets/vault-media-crypto";

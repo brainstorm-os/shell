@@ -30,7 +30,7 @@ import {
 	asBillingAccountStatus,
 	billingFail,
 	billingOk,
-} from "../../shared/billing-settings-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
 import { PlanTier, asPlanTier } from "./plan";
 
 /** One POST to billing-edge. `null` = transport failure (offline / timeout);

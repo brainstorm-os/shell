@@ -9,9 +9,9 @@
  * cap to v2. Only the dashboard reads/binds.
  */
 
+import type { SelectiveSyncPolicy } from "@brainstorm-os/protocol/selective-sync-types";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import type { SelectiveSyncPolicy } from "../../shared/selective-sync-types";
 import type { RestoreSummary } from "../sync/restore-engine";
 import type { SelectiveSyncStore } from "../sync/selective-sync-store";
 import type { SyncStatusSnapshot, SyncStatusStore } from "../sync/sync-status-store";

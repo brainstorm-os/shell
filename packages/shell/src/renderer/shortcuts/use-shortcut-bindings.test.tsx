@@ -10,7 +10,10 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BindingSource, type ShortcutBindingRow } from "../../shortcut-binding-types";
+import {
+	BindingSource,
+	type ShortcutBindingRow,
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 import { buildShortcutBindingsForTests, useShortcutBindings } from "./use-shortcut-bindings";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

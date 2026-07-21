@@ -6,9 +6,13 @@
  * recovery action the renderer doesn't understand.
  */
 
+import {
+	VaultDbKind,
+	VaultRecovery,
+	corruptionMessage,
+} from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { describe, expect, it } from "vitest";
 import { CorruptionRecovery } from "../main/storage/recovery-plan";
-import { VaultDbKind, VaultRecovery, corruptionMessage } from "./vault-recovery-wire-types";
 
 describe("vault-recovery wire enums", () => {
 	it("VaultRecovery values mirror the main CorruptionRecovery enum exactly", () => {

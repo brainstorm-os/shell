@@ -27,13 +27,13 @@
  * Localisation: every user-visible string flows through `t()`.
  */
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
 	FeedbackKind,
 	type FeedbackPayload,
 	FeedbackSensitivity,
 	type FeedbackSettings,
-} from "../../feedback-wire-types";
+} from "@brainstorm-os/protocol/feedback-wire-types";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";

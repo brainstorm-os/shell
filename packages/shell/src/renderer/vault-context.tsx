@@ -1,7 +1,7 @@
+import type { VaultDbKind, VaultRecovery } from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { track } from "@brainstorm-os/sdk/analytics";
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { CloudSyncWarning, CreateVaultOptions, VaultEntry } from "../preload";
-import type { VaultDbKind, VaultRecovery } from "../shared/vault-recovery-wire-types";
 import { ToastKind, pushToast } from "./ui/toasts";
 
 /** 12.8 — an open attempt that hit a corrupt domain DB the storage layer won't

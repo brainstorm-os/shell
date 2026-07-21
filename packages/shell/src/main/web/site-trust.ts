@@ -17,7 +17,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { SiteTrustGrant } from "../../web-privacy-wire-types";
+import type { SiteTrustGrant } from "@brainstorm-os/protocol/web-privacy-wire-types";
 import { webOriginOf } from "./site-permissions";
 
 export const SITE_TRUST_FILENAME = "web-site-trust.json";

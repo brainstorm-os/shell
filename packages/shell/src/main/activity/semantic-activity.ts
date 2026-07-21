@@ -4,7 +4,11 @@
  * store or the embedder.
  */
 
-import { ActivityKind, ActivityPhase, type BackgroundOperation } from "../../activity-types";
+import {
+	ActivityKind,
+	ActivityPhase,
+	type BackgroundOperation,
+} from "@brainstorm-os/protocol/activity-types";
 import { EmbedderPhase, type SemanticModelStatus } from "../search/embedder-status";
 
 export const SEMANTIC_MODEL_OP_ID = "semantic-model-download";

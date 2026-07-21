@@ -14,8 +14,11 @@
  * metadata.
  */
 
+import {
+	BindingSource,
+	type ShortcutBindingRow,
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 import { useEffect, useState } from "react";
-import { BindingSource, type ShortcutBindingRow } from "../../shortcut-binding-types";
 import { defaultChordFor } from "./default-chords";
 
 export type ShortcutBindings = {

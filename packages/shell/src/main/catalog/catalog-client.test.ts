@@ -1,6 +1,6 @@
 import { ed25519GetPublicKey, ed25519Sign } from "@brainstorm-os/native";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { beforeEach, describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import {
 	CatalogClient,
 	CatalogRefreshStatus,

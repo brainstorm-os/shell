@@ -8,13 +8,13 @@
  * tested unit.
  */
 
-import { ipcMain } from "electron";
 import {
 	type AutoUpdateState,
 	type UpdateCheckResult,
 	type UpdatePrefs,
 	toUpdateChannel,
-} from "../../shared/update-wire-types";
+} from "@brainstorm-os/protocol/update-wire-types";
+import { ipcMain } from "electron";
 import type { AutoUpdateEngine } from "../update/auto-update-engine";
 import type { UpdateService } from "../update/update-service";
 

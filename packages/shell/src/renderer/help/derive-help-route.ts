@@ -19,7 +19,7 @@
  * specific surface-help articles get authored.
  */
 
-import type { WindowEntry } from "../../shared/window-types";
+import type { WindowEntry } from "@brainstorm-os/protocol/window-types";
 import type { SettingsSection } from "../settings/sections";
 
 export type HelpRouteState = {

@@ -23,12 +23,12 @@
  * stale renderer can't end-run the check.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	BindingSource,
 	SetOverrideErrorReason,
 	type ShortcutBindingRow,
-} from "../../shortcut-binding-types";
+} from "@brainstorm-os/protocol/shortcut-binding-types";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../i18n/t";
 import { captureChord } from "../shortcuts/chord-capture";
 import { formatChord, isMacPlatform } from "../shortcuts/chord-display";

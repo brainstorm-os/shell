@@ -7,10 +7,10 @@
  * regression where the button rendered but did nothing.
  */
 
+import type { NotificationRecord } from "@brainstorm-os/protocol/shell-prefs";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotificationRecord } from "../../shared/shell-prefs";
 import { NotificationBell } from "./notification-center";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -22,6 +22,7 @@
  * the caller) or a silently-skipped delivery (for a target lacking `dnd.drop`).
  */
 
+import type { WindowEntry } from "@brainstorm-os/protocol/window-types";
 import {
 	APP_DRAG_LEAVE_CHANNEL,
 	APP_DRAG_OVER_CHANNEL,
@@ -40,7 +41,6 @@ import type {
 import { hardenObjectDragItems, objectDragItemTypes } from "@brainstorm-os/sdk/entity-drag";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import type { WindowEntry } from "../../shared/window-types";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { ActiveDragSession, DragSessionStore, DragTarget } from "./drag-session";
 import { hitTestWindow } from "./hit-test";

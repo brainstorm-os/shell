@@ -13,7 +13,7 @@
  * exactly because it's stamped `catalog_id = brainstorm-official`.
  */
 
-import { UpdateChannel } from "../../shared/update-wire-types";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 
 /** The canonical id of the official Brainstorm catalog. First-party apps —
  *  both bootstrap-cache and on-demand catalog installs — carry this. */

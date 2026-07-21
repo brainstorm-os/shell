@@ -15,12 +15,12 @@
  * the same seam the launcher already used for `BrowserWindowFactory`.
  */
 
-import { APP_TAB_COMMAND_CHANNEL, TAB_ICON_NONE, TabCommandKind } from "@brainstorm-os/sdk-types";
 import {
 	CHROME_TABS_STATE_CHANNEL,
 	CHROME_THEME_CHANNEL,
 	type ChromeTabsState,
-} from "../../shared/chrome-tabs";
+} from "@brainstorm-os/protocol/chrome-tabs";
+import { APP_TAB_COMMAND_CHANNEL, TAB_ICON_NONE, TabCommandKind } from "@brainstorm-os/sdk-types";
 import { focusStealingDisabled } from "../window/reveal-window";
 
 export type Rectangle = { x: number; y: number; width: number; height: number };

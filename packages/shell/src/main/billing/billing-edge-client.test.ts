@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
 	BillingAccountStatus,
 	BillingCheckoutCycle,
 	BillingCheckoutPlan,
 	BillingSettingsFailure,
-} from "../../shared/billing-settings-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import { describe, expect, it } from "vitest";
 import { BillingEdgeClient, type BillingEdgePostJson } from "./billing-edge-client";
 import { PlanTier } from "./plan";
 

@@ -1,6 +1,6 @@
+import { gradientFor } from "@brainstorm-os/protocol/app-icon-palette";
 import { describe, expect, it } from "vitest";
 import { gradientFor as rendererGradientFor } from "../renderer/dashboard/app-icon-palette";
-import { gradientFor } from "./app-icon-palette";
 
 describe("shared app-icon palette", () => {
 	it("gradientFor is deterministic for a given seed", () => {

@@ -7,10 +7,10 @@
  * "current item" signal; the focused-window highlight is separate OS focus).
  */
 
+import type { WindowEntry } from "@brainstorm-os/protocol/window-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WindowEntry } from "../../shared/window-types";
 import { WindowStrip } from "./window-strip";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

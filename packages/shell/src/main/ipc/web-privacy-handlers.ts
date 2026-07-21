@@ -10,7 +10,6 @@
  * gated on `web.browse`.
  */
 
-import { ipcMain } from "electron";
 import {
 	WEB_EGRESS_SUMMARY_CHANNEL,
 	WEB_SITE_PERMISSIONS_LIST_CHANNEL,
@@ -18,7 +17,8 @@ import {
 	WEB_SITE_TRUST_LIST_CHANNEL,
 	WEB_SITE_TRUST_REVOKE_CHANNEL,
 	WEB_SITE_TRUST_SET_CHANNEL,
-} from "../../web-privacy-wire-types";
+} from "@brainstorm-os/protocol/web-privacy-wire-types";
+import { ipcMain } from "electron";
 import { webOriginOf } from "../web/site-permissions";
 import type { WebPrivacyRuntime } from "../web/web-privacy-runtime";
 

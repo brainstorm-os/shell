@@ -5,8 +5,8 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { UploadQuotaDecision } from "@brainstorm-os/protocol/quota-types";
 import { describe, expect, it, vi } from "vitest";
-import { UploadQuotaDecision } from "../../shared/quota-types";
 import { generateSymmetricKey } from "../credentials/crypto";
 import type { AssetCas } from "./asset-cas";
 import type { AssetChunkManifest } from "./asset-chunks";

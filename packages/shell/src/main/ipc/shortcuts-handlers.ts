@@ -29,7 +29,6 @@
  * but logs the failure. A subsequent successful write reconciles.
  */
 
-import { type WebContents, ipcMain } from "electron";
 import {
 	BindingSource,
 	ResetOverrideErrorReason,
@@ -37,7 +36,8 @@ import {
 	SetOverrideErrorReason,
 	type SetOverrideResult,
 	type ShortcutBindingRow,
-} from "../../shortcut-binding-types";
+} from "@brainstorm-os/protocol/shortcut-binding-types";
+import { type WebContents, ipcMain } from "electron";
 import { writeOverridesToEntity } from "../shortcuts/bindings-entity";
 import { normalizeChord } from "../shortcuts/chord";
 import type { ResolvedBinding, ShortcutRegistry } from "../shortcuts/shortcut-registry";

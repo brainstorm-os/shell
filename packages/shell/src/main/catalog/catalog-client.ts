@@ -11,7 +11,7 @@
  */
 
 import { ed25519Verify } from "@brainstorm-os/native";
-import type { UpdateChannel } from "../../shared/update-wire-types";
+import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import {
 	type Ed25519Verify,
 	type ResolvedVersion,

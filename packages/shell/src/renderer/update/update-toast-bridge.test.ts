@@ -1,5 +1,5 @@
+import { UpdateLifecycle } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it } from "vitest";
-import { UpdateLifecycle } from "../../shared/update-wire-types";
 import { UpdateToastKind, planUpdateToast } from "./update-toast-bridge";
 
 describe("planUpdateToast", () => {

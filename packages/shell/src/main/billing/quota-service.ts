@@ -36,7 +36,7 @@ import {
 	inertQuotaVerdict,
 	planQuotaLimitBytes,
 	quotaVerdict,
-} from "../../shared/quota-types";
+} from "@brainstorm-os/protocol/quota-types";
 import type { Entitlement } from "./plan";
 
 export type QuotaServiceDeps = {

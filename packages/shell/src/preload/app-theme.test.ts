@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { gradientFor } from "@brainstorm-os/protocol/app-icon-palette";
 import { describe, expect, it } from "vitest";
-import { gradientFor } from "../shared/app-icon-palette";
 import { APP_THEME_STYLE_ID, appIconVarPairs, buildAppIconVarsCss } from "./app-theme";
 
 const SDK_APP_THEME_CSS = readFileSync(

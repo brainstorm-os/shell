@@ -8,7 +8,7 @@
  * without spinning up a BrowserWindow.
  */
 
-import { TilePreset } from "../../shared/window-types";
+import { TilePreset } from "@brainstorm-os/protocol/window-types";
 import type { MonitorInfo, WindowPlacement } from "./monitor";
 
 export { TilePreset };

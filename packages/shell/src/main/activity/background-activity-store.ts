@@ -10,7 +10,7 @@
  * chip's summary names the freshest operation.
  */
 
-import type { ActivitySnapshot, BackgroundOperation } from "../../activity-types";
+import type { ActivitySnapshot, BackgroundOperation } from "@brainstorm-os/protocol/activity-types";
 
 export class BackgroundActivityStore {
 	// Insertion/update order = recency: a re-`set` moves the op to the front.

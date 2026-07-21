@@ -1,7 +1,11 @@
+import {
+	type WindowBounds,
+	type WindowEntry,
+	WindowState,
+} from "@brainstorm-os/protocol/window-types";
 import { DragPayloadKind, DropEffect, type ObjectDragItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
-import { type WindowBounds, type WindowEntry, WindowState } from "../../shared/window-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import {
 	APP_DRAG_LEAVE_CHANNEL,

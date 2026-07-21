@@ -9,15 +9,15 @@
  * test hooks; production wires `window.brainstorm.feedback.*`.
  */
 
-import { act } from "react";
-import { type Root, createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	FeedbackKind,
 	type FeedbackPayload,
 	FeedbackSensitivity,
 	type FeedbackSettings,
-} from "../../feedback-wire-types";
+} from "@brainstorm-os/protocol/feedback-wire-types";
+import { act } from "react";
+import { type Root, createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackDialog } from "./feedback-dialog";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

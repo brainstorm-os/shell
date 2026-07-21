@@ -22,7 +22,7 @@
  * `finally`.
  */
 
-import { UploadQuotaDecision } from "../../shared/quota-types";
+import { UploadQuotaDecision } from "@brainstorm-os/protocol/quota-types";
 import type { AssetCas } from "./asset-cas";
 import { type InstallManifest, uploadBoundAsset } from "./asset-sync";
 import type { AssetKind } from "./asset-types";

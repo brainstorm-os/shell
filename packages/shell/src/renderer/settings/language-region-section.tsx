@@ -13,15 +13,15 @@
  * from `Intl` so they stay correct across platforms.
  */
 
-import { useId, useMemo } from "react";
-import { AVAILABLE_LANGUAGES, languageLabel } from "../../shared/locale-catalog";
 import {
 	DateStylePref,
 	FIRST_DAY_AUTO,
 	type FirstDayOfWeek,
 	HourCyclePref,
 	REGIONAL_AUTO,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import { useId, useMemo } from "react";
+import { AVAILABLE_LANGUAGES, languageLabel } from "../../shared/locale-catalog";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { t } from "../i18n/t";
 import { SettingRow, SettingSelect } from "./settings-controls";

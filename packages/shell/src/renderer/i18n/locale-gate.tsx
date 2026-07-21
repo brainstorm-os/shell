@@ -15,8 +15,8 @@
  * not hardcoded English.
  */
 
+import { DEFAULT_LANGUAGE } from "@brainstorm-os/protocol/shell-prefs";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
-import { DEFAULT_LANGUAGE } from "../../shared/shell-prefs";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { readLastLocale, rememberLastLocale } from "./last-locale";
 import { loadAndApplyLocale } from "./locale-pack-loader";

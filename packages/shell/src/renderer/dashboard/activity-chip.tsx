@@ -11,9 +11,9 @@
  * the dashboard owns the `AnimatePresence` mount of the popover.
  */
 
+import { ActivityPhase, type ActivitySnapshot } from "@brainstorm-os/protocol/activity-types";
 import { AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { ActivityPhase, type ActivitySnapshot } from "../../activity-types";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { Spinner } from "../ui/spinner";

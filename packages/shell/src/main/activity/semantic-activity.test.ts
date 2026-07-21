@@ -1,5 +1,5 @@
+import { ActivityKind, ActivityPhase } from "@brainstorm-os/protocol/activity-types";
 import { describe, expect, it } from "vitest";
-import { ActivityKind, ActivityPhase } from "../../activity-types";
 import {
 	applyProgress,
 	initialStatus,

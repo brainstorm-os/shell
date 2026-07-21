@@ -1,0 +1,39 @@
+{
+  "name": "@brainstorm-os/protocol",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Isomorphic wire-format contracts shared across the Brainstorm shell, renderer, and sandboxed apps — appearance, routes, quotas, billing, sync/network/feedback status, shell prefs, and other structural types.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./activity-types": "./src/activity-types.ts",
+    "./app-icon-art": "./src/app-icon-art.ts",
+    "./app-icon-palette": "./src/app-icon-palette.ts",
+    "./app-lock-wire-types": "./src/app-lock-wire-types.ts",
+    "./appearance": "./src/appearance.ts",
+    "./billing-settings-types": "./src/billing-settings-types.ts",
+    "./billing-types": "./src/billing-types.ts",
+    "./chrome-tabs": "./src/chrome-tabs.ts",
+    "./feedback-wire-types": "./src/feedback-wire-types.ts",
+    "./format-context": "./src/format-context.ts",
+    "./network-wire-types": "./src/network-wire-types.ts",
+    "./quota-types": "./src/quota-types.ts",
+    "./route": "./src/route.ts",
+    "./selective-sync-types": "./src/selective-sync-types.ts",
+    "./shell-prefs": "./src/shell-prefs.ts",
+    "./shortcut-binding-types": "./src/shortcut-binding-types.ts",
+    "./sync-status-types": "./src/sync-status-types.ts",
+    "./update-wire-types": "./src/update-wire-types.ts",
+    "./vault-recovery-wire-types": "./src/vault-recovery-wire-types.ts",
+    "./web-privacy-wire-types": "./src/web-privacy-wire-types.ts",
+    "./window-types": "./src/window-types.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@brainstorm-os/sdk-types": "workspace:*",
+    "@brainstorm-os/tokens": "workspace:*"
+  }
+}

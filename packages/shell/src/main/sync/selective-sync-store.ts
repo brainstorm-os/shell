@@ -14,7 +14,7 @@ import {
 	DEFAULT_SELECTIVE_SYNC_POLICY,
 	type SelectiveSyncPolicy,
 	normalizeSelectiveSyncPolicy,
-} from "../../shared/selective-sync-types";
+} from "@brainstorm-os/protocol/selective-sync-types";
 
 const POLICY_FILE_NAME = "selective-sync.json";
 

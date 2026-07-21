@@ -19,7 +19,7 @@
  * publish pipeline (14.34) that produces the bundles.
  */
 
-import type { UpdateChannel } from "../../shared/update-wire-types";
+import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { InstallOrigin, OFFICIAL_CATALOG_ID } from "../apps/install-provenance";
 import type { AppInstaller } from "../apps/installer";
 import { type BundleAcquireDeps, BundleAcquireFailure, acquireBundle } from "./bundle-acquire";

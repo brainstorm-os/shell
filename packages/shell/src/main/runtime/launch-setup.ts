@@ -6,6 +6,7 @@
  */
 
 import { join } from "node:path";
+import { regionalToFormatContext } from "@brainstorm-os/protocol/format-context";
 import {
 	ActionTrustTier,
 	type OpenTarget,
@@ -13,7 +14,6 @@ import {
 	OsHandoffConsent,
 } from "@brainstorm-os/sdk-types";
 import { BaseWindow, WebContentsView, app, nativeTheme, screen, shell } from "electron";
-import { regionalToFormatContext } from "../../shared/format-context";
 import { resolveAppName } from "../apps/app-name";
 import { AppSignatureStatus } from "../apps/app-signature";
 import { wireExternalLinkRouting } from "../apps/external-link-routing";

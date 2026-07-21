@@ -22,6 +22,8 @@
  * follow-up that keeps the route current after a replace.
  */
 
+import { entityRoute } from "@brainstorm-os/protocol/route";
+import { NavigationMode } from "@brainstorm-os/protocol/window-types";
 import {
 	ActionTrustTier,
 	type ContributedAction,
@@ -48,8 +50,6 @@ import {
 	normalizeOpenInput,
 	osHandoffSignature,
 } from "@brainstorm-os/sdk-types";
-import { entityRoute } from "../../shared/route";
-import { NavigationMode } from "../../shared/window-types";
 import type { LaunchOrchestrator } from "../apps/launch-orchestrator";
 import type { AppLauncher, AppWindow } from "../apps/launcher";
 import type {

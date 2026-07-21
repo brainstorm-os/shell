@@ -14,14 +14,14 @@
  * runs through the same handler, which re-subscribes the new session's store.
  */
 
-import { useEffect, useState } from "react";
-import type { DashboardSnapshot } from "../../preload";
 import {
 	DEFAULT_CHROME,
 	DEFAULT_LOCALE,
 	DEFAULT_NOTIFICATIONS,
 	DEFAULT_REGIONAL,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import { useEffect, useState } from "react";
+import type { DashboardSnapshot } from "../../preload";
 
 /**
  * Fill the settings-overhaul snapshot maps when they're absent. A snapshot

@@ -9,7 +9,7 @@
  * primary key is stable; INSERT OR REPLACE clears `uninstalled_at`).
  */
 
-import type { UpdateChannel } from "../../../shared/update-wire-types";
+import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { AppSignatureStatus } from "../../apps/app-signature";
 import {
 	type InstallOrigin,

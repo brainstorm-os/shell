@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import { CapabilityLedger } from "../capabilities/ledger";
 import type { DashboardStore } from "../dashboard/dashboard-store";
 import { DataStores } from "../storage/data-stores";

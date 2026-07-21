@@ -7,13 +7,17 @@
  * math otherwise. Plus the pause signal + usage-cache mechanics.
  */
 
-import { describe, expect, it, vi } from "vitest";
-import { EntitlementStatus, PlanTier, freeEntitlement } from "../../shared/billing-types";
+import {
+	EntitlementStatus,
+	PlanTier,
+	freeEntitlement,
+} from "@brainstorm-os/protocol/billing-types";
 import {
 	AttachmentSyncPauseReason,
 	QuotaResource,
 	UploadQuotaDecision,
-} from "../../shared/quota-types";
+} from "@brainstorm-os/protocol/quota-types";
+import { describe, expect, it, vi } from "vitest";
 import type { Entitlement } from "./plan";
 import { QuotaService, type QuotaServiceDeps } from "./quota-service";
 

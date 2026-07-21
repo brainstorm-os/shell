@@ -12,7 +12,10 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BindingSource, type ShortcutBindingRow } from "../../shortcut-binding-types";
+import {
+	BindingSource,
+	type ShortcutBindingRow,
+} from "@brainstorm-os/protocol/shortcut-binding-types";
 import { buildShortcutBindingsForTests } from "../shortcuts/use-shortcut-bindings";
 import { EditableChord, findConflict } from "./editable-chord";
 

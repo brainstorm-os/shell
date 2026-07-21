@@ -5,9 +5,9 @@
  * substring leaks through.
  */
 
+import { AttachmentSyncPauseReason } from "@brainstorm-os/protocol/sync-status-types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AttachmentSyncPauseReason } from "../../sync-status-types";
 import { SyncStatusPopover, formatRelativeAge, relayUrlHost } from "./sync-status-popover";
 import { SyncState, type SyncStatusSnapshot } from "./use-sync-status";
 

@@ -5,7 +5,7 @@
  * actual apply live in `update-engine.ts`. Per §The update engine.
  */
 
-import type { UpdateChannel } from "../../shared/update-wire-types";
+import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { compareVersions } from "../update/update-core";
 import { findListing } from "./catalog-core";
 import type { CatalogIndex, CatalogVersion } from "./catalog-wire-types";

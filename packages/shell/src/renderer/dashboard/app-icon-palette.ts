@@ -10,7 +10,7 @@
  * which only the dashboard tile needs.
  */
 
-export { type IconGradient, gradientFor } from "../../shared/app-icon-palette";
+export { type IconGradient, gradientFor } from "@brainstorm-os/protocol/app-icon-palette";
 
 /** Up to two letters: first letter of the first two words, or the first
  *  two letters of a single word. Strips punctuation so `io.example.foo`

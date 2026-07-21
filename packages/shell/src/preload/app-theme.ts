@@ -15,7 +15,7 @@
  * rebuilding apps.
  */
 
-import { type IconGradient, gradientFor } from "../shared/app-icon-palette";
+import { type IconGradient, gradientFor } from "@brainstorm-os/protocol/app-icon-palette";
 
 export const APP_THEME_STYLE_ID = "brainstorm-app-theme";
 

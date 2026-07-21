@@ -5,8 +5,8 @@
  * activity chip. Uses the shared `<Popover>` primitive (no bespoke chrome).
  */
 
-import type { BackgroundOperation } from "../../activity-types";
-import { ActivityPhase } from "../../activity-types";
+import type { BackgroundOperation } from "@brainstorm-os/protocol/activity-types";
+import { ActivityPhase } from "@brainstorm-os/protocol/activity-types";
 import { t } from "../i18n/t";
 import { Icon } from "../ui/icon";
 import { Popover } from "../ui/popover";

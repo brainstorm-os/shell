@@ -1,6 +1,6 @@
+import type { VaultActivateResult } from "@brainstorm-os/protocol/vault-recovery-wire-types";
+import { toVaultDbKind, toVaultRecovery } from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { BrowserWindow, dialog, ipcMain } from "electron";
-import type { VaultActivateResult } from "../../shared/vault-recovery-wire-types";
-import { toVaultDbKind, toVaultRecovery } from "../../shared/vault-recovery-wire-types";
 import type { DataStoreKind } from "../storage/data-stores";
 import { VaultCorruptionError } from "../storage/recovery-plan";
 import { detectCloudSync } from "../vault/cloud-sync";

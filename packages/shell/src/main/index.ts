@@ -3,6 +3,14 @@ import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { makeBpHookRouter, makeBpRouter } from "@brainstorm-os/block-protocol";
+import { ActivityKind, ActivityPhase } from "@brainstorm-os/protocol/activity-types";
+import { AppearanceMode, AppearanceSlot } from "@brainstorm-os/protocol/appearance";
+import {
+	DEFAULT_SELECTIVE_SYNC_POLICY,
+	SelectiveSyncMode,
+	entityMatchesPolicy,
+} from "@brainstorm-os/protocol/selective-sync-types";
+import { UPDATE_STATE_EVENT } from "@brainstorm-os/protocol/update-wire-types";
 import {
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
@@ -36,14 +44,6 @@ import {
 	shell,
 	webContents,
 } from "electron";
-import { ActivityKind, ActivityPhase } from "../activity-types";
-import { AppearanceMode, AppearanceSlot } from "../shared/appearance";
-import {
-	DEFAULT_SELECTIVE_SYNC_POLICY,
-	SelectiveSyncMode,
-	entityMatchesPolicy,
-} from "../shared/selective-sync-types";
-import { UPDATE_STATE_EVENT } from "../shared/update-wire-types";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
 import { AiQuotaService } from "./ai/ai-quota";

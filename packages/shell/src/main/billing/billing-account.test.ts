@@ -1,13 +1,17 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	BillingCheckoutCycle,
 	BillingCheckoutPlan,
 	BillingSettingsFailure,
-} from "../../shared/billing-settings-types";
-import { QuotaResource, type QuotaStateView, inertQuotaVerdict } from "../../shared/quota-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import {
+	QuotaResource,
+	type QuotaStateView,
+	inertQuotaVerdict,
+} from "@brainstorm-os/protocol/quota-types";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DataStores } from "../storage/data-stores";
 import { AccountRepository } from "./account-repo";
 import { type BillingAccountDeps, BillingAccountService } from "./billing-account";

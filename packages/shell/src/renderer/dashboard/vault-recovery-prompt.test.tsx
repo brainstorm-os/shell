@@ -7,9 +7,9 @@
  * capability-prompt precedent; here we assert the wiring + copy.
  */
 
+import { VaultDbKind, VaultRecovery } from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { VaultDbKind, VaultRecovery } from "../../shared/vault-recovery-wire-types";
 import { VaultRecoveryPrompt } from "./vault-recovery-prompt";
 
 describe("VaultRecoveryPrompt", () => {

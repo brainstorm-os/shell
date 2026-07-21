@@ -20,7 +20,7 @@ import {
 	UpdateAvailability,
 	UpdateChannel,
 	type UpdateCheckResult,
-} from "../../shared/update-wire-types";
+} from "@brainstorm-os/protocol/update-wire-types";
 
 type ParsedVersion = {
 	readonly core: readonly [number, number, number];

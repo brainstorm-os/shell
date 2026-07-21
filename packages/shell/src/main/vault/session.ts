@@ -29,7 +29,7 @@
  */
 
 import { join } from "node:path";
-import type { UnlockResult } from "../../shared/app-lock-wire-types";
+import type { UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 import { AiUsageRepository } from "../ai/ai-usage-repo";
 import { AssetDekStore } from "../assets/asset-dek-store";
 import { AssetStore } from "../assets/asset-store";
@@ -1091,7 +1091,7 @@ export function appLockModeForBackend(name: KeystoreBackendName): AppLockMode {
 
 // Wire types live in the renderer-safe shared module; re-exported here so the
 // existing main-side importers keep resolving them from `session.ts`.
-export type { UnlockReason, UnlockResult } from "../../shared/app-lock-wire-types";
+export type { UnlockReason, UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 
 type LockedVaultState = {
 	vaultId: string;

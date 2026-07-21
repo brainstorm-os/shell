@@ -29,8 +29,8 @@ import {
 	asBillingCheckoutCycle,
 	asBillingCheckoutPlan,
 	billingFail,
-} from "../../shared/billing-settings-types";
-import type { QuotaStateView } from "../../shared/quota-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import type { QuotaStateView } from "@brainstorm-os/protocol/quota-types";
 import type { AccountRepository } from "./account-repo";
 import type { BillingEdgeClient } from "./billing-edge-client";
 import type { EntitlementRepository } from "./entitlement-repo";
