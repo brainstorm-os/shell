@@ -13,7 +13,7 @@
  * without a schema change. SQL lives only here (CLAUDE.md §Repository pattern).
  */
 
-import type { SqliteDatabase, SqliteStatement } from "../storage/sqlite";
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { type FeatureFlag, type PlanTier, asFeatureFlags, asPlanTier } from "./plan";
 
 export type CachedEntitlement = {

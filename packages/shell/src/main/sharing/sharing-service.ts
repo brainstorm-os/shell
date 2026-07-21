@@ -28,11 +28,11 @@
  */
 
 import { Buffer } from "node:buffer";
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ShareInviteToken, SharedContact, SharedMember } from "@brainstorm-os/sdk-types";
 import { RosterRole } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { AccessRole } from "../collab/access-record";
 import type { ContactsStore } from "../collab/contacts-store";
 import { type ShareInvite, verifyShareInvite } from "../collab/share-invite";

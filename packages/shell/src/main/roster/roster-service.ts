@@ -21,11 +21,11 @@
  * identity's profile even with the capability.
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
 import { RosterRole } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { AccessRole, activeMembers } from "../collab/access-record";
 import {
 	fingerprintOf,

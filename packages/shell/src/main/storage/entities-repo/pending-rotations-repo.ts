@@ -14,7 +14,7 @@
  * superseded it. LOCAL derived state — never syncs, never crosses the wire.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 /** One entity awaiting its deferred rotation wire-delivery. */
 export type PendingRotationRecord = {

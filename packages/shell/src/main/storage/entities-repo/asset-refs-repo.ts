@@ -9,8 +9,8 @@
  * now-unreferenced asset. `countByAsset` is the GC reachability test.
  */
 
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import type { AssetRefRole } from "../../assets/asset-types";
-import type { SqliteDatabase, SqliteStatement } from "../sqlite";
 
 export type AssetRefRecord = {
 	entityId: string;

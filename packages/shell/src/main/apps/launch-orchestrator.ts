@@ -16,9 +16,9 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { FormatContext, LaunchContext } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { AppsRepository } from "../storage/registry-repo/apps-repo";
 import type { AppLauncher, AppWindow, LaunchOptions } from "./launcher";
 

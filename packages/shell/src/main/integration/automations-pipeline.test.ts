@@ -18,6 +18,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
 import {
 	EntityOp,
 	StepKind,
@@ -32,7 +33,6 @@ import { AutomationsHost, type LoadedWorkflow } from "../automations/automations
 import { createBrokerInterpreterPorts } from "../automations/broker-interpreter-ports";
 import { ReminderRunner } from "../automations/reminder-runner";
 import { SchedulerService } from "../automations/scheduler-service";
-import type { CapabilityLedger as CapabilityLedgerType } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { makeEntitiesServiceHandler } from "../entities/entities-service";
 import { EntityDekStore } from "../entities/entity-dek-store";
@@ -250,6 +250,7 @@ describe("Automations pipeline — fire → run → real entity → persisted ru
 // runNow service surface, the 11b.15 designation gate, and an 11b.8 HTTP
 // step through the cap-scoped egress port.
 
+import type { CapabilityGrant } from "@brainstorm-os/capabilities/ledger";
 import {
 	EntityEventVerb,
 	TRIGGER_TYPE_URL,
@@ -263,7 +264,6 @@ import {
 	makeAutomationsServiceHandler,
 } from "../automations/automations-service";
 import { AUTOMATIONS_APP_ID, buildAutomationsDeployment } from "../automations/wiring";
-import type { CapabilityGrant } from "../capabilities/ledger";
 import { makeEntitiesServiceHandler as makeHandlerForDeploy } from "../entities/entities-service";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
 

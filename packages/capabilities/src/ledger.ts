@@ -17,8 +17,8 @@
  * grants when the user accepts a manifest's capability requests.
  */
 
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { ulid } from "ulid";
-import type { SqliteDatabase } from "../storage/sqlite";
 
 /** How a capability grant was created. String values are persisted in the
  *  `granted_via` column (and its CHECK constraint) — keep them stable. */

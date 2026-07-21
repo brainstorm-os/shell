@@ -23,14 +23,14 @@ import * as Y from "yjs";
 let USER_DATA_DIR = "";
 vi.mock("electron", () => ({ app: { getPath: () => USER_DATA_DIR } }));
 
+import { __setSqlcipherDriverForTests } from "@brainstorm-os/sqlite";
+import { __resetAtRestProbeForTests } from "@brainstorm-os/sqlite/at-rest-mode";
 import { AssetKind } from "../assets/asset-types";
 import { packBundle, unpackBundle } from "../bundle/bundle-archive";
 import { BundleExportScopeKind, BundlePath } from "../bundle/bundle-format";
 import { exportVaultBundle } from "../bundle/vault-export";
 import { importVaultBundle } from "../bundle/vault-import";
-import { __resetAtRestProbeForTests } from "../storage/at-rest-mode";
 import { EntitiesRepository } from "../storage/entities-repo";
-import { __setSqlcipherDriverForTests } from "../storage/sqlite";
 import { closeActiveVaultSession, getActiveVaultSession } from "../vault/session";
 import { createVault } from "../vault/vault";
 

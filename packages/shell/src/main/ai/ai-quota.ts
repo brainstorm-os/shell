@@ -41,10 +41,10 @@
  * for the documented contract TODO).
  */
 
+import { SHELL_IDENTITY } from "@brainstorm-os/capabilities/default-grants";
 import { AI_BUDGET_EXHAUSTED_ERROR_KIND } from "@brainstorm-os/sdk-types";
 import type { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { CreditEntryKind } from "../billing/credit-ledger-repo";
-import { SHELL_IDENTITY } from "../capabilities/default-grants";
 import type { AppAiBudget } from "../vault/ai-settings-store";
 import { AiUsageOutcome, type AiUsageRecord } from "./ai-usage-log";
 import type { AiUsageRepository } from "./ai-usage-repo";

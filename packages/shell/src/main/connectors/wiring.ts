@@ -14,6 +14,7 @@
  * pending — the engine is fully unit-tested; this is the deploy seam.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	CONNECTOR_ACCOUNT_TYPE_URL,
 	ConflictPolicy,
@@ -21,7 +22,6 @@ import {
 	SYNC_RUN_TYPE_URL,
 	SyncDirection,
 } from "@brainstorm-os/sdk-types";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { CredentialStore } from "../credentials/store";
 import type { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import {

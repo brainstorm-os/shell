@@ -1,12 +1,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { open as openSqlite } from "@brainstorm-os/sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import { ENTITIES_MIGRATIONS } from "../storage/entities-schema";
 import { applyMigrations } from "../storage/migrations";
-import { open as openSqlite } from "../storage/sqlite";
-import type { SqliteDatabase } from "../storage/sqlite";
 import {
 	SEED_PROVENANCE_KEY,
 	SEED_PROVENANCE_VALUE,

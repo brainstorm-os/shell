@@ -1,0 +1,37 @@
+{
+  "name": "@brainstorm-os/sqlite",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Brainstorm's runtime-agnostic SQLite abstraction — one SqliteDatabase interface over bun:sqlite (tests) and SQLCipher/better-sqlite3-multiple-ciphers (Electron), plus at-rest encryption key derivation + migration.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/sqlite.ts",
+    "./at-rest-mode": "./src/at-rest-mode.ts",
+    "./at-rest-key": "./src/at-rest-key.ts",
+    "./at-rest-migration": "./src/at-rest-migration.ts",
+    "./at-rest-fake-driver": "./src/at-rest-fake-driver.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@brainstorm-os/native": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
+  },
+  "peerDependencies": {
+    "better-sqlite3-multiple-ciphers": "*",
+    "sqlite-vec": "*"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3-multiple-ciphers": {
+      "optional": true
+    },
+    "sqlite-vec": {
+      "optional": true
+    }
+  }
+}

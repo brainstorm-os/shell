@@ -18,9 +18,9 @@
  * which is called only from `main/index.ts`.
  */
 
+import { applyDefaultAppGrants } from "@brainstorm-os/capabilities/default-grants";
+import { GrantedVia, parseCapability } from "@brainstorm-os/capabilities/ledger";
 import { ulid } from "ulid";
-import { applyDefaultAppGrants } from "../capabilities/default-grants";
-import { GrantedVia, parseCapability } from "../capabilities/ledger";
 import { getActiveVaultSession } from "../vault/session";
 
 export const CAPABILITY_PROMPT_CHANNEL = "capabilities:prompt" as const;

@@ -9,7 +9,7 @@
  * `value` is an opaque JSON string the caller serialises/parses.
  */
 
-import type { SqliteDatabase, SqliteStatement } from "./sqlite";
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 
 export type SettingsEntry = { key: string; value: string };
 

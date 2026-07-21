@@ -1,7 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ulid } from "ulid";
-import type { KeystoreBackendName, PickKeystoreOptions } from "../credentials/keystore";
 import {
 	type AtRestMode,
 	AtRestReconcileOutcome,
@@ -9,7 +7,9 @@ import {
 	isAtRestMode,
 	probeAtRestMode,
 	reconcileAtRestMode,
-} from "../storage/at-rest-mode";
+} from "@brainstorm-os/sqlite/at-rest-mode";
+import { ulid } from "ulid";
+import type { KeystoreBackendName, PickKeystoreOptions } from "../credentials/keystore";
 import { type DataStoreKind, archiveCorruptDb } from "../storage/data-stores";
 import { assertVaultFormatNotPreFreeze, assertVaultFormatSupported } from "../util/schema-version";
 import { WELCOME_SEED_VERSION } from "../welcome/welcome-content";

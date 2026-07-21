@@ -1,5 +1,5 @@
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { describe, expect, it, vi } from "vitest";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { ResolvedAccount, ResolvedConnector } from "./connectors-request";
 import { type ConnectorsServiceDeps, makeConnectorsServiceHandler } from "./connectors-service";
 import type { OAuthBroker } from "./oauth-broker";

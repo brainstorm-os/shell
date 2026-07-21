@@ -16,9 +16,9 @@
  * cap not held → `Denied`.
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { AccountRepository } from "./account-repo";
 import type { EntitlementRepository } from "./entitlement-repo";
 import {

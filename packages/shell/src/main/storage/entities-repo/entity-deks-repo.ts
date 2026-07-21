@@ -19,8 +19,8 @@
  * the rotation policy when 10.2 lands.
  */
 
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { type SealedSecret, isSealedSecret } from "../../credentials/crypto";
-import type { SqliteDatabase, SqliteStatement } from "../sqlite";
 
 export type EntityDekRecord = {
 	dekId: string;

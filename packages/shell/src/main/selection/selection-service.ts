@@ -22,11 +22,11 @@
  * cap not held → `Denied`.
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ObjectDragItem, SelectionSnapshot } from "@brainstorm-os/sdk-types";
 import { hardenObjectDragItems } from "@brainstorm-os/sdk/entity-drag";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 
 /** Lets an app publish its own selection. Broadly grantable (opt-in per
  *  manifest) — an app publishing its own selection is low-risk. */

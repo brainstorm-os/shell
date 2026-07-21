@@ -1,15 +1,15 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION } from "../../ipc/envelope";
 import { AppSignatureStatus } from "../apps/app-signature";
 import { DEFAULT_INSTALL_PROVENANCE } from "../apps/install-provenance";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { DataStores } from "../storage/data-stores";
 import { RegistryRepositories } from "../storage/registry-repo/index";
-import type { SqliteDatabase } from "../storage/sqlite";
 import {
 	PLATFORM_READ_CAPABILITY,
 	type PlatformServiceOptions,

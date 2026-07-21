@@ -13,8 +13,8 @@
  * "what's the earliest armed fire" without parsing every config).
  */
 
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import type { TimeTriggerConfig } from "../../automations/trigger-schedule";
-import type { SqliteDatabase } from "../sqlite";
 
 /** The durable shape of one registered trigger (mirrors `PersistedFire`). */
 export type SchedulerFireRecord = {

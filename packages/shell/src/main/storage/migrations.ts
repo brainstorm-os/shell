@@ -18,8 +18,8 @@
  * the same ordering / forward-only / error-propagation rules apply.
  */
 
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { type Migration, runMigrations } from "../util/schema-version";
-import type { SqliteDatabase } from "./sqlite";
 
 export type SqliteMigration = Migration<SqliteDatabase>;
 

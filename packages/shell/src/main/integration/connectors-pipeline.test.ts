@@ -18,6 +18,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
 import {
 	CONNECTOR_TYPE_URL,
 	ConflictPolicy,
@@ -30,7 +31,6 @@ import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc"
 import { AutomationsHost } from "../automations/automations-host";
 import { ReminderRunner } from "../automations/reminder-runner";
 import { SchedulerService } from "../automations/scheduler-service";
-import type { CapabilityLedger as CapabilityLedgerType } from "../capabilities/ledger";
 import {
 	type ConnectorsSyncDeps,
 	type SyncContext,

@@ -1,7 +1,7 @@
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { WorkflowRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { AUTOMATIONS_RUN_CAP, makeAutomationsServiceHandler } from "./automations-service";
 import type { AutomationsDeployment } from "./wiring";
 

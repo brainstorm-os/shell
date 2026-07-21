@@ -14,12 +14,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { _resetStorageWorker, handleStorageEnvelope } from "../../workers/storage/index";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { DataStores } from "../storage/data-stores";
 
 const APP_ID = "io.brainstorm.upload-it";

@@ -26,6 +26,7 @@
  * against the active vault's ledger here — the authoritative gate.
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import {
 	MCP_SPAWN_LOCAL_CAP,
 	type McpAgentTool,
@@ -43,7 +44,6 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { McpCallOutcome, type McpCallRecord, argKeysOf } from "./mcp-audit-log";
 import {
 	type McpServerView,

@@ -17,11 +17,11 @@
  * `WidgetHost` stays the pure, unit-tested lifecycle core; this is the glue.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { FormatContext } from "@brainstorm-os/sdk-types";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import type { ThemeName } from "@brainstorm-os/tokens";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
-import type { SqliteDatabase } from "../storage/sqlite";
 import { WidgetHost, type WidgetLayout, type WidgetPlacement } from "./widget-host";
 import {
 	type WidgetSpec,

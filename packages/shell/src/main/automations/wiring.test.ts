@@ -5,6 +5,7 @@
  * live app-grant ceiling.
  */
 
+import type { CapabilityGrant, CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	EntityEventVerb,
 	StepKind,
@@ -18,7 +19,6 @@ import {
 	workflowToProperties,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
-import type { CapabilityGrant, CapabilityLedger } from "../capabilities/ledger";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
 import type { UiNotification } from "../ui/notify-host";
 import { AUTOMATION_HOST_ENTITY_ID } from "./automation-host-designation";

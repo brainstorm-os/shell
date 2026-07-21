@@ -10,9 +10,9 @@
  * returns null when no vault is open → `Unavailable`, fail-closed.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { requireServiceCapability } from "../connectors/connectors-service";
 import type { AutomationsDeployment } from "./wiring";
 

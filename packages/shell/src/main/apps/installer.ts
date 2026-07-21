@@ -35,11 +35,11 @@
 
 import { cp, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { applyDefaultAppGrants } from "../capabilities/default-grants";
-import { type CapabilityLedger, GrantedVia } from "../capabilities/ledger";
+import { applyDefaultAppGrants } from "@brainstorm-os/capabilities/default-grants";
+import { type CapabilityLedger, GrantedVia } from "@brainstorm-os/capabilities/ledger";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { type ShortcutRegistry, shellChordSet } from "../shortcuts/shortcut-registry";
 import { OpenerTargetKind, RegistryRepositories } from "../storage/registry-repo";
-import type { SqliteDatabase } from "../storage/sqlite";
 import { hashBundleDirectory } from "./app-bundle-hash";
 import {
 	AppSignatureStatus,

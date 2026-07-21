@@ -5,7 +5,7 @@
  * un-orphan on re-install. Upsert keeps the same row across version cycles.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 export type EntityTypeRecord = {
 	id: string;

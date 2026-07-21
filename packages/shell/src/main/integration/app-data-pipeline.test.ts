@@ -23,6 +23,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 // `PropertyStore` is the exact store the Notes `PropertiesProvider`
 // feeds the snapshot into; the picker lists `store.getSnapshot()`. It
@@ -47,8 +49,6 @@ import type { LaunchOrchestrator } from "../apps/launch-orchestrator";
 import type { AppWindow } from "../apps/launcher";
 import type { AppManifest } from "../apps/manifest";
 import { bootstrapApps } from "../apps/seed-packaged-apps";
-import type { CapabilityLedger as CapabilityLedgerType } from "../capabilities/ledger";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import type { DashboardStore } from "../dashboard/dashboard-store";
 import { makeEntitiesServiceHandler } from "../entities/entities-service";

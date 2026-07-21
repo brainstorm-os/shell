@@ -29,9 +29,9 @@
  * against a real vault session without Electron.
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ValueType } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { VaultSession } from "../vault/session";
 import { inferMapping } from "./import-map";
 import { parseTable } from "./import-parse";

@@ -9,10 +9,10 @@
  *   - A fresh install has the same shape as a v1-then-migrated DB.
  */
 
+import { open } from "@brainstorm-os/sqlite";
 import { describe, expect, it } from "vitest";
 import { ENTITIES_MIGRATIONS } from "./entities-schema";
 import { applyMigrations, getSchemaVersion } from "./migrations";
-import { open } from "./sqlite";
 
 async function fresh() {
 	return open(":memory:");

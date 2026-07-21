@@ -10,6 +10,7 @@
  */
 
 import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { AppSignatureStatus } from "../../apps/app-signature";
 import {
 	type InstallOrigin,
@@ -17,7 +18,6 @@ import {
 	parseChannel,
 	parseInstallOrigin,
 } from "../../apps/install-provenance";
-import type { SqliteDatabase } from "../sqlite";
 
 export type AppRecord = {
 	id: string;

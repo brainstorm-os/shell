@@ -19,6 +19,7 @@
  * dashboard-only entry point.
  */
 
+import { open as openSqlite } from "@brainstorm-os/sqlite";
 import type { IpcMain } from "electron";
 import rawChangelog from "../../../changelog/changelog.json";
 import rawHelpCorpus from "../../../help-corpus/corpus.json";
@@ -33,7 +34,6 @@ import {
 import { HelpIndexer, articleByTopicId } from "../help/help-indexer";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { open as openSqlite } from "../storage/sqlite";
 
 let cachedChangelog: Changelog | null = null;
 

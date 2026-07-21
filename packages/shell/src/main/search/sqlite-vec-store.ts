@@ -21,7 +21,7 @@
  * `loadVecExtension()`, so the DDL is always safe here.
  */
 
-import type { SqliteDatabase } from "../storage/sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import {
 	type VectorHit,
 	type VectorRow,

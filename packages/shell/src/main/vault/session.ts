@@ -29,6 +29,8 @@
  */
 
 import { join } from "node:path";
+import { applyShellGrants } from "@brainstorm-os/capabilities/default-grants";
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 import { AiUsageRepository } from "../ai/ai-usage-repo";
 import { AssetDekStore } from "../assets/asset-dek-store";
@@ -44,8 +46,6 @@ import { AccountRepository } from "../billing/account-repo";
 import { BillingService } from "../billing/billing-service";
 import { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { EntitlementRepository } from "../billing/entitlement-repo";
-import { applyShellGrants } from "../capabilities/default-grants";
-import { CapabilityLedger } from "../capabilities/ledger";
 import {
 	clearAppLockPin,
 	hasAppLockPin,

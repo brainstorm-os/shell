@@ -20,9 +20,11 @@ export default defineConfig(({ command }) => {
 					exclude: [
 						"@brainstorm-os/block-protocol",
 						"@brainstorm-os/protocol",
+						"@brainstorm-os/sqlite",
 						"@brainstorm-os/sdk",
 						"@brainstorm-os/sdk-types",
 						"@brainstorm-os/tokens",
+						"@brainstorm-os/capabilities",
 						"@brainstorm-os/editor",
 					],
 				}),

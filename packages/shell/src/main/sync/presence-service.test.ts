@@ -5,9 +5,9 @@
  * `sharing-service`'s server-side re-check tests.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { PresenceRouter } from "./presence-router";
 import { type PresenceServiceOptions, makePresenceServiceHandler } from "./presence-service";
 

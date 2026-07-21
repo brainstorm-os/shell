@@ -9,7 +9,7 @@
  * mapping lives in `web/cookie-serde.ts`.
  */
 
-import type { SqliteDatabase } from "./sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 /** `SameSite` policy. Values are BOTH the persisted form AND Electron's
  *  `Cookie.sameSite` / `CookiesSetDetails.sameSite` wire strings — keep them

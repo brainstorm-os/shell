@@ -17,8 +17,8 @@
  * indexer's `<mark>…</mark>` so the renderer can use one highlighter.
  */
 
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { buildMatchExpression } from "../search/search-indexer";
-import type { SqliteDatabase } from "../storage/sqlite";
 import type { HelpArticle, HelpCorpus, HelpHit } from "./help-corpus";
 
 const DEFAULT_LIMIT = 50;

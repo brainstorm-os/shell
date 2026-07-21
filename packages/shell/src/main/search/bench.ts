@@ -35,9 +35,9 @@
  * Spec: §Performance budgets.
  */
 
+import { type SqliteDatabase, open, openWithVecExtension } from "@brainstorm-os/sqlite";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { type SqliteDatabase, open, openWithVecExtension } from "../storage/sqlite";
 import {
 	type BenchQuery,
 	type BenchQueryKind,

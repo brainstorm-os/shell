@@ -21,9 +21,9 @@
  * source by the router (only apps that published receive it).
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { PresenceRouter } from "./presence-router";
 
 /** Presence rides the per-type entities read grant — no new default capability. */

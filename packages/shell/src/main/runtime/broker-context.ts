@@ -16,8 +16,8 @@
  * lets the Broker stay vault-agnostic.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { AppIdentityVerifier, CapabilityChecker, DenialEvent } from "../../ipc/broker";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import { appendAuditEvent } from "../vault/audit-log";
 import { type VaultSession, getActiveVaultSession } from "../vault/session";

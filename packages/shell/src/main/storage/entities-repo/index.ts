@@ -6,7 +6,7 @@
  * these typed methods; SQL stays in the individual repo files.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { AssetDeksRepository } from "./asset-deks-repo";
 import { AssetRefsRepository } from "./asset-refs-repo";
 import { AssetsRepository } from "./assets-repo";

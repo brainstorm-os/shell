@@ -35,15 +35,15 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { DASHBOARD_DOC_ID } from "../dashboard/dashboard-store";
-import { type SignedAddDeviceRecord, verifyAddDeviceRecord } from "../pairing/devices-store";
 import {
 	AtRestMode,
 	type AtRestProbeResult,
 	AtRestReconcileOutcome,
 	probeAtRestMode,
 	reconcileAtRestMode,
-} from "../storage/at-rest-mode";
+} from "@brainstorm-os/sqlite/at-rest-mode";
+import { DASHBOARD_DOC_ID } from "../dashboard/dashboard-store";
+import { type SignedAddDeviceRecord, verifyAddDeviceRecord } from "../pairing/devices-store";
 import type { YDocStore } from "../storage/ydoc-store";
 import { VAULT_PROPERTIES_DOC_ID } from "./vault-properties-store";
 

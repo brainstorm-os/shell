@@ -1,8 +1,8 @@
+import { open } from "@brainstorm-os/sqlite";
 import { describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { open } from "../storage/sqlite";
 import { SearchIndexer } from "./search-indexer";
 import { makeSearchServiceHandler } from "./search-service";
 
