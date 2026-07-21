@@ -8,7 +8,7 @@
  * dataset per [[preview-drop-pattern]].
  */
 
-import { type NavigationMode, openEntity as dispatchOpenVerb } from "@brainstorm/sdk";
+import { type NavigationMode, openEntity as dispatchOpenVerb } from "@brainstorm-os/sdk";
 import type {
 	BlocksService,
 	BpService,
@@ -18,8 +18,8 @@ import type {
 	VaultEntitiesService as SdkVaultEntitiesService,
 	SearchService,
 	VaultEntity,
-} from "@brainstorm/sdk-types";
-import type { SaveFileService } from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk-types";
+import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 
 export type { SaveFileService };
 
@@ -176,7 +176,7 @@ export type TasksBrainstorm = {
 		/** Vault-entities aggregator. We consume `onChange` only — fans on
 		 *  every cross-app write + dev reseed, used to re-pull `repository.listAll`
 		 *  so a freshly-seeded vault appears without manual reload. The dashboard
-		 *  widget also reads it through `@brainstorm/react-yjs`'s `useVaultEntities`,
+		 *  widget also reads it through `@brainstorm-os/react-yjs`'s `useVaultEntities`,
 		 *  which wants the full SDK service shape. */
 		vaultEntities?: SdkVaultEntitiesService;
 		/** Shell notification surface — due/scheduled alerts (9.14.9). */

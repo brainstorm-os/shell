@@ -4,7 +4,7 @@
  * waiting, plus the per-account error isolation and `stop()` semantics.
  */
 
-import { MAIL_ACCOUNT_TYPE_URL } from "@brainstorm/sdk-types";
+import { MAIL_ACCOUNT_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { listEnabledMailAccountIds, startMailSessionSync } from "./mail-session-registration";
 

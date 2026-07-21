@@ -15,7 +15,7 @@
  * tabindex; the columns are plain `group`s.
  */
 
-import { Orientation, type SpatialCell, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, type SpatialCell, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { t } from "../i18n/t";
 import type { BoardColumn } from "../logic/compile-board";
 import type { Task } from "../types/task";

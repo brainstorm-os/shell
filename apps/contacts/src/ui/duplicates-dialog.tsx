@@ -13,8 +13,8 @@
  * Enter in the radio group merges.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Popover } from "@brainstorm/sdk/popover";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Popover } from "@brainstorm-os/sdk/popover";
 import { useId, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { plural, t } from "../i18n";

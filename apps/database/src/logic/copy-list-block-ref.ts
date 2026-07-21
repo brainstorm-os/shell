@@ -5,7 +5,7 @@
  * The block render code (`src/blocks/embedded-list/entry.ts`) already builds
  * to `dist/blocks/embedded-list.js` and is served live by the shell's
  * `bsblock://` block-bundle loader; a host document mounts it through
- * `@brainstorm/sdk/block-mount` `BpBlockMount`, resolving the providing app
+ * `@brainstorm-os/sdk/block-mount` `BpBlockMount`, resolving the providing app
  * via `services.blocks.forType("brainstorm/List/v1")`. What was missing was
  * the entry point on Database's side: a way for the user to put a List onto
  * the clipboard so a document can embed it.
@@ -23,7 +23,7 @@
  * app.
  */
 
-import { formatBrainstormEntityUri } from "@brainstorm/sdk/note-references";
+import { formatBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 
 /** Build the clipboard payload for embedding a list as an inline block: the
  *  plain `brainstorm://entity/<listId>` URI. Kept separate from the clipboard

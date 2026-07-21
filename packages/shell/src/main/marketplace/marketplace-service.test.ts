@@ -1,4 +1,4 @@
-import { ThemeName, themeCatalog } from "@brainstorm/tokens";
+import { ThemeName, themeCatalog } from "@brainstorm-os/tokens";
 import { describe, expect, it } from "vitest";
 import { ContentKind } from "./kinds";
 import { InstallState, ListingSource } from "./listing";

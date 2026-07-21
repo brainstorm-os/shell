@@ -5,7 +5,7 @@
  * lives in the typed-link graph rather than in this row.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 
 export type Project = {
 	id: string;

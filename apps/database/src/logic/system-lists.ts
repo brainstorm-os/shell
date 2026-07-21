@@ -5,14 +5,14 @@
  * vault contains, which lets product plumbing (BrowsingHistories,
  * ListViews, Triggers, Workflows…) read exactly like the user's own
  * collections. The classification itself lives in
- * `@brainstorm/sdk/system-entities`; this module is the pure row model:
+ * `@brainstorm-os/sdk/system-entities`; this module is the pure row model:
  * user lists keep their order on top, system type-lists drop under a
  * collapsed "System" disclosure header rendered below them. User-created
  * collections are NEVER classified system — only vault-derived `ByType`
  * lists whose every source type is infrastructure.
  */
 
-import { isPlumbingEntityType } from "@brainstorm/sdk/system-entities";
+import { isPlumbingEntityType } from "@brainstorm-os/sdk/system-entities";
 import type { List } from "../types/list";
 import { ListSourceKind } from "../types/list-source";
 

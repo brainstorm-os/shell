@@ -1,5 +1,5 @@
-import type { SaveFileService, SaveFileTarget } from "@brainstorm/sdk/export-file";
-import type { EntityRow } from "@brainstorm/sdk/in-memory-entities";
+import type { SaveFileService, SaveFileTarget } from "@brainstorm-os/sdk/export-file";
+import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
 import { describe, expect, it, vi } from "vitest";
 import { ListExportFormat } from "../logic/list-export";
 import { runListExport } from "./export-flow";

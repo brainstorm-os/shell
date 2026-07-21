@@ -31,7 +31,7 @@ const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean => {
 
 const EMPTY = new Uint8Array(0);
 
-describe("@brainstorm/native — XChaCha20-Poly1305 (NAPI-3e)", () => {
+describe("@brainstorm-os/native — XChaCha20-Poly1305 (NAPI-3e)", () => {
 	it("native seal === @noble xchacha20poly1305 encrypt BYTE-FOR-BYTE over random tuples (incl. empty aad)", async () => {
 		const { xchacha20Poly1305Seal } = await loadNative();
 		for (let i = 0; i < 16; i++) {

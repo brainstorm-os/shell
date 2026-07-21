@@ -1,4 +1,4 @@
-/** Re-export shim — InlineTransclusionNode now lives in `@brainstorm/editor`. */
+/** Re-export shim — InlineTransclusionNode now lives in `@brainstorm-os/editor`. */
 export {
 	INLINE_TRANSCLUSION_NODE_TYPE,
 	INLINE_TRANSCLUSION_DOM_FLAG,
@@ -8,4 +8,4 @@ export {
 	$isInlineTransclusionNode,
 	InlineTransclusionNode,
 	InlineTransclusionView,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

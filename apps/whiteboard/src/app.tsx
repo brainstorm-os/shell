@@ -12,27 +12,27 @@
  * `subscribe()` snapshot.
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { SaveDispositionKind, svgToPng, textToBytes } from "@brainstorm/sdk/export-file";
+import "@brainstorm-os/sdk/app-theme.css";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { SaveDispositionKind, svgToPng, textToBytes } from "@brainstorm-os/sdk/export-file";
 import {
 	type ExportFormatSpec,
 	ExportOptionKind,
 	type ExportSelectOption,
 	openExportPopover,
-} from "@brainstorm/sdk/export-popover";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { NavButtons, type NavHistory } from "@brainstorm/sdk/nav-history";
+} from "@brainstorm-os/sdk/export-popover";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { NavButtons, type NavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
+} from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import {
 	type ReactElement,
 	useCallback,

@@ -17,8 +17,8 @@
  * and everywhere else (no drift — [[per-object-icons-everywhere]]).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { deriveEntityTitle } from "../entities/derive-title";
 import type { EntitiesRepository } from "../storage/entities-repo";
 

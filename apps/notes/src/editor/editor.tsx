@@ -6,7 +6,7 @@
  * root (`Y.XmlText` named `"root"`, per
  *  §Universal rich-text body)
  * through the shared `<BrainstormEditor>` wrapper from
- * `@brainstorm/editor`. Persistence flows through the 9.3.2b
+ * `@brainstorm-os/editor`. Persistence flows through the 9.3.2b
  * `loadDoc`/`applyDoc` resolver, not the per-note kv silo.
  *
  * Initial state (9.3.5.N3): title seeding rides
@@ -82,13 +82,13 @@ import {
 	TransclusionTypeaheadPlugin,
 	TurnIntoPlugin,
 	createMapBlockAnchorStore,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { TRANSFORMERS } from "@lexical/markdown";
 import { CheckListPlugin } from "@lexical/react/LexicalCheckListPlugin";
 import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin";

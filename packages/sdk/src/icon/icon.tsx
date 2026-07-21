@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/icon` — the app-side `<Icon>`, mirroring the shell's
+ * `@brainstorm-os/sdk/icon` — the app-side `<Icon>`, mirroring the shell's
  * common Icon component (`packages/shell/src/renderer/ui/icon.tsx`): same
  * `IconName` enum, same glyph mapping, same default size (16) and
  * unknown-name behaviour (warn in dev, render nothing).

@@ -1,4 +1,4 @@
-# @brainstorm/native-embed
+# @brainstorm-os/native-embed
 
 Native NAPI-RS embedding addon for Brainstorm's **local semantic search** (plan
 11.3). Wraps [`fastembed-rs`](https://github.com/Anush008/fastembed-rs) (ONNX
@@ -6,10 +6,10 @@ Runtime) to compute on-device text embeddings — `bge-small-en-v1.5`, 384-d,
 English. Content never leaves the device (the only network is the one-time
 model-weight download on first use).
 
-## Why a separate crate from `@brainstorm/native`
+## Why a separate crate from `@brainstorm-os/native`
 
 ONNX Runtime is a large native dependency. Keeping it out of the
-security-critical crypto crate (`@brainstorm/native`) means the crypto binary
+security-critical crypto crate (`@brainstorm-os/native`) means the crypto binary
 stays small + cross-compiles cleanly, and this addon can be loaded lazily (only
 when semantic search is enabled) and shipped/updated independently.
 

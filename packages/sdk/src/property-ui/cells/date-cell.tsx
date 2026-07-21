@@ -11,7 +11,12 @@
  * "Yesterday" (the popover editor is identical).
  */
 
-import { type CellProps, DateGranularity, type DateValue, ValueType } from "@brainstorm/sdk-types";
+import {
+	type CellProps,
+	DateGranularity,
+	type DateValue,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import {

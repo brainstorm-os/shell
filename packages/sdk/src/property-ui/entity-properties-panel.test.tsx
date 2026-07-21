@@ -7,7 +7,7 @@
  * write-throughs compute the next bag via the pure value-store helpers.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

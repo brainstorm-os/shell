@@ -8,7 +8,7 @@
  * `effective-def`) if a third surface needs it.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import type { EntityRow } from "./in-memory-graph";
 import { MAX_INSPECTOR_ROWS, humaniseKey } from "./node-properties";
 

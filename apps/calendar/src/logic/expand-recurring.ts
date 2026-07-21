@@ -1,7 +1,7 @@
 /**
  * Materialize recurring `ScheduledItem`s onto a visible window.
  *
- * The 9.15.5 shared engine (`occurrencesInRange`, `@brainstorm/sdk-types`)
+ * The 9.15.5 shared engine (`occurrencesInRange`, `@brainstorm-os/sdk-types`)
  * owns the date math; this is the thin Calendar-side adapter that turns
  * one anchored item + its `recurrence` into one item *per occurrence in
  * the window*, preserving duration and re-deriving a stable per-instance
@@ -15,7 +15,7 @@
  * per-occurrence (the `ScheduledItem` contract anticipates exactly this).
  */
 
-import { occurrencesInRange } from "@brainstorm/sdk-types";
+import { occurrencesInRange } from "@brainstorm-os/sdk-types";
 import type { ScheduledItem } from "./scheduled-item";
 
 export function expandRecurringItems(

@@ -24,13 +24,13 @@ import {
 	OpenWithDecisionKind,
 	OsHandoffSignatureKind,
 	parseOsHandoffSignature,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	type CompositeItemProps,
 	Orientation,
 	SelectionAttribute,
 	useCompositeKeyboard,
-} from "@brainstorm/sdk/a11y";
+} from "@brainstorm-os/sdk/a11y";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { OpenWithPromptRequest } from "../../preload";

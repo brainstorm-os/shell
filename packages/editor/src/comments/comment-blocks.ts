@@ -5,7 +5,7 @@
  * (session) block ids to live block DOM nodes.
  */
 
-import { type CommentDef, CommentStatus, buildThreads } from "@brainstorm/sdk-types";
+import { type CommentDef, CommentStatus, buildThreads } from "@brainstorm-os/sdk-types";
 import { DOCUMENT_BLOCK_ID } from "./comments-panel";
 
 /**

@@ -1,7 +1,7 @@
 /*
  * `.bs-searchbar` chrome for both `attachSearchbar` (DOM) and `<Searchbar>`
  * (React). Loaded from two places so both first-party apps (via
- * `@brainstorm/sdk/app-theme.css`) AND the shell-privileged dashboard (via
+ * `@brainstorm-os/sdk/app-theme.css`) AND the shell-privileged dashboard (via
  * an explicit import in `packages/shell/src/renderer/main.tsx`) get
  * identical chrome — the prior project-wide rule that "the SDK component
  * library is for apps; the shell has its own" leaves `<Searchbar>` adopters

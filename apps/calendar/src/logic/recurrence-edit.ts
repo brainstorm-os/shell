@@ -1,6 +1,6 @@
 /**
  * Re-export shim — the recurrence-edit helpers moved to the shared
- * `@brainstorm/sdk/recurrence-edit` when Tasks (9.14.12) became the second
+ * `@brainstorm-os/sdk/recurrence-edit` when Tasks (9.14.12) became the second
  * consumer of the recurrence editor. Calendar's import sites stay unchanged.
  */
 
@@ -13,4 +13,4 @@ export {
 	normalizeWeekdays,
 	repeatKindOf,
 	weekdayForDate,
-} from "@brainstorm/sdk/recurrence-edit";
+} from "@brainstorm-os/sdk/recurrence-edit";

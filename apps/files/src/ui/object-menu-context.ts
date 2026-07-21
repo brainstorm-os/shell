@@ -13,9 +13,9 @@
  * the entity exists).
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import type { ObjectMenuExtraItem } from "@brainstorm/sdk/object-menu";
-import type { OpenObjectMenuOptions } from "@brainstorm/sdk/object-menu";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import type { ObjectMenuExtraItem } from "@brainstorm-os/sdk/object-menu";
+import type { OpenObjectMenuOptions } from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n";
 import { SelectionModifier } from "../logic/selection";
 import type { FilesStore } from "../store/use-files-store";

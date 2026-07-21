@@ -5,7 +5,7 @@ import {
 	type BlockFrameEnvelope,
 	BlockFrameMessageDirection,
 	BlockFrameMessageKind,
-} from "@brainstorm/sdk/block-frame";
+} from "@brainstorm-os/sdk/block-frame";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type BlockRuntimeContext, startBlock } from "./index";
 

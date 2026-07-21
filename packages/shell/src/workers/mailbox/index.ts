@@ -27,7 +27,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { MailProtocol } from "@brainstorm/sdk-types";
+import { MailProtocol } from "@brainstorm-os/sdk-types";
 import type { Envelope, EnvelopeReply } from "../../ipc/envelope";
 import { makeErrorReply, makeOkReply, validateEnvelope } from "../../ipc/envelope";
 import type {

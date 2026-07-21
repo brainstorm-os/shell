@@ -13,7 +13,7 @@
  * editing/60-spellcheck.md.
  */
 
-import type { SpellcheckBridge, SpellcheckContext } from "@brainstorm/sdk-types";
+import type { SpellcheckBridge, SpellcheckContext } from "@brainstorm-os/sdk-types";
 import { type ContextMenuItem, openContextMenu } from "./menus";
 
 export type SpellcheckMenuLabels = {

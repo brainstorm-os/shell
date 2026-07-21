@@ -20,7 +20,7 @@
  * since-deleted target falls back to the app's default landing.
  */
 
-import type { SettingsService } from "@brainstorm/sdk-types";
+import type { SettingsService } from "@brainstorm-os/sdk-types";
 
 const DEFAULT_KEY = "last-viewed";
 

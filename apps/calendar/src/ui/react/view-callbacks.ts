@@ -4,8 +4,8 @@
  * the views and the chip agree on the exact shapes.
  */
 
-import type { ObjectDragPayload } from "@brainstorm/sdk-types";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
+import type { ObjectDragPayload } from "@brainstorm-os/sdk-types";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ScheduledItem } from "../../logic/scheduled-item";
 

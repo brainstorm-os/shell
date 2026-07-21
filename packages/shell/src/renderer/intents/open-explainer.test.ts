@@ -1,4 +1,4 @@
-import { OpenRefusal, OpenRung } from "@brainstorm/sdk-types";
+import { OpenRefusal, OpenRung } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { IntentDispatchResult } from "../../preload";
 import { ToastKind } from "../ui/toasts";

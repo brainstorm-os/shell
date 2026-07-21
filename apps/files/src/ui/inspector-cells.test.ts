@@ -1,4 +1,4 @@
-import { PropertyView, ValueType } from "@brainstorm/sdk-types";
+import { PropertyView, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { EditableField, fieldDef, readFieldValue, toStoredValue } from "./inspector-cells";
 

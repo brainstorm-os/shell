@@ -6,7 +6,7 @@
  * ArrowUp/Down to the next visible row.
  */
 
-import type { TreeNode } from "@brainstorm/sdk/a11y";
+import type { TreeNode } from "@brainstorm-os/sdk/a11y";
 import { FOLDER_TYPE, ROOT_FOLDER_ID } from "../types/entity";
 import type { FolderTree } from "./folder-tree";
 

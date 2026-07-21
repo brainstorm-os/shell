@@ -8,7 +8,7 @@
  * exactly as each view provides them.
  */
 
-import { PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import { PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";

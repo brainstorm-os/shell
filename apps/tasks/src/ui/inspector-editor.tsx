@@ -27,13 +27,13 @@ import {
 	FULL_EDITOR_NODES,
 	FullEditorPlugins,
 	richTextTheme,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";
 import { useMemo } from "react";
 import { createTaskEmbedCommand } from "../editor/task-embed-command";
@@ -58,7 +58,7 @@ export type TaskInspectorEditorProps = {
 	 *  AutosavePlugin only calls back after genuine interaction). The app
 	 *  uses this to clear the legacy `notes` string once.
 	 *
-	 *  Per the shared editor save contract (`@brainstorm/editor`'s
+	 *  Per the shared editor save contract (`@brainstorm-os/editor`'s
 	 *  `denormalizeBody`), the rich body persists via the Y.Doc resolver;
 	 *  Tasks deliberately does NOT denormalise a `title`/`body` snippet —
 	 *  a task's title and status are first-class properties edited

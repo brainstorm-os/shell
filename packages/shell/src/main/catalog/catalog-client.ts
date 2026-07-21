@@ -10,7 +10,7 @@
  * unverified index.
  */
 
-import { ed25519Verify } from "@brainstorm/native";
+import { ed25519Verify } from "@brainstorm-os/native";
 import type { UpdateChannel } from "../../shared/update-wire-types";
 import {
 	type Ed25519Verify,
@@ -70,7 +70,7 @@ export type CatalogClientOptions = {
 	readonly fetchIndexJson: () => Promise<unknown>;
 	readonly trustedKeys: CatalogTrustedKeys;
 	readonly cache: CatalogCacheStore;
-	/** Ed25519 verify primitive; defaults to `@brainstorm/native`. */
+	/** Ed25519 verify primitive; defaults to `@brainstorm-os/native`. */
 	readonly verify?: Ed25519Verify;
 };
 

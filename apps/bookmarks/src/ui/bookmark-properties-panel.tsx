@@ -1,6 +1,6 @@
 /**
  * Bookmark properties inspector — a thin adapter over the SHARED
- * `@brainstorm/sdk/properties-panel`. It only maps the bookmark's bridged
+ * `@brainstorm-os/sdk/properties-panel`. It only maps the bookmark's bridged
  * fields (see `bookmark-properties.ts`) to the generic `rows` the shared panel
  * renders; all chrome (glass slide-over, header, grid rows) lives in the SDK
  * component, identical to Notes / Journal / Database.
@@ -12,9 +12,9 @@
  * bridge for the entity's real `values` with no panel change.
  */
 
-import { EntityCommentsPanel } from "@brainstorm/editor";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
-import { readValue, useDictionary, useDictionaryStore } from "@brainstorm/sdk/property-ui";
+import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
+import { readValue, useDictionary, useDictionaryStore } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n/manifest";
 import {
 	BOOKMARK_PROPERTY_DEFS,

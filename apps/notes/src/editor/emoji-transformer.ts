@@ -1,6 +1,6 @@
 /**
  * B11.1 — emoji shortcode shortcut: typing `:grinning_face:` (the Unicode
- * `slug` the picker + `@brainstorm/sdk/icon-picker` already use) rewrites to
+ * `slug` the picker + `@brainstorm-os/sdk/icon-picker` already use) rewrites to
  * the emoji glyph as you type the closing `:`.
  *
  * An `@lexical/markdown` `TextMatchTransformer` on the editor's
@@ -11,7 +11,7 @@
  * separate editor follow-up; this is the exact-slug rewrite.
  */
 
-import { EMOJI_SHORTCODE_BODY, resolveEmojiShortcode } from "@brainstorm/sdk/icon-picker";
+import { EMOJI_SHORTCODE_BODY, resolveEmojiShortcode } from "@brainstorm-os/sdk/icon-picker";
 import type { TextMatchTransformer } from "@lexical/markdown";
 import type { TextNode } from "lexical";
 

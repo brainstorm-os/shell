@@ -15,7 +15,7 @@
  * `normalizeAddress` so it is identical to how the address was parsed.
  */
 
-import { type MailAddress, normalizeAddress } from "@brainstorm/sdk-types";
+import { type MailAddress, normalizeAddress } from "@brainstorm-os/sdk-types";
 
 export const PERSON_TYPE = "brainstorm/Person/v1";
 

@@ -26,7 +26,7 @@ import {
 	EntityEventVerb,
 	type EntityMergeResult,
 	type EntityQuery,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { AssetKind } from "../assets/asset-types";
 import { LedgerUnavailableError } from "../capabilities/ledger";

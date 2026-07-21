@@ -13,7 +13,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-// Chrome is the shared SDK sheet (`@brainstorm/sdk/checkbox/checkbox.css`),
+// Chrome is the shared SDK sheet (`@brainstorm-os/sdk/checkbox/checkbox.css`),
 // imported once in `main.tsx` so the shell and every app share one definition.
 
 export type CheckboxProps = {

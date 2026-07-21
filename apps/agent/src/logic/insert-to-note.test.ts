@@ -1,4 +1,4 @@
-import { INSERT_MARKDOWN_MAX, InsertPosition } from "@brainstorm/sdk-types";
+import { INSERT_MARKDOWN_MAX, InsertPosition } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	AddToNoteMode,

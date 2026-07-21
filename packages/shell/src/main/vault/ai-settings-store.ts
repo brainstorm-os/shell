@@ -20,7 +20,7 @@ import {
 	GEMINI_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export const AI_SETTINGS_FILENAME = "ai-settings.json";
 

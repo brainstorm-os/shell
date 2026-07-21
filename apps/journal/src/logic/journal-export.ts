@@ -1,7 +1,7 @@
 /**
  * Journal export (9.16.12) — render a date range of entries to Markdown or
  * HTML. Pure string codecs over the projected `JournalEntry[]`; the file
- * write rides the shared `@brainstorm/sdk/export-file` flow in `app.ts`.
+ * write rides the shared `@brainstorm-os/sdk/export-file` flow in `app.ts`.
  *
  * Each entry contributes its date heading, a metadata line (mood · words ·
  * habits), and its preview text. The preview is the denormalised snippet

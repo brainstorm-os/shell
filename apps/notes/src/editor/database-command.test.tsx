@@ -4,7 +4,7 @@
  * store round-trips the `typeFilter` scope it opens with.
  */
 
-import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
+import { COLLECTION_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it } from "vitest";
 import { BLOCK_COMMANDS, CommandCategory } from "./commands";
 import { embedPickerStore } from "./embed-picker-store";

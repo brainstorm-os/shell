@@ -19,7 +19,7 @@
  *
  * A `null` cover means "no explicit cover": the renderer falls back to a
  * deterministic gradient seeded by the object's id (never a broken-image
- * square) — see `@brainstorm/sdk/entity-cover`.
+ * square) — see `@brainstorm-os/sdk/entity-cover`.
  *
  * Leaf module (no imports) so helpers can depend on the cover model
  * without a cycle through the `index` barrel — exactly like `icon.ts`.

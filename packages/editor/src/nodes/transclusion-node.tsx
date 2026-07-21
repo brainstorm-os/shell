@@ -21,7 +21,7 @@
  * out-of-Brainstorm paste still resolves back to a live reference.
  */
 
-import { navModeFromEvent } from "@brainstorm/sdk";
+import { navModeFromEvent } from "@brainstorm-os/sdk";
 import {
 	type DOMConversionMap,
 	type DOMConversionOutput,

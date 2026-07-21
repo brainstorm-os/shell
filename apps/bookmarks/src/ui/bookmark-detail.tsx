@@ -25,21 +25,21 @@ import {
 	EditorCapturePlugin,
 	FULL_EDITOR_NODES,
 	FullEditorPlugins,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
-import { CoverKind } from "@brainstorm/sdk-types";
-import type { Cover, PropertiesService, SerializedBlock } from "@brainstorm/sdk-types";
-import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-picker";
-import { createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/react-yjs";
+import { CoverKind } from "@brainstorm-os/sdk-types";
+import type { Cover, PropertiesService, SerializedBlock } from "@brainstorm-os/sdk-types";
+import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
+import { createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
 import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/manifest";

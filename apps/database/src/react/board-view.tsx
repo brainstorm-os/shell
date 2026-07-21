@@ -14,9 +14,13 @@
  * (`application/x-brainstorm-entity`) and consumers depend on it.
  */
 
-import { DragPayloadKind, type ObjectDragPayload } from "@brainstorm/sdk-types";
-import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm/sdk/object-dnd";
+import { DragPayloadKind, type ObjectDragPayload } from "@brainstorm-os/sdk-types";
+import {
+	type CompositeItemProps,
+	Orientation,
+	useCompositeKeyboard,
+} from "@brainstorm-os/sdk/a11y";
+import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm-os/sdk/object-dnd";
 import {
 	DndContext,
 	type DragEndEvent,

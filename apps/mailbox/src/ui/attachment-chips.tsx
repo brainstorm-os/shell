@@ -7,8 +7,8 @@
  *  or clicked again in a later session — costs one cheap round-trip and
  *  reuses the existing file rather than re-downloading. */
 
-import { formatBytes } from "@brainstorm/sdk/format-bytes";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { formatBytes } from "@brainstorm-os/sdk/format-bytes";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ReactElement, useState } from "react";
 import { t } from "../i18n";
 import type { MailAttachmentPart } from "../types/mail-view";

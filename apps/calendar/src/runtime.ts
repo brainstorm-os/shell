@@ -17,7 +17,7 @@ import type {
 	SettingsService,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Re-exported from sdk-types so the projector + the `useVaultEntities`
  *  React hook (which yields the sdk-types snapshot) share one shape. */

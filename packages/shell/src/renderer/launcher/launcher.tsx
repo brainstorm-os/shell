@@ -36,7 +36,7 @@ import {
 	defineMenu,
 	useMenu,
 	useMenuState,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { InstalledApp, IntentDispatchResult, SearchHit } from "../../preload";
 import { t } from "../i18n/t";
@@ -46,7 +46,7 @@ import { pushToast } from "../ui/toasts";
 import { LauncherRowKind, buildRows } from "./grouped-results";
 import type { LauncherAppRow, LauncherEntityRow, LauncherRow } from "./grouped-results";
 import "./launcher.css";
-import { track } from "@brainstorm/sdk/analytics";
+import { track } from "@brainstorm-os/sdk/analytics";
 import { launchApp } from "../analytics/track-app-launch";
 import { prettyEntityType, sanitizeSnippet } from "./launcher-text";
 

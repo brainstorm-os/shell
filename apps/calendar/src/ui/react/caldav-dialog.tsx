@@ -9,8 +9,12 @@
  * re-apply.
  */
 
-import type { CalDavCalendarInfo, CalDavService, CalDavSyncSummary } from "@brainstorm/sdk-types";
-import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm/sdk/popover";
+import type {
+	CalDavCalendarInfo,
+	CalDavService,
+	CalDavSyncSummary,
+} from "@brainstorm-os/sdk-types";
+import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { plural, t } from "../../i18n/t";
 import type { EntitiesService, EntityRecord } from "../../storage/runtime";

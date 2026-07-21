@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { STYLE_HOOK_REGIONS } from "@brainstorm/sdk-types";
+import { STYLE_HOOK_REGIONS } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 
 /**
  * Structural guard for the frozen `data-bs-region` hook contract (OQ-183).
- * The contract (`@brainstorm/sdk-types` `STYLE_HOOK_REGIONS`) promises a
+ * The contract (`@brainstorm-os/sdk-types` `STYLE_HOOK_REGIONS`) promises a
  * stable chrome anchor for every listed region; this asserts each one is
  * actually stamped in the rendered chrome — so a refactor can't silently
  * drop a hook published StylePacks target — and that no undocumented region

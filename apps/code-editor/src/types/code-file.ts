@@ -5,15 +5,15 @@
  */
 
 // The language enum, its ordered list, and the membership guard live in
-// `@brainstorm/sdk/language-detect` (shared with the Preview app). Re-export
+// `@brainstorm-os/sdk/language-detect` (shared with the Preview app). Re-export
 // under the `LanguageKey` name the Code Editor uses everywhere.
-import type { CodeLanguage } from "@brainstorm/sdk/language-detect";
+import type { CodeLanguage } from "@brainstorm-os/sdk/language-detect";
 
 export {
 	CodeLanguage as LanguageKey,
 	CODE_LANGUAGES as LANGUAGES,
 	isCodeLanguage as isLanguageKey,
-} from "@brainstorm/sdk/language-detect";
+} from "@brainstorm-os/sdk/language-detect";
 
 export interface CodeFile {
 	/** Stable opaque id. */

@@ -4,8 +4,8 @@
  * actual file work lives in the pure `ui/ics-actions` orchestrators.
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { useRef } from "react";
 import { t } from "../../i18n/t";
 import type { CalendarFilesService } from "../../storage/runtime";

@@ -10,7 +10,7 @@
  * empty-bin) route through the shared `confirm()` primitive.
  */
 
-import { Orientation, useCompositeKeyboard, useFocusTrap } from "@brainstorm/sdk/a11y";
+import { Orientation, useCompositeKeyboard, useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

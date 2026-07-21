@@ -8,7 +8,7 @@
  * `label` (mention chips, future inline tokens) contributes its label —
  * the visible chip text — so the flattened string matches what a reader
  * sees in the editor. This walker is node-class agnostic on purpose: it
- * is shared by every `@brainstorm/editor` consumer and must not depend on
+ * is shared by every `@brainstorm-os/editor` consumer and must not depend on
  * an app-local node module.
  */
 

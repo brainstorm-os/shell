@@ -11,7 +11,7 @@
 export const CHROME_TABS_STATE_CHANNEL = "chrome:tabs:state";
 
 /** Main → chrome-view push: the active theme *name*. The strip renderer
- *  resolves it through the bundled `@brainstorm/tokens` registry (the preload
+ *  resolves it through the bundled `@brainstorm-os/tokens` registry (the preload
  *  only forwards the name — see the no-heavy-imports rule in chrome-preload).
  *  Mirrors the bootstrap `--brainstorm-theme=` arg so a live theme switch
  *  repaints the strip the same way the app windows repaint. */

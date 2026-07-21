@@ -23,13 +23,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 // `PropertyStore` is the exact store the Notes `PropertiesProvider`
 // feeds the snapshot into; the picker lists `store.getSnapshot()`. It
-// only imports `@brainstorm/sdk-types` (no Lexical / no Notes `Window`
+// only imports `@brainstorm-os/sdk-types` (no Lexical / no Notes `Window`
 // global), so it's safe to pull into the shell TS program — unlike the
 // editor modules.
-import { PropertyStore } from "@brainstorm/sdk/property-ui";
+import { PropertyStore } from "@brainstorm-os/sdk/property-ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 // Integration test: deliberately reaches into the apps' PURE transforms

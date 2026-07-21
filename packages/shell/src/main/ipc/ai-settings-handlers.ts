@@ -16,7 +16,7 @@ import {
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { ipcMain } from "electron";
 import { AI_BUDGET_WINDOW_MS } from "../ai/ai-quota";
 import type { AiAppUsageSummary } from "../ai/ai-usage-repo";

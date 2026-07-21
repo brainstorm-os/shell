@@ -7,14 +7,14 @@ import {
 	MentionComposerPlugin,
 	MentionNode,
 	renderEditorState,
-} from "@brainstorm/editor";
-import { useVaultEntities } from "@brainstorm/react-yjs";
+} from "@brainstorm-os/editor";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import {
 	AttachmentKind,
 	IconKind,
 	type MessageAttachment,
 	type RosterMember,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	AttachContextButton,
 	type ComposerContextHost,
@@ -30,17 +30,17 @@ import {
 	useComposerObjectDrop,
 	visibleAttachments,
 	withMentionAttachments,
-} from "@brainstorm/sdk/composer-context";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm/sdk/menus";
-import { closeObjectMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { Popover } from "@brainstorm/sdk/popover";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+} from "@brainstorm-os/sdk/composer-context";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm-os/sdk/menus";
+import { closeObjectMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { Popover } from "@brainstorm-os/sdk/popover";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
 import { plural, t } from "./i18n";

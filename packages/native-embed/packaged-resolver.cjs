@@ -1,6 +1,6 @@
 /**
- * Packaged-mode native binary resolution for `@brainstorm/native-embed`
- * (plan 11.3). Sibling of `@brainstorm/native`'s resolver — same strategy,
+ * Packaged-mode native binary resolution for `@brainstorm-os/native-embed`
+ * (plan 11.3). Sibling of `@brainstorm-os/native`'s resolver — same strategy,
  * different binary name (`brainstorm-embed`).
  *
  * In dev (`bun run dev`, vitest) the auto-generated `./index.js` resolves the

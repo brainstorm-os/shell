@@ -14,7 +14,7 @@
  * never a half-restored ghost.
  */
 
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 import type { BrowsingSessionRecord, TabSnapshot } from "../types/browsing-session";
 import { MAX_RECENTLY_CLOSED } from "../types/browsing-session";
 import { isWebUrl } from "./external-open";

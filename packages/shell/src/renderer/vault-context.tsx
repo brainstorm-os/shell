@@ -1,4 +1,4 @@
-import { track } from "@brainstorm/sdk/analytics";
+import { track } from "@brainstorm-os/sdk/analytics";
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { CloudSyncWarning, CreateVaultOptions, VaultEntry } from "../preload";
 import type { VaultDbKind, VaultRecovery } from "../shared/vault-recovery-wire-types";

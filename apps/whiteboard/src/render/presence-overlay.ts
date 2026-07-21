@@ -9,7 +9,7 @@
  *
  * Peer colour goes straight into inline styles (the `peerColor` hex
  * literals are deliberately not theme tokens — see
- * `@brainstorm/sdk/peer-presence`). Pure DOM: no engine state, no
+ * `@brainstorm-os/sdk/peer-presence`). Pure DOM: no engine state, no
  * listeners; the engine repaints on awareness change.
  */
 

@@ -17,9 +17,9 @@
  * reuses the *same* chrome rather than re-implementing it.
  */
 
-import { summarizeRecurrence } from "@brainstorm/sdk-types";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { type SelectionModifier, modifierFromEvent } from "@brainstorm/sdk/selection";
+import { summarizeRecurrence } from "@brainstorm-os/sdk-types";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { type SelectionModifier, modifierFromEvent } from "@brainstorm-os/sdk/selection";
 import { recurrenceLabels } from "../i18n/recurrence-labels";
 import { t } from "../i18n/t";
 import { dateKey } from "../logic/date-buckets";

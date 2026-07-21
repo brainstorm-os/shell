@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ObjectMenuRuntime } from "@brainstorm/sdk/object-menu";
+import type { ObjectMenuRuntime } from "@brainstorm-os/sdk/object-menu";
 import { describe, expect, it } from "vitest";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";

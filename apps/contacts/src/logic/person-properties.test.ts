@@ -1,4 +1,4 @@
-import { DateGranularity } from "@brainstorm/sdk-types";
+import { DateGranularity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Person } from "../types/person";
 import {

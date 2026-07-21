@@ -51,7 +51,7 @@ export const FIRST_PARTY_APPS: ReadonlyArray<FirstPartyApp> = [
 	{ dir: "books", label: "Books", expectedAppId: "io.brainstorm.books" },
 	{ dir: "chat", label: "Chat", expectedAppId: "io.brainstorm.chat" },
 	// Still coming-soon stubs — registered + launchable, body is the shared
-	// `@brainstorm/sdk/coming-soon` placeholder until each real build lands.
+	// `@brainstorm-os/sdk/coming-soon` placeholder until each real build lands.
 	{ dir: "form-designer", label: "Forms", expectedAppId: "io.brainstorm.form-designer" },
 	{ dir: "agent", label: "Agent", expectedAppId: "io.brainstorm.agent" },
 ];

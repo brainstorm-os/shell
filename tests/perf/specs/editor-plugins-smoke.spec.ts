@@ -1,6 +1,6 @@
 /**
  * Smoke test for the editor-plugin extraction (Phase 1–5 of the
- * `@brainstorm/editor` move). Verifies what a manual session would:
+ * `@brainstorm-os/editor` move). Verifies what a manual session would:
  *   - Notes opens, contenteditable mounts, hovering a block surfaces
  *     the gutter (`+` / grip buttons), typing `/` opens the slash menu.
  *   - Journal opens an entry, the same plugins work.

@@ -4,7 +4,7 @@
  * (which can't resolve `electron`). Mirrors `os-handoff-prompt-ipc.ts`.
  */
 
-import type { OpenWithDecision } from "@brainstorm/sdk-types";
+import type { OpenWithDecision } from "@brainstorm-os/sdk-types";
 import { ipcMain } from "electron";
 import { OPEN_WITH_PROMPT_REPLY_CHANNEL, type OpenWithPromptHost } from "./open-with-prompt";
 

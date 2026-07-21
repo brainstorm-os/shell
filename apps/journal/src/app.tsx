@@ -8,7 +8,7 @@
  * backlinks), and a right properties panel.
  *
  * Reactivity: the live entry list is derived from the whole-vault snapshot read
- * through the ONE shared stack — `@brainstorm/react-yjs` `useVaultEntities`
+ * through the ONE shared stack — `@brainstorm-os/react-yjs` `useVaultEntities`
  * (which owns the change subscription + coalescing). The day body itself is a
  * Yjs-bound editor island. There is NO hand-rolled `onChange → list → setState`
  * loop — a Notes-app edit, an autosave, or a write from another device
@@ -19,40 +19,40 @@
  * mutation paths (create / icon / check-in) no-op per the preview-drop pattern.
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/editor/editor.css";
-import "@brainstorm/editor/editor-theme.css";
-import { type CommentsFocusRequest, RightPanelTab } from "@brainstorm/editor";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { navModeFromEvent, openEntity } from "@brainstorm/sdk";
-import type { CommentAnchor, Icon } from "@brainstorm/sdk-types";
-import { MiniCalendar, openCalendarPopover } from "@brainstorm/sdk/calendar";
-import type { MonthGridReactCell } from "@brainstorm/sdk/calendar";
-import { Checkbox } from "@brainstorm/sdk/checkbox";
-import { DatePager } from "@brainstorm/sdk/date-pager";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/editor/editor-theme.css";
+import { type CommentsFocusRequest, RightPanelTab } from "@brainstorm-os/editor";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
+import type { CommentAnchor, Icon } from "@brainstorm-os/sdk-types";
+import { MiniCalendar, openCalendarPopover } from "@brainstorm-os/sdk/calendar";
+import type { MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { DatePager } from "@brainstorm-os/sdk/date-pager";
 import {
 	attachFindBar,
 	attachFindShortcuts,
 	createDomTextSearchProvider,
 	createFindController,
-} from "@brainstorm/sdk/find-replace";
-import { Icon as Glyph, IconName } from "@brainstorm/sdk/icon";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
+} from "@brainstorm-os/sdk/find-replace";
+import { Icon as Glyph, IconName } from "@brainstorm-os/sdk/icon";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	type AnchoredMenuItem,
 	type ObjectMenuChromeLabels,
 	type ObjectMenuRuntime,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { IconPickerButton } from "@brainstorm/sdk/picker-host";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
-import { attachShortcut } from "@brainstorm/sdk/shortcut";
-import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
+} from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { IconPickerButton } from "@brainstorm-os/sdk/picker-host";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import type { SerializedEditorState } from "lexical";
 import {
 	type ReactElement,
@@ -650,7 +650,7 @@ export function JournalApp(): ReactElement {
 				format === ExportFormat.Md ? journalToMarkdown(rows, labels) : journalToHtml(rows, labels);
 			const ext = format === ExportFormat.Md ? "md" : "html";
 			const { requestSaveBytes, suggestedFilename, textToBytes } = await import(
-				"@brainstorm/sdk/export-file"
+				"@brainstorm-os/sdk/export-file"
 			);
 			await requestSaveBytes(files, {
 				title: t("export.saveDialogTitle"),

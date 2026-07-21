@@ -13,7 +13,7 @@ import {
 	SendIntentVerb,
 	formatMailAddress,
 	parseAddressList,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { MessageView } from "../types/mail-view";
 
 export { SendIntentVerb };

@@ -6,8 +6,8 @@
  * cell picker (driven off a fake `window.brainstorm.vaultEntities`).
  */
 
-import type { CellProps, PropertyDef, VaultEntity } from "@brainstorm/sdk-types";
-import { CARDINALITY_HARD_MAX, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import type { CellProps, PropertyDef, VaultEntity } from "@brainstorm-os/sdk-types";
+import { CARDINALITY_HARD_MAX, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { type ComponentType, type ReactNode, createElement } from "react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";

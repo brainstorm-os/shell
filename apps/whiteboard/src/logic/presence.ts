@@ -8,7 +8,7 @@
  * they receive. This module owns the payload codec (encode = what we
  * publish; apply = hardening + deriving renderable peers from a state
  * map), so it is transport-agnostic: it works over the structural
- * `AwarenessLike` from `@brainstorm/react-yjs`, which both the local
+ * `AwarenessLike` from `@brainstorm-os/react-yjs`, which both the local
  * no-transport channel (`createLocalAwareness`) and a real
  * `y-protocols/awareness` instance satisfy. The shell's Stage-10
  * `AwarenessBroadcaster` ferries real `Awareness` updates between
@@ -22,8 +22,8 @@
  * when the published colour isn't a plain hex literal.
  */
 
-import { PEER_NAME_MAX_LEN, peerColor } from "@brainstorm/sdk/peer-presence";
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import { PEER_NAME_MAX_LEN, peerColor } from "@brainstorm-os/sdk/peer-presence";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 
 /** The awareness-state field whiteboard presence publishes under. */
 export const PRESENCE_FIELD = "whiteboard";

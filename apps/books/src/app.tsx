@@ -13,7 +13,7 @@
  *
  * Opening a book: a `Book/v1` whose format is PDF mounts the 9.21.5 PDF
  * reading mode (bytes fetched from the backing `File/v1`'s `brainstorm:`
- * URL, decoded by the shared `@brainstorm/sdk/pdf-engine`); an EPUB is parsed
+ * URL, decoded by the shared `@brainstorm-os/sdk/pdf-engine`); an EPUB is parsed
  * by epub.js (lazy-loaded, 9.21.2) into `BookContent` and read through the same
  * reflow reader as the sample; a file-less preview record still shows the
  * "not built yet" notice. The in-memory sample book is OPT-IN from the empty
@@ -21,13 +21,13 @@
  * auto-opens and masquerades as the user's library — F-224 territory).
  */
 
-import { useLiveEntities } from "@brainstorm/react-yjs";
-import type { CoversService, Entity } from "@brainstorm/sdk-types";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { useLiveEntities } from "@brainstorm-os/react-yjs";
+import type { CoversService, Entity } from "@brainstorm-os/sdk-types";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	type ObjectMenuExtraItem,
 	type ObjectMenuRuntime,
@@ -36,12 +36,12 @@ import {
 	closeObjectMenu,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import type { PdfEngineDocument } from "@brainstorm/sdk/pdf-engine";
-import { openPdfDocument, resolvePdfOutline } from "@brainstorm/sdk/pdf-engine";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
+} from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import type { PdfEngineDocument } from "@brainstorm-os/sdk/pdf-engine";
+import { openPdfDocument, resolvePdfOutline } from "@brainstorm-os/sdk/pdf-engine";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";
@@ -228,7 +228,7 @@ function asObjectMenuRuntime(runtime: BooksRuntime): ObjectMenuRuntime {
 	};
 }
 
-/** Right-panel open state — window-scoped (`@brainstorm/sdk/panel-state`).
+/** Right-panel open state — window-scoped (`@brainstorm-os/sdk/panel-state`).
  *  Open by default — selecting a book should surface its cover / properties
  *  / contents inspector; only an explicit user-close (`"false"`) keeps it
  *  shut for the rest of this window. (Defaulting closed regressed the
@@ -426,7 +426,7 @@ export function BooksApp(): ReactElement {
 
 	// Reopen the book the user was last reading when Books launches without an
 	// explicit target (fresh / session-restore). The hint is device-local and
-	// per-vault (`@brainstorm/sdk/last-viewed` over the settings service). A
+	// per-vault (`@brainstorm-os/sdk/last-viewed` over the settings service). A
 	// since-deleted book is dropped silently — we stay on the shelf rather than
 	// landing on a "couldn't open" state — and a user open during the awaited
 	// staleness check wins (we only restore if the selection is still empty).

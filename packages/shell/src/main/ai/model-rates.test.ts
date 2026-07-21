@@ -2,7 +2,7 @@ import {
 	ANTHROPIC_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { CREDIT_MICROS, FALLBACK_CLOUD_RATE, creditsMicroForUsage } from "./model-rates";
 

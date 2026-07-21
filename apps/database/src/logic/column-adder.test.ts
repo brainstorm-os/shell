@@ -3,7 +3,7 @@
  * The pure half of 9.3.5.U.b — the renderer's option list driver.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { ColumnSpec } from "../types/list-view";
 import {

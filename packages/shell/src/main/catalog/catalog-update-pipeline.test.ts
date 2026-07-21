@@ -9,7 +9,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ed25519GetPublicKey, ed25519Sign } from "@brainstorm/native";
+import { ed25519GetPublicKey, ed25519Sign } from "@brainstorm-os/native";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { UpdateChannel } from "../../shared/update-wire-types";
 import { InstallOrigin } from "../apps/install-provenance";

@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/select-menu` — the one select control. A `.bs-select`
+ * `@brainstorm-os/sdk/select-menu` — the one select control. A `.bs-select`
  * trigger (React `<SelectMenu>` or DOM `createSelectMenu`) opening its
  * option list through the shared fancy-menus runtime — the replacement for
  * every native `<select>` so dropdowns share the menu chrome, keyboard

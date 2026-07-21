@@ -4,7 +4,7 @@
  * single vault-level catalog owned by the shell.
  */
 
-import type { Dictionary } from "@brainstorm/sdk-types";
+import type { Dictionary } from "@brainstorm-os/sdk-types";
 
 export type DictionaryBackend = {
 	setDictionary(dict: Dictionary): Promise<void>;

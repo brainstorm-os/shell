@@ -21,7 +21,7 @@
  * each defaults to a self-sufficient implementation in `./seams`.
  */
 
-import type { Dictionary, PropertiesService, PropertyDef } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertiesService, PropertyDef } from "@brainstorm-os/sdk-types";
 import {
 	type ReactNode,
 	createContext,

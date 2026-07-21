@@ -1,4 +1,4 @@
-import { TokenSetAppearance, type TokenSetDef } from "@brainstorm/sdk-types";
+import { TokenSetAppearance, type TokenSetDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	clearOverride,

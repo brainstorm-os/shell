@@ -1,11 +1,11 @@
 /**
- * @brainstorm/react-yjs — React ⇄ Yjs binding (Stage 9.1).
+ * @brainstorm-os/react-yjs — React ⇄ Yjs binding (Stage 9.1).
  *
  * The hooks are the only sanctioned way React reads Yjs CRDT state: they
  * batch per microtask and are read-only (mutations flow through the SDK's
  * `entities.update`). `useYDoc(entityId)` resolves through a
  * `<YDocProvider>` the SDK installs at Stage 9.3; `useYDoc(doc)` and the
- * value hooks work today (used by `@brainstorm/editor` at 9.2).
+ * value hooks work today (used by `@brainstorm-os/editor` at 9.2).
  *
  * Pure `*Store` builders + `createYStore` are exported so editors and
  * tests can drive the subscription core without React.

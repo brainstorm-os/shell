@@ -25,7 +25,7 @@ import {
 	type RecurrenceSummaryLabels,
 	WEEKDAYS,
 	type Weekday,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	REPEAT_KINDS,
 	type RepeatKind,
@@ -243,7 +243,7 @@ function MonthlyPattern({
 	return (
 		// The options are native <input type="radio"> sharing one name, so the
 		// platform owns roving focus + arrow navigation — no custom composite
-		// keyboard handling to route through @brainstorm/sdk/a11y.
+		// keyboard handling to route through @brainstorm-os/sdk/a11y.
 		// kbn-roles-exempt
 		<div className="bs-recur__monthly" role="radiogroup" aria-label={labels.monthlyMode}>
 			<label className="bs-recur__monthly-option">

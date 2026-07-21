@@ -18,9 +18,9 @@
  * off the `<kind>:` prefix.
  */
 
-import { type Recurrence, isRecurrence } from "@brainstorm/sdk-types";
-import { nullableNumber, nullableString } from "@brainstorm/sdk/codec-helpers";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import { type Recurrence, isRecurrence } from "@brainstorm-os/sdk-types";
+import { nullableNumber, nullableString } from "@brainstorm-os/sdk/codec-helpers";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { parseComments } from "../logic/task-comments";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";

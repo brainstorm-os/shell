@@ -8,8 +8,8 @@
  * not DOM.
  */
 
-import { AttachmentKind } from "@brainstorm/sdk-types";
-import type { ContextCandidate } from "@brainstorm/sdk/composer-context";
+import { AttachmentKind } from "@brainstorm-os/sdk-types";
+import type { ContextCandidate } from "@brainstorm-os/sdk/composer-context";
 import { createRef } from "react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -25,7 +25,7 @@ import { MentionNode } from "./nodes/mention-node";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const openTypeaheadMenu = vi.hoisted(() => vi.fn());
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	openTypeaheadMenu,
 	closeTypeaheadMenu: vi.fn(),
 	setTypeaheadActiveIndex: vi.fn(),

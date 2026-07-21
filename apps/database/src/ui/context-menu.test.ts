@@ -14,15 +14,15 @@
  *     mock — the shared menu is a singleton, mocking it pollutes the
  *     boot-smoke test that imports `app.ts`).
  *  2. The per-object stage menu must route through the shared
- *     `@brainstorm/sdk/object-menu` `openObjectMenu` (pin pre-fetch +
+ *     `@brainstorm-os/sdk/object-menu` `openObjectMenu` (pin pre-fetch +
  *     identical Open/Pin order), never a hand-rolled item array. Asserted
  *     as an `app.ts` source contract.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { IconName } from "@brainstorm/sdk/icon";
-import { closeAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { closeAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { closeContextMenu, openContextMenu } from "./context-menu";
 
@@ -102,7 +102,7 @@ describe("Database per-object stage menu is the shared object menu (B-1 parity)"
 		// for the header subtitle's shared menu wiring) — only requirement
 		// is that `openObjectMenu` itself comes from the shared SDK.
 		expect(APP_SRC).toMatch(
-			/import\s*\{[^}]*\bopenObjectMenu\b[^}]*\}\s*from\s*["']@brainstorm\/sdk\/object-menu["']/,
+			/import\s*\{[^}]*\bopenObjectMenu\b[^}]*\}\s*from\s*["']@brainstorm-os\/sdk\/object-menu["']/,
 		);
 	});
 

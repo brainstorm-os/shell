@@ -18,8 +18,8 @@
  * mirrors `view-settings.ts` (`.db-popover`).
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import { matchesChord } from "@brainstorm/sdk/shortcut";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { matchesChord } from "@brainstorm-os/sdk/shortcut";
 import { setSharedIcon } from "./icons";
 
 export type SourceTypeOption = {

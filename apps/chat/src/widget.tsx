@@ -13,14 +13,14 @@
  * stable `CHAT_WIDGET_QUERY`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";

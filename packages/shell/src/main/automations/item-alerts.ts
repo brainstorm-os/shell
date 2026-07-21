@@ -10,7 +10,7 @@
  * precomputed at derive time; freshness is owned by the deployment's
  * rehydrate-on-entity-change (completing a task re-derives and the alert
  * unregisters — a tighter window than the in-app 30s tick). The dedupe
- * keys REPLICATE `@brainstorm/sdk/reminder-schedule.reminderDedupeKey`
+ * keys REPLICATE `@brainstorm-os/sdk/reminder-schedule.reminderDedupeKey`
  * over the app-side source ids (`<taskId>#due` / `<taskId>#scheduled` /
  * `<eventId>`), so when an app window is open and both schedulers fire,
  * the notify host's `(appId, dedupeKey)` window collapses the duplicate.

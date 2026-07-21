@@ -1,6 +1,6 @@
 /**
  * Peer presence — the pure core of remote-cursor collaboration overlays.
- * Extracted from `@brainstorm/editor` at copy two (the Whiteboard presence
+ * Extracted from `@brainstorm-os/editor` at copy two (the Whiteboard presence
  * overlay, 9.17.19, is the second consumer; the editor module now
  * delegates here). A presence renderer draws a remote peer's caret /
  * cursor + name label from the `{ name, color }` each client publishes
@@ -46,7 +46,7 @@ export function peerColor(seed: number): string {
 
 /**
  * Sanitize a user-supplied display name before publishing it to peers:
- * the shared inline-text hardening (`@brainstorm/sdk/sanitize-text` —
+ * the shared inline-text hardening (`@brainstorm-os/sdk/sanitize-text` —
  * control / zero-width / bidi-override strip, whitespace collapse, clamp to
  * {@link PEER_NAME_MAX_LEN}), falling back to `fallback` when the result is
  * empty or the input was not a usable string.

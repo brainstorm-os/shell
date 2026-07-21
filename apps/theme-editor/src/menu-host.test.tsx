@@ -8,7 +8,7 @@
  * on `#root`, `body` stays a plain block, and the host attaches at body root.
  */
 
-import { mountMenuHost } from "@brainstorm/sdk/menus";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(() => {

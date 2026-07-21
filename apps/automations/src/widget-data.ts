@@ -11,7 +11,7 @@ import {
 	WORKFLOW_TYPE_URL,
 	WorkflowRunStatus,
 	isWorkflowRunStatus,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { AutomationsI18nKey } from "./i18n";
 
 /** Manifest widget id — must match `registrations.widgets[].id` in manifest.json. */

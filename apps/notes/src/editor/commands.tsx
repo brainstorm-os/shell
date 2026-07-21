@@ -4,7 +4,7 @@
  *
  * Since 9.18.3c(d) the generic catalogue (turn-into, structural inserts,
  * align / indent / move / duplicate / delete actions) comes from
- * `@brainstorm/editor`'s shared `createStandardBlockCommands` /
+ * `@brainstorm-os/editor`'s shared `createStandardBlockCommands` /
  * `createStandardBlockActions` — the SAME set Journal / Tasks / Bookmarks
  * mount — ordered by `NOTES_BLOCK_PALETTE`. Only the genuinely Notes-coupled
  * commands (media upload, property blocks, sub-pages, ToC, equations, inline
@@ -40,15 +40,15 @@ import {
 	orderCommandsByPalette,
 	serializeBlocksAsJson,
 	swatchCssValue,
-} from "@brainstorm/editor";
-import { COLLECTION_TYPE_URL, type Entity } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/editor";
+import { COLLECTION_TYPE_URL, type Entity } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import {
 	TEMPLATE_ENTITY_TYPE,
 	blockSnippetToTemplateProperties,
 	entityToTemplate,
-} from "@brainstorm/sdk/templates";
+} from "@brainstorm-os/sdk/templates";
 import {
 	$createParagraphNode,
 	$getNodeByKey,
@@ -87,8 +87,8 @@ const GRAPH_ENTITY_TYPE = "brainstorm/Graph/v1";
  *  highlight to the `io.brainstorm.books/embedded-highlight` block. */
 const HIGHLIGHT_ENTITY_TYPE = "brainstorm/Highlight/v1";
 
-export type { BlockCommand, CommandContext } from "@brainstorm/editor";
-export { CommandCategory, selectBlocksAsRange } from "@brainstorm/editor";
+export type { BlockCommand, CommandContext } from "@brainstorm-os/editor";
+export { CommandCategory, selectBlocksAsRange } from "@brainstorm-os/editor";
 
 /** Pre-resolved editor-catalogue translator. Notes ships no editor-string
  *  overrides today, so the shared English defaults match what Journal /
@@ -136,7 +136,7 @@ function shared(ids: readonly string[]): readonly BlockCommand[] {
 }
 
 // Media (`/image` `/video` `/audio` `/file`) is the SHARED catalogue from
-// `@brainstorm/editor` — the exact same commands Journal / Tasks / Bookmarks
+// `@brainstorm-os/editor` — the exact same commands Journal / Tasks / Bookmarks
 // mount via `<FullEditorPlugins media>` (extracted 2026-06-18). Notes does NOT
 // re-author them; that fork is the drift the editor-parity test fences off.
 const NOTES_MEDIA_COMMANDS: readonly BlockCommand[] = createMediaBlockCommands(editorT);

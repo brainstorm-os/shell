@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/icon` — the app-side interface-glyph primitive.
+ * `@brainstorm-os/sdk/icon` — the app-side interface-glyph primitive.
  * `<Icon>` (React) and `createIconElement` (pure DOM) paint the SAME glyph
  * from one shared `IconName` enum + registry, mirroring the shell's
  * `ui/icon.tsx` so an app's chrome looks identical to the shell's. An

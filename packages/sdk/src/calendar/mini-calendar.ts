@@ -5,7 +5,7 @@
  *
  * Composed on top of `createMonthGrid` so the grid math + visual style
  * stay shared with full-page month views. The nav-button glyphs come
- * from `@brainstorm/sdk/icon` so RTL flipping is wired once.
+ * from `@brainstorm-os/sdk/icon` so RTL flipping is wired once.
  */
 
 import { type WeekStartsOn, addMonths } from "../date-grid/date-grid";
@@ -87,7 +87,7 @@ export function createMiniCalendar(initial: MiniCalendarOptions): MiniCalendarHa
 		header.className = "bs-cal-mini__header";
 
 		// `today | ‹ | ›` cluster + trailing month label — the shared
-		// `@brainstorm/sdk/date-pager` chrome, so the cluster reads
+		// `@brainstorm-os/sdk/date-pager` chrome, so the cluster reads
 		// identically across every host that shows a mini-calendar.
 		const pager = createDatePager({
 			labels: { today: initial.labels.today, prev: initial.labels.prev, next: initial.labels.next },

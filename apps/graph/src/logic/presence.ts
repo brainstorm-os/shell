@@ -4,8 +4,8 @@
  * is `graph` (header stacks use the separate `presence` field via usePresence).
  */
 
-import { PEER_NAME_MAX_LEN, peerColor } from "@brainstorm/sdk/peer-presence";
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import { PEER_NAME_MAX_LEN, peerColor } from "@brainstorm-os/sdk/peer-presence";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 
 export const PRESENCE_FIELD = "graph";
 

@@ -12,8 +12,8 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
-import type { EntityRow } from "@brainstorm/sdk/in-memory-entities";
+} from "@brainstorm-os/sdk/export-file";
+import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
 import {
 	type ExportColumn,
 	ListExportFormat,

@@ -15,8 +15,8 @@ import {
 	type ContextMenuItem,
 	closeContextMenu,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
-import { SystemEntityType } from "@brainstorm/sdk/system-entities";
+} from "@brainstorm-os/sdk/menus";
+import { SystemEntityType } from "@brainstorm-os/sdk/system-entities";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { __testing } from "./app";

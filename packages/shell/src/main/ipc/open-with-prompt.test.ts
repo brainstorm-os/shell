@@ -1,4 +1,4 @@
-import { type OpenWithCandidate, OpenWithDecisionKind } from "@brainstorm/sdk-types";
+import { type OpenWithCandidate, OpenWithDecisionKind } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

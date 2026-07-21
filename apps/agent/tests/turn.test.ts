@@ -12,7 +12,7 @@ import {
 	type Intent,
 	type IntentResult,
 	MessageRole,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { makeDispatchTool, makeGenerate, runAgentTurn, usedToolNames } from "../src/logic/turn";
 

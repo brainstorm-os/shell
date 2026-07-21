@@ -1,5 +1,5 @@
 /**
- * Journal's `Date`-based adapter over `@brainstorm/sdk/date-grid`.
+ * Journal's `Date`-based adapter over `@brainstorm-os/sdk/date-grid`.
  *
  * The canonical date math (DST-safe `addDays` / `startOfMonthGrid` /
  * `buildMonthGrid`, plus the `GridCell` shape) now lives in the SDK so
@@ -19,10 +19,10 @@ import {
 	buildWeekGrid as sdkBuildWeekGrid,
 	daysBetween as sdkDaysBetween,
 	weekdayLabels as sdkWeekdayLabels,
-} from "@brainstorm/sdk/date-grid";
+} from "@brainstorm-os/sdk/date-grid";
 import type { WeekStartsOn } from "../types/view";
 
-export type { GridCell } from "@brainstorm/sdk/date-grid";
+export type { GridCell } from "@brainstorm-os/sdk/date-grid";
 
 /** Build a 7-cell array starting on `weekStartsOn`, anchored on whatever
  *  week contains `focus`. */

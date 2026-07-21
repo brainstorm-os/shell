@@ -13,8 +13,8 @@
  * single-day-open model (only one entry editor is mounted at a time).
  */
 
-import { $createMentionNode, applySuggestionInEditor } from "@brainstorm/editor";
-import type { CommentAnchor } from "@brainstorm/sdk-types";
+import { $createMentionNode, applySuggestionInEditor } from "@brainstorm-os/editor";
+import type { CommentAnchor } from "@brainstorm-os/sdk-types";
 import {
 	$createTextNode,
 	$getRoot,

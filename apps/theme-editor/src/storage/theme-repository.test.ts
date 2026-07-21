@@ -4,7 +4,7 @@ import {
 	ThemeRefKind,
 	TokenSetAppearance,
 	type VaultEntity,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntitiesService, EntityRecord } from "./runtime";
 import {

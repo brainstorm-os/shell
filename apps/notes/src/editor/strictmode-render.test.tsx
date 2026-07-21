@@ -17,7 +17,11 @@
  * StrictMode (a dev-only no-op in production).
  */
 
-import { BASELINE_NODES, BrainstormEditor, plantSerializedStateIntoDoc } from "@brainstorm/editor";
+import {
+	BASELINE_NODES,
+	BrainstormEditor,
+	plantSerializedStateIntoDoc,
+} from "@brainstorm-os/editor";
 import {
 	YDocProvider,
 	type YDocResolverApi,
@@ -26,7 +30,7 @@ import {
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import type { SerializedEditorState } from "lexical";
 import { type ReactNode, StrictMode, act } from "react";
 import { createRoot } from "react-dom/client";

@@ -8,10 +8,10 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@brainstorm/editor": "workspace:*",
-    "@brainstorm/react-yjs": "workspace:*",
-    "@brainstorm/sdk": "workspace:*",
-    "@brainstorm/sdk-types": "workspace:*",
+    "@brainstorm-os/editor": "workspace:*",
+    "@brainstorm-os/react-yjs": "workspace:*",
+    "@brainstorm-os/sdk": "workspace:*",
+    "@brainstorm-os/sdk-types": "workspace:*",
     "epubjs": "^0.3.93",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

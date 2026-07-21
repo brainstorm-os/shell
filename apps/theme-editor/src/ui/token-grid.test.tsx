@@ -1,12 +1,12 @@
-import { EMPTY_TOKEN_SET, TokenSetAppearance } from "@brainstorm/sdk-types";
-import { openColorPicker } from "@brainstorm/sdk/color-picker";
+import { EMPTY_TOKEN_SET, TokenSetAppearance } from "@brainstorm-os/sdk-types";
+import { openColorPicker } from "@brainstorm-os/sdk/color-picker";
 // @vitest-environment jsdom
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderInto, typeInto } from "../test/render";
 import { TokenGrid } from "./token-grid";
 
-vi.mock("@brainstorm/sdk/color-picker", () => ({
+vi.mock("@brainstorm-os/sdk/color-picker", () => ({
 	openColorPicker: vi.fn(),
 }));
 

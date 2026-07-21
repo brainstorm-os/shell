@@ -15,8 +15,13 @@
  * the rewrite handles both shapes.
  */
 
-import type { Dictionary, DictionaryItem, LabeledValue, PropertyDef } from "@brainstorm/sdk-types";
-import { isMultiValued } from "@brainstorm/sdk-types";
+import type {
+	Dictionary,
+	DictionaryItem,
+	LabeledValue,
+	PropertyDef,
+} from "@brainstorm-os/sdk-types";
+import { isMultiValued } from "@brainstorm-os/sdk-types";
 import { newDictionaryItemId } from "../properties-keys";
 import { nextSortIndex } from "./dictionary-helpers";
 

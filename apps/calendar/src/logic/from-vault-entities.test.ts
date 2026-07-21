@@ -1,4 +1,4 @@
-import { IconKind, yearlyRecurrenceForDate } from "@brainstorm/sdk-types";
+import { IconKind, yearlyRecurrenceForDate } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	JOURNAL_ENTRY_TYPE,

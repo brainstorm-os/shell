@@ -26,7 +26,7 @@ import {
 	type WorkflowRunDef,
 	WorkflowRunStatus,
 	type WorkflowStep,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Per-step execution result in the runner's provenance log. */
 export enum StepRunStatus {

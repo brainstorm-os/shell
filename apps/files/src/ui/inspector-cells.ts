@@ -2,7 +2,7 @@
  * Pure defs-bridge for the inspector's editable metadata cells (9.8.13).
  *
  * The Properties tab edits `name` + `description` through the SHARED
- * `@brainstorm/sdk` property cells (the same Plain / Multiline cells the
+ * `@brainstorm-os/sdk` property cells (the same Plain / Multiline cells the
  * Database grid + properties panels use), so Files never hand-rolls a
  * text input. A cell needs a `PropertyDef`; Files has no property catalog,
  * so we synthesise a minimal scalar Text def per field (name = single-line
@@ -13,7 +13,7 @@
  * own catalog/`db-cell-bridge` to reuse here.
  */
 
-import { type PropertyDef, PropertyView, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
 
 /** The editable scalar-text fields the inspector exposes. The enum value
  *  IS the entity `properties` key, per the no-string-discriminator

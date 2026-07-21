@@ -1,4 +1,4 @@
-import { ThemeName } from "@brainstorm/tokens";
+import { ThemeName } from "@brainstorm-os/tokens";
 import { describe, expect, it, vi } from "vitest";
 import type { WebContentsViewHandle } from "../apps/window-container";
 import type { WidgetPlacement } from "./widget-host";

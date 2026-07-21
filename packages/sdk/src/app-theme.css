@@ -2,7 +2,7 @@
  * Brainstorm app-theme — the single source of truth for first-party-app
  * theming. Imported by each app's TS entry at build time:
  *
- *   import "@brainstorm/sdk/app-theme.css";
+ *   import "@brainstorm-os/sdk/app-theme.css";
  *
  * Apps are sandboxed renderers that do NOT import the shell's component
  * library. Before this file existed, each app re-declared its own `:root`
@@ -736,7 +736,7 @@ select {
 
 /* ============================================================
  * HEADER-NAV — shared in-app back/forward control
- * (@brainstorm/sdk/nav-history `<NavButtons>` / `createNavButtons`).
+ * (@brainstorm-os/sdk/nav-history `<NavButtons>` / `createNavButtons`).
  * Chrome owned here so every app's header back/forward is
  * pixel-identical; apps declare zero styling for it.
  * ============================================================ */
@@ -858,7 +858,7 @@ select {
 /* ============================================================
  * ICON-PICK — canonical clickable object-icon affordance shared
  * by every app (Notes page icon, Database list icon, …). Markup +
- * behaviour live in `@brainstorm/sdk/picker-host`; LOOK is here.
+ * behaviour live in `@brainstorm-os/sdk/picker-host`; LOOK is here.
  * Look-only: transparent until hover, flex-centred, no border.
  * Pixel box is caller-chosen inline so the same component serves
  * a 24px header chip and a 28px doc-title glyph.

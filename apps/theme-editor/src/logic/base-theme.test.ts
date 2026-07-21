@@ -1,5 +1,5 @@
-import { TokenSetAppearance } from "@brainstorm/sdk-types";
-import { ThemeName, defaultDark, defaultLight, themes } from "@brainstorm/tokens";
+import { TokenSetAppearance } from "@brainstorm-os/sdk-types";
+import { ThemeName, defaultDark, defaultLight, themes } from "@brainstorm-os/tokens";
 import { describe, expect, it } from "vitest";
 import {
 	appearanceOfTheme,

@@ -1,5 +1,10 @@
-import { BpErrorCode, BpModule, type BpRouterContext, BpSource } from "@brainstorm/block-protocol";
-import type { Entity } from "@brainstorm/sdk-types";
+import {
+	BpErrorCode,
+	BpModule,
+	type BpRouterContext,
+	BpSource,
+} from "@brainstorm-os/block-protocol";
+import type { Entity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Envelope } from "../../ipc/envelope";

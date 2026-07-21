@@ -6,7 +6,7 @@
  * commit; no separate edit mode.
  */
 
-import { type CellProps, ValueType } from "@brainstorm/sdk-types";
+import { type CellProps, ValueType } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback } from "react";
 import { usePropertyUiSeams } from "../use-properties";

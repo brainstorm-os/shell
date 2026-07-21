@@ -10,8 +10,8 @@
  * caller can localise.
  */
 
-import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
-import { formatDuration } from "@brainstorm/sdk/property-ui/pure";
+import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
+import { formatDuration } from "@brainstorm-os/sdk/property-ui/pure";
 
 export enum AggregationKind {
 	None = "none",

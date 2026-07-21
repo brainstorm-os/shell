@@ -7,10 +7,10 @@
  * app-owned). The app's domain `createdAt`/`updatedAt` stay in the
  * property bag — the store owns entity-level timestamps and would clobber
  * them on every write. Plumbing lives in
- * `@brainstorm/sdk/storage-repository`.
+ * `@brainstorm-os/sdk/storage-repository`.
  */
 
-import { createEntityRepository } from "@brainstorm/sdk/storage-repository";
+import { createEntityRepository } from "@brainstorm-os/sdk/storage-repository";
 import { BOOKMARK_ENTITY_TYPE, type Bookmark } from "../types/bookmark";
 import { parseStoredBookmark, serializeBookmark } from "./codec";
 import type { BookmarksRepository } from "./repository";

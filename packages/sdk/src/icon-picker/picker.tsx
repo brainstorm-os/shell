@@ -1,6 +1,6 @@
 /**
  * IconPicker — the ONE universal icon chooser, shared by every app via
- * `@brainstorm/sdk/icon-picker` (the React twin of `createEntityIconElement`
+ * `@brainstorm-os/sdk/icon-picker` (the React twin of `createEntityIconElement`
  * / `<EntityCover>`). Coverage cranked all the way up:
  *
  *   - Emoji tab: every emoji from `unicode-emoji-json` (10 groups,
@@ -20,8 +20,8 @@
  * its own overlay, so there is no app-keyboard-registry coupling here.
  */
 
-import { type Icon, IconKind, type SkinTone } from "@brainstorm/sdk-types";
-import { SkinTone as ST } from "@brainstorm/sdk-types";
+import { type Icon, IconKind, type SkinTone } from "@brainstorm-os/sdk-types";
+import { SkinTone as ST } from "@brainstorm-os/sdk-types";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type ChangeEvent,
@@ -75,7 +75,7 @@ export type IconPickerProps = {
 	onClose: () => void;
 	/** Optional per-host overrides; omitted keys fall back to the
 	 *  canonical `DEFAULT_ICON_PICKER_LABELS` (SDK i18n convention —
-	 *  see `@brainstorm/sdk/i18n`). */
+	 *  see `@brainstorm-os/sdk/i18n`). */
 	labels?: Partial<IconPickerLabels> | undefined;
 	/** Custom-image upload backing (B11.14). When omitted the Upload + Library
 	 *  tabs stay placeholders. */

@@ -6,14 +6,14 @@
  * (right-click + hover ⋯) so Open / Delete are reachable from the list.
  */
 
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type ObjectMenuContext,
 	ObjectMenuTrigger,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
+} from "@brainstorm-os/sdk/object-menu";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { useMemo, useRef } from "react";
 import { type ContactsI18nKey, plural, t } from "../i18n";
 import { type NextBirthday, isBirthdaySoon, nextBirthday } from "../logic/birthday";

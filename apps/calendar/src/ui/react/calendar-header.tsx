@@ -6,9 +6,9 @@
  * `.app-header__right`. Title-in-the-header matches every other app.
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { DatePager } from "@brainstorm/sdk/date-pager";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { DatePager } from "@brainstorm-os/sdk/date-pager";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { useState } from "react";
 import { type TKey, t } from "../../i18n/t";
 import {

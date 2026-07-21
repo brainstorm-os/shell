@@ -12,8 +12,8 @@
  * shared `openObjectMenu` popup).
  */
 
-import { summarizeRecurrence } from "@brainstorm/sdk-types";
-import { openObjectMenu } from "@brainstorm/sdk/object-menu";
+import { summarizeRecurrence } from "@brainstorm-os/sdk-types";
+import { openObjectMenu } from "@brainstorm-os/sdk/object-menu";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, Ref } from "react";
 import { useCallback } from "react";
 import { recurrenceLabels } from "../../i18n/recurrence-labels";

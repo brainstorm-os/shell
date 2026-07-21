@@ -4,7 +4,7 @@
  * without any app runtime (the source is a plain fake).
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import { afterEach, expect, it, vi } from "vitest";
 import {
 	type EntityIndexSource,

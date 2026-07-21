@@ -2,7 +2,7 @@
  * SelectionInspector (9.13.11) — the editable property panel for the canvas
  * click-selection. One selected node ⇒ its title + scalar properties rendered
  * through the SHARED `<PropertiesPanel>` (`.bs-props` content + the same
- * `@brainstorm/sdk/property-ui` cells every other app uses), writing through
+ * `@brainstorm-os/sdk/property-ui` cells every other app uses), writing through
  * `onCommit` → `entities.update`. Two or more ⇒ a count summary (bulk edit is
  * forward scope). Zero ⇒ renders nothing.
  *
@@ -13,9 +13,9 @@
  * it stays inline-editable (the inspector is the only edit surface for a node).
  */
 
-import { EntityCommentsPanel, type EntityCommentsServices } from "@brainstorm/editor";
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
+import { EntityCommentsPanel, type EntityCommentsServices } from "@brainstorm-os/editor";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
 import type { ReactElement } from "react";
 import { plural, t } from "../i18n/t";
 import type { EntityRow } from "../logic/in-memory-graph";

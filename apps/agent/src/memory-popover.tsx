@@ -1,6 +1,6 @@
 /**
  * Agent-7 — the long-term-memory manager (scope + redaction). Built on the
- * shared `@brainstorm/sdk/popover` + `.bs-btn` primitives (no bespoke chrome).
+ * shared `@brainstorm-os/sdk/popover` + `.bs-btn` primitives (no bespoke chrome).
  * Pure presentation over the pure helpers in `logic/memory.ts`; the parent owns
  * the opt-in flag persistence and the cap-checked entity writes.
  *
@@ -10,9 +10,9 @@
  * without an explicit user action (parent gates writes on the toggle).
  */
 
-import { Checkbox } from "@brainstorm/sdk/checkbox";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";

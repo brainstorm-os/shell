@@ -8,7 +8,7 @@
  * folder that `submit` appends to (so the idempotent-send path is testable).
  */
 
-import { type MailProtocol, MailProtocol as Protocol } from "@brainstorm/sdk-types";
+import { type MailProtocol, MailProtocol as Protocol } from "@brainstorm-os/sdk-types";
 import type {
 	FetchResult,
 	FetchSpec,

@@ -20,7 +20,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PlatformCatalog } from "@brainstorm/sdk-types";
+import type { PlatformCatalog } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";

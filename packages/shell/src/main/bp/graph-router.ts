@@ -19,8 +19,8 @@ import {
 	BpErrorCode,
 	type BpModuleHandler,
 	type BpModuleResponse,
-} from "@brainstorm/block-protocol";
-import type { Entity, EntityQuery } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/block-protocol";
+import type { Entity, EntityQuery } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import { ServiceErrorName } from "../services/errors";
 

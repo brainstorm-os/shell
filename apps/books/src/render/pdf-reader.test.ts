@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { PdfLink } from "@brainstorm/sdk/pdf-engine";
+import type { PdfLink } from "@brainstorm-os/sdk/pdf-engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PdfTint } from "../logic/pdf-view";
 import { makeLocator } from "../types/locator";

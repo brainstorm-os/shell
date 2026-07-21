@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CalendarRange, CalendarRecurring, CalendarWeekStart } from "@brainstorm/sdk-types";
+import { CalendarRange, CalendarRecurring, CalendarWeekStart } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { CompiledView } from "../logic/compile-view";
 import type { EntityRow } from "../logic/in-memory-entities";

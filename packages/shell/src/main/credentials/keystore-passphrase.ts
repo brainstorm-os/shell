@@ -29,7 +29,11 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { argon2idDerive, xchacha20Poly1305Open, xchacha20Poly1305Seal } from "@brainstorm/native";
+import {
+	argon2idDerive,
+	xchacha20Poly1305Open,
+	xchacha20Poly1305Seal,
+} from "@brainstorm-os/native";
 import { base64ToBytes, bytesToBase64 } from "./crypto";
 import type { KeystoreAccount, KeystoreBackend, KeystoreBackendName } from "./keystore";
 import { PASSPHRASE_WRAP_FILENAME } from "./keystore-insecure";

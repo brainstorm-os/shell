@@ -60,7 +60,7 @@ button:focus-visible {
 /* ─── App header ────────────────────────────────────────────────────
  * The full header chrome — flex skeleton, left/right groups, height +
  * platform padding, drag region, skin — is the shared `.app-header` rule in
- * `@brainstorm/sdk/app-theme.css`. Only task-specific controls stay local. */
+ * `@brainstorm-os/sdk/app-theme.css`. Only task-specific controls stay local. */
 
 /* Header "+" new-task button — icon-only ghost, mirrors Notes'
    `.notes__btn-icon` / Bookmarks' `.bookmarks__header-btn`. */
@@ -1613,7 +1613,7 @@ body.is-resizing .tasks-resize {
 }
 
 /* Empty surface uses the shared `<EmptyState>` Hero via the DOM twin
- * (`createEmptyState`); its chrome lives in `@brainstorm/sdk/empty-state.css`. */
+ * (`createEmptyState`); its chrome lives in `@brainstorm-os/sdk/empty-state.css`. */
 
 /* ─── Object-menu ⋯ affordance — the SDK `bs-object-menu__host--row`
  *     modifier (applied on the <li>) owns hide-by-default /
@@ -1737,7 +1737,7 @@ body.is-resizing .tasks-resize {
 	gap: var(--space-3);
 }
 
-/* Date fields open the shared `@brainstorm/sdk/calendar` popover instead of
+/* Date fields open the shared `@brainstorm-os/sdk/calendar` popover instead of
    a native `<input type="date">` (F-229). The trigger borrows the input face
    so it sits flush with the text fields above it. */
 .tasks-compose__date-trigger {

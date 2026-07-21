@@ -8,8 +8,8 @@
  * cached UID per RFC 3501 §2.3.1.1 — the cursor fails closed to a re-walk).
  */
 
-import type { MailAttachmentPart } from "@brainstorm/sdk-types";
-import { FolderRole, MailFlag } from "@brainstorm/sdk-types";
+import type { MailAttachmentPart } from "@brainstorm-os/sdk-types";
+import { FolderRole, MailFlag } from "@brainstorm-os/sdk-types";
 import type { RawMessage } from "../../main/mailbox/mail-driver";
 
 // RFC 6154 special-use attributes (plus Gmail's \All).

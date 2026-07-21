@@ -1,4 +1,4 @@
-import { ConflictPolicy, SyncDirection, SyncRunStatus } from "@brainstorm/sdk-types";
+import { ConflictPolicy, SyncDirection, SyncRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type ConnectorsSyncDeps,

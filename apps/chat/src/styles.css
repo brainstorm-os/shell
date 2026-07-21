@@ -1,5 +1,5 @@
 /* Structural rules only. Colours, the `.app-header` chrome, glass, and the
-   `.bs-btn` primitive come from the shell-injected @brainstorm/sdk app-theme.
+   `.bs-btn` primitive come from the shell-injected @brainstorm-os/sdk app-theme.
    Every `var(--…)` here names a real app-theme alias (packages/sdk/src/app-theme.css)
    or flattened token — no phantoms (tools/check-css-tokens.mjs is zero-baseline). */
 :root {
@@ -223,7 +223,7 @@ body {
 	align-items: center;
 }
 
-/* Both center empties render through `@brainstorm/sdk/empty-state` (Hero);
+/* Both center empties render through `@brainstorm-os/sdk/empty-state` (Hero);
  * the placeholder div is just the fill host (the transcript empty centers via
  * `.chat__messages--empty`). */
 .chat__placeholder {

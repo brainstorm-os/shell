@@ -19,7 +19,7 @@
  * `base64UrlToBytes` for the pairing subsystem.
  */
 
-import { sha256 } from "@brainstorm/native";
+import { sha256 } from "@brainstorm-os/native";
 
 export const PAIRING_CHANNEL_DOMAIN = "brainstorm/v1/pair";
 

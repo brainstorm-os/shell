@@ -9,7 +9,7 @@
  * `makeInitialState` seeds a TitleNode + paragraph on the string path.
  */
 
-import { type SerializedTitleNode, TITLE_NODE_TYPE } from "@brainstorm/editor";
+import { type SerializedTitleNode, TITLE_NODE_TYPE } from "@brainstorm-os/editor";
 import type { SerializedEditorState, SerializedTextNode } from "lexical";
 
 export function migrateTitleIntoBody(

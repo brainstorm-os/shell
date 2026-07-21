@@ -8,7 +8,7 @@
  * ATTENDEE; status ↔ STATUS; colour rides an `X-BRAINSTORM-COLOR` X-prop.
  */
 
-import type { Recurrence } from "@brainstorm/sdk-types";
+import type { Recurrence } from "@brainstorm-os/sdk-types";
 import type { Attendee } from "../types/attendee";
 import { AttendeeRsvp } from "../types/attendee";
 import type { Event } from "../types/event";

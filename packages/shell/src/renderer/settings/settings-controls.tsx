@@ -5,12 +5,12 @@
  * rather than being copied (CLAUDE.md DRY rule).
  *
  * Enumerated choices ride the shared select control
- * (`@brainstorm/sdk/select-menu` — fancy-menus chrome, keyboard model, a11y).
+ * (`@brainstorm-os/sdk/select-menu` — fancy-menus chrome, keyboard model, a11y).
  * Booleans use the shared `<Checkbox>`. Every visible string is passed in
  * already-translated by the caller via `t()`.
  */
 
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { useEffect, useId, useState } from "react";
 import { CheckboxGlyph } from "../ui/checkbox";
 

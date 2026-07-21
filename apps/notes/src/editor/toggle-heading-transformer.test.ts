@@ -1,4 +1,4 @@
-import { ToggleNode, ToggleVariant } from "@brainstorm/editor";
+import { ToggleNode, ToggleVariant } from "@brainstorm-os/editor";
 import { createHeadlessEditor } from "@lexical/headless";
 import { $createParagraphNode, $createTextNode, $getRoot } from "lexical";
 import { describe, expect, it } from "vitest";

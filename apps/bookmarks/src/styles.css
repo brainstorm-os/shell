@@ -32,7 +32,7 @@ button {
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin, title
  * face) is the shared `.app-header` / `.app-header__title` pair in
- * `@brainstorm/sdk/app-theme.css`. */
+ * `@brainstorm-os/sdk/app-theme.css`. */
 
 /* Header action button — the icon-only "Open original" affordance when a
  * bookmark is open (an anchor styled as a button so it keeps the shell's
@@ -236,7 +236,7 @@ body.is-resizing .bookmarks__resize {
 }
 
 /* The trailing count pills (surface nav, collections, tag list) are the
- * shared `.bs-count-badge` from `@brainstorm/sdk/count-badge` — no per-app
+ * shared `.bs-count-badge` from `@brainstorm-os/sdk/count-badge` — no per-app
  * pill CSS. */
 
 /* Section labels (COLLECTIONS / TAGS) align their text + trailing button with
@@ -948,7 +948,7 @@ textarea.bookmarks__form-input {
 	color: var(--danger);
 }
 
-/* The "Download page content" checkbox is the shared `@brainstorm/sdk/checkbox`
+/* The "Download page content" checkbox is the shared `@brainstorm-os/sdk/checkbox`
  * (`.checkbox` chrome from app-theme.css) — no app-local checkbox styling. */
 
 .bookmarks__form-footer {
@@ -1009,7 +1009,7 @@ textarea.bookmarks__form-input {
 }
 
 /* Reading sheet — centered column. The properties inspector is the shared
- * `@brainstorm/sdk/properties-panel` (`.bs-props`): a fixed glass overlay that
+ * `@brainstorm-os/sdk/properties-panel` (`.bs-props`): a fixed glass overlay that
  * slides in over this content, so the sheet stays full-width underneath. */
 .bm-detail__sheet {
 	max-width: 72ch;

@@ -7,15 +7,15 @@
  * and clicking a row opens that task in the full Tasks app.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import "@brainstorm/sdk/select-menu.css";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import "@brainstorm-os/sdk/select-menu.css";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
 import { t, tCount } from "./i18n/t";
 import { TASK_TYPE } from "./storage/entities-repository";

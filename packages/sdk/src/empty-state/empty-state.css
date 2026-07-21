@@ -1,6 +1,6 @@
 /**
  * Shared empty-state chrome. Imported once per app
- * (`import "@brainstorm/sdk/empty-state.css"`). Tokens are the app-theme
+ * (`import "@brainstorm-os/sdk/empty-state.css"`). Tokens are the app-theme
  * aliases every app already loads via `app-theme.css`.
  */
 

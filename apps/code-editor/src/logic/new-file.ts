@@ -4,7 +4,7 @@
  * one. Pure (no DOM / no service); the app wires the create call.
  */
 
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 
 const BASE = "untitled";
 const EXT = "ts";

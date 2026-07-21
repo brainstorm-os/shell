@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import type { EntityRow } from "@brainstorm/sdk/in-memory-entities";
-import { DictionaryStore, PropertiesContext } from "@brainstorm/sdk/property-ui";
+import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
+import { DictionaryStore, PropertiesContext } from "@brainstorm-os/sdk/property-ui";
 import { act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

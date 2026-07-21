@@ -6,18 +6,18 @@
  * covered in `logic/recently-closed.test.ts`; this exercises the React glue.
  */
 
-import type { WebViewClient } from "@brainstorm/sdk-types";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import type { WebViewClient } from "@brainstorm-os/sdk-types";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactNode, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserApp } from "./app";
 
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	mountMenuHost: vi.fn(() => () => {}),
 	closeTypeaheadMenu: vi.fn(),
 }));
-vi.mock("@brainstorm/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

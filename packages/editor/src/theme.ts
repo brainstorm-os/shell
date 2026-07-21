@@ -39,7 +39,7 @@ export const baselineTheme: EditorThemeClasses = {
 
 /**
  * The full rich-text theme — maps Lexical built-in node types to the
- * `notes__*` class names that `@brainstorm/editor/editor-theme.css`
+ * `notes__*` class names that `@brainstorm-os/editor/editor-theme.css`
  * styles (and that the shared custom nodes — callout / toggle / mention /
  * transclusion — already emit). Every surface that mounts the full editor
  * (`<FullEditorPlugins>` + `editor-theme.css`) passes this as

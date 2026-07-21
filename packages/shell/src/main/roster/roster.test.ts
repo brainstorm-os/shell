@@ -5,7 +5,7 @@
  * stable ordering, and graceful unknown-profile handling.
  */
 
-import { type RosterMember, RosterRole } from "@brainstorm/sdk-types";
+import { type RosterMember, RosterRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type ResolvedDisplay, joinRoster } from "./roster";
 

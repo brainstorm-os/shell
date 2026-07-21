@@ -13,7 +13,7 @@
  * never claims a dashed date). An all-blank column falls back to Text.
  */
 
-import { ValueType } from "@brainstorm/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { parseCsvRows } from "./csv";
 
 export type InferredCsvColumn = {

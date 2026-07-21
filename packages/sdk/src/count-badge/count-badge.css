@@ -7,7 +7,7 @@
  *
  * Tokens are app-theme aliases (`--hover`, `--text-dim`, …) so the pill
  * follows the active theme. Consumers load it via
- * `@brainstorm/sdk/count-badge.css`.
+ * `@brainstorm-os/sdk/count-badge.css`.
  */
 .bs-count-badge {
 	display: inline-flex;

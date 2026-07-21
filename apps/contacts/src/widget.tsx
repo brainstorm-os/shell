@@ -12,16 +12,16 @@
  * `onChange` — the sanctioned reactivity stack), filtered to `Person/v1`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import "@brainstorm/sdk/select-menu.css";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import "@brainstorm-os/sdk/select-menu.css";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
 import { plural, t } from "./i18n";
 import { useContactsT } from "./i18n-hooks";

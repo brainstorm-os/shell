@@ -6,7 +6,7 @@
  * "restores built-in" cases — so the 11 apps are unaffected until a
  * pack is installed.
  */
-import { type IconPackDef, IconPackStyle } from "@brainstorm/sdk-types";
+import { type IconPackDef, IconPackStyle } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

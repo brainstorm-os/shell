@@ -47,7 +47,7 @@ import {
 	groupForVerb,
 	normalizeOpenInput,
 	osHandoffSignature,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { entityRoute } from "../../shared/route";
 import { NavigationMode } from "../../shared/window-types";
 import type { LaunchOrchestrator } from "../apps/launch-orchestrator";

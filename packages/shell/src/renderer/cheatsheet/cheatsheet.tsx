@@ -33,7 +33,7 @@ import {
 	defineMenu,
 	useMenu,
 	useMenuState,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/t";
 // `.cheatsheet__key` / `.cheatsheet__row-chord-empty` style the chord tokens

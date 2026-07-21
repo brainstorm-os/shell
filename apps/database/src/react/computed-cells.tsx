@@ -10,7 +10,7 @@
  * uses for the editing path.
  */
 
-import type { ColumnFormula, ColumnRollup, PropertyDef } from "@brainstorm/sdk-types";
+import type { ColumnFormula, ColumnRollup, PropertyDef } from "@brainstorm-os/sdk-types";
 import { type ReactElement, type ReactNode, createContext, useContext, useMemo } from "react";
 import { formatAggregation } from "../logic/aggregations";
 import { effectiveColumnDef } from "../logic/effective-def";

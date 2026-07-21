@@ -1,20 +1,20 @@
-import { openContextMenu } from "@brainstorm/sdk/menus";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { openContextMenu } from "@brainstorm-os/sdk/menus";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 // @vitest-environment jsdom
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ThemeEditorApp } from "./app";
 import { flush, renderInto } from "./test/render";
 
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	mountMenuHost: vi.fn(),
 	MenuAlign: { Start: "start", End: "end" },
 	openContextMenu: vi.fn(() => true),
 	sdkMenuIcon: vi.fn(() => ({ icon: () => null })),
 	blankMenuIcon: { icon: () => null },
 }));
-vi.mock("@brainstorm/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
-vi.mock("@brainstorm/sdk/color-picker", () => ({ openColorPicker: vi.fn() }));
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
+vi.mock("@brainstorm-os/sdk/color-picker", () => ({ openColorPicker: vi.fn() }));
 
 afterEach(() => {
 	vi.mocked(openAnchoredMenu).mockClear();

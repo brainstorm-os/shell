@@ -11,7 +11,7 @@
  * recently-visited section (`recentVisits`).
  */
 
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 import { CLIP_TITLE_MAX_LEN, clippableUrl } from "./clip";
 
 /** Canonical Block-Protocol type id of the vault's visit log. */

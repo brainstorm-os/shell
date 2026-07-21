@@ -13,7 +13,7 @@ import {
 	isTypographyScale,
 	isValidTypography,
 	resolveFontStack,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { EntitiesService, EntityRecord } from "./runtime";
 
 const TYPOGRAPHY_TYPE = "brainstorm/Typography/v1";

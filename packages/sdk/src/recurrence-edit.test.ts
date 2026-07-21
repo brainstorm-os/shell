@@ -1,4 +1,4 @@
-import { DEFAULT_RECURRENCE_LABELS, RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { DEFAULT_RECURRENCE_LABELS, RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	RepeatKind,

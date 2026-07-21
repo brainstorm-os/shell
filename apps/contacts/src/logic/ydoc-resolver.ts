@@ -1,6 +1,6 @@
 /**
  * Renderer-side Y.Doc replica resolver. The singleton accessor lives in
- * `@brainstorm/react-yjs` (`createYDocResolverAccessor`, shared with Notes /
+ * `@brainstorm-os/react-yjs` (`createYDocResolverAccessor`, shared with Notes /
  * Journal / Tasks / Bookmarks / Code Editor); this wires it to the Contacts
  * runtime getter.
  *
@@ -16,7 +16,7 @@ import {
 	type YDocResolver,
 	createYDocResolver,
 	createYDocResolverAccessor,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { getBrainstorm } from "../runtime";
 
 export const getYDocResolverApi = createYDocResolverAccessor(getBrainstorm);

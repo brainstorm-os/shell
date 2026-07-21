@@ -25,7 +25,7 @@ import {
 	type ListView,
 	ListViewKind,
 	type SortKey,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export const LIST_VIEW_ENTITY_TYPE = "brainstorm/ListView/v1";
 

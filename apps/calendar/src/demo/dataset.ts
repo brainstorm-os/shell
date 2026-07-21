@@ -15,7 +15,7 @@
  * with live `entities.read:*` queries; the renderer stays untouched.
  */
 
-import { IconKind, RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { IconKind, RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { EVENT_SOURCE_KEY, type ScheduledItem, sourceKeyFor } from "../logic/scheduled-item";
 import type { Event } from "../types/event";
 

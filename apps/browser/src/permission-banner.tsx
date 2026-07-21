@@ -8,8 +8,8 @@
  * the site stops asking; Dismiss just hides the ask for now.
  */
 
-import { SitePermissionKind } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { SitePermissionKind } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { t } from "./i18n";
 

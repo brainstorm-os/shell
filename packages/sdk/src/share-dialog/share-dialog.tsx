@@ -17,8 +17,8 @@ import type {
 	RosterService,
 	SharedContact,
 	SharingService,
-} from "@brainstorm/sdk-types";
-import { RosterRole } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
+import { RosterRole } from "@brainstorm-os/sdk-types";
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import { Icon, IconName } from "../icon";
 import { Popover } from "../popover";

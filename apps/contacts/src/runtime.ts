@@ -1,6 +1,6 @@
 /**
  * The slice of `window.brainstorm` this app reads. `vaultEntities` is the
- * live entity-snapshot service (subscribed through `@brainstorm/react-yjs`'s
+ * live entity-snapshot service (subscribed through `@brainstorm-os/react-yjs`'s
  * `useVaultEntities`, never `onChange` directly); `entities` creates / edits
  * the `Person/v1` rows; `properties` backs the shared property-value cells;
  * `intents` routes an `open` to a linked company / person.
@@ -13,7 +13,7 @@ import type {
 	PropertiesService,
 	SettingsService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Files-host handle + the slice of the service the vCard import / export flow
  *  needs (Stage 9.10; caps `files.read` / `files.write`). Mirrors Calendar's
@@ -87,7 +87,7 @@ export type ContactsRuntime = {
 		 *  empty toasts (cap `notifications.post`). */
 		ui?: UiService;
 		/** Per-device, per-vault settings — backs "reopen the last contact I was
-		 *  viewing" via `@brainstorm/sdk/last-viewed`. */
+		 *  viewing" via `@brainstorm-os/sdk/last-viewed`. */
 		settings?: SettingsService;
 	} | null;
 	/** Inbound Y.Doc update bridge — feeds the renderer-side resolver behind

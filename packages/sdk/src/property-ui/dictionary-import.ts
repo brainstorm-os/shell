@@ -9,7 +9,7 @@
  * before commit — the caller mints ids + sortIndex.
  */
 
-import type { DictionaryItem } from "@brainstorm/sdk-types";
+import type { DictionaryItem } from "@brainstorm-os/sdk-types";
 
 export enum ImportFormat {
 	Csv = "csv",

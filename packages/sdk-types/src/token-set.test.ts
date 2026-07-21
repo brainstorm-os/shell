@@ -38,7 +38,7 @@ describe("constants + frozen tables", () => {
 		expect(EMPTY_TOKEN_SET.overrides).toEqual({});
 	});
 
-	it("appearance values match the @brainstorm/tokens vocabulary", () => {
+	it("appearance values match the @brainstorm-os/tokens vocabulary", () => {
 		expect(TokenSetAppearance.Light).toBe("light");
 		expect(TokenSetAppearance.Dark).toBe("dark");
 	});

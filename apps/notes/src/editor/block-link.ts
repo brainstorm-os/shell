@@ -10,7 +10,7 @@
  * the scroll-into-window + place-caret-on-open consumer is the follow-up rung.
  */
 
-import { formatBrainstormEntityUri } from "@brainstorm/sdk/note-references";
+import { formatBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 
 /** Write the block link to the clipboard. Resolves to whether the write
  *  succeeded — a denied or unavailable Clipboard API is a no-op (returns

@@ -149,7 +149,7 @@ textarea {
 
 /* Header chrome — flex skeleton, gap, border, background, height / padding and
  * the drag-region contract — is the shared `.app-header` rule in
- * `@brainstorm/sdk/app-theme.css`; Notes' header carries both classes so it
+ * `@brainstorm-os/sdk/app-theme.css`; Notes' header carries both classes so it
  * applies for free. Notes keeps only its own grid placement (above) and its
  * `.notes__header-*` child classes (below). */
 
@@ -167,7 +167,7 @@ textarea {
 
 /* The header icon affordance is the shared `.bs-icon-pick` component
  * (look owned by the shell app-theme; markup/behaviour shared via
- * @brainstorm/sdk/picker-host). Notes keeps zero copy of it now — size is
+ * @brainstorm-os/sdk/picker-host). Notes keeps zero copy of it now — size is
  * passed inline at the call site, the drag-region opt-out is above. */
 
 /* Main + scroll container */
@@ -321,7 +321,7 @@ textarea {
 }
 
 /* Editor-content chrome (blocks, toolbars, media, callouts, typeaheads, …)
- * is the shared `@brainstorm/editor/editor-theme.css` sheet — imported in
+ * is the shared `@brainstorm-os/editor/editor-theme.css` sheet — imported in
  * main.tsx BEFORE this file so anything below can override it. Notes keeps
  * zero copy of it. */
 
@@ -330,7 +330,7 @@ textarea {
 
 /* The add-property picker popover (`/property` slash, gutter, PropertyList
    "+", Properties panel) is the shared `<AddPropertyPicker>` from
-   `@brainstorm/sdk/property-ui` — its chrome lives in the SDK, not here. */
+   `@brainstorm-os/sdk/property-ui` — its chrome lives in the SDK, not here. */
 
 /* The shared property cells are built for fixed-width table columns (width:100%,
    flex-wrap, ellipsis). Inline in a paragraph the host has no column width, so
@@ -509,7 +509,7 @@ textarea {
 }
 
 /* Header action buttons use the shared `.header-icon-btn` chrome from
- * @brainstorm/sdk/app-theme.css (same as files/books) — no per-app re-roll. */
+ * @brainstorm-os/sdk/app-theme.css (same as files/books) — no per-app re-roll. */
 
 /* ── Left navigation panel ────────────────────────────────────────────
    Recent-notes list. Opaque (no glass), absolutely positioned over the
@@ -600,7 +600,7 @@ textarea {
 
 /* The active panel (Properties or Comments) fills below the tab strip.
  * The strip itself (`.bs-panel-tabs`) and its tabs are the shared
- * `@brainstorm/editor` CommentsRightPanel chrome (comments-styles.css). */
+ * `@brainstorm-os/editor` CommentsRightPanel chrome (comments-styles.css). */
 .notes__props > :not(.bs-panel-tabs) {
 	flex: 1 1 0;
 	min-height: 0;
@@ -642,7 +642,7 @@ body.is-resizing .notes__props-resize {
 	outline: none;
 }
 
-/* Panel CONTENTS are the shared `@brainstorm/sdk/properties-panel` (`.bs-props__*`,
+/* Panel CONTENTS are the shared `@brainstorm-os/sdk/properties-panel` (`.bs-props__*`,
  * via app-theme.css). `.notes__props` above is just the resizable glass container
  * that hosts it. */
 

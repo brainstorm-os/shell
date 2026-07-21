@@ -37,7 +37,7 @@ import {
 	type OpenWithCandidate,
 	type OpenWithDecision,
 	OpenWithDecisionKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 
 export { OpenWithDecisionKind };

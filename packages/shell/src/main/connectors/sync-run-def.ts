@@ -4,7 +4,7 @@
  * `toWorkflowRunDef`). Persisted by the sync service after each run.
  */
 
-import type { SyncRunDef } from "@brainstorm/sdk-types";
+import type { SyncRunDef } from "@brainstorm-os/sdk-types";
 import type { SyncRunResult } from "./sync-runner";
 
 export function toSyncRunDef(result: SyncRunResult): SyncRunDef {

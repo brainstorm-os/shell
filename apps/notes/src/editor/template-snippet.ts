@@ -7,8 +7,8 @@
  * picker + menu interactions themselves are real-shell dogfood-gated.
  */
 
-import type { Template } from "@brainstorm/sdk-types";
-import { snippetFromTemplate } from "@brainstorm/sdk/templates";
+import type { Template } from "@brainstorm-os/sdk-types";
+import { snippetFromTemplate } from "@brainstorm-os/sdk/templates";
 
 /** A block-snippet template reduced to what the `/template` picker renders and
  *  inserts: its display name, the serialized-blocks JSON fragment, and its

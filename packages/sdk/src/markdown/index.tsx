@@ -194,7 +194,7 @@ export interface MarkdownProps {
 }
 
 /** Render a markdown string as a `.bs-markdown` prose block. Load styles once
- *  per app: `import "@brainstorm/sdk/markdown.css"`. */
+ *  per app: `import "@brainstorm-os/sdk/markdown.css"`. */
 export function Markdown({ source, className, onEntityLink }: MarkdownProps): ReactElement {
 	const blocks = parseMarkdown(source);
 	const cls = className ? `bs-markdown ${className}` : "bs-markdown";

@@ -1,8 +1,8 @@
-/** Re-export shim — BookmarkNode now lives in `@brainstorm/editor`. */
+/** Re-export shim — BookmarkNode now lives in `@brainstorm-os/editor`. */
 export {
 	BOOKMARK_NODE_TYPE,
 	type SerializedBookmarkNode,
 	$createBookmarkNode,
 	$isBookmarkNode,
 	BookmarkNode,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

@@ -1,6 +1,6 @@
 /**
  * Graph keyboard chord map invariants. The chords feed
- * `@brainstorm/sdk/shortcut` `matchesChord` at runtime (parser is
+ * `@brainstorm-os/sdk/shortcut` `matchesChord` at runtime (parser is
  * SDK-tested); here we pin the *map* contract: every action is bound, the
  * grammar is the canonical one `matchesChord` understands (`CmdOrCtrl`,
  * never the unsupported `Mod`), and the zoom keys use the unshifted
@@ -8,7 +8,7 @@
  * which `normalizeKey` would never produce from a real event). A typo'd
  * chord fails here instead of silently no-op-ing in the app.
  *
- * The test deliberately does not import `@brainstorm/sdk/shortcut` — that
+ * The test deliberately does not import `@brainstorm-os/sdk/shortcut` — that
  * subpath has no vitest alias and the parser already has its own SDK
  * suite; re-exercising it here would only couple this app test to shell
  * test config we may not edit.

@@ -6,7 +6,7 @@
  * (the app owns state + persistence).
  *
  * Rich syntax-highlighted editing lives in the code-editor app (which uses
- * `@brainstorm/sdk/code-highlight`); this pane is the quick inline editor +
+ * `@brainstorm-os/sdk/code-highlight`); this pane is the quick inline editor +
  * the validation gate, with "Edit in Code Editor" as the rich-editing path.
  */
 
@@ -14,7 +14,7 @@ import {
 	type StylePackDef,
 	StylePackSanitizeSeverity,
 	sanitizeStylePackCss,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { ReactElement } from "react";
 import type { Translate } from "./translate";
 

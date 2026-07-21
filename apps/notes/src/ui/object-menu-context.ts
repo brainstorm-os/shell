@@ -13,13 +13,13 @@
  * (e.g. before the runtime is ready).
  */
 
-import type { Intent } from "@brainstorm/sdk-types";
+import type { Intent } from "@brainstorm-os/sdk-types";
 import type {
 	CollectionsEntitiesService,
 	ObjectMenuContext,
 	ObjectMenuExtraItem,
 	ObjectMenuRuntime,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n/t";
 import { NOTE_TYPE } from "../store/entities-repository";
 import type { NotesBrainstorm } from "../store/runtime";

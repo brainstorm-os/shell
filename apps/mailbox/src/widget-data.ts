@@ -7,7 +7,7 @@
  * live in exactly one place.
  */
 
-import type { VaultEntitiesListQuery } from "@brainstorm/sdk-types";
+import type { VaultEntitiesListQuery } from "@brainstorm-os/sdk-types";
 import { t } from "./i18n";
 import { senderLabel, toMessageView } from "./logic/mail-view";
 import { EMAIL_TYPE_URL, type MessageView } from "./types/mail-view";

@@ -4,7 +4,7 @@
  * grid's "what to show" rules are testable without the block harness, and so
  * the heuristics are SHARED with the main Database app rather than forked:
  * type inference comes from `logic/effective-def` (`inferPropertyDef`),
- * labels from `ui/humanize`, dates from `@brainstorm/sdk/date-formatters`.
+ * labels from `ui/humanize`, dates from `@brainstorm-os/sdk/date-formatters`.
  *
  * The block has NO catalog access — its only vault channel is the BP graph
  * module (`getEntity`/`queryEntities`), and `PropertyDef`s live in the
@@ -18,8 +18,8 @@
  * "1 reference" placeholder — NEVER the raw id.
  */
 
-import { ValueType } from "@brainstorm/sdk-types";
-import { formatDate, formatTime } from "@brainstorm/sdk/date-formatters";
+import { ValueType } from "@brainstorm-os/sdk-types";
+import { formatDate, formatTime } from "@brainstorm-os/sdk/date-formatters";
 import { inferPropertyDef } from "../../logic/effective-def";
 import { humanize } from "../../ui/humanize";
 
@@ -41,7 +41,7 @@ export const MAX_REF_LOOKUPS = 50;
 /** Property keys never shown as columns (structural / rendered elsewhere). */
 const HIDDEN_KEYS = new Set(["id", "createdAt", "updatedAt", "icon", "cover", "deletedAt"]);
 
-/** A vault-minted property key (`newPropertyKey()` in `@brainstorm/sdk/
+/** A vault-minted property key (`newPropertyKey()` in `@brainstorm-os/sdk/
  *  properties-keys`) — an opaque id whose display name lives only in the
  *  properties catalog the block can't reach. */
 export function isOpaqueKey(key: string): boolean {

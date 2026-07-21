@@ -1,4 +1,4 @@
-import { DateGranularity, ValueType } from "@brainstorm/sdk-types";
+import { DateGranularity, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { planImport, runImport } from "./import-engine";
 import { inferMapping, inferValueType } from "./import-map";

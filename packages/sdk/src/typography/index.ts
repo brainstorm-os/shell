@@ -17,7 +17,7 @@ import {
 	type TypographyDef,
 	isTypographyScale,
 	resolveFontStack,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** CSS var the renderer reads for a font role — mirrors the token family
  *  path (`text.family.<role>` → `--text-family-<role>`), so the contract

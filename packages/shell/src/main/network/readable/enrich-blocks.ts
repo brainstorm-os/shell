@@ -13,7 +13,7 @@
  * handler owns the guarded fetch + the count/size/concurrency caps.
  */
 
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 
 /** A block that carries an image `src` — the shape the readable extractor emits
  *  (`html-to-blocks.ts` `imageNode`). */

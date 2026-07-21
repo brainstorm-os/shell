@@ -1,6 +1,6 @@
 /**
  * Date-range math for the four Calendar views — re-export from
- * `@brainstorm/sdk/date-grid`. The Calendar app used to carry the
+ * `@brainstorm-os/sdk/date-grid`. The Calendar app used to carry the
  * canonical implementation here; it's now lifted to the SDK so every
  * date-axis app (Journal, Database calendar view, Tasks date popovers,
  * future ones) reads the same DST-safe helpers
@@ -25,4 +25,4 @@ export {
 	startOfMonthGrid,
 	startOfWeek,
 	weekDays,
-} from "@brainstorm/sdk/date-grid";
+} from "@brainstorm-os/sdk/date-grid";

@@ -18,7 +18,7 @@
  * re-cascade concern, not a hard failure here.
  */
 
-import { EntityEventVerb } from "@brainstorm/sdk-types";
+import { EntityEventVerb } from "@brainstorm-os/sdk-types";
 import type { EntityChange, EntityChangeEmitter } from "../entities/entity-change-emitter";
 import { containmentRuleForChild } from "./containment-registry";
 import type { SharingEngine } from "./sharing-engine";

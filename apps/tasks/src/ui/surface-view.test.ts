@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * KBN-A-tasks (12.4): the task list is a vertical listbox driven by the
- * shared `@brainstorm/sdk/a11y` composite-keyboard binding. The roles +
+ * shared `@brainstorm-os/sdk/a11y` composite-keyboard binding. The roles +
  * roving tabindex are STAMPED by the binding (not hand-written here), the
  * cursor follows the inspected task, ArrowDown moves + selects the next
  * task (same as a row click), and Enter opens it (same as the row's open

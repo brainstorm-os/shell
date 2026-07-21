@@ -16,10 +16,10 @@
     "vite": "^6.4.3"
   },
   "dependencies": {
-    "@brainstorm/editor": "workspace:*",
-    "@brainstorm/react-yjs": "workspace:*",
-    "@brainstorm/sdk": "workspace:*",
-    "@brainstorm/sdk-types": "workspace:*",
+    "@brainstorm-os/editor": "workspace:*",
+    "@brainstorm-os/react-yjs": "workspace:*",
+    "@brainstorm-os/sdk": "workspace:*",
+    "@brainstorm-os/sdk-types": "workspace:*",
     "@phosphor-icons/core": "^2.1.1",
     "pixi.js": "^8.6.0",
     "react": "^19.0.0",

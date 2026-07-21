@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/calendar` — shared month-grid + mini-calendar
+ * `@brainstorm-os/sdk/calendar` — shared month-grid + mini-calendar
  * primitives. Used by every app with a calendar surface (Calendar app
  * month/sidebar, Database calendar view month + year tiles, Tasks date
  * popover). Visual style ships in `./calendar.css`, loaded through the

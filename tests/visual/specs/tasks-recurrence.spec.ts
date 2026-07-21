@@ -2,7 +2,7 @@
  * Tasks recurrence editing end-to-end smoke (9.14.12).
  *
  * Boots the real Electron shell, opens a seeded task, and drives the shared
- * recurrence editor (extracted to `@brainstorm/sdk/recurrence-editor`): picking
+ * recurrence editor (extracted to `@brainstorm-os/sdk/recurrence-editor`): picking
  * "Weekly" reveals the weekday toggles and a live summary, with no renderer
  * console errors. Proves the SDK editor mounts + persists through the Tasks
  * adapter against the live app.

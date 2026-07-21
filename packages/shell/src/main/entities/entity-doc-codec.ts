@@ -28,7 +28,7 @@ import {
 	ENTITY_LINKS_ARRAY_NAME,
 	ENTITY_PROPS_MAP_NAME,
 	type EntityDocLink,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type * as Y from "yjs";
 
 export type EntityDocProjection = {

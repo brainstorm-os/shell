@@ -7,7 +7,7 @@
  * `null` so the renderer falls back to the id-seeded gradient.
  */
 
-import { CoverKind } from "@brainstorm/sdk-types";
+import { CoverKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { parseStoredNote, serializeNote } from "./codec";
 

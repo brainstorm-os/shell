@@ -1,4 +1,4 @@
-import { IconKind, RecurrenceKind } from "@brainstorm/sdk-types";
+import { IconKind, RecurrenceKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Event } from "../types/event";
 import { EVENT_KEY_PREFIX, eventKey, parseStoredEvent, serializeEvent } from "./codec";

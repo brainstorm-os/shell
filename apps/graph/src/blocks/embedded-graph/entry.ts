@@ -5,7 +5,7 @@
  * 2 connections · 1 view"); a click opens it in the Graph app. Read-only — a
  * graph's pattern is edited in the app. Runs INSIDE the sandboxed
  * opaque-origin iframe (no ambient authority, no `window.brainstorm`); its
- * only channel to the vault is the `@brainstorm/sdk/block-runtime` harness
+ * only channel to the vault is the `@brainstorm-os/sdk/block-runtime` harness
  * (`getEntity` over the BP graph module). Pure DOM — no framework, no SDK
  * i18n: the bundle is a single self-contained IIFE inlined into the frame's
  * srcdoc, so it carries its own literals (mirrors `embedded-whiteboard` /
@@ -19,7 +19,7 @@
  * at a glance.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 
 interface BpEntity {
 	entityId: string;
@@ -74,7 +74,7 @@ function summaryLabel(subjects: number, connections: number, views: number): str
 }
 
 // Colours come from the host theme tokens the block-runtime mirrors onto
-// `:root` (`@brainstorm/sdk/block-runtime` BlockControlKind.Theme); the literal
+// `:root` (`@brainstorm-os/sdk/block-runtime` BlockControlKind.Theme); the literal
 // fallbacks in each `var(--…, fallback)` only paint before the theme lands / in
 // standalone tests. No `prefers-color-scheme` overrides — the active theme (not
 // the OS) is the source of truth.

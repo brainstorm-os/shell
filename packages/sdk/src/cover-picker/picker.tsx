@@ -1,6 +1,6 @@
 /**
  * CoverPicker — the ONE object-cover chooser, shared by every app via
- * `@brainstorm/sdk/cover-picker` (the visual companion to `<IconPicker>`,
+ * `@brainstorm-os/sdk/cover-picker` (the visual companion to `<IconPicker>`,
  * realising the per-object-covers-everywhere invariant of B7.3).
  *
  *   - Image      : drag-and-drop / click upload (→ injected
@@ -31,7 +31,7 @@
  * so the two pickers are visibly one family.
  */
 
-import { type Cover, type CoverFocal, CoverKind } from "@brainstorm/sdk-types";
+import { type Cover, type CoverFocal, CoverKind } from "@brainstorm-os/sdk-types";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Orientation, VirtualGridRowKind, useCompositeKeyboard, useVirtualGridNav } from "../a11y";
@@ -57,7 +57,7 @@ export type CoverPickerProps = {
 	onClose: () => void;
 	/** Optional per-host overrides; omitted keys fall back to the
 	 *  canonical `DEFAULT_COVER_PICKER_LABELS` (SDK i18n convention —
-	 *  see `@brainstorm/sdk/i18n`). */
+	 *  see `@brainstorm-os/sdk/i18n`). */
 	labels?: Partial<CoverPickerLabels> | undefined;
 	covers: CoverPickerService;
 };

@@ -4,7 +4,7 @@
  * `entities.db` store); the renderer call sites depend only on this type.
  */
 
-import type { SingleEntityRepository } from "@brainstorm/sdk/storage-repository";
+import type { SingleEntityRepository } from "@brainstorm-os/sdk/storage-repository";
 import type { Bookmark } from "../types/bookmark";
 
 export type BookmarksRepository = SingleEntityRepository<Bookmark>;

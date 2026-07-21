@@ -1,6 +1,6 @@
 /**
  * Mailbox app styles. Structural only — colour / type / spacing come from the
- * shared design tokens (loaded via `@brainstorm/sdk/app-theme.css`). Layout is
+ * shared design tokens (loaded via `@brainstorm-os/sdk/app-theme.css`). Layout is
  * a fixed three-pane grid (folder rail | message list | reading pane) under
  * the shared 44px `.app-header` baseline.
  */
@@ -46,7 +46,7 @@ body {
 
 /* Header chrome — flex skeleton, left/right groups, the `<h1>` title face
  * (incl. `margin: 0`), height / padding / drag region — is the shared
- * `.app-header` rule in `@brainstorm/sdk/app-theme.css`. Nothing local. */
+ * `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. Nothing local. */
 
 .mb-app__panes {
 	flex: 1;
@@ -393,7 +393,7 @@ body {
 }
 
 /* The thread message-count pill is the shared `.bs-count-badge`
- * (`@brainstorm/sdk/count-badge`, accent tone) — no per-app pill CSS. */
+ * (`@brainstorm-os/sdk/count-badge`, accent tone) — no per-app pill CSS. */
 
 .mb-thread__chevron {
 	flex: 0 0 auto;
@@ -715,7 +715,7 @@ body {
 /* ── Connect-account CTA + dialog (Mailbox-5) ────────────────────────── */
 
 /* Fill host for the no-account empty; the chrome itself is the shared
- * `@brainstorm/sdk/empty-state` (Hero). */
+ * `@brainstorm-os/sdk/empty-state` (Hero). */
 .mb-cta {
 	flex: 1;
 	display: flex;
@@ -828,7 +828,7 @@ body {
 /* ── Connect dialog — Gmail / IMAP mode toggle + host rows ──────────────── */
 
 /* Mode toggle wears the shared `.bs-segmented` face
- * (@brainstorm/sdk/segmented.css); only the layout gap stays local. */
+ * (@brainstorm-os/sdk/segmented.css); only the layout gap stays local. */
 .mb-connect__modes {
 	margin-bottom: var(--space-2);
 }

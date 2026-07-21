@@ -11,8 +11,8 @@
  * Rows are real buttons, so Tab + Enter works without the arrow keys too.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";

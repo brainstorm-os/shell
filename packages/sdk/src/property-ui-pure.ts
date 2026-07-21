@@ -1,12 +1,12 @@
 /**
- * `@brainstorm/sdk/property-ui/pure` — the DOM/React-free half of the
+ * `@brainstorm-os/sdk/property-ui/pure` — the DOM/React-free half of the
  * shared property layer. Pure value formatting + dictionary algebra,
  * nothing that touches `react` or the cell registry (which `register`s
  * at module load — a side effect this barrel must never statically
  * pull, or the importer drags React in).
  *
  * Consumed by the Database app's vanilla-DOM painters (`"types": []`,
- * no `@types/react`). The React face lives at `@brainstorm/sdk/
+ * no `@types/react`). The React face lives at `@brainstorm-os/sdk/
  * property-ui`; do NOT add a `.tsx` / registry / `react` import here.
  */
 
@@ -83,4 +83,4 @@ export type {
 	PropertyDef,
 	PropertyView,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";

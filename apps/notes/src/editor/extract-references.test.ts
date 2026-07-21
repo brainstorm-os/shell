@@ -3,7 +3,7 @@ import {
 	INLINE_TRANSCLUSION_NODE_TYPE as SDK_INLINE_TRANSCLUSION_NODE_TYPE,
 	MENTION_NODE_TYPE as SDK_MENTION_NODE_TYPE,
 	TRANSCLUSION_NODE_TYPE as SDK_TRANSCLUSION_NODE_TYPE,
-} from "@brainstorm/sdk/note-references";
+} from "@brainstorm-os/sdk/note-references";
 import type { SerializedEditorState } from "lexical";
 import { describe, expect, it } from "vitest";
 import { ReferenceKind, extractReferences, parseBrainstormEntityUri } from "./extract-references";

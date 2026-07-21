@@ -1,4 +1,4 @@
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	LARGE_PAGE_BLOCK_THRESHOLD,

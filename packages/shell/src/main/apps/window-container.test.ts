@@ -1,4 +1,4 @@
-import { TAB_ICON_NONE, TabCommandKind } from "@brainstorm/sdk-types";
+import { TAB_ICON_NONE, TabCommandKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type BaseWindowHandle,

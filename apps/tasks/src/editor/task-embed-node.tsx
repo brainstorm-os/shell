@@ -19,9 +19,9 @@
  * graph.
  */
 
-import { BpBlockMount, type BpBlockMountHandle } from "@brainstorm/sdk/block-mount";
-import { BlockRendererKind, useBlockRenderer } from "@brainstorm/sdk/block-registry";
-import { BlockControlKind } from "@brainstorm/sdk/block-runtime";
+import { BpBlockMount, type BpBlockMountHandle } from "@brainstorm-os/sdk/block-mount";
+import { BlockRendererKind, useBlockRenderer } from "@brainstorm-os/sdk/block-registry";
+import { BlockControlKind } from "@brainstorm-os/sdk/block-runtime";
 import {
 	DecoratorNode,
 	type EditorConfig,

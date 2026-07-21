@@ -10,7 +10,7 @@
  * `web.browse`).
  */
 
-import type { SitePermissionKind } from "@brainstorm/sdk-types";
+import type { SitePermissionKind } from "@brainstorm-os/sdk-types";
 
 /** One persisted per-origin device-permission decision. `allow: false` is an
  *  explicit block (the chrome stops asking); absence of a grant is the

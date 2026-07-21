@@ -24,7 +24,7 @@
  * appears when the app passes an `onRemove` handler.
  */
 
-import type { ContributedAction } from "@brainstorm/sdk-types";
+import type { ContributedAction } from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
 import { openEntity } from "../open-entity";
 

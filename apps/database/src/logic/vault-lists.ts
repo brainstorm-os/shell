@@ -17,8 +17,8 @@
  * the snapshot source.
  */
 
-import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
-import { friendlyTypeName, isChildEntityType } from "@brainstorm/sdk/system-entities";
+import { COLLECTION_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { friendlyTypeName, isChildEntityType } from "@brainstorm-os/sdk/system-entities";
 import { plural, t } from "../i18n";
 import type { List } from "../types/list";
 import { ListSourceKind } from "../types/list-source";

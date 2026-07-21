@@ -8,8 +8,8 @@
  * regress back to "you can only check off tasks".
  */
 
-import { RecurrenceKind } from "@brainstorm/sdk-types";
-import { SelectionModifier } from "@brainstorm/sdk/selection";
+import { RecurrenceKind } from "@brainstorm-os/sdk-types";
+import { SelectionModifier } from "@brainstorm-os/sdk/selection";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";

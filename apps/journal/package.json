@@ -8,10 +8,10 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@brainstorm/editor": "workspace:*",
-    "@brainstorm/react-yjs": "workspace:*",
-    "@brainstorm/sdk": "workspace:*",
-    "@brainstorm/sdk-types": "workspace:*",
+    "@brainstorm-os/editor": "workspace:*",
+    "@brainstorm-os/react-yjs": "workspace:*",
+    "@brainstorm-os/sdk": "workspace:*",
+    "@brainstorm-os/sdk-types": "workspace:*",
     "@lexical/markdown": "^0.21.0",
     "@lexical/react": "^0.21.0",
     "@phosphor-icons/react": "^2.1.10",

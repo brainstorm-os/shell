@@ -9,7 +9,7 @@
 
 // @vitest-environment jsdom
 
-import { BlockFramePhase } from "@brainstorm/sdk/block-frame";
+import { BlockFramePhase } from "@brainstorm-os/sdk/block-frame";
 import { createRef } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";

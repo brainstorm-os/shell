@@ -13,7 +13,7 @@ import {
 	TriggerKind,
 	aggregateWorkflowCapabilities,
 	isCapabilitySubset,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	GeneralizeRefusal,

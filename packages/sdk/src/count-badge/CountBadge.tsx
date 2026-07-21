@@ -4,7 +4,7 @@
  * Every app uses this so the badges read as siblings instead of each app's
  * own hand-rolled `__count` span.
  *
- * Load the styles once per app: `import "@brainstorm/sdk/count-badge.css"`.
+ * Load the styles once per app: `import "@brainstorm-os/sdk/count-badge.css"`.
  */
 
 import { CountBadgeTone, countBadgeClassName, formatCount } from "./format-count";

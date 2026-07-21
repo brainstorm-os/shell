@@ -24,7 +24,7 @@
  *      sample series is under `MEM_SLOPE_MB_PER_MIN` (1 MB/min).
  *
  * Two real `_electron.launch` shells with isolated `--user-data-dir`s,
- * a real `@brainstorm/relay-server` child process, real audit log
+ * a real `@brainstorm-os/relay-server` child process, real audit log
  * on disk. NOT in-process — the in-process two-`VaultSession` proof
  * already lives at `packages/shell/src/main/sync/new-device-join.test.ts`.
  *

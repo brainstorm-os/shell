@@ -10,7 +10,7 @@
  *     depth-tagged step-log inspector (11b.13).
  *
  * Reactivity: all three lists are derived from the live whole-vault snapshot
- * read through the ONE shared stack — `@brainstorm/react-yjs`
+ * read through the ONE shared stack — `@brainstorm-os/react-yjs`
  * `useVaultEntities` (which owns the change subscription + coalescing) —
  * never a hand-rolled `onChange → list → setState`. Pure logic lives in
  * `logic/*`; persistence in `storage/*`. Outside the shell there is no
@@ -18,8 +18,12 @@
  * [[preview-drop-pattern]].
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import type { AutomationsHostStatus, AutomationsService, ReminderDef } from "@brainstorm/sdk-types";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import type {
+	AutomationsHostStatus,
+	AutomationsService,
+	ReminderDef,
+} from "@brainstorm-os/sdk-types";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type AutomationsI18nKey, t } from "./i18n";
 import { useAutomationsT } from "./i18n-hooks";

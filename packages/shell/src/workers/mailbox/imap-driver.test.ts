@@ -8,7 +8,7 @@
  * fail-close, and close() idempotence.
  */
 
-import { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
+import { FolderRole, MailFlag, MailProtocol } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { FetchWalk } from "../../main/mailbox/mail-driver";
 import {

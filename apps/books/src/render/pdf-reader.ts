@@ -4,7 +4,7 @@
  * footer nav, page chords) but paints each page onto a canvas through an
  * injected `PdfPagePort` instead of slicing reflow fragments — the port is
  * the seam that keeps this surface unit-testable: the app wires it to the
- * shared `@brainstorm/sdk/pdf-engine` (Preview's pdf.js stack — no second
+ * shared `@brainstorm-os/sdk/pdf-engine` (Preview's pdf.js stack — no second
  * one), tests inject a fake.
  *
  * Font-size reflow + highlights are reflow-only features and deliberately
@@ -16,10 +16,10 @@
  * could bring highlights back — not this iteration.
  */
 
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import type { PdfLink } from "@brainstorm/sdk/pdf-engine";
-import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
-import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import type { PdfLink } from "@brainstorm-os/sdk/pdf-engine";
+import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
+import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { type BooksI18nKey, t } from "../i18n";
 import {
 	type PdfReaderState,

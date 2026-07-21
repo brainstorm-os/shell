@@ -15,8 +15,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm/sdk-types";
-import { type ThemeName, isThemeName, themes } from "@brainstorm/tokens";
+import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm-os/sdk-types";
+import { type ThemeName, isThemeName, themes } from "@brainstorm-os/tokens";
 import { type BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme } from "electron";
 import {
 	AppearanceSlot,
@@ -62,7 +62,7 @@ export const DASHBOARD_SNAPSHOT_CHANNEL = "dashboard:snapshot";
 /** App-renderer-bound channel: payload is the active theme *name*
  *  (`"midnight"`, `"default-dark"`, …). Mirrors the bootstrap payload the
  *  app preload reads from `--brainstorm-theme=…`. The preload resolves
- *  the name through the bundled `@brainstorm/tokens` registry — no
+ *  the name through the bundled `@brainstorm-os/tokens` registry — no
  *  flattened-map shipping over IPC. */
 export const APP_THEME_CHANGED_CHANNEL = "app:theme-changed";
 

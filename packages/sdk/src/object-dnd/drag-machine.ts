@@ -26,7 +26,7 @@ import {
 	type DragPoint,
 	type DropResult,
 	type ObjectDragItem,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The `dnd` surface a source drives — the begin/move/drop/cancel quartet. */
 export type DragSourceController = Pick<DndService, "begin" | "move" | "drop" | "cancel">;

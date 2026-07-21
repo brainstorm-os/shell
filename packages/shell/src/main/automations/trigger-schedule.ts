@@ -6,7 +6,7 @@
  * service is a thin timer + persistence shell over it.
  *
  * **OQ-165 resolved (reuse, not a parallel dialect).** Time triggers
- * store the structured `@brainstorm/sdk-types` `Recurrence` — whose
+ * store the structured `@brainstorm-os/sdk-types` `Recurrence` — whose
  * `Custom { rrule }` arm already holds a raw RFC-5545 string for the long
  * tail — and we reuse the 9.15.5 `nextOccurrence` engine wholesale rather
  * than introduce a second RRULE storage/parser. One recurrence
@@ -16,7 +16,7 @@
  * still be run manually.)
  */
 
-import { type Recurrence, nextOccurrence } from "@brainstorm/sdk-types";
+import { type Recurrence, nextOccurrence } from "@brainstorm-os/sdk-types";
 
 /** What a one-shot trigger does when it comes due while the scheduler
  *  wasn't running to fire it (the app was closed). `Skip` (the default,

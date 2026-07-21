@@ -18,9 +18,9 @@
  * replaces only the read source behind this hook.
  */
 
-import { useOptionalYDocResolver } from "@brainstorm/react-yjs";
-import { announce } from "@brainstorm/sdk/a11y";
-import { type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { useOptionalYDocResolver } from "@brainstorm-os/react-yjs";
+import { announce } from "@brainstorm-os/sdk/a11y";
+import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural, t } from "../i18n";
 import { type BreadcrumbSegment, deriveBreadcrumbs } from "../logic/breadcrumbs";
@@ -181,7 +181,7 @@ export function useFilesStore() {
 	}
 	const tree = treeRef.current;
 
-	// CRDT seam (`@brainstorm/react-yjs`). Files is read-only over the
+	// CRDT seam (`@brainstorm-os/react-yjs`). Files is read-only over the
 	// `vaultEntities` snapshot today, so no SDK `<YDocProvider>` is
 	// installed and this resolves to `null` — the snapshot path drives
 	// state. When the entities-service resolver lands (Stage 9.3.2) the
@@ -207,7 +207,7 @@ export function useFilesStore() {
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
 		() => new Set([ROOT_FOLDER_ID]),
 	);
-	// Folder back/forward is the shared SDK primitive (`@brainstorm/sdk/
+	// Folder back/forward is the shared SDK primitive (`@brainstorm-os/sdk/
 	// nav-history`) — same model + header chrome + chords as every other
 	// first-party app. The current folder id IS Files' navigable location;
 	// `navHist.get()` is the render snapshot (still `{current,back,forward}`,
@@ -1323,7 +1323,7 @@ export function useFilesStore() {
  *  `copy: true` flag opts into the membership-add (multi-membership)
  *  variant; default is move. Silent on every failure mode (missing
  *  payload, missing folders, cycle, no entities service) — the
- *  dispatcher's typed wrapper (`moveEntity` from `@brainstorm/sdk`)
+ *  dispatcher's typed wrapper (`moveEntity` from `@brainstorm-os/sdk`)
  *  surfaces the result. Exported for unit-test access without spinning
  *  up the React store. */
 export function handleMoveIntent(

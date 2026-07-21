@@ -3,7 +3,7 @@ import {
 	type AiGenerateResult,
 	GEMINI_PROVIDER_ID,
 	MessageRole,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type GeminiHttp, createGeminiProvider } from "./gemini-provider";
 

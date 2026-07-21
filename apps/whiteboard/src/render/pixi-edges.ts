@@ -39,7 +39,7 @@ import {
 	computeViewBounds,
 	segmentInView,
 	viewportUsable,
-} from "@brainstorm/sdk/frustum-cull";
+} from "@brainstorm-os/sdk/frustum-cull";
 import { polylineMidpoint } from "../logic/edge-path";
 import type { Point } from "../logic/handle-positions";
 import { ArrowHead } from "../types/edge";

@@ -10,7 +10,7 @@
  * affordance — three consumers, one component (CLAUDE.md DRY rule).
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
 import {
 	type ReactElement,
 	type ReactNode,

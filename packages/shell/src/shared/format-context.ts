@@ -8,7 +8,7 @@
  * Pure (no Electron / React); shared by the launch stamp + the broadcast diff.
  */
 
-import type { FormatContext } from "@brainstorm/sdk-types";
+import type { FormatContext } from "@brainstorm-os/sdk-types";
 import { REGIONAL_AUTO, type RegionalState, hourCycleToHour12 } from "./shell-prefs";
 
 /**
@@ -38,7 +38,7 @@ export function regionalToFormatContext(language: string, regional: RegionalStat
 /** Structural equality of two contexts — lets the broadcaster skip redundant
  *  fan-outs when an unrelated dashboard mutation leaves the format unchanged.
  *  Intentionally duplicated by the renderer-side `sameFormat` in
- *  `@brainstorm/sdk` `runtime.ts`: that copy can't import this one (leaf SDK
+ *  `@brainstorm-os/sdk` `runtime.ts`: that copy can't import this one (leaf SDK
  *  must not depend on the shell), so don't "dedupe" them into a layer crossing. */
 export function sameFormatContext(a: FormatContext, b: FormatContext): boolean {
 	return a.locale === b.locale && a.hour12 === b.hour12 && a.timeZone === b.timeZone;

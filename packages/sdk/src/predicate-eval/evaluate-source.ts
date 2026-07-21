@@ -11,7 +11,12 @@
  * the live service is a substitution, not a renderer rewrite.
  */
 
-import { CompositeOp, LinkDirection, type ListSource, ListSourceKind } from "@brainstorm/sdk-types";
+import {
+	CompositeOp,
+	LinkDirection,
+	type ListSource,
+	ListSourceKind,
+} from "@brainstorm-os/sdk-types";
 import { effectiveMembers } from "../collections";
 import type { InMemoryVault } from "../in-memory-entities";
 import { evaluatePredicate } from "./evaluate-predicate";

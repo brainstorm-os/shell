@@ -18,7 +18,7 @@
  * called.
  */
 
-import { isHttpMcpTransport, isStdioMcpTransport } from "@brainstorm/sdk-types";
+import { isHttpMcpTransport, isStdioMcpTransport } from "@brainstorm-os/sdk-types";
 import { readMcpServerAuth } from "../credentials/mcp-server-auth";
 import type { CredentialStore } from "../credentials/store";
 import type { McpServerView } from "./mcp-config-store";

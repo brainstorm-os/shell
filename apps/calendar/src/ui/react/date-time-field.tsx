@@ -2,7 +2,7 @@
  * DateTimeField — the themed start/end picker for the event detail surface,
  * replacing the native `<input type="date">` / `<input type="datetime-local">`
  * that were inconsistent with every other date surface in the product
- * (F-229). The date half pops the shared `@brainstorm/sdk/calendar`
+ * (F-229). The date half pops the shared `@brainstorm-os/sdk/calendar`
  * `openCalendarPopover`; the time half is a shared `<SelectMenu>` of
  * quarter-hour slots — neither uses OS chrome.
  *
@@ -12,8 +12,8 @@
  * string and hands it back through `onChange`.
  */
 
-import { openCalendarPopover } from "@brainstorm/sdk/calendar";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
+import { openCalendarPopover } from "@brainstorm-os/sdk/calendar";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { type JSX, useMemo, useRef } from "react";
 import { type TKey, t } from "../../i18n/t";
 import { formatTime } from "../format-date";

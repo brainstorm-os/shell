@@ -39,7 +39,7 @@ body {
 
 /* Header chrome — flex skeleton, left/right groups, border, drag region, the
  * title face (`.app-header__title`), and HEIGHT + platform PADDING (preload's
- * managed style element) — is wholly owned by `@brainstorm/sdk/app-theme.css`
+ * managed style element) — is wholly owned by `@brainstorm-os/sdk/app-theme.css`
  * + `app-preload.ts`; the glass surface is the shared default — no modifier.
  * Never re-declare height/padding here. */
 
@@ -553,7 +553,7 @@ body {
 }
 
 /* The swatch IS the colour-picker trigger — clicking it opens the shared
- * rich `@brainstorm/sdk/color-picker` menu anchored to the swatch. */
+ * rich `@brainstorm-os/sdk/color-picker` menu anchored to the swatch. */
 .te-row__swatch {
 	width: var(--control-height-sm);
 	height: var(--control-height-sm);

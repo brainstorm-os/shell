@@ -17,7 +17,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { SitePermissionKind } from "@brainstorm/sdk-types";
+import { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import type { SitePermissionGrant } from "../../web-privacy-wire-types";
 
 export const SITE_PERMISSIONS_FILENAME = "web-site-permissions.json";

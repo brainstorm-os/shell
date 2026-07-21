@@ -1,5 +1,5 @@
 /**
- * extract-references — **folded into the shared `@brainstorm/sdk/note-references`
+ * extract-references — **folded into the shared `@brainstorm-os/sdk/note-references`
  * (B6.5)**. The Notes-side walker and the shell-side mirror were byte-for-byte
  * copies of the same recursive scan over a Lexical `SerializedEditorState`;
  * they now share one implementation. This module keeps the Notes-local names
@@ -18,4 +18,4 @@ export {
 	extractNoteReferences as extractReferences,
 	formatBrainstormEntityUri,
 	parseBrainstormEntityUri,
-} from "@brainstorm/sdk/note-references";
+} from "@brainstorm-os/sdk/note-references";

@@ -6,7 +6,7 @@
  * `tabindex="0"` for the keyboard path.
  */
 
-import { attachResizable } from "@brainstorm/sdk/resizable";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
 import { useCallback, useRef } from "react";
 
 export type UseResizableOptions = {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { DictionaryStore, PropertiesContext } from "@brainstorm/sdk/property-ui";
+import { DictionaryStore, PropertiesContext } from "@brainstorm-os/sdk/property-ui";
 import { act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,5 +1,5 @@
 /**
- * @brainstorm/tokens — semantic design tokens.
+ * @brainstorm-os/tokens — semantic design tokens.
  *
  * Per §Themes and :
  * apps reference tokens by semantic name, never raw values. Token sets define

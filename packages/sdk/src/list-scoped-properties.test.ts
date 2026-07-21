@@ -1,5 +1,5 @@
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { ScopedList } from "./list-scoped-properties";
 import { inheritedPropertyDefs, listsContainingEntity } from "./list-scoped-properties";

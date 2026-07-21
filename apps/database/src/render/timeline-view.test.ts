@@ -6,7 +6,7 @@
  * scroll-into-view needs the real shell.
  */
 
-import { TimelineDensity } from "@brainstorm/sdk-types";
+import { TimelineDensity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { EntityRow } from "../logic/in-memory-entities";
 import type { TimelineLayoutOptions } from "../types/list-view";

@@ -18,7 +18,7 @@ import {
 	Orientation,
 	SelectionAttribute,
 	useCompositeKeyboard,
-} from "@brainstorm/sdk/a11y";
+} from "@brainstorm-os/sdk/a11y";
 import { useMemo, useState } from "react";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";

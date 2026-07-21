@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/popover` — the app-side dialog/popover primitive.
+ * `@brainstorm-os/sdk/popover` — the app-side dialog/popover primitive.
  * `<Popover>` (React) and `createPopoverElement` (pure DOM) give an app the
  * same glass-overlay chrome the shell's shared `<Popover>` does, on the
  * same call-site contract (title / onClose / children / footer? / size? /

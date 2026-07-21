@@ -1,5 +1,5 @@
-import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { LOCALE_PACK_IMPORTERS, PREVIEW_I18N, type PreviewI18nKey } from "./i18n";
 
 export function usePreviewT(runtime?: LocaleRuntime | null): TFunction<typeof PREVIEW_I18N> {

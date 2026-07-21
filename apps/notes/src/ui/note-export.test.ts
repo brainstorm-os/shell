@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { SaveFileService } from "@brainstorm/sdk/export-file";
+import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 import type { SerializedEditorState } from "lexical";
 import { afterEach, describe, expect, it } from "vitest";
 import { NoteExportFormat, buildNoteExportItems, runNoteExport } from "./note-export";

@@ -18,7 +18,7 @@
  * unit-tested without the editor surface or jsdom.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 
 export type MentionTrigger = {
 	/** Character offset (in the paragraph text) where `@` sits. */

@@ -15,7 +15,7 @@
  * a host-facing wrapper over a live editor, so the logic is headless-tested.
  */
 
-import type { CommentAnchor } from "@brainstorm/sdk-types";
+import type { CommentAnchor } from "@brainstorm-os/sdk-types";
 import {
 	$createRangeSelection,
 	$getNodeByKey,

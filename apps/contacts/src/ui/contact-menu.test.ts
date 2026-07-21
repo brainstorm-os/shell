@@ -13,7 +13,7 @@ import {
 	type ObjectMenuExtraItem,
 	type ObjectMenuRuntime,
 	buildObjectMenuItems,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import { describe, expect, it } from "vitest";
 import type { ContactsRuntime } from "../runtime";
 import { PERSON_TYPE, type Person } from "../types/person";

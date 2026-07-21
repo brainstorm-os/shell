@@ -9,7 +9,7 @@
  * so a partial source row produces a partial entity, not one full of empties.
  */
 
-import { DateGranularity, type DateValue, ValueType } from "@brainstorm/sdk-types";
+import { DateGranularity, type DateValue, ValueType } from "@brainstorm-os/sdk-types";
 import type { EntityDraft, ImportRecord, MappingPlan } from "./import-types";
 
 const TRUE_TOKENS = new Set(["true", "1", "yes", "y", "on"]);

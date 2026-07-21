@@ -15,7 +15,7 @@
  * and the matching logic unit-testable without a DOM.
  */
 
-import { type RankableHit, orderByHitRank } from "@brainstorm/sdk";
+import { type RankableHit, orderByHitRank } from "@brainstorm-os/sdk";
 import type { Task } from "../types/task";
 
 const taskId = (t: Task): string => t.id;

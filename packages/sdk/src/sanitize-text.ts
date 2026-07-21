@@ -1,7 +1,7 @@
 /**
  * Shared hardening for untrusted single-line text — page-supplied web titles
  * the Browser clips into the vault, peer-supplied display names the editor
- * publishes to collaborators. Extracted from `@brainstorm/editor`'s
+ * publishes to collaborators. Extracted from `@brainstorm-os/editor`'s
  * peer-presence sanitizer at copy two (the Browser clip-to-vault path is the
  * second consumer); `sanitizePeerName` now delegates here.
  *

@@ -1,5 +1,5 @@
 /**
- * @brainstorm/sdk — runtime that turns `brainstorm.services.*` calls into
+ * @brainstorm-os/sdk — runtime that turns `brainstorm.services.*` calls into
  * broker envelopes. Used by app preload scripts (to expose
  * `window.brainstorm`) and by tests / mock-shell-dock.
  *
@@ -184,8 +184,8 @@ export {
 	type TFunction,
 	type TParams,
 } from "./i18n/common-labels";
-export type * from "@brainstorm/sdk-types";
+export type * from "@brainstorm-os/sdk-types";
 // Runtime value (the canonical type→default-icon resolver) — `export
 // type *` above only carries types, so this needs an explicit value
 // re-export for non-type consumers (Graph/Database/Files fallbacks).
-export { defaultIconForType, GENERIC_TYPE_ICON } from "@brainstorm/sdk-types";
+export { defaultIconForType, GENERIC_TYPE_ICON } from "@brainstorm-os/sdk-types";

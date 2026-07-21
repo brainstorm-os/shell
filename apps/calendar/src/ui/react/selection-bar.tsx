@@ -5,7 +5,7 @@
  * two actions via the shared composite toolbar binding.
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { useState } from "react";
 import { t } from "../../i18n/t";
 

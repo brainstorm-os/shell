@@ -10,7 +10,7 @@
  *
  * This validates both the global `:focus-visible` rule in
  * `packages/shell/src/renderer/styles.css` (KBN-1c) AND the JS-side modality
- * tracker in `@brainstorm/sdk/a11y/use-focus-visible` (KBN-1b) — both must
+ * tracker in `@brainstorm-os/sdk/a11y/use-focus-visible` (KBN-1b) — both must
  * agree, because the JS twin is consumed by surfaces that need to react in
  * JS (virtualized lists scrolling on keyboard focus but not on click).
  */

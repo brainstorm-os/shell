@@ -1,4 +1,4 @@
-import { ConflictPolicy, SyncDirection, SyncRunStatus } from "@brainstorm/sdk-types";
+import { ConflictPolicy, SyncDirection, SyncRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	CONNECTOR_EXTERNAL_ID_PROP,

@@ -4,7 +4,7 @@
  *
  * Strategy: SQL fast paths for the *indexable* source kinds (`byType` rides
  * `idx_entities_type`, `byLink` rides `idx_links_source`/`idx_links_dest`),
- * and the SHARED `@brainstorm/sdk/predicate-eval` evaluator for the
+ * and the SHARED `@brainstorm-os/sdk/predicate-eval` evaluator for the
  * filter-shaped kinds (`byFilter`, `byVocabulary`) over a lazily-materialized
  * row set — the exact code the renderer runs, so the two paths cannot drift
  * (parity by construction for the evaluator kinds; parity property tests for
@@ -23,14 +23,19 @@
  * process).
  */
 
-import { CompositeOp, LinkDirection, type ListSource, ListSourceKind } from "@brainstorm/sdk-types";
-import type { InMemoryVault } from "@brainstorm/sdk/in-memory-entities";
+import {
+	CompositeOp,
+	LinkDirection,
+	type ListSource,
+	ListSourceKind,
+} from "@brainstorm-os/sdk-types";
+import type { InMemoryVault } from "@brainstorm-os/sdk/in-memory-entities";
 import {
 	byLinkAnchors,
 	evaluateSource,
 	intersectAll,
 	unionAll,
-} from "@brainstorm/sdk/predicate-eval";
+} from "@brainstorm-os/sdk/predicate-eval";
 
 /* ── Cost caps (structural — checked before execution) ──────────────────── */
 

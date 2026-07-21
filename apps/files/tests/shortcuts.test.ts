@@ -1,6 +1,6 @@
 /**
  * The Files app's keyboard surface is now the chord *registry* only —
- * matching/binding moved to the shared `@brainstorm/sdk/shortcut` layer
+ * matching/binding moved to the shared `@brainstorm-os/sdk/shortcut` layer
  * (B-2), which carries its own `matchesChord`/`attachShortcut` tests in
  * `packages/sdk`. This suite covers what the app still owns: a complete,
  * collision-free `ActionId → chord` registry the renderer feeds into

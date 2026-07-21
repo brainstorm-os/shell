@@ -19,10 +19,10 @@
  * registry of Ed25519 public keys. Verify-only — this module never touches a
  * private key and never imports keystore/keyring APIs (crypto-routing rule:
  * only `main/credentials/` may). It uses the same `ed25519Verify` from
- * `@brainstorm/native` the sync envelope verifier uses.
+ * `@brainstorm-os/native` the sync envelope verifier uses.
  */
 
-import { ed25519Verify } from "@brainstorm/native";
+import { ed25519Verify } from "@brainstorm-os/native";
 
 /** Outcome of checking a manifest's signature. Recorded on the `apps` row as a
  *  string (the enum values ARE the wire format). */

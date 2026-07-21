@@ -12,9 +12,9 @@
  * when its scope grows.
  */
 
-import { type Recurrence, isRecurrence } from "@brainstorm/sdk-types";
-import { nullableNumber, nullableString } from "@brainstorm/sdk/codec-helpers";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import { type Recurrence, isRecurrence } from "@brainstorm-os/sdk-types";
+import { nullableNumber, nullableString } from "@brainstorm-os/sdk/codec-helpers";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { normalizeAttendees } from "../logic/attendees";
 import { normalizeReminders } from "../logic/reminders";
 import { normalizeTimeZone } from "../logic/timezone";

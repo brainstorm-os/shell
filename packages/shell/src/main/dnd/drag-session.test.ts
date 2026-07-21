@@ -1,4 +1,4 @@
-import { DragPayloadKind, DropEffect, type ObjectDragItem } from "@brainstorm/sdk-types";
+import { DragPayloadKind, DropEffect, type ObjectDragItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { DragSessionStore } from "./drag-session";
 

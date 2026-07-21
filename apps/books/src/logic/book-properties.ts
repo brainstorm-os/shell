@@ -1,13 +1,13 @@
 /**
  * The Book property bridge for the shared inspector — synthesises the
  * `PropertyDef[]` + values the SHARED property-value cells render
- * (`@brainstorm/sdk/properties-panel`), mirroring the Contacts / Bookmarks
+ * (`@brainstorm-os/sdk/properties-panel`), mirroring the Contacts / Bookmarks
  * bridges. Author writes back as an entity patch; format / pages / progress
  * are derived read-only facts (progress is owned by the reader's
  * position-persistence path, never edited by hand).
  */
 
-import { type PropertyDef, PropertyView, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
 import { t } from "../i18n";
 import { type Book, BookFormat } from "../types/book";
 

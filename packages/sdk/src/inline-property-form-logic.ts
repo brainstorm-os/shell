@@ -1,6 +1,6 @@
 /**
  * Pure-logic helpers backing the shared `<InlinePropertyForm>` React
- * component. Lives in `@brainstorm/sdk` so Notes, Database, Graph, and
+ * component. Lives in `@brainstorm-os/sdk` so Notes, Database, Graph, and
  * any future app can drive the same form against the same vault-level
  * `PropertiesService` without copying logic or styles.
  *
@@ -21,7 +21,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	PropertyKindPreset,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { compileFormula } from "./formula";
 import { newDictionaryId, newDictionaryItemId, newPropertyKey } from "./properties-keys";
 import { defForPreset } from "./properties-preset";

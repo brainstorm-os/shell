@@ -4,8 +4,8 @@
  * Journal app's renderer; not persisted separately.
  */
 
-import type { Icon } from "@brainstorm/sdk/entity-icon";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui";
+import type { Icon } from "@brainstorm-os/sdk/entity-icon";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import type { HabitId, MoodId } from "../logic/check-in";
 
 export type JournalEntry = {

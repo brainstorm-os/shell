@@ -10,7 +10,7 @@
  * Pure + framework-free so the payload rule is unit-tested without a runtime.
  */
 
-import { SendIntentVerb } from "@brainstorm/sdk-types";
+import { SendIntentVerb } from "@brainstorm-os/sdk-types";
 
 /** Guard against a stray dispatch with nothing to draft — the caller already
  *  gates on a non-empty body, but a pure throw keeps misuse loud in tests. */

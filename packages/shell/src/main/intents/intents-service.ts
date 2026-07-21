@@ -7,7 +7,7 @@
  *   - `suggest(envelope: IntentEnvelope)`  → SuggestedHandler[]
  */
 
-import type { ContributedActionTarget, ContributedVerb } from "@brainstorm/sdk-types";
+import type { ContributedActionTarget, ContributedVerb } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import type { IntentEnvelope, IntentsBus } from "./intents-bus";

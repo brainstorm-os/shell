@@ -20,11 +20,11 @@ import {
 	attachFindBar,
 	attachFindShortcuts,
 	createFindController,
-} from "@brainstorm/sdk/find-replace";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
-import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
-import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellcheck";
+} from "@brainstorm-os/sdk/find-replace";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
+import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm-os/sdk/spellcheck";
 import * as Y from "yjs";
 import {
 	autoCloseOnBackspace,

@@ -1,4 +1,4 @@
-import { track } from "@brainstorm/sdk/analytics";
+import { track } from "@brainstorm-os/sdk/analytics";
 import { useEffect, useRef } from "react";
 import { useVault } from "../vault-context";
 

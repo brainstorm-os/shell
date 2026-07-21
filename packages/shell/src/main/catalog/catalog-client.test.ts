@@ -1,4 +1,4 @@
-import { ed25519GetPublicKey, ed25519Sign } from "@brainstorm/native";
+import { ed25519GetPublicKey, ed25519Sign } from "@brainstorm-os/native";
 import { beforeEach, describe, expect, it } from "vitest";
 import { UpdateChannel } from "../../shared/update-wire-types";
 import {

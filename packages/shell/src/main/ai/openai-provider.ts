@@ -16,7 +16,7 @@ import {
 	type AiGenerateRequest,
 	type AiGenerateResult,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { AiServiceError, type ModelProvider, buildUsage } from "./provider";
 
 /** Map our wire content to the Chat Completions `content` field: a plain string

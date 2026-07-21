@@ -1,4 +1,4 @@
-import type { Dictionary, DictionaryItem } from "@brainstorm/sdk-types";
+import type { Dictionary, DictionaryItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type DictionaryBackend, DictionaryStore } from "./dictionary-store";
 

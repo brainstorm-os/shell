@@ -7,12 +7,12 @@
  * apps; only `Event/v1` is Calendar-app-owned.
  *
  * Recurrence reuses the cross-app `Recurrence` discriminated union from
- * `@brainstorm/sdk-types` so a Task's `scheduledAt + recurrence` and an
+ * `@brainstorm-os/sdk-types` so a Task's `scheduledAt + recurrence` and an
  * Event's `start + recurrence` share the same shape (resolves OQ-CAL-1
  * by inheriting OQ-TK-1's resolution).
  */
 
-import type { Icon, Recurrence } from "@brainstorm/sdk-types";
+import type { Icon, Recurrence } from "@brainstorm-os/sdk-types";
 import type { Attendee } from "./attendee";
 
 export type Event = {

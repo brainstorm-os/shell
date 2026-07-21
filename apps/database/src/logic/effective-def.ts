@@ -18,7 +18,7 @@
  *     render read-only, exactly as before.
  */
 
-import { DateGranularity, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { DateGranularity, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { humanize } from "../ui/humanize";
 import type { EntityRow } from "./in-memory-entities";
 import { readPropertyPath } from "./in-memory-entities";

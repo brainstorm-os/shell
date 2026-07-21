@@ -1,11 +1,11 @@
-import { type ReminderDef, completeReminder, snoozeReminder } from "@brainstorm/sdk-types";
-import { openCalendarPopover } from "@brainstorm/sdk/calendar";
-import { formatRelativeDate, formatTime } from "@brainstorm/sdk/date-formatters";
-import { EmptyState, EmptyStateTone } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
+import { type ReminderDef, completeReminder, snoozeReminder } from "@brainstorm-os/sdk-types";
+import { openCalendarPopover } from "@brainstorm-os/sdk/calendar";
+import { formatRelativeDate, formatTime } from "@brainstorm-os/sdk/date-formatters";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { type FormEvent, type ReactElement, useMemo, useRef, useState } from "react";
 import { type AutomationsI18nKey, t } from "../i18n";
 import {
@@ -82,7 +82,7 @@ function timeOf(p: DueParts): string {
 }
 
 /** The themed due picker (F-229): a date trigger that pops the shared
- *  `@brainstorm/sdk/calendar` popover plus a quarter-hour time `<SelectMenu>`
+ *  `@brainstorm-os/sdk/calendar` popover plus a quarter-hour time `<SelectMenu>`
  *  — no OS-native `<input type="datetime-local">`. Speaks the same
  *  `YYYY-MM-DDTHH:mm` wall-clock string the capture round-trips. */
 function DueField({

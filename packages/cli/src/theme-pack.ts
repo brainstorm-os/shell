@@ -23,7 +23,7 @@ import {
 	sanitizeStylePackCss,
 	validateStylePack,
 	validateTokenSet,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** A distributable theme package — components inlined (not entity refs). */
 export type ThemePackage = {

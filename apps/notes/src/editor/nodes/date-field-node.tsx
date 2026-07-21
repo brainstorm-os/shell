@@ -27,8 +27,8 @@ import {
 	type PropertyDef,
 	PropertyView,
 	ValueType,
-} from "@brainstorm/sdk-types";
-import { getCell } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk-types";
+import { getCell } from "@brainstorm-os/sdk/property-ui";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$applyNodeReplacement,

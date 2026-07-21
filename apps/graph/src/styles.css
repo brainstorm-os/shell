@@ -58,7 +58,7 @@ body {
  * and absolute positioning. */
 /* The flex skeleton, left/right groups, drag region, height / padding and the
  * glass surface (the shared default) are the shared `.app-header` rule in
- * `@brainstorm/sdk/app-theme.css`. Graph only adds the absolute overlay
+ * `@brainstorm-os/sdk/app-theme.css`. Graph only adds the absolute overlay
  * positioning so the header floats over the canvas. The `:root` prefix
  * matches the shared SDK rule's specificity (`:root .app-header`, 0,2,0) so
  * Graph's absolute-overlay delta reliably wins. */
@@ -877,7 +877,7 @@ body.is-resizing .graph-sidebar__resize {
 }
 
 /* The keyboard-focus announcement target's sr-only clip is applied inline by
- * the shared `attachLiveRegion` (@brainstorm/sdk/a11y) — no rule needed here. */
+ * the shared `attachLiveRegion` (@brainstorm-os/sdk/a11y) — no rule needed here. */
 
 .graph-canvas {
 	width: 100%;

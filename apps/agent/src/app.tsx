@@ -6,9 +6,9 @@ import {
 	MentionComposerPlugin,
 	MentionNode,
 	renderEditorState,
-} from "@brainstorm/editor";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { type OpenCapableRuntime, openEntity } from "@brainstorm/sdk";
+} from "@brainstorm-os/editor";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { type OpenCapableRuntime, openEntity } from "@brainstorm-os/sdk";
 import {
 	AI_BUDGET_EXHAUSTED_ERROR_KIND,
 	type AgentLoopResult,
@@ -31,7 +31,7 @@ import {
 	ToolRefusalReason,
 	capabilityImplies,
 	intersectAgentTools,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	AttachContextButton,
 	type ComposerContextHost,
@@ -44,18 +44,18 @@ import {
 	useComposerContext,
 	visibleAttachments,
 	withMentionAttachments,
-} from "@brainstorm/sdk/composer-context";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Markdown } from "@brainstorm/sdk/markdown";
+} from "@brainstorm-os/sdk/composer-context";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Markdown } from "@brainstorm-os/sdk/markdown";
 import {
 	type ObjectMenuContext,
 	ObjectMenuMoreButton,
 	type ObjectMenuRuntime,
 	ObjectMenuTrigger,
-} from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+} from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { AddToNotePopover } from "./add-to-note-popover";

@@ -10,7 +10,7 @@
  * round-trip test.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 
 export type BinItem = {
 	id: string;

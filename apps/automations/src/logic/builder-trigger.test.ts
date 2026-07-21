@@ -4,7 +4,7 @@ import {
 	RecurrenceKind,
 	TriggerKind,
 	type Weekday,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	BUILDER_TRIGGER_KINDS,

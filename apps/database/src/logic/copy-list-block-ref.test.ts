@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { parseBrainstormEntityUri } from "@brainstorm/sdk/note-references";
+import { parseBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { copyListBlockRef, listBlockRef } from "./copy-list-block-ref";
 

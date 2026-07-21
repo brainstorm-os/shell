@@ -2,7 +2,7 @@
  * Code-Editor — React app (all-apps-React track). Mirrors the theme-editor
  * reference conversion (9.9.7): a React root mounts the chrome (header, file
  * sidebar, references inspector, empty state), live vault data is read ONLY
- * through `@brainstorm/react-yjs` (`useVaultEntities`), and the editing
+ * through `@brainstorm-os/react-yjs` (`useVaultEntities`), and the editing
  * surface is an imperative island (`createCodePane`) confined behind a ref
  * boundary — the same posture Graph/Whiteboard use for their draw loops.
  *
@@ -16,27 +16,34 @@
  * read path still sources `content` from properties).
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm/sdk";
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
-import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { type Icon as EntityIconValue, createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import {
+	type CompositeItemProps,
+	Orientation,
+	useCompositeKeyboard,
+} from "@brainstorm-os/sdk/a11y";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import {
+	type Icon as EntityIconValue,
+	createEntityIconElement,
+} from "@brainstorm-os/sdk/entity-icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
-import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
+} from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";
 import { type CodeEditorMessageKey, t } from "./i18n";
@@ -74,7 +81,7 @@ const translateMsg = (key: string, params?: Record<string, string>): string =>
 
 // ── Panel + editor preferences (device-local; same localStorage path as
 // every other first-party app). The right-hand refs panel is the exception:
-// window-scoped via `@brainstorm/sdk/panel-state`. ──────────────────────
+// window-scoped via `@brainstorm-os/sdk/panel-state`. ──────────────────────
 const NAV_OPEN_KEY = "code-editor:nav-open";
 const REFS_OPEN_KEY = "code-editor:refs-open";
 const WRAP_KEY = "code-editor:wrap";
@@ -165,7 +172,7 @@ function isDirty(row: CodeFileRow, edits: ReadonlyMap<string, string>): boolean 
 }
 
 /** The object's own universal icon, rendered through the shared imperative
- *  primitive (the SDK has no React entity-icon outside `@brainstorm/editor`,
+ *  primitive (the SDK has no React entity-icon outside `@brainstorm-os/editor`,
  *  which this app deliberately does not depend on). */
 function EntityIcon({ icon, size }: { icon: EntityIconValue | null; size: number }): ReactElement {
 	const ref = useRef<HTMLSpanElement>(null);
@@ -269,7 +276,7 @@ export function CodeEditorApp(): ReactElement {
 			else nav.push(id);
 			setSelectedId(id);
 			// Remember the open file so the next plain launch lands back on it
-			// (device-local, per-vault, app-namespaced — see `@brainstorm/sdk/last-viewed`).
+			// (device-local, per-vault, app-namespaced — see `@brainstorm-os/sdk/last-viewed`).
 			void rememberLastViewed(getCodeEditorRuntime()?.services?.settings, id);
 		},
 		[nav],

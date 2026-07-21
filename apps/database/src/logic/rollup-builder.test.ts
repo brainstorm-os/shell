@@ -1,4 +1,4 @@
-import { ValueType } from "@brainstorm/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { AggregationKind } from "./aggregations";
 import type { EntityRow } from "./in-memory-entities";

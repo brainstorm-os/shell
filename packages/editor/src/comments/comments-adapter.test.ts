@@ -1,4 +1,4 @@
-import { COMMENT_TYPE_URL, type CommentDef, CommentKind } from "@brainstorm/sdk-types";
+import { COMMENT_TYPE_URL, type CommentDef, CommentKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type CommentEntitiesService,

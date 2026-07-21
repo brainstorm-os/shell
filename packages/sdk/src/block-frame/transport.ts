@@ -45,7 +45,7 @@
  * future host-side telemetry surface can read them without the transport
  * emitting per-event log noise.
  *
- * Inner-frame helper: shipped at `./inner-transport.ts` (`@brainstorm/
+ * Inner-frame helper: shipped at `./inner-transport.ts` (`@brainstorm-os/
  * sdk/block-frame/inner` subpath). The same envelope shape exported below
  * is the wire spec both sides honour.
  */

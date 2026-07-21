@@ -7,11 +7,11 @@
  * sensitive is kept in this renderer beyond the form state itself.
  */
 
-import { SyncWindow } from "@brainstorm/sdk-types";
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Checkbox } from "@brainstorm/sdk/checkbox";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { SyncWindow } from "@brainstorm-os/sdk-types";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { t } from "../i18n";

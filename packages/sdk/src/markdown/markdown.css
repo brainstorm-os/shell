@@ -1,7 +1,7 @@
 /**
  * Shared `.bs-markdown` prose styling for rendered markdown (Agent replies,
  * future note/message previews). Import once per app:
- * `import "@brainstorm/sdk/markdown.css"`. Tokens are the app-theme aliases
+ * `import "@brainstorm-os/sdk/markdown.css"`. Tokens are the app-theme aliases
  * every app already loads via `app-theme.css`.
  */
 

@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/recurrence-editor` — the shared write-half of the
+ * `@brainstorm-os/sdk/recurrence-editor` — the shared write-half of the
  * `Recurrence` union, mounted wherever a recurring object is authored
  * (Calendar events 9.15.13, Tasks 9.14.12). A kind selector (none / daily /
  * weekly / monthly / yearly / custom) swaps in kind-specific controls; every
@@ -22,7 +22,7 @@ import {
 	type RecurrenceSummaryLabels,
 	WEEKDAYS,
 	type Weekday,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	REPEAT_KINDS,
 	type RepeatKind,
@@ -253,7 +253,7 @@ function monthlyPattern(
 	wrap.className = "bs-recur__monthly";
 	// The options are native <input type="radio"> sharing one name, so the
 	// platform owns roving focus + arrow navigation — no custom composite
-	// keyboard handling to route through @brainstorm/sdk/a11y.
+	// keyboard handling to route through @brainstorm-os/sdk/a11y.
 	// kbn-roles-exempt
 	wrap.setAttribute("role", "radiogroup");
 	wrap.setAttribute("aria-label", labels.monthlyMode);

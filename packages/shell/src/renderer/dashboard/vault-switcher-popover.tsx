@@ -9,7 +9,7 @@
  * point for vaults not yet in the registry.
  */
 
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VaultEntry } from "../../preload";
 import { t } from "../i18n/t";

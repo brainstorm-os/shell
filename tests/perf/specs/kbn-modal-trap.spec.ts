@@ -7,7 +7,7 @@
  *
  * The "Vault info" button on the dashboard chrome opens the `VaultInfoPopover`
  * which is built on the shared `<Popover>` primitive — the one surface that
- * has `useFocusTrap` from `@brainstorm/sdk/a11y` adopted (KBN-S-popover,
+ * has `useFocusTrap` from `@brainstorm-os/sdk/a11y` adopted (KBN-S-popover,
  * 2026-05-27). Same trap path the IconPicker / CoverPicker / Cheatsheet
  * popovers exercise.
  */

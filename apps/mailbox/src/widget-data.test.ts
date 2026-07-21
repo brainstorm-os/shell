@@ -4,7 +4,7 @@
  * component shell mirrors the real-shell-verified Contacts / Journal widgets.
  */
 
-import { MailFlag } from "@brainstorm/sdk-types";
+import { MailFlag } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { EMAIL_TYPE_URL, MAIL_FOLDER_TYPE_URL } from "./types/mail-view";
 import { LIST_LIMIT, type WidgetEmailEntity, shapeInbox } from "./widget-data";

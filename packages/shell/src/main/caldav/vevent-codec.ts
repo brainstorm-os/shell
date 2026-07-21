@@ -10,7 +10,7 @@
  * times real CalDAV servers emit — `DTSTART;TZID=…` is converted to an
  * epoch instant via `Intl` (no tz database dependency) and the IANA id is
  * kept on the `timeZone` property. RRULE rides the one shared
- * `@brainstorm/sdk-types` structured-Recurrence codec.
+ * `@brainstorm-os/sdk-types` structured-Recurrence codec.
  *
  * Push serialisation emits timed events as UTC instants (`DTSTART:…Z`) —
  * lossless on the instant, universally accepted; the original TZID
@@ -25,7 +25,7 @@ import {
 	isRecurrence,
 	recurrenceToRRule,
 	rruleToRecurrence,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 // Wire values mirror the Calendar app's catalogs (`apps/calendar/src/types/
 // attendee.ts`, `logic/event-status.ts`) — the entity property contract.

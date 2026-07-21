@@ -1,4 +1,4 @@
-import type { SettingsService } from "@brainstorm/sdk-types";
+import type { SettingsService } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { sourceKeyFor } from "./scheduled-item";
 import { defaultHiddenSources, loadHiddenSources, saveHiddenSources } from "./source-prefs";

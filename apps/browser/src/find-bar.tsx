@@ -12,8 +12,8 @@
  * the host app), all via the SDK shortcut binder, never raw `e.key`.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { attachShortcut } from "@brainstorm/sdk/shortcut";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { t } from "./i18n";

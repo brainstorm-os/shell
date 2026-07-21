@@ -16,7 +16,7 @@
  * seam only owns the editor-internal strings, not the surrounding app UI.
  */
 
-import { type TFunction, createT } from "@brainstorm/sdk/i18n";
+import { type TFunction, createT } from "@brainstorm-os/sdk/i18n";
 import { type ReactNode, createContext, useContext, useMemo } from "react";
 
 export type EditorI18nKey =

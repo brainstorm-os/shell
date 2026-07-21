@@ -62,7 +62,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const ${constName} = enCatalog as typeof enCatalog;
@@ -94,8 +94,8 @@ ${pluralBlock}
 
 writeFileSync(
 	join(appDir, "src", "i18n-hooks.tsx"),
-	`import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+	`import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { ${constName}, type ${keyType}, LOCALE_PACK_IMPORTERS } from "./i18n";
 
 export function use${prefix}T(runtime?: LocaleRuntime | null): TFunction<typeof ${constName}> {
@@ -137,7 +137,7 @@ writeFileSync(
 	`/**
  * @vitest-environment jsdom
  */
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

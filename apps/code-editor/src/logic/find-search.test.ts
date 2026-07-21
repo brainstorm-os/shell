@@ -3,7 +3,7 @@
  * case / whole-word / regex matching, scope restriction, invalid-regex
  * safety, and the one-commit replace-all splice.
  */
-import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm/sdk/find-replace";
+import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm-os/sdk/find-replace";
 import { describe, expect, it } from "vitest";
 import { replaceAllInContent, searchCode } from "./find-search";
 

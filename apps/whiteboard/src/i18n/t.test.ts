@@ -3,7 +3,7 @@ import { WHITEBOARD_MANIFEST, createT } from "./t";
 
 const t = createT();
 
-describe("createT() (over @brainstorm/sdk/i18n)", () => {
+describe("createT() (over @brainstorm-os/sdk/i18n)", () => {
 	it("returns the default-English string for a known key", () => {
 		expect(t("whiteboard.zoom.in")).toBe("Zoom in");
 	});

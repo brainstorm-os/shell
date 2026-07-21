@@ -34,11 +34,11 @@ export const NEW_TAB_URL = "about:blank";
 export const MAX_RECENTLY_CLOSED = 16;
 
 // The runtime load/security enums are the shared WebView wire contract
-// (Browser-2 lifted them to `@brainstorm/sdk-types` so the shell host service
+// (Browser-2 lifted them to `@brainstorm-os/sdk-types` so the shell host service
 // speaks the same vocabulary). Imported for the local type definitions below
 // and re-exported so this module stays the app's one import home for session
 // types.
-import { TabLoadState, TabSecurityState } from "@brainstorm/sdk-types";
+import { TabLoadState, TabSecurityState } from "@brainstorm-os/sdk-types";
 
 export { TabLoadState, TabSecurityState };
 

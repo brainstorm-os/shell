@@ -19,8 +19,8 @@
  * have to stub the SDK runtime + drive its async `list()` boot.
  */
 
-import { type PropertyDef, PropertyView, ValueType } from "@brainstorm/sdk-types";
-import { DictionaryStore, PropertiesContext, PropertyStore } from "@brainstorm/sdk/property-ui";
+import { type PropertyDef, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
+import { DictionaryStore, PropertiesContext, PropertyStore } from "@brainstorm-os/sdk/property-ui";
 import { CodeNode } from "@lexical/code";
 import { createHeadlessEditor } from "@lexical/headless";
 import { AutoLinkNode, LinkNode } from "@lexical/link";

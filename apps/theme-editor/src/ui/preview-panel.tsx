@@ -10,7 +10,7 @@
  * mockup. Token-driven only — the mockup must look right under any theme.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ReactElement, type Ref, useState } from "react";
 import type { Translate } from "./translate";
 

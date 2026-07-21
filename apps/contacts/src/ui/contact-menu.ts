@@ -7,12 +7,12 @@
  * catch-all overflow.
  */
 
-import type { Intent } from "@brainstorm/sdk-types";
+import type { Intent } from "@brainstorm-os/sdk-types";
 import type {
 	ObjectMenuContext,
 	ObjectMenuExtraItem,
 	ObjectMenuRuntime,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n";
 import type { ContactsRuntime } from "../runtime";
 import { PERSON_TYPE, type Person } from "../types/person";

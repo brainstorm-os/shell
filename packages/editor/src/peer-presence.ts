@@ -1,8 +1,8 @@
 /**
- * Peer presence — extracted to `@brainstorm/sdk/peer-presence` at copy two
+ * Peer presence — extracted to `@brainstorm-os/sdk/peer-presence` at copy two
  * (the Whiteboard presence overlay, 9.17.19, is the second consumer). This
  * module stays as a delegating re-export so the editor's public surface
- * (`@brainstorm/editor` → `peerColor` / `localPresence` / …) is unchanged.
+ * (`@brainstorm-os/editor` → `peerColor` / `localPresence` / …) is unchanged.
  */
 
 export {
@@ -12,4 +12,4 @@ export {
 	localPresenceName,
 	peerColor,
 	sanitizePeerName,
-} from "@brainstorm/sdk/peer-presence";
+} from "@brainstorm-os/sdk/peer-presence";

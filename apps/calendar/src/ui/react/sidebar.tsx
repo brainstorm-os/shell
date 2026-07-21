@@ -6,7 +6,7 @@
  * not a hardcoded enum. View-kind switching lives in the header only.
  */
 
-import { MiniCalendar } from "@brainstorm/sdk/calendar";
+import { MiniCalendar } from "@brainstorm-os/sdk/calendar";
 import { t } from "../../i18n/t";
 import type { CalendarSource } from "../../logic/calendar-sources";
 import type { WeekStartsOn } from "../../types/calendar-view";

@@ -31,7 +31,7 @@ button {
 }
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin) is the
- * shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`. */
+ * shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. */
 
 /* Board-identity row is a wrapping <div> — outside the shell rule's
  * tag/class list, so be explicit. */
@@ -576,7 +576,7 @@ button {
 /* ── Nodes ───────────────────────────────────────────────────────────── */
 
 /* Every node-chrome token carries a design-token fallback (the
- * DefaultDark value from @brainstorm/tokens — same precedent as the
+ * DefaultDark value from @brainstorm-os/tokens — same precedent as the
  * `--node-tint, #f6cd6b` sticky fallback already in this file). The
  * shell injects the live theme tokens via a preload `<style>` element;
  * a sandboxed app preload can apply that sheet a frame late or out of
@@ -628,7 +628,7 @@ button {
 }
 
 /* The selection / nudge announcement target's sr-only clip is applied inline
- * by the shared `attachLiveRegion` (@brainstorm/sdk/a11y) — no rule needed. */
+ * by the shared `attachLiveRegion` (@brainstorm-os/sdk/a11y) — no rule needed. */
 
 /* Layers panel (9.17.13 / F-197) — right-edge glass overlay floating over
  * the canvas (the `glass--strong` class supplies the blurred surface). */
@@ -1010,7 +1010,7 @@ button {
 
 /* Cursor chrome counter-scales so it reads the same size at every zoom.
  * The peer colour is an inline style (deliberately not a theme token —
- * see @brainstorm/sdk/peer-presence). */
+ * see @brainstorm-os/sdk/peer-presence). */
 .whiteboard__presence-cursor {
 	position: absolute;
 	display: flex;

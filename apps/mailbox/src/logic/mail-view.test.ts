@@ -1,4 +1,4 @@
-import { MailFlag } from "@brainstorm/sdk-types";
+import { MailFlag } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { EMAIL_TYPE_URL, FolderRole, MAIL_ACCOUNT_TYPE_URL } from "../types/mail-view";
 import { demoEntities } from "./demo";

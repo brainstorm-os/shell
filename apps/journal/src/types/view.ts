@@ -21,9 +21,9 @@ export const JOURNAL_MODES: readonly JournalMode[] = Object.freeze([
 ]);
 
 /** Canonical numeric weekday for the week-start preference. Re-exported
- *  from `@brainstorm/sdk/date-grid` so Journal shares the enum with
+ *  from `@brainstorm-os/sdk/date-grid` so Journal shares the enum with
  *  Calendar and any future date-axis app. */
-import { WeekStartsOn } from "@brainstorm/sdk/date-grid";
+import { WeekStartsOn } from "@brainstorm-os/sdk/date-grid";
 export { WeekStartsOn };
 
 export type JournalView = {

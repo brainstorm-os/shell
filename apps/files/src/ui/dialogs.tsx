@@ -5,11 +5,11 @@
  * editor (shared `<IconPicker>` / `<CoverPicker>`).
  */
 
-import type { Cover, Icon as IconValue } from "@brainstorm/sdk-types";
-import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-picker";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { IconPicker } from "@brainstorm/sdk/icon-picker";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import type { Cover, Icon as IconValue } from "@brainstorm-os/sdk-types";
+import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { IconPicker } from "@brainstorm-os/sdk/icon-picker";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import type { DestinationFolder } from "../logic/destination-folders";

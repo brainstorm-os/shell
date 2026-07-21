@@ -12,9 +12,9 @@ import {
 	type WebViewClient,
 	type WebViewEvent,
 	WebViewEventKind,
-} from "@brainstorm/sdk-types";
-import { openTypeaheadMenu } from "@brainstorm/sdk/menus";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk-types";
+import { openTypeaheadMenu } from "@brainstorm-os/sdk/menus";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactNode, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,8 +24,8 @@ import { PERSIST_DEBOUNCE_MS, sessionRecordToProperties } from "./logic/persiste
 import type { EntityRecord } from "./runtime";
 import type { BrowsingSessionRecord } from "./types/browsing-session";
 
-vi.mock("@brainstorm/sdk/menus", async (importOriginal) => ({
-	...(await importOriginal<typeof import("@brainstorm/sdk/menus")>()),
+vi.mock("@brainstorm-os/sdk/menus", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@brainstorm-os/sdk/menus")>()),
 	mountMenuHost: vi.fn(() => () => {}),
 	// The omnibox renders its suggestions through the shared typeahead runtime;
 	// with no real menu host mounted here, spy on the opener to assert the
@@ -34,7 +34,7 @@ vi.mock("@brainstorm/sdk/menus", async (importOriginal) => ({
 	openTypeaheadMenu: vi.fn(() => true),
 	closeTypeaheadMenu: vi.fn(),
 }));
-vi.mock("@brainstorm/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

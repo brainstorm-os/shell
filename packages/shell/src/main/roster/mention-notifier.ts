@@ -17,7 +17,7 @@
  * core both paths call; the wiring sits on the entities create-wrap.
  */
 
-import { AttachmentKind, SenderKind } from "@brainstorm/sdk-types";
+import { AttachmentKind, SenderKind } from "@brainstorm-os/sdk-types";
 
 /** The Message/Comment substrate type urls (kept here so the wiring has one
  *  literal home and never drifts from the apps). */

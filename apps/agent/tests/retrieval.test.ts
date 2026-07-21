@@ -5,7 +5,7 @@
  * turn's citation ids to clickable link descriptors labelled by title.
  */
 
-import type { SearchHit, SearchQuery } from "@brainstorm/sdk-types";
+import type { SearchHit, SearchQuery } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	RETRIEVAL_SNIPPET_MAX,

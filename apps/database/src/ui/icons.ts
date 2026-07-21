@@ -1,7 +1,7 @@
 /**
  * Database app chrome glyphs.
  *
- * The shared `@brainstorm/sdk/icon` registry is the source of truth — every
+ * The shared `@brainstorm-os/sdk/icon` registry is the source of truth — every
  * glyph it exposes renders via `createIconElement` so it paints identically
  * across the product (same pattern as `apps/tasks/src/ui/icons.ts`). The only
  * glyphs Database needs that the registry does NOT expose are the **view-kind
@@ -15,7 +15,7 @@
  * never duplicate the glyph in the label text.
  */
 
-import { type IconName, createGlyphElement, createIconElement } from "@brainstorm/sdk/icon";
+import { type IconName, createGlyphElement, createIconElement } from "@brainstorm-os/sdk/icon";
 
 /** Glyphs that only live in this app (the shared registry has no equivalent). */
 export enum DatabaseIcon {

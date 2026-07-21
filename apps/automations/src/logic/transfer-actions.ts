@@ -16,7 +16,7 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk/export-file";
 import { loadTrigger, persistImportedAutomation } from "../storage/automation-repository";
 import type { LoadedWorkflow } from "../storage/automation-repository";
 import type { EntitiesService, FilesService } from "../storage/runtime";

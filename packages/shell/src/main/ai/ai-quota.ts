@@ -41,7 +41,7 @@
  * for the documented contract TODO).
  */
 
-import { AI_BUDGET_EXHAUSTED_ERROR_KIND } from "@brainstorm/sdk-types";
+import { AI_BUDGET_EXHAUSTED_ERROR_KIND } from "@brainstorm-os/sdk-types";
 import type { CreditLedgerRepository } from "../billing/credit-ledger-repo";
 import { CreditEntryKind } from "../billing/credit-ledger-repo";
 import { SHELL_IDENTITY } from "../capabilities/default-grants";

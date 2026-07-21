@@ -20,7 +20,7 @@ import {
 	type ConnectorAccountDef,
 	SYNC_RUN_TYPE_URL,
 	SyncDirection,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import type { CredentialStore } from "../credentials/store";
 import type { EntitiesRepository } from "../storage/entities-repo/entities-repo";

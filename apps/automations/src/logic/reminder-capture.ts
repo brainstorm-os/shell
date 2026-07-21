@@ -8,7 +8,7 @@
  * Reminders are sugar over `Reminder/v1`, so capture is deliberately
  * low-friction: a bare subject + Enter produces a reminder due tomorrow
  * morning. The Done/Snooze transitions reuse the shared
- * `@brainstorm/sdk-types` definitions (one meaning of "done"/"snooze").
+ * `@brainstorm-os/sdk-types` definitions (one meaning of "done"/"snooze").
  */
 
 import {
@@ -19,7 +19,7 @@ import {
 	nextOccurrence,
 	recurrenceToRRule,
 	rruleToRecurrence,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Recurrence choices the capture surface offers (a curated subset of the
  *  structured `Recurrence` forms — the long tail is the builder's job). */

@@ -1,4 +1,4 @@
-import type { Intent, LaunchContext } from "@brainstorm/sdk-types";
+import type { Intent, LaunchContext } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { externalUrlFromIntent, externalUrlFromLaunch, isWebUrl } from "./external-open";
 

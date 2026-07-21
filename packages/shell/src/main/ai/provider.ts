@@ -12,7 +12,7 @@
  * over a push channel) is the next rung and is additive to this interface.
  */
 
-import type { AiGenerateRequest, AiGenerateResult } from "@brainstorm/sdk-types";
+import type { AiGenerateRequest, AiGenerateResult } from "@brainstorm-os/sdk-types";
 
 export interface ModelProvider {
 	readonly id: string;

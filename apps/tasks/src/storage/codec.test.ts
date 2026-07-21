@@ -1,4 +1,4 @@
-import { IconKind, RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { IconKind, RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";

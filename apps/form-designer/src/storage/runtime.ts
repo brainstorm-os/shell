@@ -18,8 +18,8 @@ import type {
 	ExportService,
 	PropertiesService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
-import type { SaveFileService } from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk-types";
+import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 
 export type EntitiesService = {
 	get(id: string): Promise<Entity | null>;

@@ -21,8 +21,8 @@
  * the display `aspect` and an optional `className` / `radius`.
  */
 
-import type { Cover, CoverFocal } from "@brainstorm/sdk-types";
-import { CoverKind } from "@brainstorm/sdk-types";
+import type { Cover, CoverFocal } from "@brainstorm-os/sdk-types";
+import { CoverKind } from "@brainstorm-os/sdk-types";
 
 /** The structural minimum needed to render a cover: a stable id (the
  *  gradient seed) and the bag the universal `cover` property lives in.

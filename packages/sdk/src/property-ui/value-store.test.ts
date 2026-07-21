@@ -1,5 +1,5 @@
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { CARDINALITY_HARD_MAX, ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { CARDINALITY_HARD_MAX, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { emptyValueFor } from "../properties-validate";
 import { bindValue, clearValue, migrateValuesField, readValue, writeValue } from "./value-store";

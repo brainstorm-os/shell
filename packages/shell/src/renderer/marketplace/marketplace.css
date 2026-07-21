@@ -201,7 +201,7 @@
 
 /* The bar chrome itself is `.bs-searchbar` (loaded by
  * `packages/shell/src/renderer/main.tsx` via
- * `@brainstorm/sdk/searchbar/searchbar.css`); this rule stretches it within
+ * `@brainstorm-os/sdk/searchbar/searchbar.css`); this rule stretches it within
  * the toolbar row and applies the marketplace-only tinted surround. */
 .marketplace__search {
 	min-width: 220px;

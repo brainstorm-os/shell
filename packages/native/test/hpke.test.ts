@@ -133,7 +133,7 @@ const nobleOpenBase = (
 	return chacha20poly1305(key, baseNonce, aad).decrypt(ct);
 };
 
-describe("@brainstorm/native — HPKE base mode (NAPI-3d)", () => {
+describe("@brainstorm-os/native — HPKE base mode (NAPI-3d)", () => {
 	it("matches the RFC 9180 A.2.1 base-mode test vector at sequence 0", async () => {
 		const { hpkeSealBase, hpkeOpenBase } = await loadNative();
 		const info = fromHex("4f6465206f6e2061204772656369616e2055726e");

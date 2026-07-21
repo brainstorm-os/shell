@@ -4,7 +4,7 @@
  * vitest/jsdom can't exercise the fancy-menus runtime (custom-body menu,
  * positioning, the published MenuStore), so this boots the real Electron
  * shell, opens Theme Editor, clicks the first token swatch, and asserts the
- * `@brainstorm/sdk/color-picker` menu mounts with its 2D area + hue track +
+ * `@brainstorm-os/sdk/color-picker` menu mounts with its 2D area + hue track +
  * hex field + Apply/Cancel — then drags the saturation area and confirms the
  * hex value changes (live preview path) before screenshotting.
  */

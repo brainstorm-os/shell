@@ -15,9 +15,9 @@
  *     dispatch) so power users keep "open in new window".
  */
 
-import { setEditorHost, setEntityIndexSource } from "@brainstorm/editor";
-import { openEntity } from "@brainstorm/sdk";
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import { setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
+import { openEntity } from "@brainstorm-os/sdk";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

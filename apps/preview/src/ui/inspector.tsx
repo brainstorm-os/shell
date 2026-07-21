@@ -23,15 +23,15 @@ import {
 	CommentsRightPanel,
 	type RightPanelTab,
 	localPresenceName,
-} from "@brainstorm/editor";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/editor";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import {
 	PropertiesPanel,
 	type PropertiesPanelMeta,
 	type PropertiesPanelRow,
-} from "@brainstorm/sdk/properties-panel";
-import { EntityPropertiesPanel, PropertiesProvider } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk/properties-panel";
+import { EntityPropertiesPanel, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
 import { type ReactElement, useCallback, useMemo } from "react";
 import { humaniseBytes, humaniseDate, humaniseMime } from "../host/inspector-format";
 import type { PreviewRuntime } from "../host/runtime";

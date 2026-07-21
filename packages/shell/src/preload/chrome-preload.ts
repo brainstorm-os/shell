@@ -8,7 +8,7 @@
  *
  * IMPORTANT: this preload must import NOTHING heavy. The two preload entries
  * (app-preload + chrome-preload) are bundled together; if both import
- * `@brainstorm/tokens`, Rollup extracts the shared code into a `chunks/*.cjs`
+ * `@brainstorm-os/tokens`, Rollup extracts the shared code into a `chunks/*.cjs`
  * file that a SANDBOXED preload cannot `require()` — which breaks BOTH preloads
  * (app windows boot with no `window.brainstorm`). So theming lives in the strip
  * RENDERER (tab-strip.tsx), where code-splitting is fine; this preload only

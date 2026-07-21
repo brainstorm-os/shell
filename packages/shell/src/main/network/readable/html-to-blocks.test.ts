@@ -1,4 +1,4 @@
-import { createBrainstormHeadlessEditor } from "@brainstorm/editor";
+import { createBrainstormHeadlessEditor } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { type SerializedBlock, htmlToSerializedBlocks } from "./html-to-blocks";
 

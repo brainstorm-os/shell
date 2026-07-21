@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Tests for `@brainstorm/sdk/select-menu` — the native-`<select>`
+ * Tests for `@brainstorm-os/sdk/select-menu` — the native-`<select>`
  * replacement. Asserts the trigger face (label / placeholder / aria), the
  * option list it opens through the shared context-menu config (check on the
  * chosen option, blank icon column on the rest, `<optgroup>`-style section

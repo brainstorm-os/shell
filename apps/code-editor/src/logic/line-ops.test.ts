@@ -1,4 +1,4 @@
-import { CodeLanguage } from "@brainstorm/sdk/language-detect";
+import { CodeLanguage } from "@brainstorm-os/sdk/language-detect";
 import { describe, expect, it } from "vitest";
 import {
 	type BufferSelection,

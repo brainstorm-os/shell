@@ -1,4 +1,4 @@
-import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { Priority, type Task } from "../types/task";
 import {

@@ -12,7 +12,12 @@
  * data, never a `--color-state-*` chrome token.
  */
 
-import { type CellProps, type LabeledValue, ValueType, isMultiValued } from "@brainstorm/sdk-types";
+import {
+	type CellProps,
+	type LabeledValue,
+	ValueType,
+	isMultiValued,
+} from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { dictionaryEditorStore } from "../dictionary-editor-store";

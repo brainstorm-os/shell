@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { createEntityIconElement, parseIcon } from "./entity-icon";
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { CalDavService } from "@brainstorm/sdk-types";
+import type { CalDavService } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EntitiesService, EntityRecord } from "../../storage/runtime";
 import { flush, renderInto } from "../../test/render";

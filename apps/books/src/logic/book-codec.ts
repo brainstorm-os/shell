@@ -13,7 +13,7 @@
  * re-paginating every book.
  *
  * App-local + pure: the entity reads/writes themselves flow through
- * @brainstorm/react-yjs when the real library list lands (gated on 9.21.2);
+ * @brainstorm-os/react-yjs when the real library list lands (gated on 9.21.2);
  * this module owns only the shape, so it is buildable + testable now.
  */
 

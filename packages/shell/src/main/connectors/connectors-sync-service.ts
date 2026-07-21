@@ -12,7 +12,7 @@ import {
 	MAX_SYNC_MAPPINGS_HARD,
 	MAX_SYNC_MAPPINGS_SOFT,
 	SyncRunStatus,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { toSyncRunDef } from "./sync-run-def";
 import {
 	type ResolvedMapping,

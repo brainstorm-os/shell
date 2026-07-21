@@ -1,4 +1,4 @@
-import { PropertyView } from "@brainstorm/sdk-types";
+import { PropertyView } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	PROPERTY_BLOCK_MIME,

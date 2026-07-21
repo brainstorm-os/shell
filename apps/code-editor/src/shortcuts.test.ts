@@ -4,9 +4,9 @@ import { CODE_EDITOR_CHORDS, CodeEditorAction } from "./shortcuts";
 /**
  * The chord *grammar* (`Mod+…+Key`, mods drawn from
  * Cmd/Ctrl/CmdOrCtrl/Alt/Shift) is the shell registry's stable contract —
- * `@brainstorm/sdk/shortcut`'s `matchesChord` parses exactly this. We
+ * `@brainstorm-os/sdk/shortcut`'s `matchesChord` parses exactly this. We
  * assert the declared chords against that grammar rather than importing
- * the SDK matcher: the `@brainstorm/sdk/shortcut` subpath has no vitest
+ * the SDK matcher: the `@brainstorm-os/sdk/shortcut` subpath has no vitest
  * alias yet (a shared-config gap reported to the integrator), and the
  * production runtime resolves it fine via the package `exports` map.
  */

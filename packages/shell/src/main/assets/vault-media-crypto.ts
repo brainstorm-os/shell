@@ -19,7 +19,7 @@
  * in place of an icon.
  */
 
-import { hkdfSha256 } from "@brainstorm/native";
+import { hkdfSha256 } from "@brainstorm-os/native";
 import { openBytes, sealBytes } from "../credentials/crypto";
 
 /** Domains of vault media blobs. The value is BOTH the on-disk subdirectory

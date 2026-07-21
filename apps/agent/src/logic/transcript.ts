@@ -5,7 +5,7 @@
  * unit-testable in isolation.
  */
 
-import { type AiChatMessage, MessageRole, isMessageRole } from "@brainstorm/sdk-types";
+import { type AiChatMessage, MessageRole, isMessageRole } from "@brainstorm-os/sdk-types";
 import { CITATION_ID_SOURCE } from "./citation-format";
 
 /** The anti-fabrication contract shared by both the plain-chat and tool-enabled

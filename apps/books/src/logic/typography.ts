@@ -23,7 +23,7 @@ import {
 	SYSTEM_TYPOGRAPHY,
 	type TypographyDef,
 	resolveFontStack,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Body font family. Each maps to a real `font-family` stack; `System`
  *  resolves through the Typography render-application's body role so the

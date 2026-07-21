@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { getEscapeStack, installEscapeHandler } from "@brainstorm/sdk/a11y";
+import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
 import { act, useState } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

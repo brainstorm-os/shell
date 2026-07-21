@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/property-ui` property-catalog — pure search + display
+ * `@brainstorm-os/sdk/property-ui` property-catalog — pure search + display
  * classification over a `PropertyDef` set, shared by the add-property
  * picker (and any surface that lists the vault's property catalog).
  *
@@ -16,8 +16,8 @@
  * they're Lexical-specific.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { PropertyFormat, ValueType, isMultiValued } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { PropertyFormat, ValueType, isMultiValued } from "@brainstorm-os/sdk-types";
 
 export type FilterResult = {
 	def: PropertyDef;

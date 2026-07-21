@@ -25,7 +25,7 @@ const SEEDS = [
 	new Uint8Array(32).map((_, i) => (i * 31) & 0xff),
 ] as const;
 
-describe("@brainstorm/native — ed25519 (NAPI-3a)", () => {
+describe("@brainstorm-os/native — ed25519 (NAPI-3a)", () => {
 	it("derives the same public key as @noble/curves/ed25519.js across fixed seeds", async () => {
 		const { ed25519GetPublicKey } = await loadNative();
 		for (const seed of SEEDS) {

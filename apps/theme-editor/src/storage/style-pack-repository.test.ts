@@ -1,4 +1,4 @@
-import { STYLE_PACK_CSS_MIME, type StylePackDef } from "@brainstorm/sdk-types";
+import { STYLE_PACK_CSS_MIME, type StylePackDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntitiesService, EntityRecord } from "./runtime";
 import {

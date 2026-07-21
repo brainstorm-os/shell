@@ -49,7 +49,7 @@ export type IntentsService = {
 };
 
 /** Per-device, per-vault, app-namespaced settings — backs the "reopen the
- *  file I was editing" hint via `@brainstorm/sdk/last-viewed`. Structurally
+ *  file I was editing" hint via `@brainstorm-os/sdk/last-viewed`. Structurally
  *  matches the SDK `SettingsService`; optional (absent on preview / older
  *  shells, where the hint is a no-op). */
 export type SettingsService = {
@@ -71,7 +71,7 @@ export type DashboardService = {
 /** Subset of the shell's entities service the Y.Doc resolver needs for
  *  the editor's write-through path. Mirrors the journal/notes mirror
  *  apps' shape so the code-editor uses the same shared resolver core
- *  (`@brainstorm/react-yjs`). Optional — older shells / the preview
+ *  (`@brainstorm-os/react-yjs`). Optional — older shells / the preview
  *  drop expose neither and the editor degrades to the in-memory
  *  textarea (edits live for the session, no persistence).
  *

@@ -10,7 +10,7 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk/export-file";
 import { t } from "../i18n";
 import { type VCardContact, parseVCards, serializeVCards } from "../logic/vcard";
 import type { ContactsFilesService } from "../runtime";

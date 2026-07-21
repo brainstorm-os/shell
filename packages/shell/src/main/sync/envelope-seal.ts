@@ -23,7 +23,7 @@
  * it was never reached on signature/id-mismatch failures.
  */
 
-import { xchacha20Poly1305Open, xchacha20Poly1305Seal } from "@brainstorm/native";
+import { xchacha20Poly1305Open, xchacha20Poly1305Seal } from "@brainstorm-os/native";
 import { XCHACHA_KEY_BYTES, XCHACHA_NONCE_BYTES, base64ToBytes } from "../credentials/crypto";
 import { type MemberWrapPayload, isMemberWrapPayload } from "../credentials/member-wraps";
 import type { EncryptedFrame } from "./envelope-codec";

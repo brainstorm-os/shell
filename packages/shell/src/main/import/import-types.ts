@@ -15,7 +15,7 @@
  * updates rather than duplicates.
  */
 
-import type { ValueType } from "@brainstorm/sdk-types";
+import type { ValueType } from "@brainstorm-os/sdk-types";
 
 /** Format of a parsed source. The per-format Parse adapter is selected by
  *  this discriminator (CSV / Markdown / HTML adapters land at IE-4). */

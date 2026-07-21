@@ -16,7 +16,7 @@ import {
 	type ObjectMenuExtraItem,
 	type ObjectMenuRuntime,
 	paintHeaderRight,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n/t";
 import { PROJECT_TYPE, TASK_TYPE } from "../storage/entities-repository";
 import type { Project } from "../types/project";

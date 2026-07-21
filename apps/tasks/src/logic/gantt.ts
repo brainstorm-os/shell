@@ -19,12 +19,12 @@
  *   - neither          → unscheduled; counted, not drawn.
  */
 
-import { addDays as addDaysSdk, startOfDay } from "@brainstorm/sdk/date-grid";
+import { addDays as addDaysSdk, startOfDay } from "@brainstorm-os/sdk/date-grid";
 import type { Task } from "../types/task";
 import { topLevelTasks } from "./subtask-tree";
 import { indexById, isBlocked } from "./task-dependencies";
 
-/** The local day-start containing `ms` — the shared `@brainstorm/sdk/date-grid`
+/** The local day-start containing `ms` — the shared `@brainstorm-os/sdk/date-grid`
  *  `startOfDay` (the ONE day-walk Calendar / Database / Journal use; a
  *  DST fix there reaches the Gantt too). Re-exported under the Gantt's
  *  vocabulary so the view + tests speak one dialect. */

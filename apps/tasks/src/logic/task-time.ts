@@ -7,7 +7,7 @@
  * (B5.12), which takes hours — so minutes round-trip through `/ 60`.
  */
 
-import { formatDuration } from "@brainstorm/sdk/property-ui/pure";
+import { formatDuration } from "@brainstorm-os/sdk/property-ui/pure";
 
 /** Format a minute count as a duration ("2h 30m" / "45m" / "0h"); null/blank
  *  → "". Delegates to the shared `formatDuration` (hours in). */

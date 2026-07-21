@@ -12,7 +12,7 @@ import {
 	IconPackStyle,
 	type VaultEntity,
 	isValidIconPack,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { InstalledPack } from "../logic/icon-pack-options";
 import type { EntitiesService } from "./runtime";
 
@@ -20,7 +20,7 @@ const ICON_PACK_TYPE = "brainstorm/IconPack/v1";
 
 /** Project the installed `IconPack/v1` entities out of a whole-vault
  *  snapshot — the pure derivation the live icon-pack picker runs on (the
- *  snapshot flows through `@brainstorm/react-yjs` `useVaultEntities`). */
+ *  snapshot flows through `@brainstorm-os/react-yjs` `useVaultEntities`). */
 export function iconPacksFromSnapshot(entities: ReadonlyArray<VaultEntity>): InstalledPack[] {
 	return entities
 		.filter((e) => e.type === ICON_PACK_TYPE && e.deletedAt === null)

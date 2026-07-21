@@ -17,8 +17,8 @@
  * Cmd/Ctrl = new tab, Shift = new window), matching Notes.
  */
 
-import { dispatchOpenEntity } from "@brainstorm/editor";
-import { navModeFromEvent } from "@brainstorm/sdk";
+import { dispatchOpenEntity } from "@brainstorm-os/editor";
+import { navModeFromEvent } from "@brainstorm-os/sdk";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useEffect } from "react";
 

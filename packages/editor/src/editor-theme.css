@@ -1,6 +1,6 @@
 /**
  * editor-theme.css — the shared editor block stylesheet for the
- * `@brainstorm/editor` plugins + nodes (slash menu, callouts, code,
+ * `@brainstorm-os/editor` plugins + nodes (slash menu, callouts, code,
  * toggles, columns, tables, mentions, emoji menu, typeaheads, property
  * blocks, media, embeds, transclusion, etc.).
  *
@@ -11,8 +11,8 @@
  * rename (`notes__*` → `bs-editor__*`) is a separate, mechanical cleanup;
  * keeping the names stable here is what makes the lift zero-risk.
  *
- * Consumers import `@brainstorm/editor/editor-theme.css` once at app boot
- * (alongside `@brainstorm/editor/editor.css`, which carries the plugin
+ * Consumers import `@brainstorm-os/editor/editor-theme.css` once at app boot
+ * (alongside `@brainstorm-os/editor/editor.css`, which carries the plugin
  * CSS — table / block-selection / block-gutter / virtualize).
  *
  * NOTE (unify stage 3): Notes still also defines these rules inline in its
@@ -1918,7 +1918,7 @@ body.bs-table-col-resizing * {
 	justify-content: center;
 	/* Scrim only — no full-viewport backdrop-filter here (it would stack a
 	 * second whole-screen blur pass under the modal's own). See
-	 * `@brainstorm/sdk` dictionary-editor.css for the canonical note. */
+	 * `@brainstorm-os/sdk` dictionary-editor.css for the canonical note. */
 	background: color-mix(in srgb, var(--bg) 55%, transparent);
 }
 

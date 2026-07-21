@@ -7,8 +7,8 @@
  * input, ↑/↓ move the cursor, Enter picks.
  */
 
-import { CompositeHost, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm/sdk/popover";
+import { CompositeHost, Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useEffect, useMemo, useState } from "react";
 import { t } from "../../i18n/t";
 import { labelForSourceKey } from "../../logic/calendar-sources";

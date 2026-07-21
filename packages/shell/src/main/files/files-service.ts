@@ -59,7 +59,7 @@ import type { FSWatcher } from "node:fs";
 import { watch as fsWatch } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import type { StoredAsset } from "@brainstorm/sdk-types";
+import type { StoredAsset } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import {
@@ -111,7 +111,7 @@ export type StoreUploadAsset = (input: {
 
 /** SDK-side `FileHandle` shape — opaque token + a display name the picker
  *  surfaced so a UI can label the row without re-asking. Matches
- *  `@brainstorm/sdk-types`'s `FileHandle`. */
+ *  `@brainstorm-os/sdk-types`'s `FileHandle`. */
 export type FileHandleWire = { handleId: string; displayName: string };
 
 /** Result of a `showOpenDialog` callback. `canceled === true` returns an

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DragPayloadKind, DropEffect } from "@brainstorm/sdk-types";
+import { DragPayloadKind, DropEffect } from "@brainstorm-os/sdk-types";
 import { useRef } from "react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";

@@ -1,6 +1,6 @@
-import type { AutomationsHostStatus } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import type { AnchoredMenuItem } from "@brainstorm/sdk/object-menu";
+import type { AutomationsHostStatus } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import type { AnchoredMenuItem } from "@brainstorm-os/sdk/object-menu";
 import type { ReactElement } from "react";
 import { plural, t } from "../i18n";
 import type { AutomationsI18nKey } from "../i18n";

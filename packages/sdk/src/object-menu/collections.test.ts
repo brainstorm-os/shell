@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Entity, EntityQuery } from "@brainstorm/sdk-types";
+import type { Entity, EntityQuery } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LIST_ENTITY_TYPE } from "../list-entity-codec";
 import {

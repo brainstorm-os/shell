@@ -17,8 +17,8 @@
  * no-op, so the same plugins mount cleanly in previews/tests.
  */
 
-import type { NavigationMode } from "@brainstorm/sdk";
-import type { BpService } from "@brainstorm/sdk-types";
+import type { NavigationMode } from "@brainstorm-os/sdk";
+import type { BpService } from "@brainstorm-os/sdk-types";
 
 /** Result shape of the shell's `storage.uploadFile` surface. */
 export type EditorUploadResult = {

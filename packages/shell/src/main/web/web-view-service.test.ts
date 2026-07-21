@@ -4,7 +4,7 @@ import {
 	type WebViewEvent,
 	WebViewEventKind,
 	WebViewMethod,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BaseWindowHandle } from "../apps/window-container";
 import {

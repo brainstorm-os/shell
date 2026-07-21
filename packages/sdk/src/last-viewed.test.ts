@@ -1,4 +1,4 @@
-import type { SettingsService } from "@brainstorm/sdk-types";
+import type { SettingsService } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { recallLastViewed, rememberLastViewed } from "./last-viewed";
 

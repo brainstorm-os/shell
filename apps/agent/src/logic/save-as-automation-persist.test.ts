@@ -12,7 +12,7 @@ import {
 	TriggerKind,
 	WORKFLOW_TYPE_URL,
 	propertiesToWorkflow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { WorkflowDraft } from "./save-as-automation";
 import { persistWorkflowDraft } from "./save-as-automation-persist";

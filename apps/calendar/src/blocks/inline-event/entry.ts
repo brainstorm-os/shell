@@ -3,10 +3,10 @@
  * in a host document via the BP block frame. Shows the event's title, time
  * range, and location; a click opens the event in the Calendar app. Read-only
  * (an event's edits live in the app). Runs in the sandbox via
- * `@brainstorm/sdk/block-runtime`. Pure DOM.
+ * `@brainstorm-os/sdk/block-runtime`. Pure DOM.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 
 interface BpEntity {
 	entityId: string;

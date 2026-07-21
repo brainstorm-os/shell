@@ -1,4 +1,4 @@
-import { TokenSetAppearance } from "@brainstorm/sdk-types";
+import { TokenSetAppearance } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type CliIo, runCli } from "./cli";
 

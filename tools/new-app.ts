@@ -3,7 +3,7 @@
  * the recommended track, so it starts COMPLIANT instead of drifting:
  *  - React (createRoot) — the one ecosystem.
  *   - the shared `.app-header` chrome (44px baseline, object ⋯ slot).
- *   - a LIVE entity list via `@brainstorm/react-yjs`'s `useVaultEntities` —
+ *   - a LIVE entity list via `@brainstorm-os/react-yjs`'s `useVaultEntities` —
  *     never a hand-rolled `vaultEntities.onChange` loop (the reactivity
  *     gate, tools/check-app-reactivity.mjs, rejects that).
  *
@@ -47,9 +47,9 @@ const files: Record<string, string> = {
 			type: "module",
 			scripts: { build: "vite build", dev: "vite build --watch" },
 			dependencies: {
-				"@brainstorm/react-yjs": "workspace:*",
-				"@brainstorm/sdk": "workspace:*",
-				"@brainstorm/sdk-types": "workspace:*",
+				"@brainstorm-os/react-yjs": "workspace:*",
+				"@brainstorm-os/sdk": "workspace:*",
+				"@brainstorm-os/sdk-types": "workspace:*",
 				react: "^19.0.0",
 				"react-dom": "^19.0.0",
 			},
@@ -169,10 +169,10 @@ declare module "*.css";
 	"src/runtime.ts": `/**
  * The slice of \`window.brainstorm\` this app reads. \`vaultEntities\` is the
  * live entity-snapshot service; the app subscribes to it through
- * \`@brainstorm/react-yjs\`'s \`useVaultEntities\`, never \`onChange\` directly.
+ * \`@brainstorm-os/react-yjs\`'s \`useVaultEntities\`, never \`onChange\` directly.
  */
 
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
 
 export type ${comp}Runtime = {
 	app?: { id: string; version: string; sdkVersion: string };
@@ -193,9 +193,9 @@ export function getBrainstorm(): ${comp}Runtime | null {
 }
 `,
 
-	"src/main.tsx": `import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
+	"src/main.tsx": `import "@brainstorm-os/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ${comp} } from "./app";
@@ -216,7 +216,7 @@ createRoot(root).render(
 
 	"src/app.tsx": `import { useMemo } from "react";
 import type { ReactElement } from "react";
-import { useVaultEntities } from "@brainstorm/react-yjs";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { getBrainstorm } from "./runtime";
 
 /** The entity type this app owns. The list scopes to its OWN type — never
@@ -260,7 +260,7 @@ export function ${comp}(): ReactElement {
 `,
 
 	"src/styles.css": `/* Structural rules only. Colours, the \`.app-header\` chrome, glass, and the
-   primary button come from the shell-injected @brainstorm/sdk app-theme. */
+   primary button come from the shell-injected @brainstorm-os/sdk app-theme. */
 :root {
 	color-scheme: light dark;
 }

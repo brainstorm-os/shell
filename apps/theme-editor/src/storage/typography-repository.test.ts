@@ -1,4 +1,4 @@
-import { SYSTEM_TYPOGRAPHY, type TypographyDef, TypographyScale } from "@brainstorm/sdk-types";
+import { SYSTEM_TYPOGRAPHY, type TypographyDef, TypographyScale } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntitiesService, EntityRecord } from "./runtime";
 import {

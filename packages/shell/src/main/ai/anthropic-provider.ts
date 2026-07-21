@@ -25,7 +25,7 @@ import {
 	type AiGenerateResult,
 	MessageRole,
 	messageText,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { AiServiceError, type ModelProvider, buildUsage } from "./provider";
 
 /** A Claude Messages content block (the subset we emit). */

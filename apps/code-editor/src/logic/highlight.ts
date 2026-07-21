@@ -1,6 +1,6 @@
 /**
  * Shiki integration for the code-editor buffer (9.7.2) — now a thin
- * `LanguageKey` adapter over the shared `@brainstorm/sdk/code-highlight`
+ * `LanguageKey` adapter over the shared `@brainstorm-os/sdk/code-highlight`
  * tokenizer (extracted at copy two for Notes code blocks, B11.4). The engine
  * — lazy highlighter singleton, theme loading, grammar code-splitting, the
  * test DI seam — lives in the SDK; this file only maps the code-editor's
@@ -15,7 +15,7 @@ import {
 	resetHighlighter,
 	setHighlighterFactory,
 	tokenizeShiki,
-} from "@brainstorm/sdk/code-highlight";
+} from "@brainstorm-os/sdk/code-highlight";
 import { LanguageKey } from "../types/code-file";
 
 export { HighlightTheme, resetHighlighter, setHighlighterFactory };

@@ -5,7 +5,7 @@
  * than typed as a bare literal at the call site.
  */
 
-import type { IntentsService } from "@brainstorm/sdk-types";
+import type { IntentsService } from "@brainstorm-os/sdk-types";
 import { PERSON_TYPE, type VaultEntityLike } from "../types/person";
 
 const OPEN_VERB = "open" as const;

@@ -1,7 +1,7 @@
 /**
  * PDF renderer — 9.20.5.
  *
- * Quick-look PDF viewer over the shared `@brainstorm/sdk/pdf-engine` (the
+ * Quick-look PDF viewer over the shared `@brainstorm-os/sdk/pdf-engine` (the
  * one pdf.js stack, shared with Books since 9.21.5). pdf.js (+ its worker)
  * is the heavy bit (OQ-PV-2, ~3 MB), so this whole module is reached only
  * through the registry's dynamic `import()` — Preview's cold start never
@@ -13,8 +13,8 @@
  * render, destroys the pdf.js document + worker, and revokes any owned URL.
  */
 
-import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
+import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import {
 	type PdfEngineDocument,
 	type PdfLink,
@@ -22,7 +22,7 @@ import {
 	pdfPageLinks,
 	renderPdfPage,
 	terminatePdfWorker,
-} from "@brainstorm/sdk/pdf-engine";
+} from "@brainstorm-os/sdk/pdf-engine";
 import { t } from "../i18n";
 import {
 	PDF_ZOOM_STEP,

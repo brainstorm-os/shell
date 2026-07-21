@@ -16,7 +16,7 @@
  * tags appear in the picker.
  */
 
-import type { Dictionary, DictionaryItem, PropertiesService } from "@brainstorm/sdk-types";
+import type { Dictionary, DictionaryItem, PropertiesService } from "@brainstorm-os/sdk-types";
 import { t } from "../i18n/t";
 import { PRIORITIES, Priority, TaskStatus } from "../types/task";
 import type { Task } from "../types/task";

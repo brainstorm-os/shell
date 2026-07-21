@@ -1,6 +1,6 @@
 /**
  * The slice of `window.brainstorm` Mailbox reads. `vaultEntities` is the live
- * entity-snapshot service (subscribed through `@brainstorm/react-yjs`'s
+ * entity-snapshot service (subscribed through `@brainstorm-os/react-yjs`'s
  * `useVaultEntities`, never `onChange` directly) — the app is a viewer over
  * `Email/v1` / `MailFolder/v1` / `MailAccount/v1` rows the shell-side
  * `MailTransport` worker projects. `entities` flips `flags` (the only mutable
@@ -16,7 +16,7 @@ import type {
 	LaunchContext,
 	MailService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type MailboxRuntime = {
 	app?: { id: string; version: string; sdkVersion: string };

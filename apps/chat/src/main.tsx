@@ -1,10 +1,10 @@
-import "@brainstorm/editor/editor-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/sdk/composer-context.css";
-import "@brainstorm/sdk/empty-state.css";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { getWidgetLaunch } from "@brainstorm/sdk/widget";
+import "@brainstorm-os/editor/editor-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/sdk/composer-context.css";
+import "@brainstorm-os/sdk/empty-state.css";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ChatApp } from "./app";

@@ -8,8 +8,8 @@
  * button's job, so the view has no close affordance of its own.
  */
 
-import type { RecurrenceEditorLabels } from "@brainstorm/sdk/recurrence-editor";
-import { buildRecurrenceLabels } from "@brainstorm/sdk/recurrence-labels";
+import type { RecurrenceEditorLabels } from "@brainstorm-os/sdk/recurrence-editor";
+import { buildRecurrenceLabels } from "@brainstorm-os/sdk/recurrence-labels";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Priority, type Task } from "../types/task";
 import { renderLegacyNotesFallback, renderTaskDetailView } from "./inspector-view";

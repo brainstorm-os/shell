@@ -19,7 +19,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type FormatOptions = {
 	locale?: string;

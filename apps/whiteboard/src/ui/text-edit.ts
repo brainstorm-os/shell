@@ -20,7 +20,7 @@
  * Pure DOM + the app shortcut layer — jsdom-testable without the canvas.
  */
 
-import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellcheck";
+import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm-os/sdk/spellcheck";
 import {
 	type SelectionStyles,
 	plainToRich,

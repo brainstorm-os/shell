@@ -11,10 +11,10 @@
  * Pure + leaf (imports only `./recurrence`). i18n is the caller's job:
  * every user-visible fragment is supplied via the `labels` object
  * (closures for the parametric cases), exactly the injected-labels
- * convention `@brainstorm/sdk`'s `<InlinePropertyForm>` established —
+ * convention `@brainstorm-os/sdk`'s `<InlinePropertyForm>` established —
  * sdk-types bundles no UI English beyond the convenience
  * `DEFAULT_RECURRENCE_LABELS` pack (used by tests + as a sane fallback,
- * the same role `@brainstorm/sdk/i18n` common-labels plays).
+ * the same role `@brainstorm-os/sdk/i18n` common-labels plays).
  */
 
 import {

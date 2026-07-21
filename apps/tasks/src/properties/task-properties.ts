@@ -2,7 +2,7 @@
  * Task properties bridge (interim, pre-property-backed entity). A task's
  * first-class attributes — status, priority, schedule, project, assignee,
  * estimate/logged, tags, timestamps — are surfaced AND edited through the
- * shared property-value cells (`@brainstorm/sdk/property-ui`) rather than
+ * shared property-value cells (`@brainstorm-os/sdk/property-ui`) rather than
  * hand-rolled chips / menus / inputs ([[feedback-no-hand-rolled-property-panels]]),
  * exactly like the Bookmarks detail.
  *
@@ -28,9 +28,9 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
-} from "@brainstorm/sdk-types";
-import type { PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
-import { type ValuesMap, readValue } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk-types";
+import type { PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
+import { type ValuesMap, readValue } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n/t";
 import { Priority } from "../types/task";
 import type { Task } from "../types/task";

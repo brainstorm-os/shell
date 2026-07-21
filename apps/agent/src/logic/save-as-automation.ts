@@ -47,7 +47,7 @@ import {
 	aggregateWorkflowCapabilities,
 	capabilityImplies,
 	validateCapabilityTiers,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The runtime-input placeholder the generalized instruction references — the
  *  Manual trigger's input is bound here when the workflow runs, so the saved

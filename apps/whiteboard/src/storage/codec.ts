@@ -23,7 +23,7 @@
  * keys flow through the `{...n}` spread unchanged.
  */
 
-import { coerceEnum, nullableString } from "@brainstorm/sdk/codec-helpers";
+import { coerceEnum, nullableString } from "@brainstorm-os/sdk/codec-helpers";
 import { coerceInkPoints } from "../logic/ink";
 import { richToPlain } from "../logic/rich-text";
 import {

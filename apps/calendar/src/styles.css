@@ -52,7 +52,7 @@ button:focus-visible {
 /* ─── App header ─────────────────────────────────────────────────── */
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin) is the
- * shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`; only the
+ * shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`; only the
  * calendar-specific delta stays local. */
 .app-header__right {
 	flex: 0 0 auto;
@@ -255,7 +255,7 @@ body.is-resizing .calendar-resize {
 	font-size: var(--text-size-sm);
 }
 
-/* The sidebar mini-month is the shared `@brainstorm/sdk/calendar`
+/* The sidebar mini-month is the shared `@brainstorm-os/sdk/calendar`
  * `createMiniCalendar` (`.bs-cal-mini*`, styled by the SDK's calendar.css
  * via the app-theme aggregator) — no app-local mini-month chrome. */
 
@@ -327,7 +327,7 @@ body.is-resizing .calendar-resize {
 
 /* ─── Month view ──────────────────────────────────────────────────── */
 
-/* The grid itself is the shared `@brainstorm/sdk/calendar` month grid
+/* The grid itself is the shared `@brainstorm-os/sdk/calendar` month grid
  * (`.bs-cal-month*`, styled by the SDK). The host only has to give it the
  * full content height; the per-cell chip list below is Calendar-owned. */
 .cal-month-host {
@@ -1410,7 +1410,7 @@ body.is-resizing .calendar-resize {
 }
 
 /* Recurrence editor (9.15.13). */
-/* Recurrence editor chrome moved to `@brainstorm/sdk/recurrence-editor.css`
+/* Recurrence editor chrome moved to `@brainstorm-os/sdk/recurrence-editor.css`
    (`.bs-recur__*`) when the editor was shared with Tasks (9.14.12). */
 
 /* Reminder preset chips (9.15.16). */

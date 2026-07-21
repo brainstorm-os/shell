@@ -35,7 +35,7 @@ import {
 	TEMPLATE_TYPE_URL,
 	type Template,
 	TemplateKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Re-exported for call sites that create/query the entity by type. */
 export const TEMPLATE_ENTITY_TYPE = TEMPLATE_TYPE_URL;
@@ -138,7 +138,7 @@ export function blockSnippetToTemplateProperties(
 
 /** Read a block-snippet template's serialized-blocks JSON fragment, or `null`
  *  when the template carries none / isn't a block-snippet. Feed the result to
- *  `insertSnippet` from `@brainstorm/editor`. */
+ *  `insertSnippet` from `@brainstorm-os/editor`. */
 export function snippetFromTemplate(template: Template): string | null {
 	if (template.templateKind !== TemplateKind.BlockSnippet) return null;
 	const raw = template.prototype[TEMPLATE_SNIPPET_KEY];

@@ -3,7 +3,7 @@
   "name": "Calendar",
   "version": "0.1.0",
   "sdk": "1",
-  "description": "Cross-app temporal browser. Surfaces every entity in the vault with a date property — Events, Tasks, Notes, Person birthdays — on Month / Week / Day / Agenda views. Recurrence is shared with Tasks via @brainstorm/sdk-types.",
+  "description": "Cross-app temporal browser. Surfaces every entity in the vault with a date property — Events, Tasks, Notes, Person birthdays — on Month / Week / Day / Agenda views. Recurrence is shared with Tasks via @brainstorm-os/sdk-types.",
   "icon": "icon.svg",
   "entry": "dist/index.html",
   "capabilities": [

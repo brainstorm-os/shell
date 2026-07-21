@@ -15,9 +15,9 @@
  * layout's gap/column collapses around the missing slot (no sized box).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { type CoverSubject, createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { type CoverSubject, createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
 import { useEffect, useRef } from "react";
 
 export type EntityIconProps = {

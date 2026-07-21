@@ -23,7 +23,7 @@ import {
 	createEditorT,
 	createMediaBlockCommands,
 	createStandardBlockCommands,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { BLOCK_COMMANDS } from "./commands";
 import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";

@@ -14,7 +14,7 @@ import {
 	type LabeledValue,
 	type VaultEntity,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { coerceValue } from "../../properties-validate";

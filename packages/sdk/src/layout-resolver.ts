@@ -21,7 +21,7 @@
  * verbatim rather than fork a parallel one.
  */
 
-import type { LayoutContext, LayoutDef, Scope } from "@brainstorm/sdk-types";
+import type { LayoutContext, LayoutDef, Scope } from "@brainstorm-os/sdk-types";
 
 export type LayoutResolveTarget = {
 	entityId: string;

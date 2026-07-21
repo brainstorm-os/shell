@@ -17,8 +17,8 @@
  * `WidgetHost` stays the pure, unit-tested lifecycle core; this is the glue.
  */
 
-import type { FormatContext } from "@brainstorm/sdk-types";
-import type { ThemeName } from "@brainstorm/tokens";
+import type { FormatContext } from "@brainstorm-os/sdk-types";
+import type { ThemeName } from "@brainstorm-os/tokens";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import type { SqliteDatabase } from "../storage/sqlite";

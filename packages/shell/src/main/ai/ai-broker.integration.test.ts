@@ -5,7 +5,7 @@
  * lacking `ai.use` is denied before the handler runs.
  */
 
-import { type AiGenerateResult, MessageRole } from "@brainstorm/sdk-types";
+import { type AiGenerateResult, MessageRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { Broker } from "../../ipc/broker";
 import { makeAiServiceHandler } from "./ai-service";

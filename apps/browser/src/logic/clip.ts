@@ -23,8 +23,8 @@
  * Bookmarks-side metadata scrape backfills it.
  */
 
-import type { SerializedBlock } from "@brainstorm/sdk-types";
-import { sanitizeInlineText } from "@brainstorm/sdk/sanitize-text";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 
 /** Canonical Block-Protocol type id of the clip artifact. Owned by the
  *  Bookmarks app (`apps/bookmarks/src/types/bookmark.ts`); apps don't import

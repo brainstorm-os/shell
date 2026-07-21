@@ -10,8 +10,8 @@
  * otherwise-bare task still reads as a task.
  */
 
-import { summarizeRecurrence } from "@brainstorm/sdk-types";
-import type { RecurrenceSummaryLabels } from "@brainstorm/sdk-types";
+import { summarizeRecurrence } from "@brainstorm-os/sdk-types";
+import type { RecurrenceSummaryLabels } from "@brainstorm-os/sdk-types";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";
 

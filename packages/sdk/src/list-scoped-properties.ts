@@ -26,7 +26,7 @@
  * in isolation, mirroring `validatePropertyDef` / `effectiveMembers`.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
 import { type MemberRefs, effectiveMembers } from "./collections";
 
 /** The minimal List shape the resolver reads. The app's full List entity

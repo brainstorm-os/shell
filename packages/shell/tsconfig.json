@@ -3,7 +3,7 @@
   "compilerOptions": {
     "types": ["node", "vite/client"],
     "paths": {
-      "@brainstorm/tokens": ["../tokens/src/index.ts"]
+      "@brainstorm-os/tokens": ["../tokens/src/index.ts"]
     }
   },
   "include": ["src/**/*", "electron.vite.config.ts"]

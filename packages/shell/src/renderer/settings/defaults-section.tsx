@@ -18,7 +18,7 @@
  * refetch (mirrors `ThemeSection`).
  */
 
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { useEffect, useState } from "react";
 import type {
 	DefaultsCatalog,

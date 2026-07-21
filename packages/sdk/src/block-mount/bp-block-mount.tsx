@@ -5,7 +5,7 @@
  * Lifecycle wiring on top of the 9.5 trio:
  *
  *   1. On mount, build a container `<div>` and call `createBlockFrame`
- *      ({@link @brainstorm/sdk/block-frame}) to spawn the sandboxed
+ *      ({@link @brainstorm-os/sdk/block-frame}) to spawn the sandboxed
  *      opaque-origin iframe inside it.
  *   2. Open a `createBlockFrameTransport` over the handle, bound to the
  *      embedding `entityId` + capability snapshot. The transport mints
@@ -35,7 +35,7 @@
  * "shared mount seam".
  */
 
-import type { BpMessage, BpService } from "@brainstorm/sdk-types";
+import type { BpMessage, BpService } from "@brainstorm-os/sdk-types";
 import {
 	type BlockFrameHandle,
 	BlockFramePhase,
@@ -43,7 +43,7 @@ import {
 	createBlockFrame,
 	createBlockFrameTransport,
 	defaultMintChannelId,
-} from "@brainstorm/sdk/block-frame";
+} from "@brainstorm-os/sdk/block-frame";
 import {
 	type CSSProperties,
 	type JSX,

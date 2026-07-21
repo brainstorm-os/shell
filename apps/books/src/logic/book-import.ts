@@ -23,7 +23,7 @@ export const FILE_ENTITY_TYPE = "brainstorm/File/v1";
 export const IMPORT_EXTENSIONS: readonly string[] = ["pdf", "epub"];
 
 /** The slice of `files.import`'s reply this module persists. Structurally
- *  typed so Books takes no value dependency on `@brainstorm/sdk-types`. */
+ *  typed so Books takes no value dependency on `@brainstorm-os/sdk-types`. */
 export type ImportedFile = {
 	assetId: string;
 	contentHash: string;

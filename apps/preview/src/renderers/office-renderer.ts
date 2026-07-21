@@ -12,7 +12,7 @@
  * untrusted-markup path and goes through `sanitizeToFragment`.
  */
 
-import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { unzipSync } from "fflate";
 import * as mammoth from "mammoth";
 import * as XLSX from "xlsx";

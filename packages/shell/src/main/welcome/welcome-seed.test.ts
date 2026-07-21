@@ -2,7 +2,7 @@ import {
 	BASELINE_NODES,
 	SEED_STANDIN_NODES,
 	plantSerializedStateIntoDoc,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { describe, expect, it, vi } from "vitest";
 import { Doc, XmlText, encodeStateAsUpdate } from "yjs";
 import { WELCOME_SEED_CREATED_BY, WELCOME_SEED_VERSION, type WelcomeBody } from "./welcome-content";

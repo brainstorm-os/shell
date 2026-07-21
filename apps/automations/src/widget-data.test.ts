@@ -5,7 +5,11 @@
  * real-shell-verified Contacts widget.
  */
 
-import { WORKFLOW_RUN_TYPE_URL, WORKFLOW_TYPE_URL, WorkflowRunStatus } from "@brainstorm/sdk-types";
+import {
+	WORKFLOW_RUN_TYPE_URL,
+	WORKFLOW_TYPE_URL,
+	WorkflowRunStatus,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { RunTone, type WidgetRunEntity, runTone, shapeRuns } from "./widget-data";
 

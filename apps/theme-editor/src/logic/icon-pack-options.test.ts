@@ -1,4 +1,4 @@
-import { BUILTIN_ICON_PACK, type ThemeComponentRef, ThemeRefKind } from "@brainstorm/sdk-types";
+import { BUILTIN_ICON_PACK, type ThemeComponentRef, ThemeRefKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_CHOICE_KEY, iconPackChoices, selectedChoiceKey } from "./icon-pack-options";
 

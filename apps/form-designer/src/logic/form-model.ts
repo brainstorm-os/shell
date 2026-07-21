@@ -27,7 +27,7 @@ import {
 	type PropertyCell,
 	type PropertyPredicate,
 	type Scope,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Default target type for a new form — the generic `Object/v1` the
  *  Database app registers. The builder lets the user pick another. */

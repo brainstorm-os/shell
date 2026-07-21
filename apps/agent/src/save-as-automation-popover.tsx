@@ -3,15 +3,15 @@
  * generalized {@link WorkflowDraft} READABLY (name, trigger, the agent step's
  * instruction + tools, the generalized parameters, and the capability set the
  * workflow will hold) so the user confirms exactly what gets created before
- * anything is written. Built on the shared `@brainstorm/sdk/popover` primitive
+ * anything is written. Built on the shared `@brainstorm-os/sdk/popover` primitive
  * (no bespoke dialog chrome).
  *
  * This is a review affordance, not a silent save: `onConfirm` is wired to the
  * Save button only; closing / Cancel writes nothing.
  */
 
-import { StepKind } from "@brainstorm/sdk-types";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import { StepKind } from "@brainstorm-os/sdk-types";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useMemo } from "react";
 import type { ReactElement } from "react";
 import { grantLabel } from "./conversation-settings-popover";

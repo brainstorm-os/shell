@@ -6,7 +6,7 @@
  * seeds (everything else is edited in the properties panel afterwards).
  */
 
-import { Popover } from "@brainstorm/sdk/popover";
+import { Popover } from "@brainstorm-os/sdk/popover";
 import { useId, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactElement } from "react";
 import { t } from "../i18n";

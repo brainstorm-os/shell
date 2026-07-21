@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { CoverKind } from "@brainstorm/sdk-types";
+import { CoverKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	COVER_GRADIENTS,

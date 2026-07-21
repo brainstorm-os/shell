@@ -1,4 +1,4 @@
-import { TokenSetAppearance } from "@brainstorm/sdk-types";
+import { TokenSetAppearance } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	PackComponent,

@@ -1,9 +1,11 @@
 {
-  "name": "@brainstorm/native-embed",
+  "name": "@brainstorm-os/native-embed",
   "version": "0.0.1",
-  "private": true,
-  "description": "Native NAPI-RS embedding addon for Brainstorm — local semantic-search embeddings (fastembed-rs / ONNX Runtime, bge-small-en-v1.5). Isolated from @brainstorm/native so ONNX Runtime never links into the crypto binary. See docs/implementation-plan.md §11.3.",
+  "description": "Native NAPI-RS embedding addon for Brainstorm — local semantic-search embeddings (fastembed-rs / ONNX Runtime, bge-small-en-v1.5). Isolated from @brainstorm-os/native so ONNX Runtime never links into the crypto binary. See docs/implementation-plan.md §11.3.",
   "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "loader.cjs",
   "module": "native.mjs",
   "types": "index.d.ts",

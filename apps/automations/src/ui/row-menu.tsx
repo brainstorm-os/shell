@@ -1,5 +1,5 @@
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactElement, useRef } from "react";
 
 /** Trailing hover-revealed ⋯ overflow holding a row's actions — the same

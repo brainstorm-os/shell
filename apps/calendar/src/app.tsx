@@ -12,16 +12,16 @@
 
 import "./types";
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
-import type { ObjectDragPayload } from "@brainstorm/sdk-types";
-import { LiveRegion, announce } from "@brainstorm/sdk/a11y";
-import { IconName } from "@brainstorm/sdk/icon";
-import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { useResizable } from "@brainstorm/sdk/resizable";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
+import type { ObjectDragPayload } from "@brainstorm-os/sdk-types";
+import { LiveRegion, announce } from "@brainstorm-os/sdk/a11y";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { useResizable } from "@brainstorm-os/sdk/resizable";
 import {
 	type MouseEvent as ReactMouseEvent,
 	useCallback,

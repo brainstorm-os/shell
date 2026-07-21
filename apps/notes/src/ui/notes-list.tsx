@@ -8,7 +8,7 @@
  *
  * In the default (recency) view, rows are grouped under date-section
  * headers — Today / Yesterday / Previous 7 days / Previous 30 days /
- * by-month — via the shared `@brainstorm/sdk/date-buckets` bucketer
+ * by-month — via the shared `@brainstorm-os/sdk/date-buckets` bucketer
  * (identical sections in every such list), so a row no longer carries a
  * per-row "edited 4m ago" caption. The inline-search view stays flat in
  * relevance order (date sections would fight the ranking).
@@ -25,13 +25,13 @@
  * `noteObjectMenuContext`, rendered by the SDK chrome.
  */
 
-import { clipPlainText, extractPlainText } from "@brainstorm/editor";
-import { type NavigationMode, navModeFromEvent } from "@brainstorm/sdk";
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { groupByDateBucket } from "@brainstorm/sdk/date-buckets";
-import { setEntityDragData } from "@brainstorm/sdk/entity-drag";
-import { IconName } from "@brainstorm/sdk/icon";
-import { ObjectMenuTrigger } from "@brainstorm/sdk/object-menu";
+import { clipPlainText, extractPlainText } from "@brainstorm-os/editor";
+import { type NavigationMode, navModeFromEvent } from "@brainstorm-os/sdk";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { groupByDateBucket } from "@brainstorm-os/sdk/date-buckets";
+import { setEntityDragData } from "@brainstorm-os/sdk/entity-drag";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useMemo, useRef } from "react";
 import { t } from "../i18n/t";

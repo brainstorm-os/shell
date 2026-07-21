@@ -5,7 +5,7 @@
  * tokens; unknown token names are rejected").
  *
  * This is a **snapshot** of `Object.keys(flattenTokens(defaultLight))`
- * from `@brainstorm/tokens`. It lives here (not in the tokens package)
+ * from `@brainstorm-os/tokens`. It lives here (not in the tokens package)
  * so the sdk-types contracts stay dependency-free — `token-set.ts` can
  * validate namespace membership without importing the tokens runtime.
  * A drift guard in `packages/tokens/src/token-names.test.ts` pins this
@@ -24,7 +24,7 @@ export const TOKEN_NAME_VERSION = 2;
 /**
  * Every legal semantic-token CSS variable name, sorted. A `TokenSet`'s
  * `overrides` keys must each be a member of this set. Snapshot of the
- * `@brainstorm/tokens` flattened key space (pinned by the tokens-package
+ * `@brainstorm-os/tokens` flattened key space (pinned by the tokens-package
  * drift test).
  */
 export const CANONICAL_TOKEN_NAMES = Object.freeze([

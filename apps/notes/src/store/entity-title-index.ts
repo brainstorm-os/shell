@@ -1,9 +1,9 @@
 /**
  * Re-export shim — the vault-entity title index now lives in
- * `@brainstorm/editor` (`plugins/entity-index`), decoupled from the app
+ * `@brainstorm-os/editor` (`plugins/entity-index`), decoupled from the app
  * runtime via an injected source (`setEntityIndexSource`, wired in Notes'
  * boot). Notes-local imports keep working through here; new code should
- * import from `@brainstorm/editor` directly.
+ * import from `@brainstorm-os/editor` directly.
  */
 
 export {
@@ -12,4 +12,4 @@ export {
 	entityTitlesSnapshot,
 	getEntityTitle,
 	subscribeEntityTitles,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

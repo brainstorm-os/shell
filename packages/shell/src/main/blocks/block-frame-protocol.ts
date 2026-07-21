@@ -7,7 +7,7 @@
  * the document's CSP from the embedder's.
  *
  * URL shape: `bsblock://frame/?b=<blockId>&c=<channelId>&e=<entityId>` — built
- * by `makeBlockFrameUrl` in `@brainstorm/sdk/block-frame`. The handler looks up
+ * by `makeBlockFrameUrl` in `@brainstorm-os/sdk/block-frame`. The handler looks up
  * the providing app's installed bundle by `blockId` (registry `blocks.source`)
  * and returns `buildBlockSrcdoc(bundle, {channelId, entityId})` with the block
  * frame's own CSP as a response header.
@@ -20,7 +20,11 @@
  * origin, `secure` for a secure context; no fetch / CORS / stream).
  */
 
-import { BLOCK_FRAME_CSP, BLOCK_FRAME_SCHEME, buildBlockSrcdoc } from "@brainstorm/sdk/block-frame";
+import {
+	BLOCK_FRAME_CSP,
+	BLOCK_FRAME_SCHEME,
+	buildBlockSrcdoc,
+} from "@brainstorm-os/sdk/block-frame";
 import { protocol } from "electron";
 import { isValidBlockId } from "../apps/block-id";
 import type { BlocksRepository } from "../storage/registry-repo/blocks-repo";

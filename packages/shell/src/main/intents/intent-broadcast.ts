@@ -14,7 +14,7 @@
  * "Opened from Notes".
  */
 
-import type { Intent } from "@brainstorm/sdk-types";
+import type { Intent } from "@brainstorm-os/sdk-types";
 import { type AppWindow, isAppWindowLive } from "../apps/launcher";
 
 export const APP_INTENT_CHANNEL = "app:intent";

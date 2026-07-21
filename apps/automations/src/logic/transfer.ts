@@ -23,7 +23,7 @@ import {
 	isTriggerKind,
 	validateTrigger,
 	validateWorkflow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export const AUTOMATION_BUNDLE_KIND = "brainstorm/automation-bundle";
 export const AUTOMATION_BUNDLE_VERSION = 1;

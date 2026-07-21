@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/object-menu` — the cross-app object context menu. The
+ * `@brainstorm-os/sdk/object-menu` — the cross-app object context menu. The
  * headless builder (`buildObjectMenuItems`) decides *what* actions exist;
  * the renderer (`openObjectMenu` / `<ObjectMenuTrigger>`) decides *how*
  * they look — one shared glass popup so every app's menu is identical.

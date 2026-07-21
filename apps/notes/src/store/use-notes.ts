@@ -10,8 +10,8 @@
  * on read).
  */
 
-import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm/sdk-types";
-import { writeValue } from "@brainstorm/sdk/property-ui/pure";
+import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm-os/sdk-types";
+import { writeValue } from "@brainstorm-os/sdk/property-ui/pure";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTrailingCoalescer } from "./coalesce";
 import { createEntitiesRepository, foreignEntityToNote } from "./entities-repository";

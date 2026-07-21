@@ -11,7 +11,7 @@
  * `<Popover>` + `useFocusTrap` tests; here we pin the deny-by-default contract.
  */
 
-import { getEscapeStack, installEscapeHandler } from "@brainstorm/sdk/a11y";
+import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";

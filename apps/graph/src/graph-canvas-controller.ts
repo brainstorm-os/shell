@@ -24,10 +24,10 @@
  * command methods so Stage 2 can swap the chrome without reaching into state.
  */
 
-import { openEntity } from "@brainstorm/sdk";
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm/sdk/a11y";
-import { IconName } from "@brainstorm/sdk/icon";
+import { openEntity } from "@brainstorm-os/sdk";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type AnchoredMenuItem,
 	type ObjectMenuExtraItem,
@@ -37,9 +37,9 @@ import {
 	closeObjectMenu,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { SelectionModifier, modifierFromEvent } from "@brainstorm/sdk/selection";
-import { attachShortcut } from "@brainstorm/sdk/shortcut";
+} from "@brainstorm-os/sdk/object-menu";
+import { SelectionModifier, modifierFromEvent } from "@brainstorm-os/sdk/selection";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
 
 import { plural, t } from "./i18n/t";
 import {

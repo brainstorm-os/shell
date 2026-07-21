@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/predicate-eval` — the ONE pure evaluation stack for the
+ * `@brainstorm-os/sdk/predicate-eval` — the ONE pure evaluation stack for the
  * Database filter language and `ListSource` membership criteria. Promoted
  * from `apps/database/src/logic/` (9.12.3) so the app renderer AND the
  * shell's entities-service `ListSource` query path run the same code —

@@ -8,7 +8,7 @@
  * label wiring + the close/remove contract every host depends on.
  */
 
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

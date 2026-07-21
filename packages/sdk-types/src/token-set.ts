@@ -26,7 +26,7 @@ import { isCanonicalTokenName } from "./token-names";
 export const TOKEN_SET_TYPE_URL = "brainstorm/TokenSet/v1";
 
 /** Which appearance a token set targets. Values match the
- *  `@brainstorm/tokens` `ThemeAppearance` enum at the string layer so
+ *  `@brainstorm-os/tokens` `ThemeAppearance` enum at the string layer so
  *  the two vocabularies are interchangeable without a cross-package
  *  dependency. */
 export enum TokenSetAppearance {

@@ -6,7 +6,7 @@
  * `body` reset kills the browser-default 8px margin that insets the header
  * off the window edges. The shell (`app-preload.ts`) owns the header HEIGHT
  * + macOS traffic-light PADDING; the title face is the shared
- * `.app-header__title` in `@brainstorm/sdk/app-theme.css`. */
+ * `.app-header__title` in `@brainstorm-os/sdk/app-theme.css`. */
 * {
 	box-sizing: border-box;
 }

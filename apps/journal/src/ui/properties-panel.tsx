@@ -2,7 +2,7 @@
  * Right-sidebar properties panel — a React island mounted into Journal's
  * plain-DOM shell (mirrors the existing `entry-editor-mount.tsx` pattern).
  *
- * A thin adapter over the SHARED `@brainstorm/sdk/properties-panel`, so the
+ * A thin adapter over the SHARED `@brainstorm-os/sdk/properties-panel`, so the
  * Journal inspector reads pixel-identical to Notes' and Database's (same
  * 44px header, `.bs-props__*` rows + cells, metadata footer). Journal maps
  * the focused day's `entry.values` to the generic `rows`, surfaces date-key /
@@ -24,15 +24,15 @@ import {
 	CommentsProvider,
 	CommentsRightPanel,
 	type RightPanelTab,
-} from "@brainstorm/editor";
-import type { CommentAnchor, CommentDef, RosterService } from "@brainstorm/sdk-types";
-import type { PropertiesPanelMeta } from "@brainstorm/sdk/properties-panel";
+} from "@brainstorm-os/editor";
+import type { CommentAnchor, CommentDef, RosterService } from "@brainstorm-os/sdk-types";
+import type { PropertiesPanelMeta } from "@brainstorm-os/sdk/properties-panel";
 import {
 	EntityPropertiesPanel,
 	PropertiesProvider,
 	type ValuesMap,
-} from "@brainstorm/sdk/property-ui";
-import { useSelfDisplayName } from "@brainstorm/sdk/self-display-name";
+} from "@brainstorm-os/sdk/property-ui";
+import { useSelfDisplayName } from "@brainstorm-os/sdk/self-display-name";
 import { type JSX, useCallback, useMemo } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type JournalT, journalPlural } from "../logic/journal-i18n";
@@ -151,7 +151,7 @@ export function JournalPropertiesIsland({
 }
 
 /** Journal's properties inspector — a thin adapter over the SHARED
- *  `@brainstorm/sdk/property-ui` `EntityPropertiesPanel` (the values-bag →
+ *  `@brainstorm-os/sdk/property-ui` `EntityPropertiesPanel` (the values-bag →
  *  editable-rows + add-menu body every entity app reuses), identical chrome to
  *  Notes / Database. Journal supplies the focused day's `values` bag, the
  *  write-through (which creates today's entry on demand), the `meta` footer,

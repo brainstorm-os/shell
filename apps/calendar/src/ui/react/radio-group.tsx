@@ -6,7 +6,7 @@
  * `aria-checked` reflects the selected value (owned here).
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import type { ReactNode } from "react";
 import { useState } from "react";
 

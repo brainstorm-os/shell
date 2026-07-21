@@ -20,7 +20,7 @@
  * is always a TitleNode") fills the gap.
  */
 
-import { $createTitleNode } from "@brainstorm/editor";
+import { $createTitleNode } from "@brainstorm-os/editor";
 import {
 	$createParagraphNode,
 	$createTextNode,

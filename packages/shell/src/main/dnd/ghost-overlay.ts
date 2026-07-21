@@ -17,7 +17,7 @@
  * Electron binding wired in `main/index.ts`.
  */
 
-import { type DragGhostSpec, type DragPoint, DropEffect } from "@brainstorm/sdk-types";
+import { type DragGhostSpec, type DragPoint, DropEffect } from "@brainstorm-os/sdk-types";
 import { BrowserWindow } from "electron";
 import type { GhostOverlay } from "./dnd-service";
 

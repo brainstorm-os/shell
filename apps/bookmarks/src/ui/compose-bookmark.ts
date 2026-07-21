@@ -1,13 +1,13 @@
 /**
  * Add-bookmark + edit-tags surfaces, rendered through the shared
- * `@brainstorm/sdk/popover` glass chrome (no bespoke dialog markup).
+ * `@brainstorm-os/sdk/popover` glass chrome (no bespoke dialog markup).
  * The URL normalize / dedupe / tag-normalize policy lives in
  * `logic/compose.ts` — these functions are the form shell + validation
  * feedback only.
  */
 
-import { createCheckbox } from "@brainstorm/sdk/checkbox";
-import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
+import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
+import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { t } from "../i18n/manifest";
 import { ComposeError, applyTagEdit, composeBookmark } from "../logic/compose";
 import type { Bookmark } from "../types/bookmark";

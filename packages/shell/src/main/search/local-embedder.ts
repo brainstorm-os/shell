@@ -1,7 +1,7 @@
 /**
  * `FastembedEmbedder` — the real local embedding model for semantic search
  * (plan 11.3), dropped into the `TextEmbedder` seam 11.2 built. Wraps the
- * `@brainstorm/native-embed` NAPI addon (fastembed-rs / ONNX Runtime,
+ * `@brainstorm-os/native-embed` NAPI addon (fastembed-rs / ONNX Runtime,
  * `bge-small-en-v1.5`, 384-d). Embeddings are computed on-device; content never
  * leaves the machine (the addon has no network beyond the one-time model-weight
  * download).
@@ -29,7 +29,7 @@ import {
  *  shell holds the latest snapshot + exposes it to Settings → Search. */
 export type StatusSink = (status: SemanticModelStatus) => void;
 
-/** The subset of `@brainstorm/native-embed` this seam uses. */
+/** The subset of `@brainstorm-os/native-embed` this seam uses. */
 export type EmbedNative = {
 	/** Build/load the model, downloading weights into `cacheDir` on first run.
 	 *  Idempotent; resolves when ready to embed. `onProgress` (optional — older
@@ -168,7 +168,7 @@ export async function loadFastembedEmbedder(
 		// keeps `tsc --noEmit` from demanding those types (the module is cast to
 		// `Partial<EmbedNative>` here anyway) — otherwise a fresh checkout fails
 		// typecheck on the missing declaration.
-		const specifier = "@brainstorm/native-embed";
+		const specifier = "@brainstorm-os/native-embed";
 		const native = (await import(/* @vite-ignore */ specifier)) as Partial<EmbedNative>;
 		return makeEmbedderFromNative(native, cacheDir, onStatus);
 	} catch (error) {

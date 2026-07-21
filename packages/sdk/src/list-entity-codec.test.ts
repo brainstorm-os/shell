@@ -1,4 +1,4 @@
-import { type Entity, IconKind, type List, ListSourceKind } from "@brainstorm/sdk-types";
+import { type Entity, IconKind, type List, ListSourceKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "./list-entity-codec";
 

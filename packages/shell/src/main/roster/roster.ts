@@ -16,7 +16,7 @@
  *     by pubkey, for a stable cross-device reading order.
  */
 
-import { type RosterMember, RosterRole } from "@brainstorm/sdk-types";
+import { type RosterMember, RosterRole } from "@brainstorm-os/sdk-types";
 
 /** A pubkey + role drawn from the access record (already filtered to active). */
 export type ActiveMemberRef = {

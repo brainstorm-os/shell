@@ -19,7 +19,7 @@
  * without a resolver round-trip.
  */
 
-import type { NavigationMode } from "@brainstorm/sdk";
+import type { NavigationMode } from "@brainstorm-os/sdk";
 import { getEditorHost } from "./editor-host";
 
 export function dispatchOpenEntity(target: {

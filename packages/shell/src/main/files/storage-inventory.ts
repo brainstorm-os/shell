@@ -15,7 +15,7 @@
  * stats sizes, then hands the rows here.
  */
 
-import { type StoredAsset, StoredAssetKind } from "@brainstorm/sdk-types";
+import { type StoredAsset, StoredAssetKind } from "@brainstorm-os/sdk-types";
 import { AssetKind } from "../assets/asset-types";
 import type { AssetRecord } from "../storage/entities-repo/assets-repo";
 

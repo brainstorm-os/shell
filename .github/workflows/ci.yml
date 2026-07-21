@@ -60,7 +60,7 @@ jobs:
         run: bun run test
 
       - name: Build shell bundle (sanity)
-        run: bun run --filter @brainstorm/shell build
+        run: bun run --filter @brainstorm-os/shell build
 
   # 13.3 — real-renderer smoke on a virtual display. Runs the Playwright e2e
   # suite (beta-exit flows) and the KBN-P keyboard-accessibility specs against
@@ -87,7 +87,7 @@ jobs:
       - name: Build native (host-arch)
         env:
           CARGO_BUILD_JOBS: 2
-        run: bun run --filter @brainstorm/native build:linux-x64
+        run: bun run --filter @brainstorm-os/native build:linux-x64
 
       - name: Rebuild SQLite natives for Electron's ABI
         # bun install fetches Node-ABI prebuilds; the shell loads these inside

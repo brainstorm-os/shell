@@ -1,4 +1,4 @@
-import { WorkflowRunStatus } from "@brainstorm/sdk-types";
+import { WorkflowRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import type { CapabilityLedger } from "../capabilities/ledger";

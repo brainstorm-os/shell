@@ -15,9 +15,9 @@
  * callback (typically `useNotes().setValue` curried by `noteId`).
  */
 
-import type { SelectionCommentAnchor } from "@brainstorm/editor";
-import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm/sdk-types";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui/pure";
+import type { SelectionCommentAnchor } from "@brainstorm-os/editor";
+import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm-os/sdk-types";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui/pure";
 import { type ReactNode, createContext, useContext, useMemo } from "react";
 
 export type NoteContextValue = {

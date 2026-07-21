@@ -30,7 +30,7 @@ button {
 }
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin) is the
- * shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`. */
+ * shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. */
 
 /* Two-column layout (mirrors Notes): collapsible left calendar sidebar +
  * the entry editor. The right properties panel is NOT a grid track — it is
@@ -135,7 +135,7 @@ button {
 }
 
 /* The active panel (Properties or Comments) fills below the tab strip; the
- * strip itself (`.bs-panel-tabs`) is the shared `@brainstorm/editor`
+ * strip itself (`.bs-panel-tabs`) is the shared `@brainstorm-os/editor`
  * CommentsRightPanel chrome (mirrors Notes' `.notes__props` rule). */
 .journal__props > :not(.bs-panel-tabs) {
 	flex: 1 1 0;
@@ -241,7 +241,7 @@ body.is-resizing .journal__props-resize {
 /* Seeded journal `.ydoc` files plant a TitleNode at root[0] carrying the
  * ISO date. The journal day already paints that date in the app header
  * (`.journal__header-title`), so the duplicate inside the editor is
- * hidden. The shared `TitleNode` from `@brainstorm/editor` renders as
+ * hidden. The shared `TitleNode` from `@brainstorm-os/editor` renders as
  * `<h1 class="notes__title">`; we scope the hide rule to the editor host
  * so the same class on the Notes side keeps its visible styling. */
 .journal__entry-editor .notes__title {
@@ -355,7 +355,7 @@ body.is-resizing .journal__props-resize {
 }
 
 /* ── Sidebar mini-calendar ───────────────────────────────────────────── */
-/* The grid + nav are the shared `@brainstorm/sdk/calendar` mini-calendar
+/* The grid + nav are the shared `@brainstorm-os/sdk/calendar` mini-calendar
  * (`.bs-cal-mini*`, square day cells styled by the SDK). Journal's only
  * addition is the per-day entry-presence dot, riding under the day number
  * inside the rounded cell. */
@@ -852,7 +852,7 @@ body.is-resizing .journal__props-resize {
 }
 
 /* ── Properties panel ────────────────────────────────────────────────── */
-/* The panel CONTENT is the shared `@brainstorm/sdk/properties-panel`
+/* The panel CONTENT is the shared `@brainstorm-os/sdk/properties-panel`
  * (`.bs-props__*`, identical chrome to Notes / Database); only the
  * "Open in Notes" hint below the rows is Journal-local. */
 

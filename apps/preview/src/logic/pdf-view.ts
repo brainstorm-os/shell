@@ -57,4 +57,4 @@ export {
 	PDF_ZOOM_STEP,
 	clampZoom,
 	fitScale,
-} from "@brainstorm/sdk/pdf-engine";
+} from "@brainstorm-os/sdk/pdf-engine";

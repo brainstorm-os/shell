@@ -7,7 +7,7 @@
  * that's unreadable on its own surface. The theme-editor surfaces failures
  * inline (9.9.6) and the CLI `pack` fails on them.
  *
- * sdk-types is a leaf and must not depend on `@brainstorm/tokens`, so the
+ * sdk-types is a leaf and must not depend on `@brainstorm-os/tokens`, so the
  * caller supplies a `resolve(tokenName)` returning the effective CSS colour
  * (base ∪ overrides) — the theme-editor's `composePreviewVars` is exactly
  * that map. Colours the lint can't evaluate (named, `var()`, gradients) are

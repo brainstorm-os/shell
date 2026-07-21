@@ -1,4 +1,4 @@
-import { ListSourceKind } from "@brainstorm/sdk-types";
+import { ListSourceKind } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { List } from "../types/list";
 import { type ListView, ListViewKind } from "../types/list-view";

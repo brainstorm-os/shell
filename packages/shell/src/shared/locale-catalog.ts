@@ -9,9 +9,9 @@
 
 // The source language + fallback-chain resolver are shared with the app SDK
 // (apps walk the same chain to load their own overlay packs — 12.15 slice 15c).
-// They live in `@brainstorm/sdk/i18n` so there's one home; re-exported here so
+// They live in `@brainstorm-os/sdk/i18n` so there's one home; re-exported here so
 // every existing shell importer keeps working unchanged.
-export { SOURCE_LANGUAGE, localeFallbackChain } from "@brainstorm/sdk/i18n";
+export { SOURCE_LANGUAGE, localeFallbackChain } from "@brainstorm-os/sdk/i18n";
 
 /** Languages with a shipped catalog, source language first. Grows as seed /
  *  community packs land. */

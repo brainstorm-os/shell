@@ -12,7 +12,7 @@
  *
  * **File-save side (9.13.13b).** Generic helpers (`textToBytes`,
  * `svgToPng`, `suggestedFilename`, `requestSaveBytes`) live in
- * `@brainstorm/sdk/export-file` — extracted at copy two when Whiteboard
+ * `@brainstorm-os/sdk/export-file` — extracted at copy two when Whiteboard
  * 9.17.8b adopted the same flow (per [[extract-to-sdk-at-copy-two]]).
  * This module retains the Graph-specific format tables (extension +
  * MIME, keyed off the `GraphExportFormat` enum) so the menu wiring
@@ -270,7 +270,7 @@ export function toSVG(input: SvgExportInput): string {
 // ─── File-save plumbing (9.13.13b) ───────────────────────────────────────────
 //
 // Generic helpers (`textToBytes`, `svgToPng`, `suggestedFilename`,
-// `requestSaveBytes`) live in `@brainstorm/sdk/export-file` — shared
+// `requestSaveBytes`) live in `@brainstorm-os/sdk/export-file` — shared
 // with Whiteboard at 9.17.8b (per [[extract-to-sdk-at-copy-two]]). This
 // module keeps the Graph-specific format-tables that key off the
 // `GraphExportFormat` enum.

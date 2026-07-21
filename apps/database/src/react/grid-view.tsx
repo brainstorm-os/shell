@@ -26,11 +26,15 @@
  * scope for this rung. React migration of cell internals is follow-up.
  */
 
-import { type ObjectDragItem, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
-import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { useDragSource } from "@brainstorm/sdk/object-dnd";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { type ObjectDragItem, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	type CompositeItemProps,
+	Orientation,
+	useCompositeKeyboard,
+} from "@brainstorm-os/sdk/a11y";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { useDragSource } from "@brainstorm-os/sdk/object-dnd";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import {
 	DndContext,
 	type DragEndEvent,

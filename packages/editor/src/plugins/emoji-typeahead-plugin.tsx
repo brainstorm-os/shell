@@ -18,13 +18,13 @@
  * variant inserts the toned glyph, the row body inserts the neutral base.
  */
 
-import { SkinTone } from "@brainstorm/sdk-types";
+import { SkinTone } from "@brainstorm-os/sdk-types";
 import {
 	ALL_EMOJIS,
 	type EmojiData,
 	applySkinTone,
 	emojiShortcodeCandidates,
-} from "@brainstorm/sdk/icon-picker";
+} from "@brainstorm-os/sdk/icon-picker";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$createTextNode,

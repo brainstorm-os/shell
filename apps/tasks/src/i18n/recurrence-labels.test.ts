@@ -1,4 +1,4 @@
-import { RecurrenceKind, Weekday, summarizeRecurrence } from "@brainstorm/sdk-types";
+import { RecurrenceKind, Weekday, summarizeRecurrence } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { recurrenceLabels } from "./recurrence-labels";
 

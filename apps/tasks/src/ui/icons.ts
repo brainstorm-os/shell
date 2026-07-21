@@ -1,7 +1,7 @@
 /**
  * Tasks chrome glyphs.
  *
- * The shared `@brainstorm/sdk/icon` set is the source of truth — anything
+ * The shared `@brainstorm-os/sdk/icon` set is the source of truth — anything
  * in it renders via `createIconElement`. The only glyphs Tasks' sidebar
  * needs that the shared registry does NOT yet expose are the **Inbox**
  * (Phosphor `tray`) and **Upcoming** (Phosphor `calendar-dots`) markers
@@ -16,7 +16,7 @@
  * routes through the SDK — today via `IconName.KindDate`, and so on.
  */
 
-import { type IconName, createGlyphElement, createIconElement } from "@brainstorm/sdk/icon";
+import { type IconName, createGlyphElement, createIconElement } from "@brainstorm-os/sdk/icon";
 
 export enum TasksIcon {
 	Inbox = "inbox",

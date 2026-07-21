@@ -6,7 +6,7 @@
  * contact list when that panel is hidden.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

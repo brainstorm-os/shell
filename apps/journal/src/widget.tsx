@@ -12,14 +12,14 @@
  * `onChange` — the sanctioned reactivity stack), filtered to `Entry/v1`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
 import { buildJournalT, journalPlural } from "./logic/journal-i18n";
 import { JOURNAL_ENTRY_TYPE, getJournalRuntime } from "./runtime";

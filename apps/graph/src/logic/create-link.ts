@@ -24,7 +24,7 @@ import {
 	type PropertyDef,
 	ValueType,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** What a pointer-down on a node means for the gesture that follows. */
 export enum NodeDragKind {

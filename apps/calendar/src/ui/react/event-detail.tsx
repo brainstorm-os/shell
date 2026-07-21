@@ -11,15 +11,15 @@
  * repo write; this surface only emits the resolved result).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { Checkbox } from "@brainstorm/sdk/checkbox";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { type ObjectMenuContext, openObjectMenu } from "@brainstorm/sdk/object-menu";
-import { closePicker, openIconPicker } from "@brainstorm/sdk/picker-host";
-import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm/sdk/popover";
-import { RecurrenceEditor } from "@brainstorm/sdk/recurrence-editor";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
-import { matchesChord } from "@brainstorm/sdk/shortcut";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { type ObjectMenuContext, openObjectMenu } from "@brainstorm-os/sdk/object-menu";
+import { closePicker, openIconPicker } from "@brainstorm-os/sdk/picker-host";
+import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { RecurrenceEditor } from "@brainstorm-os/sdk/recurrence-editor";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
+import { matchesChord } from "@brainstorm-os/sdk/shortcut";
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import { calendarRecurrenceEditorLabels } from "../../i18n/recurrence-editor-labels";
 import { recurrenceLabels } from "../../i18n/recurrence-labels";

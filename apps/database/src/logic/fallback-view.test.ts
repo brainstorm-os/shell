@@ -6,8 +6,8 @@
  * producer, not just the importer.
  */
 
-import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "@brainstorm/sdk";
-import type { List as SdkList } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "@brainstorm-os/sdk";
+import type { List as SdkList } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { List } from "../types/list";
 import { ListViewKind } from "../types/list-view";

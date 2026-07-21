@@ -4,7 +4,7 @@
  * no host globals, no prototype access, no foreign code path.
  */
 
-import { StepKind, WorkflowRunStatus, type WorkflowStep } from "@brainstorm/sdk-types";
+import { StepKind, WorkflowRunStatus, type WorkflowStep } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type ExprScope, ExpressionError, evaluateExpression } from "./code-expression";
 import { codeExpressionScope, createCoreInterpreters } from "./step-interpreters";

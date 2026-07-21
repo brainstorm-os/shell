@@ -17,8 +17,8 @@
  * `<Icon>` primitives; outline-on-border focus per the shared rule.
  */
 
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import { isPlumbingEntityType, typeDisplayName } from "@brainstorm/sdk/system-entities";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import { isPlumbingEntityType, typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import { AnimatePresence } from "framer-motion";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";

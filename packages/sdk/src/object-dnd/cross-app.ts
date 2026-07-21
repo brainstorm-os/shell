@@ -23,7 +23,7 @@ import {
 	type DropDelivery,
 	DropEffect,
 	type ObjectDragPayload,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { objectDragItemTypes } from "../entity-drag";
 
 export { CROSS_APP_DRAG_LEAVE_EVENT, CROSS_APP_DRAG_OVER_EVENT, CROSS_APP_DROP_EVENT };

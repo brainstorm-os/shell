@@ -14,15 +14,15 @@
  * hand-rolls month/weekday name tables.
  */
 
-import type { FormatContext } from "@brainstorm/sdk-types";
+import type { FormatContext } from "@brainstorm-os/sdk-types";
 import { daysBetween } from "./date-grid/date-grid";
 
 /**
  * Locale + regional formatting context. Canonical definition lives in the leaf
- * `@brainstorm/sdk-types` so it can ride the app handshake + runtime (12.15
+ * `@brainstorm-os/sdk-types` so it can ride the app handshake + runtime (12.15
  * slice 15f); re-exported here because the formatters below consume it and most
  * call sites import it alongside them. Apps read the live context from
- * `runtime.format` (`useFormatContext` in `@brainstorm/sdk/i18n-react`); the
+ * `runtime.format` (`useFormatContext` in `@brainstorm-os/sdk/i18n-react`); the
  * shell builds it from its dashboard snapshot.
  */
 export type { FormatContext };

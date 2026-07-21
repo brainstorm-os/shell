@@ -6,14 +6,14 @@
  * vault `entities.delete(id)`. Cancelling must NOT delete.
  */
 
-import { LAYOUT_TYPE_URL } from "@brainstorm/sdk-types";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { LAYOUT_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FormDesignerApp } from "./app";
 
-vi.mock("@brainstorm/sdk/object-menu", () => ({
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
 }));
 

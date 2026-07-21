@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { CodeNode } from "@lexical/code";
 import { createHeadlessEditor } from "@lexical/headless";
 import { AutoLinkNode, LinkNode } from "@lexical/link";

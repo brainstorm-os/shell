@@ -15,9 +15,9 @@ import {
 	applySuggestionInEditor,
 	denormalizeBody,
 	useCommentMentionHost,
-} from "@brainstorm/editor";
-import { useBlankRecoveryGap } from "@brainstorm/react-yjs";
-import { NavigationMode } from "@brainstorm/sdk";
+} from "@brainstorm-os/editor";
+import { useBlankRecoveryGap } from "@brainstorm-os/react-yjs";
+import { NavigationMode } from "@brainstorm-os/sdk";
 import type {
 	CommentAnchor,
 	CommentDef,
@@ -26,34 +26,34 @@ import type {
 	PropertyDef,
 	PropertyValueByValueType,
 	ValueType,
-} from "@brainstorm/sdk-types";
-import { LiveRegion } from "@brainstorm/sdk/a11y";
-import { CoverPicker, type CoverPickerService } from "@brainstorm/sdk/cover-picker";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
-import { Icon as IconGlyph, IconName } from "@brainstorm/sdk/icon";
-import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { openSearchPicker } from "@brainstorm/sdk/menus";
-import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
-import { type NoteReference, extractNoteReferences } from "@brainstorm/sdk/note-references";
+} from "@brainstorm-os/sdk-types";
+import { LiveRegion } from "@brainstorm-os/sdk/a11y";
+import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { copyEntityBody, hasBodyDocTransport } from "@brainstorm-os/sdk/entity-body-copy";
+import { Icon as IconGlyph, IconName } from "@brainstorm-os/sdk/icon";
+import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { openSearchPicker } from "@brainstorm-os/sdk/menus";
+import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
+import { type NoteReference, extractNoteReferences } from "@brainstorm-os/sdk/note-references";
 import {
 	type ObjectMenuExtraItem,
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
-} from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { AddIconGlyph } from "@brainstorm/sdk/picker-host";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { PropertiesProvider } from "@brainstorm/sdk/property-ui";
-import { bindValue, clearValue } from "@brainstorm/sdk/property-ui/pure";
-import { attachResizable } from "@brainstorm/sdk/resizable";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
-import { useSelfDisplayName } from "@brainstorm/sdk/self-display-name";
-import { ShareDialog, type ShareDialogLabels } from "@brainstorm/sdk/share-dialog";
-import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
-import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm/sdk/templates";
+} from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { AddIconGlyph } from "@brainstorm-os/sdk/picker-host";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
+import { bindValue, clearValue } from "@brainstorm-os/sdk/property-ui/pure";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
+import { useSelfDisplayName } from "@brainstorm-os/sdk/self-display-name";
+import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
+import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
+import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm-os/sdk/templates";
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
@@ -242,7 +242,7 @@ export function NotesApp() {
 		[notes, onSelectNote],
 	);
 	// The note the user last had open, recalled from the per-device settings
-	// service (`@brainstorm/sdk/last-viewed`) — async, so the boot restore
+	// service (`@brainstorm-os/sdk/last-viewed`) — async, so the boot restore
 	// below waits on `lastViewedLoaded` before picking, and the persist effect
 	// only ever writes a non-null id so a transient null can't wipe it.
 	const lastOpenRef = useRef<string | null>(null);
@@ -253,7 +253,7 @@ export function NotesApp() {
 
 	// Live comments adapter for the open note (B11.9). Bridges the vault
 	// entities signal + entities-service mutations into the shared
-	// `@brainstorm/editor` comments adapter; null when no note or on an older
+	// `@brainstorm-os/editor` comments adapter; null when no note or on an older
 	// shell without the real entities service (Comments tab then stays hidden).
 	const commentsAdapter = useNotesCommentsAdapter(note?.id ?? null);
 	// Collab-C6 — roster-backed @-mention for the comment composer (Notes wires

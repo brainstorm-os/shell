@@ -11,7 +11,7 @@
  * the CI full-suite run.)
  */
 
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { readEntityIcon } from "../src/logic/entity-icon";
 

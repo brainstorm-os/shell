@@ -34,7 +34,7 @@ export type MemberExclude = {
 
 /** Manual overrides layered on a Collection's dynamic `source`.
  *  `effective = (source ∪ include) \ exclude` (see `effectiveMembers`
- *  in `@brainstorm/sdk`). */
+ *  in `@brainstorm-os/sdk`). */
 export type MemberOverrides = {
 	include: MemberInclude[];
 	exclude: MemberExclude[];

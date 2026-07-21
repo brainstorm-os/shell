@@ -9,7 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewApp } from "./app";
@@ -17,11 +17,11 @@ import { _resetPreviewRegistryForTests } from "./logic/registry";
 import { flush, renderInto } from "./test/render";
 import { PreviewContextKind } from "./types/preview-context";
 
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	mountMenuHost: vi.fn(),
 	MenuAlign: { Start: "start", End: "end" },
 }));
-vi.mock("@brainstorm/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 
 beforeEach(() => {
 	// No renderers registered — the stage shows the "renderer not wired" pane

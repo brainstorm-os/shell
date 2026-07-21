@@ -12,8 +12,8 @@
  * mood/habit filter rows keep their `role="group"` (not a composite role).
  */
 
-import { CompositeHost, Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
+import { CompositeHost, Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import {
 	HABIT_LABEL_KEY,
 	type HabitId,

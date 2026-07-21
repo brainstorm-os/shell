@@ -1,4 +1,4 @@
-import { AiContentPartKind, MessageRole, OLLAMA_PROVIDER_ID } from "@brainstorm/sdk-types";
+import { AiContentPartKind, MessageRole, OLLAMA_PROVIDER_ID } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type OllamaHttp, createOllamaProvider } from "./ollama-provider";
 

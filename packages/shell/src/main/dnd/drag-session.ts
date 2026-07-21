@@ -10,8 +10,8 @@
  * broker-verified `envelope.app`, stamped at `begin`.
  */
 
-import { DropEffect } from "@brainstorm/sdk-types";
-import type { DragPayloadKind, ObjectDragItem, ObjectDragPayload } from "@brainstorm/sdk-types";
+import { DropEffect } from "@brainstorm-os/sdk-types";
+import type { DragPayloadKind, ObjectDragItem, ObjectDragPayload } from "@brainstorm-os/sdk-types";
 
 /** The current hover target, as resolved by hit-testing. */
 export type DragTarget = {

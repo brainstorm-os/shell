@@ -11,11 +11,11 @@
  * call `onMove(entity, dayStart)` so the host can write the date property.
  */
 
-import { birthdayOccurrencesInRange } from "@brainstorm/sdk-types";
-import { attachGridCellKeyboard } from "@brainstorm/sdk/a11y";
-import { MonthGridDensity, createMonthGrid } from "@brainstorm/sdk/calendar";
-import { WeekStartsOn } from "@brainstorm/sdk/date-grid";
-import { createDatePager } from "@brainstorm/sdk/date-pager";
+import { birthdayOccurrencesInRange } from "@brainstorm-os/sdk-types";
+import { attachGridCellKeyboard } from "@brainstorm-os/sdk/a11y";
+import { MonthGridDensity, createMonthGrid } from "@brainstorm-os/sdk/calendar";
+import { WeekStartsOn } from "@brainstorm-os/sdk/date-grid";
+import { createDatePager } from "@brainstorm-os/sdk/date-pager";
 import { plural, t } from "../i18n";
 import type { CompiledView } from "../logic/compile-view";
 import type { EntityRow } from "../logic/in-memory-entities";
@@ -89,7 +89,7 @@ function renderToolbar(props: CalendarViewProps): HTMLElement {
 	}
 	right.appendChild(segments);
 
-	// Third-copy promotion to `@brainstorm/sdk/date-pager` (the cluster
+	// Third-copy promotion to `@brainstorm-os/sdk/date-pager` (the cluster
 	// also lives in Calendar header + Journal day-strip). Database keeps
 	// the legacy `dbv-cal__controls` class on the root so existing layout
 	// CSS keeps working.

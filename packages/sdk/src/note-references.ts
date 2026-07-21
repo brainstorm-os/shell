@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/note-references` — the **single** cross-entity reference
+ * `@brainstorm-os/sdk/note-references` — the **single** cross-entity reference
  * walker over a Lexical `SerializedEditorState` note body (B6.5).
  *
  * Before this, the Notes app (`editor/extract-references.ts`, for backlinks /

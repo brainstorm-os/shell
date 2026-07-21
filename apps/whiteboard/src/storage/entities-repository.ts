@@ -6,10 +6,10 @@
  * Two types read in one combined query; writes are get-then-create-or-update
  * keyed on the stable app-owned id. Domain `createdAt`/`updatedAt` + the
  * inline `nodes[]` + the `whiteboardId` FK all live in the property bag.
- * Plumbing lives in `@brainstorm/sdk/storage-repository`.
+ * Plumbing lives in `@brainstorm-os/sdk/storage-repository`.
  */
 
-import { deleteEntity, queryEntityRows, upsertEntity } from "@brainstorm/sdk/storage-repository";
+import { deleteEntity, queryEntityRows, upsertEntity } from "@brainstorm-os/sdk/storage-repository";
 import type { WhiteboardEdge } from "../types/edge";
 import type { Whiteboard } from "../types/whiteboard";
 import {

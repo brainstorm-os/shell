@@ -8,8 +8,8 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@brainstorm/sdk": "workspace:*",
-    "@brainstorm/sdk-types": "workspace:*",
+    "@brainstorm-os/sdk": "workspace:*",
+    "@brainstorm-os/sdk-types": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

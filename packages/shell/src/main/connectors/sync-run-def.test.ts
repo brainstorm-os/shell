@@ -1,4 +1,4 @@
-import { SyncRunStatus } from "@brainstorm/sdk-types";
+import { SyncRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { toSyncRunDef } from "./sync-run-def";
 import type { SyncRunResult } from "./sync-runner";

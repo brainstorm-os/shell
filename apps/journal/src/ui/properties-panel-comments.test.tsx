@@ -10,7 +10,7 @@
  *      degrades to the properties-only panel — no tab strip.
  */
 
-import { RightPanelTab } from "@brainstorm/editor";
+import { RightPanelTab } from "@brainstorm-os/editor";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildJournalT } from "../logic/journal-i18n";

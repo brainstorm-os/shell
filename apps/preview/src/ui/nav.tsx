@@ -3,7 +3,7 @@
  * gallery to walk (≤1 sibling), where the arrows are noise.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { t } from "../i18n";
 

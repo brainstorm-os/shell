@@ -18,9 +18,9 @@
  * is the single Tab stop; `aria-activedescendant` tracks the active bar).
  */
 
-import { attachOrderedGridCellKeyboard } from "@brainstorm/sdk/a11y";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { attachOrderedGridCellKeyboard } from "@brainstorm-os/sdk/a11y";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { t, tCount } from "../i18n/t";
 import { type GanttModel, type GanttRow, rangeDays } from "../logic/gantt";
 import { formatMinutes } from "../logic/task-time";

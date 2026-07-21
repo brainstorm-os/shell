@@ -1,5 +1,5 @@
 /**
- * @brainstorm/editor — `brainstorm-editor` (Stage 9.2).
+ * @brainstorm-os/editor — `brainstorm-editor` (Stage 9.2).
  *
  * A pre-configured, always-Yjs-backed Lexical editor + the baseline node
  * set + a Lexical-free read-only preview renderer. Consumes 9.1's

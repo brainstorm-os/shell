@@ -11,7 +11,7 @@
  * keystone). Pure + unit-tested in isolation — no DOM, no services.
  */
 
-import { normalizeAddress } from "@brainstorm/sdk-types";
+import { normalizeAddress } from "@brainstorm-os/sdk-types";
 import { PERSON_TYPE, type VaultEntityLike } from "../types/person";
 import { toStringArray } from "./person-view";
 

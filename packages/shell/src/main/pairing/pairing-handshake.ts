@@ -35,7 +35,7 @@ import {
 	hkdfSha256,
 	x25519GetPublicKey,
 	x25519GetSharedSecret,
-} from "@brainstorm/native";
+} from "@brainstorm-os/native";
 import type { SealedSecret } from "../credentials/crypto";
 import {
 	IDENTITY_SECRET_BYTES,

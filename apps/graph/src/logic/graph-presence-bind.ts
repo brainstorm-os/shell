@@ -3,8 +3,8 @@
  * channel, pointer publishing, and the screen-space overlay layer.
  */
 
-import type { LocalAwareness } from "@brainstorm/react-yjs";
-import { localPresenceName } from "@brainstorm/sdk/peer-presence";
+import type { LocalAwareness } from "@brainstorm-os/react-yjs";
+import { localPresenceName } from "@brainstorm-os/sdk/peer-presence";
 import type { AppState } from "../graph-canvas-controller";
 import { type PresenceNodeScreen, renderPresenceOverlay } from "../render/presence-overlay";
 import { PRESENCE_FIELD, buildLocalPresence, presencePeers } from "./presence";

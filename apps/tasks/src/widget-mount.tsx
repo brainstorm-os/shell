@@ -6,9 +6,9 @@
  * keeps the `AppErrorBoundary` wrapper clean.
  */
 
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import type { WidgetLaunch } from "@brainstorm/sdk/widget";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import type { WidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { TasksWidget } from "./widget";
 

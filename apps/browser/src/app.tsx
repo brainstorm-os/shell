@@ -19,16 +19,16 @@ import {
 	type WebViewClient,
 	type WebViewEvent,
 	WebViewEventKind,
-} from "@brainstorm/sdk-types";
-import { Icon, IconDirection, IconName, IconWeight } from "@brainstorm/sdk/icon";
+} from "@brainstorm-os/sdk-types";
+import { Icon, IconDirection, IconName, IconWeight } from "@brainstorm-os/sdk/icon";
 import {
 	MenuAlign,
 	closeTypeaheadMenu,
 	mountMenuHost,
 	openTypeaheadMenu,
-} from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { attachShortcut, useShortcut } from "@brainstorm/sdk/shortcut";
+} from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { attachShortcut, useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { FindBar, type FindMatchState } from "./find-bar";

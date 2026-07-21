@@ -26,7 +26,7 @@
  * `apps_inherit_shell_theme` convention) so theming "just works".
  */
 
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import { CaretLeft } from "@phosphor-icons/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";

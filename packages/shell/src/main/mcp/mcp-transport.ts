@@ -25,7 +25,7 @@ import {
 	MCP_TOOLS_PER_SERVER_MAX,
 	type McpToolDescriptor,
 	sanitizeToolDescriptor,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Per-request budgets. `tools/list` + `tools/call` are interactive — short
  *  enough to keep a down server from blocking the loop (doc 64 §budgets:

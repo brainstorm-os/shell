@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/shortcut` — the host-agnostic keyboard layer. Apps bind
+ * `@brainstorm-os/sdk/shortcut` — the host-agnostic keyboard layer. Apps bind
  * a chord (the same chord syntax the shell registry uses) instead of
  * scattering raw `e.key` checks. `attachShortcut` is the pure-DOM binder;
  * `useShortcut` is the React twin; `matchesChord`/`normalizeKey` are the

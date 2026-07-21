@@ -1,9 +1,11 @@
 {
-  "name": "@brainstorm/block-protocol",
+  "name": "@brainstorm-os/block-protocol",
   "version": "0.0.1",
-  "private": true,
   "description": "Transport-agnostic Block Protocol core for Brainstorm — the BP message envelope, the module router, and the hook-module router. Host bindings (e.g. the graph module → vault entities) live in the shell.",
   "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "src/index.ts",

@@ -11,8 +11,8 @@
  * instead of the generic `Entity` cube fallback.
  */
 
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { IconName } from "@brainstorm/sdk/icon";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { t } from "../i18n";
 

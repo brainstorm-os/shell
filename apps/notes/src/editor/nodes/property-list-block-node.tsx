@@ -11,8 +11,8 @@
  * logic, sharing the cell registry + fallbacks.
  */
 
-import { defaultViewFor } from "@brainstorm/sdk-types";
-import { getCell, readValue, useProperty } from "@brainstorm/sdk/property-ui";
+import { defaultViewFor } from "@brainstorm-os/sdk-types";
+import { getCell, readValue, useProperty } from "@brainstorm-os/sdk/property-ui";
 import {
 	type DOMConversionMap,
 	DecoratorNode,

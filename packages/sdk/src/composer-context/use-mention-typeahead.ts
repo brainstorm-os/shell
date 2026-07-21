@@ -11,7 +11,7 @@
  * is never interrupted — the sanctioned pattern from the editor caret typeaheads.
  */
 
-import type { MessageAttachment } from "@brainstorm/sdk-types";
+import type { MessageAttachment } from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type TypeaheadMenuItem,

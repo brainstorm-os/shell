@@ -5,8 +5,8 @@
  * result, and degrades gracefully (error chip / em-dash) without throwing.
  */
 
-import type { CellProps, PropertyDef } from "@brainstorm/sdk-types";
-import { PropertyFormat, PropertyView, ValueType } from "@brainstorm/sdk-types";
+import type { CellProps, PropertyDef } from "@brainstorm-os/sdk-types";
+import { PropertyFormat, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

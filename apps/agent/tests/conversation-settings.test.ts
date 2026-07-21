@@ -5,7 +5,7 @@
  * (`agent-tools.test.ts`); these cover the new narrowing/merge/budget math.
  */
 
-import { OLLAMA_PROVIDER_ID } from "@brainstorm/sdk-types";
+import { OLLAMA_PROVIDER_ID } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	AUTO_PROVIDER,

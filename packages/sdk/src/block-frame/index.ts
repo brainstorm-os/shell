@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/block-frame` — 9.5.1 block-frame iframe primitive +
+ * `@brainstorm-os/sdk/block-frame` — 9.5.1 block-frame iframe primitive +
  * 9.5.2 postMessage transport.
  *
  * Standalone factory + constants the embedding apps consume to mount a

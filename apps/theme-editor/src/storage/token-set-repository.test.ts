@@ -1,4 +1,4 @@
-import { EMPTY_TOKEN_SET, TokenSetAppearance, type TokenSetDef } from "@brainstorm/sdk-types";
+import { EMPTY_TOKEN_SET, TokenSetAppearance, type TokenSetDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntitiesService, EntityRecord } from "./runtime";
 import {

@@ -6,7 +6,7 @@
  * popover's own list does NOT dismiss — regression coverage). The header
  * doubles as an explicit "open this day" route.
  *
- * Deliberately bespoke, not `@brainstorm/sdk/popover`: that primitive is a
+ * Deliberately bespoke, not `@brainstorm-os/sdk/popover`: that primitive is a
  * fixed, centred, full-viewport MODAL (backdrop + `aria-modal`). This is an
  * anchored, non-modal flyout that must pop at the day pill and leave the rest
  * of the month interactive — no shared anchored-panel primitive exists yet.

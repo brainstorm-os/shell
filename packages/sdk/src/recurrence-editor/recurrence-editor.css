@@ -1,5 +1,5 @@
 /**
- * Recurrence editor chrome (`@brainstorm/sdk/recurrence-editor`). Neutral
+ * Recurrence editor chrome (`@brainstorm-os/sdk/recurrence-editor`). Neutral
  * `bs-recur__*` classes; consumers import this sheet directly (it is not
  * side-effect-imported from the module so it survives tree-shaking). Tuned to
  * the shared token set so it themes with the host.

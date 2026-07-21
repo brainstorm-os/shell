@@ -4,7 +4,7 @@
  * The single-object-space remodel promotes Lists/Collections from in-memory
  * Database-app state to first-class vault entities. This is the pure,
  * dependency-free keystone every read/write goes through: it maps a frozen
- * `List` (the app-facing shape, `@brainstorm/sdk-types`) to the `properties`
+ * `List` (the app-facing shape, `@brainstorm-os/sdk-types`) to the `properties`
  * bag stored on a `brainstorm/List/v1` `Entity`, and back.
  *
  * Field mapping: `List.id` ⇄ `Entity.id`; `List.createdAt`/`updatedAt` ⇄ the
@@ -30,7 +30,7 @@ import {
 	type MemberExclude,
 	type MemberInclude,
 	type MemberOverrides,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Re-exported for call sites that create/query the entity by type. */
 export const LIST_ENTITY_TYPE = COLLECTION_TYPE_URL;

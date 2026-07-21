@@ -14,7 +14,7 @@ import type {
 	LinkPreview,
 	PropertiesService,
 	SerializedBlock,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 type StorageValue = unknown;
 

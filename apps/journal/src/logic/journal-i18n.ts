@@ -1,6 +1,6 @@
 /**
  * Journal app i18n manifest + `t()`. Built on the shared SDK `createT`
- * (`@brainstorm/sdk/i18n`) so every user-visible string flows through one
+ * (`@brainstorm-os/sdk/i18n`) so every user-visible string flows through one
  * typed lookup with `{name}` interpolation — no bare literals in `app.ts`.
  *
  * English defaults live here; a localised build passes a `Partial<…>`
@@ -9,8 +9,8 @@
  * the shell's `t.ts` convention (no embedded ICU plural in v1).
  */
 
-import { createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
-import type { TFunction, TParams } from "@brainstorm/sdk/i18n";
+import { createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
+import type { TFunction, TParams } from "@brainstorm-os/sdk/i18n";
 
 /** The frozen set of Journal string ids. The key set is fixed; values
  *  are `string` (not literal types) so a localised build can override

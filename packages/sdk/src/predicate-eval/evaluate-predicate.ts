@@ -15,8 +15,8 @@
  * truth-table for both without divergence.
  */
 
-import { isPropertyRef } from "@brainstorm/sdk-types";
-import type { PropertyPredicate, ScalarValue } from "@brainstorm/sdk-types";
+import { isPropertyRef } from "@brainstorm-os/sdk-types";
+import type { PropertyPredicate, ScalarValue } from "@brainstorm-os/sdk-types";
 import { type EntityRow, readPropertyPath } from "../in-memory-entities";
 import { isInRelativeRange, isRelativeDateRange } from "./relative-date";
 

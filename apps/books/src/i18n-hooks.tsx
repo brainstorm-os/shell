@@ -1,5 +1,5 @@
-import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { BOOKS_I18N, type BooksI18nKey, LOCALE_PACK_IMPORTERS } from "./i18n";
 
 export function useBooksT(runtime?: LocaleRuntime | null): TFunction<typeof BOOKS_I18N> {

@@ -1,6 +1,6 @@
 /**
  * Task properties inspector — a thin adapter over the SHARED
- * `@brainstorm/sdk/properties-panel`, mirroring the Bookmarks panel. It maps
+ * `@brainstorm-os/sdk/properties-panel`, mirroring the Bookmarks panel. It maps
  * the task's bridged fields (see `task-properties.ts`) to the generic `rows`
  * the shared panel renders; all chrome (glass slide-over, header, grid rows)
  * lives in the SDK component, identical to Notes / Journal / Bookmarks.
@@ -19,13 +19,13 @@
  * use, so a property created once in the vault catalog works on tasks too.
  */
 
-import { EntityCommentsPanel } from "@brainstorm/editor";
-import type { PropertyDef, PropertyValueByValueType } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
-import { IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
+import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import type { PropertyDef, PropertyValueByValueType } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
 import {
 	type ValuesMap,
 	bindValue,
@@ -33,7 +33,7 @@ import {
 	readValue,
 	usePropertyStore,
 	writeValue,
-} from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk/property-ui";
 import { useRef } from "react";
 import { t } from "../i18n/t";
 import {

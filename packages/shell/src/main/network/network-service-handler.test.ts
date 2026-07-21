@@ -1,5 +1,5 @@
 import * as nodeHttp from "node:http";
-import type { NetworkReadableResult } from "@brainstorm/sdk-types";
+import type { NetworkReadableResult } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 

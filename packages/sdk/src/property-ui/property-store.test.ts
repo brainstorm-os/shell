@@ -1,5 +1,5 @@
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type PropertyBackend, PropertyStore } from "./property-store";
 

@@ -1,4 +1,9 @@
-import { LayoutCellKind, LayoutContext, type LayoutDef, LayoutMode } from "@brainstorm/sdk-types";
+import {
+	LayoutCellKind,
+	LayoutContext,
+	type LayoutDef,
+	LayoutMode,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	type LayoutCandidate,

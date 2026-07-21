@@ -1,4 +1,4 @@
-import { RecurrenceKind } from "@brainstorm/sdk-types";
+import { RecurrenceKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { CalendarViewKind, WeekStartsOn } from "../types/calendar-view";
 import {

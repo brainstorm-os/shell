@@ -12,15 +12,15 @@
  * the sanctioned reactivity stack), narrowed to `Conversation/v1`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { type OpenCapableRuntime, openEntity } from "@brainstorm/sdk";
-import { CONVERSATION_TYPE_URL } from "@brainstorm/sdk-types";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { type OpenCapableRuntime, openEntity } from "@brainstorm-os/sdk";
+import { CONVERSATION_TYPE_URL } from "@brainstorm-os/sdk-types";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
 import { useAgentT } from "./i18n-hooks";

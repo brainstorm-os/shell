@@ -1,6 +1,6 @@
 /**
  * The slice of `window.brainstorm` this app reads. `vaultEntities` is the live
- * entity-snapshot service (subscribed through `@brainstorm/react-yjs`'s
+ * entity-snapshot service (subscribed through `@brainstorm-os/react-yjs`'s
  * `useVaultEntities`, never `onChange` directly); `entities` persists channels
  * + messages; `roster` resolves the channel's members + the local author's
  * self-asserted display profile (Collab-C6); `storage` holds per-device prefs.
@@ -13,7 +13,7 @@ import type {
 	SharingService,
 	StorageService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type ChatAppRuntime = {
 	app?: { id: string; version: string; sdkVersion: string };

@@ -5,7 +5,11 @@
  * stays trivially testable.
  */
 
-import { AttachmentKind, type EntityAttachment, type ObjectDragItem } from "@brainstorm/sdk-types";
+import {
+	AttachmentKind,
+	type EntityAttachment,
+	type ObjectDragItem,
+} from "@brainstorm-os/sdk-types";
 
 /** Build a pinned-entity attachment from a dragged object. Omits empty optional
  *  fields for `exactOptionalPropertyTypes`. */

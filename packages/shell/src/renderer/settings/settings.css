@@ -629,7 +629,7 @@
 }
 
 /* Theme picker — one card per built-in theme. The preview tile samples
- * the actual tokens (`previewOf()` in @brainstorm/tokens themes.ts) so
+ * the actual tokens (`previewOf()` in @brainstorm-os/tokens themes.ts) so
  * the swatch can't drift from the rendered palette.
  *
  * Selected state ring sits OUTSIDE the card so the preview edges stay
@@ -782,7 +782,7 @@
 
 /* Settings/Data uses the shared `.bs-searchbar` chrome (loaded by
  * `packages/shell/src/renderer/main.tsx` via
- * `@brainstorm/sdk/searchbar/searchbar.css`); this rule just stretches it
+ * `@brainstorm-os/sdk/searchbar/searchbar.css`); this rule just stretches it
  * across the toolbar row and gives it the subtle 1px surround the rest of
  * the data panel carries. */
 /* Specificity (0,3,0) so the `md` height beats the SDK base rule

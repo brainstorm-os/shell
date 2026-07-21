@@ -1,6 +1,6 @@
 /**
  * Contacts app styles. Structural only — colour / type / spacing all come
- * from the shared design tokens (loaded via `@brainstorm/sdk/app-theme.css`).
+ * from the shared design tokens (loaded via `@brainstorm-os/sdk/app-theme.css`).
  * The `.app-header` baseline (44px, bottom border) is the shared rule; the
  * properties inspector reuses the shared `.bs-props` glass overlay (the app
  * owns the container, the SDK owns `.bs-props__inner`).
@@ -148,7 +148,7 @@ body.is-resizing .contacts__resize {
 /* ── App header ──────────────────────────────────────────────────────────
  * The full header chrome — flex skeleton, left/right groups, the `<h1>` title
  * face (incl. its `margin: 0` reset), height / padding / drag-region — is the
- * shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`. Nothing to
+ * shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. Nothing to
  * declare locally. */
 
 /* ── Shared controls ─────────────────────────────────────────────────── */

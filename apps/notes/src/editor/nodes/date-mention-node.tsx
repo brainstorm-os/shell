@@ -1,7 +1,7 @@
 /**
- * Re-export shim — `DateMentionNode` now lives in `@brainstorm/editor`.
+ * Re-export shim — `DateMentionNode` now lives in `@brainstorm-os/editor`.
  * Notes-local imports keep working through here; new code should import
- * from `@brainstorm/editor` directly.
+ * from `@brainstorm-os/editor` directly.
  */
 
 export {
@@ -10,4 +10,4 @@ export {
 	$createDateMentionNode,
 	$isDateMentionNode,
 	DateMentionNode,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

@@ -37,7 +37,7 @@ import {
 	SyncWindow,
 	formatMailAddress,
 	isSyncWindow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import type { AssetStore } from "../assets/asset-store";

@@ -1,4 +1,4 @@
-import { buildObjectMenuItems } from "@brainstorm/sdk/object-menu";
+import { buildObjectMenuItems } from "@brainstorm-os/sdk/object-menu";
 import { describe, expect, it, vi } from "vitest";
 import type { FilesStore } from "../store/use-files-store";
 import { type Entity, FILE_TYPE, FOLDER_TYPE } from "../types/entity";

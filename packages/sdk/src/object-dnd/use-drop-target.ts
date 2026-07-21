@@ -16,7 +16,7 @@
  * drop.
  */
 
-import { DragPayloadKind, DropEffect, type ObjectDragPayload } from "@brainstorm/sdk-types";
+import { DragPayloadKind, DropEffect, type ObjectDragPayload } from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { dataTransferHasEntity, objectDragItemTypes, readObjectDragData } from "../entity-drag";
 import { type CrossAppDropTarget, type DropTargetInfo, crossAppDropRegistry } from "./cross-app";

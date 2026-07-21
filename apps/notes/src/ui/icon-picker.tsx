@@ -1,13 +1,16 @@
 /**
- * Notes' thin host for the shared `@brainstorm/sdk/icon-picker`. The one
+ * Notes' thin host for the shared `@brainstorm-os/sdk/icon-picker`. The one
  * picker (full emoji + Phosphor coverage, virtualised) lives in the SDK;
  * Notes only wires the host-specific bits the SDK convention keeps out of
  * shared surfaces: localized `labels` (each via notes' own `t()`) and the
  * close shortcut through the renderer shortcut registry.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { type IconUploadService, IconPicker as SdkIconPicker } from "@brainstorm/sdk/icon-picker";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import {
+	type IconUploadService,
+	IconPicker as SdkIconPicker,
+} from "@brainstorm-os/sdk/icon-picker";
 import { useMemo } from "react";
 import { t } from "../i18n/t";
 import { ActionId } from "../keyboard/action-ids";

@@ -31,7 +31,7 @@ import {
 	isValidMcpServerId,
 	isValidStdioArgs,
 	isValidStdioCommand,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export const MCP_SERVERS_FILENAME = "mcp-servers.json";
 export const MCP_ENABLEMENT_FILENAME = "mcp-enablement.local.json";

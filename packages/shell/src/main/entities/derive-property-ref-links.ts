@@ -17,8 +17,8 @@
  * paints a ghost edge.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import type { VaultEntity, VaultLink } from "./vault-entities-service";
 
 /** A single rule. Walks every entity matching `entityType`, reads

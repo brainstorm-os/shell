@@ -12,8 +12,8 @@
  * an already-running window.
  */
 
-import type { Entity, PropertiesService, VaultEntitiesService } from "@brainstorm/sdk-types";
-import type { SaveFileService } from "@brainstorm/sdk/export-file";
+import type { Entity, PropertiesService, VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 import type { PreviewContext } from "../types/preview-context";
 
 /** Wire-shape an originating app puts on the intent payload. Bytes-mode
@@ -61,7 +61,7 @@ export type PreviewRuntime = {
 		 *  build — the inspector falls back to read-only facts. */
 		properties?: PropertiesService | null;
 		/** Whole-vault live snapshot driving the library sidebar — read through
-		 *  `@brainstorm/react-yjs`'s `useVaultEntities` (which owns the change
+		 *  `@brainstorm-os/react-yjs`'s `useVaultEntities` (which owns the change
 		 *  subscription), then filtered to `File/v1` rows. Preview holds the
 		 *  `entities.read:*` wildcard that `list()` requires. Null on a standalone
 		 *  preview build. */

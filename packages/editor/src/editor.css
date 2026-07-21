@@ -1,5 +1,5 @@
-/* Aggregated stylesheet for `@brainstorm/editor`. Host apps import via
- * `import "@brainstorm/editor/editor.css"` from their renderer entry —
+/* Aggregated stylesheet for `@brainstorm-os/editor`. Host apps import via
+ * `import "@brainstorm-os/editor/editor.css"` from their renderer entry —
  * the subpath export is the reliable way to ship CSS from a workspace
  * package (transitive side-effect CSS imports from this package's
  * `index.ts` get tree-shaken by Rollup despite `sideEffects` flags).

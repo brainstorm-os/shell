@@ -12,7 +12,7 @@ import {
 	type FindQuery,
 	type ModelRange,
 	type TextSearchProvider,
-} from "@brainstorm/sdk/find-replace";
+} from "@brainstorm-os/sdk/find-replace";
 import {
 	type CodeMatch,
 	type SearchScope,

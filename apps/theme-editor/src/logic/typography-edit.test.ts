@@ -1,4 +1,4 @@
-import { FontRole, SYSTEM_TYPOGRAPHY, TypographyScale } from "@brainstorm/sdk-types";
+import { FontRole, SYSTEM_TYPOGRAPHY, TypographyScale } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	isSystemTypography,

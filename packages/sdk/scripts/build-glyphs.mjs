@@ -5,7 +5,7 @@
  * The pack mirrors the full `ICON_ASSET` registry — one glyph per `IconName`,
  * keyed by the enum VALUE — so the pure-DOM `createIconElement` can paint any
  * name the React `<Icon>` can. Add a name to the registry (`icon-registry.ts`)
- * then re-run `bun run --filter @brainstorm/sdk build:glyphs`.
+ * then re-run `bun run --filter @brainstorm-os/sdk build:glyphs`.
  *
  * The asset → markup extraction matches the committed bytes exactly (Phosphor
  * is pinned), so a clean run is purely additive for any newly-registered name.
@@ -76,7 +76,7 @@ const header = `/**
  * stylesheet-independent). Keyed by the IconName enum value so it stays in
  * sync with the registry in ./icon-registry.ts.
  *
- * Regenerate: bun run --filter @brainstorm/sdk build:glyphs
+ * Regenerate: bun run --filter @brainstorm-os/sdk build:glyphs
  * (scripts/build-glyphs.mjs reads node_modules/@phosphor-icons/core/assets/
  * <weight>/<name>[-<weight>].svg for every glyph in the curated DOM_PACK).
  */

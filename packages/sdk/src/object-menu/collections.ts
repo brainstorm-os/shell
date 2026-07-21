@@ -14,7 +14,7 @@
  * why `addToList`/`removeFromList` run with `matchesSource: false`.
  */
 
-import type { Entity, EntityQuery, Icon, MemberOverrideSource } from "@brainstorm/sdk-types";
+import type { Entity, EntityQuery, Icon, MemberOverrideSource } from "@brainstorm-os/sdk-types";
 import { AddOutcome, RemoveOutcome, addToList, removeFromList } from "../collections";
 import { LIST_ENTITY_TYPE, entityToList } from "../list-entity-codec";
 

@@ -2,13 +2,13 @@
  * App-side keyboard delivery per
  * §Keyboard handling. Every keyboard interaction routes through an
  * action id; no raw `e.key` outside this module. Chord *matching* is the
- * shared `@brainstorm/sdk/shortcut` parser (the per-app chord parser
+ * shared `@brainstorm-os/sdk/shortcut` parser (the per-app chord parser
  * stopgap is retired per the shared-fundamentals contract) — this module
  * keeps only the action-id registry + the typing-target guard the shared
  * binder intentionally doesn't impose.
  */
 
-import { matchesChord } from "@brainstorm/sdk/shortcut";
+import { matchesChord } from "@brainstorm-os/sdk/shortcut";
 
 export const ActionId = {
 	GoMonth: "brainstorm.calendar/go-month",

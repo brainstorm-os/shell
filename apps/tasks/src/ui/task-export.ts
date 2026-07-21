@@ -1,7 +1,7 @@
 /**
  * Tasks "Export…" object-menu rows (IE-8) — the generic entity-export
  * affordance wired to Tasks' runtime. Delegates entirely to the shared
- * `@brainstorm/sdk/entity-export` primitive (serialise via
+ * `@brainstorm-os/sdk/entity-export` primitive (serialise via
  * `export.serializeEntities` → save via the Files host), supplying Tasks'
  * `t()` labels. A single task header exports that task; a project header
  * exports all the project's tasks (the spreadsheet/backup case).
@@ -11,9 +11,9 @@
  * rather than dead.
  */
 
-import type { ExportTextFormat } from "@brainstorm/sdk-types";
-import { type EntityExportInput, buildEntityExportItems } from "@brainstorm/sdk/entity-export";
-import type { ObjectMenuExtraItem } from "@brainstorm/sdk/object-menu";
+import type { ExportTextFormat } from "@brainstorm-os/sdk-types";
+import { type EntityExportInput, buildEntityExportItems } from "@brainstorm-os/sdk/entity-export";
+import type { ObjectMenuExtraItem } from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n/t";
 import type { TasksBrainstorm } from "../storage/runtime";
 

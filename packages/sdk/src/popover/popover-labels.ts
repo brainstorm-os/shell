@@ -1,6 +1,6 @@
 /**
  * Popover chrome strings. Same labels-injection convention as
- * `@brainstorm/sdk/i18n` (`common-labels.ts`): hosts pass nothing for the
+ * `@brainstorm-os/sdk/i18n` (`common-labels.ts`): hosts pass nothing for the
  * canonical English; a localised host passes a `Partial<PopoverLabels>` of
  * just the keys it translates. No bare strings live inside the component —
  * it reads everything from a merged labels object.

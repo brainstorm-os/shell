@@ -13,10 +13,10 @@
  * company routes an `open` intent to its owning app.
  */
 
-import type { PropertiesService } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { PropertiesPanel } from "@brainstorm/sdk/properties-panel";
-import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/property-ui";
+import type { PropertiesService } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { PropertiesPanel } from "@brainstorm-os/sdk/properties-panel";
+import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
 import { useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import {

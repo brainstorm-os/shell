@@ -1,7 +1,7 @@
 /**
  * Inline cell editing in the Database grid (real shell). Opens the
  * Database app against a seeded vault, ensures a Grid view, and verifies
- * the grid renders the shared `@brainstorm/sdk` editing cells (`.bs-cell-*`)
+ * the grid renders the shared `@brainstorm-os/sdk` editing cells (`.bs-cell-*`)
  * rather than read-only paint — proving the EditableCell + PropertiesProvider
  * wiring works inside the app renderer. Then exercises a text/number edit.
  */

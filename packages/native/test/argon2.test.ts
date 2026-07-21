@@ -21,7 +21,7 @@ const hex = (bytes: Uint8Array | Buffer): string =>
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
-describe("@brainstorm/native — argon2id (NAPI-2)", () => {
+describe("@brainstorm-os/native — argon2id (NAPI-2)", () => {
 	it("matches @noble/hashes/argon2.js byte-for-byte at the shell's TEST_KDF profile", async () => {
 		const { argon2idDerive } = await loadNative();
 		const passphrase = utf8("hunter2");

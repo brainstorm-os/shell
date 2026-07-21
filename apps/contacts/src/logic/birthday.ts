@@ -7,7 +7,7 @@
  * (including the Feb-29 → Feb-28 non-leap clamp). Pure — unit-tested.
  */
 
-import { birthdayOccurrencesInRange } from "@brainstorm/sdk-types";
+import { birthdayOccurrencesInRange } from "@brainstorm-os/sdk-types";
 
 const DAY_MS = 86_400_000;
 

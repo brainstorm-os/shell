@@ -14,7 +14,7 @@
  * vault's grant file finishes loading. Mutations queue behind the load.
  */
 
-import type { SitePermissionKind } from "@brainstorm/sdk-types";
+import type { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import type {
 	SitePermissionGrant,
 	SiteTrustGrant,

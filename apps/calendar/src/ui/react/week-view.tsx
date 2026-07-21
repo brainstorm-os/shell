@@ -7,7 +7,7 @@
  * today's column. Drag-to-reschedule + ordered grid keyboard preserved.
  */
 
-import { attachOrderedGridCellKeyboard } from "@brainstorm/sdk/a11y";
+import { attachOrderedGridCellKeyboard } from "@brainstorm-os/sdk/a11y";
 import { useEffect, useRef } from "react";
 import { t } from "../../i18n/t";
 import type { CompiledDayView, CompiledWeekView, WeekDayBucket } from "../../logic/compile-view";

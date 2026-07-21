@@ -3,7 +3,7 @@
  *  Received mail is immutable; the only mutations are flags (server state)
  *  and reply/forward dispatch as intents. */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { t } from "../i18n";
 import { messageDateLabel } from "../logic/format";

@@ -3,7 +3,7 @@ import {
 	type VaultEntity,
 	WORKFLOW_RUN_TYPE_URL,
 	WORKFLOW_TYPE_URL,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	remindersFromSnapshot,

@@ -16,7 +16,7 @@ import {
 	type WorkflowStep,
 	triggerToProperties,
 	workflowToProperties,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { CapabilityGrant, CapabilityLedger } from "../capabilities/ledger";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";

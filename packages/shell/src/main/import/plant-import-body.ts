@@ -19,7 +19,7 @@ import {
 	BASELINE_NODES,
 	SEED_STANDIN_NODES,
 	plantSerializedStateIntoDoc,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { Doc, XmlText, applyUpdate, encodeStateAsUpdate, encodeStateVector } from "yjs";
 import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";

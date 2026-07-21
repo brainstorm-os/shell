@@ -11,7 +11,7 @@ import {
 	SYSTEM_TYPOGRAPHY,
 	type TypographyDef,
 	type TypographyScale,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** A fresh editable typography seeded from the never-empty system stacks
  *  (so a brand-new typography is structurally valid before any edit). */

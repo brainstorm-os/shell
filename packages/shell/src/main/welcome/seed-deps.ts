@@ -15,7 +15,7 @@ import {
 	BASELINE_NODES,
 	SEED_STANDIN_NODES,
 	plantSerializedStateIntoDoc,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { Doc, encodeStateAsUpdate } from "yjs";
 import { bytesToBase64 } from "../credentials/crypto";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";

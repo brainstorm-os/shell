@@ -17,7 +17,7 @@
  * dangling node.
  */
 
-import type { ObjectDragItem, ObjectDragPayload } from "@brainstorm/sdk-types";
+import type { ObjectDragItem, ObjectDragPayload } from "@brainstorm-os/sdk-types";
 
 export const ENTITY_DRAG_MIME = "application/vnd.brainstorm.entity+json";
 
@@ -122,7 +122,7 @@ export function dataTransferHasEntity(dataTransfer: DataTransfer | null): boolea
 
 // ─── Multi-item selection / cross-app drag payload (DND-1,) ──
 
-/** The canonical multi-item drag types live in `@brainstorm/sdk-types` (so the
+/** The canonical multi-item drag types live in `@brainstorm-os/sdk-types` (so the
  *  shell `dnd`/`selection` services + the SDK proxy share one home); re-exported
  *  here alongside the hardening helpers. `ObjectDragItem` is structurally
  *  `EntityDragPayload` (the intra-app HTML5 drag item). */

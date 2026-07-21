@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/recurrence-edit` — pure helpers backing the shared
+ * `@brainstorm-os/sdk/recurrence-edit` — pure helpers backing the shared
  * recurrence editor (Calendar 9.15.13, Tasks 9.14.12). The date-anchored
  * defaulting + value-coercion logic lives here so it can be exercised without
  * a renderer and shared by every app that authors a `Recurrence`. Every
@@ -18,7 +18,7 @@ import {
 	type Weekday,
 	isRecurrence,
 	summarizeRecurrence,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The kind selector's options — the five structured/custom kinds plus a
  *  leading "none" sentinel (no recurrence). */

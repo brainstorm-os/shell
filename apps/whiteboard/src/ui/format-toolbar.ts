@@ -8,7 +8,7 @@
  * is prevented on the whole bar for the same reason — clicks act without
  * ever moving focus, so the selection in the editor survives. (Toolbars
  * are explicitly not menus per the fancy-menus migration notes; the
- * pattern mirrors `@brainstorm/editor`'s inline toolbar.)
+ * pattern mirrors `@brainstorm-os/editor`'s inline toolbar.)
  *
  * Layout: [B I U S] | [colour dots: default + palette] | [size: S M L].
  * Mark buttons reflect the selection via `aria-pressed`; a colour / size
@@ -17,7 +17,7 @@
  * default.
  */
 
-import type { TParams } from "@brainstorm/sdk/i18n";
+import type { TParams } from "@brainstorm-os/sdk/i18n";
 import type { WhiteboardMessageKey } from "../i18n/t";
 import type { SelectionStyles } from "../logic/rich-text";
 import { TEXT_COLORS, TEXT_SIZES, TextColor, type TextSize, textColorToCss } from "../types/node";

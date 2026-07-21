@@ -1,9 +1,11 @@
 {
-  "name": "@brainstorm/sdk-types",
+  "name": "@brainstorm-os/sdk-types",
   "version": "0.0.1",
-  "private": true,
   "description": "Type declarations for the Brainstorm app SDK. Runtime is injected by the shell; this package is types only.",
   "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "src/index.ts",

@@ -1,4 +1,4 @@
-import { TabSecurityState } from "@brainstorm/sdk-types";
+import { TabSecurityState } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TRACKER_BLOCKLIST,

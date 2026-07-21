@@ -1,7 +1,7 @@
 /**
- * `@brainstorm/sdk/i18n-react` — the React half of the app-side i18n stack
- * (12.15 slice 15b). Kept in its own subpath so the pure `@brainstorm/sdk/i18n`
- * barrel (`createT` / labels) stays React-free — `@brainstorm/sdk-types`
+ * `@brainstorm-os/sdk/i18n-react` — the React half of the app-side i18n stack
+ * (12.15 slice 15b). Kept in its own subpath so the pure `@brainstorm-os/sdk/i18n`
+ * barrel (`createT` / labels) stays React-free — `@brainstorm-os/sdk-types`
  * imports that barrel, and the leaf package must not pull React.
  *
  * Two hooks:
@@ -25,7 +25,7 @@ import {
 	DEFAULT_LOCALE,
 	type FormatContext,
 	type Subscription,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { useEffect, useMemo, useState } from "react";
 import { formatDate, formatNumber } from "../date-formatters";
 import {

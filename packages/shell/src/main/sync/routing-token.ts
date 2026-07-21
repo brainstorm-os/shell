@@ -67,7 +67,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { hkdfSha256 } from "@brainstorm/native";
+import { hkdfSha256 } from "@brainstorm-os/native";
 
 /** Domain separator (HKDF salt) — never reused by another derivation. */
 export const ROUTING_TOKEN_SALT = "brainstorm/v1/routing-token";

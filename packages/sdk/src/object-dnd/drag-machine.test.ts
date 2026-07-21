@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DragPayloadKind, type DragSessionInfo, DropEffect } from "@brainstorm/sdk-types";
+import { DragPayloadKind, type DragSessionInfo, DropEffect } from "@brainstorm-os/sdk-types";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DragMachine, type DragSourceSpec, type SourcePointerEvent } from "./drag-machine";
 

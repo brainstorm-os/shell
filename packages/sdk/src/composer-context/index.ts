@@ -1,12 +1,12 @@
 /**
- * `@brainstorm/sdk/composer-context` — the shared composer "context rail": let a
+ * `@brainstorm-os/sdk/composer-context` — the shared composer "context rail": let a
  * chat composer attach explicit context to a turn (pinned documents, @-mentioned
  * people, uploaded media) so it reaches the agent. The durable wire shape is
  * `MessageAttachment` (sdk-types); this primitive owns the UI — the inline `@`
  * typeahead, the chip rail, the attach button — over a host-supplied search +
  * upload seam, so the Agent app and the Chats app build the same affordance.
  *
- * Pair the CSS subpath `@brainstorm/sdk/composer-context.css`.
+ * Pair the CSS subpath `@brainstorm-os/sdk/composer-context.css`.
  */
 
 export {

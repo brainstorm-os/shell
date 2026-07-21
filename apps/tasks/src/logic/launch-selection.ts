@@ -22,7 +22,7 @@
  * follow-up). Centralising makes the second-wiring trivial.
  */
 
-import type { LaunchContext } from "@brainstorm/sdk-types";
+import type { LaunchContext } from "@brainstorm-os/sdk-types";
 import type { Project } from "../types/project";
 import { TaskSurface } from "../types/surface";
 import type { Task } from "../types/task";

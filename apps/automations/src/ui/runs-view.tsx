@@ -1,6 +1,6 @@
-import { formatRelativeDate } from "@brainstorm/sdk/date-formatters";
-import { EmptyState, EmptyStateTone } from "@brainstorm/sdk/empty-state";
-import { IconName } from "@brainstorm/sdk/icon";
+import { formatRelativeDate } from "@brainstorm-os/sdk/date-formatters";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import { type ReactElement, useState } from "react";
 import { type AutomationsI18nKey, t } from "../i18n";
 import type { RunStep, RunView } from "../logic/run-view";

@@ -6,7 +6,7 @@
  *
  * Channels are the app-owned `io.brainstorm.chat/Channel/v1`; messages reuse
  * the shared `brainstorm/Message/v1` substrate (the messaging-compatible
- * foundation in `@brainstorm/sdk-types` `conversation.ts`) with the
+ * foundation in `@brainstorm-os/sdk-types` `conversation.ts`) with the
  * `participant` sender carrying the human author — so a Chat message is the
  * same entity an Agent transcript turn is, just authored by a person.
  */
@@ -19,8 +19,8 @@ import {
 	type RosterMember,
 	type RosterRole,
 	SenderKind,
-} from "@brainstorm/sdk-types";
-import { parseAttachments } from "@brainstorm/sdk/composer-context";
+} from "@brainstorm-os/sdk-types";
+import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
 
 /** The Chat-owned channel type (a channel is NOT an AI `Conversation/v1`, so
  *  it never collides with the Agent app's primary opener). */
@@ -322,9 +322,9 @@ export function authorColor(authorRef: string): string {
 }
 
 /** Up-to-two-letter avatar initials — the shared SDK helper (a second consumer
- *  is `<PresenceStack>`, so it lives in `@brainstorm/sdk/presence-stack`).
+ *  is `<PresenceStack>`, so it lives in `@brainstorm-os/sdk/presence-stack`).
  *  Re-exported here so chat's existing importers are unchanged. */
-export { presenceInitials as initials } from "@brainstorm/sdk/presence-stack";
+export { presenceInitials as initials } from "@brainstorm-os/sdk/presence-stack";
 
 // ─────────────────────────────── compose ───────────────────────────────
 

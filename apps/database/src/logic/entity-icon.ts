@@ -11,7 +11,7 @@
  * module-eval, scheduling async work that outlives a jsdom test env).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 import { IconKind } from "../types/icon";
 import type { EntityRow } from "./in-memory-entities";
 

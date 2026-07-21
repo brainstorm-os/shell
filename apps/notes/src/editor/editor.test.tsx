@@ -6,12 +6,12 @@
  * cross-app links depend on ([[feedback_mention_persisted_protocol]]).
  *
  * Composition:
- *   - `useYDoc(noteId)` from `@brainstorm/react-yjs` (resolver-backed
+ *   - `useYDoc(noteId)` from `@brainstorm-os/react-yjs` (resolver-backed
  *     entity→doc lookup);
  *   - `useUniversalBody(doc)` from the 9.3.5.B/N2 universal-body
  *     keystone — the `Y.XmlText` named `"root"` (the well-known name
  *     `@lexical/yjs`'s `createBinding` binds to);
- *   - `<BrainstormEditor>` from `@brainstorm/editor` (the `@lexical/yjs`
+ *   - `<BrainstormEditor>` from `@brainstorm-os/editor` (the `@lexical/yjs`
  *     binding wrapper).
  */
 
@@ -19,8 +19,8 @@ import {
 	BASELINE_NODES,
 	SEED_STANDIN_NODES,
 	plantSerializedStateIntoDoc,
-} from "@brainstorm/editor";
-import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm/react-yjs";
+} from "@brainstorm-os/editor";
+import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm-os/react-yjs";
 import { REDO_COMMAND, UNDO_COMMAND } from "lexical";
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";

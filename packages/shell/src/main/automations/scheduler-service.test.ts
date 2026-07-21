@@ -1,4 +1,4 @@
-import { RecurrenceKind } from "@brainstorm/sdk-types";
+import { RecurrenceKind } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type PersistedFire, SchedulerService, type SchedulerStore } from "./scheduler-service";
 

@@ -1,4 +1,4 @@
-import type { PlatformCatalog } from "@brainstorm/sdk-types";
+import type { PlatformCatalog } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { buildWorkspaceContextBlock, joinContextBlocks } from "./workspace-context";
 

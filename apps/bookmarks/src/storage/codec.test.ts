@@ -1,4 +1,4 @@
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { BOOKMARK_KEY_PREFIX, bookmarkKey, parseStoredBookmark, serializeBookmark } from "./codec";
 

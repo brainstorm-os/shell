@@ -1,6 +1,6 @@
 /**
  * Journal comments bindings (B11.9) — thin wrappers that hand the Journal
- * runtime services to the shared `@brainstorm/editor` comments hooks (the
+ * runtime services to the shared `@brainstorm-os/editor` comments hooks (the
  * exact mirror of `apps/notes/src/store/comments-adapter.ts`). All bridge
  * logic (codec / filter / cache / liveness via `useVaultEntities`) lives in
  * the shared `useEntityCommentsAdapter`.
@@ -15,7 +15,7 @@ import {
 	type CommentsAdapter,
 	useEntityCommentsAdapter,
 	useOpenCommentBlockIds as useSharedOpenCommentBlockIds,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { useMemo } from "react";
 import { getJournalRuntime } from "../runtime";
 

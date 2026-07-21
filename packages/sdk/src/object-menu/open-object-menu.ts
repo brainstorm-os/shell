@@ -25,7 +25,7 @@ import {
 	type ContributedActionGroup,
 	ContributedVerb,
 	groupContributedActions,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
 import { MenuAlign } from "../menus";
 import { OPEN_VERB } from "../open-entity";

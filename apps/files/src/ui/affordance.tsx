@@ -14,7 +14,7 @@
  * 9.8.2b shared-package STOP item in the build report.
  *
  * The panel-toggle glyph that used to live here moved to
- * `@brainstorm/sdk/panel-toggle` once we hit the 7th copy — now the only
+ * `@brainstorm-os/sdk/panel-toggle` once we hit the 7th copy — now the only
  * source, used by every first-party app.
  */
 

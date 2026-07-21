@@ -15,7 +15,7 @@ import {
 	GEMINI_PROVIDER_ID,
 	MessageRole,
 	messageText,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { AiServiceError, type ModelProvider, buildUsage } from "./provider";
 
 /** A Gemini `parts` entry (the subset we emit). */

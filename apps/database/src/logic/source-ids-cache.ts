@@ -19,7 +19,7 @@
  * wholesale instead of clobbering fresher entries.
  */
 
-import type { List, ListSource, SourceQueryResult } from "@brainstorm/sdk-types";
+import type { List, ListSource, SourceQueryResult } from "@brainstorm-os/sdk-types";
 import { applyMemberOverrides, evaluateSource } from "./evaluate-source";
 import type { InMemoryEntities } from "./in-memory-entities";
 

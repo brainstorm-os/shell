@@ -1,7 +1,7 @@
 /**
  * Form Designer app i18n manifest. Per
  * §Localization every user-visible string flows through the shared app-side
- * `t()` (`createT` from `@brainstorm/sdk/i18n` — `{name}` interpolation only,
+ * `t()` (`createT` from `@brainstorm-os/sdk/i18n` — `{name}` interpolation only,
  * no ICU) — no bare literals.
  */
 
@@ -11,7 +11,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const FORM_DESIGNER_I18N = enCatalog as typeof enCatalog;

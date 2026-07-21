@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { StepKind } from "@brainstorm/sdk-types";
+import { StepKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type BuilderState, triggerStep } from "../logic/builder-model";
 import { emptyBuilderTrigger } from "../logic/builder-trigger";

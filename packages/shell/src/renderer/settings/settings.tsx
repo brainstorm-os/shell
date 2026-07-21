@@ -20,7 +20,7 @@ import {
 	useCompositeKeyboard,
 	useFocusTrap,
 	useRegionNavigation,
-} from "@brainstorm/sdk/a11y";
+} from "@brainstorm-os/sdk/a11y";
 import { AnimatePresence, motion } from "framer-motion";
 import {
 	type ReactNode,

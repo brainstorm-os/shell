@@ -5,7 +5,7 @@
  * overrides) are unit-tested without a browser.
  */
 
-import { type TokenSetDef, resolveTokenOverrides } from "@brainstorm/sdk-types";
+import { type TokenSetDef, resolveTokenOverrides } from "@brainstorm-os/sdk-types";
 
 /** Set an override immutably. A blank/whitespace value clears it (an
  *  empty override is meaningless — the base shows through). */

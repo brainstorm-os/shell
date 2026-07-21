@@ -55,7 +55,7 @@ type DragState = {
 
 export type BlockGutterPluginProps = {
 	/** Ordered list of commands the action menu surfaces. The host app
-	 *  assembles its own catalogue (`@brainstorm/editor`'s `BlockCommand`
+	 *  assembles its own catalogue (`@brainstorm-os/editor`'s `BlockCommand`
 	 *  type). When omitted, the action menu renders no command rows —
 	 *  the gutter still works for `+` insert + drag-to-reorder. */
 	commands?: readonly BlockCommand[];

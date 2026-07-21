@@ -6,7 +6,7 @@
  * (matching Notes' chrome-light sidebar).
  */
 
-import { Searchbar } from "@brainstorm/sdk/searchbar";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { t } from "../i18n";

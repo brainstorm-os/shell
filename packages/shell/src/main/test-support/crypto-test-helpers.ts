@@ -1,5 +1,5 @@
 /**
- * Test-only crypto helpers backed by `@brainstorm/native` + `node:crypto`.
+ * Test-only crypto helpers backed by `@brainstorm-os/native` + `node:crypto`.
  *
  * The production code dropped its noble-curves dependency in NAPI-3e; the
  * test suites that used the noble `ed25519` / `x25519` objects (keygen /
@@ -19,7 +19,7 @@ import {
 	ed25519Sign,
 	ed25519Verify,
 	x25519GetPublicKey,
-} from "@brainstorm/native";
+} from "@brainstorm-os/native";
 
 export function randomBytes(length: number): Uint8Array {
 	return new Uint8Array(nodeRandomBytes(length));

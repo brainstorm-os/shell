@@ -5,7 +5,7 @@ import {
 	type DropDelivery,
 	DropEffect,
 	type ObjectDragPayload,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CompiledMonthView, MonthDayCell } from "../../logic/compile-view";

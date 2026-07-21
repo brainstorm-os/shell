@@ -21,7 +21,7 @@ import {
 	newDictionaryId,
 	newDictionaryItemId,
 	newPropertyKey,
-} from "@brainstorm/sdk";
+} from "@brainstorm-os/sdk";
 import {
 	type Dictionary,
 	type DictionaryItem,
@@ -29,18 +29,18 @@ import {
 	PropertyKindPreset,
 	isMultiValued,
 	presetOf,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	type CompositeItemProps,
 	Orientation,
 	SelectionAttribute,
 	useCompositeKeyboard,
-} from "@brainstorm/sdk/a11y";
-import type { IconComponent, IconParam } from "@brainstorm/sdk/menus";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
-import { MultiSelectMenu } from "@brainstorm/sdk/select-menu";
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+} from "@brainstorm-os/sdk/a11y";
+import type { IconComponent, IconParam } from "@brainstorm-os/sdk/menus";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
+import { MultiSelectMenu } from "@brainstorm-os/sdk/select-menu";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/t";
 import { matchesChord } from "../shortcuts/use-shortcut";

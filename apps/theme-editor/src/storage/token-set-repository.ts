@@ -12,7 +12,7 @@ import {
 	isTokenSetAppearance,
 	isValidTokenSet,
 	resolveTokenOverrides,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { EntitiesService, EntityRecord } from "./runtime";
 
 const TOKEN_SET_TYPE = "brainstorm/TokenSet/v1";

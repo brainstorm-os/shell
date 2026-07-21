@@ -2,7 +2,7 @@
  * publishTabIdentity — the ONE way an app labels its tab (and the OS window)
  * with the open object's name + icon. The shell reads `document.title` via
  * `page-title-updated` and the favicon via `page-favicon-updated` (see
- * `@brainstorm/sdk-types` tab-identity for the favicon codec), so this is
+ * `@brainstorm-os/sdk-types` tab-identity for the favicon codec), so this is
  * pure DOM — no IPC, no capability.
  *
  * Call it whenever the open object changes (or its name/icon edits land):
@@ -14,8 +14,8 @@
  * cleared (removing the `<link>` would not re-fire the Electron event).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { tabFaviconUrl } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { tabFaviconUrl } from "@brainstorm-os/sdk-types";
 
 export type TabIdentity = {
 	/** The open object's display name (tab label + OS window title). */

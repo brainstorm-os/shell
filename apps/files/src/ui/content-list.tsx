@@ -11,17 +11,17 @@
  * mounted even for very large folders.
  */
 
-import { DragPayloadKind } from "@brainstorm/sdk-types";
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { DragPayloadKind } from "@brainstorm-os/sdk-types";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import {
 	DropSemantic,
 	effectForSemantic,
 	useDragSource,
 	useDropTarget,
-} from "@brainstorm/sdk/object-dnd";
-import { ObjectMenuTrigger } from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-dnd";
+import { ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";

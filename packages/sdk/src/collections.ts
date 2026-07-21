@@ -18,10 +18,10 @@ import {
 	type MemberInclude,
 	type MemberOverrideSource,
 	type MemberOverrides,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Minimal structural override shape — `MemberOverrides` from
- *  `@brainstorm/sdk-types` satisfies it, and so does the lighter
+ *  `@brainstorm-os/sdk-types` satisfies it, and so does the lighter
  *  `{ entityId }[]` form callers already hold; only `entityId` is read. */
 export type MemberRefs = {
 	include: ReadonlyArray<{ entityId: string }>;

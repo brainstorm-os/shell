@@ -9,8 +9,8 @@
  * surprise-drag a stale selection).
  */
 
-import type { ObjectDragItem } from "@brainstorm/sdk-types";
-import { dragItemsForSelection } from "@brainstorm/sdk/object-dnd";
+import type { ObjectDragItem } from "@brainstorm-os/sdk-types";
+import { dragItemsForSelection } from "@brainstorm-os/sdk/object-dnd";
 import { entityTitle } from "../render/cells";
 import type { EntityRow } from "./in-memory-entities";
 

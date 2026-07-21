@@ -14,8 +14,8 @@
  * unchanged: it shipped well (per the friction log) and is left untouched.
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import type { AnchoredMenuItem } from "@brainstorm/sdk/object-menu";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import type { AnchoredMenuItem } from "@brainstorm-os/sdk/object-menu";
 import type { TranslationParams, WhiteboardMessageKey } from "../i18n/t";
 import {
 	FONT_FAMILIES,

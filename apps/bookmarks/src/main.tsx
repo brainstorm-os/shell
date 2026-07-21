@@ -6,14 +6,14 @@
  * storage service.
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/sdk/empty-state.css";
-import { setEditorHost } from "@brainstorm/editor";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";
-import { getWidgetLaunch } from "@brainstorm/sdk/widget";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/sdk/empty-state.css";
+import { setEditorHost } from "@brainstorm-os/editor";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { BookmarksApp } from "./app";
 import { getBrainstorm } from "./storage/runtime";

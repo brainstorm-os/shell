@@ -1,5 +1,5 @@
 /**
- * @brainstorm/sdk-types — type-only declarations for the Brainstorm app SDK.
+ * @brainstorm-os/sdk-types — type-only declarations for the Brainstorm app SDK.
  *
  * Per the SDK *runtime* is injected by the shell into
  * the renderer at preload time via a `brainstorm` global. App authors install
@@ -70,7 +70,7 @@ export const DEFAULT_LOCALE = "en";
  * Locale + regional formatting context threaded from the shell's Settings →
  * Regional choice to apps (12.15 slice 15f). Provider-neutral (plain
  * strings/booleans) so the leaf types package carries it without depending on
- * the shell's preference enums; `@brainstorm/sdk/date-formatters` re-exports
+ * the shell's preference enums; `@brainstorm-os/sdk/date-formatters` re-exports
  * this type and its formatters consume it. Every field optional — an omitted
  * field keeps the host/locale default, so `{}` reproduces host behaviour. */
 export type FormatContext = {
@@ -98,7 +98,7 @@ export type LaunchContext =
 	| { reason: "intent"; intent: Intent }
 	/** The app is mounted as a dashboard WIDGET (7.3 / OQ-6 v1: the app's own
 	 *  bundle renders in widget-mode in its own broker-scoped surface). The SDK
-	 *  `@brainstorm/sdk/widget` bootstrap reads `widgetId` to pick which
+	 *  `@brainstorm-os/sdk/widget` bootstrap reads `widgetId` to pick which
 	 *  registered widget to render; `bind` is an optional entity / saved-view id
 	 *  for parameterised widgets (e.g. a Database view summary). */
 	| { reason: "widget"; widgetId: string; bind?: string };
@@ -560,7 +560,7 @@ export type LinkPreview = {
  *  readable-content service (Net-2) returns these so a captured page's body can
  *  drop straight into a Bookmark's universal rich-text body with zero transform
  *  (9.18.5). Structural — kept here as the contract type so callers don't depend
- *  on `@brainstorm/editor`. */
+ *  on `@brainstorm-os/editor`. */
 export type SerializedBlock = {
 	type: string;
 	version: number;
@@ -957,7 +957,7 @@ export type SelectionSnapshot = {
 
 /** The cross-app drag wire format — the selection in motion (DND-2,
  * ). `sourceApp` is stamped by the shell from the verified
- *  drag session, never app-provided. Canonical home; `@brainstorm/sdk/entity-drag`
+ *  drag session, never app-provided. Canonical home; `@brainstorm-os/sdk/entity-drag`
  *  re-exports it. */
 export type ObjectDragPayload = {
 	v: 1;
@@ -1109,7 +1109,7 @@ export const APP_DRAG_LEAVE_CHANNEL = "app:drag-leave";
 export const APP_DROP_CHANNEL = "app:drop";
 
 /** Renderer-internal DOM CustomEvent names the app-preload re-dispatches the
- *  shell push channels as (so `@brainstorm/sdk/object-dnd`'s drop registry can
+ *  shell push channels as (so `@brainstorm-os/sdk/object-dnd`'s drop registry can
  *  subscribe without importing preload internals). Defined here — not in the
  *  React-bearing `object-dnd` barrel — so the lean preload imports just the
  *  names. */
@@ -1415,7 +1415,7 @@ export type DashboardService = {
 
 /**
  * Render-to-PDF service (B11.12). The app serialises its own content to
- * self-contained HTML (e.g. `@brainstorm/editor`'s `serializedStateToHtml`,
+ * self-contained HTML (e.g. `@brainstorm-os/editor`'s `serializedStateToHtml`,
  * which already escapes text + allowlists URL schemes) and hands it here; the
  * shell renders it in a locked-down, script-disabled, network-blocked
  * offscreen window and returns the PDF bytes. The app then saves those bytes
@@ -2055,7 +2055,7 @@ export type AppRuntime = {
 	/** Active regional-format context (12.15 slice 15f) — locale + hour cycle +
 	 *  time zone derived from Settings → Regional. A snapshot across the sandbox
 	 *  boundary like `locale`; the LIVE value arrives as the argument to
-	 *  `onFormatChange`. Feed it to `@brainstorm/sdk/date-formatters`. */
+	 *  `onFormatChange`. Feed it to `@brainstorm-os/sdk/date-formatters`. */
 	readonly format: FormatContext;
 	/** Subscribe to live regional-format changes. Fires whenever the user edits
 	 *  a Regional setting. Returns a `Subscription` to detach. */
@@ -2079,7 +2079,7 @@ export type { Icon } from "./icon";
 /**
  * Tab-identity favicon codec — encodes a universal `Icon` as the favicon
  * URL an app publishes for the shell-drawn tab strip (the icon twin of
- * `document.title`). Apps call `@brainstorm/sdk/tab-identity`; the shell
+ * `document.title`). Apps call `@brainstorm-os/sdk/tab-identity`; the shell
  * recognises `TAB_ICON_NONE` as "no icon".
  */
 export { TAB_ICON_NONE, emojiFaviconUrl, tabFaviconUrl } from "./tab-identity";
@@ -2088,7 +2088,7 @@ export { TAB_ICON_NONE, emojiFaviconUrl, tabFaviconUrl } from "./tab-identity";
  * Universal cover model — every object can carry a wide banner backdrop,
  * the visual companion to the universal icon. See
  * . Renderer + curated gradient set +
- * id-seeded fallback live in `@brainstorm/sdk/entity-cover`.
+ * id-seeded fallback live in `@brainstorm-os/sdk/entity-cover`.
  */
 export { CoverKind } from "./cover";
 export type { Cover, CoverFocal } from "./cover";
@@ -2234,7 +2234,7 @@ export type { IconPackSvgSanitizeIssue } from "./icon-pack-sanitizer";
 /**
  * Canonical semantic-token namespace — the frozen `--kebab` CSS variable
  * names a `brainstorm/TokenSet/v1` may override (
- * store.md §Validation). Snapshot of the `@brainstorm/tokens` flattened
+ * store.md §Validation). Snapshot of the `@brainstorm-os/tokens` flattened
  * key space; pinned by a drift test in the tokens package.
  */
 export { CANONICAL_TOKEN_NAMES, TOKEN_NAME_VERSION, isCanonicalTokenName } from "./token-names";

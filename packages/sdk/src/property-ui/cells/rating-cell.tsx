@@ -7,7 +7,7 @@
  * no edit mode, the click commits.
  */
 
-import { type CellProps, ValueType } from "@brainstorm/sdk-types";
+import { type CellProps, ValueType } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback } from "react";
 import { coerceValue } from "../../properties-validate";

@@ -10,19 +10,19 @@ import {
 	localPresenceName,
 	useCommentMutations,
 	useEntityCommentsAdapter,
-} from "@brainstorm/editor";
-import { openEntity } from "@brainstorm/sdk";
-import { type PropertyDef, ValueType, type VaultEntitiesService } from "@brainstorm/sdk-types";
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import type { CoverPickerService } from "@brainstorm/sdk/cover-picker";
-import { coverOf } from "@brainstorm/sdk/entity-cover";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { AddIconGlyph, openCoverPicker, openIconPicker } from "@brainstorm/sdk/picker-host";
+} from "@brainstorm-os/editor";
+import { openEntity } from "@brainstorm-os/sdk";
+import { type PropertyDef, ValueType, type VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import type { CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
+import { coverOf } from "@brainstorm-os/sdk/entity-cover";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { AddIconGlyph, openCoverPicker, openIconPicker } from "@brainstorm-os/sdk/picker-host";
 import {
 	PropertiesPanel,
 	type PropertiesPanelMeta,
 	type PropertiesPanelRow,
-} from "@brainstorm/sdk/properties-panel";
+} from "@brainstorm-os/sdk/properties-panel";
 import { t } from "../i18n";
 import { humanLinkType } from "../logic/entity-links";
 import { customPropertyRows } from "../logic/property-rows";

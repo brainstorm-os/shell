@@ -16,7 +16,7 @@ import {
 	DEFAULT_BUILTIN_CUSTOM_NODES,
 	SHELL_ENTITY_CARD_BLOCK_ID,
 	createBlockRendererRegistry,
-} from "@brainstorm/sdk/block-registry";
+} from "@brainstorm-os/sdk/block-registry";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";

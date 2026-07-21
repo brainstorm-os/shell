@@ -12,7 +12,7 @@
  * old approach would have thrown — pinned below so the contract can't regress).
  */
 
-import { BASELINE_NODES } from "@brainstorm/editor";
+import { BASELINE_NODES } from "@brainstorm-os/editor";
 import { $getRoot, type LexicalEditor, type SerializedEditorState, createEditor } from "lexical";
 import { describe, expect, it } from "vitest";
 import { JOURNAL_EDITOR_NODES, plantJournalSeed } from "./entry-editor";

@@ -8,7 +8,7 @@
  * degrades to safe defaults and never throws.
  */
 
-import { type WorkflowRunStatus, isWorkflowRunStatus } from "@brainstorm/sdk-types";
+import { type WorkflowRunStatus, isWorkflowRunStatus } from "@brainstorm-os/sdk-types";
 import type { EntityRecord } from "../storage/runtime";
 
 /** A decoded `stepLog` entry. The runner writes a flat, depth-tagged list;

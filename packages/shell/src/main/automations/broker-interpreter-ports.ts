@@ -16,7 +16,7 @@
  * adapter + its contract.
  */
 
-import { type WorkflowStep, capabilityImplies } from "@brainstorm/sdk-types";
+import { type WorkflowStep, capabilityImplies } from "@brainstorm-os/sdk-types";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import type { EntityRecord, HttpPort, InterpreterPorts } from "./step-interpreters";
 

@@ -1,5 +1,5 @@
 /**
- * Media upload helpers — extracted to `@brainstorm/editor` (the shared
+ * Media upload helpers — extracted to `@brainstorm-os/editor` (the shared
  * media stack) so every editor surface uploads the same way. The shared
  * implementation routes through the host uploader wired with
  * `setEditorHost({ uploadFile })` (Notes wires it in `main.tsx` from
@@ -16,4 +16,4 @@ export {
 	resolveBinarySrc,
 	resolveImageSrc,
 	tryUploadFile,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

@@ -13,16 +13,16 @@
  * `Workflow/v1`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
-import { WORKFLOW_TYPE_URL } from "@brainstorm/sdk-types";
-import { formatRelativeDate, formatTime } from "@brainstorm/sdk/date-formatters";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
+import { WORKFLOW_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { formatRelativeDate, formatTime } from "@brainstorm-os/sdk/date-formatters";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
 import { useAutomationsT } from "./i18n-hooks";

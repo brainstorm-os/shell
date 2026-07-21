@@ -1,4 +1,4 @@
-import { RecurrenceKind, yearlyRecurrenceForDate } from "@brainstorm/sdk-types";
+import { RecurrenceKind, yearlyRecurrenceForDate } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { expandRecurringItems } from "./expand-recurring";
 import { EVENT_SOURCE_KEY, type ScheduledItem } from "./scheduled-item";

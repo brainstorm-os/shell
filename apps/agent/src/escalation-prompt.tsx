@@ -13,7 +13,7 @@
  * auto-grants.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { grantLabel } from "./conversation-settings-popover";
 import { t } from "./i18n";

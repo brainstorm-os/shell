@@ -9,7 +9,7 @@
  *   - `id` is the package id (matches an app manifest id, or the built-in
  *     theme enum value). `(kind, id)` is globally unique.
  *   - `version` is the currently-listed version. For themes packaged with
- *     the shell, this matches `@brainstorm/tokens` SDK version; for apps
+ *     the shell, this matches `@brainstorm-os/tokens` SDK version; for apps
  *     it's the installed manifest version.
  *   - `installed` reflects current vault state. Sourceless listings (the
  *     built-in themes) are always installed.

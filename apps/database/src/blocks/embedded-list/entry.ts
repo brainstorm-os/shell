@@ -3,7 +3,7 @@
  * that renders inside a host document (e.g. a Notes doc) via the BP block
  * frame. Runs INSIDE the sandboxed opaque-origin iframe: no ambient
  * authority, no `window.brainstorm`; its only channel to the vault is the
- * `@brainstorm/sdk/block-runtime` harness (`getEntity` / `queryEntities`
+ * `@brainstorm-os/sdk/block-runtime` harness (`getEntity` / `queryEntities`
  * over the BP graph module).
  *
  * Data flow: the host hands us the embedded entity id (a `brainstorm/List/v1`).
@@ -16,7 +16,7 @@
  * `./format.ts`, shared with the main app's inference + SDK formatters.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 import {
 	EMPTY_REF_TITLES,
 	MAX_ROWS,
@@ -114,7 +114,7 @@ async function resolveRefTitles(
 }
 
 // Colours come from the host theme tokens the block-runtime mirrors onto
-// `:root` (`@brainstorm/sdk/block-runtime` BlockControlKind.Theme); the
+// `:root` (`@brainstorm-os/sdk/block-runtime` BlockControlKind.Theme); the
 // `light-dark()` fallbacks only paint before the theme lands / in standalone
 // tests, and follow `prefers-color-scheme` via the `color-scheme: light dark`
 // default below (the host's pushed `color-scheme` overrides it inline). The

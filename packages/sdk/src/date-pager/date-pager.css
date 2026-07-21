@@ -1,6 +1,6 @@
 /**
  * Date pager — minimal shared chrome for the today/prev/next cluster
- * (`@brainstorm/sdk/date-pager`). The shape is opinionated (flex row,
+ * (`@brainstorm-os/sdk/date-pager`). The shape is opinionated (flex row,
  * tight gap, button reset); the palette is left to the host so Calendar /
  * Database / Journal can keep their own pill / flat / linear treatments.
  *

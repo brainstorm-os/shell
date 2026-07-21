@@ -1,12 +1,12 @@
 /**
- * Tasks-app translate function. Built on the shared `@brainstorm/sdk/i18n`
+ * Tasks-app translate function. Built on the shared `@brainstorm-os/sdk/i18n`
  * `createT` (the app-side `t()` per the shared-fundamentals contract §C) —
  * this module owns only the default-English manifest + a dev missing-key
  * warning + the tiny plural switch; the lookup/interpolation is the SDK's.
  * Per CLAUDE.md §Localization every user-visible string wraps in `t(key)`.
  */
 
-import { createT } from "@brainstorm/sdk/i18n";
+import { createT } from "@brainstorm-os/sdk/i18n";
 
 const DEFAULTS = {
 	// App chrome
@@ -203,7 +203,7 @@ const DEFAULTS = {
 	"tasks.recurrence.ordinal.last": "last",
 	"tasks.recurrence.listSeparator": ", ",
 
-	// Recurrence editor UI (9.14.12 — shared @brainstorm/sdk/recurrence-editor)
+	// Recurrence editor UI (9.14.12 — shared @brainstorm-os/sdk/recurrence-editor)
 	"tasks.recurrence.field.repeat": "Repeat",
 	"tasks.recurrence.kind.none": "Does not repeat",
 	"tasks.recurrence.kind.daily": "Daily",

@@ -18,7 +18,7 @@
  * vault-scoped `propertyStore`) and the cells reach the vault.
  */
 
-import type { PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
 	PropertiesPanel,

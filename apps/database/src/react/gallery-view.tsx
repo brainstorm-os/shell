@@ -16,8 +16,12 @@
  * color treatment in the imperative renderer).
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import {
+	type CompositeItemProps,
+	Orientation,
+	useCompositeKeyboard,
+} from "@brainstorm-os/sdk/a11y";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type CSSProperties,

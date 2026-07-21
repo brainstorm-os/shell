@@ -2,7 +2,7 @@
  * Markdown → DOM builder for the Preview app's markdown renderer.
  *
  * The pure parser (`parseMarkdown`, the block model, `isSafeLinkUrl`,
- * `wordCountForMarkdown`) now lives in `@brainstorm/sdk/markdown` — shared with
+ * `wordCountForMarkdown`) now lives in `@brainstorm-os/sdk/markdown` — shared with
  * the Agent's React renderer (extracted at copy two). This module keeps only
  * the DOM builder: it constructs DOM nodes one at a time so every user-supplied
  * string becomes a text node, never an HTML fragment (XSS-safe by
@@ -16,7 +16,7 @@ import {
 	isSafeLinkUrl,
 	parseMarkdown,
 	wordCountForMarkdown,
-} from "@brainstorm/sdk/markdown";
+} from "@brainstorm-os/sdk/markdown";
 
 export { BlockKind, type MarkdownBlock, isSafeLinkUrl, parseMarkdown, wordCountForMarkdown };
 

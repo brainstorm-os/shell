@@ -10,7 +10,7 @@
  * (whose day arithmetic is UTC-string based, so DST never drifts it).
  */
 
-import type { VaultEntitiesListQuery } from "@brainstorm/sdk-types";
+import type { VaultEntitiesListQuery } from "@brainstorm-os/sdk-types";
 import { compareJournalKeys, dateKeyForJournal, parseJournalDateKey } from "./logic/journal-keys";
 import { previewBodyText } from "./logic/journal-projection";
 import { currentStreak } from "./logic/streaks";

@@ -10,7 +10,7 @@
  * + the presentation, so it's testable without the relay and reusable by any
  * app header the wiring feeds.
  *
- * Colours are literal hex on the peer (from `@brainstorm/sdk/peer-presence`'s
+ * Colours are literal hex on the peer (from `@brainstorm-os/sdk/peer-presence`'s
  * `peerColor`), applied inline — the same rationale as peer-presence: cursor/
  * overlay renderers write `color` straight into styles, so a `var(--…)` would
  * paint nothing. Chrome (ring, overlap, `+N` chip) uses theme tokens.

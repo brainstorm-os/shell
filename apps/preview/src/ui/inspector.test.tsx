@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { RightPanelTab } from "@brainstorm/editor";
+import { RightPanelTab } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { flush, renderInto } from "../test/render";
 import { Inspector } from "./inspector";

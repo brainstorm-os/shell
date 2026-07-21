@@ -4,8 +4,8 @@
  * `def.count`, so the registry only keys off `(valueType, view)`.
  */
 
-import type { CellProps, ValueType } from "@brainstorm/sdk-types";
-import { PropertyView, ValueType as VT } from "@brainstorm/sdk-types";
+import type { CellProps, ValueType } from "@brainstorm-os/sdk-types";
+import { PropertyView, ValueType as VT } from "@brainstorm-os/sdk-types";
 import type { ComponentType } from "react";
 import { CheckboxCell } from "./checkbox-cell";
 import { DateCell, RelativeDateCell } from "./date-cell";

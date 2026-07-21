@@ -80,7 +80,7 @@ export const DEFAULT_APP_CAPABILITIES: ReadonlyArray<{ capability: string; scope
 	// Pin-any-object-to-dashboard (7.13). Default-minimum on the same
 	// rationale as `covers.write` / `properties.write`: every first-party
 	// app exposes "Pin to dashboard" on its objects through the one shared
-	// object menu (`@brainstorm/sdk/object-menu`), and a pin is a thin,
+	// object menu (`@brainstorm-os/sdk/object-menu`), and a pin is a thin,
 	// reversible dashboard-state write that never touches the object. The
 	// `IconRecord` stores only the entity id (no cross-app data leak); the
 	// grant is unscoped — apps pin their own objects by id. Stage 14 can

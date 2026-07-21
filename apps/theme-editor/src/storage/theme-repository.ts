@@ -14,15 +14,15 @@ import {
 	isTokenSetAppearance,
 	isValidTheme,
 	resolveThemeRef,
-} from "@brainstorm/sdk-types";
-import type { VaultEntity } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import type { EntitiesService, EntityRecord } from "./runtime";
 
 const THEME_TYPE = "brainstorm/Theme/v1";
 
 /** Project the saved `Theme/v1` entities out of a whole-vault snapshot —
  *  the pure derivation the live theme-selector list runs on (the snapshot
- *  itself flows through `@brainstorm/react-yjs` `useVaultEntities`). A blank
+ *  itself flows through `@brainstorm-os/react-yjs` `useVaultEntities`). A blank
  *  name falls back to the entity id. */
 export function themesFromSnapshot(entities: ReadonlyArray<VaultEntity>): SavedTheme[] {
 	return entities

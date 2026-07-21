@@ -32,7 +32,7 @@
 
 import { Buffer } from "node:buffer";
 import { join } from "node:path";
-import { ENTITY_PROPS_MAP_NAME, type EntityDocLink } from "@brainstorm/sdk-types";
+import { ENTITY_PROPS_MAP_NAME, type EntityDocLink } from "@brainstorm-os/sdk-types";
 import * as Y from "yjs";
 import type { Envelope, EnvelopeReply } from "../../ipc/envelope";
 import { makeErrorReply, makeOkReply, validateEnvelope } from "../../ipc/envelope";

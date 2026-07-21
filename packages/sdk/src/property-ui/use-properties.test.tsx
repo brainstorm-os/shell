@@ -11,7 +11,7 @@
  * though my vault has them" report.
  */
 
-import { type Dictionary, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type Dictionary, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { StrictMode, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

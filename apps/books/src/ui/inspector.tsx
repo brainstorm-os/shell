@@ -1,6 +1,6 @@
 /**
  * The Books right inspector — a thin adapter over the SHARED
- * `@brainstorm/sdk/properties-panel` (chrome identical to Notes / Journal /
+ * `@brainstorm-os/sdk/properties-panel` (chrome identical to Notes / Journal /
  * Database / Contacts), wrapped in the shared `.bs-props` glass slide-over
  * container. It contributes the Books-specific content slots: the cover
  * band (`lead` — host carries `flex-shrink: 0` per the cover-host rule),
@@ -9,14 +9,14 @@
  * mounted reader), and the last-read / added metadata footer.
  */
 
-import { EntityCommentsPanel } from "@brainstorm/editor";
-import { formatDate } from "@brainstorm/sdk/date-formatters";
-import type { CoverSubject } from "@brainstorm/sdk/entity-cover";
+import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { formatDate } from "@brainstorm-os/sdk/date-formatters";
+import type { CoverSubject } from "@brainstorm-os/sdk/entity-cover";
 import {
 	PropertiesPanel,
 	type PropertiesPanelMeta,
 	type PropertiesPanelRow,
-} from "@brainstorm/sdk/properties-panel";
+} from "@brainstorm-os/sdk/properties-panel";
 import type { ReactElement } from "react";
 import { t } from "../i18n";
 import {

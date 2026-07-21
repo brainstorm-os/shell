@@ -1,7 +1,7 @@
 /**
  * Graph app keyboard chords. Declared as a typed enum + a single chord map
  * (the same chord syntax the shell shortcut registry uses) so every binding
- * routes through `@brainstorm/sdk/shortcut` `attachShortcut` instead of raw
+ * routes through `@brainstorm-os/sdk/shortcut` `attachShortcut` instead of raw
  * `e.key` checks (shared-fundamentals contract §C + the
  * [[keyboard-and-i18n]] rule).
  *

@@ -1,4 +1,4 @@
-import type { LinkPreview } from "@brainstorm/sdk-types";
+import type { LinkPreview } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Bookmark } from "../types/bookmark";
 import {

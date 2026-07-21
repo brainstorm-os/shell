@@ -7,9 +7,9 @@
  * icons can never occupy the same cell with one hidden under the other).
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { IconName } from "@brainstorm/sdk/icon";
-import { type ContextMenuItem, openContextMenu, sdkMenuIcon } from "@brainstorm/sdk/menus";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { type ContextMenuItem, openContextMenu, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
 import {
 	type CSSProperties,
 	memo,

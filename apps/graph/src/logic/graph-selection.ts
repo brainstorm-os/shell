@@ -3,12 +3,12 @@
  *
  * Single click selects (replace), Mod-click toggles, Shift-click extends a
  * range over the visible node order. Built on the shared
- * `@brainstorm/sdk/selection` primitives so the graph's multi-select behaves
+ * `@brainstorm-os/sdk/selection` primitives so the graph's multi-select behaves
  * exactly like the Database/Files lists. The controller owns the live `Set`;
  * this decides the next selection + anchor for a click.
  */
 
-import { SelectionModifier, computeRange, toggleId } from "@brainstorm/sdk/selection";
+import { SelectionModifier, computeRange, toggleId } from "@brainstorm-os/sdk/selection";
 
 export type NodeSelection = {
 	selected: Set<string>;

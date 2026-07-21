@@ -30,13 +30,13 @@
  * change.
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/editor/editor.css";
-import "@brainstorm/sdk/virtual-list.css";
-import "@brainstorm/sdk/property-ui/dictionary-editor.css";
-import "@brainstorm/sdk/count-badge.css";
-import { EntityCommentsPanel } from "@brainstorm/editor";
-import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm/sdk";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/sdk/virtual-list.css";
+import "@brainstorm-os/sdk/property-ui/dictionary-editor.css";
+import "@brainstorm-os/sdk/count-badge.css";
+import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm-os/sdk";
 import {
 	COLLECTION_TYPE_URL,
 	type Cover,
@@ -53,29 +53,33 @@ import {
 	ValueType,
 	type VaultEntity,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
-import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm/sdk/a11y";
-import { createCountBadge } from "@brainstorm/sdk/count-badge";
-import { copyEntityBody, hasBodyDocTransport } from "@brainstorm/sdk/entity-body-copy";
-import { coverOf, createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { type NavHistory, createNavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
+} from "@brainstorm-os/sdk-types";
+import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
+import { createCountBadge } from "@brainstorm-os/sdk/count-badge";
+import { copyEntityBody, hasBodyDocTransport } from "@brainstorm-os/sdk/entity-body-copy";
+import { coverOf, createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import {
+	type NavHistory,
+	createNavButtons,
+	createNavHistory,
+} from "@brainstorm-os/sdk/nav-history";
 import {
 	type CollectionsEntitiesService,
 	attachObjectMenuTrigger,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { PanelSide, panelToggleIcon } from "@brainstorm/sdk/panel-toggle";
-import { createAddIconGlyph } from "@brainstorm/sdk/picker-host";
-import "@brainstorm/sdk/presence-stack.css";
-import { renderPresenceHeader } from "@brainstorm/sdk/presence-stack";
-import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/property-ui";
-import { applyPersistedPanelWidth, attachResizable } from "@brainstorm/sdk/resizable";
-import { attachShortcut } from "@brainstorm/sdk/shortcut";
-import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
+} from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, panelToggleIcon } from "@brainstorm-os/sdk/panel-toggle";
+import { createAddIconGlyph } from "@brainstorm-os/sdk/picker-host";
+import "@brainstorm-os/sdk/presence-stack.css";
+import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
+import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
+import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import {
 	CreateOptionKind,
 	type CreateTemplateOption,
@@ -85,8 +89,8 @@ import {
 	draftFromCreateOption,
 	entityToTemplate,
 	objectToTemplateProperties,
-} from "@brainstorm/sdk/templates";
-import { type VirtualListHandle, createVirtualList } from "@brainstorm/sdk/virtual-list";
+} from "@brainstorm-os/sdk/templates";
+import { type VirtualListHandle, createVirtualList } from "@brainstorm-os/sdk/virtual-list";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -138,8 +142,8 @@ function writeBoolPref(key: string, value: boolean): void {
 		dbMain.dataset.inspectorOpen = "false";
 	}
 }
-import { ExportOptionKind, openExportPopover } from "@brainstorm/sdk/export-popover";
-import { PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
+import { ExportOptionKind, openExportPopover } from "@brainstorm-os/sdk/export-popover";
+import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { TYPE_LABELS } from "./demo/dataset";
 import { t } from "./i18n";
 import { PERSON_TYPE } from "./logic/contact-import";
@@ -163,7 +167,7 @@ registerBuiltInImportMappers();
  *  snapshot is loaded yet, chips simply have no colour (no demo palette). */
 const NULL_VOCAB = () => null;
 
-import { subscribe as subscribePerf, time } from "@brainstorm/sdk/perf";
+import { subscribe as subscribePerf, time } from "@brainstorm-os/sdk/perf";
 import { type ReactElement, createElement } from "react";
 import { type Backlink, backlinksFor } from "./logic/backlinks";
 import { pickerCandidatesForEntity, sourceMatches } from "./logic/collections-for-entity";
@@ -1917,7 +1921,7 @@ function onOpenEntity(state: AppState, entity: EntityRow): void {
  * view kind (grid / list / gallery / board / calendar / timeline) —
  * each renders rows with `data-entity-id`, so there's a single
  * integration point, not one per renderer. Items come from
- * `@brainstorm/sdk/object-menu` so Database, the shell, and every other
+ * `@brainstorm-os/sdk/object-menu` so Database, the shell, and every other
  * app show the *same* Open / Pin·Unpin (/ future Print…) in the same
  * order with the same behaviour. Bound once at boot (the body element
  * survives `replaceChildren` across re-renders).
@@ -2360,7 +2364,7 @@ function buildHeaderExtraItems(
 	return items;
 }
 
-// Shared in-app back/forward (`@brainstorm/sdk/nav-history`) — same model
+// Shared in-app back/forward (`@brainstorm-os/sdk/nav-history`) — same model
 // + header chrome + chords as every other first-party app. The active
 // {list, view} pair IS the navigable location. `applyingDbNav` guards the
 // history-driven path so `selectList`/`selectView` (the user-nav
@@ -4532,7 +4536,7 @@ type BrainstormRuntime = {
 		};
 		/** Files host service slice the 9.12.16-UI import flow needs.
 		 *  Narrowed to `requestOpen` + `read`; the full surface lives in
-		 *  `@brainstorm/sdk-types::FilesService`. Present only when
+		 *  `@brainstorm-os/sdk-types::FilesService`. Present only when
 		 *  `files.read` is granted; the "Import…" affordance hides
 		 *  entirely otherwise (preview / standalone-dev / future
 		 *  non-Electron host). */

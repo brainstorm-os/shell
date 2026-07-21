@@ -9,7 +9,7 @@
  * here we only verify the command-registry plumbing.
  */
 
-import { createMapBlockAnchorStore, mountBlockAnchors } from "@brainstorm/editor";
+import { createMapBlockAnchorStore, mountBlockAnchors } from "@brainstorm-os/editor";
 import { CodeNode } from "@lexical/code";
 import { createHeadlessEditor } from "@lexical/headless";
 import { AutoLinkNode, LinkNode } from "@lexical/link";

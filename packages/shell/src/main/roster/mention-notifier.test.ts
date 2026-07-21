@@ -3,7 +3,7 @@
  * Message/Comment + the self-suppressing should-notify decision.
  */
 
-import { AttachmentKind, SenderKind } from "@brainstorm/sdk-types";
+import { AttachmentKind, SenderKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	COMMENT_TYPE_URL,

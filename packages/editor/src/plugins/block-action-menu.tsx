@@ -5,7 +5,7 @@
  * catalog, and an `onActivate` that dispatches the chosen command with the
  * right `blockKeys`.
  *
- * Renders through the shared fancy-menus runtime (`@brainstorm/sdk/menus`) so
+ * Renders through the shared fancy-menus runtime (`@brainstorm-os/sdk/menus`) so
  * it matches every other menu's chrome / escape-stack / glass — section
  * headers group the commands by `CommandCategory`. Each command keeps its
  * Phosphor icon: the editor's icons are React nodes, so we wrap each in an
@@ -18,7 +18,7 @@ import {
 	type IconComponent,
 	type IconParam,
 	openContextMenu,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import type { ReactNode } from "react";
 import { type BlockCommand, CommandCategory } from "../block-command";
 import type { EditorT } from "../i18n";

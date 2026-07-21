@@ -12,7 +12,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ListSource, MESSAGE_TYPE_URL } from "@brainstorm/sdk-types";
+import { type ListSource, MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { queryVaultListSource } from "../entities/vault-entities-service";
 import { DataStores } from "../storage/data-stores";

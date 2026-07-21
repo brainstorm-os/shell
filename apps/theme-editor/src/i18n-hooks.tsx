@@ -1,5 +1,5 @@
-import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm/sdk/i18n";
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+import { type TFunction, type TParams, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { LOCALE_PACK_IMPORTERS, THEME_EDITOR_I18N, type ThemeEditorI18nKey } from "./i18n";
 
 export function useThemeEditorT(

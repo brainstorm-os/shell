@@ -15,7 +15,11 @@
  * accurate — no dynamic measurement needed.
  */
 
-import { type CompositeItemProps, Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import {
+	type CompositeItemProps,
+	Orientation,
+	useCompositeKeyboard,
+} from "@brainstorm-os/sdk/a11y";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type CSSProperties,

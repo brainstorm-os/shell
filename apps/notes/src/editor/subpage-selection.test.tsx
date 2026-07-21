@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { BASELINE_NODES } from "@brainstorm/editor";
+import { BASELINE_NODES } from "@brainstorm-os/editor";
 import {
 	$createParagraphNode,
 	$createTextNode,

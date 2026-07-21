@@ -20,7 +20,7 @@ describe("constants", () => {
 	it("pins the type url, mime + buffer root", () => {
 		expect(STYLE_PACK_TYPE_URL).toBe("brainstorm/StylePack/v1");
 		expect(STYLE_PACK_CSS_MIME).toBe("text/css");
-		// Must match @brainstorm/editor getCodeBuffer's root so code-editor
+		// Must match @brainstorm-os/editor getCodeBuffer's root so code-editor
 		// binds the same buffer on cross-app open.
 		expect(STYLE_PACK_BODY_ROOT).toBe("content");
 	});

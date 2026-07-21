@@ -2,7 +2,7 @@
  * Symmetric encryption helpers used by the credential store (Stage 2) and
  * later by entity DEK encryption (Stage 10).
  *
- * Cipher per OQ-25 resolution: **XChaCha20-Poly1305** via `@brainstorm/native`.
+ * Cipher per OQ-25 resolution: **XChaCha20-Poly1305** via `@brainstorm-os/native`.
  *   - 256-bit key
  *   - 192-bit nonce (extended) — random nonces are safe against birthday-style
  *     collisions in any realistic Brainstorm vault.
@@ -18,7 +18,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { xchacha20Poly1305Open, xchacha20Poly1305Seal } from "@brainstorm/native";
+import { xchacha20Poly1305Open, xchacha20Poly1305Seal } from "@brainstorm-os/native";
 
 const EMPTY_AAD = new Uint8Array(0);
 

@@ -9,17 +9,17 @@
  * re-render together on the next `render()`.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { createEmptyState } from "@brainstorm/sdk/empty-state";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { createEmptyState } from "@brainstorm-os/sdk/empty-state";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import {
 	type ObjectMenuContext,
 	type ObjectMenuRuntime,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { createIconPickerButton } from "@brainstorm/sdk/picker-host";
+} from "@brainstorm-os/sdk/object-menu";
+import { createIconPickerButton } from "@brainstorm-os/sdk/picker-host";
 import { t, tCount } from "../i18n/t";
 import type { CompiledSection, CompiledSurface } from "../logic/compile-surface";
 import { dateKey } from "../logic/date-buckets";

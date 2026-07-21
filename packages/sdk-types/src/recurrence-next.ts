@@ -3,7 +3,7 @@
  * `after`, or `null` when the structured form can't expand (`Custom`
  * RRULE has no in-tree parser).
  *
- * Extracted to `@brainstorm/sdk-types` (the home of the `Recurrence`
+ * Extracted to `@brainstorm-os/sdk-types` (the home of the `Recurrence`
  * union + the 9.15.5 `occurrencesInRange` range-materializer): Tasks'
  * `logic/next-occurrence.ts` carried this verbatim with a comment that
  * "the SDK extracts this directly when it lands — there is no parallel

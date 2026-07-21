@@ -1,6 +1,6 @@
 /**
  * Renderer-side Y.Doc replica resolver. The singleton accessor lives in
- * `@brainstorm/react-yjs` (`createYDocResolverAccessor`, shared with Journal
+ * `@brainstorm-os/react-yjs` (`createYDocResolverAccessor`, shared with Journal
  * / Code Editor / Tasks); this wires it to the Notes runtime getter.
  *
  * `contextBridge.exposeInMainWorld` can't structured-clone a Y.Doc across
@@ -10,7 +10,7 @@
  * replica.
  */
 
-import { createYDocResolverAccessor } from "@brainstorm/react-yjs";
+import { createYDocResolverAccessor } from "@brainstorm-os/react-yjs";
 import { getBrainstorm } from "./runtime";
 
 export const getYDocResolverApi = createYDocResolverAccessor(getBrainstorm);

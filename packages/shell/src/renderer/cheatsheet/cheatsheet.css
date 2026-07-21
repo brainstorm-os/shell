@@ -1,7 +1,7 @@
 /*
  * Shortcut cheatsheet (Stage 6.9, fancy-menus at 8.8). The overlay chrome,
  * search, sectioned list and rows are now a `@react-fancy-menus` surface
- * (themed via `@brainstorm/sdk/menus.css`); only the chord-token glyphs that
+ * (themed via `@brainstorm-os/sdk/menus.css`); only the chord-token glyphs that
  * render inside each row's caption keep bespoke styling here so they read as
  * physical keys, matching the Settings → Keyboard panel.
  */

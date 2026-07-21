@@ -1,4 +1,4 @@
-import { DropEffect } from "@brainstorm/sdk-types";
+import { DropEffect } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { DropSemantic, effectForSemantic, leastDestructive } from "./drop-semantics";
 

@@ -1,4 +1,4 @@
-import { SelectionModifier } from "@brainstorm/sdk/selection";
+import { SelectionModifier } from "@brainstorm-os/sdk/selection";
 import { describe, expect, it } from "vitest";
 import { EMPTY_NODE_SELECTION, applyNodeSelection, clearNodeSelection } from "./graph-selection";
 

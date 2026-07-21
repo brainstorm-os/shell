@@ -1,14 +1,14 @@
 /**
  * VP-7c parity: with a real vault `PropertyDef` resolved, scalar
- * formatting routes through `@brainstorm/sdk/property-ui/pure`'s
+ * formatting routes through `@brainstorm-os/sdk/property-ui/pure`'s
  * `formatScalar` — the exact code Notes' cells run. These assert the
  * schema-driven path matches the standalone heuristic on the demo
  * dataset's shapes (so the move is behaviour-preserving), and that the
  * no-schema fallback is byte-for-byte unchanged.
  */
 
-import type { PropertiesSnapshot, PropertyDef } from "@brainstorm/sdk-types";
-import { DateGranularity, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import type { PropertiesSnapshot, PropertyDef } from "@brainstorm-os/sdk-types";
+import { DateGranularity, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it } from "vitest";
 import type { EntityRow } from "../logic/in-memory-entities";
 import {

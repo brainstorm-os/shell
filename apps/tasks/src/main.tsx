@@ -10,15 +10,15 @@
  * lives in `<TasksApp>` (React). The imperative DOM view-builders it reuses
  * (`renderSurfaceView` / `renderSidebar` / `renderTaskDetailView` / …) mount
  * behind ref boundaries inside it; only the live entity list flows through the
- * ONE shared reactivity stack (`@brainstorm/react-yjs`'s `useLiveEntities`).
+ * ONE shared reactivity stack (`@brainstorm-os/react-yjs`'s `useLiveEntities`).
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import "@brainstorm/sdk/empty-state.css";
-import "@brainstorm/editor/editor.css";
-import "@brainstorm/sdk/recurrence-editor.css";
-import "@brainstorm/editor/editor-theme.css";
+import "@brainstorm-os/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import "@brainstorm-os/sdk/empty-state.css";
+import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/sdk/recurrence-editor.css";
+import "@brainstorm-os/editor/editor-theme.css";
 import "./types"; // keep the type surface in the build graph
 
 import {
@@ -29,15 +29,15 @@ import {
 	setEditorHost,
 	setEntityIndexSource,
 	subscribeEntityTitles,
-} from "@brainstorm/editor";
-import { openEntity } from "@brainstorm/sdk";
-import type { Intent } from "@brainstorm/sdk-types";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import type { EntityTitleSource } from "@brainstorm/sdk/property-ui";
-import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";
-import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
-import { getWidgetLaunch } from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/editor";
+import { openEntity } from "@brainstorm-os/sdk";
+import type { Intent } from "@brainstorm-os/sdk-types";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import type { EntityTitleSource } from "@brainstorm-os/sdk/property-ui";
+import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
+import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { TasksApp } from "./app";
 import { ASSIGNEE_CATALOG_DEF } from "./properties/task-properties";

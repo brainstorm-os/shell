@@ -1,7 +1,7 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ANTHROPIC_PROVIDER_ID, OLLAMA_PROVIDER_ID } from "@brainstorm/sdk-types";
+import { ANTHROPIC_PROVIDER_ID, OLLAMA_PROVIDER_ID } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { removeTestDir } from "../test-support/remove-test-dir";
 import {

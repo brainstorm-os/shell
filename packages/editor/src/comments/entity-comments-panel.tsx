@@ -20,8 +20,8 @@ import {
 	AttachmentKind,
 	type RosterService,
 	type VaultEntitiesService,
-} from "@brainstorm/sdk-types";
-import type { ComposerContextHost, ContextCandidate } from "@brainstorm/sdk/composer-context";
+} from "@brainstorm-os/sdk-types";
+import type { ComposerContextHost, ContextCandidate } from "@brainstorm-os/sdk/composer-context";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { localPresenceName } from "../peer-presence";
 import { CommentsProvider } from "./comments-context";

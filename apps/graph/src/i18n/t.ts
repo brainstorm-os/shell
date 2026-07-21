@@ -1,7 +1,7 @@
 /**
  * The Graph app's bound `t()` — the single translation entry point for
  * every JS-built user-visible string. Wraps the shared
- * `@brainstorm/sdk/i18n` `createT` over the local English manifest, so the
+ * `@brainstorm-os/sdk/i18n` `createT` over the local English manifest, so the
  * Graph app uses the *same* interpolation + missing-key semantics every
  * other app does (shared-fundamentals contract §C).
  *
@@ -9,7 +9,7 @@
  * argument to `createT`; v1 ships English-only like its sibling apps.
  */
 
-import { type TParams, createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import { type TParams, createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
 import { GRAPH_I18N, type GraphI18nKey } from "./manifest";
 
 export const t = createT(GRAPH_I18N);

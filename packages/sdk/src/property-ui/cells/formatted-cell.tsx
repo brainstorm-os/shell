@@ -5,7 +5,7 @@
  * resting chrome: Pill (chip) or Plain (inline text).
  */
 
-import { type CellProps, PropertyFormat } from "@brainstorm/sdk-types";
+import { type CellProps, PropertyFormat } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { coerceValue } from "../../properties-validate";

@@ -1,4 +1,4 @@
-import { isValidReminder } from "@brainstorm/sdk-types";
+import { isValidReminder } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	RecurrencePreset,

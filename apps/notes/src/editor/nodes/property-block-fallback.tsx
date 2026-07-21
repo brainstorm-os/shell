@@ -12,7 +12,7 @@
  * placeholders, not error states.
  */
 
-import type { PropertyDef, PropertyView } from "@brainstorm/sdk-types";
+import type { PropertyDef, PropertyView } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { t } from "../../i18n/t";
 

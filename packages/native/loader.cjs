@@ -1,5 +1,5 @@
 /**
- * CJS entry for `@brainstorm/native` (13.1b / NAPI-1b).
+ * CJS entry for `@brainstorm-os/native` (13.1b / NAPI-1b).
  *
  * Sits in front of the auto-generated `./index.js` to wire packaged-mode
  * binary resolution. In dev this is a transparent passthrough — the call to

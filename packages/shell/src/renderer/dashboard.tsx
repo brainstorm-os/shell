@@ -4,7 +4,7 @@ import {
 	getEscapeStack,
 	installEscapeHandler,
 	useRegionNavigation,
-} from "@brainstorm/sdk/a11y";
+} from "@brainstorm-os/sdk/a11y";
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
@@ -103,7 +103,7 @@ function warmOverlayChunks(): void {
 		void load().catch(() => {});
 	}
 }
-import { track } from "@brainstorm/sdk/analytics";
+import { track } from "@brainstorm-os/sdk/analytics";
 import { launchApp, trackAppLaunch } from "./analytics/track-app-launch";
 import { ConfirmVariant, confirm } from "./ui/confirm";
 import { Icon, IconName } from "./ui/icon";

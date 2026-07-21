@@ -18,8 +18,13 @@
  * Persisted shape is protocol — don't rename `type` / `checked`.
  */
 
-import { type CellProps, type PropertyDef, PropertyView, ValueType } from "@brainstorm/sdk-types";
-import { getCell } from "@brainstorm/sdk/property-ui";
+import {
+	type CellProps,
+	type PropertyDef,
+	PropertyView,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
+import { getCell } from "@brainstorm-os/sdk/property-ui";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$applyNodeReplacement,

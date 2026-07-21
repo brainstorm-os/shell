@@ -7,8 +7,8 @@
  * selection, and that "Manage values" routes to the editor store.
  */
 
-import type { CellProps, Dictionary, LabeledValue, PropertyDef } from "@brainstorm/sdk-types";
-import { CARDINALITY_HARD_MAX, PropertyView, ValueType } from "@brainstorm/sdk-types";
+import type { CellProps, Dictionary, LabeledValue, PropertyDef } from "@brainstorm-os/sdk-types";
+import { CARDINALITY_HARD_MAX, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

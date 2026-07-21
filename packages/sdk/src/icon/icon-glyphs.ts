@@ -9,7 +9,7 @@
  * stylesheet-independent). Keyed by the IconName enum value so it stays in
  * sync with the registry in ./icon-registry.ts.
  *
- * Regenerate: bun run --filter @brainstorm/sdk build:glyphs
+ * Regenerate: bun run --filter @brainstorm-os/sdk build:glyphs
  * (scripts/build-glyphs.mjs reads node_modules/@phosphor-icons/core/assets/
  * <weight>/<name>[-<weight>].svg for every glyph in the curated DOM_PACK).
  */

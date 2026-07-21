@@ -13,10 +13,10 @@
  * Bookmarks up by `<kind>:` prefix without code changes.
  */
 
-import type { SerializedBlock } from "@brainstorm/sdk-types";
-import { nullableNumber, nullableString } from "@brainstorm/sdk/codec-helpers";
-import { parseCover } from "@brainstorm/sdk/entity-cover";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
+import { nullableNumber, nullableString } from "@brainstorm-os/sdk/codec-helpers";
+import { parseCover } from "@brainstorm-os/sdk/entity-cover";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { normalizeTagList } from "../logic/tag-utils";
 import { normalizeUrl } from "../logic/url-parse";
 import type { Bookmark } from "../types/bookmark";

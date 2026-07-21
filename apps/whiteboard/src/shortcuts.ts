@@ -4,10 +4,10 @@
  * id; no raw `e.key` outside this module.
  *
  * The chord syntax + semantics are deliberately identical to
- * `@brainstorm/sdk/shortcut`'s `matchesChord` (same `CmdOrCtrl` / `isMac`
+ * `@brainstorm-os/sdk/shortcut`'s `matchesChord` (same `CmdOrCtrl` / `isMac`
  * resolution) so the contract's shared-parser intent holds. A full
  * migration to the SDK helper is *blocked*, not skipped: the root
- * `vitest.config.ts` has no `@brainstorm/sdk/shortcut` alias (it covers
+ * `vitest.config.ts` has no `@brainstorm-os/sdk/shortcut` alias (it covers
  * `object-menu` / `i18n` / `entity-icon` but not `shortcut` / `popover` /
  * `icon`), and that file is outside this builder's edit scope — see the
  * handoff STOP-needs. This module also keeps the richer `bindShortcut`
@@ -171,7 +171,7 @@ export function isTypingTarget(target: EventTarget | null | undefined): boolean 
 /**
  * Test the chord syntax `[<Mod>+]<Key>` against a KeyboardEvent. Public
  * for unit tests; production code goes through `bindShortcut`. Kept byte-
- * identical in semantics to `@brainstorm/sdk/shortcut`'s `matchesChord`
+ * identical in semantics to `@brainstorm-os/sdk/shortcut`'s `matchesChord`
  * (the parser this delegates to once the root vitest alias lands).
  */
 export function matchesChord(event: KeyboardEvent, chord: string): boolean {

@@ -5,8 +5,13 @@
  * changed, and the codec round-trip survives the service hop.
  */
 
-import { LIST_VIEW_ENTITY_TYPE } from "@brainstorm/sdk";
-import { type Entity, type EntityQuery, type ListView, ListViewKind } from "@brainstorm/sdk-types";
+import { LIST_VIEW_ENTITY_TYPE } from "@brainstorm-os/sdk";
+import {
+	type Entity,
+	type EntityQuery,
+	type ListView,
+	ListViewKind,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	type ViewEntitiesService,

@@ -5,8 +5,8 @@
  * the TagPicker's inline "Create '<query>'" affordance.
  */
 
-import type { CellProps, Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { CellProps, Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { type ComponentType, type ReactNode, act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

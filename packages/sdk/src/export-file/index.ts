@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/export-file` — shared helpers for the cross-app
+ * `@brainstorm-os/sdk/export-file` — shared helpers for the cross-app
  * "Save as file" flow that rides on the Stage 9.10 Files-host service.
  *
  * The consumer pattern is the same in every app:
@@ -33,7 +33,7 @@
 
 /** Minimal slice of `FilesService` (Stage 9.10) the save flow needs.
  *  Centralised here so apps don't need to depend on the full
- *  `@brainstorm/sdk-types` `FilesService` surface to wire one menu row. */
+ *  `@brainstorm-os/sdk-types` `FilesService` surface to wire one menu row. */
 export type SaveFileTarget = {
 	readonly handleId: string;
 	readonly displayName: string;

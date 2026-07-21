@@ -1,4 +1,4 @@
-import type { ReminderDef } from "@brainstorm/sdk-types";
+import type { ReminderDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ReminderRunner, type ReminderStore } from "./reminder-runner";
 

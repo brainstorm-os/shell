@@ -22,7 +22,7 @@
  * pages; dataview fidelity is a later refinement.
  */
 
-import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm/sdk";
+import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm-os/sdk";
 import {
 	CARDINALITY_HARD_MAX,
 	DateGranularity,
@@ -33,7 +33,7 @@ import {
 	type PropertyDef,
 	ValueType,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { extensionForMime, servedMimeForName } from "../files/upload-mime";
@@ -894,7 +894,7 @@ export function parseAnytypeExport(
 		if (updatedMs !== null) properties.updatedAt = updatedMs;
 
 		// F-394 — mirror the user-facing relations into the `values` bag the
-		// shared property panel reads (`@brainstorm/sdk/property-ui` value-store:
+		// shared property panel reads (`@brainstorm-os/sdk/property-ui` value-store:
 		// per-entity property values live under `properties.values`, keyed by
 		// PropertyDef.key). Notes' Properties panel renders exactly the keys in
 		// that bag that have a registered PropertyDef, so without this the

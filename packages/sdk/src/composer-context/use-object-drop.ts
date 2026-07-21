@@ -9,7 +9,7 @@
  * through to the composer's upload path untouched.
  */
 
-import { DragPayloadKind, type EntityAttachment } from "@brainstorm/sdk-types";
+import { DragPayloadKind, type EntityAttachment } from "@brainstorm-os/sdk-types";
 import {
 	DropSemantic,
 	type DropTargetHandle,

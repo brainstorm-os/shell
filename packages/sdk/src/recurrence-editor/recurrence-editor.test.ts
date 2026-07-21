@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildRecurrenceLabels } from "../i18n/recurrence-labels";

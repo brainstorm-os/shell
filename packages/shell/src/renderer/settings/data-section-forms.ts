@@ -7,7 +7,7 @@
  * fresh data — never mutate inputs.
  *
  * The shell-side `PropertiesStore.setProperty` / `setDictionary` will
- * re-validate via `@brainstorm/sdk` regardless of what this layer
+ * re-validate via `@brainstorm-os/sdk` regardless of what this layer
  * approves; these helpers exist so the form can surface inline errors
  * close to the user without round-tripping IPC.
  */
@@ -17,13 +17,13 @@ import {
 	newDictionaryItemId,
 	newPropertyKey,
 	validatePropertyDef,
-} from "@brainstorm/sdk";
+} from "@brainstorm-os/sdk";
 import {
 	type Dictionary,
 	type DictionaryItem,
 	type PropertyDef,
 	PropertyKindPreset,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type PropertyDraftInput = {
 	name: string;

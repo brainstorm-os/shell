@@ -6,12 +6,12 @@
  * `predev` / `pretest` / `build:native` hooks). The autogen emits a
  * `module.exports = nativeBinding` line BEFORE the per-symbol assignments,
  * which prevents Rollup from statically tracking the named exports.
- * Consumers writing `import { ed25519GetPublicKey } from "@brainstorm/native"`
+ * Consumers writing `import { ed25519GetPublicKey } from "@brainstorm-os/native"`
  * then fail with `"ed25519GetPublicKey" is not exported by "../native/index.js"`
  * at bundle time.
  *
  * **Who actually consumes this shim today:**
- * - **Vitest** (the workspace test runner) — resolves `@brainstorm/native`
+ * - **Vitest** (the workspace test runner) — resolves `@brainstorm-os/native`
  *   via package.json `exports.".".import` → `native.mjs`. Without the shim,
  *   `bun --bun vitest` fails to import named symbols.
  * - **Future renderer / SDK consumers** — none today (all native imports
@@ -20,9 +20,9 @@
  *
  * **Who does NOT use this shim** (despite the file's earlier docstring
  * claiming otherwise): the shell's main-process bundle. `electron-vite`'s
- * `externalizeDepsPlugin` externalizes `@brainstorm/native` (it's not in
+ * `externalizeDepsPlugin` externalizes `@brainstorm-os/native` (it's not in
  * the bundle exclude list), so production main code does
- * `require("@brainstorm/native")` at runtime, which resolves via
+ * `require("@brainstorm-os/native")` at runtime, which resolves via
  * package.json's `exports.".".require` → `loader.cjs` (the packaged-mode
  * wrapper around the auto-generated `index.js`). The CJS named-export
  * assignments work fine under Node's CJS interop. Rollup never sees this

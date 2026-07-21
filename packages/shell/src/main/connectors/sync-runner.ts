@@ -38,7 +38,7 @@ import {
 	SyncRunStatus,
 	isWildcardAll,
 	validateConnectorRequest,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { applyFieldMap, readPath } from "./field-map";
 
 /** The flat, indexed property every synced entity carries for the

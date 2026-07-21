@@ -1,28 +1,28 @@
-import { BrainstormMenuProvider } from "@brainstorm/sdk/menus";
+import { BrainstormMenuProvider } from "@brainstorm-os/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import "./styles.css";
 // fancy-menus chrome: the package runtime sheet first, then the SDK bridge
 // that maps --fm-* onto Brainstorm tokens (bridge must win the cascade, so
-// it imports second). See `@brainstorm/sdk/menus.css`.
+// it imports second). See `@brainstorm-os/sdk/menus.css`.
 import "@react-fancy-menus/core/runtime.css";
-import "@brainstorm/sdk/menus.css";
+import "@brainstorm-os/sdk/menus.css";
 // `<Searchbar>` (used in Marketplace + Settings → Data) renders `.bs-searchbar`
 // classes whose chrome lives in the SDK. Apps pull it via `app-theme.css`; the
 // shell renderer is sandbox-free and never loads that file, so import the
 // searchbar-only sub-sheet directly.
-import "@brainstorm/sdk/searchbar/searchbar.css";
+import "@brainstorm-os/sdk/searchbar/searchbar.css";
 // `<Checkbox>` chrome is shared with the apps (one definition in the SDK); same
 // reason as the searchbar sheet above — the shell doesn't load `app-theme.css`,
 // so import the checkbox sub-sheet directly.
-import "@brainstorm/sdk/checkbox/checkbox.css";
-import { DEFAULT_THEME } from "@brainstorm/tokens";
+import "@brainstorm-os/sdk/checkbox/checkbox.css";
+import { DEFAULT_THEME } from "@brainstorm-os/tokens";
 import { LocaleGate } from "./i18n/locale-gate";
 import { ThemeProvider, applyThemeVars } from "./theme/theme-provider";
 import { ErrorBoundary } from "./ui/error-boundary";
 import "./ui/error-boundary.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import { AnalyticsBetaNotice } from "./analytics/beta-notice";
 import { ShellTracking } from "./analytics/shell-tracking";
 import { installFocusNav } from "./focus-nav";

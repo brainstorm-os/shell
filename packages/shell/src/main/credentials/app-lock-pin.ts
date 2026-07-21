@@ -12,7 +12,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { argon2idDerive } from "@brainstorm/native";
+import { argon2idDerive } from "@brainstorm-os/native";
 import { base64ToBytes, bytesToBase64 } from "./crypto";
 import type { KeystoreBackend } from "./keystore";
 

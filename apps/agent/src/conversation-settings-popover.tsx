@@ -1,7 +1,7 @@
 /**
  * Agent-5 — the per-conversation settings dialog: tool grants (narrowing only),
  * the model/provider picker, and the token budget. Built on the shared
- * `@brainstorm/sdk/popover` + `@brainstorm/sdk/select-menu` primitives (no
+ * `@brainstorm-os/sdk/popover` + `@brainstorm-os/sdk/select-menu` primitives (no
  * bespoke chrome). Pure presentation over the pure helpers in
  * `logic/conversation-settings.ts`; the parent owns persistence.
  *
@@ -10,10 +10,10 @@
  * `ai.provider:<id>`s. The three-tier intersection remains the chokepoint.
  */
 
-import { Checkbox } from "@brainstorm/sdk/checkbox";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import type { SelectMenuOption } from "@brainstorm/sdk/select-menu";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import type { SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { useMemo } from "react";
 import type { ReactElement } from "react";
 import { type AgentI18nKey, t } from "./i18n";

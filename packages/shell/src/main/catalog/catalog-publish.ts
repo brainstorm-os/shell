@@ -13,7 +13,7 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, posix, sep } from "node:path";
-import { ed25519GetPublicKey } from "@brainstorm/native";
+import { ed25519GetPublicKey } from "@brainstorm-os/native";
 import { bundleSha256Hex, packBrainstormBundle, signBundleHash } from "./brainstorm-package";
 
 /** Files always included from a bundle dir, plus everything under these dirs. */

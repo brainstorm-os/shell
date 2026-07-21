@@ -25,7 +25,7 @@ import {
 	SYNC_WINDOW_ALL_MAX_MESSAGES,
 	type SyncWindow,
 	syncWindowDays,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { MailDriver, OutboundMessage } from "./mail-driver";
 import { FetchWalk } from "./mail-driver";
 import { projectFolder, projectMessage } from "./mail-projection";

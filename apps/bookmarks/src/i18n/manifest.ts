@@ -1,14 +1,14 @@
 /**
  * Bookmarks app i18n manifest — every user-visible string the renderer
  * emits, keyed and English-defaulted, consumed through the shared
- * `@brainstorm/sdk/i18n` `createT`. A localised build passes a
+ * `@brainstorm-os/sdk/i18n` `createT`. A localised build passes a
  * `Partial<BookmarksMessages>` of overrides; missing keys degrade to
  * the English default (never a crash) per the shared `t()` contract.
  *
  * No bare string literal may reach the DOM — it goes through a key here.
  */
 
-import { type TParams, createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import { type TParams, createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
 
 export const BOOKMARKS_MESSAGES = {
 	"surface.inbox": "Inbox",

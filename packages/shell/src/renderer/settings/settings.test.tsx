@@ -11,7 +11,7 @@
  * is exercised without mounting the heavier section bodies.
  */
 
-import { getEscapeStack, installEscapeHandler } from "@brainstorm/sdk/a11y";
+import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";

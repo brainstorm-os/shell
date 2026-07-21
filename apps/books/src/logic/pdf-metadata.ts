@@ -11,7 +11,7 @@
  * + cover upload glue lives in `render/pdf-cover.ts` + the app.
  */
 
-import { CoverKind } from "@brainstorm/sdk-types";
+import { CoverKind } from "@brainstorm-os/sdk-types";
 
 /** The slice of pdf.js `getMetadata().info` we read. Structurally typed —
  *  no dependency on pdf.js's large `.d.ts`. */

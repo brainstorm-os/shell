@@ -1,6 +1,6 @@
 /**
  * The slice of `window.brainstorm` this app reads. `vaultEntities` is the
- * live entity-snapshot service (subscribed through `@brainstorm/react-yjs`'s
+ * live entity-snapshot service (subscribed through `@brainstorm-os/react-yjs`'s
  * `useVaultEntities`, never `onChange` directly); `entities` persists the
  * transcript; `ai` is the broker surface that routes to the local model;
  * `intents` is the cap-checked bus the agent loop dispatches tools through
@@ -20,7 +20,7 @@ import type {
 	StorageService,
 	Subscription,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type AgentRuntime = {
 	app?: { id: string; version: string; sdkVersion: string };

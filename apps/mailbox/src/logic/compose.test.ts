@@ -1,6 +1,6 @@
 /** Composer seeding + send-payload shaping (Mailbox-4). */
 
-import { MailFlag } from "@brainstorm/sdk-types";
+import { MailFlag } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { MessageView } from "../types/mail-view";
 import {

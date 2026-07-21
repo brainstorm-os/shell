@@ -11,7 +11,7 @@
  *   - The store reference has to be ours to feed `store.isOpen()` into the
  *     suppression registry (the bare `<MenuProvider>` creates its own).
  *
- * Theme is handled entirely in CSS (`@brainstorm/sdk/menus.css` bridges
+ * Theme is handled entirely in CSS (`@brainstorm-os/sdk/menus.css` bridges
  * `--fm-*` → `--color-*`), so it recolours reactively on theme switch and
  * isn't passed here as a static `ThemeTokens` snapshot.
  */

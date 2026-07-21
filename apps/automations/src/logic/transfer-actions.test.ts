@@ -7,7 +7,7 @@ import {
 	type WorkflowDef,
 	type WorkflowStep,
 	aggregateWorkflowCapabilities,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { LoadedWorkflow } from "../storage/automation-repository";
 import type {
