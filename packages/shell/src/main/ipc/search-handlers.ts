@@ -22,6 +22,7 @@ import type { VectorIndexer } from "../search/vector-indexer";
 export const SEARCH_QUERY_CHANNEL = "search:query";
 export const SEARCH_STATS_CHANNEL = "search:stats";
 export const SEARCH_REINDEX_CHANNEL = "search:reindex";
+export const SEARCH_ENABLE_SEMANTIC_CHANNEL = "search:enable-semantic";
 
 /** What the Settings → Search panel renders. `available` is the number of
  *  indexable entities the *sources* currently hold (entities.db + the
@@ -49,6 +50,10 @@ export type SearchHandlerDeps = {
 	getSemanticStatus?: () => SemanticModelStatus;
 	/** Rebuild the index from sources (same path as vault-activation). */
 	reindex: () => Promise<void>;
+	/** 11.3 consent gate — grant consent + start the ~130 MB model download and
+	 *  vector indexing. Optional so callers/tests without the embedder wired can
+	 *  omit it (the channel then reports the current, still-gated status). */
+	enableSemantic?: () => Promise<void>;
 	/** Count of indexable entities the sources hold right now; null when
 	 *  there's no session or the scan failed. Drives the coverage estimate. */
 	getAvailableCount: () => Promise<number | null>;
@@ -82,6 +87,15 @@ export function registerSearchHandlers(deps: SearchHandlerDeps): void {
 			await deps.reindex();
 		} catch (error) {
 			console.warn("[brainstorm] search:reindex failed:", error);
+		}
+		return buildReport(deps);
+	});
+
+	ipcMain.handle(SEARCH_ENABLE_SEMANTIC_CHANNEL, async (): Promise<SearchIndexReport> => {
+		try {
+			await deps.enableSemantic?.();
+		} catch (error) {
+			console.warn("[brainstorm] search:enable-semantic failed:", error);
 		}
 		return buildReport(deps);
 	});

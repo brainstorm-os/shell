@@ -1530,6 +1530,13 @@
 	margin: 0;
 }
 
+.search-index__semantic-consent {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-3);
+}
+
 .search-index__semantic-progress {
 	display: flex;
 	flex-direction: column;

@@ -33,6 +33,7 @@ export function SearchSection() {
 	const [report, setReport] = useState<SearchIndexReport | null>(null);
 	const [loaded, setLoaded] = useState(false);
 	const [reindexing, setReindexing] = useState(false);
+	const [enablingSemantic, setEnablingSemantic] = useState(false);
 	const setHeaderActions = useSettingsHeaderActions();
 
 	useEffect(() => {
@@ -86,6 +87,20 @@ export function SearchSection() {
 			});
 		} finally {
 			setReindexing(false);
+		}
+	}, []);
+
+	// 11.3 consent gate — opt into the ~130 MB semantic-model download. The
+	// returned report already reflects the new status (NeedsConsent → Idle /
+	// Downloading / Absent), and the Downloading re-poll effect above then
+	// animates the bar.
+	const onEnableSemantic = useCallback(async () => {
+		setEnablingSemantic(true);
+		try {
+			const next = await window.brainstorm.search.enableSemantic();
+			setReport(next);
+		} finally {
+			setEnablingSemantic(false);
 		}
 	}, []);
 
@@ -179,7 +194,11 @@ export function SearchSection() {
 				/>
 			</div>
 
-			<SemanticStatusCard status={report.semantic} />
+			<SemanticStatusCard
+				status={report.semantic}
+				onEnable={onEnableSemantic}
+				enabling={enablingSemantic}
+			/>
 
 			<div className="search-index__bytype">
 				<h4 className="settings__section-title">{t("shell.settings.search.byType.heading")}</h4>
@@ -218,7 +237,17 @@ export function SearchSection() {
  *  (`bge-small-en-v1.5`, ~130 MB) downloads on first semantic-search use; this
  *  is the only place a user can see that happening (or that it's ready / off).
  *  Absent → the row is a quiet "text-only" note; Downloading → a live bar. */
-export function SemanticStatusCard({ status }: { status: SemanticModelStatus }) {
+export function SemanticStatusCard({
+	status,
+	onEnable,
+	enabling,
+}: {
+	status: SemanticModelStatus;
+	/** 11.3 consent gate — grant consent + start the download. Omitted where the
+	 *  action isn't available (e.g. the ambient status card). */
+	onEnable?: () => void;
+	enabling?: boolean;
+}) {
 	const { phase } = status;
 	const icon =
 		phase === EmbedderPhase.Ready
@@ -262,6 +291,26 @@ export function SemanticStatusCard({ status }: { status: SemanticModelStatus }) 
 						{status.totalBytes > 0 &&
 							` · ${formatBytes(status.downloadedBytes)} / ${formatBytes(status.totalBytes)}`}
 					</span>
+				</div>
+			) : phase === EmbedderPhase.NeedsConsent ? (
+				<div className="search-index__semantic-consent">
+					<p className="search-index__semantic-detail">
+						{t("shell.settings.search.semantic.needsConsent")}
+					</p>
+					{onEnable ? (
+						<button
+							type="button"
+							className="bs-btn bs-btn--sm"
+							data-bs-primary
+							onClick={onEnable}
+							disabled={enabling}
+							data-testid="settings-search-enable-semantic"
+						>
+							{enabling
+								? t("shell.settings.search.semantic.enabling")
+								: t("shell.settings.search.semantic.enable")}
+						</button>
+					) : null}
 				</div>
 			) : (
 				<p className="search-index__semantic-detail">

@@ -1123,6 +1123,8 @@ const search = {
 	query: (q: SearchQuery): Promise<SearchHit[]> => ipcRenderer.invoke("search:query", q),
 	stats: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:stats"),
 	reindex: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:reindex"),
+	// 11.3 consent gate — opt into the ~130 MB semantic-model download.
+	enableSemantic: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:enable-semantic"),
 };
 
 /** Privileged intent-dispatch surface — for the launcher palette + future

@@ -34,6 +34,11 @@ export enum EmbedderPhase {
 	/** The download or init failed (e.g. offline on first run). Not terminal —
 	 *  the seam retries on the next embed, which moves this back to Downloading. */
 	Failed = "failed",
+	/** The user hasn't opted into the ~130 MB model download yet (11.3 consent
+	 *  gate). Search stays lexical-only until they enable it in Settings →
+	 *  Search; enabling moves this to Downloading (or Absent if the addon turns
+	 *  out unavailable). */
+	NeedsConsent = "needs-consent",
 }
 
 /** One per-file progress tick emitted by the native addon while fetching a
@@ -95,6 +100,12 @@ export function initialStatus(): SemanticModelStatus {
 /** The addon isn't loadable — search is lexical-only. */
 export function absentStatus(): SemanticModelStatus {
 	return base(EmbedderPhase.Absent);
+}
+
+/** The user hasn't consented to the model download yet (11.3 consent gate) —
+ *  search is lexical-only until they enable it. */
+export function needsConsentStatus(): SemanticModelStatus {
+	return base(EmbedderPhase.NeedsConsent);
 }
 
 /** `embedderInit` was called — the download is (re)starting. Clears any prior

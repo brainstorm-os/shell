@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EmbedderPhase, markReady } from "../search/embedder-status";
+import { EmbedderPhase, markReady, needsConsentStatus } from "../search/embedder-status";
 import type { SearchHit, SearchIndexer } from "../search/search-indexer";
 import { runHybridQuery } from "../search/search-service";
 import type { VectorIndexer } from "../search/vector-indexer";
@@ -91,6 +91,14 @@ describe("buildReport — semantic model status (11.3)", () => {
 		});
 		expect(report.available).toBeNull();
 		expect(report.semantic.phase).toBe(EmbedderPhase.Ready);
+	});
+
+	it("surfaces the pre-opt-in NeedsConsent gate to the panel (11.3 consent)", async () => {
+		const report = await buildReport({
+			...baseDeps,
+			getSemanticStatus: () => needsConsentStatus(),
+		});
+		expect(report.semantic.phase).toBe(EmbedderPhase.NeedsConsent);
 	});
 });
 

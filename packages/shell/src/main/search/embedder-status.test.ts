@@ -8,6 +8,7 @@ import {
 	markFailed,
 	markReady,
 	markStarted,
+	needsConsentStatus,
 } from "./embedder-status";
 
 const tick = (over: Partial<Parameters<typeof applyProgress>[1]> = {}) => ({
@@ -29,6 +30,14 @@ describe("embedder-status", () => {
 
 	it("absentStatus is a terminal lexical-only marker", () => {
 		expect(absentStatus().phase).toBe(EmbedderPhase.Absent);
+	});
+
+	it("needsConsentStatus marks the pre-opt-in gate with no progress", () => {
+		const s = needsConsentStatus();
+		expect(s.phase).toBe(EmbedderPhase.NeedsConsent);
+		expect(s.model).toBe(SEMANTIC_MODEL_NAME);
+		expect(s.percent).toBeNull();
+		expect(s.error).toBeNull();
 	});
 
 	it("markStarted enters Downloading and clears prior error", () => {
