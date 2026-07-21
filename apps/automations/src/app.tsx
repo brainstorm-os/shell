@@ -28,6 +28,7 @@ import {
 	type BuilderTrigger,
 	builderTriggerFromDef,
 	emptyBuilderTrigger,
+	triggerTypeSuggestions,
 } from "./logic/builder-trigger";
 import type { WorkflowTemplate } from "./logic/templates";
 import {
@@ -136,6 +137,13 @@ export function AutomationsApp(): ReactElement {
 	const workflows = useMemo(() => workflowsFromSnapshot(vault.entities), [vault]);
 	const reminders = useMemo(() => remindersFromSnapshot(vault.entities), [vault]);
 	const runs = useMemo(() => runsFromSnapshot(vault.entities), [vault]);
+	// Mailbox-8 — surface the types the vault holds (+ curated) as EntityEvent
+	// trigger suggestions, so authoring an email-triage automation doesn't need
+	// the exact `brainstorm/Email/v1` URL.
+	const knownTriggerTypes = useMemo(
+		() => triggerTypeSuggestions(vault.entities.map((e) => e.type)),
+		[vault],
+	);
 
 	// ── Boot: the runtime hands services over after first paint, so gate the
 	// live binding on the lifecycle `ready` handshake (fall through immediately
@@ -443,6 +451,7 @@ export function AutomationsApp(): ReactElement {
 			{builder.mode !== "closed" ? (
 				<WorkflowBuilder
 					appCapabilities={appCapabilities}
+					knownTriggerTypes={knownTriggerTypes}
 					{...(builder.mode === "edit"
 						? { initialState: builder.state, initialTrigger: builder.trigger }
 						: {})}
