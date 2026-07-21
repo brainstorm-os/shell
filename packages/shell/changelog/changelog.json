@@ -3,6 +3,187 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.7.0",
+      "date": "2026-07-21",
+      "icon": "📬",
+      "title": "Your inbox starts working for you",
+      "summary": "Email can trigger automations and get AI-triaged, attachments are first-class files you can search and link, and the assistant can hand a reply straight to your composer.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Mailbox"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Email triggers",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a new message can now fire an "
+            },
+            {
+              "text": "automation",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", with an AI-triage step that reads the mail and decides what to do. Route, label, or act on your inbox without lifting a finger."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Attachments as files",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — every attachment becomes a real "
+            },
+            {
+              "text": "File entity",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " you can search, link, and reuse. The reading pane shows attachment chips; click one to fetch and open it in place."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Cleaner replies",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — reply and forward preserve the original's formatting with HTML-aware quoting."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Agent"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Draft as email",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — hand an assistant reply straight to the "
+            },
+            {
+              "text": "Mailbox composer",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " as a ready-to-send draft."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Search"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Semantic search, on your terms",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the on-device model downloads only when you "
+            },
+            {
+              "text": "opt in",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", never silently."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish & fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Preview",
+              "marks": ["bold"]
+            },
+            {
+              "text": " shows the app name in its header when nothing is open."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A blocked download",
+              "marks": ["bold"]
+            },
+            {
+              "text": " now offers a clear next step instead of a dead shield."
+            }
+          ]
+        },
+        {
+          "kind": "p",
+          "text": "Plus a sweep of dogfood fixes: new objects rename in place, empty states tell the truth, image figures stay in the content column, tidier bookmark cards, cleaner Anytype imports, and clearer reconnect prompts."
+        },
+        {
+          "kind": "callout",
+          "icon": "📦",
+          "text": [
+            {
+              "text": "For developers. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Brainstorm's building blocks are now on npm under "
+            },
+            {
+              "text": "@brainstorm-os",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — tokens, types, the React‑Yjs hooks, Block Protocol, the SDK, and the editor."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.0",
       "date": "2026-07-19",
       "icon": "🗄️",
