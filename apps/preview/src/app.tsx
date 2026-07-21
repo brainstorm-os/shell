@@ -313,8 +313,14 @@ export function PreviewApp(): ReactElement {
 						onNext={() => stepBy(1)}
 					/>
 					{chip ? <SourceChip kind={chip.kind} label={chip.label} /> : null}
-					<span className="app-header__title preview__filename" title={activeFile?.info.name ?? ""}>
-						{activeFile?.info.name ?? ""}
+					{/* Every app-header carries a title face; with nothing open, fall
+					    back to the app name so the header never reads blank (Marcus
+					    911 — Preview showed only a "0 of 0" counter, no title). */}
+					<span
+						className="app-header__title preview__filename"
+						title={activeFile?.info.name ?? t("app.title")}
+					>
+						{activeFile?.info.name ?? t("app.title")}
 					</span>
 				</div>
 				<div className="app-header__right">
