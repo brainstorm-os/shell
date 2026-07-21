@@ -187,7 +187,8 @@ describe("preview open-path: launch handshake → render", () => {
 
 		expect(rt.services.entities.get).not.toHaveBeenCalled();
 		expect(container.querySelector(".preview__render-surface")).toBeNull();
-		expect(container.querySelector(".preview__filename")?.textContent).toBe("");
+		// Marcus 911 — header falls back to the app name when nothing is open.
+		expect(container.querySelector(".preview__filename")?.textContent).toBe("Preview");
 	});
 
 	it("an already-running quick-look intent renders via runtime.on('intent')", async () => {

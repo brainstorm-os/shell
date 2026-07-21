@@ -91,7 +91,9 @@ describe("PreviewApp", () => {
 		await flush();
 		expect(container.querySelector(".bs-empty-state")).not.toBeNull();
 		expect(container.querySelector("select")).toBeNull();
-		expect(container.querySelector(".preview__filename")?.textContent).toBe("");
+		// Marcus 911 — with nothing open the header falls back to the app name
+		// so it never reads blank (was: empty title beside a bare "0 of 0").
+		expect(container.querySelector(".preview__filename")?.textContent).toBe("Preview");
 		await unmount();
 	});
 
