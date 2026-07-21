@@ -459,6 +459,13 @@
         "vite": "^6.4.3",
       },
     },
+    "packages/block-protocol": {
+      "name": "@brainstorm/block-protocol",
+      "version": "0.0.1",
+      "dependencies": {
+        "@blockprotocol/core": "0.1.4",
+      },
+    },
     "packages/cli": {
       "name": "@brainstorm/cli",
       "version": "0.0.1",
@@ -584,12 +591,13 @@
     },
     "packages/shell": {
       "name": "@brainstorm/shell",
-      "version": "0.5.3",
+      "version": "0.6.0",
       "dependencies": {
         "@blockprotocol/core": "0.1.4",
         "@blockprotocol/graph": "0.4.2",
         "@blockprotocol/hook": "0.1.8",
         "@blockprotocol/type-system": "0.2.1",
+        "@brainstorm/block-protocol": "workspace:*",
         "@brainstorm/editor": "workspace:*",
         "@brainstorm/native": "workspace:*",
         "@brainstorm/native-embed": "workspace:*",
@@ -830,6 +838,8 @@
     "@brainstorm-app/theme-editor": ["@brainstorm-app/theme-editor@workspace:apps/theme-editor"],
 
     "@brainstorm-app/whiteboard": ["@brainstorm-app/whiteboard@workspace:apps/whiteboard"],
+
+    "@brainstorm/block-protocol": ["@brainstorm/block-protocol@workspace:packages/block-protocol"],
 
     "@brainstorm/cli": ["@brainstorm/cli@workspace:packages/cli"],
 

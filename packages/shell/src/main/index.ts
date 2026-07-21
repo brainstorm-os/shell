@@ -2,6 +2,7 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { makeBpHookRouter, makeBpRouter } from "@brainstorm/block-protocol";
 import {
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
@@ -98,8 +99,6 @@ import {
 } from "./blocks/block-frame-protocol";
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
-import { makeBpHookRouter } from "./bp/hook-router";
-import { makeBpRouter } from "./bp/router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { isAuthorizedWriter, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";

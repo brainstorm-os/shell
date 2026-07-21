@@ -170,6 +170,7 @@
     "@blockprotocol/graph": "0.4.2",
     "@blockprotocol/hook": "0.1.8",
     "@blockprotocol/type-system": "0.2.1",
+    "@brainstorm/block-protocol": "workspace:*",
     "@brainstorm/editor": "workspace:*",
     "@brainstorm/native": "workspace:*",
     "@brainstorm/native-embed": "workspace:*",
