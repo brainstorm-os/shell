@@ -51,13 +51,15 @@ describe("type urls + enum tables", () => {
 		expect(ENGINE_STEP_KINDS).not.toContain(StepKind.Code);
 	});
 
-	it("the engine trigger subset excludes the network/file/startup kinds", () => {
+	it("the engine trigger subset includes startup but excludes the network/file kinds", () => {
 		expect(ENGINE_TRIGGER_KINDS).toEqual([
 			TriggerKind.Time,
 			TriggerKind.EntityEvent,
 			TriggerKind.Manual,
+			TriggerKind.Startup,
 		]);
 		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.Webhook);
+		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.FileWatch);
 	});
 
 	it("guards reject non-members", () => {

@@ -124,6 +124,7 @@
   "trigger.kind.time": "Una programación",
   "trigger.kind.entity-event": "Un cambio de entidad",
   "trigger.kind.manual": "Ejecutar bajo demanda",
+  "trigger.kind.startup": "Cuando se abre la aplicación",
   "time.preset.daily": "Diario",
   "time.preset.weekdays": "Cada día laborable",
   "time.preset.weekly": "Semanal",

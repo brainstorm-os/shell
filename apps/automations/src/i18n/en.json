@@ -124,6 +124,7 @@
   "trigger.kind.time": "A schedule",
   "trigger.kind.entity-event": "An entity change",
   "trigger.kind.manual": "Run on demand",
+  "trigger.kind.startup": "When the app starts",
   "time.preset.daily": "Daily",
   "time.preset.weekdays": "Every weekday",
   "time.preset.weekly": "Weekly",
