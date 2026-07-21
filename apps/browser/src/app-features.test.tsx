@@ -434,6 +434,60 @@ describe("per-site permission banner", () => {
 	});
 });
 
+describe("F-426 — actionable tracker shield", () => {
+	beforeEach(() => {
+		vi.mocked(openAnchoredMenu).mockClear();
+	});
+
+	async function blockTrackers(): Promise<void> {
+		await act(async () => {
+			webView.emit({ kind: WebViewEventKind.UrlChanged, tabId: "tab-1", url: "https://x.test/home" });
+		});
+		await act(async () => {
+			webView.emit({
+				kind: WebViewEventKind.TrackerBlocked,
+				tabId: "tab-1",
+				blockedTrackerCount: 3,
+			});
+		});
+	}
+
+	it("expands into an explainer + a one-click trust-and-reload action", async () => {
+		await render(<BrowserApp />);
+		await blockTrackers();
+
+		const trustCalls: Array<{ origin: string; trusted: boolean }> = [];
+		webView.setSiteTrust = (origin, trusted) => {
+			trustCalls.push({ origin, trusted });
+			return Promise.resolve();
+		};
+
+		const shield = container.querySelector<HTMLButtonElement>('[data-testid="browser-shield"]');
+		expect(shield).not.toBeNull();
+		await act(async () => shield?.click());
+
+		const items = vi.mocked(openAnchoredMenu).mock.calls.at(-1)?.[1] as Array<{
+			label?: string;
+			section?: boolean;
+			onSelect?: () => void;
+		}>;
+		// The blocked-tracker count is no longer trivia: it heads an explainer
+		// that a site may break, followed by the trust escape hatch.
+		expect(items.some((i) => i.section && i.label?.includes("may not work"))).toBe(true);
+		const action = items.find((i) => i.onSelect);
+		expect(action?.label).toBe("Trust this site & reload");
+
+		await act(async () => action?.onSelect?.());
+		expect(trustCalls).toEqual([{ origin: "https://x.test", trusted: true }]);
+		expect(webView.reloaded).toContain("tab-1");
+	});
+
+	it("shows no shield when nothing was blocked", async () => {
+		await render(<BrowserApp />);
+		expect(container.querySelector('[data-testid="browser-shield"]')).toBeNull();
+	});
+});
+
 describe("browsing history", () => {
 	function historyRow(visits: HistoryVisit[]): EntityRecord {
 		return {

@@ -52,6 +52,11 @@
   "security.local": "Local page",
   "shield.blocked.one": "{count} tracker blocked",
   "shield.blocked.other": "{count} trackers blocked",
+  "shield.menu.label": "Tracking protection",
+  "shield.menu.blocked.one": "{count} tracker blocked on this page",
+  "shield.menu.blocked.other": "{count} trackers blocked on this page",
+  "shield.menu.mayBreak": "Some features may not work with protection on.",
+  "shield.menu.trust": "Trust this site & reload",
   "unavailable.title": "Browser",
   "unavailable.blurb": "The browser engine runs in the Brainstorm shell. Launch this app from Brainstorm to browse."
 }

@@ -228,8 +228,22 @@ body {
 
 .browser__shield {
 	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-2);
+	border: none;
+	background: none;
+	font: inherit;
 	font-size: var(--text-size-xs);
 	color: var(--color-text-secondary, #555);
+	cursor: pointer;
+	border-radius: var(--radius-md);
+}
+
+.browser__shield:hover,
+.browser__shield[aria-expanded="true"] {
+	background: var(--hover);
 }
 
 /* Clip-to-vault (Browser-5) — per-tab "Save to vault" affordance. */
