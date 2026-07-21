@@ -4,21 +4,21 @@
  * plus the pure subcomponents rendered directly with props.
  */
 
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	BillingAccountStatus,
 	type BillingInvoiceView,
 	type BillingOverviewView,
 	BillingSettingsFailure,
-} from "../../shared/billing-settings-types";
-import { EntitlementStatus, FeatureFlag, PlanTier } from "../../shared/billing-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import { EntitlementStatus, FeatureFlag, PlanTier } from "@brainstorm-os/protocol/billing-types";
 import {
 	QuotaResource,
 	type QuotaStateView,
 	inertQuotaVerdict,
 	quotaVerdict,
-} from "../../shared/quota-types";
+} from "@brainstorm-os/protocol/quota-types";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	BillingSection,
 	InvoicesGroup,

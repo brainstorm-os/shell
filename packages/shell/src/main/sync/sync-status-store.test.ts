@@ -9,8 +9,8 @@
  */
 
 import { EventEmitter } from "node:events";
+import { AttachmentSyncPauseReason } from "@brainstorm-os/protocol/quota-types";
 import { describe, expect, it, vi } from "vitest";
-import { AttachmentSyncPauseReason } from "../../shared/quota-types";
 import {
 	ActiveRelayKind,
 	type ActiveRelayOrchestrator,

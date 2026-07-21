@@ -19,6 +19,11 @@
  * slot (wallpaper).
  */
 
+import {
+	AppearanceMode,
+	AppearanceSlot,
+	effectiveSlotFor,
+} from "@brainstorm-os/protocol/appearance";
 import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import {
 	ThemeAppearance,
@@ -28,7 +33,6 @@ import {
 } from "@brainstorm-os/tokens";
 import { useCallback, useEffect, useState } from "react";
 import type { AppearancePair, DashboardWallpaper } from "../../preload";
-import { AppearanceMode, AppearanceSlot, effectiveSlotFor } from "../../shared/appearance";
 import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { wallpaperBackground } from "../dashboard/wallpaper";

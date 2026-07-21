@@ -5,15 +5,15 @@
  * swaps to a warning glyph on any error. The popover lists a row + bar per op.
  */
 
-import { act } from "react";
-import { type Root, createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	ActivityKind,
 	ActivityPhase,
 	type ActivitySnapshot,
 	type BackgroundOperation,
-} from "../../activity-types";
+} from "@brainstorm-os/protocol/activity-types";
+import { act } from "react";
+import { type Root, createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActivityChip } from "./activity-chip";
 import { ActivityPopover } from "./activity-popover";
 

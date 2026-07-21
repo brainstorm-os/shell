@@ -12,7 +12,7 @@
  * the source ↔ target geometry mapping happens, and it stays shell-privileged.
  */
 
-import { type WindowEntry, WindowState } from "../../shared/window-types";
+import { type WindowEntry, WindowState } from "@brainstorm-os/protocol/window-types";
 
 export type DragPoint = { x: number; y: number };
 

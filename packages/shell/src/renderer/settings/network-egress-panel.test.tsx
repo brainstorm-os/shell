@@ -6,14 +6,14 @@
  * loading branch + section enum + helpers.
  */
 
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	EffectiveProxyKind,
 	NetworkAuditOutcome,
 	NetworkPrivacyMode,
 	NetworkProxyMode,
-} from "../../network-wire-types";
+} from "@brainstorm-os/protocol/network-wire-types";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NetworkEgressPanel, formatBytes, formatRelative } from "./network-egress-panel";
 import { SettingsSection } from "./sections";
 

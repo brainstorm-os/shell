@@ -9,11 +9,11 @@
  *   2. the synchronous fast-path push (`onTheme`), the fix for the shell lag.
  */
 
+import { AppearanceMode, type AppearanceState } from "@brainstorm-os/protocol/appearance";
 import { ThemeName } from "@brainstorm-os/tokens";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppearanceMode, type AppearanceState } from "../../shared/appearance";
 import { ThemeProvider } from "./theme-provider";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

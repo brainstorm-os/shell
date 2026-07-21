@@ -14,10 +14,10 @@
  * on the 6th digit" + "renders no Unlock submit button" tests pin that design.
  */
 
+import type { LockChangedPayload, UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LockChangedPayload, UnlockResult } from "../shared/app-lock-wire-types";
 import { LockScreen, useVaultLock } from "./lock-screen";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

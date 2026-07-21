@@ -1,5 +1,5 @@
+import { UpdateAvailability, UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it } from "vitest";
-import { UpdateAvailability, UpdateChannel } from "../../shared/update-wire-types";
 import {
 	candidateRelease,
 	compareVersions,

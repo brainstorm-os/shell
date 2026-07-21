@@ -1,5 +1,9 @@
+import {
+	type WindowBounds,
+	type WindowEntry,
+	WindowState,
+} from "@brainstorm-os/protocol/window-types";
 import { describe, expect, it } from "vitest";
-import { type WindowBounds, type WindowEntry, WindowState } from "../../shared/window-types";
 import { hitTestWindow } from "./hit-test";
 
 function win(

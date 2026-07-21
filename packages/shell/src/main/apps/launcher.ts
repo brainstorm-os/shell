@@ -21,10 +21,10 @@
  */
 
 import { join } from "node:path";
+import { entityRoute, routesEquivalent } from "@brainstorm-os/protocol/route";
 import { encodeHandshake } from "@brainstorm-os/sdk";
 import type { AppHandshake, FormatContext, LaunchContext } from "@brainstorm-os/sdk-types";
 import { type ThemeName, themes } from "@brainstorm-os/tokens";
-import { entityRoute, routesEquivalent } from "../../shared/route";
 import type { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import type { AppsRepository } from "../storage/registry-repo";
 import { focusStealingDisabled, revealWindow } from "../window/reveal-window";

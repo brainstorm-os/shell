@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../../shared/update-wire-types";
 import { AppSignatureStatus } from "../../apps/app-signature";
 import { InstallOrigin, OFFICIAL_CATALOG_ID } from "../../apps/install-provenance";
 import { DataStores } from "../data-stores";

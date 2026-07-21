@@ -16,7 +16,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { WebEgressHostSummary } from "../../web-privacy-wire-types";
+import type { WebEgressHostSummary } from "@brainstorm-os/protocol/web-privacy-wire-types";
 
 export const WEB_EGRESS_FILENAME = "web-egress-audit.json";
 

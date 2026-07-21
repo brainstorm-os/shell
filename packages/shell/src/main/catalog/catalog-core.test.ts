@@ -1,5 +1,5 @@
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import {
 	decodeIndexPayload,
 	resolveCatalogVersion,

@@ -1,5 +1,5 @@
+import { UpdateChannel, UpdateLifecycle } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it, vi } from "vitest";
-import { UpdateChannel, UpdateLifecycle } from "../../shared/update-wire-types";
 import {
 	AutoUpdateEngine,
 	type AutoUpdaterHandlers,

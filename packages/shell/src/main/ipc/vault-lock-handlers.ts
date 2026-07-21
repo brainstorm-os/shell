@@ -25,8 +25,8 @@
  * only adapts IPC args + fans out the broadcast.
  */
 
+import type { LockChangedPayload, UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 import { BrowserWindow, ipcMain } from "electron";
-import type { LockChangedPayload, UnlockResult } from "../../shared/app-lock-wire-types";
 import {
 	activeVaultHasPin,
 	clearActiveVaultPin,

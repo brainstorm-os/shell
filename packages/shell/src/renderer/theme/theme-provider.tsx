@@ -1,6 +1,10 @@
+import {
+	AppearanceSlot,
+	type AppearanceState,
+	effectiveSlotFor,
+} from "@brainstorm-os/protocol/appearance";
 import { DEFAULT_THEME, ThemeName, flattenTokens, themes } from "@brainstorm-os/tokens";
 import { type ReactNode, useEffect, useState } from "react";
-import { AppearanceSlot, type AppearanceState, effectiveSlotFor } from "../../shared/appearance";
 import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { useVaultMaybe } from "../vault-context";

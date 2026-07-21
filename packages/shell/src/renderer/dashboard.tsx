@@ -1,19 +1,9 @@
 import {
-	LiveRegion,
-	RegionId,
-	getEscapeStack,
-	installEscapeHandler,
-	useRegionNavigation,
-} from "@brainstorm-os/sdk/a11y";
-import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
-import {
 	AppearanceMode,
 	AppearanceSlot,
 	effectiveSlotFor,
 	nextModeForToggle,
-} from "../shared/appearance";
+} from "@brainstorm-os/protocol/appearance";
 import {
 	type ClockPrefs,
 	DEFAULT_CHROME,
@@ -24,8 +14,18 @@ import {
 	effectiveHourCycle,
 	hourCycleToHour12,
 	isHeaderControlVisible,
-} from "../shared/shell-prefs";
-import type { MonitorSummary, TilePreset, WindowEntry } from "../shared/window-types";
+} from "@brainstorm-os/protocol/shell-prefs";
+import type { MonitorSummary, TilePreset, WindowEntry } from "@brainstorm-os/protocol/window-types";
+import {
+	LiveRegion,
+	RegionId,
+	getEscapeStack,
+	installEscapeHandler,
+	useRegionNavigation,
+} from "@brainstorm-os/sdk/a11y";
+import { AnimatePresence, motion } from "framer-motion";
+import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
 import { onSystemPreferenceChange, systemPrefersDark } from "./dashboard/appearance-watcher";
 import "./dashboard.css";
 import { AppGrid } from "./dashboard/app-grid";

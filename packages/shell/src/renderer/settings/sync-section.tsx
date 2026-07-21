@@ -8,9 +8,12 @@
  * shared text-clamp pattern.
  */
 
+import {
+	SelectiveSyncMode,
+	type SelectiveSyncPolicy,
+} from "@brainstorm-os/protocol/selective-sync-types";
 import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { useEffect, useState } from "react";
-import { SelectiveSyncMode, type SelectiveSyncPolicy } from "../../shared/selective-sync-types";
 import { formatRelativeAge, relayUrlHost } from "../dashboard/sync-status-popover";
 import { useSyncStatus } from "../dashboard/use-sync-status";
 import { SyncState } from "../dashboard/use-sync-status";

@@ -14,7 +14,11 @@
 
 import { promises as fs } from "node:fs";
 import { dirname, join } from "node:path";
-import { UpdateChannel, type UpdatePrefs, toUpdateChannel } from "../../shared/update-wire-types";
+import {
+	UpdateChannel,
+	type UpdatePrefs,
+	toUpdateChannel,
+} from "@brainstorm-os/protocol/update-wire-types";
 
 const PREFS_FILE_NAME = "update-prefs.json";
 

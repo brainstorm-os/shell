@@ -13,7 +13,7 @@
  * unit-testable without React or the preload bridge.
  */
 
-import { type AutoUpdateState, UpdateLifecycle } from "../../shared/update-wire-types";
+import { type AutoUpdateState, UpdateLifecycle } from "@brainstorm-os/protocol/update-wire-types";
 import { t } from "../i18n/t";
 import { ToastKind, pushToast } from "../ui/toasts";
 

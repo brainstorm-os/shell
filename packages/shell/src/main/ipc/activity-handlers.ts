@@ -7,9 +7,9 @@
  * Apps don't read this — it's shell chrome. Only the dashboard binds.
  */
 
+import type { ActivitySnapshot } from "@brainstorm-os/protocol/activity-types";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
-import type { ActivitySnapshot } from "../../activity-types";
 import type { BackgroundActivityStore } from "../activity/background-activity-store";
 
 export const ACTIVITY_SNAPSHOT_CHANNEL = "activity:snapshot";

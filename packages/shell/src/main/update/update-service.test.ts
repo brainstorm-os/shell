@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UpdateAvailability, UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UpdateAvailability, UpdateChannel } from "../../shared/update-wire-types";
 import { UpdatePrefsStore, updatePrefsPath } from "./update-prefs-store";
 import { UpdateService } from "./update-service";
 

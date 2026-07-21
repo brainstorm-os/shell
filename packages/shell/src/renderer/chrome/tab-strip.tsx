@@ -1,7 +1,7 @@
+import type { ChromeBridge, ChromeTab, ChromeTabsState } from "@brainstorm-os/protocol/chrome-tabs";
 import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm-os/tokens";
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { ChromeBridge, ChromeTab, ChromeTabsState } from "../../shared/chrome-tabs";
 import "./tab-strip.css";
 
 declare global {

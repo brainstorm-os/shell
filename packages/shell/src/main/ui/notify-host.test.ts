@@ -1,5 +1,8 @@
+import {
+	DEFAULT_NOTIFICATIONS,
+	type NotificationRecord,
+} from "@brainstorm-os/protocol/shell-prefs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_NOTIFICATIONS, type NotificationRecord } from "../../shared/shell-prefs";
 import {
 	UiNotifyHost,
 	coerceKind,

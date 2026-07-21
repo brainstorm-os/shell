@@ -18,9 +18,12 @@
  * `<VaultRecoveryPromptHost>` that wires it to `useVault`.
  */
 
+import {
+	VaultRecovery,
+	corruptionMessage,
+} from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { AnimatePresence } from "framer-motion";
 import { useRef } from "react";
-import { VaultRecovery, corruptionMessage } from "../../shared/vault-recovery-wire-types";
 import { t } from "../i18n/t";
 import { Button, ButtonVariant } from "../ui/button";
 import { Popover } from "../ui/popover";

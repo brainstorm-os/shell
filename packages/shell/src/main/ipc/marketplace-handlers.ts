@@ -15,10 +15,10 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { effectiveSlotFor } from "@brainstorm-os/protocol/appearance";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { type ThemeName, isThemeName } from "@brainstorm-os/tokens";
 import { app, ipcMain, nativeTheme } from "electron";
-import { effectiveSlotFor } from "../../shared/appearance";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import { firstPartyAppsDir, readFirstPartyCatalog } from "../apps/first-party";
 import { AppInstaller } from "../apps/installer";
 import {

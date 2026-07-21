@@ -13,8 +13,12 @@
  * `snapshot.state` so the renderer-side stale override actually applies.
  */
 
+import {
+	SyncState,
+	type SyncStatusSnapshot,
+	SyncTransportState,
+} from "@brainstorm-os/protocol/sync-status-types";
 import { useEffect, useState } from "react";
-import { SyncState, type SyncStatusSnapshot, SyncTransportState } from "../../sync-status-types";
 
 export { SyncState, SyncTransportState };
 export type { SyncStatusSnapshot };

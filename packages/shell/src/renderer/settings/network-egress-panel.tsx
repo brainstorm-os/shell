@@ -26,6 +26,27 @@
  *   - Outline-on-border focus mirrors `feedback_focus_outline_replaces_border`.
  */
 
+import type {
+	CrashPayload,
+	CrashPendingSummary,
+	CrashSubmissionResult,
+} from "@brainstorm-os/protocol/feedback-wire-types";
+import { CrashKind } from "@brainstorm-os/protocol/feedback-wire-types";
+import type {
+	NetworkAuditRecord,
+	NetworkBrokerState,
+	NetworkCacheStats,
+	NetworkPerAppSummary,
+	NetworkProxyConfig,
+	NetworkProxyEndpoint,
+	VaultNetworkSettings,
+} from "@brainstorm-os/protocol/network-wire-types";
+import {
+	EffectiveProxyKind,
+	NetworkAuditOutcome,
+	NetworkPrivacyMode,
+	NetworkProxyMode,
+} from "@brainstorm-os/protocol/network-wire-types";
 import { isPublicBeta } from "@brainstorm-os/sdk/analytics";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -37,27 +58,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type {
-	CrashPayload,
-	CrashPendingSummary,
-	CrashSubmissionResult,
-} from "../../feedback-wire-types";
-import { CrashKind } from "../../feedback-wire-types";
-import type {
-	NetworkAuditRecord,
-	NetworkBrokerState,
-	NetworkCacheStats,
-	NetworkPerAppSummary,
-	NetworkProxyConfig,
-	NetworkProxyEndpoint,
-	VaultNetworkSettings,
-} from "../../network-wire-types";
-import {
-	EffectiveProxyKind,
-	NetworkAuditOutcome,
-	NetworkPrivacyMode,
-	NetworkProxyMode,
-} from "../../network-wire-types";
 import type { InstalledApp } from "../../preload";
 import { AppIcon } from "../dashboard/app-icon";
 import { FeedbackDialog } from "../feedback/feedback-dialog";

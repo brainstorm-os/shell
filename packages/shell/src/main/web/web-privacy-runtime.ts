@@ -14,12 +14,12 @@
  * vault's grant file finishes loading. Mutations queue behind the load.
  */
 
-import type { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import type {
 	SitePermissionGrant,
 	SiteTrustGrant,
 	WebEgressHostSummary,
-} from "../../web-privacy-wire-types";
+} from "@brainstorm-os/protocol/web-privacy-wire-types";
+import type { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import {
 	SitePermissionStore,
 	readSitePermissionGrants,

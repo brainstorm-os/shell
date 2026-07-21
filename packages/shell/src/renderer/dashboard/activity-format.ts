@@ -5,7 +5,7 @@
  * happens at the consumer so these stay string-key mappers.
  */
 
-import { ActivityKind } from "../../activity-types";
+import { ActivityKind } from "@brainstorm-os/protocol/activity-types";
 import { IconName } from "../ui/icon";
 
 export function iconForActivityKind(kind: ActivityKind): IconName {

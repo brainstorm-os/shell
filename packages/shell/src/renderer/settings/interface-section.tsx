@@ -8,13 +8,13 @@
  * one exists, so the toggle list reads identically to the live header.
  */
 
-import { useEffect, useId } from "react";
 import {
 	HEADER_CONTROL_ORDER,
 	HeaderControlId,
 	HourCyclePref,
 	isHeaderControlVisible,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import { useEffect, useId } from "react";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { t } from "../i18n/t";
 import { IconName } from "../ui/icon";

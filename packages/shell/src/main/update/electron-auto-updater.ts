@@ -13,9 +13,9 @@
  * compromised feed can't push an artefact signed by a different identity.
  */
 
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { app } from "electron";
 import electronUpdater, { type ProgressInfo, type UpdateInfo } from "electron-updater";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import type { AutoUpdaterHandlers, ManagedAutoUpdater } from "./auto-update-engine";
 
 const { autoUpdater } = electronUpdater;

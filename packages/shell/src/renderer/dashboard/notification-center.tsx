@@ -10,9 +10,9 @@
  * process push + OS-native + DND/mute enforcement is the host half (Track C).
  */
 
+import type { NotificationKind, NotificationRecord } from "@brainstorm-os/protocol/shell-prefs";
 import { useEffect, useMemo, useState } from "react";
 import type { InstalledApp } from "../../preload";
-import type { NotificationKind, NotificationRecord } from "../../shared/shell-prefs";
 import { t } from "../i18n/t";
 import { Button, ButtonVariant } from "../ui/button";
 import { Icon, IconName } from "../ui/icon";

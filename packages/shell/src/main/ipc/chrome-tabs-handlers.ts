@@ -8,14 +8,14 @@
  * a no-op (fail-closed).
  */
 
-import { ipcMain } from "electron";
 import {
 	CHROME_TABS_ACTIVATE,
 	CHROME_TABS_CLOSE,
 	CHROME_TABS_NEW,
 	CHROME_TABS_REORDER,
 	CHROME_TABS_REQUEST,
-} from "../../shared/chrome-tabs";
+} from "@brainstorm-os/protocol/chrome-tabs";
+import { ipcMain } from "electron";
 import type { LaunchOrchestrator } from "../apps/launch-orchestrator";
 import type { AppLauncher } from "../apps/launcher";
 

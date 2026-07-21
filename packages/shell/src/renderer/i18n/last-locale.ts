@@ -12,7 +12,7 @@
  * resolves them through the fallback chain and lands on English.
  */
 
-import { DEFAULT_LANGUAGE } from "../../shared/shell-prefs";
+import { DEFAULT_LANGUAGE } from "@brainstorm-os/protocol/shell-prefs";
 
 const STORAGE_KEY = "brainstorm.locale.last";
 

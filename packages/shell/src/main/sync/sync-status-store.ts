@@ -28,7 +28,7 @@
  */
 
 import { statSync } from "node:fs";
-import type { AttachmentSyncPauseReason } from "../../shared/quota-types";
+import type { AttachmentSyncPauseReason } from "@brainstorm-os/protocol/quota-types";
 import { ActiveRelayKind, type ActiveRelayOrchestrator } from "./active-relay";
 import { seqTrackerPath } from "./seq-tracker";
 import { type WebSocketRelayPort, WebSocketRelayState } from "./websocket-relay-port";

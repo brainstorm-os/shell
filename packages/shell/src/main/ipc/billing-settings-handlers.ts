@@ -10,13 +10,13 @@
  * returned to any renderer.
  */
 
-import { ipcMain } from "electron";
 import type {
 	BillingAccountSummaryView,
 	BillingInvoiceView,
 	BillingOverviewView,
 	BillingSettingsResult,
-} from "../../shared/billing-settings-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import { ipcMain } from "electron";
 import type { BillingAccountService } from "../billing/billing-account";
 
 export const BILLING_OVERVIEW_CHANNEL = "billing-settings:overview" as const;

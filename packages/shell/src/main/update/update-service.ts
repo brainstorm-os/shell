@@ -14,7 +14,11 @@
  * with no network and no Electron.
  */
 
-import type { UpdateChannel, UpdateCheckResult, UpdatePrefs } from "../../shared/update-wire-types";
+import type {
+	UpdateChannel,
+	UpdateCheckResult,
+	UpdatePrefs,
+} from "@brainstorm-os/protocol/update-wire-types";
 import { evaluateUpdate, parseReleaseFeed } from "./update-core";
 import type { UpdatePrefsStore } from "./update-prefs-store";
 

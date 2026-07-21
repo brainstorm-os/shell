@@ -9,10 +9,10 @@
  * checkbox reflects the new state without a remount.
  */
 
+import { DEFAULT_CHROME, HeaderControlId } from "@brainstorm-os/protocol/shell-prefs";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CHROME, HeaderControlId } from "../../shared/shell-prefs";
 import { SettingsHeaderActionsContext } from "./header-actions";
 import { InterfaceSection } from "./interface-section";
 

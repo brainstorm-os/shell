@@ -32,15 +32,6 @@
  * Bun's Vitest.
  */
 
-import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
-import {
-	DEFAULT_THEME_BY_APPEARANCE,
-	ThemeAppearance,
-	type ThemeName,
-	isThemeName,
-	themeAppearance,
-} from "@brainstorm-os/tokens";
-import * as Y from "yjs";
 import {
 	AppearanceMode,
 	type AppearancePair,
@@ -49,7 +40,7 @@ import {
 	effectiveSlotFor,
 	isAppearanceMode,
 	slotForTheme,
-} from "../../shared/appearance";
+} from "@brainstorm-os/protocol/appearance";
 import {
 	type ChromeState,
 	type ClockPrefs,
@@ -72,7 +63,16 @@ import {
 	type RegionalState,
 	isHeaderControlId,
 	isNotificationKind,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
+import {
+	DEFAULT_THEME_BY_APPEARANCE,
+	ThemeAppearance,
+	type ThemeName,
+	isThemeName,
+	themeAppearance,
+} from "@brainstorm-os/tokens";
+import * as Y from "yjs";
 import type { YDocStore } from "../storage/ydoc-store";
 
 export const DASHBOARD_DOC_ID = "brainstorm-Dashboard";

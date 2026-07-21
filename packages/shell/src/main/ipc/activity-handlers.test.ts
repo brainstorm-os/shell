@@ -16,7 +16,7 @@ vi.mock("electron", () => ({
 	},
 }));
 
-import { ActivityKind, ActivityPhase } from "../../activity-types";
+import { ActivityKind, ActivityPhase } from "@brainstorm-os/protocol/activity-types";
 import { BackgroundActivityStore } from "../activity/background-activity-store";
 import {
 	ACTIVITY_SNAPSHOT_CHANNEL,

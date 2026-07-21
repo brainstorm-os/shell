@@ -1,5 +1,5 @@
+import type { WindowEntry } from "@brainstorm-os/protocol/window-types";
 import { describe, expect, it } from "vitest";
-import type { WindowEntry } from "../../shared/window-types";
 import { SettingsSection } from "../settings/sections";
 import { deriveHelpRoute } from "./derive-help-route";
 

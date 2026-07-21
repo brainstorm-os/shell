@@ -18,7 +18,6 @@
  * process (`BillingAccountService`); this panel only invokes the bridge.
  */
 
-import { useCallback, useEffect, useId, useState } from "react";
 import {
 	BillingAccountStatus,
 	type BillingAccountSummaryView,
@@ -27,8 +26,9 @@ import {
 	type BillingInvoiceView,
 	type BillingOverviewView,
 	BillingSettingsFailure,
-} from "../../shared/billing-settings-types";
-import { EntitlementStatus, FeatureFlag, PlanTier } from "../../shared/billing-types";
+} from "@brainstorm-os/protocol/billing-settings-types";
+import { EntitlementStatus, FeatureFlag, PlanTier } from "@brainstorm-os/protocol/billing-types";
+import { useCallback, useEffect, useId, useState } from "react";
 import { formatBytes } from "../format/relative-time";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";

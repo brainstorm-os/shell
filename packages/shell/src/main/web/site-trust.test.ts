@@ -4,8 +4,8 @@
  * `trusted: true` rows persist; untrust deletes.
  */
 
+import type { SiteTrustGrant } from "@brainstorm-os/protocol/web-privacy-wire-types";
 import { describe, expect, it } from "vitest";
-import type { SiteTrustGrant } from "../../web-privacy-wire-types";
 import { SiteTrustStore, parseSiteTrustGrants } from "./site-trust";
 
 const X = "https://x.com";

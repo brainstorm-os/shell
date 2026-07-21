@@ -8,7 +8,7 @@
  * client. Total — every function returns null/false on bad input, never throws.
  */
 
-import type { UpdateChannel } from "../../shared/update-wire-types";
+import type { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import type {
 	CatalogIndex,
 	CatalogListing,

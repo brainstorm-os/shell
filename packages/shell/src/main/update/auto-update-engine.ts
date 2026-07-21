@@ -20,7 +20,7 @@ import {
 	type UpdateChannel,
 	UpdateLifecycle,
 	type UpdateProgress,
-} from "../../shared/update-wire-types";
+} from "@brainstorm-os/protocol/update-wire-types";
 
 /** The callbacks the engine reacts to. Mirrors the electron-updater
  *  autoUpdater events we consume, normalised to plain data. */

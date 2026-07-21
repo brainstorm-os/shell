@@ -24,9 +24,9 @@
  * the dashboard unmounts this route.
  */
 
+import type { UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
 import { InitialFocusMode, useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { useCallback, useEffect, useState } from "react";
-import type { UnlockResult } from "../shared/app-lock-wire-types";
 import { t } from "./i18n/t";
 import { Button, ButtonVariant } from "./ui/button";
 import { Icon, IconName } from "./ui/icon";

@@ -1,17 +1,17 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
-import { ThemeName } from "@brainstorm-os/tokens";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AppearanceMode, AppearanceSlot } from "../../shared/appearance";
+import { AppearanceMode, AppearanceSlot } from "@brainstorm-os/protocol/appearance";
 import {
 	DateStylePref,
 	HeaderControlId,
 	HourCyclePref,
 	isHeaderControlVisible,
 	isWithinDnd,
-} from "../../shared/shell-prefs";
+} from "@brainstorm-os/protocol/shell-prefs";
+import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
+import { ThemeName } from "@brainstorm-os/tokens";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { placeDashboardIcon } from "../dev/seed-demo-apps";
 import { YDocStore } from "../storage/ydoc-store";
 import { DASHBOARD_DOC_ID, DashboardStore, applyLegacyMigration } from "./dashboard-store";

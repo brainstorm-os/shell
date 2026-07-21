@@ -1,5 +1,9 @@
+import {
+	ActivityKind,
+	ActivityPhase,
+	type BackgroundOperation,
+} from "@brainstorm-os/protocol/activity-types";
 import { describe, expect, it, vi } from "vitest";
-import { ActivityKind, ActivityPhase, type BackgroundOperation } from "../../activity-types";
 import { BackgroundActivityStore } from "./background-activity-store";
 
 const op = (over: Partial<BackgroundOperation> = {}): BackgroundOperation => ({

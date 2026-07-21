@@ -1,5 +1,5 @@
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import type { CatalogIndex } from "./catalog-wire-types";
 import { type InstalledForUpdate, planCatalogUpdates } from "./update-planning";
 

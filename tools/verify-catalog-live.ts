@@ -17,6 +17,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { AppInstaller } from "../packages/shell/src/main/apps/installer";
 import { CapabilityLedger } from "../packages/shell/src/main/capabilities/ledger";
 import {
@@ -32,7 +33,6 @@ import { officialCatalogTrustedKeys } from "../packages/shell/src/main/catalog/c
 import { InstallEngine, InstallOutcome } from "../packages/shell/src/main/catalog/install-engine";
 import { DataStores } from "../packages/shell/src/main/storage/data-stores";
 import { AppsRepository } from "../packages/shell/src/main/storage/registry-repo/apps-repo";
-import { UpdateChannel } from "../packages/shell/src/shared/update-wire-types";
 
 const CATALOG = process.env.BRAINSTORM_CATALOG_URL ?? "http://127.0.0.1:8788";
 const APP_ID = process.argv[2] ?? "io.brainstorm.notes";

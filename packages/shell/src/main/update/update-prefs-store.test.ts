@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import { UpdatePrefsStore, defaultUpdatePrefs, updatePrefsPath } from "./update-prefs-store";
 
 let dir: string;

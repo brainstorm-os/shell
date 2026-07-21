@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { WebEgressHostSummary } from "@brainstorm-os/protocol/web-privacy-wire-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { WebEgressHostSummary } from "../../web-privacy-wire-types";
 import {
 	WebEgressAudit,
 	parseWebEgressRows,

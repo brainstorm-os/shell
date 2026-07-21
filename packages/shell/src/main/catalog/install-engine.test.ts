@@ -1,5 +1,5 @@
+import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { describe, expect, it, vi } from "vitest";
-import { UpdateChannel } from "../../shared/update-wire-types";
 import { InstallOrigin, OFFICIAL_CATALOG_ID } from "../apps/install-provenance";
 import type { InstallResult } from "../apps/installer";
 import { CatalogClient, InMemoryCatalogCache } from "./catalog-client";

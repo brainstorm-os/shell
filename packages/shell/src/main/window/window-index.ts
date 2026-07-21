@@ -21,7 +21,7 @@ import {
 	type WindowBounds,
 	type WindowEntry,
 	WindowState,
-} from "../../shared/window-types";
+} from "@brainstorm-os/protocol/window-types";
 import type { AppLauncher } from "../apps/launcher";
 import { type MonitorInfo, monitorIdFor } from "./monitor";
 import { type TilePreset, projectOntoMonitor, tileBounds } from "./tile";

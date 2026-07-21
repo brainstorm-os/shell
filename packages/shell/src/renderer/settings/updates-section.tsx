@@ -10,14 +10,14 @@
  * last-checked stamp persist app-global through `window.brainstorm.update`.
  */
 
-import { useCallback, useEffect, useId, useState } from "react";
 import {
 	type AutoUpdateState,
 	UpdateAvailability,
 	UpdateChannel,
 	type UpdateCheckResult,
 	UpdateLifecycle,
-} from "../../shared/update-wire-types";
+} from "@brainstorm-os/protocol/update-wire-types";
+import { useCallback, useEffect, useId, useState } from "react";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { SettingRow, SettingSelect } from "./settings-controls";

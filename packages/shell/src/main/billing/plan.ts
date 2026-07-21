@@ -5,4 +5,4 @@
  * repos / service / broker handler — one source of truth, one shim.
  */
 
-export * from "../../shared/billing-types";
+export * from "@brainstorm-os/protocol/billing-types";

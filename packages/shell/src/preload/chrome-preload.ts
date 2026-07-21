@@ -19,7 +19,6 @@
  * strip can only ever drive its own container (see chrome-tabs-handlers.ts).
  */
 
-import { contextBridge, ipcRenderer } from "electron";
 import {
 	CHROME_TABS_ACTIVATE,
 	CHROME_TABS_CLOSE,
@@ -30,7 +29,8 @@ import {
 	CHROME_THEME_CHANNEL,
 	type ChromeBridge,
 	type ChromeTabsState,
-} from "../shared/chrome-tabs";
+} from "@brainstorm-os/protocol/chrome-tabs";
+import { contextBridge, ipcRenderer } from "electron";
 
 function readArg(prefix: string): string | null {
 	for (const arg of process.argv) {
