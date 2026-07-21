@@ -241,6 +241,37 @@ describe("AgentApp stored transcript rendering (F-319)", () => {
 		expect(body?.textContent).not.toContain("**");
 	});
 
+	it("Agent-9: 'Draft as email' dispatches the compose intent with the reply body", async () => {
+		installWithAssistantMessage();
+		const dispatch = vi.fn((_envelope: unknown) => Promise.resolve(null));
+		const services = (window.brainstorm as NonNullable<typeof window.brainstorm>).services as Record<
+			string,
+			unknown
+		>;
+		services.intents = { dispatch };
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const button = handle.container.querySelector<HTMLButtonElement>(
+			'[data-testid="agent-draft-email"]',
+		);
+		expect(button).not.toBeNull();
+		button?.click();
+		await flush();
+		expect(dispatch).toHaveBeenCalledTimes(1);
+		const envelope = dispatch.mock.calls[0]?.[0] as { verb: string; payload: { body: string } };
+		expect(envelope.verb).toBe("compose");
+		expect(envelope.payload.body).toContain("Summary of Northbound Q3 Plan");
+	});
+
+	it("Agent-9: no 'Draft as email' button when the intents service is absent", async () => {
+		installWithAssistantMessage();
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		expect(handle.container.querySelector('[data-testid="agent-draft-email"]')).toBeNull();
+	});
+
 	it("renders `[n_…] Title` citations as entity links, never the raw node id", async () => {
 		installWithAssistantMessage();
 		handle = await renderInto(<AgentApp />);

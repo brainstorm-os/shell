@@ -107,6 +107,8 @@
   "widget.date.yesterday": "ayer",
   "insert.action": "Añadir a una nota",
   "insert.action.hint": "Inserta esta respuesta en una nota o enlaza este chat desde una",
+  "draftEmail.action": "Redactar como correo",
+  "draftEmail.action.hint": "Abre un correo nuevo en Buzón con esta respuesta ya escrita",
   "insert.title": "Añadir a una nota",
   "insert.mode.label": "Qué añadir",
   "insert.mode.reply": "Insertar respuesta",

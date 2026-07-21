@@ -107,6 +107,8 @@
   "widget.date.yesterday": "yesterday",
   "insert.action": "Add to note",
   "insert.action.hint": "Insert this reply into a note, or link this chat from one",
+  "draftEmail.action": "Draft as email",
+  "draftEmail.action.hint": "Open a new email in Mailbox pre-filled with this reply",
   "insert.title": "Add to note",
   "insert.mode.label": "What to add",
   "insert.mode.reply": "Insert reply",
