@@ -31,9 +31,9 @@ import {
 	DriverErrorKind,
 	assertOutboundHeadersSafe,
 	driverError,
-	sanitizeIdToken,
 	submissionMessageId,
 } from "./driver-common";
+import { MIME_TEXT_HTML, MIME_TEXT_PLAIN, buildMimeMessage } from "./mail-mime";
 
 const DRIVER_NAME = "gmail";
 
@@ -73,9 +73,6 @@ const CATEGORY_LABEL_PREFIX = "CATEGORY_";
 const UNREAD_LABEL_ID = "UNREAD";
 const STARRED_LABEL_ID = "STARRED";
 const INBOX_LABEL_ID = "INBOX";
-
-const MIME_TEXT_PLAIN = "text/plain";
-const MIME_TEXT_HTML = "text/html";
 
 type GmailLabel = {
 	id?: string;
@@ -196,67 +193,6 @@ function projectMessage(message: GmailMessage, folderPath: string): RawMessage {
 		folderPath,
 		...(body.attachments.length > 0 ? { attachmentParts: body.attachments } : {}),
 	};
-}
-
-function isAscii(value: string): boolean {
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: ASCII range check is the point
-	return /^[\x00-\x7F]*$/.test(value);
-}
-
-/** RFC 2047 encoded-word for a non-ASCII header value. */
-function encodeHeaderValue(value: string): string {
-	if (isAscii(value)) return value;
-	return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
-}
-
-/** Base64 body chunked to 76-char lines per RFC 2045 §6.8. */
-function encodeBodyBase64(value: string): string {
-	const b64 = Buffer.from(value, "utf8").toString("base64");
-	return b64.match(/.{1,76}/g)?.join("\r\n") ?? "";
-}
-
-function bodyPartLines(mimeType: string, content: string): string[] {
-	return [
-		`Content-Type: ${mimeType}; charset=utf-8`,
-		"Content-Transfer-Encoding: base64",
-		"",
-		encodeBodyBase64(content),
-	];
-}
-
-function buildMime(message: OutboundMessage, messageId: string, nowMs: number): string {
-	const lines: string[] = [
-		`Message-ID: ${messageId}`,
-		`Date: ${new Date(nowMs).toUTCString()}`,
-		`From: ${message.from}`,
-		`To: ${message.to.join(", ")}`,
-	];
-	if (message.cc && message.cc.length > 0) lines.push(`Cc: ${message.cc.join(", ")}`);
-	if (message.subject !== undefined) {
-		lines.push(`Subject: ${encodeHeaderValue(message.subject)}`);
-	}
-	if (message.inReplyTo !== undefined) lines.push(`In-Reply-To: ${message.inReplyTo}`);
-	if (message.references && message.references.length > 0) {
-		lines.push(`References: ${message.references.join(" ")}`);
-	}
-	lines.push("MIME-Version: 1.0");
-
-	const hasText = message.bodyText !== undefined;
-	const hasHtml = message.bodyHtml !== undefined;
-	if (hasText && hasHtml) {
-		const boundary = `bs-${sanitizeIdToken(message.submissionId)}`;
-		lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`, "");
-		lines.push(`--${boundary}`);
-		lines.push(...bodyPartLines(MIME_TEXT_PLAIN, message.bodyText ?? ""));
-		lines.push(`--${boundary}`);
-		lines.push(...bodyPartLines(MIME_TEXT_HTML, message.bodyHtml ?? ""));
-		lines.push(`--${boundary}--`);
-	} else if (hasHtml) {
-		lines.push(...bodyPartLines(MIME_TEXT_HTML, message.bodyHtml ?? ""));
-	} else {
-		lines.push(...bodyPartLines(MIME_TEXT_PLAIN, message.bodyText ?? ""));
-	}
-	return lines.join("\r\n");
 }
 
 /** Map with at most `limit` calls in flight, preserving input order. */
@@ -422,7 +358,7 @@ export function makeGmailDriver(input: GmailDriverInput): MailDriver {
 			assertOutboundHeadersSafe(DRIVER_NAME, message);
 			const messageId = submissionMessageId(message.submissionId);
 			const receivedAt = now();
-			const mime = buildMime(message, messageId, receivedAt);
+			const mime = buildMimeMessage(message, messageId, receivedAt);
 			const raw = Buffer.from(mime, "utf8").toString("base64url");
 			await request("submit", `${USERS_ME}/messages/send`, {
 				method: "POST",

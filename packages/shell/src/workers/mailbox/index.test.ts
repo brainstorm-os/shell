@@ -100,13 +100,21 @@ describe("mailbox worker envelope handling", () => {
 		if (reply.ok) expect((reply.value as { connected: boolean }).connected).toBe(true);
 	});
 
-	it("the default factory reports MS Graph (M365) as unimplemented residue", async () => {
+	it("the default factory builds an ms-graph driver from a token alone", async () => {
 		const reply = await handleMailboxEnvelope(
 			envelope("connect", [
-				{ accountId: "acct-1", protocol: "ms-graph", credentials: { secret: "x" } },
+				{ accountId: "acct-msgraph", protocol: "ms-graph", credentials: { secret: "x" } },
 			]),
 		);
+		expect(reply.ok).toBe(true);
+		if (reply.ok) expect((reply.value as { connected: boolean }).connected).toBe(true);
+	});
+
+	it("the default factory rejects an unknown protocol", async () => {
+		const reply = await handleMailboxEnvelope(
+			envelope("connect", [{ accountId: "acct-1", protocol: "pop3", credentials: { secret: "x" } }]),
+		);
 		expect(reply.ok).toBe(false);
-		if (!reply.ok) expect(reply.error.kind).toBe("Unavailable");
+		if (!reply.ok) expect(reply.error.kind).toBe("Invalid");
 	});
 });
