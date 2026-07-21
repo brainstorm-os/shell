@@ -262,10 +262,16 @@ import { SHELL_ACTION_CHANNEL, createMenuSetup } from "./runtime/menu-setup";
 import { createShortcutSetup } from "./runtime/shortcut-setup";
 import { collectIndexableEntities } from "./search/collect-indexable";
 import type { TextEmbedder } from "./search/embedder";
-import { type SemanticModelStatus, absentStatus, initialStatus } from "./search/embedder-status";
+import {
+	type SemanticModelStatus,
+	absentStatus,
+	initialStatus,
+	needsConsentStatus,
+} from "./search/embedder-status";
 import { loadFastembedEmbedder } from "./search/local-embedder";
 import { SearchIndexer, pickIndexable } from "./search/search-indexer";
 import { makeSearchServiceHandler } from "./search/search-service";
+import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-store";
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
@@ -2055,7 +2061,13 @@ void app.whenReady().then(async () => {
 	// the embedder's per-file byte progress. Settings → Search polls this via
 	// `search:stats` so the ~130 MB first-run download shows a live bar instead
 	// of a silent minute. `Absent` once we know the native addon can't load.
-	let semanticStatus: SemanticModelStatus = initialStatus();
+	// 11.3 consent gate — the ~130 MB model is never downloaded until the user
+	// opts in (Settings → Search). App-global (the model cache is shared across
+	// vaults), default not-consented, so a fresh install is lexical-only.
+	const semanticPrefsStore = new SemanticPrefsStore({
+		path: semanticPrefsPath(app.getPath("userData")),
+	});
+	let semanticStatus: SemanticModelStatus = needsConsentStatus();
 	const getLocalEmbedder = (): Promise<TextEmbedder | null> => {
 		if (!localEmbedderLoad) {
 			// First-run model weights download into userData/models (controllable,
@@ -2245,10 +2257,22 @@ void app.whenReady().then(async () => {
 			// platform). A vector-rebuild failure downstream is isolated —
 			// `rebuildSearchIndex` rebuilds lexical first, then vector in a
 			// swallowing catch, so an offline model download never breaks search.
-			const embedder = await getLocalEmbedder();
-			if (embedder) {
-				const vector = createVectorIndexer(db, embedder);
-				vectorIndexer = vector?.indexer ?? null;
+			// 11.3 consent gate — only load the addon + build the vector index
+			// when the user opted into the model download. Pre-consent we do
+			// NOTHING semantic (no native load, no embed, no download): status is
+			// NeedsConsent and search stays lexical-only until they enable it.
+			if ((await semanticPrefsStore.load()).consented) {
+				const embedder = await getLocalEmbedder();
+				if (embedder) {
+					// Idle until the first embed emits Downloading — so a consented
+					// but empty vault (no embed runs) reads "ready to download" rather
+					// than stuck on NeedsConsent.
+					semanticStatus = initialStatus();
+					const vector = createVectorIndexer(db, embedder);
+					vectorIndexer = vector?.indexer ?? null;
+				}
+			} else {
+				semanticStatus = needsConsentStatus();
 			}
 			await rebuildSearchIndex();
 		} catch (error) {
@@ -2256,6 +2280,29 @@ void app.whenReady().then(async () => {
 			searchIndexer = null;
 			vectorIndexer = null;
 		}
+	};
+
+	// 11.3 — user opts into semantic search (Settings → Search "Enable"). Persist
+	// the consent, then build the vector index on the live search.db handle and
+	// kick a rebuild — the ~130 MB download starts on the first embed, streaming
+	// status through `semanticStatus`. Idempotent: a no-op if already indexing.
+	const enableSemanticSearch = async (): Promise<void> => {
+		await semanticPrefsStore.setConsent(true);
+		const session = getActiveVaultSession();
+		if (!session || !searchIndexer) return;
+		if (!vectorIndexer) {
+			const db = await session.dataStores.open("search");
+			const embedder = await getLocalEmbedder();
+			// A null embedder (addon absent on this platform) leaves the status at
+			// Absent via `getLocalEmbedder`, so the panel shows "unavailable"
+			// rather than a stuck NeedsConsent.
+			if (embedder) {
+				semanticStatus = initialStatus();
+				const vector = createVectorIndexer(db, embedder);
+				vectorIndexer = vector?.indexer ?? null;
+			}
+		}
+		await rebuildSearchIndex();
 	};
 
 	// 6.7 — migrate the legacy flat `<vault>/shell/shortcut-bindings.json`
@@ -4404,6 +4451,9 @@ void app.whenReady().then(async () => {
 		getVectorIndexer: () => vectorIndexer,
 		// 11.3 progress UX — live semantic-model download status for the panel.
 		getSemanticStatus: () => semanticStatus,
+		// 11.3 consent gate — Settings → Search "Enable" grants consent + starts
+		// the download.
+		enableSemantic: enableSemanticSearch,
 		reindex: rebuildSearchIndex,
 		// Coverage source-of-truth: the same collector + indexable predicate
 		// `rebuildSearchIndex` uses, so "indexed vs. available" can't drift
