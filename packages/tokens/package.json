@@ -2,16 +2,20 @@
   "name": "@brainstorm-os/tokens",
   "version": "0.0.1",
   "description": "Semantic design tokens for the Brainstorm shell and apps.",
-  "license": "UNLICENSED",
-  "publishConfig": {
-    "access": "public"
-  },
+  "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --outDir dist --tsconfig tsconfig.build.json && node ../../scripts/prepare-publish.mjs tokens",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@brainstorm-os/sdk-types": "workspace:*"
