@@ -14,13 +14,14 @@
  * cross toward a renderer; the broker never produces the `_shell` sentinel
  * for a renderer-originated envelope.
  *
- * Driver implementations: `gmail-api` rides the REST `gmail-driver`
- * (stateless HTTPS, no socket); `imap` rides the socket `imap-driver`
- * (imapflow + nodemailer + mailparser — live-account verification is the
- * real-shell residue, like the connector OAuth round-trip). JMAP is the
- * remaining residue — the default factory throws `Unavailable` for it;
- * tests inject a `FakeMailDriver` through `__setMailDriverFactory`, so the
- * whole worker + engine spine is proven in-process.
+ * Driver implementations: `gmail-api` rides the REST `gmail-driver` and
+ * `jmap` the REST `jmap-driver` (both stateless HTTPS, no socket); `imap`
+ * rides the socket `imap-driver` (imapflow + nodemailer + mailparser —
+ * live-account verification is the real-shell residue, like the connector
+ * OAuth round-trip). `ms-graph` (M365) is the remaining residue — the default
+ * factory throws `Unavailable` for it; tests inject a `FakeMailDriver` through
+ * `__setMailDriverFactory`, so the whole worker + engine spine is proven
+ * in-process.
  *
  * Runs under `utilityProcess.fork`; messages are plain objects via
  * `process.parentPort`. No SQLite/Yjs/Electron-renderer types cross here.
@@ -40,6 +41,7 @@ import type {
 import { installWorkerProcessGuards, wireParentPort } from "../worker-runtime";
 import { makeGmailDriver } from "./gmail-driver";
 import { makeImapSmtpDriver } from "./imap-driver";
+import { makeJmapDriver } from "./jmap-driver";
 
 type ParentPortMessage = { data: unknown };
 type ParentPort = {
@@ -87,11 +89,28 @@ const defaultFactory: MailDriverFactory = (input) => {
 			credentials: input.credentials,
 		});
 	}
+	if (input.protocol === MailProtocol.Jmap) {
+		if (!input.incoming) {
+			throw workerError("Invalid", "jmap account requires an incoming host (the JMAP server)");
+		}
+		return makeJmapDriver({
+			sessionUrl: jmapSessionUrl(input.incoming.host, input.incoming.port),
+			credentials: input.credentials,
+		});
+	}
 	throw workerError(
 		"Unavailable",
-		`mail driver not implemented for protocol "${input.protocol}" — JMAP transport is the remaining residue`,
+		`mail driver not implemented for protocol "${input.protocol}" — MS Graph (M365) transport is the remaining residue`,
 	);
 };
+
+/** RFC 8620 §2.2 autodiscovery: the well-known session resource for a JMAP
+ *  server host. `.well-known/jmap` 30x-redirects to the real session URL,
+ *  which `fetch` follows. Port 443 is implied and omitted. */
+function jmapSessionUrl(host: string, port: number): string {
+	const authority = port === 443 ? host : `${host}:${port}`;
+	return `https://${authority}/.well-known/jmap`;
+}
 
 let factory: MailDriverFactory = defaultFactory;
 const drivers = new Map<string, MailDriver>();
