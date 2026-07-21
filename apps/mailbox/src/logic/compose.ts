@@ -26,6 +26,12 @@ export type ComposeSeed = {
 	cc: string;
 	subject: string;
 	body: string;
+	/** HTML-quoted original for reply/forward (Mailbox-11 residue): the
+	 *  message's sanitised `bodyHtmlSafe` wrapped in an attribution + a
+	 *  blockquote. Present only when the original carried HTML; the composer
+	 *  seeds the rich editor from this so the quote keeps its formatting
+	 *  instead of flattening to `> ` text. */
+	bodyHtml?: string;
 	inReplyTo?: string;
 	references?: string[];
 	submissionId: string;
@@ -68,8 +74,26 @@ export function quotedBody(original: string, quoteHeader: string): string {
 	return `\n\n${quoteHeader}\n${quoted}`;
 }
 
+function escapeHtml(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Quote the original's sanitised HTML under an attribution line, inside a
+ *  blockquote (Mailbox-11 residue). `originalHtml` is `bodyHtmlSafe` — already
+ *  through `sanitizeMailHtml` at projection — so this only wraps it; the
+ *  attribution is plain text and gets escaped. The composer seeds the editor
+ *  with this and prepends its own blank cursor line above the quote. */
+export function quotedHtmlBody(originalHtml: string, quoteHeader: string): string {
+	return `<p>${escapeHtml(quoteHeader)}</p><blockquote>${originalHtml}</blockquote>`;
+}
+
 const REPLY_PREFIX = "Re:";
 const FORWARD_PREFIX = "Fwd:";
+
+function htmlQuote(message: MessageView, quoteHeader: string): { bodyHtml?: string } {
+	const html = message.bodyHtmlSafe.trim();
+	return html.length > 0 ? { bodyHtml: quotedHtmlBody(message.bodyHtmlSafe, quoteHeader) } : {};
+}
 
 export function replySeed(message: MessageView, quoteHeader: string): ComposeSeed {
 	return {
@@ -78,6 +102,7 @@ export function replySeed(message: MessageView, quoteHeader: string): ComposeSee
 		cc: "",
 		subject: prefixedSubject(message.subject, REPLY_PREFIX),
 		body: quotedBody(message.bodyText, quoteHeader),
+		...htmlQuote(message, quoteHeader),
 		inReplyTo: message.messageId,
 		references: [message.messageId],
 		submissionId: newSubmissionId(),
@@ -91,6 +116,7 @@ export function forwardSeed(message: MessageView, quoteHeader: string): ComposeS
 		cc: "",
 		subject: prefixedSubject(message.subject, FORWARD_PREFIX),
 		body: quotedBody(message.bodyText, quoteHeader),
+		...htmlQuote(message, quoteHeader),
 		submissionId: newSubmissionId(),
 	};
 }

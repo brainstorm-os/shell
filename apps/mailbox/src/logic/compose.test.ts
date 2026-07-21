@@ -8,6 +8,7 @@ import {
 	forwardSeed,
 	newSubmissionId,
 	parseRecipients,
+	quotedHtmlBody,
 	replySeed,
 	seedFromIntentPayload,
 	sendPayloadFromSeed,
@@ -66,6 +67,37 @@ describe("forwardSeed", () => {
 		expect(seed.body).toContain("> line one");
 		expect(seed.inReplyTo).toBeUndefined();
 		expect(seed.references).toBeUndefined();
+	});
+});
+
+describe("HTML quoting (Mailbox-11 residue)", () => {
+	const HTML = "<p>the <strong>plan</strong></p>";
+
+	it("carries an HTML quote on reply when the original had HTML", () => {
+		const seed = replySeed(message({ bodyHtmlSafe: HTML }), QUOTE);
+		expect(seed.bodyHtml).toContain("<blockquote>");
+		expect(seed.bodyHtml).toContain(HTML);
+		expect(seed.bodyHtml).toContain(QUOTE);
+		// The plain-text quote is still present as the multipart/alternative text.
+		expect(seed.body).toContain("> line one");
+	});
+
+	it("carries an HTML quote on forward too", () => {
+		const seed = forwardSeed(message({ bodyHtmlSafe: HTML }), QUOTE);
+		expect(seed.bodyHtml).toContain("<blockquote>");
+	});
+
+	it("omits bodyHtml for a plain-text-only original", () => {
+		expect(replySeed(message(), QUOTE).bodyHtml).toBeUndefined();
+		expect(replySeed(message({ bodyHtmlSafe: "   " }), QUOTE).bodyHtml).toBeUndefined();
+	});
+
+	it("escapes the attribution line so a crafted sender name cannot inject markup", () => {
+		const quoted = quotedHtmlBody("<p>body</p>", "On date, <img src=x onerror=alert(1)> wrote:");
+		expect(quoted).not.toContain("<img");
+		expect(quoted).toContain("&lt;img");
+		// The already-sanitised original HTML is passed through unescaped.
+		expect(quoted).toContain("<p>body</p>");
 	});
 });
 
