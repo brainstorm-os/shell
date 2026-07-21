@@ -2,7 +2,7 @@
  * Code-Editor English string manifest + the app-side `t()`.
  *
  * Every user-visible string in the renderer flows through `t(key)` from
- * `@brainstorm/sdk/i18n` (the shared app-side translator — `{name}`
+ * `@brainstorm-os/sdk/i18n` (the shared app-side translator — `{name}`
  * interpolation, override-able per locale). No bare literals in `app.ts`
  * per §Localization. Object-menu
  * chrome is localised through the same manifest where it overlaps.
@@ -14,7 +14,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const CODE_EDITOR_MESSAGES = enCatalog as typeof enCatalog;

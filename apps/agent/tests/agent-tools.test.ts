@@ -6,7 +6,7 @@
  * catalogue.
  */
 
-import { intersectAgentTools } from "@brainstorm/sdk-types";
+import { intersectAgentTools } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	AGENT_TOOL_VERB,

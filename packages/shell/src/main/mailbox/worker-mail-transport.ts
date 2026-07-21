@@ -9,7 +9,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { MailProtocol } from "@brainstorm/sdk-types";
+import type { MailProtocol } from "@brainstorm-os/sdk-types";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope, type EnvelopeReply } from "../../ipc/envelope";
 import type {
 	DriverCredentials,

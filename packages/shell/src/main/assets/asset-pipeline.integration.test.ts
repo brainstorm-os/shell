@@ -16,7 +16,7 @@ vi.mock("electron", () => ({
 	session: { defaultSession: { setProxy: vi.fn() } },
 }));
 
-import type { LinkPreview } from "@brainstorm/sdk-types";
+import type { LinkPreview } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
 import type { FetchImpl, LookupHost } from "../network/network-service";

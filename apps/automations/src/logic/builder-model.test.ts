@@ -4,7 +4,7 @@ import {
 	type WorkflowDef,
 	type WorkflowStep,
 	aggregateWorkflowCapabilities,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	BUILDER_STEP_KINDS,

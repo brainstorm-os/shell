@@ -2,7 +2,7 @@
  * Editor entity-index + open-host wiring for the day-body `@`-mention /
  * transclusion typeaheads.
  *
- * The shared `@brainstorm/editor` index wants a `{ list, onChange }` source.
+ * The shared `@brainstorm-os/editor` index wants a `{ list, onChange }` source.
  * Rather than open a SECOND raw `vaultEntities.onChange` subscription (the app
  * already reads the live snapshot through `useVaultEntities`), we feed the
  * editor index from that SAME reactive snapshot: `app.tsx` calls
@@ -14,9 +14,9 @@
  * simply lists whatever snapshot was last pushed).
  */
 
-import { setEditorHost, setEntityIndexSource } from "@brainstorm/editor";
-import { openEntity } from "@brainstorm/sdk";
-import type { Intent, VaultEntity } from "@brainstorm/sdk-types";
+import { setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
+import { openEntity } from "@brainstorm-os/sdk";
+import type { Intent, VaultEntity } from "@brainstorm-os/sdk-types";
 import { getJournalRuntime } from "../runtime";
 
 let current: readonly VaultEntity[] = [];

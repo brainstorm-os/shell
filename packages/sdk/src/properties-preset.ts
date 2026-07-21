@@ -20,7 +20,7 @@ import {
 	PropertyKindPreset,
 	ValueType,
 	type VocabularyRef,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type DefForPresetOptions = {
 	name: string;

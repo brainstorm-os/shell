@@ -12,7 +12,7 @@
  * itself stays a calm status + action row; removal confirms first.
  */
 
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "../i18n/t";

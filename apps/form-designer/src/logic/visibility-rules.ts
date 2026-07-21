@@ -8,7 +8,7 @@
  * required-value validation (it can't block Create) and the written
  * `properties` (a hidden answer is never persisted).
  *
- * The predicate is evaluated by the SHARED `@brainstorm/sdk/predicate-eval`
+ * The predicate is evaluated by the SHARED `@brainstorm-os/sdk/predicate-eval`
  * stack — the exact evaluator the Database filter language + ListSource
  * membership run — so visibility rules speak one language, never a
  * second form-only mini-language. The in-progress values stand in for
@@ -17,9 +17,9 @@
  * Pure — no DOM. Lives beside `form-model` so it gets node-env coverage.
  */
 
-import type { PropertyPredicate } from "@brainstorm/sdk-types";
-import type { EntityRow } from "@brainstorm/sdk/in-memory-entities";
-import { evaluatePredicate } from "@brainstorm/sdk/predicate-eval";
+import type { PropertyPredicate } from "@brainstorm-os/sdk-types";
+import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
+import { evaluatePredicate } from "@brainstorm-os/sdk/predicate-eval";
 import { type FormField, emptyFillFields, fillValuesToProperties } from "./form-model";
 
 /** Treat the collected fill values as a single entity's `properties` so

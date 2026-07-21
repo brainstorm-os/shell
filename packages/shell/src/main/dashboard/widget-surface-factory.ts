@@ -26,9 +26,9 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { encodeHandshake } from "@brainstorm/sdk";
-import type { AppHandshake, FormatContext } from "@brainstorm/sdk-types";
-import type { ThemeName } from "@brainstorm/tokens";
+import { encodeHandshake } from "@brainstorm-os/sdk";
+import type { AppHandshake, FormatContext } from "@brainstorm-os/sdk-types";
+import type { ThemeName } from "@brainstorm-os/tokens";
 import { backgroundColorForTheme } from "../apps/launcher";
 import type { Rectangle, WebContentsViewHandle } from "../apps/window-container";
 import type { CapabilityLedger } from "../capabilities/ledger";
@@ -234,7 +234,7 @@ export function createWidgetSurface(
 		},
 		// Reuse the same pause channel an app window uses: the app-preload
 		// mirrors `window:visibility-changed` onto `dataset.appHidden` +
-		// `brainstorm:app-visibility`, which `@brainstorm/sdk/widget` reads.
+		// `brainstorm:app-visibility`, which `@brainstorm-os/sdk/widget` reads.
 		sendVisibility: (visible) => {
 			if (alive()) view.webContents.send("window:visibility-changed", visible);
 		},

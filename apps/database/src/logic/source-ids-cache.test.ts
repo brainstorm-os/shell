@@ -6,7 +6,7 @@
  * `compileMembershipWith` override layering on top of shell ids.
  */
 
-import type { List, ListSource, SourceQueryResult } from "@brainstorm/sdk-types";
+import type { List, ListSource, SourceQueryResult } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { ListSourceKind } from "../types/list-source";
 import type { EntityRow, InMemoryEntities } from "./in-memory-entities";

@@ -4,7 +4,7 @@
  * the raw number inline; the bar reflects the clamped fraction.
  */
 
-import { type CellProps, ValueType } from "@brainstorm/sdk-types";
+import { type CellProps, ValueType } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { coerceValue } from "../../properties-validate";

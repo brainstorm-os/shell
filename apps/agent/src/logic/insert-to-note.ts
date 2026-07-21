@@ -22,7 +22,7 @@ import {
 	INSERT_INTENT_VERB,
 	INSERT_MARKDOWN_MAX,
 	buildNoteInsertPayload,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { CITATION_ID_SOURCE } from "./citation-format";
 
 /** The Note entity type the affordance targets (doc 75 v1: Notes is the one

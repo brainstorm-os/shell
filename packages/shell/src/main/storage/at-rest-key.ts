@@ -19,7 +19,7 @@
  * string without colliding with the v1 key.
  */
 
-import { hkdfSha256 } from "@brainstorm/native";
+import { hkdfSha256 } from "@brainstorm-os/native";
 
 /** The four domain DBs whose at-rest keys we derive. Mirrors
  *  `DataStoreKind` in `data-stores.ts`; kept as an enum so the info-string

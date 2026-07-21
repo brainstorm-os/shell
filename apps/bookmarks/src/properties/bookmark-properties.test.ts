@@ -1,4 +1,9 @@
-import { DateGranularity, type Dictionary, PropertyView, ValueType } from "@brainstorm/sdk-types";
+import {
+	DateGranularity,
+	type Dictionary,
+	PropertyView,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Bookmark } from "../types/bookmark";
 import {

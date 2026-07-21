@@ -1,4 +1,4 @@
-import { ALL_EMOJIS } from "@brainstorm/sdk/icon-picker";
+import { ALL_EMOJIS } from "@brainstorm-os/sdk/icon-picker";
 import { createHeadlessEditor } from "@lexical/headless";
 import { $createParagraphNode, $createTextNode, $getRoot } from "lexical";
 import { describe, expect, it } from "vitest";

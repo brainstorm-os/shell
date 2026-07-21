@@ -2,6 +2,7 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { makeBpHookRouter, makeBpRouter } from "@brainstorm-os/block-protocol";
 import {
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
@@ -16,8 +17,8 @@ import {
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
 	extractFieldsFromTypeSchema,
-} from "@brainstorm/sdk-types";
-import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm/tokens";
+} from "@brainstorm-os/sdk-types";
+import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
 	net,
 	BrowserWindow,
@@ -98,8 +99,6 @@ import {
 } from "./blocks/block-frame-protocol";
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
-import { makeBpHookRouter } from "./bp/hook-router";
-import { makeBpRouter } from "./bp/router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { isAuthorizedWriter, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
@@ -349,7 +348,7 @@ const DEVTOOLS_ENABLED = true;
 // Packaged builds run under the product name "Brainstorm" so their userData
 // (and the single-instance lock keyed on it) is distinct from a developer's
 // `electron-vite dev` session, whose app name stays the package name
-// `@brainstorm/shell`. Without this, launching the packaged app while `bun run
+// `@brainstorm-os/shell`. Without this, launching the packaged app while `bun run
 // dev` is open makes `requestSingleInstanceLock()` fail and the packaged app
 // silently quits. Must run before the first `getPath("userData")` access
 // (the single-instance lock below). Dev is intentionally left untouched.
@@ -2047,7 +2046,7 @@ void app.whenReady().then(async () => {
 	let rebuildToken: symbol = Symbol("idle");
 
 	// 11.3 — the real local embedding model (`bge-small-en-v1.5`, 384-d, via the
-	// `@brainstorm/native-embed` fastembed/ONNX addon). Loaded once, lazily, and
+	// `@brainstorm-os/native-embed` fastembed/ONNX addon). Loaded once, lazily, and
 	// DEFENSIVELY: `loadFastembedEmbedder` returns null when the native addon
 	// isn't available (a platform without a prebuilt `.node`, or ONNX Runtime
 	// failing to load), so `swapSearchIndexer` simply skips the vector index and

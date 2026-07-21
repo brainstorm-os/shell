@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DateGranularity, type DateValue } from "@brainstorm/sdk-types";
+import { DateGranularity, type DateValue } from "@brainstorm-os/sdk-types";
 import { createHeadlessEditor } from "@lexical/headless";
 import {
 	$createParagraphNode,

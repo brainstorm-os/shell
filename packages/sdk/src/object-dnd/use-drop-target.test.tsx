@@ -4,7 +4,7 @@ import {
 	type DropDelivery,
 	DropEffect,
 	type ObjectDragPayload,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

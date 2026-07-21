@@ -23,9 +23,9 @@ export const CALENDAR_VIEW_KINDS: readonly CalendarViewKind[] = Object.freeze([
 ]);
 
 /** Canonical numeric weekday for the week-start preference. Re-exported
- *  from `@brainstorm/sdk/date-grid` so the Calendar app shares one enum
+ *  from `@brainstorm-os/sdk/date-grid` so the Calendar app shares one enum
  *  with Journal and any future date-axis app — no per-app duplicate. */
-import { WeekStartsOn } from "@brainstorm/sdk/date-grid";
+import { WeekStartsOn } from "@brainstorm-os/sdk/date-grid";
 export { WeekStartsOn };
 
 export type CalendarView = {

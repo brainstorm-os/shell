@@ -15,8 +15,8 @@
  * v1 surface is the strip; thumbnails (OQ-135 cadence) come later.
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { type ContextMenuItem, openContextMenu } from "@brainstorm/sdk/menus";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { type ContextMenuItem, openContextMenu } from "@brainstorm-os/sdk/menus";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type MonitorSummary, TilePreset, type WindowEntry } from "../../shared/window-types";
 import { t } from "../i18n/t";

@@ -1,7 +1,7 @@
 /**
  * Capture-phase keyboard hook scoped to the shared editor plugins.
  *
- * Why this exists alongside `@brainstorm/sdk/shortcut`:
+ * Why this exists alongside `@brainstorm-os/sdk/shortcut`:
  *   - Block-level keybindings (Backspace/Delete/ArrowUp/ArrowDown/Mod+a,
  *     copy/cut/paste/duplicate, move-block) must fire BEFORE Lexical's
  *     contenteditable handlers can swallow them. The SDK hook binds in
@@ -12,11 +12,11 @@
  *   - The capture-phase listener stays on `document` so it owns the
  *     event before any nested popover / overlay handler.
  *
- * Chord syntax is the shared parser (`@brainstorm/sdk/shortcut`'s
+ * Chord syntax is the shared parser (`@brainstorm-os/sdk/shortcut`'s
  * `matchesChord`) — same string format used everywhere else.
  */
 
-import { matchesChord } from "@brainstorm/sdk/shortcut";
+import { matchesChord } from "@brainstorm-os/sdk/shortcut";
 import { useEffect, useRef } from "react";
 
 export type EditorShortcutOptions = {

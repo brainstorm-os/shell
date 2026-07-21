@@ -1,4 +1,4 @@
-import { RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { EVENT_SOURCE_KEY, type ScheduledItem } from "./scheduled-item";
 import { matchScore, searchScheduledItems } from "./search";

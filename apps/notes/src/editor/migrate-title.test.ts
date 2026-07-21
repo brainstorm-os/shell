@@ -1,4 +1,4 @@
-import { TITLE_NODE_TYPE } from "@brainstorm/editor";
+import { TITLE_NODE_TYPE } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { migrateTitleIntoBody } from "./migrate-title";
 

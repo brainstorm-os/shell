@@ -2,7 +2,7 @@
  * Bridge to the shell app preload — types only the slice of
  * `window.brainstorm` Books uses: the launch handshake, the `app:intent`
  * push channel, the live vault snapshot (`vaultEntities`, subscribed
- * through `@brainstorm/react-yjs`'s `useVaultEntities` — never `onChange`
+ * through `@brainstorm-os/react-yjs`'s `useVaultEntities` — never `onChange`
  * directly), and the capability-gated `entities` service (resolve a Book +
  * its backing File row; persist reading state; remove a book). Null outside
  * the shell (the standalone preview keeps the sample book).
@@ -15,7 +15,7 @@ import type {
 	FilesService,
 	SettingsService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type BooksOpenPayload = {
 	entityId?: unknown;
@@ -77,7 +77,7 @@ export type BooksRuntime = {
 		 *  (`covers.write` is a default app grant). Null on a preview build. */
 		covers?: CoversService | null;
 		/** Per-device, per-vault, app-namespaced settings — backs the
-		 *  "reopen the book I was reading" hint via `@brainstorm/sdk/last-viewed`.
+		 *  "reopen the book I was reading" hint via `@brainstorm-os/sdk/last-viewed`.
 		 *  Null on a preview build. */
 		settings?: SettingsService | null;
 	} | null;

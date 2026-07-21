@@ -1,7 +1,7 @@
 /**
  * Graph chrome glyphs.
  *
- * The shared `@brainstorm/sdk/icon` registry is the source of truth — any
+ * The shared `@brainstorm-os/sdk/icon` registry is the source of truth — any
  * glyph it exposes renders via `createIconElement` / `<Icon>` so Graph's
  * chrome looks identical to the rest of the product. The only glyphs Graph
  * needs that the shared registry does NOT expose are the graph-specific
@@ -15,7 +15,7 @@
  * must not duplicate the glyph in the label text.
  */
 
-import { type IconName, createGlyphElement, createIconElement } from "@brainstorm/sdk/icon";
+import { type IconName, createGlyphElement, createIconElement } from "@brainstorm-os/sdk/icon";
 
 /** Graph glyphs that exist in the shared SDK registry — delegated so they
  *  render identically to every other app. */

@@ -12,7 +12,7 @@
  * (the private half lives only in the catalog service's secret manager).
  */
 
-import { ed25519GetPublicKey } from "@brainstorm/native";
+import { ed25519GetPublicKey } from "@brainstorm-os/native";
 import type { CatalogTrustedKeys } from "./catalog-client";
 
 /** The dev `catalog-edge` signing seed (`SigningKey::from_bytes(&[9u8; 32])`).

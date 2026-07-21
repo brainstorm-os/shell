@@ -17,7 +17,7 @@
  * Properties pane) are shell-integration work tracked separately.
  */
 
-import { PropertyView, enumGuard } from "@brainstorm/sdk-types";
+import { PropertyView, enumGuard } from "@brainstorm-os/sdk-types";
 
 /** Clipboard flavour. A custom MIME so a paste into a plain-text field
  *  never accidentally consumes it and the host can feature-detect us. */

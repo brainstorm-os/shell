@@ -8,7 +8,7 @@
  * proven in `sharing-engine-collection.test.ts`.
  */
 
-import { EntityEventVerb, MESSAGE_TYPE_URL } from "@brainstorm/sdk-types";
+import { EntityEventVerb, MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { EntityChangeEmitter } from "../entities/entity-change-emitter";
 import {

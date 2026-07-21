@@ -14,7 +14,7 @@
  *     own source of truth so the whole authoring surface works in the
  *     preview drop. NOTE: this is an imperative, self-contained app store
  *     for a non-React render surface — not a vault-entity reactivity loop;
- *     when the real entity reads land they flow through @brainstorm/react-yjs
+ *     when the real entity reads land they flow through @brainstorm-os/react-yjs
  *     per the reactivity rule.
  */
 

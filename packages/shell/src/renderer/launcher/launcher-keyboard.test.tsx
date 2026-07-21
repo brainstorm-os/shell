@@ -9,8 +9,8 @@
  * escape stack. Pure row assembly + ranking live in `grouped-results.test.ts`.
  */
 
-import { getEscapeStack, installEscapeHandler } from "@brainstorm/sdk/a11y";
-import { BrainstormMenuProvider } from "@brainstorm/sdk/menus";
+import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
+import { BrainstormMenuProvider } from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";

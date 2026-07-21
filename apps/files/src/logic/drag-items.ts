@@ -10,8 +10,8 @@
  * plain drag of an unselected row doesn't surprise-drag a stale selection).
  */
 
-import type { ObjectDragItem } from "@brainstorm/sdk-types";
-import { dragItemsForSelection } from "@brainstorm/sdk/object-dnd";
+import type { ObjectDragItem } from "@brainstorm-os/sdk-types";
+import { dragItemsForSelection } from "@brainstorm-os/sdk/object-dnd";
 import { type Entity, readName } from "../types/entity";
 import type { SelectionState } from "./selection";
 

@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatApp } from "./app";
 import { CHANNEL_TYPE, MESSAGE_TYPE } from "./logic/chat";
 
-vi.mock("@brainstorm/sdk/object-menu", () => ({
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
 	closeObjectMenu: vi.fn(),
 }));

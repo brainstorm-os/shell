@@ -24,7 +24,7 @@ import {
 	WORKFLOW_RUN_TYPE_URL,
 	WorkflowRunStatus,
 	type WorkflowStep,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServiceHandler } from "../../ipc/broker";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
@@ -257,7 +257,7 @@ import {
 	WORKFLOW_TYPE_URL,
 	triggerToProperties,
 	workflowToProperties,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	AUTOMATIONS_RUN_CAP,
 	makeAutomationsServiceHandler,

@@ -8,7 +8,7 @@ import type {
 	ContributedAction,
 	ContributedActionTarget,
 	ContributedVerb,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The minimal runtime slice `useContributedActions` / `<ActionMenu>` read —
  *  the `intents.suggestActions` discovery surface plus `dispatch` for

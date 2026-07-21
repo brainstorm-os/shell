@@ -13,13 +13,13 @@
  *
  * Reactivity: the saved-theme + installed-icon-pack lists are derived from
  * the live whole-vault snapshot read through the ONE shared stack —
- * `@brainstorm/react-yjs` `useVaultEntities` (which owns the change
+ * `@brainstorm-os/react-yjs` `useVaultEntities` (which owns the change
  * subscription + coalescing) — never a hand-rolled `onChange → list →
  * setState`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
 import {
 	EMPTY_STYLE_PACK,
 	EMPTY_TOKEN_SET,
@@ -32,13 +32,13 @@ import {
 	type TokenSetDef,
 	type TypographyDef,
 	type TypographyScale,
-} from "@brainstorm/sdk-types";
-import { setActiveIconPack } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
-import { typographyCssVars } from "@brainstorm/sdk/typography";
-import { ThemeName } from "@brainstorm/tokens";
+} from "@brainstorm-os/sdk-types";
+import { setActiveIconPack } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
+import { typographyCssVars } from "@brainstorm-os/sdk/typography";
+import { ThemeName } from "@brainstorm-os/tokens";
 import {
 	type ReactElement,
 	useCallback,
@@ -181,7 +181,7 @@ export function ThemeEditorApp(): ReactElement {
 	const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
 	// ── Reactivity: the saved-theme + installed-pack lists read off the live
-	// whole-vault snapshot through the ONE shared stack — `@brainstorm/react-yjs`
+	// whole-vault snapshot through the ONE shared stack — `@brainstorm-os/react-yjs`
 	// `useVaultEntities` (which owns the change subscription + coalescing). A
 	// save here, or a write from another device, re-derives both lists with no
 	// hand-rolled `onChange → list → setState` loop.

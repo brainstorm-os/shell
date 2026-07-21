@@ -18,7 +18,7 @@
  * `javascript:` / custom schemes.
  */
 
-import { type SitePermissionKind, TabLoadState, WebViewEventKind } from "@brainstorm/sdk-types";
+import { type SitePermissionKind, TabLoadState, WebViewEventKind } from "@brainstorm-os/sdk-types";
 import { type Session, WebContentsView, app } from "electron";
 import { TabChord, type WebContentsViewHandle, tabChordFor } from "../apps/window-container";
 import { networkEgressHostOf } from "../network/audit-log";

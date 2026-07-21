@@ -24,12 +24,12 @@
  * controller owns their content.
  */
 
-import "@brainstorm/sdk/app-theme.css";
+import "@brainstorm-os/sdk/app-theme.css";
 import "./types"; // type-only side-effect import keeps the surface in the build graph.
-import type { EntityCommentsServices } from "@brainstorm/editor";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
-import { Checkbox } from "@brainstorm/sdk/checkbox";
+import type { EntityCommentsServices } from "@brainstorm-os/editor";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { Checkbox } from "@brainstorm-os/sdk/checkbox";
 import {
 	SaveDispositionKind,
 	failureDetail,
@@ -37,15 +37,15 @@ import {
 	suggestedFilename,
 	svgToPng,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk/export-file";
 import {
 	type ExportFormatSpec,
 	ExportOptionKind,
 	type ExportSelectOption,
 	openExportPopover,
-} from "@brainstorm/sdk/export-popover";
-import { IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign, mountMenuHost } from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/export-popover";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign, mountMenuHost } from "@brainstorm-os/sdk/menus";
 import {
 	type AnchoredMenuItem,
 	type ObjectMenuExtraItem,
@@ -53,10 +53,10 @@ import {
 	closeObjectMenu,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
-import { attachResizable } from "@brainstorm/sdk/resizable";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+} from "@brainstorm-os/sdk/object-menu";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import {
 	type ReactElement,
 	type ReactNode,
@@ -1780,7 +1780,7 @@ function HistoryFab({
 			</button>
 			{/* Anchored, non-modal scrubber panel: it must stay live while you drag
 			    the time slider and watch the graph animate behind it, so it is NOT
-			    `@brainstorm/sdk/popover` (a fixed, centred, full-viewport modal) —
+			    `@brainstorm-os/sdk/popover` (a fixed, centred, full-viewport modal) —
 			    no shared anchored-panel primitive exists yet. */}
 			<div
 				ref={popRef}

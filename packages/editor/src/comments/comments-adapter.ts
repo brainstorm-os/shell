@@ -20,7 +20,7 @@ import {
 	CommentKind,
 	type CommentSuggestion,
 	isCommentKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** A new comment to create. `kind` defaults to `CommentKind.Comment`, `parentId` to
  *  `null` (a top-level comment). A reply passes the root's anchor + its id. */

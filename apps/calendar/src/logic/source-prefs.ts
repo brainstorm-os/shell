@@ -2,14 +2,14 @@
  * Per-device persistence for the calendar's source-filter visibility (9.15f).
  *
  * Backed by the `settings` service (device-local, vault-scoped — same posture
- * as `@brainstorm/sdk/last-viewed`), NOT localStorage: which sources you show
+ * as `@brainstorm-os/sdk/last-viewed`), NOT localStorage: which sources you show
  * is a per-device view preference, not synced content. We persist the *hidden*
  * set so a newly discovered source (a new type, a new date property) defaults
  * to visible rather than silently absent. Best-effort throughout — a missing
  * service or a write race degrades to the defaults, never throws into render.
  */
 
-import type { SettingsService } from "@brainstorm/sdk-types";
+import type { SettingsService } from "@brainstorm-os/sdk-types";
 import { SOURCE_OVERRIDES } from "./scheduled-item";
 
 const HIDDEN_SOURCES_KEY = "calendar.hidden-sources";

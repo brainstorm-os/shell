@@ -1,5 +1,5 @@
-import type { PropertiesSnapshot, PropertyDef } from "@brainstorm/sdk-types";
-import { PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import type { PropertiesSnapshot, PropertyDef } from "@brainstorm-os/sdk-types";
+import { PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	buildPropertyDefResolver,

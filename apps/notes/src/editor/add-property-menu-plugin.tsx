@@ -1,7 +1,7 @@
 /**
  * AddPropertyMenuPlugin — wires the shared SDK `<AddPropertyPicker>` to
  * Notes' editor targets. The picker (search + create-new) is owned by
- * `@brainstorm/sdk/property-ui` so every properties panel shares one
+ * `@brainstorm-os/sdk/property-ui` so every properties panel shares one
  * flow; this plugin only supplies the four editor mutations.
  *
  * Opens whenever `addPropertyStore` carries a target (set by the
@@ -16,7 +16,7 @@
  * command computes its anchor via `editor.getElementByKey`).
  */
 
-import { AddPropertyPicker, type AddPropertyPickerLabels } from "@brainstorm/sdk/property-ui";
+import { AddPropertyPicker, type AddPropertyPickerLabels } from "@brainstorm-os/sdk/property-ui";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { t } from "../i18n/t";

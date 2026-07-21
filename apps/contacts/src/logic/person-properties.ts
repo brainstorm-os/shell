@@ -1,7 +1,7 @@
 /**
  * The Person property bridge for the shared inspector. Like the Bookmarks
  * bridge, it synthesises a `PropertyDef[]` + a `ValuesMap` so the SHARED
- * property-value cells (`@brainstorm/sdk/properties-panel`) render a contact's
+ * property-value cells (`@brainstorm-os/sdk/properties-panel`) render a contact's
  * attributes — never hand-rolled rows ([[feedback-no-hand-rolled-property-panels]]).
  * Person IS a property-bearing entity, so the values come straight from its
  * properties; the only bridging is array↔newline for the multi-value
@@ -17,8 +17,8 @@ import {
 	type PropertyDef,
 	PropertyView,
 	ValueType,
-} from "@brainstorm/sdk-types";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk-types";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n";
 import { COMPANY_TYPE, PERSON_TYPE, type Person } from "../types/person";
 

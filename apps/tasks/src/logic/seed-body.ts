@@ -6,7 +6,7 @@
  * once the body owns the content (so there's never a moment of data
  * loss, and never two competing sources of truth).
  *
- * The mechanics are the SHARED `@brainstorm/editor` legacy-text helpers
+ * The mechanics are the SHARED `@brainstorm-os/editor` legacy-text helpers
  * (Contacts' `bio` rides the same path); these wrappers keep the
  * task-vocabulary names the app + its tests use.
  */
@@ -15,7 +15,7 @@ import {
 	hasLegacyText,
 	plainTextToSerializedState,
 	shouldClearLegacyText,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import type { SerializedEditorState } from "lexical";
 
 export function notesStringToSerializedState(notes: string): SerializedEditorState {

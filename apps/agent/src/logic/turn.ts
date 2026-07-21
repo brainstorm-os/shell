@@ -21,7 +21,7 @@ import {
 	type Intent,
 	type IntentsService,
 	runAgentLoop,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { toolCallToIntent } from "./agent-tools";
 import { withRetrievalContext } from "./retrieval";
 import { AGENT_GROUNDING_GUIDANCE } from "./transcript";

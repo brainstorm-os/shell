@@ -1,5 +1,5 @@
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { CARDINALITY_HARD_MAX, ValueType } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { CARDINALITY_HARD_MAX, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	type NoteValues,

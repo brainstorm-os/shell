@@ -7,8 +7,8 @@
  * add section + no revoke affordances.
  */
 
-import type { RosterMember, RosterService, SharingService } from "@brainstorm/sdk-types";
-import { RosterRole } from "@brainstorm/sdk-types";
+import type { RosterMember, RosterService, SharingService } from "@brainstorm-os/sdk-types";
+import { RosterRole } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

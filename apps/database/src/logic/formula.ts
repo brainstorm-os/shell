@@ -1,12 +1,12 @@
 /**
  * Database formula-column glue. The pure formula ENGINE moved to the SDK
- * (`@brainstorm/sdk/formula`) so a first-class formula PROPERTY can render in
+ * (`@brainstorm-os/sdk/formula`) so a first-class formula PROPERTY can render in
  * any app's property-ui; this module re-exports it for the app's existing
  * call-sites and adds the Database-only `ColumnSpec` builder (a formula COLUMN
  * is a per-view synthetic column, distinct from a formula property).
  */
 
-import type { ColumnSpec } from "@brainstorm/sdk-types";
+import type { ColumnSpec } from "@brainstorm-os/sdk-types";
 
 export {
 	type CompiledFormula,
@@ -17,7 +17,7 @@ export {
 	compileFormula,
 	evaluateFormula,
 	formulaReferences,
-} from "@brainstorm/sdk/formula";
+} from "@brainstorm-os/sdk/formula";
 
 /** A spec-derived, stable synthetic column id keyed on the expression — so the
  *  same formula is never added twice and React keys stay stable across rebuilds

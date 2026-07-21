@@ -1,4 +1,4 @@
-import type { IntentsService } from "@brainstorm/sdk-types";
+import type { IntentsService } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { COMPANY_TYPE, PERSON_TYPE, type VaultEntityLike } from "../types/person";
 import { openEntityRef, resolveOpenTarget } from "./open";

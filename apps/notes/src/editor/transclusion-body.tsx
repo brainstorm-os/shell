@@ -22,13 +22,13 @@
  * `decideTransclusionRender` instead of recursing forever.
  */
 
-import { BrainstormEditor, EditablePlugin } from "@brainstorm/editor";
+import { BrainstormEditor, EditablePlugin } from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";
 import { editorTheme } from "./theme";
 import {

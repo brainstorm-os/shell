@@ -26,28 +26,28 @@
  *     placeholder; "New board" creates an in-memory board for the page lifetime.
  */
 
-import { openEntity } from "@brainstorm/sdk";
-import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm/sdk/a11y";
+import { openEntity } from "@brainstorm-os/sdk";
+import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
 import {
 	SaveDispositionKind,
 	requestSaveBytes,
 	suggestedFilename,
 	svgToPng,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
-import { IconName } from "@brainstorm/sdk/icon";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
-import { formatBrainstormEntityUri } from "@brainstorm/sdk/note-references";
+} from "@brainstorm-os/sdk/export-file";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
+import { formatBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 import {
 	type AnchoredMenuItem,
 	type ObjectMenuContext,
 	type ObjectMenuRuntime,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { localPresenceName } from "@brainstorm/sdk/peer-presence";
-import { attachResizable } from "@brainstorm/sdk/resizable";
-import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
+} from "@brainstorm-os/sdk/object-menu";
+import { localPresenceName } from "@brainstorm-os/sdk/peer-presence";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
+import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import { type WhiteboardMessageKey, createT, pluralWith } from "./i18n/t";
 import {
 	type AlignKind,
@@ -2310,7 +2310,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	function changeBoardIcon(): void {
-		void import("@brainstorm/sdk/picker-host").then(({ openIconPicker }) => {
+		void import("@brainstorm-os/sdk/picker-host").then(({ openIconPicker }) => {
 			openIconPicker({
 				value: state.whiteboard.icon ?? null,
 				onChange: (next) => {

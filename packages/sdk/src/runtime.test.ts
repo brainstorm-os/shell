@@ -1,4 +1,4 @@
-import type { AppHandshake } from "@brainstorm/sdk-types";
+import type { AppHandshake } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Bridge, BridgeReply } from "./bridge";
 import { CapabilityDenied, Conflict, Invalid, NotFound, Unavailable } from "./errors";

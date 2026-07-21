@@ -5,7 +5,7 @@
  * draft list (`useComposerContext`) and passes it down.
  */
 
-import type { MessageAttachment } from "@brainstorm/sdk-types";
+import type { MessageAttachment } from "@brainstorm-os/sdk-types";
 import type { ReactElement } from "react";
 import { Icon, IconName } from "../icon";
 import { attachmentIcon, attachmentKey, attachmentLabel } from "./types";

@@ -2,7 +2,7 @@
  * CodeHighlightPlugin — Shiki syntax highlighting for code blocks (B11.4).
  *
  * Lexical's `@lexical/code` highlighting uses Prism; we standardised on Shiki
- * (the shared `@brainstorm/sdk/code-highlight` tokenizer, also used by the
+ * (the shared `@brainstorm-os/sdk/code-highlight` tokenizer, also used by the
  * code-editor app). Shiki tokenization is **async** (grammars load on demand),
  * so it can't drive a synchronous Lexical node transform — instead this is a
  * read-only **overlay**: per `.notes__code` block we paint Shiki tokens into a
@@ -27,7 +27,7 @@
  * the OS — so light tokens never land on a dark code background.
  */
 
-import { HighlightTheme, type ThemedToken, tokenizeShiki } from "@brainstorm/sdk/code-highlight";
+import { HighlightTheme, type ThemedToken, tokenizeShiki } from "@brainstorm-os/sdk/code-highlight";
 import { CodeNode } from "@lexical/code";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, type LexicalEditor } from "lexical";

@@ -2,7 +2,7 @@
  * The semantic-token editor grid. One section per token family; each row
  * shows the token name, a live **swatch that is itself the colour-picker
  * trigger** (colour tokens; clicking it opens the shared rich
- * `@brainstorm/sdk/color-picker` menu — a 2D area + hue + hex), an
+ * `@brainstorm-os/sdk/color-picker` menu — a 2D area + hue + hex), an
  * authoritative text input, and a reset button shown only while the token
  * is overridden.
  *
@@ -15,8 +15,8 @@
  * so Arrow keys move the cursor without fighting editing.
  */
 
-import type { TokenSetDef } from "@brainstorm/sdk-types";
-import { type ColorPickerLabels, openColorPicker } from "@brainstorm/sdk/color-picker";
+import type { TokenSetDef } from "@brainstorm-os/sdk-types";
+import { type ColorPickerLabels, openColorPicker } from "@brainstorm-os/sdk/color-picker";
 import { type ReactElement, useId, useRef, useState } from "react";
 import { toColorInputValue } from "../logic/color-input";
 import type { TokenSectionGroup } from "../logic/token-rows";

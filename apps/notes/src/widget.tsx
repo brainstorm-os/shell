@@ -7,15 +7,15 @@
  * row opens that note in the full Notes app.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import "@brainstorm/sdk/select-menu.css";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import "@brainstorm-os/sdk/select-menu.css";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
 import { t, tCount } from "./i18n/t";
 import { NOTE_TYPE } from "./store/entities-repository";

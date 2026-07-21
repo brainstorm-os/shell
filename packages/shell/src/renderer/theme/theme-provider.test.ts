@@ -6,7 +6,7 @@
  * arrives.
  */
 
-import { DEFAULT_THEME, ThemeName } from "@brainstorm/tokens";
+import { DEFAULT_THEME, ThemeName } from "@brainstorm-os/tokens";
 import { describe, expect, it } from "vitest";
 import { AppearanceMode, type AppearancePair, type AppearanceState } from "../../shared/appearance";
 import { effectiveTheme } from "./theme-provider";

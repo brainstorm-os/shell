@@ -7,15 +7,15 @@
  * app, Welcome-2 template Collections, and the `9.12.13(c)` PinnedList).
  *
  * Pure orchestration over the injected entities service — the codec
- * (`@brainstorm/sdk`) owns the List ⇄ entity mapping; this owns the
+ * (`@brainstorm-os/sdk`) owns the List ⇄ entity mapping; this owns the
  * create-or-update / query / delete calls. Vault-derived Lists (`list_vault_*`)
  * are NOT persisted here — they're regenerated from the vault snapshot on every
  * load, exactly as before; only user-created Lists round-trip through
  * `entities.db`.
  */
 
-import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "@brainstorm/sdk";
-import type { EntitiesService, List } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "@brainstorm-os/sdk";
+import type { EntitiesService, List } from "@brainstorm-os/sdk-types";
 
 /** The slice of the entities service this adapter needs — narrowed so a host
  *  can inject a stub and so the dependency is explicit. */

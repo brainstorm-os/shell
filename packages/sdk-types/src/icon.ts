@@ -11,7 +11,7 @@
  * Leaf module (no imports) so `type-icon.ts` and other helpers can
  * depend on the icon model without a cycle through the `index` barrel.
  * `index.ts` re-exports everything here, so the public
- * `@brainstorm/sdk-types` surface is unchanged.
+ * `@brainstorm-os/sdk-types` surface is unchanged.
  */
 
 export enum IconKind {

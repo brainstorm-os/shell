@@ -1,5 +1,5 @@
-import { LIST_ENTITY_TYPE, entityToList } from "@brainstorm/sdk";
-import type { Entity } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE, entityToList } from "@brainstorm-os/sdk";
+import type { Entity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	TEMPLATE_CREATED_BY,

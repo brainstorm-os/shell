@@ -4,7 +4,7 @@
  * `bulkShiftToDate`). Pre-filled with the batch's current earliest day.
  */
 
-import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm/sdk/popover";
+import { Popover, PopoverBodyPadding, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useState } from "react";
 import { t } from "../../i18n/t";
 import { DateTimeField } from "./date-time-field";

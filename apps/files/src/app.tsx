@@ -1,5 +1,5 @@
 /**
- * Files app — React + `@brainstorm/react-yjs` renderer (Stage 9.8.2b).
+ * Files app — React + `@brainstorm-os/react-yjs` renderer (Stage 9.8.2b).
  *
  * Replaces the former plain-DOM `app.ts` preview drop. Every long-term
  * logic keystone (`FolderTree` + selection/rename/nav/search/preview-
@@ -17,7 +17,7 @@
  * instead of a synthetic placeholder. `entities.subscribe` /
  * `ui.windows.setRoute` remain folded into the Stage 9.3 swap.
  *
- * `@brainstorm/react-yjs` is the app's CRDT seam. Files is read-only
+ * `@brainstorm-os/react-yjs` is the app's CRDT seam. Files is read-only
  * over the `vaultEntities` snapshot today, so it does NOT install a
  * `<YDocProvider>` yet — per the package contract `useYDoc(entityId)`
  * needs the entities-service resolver that lands at Stage 9.3.2. When
@@ -28,25 +28,25 @@
  * resolver itself remains part of the Stage 9.3.2 entities-service work.
  */
 
-import { openEntity, quickLookEntity } from "@brainstorm/sdk";
-import type { StoredAsset } from "@brainstorm/sdk-types";
-import { LiveRegion, announce } from "@brainstorm/sdk/a11y";
+import { openEntity, quickLookEntity } from "@brainstorm-os/sdk";
+import type { StoredAsset } from "@brainstorm-os/sdk-types";
+import { LiveRegion, announce } from "@brainstorm-os/sdk/a11y";
 import {
 	SaveDispositionKind,
 	requestSaveBytes,
 	suggestedFilename,
-} from "@brainstorm/sdk/export-file";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign, openSearchPicker } from "@brainstorm/sdk/menus";
-import { NavButtons } from "@brainstorm/sdk/nav-history";
+} from "@brainstorm-os/sdk/export-file";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign, openSearchPicker } from "@brainstorm-os/sdk/menus";
+import { NavButtons } from "@brainstorm-os/sdk/nav-history";
 import {
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
-import { useShortcut } from "@brainstorm/sdk/shortcut";
+} from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
+import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { type TranslationKey, plural, t } from "./i18n";
 import { useFilesT } from "./i18n-hooks";

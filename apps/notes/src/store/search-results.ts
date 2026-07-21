@@ -11,8 +11,8 @@
  * isolation; the React layer only owns debounce + async plumbing.
  */
 
-import { extractPlainText } from "@brainstorm/editor";
-import { type RankableHit, orderByHitRank } from "@brainstorm/sdk";
+import { extractPlainText } from "@brainstorm-os/editor";
+import { type RankableHit, orderByHitRank } from "@brainstorm-os/sdk";
 import type { StoredNote } from "./note";
 
 /** Note ids present in `hits`, in the index's rank order. Notes the

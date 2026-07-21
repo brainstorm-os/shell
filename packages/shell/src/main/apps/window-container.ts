@@ -15,7 +15,7 @@
  * the same seam the launcher already used for `BrowserWindowFactory`.
  */
 
-import { APP_TAB_COMMAND_CHANNEL, TAB_ICON_NONE, TabCommandKind } from "@brainstorm/sdk-types";
+import { APP_TAB_COMMAND_CHANNEL, TAB_ICON_NONE, TabCommandKind } from "@brainstorm-os/sdk-types";
 import {
 	CHROME_TABS_STATE_CHANNEL,
 	CHROME_THEME_CHANNEL,
@@ -583,7 +583,7 @@ export class WindowContainer {
 			this.fireChanged();
 		};
 		// The app's favicon labels the tab with its open object's icon (the icon
-		// twin of `page-title-updated`; published via `@brainstorm/sdk/tab-identity`).
+		// twin of `page-title-updated`; published via `@brainstorm-os/sdk/tab-identity`).
 		// Scheme gate, same invariant as entity-icon's parseIcon: `properties.icon`
 		// is app-authored, and the URL becomes an `img.src` in the privileged strip
 		// renderer — only inline data and the vault icon protocol may pass, never

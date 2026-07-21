@@ -10,7 +10,7 @@
  * and the filtered-entities cache all need. Before this module each of those
  * sites re-spelled `effective = (source ∪ include) \ exclude` inline (four
  * copies — past the DRY ceiling), so a future change to membership semantics
- * had four places to drift. The canonical formula lives in `@brainstorm/sdk`
+ * had four places to drift. The canonical formula lives in `@brainstorm-os/sdk`
  * (`effectiveMembers`, via `applyMemberOverrides`); this module is the
  * List-shaped front door to it.
  *

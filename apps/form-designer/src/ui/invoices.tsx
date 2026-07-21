@@ -9,14 +9,14 @@
  * snapshot from our own write never clobbers in-flight typing.
  */
 
-import type { ExportService } from "@brainstorm/sdk-types";
+import type { ExportService } from "@brainstorm-os/sdk-types";
 import {
 	SaveDispositionKind,
 	type SaveFileService,
 	requestSaveBytes,
-} from "@brainstorm/sdk/export-file";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+} from "@brainstorm-os/sdk/export-file";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import {

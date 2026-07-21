@@ -24,7 +24,7 @@ import {
 	SYNC_RUN_TYPE_URL,
 	SyncDirection,
 	SyncRunStatus,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { __ydocCacheResetForTest, handleYDocEnvelope } from "../../workers/ydoc";
 import { AutomationsHost } from "../automations/automations-host";

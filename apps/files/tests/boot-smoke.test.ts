@@ -8,8 +8,8 @@
  *
  * KNOWN HARNESS GAP (out of this lane's scope — reported to the
  * integrator): the root `vitest.config.ts` alias map predates the B-2
- * shared-fundamentals wave and is missing `@brainstorm/sdk/shortcut`,
- * `@brainstorm/sdk/icon` and `@brainstorm/sdk/popover` (the subpaths B-2
+ * shared-fundamentals wave and is missing `@brainstorm-os/sdk/shortcut`,
+ * `@brainstorm-os/sdk/icon` and `@brainstorm-os/sdk/popover` (the subpaths B-2
  * shipped and Wave-3 React apps must adopt). Until those three alias
  * lines land, Vite cannot resolve the app graph *in the test runner*
  * (the production `vite build` resolves fine via package `exports`). So
@@ -25,7 +25,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const INDEX_HTML = readFileSync(join(__dirname, "../src/index.html"), "utf8");
 const BODY_HTML = INDEX_HTML.replace(/[\s\S]*<body[^>]*>/i, "").replace(/<\/body>[\s\S]*/i, "");
 
-const HARNESS_ALIAS_GAP = /Failed to resolve import "@brainstorm\/sdk\/(shortcut|icon|popover)"/;
+const HARNESS_ALIAS_GAP = /Failed to resolve import "@brainstorm-os\/sdk\/(shortcut|icon|popover)"/;
 
 describe("files app boots without a module-eval crash", () => {
 	beforeEach(() => {

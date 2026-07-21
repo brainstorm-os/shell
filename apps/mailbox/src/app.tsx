@@ -7,14 +7,14 @@
  * shell it runs on an in-memory demo set through the same projection code.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
-import { FILE_ENTITY_TYPE, MailFlag, SendIntentVerb } from "@brainstorm/sdk-types";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
+import { FILE_ENTITY_TYPE, MailFlag, SendIntentVerb } from "@brainstorm-os/sdk-types";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "./i18n";

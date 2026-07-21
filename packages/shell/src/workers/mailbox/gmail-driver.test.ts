@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
+import { FolderRole, MailFlag, MailProtocol } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { makeGmailDriver } from "./gmail-driver";
 

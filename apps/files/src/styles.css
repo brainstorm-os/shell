@@ -77,7 +77,7 @@ textarea {
 /* ── App header (44px) ────────────────────────────────────────────────── */
 
 /* Header chrome (flex skeleton, left/right groups, drag region, height /
- * padding) is the shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`;
+ * padding) is the shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`;
  * the glass surface is the shared default — no modifier needed. Only the
  * files-specific delta stays local. */
 .app-header__left {
@@ -1691,7 +1691,7 @@ body:not([data-inspector="open"]) .inspector {
 /* The view-mode picker is the shared `<SelectMenu>` (`.bs-select` trigger +
  * fancy-menus popup, 9.8.10); `.view-switch` only constrains the trigger
  * height to the toolbar's compact controls. The chrome comes from
- * `@brainstorm/sdk/select-menu.css`. */
+ * `@brainstorm-os/sdk/select-menu.css`. */
 .view-switch.bs-select {
 	height: var(--control-height-sm);
 }

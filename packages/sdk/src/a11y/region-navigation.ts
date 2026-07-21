@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/a11y` region-navigation controller — pure F6 / Shift+F6
+ * `@brainstorm-os/sdk/a11y` region-navigation controller — pure F6 / Shift+F6
  * cycling across major panes within one window. NO DOM (KBN-1b binds it).
  * One region per stable shell pane (`RegionId.*`) plus open-string ids for
  * apps that declare their own.

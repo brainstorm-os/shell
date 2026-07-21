@@ -11,7 +11,7 @@ import {
 	type ContextMenuItem,
 	closeContextMenu,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -99,7 +99,7 @@ function channelTrigger(): HTMLButtonElement {
 }
 
 /** Items of the open select popup — the shared select control routes through
- *  the fancy-menus store (see `@brainstorm/sdk/select-menu` tests). */
+ *  the fancy-menus store (see `@brainstorm-os/sdk/select-menu` tests). */
 function openItems(menuLabel: string): ContextMenuItem[] {
 	const store = getActiveMenuStore();
 	const open = store?.getAll().find((m) => m.id === `${CONTEXT_MENU_ID}:${menuLabel}`);

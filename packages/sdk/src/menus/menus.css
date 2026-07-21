@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/menus.css` — the theme bridge that maps fancy-menus'
+ * `@brainstorm-os/sdk/menus.css` — the theme bridge that maps fancy-menus'
  * public `--fm-*` design-system surface onto Brainstorm's `--color-*` /
  * `--radius-*` / `--shadow-*` / `--z-*` tokens.
  *
@@ -13,7 +13,7 @@
  * cascade over the package defaults:
  *
  *   import "@react-fancy-menus/core/runtime.css";
- *   import "@brainstorm/sdk/menus.css";
+ *   import "@brainstorm-os/sdk/menus.css";
  *
  * (Both arrive as JS-injected <style> tags, so cascade order follows import
  * order — see [[feedback_sdk_css_cascade_trap]].)

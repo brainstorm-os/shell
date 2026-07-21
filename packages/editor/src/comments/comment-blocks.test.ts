@@ -1,4 +1,4 @@
-import { type CommentDef, CommentKind } from "@brainstorm/sdk-types";
+import { type CommentDef, CommentKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { openCommentBlockIds } from "./comment-blocks";
 import { DOCUMENT_BLOCK_ID } from "./comments-panel";

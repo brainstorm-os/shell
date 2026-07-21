@@ -2,7 +2,7 @@
  * EntityDropPlugin (B11.8) — accept an object dragged from a list / sidebar /
  * search surface and drop it into the editor as a reference at the drop point.
  *
- * Payload contract is the shared `@brainstorm/sdk/entity-drag` MIME
+ * Payload contract is the shared `@brainstorm-os/sdk/entity-drag` MIME
  * (`application/vnd.brainstorm.entity+json`). The drop handler mirrors
  * `MediaDropPlugin`: Lexical moves the caret to the drop position before
  * `DROP_COMMAND` fires, so `$getSelection()` is the drop point.
@@ -23,15 +23,15 @@
  * (the least-destructive default); intra-renderer Alt-drop still transcludes.
  */
 
-import { useYDocLoaded } from "@brainstorm/react-yjs";
-import { DragPayloadKind, DropEffect } from "@brainstorm/sdk-types";
-import { announce } from "@brainstorm/sdk/a11y";
+import { useYDocLoaded } from "@brainstorm-os/react-yjs";
+import { DragPayloadKind, DropEffect } from "@brainstorm-os/sdk-types";
+import { announce } from "@brainstorm-os/sdk/a11y";
 import {
 	type EntityDragPayload,
 	dataTransferHasEntity,
 	readEntityDragData,
-} from "@brainstorm/sdk/entity-drag";
-import { useDropTarget } from "@brainstorm/sdk/object-dnd";
+} from "@brainstorm-os/sdk/entity-drag";
+import { useDropTarget } from "@brainstorm-os/sdk/object-dnd";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$createParagraphNode,

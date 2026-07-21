@@ -1,8 +1,8 @@
-import type { Cover, Icon } from "@brainstorm/sdk-types";
-import { IconKind } from "@brainstorm/sdk-types";
-import { parseCover } from "@brainstorm/sdk/entity-cover";
-import type { NoteReference } from "@brainstorm/sdk/note-references";
-import { type ValuesMap, migrateValuesField } from "@brainstorm/sdk/property-ui/pure";
+import type { Cover, Icon } from "@brainstorm-os/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
+import { parseCover } from "@brainstorm-os/sdk/entity-cover";
+import type { NoteReference } from "@brainstorm-os/sdk/note-references";
+import { type ValuesMap, migrateValuesField } from "@brainstorm-os/sdk/property-ui/pure";
 import type { SerializedEditorState } from "lexical";
 
 /** What we store under `note:<id>` in `storage.kv`. v1 — single blob per

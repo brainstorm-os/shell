@@ -12,7 +12,7 @@
  * Helpers `emojiFilename` and `emojiUrl` mirror the shell's algorithm.
  */
 
-import { SkinTone as ST, type SkinTone } from "@brainstorm/sdk-types";
+import { SkinTone as ST, type SkinTone } from "@brainstorm-os/sdk-types";
 import emojisByGroup from "unicode-emoji-json/data-by-group.json";
 
 export type EmojiData = {

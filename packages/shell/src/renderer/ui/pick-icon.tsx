@@ -10,7 +10,7 @@
  *   - `undefined`    — user dismissed (Escape / click outside / cancel)
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 import { useSyncExternalStore } from "react";
 import { IconPicker } from "./icon-picker";
 

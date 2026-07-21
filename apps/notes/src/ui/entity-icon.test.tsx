@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";

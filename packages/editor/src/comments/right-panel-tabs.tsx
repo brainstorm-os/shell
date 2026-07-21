@@ -4,7 +4,7 @@
  * so the chrome is identical across Notes / Journal / Tasks / Bookmarks
  * (extracted at copy two: Notes shipped it first, Journal is the second
  * consumer). A focus-then-commit `tablist` driven by the shared
- * `@brainstorm/sdk/a11y` composite keyboard (roles come from the binding
+ * `@brainstorm-os/sdk/a11y` composite keyboard (roles come from the binding
  * spread, not literals); arrow keys move + commit, Enter / click select.
  *
  * Render `<CommentsRightPanel>` inside a `CommentsProvider` so the Comments
@@ -12,8 +12,8 @@
  * tab is showing.
  */
 
-import type { CommentAnchor } from "@brainstorm/sdk-types";
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import type { CommentAnchor } from "@brainstorm-os/sdk-types";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import type { ReactNode } from "react";
 import { useEditorT } from "../i18n";
 import { useComments } from "./comments-context";

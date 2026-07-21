@@ -29,7 +29,7 @@ import {
 	type DictionaryItem,
 	type PropertyDef,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export const PLAN_DICT_STATUS_ID = "dict-task-status";
 export const PLAN_DICT_PRIORITY_ID = "dict-task-priority";

@@ -17,7 +17,7 @@
  * (the dashboard's no-handler toast etc.) still runs.
  */
 
-import { OpenRefusal, OpenRung } from "@brainstorm/sdk-types";
+import { OpenRefusal, OpenRung } from "@brainstorm-os/sdk-types";
 import type { IntentDispatchResult } from "../../preload";
 import { ToastKind } from "../ui/toasts";
 

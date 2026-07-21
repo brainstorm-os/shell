@@ -1,5 +1,5 @@
 /**
- * Members-override algorithm — **promoted to `@brainstorm/sdk` (9.3.5.V 7c)**
+ * Members-override algorithm — **promoted to `@brainstorm-os/sdk` (9.3.5.V 7c)**
  * so the shell `collections` host service and this app share one
  * implementation. This module is now a thin re-export bridge (mirrors how
  * `../types/list` re-exports the promoted collection types); the canonical
@@ -17,4 +17,4 @@ export {
 	type RemoveResult,
 	addToList,
 	removeFromList,
-} from "@brainstorm/sdk";
+} from "@brainstorm-os/sdk";

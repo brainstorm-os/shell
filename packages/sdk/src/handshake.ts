@@ -14,7 +14,7 @@
  * runtime the SDK targets (browsers, Node 16+, Electron sandboxed preloads).
  */
 
-import type { AppHandshake } from "@brainstorm/sdk-types";
+import type { AppHandshake } from "@brainstorm-os/sdk-types";
 
 export function encodeHandshake(handshake: AppHandshake): string {
 	const json = JSON.stringify(handshake);

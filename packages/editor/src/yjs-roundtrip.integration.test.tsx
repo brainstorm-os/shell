@@ -19,7 +19,7 @@
  * jsdom so a future change that reaches for `document` doesn't go silent.
  */
 
-import { type YDocTransport, createYDocResolver, getUniversalBody } from "@brainstorm/react-yjs";
+import { type YDocTransport, createYDocResolver, getUniversalBody } from "@brainstorm-os/react-yjs";
 import { createBinding, syncLexicalUpdateToYjs, syncYjsChangesToLexical } from "@lexical/yjs";
 import {
 	$createParagraphNode,

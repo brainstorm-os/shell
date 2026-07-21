@@ -20,7 +20,7 @@ import type {
 	PlatformCatalogEntityType,
 	PlatformCatalogIntent,
 	PlatformCatalogProperty,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { sanitizeBoundedText } from "../intents/sanitize-label";
 
 const MAX_NAME_LENGTH = 80;

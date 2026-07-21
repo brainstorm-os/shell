@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decodeHandshake, encodeHandshake } from "@brainstorm/sdk";
-import type { AppHandshake } from "@brainstorm/sdk-types";
+import { decodeHandshake, encodeHandshake } from "@brainstorm-os/sdk";
+import type { AppHandshake } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import { DataStores } from "../storage/data-stores";

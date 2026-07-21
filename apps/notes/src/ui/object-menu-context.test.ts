@@ -1,4 +1,4 @@
-import { buildObjectMenuItems } from "@brainstorm/sdk/object-menu";
+import { buildObjectMenuItems } from "@brainstorm-os/sdk/object-menu";
 import { describe, expect, it, vi } from "vitest";
 import type { NotesBrainstorm } from "../store/runtime";
 import { noteObjectMenuContext } from "./object-menu-context";

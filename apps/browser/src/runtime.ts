@@ -13,7 +13,7 @@ import type {
 	SerializedBlock,
 	Subscription,
 	WebViewClient,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type EntityRecord = {
 	id: string;

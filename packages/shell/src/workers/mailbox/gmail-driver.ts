@@ -12,8 +12,8 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { MailAttachmentPart } from "@brainstorm/sdk-types";
-import { FolderRole, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
+import type { MailAttachmentPart } from "@brainstorm-os/sdk-types";
+import { FolderRole, MailFlag, MailProtocol } from "@brainstorm-os/sdk-types";
 import type {
 	DriverCredentials,
 	FetchAttachmentResult,

@@ -1,12 +1,12 @@
 /**
  * Calendar-app translate function. Wraps the shared
- * `createT` from `@brainstorm/sdk/i18n` (the one app-side `t()` — no
+ * `createT` from `@brainstorm-os/sdk/i18n` (the one app-side `t()` — no
  * per-app re-implementation of the lookup / `{param}` interpolation /
  * missing-key behaviour) over a default-English manifest. A localised
  * build passes overrides via `createT(MANIFEST, overrides)`.
  */
 
-import { createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import { createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
 
 export const MANIFEST = {
 	// App chrome

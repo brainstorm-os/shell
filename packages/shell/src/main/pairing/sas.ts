@@ -15,7 +15,7 @@
  * keeps the UI legible.
  */
 
-import { hkdfSha256 } from "@brainstorm/native";
+import { hkdfSha256 } from "@brainstorm-os/native";
 
 export const SAS_INFO_DEFAULT = "brainstorm/v1/pair/sas";
 export const SAS_INFO_QR_CONFIRM = "brainstorm/v1/pair/qr-sas";

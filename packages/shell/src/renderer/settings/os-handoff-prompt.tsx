@@ -19,7 +19,7 @@ import {
 	OsHandoffPromptDecision,
 	OsHandoffSignatureKind,
 	parseOsHandoffSignature,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { OsHandoffPromptRequest } from "../../preload";

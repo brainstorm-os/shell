@@ -16,7 +16,7 @@
  * Persisted shape is protocol — don't rename `type` / `iso` / `label`.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import {
 	$applyNodeReplacement,
 	type DOMConversionMap,

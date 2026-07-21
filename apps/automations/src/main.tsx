@@ -1,9 +1,9 @@
-import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import "@brainstorm/sdk/empty-state.css";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { getWidgetLaunch } from "@brainstorm/sdk/widget";
+import "@brainstorm-os/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import "@brainstorm-os/sdk/empty-state.css";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AutomationsApp } from "./app";

@@ -1,21 +1,21 @@
-import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import "@brainstorm/sdk/empty-state.css";
-import "@brainstorm/sdk/share-dialog.css";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
-import { mountSpellcheckMenuFromWindow } from "@brainstorm/sdk/spellcheck-menu";
-import "@brainstorm/editor/editor.css";
-import "@brainstorm/editor/editor-theme.css";
-import { setEditorHost, setEntityIndexSource } from "@brainstorm/editor";
-import { YDocProvider } from "@brainstorm/react-yjs";
+import "@brainstorm-os/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import "@brainstorm-os/sdk/empty-state.css";
+import "@brainstorm-os/sdk/share-dialog.css";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
+import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
+import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/editor/editor-theme.css";
+import { setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
+import { YDocProvider } from "@brainstorm-os/react-yjs";
 import {
 	BlockRendererRegistryProvider,
 	DEFAULT_BUILTIN_CUSTOM_NODES,
 	createBlockRendererRegistry,
-} from "@brainstorm/sdk/block-registry";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { applyPersistedPanelWidth } from "@brainstorm/sdk/resizable";
-import { getWidgetLaunch } from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/block-registry";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { NotesApp } from "./app";
 import { getBrainstorm, openEntityInShell } from "./store/runtime";
@@ -62,7 +62,7 @@ function mountFullApp(mountRoot: HTMLElement): void {
 
 	// Wire the shared vault-entity index (title + icon lookups for mention /
 	// page-ref / transclusion / block-embed decorators + the Link cell) to the
-	// shell's `vaultEntities` service. The index lives in `@brainstorm/editor`,
+	// shell's `vaultEntities` service. The index lives in `@brainstorm-os/editor`,
 	// decoupled from the runtime — Notes injects the source once at boot.
 	const vaultEntities = runtime?.services.vaultEntities;
 	if (vaultEntities) {

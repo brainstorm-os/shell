@@ -2,7 +2,7 @@ import {
 	hasDismissedBetaAnalyticsNotice,
 	isPublicBeta,
 	markBetaAnalyticsNoticeDismissed,
-} from "@brainstorm/sdk/analytics";
+} from "@brainstorm-os/sdk/analytics";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { t } from "../i18n/t";

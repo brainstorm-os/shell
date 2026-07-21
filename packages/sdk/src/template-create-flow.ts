@@ -14,14 +14,14 @@
  * and go straight to a blank draft (today's behavior, unchanged when a
  * type/collection has no applicable template — per doc 66 §The shared surfaces).
  *
- * Pure + dependency-free over `@brainstorm/sdk-types`: the picker chrome (the
+ * Pure + dependency-free over `@brainstorm-os/sdk-types`: the picker chrome (the
  * shared fancy-menus runtime) and the body copy (the chosen template's `root`
  * Y.XmlText copied onto the new entity through the editor insert path) are the
  * consuming surface's job; this only decides *what is offered* and *what draft a
  * choice produces*.
  */
 
-import type { Template } from "@brainstorm/sdk-types";
+import type { Template } from "@brainstorm-os/sdk-types";
 import {
 	type DefaultTemplateLadder,
 	type TemplateDraft,

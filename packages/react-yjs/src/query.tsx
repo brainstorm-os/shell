@@ -19,7 +19,7 @@ import type {
 	VaultEntitiesListQuery,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { createQueryStore } from "./query-store";
 import { EMPTY_VAULT_SNAPSHOT, vaultSnapshotEquals } from "./vault-entities";

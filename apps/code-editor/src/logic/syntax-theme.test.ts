@@ -1,4 +1,4 @@
-import { HighlightTheme } from "@brainstorm/sdk/code-highlight";
+import { HighlightTheme } from "@brainstorm-os/sdk/code-highlight";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_SYNTAX_THEME_PREFERENCE,

@@ -45,7 +45,7 @@
 import { promises as dnsPromises } from "node:dns";
 import * as nodeHttp from "node:http";
 import * as nodeHttps from "node:https";
-import type { NetworkReadableResult, SerializedBlock } from "@brainstorm/sdk-types";
+import type { NetworkReadableResult, SerializedBlock } from "@brainstorm-os/sdk-types";
 import { net, session } from "electron";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";

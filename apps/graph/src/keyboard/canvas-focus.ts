@@ -19,7 +19,7 @@
  * dashboard icon grid.
  */
 
-import { type SpatialCell, SpatialDirection, spatialGridStep } from "@brainstorm/sdk/a11y";
+import { type SpatialCell, SpatialDirection, spatialGridStep } from "@brainstorm-os/sdk/a11y";
 
 export { SpatialDirection };
 

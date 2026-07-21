@@ -1,6 +1,6 @@
-import "@brainstorm/sdk/app-theme.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
+import "@brainstorm-os/sdk/app-theme.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { WhiteboardApp } from "./app";

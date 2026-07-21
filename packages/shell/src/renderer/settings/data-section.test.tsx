@@ -9,7 +9,7 @@
  * a single checked item that arrow keys move.
  */
 
-import { BrainstormMenuProvider, getActiveMenuStore } from "@brainstorm/sdk/menus";
+import { BrainstormMenuProvider, getActiveMenuStore } from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

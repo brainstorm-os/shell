@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/icon-picker` — the ONE icon picker + the emoji/Phosphor
+ * `@brainstorm-os/sdk/icon-picker` — the ONE icon picker + the emoji/Phosphor
  * data behind it. React `<IconPicker>` is the host-agnostic chooser
  * (labels injected per the SDK i18n convention); the data helpers
  * (`emojiUrl`, the Phosphor lazy-load) are what `EntityIcon` renders

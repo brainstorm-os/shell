@@ -239,7 +239,7 @@
 	padding: var(--space-3) var(--space-2) var(--space-1);
 }
 
-/* `today | ‹ | ›` cluster (`@brainstorm/sdk/date-pager`) followed by the
+/* `today | ‹ | ›` cluster (`@brainstorm-os/sdk/date-pager`) followed by the
  * month label — the buttons follow the inline axis, the label trails. */
 :root .bs-cal-mini__header {
 	display: flex;

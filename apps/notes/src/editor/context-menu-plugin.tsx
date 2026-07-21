@@ -10,7 +10,7 @@
  * anchors against.
  */
 
-import { openBlockActionMenu, useBlockSelectionStore, useEditorT } from "@brainstorm/editor";
+import { openBlockActionMenu, useBlockSelectionStore, useEditorT } from "@brainstorm-os/editor";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getNearestNodeFromDOMNode, type NodeKey } from "lexical";
 import { useEffect } from "react";

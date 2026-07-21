@@ -16,11 +16,11 @@
  * writes.
  *
  * The fixture itself (`LARGE_DOC_PROFILES` + `seedLargeDoc`) lives in
- * `@brainstorm/editor` per the N5 contract; this file is the renderer-
+ * `@brainstorm-os/editor` per the N5 contract; this file is the renderer-
  * side adapter that calls it against the captured editor.
  */
 
-import { LARGE_DOC_PROFILES, type LargeDocProfile, seedLargeDoc } from "@brainstorm/editor";
+import { LARGE_DOC_PROFILES, type LargeDocProfile, seedLargeDoc } from "@brainstorm-os/editor";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useEffect } from "react";
 import { BLOCK_COMMANDS } from "./commands";

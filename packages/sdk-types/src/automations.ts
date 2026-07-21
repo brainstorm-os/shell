@@ -20,7 +20,7 @@
  * re-exports with no cycle. Capability strings are parsed locally (a
  * three-line mirror of the shell ledger's `parseCapability` + scope rule,
  * doc 09 §Capabilities) to keep this a dependency-free contract leaf —
- * sdk-types cannot import from `@brainstorm/shell`.
+ * sdk-types cannot import from `@brainstorm-os/shell`.
  */
 
 import { enumGuard } from "./enum-guard";

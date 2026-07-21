@@ -9,7 +9,7 @@
  *
  * Runs INSIDE the sandboxed opaque-origin iframe (no ambient authority, no
  * `window.brainstorm`); its only channel to the vault is the
- * `@brainstorm/sdk/block-runtime` harness (`getEntity` over the BP graph
+ * `@brainstorm-os/sdk/block-runtime` harness (`getEntity` over the BP graph
  * module). It resolves the source book with a SECOND `getEntity` keyed by the
  * highlight's `bookId` (Books holds `entities.read:brainstorm/Book/v1`). Pure
  * DOM — no framework, no SDK i18n: the bundle is a single self-contained IIFE
@@ -20,7 +20,7 @@
  * colour swatch is a CSS-painted chip, never a fetched asset.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 
 interface BpEntity {
 	entityId: string;
@@ -64,7 +64,7 @@ function bookTitle(book: BpEntity | null): string {
 }
 
 // Colours come from the host theme tokens the block-runtime mirrors onto
-// `:root` (`@brainstorm/sdk/block-runtime` BlockControlKind.Theme); the literal
+// `:root` (`@brainstorm-os/sdk/block-runtime` BlockControlKind.Theme); the literal
 // fallbacks in each `var(--…, fallback)` only paint before the theme lands / in
 // standalone tests. No `prefers-color-scheme` overrides — the active theme (not
 // the OS) is the source of truth.

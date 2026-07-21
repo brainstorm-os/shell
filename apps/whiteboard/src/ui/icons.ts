@@ -6,8 +6,8 @@
  * platforms and don't honour the theme accent.
  */
 
-import { createGlyphElement, glyphIconParam } from "@brainstorm/sdk/icon";
-import type { IconParam } from "@brainstorm/sdk/menus";
+import { createGlyphElement, glyphIconParam } from "@brainstorm-os/sdk/icon";
+import type { IconParam } from "@brainstorm-os/sdk/menus";
 
 export enum WhiteboardIcon {
 	Plus = "plus",

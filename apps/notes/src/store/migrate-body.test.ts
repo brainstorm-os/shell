@@ -12,7 +12,7 @@
  * future change that does reach for the DOM doesn't go silent.
  */
 
-import { getUniversalBody } from "@brainstorm/react-yjs";
+import { getUniversalBody } from "@brainstorm-os/react-yjs";
 import type { SerializedEditorState } from "lexical";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Doc, XmlText } from "yjs";

@@ -1,5 +1,5 @@
 /**
- * @brainstorm/cli — developer-side tooling for app + theme authors.
+ * @brainstorm-os/cli — developer-side tooling for app + theme authors.
  *
  * v1 ships the theme `pack` command (9.9.6): validate a theme package against
  * the same token / contrast / StylePack-CSS validators the theme-editor uses,

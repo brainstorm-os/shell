@@ -1,4 +1,4 @@
-import { type Entity, IconKind, type Template, TemplateKind } from "@brainstorm/sdk-types";
+import { type Entity, IconKind, type Template, TemplateKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	TEMPLATE_ENTITY_TYPE,

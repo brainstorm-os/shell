@@ -13,25 +13,25 @@
  * only minted on submit, so there is no abandoned-empty ghost to clean up.
  */
 
-import { YDocProvider, useVaultEntities } from "@brainstorm/react-yjs";
-import type { VaultEntity } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { recallLastViewed, rememberLastViewed } from "@brainstorm/sdk/last-viewed";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { YDocProvider, useVaultEntities } from "@brainstorm-os/react-yjs";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	type AnchoredMenuItem,
 	type ObjectMenuExtraItem,
 	ObjectMenuMoreButton,
 	ObjectMenuTrigger,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { Popover } from "@brainstorm/sdk/popover";
-import type { EntityTitleSource } from "@brainstorm/sdk/property-ui";
-import { useResizable } from "@brainstorm/sdk/resizable";
-import { publishTabIdentity } from "@brainstorm/sdk/tab-identity";
+} from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { Popover } from "@brainstorm-os/sdk/popover";
+import type { EntityTitleSource } from "@brainstorm-os/sdk/property-ui";
+import { useResizable } from "@brainstorm-os/sdk/resizable";
+import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { plural, t } from "./i18n";

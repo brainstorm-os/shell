@@ -36,7 +36,7 @@
  * plain in-memory snapshots — same shape as `note-entities-codec`.
  */
 
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import type { VaultEntity } from "../entities/vault-entities-service";
 
 export type UsageCounts = {

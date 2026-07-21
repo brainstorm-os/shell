@@ -14,7 +14,7 @@
  * what's stamped), so this stays a thin read.
  */
 
-import type { RosterService } from "@brainstorm/sdk-types";
+import type { RosterService } from "@brainstorm-os/sdk-types";
 import { useEffect, useState } from "react";
 import { localPresenceName } from "./peer-presence";
 

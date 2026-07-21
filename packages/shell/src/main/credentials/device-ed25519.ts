@@ -16,7 +16,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { ed25519GetPublicKey, ed25519Sign, ed25519Verify } from "@brainstorm/native";
+import { ed25519GetPublicKey, ed25519Sign, ed25519Verify } from "@brainstorm-os/native";
 import {
 	assertSecret as assertSecretLen,
 	publicKeyFromBase64 as publicKeyFromBase64Len,

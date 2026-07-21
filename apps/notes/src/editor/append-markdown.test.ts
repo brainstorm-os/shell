@@ -4,7 +4,7 @@
  * APPENDED to a target editor's existing content (never replacing it).
  */
 
-import { BASELINE_NODES, BLOCK_MARKDOWN_TRANSFORMERS } from "@brainstorm/editor";
+import { BASELINE_NODES, BLOCK_MARKDOWN_TRANSFORMERS } from "@brainstorm-os/editor";
 import { createHeadlessEditor } from "@lexical/headless";
 import { TRANSFORMERS } from "@lexical/markdown";
 import { $createParagraphNode, $createTextNode, $getRoot } from "lexical";

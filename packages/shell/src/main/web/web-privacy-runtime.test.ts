@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SitePermissionKind } from "@brainstorm/sdk-types";
+import { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readSitePermissionGrants, writeSitePermissionGrants } from "./site-permissions";
 import { writeWebEgressRows } from "./web-egress-audit";

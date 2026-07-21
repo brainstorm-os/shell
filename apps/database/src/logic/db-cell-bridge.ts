@@ -1,6 +1,6 @@
 /**
  * Value-shape bridge between the Database's flat entity `properties` map
- * and the shared `@brainstorm/sdk` property cells.
+ * and the shared `@brainstorm-os/sdk` property cells.
  *
  * The two layers store the same logical value in different shapes:
  *   - DB raw:  dates are bare epoch-ms numbers, multi-values are bare
@@ -22,7 +22,7 @@ import {
 	type PropertyDef,
 	ValueType,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 function asDateValue(raw: unknown, granularity: DateGranularity | undefined): DateValue | null {
 	if (typeof raw === "number" && Number.isFinite(raw)) {

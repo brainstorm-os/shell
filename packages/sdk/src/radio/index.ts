@@ -5,7 +5,7 @@
  * box mirrors its state through the native `:checked` sibling selector — no JS
  * state-sync needed. Radios sharing a `name` form one group.
  *
- * The CSS ships in `app-theme.css` (apps) and as the `@brainstorm/sdk/radio`
+ * The CSS ships in `app-theme.css` (apps) and as the `@brainstorm-os/sdk/radio`
  * subpath (shell).
  */
 

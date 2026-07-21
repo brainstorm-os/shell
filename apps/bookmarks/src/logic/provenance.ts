@@ -8,7 +8,7 @@
  * DOM-free and unit-tested without the detail view.
  */
 
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 
 /** A captured body past this many blocks is flagged "large" — the extractor's
  *  byte cap means very long pages may be truncated mid-article. Tuned so a

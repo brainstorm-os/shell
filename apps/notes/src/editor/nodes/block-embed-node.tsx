@@ -1,4 +1,4 @@
-/** Re-export shim — BlockEmbedNode now lives in `@brainstorm/editor`
+/** Re-export shim — BlockEmbedNode now lives in `@brainstorm-os/editor`
  *  (F-070 embed parity: Journal / Tasks render the same card). */
 export {
 	BLOCK_EMBED_DOM_FLAG,
@@ -10,4 +10,4 @@ export {
 	$isBlockEmbedNode,
 	BlockEmbedNode,
 	BlockEmbedView,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

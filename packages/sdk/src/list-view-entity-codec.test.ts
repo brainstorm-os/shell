@@ -10,7 +10,7 @@ import {
 	type ListView,
 	ListViewKind,
 	SortDirection,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	LIST_VIEW_ENTITY_TYPE,

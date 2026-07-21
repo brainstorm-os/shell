@@ -6,8 +6,8 @@
  * matcher (Enter / Space).
  */
 
-import { type ObjectMenuContext, openObjectMenu } from "@brainstorm/sdk/object-menu";
-import { matchesChord } from "@brainstorm/sdk/shortcut";
+import { type ObjectMenuContext, openObjectMenu } from "@brainstorm-os/sdk/object-menu";
+import { matchesChord } from "@brainstorm-os/sdk/shortcut";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useRef } from "react";
 

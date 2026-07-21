@@ -7,7 +7,7 @@
  * [[feedback_no_default_type_icon_fallback]]).
  */
 
-import { type Icon, createEntityIconElement } from "@brainstorm/sdk/entity-icon";
+import { type Icon, createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
 import { useEffect, useRef } from "react";
 
 export type EntityIconProps = {

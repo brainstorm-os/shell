@@ -7,7 +7,7 @@
  * entities service). Rather than block 9.1 on 9.3, the resolver is
  * injected through context: the SDK provides a real `<YDocProvider>` at
  * 9.3; until then `useYDoc(doc)` (passing a Y.Doc directly) is fully
- * functional and is what `@brainstorm/editor` previews (9.2) use.
+ * functional and is what `@brainstorm-os/editor` previews (9.2) use.
  *
  * The resolver is synchronous and refcounted: `resolve(entityId)` returns
  * a handle whose `release()` the hook calls on unmount so the entities

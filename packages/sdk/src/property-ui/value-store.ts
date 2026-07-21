@@ -19,7 +19,7 @@
  * on the entity. The pure shape here translates 1:1.
  */
 
-import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm-os/sdk-types";
 import { coerceValue, emptyValueFor, isEmptyValue } from "../properties-validate";
 
 export type ValuesMap = Record<string, unknown>;

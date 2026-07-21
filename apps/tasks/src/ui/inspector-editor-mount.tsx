@@ -14,12 +14,12 @@
  * paragraph. The editor never mounts there.
  */
 
-import { YDocProvider } from "@brainstorm/react-yjs";
+import { YDocProvider } from "@brainstorm-os/react-yjs";
 import {
 	BlockRendererRegistryProvider,
 	DEFAULT_BUILTIN_CUSTOM_NODES,
 	createBlockRendererRegistry,
-} from "@brainstorm/sdk/block-registry";
+} from "@brainstorm-os/sdk/block-registry";
 import { type Root, createRoot } from "react-dom/client";
 import { getBrainstorm } from "../storage/runtime";
 import { getYDocResolverApi } from "../store/ydoc-resolver";

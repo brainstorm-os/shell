@@ -12,7 +12,7 @@
  * Why here and not in an app: two seeders need the exact same stand-ins — the
  * dev-vault seed-cli (`tools/mcp-server/src/seed`) and the shell's Welcome-1
  * starter-content seeder — and neither can import the other's (nor an app's)
- * node classes. Extracting them to `@brainstorm/editor` (which already owns
+ * node classes. Extracting them to `@brainstorm-os/editor` (which already owns
  * `plantSerializedStateIntoDoc` + `BASELINE_NODES`) is the single source, per
  * the DRY-at-copy-two rule. The serialized shape MUST stay in lockstep with
  * `apps/notes/src/editor/notes-nodes.ts` `NOTES_ADDITIONAL_NODES` — any node a

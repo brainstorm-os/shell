@@ -14,7 +14,7 @@
  * Pure + framework-free so the refusal matrix is unit-tested without a shell.
  */
 
-import { INSERT_INTENT_VERB, parseNoteInsertPayload } from "@brainstorm/sdk-types";
+import { INSERT_INTENT_VERB, parseNoteInsertPayload } from "@brainstorm-os/sdk-types";
 import { NOTE_TYPE } from "../store/entities-repository";
 
 /** Why an `insert` intent was refused — drives the localized notice. */

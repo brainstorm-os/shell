@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OsHandoffConsent } from "@brainstorm/sdk-types";
-import { ThemeName } from "@brainstorm/tokens";
+import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
+import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AppearanceMode, AppearanceSlot } from "../../shared/appearance";
 import {

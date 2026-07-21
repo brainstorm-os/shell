@@ -1,4 +1,4 @@
-import { CONTRAST_PAIRS, lintTokenContrast } from "@brainstorm/sdk-types";
+import { CONTRAST_PAIRS, lintTokenContrast } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { ThemeName, themes } from "./themes";
 import { flattenTokens } from "./tokens";

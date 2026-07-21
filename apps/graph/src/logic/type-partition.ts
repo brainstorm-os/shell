@@ -10,7 +10,7 @@
  * the Database sidebar's System disclosure does (F-318).
  */
 
-import { isPlumbingEntityType } from "@brainstorm/sdk/system-entities";
+import { isPlumbingEntityType } from "@brainstorm-os/sdk/system-entities";
 import type { TypeOption } from "./pattern-edit";
 
 export type PartitionedTypeOptions = {

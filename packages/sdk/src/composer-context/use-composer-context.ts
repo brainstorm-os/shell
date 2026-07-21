@@ -5,7 +5,7 @@
  * Pure React state — no services — so the host wires its own search/upload.
  */
 
-import type { MessageAttachment } from "@brainstorm/sdk-types";
+import type { MessageAttachment } from "@brainstorm-os/sdk-types";
 import { useCallback, useMemo, useState } from "react";
 import { attachmentKey } from "./types";
 

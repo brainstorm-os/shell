@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/nav-history` — the ONE in-app back/forward model every
+ * `@brainstorm-os/sdk/nav-history` — the ONE in-app back/forward model every
  * first-party app uses, so navigation behaves and looks identical whether
  * you're in Notes, Database, Graph, Calendar, Files, … (per CLAUDE.md DRY:
  * 9+ call sites → one shared primitive, not N hand-rolled stacks).

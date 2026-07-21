@@ -19,7 +19,7 @@
  * capability-gated `roster` service.
  */
 
-import { sha256 } from "@brainstorm/native";
+import { sha256 } from "@brainstorm-os/native";
 import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
 import {
 	fingerprintPublicKey,

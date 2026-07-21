@@ -21,9 +21,9 @@
  */
 
 import { join } from "node:path";
-import { encodeHandshake } from "@brainstorm/sdk";
-import type { AppHandshake, FormatContext, LaunchContext } from "@brainstorm/sdk-types";
-import { type ThemeName, themes } from "@brainstorm/tokens";
+import { encodeHandshake } from "@brainstorm-os/sdk";
+import type { AppHandshake, FormatContext, LaunchContext } from "@brainstorm-os/sdk-types";
+import { type ThemeName, themes } from "@brainstorm-os/tokens";
 import { entityRoute, routesEquivalent } from "../../shared/route";
 import type { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import type { AppsRepository } from "../storage/registry-repo";

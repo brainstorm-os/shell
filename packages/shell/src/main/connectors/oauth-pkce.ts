@@ -10,7 +10,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { sha256 } from "@brainstorm/native";
+import { sha256 } from "@brainstorm-os/native";
 
 /** base64url (RFC 4648 §5, no padding) of raw bytes. */
 function toBase64Url(bytes: Uint8Array): string {

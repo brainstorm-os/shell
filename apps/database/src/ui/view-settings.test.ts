@@ -13,7 +13,7 @@ import {
 	closeContextMenu,
 	getActiveMenuStore,
 	mountMenuHost,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formulaColumnId } from "../logic/formula";

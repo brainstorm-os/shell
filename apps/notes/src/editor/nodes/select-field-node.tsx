@@ -28,7 +28,7 @@ import {
 	Vertical,
 	defineMenu,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$applyNodeReplacement,

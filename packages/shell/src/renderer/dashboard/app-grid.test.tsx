@@ -2,13 +2,13 @@
 /**
  * Start-menu app grid glue: renders every installed app, filters by query,
  * launches on click (and on Enter in the search box), and surfaces an empty
- * state. The 2-D roving keyboard model lives in `@brainstorm/sdk/a11y`
+ * state. The 2-D roving keyboard model lives in `@brainstorm-os/sdk/a11y`
  * (`useCompositeKeyboard`, separately tested); here we cover the React + IPC
  * wiring. App ranking is covered by `grouped-results.test.ts`.
  */
 
-import { getEscapeStack, installEscapeHandler } from "@brainstorm/sdk/a11y";
-import { BrainstormMenuProvider } from "@brainstorm/sdk/menus";
+import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
+import { BrainstormMenuProvider } from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";

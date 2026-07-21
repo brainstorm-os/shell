@@ -10,12 +10,12 @@
  * The selection is rendered identifier-by-identifier — `selectedIds`
  * is a `Set<string>` consumed by every view renderer.
  *
- * The range + toggle math lives in `@brainstorm/sdk/selection` (shared
+ * The range + toggle math lives in `@brainstorm-os/sdk/selection` (shared
  * with the Files content pane); this module keeps the Database's
  * mutable-`Set` state shape and click API around it.
  */
 
-import { computeRange, toggleId } from "@brainstorm/sdk/selection";
+import { computeRange, toggleId } from "@brainstorm-os/sdk/selection";
 
 export type SelectionState = {
 	selectedIds: Set<string>;

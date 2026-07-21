@@ -1,12 +1,12 @@
 /**
  * 9.18.3c(d) drift-fence — Notes' slash/action catalogue is built ON the
- * shared `@brainstorm/editor` catalogue (the same set Journal / Tasks /
+ * shared `@brainstorm-os/editor` catalogue (the same set Journal / Tasks /
  * Bookmarks mount), with only the genuinely Notes-coupled commands authored
  * locally. If Notes re-grows a bespoke copy of a generic command, or the
  * shared catalogue renames an id Notes' palette lists, these fail.
  */
 
-import { createEditorT, createStandardBlockCommands } from "@brainstorm/editor";
+import { createEditorT, createStandardBlockCommands } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { BLOCK_ACTIONS, BLOCK_COMMANDS, NOTES_BLOCK_PALETTE } from "./commands";
 

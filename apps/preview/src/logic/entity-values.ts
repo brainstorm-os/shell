@@ -9,8 +9,8 @@
  * read-only facts instead of editable rows.
  */
 
-import type { VaultEntitiesSnapshot } from "@brainstorm/sdk-types";
-import { type ValuesMap, migrateValuesField } from "@brainstorm/sdk/property-ui";
+import type { VaultEntitiesSnapshot } from "@brainstorm-os/sdk-types";
+import { type ValuesMap, migrateValuesField } from "@brainstorm-os/sdk/property-ui";
 
 export function entityValuesFromSnapshot(
 	snapshot: VaultEntitiesSnapshot,

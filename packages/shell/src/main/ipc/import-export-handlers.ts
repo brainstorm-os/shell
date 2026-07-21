@@ -17,7 +17,7 @@
 
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
-import type { ValueType } from "@brainstorm/sdk-types";
+import type { ValueType } from "@brainstorm-os/sdk-types";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { BundleExportScopeKind } from "../bundle/bundle-format";
 import { exportVaultBundle } from "../bundle/vault-export";

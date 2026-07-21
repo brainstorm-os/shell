@@ -13,7 +13,7 @@
  * `formatAggregation(result, targetDef)` formats it in the target's own units.
  */
 
-import type { ColumnRollup } from "@brainstorm/sdk-types";
+import type { ColumnRollup } from "@brainstorm-os/sdk-types";
 import { AggregationKind, type AggregationResult, computeAggregation } from "./aggregations";
 import type { EntityRow } from "./in-memory-entities";
 

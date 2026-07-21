@@ -15,7 +15,7 @@
  * testable.
  */
 
-import { isChildEntityType } from "@brainstorm/sdk/system-entities";
+import { isChildEntityType } from "@brainstorm-os/sdk/system-entities";
 import { FILE_TYPE, FOLDER_TYPE, entityTypeName } from "../types/entity";
 
 /** Type-name families that are app-internal state / view config / logs /

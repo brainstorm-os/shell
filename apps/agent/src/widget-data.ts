@@ -9,8 +9,8 @@
  * message bumps it — "last active" is the better signal for a dashboard tile.
  */
 
-import { CONVERSATION_TYPE_URL, type VaultEntitiesListQuery } from "@brainstorm/sdk-types";
-import { formatRelativeDate } from "@brainstorm/sdk/date-formatters";
+import { CONVERSATION_TYPE_URL, type VaultEntitiesListQuery } from "@brainstorm-os/sdk-types";
+import { formatRelativeDate } from "@brainstorm-os/sdk/date-formatters";
 import { t } from "./i18n";
 
 /** Manifest widget id — must match `registrations.widgets[].id` in manifest.json. */

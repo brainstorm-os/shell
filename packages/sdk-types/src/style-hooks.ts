@@ -31,7 +31,7 @@ export const STYLE_HOOK_VERSION = 1;
  * surface or a sub-region. Keep alphabetical within each group.
  */
 export const STYLE_HOOK_REGIONS = Object.freeze([
-	// App frame (shared @brainstorm/sdk app-theme chrome — every app).
+	// App frame (shared @brainstorm-os/sdk app-theme chrome — every app).
 	"app-header",
 	"app-header-left",
 	"app-header-right",

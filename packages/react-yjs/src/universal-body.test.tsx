@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm/sdk-types";
+import { UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm-os/sdk-types";
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

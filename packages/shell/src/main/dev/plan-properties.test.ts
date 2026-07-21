@@ -1,5 +1,5 @@
-import { validateDictionary, validatePropertyDef } from "@brainstorm/sdk";
-import { ValueType } from "@brainstorm/sdk-types";
+import { validateDictionary, validatePropertyDef } from "@brainstorm-os/sdk";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	PLAN_DICT_PRIORITY_ID,

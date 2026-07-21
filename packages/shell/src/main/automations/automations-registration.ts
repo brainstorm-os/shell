@@ -25,7 +25,7 @@ import {
 	propertiesToReminder,
 	propertiesToTrigger,
 	propertiesToWorkflow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { EntityEventTrigger, ScheduleRegistration } from "./automations-host";
 import { reminderToTriggerConfig } from "./reminder-schedule";
 import type { TimeTriggerConfig } from "./trigger-schedule";

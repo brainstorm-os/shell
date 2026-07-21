@@ -1,6 +1,6 @@
 /**
  * PropertiesPanel (Notes) — a thin adapter over the SHARED
- * `@brainstorm/sdk/properties-panel`. It maps the open note's `values` bag to
+ * `@brainstorm-os/sdk/properties-panel`. It maps the open note's `values` bag to
  * the generic `rows` + `meta` the shared content renders; all chrome (header,
  * grid rows, add/remove affordances) lives in the SDK component, identical to
  * every other app. The resizable glass container (`.notes__props`) stays in
@@ -11,13 +11,13 @@
  * row's remove clears the key.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
 import {
 	type PropertiesPanelMeta,
 	type PropertiesPanelRow,
 	PropertiesPanel as SharedPropertiesPanel,
-} from "@brainstorm/sdk/properties-panel";
-import { type ValuesMap, readValue, usePropertyStore } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk/properties-panel";
+import { type ValuesMap, readValue, usePropertyStore } from "@brainstorm-os/sdk/property-ui";
 import { type JSX, useCallback, useMemo, useRef } from "react";
 import {
 	type AddPropertyTarget,

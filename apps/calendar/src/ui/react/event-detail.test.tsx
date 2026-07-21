@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { closeCalendarPopover } from "@brainstorm/sdk/calendar";
+import { closeCalendarPopover } from "@brainstorm-os/sdk/calendar";
 import {
 	BrainstormMenuProvider,
 	CONTEXT_MENU_ID,
 	type ContextMenuItem,
 	closeContextMenu,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flush, renderInto } from "../../test/render";

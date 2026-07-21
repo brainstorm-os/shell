@@ -1,5 +1,5 @@
 {
-  "_doc": "Files that subscribe to the coarse `vaultEntities.onChange` signal directly instead of through @brainstorm/react-yjs's useVaultEntities/useLiveEntities. This list is a RATCHET enforced by tools/check-app-reactivity.mjs: it may only shrink. New apps/files MUST use the shared hooks (the gate rejects additions). As apps migrate (implementation-plan Step 3), delete the migrated file's line. When empty, delete this baseline and make the gate an absolute ban.",
+  "_doc": "Files that subscribe to the coarse `vaultEntities.onChange` signal directly instead of through @brainstorm-os/react-yjs's useVaultEntities/useLiveEntities. This list is a RATCHET enforced by tools/check-app-reactivity.mjs: it may only shrink. New apps/files MUST use the shared hooks (the gate rejects additions). As apps migrate (implementation-plan Step 3), delete the migrated file's line. When empty, delete this baseline and make the gate an absolute ban.",
   "files": [
     "apps/books/src/app.tsx",
     "apps/database/src/app.ts",

@@ -36,7 +36,7 @@
  * Pure module (no Electron imports) so it's testable under Bun's vitest.
  */
 
-import { ed25519Sign, ed25519Verify } from "@brainstorm/native";
+import { ed25519Sign, ed25519Verify } from "@brainstorm-os/native";
 import * as Y from "yjs";
 
 export const DEVICES_META_KEY = "devices";

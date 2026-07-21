@@ -3,7 +3,7 @@
  *  Today renders as a clock time; other days fall back to the shared
  *  relative/absolute label. */
 
-import { formatRelativeDate } from "@brainstorm/sdk/date-formatters";
+import { formatRelativeDate } from "@brainstorm-os/sdk/date-formatters";
 import { t } from "../i18n";
 
 const labels = () => ({

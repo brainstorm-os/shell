@@ -5,7 +5,7 @@
  * their `vaultEntities` + entities-mutation services; nothing here is app-
  * specific (no `getBrainstorm`), so the ~130 lines of bridge logic live once.
  *
- * Liveness comes from the sanctioned reactivity stack (`@brainstorm/react-yjs`
+ * Liveness comes from the sanctioned reactivity stack (`@brainstorm-os/react-yjs`
  * `useVaultEntities`, which wraps the vault signal in the shared
  * `createQueryStore` coalescer) — NOT a hand-rolled `vaultEntities.onChange`
  * loop. The shared `createEntityCommentsAdapter` still owns the codec /
@@ -13,13 +13,13 @@
  * whose `subscribe` is driven by the React snapshot.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import {
 	COMMENT_TYPE_URL,
 	type CommentDef,
 	type VaultEntitiesSnapshot,
-} from "@brainstorm/sdk-types";
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
 import { useEffect, useMemo, useRef } from "react";
 import { openCommentBlockIds } from "./comment-blocks";
 import {

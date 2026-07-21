@@ -7,7 +7,7 @@ import {
 	McpTransportKind,
 	fingerprintTools,
 	mcpServerCapability,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import type { CapabilityLedger } from "../capabilities/ledger";

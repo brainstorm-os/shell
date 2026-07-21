@@ -1,11 +1,11 @@
-import { LIST_ENTITY_TYPE } from "@brainstorm/sdk";
+import { LIST_ENTITY_TYPE } from "@brainstorm-os/sdk";
 import {
 	type Entity,
 	type EntityQuery,
 	IconKind,
 	type List,
 	ListSourceKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	type ListEntitiesService,

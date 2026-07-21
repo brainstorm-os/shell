@@ -18,7 +18,7 @@
  * tree-shakes out of the production bundle.
  */
 
-import { ed25519Verify } from "@brainstorm/native";
+import { ed25519Verify } from "@brainstorm-os/native";
 import * as Y from "yjs";
 import { XCHACHA_NONCE_BYTES } from "../credentials/crypto";
 import { type MemberWrapPayload, wrapDekVersionOf } from "../credentials/member-wraps";

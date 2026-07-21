@@ -11,7 +11,7 @@
  * agent transcript (or an orphan) and must not leak into the glance tile.
  */
 
-import type { VaultEntitiesListQuery } from "@brainstorm/sdk-types";
+import type { VaultEntitiesListQuery } from "@brainstorm-os/sdk-types";
 import { CHANNEL_TYPE, MESSAGE_TYPE, sortMessages, toMessage } from "./logic/chat";
 
 /** Manifest widget id — must match `registrations.widgets[].id` in manifest.json. */

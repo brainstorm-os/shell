@@ -10,7 +10,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	coerceValue,

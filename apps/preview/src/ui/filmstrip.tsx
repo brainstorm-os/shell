@@ -5,13 +5,13 @@
  *
  * KBN-A-preview (filmstrip): the strip is a horizontal listbox via the
  * shared DOM composite-keyboard binding (`attachCompositeKeyboard` from
- * `@brainstorm/sdk/a11y`) — ArrowLeft/Right rove between thumbs, Enter/Space
+ * `@brainstorm-os/sdk/a11y`) — ArrowLeft/Right rove between thumbs, Enter/Space
  * activates. React renders the thumbs; the binding stamps roles + roving
  * tabindex and is re-applied (`refresh()`) after each render so the cursor
  * mirrors the current file index.
  */
 
-import { Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { type ReactElement, useEffect, useRef } from "react";
 import type { PreviewFile } from "../demo/dataset";
 import { ThumbUrlCache, kindClassFor, kindGlyphFor } from "./filmstrip-thumb";

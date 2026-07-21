@@ -1,4 +1,4 @@
-import { StoredAssetKind } from "@brainstorm/sdk-types";
+import { StoredAssetKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, test, vi } from "vitest";
 import { AssetKind } from "../assets/asset-types";
 import type { AssetRecord } from "../storage/entities-repo";

@@ -18,8 +18,8 @@
  * is the rollback escape-hatch (see `migrate-body.ts` §Reversibility).
  */
 
-import { coerceNoteReferences } from "@brainstorm/sdk/note-references";
-import { migrateValuesField } from "@brainstorm/sdk/property-ui/pure";
+import { coerceNoteReferences } from "@brainstorm-os/sdk/note-references";
+import { migrateValuesField } from "@brainstorm-os/sdk/property-ui/pure";
 import type { SerializedEditorState } from "lexical";
 import { NOTE_KEY_PREFIX, type StoredNote, readCover, readIcon } from "./note";
 

@@ -17,7 +17,7 @@
  * lifecycle logic is unit-testable without spawning a real process.
  */
 
-import type { McpToolDescriptor } from "@brainstorm/sdk-types";
+import type { McpToolDescriptor } from "@brainstorm-os/sdk-types";
 import {
 	MCP_CALL_TIMEOUT_MS,
 	MCP_DISCOVERY_TIMEOUT_MS,

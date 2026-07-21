@@ -5,7 +5,7 @@
  * tests are the security surface.
  */
 
-import { PEER_COLORS } from "@brainstorm/sdk/peer-presence";
+import { PEER_COLORS } from "@brainstorm-os/sdk/peer-presence";
 import { describe, expect, it } from "vitest";
 import {
 	PRESENCE_FIELD,

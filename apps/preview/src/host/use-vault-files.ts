@@ -10,7 +10,7 @@
  * empty snapshot and an empty sidebar, no special-casing the caller.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { useMemo } from "react";
 import type { PreviewFile } from "../demo/dataset";
 import { FILE_ENTITY_TYPE, previewFilesFromEntities } from "../logic/vault-files";

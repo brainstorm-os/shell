@@ -219,7 +219,7 @@ body {
 }
 
 /* History suggestions render through the shared typeahead runtime (anchored
- * under the omnibox); the dropdown chrome lives in `@brainstorm/sdk/menus`. */
+ * under the omnibox); the dropdown chrome lives in `@brainstorm-os/sdk/menus`. */
 
 .browser__omnibox {
 	flex: 1;

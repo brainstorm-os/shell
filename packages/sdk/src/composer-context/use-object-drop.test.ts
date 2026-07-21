@@ -1,4 +1,4 @@
-import { AttachmentKind } from "@brainstorm/sdk-types";
+import { AttachmentKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { objectItemToAttachment } from "./object-attachment";
 

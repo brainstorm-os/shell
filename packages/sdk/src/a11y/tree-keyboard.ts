@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/a11y` tree-walk controller — the pure half of
+ * `@brainstorm-os/sdk/a11y` tree-walk controller — the pure half of
  * `useTreeKeyboard`. The caller flattens its visible tree into an array
  * (nodes inside a collapsed parent are omitted); the controller walks that
  * array and emits collapse / expand toggles via a callback. This keeps the

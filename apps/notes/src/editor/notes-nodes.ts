@@ -8,7 +8,7 @@
  * quietly strip the bookmark. Pin the set in one place.
  */
 
-import { CalloutNode, ColumnNode, ColumnsNode, TitleNode, ToggleNode } from "@brainstorm/editor";
+import { CalloutNode, ColumnNode, ColumnsNode, TitleNode, ToggleNode } from "@brainstorm-os/editor";
 import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";

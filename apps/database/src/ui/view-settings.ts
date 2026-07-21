@@ -18,11 +18,11 @@
  * without a host round-trip.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { createCheckbox } from "@brainstorm/sdk/checkbox";
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { createSelectMenu } from "@brainstorm/sdk/select-menu";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { createSelectMenu } from "@brainstorm-os/sdk/select-menu";
 import {
 	ColumnAdderOptionKind,
 	appendColumnForProperty,

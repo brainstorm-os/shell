@@ -1,7 +1,7 @@
 /**
  * Preview comments bindings — the exact mirror of Journal's
  * `comments-bindings.ts`: hand the Preview runtime services to the shared
- * `@brainstorm/editor` comments hook so the inspector's Comments tab is live.
+ * `@brainstorm-os/editor` comments hook so the inspector's Comments tab is live.
  * All bridge logic (codec / filter / cache / liveness via `useVaultEntities`)
  * lives in the shared `useEntityCommentsAdapter`.
  *
@@ -14,7 +14,7 @@ import {
 	type CommentMutationsService,
 	type CommentsAdapter,
 	useEntityCommentsAdapter,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { useMemo } from "react";
 import { getPreviewRuntime } from "../host/runtime";
 

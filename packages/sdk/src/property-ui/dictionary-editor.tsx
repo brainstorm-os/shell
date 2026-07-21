@@ -15,7 +15,7 @@
  * Space→arrows→Space via the shortcut registry — no raw `e.key`.
  */
 
-import type { Dictionary, DictionaryItem, PropertyDef } from "@brainstorm/sdk-types";
+import type { Dictionary, DictionaryItem, PropertyDef } from "@brainstorm-os/sdk-types";
 import { type JSX, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { openAnchoredMenu } from "../object-menu";
 import { SelectMenu } from "../select-menu";

@@ -1,7 +1,7 @@
 /**
  * Syntax-theme preference for the code-editor's Shiki highlight (9.7.9).
  *
- * The shared tokenizer (`@brainstorm/sdk/code-highlight`) bundles exactly two
+ * The shared tokenizer (`@brainstorm-os/sdk/code-highlight`) bundles exactly two
  * Shiki themes — GitHub Light + GitHub Dark — loaded once at startup. This
  * module is the pure decision layer on top: the user picks a *preference*
  * (Auto / Light / Dark), the editor persists the string, and
@@ -17,7 +17,7 @@
  * and the unknown-value fallback.
  */
 
-import { HighlightTheme } from "@brainstorm/sdk/code-highlight";
+import { HighlightTheme } from "@brainstorm-os/sdk/code-highlight";
 
 /** A persisted syntax-theme choice. `Auto` tracks the shell appearance; the
  *  others pin one of the two bundled Shiki themes. Wire format is the string

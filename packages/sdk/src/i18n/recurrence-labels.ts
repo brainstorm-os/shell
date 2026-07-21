@@ -11,7 +11,7 @@
  * manifest keys.
  */
 
-import type { RecurrenceSummaryLabels } from "@brainstorm/sdk-types";
+import type { RecurrenceSummaryLabels } from "@brainstorm-os/sdk-types";
 
 /** Resolves a recurrence phrase by its key *suffix* (e.g. `"everyNDays"`,
  *  `"ordinal.first"`) within the caller's own namespace. */

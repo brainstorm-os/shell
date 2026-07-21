@@ -17,7 +17,7 @@
  * cursor, say) contributes no avatar — it's skipped, not rendered blank.
  *
  * Pure + dependency-free: takes a structural `ReadonlyMap<number, state>` so
- * the SDK module needn't import `@brainstorm/react-yjs`.
+ * the SDK module needn't import `@brainstorm-os/react-yjs`.
  */
 
 import { peerColor } from "../peer-presence";

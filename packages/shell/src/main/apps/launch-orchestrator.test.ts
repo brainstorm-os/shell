@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ThemeName } from "@brainstorm/tokens";
+import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import { DashboardStore } from "../dashboard/dashboard-store";

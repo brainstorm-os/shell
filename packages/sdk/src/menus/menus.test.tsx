@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Foundation tests for `@brainstorm/sdk/menus`:
+ * Foundation tests for `@brainstorm-os/sdk/menus`:
  *   - locale defaults + partial-override merge (SDK i18n convention)
  *   - the suppression seam: an open menu silences global single-key chords
  *     (`store.isOpen()` flows into the shortcut suppression registry), and

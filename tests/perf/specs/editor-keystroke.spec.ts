@@ -3,7 +3,7 @@
  *
  * 13.4a.2 extends the original empty-doc bench (the hand-off explicitly
  * deferred by 9.3.5.N5) into a parameterised sweep over
- * `LARGE_DOC_PROFILES` (`@brainstorm/editor`). The new pass measures the
+ * `LARGE_DOC_PROFILES` (`@brainstorm-os/editor`). The new pass measures the
  * post-virtualization (13.4a.1 Phase-1) keystroke→paint at the doc sizes
  * the dogfood vault hits in practice — the numbers that decide whether
  * 13.4a.3 must also build Phase-2 reconciliation-windowing or whether

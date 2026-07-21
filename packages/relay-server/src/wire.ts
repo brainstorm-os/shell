@@ -1,7 +1,7 @@
 /**
  * Stage 10.4 — minimal wire decoder duplicated into the relay-server.
  *
- * The relay deliberately depends on **nothing** from `@brainstorm/shell`.
+ * The relay deliberately depends on **nothing** from `@brainstorm-os/shell`.
  * It must be deployable as its own process (and eventually as a tiny
  * standalone binary) without dragging in any shell modules. The wire
  * format is the structural surface — `routing-header.ts` /

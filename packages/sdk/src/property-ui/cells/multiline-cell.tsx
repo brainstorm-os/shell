@@ -6,7 +6,7 @@
  * blur commits, Escape reverts). Scalar Text only.
  */
 
-import type { CellProps } from "@brainstorm/sdk-types";
+import type { CellProps } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import { coerceValue } from "../../properties-validate";

@@ -19,7 +19,7 @@
  * closes the flow (the actual vault-import path lands at 10.5c).
  */
 
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PairingScanPayloadResult } from "../../preload";
 import { t } from "../i18n/t";

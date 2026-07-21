@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm/react-yjs";
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import { YDocProvider, createYDocResolver, getUniversalBody } from "@brainstorm-os/react-yjs";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

@@ -8,7 +8,7 @@
  * The cover is read off the object's reserved universal `properties.cover`
  * (never keyed off `entity.type` — the rejected anti-pattern, same as
  * icons). Resolution + focal geometry + the id-seeded fallback live in
- * the shared pure keystone `@brainstorm/sdk/entity-cover`, so this
+ * the shared pure keystone `@brainstorm-os/sdk/entity-cover`, so this
  * component and the non-React `createEntityCoverElement` twin paint
  * identically.
  *
@@ -21,13 +21,13 @@
  *  owns the per-context band height.
  */
 
-import type { Cover } from "@brainstorm/sdk-types";
+import type { Cover } from "@brainstorm-os/sdk-types";
 import {
 	CoverRenderKind,
 	type CoverSubject,
 	DEFAULT_COVER_ASPECT,
 	resolveCoverBackground,
-} from "@brainstorm/sdk/entity-cover";
+} from "@brainstorm-os/sdk/entity-cover";
 import { useRef, useState } from "react";
 
 export type EntityCoverProps = {

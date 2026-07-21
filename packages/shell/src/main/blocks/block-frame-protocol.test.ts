@@ -4,7 +4,7 @@
  * electron's `protocol` is mocked so the module imports under vitest.
  */
 
-import { BLOCK_FRAME_CSP } from "@brainstorm/sdk/block-frame";
+import { BLOCK_FRAME_CSP } from "@brainstorm-os/sdk/block-frame";
 import { describe, expect, it, vi } from "vitest";
 import type { BlocksRepository } from "../storage/registry-repo/blocks-repo";
 

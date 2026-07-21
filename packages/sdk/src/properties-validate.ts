@@ -32,7 +32,7 @@ import {
 	type PropertyValueByValueType,
 	ValueType,
 	isMultiValued,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type ValidationResult = { ok: true } | { ok: false; errors: readonly string[] };
 

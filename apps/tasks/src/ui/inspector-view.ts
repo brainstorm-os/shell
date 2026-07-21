@@ -15,11 +15,11 @@
  * location), so this view has no close affordance of its own.
  */
 
-import type { Recurrence, RecurrenceSummaryLabels } from "@brainstorm/sdk-types";
+import type { Recurrence, RecurrenceSummaryLabels } from "@brainstorm-os/sdk-types";
 import {
 	type RecurrenceEditorLabels,
 	createRecurrenceEditor,
-} from "@brainstorm/sdk/recurrence-editor";
+} from "@brainstorm-os/sdk/recurrence-editor";
 import { t } from "../i18n/t";
 import type { Task, TaskComment } from "../types/task";
 import { renderCompletionToggle, renderEditableName } from "./task-row";

@@ -1,6 +1,6 @@
 /**
  * clip-plain-text — single source of truth for the body snippet
- * clip-and-ellipsis primitive shared by every `@brainstorm/editor`
+ * clip-and-ellipsis primitive shared by every `@brainstorm-os/editor`
  * consumer's autosave denormaliser and list/preview fallbacks. The
  * whitespace-collapse pass is idempotent on already-collapsed input (a
  * producer like `extractPlainText` that already collapses doesn't

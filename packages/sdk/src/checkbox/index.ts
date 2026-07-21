@@ -5,7 +5,7 @@
  * box mirrors its state through the native `:checked` / `:indeterminate`
  * sibling selectors — no JS state-sync needed.
  *
- * The CSS ships in `app-theme.css` (apps) and as the `@brainstorm/sdk/checkbox`
+ * The CSS ships in `app-theme.css` (apps) and as the `@brainstorm-os/sdk/checkbox`
  * subpath (shell). Glyph markup lives here so no app hand-rolls the SVG tick
  * ([[no-inline-glyphs]]). React apps render the `<Checkbox>` twin (also
  * exported here) for the same chrome without mounting DOM imperatively.

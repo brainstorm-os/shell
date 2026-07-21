@@ -1,4 +1,4 @@
-import { PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import { PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { buildContactProperties, seedContactProperties } from "./contact-properties";
 

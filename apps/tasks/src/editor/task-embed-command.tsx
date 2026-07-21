@@ -10,7 +10,7 @@
  * chrome; the command catalogue stays app-local (per `block-command.ts`).
  */
 
-import { type BlockCommand, CommandCategory, TodoListIcon } from "@brainstorm/editor";
+import { type BlockCommand, CommandCategory, TodoListIcon } from "@brainstorm-os/editor";
 import { $getSelection, $isRangeSelection, type LexicalEditor } from "lexical";
 import { t } from "../i18n/t";
 import { taskEmbedPickerStore } from "./task-embed-picker-store";

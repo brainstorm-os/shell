@@ -5,9 +5,9 @@
  * routes through the same `<SmartFolderNamePopover>` the save flow uses.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n";
 import { SearchScope } from "../logic/search";
 import type { SmartFolder } from "../logic/smart-folders";

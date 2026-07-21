@@ -3,7 +3,7 @@
  * conventions.md §Keyboard handling and
  * §Keyboard map.
  *
- * The actual key matching + binding now lives in `@brainstorm/sdk/shortcut`
+ * The actual key matching + binding now lives in `@brainstorm-os/sdk/shortcut`
  * (the B-2 shared shortcut layer — `useShortcut` / `attachShortcut` /
  * `matchesChord`). This module is reduced to the canonical map of Files
  * action ids → default chords; the React renderer feeds each chord into

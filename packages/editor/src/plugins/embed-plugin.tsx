@@ -12,7 +12,7 @@
  * favicon with a glyph fallback.
  */
 
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { $createLinkNode } from "@lexical/link";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRegister } from "@lexical/utils";

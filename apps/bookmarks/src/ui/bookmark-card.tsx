@@ -12,13 +12,13 @@
  * imperative version relied on.
  */
 
-import { CoverKind } from "@brainstorm/sdk-types";
-import type { CompositeItemProps } from "@brainstorm/sdk/a11y";
-import { createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { ObjectMenuMoreButton, openObjectMenu } from "@brainstorm/sdk/object-menu";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
+import { CoverKind } from "@brainstorm-os/sdk-types";
+import type { CompositeItemProps } from "@brainstorm-os/sdk/a11y";
+import { createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { ObjectMenuMoreButton, openObjectMenu } from "@brainstorm-os/sdk/object-menu";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n/manifest";
 import { CONTENT_KIND_LABEL_KEY, classifyMediaType, hasDistinctKind } from "../logic/content-kind";

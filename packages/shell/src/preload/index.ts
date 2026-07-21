@@ -8,8 +8,8 @@ import {
 	OsHandoffPromptDecision,
 	type PinResolution,
 	type PropertyDef,
-} from "@brainstorm/sdk-types";
-import type { ThemeName } from "@brainstorm/tokens";
+} from "@brainstorm-os/sdk-types";
+import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
 	AppearanceMode,
@@ -1470,7 +1470,7 @@ export const shortcuts = {
  *  stamps `rung` (and `refusal` on Refused) on every
  *  `IntentDispatchResult` (`OpenRes-1c data layer`, 2026-05-23).
  *  Re-exported as values so the renderer can `switch (result.rung)`. */
-export { OpenRefusal, OpenRung } from "@brainstorm/sdk-types";
+export { OpenRefusal, OpenRung } from "@brainstorm-os/sdk-types";
 
 /** Window-index surface (privileged — only the dashboard renderer reads).
  *  Types + enums live in `../shared/window-types` so renderer code can

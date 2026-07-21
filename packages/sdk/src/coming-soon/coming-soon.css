@@ -1,6 +1,6 @@
 /**
  * Styling for the shared `mountComingSoon` placeholder surface. Lives as a
- * subpath CSS export (`@brainstorm/sdk/coming-soon/coming-soon.css`) the
+ * subpath CSS export (`@brainstorm-os/sdk/coming-soon/coming-soon.css`) the
  * stub app imports once, mirroring `searchbar/searchbar.css` etc. Tokens
  * only — no hard-coded palette, so it follows the active theme.
  */

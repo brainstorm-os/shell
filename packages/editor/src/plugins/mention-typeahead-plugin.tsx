@@ -23,13 +23,13 @@
  * for consistency with the slash menu + add-property menu.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type TypeaheadMenuItem,
 	closeTypeaheadMenu,
 	openTypeaheadMenu,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$createTextNode,

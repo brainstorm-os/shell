@@ -22,7 +22,7 @@ import {
 	WebViewMethod,
 	type WebViewRect,
 	type WebViewRequest,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import type { BaseWindowHandle } from "../apps/window-container";
 import { upgradeToHttps } from "./web-policy";

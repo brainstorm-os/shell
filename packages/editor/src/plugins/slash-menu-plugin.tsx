@@ -13,7 +13,7 @@
  * block type. Caret remains in the resulting block.
  *
  * Presentation: the popup is the shared **controlled-list** typeahead menu
- * (`@brainstorm/sdk/menus` `openTypeaheadMenu`) — the fancy-menus runtime in
+ * (`@brainstorm-os/sdk/menus` `openTypeaheadMenu`) — the fancy-menus runtime in
  * `focusOnMount:false` + `KeyboardNavigation.None` mode, so it renders +
  * positions but never grabs focus or handles keys. The editor keeps focus and
  * owns the keyboard (the Lexical commands below), driving the runtime's
@@ -28,7 +28,7 @@
  * omitted the menu still mounts but renders nothing (no rows to show).
  */
 
-import { closeTypeaheadMenu, openTypeaheadMenu } from "@brainstorm/sdk/menus";
+import { closeTypeaheadMenu, openTypeaheadMenu } from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$getNodeByKey,
@@ -53,7 +53,7 @@ type MenuState = {
 
 export type SlashMenuPluginProps = {
 	/** Command catalogue surfaced in the menu. Apps assemble their own
-	 *  (`@brainstorm/editor`'s `BlockCommand` type). When omitted the
+	 *  (`@brainstorm-os/editor`'s `BlockCommand` type). When omitted the
 	 *  menu mounts but renders no rows. */
 	commands?: readonly BlockCommand[];
 };

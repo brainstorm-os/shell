@@ -51,7 +51,7 @@ export type UseShortcutOptions = {
  *   useShortcut("io.example.editor/save", onSave, { target: { kind: "scope", ref: editorRef } });
  *
  * For Escape on overlay surfaces, prefer `useEscapeStackEntry` from
- * `@brainstorm/sdk/a11y` (KBN-2) — it pushes onto the renderer-wide LIFO
+ * `@brainstorm-os/sdk/a11y` (KBN-2) — it pushes onto the renderer-wide LIFO
  * the document-level Escape handler drains, so nested overlays unwind
  * topmost-first under one source of truth.
  */
@@ -111,7 +111,7 @@ export function matchesChord(event: KeyboardEvent, chord: string): boolean {
 	// system emits for user rebindings (Cmd on mac, Ctrl elsewhere) — same
 	// semantics as `CmdOrCtrl`. Without aliasing it, `Mod+a` parsed to "no
 	// modifier + a" and matched a PLAIN `a` keystroke once the override stream
-	// feeds `Mod+…` chords here. Mirrors `@brainstorm/sdk/shortcut`.
+	// feeds `Mod+…` chords here. Mirrors `@brainstorm-os/sdk/shortcut`.
 	const wantMeta = mods.includes("CmdOrCtrl") || mods.includes("Mod");
 	const wantCmd = mods.includes("Cmd") || (wantMeta && isMac);
 	const wantCtrl = mods.includes("Ctrl") || (wantMeta && !isMac);

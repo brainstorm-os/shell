@@ -4,7 +4,7 @@
  * Boots the real shell + seeded vault, opens the Code Editor, forces a second
  * tab (the strip only renders with 2+ tabs), and asserts the strip labels the
  * file tab with the OPEN OBJECT's name (published via
- * `@brainstorm/sdk/tab-identity` → `page-title-updated`), then that a
+ * `@brainstorm-os/sdk/tab-identity` → `page-title-updated`), then that a
  * published emoji favicon surfaces as the tab's icon
  * (`page-favicon-updated` → `ChromeTab.icon` → strip `<img>`). The encoding
  * is unit-tested in sdk-types/sdk; this proves the live Electron wiring.

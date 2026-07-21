@@ -18,7 +18,7 @@
  * (close) stays a local handler — it isn't a composite movement.
  */
 
-import { CompositeHost, Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { CompositeHost, Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 
 export type FuzzyPaletteLabels = {
 	/** `aria-label` for the dialog + the input. */

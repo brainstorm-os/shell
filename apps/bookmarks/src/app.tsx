@@ -22,32 +22,32 @@
  *     per-card action lives in the ⋯ object menu (right-click also opens it).
  */
 
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/editor/editor.css";
-import "@brainstorm/editor/editor-theme.css";
-import "@brainstorm/sdk/count-badge.css";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/editor/editor-theme.css";
+import "@brainstorm-os/sdk/count-badge.css";
 import "./types";
-import { type LiveEntitiesSource, YDocProvider, useLiveEntities } from "@brainstorm/react-yjs";
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { CountBadge } from "@brainstorm/sdk/count-badge";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { type LiveEntitiesSource, YDocProvider, useLiveEntities } from "@brainstorm-os/react-yjs";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { CountBadge } from "@brainstorm-os/sdk/count-badge";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import type {
 	ObjectMenuChromeLabels,
 	ObjectMenuExtraItem,
 	ObjectMenuRuntime,
 	OpenObjectMenuOptions,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import {
 	ObjectMenuMoreButton,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { openCoverPicker, openIconPicker } from "@brainstorm/sdk/picker-host";
-import { attachResizable } from "@brainstorm/sdk/resizable";
-import { useShortcut } from "@brainstorm/sdk/shortcut";
+} from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { openCoverPicker, openIconPicker } from "@brainstorm-os/sdk/picker-host";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
+import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type DragEvent as ReactDragEvent,
@@ -273,7 +273,7 @@ export function BookmarksApp() {
 	);
 
 	// Live bookmark list through the ONE shared reactivity stack
-	// (`@brainstorm/react-yjs`'s `useLiveEntities`). The hook owns the coarse
+	// (`@brainstorm-os/react-yjs`'s `useLiveEntities`). The hook owns the coarse
 	// vault-change subscription (cross-app edits + dev reseed fire it), the
 	// trailing-coalesce, and the first-subscribe load — replacing the per-app
 	// `signal → listAll → setState` loop. We only hand it a `LiveEntitiesSource`:

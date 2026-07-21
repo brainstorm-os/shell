@@ -25,7 +25,7 @@ import {
 	type WorkflowStep,
 	aggregateWorkflowCapabilities,
 	missingCapabilities,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { UiNotification } from "../ui/notify-host";
 import type { ItemAlertRegistration } from "./item-alerts";
 import type { ReminderRunner } from "./reminder-runner";

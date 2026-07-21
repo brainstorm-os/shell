@@ -12,8 +12,8 @@
  * two-column layout the CSS expects.
  */
 
-import type { YDocHandle, YDocResolverApi } from "@brainstorm/react-yjs";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
+import type { YDocHandle, YDocResolverApi } from "@brainstorm-os/react-yjs";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
 import { type ForwardedRef, forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { CitationIndex } from "../logic/citation-index";
 import type { CodeFileRow } from "../logic/code-projection";

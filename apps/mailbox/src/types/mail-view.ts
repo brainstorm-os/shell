@@ -14,7 +14,7 @@ import {
 	type MailAddress,
 	type MailAttachmentPart,
 	MailFlag,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export { EMAIL_TYPE_URL, MAIL_ACCOUNT_TYPE_URL, MAIL_FOLDER_TYPE_URL, FolderRole, MailFlag };
 export type { MailAddress, MailAttachmentPart };

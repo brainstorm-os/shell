@@ -8,7 +8,7 @@
  * typeahead, the empty-paragraph hint, and marquee block selection.
  *
  * Pair it with `additionalNodes={STANDARD_ADDITIONAL_NODES}` on
- * `<BrainstormEditor>` and import `@brainstorm/editor/editor-theme.css`
+ * `<BrainstormEditor>` and import `@brainstorm-os/editor/editor-theme.css`
  * once at app boot so the blocks are styled.
  *
  * Mentions, transclusion, entity embeds (`/embed` → `BlockEmbedNode`),

@@ -7,8 +7,8 @@
  * left blank.
  */
 
-import type { ReminderDef } from "@brainstorm/sdk-types";
-import type { CalendarPopoverOptions } from "@brainstorm/sdk/calendar";
+import type { ReminderDef } from "@brainstorm-os/sdk-types";
+import type { CalendarPopoverOptions } from "@brainstorm-os/sdk/calendar";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { defaultDue } from "../logic/reminder-capture";
@@ -18,12 +18,12 @@ import { RemindersView } from "./reminders-view";
 // Capture the popover options so a test can drive `onSelect` (the picked-day
 // callback) the way clicking a day in the real shared calendar would.
 const openCalendarPopover = vi.fn();
-vi.mock("@brainstorm/sdk/calendar", () => ({
+vi.mock("@brainstorm-os/sdk/calendar", () => ({
 	openCalendarPopover: (opts: CalendarPopoverOptions) => openCalendarPopover(opts),
 }));
 // The time half is the shared <SelectMenu>; render a minimal stand-in so the
 // capture test doesn't depend on the fancy-menus runtime.
-vi.mock("@brainstorm/sdk/select-menu", () => ({
+vi.mock("@brainstorm-os/sdk/select-menu", () => ({
 	SelectMenu: ({ value, ariaLabel }: { value: string; ariaLabel: string }) => (
 		<button type="button" className="au-capture__due-time" aria-label={ariaLabel}>
 			{value}

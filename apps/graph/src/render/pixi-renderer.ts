@@ -61,7 +61,7 @@ import {
 	computeViewBounds,
 	nodeInView,
 	viewportUsable,
-} from "@brainstorm/sdk/frustum-cull";
+} from "@brainstorm-os/sdk/frustum-cull";
 import { IconKind } from "../types/icon";
 import { type EdgeGeometryInput, buildEdgeBatches } from "./edge-batch";
 import type { LayoutNode } from "./force-layout";

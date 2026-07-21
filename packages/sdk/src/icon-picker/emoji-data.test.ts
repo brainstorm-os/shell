@@ -1,4 +1,4 @@
-import { SkinTone } from "@brainstorm/sdk-types";
+import { SkinTone } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { SKIN_TONE_BASE_CHARS, applySkinTone, emojiFilename } from "./emoji-data";
 

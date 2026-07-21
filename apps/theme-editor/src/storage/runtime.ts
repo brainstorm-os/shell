@@ -10,7 +10,7 @@
  * to the in-memory `DEFAULT_THEME_COMPOSITE` per [[preview-drop-pattern]].
  */
 
-import type { TokenSetAppearance, VaultEntitiesService } from "@brainstorm/sdk-types";
+import type { TokenSetAppearance, VaultEntitiesService } from "@brainstorm-os/sdk-types";
 
 export type EntityRecord = {
 	id: string;
@@ -61,7 +61,7 @@ export type ThemeEditorBrainstorm = {
 		intents?: IntentsService;
 		theme?: ThemePreviewService;
 		/** Coarse vault-change signal — the sanctioned reactivity source
-		 *  (`@brainstorm/react-yjs` `useLiveEntities`) used to keep the saved-
+		 *  (`@brainstorm-os/react-yjs` `useLiveEntities`) used to keep the saved-
 		 *  theme + installed-icon-pack lists live across other-device writes. */
 		vaultEntities?: VaultEntitiesService;
 	} | null;

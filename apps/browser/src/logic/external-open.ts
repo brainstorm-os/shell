@@ -8,7 +8,7 @@
  * front door).
  */
 
-import type { Intent, LaunchContext } from "@brainstorm/sdk-types";
+import type { Intent, LaunchContext } from "@brainstorm-os/sdk-types";
 
 const WEB_URL_PATTERN = /^https?:\/\//i;
 const OPEN_VERB = "open";

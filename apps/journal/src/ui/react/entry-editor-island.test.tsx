@@ -13,8 +13,8 @@
  * (the revived replica) than the pre-recovery one.
  */
 
-import { createYDocResolver } from "@brainstorm/react-yjs";
-import { useYDoc } from "@brainstorm/react-yjs";
+import { createYDocResolver } from "@brainstorm-os/react-yjs";
+import { useYDoc } from "@brainstorm-os/react-yjs";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

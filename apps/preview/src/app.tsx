@@ -12,12 +12,12 @@
  * enriched `{ context, siblings }` push through `runtime.on("intent")`.
  */
 
-import { RightPanelTab } from "@brainstorm/editor";
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { requestSaveBytes } from "@brainstorm/sdk/export-file";
-import { IconName } from "@brainstorm/sdk/icon";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
+import { RightPanelTab } from "@brainstorm-os/editor";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { requestSaveBytes } from "@brainstorm-os/sdk/export-file";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewFile } from "./demo/dataset";
 import { type GalleryState, resolveOpenPayload, toPreviewFiles } from "./host/apply-open";
@@ -76,7 +76,7 @@ function extensionOf(name: string): string | null {
 	return name.slice(dot + 1).toLowerCase();
 }
 
-/** Right-panel open state — window-scoped (`@brainstorm/sdk/panel-state`):
+/** Right-panel open state — window-scoped (`@brainstorm-os/sdk/panel-state`):
  *  a fresh Preview window always starts with the inspector closed. */
 const INSPECTOR_PREF_KEY = "preview:inspector-open";
 function readInspectorPref(): boolean {

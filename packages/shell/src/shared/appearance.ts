@@ -27,7 +27,7 @@
  * CLAUDE.md guidance).
  */
 
-import { type ThemeName, themeAppearance } from "@brainstorm/tokens";
+import { type ThemeName, themeAppearance } from "@brainstorm-os/tokens";
 
 export enum AppearanceMode {
 	Light = "light",

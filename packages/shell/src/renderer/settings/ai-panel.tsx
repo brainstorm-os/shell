@@ -13,7 +13,7 @@ import {
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { AiAppBudgetView, AiSettingsView, AiUsageWindowView } from "../../preload";
 import { t } from "../i18n/t";

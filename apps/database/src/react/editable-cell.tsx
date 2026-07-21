@@ -1,6 +1,6 @@
 /**
  * EditableCell — the one bridge that makes a Database property value
- * editable in place, reusing the shared `@brainstorm/sdk` property cells
+ * editable in place, reusing the shared `@brainstorm-os/sdk` property cells
  * (the same cells the properties panel + editor block use). Drop-in for
  * the read-only `paintPropertyValue` `<DomSlot>` every view used before.
  *
@@ -17,8 +17,8 @@
  * editors work; this component itself is provider-agnostic.
  */
 
-import { type PropertyDef, defaultViewFor } from "@brainstorm/sdk-types";
-import { getCell } from "@brainstorm/sdk/property-ui";
+import { type PropertyDef, defaultViewFor } from "@brainstorm-os/sdk-types";
+import { getCell } from "@brainstorm-os/sdk/property-ui";
 import type { ReactElement } from "react";
 import { toCellValue, toDbValue } from "../logic/db-cell-bridge";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";

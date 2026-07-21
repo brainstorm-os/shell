@@ -1,4 +1,4 @@
-import { OpenQuestionStatus, SelfHostingEntityType } from "@brainstorm/sdk-types";
+import { OpenQuestionStatus, SelfHostingEntityType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { VaultEntity, VaultSnapshot } from "../runtime";
 import { CitationKind, buildCitationIndex, lookupCitation, normalizeCode } from "./citation-index";

@@ -16,7 +16,7 @@ import type {
 	SignedCatalog,
 } from "./catalog-wire-types";
 
-/** Ed25519 verify primitive (injected — production binds `@brainstorm/native`'s
+/** Ed25519 verify primitive (injected — production binds `@brainstorm-os/native`'s
  *  `ed25519Verify`; tests bind the same or a stub). Returns false on any bad
  *  input rather than throwing. */
 export type Ed25519Verify = (

@@ -11,7 +11,7 @@ import {
 	requestSaveBytes,
 	suggestedFilename,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
+} from "@brainstorm-os/sdk/export-file";
 import { t } from "../i18n/t";
 import { parseCalendar, serializeCalendar } from "../logic/ics";
 import type { CalendarFilesService } from "../storage/runtime";

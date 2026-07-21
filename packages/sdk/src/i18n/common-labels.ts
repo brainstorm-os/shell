@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/i18n` — the ONE localisation source for the SDK's
+ * `@brainstorm-os/sdk/i18n` — the ONE localisation source for the SDK's
  * shared cross-app surfaces (the icon + cover pickers). Every app embeds
  * the same `<IconPicker>` / `<CoverPicker>` chrome; rather than each app
  * re-declaring the same ~26 strings in its own `t()` manifest (or, worse,
@@ -75,7 +75,7 @@ export type CoverPickerLabels = {
 	galleryRegion: string;
 };
 
-/** The shared in-app back/forward control (`@brainstorm/sdk/nav-history`).
+/** The shared in-app back/forward control (`@brainstorm-os/sdk/nav-history`).
  *  Every app embeds the same two buttons; the canonical English lives here
  *  once so per-app `t()` manifests stay free of this boilerplate. */
 export type NavLabels = {

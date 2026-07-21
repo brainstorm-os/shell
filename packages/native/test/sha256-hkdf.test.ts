@@ -21,7 +21,7 @@ const hex = (bytes: Uint8Array) =>
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
-describe("@brainstorm/native — sha256 (NAPI-3b)", () => {
+describe("@brainstorm-os/native — sha256 (NAPI-3b)", () => {
 	it("matches @noble/hashes/sha2.js on the empty input (FIPS 180-4 anchor: e3b0c44…)", async () => {
 		const { sha256 } = await loadNative();
 		const empty = new Uint8Array(0);
@@ -59,7 +59,7 @@ describe("@brainstorm/native — sha256 (NAPI-3b)", () => {
 	});
 });
 
-describe("@brainstorm/native — hkdfSha256 (NAPI-3b)", () => {
+describe("@brainstorm-os/native — hkdfSha256 (NAPI-3b)", () => {
 	it("matches @noble/hashes/hkdf.js across the pairing / at-rest call shapes", async () => {
 		const { hkdfSha256 } = await loadNative();
 		const cases: { ikm: Uint8Array; salt?: Uint8Array; info: Uint8Array; outLen: number }[] = [

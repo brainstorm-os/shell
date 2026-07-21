@@ -6,7 +6,7 @@
  * derivation (`sceneOptionsFrom`) that the Stage-2 React layer will read.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 
 import { DEMO_GRAPH, canonicalBerlinPattern } from "./demo/dataset";

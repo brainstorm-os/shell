@@ -10,9 +10,9 @@
  * Finder / Things and works on a single pointer.
  */
 
-import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { IconName } from "@brainstorm/sdk/icon";
+import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import { t } from "../i18n/t";
 import { PROJECT_TYPE } from "../storage/entities-repository";
 import type { Project } from "../types/project";

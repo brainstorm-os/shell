@@ -3,12 +3,12 @@
  * Returns short strings like "Today", "Tomorrow", "Yesterday", "Fri",
  * "May 28", or "May 28, 2027" depending on how far the date is from `now`.
  *
- * Thin wrapper over `@brainstorm/sdk/date-formatters` (shared with
+ * Thin wrapper over `@brainstorm-os/sdk/date-formatters` (shared with
  * Calendar): the Tasks variant shows a short weekday only for the upcoming
  * 2–6 days and is locale-aware.
  */
 
-import { formatGroupDate, formatRelativeDate } from "@brainstorm/sdk/date-formatters";
+import { formatGroupDate, formatRelativeDate } from "@brainstorm-os/sdk/date-formatters";
 import { t } from "../i18n/t";
 
 function labels() {

@@ -41,7 +41,7 @@ const DEFAULT_CHORDS: Record<string, string | null> = {
 	// closes the popover") still renders from this entry, but no renderer
 	// component binds it via `useShortcut` anymore. Escape on overlay surfaces
 	// is delivered by the document-level handler installed in `dashboard.tsx`
-	// (`installEscapeHandler` from `@brainstorm/sdk/a11y`) which drains the
+	// (`installEscapeHandler` from `@brainstorm-os/sdk/a11y`) which drains the
 	// LIFO of `useEscapeStackEntry` registrations.
 	"shell/popover.close": "Escape",
 	"shell/popover.confirm": "Enter",
@@ -54,7 +54,7 @@ const DEFAULT_CHORDS: Record<string, string | null> = {
 	"shell/list.cycle-previous": "Shift+Tab",
 
 	// App layer — the shared in-app back/forward every first-party app
-	// binds via `@brainstorm/sdk/nav-history` (NAV_*_CHORD). Apps bind
+	// binds via `@brainstorm-os/sdk/nav-history` (NAV_*_CHORD). Apps bind
 	// these directly (the SDK chord layer has no registry dependency); the
 	// ids here are the stable contract for the cheatsheet + the future
 	// live-override stream. Alt+Arrow is a second binding the SDK adds.
@@ -62,7 +62,7 @@ const DEFAULT_CHORDS: Record<string, string | null> = {
 	"app/nav.forward": "CmdOrCtrl+]",
 
 	// In-document find & replace (B9.1c), bound in every text app via
-	// `@brainstorm/sdk/find-replace` `attachFindShortcuts`. As with nav,
+	// `@brainstorm-os/sdk/find-replace` `attachFindShortcuts`. As with nav,
 	// apps bind directly — these ids are the stable cheatsheet contract.
 	// One representative chord each (the SDK binds the full set incl. the
 	// input-local Enter/Shift+Enter).

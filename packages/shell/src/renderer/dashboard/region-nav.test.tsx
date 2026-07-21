@@ -11,7 +11,7 @@
  * `useRegionNavigation` hook; the live surface is exercised on perf-CI.
  */
 
-import { RegionId, useRegionNavigation } from "@brainstorm/sdk/a11y";
+import { RegionId, useRegionNavigation } from "@brainstorm-os/sdk/a11y";
 import { act, useMemo, useRef, useState } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

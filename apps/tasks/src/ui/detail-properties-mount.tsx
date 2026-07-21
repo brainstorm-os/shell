@@ -15,9 +15,9 @@
  * the caller simply skips the block.
  */
 
-import type { PropertiesService } from "@brainstorm/sdk-types";
-import { PropertiesPanel } from "@brainstorm/sdk/properties-panel";
-import { type EntityTitleSource, PropertiesProvider } from "@brainstorm/sdk/property-ui";
+import type { PropertiesService } from "@brainstorm-os/sdk-types";
+import { PropertiesPanel } from "@brainstorm-os/sdk/properties-panel";
+import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
 import { type Root, createRoot } from "react-dom/client";
 import { t } from "../i18n/t";
 import {

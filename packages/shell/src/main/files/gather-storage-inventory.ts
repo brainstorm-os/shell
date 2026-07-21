@@ -8,7 +8,7 @@
  */
 
 import { join } from "node:path";
-import type { StoredAsset } from "@brainstorm/sdk-types";
+import type { StoredAsset } from "@brainstorm-os/sdk-types";
 import type { AssetRecord } from "../storage/entities-repo";
 import { type FsStoreFile, buildStorageInventory } from "./storage-inventory";
 

@@ -23,12 +23,12 @@
  * block-level node like BlockEmbedNode.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import {
 	type TypeaheadMenuItem,
 	closeTypeaheadMenu,
 	openTypeaheadMenu,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
 	$createParagraphNode,

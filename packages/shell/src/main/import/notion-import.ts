@@ -23,8 +23,8 @@
  * and richer fidelity is tied to the HTML-export path + the editor block dialect.
  */
 
-import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm/sdk";
-import type { List, MemberInclude, PropertyDef } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm-os/sdk";
+import type { List, MemberInclude, PropertyDef } from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { servedMimeForName } from "../files/upload-mime";

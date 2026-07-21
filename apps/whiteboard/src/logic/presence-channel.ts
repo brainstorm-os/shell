@@ -1,13 +1,17 @@
 /**
  * Presence channel — whiteboard's binding to the shared awareness primitives.
- * Re-exports the local no-transport ones from `@brainstorm/react-yjs`, and
+ * Re-exports the local no-transport ones from `@brainstorm-os/react-yjs`, and
  * delegates the real IPC transport to the shared SDK `presenceAwarenessFor`
- * (`@brainstorm/sdk/presence-stack`, PRES-3b) — ONE implementation across the
+ * (`@brainstorm-os/sdk/presence-stack`, PRES-3b) — ONE implementation across the
  * fleet — bound to the whiteboard entity type.
  */
 
-import { type LocalAwareness, createLocalAwareness, randomClientId } from "@brainstorm/react-yjs";
-import { presenceAwarenessFor as presenceAwarenessForEntity } from "@brainstorm/sdk/presence-stack";
+import {
+	type LocalAwareness,
+	createLocalAwareness,
+	randomClientId,
+} from "@brainstorm-os/react-yjs";
+import { presenceAwarenessFor as presenceAwarenessForEntity } from "@brainstorm-os/sdk/presence-stack";
 import { WHITEBOARD_TYPE } from "../storage/entities-repository";
 
 export { type LocalAwareness, createLocalAwareness, randomClientId };

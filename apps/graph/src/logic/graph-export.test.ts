@@ -223,7 +223,7 @@ describe("toSVG", () => {
 });
 
 describe("file-save format tables (9.13.13b)", () => {
-	// Generic helpers moved to `@brainstorm/sdk/export-file` and are tested
+	// Generic helpers moved to `@brainstorm-os/sdk/export-file` and are tested
 	// in `packages/sdk/src/export-file/export-file.test.ts` (per
 	// [[extract-to-sdk-at-copy-two]]). Graph-specific tables stay here.
 

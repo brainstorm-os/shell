@@ -1,10 +1,14 @@
-import type { Entity } from "@brainstorm/sdk-types";
+import {
+	BpErrorCode,
+	BpModule,
+	type BpRouterContext,
+	BpSource,
+} from "@brainstorm-os/block-protocol";
+import type { Entity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Envelope } from "../../ipc/envelope";
-import { BpErrorCode, BpModule, BpSource } from "./envelope";
 import { type EntitiesInvoker, makeBpGraphRouter } from "./graph-router";
-import type { BpRouterContext } from "./router";
 
 const ctx: BpRouterContext = {
 	app: "io.example.test",

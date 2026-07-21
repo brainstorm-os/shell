@@ -12,7 +12,7 @@
  * is ISO-8601 (weeks start Monday; week 1 holds the year's first Thursday).
  */
 
-import { MENTION_NODE_TYPE } from "@brainstorm/sdk/note-references";
+import { MENTION_NODE_TYPE } from "@brainstorm-os/sdk/note-references";
 import type { SerializedEditorState } from "lexical";
 import { JOURNAL_ENTRY_TYPE } from "../runtime";
 import { dateKeyForJournal } from "./journal-keys";

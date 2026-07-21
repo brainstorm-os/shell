@@ -15,11 +15,14 @@
  * are flat-list pseudo-subgraphs until 9.3.3.4.
  */
 
-import type { Entity, EntityQuery } from "@brainstorm/sdk-types";
+import {
+	BpErrorCode,
+	type BpModuleHandler,
+	type BpModuleResponse,
+} from "@brainstorm-os/block-protocol";
+import type { Entity, EntityQuery } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import { ServiceErrorName } from "../services/errors";
-import { BpErrorCode } from "./envelope";
-import type { BpModuleHandler, BpModuleResponse } from "./router";
 
 /** The slice of broker envelope the graph router needs to synthesise.
  *  We keep this typed so a future broker-envelope change touches one

@@ -17,7 +17,7 @@
  *     of how many values are present at any moment.
  *
  * The runtime helpers (validators, key generators, preset derivation)
- * live in `@brainstorm/sdk` so the type boundary stays clean.
+ * live in `@brainstorm-os/sdk` so the type boundary stays clean.
  */
 
 import type { Icon } from "./index";
@@ -54,7 +54,7 @@ export enum PropertyFormat {
 	Duration = "duration",
 	/** A read-only computed `number` whose value is the result of evaluating
 	 *  `PropertyDef.formula` (an arithmetic expression over the entity's other
-	 *  properties — `{qty} * {rate}`) via `@brainstorm/sdk/formula`. The cell is
+	 *  properties — `{qty} * {rate}`) via `@brainstorm-os/sdk/formula`. The cell is
 	 *  never editable; nothing is stored on the entity for this property. */
 	Formula = "formula",
 }
@@ -204,7 +204,7 @@ export type PropertyDef = {
 	currency?: string;
 	/** Arithmetic expression over the entity's other properties (keys in
 	 *  `{braces}`, e.g. `{qty} * {rate}`). Applies to `number + format=formula`;
-	 *  evaluated read-only per entity via `@brainstorm/sdk/formula`. */
+	 *  evaluated read-only per entity via `@brainstorm-os/sdk/formula`. */
 	formula?: string;
 	/** Effective domain of this def. Omitted (the default) means an unscoped
 	 *  vault-global property — today's behavior. `{ kind: "list", target }`
@@ -388,7 +388,7 @@ export const KIND_PRESET_ORDER: readonly PropertyKindPreset[] = Object.freeze([
 ]);
 
 /** Default (valueType, modifier) tuple a preset should construct.
- *  Used by `defForPreset(preset, opts)` in `@brainstorm/sdk` to
+ *  Used by `defForPreset(preset, opts)` in `@brainstorm-os/sdk` to
  *  build a fresh PropertyDef in the Settings constructor. */
 export type PresetDefaults = {
 	valueType: ValueType;

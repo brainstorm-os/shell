@@ -17,8 +17,12 @@
  * a document can't embed itself.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
-import { type SearchPickerItem, closeSearchPicker, openSearchPicker } from "@brainstorm/sdk/menus";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import {
+	type SearchPickerItem,
+	closeSearchPicker,
+	openSearchPicker,
+} from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useEffect } from "react";
 import { type EditorT, useEditorT } from "../i18n";

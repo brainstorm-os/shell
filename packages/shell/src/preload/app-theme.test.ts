@@ -40,7 +40,7 @@ describe("app-theme — runtime per-app icon vars (preload-side)", () => {
 	});
 });
 
-describe("@brainstorm/sdk/app-theme.css — build-time component sheet", () => {
+describe("@brainstorm-os/sdk/app-theme.css — build-time component sheet", () => {
 	const css = SDK_APP_THEME_CSS;
 
 	it("binds every alias to a canonical --color-* / --shadow-* token", () => {

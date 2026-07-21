@@ -35,7 +35,7 @@ import {
 	BLOCK_FRAME_ROOT_ID,
 	BLOCK_FRAME_SRCDOC,
 	makeBlockFrameUrl,
-} from "@brainstorm/sdk/block-frame";
+} from "@brainstorm-os/sdk/block-frame";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppInstaller } from "../apps/installer";

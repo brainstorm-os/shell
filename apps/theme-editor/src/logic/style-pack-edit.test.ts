@@ -1,4 +1,4 @@
-import { EMPTY_STYLE_PACK, STYLE_PACK_CSS_MIME } from "@brainstorm/sdk-types";
+import { EMPTY_STYLE_PACK, STYLE_PACK_CSS_MIME } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { hasStylePackCss, setStylePackCss, setStylePackName } from "./style-pack-edit";
 

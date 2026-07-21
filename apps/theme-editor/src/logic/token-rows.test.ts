@@ -1,4 +1,4 @@
-import { CANONICAL_TOKEN_NAMES } from "@brainstorm/sdk-types";
+import { CANONICAL_TOKEN_NAMES } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { groupTokens, isColorToken, sectionFor } from "./token-rows";
 

@@ -12,8 +12,8 @@
  * falls back to the in-memory demo dataset per [[preview-drop-pattern]].
  */
 
-import type { BpService, VaultEntitiesService } from "@brainstorm/sdk-types";
-import type { SaveFileService } from "@brainstorm/sdk/export-file";
+import type { BpService, VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 import type { NoteLike } from "./logic/journal-projection";
 
 export type VaultEntity = {

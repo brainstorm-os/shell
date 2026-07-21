@@ -2,7 +2,7 @@
  * Bookmark properties bridge (interim, kv-era). A bookmark's editable
  * attributes — URL, site, saved date, read/archived status — are vault
  * PROPERTIES, surfaced through the shared property-value cells
- * (`@brainstorm/sdk/property-ui`) rather than hand-rolled rows
+ * (`@brainstorm-os/sdk/property-ui`) rather than hand-rolled rows
  * ([[feedback-no-hand-rolled-property-panels]]).
  *
  * Bookmarks still store these as first-class `Bookmark` fields in the kv
@@ -26,8 +26,8 @@ import {
 	PropertyFormat,
 	PropertyView,
 	ValueType,
-} from "@brainstorm/sdk-types";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk-types";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n/manifest";
 import type { BookmarksMessageKey } from "../i18n/manifest";
 import { CONTENT_KIND_LABEL_KEY, ContentKind, classifyMediaType } from "../logic/content-kind";

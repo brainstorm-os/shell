@@ -14,7 +14,7 @@
  * surface paints a non-trivial render.
  */
 
-import { RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";
 

@@ -8,7 +8,7 @@
  *
  * Content-only: positioning + the host's background are the consumer's; this
  * fills its host and centres within it. Load the styles once per app:
- * `import "@brainstorm/sdk/empty-state.css"`.
+ * `import "@brainstorm-os/sdk/empty-state.css"`.
  */
 
 import type { ReactElement, ReactNode } from "react";

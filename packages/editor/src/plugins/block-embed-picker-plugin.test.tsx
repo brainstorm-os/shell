@@ -16,13 +16,13 @@
  *     the host store.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import {
 	BrainstormMenuProvider,
 	SEARCH_PICKER_ID,
 	type SearchPickerItem,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";

@@ -21,7 +21,7 @@ import { importMapperForExtension, runImport } from "./import-registry";
 
 /** Minimal slice of `FilesService` (Stage 9.10) the import flow needs.
  *  Narrowed here so callers don't depend on the full surface to wire one
- *  toolbar button. Mirrors `@brainstorm/sdk/export-file::SaveFileService`. */
+ *  toolbar button. Mirrors `@brainstorm-os/sdk/export-file::SaveFileService`. */
 export type ImportFileService = {
 	requestOpen(opts?: {
 		readonly title?: string;

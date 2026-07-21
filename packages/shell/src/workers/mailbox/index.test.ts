@@ -1,4 +1,4 @@
-import { FolderRole, MailFlag } from "@brainstorm/sdk-types";
+import { FolderRole, MailFlag } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Envelope, EnvelopeReplyOk } from "../../ipc/envelope";
 import { FakeMailDriver, type FakeServerState } from "../../main/mailbox/fake-mail-driver";

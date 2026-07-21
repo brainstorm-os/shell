@@ -6,7 +6,7 @@
  * enum, so a custom type carrying a `Date` property shows up automatically.
  */
 
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { type TKey, t } from "../i18n/t";
 import type { DateKeyInfo } from "./from-vault-entities";
 import {

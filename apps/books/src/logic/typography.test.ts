@@ -1,4 +1,4 @@
-import { FontRole, SYSTEM_TYPOGRAPHY, type TypographyDef } from "@brainstorm/sdk-types";
+import { FontRole, SYSTEM_TYPOGRAPHY, type TypographyDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TYPOGRAPHY,

@@ -1,11 +1,11 @@
 // Bridge to the shell's app preload. Available once the runtime fires `ready`.
 //
 // We type the bits of `window.brainstorm` that Notes uses today. Full SDK
-// typing comes from `@brainstorm/sdk-types` once we can import it cleanly
+// typing comes from `@brainstorm-os/sdk-types` once we can import it cleanly
 // from the app side (currently the SDK runtime is exposed by the preload,
 // not the package — TypeScript only needs the shape).
 
-import { type NavigationMode, openEntity as dispatchOpenVerb } from "@brainstorm/sdk";
+import { type NavigationMode, openEntity as dispatchOpenVerb } from "@brainstorm-os/sdk";
 import type {
 	BlocksService,
 	BpService,
@@ -17,7 +17,7 @@ import type {
 	SearchService,
 	SharingService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 type StorageValue = unknown;
 
@@ -167,7 +167,7 @@ export type NotesBrainstorm = {
 		bp?: BpService;
 		/** Files host service (Stage 9.10) — present when `files.write` is
 		 *  granted. Only the save half the B11.12 Export… flow needs is typed
-		 *  here; the full surface lives in `@brainstorm/sdk-types` as
+		 *  here; the full surface lives in `@brainstorm-os/sdk-types` as
 		 *  `FilesService`. Absent on older shells — Export… no-shows. */
 		files?: {
 			requestSave(opts?: {

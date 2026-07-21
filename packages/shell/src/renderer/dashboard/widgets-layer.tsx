@@ -7,7 +7,7 @@
  * corners, z-orders under menus / popovers / DevTools, and moves + resizes with
  * the card via CSS — none of the native-overlay glitches. The iframe has no
  * preload, so its `window.brainstorm` is the postMessage shim from
- * `@brainstorm/sdk/widget`; THIS layer is the parent half of that bridge: it
+ * `@brainstorm-os/sdk/widget`; THIS layer is the parent half of that bridge: it
  * maps each iframe's message `source` → its `appId` (which the sandboxed child
  * can't forge) and proxies the call to the capability-scoped main handlers via
  * `window.brainstorm.dashboard.widgetBridge`.
@@ -17,11 +17,11 @@
  * `removeWidget`); the snapshot round-trips back as the `widgets` prop.
  */
 
-import { IconName as MenuIcon } from "@brainstorm/sdk/icon";
-import { type ContextMenuItem, sdkMenuIcon } from "@brainstorm/sdk/menus";
-import { closeAnchoredMenu, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { widgetFrameOrigin, widgetIframeQuery } from "@brainstorm/sdk/widget";
-import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm/tokens";
+import { IconName as MenuIcon } from "@brainstorm-os/sdk/icon";
+import { type ContextMenuItem, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
+import { closeAnchoredMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { widgetFrameOrigin, widgetIframeQuery } from "@brainstorm-os/sdk/widget";
+import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm-os/tokens";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardWidget } from "../../preload";
 import { launchApp } from "../analytics/track-app-launch";

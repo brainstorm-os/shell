@@ -22,7 +22,7 @@
  * adding a one-off size requires a new variant, not a per-panel override.
  */
 
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import type { ChangeEvent, KeyboardEvent, ReactNode } from "react";
 import { forwardRef, useId } from "react";
 import { Icon, type IconName } from "./icon";

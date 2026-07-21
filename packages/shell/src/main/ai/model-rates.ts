@@ -23,7 +23,7 @@ import {
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** Micro-credits per credit (1 credit = 1e6 micro-credits). */
 export const CREDIT_MICROS = 1_000_000;

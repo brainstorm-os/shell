@@ -7,10 +7,10 @@
  * anchored menu — never a bespoke dropdown, and renders only when it has items.
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { type ReactElement, useCallback, useRef } from "react";
 import { t } from "../i18n";
 

@@ -1,4 +1,4 @@
-import { isAnyShortcutSuppressed } from "@brainstorm/sdk/shortcut";
+import { isAnyShortcutSuppressed } from "@brainstorm-os/sdk/shortcut";
 // @vitest-environment jsdom
 /**
  * B9.1c integration: FindPlugin wires the shared controller +

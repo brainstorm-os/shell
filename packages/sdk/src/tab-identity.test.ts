@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { IconKind, TAB_ICON_NONE } from "@brainstorm/sdk-types";
+import { IconKind, TAB_ICON_NONE } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it } from "vitest";
 import { publishTabIdentity } from "./tab-identity";
 

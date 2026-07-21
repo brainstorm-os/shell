@@ -5,7 +5,7 @@ import {
 	WORKFLOW_TYPE_URL,
 	type WorkflowDef,
 	type WorkflowStep,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type BuilderState, triggerStep } from "../logic/builder-model";
 import { type BuilderTrigger, emptyBuilderTrigger } from "../logic/builder-trigger";

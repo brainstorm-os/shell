@@ -27,7 +27,7 @@ import {
 	APP_DRAG_OVER_CHANNEL,
 	APP_DROP_CHANNEL,
 	DropEffect,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type {
 	DragGhostSpec,
 	DragOverNotice,
@@ -36,8 +36,8 @@ import type {
 	DragSessionInfo,
 	DropDelivery,
 	DropResult,
-} from "@brainstorm/sdk-types";
-import { hardenObjectDragItems, objectDragItemTypes } from "@brainstorm/sdk/entity-drag";
+} from "@brainstorm-os/sdk-types";
+import { hardenObjectDragItems, objectDragItemTypes } from "@brainstorm-os/sdk/entity-drag";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import type { WindowEntry } from "../../shared/window-types";
@@ -61,7 +61,7 @@ export const DND_EXPORT_CAPABILITY = "dnd.export-file";
  *  realistic single file; larger exports are refused (no OS drag started). */
 export const DND_EXPORT_MAX_BYTES = 256 * 1024 * 1024;
 
-/** Shell→target push channels (single home: `@brainstorm/sdk-types`, shared
+/** Shell→target push channels (single home: `@brainstorm-os/sdk-types`, shared
  *  with the app-preload forwarder). Re-exported for the existing tests. */
 export { APP_DRAG_LEAVE_CHANNEL, APP_DRAG_OVER_CHANNEL, APP_DROP_CHANNEL };
 

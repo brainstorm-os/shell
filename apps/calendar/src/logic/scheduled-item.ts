@@ -14,7 +14,7 @@
  * fixed named keys below.
  */
 
-import type { Icon, Recurrence } from "@brainstorm/sdk-types";
+import type { Icon, Recurrence } from "@brainstorm-os/sdk-types";
 
 /** Calendar-owned `Event/v1` rows — their start/end live in the event, not a
  *  catalog Date property, so they get a fixed source key. */

@@ -23,7 +23,7 @@
  *     in `memberIds` together (membership, not spatial containment).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 import type { RichRun } from "./rich-text";
 
 export enum NodeKind {

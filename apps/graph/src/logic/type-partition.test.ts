@@ -1,4 +1,4 @@
-import { ChildEntityType, SystemEntityType } from "@brainstorm/sdk/system-entities";
+import { ChildEntityType, SystemEntityType } from "@brainstorm-os/sdk/system-entities";
 import { describe, expect, it } from "vitest";
 import { partitionTypeOptions } from "./type-partition";
 

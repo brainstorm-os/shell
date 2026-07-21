@@ -37,7 +37,7 @@ import {
 	type AgentToolCall,
 	agentToolCapabilities,
 	capabilityImplies,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The verbs the curated tools dispatch. `open` is the universal cross-app
  *  navigation verb every type's owner app handles (doc 37) — it only routes /

@@ -1,12 +1,12 @@
 /**
  * Calendar's `RecurrenceSummaryLabels` pack — feeds the shared
  * `summarizeRecurrence` keystone the app's translated phrases. The builder
- * lives in `@brainstorm/sdk/recurrence-labels` (shared with Tasks); this
+ * lives in `@brainstorm-os/sdk/recurrence-labels` (shared with Tasks); this
  * wires it to the `calendar.recurrence.*` manifest namespace.
  */
 
-import type { RecurrenceSummaryLabels } from "@brainstorm/sdk-types";
-import { buildRecurrenceLabels } from "@brainstorm/sdk/recurrence-labels";
+import type { RecurrenceSummaryLabels } from "@brainstorm-os/sdk-types";
+import { buildRecurrenceLabels } from "@brainstorm-os/sdk/recurrence-labels";
 import { type TKey, t } from "./t";
 
 export function recurrenceLabels(): RecurrenceSummaryLabels {

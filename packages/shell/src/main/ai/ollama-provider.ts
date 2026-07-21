@@ -18,7 +18,7 @@ import {
 	type AiGenerateResult,
 	OLLAMA_PROVIDER_ID,
 	messageText,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { AiServiceError, type ModelProvider } from "./provider";
 
 /** Map our wire content to an Ollama chat message: text rides `content`, images

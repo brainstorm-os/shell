@@ -41,8 +41,8 @@ import {
 	LinkDirection,
 	collectCellIds,
 	validateLayout,
-} from "@brainstorm/sdk-types";
-import { resolveLayout } from "@brainstorm/sdk/layout-resolver";
+} from "@brainstorm-os/sdk-types";
+import { resolveLayout } from "@brainstorm-os/sdk/layout-resolver";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { makeBenchCorpus } from "../search/bench-corpus";

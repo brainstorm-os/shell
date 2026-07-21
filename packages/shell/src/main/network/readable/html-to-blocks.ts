@@ -5,7 +5,7 @@
  * (`packages/editor/src/plugins/block-clipboard.ts`), so a captured page drops
  * into a Bookmark's universal body with zero transform (9.18.5).
  *
- * It does NOT import `@brainstorm/editor` (that would pull `@lexical/html`,
+ * It does NOT import `@brainstorm-os/editor` (that would pull `@lexical/html`,
  * which the editor's own clipboard path deliberately avoids) — it emits the
  * JSON literally. Validity is pinned by the round-trip test, which parses the
  * output into a real `createBrainstormHeadlessEditor`.

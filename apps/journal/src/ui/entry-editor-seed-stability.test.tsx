@@ -22,7 +22,7 @@ const seenInitialStates: unknown[] = [];
 
 // Capture every `initialEditorState` the editor wrapper receives; render
 // children so the plugin tree still mounts (all stubbed to no-ops).
-vi.mock("@brainstorm/editor", () => {
+vi.mock("@brainstorm-os/editor", () => {
 	const Passthrough = ({ children }: { children?: unknown }) => children ?? null;
 	const Noop = () => null;
 	return {
@@ -45,7 +45,7 @@ vi.mock("@brainstorm/editor", () => {
 	};
 });
 
-vi.mock("@brainstorm/react-yjs", () => {
+vi.mock("@brainstorm-os/react-yjs", () => {
 	const doc = {};
 	return {
 		useYDoc: () => doc,

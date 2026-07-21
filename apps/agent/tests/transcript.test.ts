@@ -1,4 +1,4 @@
-import { MessageRole } from "@brainstorm/sdk-types";
+import { MessageRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { formatCitationLine } from "../src/logic/citation-format";
 import {

@@ -6,11 +6,11 @@
  * partially-clipped chips. Drag-to-reschedule + grid keyboard preserved.
  */
 
-import { DragPayloadKind } from "@brainstorm/sdk-types";
-import { attachGridCellKeyboard } from "@brainstorm/sdk/a11y";
-import { MonthGrid, type MonthGridReactCell } from "@brainstorm/sdk/calendar";
-import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm/sdk/object-dnd";
-import { openObjectMenu } from "@brainstorm/sdk/object-menu";
+import { DragPayloadKind } from "@brainstorm-os/sdk-types";
+import { attachGridCellKeyboard } from "@brainstorm-os/sdk/a11y";
+import { MonthGrid, type MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
+import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm-os/sdk/object-dnd";
+import { openObjectMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n/t";
 import {

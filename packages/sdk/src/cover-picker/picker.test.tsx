@@ -7,7 +7,7 @@
  * depends on.
  */
 
-import { type Cover, CoverKind } from "@brainstorm/sdk-types";
+import { type Cover, CoverKind } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

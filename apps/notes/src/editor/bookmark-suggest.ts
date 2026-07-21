@@ -10,7 +10,7 @@
  * URL normalization stays app-local on purpose — the SDK catalog only shares
  * the codec *primitives* (`nullableString`, enum coercion), not per-app URL
  * canonicalization (Bookmarks owns its own `normalizeUrl`; Notes owns this).
- * The shape mirrors `@brainstorm/editor`'s `parseHttpUrl` so a bookmark
+ * The shape mirrors `@brainstorm-os/editor`'s `parseHttpUrl` so a bookmark
  * minted here round-trips through the same Bookmarks codec.
  */
 

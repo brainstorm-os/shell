@@ -14,11 +14,11 @@
  * discriminator (`inline-transclusion`) and the inline DOM flag, so the
  * shell-side note-references walker reads both transclusion forms in one pass
  * and surfaces a single `Transclusion` edge per target. Schema is protocol —
- * the walker (`@brainstorm/sdk/note-references`) keys off the same `type`
+ * the walker (`@brainstorm-os/sdk/note-references`) keys off the same `type`
  * string, pinned by the extract-references parity test.
  */
 
-import { navModeFromEvent } from "@brainstorm/sdk";
+import { navModeFromEvent } from "@brainstorm-os/sdk";
 import {
 	type DOMConversionMap,
 	type DOMConversionOutput,

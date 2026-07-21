@@ -30,7 +30,7 @@
  * `syncedUpdatedAt` watermark.
  */
 
-import { CALDAV_CALENDAR_REF_PROP, type CalDavSyncSummary } from "@brainstorm/sdk-types";
+import { CALDAV_CALENDAR_REF_PROP, type CalDavSyncSummary } from "@brainstorm-os/sdk-types";
 import { type CalDavClient, type CalendarObject, DeleteOutcome, PutOutcome } from "./caldav-client";
 import { parseVEvent, serializeVEvent } from "./vevent-codec";
 

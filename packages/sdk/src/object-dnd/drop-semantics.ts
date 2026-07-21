@@ -8,7 +8,7 @@
  * app's `useDropTarget` `onDrop`; this is only the shared decision layer.
  */
 
-import { DropEffect } from "@brainstorm/sdk-types";
+import { DropEffect } from "@brainstorm-os/sdk-types";
 
 /** What a dropped object becomes at a target (design §Part III). */
 export enum DropSemantic {

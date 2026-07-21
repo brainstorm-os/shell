@@ -8,7 +8,7 @@
  * survives.
  */
 
-import { closeObjectMenu } from "@brainstorm/sdk/object-menu";
+import { closeObjectMenu } from "@brainstorm-os/sdk/object-menu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ENTITY_ID_ATTR, bindDelegatedObjectMenu, createMoreButton } from "./delegated-object-menu";
 

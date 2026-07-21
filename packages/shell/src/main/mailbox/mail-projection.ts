@@ -14,7 +14,7 @@ import {
 	type MailFolderDef,
 	deriveThreadKey,
 	parseAddressList,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { RawFolder, RawMessage } from "./mail-driver";
 import { sanitizeMailHtml } from "./mail-sanitize";
 

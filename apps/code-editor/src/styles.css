@@ -40,7 +40,7 @@ button {
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin, title
  * face) is the shared `.app-header` / `.app-header__title` pair in
- * `@brainstorm/sdk/app-theme.css`. */
+ * `@brainstorm-os/sdk/app-theme.css`. */
 
 .app-header__meta {
 	font-size: var(--text-size-xs);
@@ -659,7 +659,7 @@ button {
 
 /* ── Empty state ──────────────────────────────────────────────────── */
 
-/* The empty state renders through the shared `@brainstorm/sdk/empty-state`
+/* The empty state renders through the shared `@brainstorm-os/sdk/empty-state`
  * (Hero tone); this only makes it span the editor's grid columns. */
 .editor__empty {
 	grid-column: 1 / -1;

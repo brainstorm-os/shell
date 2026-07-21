@@ -46,7 +46,7 @@ export const CODE_BUFFER_ROOT = "content";
 /** Origin tag for transactions originating in the textarea binding.
  *  Used so a future server-driven update path can tell local edits
  *  from canonical broadcasts. Disjoint from `REMOTE_ORIGIN` in
- *  `@brainstorm/react-yjs/resolver`. */
+ *  `@brainstorm-os/react-yjs/resolver`. */
 export const LOCAL_BUFFER_ORIGIN = Symbol("code-editor.local");
 
 export function getCodeBuffer(doc: Y.Doc): Y.Text {

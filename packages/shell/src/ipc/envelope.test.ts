@@ -1,4 +1,4 @@
-import { WEBVIEW_SERVICE } from "@brainstorm/sdk-types";
+import { WEBVIEW_SERVICE } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	ENVELOPE_PROTOCOL_VERSION,

@@ -28,13 +28,13 @@ import {
 	type MentionMatch,
 	clearMentionToken,
 	detectMention,
-} from "@brainstorm/sdk/composer-context";
+} from "@brainstorm-os/sdk/composer-context";
 import {
 	type TypeaheadMenuItem,
 	closeTypeaheadMenu,
 	openTypeaheadMenu,
 	setTypeaheadActiveIndex,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRegister } from "@lexical/utils";
 import {

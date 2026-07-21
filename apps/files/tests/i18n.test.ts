@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { _defaultsForTesting, t } from "../src/i18n";
 
-describe("t() (shared @brainstorm/sdk/i18n createT)", () => {
+describe("t() (shared @brainstorm-os/sdk/i18n createT)", () => {
 	it("returns the default-English string for known ids", () => {
 		expect(t("brainstorm.files.app.title")).toBe("Files");
 		expect(t("brainstorm.files.actions.new")).toBe("New");

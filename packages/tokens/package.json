@@ -1,9 +1,11 @@
 {
-  "name": "@brainstorm/tokens",
+  "name": "@brainstorm-os/tokens",
   "version": "0.0.1",
-  "private": true,
   "description": "Semantic design tokens for the Brainstorm shell and apps.",
   "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "src/index.ts",
   "module": "src/index.ts",
@@ -12,6 +14,6 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
-    "@brainstorm/sdk-types": "workspace:*"
+    "@brainstorm-os/sdk-types": "workspace:*"
   }
 }

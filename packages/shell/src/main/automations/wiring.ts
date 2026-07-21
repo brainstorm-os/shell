@@ -32,7 +32,7 @@ import {
 	propertiesToReminder,
 	propertiesToWorkflow,
 	reminderToProperties,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import type { UiNotification } from "../ui/notify-host";
 import {

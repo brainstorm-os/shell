@@ -1,4 +1,4 @@
-import { type Template, TemplateKind } from "@brainstorm/sdk-types";
+import { type Template, TemplateKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	CreateOptionKind,

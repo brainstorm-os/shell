@@ -7,7 +7,7 @@
  * `entities.write:brainstorm/Trigger/v1` (declared in its manifest); the broker
  * re-checks both writes server-side. We reuse the SAME pure codecs the
  * Automations app persists with (`triggerToProperties` / `workflowToProperties`
- * from `@brainstorm/sdk-types`) so the shell scheduler hydrates the row with the
+ * from `@brainstorm-os/sdk-types`) so the shell scheduler hydrates the row with the
  * identical decoder — no second serialization.
  *
  * SECURITY: the draft's `capabilities` are already proven ⊆ the conversation's
@@ -23,7 +23,7 @@ import {
 	type WorkflowDef,
 	triggerToProperties,
 	workflowToProperties,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { WorkflowDraft } from "./save-as-automation";
 
 /** Persist a draft as Trigger + Workflow entities; returns the created

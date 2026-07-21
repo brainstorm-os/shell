@@ -1,5 +1,5 @@
 /**
- * Notes' productionised wiring for the four `@brainstorm/sdk/property-ui`
+ * Notes' productionised wiring for the four `@brainstorm-os/sdk/property-ui`
  * host seams. The SDK ships self-sufficient English/keyboard defaults so
  * it never imports back into this app; Notes overrides them here with
  * its own `t()` manifest, its chord registry, and the vault
@@ -7,13 +7,13 @@
  * resolves an existing `notes.*` key the cells used pre-VP-7).
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import type {
 	DictionaryEditorMatchers,
 	EntityTitleSource,
 	KeyLike,
 	PropertyUiLabels,
-} from "@brainstorm/sdk/property-ui";
+} from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n/t";
 import { ActionId } from "../keyboard/action-ids";
 import { matchesActionChord } from "../keyboard/use-shortcut";

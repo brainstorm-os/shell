@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { closeCalendarPopover } from "@brainstorm/sdk/calendar";
+import { closeCalendarPopover } from "@brainstorm-os/sdk/calendar";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flush, renderInto } from "../../test/render";
 import { BulkReschedule } from "./bulk-reschedule";

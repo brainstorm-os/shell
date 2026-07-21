@@ -18,7 +18,7 @@
  */
 
 import { createRequire } from "node:module";
-import { MailProtocol } from "@brainstorm/sdk-types";
+import { MailProtocol } from "@brainstorm-os/sdk-types";
 import type {
 	DriverCredentials,
 	FetchAttachmentResult,

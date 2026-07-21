@@ -16,7 +16,7 @@
  * preserve the pair as given since both endpoints shift together.
  */
 
-import { CodeLanguage } from "@brainstorm/sdk/language-detect";
+import { CodeLanguage } from "@brainstorm-os/sdk/language-detect";
 
 export enum LineMoveDirection {
 	Up = "up",

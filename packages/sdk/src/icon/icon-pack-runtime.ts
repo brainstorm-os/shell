@@ -15,7 +15,7 @@
  * straight into the `viewBox="0 0 256 256"` wrapper both renderers use.
  */
 
-import { type IconPackDef, resolveIconSvg } from "@brainstorm/sdk-types";
+import { type IconPackDef, resolveIconSvg } from "@brainstorm-os/sdk-types";
 
 let activePack: IconPackDef | null = null;
 let epoch = 0;

@@ -1,10 +1,10 @@
 /**
- * `@brainstorm/sdk/block-registry` — the bridge layer between a
+ * `@brainstorm-os/sdk/block-registry` — the bridge layer between a
  * `BlockEmbedNode { blockId }` and the runtime that paints it.
  *
  * See {@link registry.ts} for the design notes; this index just
  * re-exports the public surface so consumers can write
- * `import { createBlockRendererRegistry } from "@brainstorm/sdk/block-registry"`.
+ * `import { createBlockRendererRegistry } from "@brainstorm-os/sdk/block-registry"`.
  */
 
 export {

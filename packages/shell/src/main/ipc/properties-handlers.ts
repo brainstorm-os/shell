@@ -16,7 +16,7 @@
  * identity changes (vault switch).
  */
 
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import { type BrowserWindow, ipcMain } from "electron";
 import { type AppWindow, isAppWindowLive } from "../apps/launcher";
 import type { PropertiesStore } from "../properties/properties-store";

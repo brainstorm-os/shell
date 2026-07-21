@@ -24,8 +24,8 @@
  * that size.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { IconKind } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { useState } from "react";
 import { emojiUrl } from "./emoji-set";
 import { resolvePackGlyph } from "./icon-packs";

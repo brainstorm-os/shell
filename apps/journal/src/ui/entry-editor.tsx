@@ -45,8 +45,8 @@ import {
 	TitleNode,
 	TitlePlugin,
 	richTextTheme,
-} from "@brainstorm/editor";
-import { useYDoc, useYDocApplyPending, useYDocLoaded } from "@brainstorm/react-yjs";
+} from "@brainstorm-os/editor";
+import { useYDoc, useYDocApplyPending, useYDocLoaded } from "@brainstorm-os/react-yjs";
 import {
 	$getRoot,
 	$parseSerializedNode,
@@ -125,7 +125,7 @@ function isLexicalState(value: unknown): value is SerializedEditorState {
 /** Notes-specific node types the journal-side editor still doesn't
  *  register. Stripped before `parseEditorState` so a state planted by
  *  Notes' richer editor doesn't blow up the journal mount with an
- *  unknown-class error. The shared `@brainstorm/editor` extraction
+ *  unknown-class error. The shared `@brainstorm-os/editor` extraction
  *  promoted Title/Toggle/Callout/Columns — and, with F-070 embed parity,
  *  `block-embed` — into this build, so those types no longer need
  *  stripping; what's still Notes-only is what hasn't moved yet (property
@@ -331,5 +331,5 @@ export function JournalEntryEditor({
  *  shared `FULL_EDITOR_NODES` (callout/toggle/columns/table/HR + the live
  *  mention / date-mention / transclusion / bookmark / web-embed nodes the
  *  shared typeaheads create). The former hand-rolled mention SHIM is gone
- *  now that the real MentionNode ships from @brainstorm/editor. */
+ *  now that the real MentionNode ships from @brainstorm-os/editor. */
 export const JOURNAL_EDITOR_NODES = [TitleNode, ...FULL_EDITOR_NODES];

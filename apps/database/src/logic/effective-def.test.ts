@@ -1,4 +1,4 @@
-import { DateGranularity, ValueType } from "@brainstorm/sdk-types";
+import { DateGranularity, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { effectiveColumnDef, inferPropertyDef } from "./effective-def";
 import type { EntityRow } from "./in-memory-entities";

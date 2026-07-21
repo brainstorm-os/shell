@@ -6,7 +6,7 @@
  * machine and the flags / special-use mappings.
  */
 
-import { FolderRole, MailFlag } from "@brainstorm/sdk-types";
+import { FolderRole, MailFlag } from "@brainstorm-os/sdk-types";
 import { simpleParser } from "mailparser";
 import { describe, expect, it } from "vitest";
 import {

@@ -1,4 +1,4 @@
-import { TITLE_NODE_TYPE, TitleNode } from "@brainstorm/editor";
+import { TITLE_NODE_TYPE, TitleNode } from "@brainstorm-os/editor";
 // @vitest-environment node
 import { createHeadlessEditor } from "@lexical/headless";
 import { $createParagraphNode, $createTextNode, $getRoot, ParagraphNode, TextNode } from "lexical";

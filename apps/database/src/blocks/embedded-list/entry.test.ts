@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { BlockRuntimeContext } from "@brainstorm/sdk/block-runtime";
+import type { BlockRuntimeContext } from "@brainstorm-os/sdk/block-runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootEmbeddedList } from "./entry";
 import {

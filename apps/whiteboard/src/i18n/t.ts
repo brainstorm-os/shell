@@ -1,13 +1,13 @@
 /**
  * Whiteboard-app translate function — now a thin binding over the shared
- * `@brainstorm/sdk/i18n` `createT` (B-2 landed; the per-app hand-rolled
+ * `@brainstorm-os/sdk/i18n` `createT` (B-2 landed; the per-app hand-rolled
  * `t()` is retired per the shared-fundamentals contract §C). The app owns
  * only its default-English manifest; lookup, `{param}` interpolation and
  * the missing-key fallback are the SDK's. Every user-visible string wraps
  * in `t(key)` per CLAUDE.md §Localization.
  */
 
-import { type TParams, createT as sdkCreateT } from "@brainstorm/sdk/i18n";
+import { type TParams, createT as sdkCreateT } from "@brainstorm-os/sdk/i18n";
 
 export const WHITEBOARD_MANIFEST = {
 	// App chrome

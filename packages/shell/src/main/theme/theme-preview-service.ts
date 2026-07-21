@@ -4,14 +4,14 @@
  * overrides across the dashboard + every app window for a few seconds, then
  * auto-revert — without committing the active theme.
  *
- * The spec is sanitized through `@brainstorm/sdk-types` `sanitizeThemePreview`
+ * The spec is sanitized through `@brainstorm-os/sdk-types` `sanitizeThemePreview`
  * (canonical token names + injection-safe values only) BEFORE it leaves this
  * process for the renderers — the trusted boundary, since the spec originates
  * in a sandboxed app. The fan-out (`broadcast`) and the auto-revert timer are
  * injected, so the whole preview→revert lifecycle is timer-free + unit-tested.
  */
 
-import { type ThemePreviewSpec, sanitizeThemePreview } from "@brainstorm/sdk-types";
+import { type ThemePreviewSpec, sanitizeThemePreview } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 

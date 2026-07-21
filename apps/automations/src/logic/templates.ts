@@ -28,7 +28,7 @@ import {
 	type WorkflowDef,
 	type WorkflowStep,
 	aggregateWorkflowCapabilities,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type WorkflowTemplate = {
 	id: string;

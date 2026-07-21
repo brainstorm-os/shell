@@ -1,6 +1,6 @@
 /**
  * Local mirror of the universal icon shape from
- *  / `@brainstorm/sdk-types`.
+ *  / `@brainstorm-os/sdk-types`.
  *
  * Same arrangement as apps/database/src/types/icon.ts — the SDK exposes
  * this canonically but the graph app doesn't take a runtime SDK dep yet

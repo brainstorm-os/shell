@@ -7,7 +7,7 @@
  * visible property); the host wires the result to `requestSaveBytes`.
  */
 
-import { type EntityRow, readPropertyPath } from "@brainstorm/sdk/in-memory-entities";
+import { type EntityRow, readPropertyPath } from "@brainstorm-os/sdk/in-memory-entities";
 
 export enum ListExportFormat {
 	Csv = "csv",

@@ -13,7 +13,7 @@
  *     border ("sandwich" anti-pattern banned).
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import type { ReactNode } from "react";
 import "./segmented.css";
 

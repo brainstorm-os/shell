@@ -9,7 +9,7 @@
  * when the host can't resolve the locale.
  */
 
-import { formatGroupDate, formatRelativeDate } from "@brainstorm/sdk/date-formatters";
+import { formatGroupDate, formatRelativeDate } from "@brainstorm-os/sdk/date-formatters";
 import { type TKey, t } from "../i18n/t";
 import { endOfMonth, endOfWeek, isSameMonth, startOfMonth, startOfWeek } from "../logic/date-range";
 import { CalendarViewKind } from "../types/calendar-view";

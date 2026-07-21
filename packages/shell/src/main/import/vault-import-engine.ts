@@ -13,7 +13,7 @@
  * the reproducible surface the §The import flow dry-run/run contract needs.
  */
 
-import type { ValueType } from "@brainstorm/sdk-types";
+import type { ValueType } from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";

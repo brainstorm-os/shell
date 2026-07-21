@@ -19,7 +19,7 @@ import {
 	CommentKind,
 	CommentStatus,
 	type CommentThread,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import {
 	CompactEditor,

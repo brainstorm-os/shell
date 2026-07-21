@@ -6,7 +6,7 @@
  * free so it gets unit coverage under the `node` environment.
  */
 
-import type { Dictionary, DictionaryItem } from "@brainstorm/sdk-types";
+import type { Dictionary, DictionaryItem } from "@brainstorm-os/sdk-types";
 import { HEX } from "./dictionary-import";
 
 /** How the dictionary editor / picker orders items. Per-user pref,

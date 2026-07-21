@@ -12,7 +12,7 @@ import {
 	PropertyFormat,
 	PropertyKindPreset,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	INLINE_PRIMARY_KIND_ORDER,

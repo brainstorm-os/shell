@@ -5,7 +5,7 @@
  * The architecture decision : a reactive
  * app — anything backed by vault entities that updates from other
  * devices/users — reads live entity lists through the ONE shared stack,
- * `@brainstorm/react-yjs`'s `useVaultEntities` / `useLiveEntities`. It must
+ * `@brainstorm-os/react-yjs`'s `useVaultEntities` / `useLiveEntities`. It must
  * NOT hand-roll `vaultEntities.onChange → list() → setState/render`: that
  * re-implements the reactivity layer per app (the drift that produced the
  * bookmarks scroll-blink and a different coalescer in every app).
@@ -84,7 +84,7 @@ if (newViolations.length === 0 && staleBaseline.length === 0) {
 
 if (newViolations.length > 0) {
 	console.error("\n✗ app-reactivity: new raw `vaultEntities.onChange` subscription(s) — use");
-	console.error("  `@brainstorm/react-yjs` `useVaultEntities` / `useLiveEntities` instead:\n");
+	console.error("  `@brainstorm-os/react-yjs` `useVaultEntities` / `useLiveEntities` instead:\n");
 	for (const f of newViolations) console.error(`    ${f}`);
 	console.error(
 		"\n  (See docs/apps/09-shared-sdk-catalog.md → 'Live entity lists'. If this app is a\n   genuinely non-reactive render surface, it should not be touching vaultEntities at all.)",

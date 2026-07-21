@@ -1,7 +1,7 @@
 /*
  * Launcher palette (Stage 7.4 / 9.22.2, fancy-menus at 8.8). The overlay
  * chrome, search input, sectioned list, keyboard nav and focus are now a
- * `@react-fancy-menus` surface (themed via `@brainstorm/sdk/menus.css`).
+ * `@react-fancy-menus` surface (themed via `@brainstorm-os/sdk/menus.css`).
  * Only the per-row content layout (app icon + title + subtitle, entity
  * snippet) keeps bespoke styling here, rendered inside each row's name slot.
  */

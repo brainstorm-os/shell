@@ -9,7 +9,7 @@
  * documents on first save, or a malformed root). Like `extract-text`, this
  * walker is node-class agnostic — any inline node carrying a string
  * `label` contributes `@<label>` (mirrors the rendered mention chip) — so
- * the shared `@brainstorm/editor` helper has no app-local node dependency.
+ * the shared `@brainstorm-os/editor` helper has no app-local node dependency.
  */
 
 import type { SerializedEditorState } from "lexical";

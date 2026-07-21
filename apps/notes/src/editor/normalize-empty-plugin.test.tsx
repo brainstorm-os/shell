@@ -5,7 +5,7 @@
  * a healthy doc is left untouched (idempotent).
  */
 
-import { $createTitleNode, BASELINE_NODES } from "@brainstorm/editor";
+import { $createTitleNode, BASELINE_NODES } from "@brainstorm-os/editor";
 import { createHeadlessEditor } from "@lexical/headless";
 import { $createParagraphNode, $createTextNode, $getRoot } from "lexical";
 import { describe, expect, it } from "vitest";

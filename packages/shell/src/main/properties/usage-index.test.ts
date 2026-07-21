@@ -9,8 +9,8 @@
  *    and degrades to the empty snapshot on reader failure.
  */
 
-import { ValueType } from "@brainstorm/sdk-types";
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { VaultEntity } from "../entities/vault-entities-service";
 import {

@@ -18,7 +18,7 @@ import {
 	Weekday,
 	isEntityEventVerb,
 	isTriggerKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The trigger kinds the v1 builder palette offers — the engine-wired set. */
 export const BUILDER_TRIGGER_KINDS = ENGINE_TRIGGER_KINDS;

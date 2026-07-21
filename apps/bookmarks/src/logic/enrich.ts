@@ -4,7 +4,7 @@
  * without the shell / network broker.
  */
 
-import type { LinkPreview } from "@brainstorm/sdk-types";
+import type { LinkPreview } from "@brainstorm-os/sdk-types";
 import type { Bookmark } from "../types/bookmark";
 import { domainFromUrl } from "./url-parse";
 

@@ -17,7 +17,7 @@
  * nothing rather than leaking.
  */
 
-import type { ExportTextFormat } from "@brainstorm/sdk-types";
+import type { ExportTextFormat } from "@brainstorm-os/sdk-types";
 import {
 	type SaveDisposition,
 	type SaveFileService,

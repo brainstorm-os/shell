@@ -1,12 +1,12 @@
 /**
  * App-side translations per
- * §Localization — the shared `@brainstorm/sdk/i18n` `createT` (`{name}`
+ * §Localization — the shared `@brainstorm-os/sdk/i18n` `createT` (`{name}`
  * interpolation only, no ICU). Database predates the convention, so the
  * legacy strings in `app.ts` are tech debt migrating as adjacent code is
  * touched; every NEW user-visible string lands here first.
  */
 
-import { type TParams, createT, plural as sdkPlural } from "@brainstorm/sdk/i18n";
+import { type TParams, createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
 
 const DEFAULTS = {
 	// Row menu (shared object-menu extras)

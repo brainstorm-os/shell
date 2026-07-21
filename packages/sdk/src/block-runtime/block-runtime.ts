@@ -2,7 +2,7 @@
  * In-iframe block runtime — the harness a first-party BP block bundle boots
  * with. It runs INSIDE the sandboxed opaque-origin frame (no ambient
  * authority, no `window.brainstorm`), so its only channel to the vault is the
- * inner postMessage transport (`@brainstorm/sdk/block-frame/inner`).
+ * inner postMessage transport (`@brainstorm-os/sdk/block-frame/inner`).
  *
  * Responsibilities, all the per-block plumbing factored out of the renderers:
  *   1. Read the routing identity the host injected into `window.__BS_BLOCK__`
@@ -28,7 +28,7 @@ import {
 	type BlockFrameBootstrap,
 	type BlockFrameInnerTransport,
 	createBlockFrameInnerTransport,
-} from "@brainstorm/sdk/block-frame/inner";
+} from "@brainstorm-os/sdk/block-frame/inner";
 
 /** Host→block control messages that are NOT BP protocol traffic (they carry
  *  no `requestId`/`module`). The embedding app sends `refresh`/`theme`; the

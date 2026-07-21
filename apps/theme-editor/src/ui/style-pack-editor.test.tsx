@@ -1,4 +1,4 @@
-import { EMPTY_STYLE_PACK } from "@brainstorm/sdk-types";
+import { EMPTY_STYLE_PACK } from "@brainstorm-os/sdk-types";
 // @vitest-environment jsdom
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";

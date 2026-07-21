@@ -3,7 +3,7 @@
  * host: decoration fan-out, reveal, single + bulk replace, the
  * captured in-selection scope, and the seed-term contract.
  */
-import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm/sdk/find-replace";
+import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm-os/sdk/find-replace";
 import { describe, expect, it } from "vitest";
 import type { CodeMatch } from "../logic/find-search";
 import { type CodeFindHost, createCodeSearchProvider } from "./code-find";

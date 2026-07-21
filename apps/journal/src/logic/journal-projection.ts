@@ -12,8 +12,8 @@
  * the editor mounts.
  */
 
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import type { JournalEntry } from "../types/entry";
 import { parseHabits, parseMood } from "./check-in";
 import { dateKeyForJournal, isJournalNoteTitle, parseJournalDateKey } from "./journal-keys";

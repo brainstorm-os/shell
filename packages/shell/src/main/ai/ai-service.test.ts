@@ -1,4 +1,8 @@
-import { type AiGenerateRequest, type AiGenerateResult, MessageRole } from "@brainstorm/sdk-types";
+import {
+	type AiGenerateRequest,
+	type AiGenerateResult,
+	MessageRole,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { makeAiServiceHandler } from "./ai-service";

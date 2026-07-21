@@ -96,220 +96,253 @@ export default defineConfig({
 			// per the ordering rule below.
 			"react-dom/client": resolve(__dirname, "packages/shell/node_modules/react-dom/client.js"),
 			"react-dom": resolve(__dirname, "packages/shell/node_modules/react-dom"),
-			"@brainstorm/tokens": resolve(__dirname, "packages/tokens/src/index.ts"),
-			// Subpath exports — must precede the bare `@brainstorm/sdk` entry
+			"@brainstorm-os/tokens": resolve(__dirname, "packages/tokens/src/index.ts"),
+			// Subpath exports — must precede the bare `@brainstorm-os/sdk` entry
 			// so the longer prefix wins (alias matching is order-sensitive),
-			// else `@brainstorm/sdk/resizable` rewrites to `…/index.ts/resizable`.
-			"@brainstorm/sdk/property-ui/pure": resolve(__dirname, "packages/sdk/src/property-ui-pure.ts"),
+			// else `@brainstorm-os/sdk/resizable` rewrites to `…/index.ts/resizable`.
+			"@brainstorm-os/sdk/property-ui/pure": resolve(
+				__dirname,
+				"packages/sdk/src/property-ui-pure.ts",
+			),
 			// `.css` must precede the bare `…/dictionary-editor` (JS) alias — the
 			// prefix matcher would otherwise rewrite it to `…/dictionary-editor.tsx.css`.
-			"@brainstorm/sdk/property-ui/dictionary-editor.css": resolve(
+			"@brainstorm-os/sdk/property-ui/dictionary-editor.css": resolve(
 				__dirname,
 				"packages/sdk/src/property-ui/dictionary-editor.css",
 			),
-			"@brainstorm/sdk/property-ui/dictionary-editor": resolve(
+			"@brainstorm-os/sdk/property-ui/dictionary-editor": resolve(
 				__dirname,
 				"packages/sdk/src/property-ui/dictionary-editor.tsx",
 			),
-			"@brainstorm/sdk/property-ui": resolve(__dirname, "packages/sdk/src/property-ui.ts"),
-			"@brainstorm/sdk/segmented.css": resolve(__dirname, "packages/sdk/src/segmented/segmented.css"),
-			"@brainstorm/sdk/resizable": resolve(__dirname, "packages/sdk/src/resizable.ts"),
-			"@brainstorm/sdk/searchbar": resolve(__dirname, "packages/sdk/src/searchbar/index.ts"),
-			"@brainstorm/sdk/perf": resolve(__dirname, "packages/sdk/src/perf.ts"),
-			"@brainstorm/sdk/date-buckets": resolve(__dirname, "packages/sdk/src/date-buckets.ts"),
-			"@brainstorm/sdk/date-formatters": resolve(__dirname, "packages/sdk/src/date-formatters.ts"),
-			"@brainstorm/sdk/format-bytes": resolve(__dirname, "packages/sdk/src/format-bytes.ts"),
-			"@brainstorm/sdk/find-replace": resolve(__dirname, "packages/sdk/src/find-replace/index.ts"),
-			"@brainstorm/sdk/frustum-cull": resolve(__dirname, "packages/sdk/src/frustum-cull.ts"),
-			"@brainstorm/sdk/in-memory-entities": resolve(
+			"@brainstorm-os/sdk/property-ui": resolve(__dirname, "packages/sdk/src/property-ui.ts"),
+			"@brainstorm-os/sdk/segmented.css": resolve(
+				__dirname,
+				"packages/sdk/src/segmented/segmented.css",
+			),
+			"@brainstorm-os/sdk/resizable": resolve(__dirname, "packages/sdk/src/resizable.ts"),
+			"@brainstorm-os/sdk/searchbar": resolve(__dirname, "packages/sdk/src/searchbar/index.ts"),
+			"@brainstorm-os/sdk/perf": resolve(__dirname, "packages/sdk/src/perf.ts"),
+			"@brainstorm-os/sdk/date-buckets": resolve(__dirname, "packages/sdk/src/date-buckets.ts"),
+			"@brainstorm-os/sdk/date-formatters": resolve(__dirname, "packages/sdk/src/date-formatters.ts"),
+			"@brainstorm-os/sdk/format-bytes": resolve(__dirname, "packages/sdk/src/format-bytes.ts"),
+			"@brainstorm-os/sdk/find-replace": resolve(__dirname, "packages/sdk/src/find-replace/index.ts"),
+			"@brainstorm-os/sdk/frustum-cull": resolve(__dirname, "packages/sdk/src/frustum-cull.ts"),
+			"@brainstorm-os/sdk/in-memory-entities": resolve(
 				__dirname,
 				"packages/sdk/src/in-memory-entities.ts",
 			),
-			"@brainstorm/sdk/system-entities": resolve(__dirname, "packages/sdk/src/system-entities.ts"),
-			"@brainstorm/sdk/predicate-eval": resolve(__dirname, "packages/sdk/src/predicate-eval/index.ts"),
-			"@brainstorm/sdk/note-references": resolve(__dirname, "packages/sdk/src/note-references.ts"),
-			"@brainstorm/sdk/language-detect": resolve(__dirname, "packages/sdk/src/language-detect.ts"),
-			"@brainstorm/sdk/code-highlight": resolve(__dirname, "packages/sdk/src/code-highlight/index.ts"),
-			"@brainstorm/sdk/selection": resolve(__dirname, "packages/sdk/src/selection.ts"),
-			"@brainstorm/sdk/codec-helpers": resolve(__dirname, "packages/sdk/src/codec-helpers.ts"),
-			"@brainstorm/sdk/sanitize-text": resolve(__dirname, "packages/sdk/src/sanitize-text.ts"),
-			"@brainstorm/sdk/spellcheck-menu": resolve(__dirname, "packages/sdk/src/spellcheck-menu.ts"),
-			"@brainstorm/sdk/spellcheck": resolve(__dirname, "packages/sdk/src/spellcheck.ts"),
-			"@brainstorm/sdk/peer-presence": resolve(__dirname, "packages/sdk/src/peer-presence.ts"),
+			"@brainstorm-os/sdk/system-entities": resolve(__dirname, "packages/sdk/src/system-entities.ts"),
+			"@brainstorm-os/sdk/predicate-eval": resolve(
+				__dirname,
+				"packages/sdk/src/predicate-eval/index.ts",
+			),
+			"@brainstorm-os/sdk/note-references": resolve(__dirname, "packages/sdk/src/note-references.ts"),
+			"@brainstorm-os/sdk/language-detect": resolve(__dirname, "packages/sdk/src/language-detect.ts"),
+			"@brainstorm-os/sdk/code-highlight": resolve(
+				__dirname,
+				"packages/sdk/src/code-highlight/index.ts",
+			),
+			"@brainstorm-os/sdk/selection": resolve(__dirname, "packages/sdk/src/selection.ts"),
+			"@brainstorm-os/sdk/codec-helpers": resolve(__dirname, "packages/sdk/src/codec-helpers.ts"),
+			"@brainstorm-os/sdk/sanitize-text": resolve(__dirname, "packages/sdk/src/sanitize-text.ts"),
+			"@brainstorm-os/sdk/spellcheck-menu": resolve(__dirname, "packages/sdk/src/spellcheck-menu.ts"),
+			"@brainstorm-os/sdk/spellcheck": resolve(__dirname, "packages/sdk/src/spellcheck.ts"),
+			"@brainstorm-os/sdk/peer-presence": resolve(__dirname, "packages/sdk/src/peer-presence.ts"),
 			// `.css` must precede the bare `…/presence-stack` (JS) alias — the
-			// prefix matcher otherwise falls through to the bare `@brainstorm/sdk`
+			// prefix matcher otherwise falls through to the bare `@brainstorm-os/sdk`
 			// entry and rewrites to `…/index.ts/presence-stack.css`, which is the
 			// exact "Failed to resolve import" that red-flagged the database
 			// app's boot-smoke suite (its app.ts imports this stylesheet).
-			"@brainstorm/sdk/presence-stack.css": resolve(
+			"@brainstorm-os/sdk/presence-stack.css": resolve(
 				__dirname,
 				"packages/sdk/src/presence-stack/presence-stack.css",
 			),
-			"@brainstorm/sdk/self-display-name": resolve(
+			"@brainstorm-os/sdk/self-display-name": resolve(
 				__dirname,
 				"packages/sdk/src/use-self-display-name.ts",
 			),
-			"@brainstorm/sdk/presence-stack": resolve(__dirname, "packages/sdk/src/presence-stack/index.ts"),
-			"@brainstorm/sdk/storage-repository": resolve(
+			"@brainstorm-os/sdk/presence-stack": resolve(
+				__dirname,
+				"packages/sdk/src/presence-stack/index.ts",
+			),
+			"@brainstorm-os/sdk/storage-repository": resolve(
 				__dirname,
 				"packages/sdk/src/storage-repository.ts",
 			),
-			"@brainstorm/sdk/last-viewed": resolve(__dirname, "packages/sdk/src/last-viewed.ts"),
-			"@brainstorm/sdk/panel-state": resolve(__dirname, "packages/sdk/src/panel-state.ts"),
-			"@brainstorm/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
-			"@brainstorm/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
-			"@brainstorm/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
-			"@brainstorm/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
-			"@brainstorm/sdk/entity-body-copy": resolve(__dirname, "packages/sdk/src/entity-body-copy.ts"),
-			"@brainstorm/sdk/templates": resolve(__dirname, "packages/sdk/src/templates.ts"),
-			"@brainstorm/sdk/entity-drag": resolve(__dirname, "packages/sdk/src/entity-drag.ts"),
-			"@brainstorm/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
-			"@brainstorm/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),
-			"@brainstorm/sdk/cover-picker": resolve(__dirname, "packages/sdk/src/cover-picker/index.ts"),
+			"@brainstorm-os/sdk/last-viewed": resolve(__dirname, "packages/sdk/src/last-viewed.ts"),
+			"@brainstorm-os/sdk/panel-state": resolve(__dirname, "packages/sdk/src/panel-state.ts"),
+			"@brainstorm-os/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
+			"@brainstorm-os/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
+			"@brainstorm-os/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
+			"@brainstorm-os/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
+			"@brainstorm-os/sdk/entity-body-copy": resolve(
+				__dirname,
+				"packages/sdk/src/entity-body-copy.ts",
+			),
+			"@brainstorm-os/sdk/templates": resolve(__dirname, "packages/sdk/src/templates.ts"),
+			"@brainstorm-os/sdk/entity-drag": resolve(__dirname, "packages/sdk/src/entity-drag.ts"),
+			"@brainstorm-os/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
+			"@brainstorm-os/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),
+			"@brainstorm-os/sdk/cover-picker": resolve(__dirname, "packages/sdk/src/cover-picker/index.ts"),
 			// `.css` before the bare JS alias (same ordering rule as above).
-			"@brainstorm/sdk/color-picker.css": resolve(
+			"@brainstorm-os/sdk/color-picker.css": resolve(
 				__dirname,
 				"packages/sdk/src/color-picker/color-picker.css",
 			),
-			"@brainstorm/sdk/color-picker": resolve(__dirname, "packages/sdk/src/color-picker/index.ts"),
-			"@brainstorm/sdk/picker-host": resolve(__dirname, "packages/sdk/src/picker-host.tsx"),
-			"@brainstorm/sdk/recurrence-labels": resolve(
+			"@brainstorm-os/sdk/color-picker": resolve(__dirname, "packages/sdk/src/color-picker/index.ts"),
+			"@brainstorm-os/sdk/picker-host": resolve(__dirname, "packages/sdk/src/picker-host.tsx"),
+			"@brainstorm-os/sdk/recurrence-labels": resolve(
 				__dirname,
 				"packages/sdk/src/i18n/recurrence-labels.ts",
 			),
-			"@brainstorm/sdk/recurrence-edit": resolve(__dirname, "packages/sdk/src/recurrence-edit.ts"),
-			"@brainstorm/sdk/reminder-schedule": resolve(__dirname, "packages/sdk/src/reminder-schedule.ts"),
+			"@brainstorm-os/sdk/recurrence-edit": resolve(__dirname, "packages/sdk/src/recurrence-edit.ts"),
+			"@brainstorm-os/sdk/reminder-schedule": resolve(
+				__dirname,
+				"packages/sdk/src/reminder-schedule.ts",
+			),
 			// `.css` before the bare JS alias (same ordering rule as above).
-			"@brainstorm/sdk/recurrence-editor.css": resolve(
+			"@brainstorm-os/sdk/recurrence-editor.css": resolve(
 				__dirname,
 				"packages/sdk/src/recurrence-editor/recurrence-editor.css",
 			),
-			"@brainstorm/sdk/recurrence-editor": resolve(
+			"@brainstorm-os/sdk/recurrence-editor": resolve(
 				__dirname,
 				"packages/sdk/src/recurrence-editor/index.ts",
 			),
-			"@brainstorm/sdk/i18n": resolve(__dirname, "packages/sdk/src/i18n/common-labels.ts"),
-			"@brainstorm/sdk/i18n-react": resolve(__dirname, "packages/sdk/src/i18n/react.tsx"),
-			"@brainstorm/sdk/object-menu": resolve(__dirname, "packages/sdk/src/object-menu/index.ts"),
-			"@brainstorm/sdk/contributed-actions": resolve(
+			"@brainstorm-os/sdk/i18n": resolve(__dirname, "packages/sdk/src/i18n/common-labels.ts"),
+			"@brainstorm-os/sdk/i18n-react": resolve(__dirname, "packages/sdk/src/i18n/react.tsx"),
+			"@brainstorm-os/sdk/object-menu": resolve(__dirname, "packages/sdk/src/object-menu/index.ts"),
+			"@brainstorm-os/sdk/contributed-actions": resolve(
 				__dirname,
 				"packages/sdk/src/contributed-actions/index.ts",
 			),
 			// `.css` before the bare JS alias (same ordering rule as above).
-			"@brainstorm/sdk/menus.css": resolve(__dirname, "packages/sdk/src/menus/menus.css"),
-			"@brainstorm/sdk/menus": resolve(__dirname, "packages/sdk/src/menus/index.ts"),
+			"@brainstorm-os/sdk/menus.css": resolve(__dirname, "packages/sdk/src/menus/menus.css"),
+			"@brainstorm-os/sdk/menus": resolve(__dirname, "packages/sdk/src/menus/index.ts"),
 			// `.css` must precede the bare `…/tooltip` (JS) alias — the prefix
 			// matcher would otherwise rewrite it to `…/tooltip/index.ts.css`.
-			"@brainstorm/sdk/tooltip.css": resolve(__dirname, "packages/sdk/src/tooltip/tooltip.css"),
-			"@brainstorm/sdk/tooltip": resolve(__dirname, "packages/sdk/src/tooltip/index.ts"),
-			"@brainstorm/sdk/widget": resolve(__dirname, "packages/sdk/src/widget/index.tsx"),
+			"@brainstorm-os/sdk/tooltip.css": resolve(__dirname, "packages/sdk/src/tooltip/tooltip.css"),
+			"@brainstorm-os/sdk/tooltip": resolve(__dirname, "packages/sdk/src/tooltip/index.ts"),
+			"@brainstorm-os/sdk/widget": resolve(__dirname, "packages/sdk/src/widget/index.tsx"),
 			// `.css` before the bare JS alias (same ordering rule as above).
-			"@brainstorm/sdk/select-menu.css": resolve(
+			"@brainstorm-os/sdk/select-menu.css": resolve(
 				__dirname,
 				"packages/sdk/src/select-menu/select-menu.css",
 			),
-			"@brainstorm/sdk/select-menu": resolve(__dirname, "packages/sdk/src/select-menu/index.ts"),
+			"@brainstorm-os/sdk/select-menu": resolve(__dirname, "packages/sdk/src/select-menu/index.ts"),
 			// `.css` alias before the base so the matcher doesn't rewrite it to
 			// `…/composer-context/index.ts.css`.
-			"@brainstorm/sdk/composer-context.css": resolve(
+			"@brainstorm-os/sdk/composer-context.css": resolve(
 				__dirname,
 				"packages/sdk/src/composer-context/composer-context.css",
 			),
-			"@brainstorm/sdk/composer-context": resolve(
+			"@brainstorm-os/sdk/composer-context": resolve(
 				__dirname,
 				"packages/sdk/src/composer-context/index.ts",
 			),
-			"@brainstorm/sdk/icon": resolve(__dirname, "packages/sdk/src/icon/index.ts"),
-			"@brainstorm/sdk/typography": resolve(__dirname, "packages/sdk/src/typography/index.ts"),
-			"@brainstorm/sdk/popover": resolve(__dirname, "packages/sdk/src/popover/index.ts"),
+			"@brainstorm-os/sdk/icon": resolve(__dirname, "packages/sdk/src/icon/index.ts"),
+			"@brainstorm-os/sdk/typography": resolve(__dirname, "packages/sdk/src/typography/index.ts"),
+			"@brainstorm-os/sdk/popover": resolve(__dirname, "packages/sdk/src/popover/index.ts"),
 			// `.css` precedes the bare JS alias so the longer prefix wins.
-			"@brainstorm/sdk/share-dialog.css": resolve(
+			"@brainstorm-os/sdk/share-dialog.css": resolve(
 				__dirname,
 				"packages/sdk/src/share-dialog/share-dialog.css",
 			),
-			"@brainstorm/sdk/share-dialog": resolve(__dirname, "packages/sdk/src/share-dialog/index.ts"),
-			"@brainstorm/sdk/shortcut": resolve(__dirname, "packages/sdk/src/shortcut/index.ts"),
-			"@brainstorm/sdk/nav-history": resolve(__dirname, "packages/sdk/src/nav-history/index.ts"),
-			"@brainstorm/sdk/a11y": resolve(__dirname, "packages/sdk/src/a11y/index.ts"),
-			"@brainstorm/sdk/analytics": resolve(__dirname, "packages/sdk/src/analytics/index.ts"),
-			"@brainstorm/sdk/date-pager": resolve(__dirname, "packages/sdk/src/date-pager/index.ts"),
-			"@brainstorm/sdk/date-grid": resolve(__dirname, "packages/sdk/src/date-grid/index.ts"),
-			"@brainstorm/sdk/calendar": resolve(__dirname, "packages/sdk/src/calendar/index.ts"),
-			"@brainstorm/sdk/panel-toggle": resolve(__dirname, "packages/sdk/src/panel-toggle/index.ts"),
-			"@brainstorm/sdk/pdf-engine": resolve(__dirname, "packages/sdk/src/pdf-engine/index.ts"),
-			"@brainstorm/sdk/checkbox": resolve(__dirname, "packages/sdk/src/checkbox/index.ts"),
-			"@brainstorm/sdk/count-badge": resolve(__dirname, "packages/sdk/src/count-badge/index.ts"),
-			"@brainstorm/sdk/properties-panel": resolve(
+			"@brainstorm-os/sdk/share-dialog": resolve(__dirname, "packages/sdk/src/share-dialog/index.ts"),
+			"@brainstorm-os/sdk/shortcut": resolve(__dirname, "packages/sdk/src/shortcut/index.ts"),
+			"@brainstorm-os/sdk/nav-history": resolve(__dirname, "packages/sdk/src/nav-history/index.ts"),
+			"@brainstorm-os/sdk/a11y": resolve(__dirname, "packages/sdk/src/a11y/index.ts"),
+			"@brainstorm-os/sdk/analytics": resolve(__dirname, "packages/sdk/src/analytics/index.ts"),
+			"@brainstorm-os/sdk/date-pager": resolve(__dirname, "packages/sdk/src/date-pager/index.ts"),
+			"@brainstorm-os/sdk/date-grid": resolve(__dirname, "packages/sdk/src/date-grid/index.ts"),
+			"@brainstorm-os/sdk/calendar": resolve(__dirname, "packages/sdk/src/calendar/index.ts"),
+			"@brainstorm-os/sdk/panel-toggle": resolve(__dirname, "packages/sdk/src/panel-toggle/index.ts"),
+			"@brainstorm-os/sdk/pdf-engine": resolve(__dirname, "packages/sdk/src/pdf-engine/index.ts"),
+			"@brainstorm-os/sdk/checkbox": resolve(__dirname, "packages/sdk/src/checkbox/index.ts"),
+			"@brainstorm-os/sdk/count-badge": resolve(__dirname, "packages/sdk/src/count-badge/index.ts"),
+			"@brainstorm-os/sdk/properties-panel": resolve(
 				__dirname,
 				"packages/sdk/src/properties-panel/index.tsx",
 			),
-			"@brainstorm/sdk/layout-resolver": resolve(__dirname, "packages/sdk/src/layout-resolver.ts"),
-			"@brainstorm/sdk/block-frame/inner": resolve(
+			"@brainstorm-os/sdk/layout-resolver": resolve(__dirname, "packages/sdk/src/layout-resolver.ts"),
+			"@brainstorm-os/sdk/block-frame/inner": resolve(
 				__dirname,
 				"packages/sdk/src/block-frame/inner-transport.ts",
 			),
-			"@brainstorm/sdk/block-frame": resolve(__dirname, "packages/sdk/src/block-frame/index.ts"),
-			"@brainstorm/sdk/block-registry": resolve(__dirname, "packages/sdk/src/block-registry/index.ts"),
-			"@brainstorm/sdk/block-mount": resolve(__dirname, "packages/sdk/src/block-mount/index.ts"),
-			"@brainstorm/sdk/block-runtime": resolve(__dirname, "packages/sdk/src/block-runtime/index.ts"),
-			"@brainstorm/sdk/export-file": resolve(__dirname, "packages/sdk/src/export-file/index.ts"),
-			"@brainstorm/sdk/export-popover": resolve(__dirname, "packages/sdk/src/export-popover/index.ts"),
-			"@brainstorm/sdk/formula": resolve(__dirname, "packages/sdk/src/formula/index.ts"),
-			"@brainstorm/sdk/entity-export": resolve(__dirname, "packages/sdk/src/entity-export/index.ts"),
-			"@brainstorm/sdk/virtual-list": resolve(__dirname, "packages/sdk/src/virtual-list/index.ts"),
-			// CSS subpaths — apps `import "@brainstorm/sdk/app-theme.css"` for
+			"@brainstorm-os/sdk/block-frame": resolve(__dirname, "packages/sdk/src/block-frame/index.ts"),
+			"@brainstorm-os/sdk/block-registry": resolve(
+				__dirname,
+				"packages/sdk/src/block-registry/index.ts",
+			),
+			"@brainstorm-os/sdk/block-mount": resolve(__dirname, "packages/sdk/src/block-mount/index.ts"),
+			"@brainstorm-os/sdk/block-runtime": resolve(
+				__dirname,
+				"packages/sdk/src/block-runtime/index.ts",
+			),
+			"@brainstorm-os/sdk/export-file": resolve(__dirname, "packages/sdk/src/export-file/index.ts"),
+			"@brainstorm-os/sdk/export-popover": resolve(
+				__dirname,
+				"packages/sdk/src/export-popover/index.ts",
+			),
+			"@brainstorm-os/sdk/formula": resolve(__dirname, "packages/sdk/src/formula/index.ts"),
+			"@brainstorm-os/sdk/entity-export": resolve(
+				__dirname,
+				"packages/sdk/src/entity-export/index.ts",
+			),
+			"@brainstorm-os/sdk/virtual-list": resolve(__dirname, "packages/sdk/src/virtual-list/index.ts"),
+			// CSS subpaths — apps `import "@brainstorm-os/sdk/app-theme.css"` for
 			// shared chrome; vitest's resolver doesn't consult the package
 			// `exports` map by default, so boot-smoke tests fail without these.
-			"@brainstorm/sdk/app-theme.css": resolve(__dirname, "packages/sdk/src/app-theme.css"),
-			"@brainstorm/sdk/searchbar/searchbar.css": resolve(
+			"@brainstorm-os/sdk/app-theme.css": resolve(__dirname, "packages/sdk/src/app-theme.css"),
+			"@brainstorm-os/sdk/searchbar/searchbar.css": resolve(
 				__dirname,
 				"packages/sdk/src/searchbar/searchbar.css",
 			),
-			"@brainstorm/sdk/checkbox/checkbox.css": resolve(
+			"@brainstorm-os/sdk/checkbox/checkbox.css": resolve(
 				__dirname,
 				"packages/sdk/src/checkbox/checkbox.css",
 			),
-			"@brainstorm/sdk/count-badge.css": resolve(
+			"@brainstorm-os/sdk/count-badge.css": resolve(
 				__dirname,
 				"packages/sdk/src/count-badge/count-badge.css",
 			),
-			"@brainstorm/sdk/properties-panel/properties-panel.css": resolve(
+			"@brainstorm-os/sdk/properties-panel/properties-panel.css": resolve(
 				__dirname,
 				"packages/sdk/src/properties-panel/properties-panel.css",
 			),
-			"@brainstorm/sdk/property-ui/cells.css": resolve(
+			"@brainstorm-os/sdk/property-ui/cells.css": resolve(
 				__dirname,
 				"packages/sdk/src/property-ui/cells.css",
 			),
-			"@brainstorm/sdk/virtual-list.css": resolve(
+			"@brainstorm-os/sdk/virtual-list.css": resolve(
 				__dirname,
 				"packages/sdk/src/virtual-list/virtual-list.css",
 			),
-			"@brainstorm/sdk/coming-soon/coming-soon.css": resolve(
+			"@brainstorm-os/sdk/coming-soon/coming-soon.css": resolve(
 				__dirname,
 				"packages/sdk/src/coming-soon/coming-soon.css",
 			),
-			"@brainstorm/sdk/coming-soon": resolve(__dirname, "packages/sdk/src/coming-soon/index.ts"),
-			"@brainstorm/sdk/empty-state.css": resolve(
+			"@brainstorm-os/sdk/coming-soon": resolve(__dirname, "packages/sdk/src/coming-soon/index.ts"),
+			"@brainstorm-os/sdk/empty-state.css": resolve(
 				__dirname,
 				"packages/sdk/src/empty-state/empty-state.css",
 			),
-			"@brainstorm/sdk/empty-state": resolve(__dirname, "packages/sdk/src/empty-state/index.ts"),
-			"@brainstorm/sdk/markdown.css": resolve(__dirname, "packages/sdk/src/markdown/markdown.css"),
-			"@brainstorm/sdk/markdown": resolve(__dirname, "packages/sdk/src/markdown/index.tsx"),
-			"@brainstorm/sdk": resolve(__dirname, "packages/sdk/src/index.ts"),
-			"@brainstorm/sdk-types": resolve(__dirname, "packages/sdk-types/src/index.ts"),
-			"@brainstorm/react-yjs": resolve(__dirname, "packages/react-yjs/src/index.ts"),
-			// CSS subpaths must precede the bare `@brainstorm/editor` alias — else
+			"@brainstorm-os/sdk/empty-state": resolve(__dirname, "packages/sdk/src/empty-state/index.ts"),
+			"@brainstorm-os/sdk/markdown.css": resolve(__dirname, "packages/sdk/src/markdown/markdown.css"),
+			"@brainstorm-os/sdk/markdown": resolve(__dirname, "packages/sdk/src/markdown/index.tsx"),
+			"@brainstorm-os/sdk": resolve(__dirname, "packages/sdk/src/index.ts"),
+			"@brainstorm-os/sdk-types": resolve(__dirname, "packages/sdk-types/src/index.ts"),
+			"@brainstorm-os/react-yjs": resolve(__dirname, "packages/react-yjs/src/index.ts"),
+			// CSS subpaths must precede the bare `@brainstorm-os/editor` alias — else
 			// it swallows the `/editor.css` suffix into `index.ts/editor.css`
 			// (boot-smoke evaluates an app entry that imports the stylesheet).
-			"@brainstorm/editor/editor.css": resolve(__dirname, "packages/editor/src/editor.css"),
-			"@brainstorm/editor/editor-theme.css": resolve(
+			"@brainstorm-os/editor/editor.css": resolve(__dirname, "packages/editor/src/editor.css"),
+			"@brainstorm-os/editor/editor-theme.css": resolve(
 				__dirname,
 				"packages/editor/src/editor-theme.css",
 			),
-			"@brainstorm/editor": resolve(__dirname, "packages/editor/src/index.ts"),
-			"@brainstorm/cli": resolve(__dirname, "packages/cli/src/index.ts"),
+			"@brainstorm-os/editor": resolve(__dirname, "packages/editor/src/index.ts"),
+			"@brainstorm-os/cli": resolve(__dirname, "packages/cli/src/index.ts"),
 			"@renderer": resolve(__dirname, "packages/shell/src/renderer"),
 		},
 	},

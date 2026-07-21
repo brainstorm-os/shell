@@ -1,6 +1,6 @@
 /**
  * Maps the Tasks runtime onto the structural slice the shared cross-app
- * object menu (`@brainstorm/sdk/object-menu`) needs. Both per-object
+ * object menu (`@brainstorm-os/sdk/object-menu`) needs. Both per-object
  * surfaces — task rows and project rows — go through ONE delegated
  * listener (`delegated-object-menu.ts`) that calls the shared
  * `openObjectMenu`, so the Open → Pin/Unpin → Remove order + chrome is
@@ -8,7 +8,7 @@
  * "Object menu"). This file is just the runtime adapter.
  */
 
-import type { ObjectMenuRuntime } from "@brainstorm/sdk/object-menu";
+import type { ObjectMenuRuntime } from "@brainstorm-os/sdk/object-menu";
 import type { TasksBrainstorm } from "../storage/runtime";
 
 /** Map the Tasks runtime onto the structural slice the shared menu

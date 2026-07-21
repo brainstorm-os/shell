@@ -20,8 +20,8 @@ import {
 	SEED_STANDIN_NODES,
 	createLocalProvider,
 	plantSerializedStateIntoDoc,
-} from "@brainstorm/editor";
-import { type YDocTransport, createYDocResolver } from "@brainstorm/react-yjs";
+} from "@brainstorm-os/editor";
+import { type YDocTransport, createYDocResolver } from "@brainstorm-os/react-yjs";
 import { createHeadlessEditor } from "@lexical/headless";
 import { createBinding, syncLexicalUpdateToYjs, syncYjsChangesToLexical } from "@lexical/yjs";
 import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";

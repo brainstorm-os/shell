@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/popover` — the app-side dialog/popover, mirroring the
+ * `@brainstorm-os/sdk/popover` — the app-side dialog/popover, mirroring the
  * shell's shared `<Popover>` call-site contract (`title` / `onClose` /
  * `children` / `footer?` / `size?` / `bodyPadding?` / `testId?`) so an
  * app's overlay chrome looks and behaves like the shell's: glass panel,

@@ -10,8 +10,8 @@
  * sibling context (a host that renders a value in isolation) renders an em-dash.
  */
 
-import { type CellProps, ValueType } from "@brainstorm/sdk-types";
-import { compileFormula } from "@brainstorm/sdk/formula";
+import { type CellProps, ValueType } from "@brainstorm-os/sdk-types";
+import { compileFormula } from "@brainstorm-os/sdk/formula";
 import type { JSX } from "react";
 import { useMemo } from "react";
 import { formatScalar } from "./format";

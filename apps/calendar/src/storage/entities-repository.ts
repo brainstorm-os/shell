@@ -5,10 +5,10 @@
  *
  * `save` is get-then-create-or-update keyed on `event.id`. The app's domain
  * `createdAt`/`updatedAt` stay in the property bag. Plumbing lives in
- * `@brainstorm/sdk/storage-repository`.
+ * `@brainstorm-os/sdk/storage-repository`.
  */
 
-import { createEntityRepository } from "@brainstorm/sdk/storage-repository";
+import { createEntityRepository } from "@brainstorm-os/sdk/storage-repository";
 import type { Event } from "../types/event";
 import { parseStoredEvent, serializeEvent } from "./codec";
 import type { EventsRepository } from "./repository";

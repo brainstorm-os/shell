@@ -1,6 +1,6 @@
 /**
  * Calendar shared-chrome smoke — verifies the SDK calendar primitive
- * (`@brainstorm/sdk/calendar` — MonthGrid + MiniCalendar) renders in
+ * (`@brainstorm-os/sdk/calendar` — MonthGrid + MiniCalendar) renders in
  * every consumer:
  *
  *  - Calendar app: month-view `.bs-cal-month`, sidebar mini `.bs-cal-mini`.

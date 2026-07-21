@@ -2,7 +2,7 @@
  * Plant a `SerializedEditorState` into a Yjs doc's universal body via a
  * one-shot headless `@lexical/yjs` binding.
  *
- * Why this lives in `@brainstorm/editor`: the operation is mechanically
+ * Why this lives in `@brainstorm-os/editor`: the operation is mechanically
  * the same across every app that backs an editor with the
  * shared-Y.Doc-root contract (Notes for legacy-body migration; Journal
  * for first-open seeding when the note's body lives in

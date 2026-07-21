@@ -8,8 +8,8 @@
  * caller wires `onDelete`), per the fail-safe destructive-action rule.
  */
 
-import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { useState } from "react";
 import { plural, t } from "../i18n";
 

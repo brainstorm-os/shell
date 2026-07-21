@@ -8,19 +8,19 @@
  * opens that bookmark in the Bookmarks app via the shell intent bus.
  */
 
-import { openEntity } from "@brainstorm/sdk";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
-import "@brainstorm/sdk/select-menu.css";
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import type { VaultEntitiesService } from "@brainstorm/sdk-types";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
+import { openEntity } from "@brainstorm-os/sdk";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import "@brainstorm-os/sdk/select-menu.css";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { plural, t } from "./i18n/manifest";

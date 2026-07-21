@@ -1,6 +1,6 @@
 /**
  * Person properties — thin adapters over the SHARED
- * `@brainstorm/sdk/properties-panel`. `personPropertyRows` maps a person's
+ * `@brainstorm-os/sdk/properties-panel`. `personPropertyRows` maps a person's
  * bridged fields (see `logic/person-properties.ts`) to the generic `rows`
  * the shared panel renders; the same rows feed BOTH surfaces: the inline
  * block at the top of the contact page (the Tasks-detail convention) and
@@ -9,9 +9,9 @@
  * Notes / Journal / Database / Bookmarks / Tasks.
  */
 
-import { EntityCommentsPanel } from "@brainstorm/editor";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
-import { readValue } from "@brainstorm/sdk/property-ui";
+import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
+import { readValue } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n";
 import {
 	PERSON_PROPERTY_DEFS,

@@ -2,9 +2,9 @@
  *  real folders grouped under its address. Selection drives the message
  *  list (`FolderSelection`). */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";
 import {

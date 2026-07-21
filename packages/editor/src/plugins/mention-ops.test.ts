@@ -1,4 +1,4 @@
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	detectMentionTrigger,

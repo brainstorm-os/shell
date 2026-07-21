@@ -25,7 +25,7 @@ import {
 	isValidMcpServerId,
 	isValidStdioArgs,
 	isValidStdioCommand,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { ipcMain } from "electron";
 import {
 	deleteMcpServerAuth,

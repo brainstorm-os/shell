@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ExportTextFormat } from "@brainstorm/sdk-types";
+import type { ExportTextFormat } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SaveFileService } from "../export-file";
 import { buildEntityExportItems, runEntityExport } from "./index";

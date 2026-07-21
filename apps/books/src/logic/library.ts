@@ -5,12 +5,12 @@
  *
  * App-local + pure. The *list itself* is a vault-entity list, so when the
  * real reads land (gated on 9.21.2) it flows through `useVaultEntities` /
- * `@brainstorm/react-yjs` per the reactivity rule — NOT a hand-rolled
+ * `@brainstorm-os/react-yjs` per the reactivity rule — NOT a hand-rolled
  * onChange→list→render loop. This module owns only the ordering math + the
  * write seam, both of which are reactivity-agnostic and testable today.
  */
 
-import { type DateBucketLabels, groupByDateBucket } from "@brainstorm/sdk/date-buckets";
+import { type DateBucketLabels, groupByDateBucket } from "@brainstorm-os/sdk/date-buckets";
 import { BOOK_ENTITY_TYPE, type Book } from "../types/book";
 import { bookFromEntity } from "./book-open";
 

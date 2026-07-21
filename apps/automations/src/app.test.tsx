@@ -1,16 +1,20 @@
-import { REMINDER_TYPE_URL, WORKFLOW_RUN_TYPE_URL, WORKFLOW_TYPE_URL } from "@brainstorm/sdk-types";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import {
+	REMINDER_TYPE_URL,
+	WORKFLOW_RUN_TYPE_URL,
+	WORKFLOW_TYPE_URL,
+} from "@brainstorm-os/sdk-types";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 // @vitest-environment jsdom
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutomationsApp } from "./app";
 import { flush, renderInto } from "./test/render";
 
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	mountMenuHost: vi.fn(),
 	MenuAlign: { Start: "start", End: "end" },
 }));
-vi.mock("@brainstorm/sdk/object-menu", () => ({
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
 }));
 

@@ -1,7 +1,7 @@
 /**
  * Builds the quick-look popover body — a definition list of the
  * `QuickLookSheet` rows. The popover chrome itself comes from the shared
- * `@brainstorm/sdk/popover` (`createPopoverElement`) in `app.ts`; this
+ * `@brainstorm-os/sdk/popover` (`createPopoverElement`) in `app.ts`; this
  * only produces the body node so the layout is testable in isolation.
  */
 

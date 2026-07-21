@@ -8,12 +8,12 @@
  * `openObjectMenu`; these are Database's app-specific menus.
  */
 
-import type { IconName } from "@brainstorm/sdk/icon";
+import type { IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type AnchoredMenuItem,
 	closeAnchoredMenu,
 	openAnchoredMenu,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 
 export type MenuItem = {
 	label: string;

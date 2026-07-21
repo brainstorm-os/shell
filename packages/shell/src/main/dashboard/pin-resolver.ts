@@ -18,8 +18,8 @@
  * registry, unchanged).
  */
 
-import type { Icon, PinResolution } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import type { Icon, PinResolution } from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { deriveEntityTitle } from "../entities/derive-title";
 import type { IconRecord } from "./dashboard-store";
 

@@ -24,7 +24,7 @@ import {
 	OS_HANDOFF_APP_LABEL,
 	OsHandoffSignatureKind,
 	osHandoffSignature,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { defaultHandlerKey } from "../dashboard/dashboard-store";
 
 /** The verb the Settings → Defaults surface configures. `open` is the one
@@ -51,7 +51,7 @@ export type DefaultsCatalogEntry = {
 };
 
 /** Sentinel app id used for "Open with the operating system" — the
- *  canonical source moved to `@brainstorm/sdk-types` (the open-resolution
+ *  canonical source moved to `@brainstorm-os/sdk-types` (the open-resolution
  *  contract owns the identity since the IntentsBus reads it on every
  *  external `open`). Re-exported here for backward-compat with code that
  *  imports it from the defaults catalog. */
@@ -95,7 +95,7 @@ export type DefaultsCatalog = {
 };
 
 /** Human label the renderer shows for the OS-handoff pick. Canonical
- *  source in `@brainstorm/sdk-types`; re-exported for backward-compat. */
+ *  source in `@brainstorm-os/sdk-types`; re-exported for backward-compat. */
 export { OS_HANDOFF_APP_LABEL };
 
 export type BuildDefaultsCatalogInput = {

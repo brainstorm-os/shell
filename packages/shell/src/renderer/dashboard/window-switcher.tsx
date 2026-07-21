@@ -8,7 +8,7 @@
  * surface lands (Stage 8). Live thumbnails are tracked in OQ-135.
  */
 
-import { useEscapeStackEntry } from "@brainstorm/sdk/a11y";
+import { useEscapeStackEntry } from "@brainstorm-os/sdk/a11y";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WindowEntry } from "../../shared/window-types";

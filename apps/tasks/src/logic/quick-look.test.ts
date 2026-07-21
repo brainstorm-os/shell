@@ -3,7 +3,7 @@
  * `intent.quick-look`. Field selection rules only emit rows with signal;
  * Status always anchors the sheet.
  */
-import { DEFAULT_RECURRENCE_LABELS, RecurrenceKind } from "@brainstorm/sdk-types";
+import { DEFAULT_RECURRENCE_LABELS, RecurrenceKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";

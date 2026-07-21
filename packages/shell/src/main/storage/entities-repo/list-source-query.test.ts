@@ -14,9 +14,14 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CompositeOp, LinkDirection, type ListSource, ListSourceKind } from "@brainstorm/sdk-types";
-import type { InMemoryVault } from "@brainstorm/sdk/in-memory-entities";
-import { evaluateSource } from "@brainstorm/sdk/predicate-eval";
+import {
+	CompositeOp,
+	LinkDirection,
+	type ListSource,
+	ListSourceKind,
+} from "@brainstorm-os/sdk-types";
+import type { InMemoryVault } from "@brainstorm-os/sdk/in-memory-entities";
+import { evaluateSource } from "@brainstorm-os/sdk/predicate-eval";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	LIST_SOURCE_MAX_CHILDREN,

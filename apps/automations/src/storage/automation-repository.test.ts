@@ -9,7 +9,7 @@ import {
 	TriggerKind,
 	WORKFLOW_TYPE_URL,
 	type WorkflowDef,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { WORKFLOW_TEMPLATES } from "../logic/templates";
 import { type AutomationBundle, importAutomation } from "../logic/transfer";

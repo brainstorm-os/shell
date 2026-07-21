@@ -13,7 +13,7 @@
  * land via text-extraction (Phase 2) / image vision (Phase 3).
  */
 
-import { AttachmentKind, type MessageAttachment } from "@brainstorm/sdk-types";
+import { AttachmentKind, type MessageAttachment } from "@brainstorm-os/sdk-types";
 
 /** A resolved vault object, reduced to what grounding needs. */
 export type ReferencedEntity = {

@@ -8,7 +8,7 @@ import {
 	OpenWithDecisionKind,
 	OsHandoffConsent,
 	OsHandoffPromptDecision,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppSignatureStatus } from "../apps/app-signature";
 import { DEFAULT_INSTALL_PROVENANCE } from "../apps/install-provenance";

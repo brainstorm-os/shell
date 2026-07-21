@@ -1,4 +1,4 @@
-import { SendIntentVerb } from "@brainstorm/sdk-types";
+import { SendIntentVerb } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { buildComposeEmailEnvelope } from "./draft-as-email";
 

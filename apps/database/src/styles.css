@@ -42,12 +42,12 @@ body {
 /* ── App header ────────────────────────────────────────────────────────── */
 
 /* Header chrome (flex skeleton, left/right groups, drag region, height /
- * padding) is the shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`;
+ * padding) is the shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`;
  * the glass surface is the shared default — no modifier needed. Only the
  * bespoke object-icon stays local. */
 
 /* Per-object icon mounted by the app header: shared `bs-icon-pick` button
- * from `@brainstorm/sdk/picker-host` (same control Notes' header uses for
+ * from `@brainstorm-os/sdk/picker-host` (same control Notes' header uses for
  * its note icon). Sits left of the subtitle so the header reads as
  *   [back/fwd] [object icon] [object name] [⋯]
  * — the universal header-navigation pattern. */
@@ -59,7 +59,7 @@ body {
 
 /* The header leads with the document: nav buttons → active-list name,
    rendered with the shared `.app-header__title` face from
-   `@brainstorm/sdk/app-theme.css`. */
+   `@brainstorm-os/sdk/app-theme.css`. */
 
 .db-search-input {
 	height: var(--control-height-md, 32px);
@@ -277,7 +277,7 @@ body.is-resizing .db-inspector__resize {
 }
 
 /* The source list is the scroll viewport; the SDK's `.bs-vlist__spacer`
- * (from `@brainstorm/sdk/virtual-list.css`) carries the full virtual height
+ * (from `@brainstorm-os/sdk/virtual-list.css`) carries the full virtual height
  * and rows are absolutely positioned within it. */
 .db-sidebar__list {
 	flex: 1;
@@ -351,7 +351,7 @@ body.is-resizing .db-inspector__resize {
 }
 
 /* The list-row count pill is the shared `.bs-count-badge`
- * (`@brainstorm/sdk/count-badge`) — no per-app pill CSS. */
+ * (`@brainstorm-os/sdk/count-badge`) — no per-app pill CSS. */
 
 /* The collapsed "System" disclosure under the user's lists (F-212) —
  * follows the section-header face (xs uppercase, dim) but is a clickable
@@ -431,7 +431,7 @@ body.is-resizing .db-inspector__resize {
 }
 
 /* The icon affordance itself is the shared `.bs-icon-pick` component
- * (markup: @brainstorm/sdk/picker-host; look: shell app-theme). This host
+ * (markup: @brainstorm-os/sdk/picker-host; look: shell app-theme). This host
  * span only keeps it as a non-shrinking flex item on the title row. */
 .db-stage__icon-host {
 	display: inline-flex;

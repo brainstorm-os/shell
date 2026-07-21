@@ -97,8 +97,8 @@ jobs:
           # (same posture as alpha.yml / release.yml after v0.4.3).
           CARGO_BUILD_JOBS: 2
         run: |
-          bun run --filter @brainstorm/native ${{ matrix.napi-script }}
-          bun run --filter @brainstorm/shell build
+          bun run --filter @brainstorm-os/native ${{ matrix.napi-script }}
+          bun run --filter @brainstorm-os/shell build
           bun run build:apps
 
       - name: Package (unsigned)

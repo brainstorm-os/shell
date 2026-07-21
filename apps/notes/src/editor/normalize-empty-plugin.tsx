@@ -17,8 +17,8 @@
  * untouched, so a normal open produces no write and no undo step.
  */
 
-import { $isTitleNode, enforceTitleInvariant } from "@brainstorm/editor";
-import { isUniversalBodyEmpty } from "@brainstorm/react-yjs";
+import { $isTitleNode, enforceTitleInvariant } from "@brainstorm-os/editor";
+import { isUniversalBodyEmpty } from "@brainstorm-os/react-yjs";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $createParagraphNode, $createTextNode, $getRoot, type RootNode } from "lexical";
 import { useEffect } from "react";

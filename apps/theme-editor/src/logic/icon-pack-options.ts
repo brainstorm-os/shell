@@ -4,7 +4,7 @@
  * the theme's current `iconPack` reference back to the selected choice.
  */
 
-import { BUILTIN_ICON_PACK, type ThemeComponentRef, ThemeRefKind } from "@brainstorm/sdk-types";
+import { BUILTIN_ICON_PACK, type ThemeComponentRef, ThemeRefKind } from "@brainstorm-os/sdk-types";
 
 export const BUILTIN_CHOICE_KEY = "builtin";
 

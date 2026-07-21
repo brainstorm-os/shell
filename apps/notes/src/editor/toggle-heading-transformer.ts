@@ -10,13 +10,13 @@
  * helper (that appends the line's inline children straight onto the new node);
  * a `ToggleNode` holds *block* children (`[title, body]`), so the custom
  * `replace` wraps the post-marker inline content into the title paragraph,
- * exactly mirroring `INSERT_TOGGLE_COMMAND` in `@brainstorm/editor`'s
+ * exactly mirroring `INSERT_TOGGLE_COMMAND` in `@brainstorm-os/editor`'s
  * toggle-plugin. The `#> ` grammar is disjoint from the built-in heading
  * shortcut (`# ` requires whitespace immediately after the `#`s; `#>` has `>`),
  * so the two never collide.
  */
 
-import { $createToggleNode, ToggleNode, ToggleVariant } from "@brainstorm/editor";
+import { $createToggleNode, ToggleNode, ToggleVariant } from "@brainstorm-os/editor";
 import type { ElementTransformer } from "@lexical/markdown";
 import { $createParagraphNode } from "lexical";
 

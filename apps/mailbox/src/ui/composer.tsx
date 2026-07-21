@@ -10,11 +10,11 @@ import {
 	CompactEditor,
 	type CompactEditorHandle,
 	type CompactEditorPayload,
-} from "@brainstorm/editor";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
-import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellcheck";
+} from "@brainstorm-os/editor";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm-os/sdk/spellcheck";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";

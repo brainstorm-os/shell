@@ -1,6 +1,6 @@
 /**
- * `@brainstorm/sdk/find-replace` — the shared in-document find & replace
- * primitive (doc 59), same shape as `@brainstorm/sdk/nav-history`.
+ * `@brainstorm-os/sdk/find-replace` — the shared in-document find & replace
+ * primitive (doc 59), same shape as `@brainstorm-os/sdk/nav-history`.
  *
  * B9.1a (this): the pure `createFindController` + the `TextSearchProvider`
  * seam + shared chord ids + shared labels — model-level, no DOM (the

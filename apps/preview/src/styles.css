@@ -45,7 +45,7 @@ button {
 }
 
 /* Header chrome (flex skeleton, left/right groups, drag region, skin) is the
- * shared `.app-header` rule in `@brainstorm/sdk/app-theme.css`. */
+ * shared `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. */
 
 
 /* ── App layout ──────────────────────────────────────────────────────── */
@@ -255,7 +255,7 @@ button {
 }
 
 /* The inspector toggle is the shared `.bs-panel-toggle`
- * (`@brainstorm/sdk/panel-toggle`) — no app-local toggle chrome. */
+ * (`@brainstorm-os/sdk/panel-toggle`) — no app-local toggle chrome. */
 
 /* ── Body: stage + inspector ─────────────────────────────────────────── */
 
@@ -316,7 +316,7 @@ button {
 }
 
 /* The first-impression empty state ("Nothing to preview") renders through the
- * shared `@brainstorm/sdk/empty-state` (Hero tone). `.preview__stage`'s
+ * shared `@brainstorm-os/sdk/empty-state` (Hero tone). `.preview__stage`'s
  * `place-items: center` + the surface's own `width/min-height: 100%` keep the
  * card centered in the full stage. */
 
@@ -351,7 +351,7 @@ button {
 }
 
 /* The active panel (Properties or Comments) fills below the tab strip; the
- * strip itself (`.bs-panel-tabs`) is the shared `@brainstorm/editor`
+ * strip itself (`.bs-panel-tabs`) is the shared `@brainstorm-os/editor`
  * CommentsRightPanel chrome (mirrors Journal's `.journal__props` rule). */
 .preview__inspector > :not(.bs-panel-tabs) {
 	flex: 1 1 0;

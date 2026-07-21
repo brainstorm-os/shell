@@ -3,14 +3,14 @@
  * a host document via the BP block frame. Shows the bookmark's favicon, title,
  * and host; a click opens the bookmark in the Bookmarks app. Read-only (a
  * bookmark's edits live in the app). Runs in the sandbox (no ambient
- * authority) via `@brainstorm/sdk/block-runtime`. Pure DOM.
+ * authority) via `@brainstorm-os/sdk/block-runtime`. Pure DOM.
  *
  * The favicon is rendered only when it is a `data:` URI — the block frame CSP
  * is `img-src data:` (no remote pixels), so a scraped `https://` faviconUrl
  * can't load inside the frame and is dropped in favour of the text monogram.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 
 interface BpEntity {
 	entityId: string;

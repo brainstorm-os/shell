@@ -5,7 +5,7 @@
  * PropertyDef → its `vocabulary.dictionaryId` → the matching
  * DictionaryItem's `colour`).
  *
- * Both walks go through `@brainstorm/sdk/property-ui/pure` so the
+ * Both walks go through `@brainstorm-os/sdk/property-ui/pure` so the
  * Database app and Notes share one implementation of the colour /
  * dictionary algebra (the VP-7 point — zero duplicated property logic).
  * Standalone (no `window.brainstorm`) keeps the demo fallbacks: no
@@ -15,8 +15,8 @@
  * the dictionary entry's colour — chrome tokens never substitute for it.
  */
 
-import type { Dictionary, PropertiesSnapshot, PropertyDef } from "@brainstorm/sdk-types";
-import { activeItems } from "@brainstorm/sdk/property-ui/pure";
+import type { Dictionary, PropertiesSnapshot, PropertyDef } from "@brainstorm-os/sdk-types";
+import { activeItems } from "@brainstorm-os/sdk/property-ui/pure";
 
 export type VocabResolver = (propertyId: string, value: string) => string | null;
 export type VocabLabelResolver = (propertyId: string, optionId: string) => string | undefined;

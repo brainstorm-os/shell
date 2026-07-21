@@ -14,13 +14,13 @@ import {
 	RecurrenceKind,
 	type ReminderDef,
 	rruleToRecurrence,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type TimeTriggerConfig, computeNextFire } from "./trigger-schedule";
 
 // The Done/Snooze transitions are now the one shared definition in
-// `@brainstorm/sdk-types` (the Automations app reuses them); re-export so
+// `@brainstorm-os/sdk-types` (the Automations app reuses them); re-export so
 // this module stays the runner's single import surface.
-export { completeReminder, snoozeReminder } from "@brainstorm/sdk-types";
+export { completeReminder, snoozeReminder } from "@brainstorm-os/sdk-types";
 
 /** A reminder's RRULE text → structured `Recurrence`. The shared parser
  *  returns `null` only for an empty string (callers gate on a non-empty

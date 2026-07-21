@@ -18,7 +18,7 @@ import {
 	type ThemeComponentRef,
 	type ThemeDef,
 	ThemeRefKind,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export enum ThemeSlot {
 	TokenSet = "tokenSet",

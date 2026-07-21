@@ -25,7 +25,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { COMPANY_TYPE } from "../entities/company-migration";
 
 const MULTI: Cardinality = { min: 0, max: 5 };

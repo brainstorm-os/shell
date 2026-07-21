@@ -15,7 +15,7 @@
  *   4. entityTitleSource — the Link cell's vault title lookup.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 
 export type KeyLike = KeyboardEvent | { key: string; nativeEvent?: { key: string } };
 

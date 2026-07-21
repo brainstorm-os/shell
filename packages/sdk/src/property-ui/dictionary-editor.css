@@ -4,12 +4,12 @@
  *
  * Canonical home for these rules: the editor is an SDK component, so any
  * app that mounts `<PropertiesProvider>` (which auto-mounts the editor
- * host) can `import "@brainstorm/sdk/property-ui/dictionary-editor.css"`
+ * host) can `import "@brainstorm-os/sdk/property-ui/dictionary-editor.css"`
  * and get a working, styled "Manage values…".
  *
  * NOTE: the `notes__dict*` class names are retained verbatim to match the
  * component + its existing duplicate copies in `notes/styles.css` and
- * `@brainstorm/editor`'s `editor-theme.css`. Renaming to a `bs-dict*`
+ * `@brainstorm-os/editor`'s `editor-theme.css`. Renaming to a `bs-dict*`
  * prefix and removing those two duplicates is queued for the right-panel
  * consistency pass.
  */

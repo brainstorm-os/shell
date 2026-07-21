@@ -4,7 +4,7 @@ import {
 	GLM_PROVIDER_ID,
 	MessageRole,
 	OPENAI_PROVIDER_ID,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type OpenAiHttp, createOpenAiProvider } from "./openai-provider";
 

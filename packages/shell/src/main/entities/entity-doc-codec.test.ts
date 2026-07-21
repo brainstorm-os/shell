@@ -2,7 +2,7 @@ import {
 	ENTITY_LINKS_ARRAY_NAME,
 	ENTITY_PROPS_MAP_NAME,
 	UNIVERSAL_BODY_FRAGMENT_NAME,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { readEntityDocProjection, writeEntityLinks, writeEntityProps } from "./entity-doc-codec";

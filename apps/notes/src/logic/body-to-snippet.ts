@@ -22,14 +22,14 @@
  * resolver here (refcounting every row across the virtualised list
  * isn't worth the snippet); callers carry a denormalised mirror in
  * `StoredNote.body` written from the autosave commit's
- * SerializedEditorState. See `@brainstorm/editor`'s `extractPlainText`
+ * SerializedEditorState. See `@brainstorm-os/editor`'s `extractPlainText`
  * for the SerializedEditorState-side walker.
  */
 
-import { DEFAULT_SNIPPET_LENGTH, clipPlainText } from "@brainstorm/editor";
+import { DEFAULT_SNIPPET_LENGTH, clipPlainText } from "@brainstorm-os/editor";
 import * as Y from "yjs";
 
-export { DEFAULT_SNIPPET_LENGTH } from "@brainstorm/editor";
+export { DEFAULT_SNIPPET_LENGTH } from "@brainstorm-os/editor";
 
 export function bodyToSnippet(body: Y.XmlText, maxChars: number = DEFAULT_SNIPPET_LENGTH): string {
 	const parts: string[] = [];

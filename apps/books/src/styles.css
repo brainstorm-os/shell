@@ -2,7 +2,7 @@
  * Books reader styling for the 9.21.1.5 preview drop. Only references real
  * theme tokens (the `--color-*`/`--space-*` values) and the app-theme
  * aliases (`--text`, `--bg`, `--accent`, …) — no phantom vars. The
- * `.app-header` chrome itself is owned by @brainstorm/sdk/app-theme.css;
+ * `.app-header` chrome itself is owned by @brainstorm-os/sdk/app-theme.css;
  * this file styles only the reader body + header deltas.
  *
  * The `--reader-*` vars are scoped to `.books` (the reading surface) so the

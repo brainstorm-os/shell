@@ -15,7 +15,7 @@
  *     vault `propertyStore`/`dictionaryStore` first, then calls `onPick`
  *     with its key). The host decides what "pick" means — bind a value,
  *     insert an editor block, append to a list.
- *   - `labels` defaults to the English `@brainstorm/sdk/i18n` set; a
+ *   - `labels` defaults to the English `@brainstorm-os/sdk/i18n` set; a
  *     localised host passes a `Partial` of just the keys it translates.
  *
  * Must render inside a `<PropertiesProvider>` (it reads the vault stores)
@@ -23,7 +23,7 @@
  * chrome via `mountMenuHost()`).
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type AddPropertyPickerLabels,

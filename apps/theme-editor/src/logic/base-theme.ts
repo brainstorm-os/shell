@@ -1,6 +1,6 @@
 /**
  * Bridge between the editor and the built-in themes shipped in
- * `@brainstorm/tokens`. The editor edits a theme by **forking a base** —
+ * `@brainstorm-os/tokens`. The editor edits a theme by **forking a base** —
  * one of the six built-ins (Default Dark/Light, Midnight, Sepia, High
  * Contrast, Solar) — and layering token overrides on top; the base
  * supplies the grid's reference column and the in-editor preview's
@@ -8,7 +8,7 @@
  * editor opens looking like the running app (not a forced light palette).
  */
 
-import { TokenSetAppearance } from "@brainstorm/sdk-types";
+import { TokenSetAppearance } from "@brainstorm-os/sdk-types";
 import {
 	DEFAULT_THEME_BY_APPEARANCE,
 	ThemeAppearance,
@@ -17,7 +17,7 @@ import {
 	themeAppearance,
 	themeCatalog,
 	themes,
-} from "@brainstorm/tokens";
+} from "@brainstorm-os/tokens";
 
 export type BuiltinThemeOption = { name: ThemeName; appearance: TokenSetAppearance };
 

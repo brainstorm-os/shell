@@ -24,7 +24,7 @@ export type ComingSoonLabels = {
 /**
  * Render the placeholder into `root`, replacing any existing content. Uses
  * `textContent` for every string so a translated label can never inject
- * markup. Styling comes from `@brainstorm/sdk/coming-soon/coming-soon.css`
+ * markup. Styling comes from `@brainstorm-os/sdk/coming-soon/coming-soon.css`
  * (the caller imports it once); this helper only builds the DOM.
  */
 export function mountComingSoon(root: HTMLElement, labels: ComingSoonLabels): void {

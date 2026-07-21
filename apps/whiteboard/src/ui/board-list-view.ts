@@ -1,6 +1,6 @@
 /**
  * Board-switcher list view for the left object-navigation sidebar (B8.2).
- * Renders one row per board and wires the shared `@brainstorm/sdk/a11y`
+ * Renders one row per board and wires the shared `@brainstorm-os/sdk/a11y`
  * composite-keyboard binding so Arrow keys rove a cursor across the rows
  * (vertical listbox) and Enter / Space switches to the focused board —
  * the same effect as a click. The container + row roles + roving tabindex
@@ -10,9 +10,9 @@
  * without mounting the Pixi canvas app.
  */
 
-import { Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import type { CompositeKeyboardHandle } from "@brainstorm/sdk/a11y";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
+import { Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import type { CompositeKeyboardHandle } from "@brainstorm-os/sdk/a11y";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
 import type { Whiteboard } from "../types/whiteboard";
 
 export type BoardListViewOptions = {

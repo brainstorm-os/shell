@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RecurrenceKind } from "@brainstorm/sdk-types";
+import { RecurrenceKind } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DataStores } from "../storage/data-stores";
 import { SchedulerFiresRepository } from "../storage/registry-repo/scheduler-fires-repo";

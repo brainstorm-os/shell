@@ -13,7 +13,7 @@
  * the host calls it on every navigation.
  */
 
-import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
+import { Orientation, SelectionAttribute, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { t } from "../i18n";
 import { formatExifPairs, parseExif } from "../logic/exif";
 import {

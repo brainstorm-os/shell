@@ -27,7 +27,7 @@ export enum IconName {
 	CaretLeft = "caret-left",
 	CaretRight = "caret-right",
 	// Select-menu glyphs — trigger caret + selected-option check (the shared
-	// `@brainstorm/sdk/select-menu` control).
+	// `@brainstorm-os/sdk/select-menu` control).
 	CaretDown = "caret-down",
 	// Stepper / sort-direction / reorder glyphs — minus (zoom-out, numeric
 	// steppers), the up caret (sort-ascending, move-up), and the six-dot drag

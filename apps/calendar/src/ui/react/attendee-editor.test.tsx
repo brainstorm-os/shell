@@ -5,7 +5,7 @@ import {
 	type ContextMenuItem,
 	closeContextMenu,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { type ReactElement, act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ATTENDEE_RSVPS } from "../../logic/attendees";

@@ -1,4 +1,4 @@
-import { createEditorT, createStandardBlockCommands } from "@brainstorm/editor";
+import { createEditorT, createStandardBlockCommands } from "@brainstorm-os/editor";
 import { describe, expect, it } from "vitest";
 import { BOOKMARK_BLOCK_PALETTE } from "./block-palette";
 

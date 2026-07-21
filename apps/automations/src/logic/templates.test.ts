@@ -3,7 +3,7 @@ import {
 	aggregateWorkflowCapabilities,
 	isValidTrigger,
 	isValidWorkflow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { WORKFLOW_TEMPLATES, instantiateTemplate, templateById } from "./templates";
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { PdfEngineDocument, PdfEnginePage } from "@brainstorm/sdk/pdf-engine";
+import type { PdfEngineDocument, PdfEnginePage } from "@brainstorm-os/sdk/pdf-engine";
 import { describe, expect, it, vi } from "vitest";
 import { enginePagePort } from "./pdf-engine-port";
 

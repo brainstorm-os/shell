@@ -5,7 +5,7 @@
  * composed with the picker's close action.
  *
  * The pure search + classification helpers (`filterProperties`,
- * `categorizeProperty`, …) now live in `@brainstorm/sdk/property-ui` so
+ * `categorizeProperty`, …) now live in `@brainstorm-os/sdk/property-ui` so
  * every properties panel shares one picker; they're re-exported here for
  * the existing Notes call sites + unit tests.
  *
@@ -33,7 +33,7 @@ export {
 	categorizeProperty,
 	filterProperties,
 	isMultiProperty,
-} from "@brainstorm/sdk/property-ui/pure";
+} from "@brainstorm-os/sdk/property-ui/pure";
 
 /** Replace an existing paragraph (the one the user typed `/property`
  *  into) with a `PropertyBlockNode` bound to `propertyKey`. Caret

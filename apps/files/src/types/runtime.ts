@@ -8,7 +8,7 @@
  * replaces only the broker registration behind it, never this shape.
  */
 
-import type { StoredAsset } from "@brainstorm/sdk-types";
+import type { StoredAsset } from "@brainstorm-os/sdk-types";
 
 export type VaultEntityShape = {
 	id: string;
@@ -65,7 +65,7 @@ export type BrainstormRuntime = {
 			onChange?(listener: () => void): BrainstormSubscription;
 		};
 		/** Real entities service (Stage 9.3). Only the surface the Files app
-		 *  uses is typed here — full surface is in `@brainstorm/sdk-types`.
+		 *  uses is typed here — full surface is in `@brainstorm-os/sdk-types`.
 		 *  Writes are gated by `entities.write:brainstorm/Folder/v1` +
 		 *  `entities.write:brainstorm/File/v1` in the manifest. */
 		entities?: {
@@ -105,7 +105,7 @@ export type BrainstormRuntime = {
 		};
 		/** Files host service (9.10) — `requestOpen` + `import` drive the
 		 *  9.8.5 create-flow upload (the second, byte-storing half). The
-		 *  shape mirrors the subset of `@brainstorm/sdk-types` `FilesService`
+		 *  shape mirrors the subset of `@brainstorm-os/sdk-types` `FilesService`
 		 *  this app consumes; the broker / SDK proxy expose the full surface. */
 		files?: {
 			requestOpen(opts?: {
@@ -133,7 +133,7 @@ export type BrainstormRuntime = {
 			listStorageInventory?(): Promise<ReadonlyArray<StoredAsset>>;
 			/** Save dialog + write-back (DND-6 — the keyboard twin of the DND-5
 			 *  drag-out). `files.write`-gated; absent on older shells. Shapes
-			 *  mirror the `@brainstorm/sdk-types` `FilesService` subset. */
+			 *  mirror the `@brainstorm-os/sdk-types` `FilesService` subset. */
 			requestSave?(opts?: {
 				readonly title?: string;
 				readonly filters?: ReadonlyArray<{
@@ -149,7 +149,7 @@ export type BrainstormRuntime = {
 		};
 		/** Cross-app DnD host (DND-5). Only `exportFile` (drag a file OUT to the
 		 *  OS via `webContents.startDrag`) is consumed here. Cap `dnd.exportFile`
-		 *  in the manifest; the full surface is in `@brainstorm/sdk-types`. */
+		 *  in the manifest; the full surface is in `@brainstorm-os/sdk-types`. */
 		dnd?: {
 			exportFile(args: { name: string; bytes: Uint8Array }): Promise<{ started: boolean }>;
 		};

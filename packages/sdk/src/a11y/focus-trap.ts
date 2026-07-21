@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/a11y` focus-trap stack — the pure stack-bookkeeping half
+ * `@brainstorm-os/sdk/a11y` focus-trap stack — the pure stack-bookkeeping half
  * of `useFocusTrap`. NO DOM. KBN-1b will sit on top of this and own the
  * inert-siblings / initial-focus / restore-on-close DOM work.
  *

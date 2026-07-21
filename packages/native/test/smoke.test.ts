@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-describe("@brainstorm/native — NAPI-1 foundation", () => {
+describe("@brainstorm-os/native — NAPI-1 foundation", () => {
 	it("loads the compiled .node binary and round-trips an int through Rust", async () => {
 		const mod = (await import("../index.js")) as { smokeSum: (a: number, b: number) => number };
 		expect(mod.smokeSum(40, 2)).toBe(42);

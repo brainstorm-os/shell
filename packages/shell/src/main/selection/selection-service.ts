@@ -22,8 +22,8 @@
  * cap not held → `Denied`.
  */
 
-import type { ObjectDragItem, SelectionSnapshot } from "@brainstorm/sdk-types";
-import { hardenObjectDragItems } from "@brainstorm/sdk/entity-drag";
+import type { ObjectDragItem, SelectionSnapshot } from "@brainstorm-os/sdk-types";
+import { hardenObjectDragItems } from "@brainstorm-os/sdk/entity-drag";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";

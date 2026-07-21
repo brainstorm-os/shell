@@ -1,5 +1,5 @@
 /**
- * FileBlockNode — extracted to `@brainstorm/editor` (the shared media
+ * FileBlockNode — extracted to `@brainstorm-os/editor` (the shared media
  * stack). Re-exported here for Notes' node set + commands; `formatBytes`
  * is consumed by the media-files test.
  */
@@ -11,4 +11,4 @@ export {
 	FileBlockNode,
 	formatBytes,
 	type SerializedFileBlockNode,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

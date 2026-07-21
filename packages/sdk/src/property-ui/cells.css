@@ -1,6 +1,6 @@
 /*
  * Property-value cell chrome — the resting + edit visuals for the shared
- * property cells (`@brainstorm/sdk/property-ui` cells: pill / plain / date /
+ * property cells (`@brainstorm-os/sdk/property-ui` cells: pill / plain / date /
  * checkbox / tag / link / file / progress / popover). MOVED here from the Notes
  * app so EVERY app that renders a property cell gets identical styling (the
  * cells emit `.bs-cell-*` classes). Loaded via `app-theme.css`.

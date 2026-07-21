@@ -1,17 +1,17 @@
 /**
  * Language detection for the editor. The detector itself lives in
- * `@brainstorm/sdk/language-detect` (shared with the Preview app); this
+ * `@brainstorm-os/sdk/language-detect` (shared with the Preview app); this
  * module re-exports the per-signal helpers and names the editor's
  * `Unknown`-fallback resolver (`resolveLanguage`).
  */
 
-import { type CodeLanguage, detectLanguage } from "@brainstorm/sdk/language-detect";
+import { type CodeLanguage, detectLanguage } from "@brainstorm-os/sdk/language-detect";
 
 export {
 	languageForExtension,
 	languageForMime,
 	languageForShebang,
-} from "@brainstorm/sdk/language-detect";
+} from "@brainstorm-os/sdk/language-detect";
 
 /**
  * Resolves the best-guess language for a file: special filename / extension

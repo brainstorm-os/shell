@@ -1,6 +1,6 @@
 /**
  * Declared keyboard chords for the Journal app. Chord strings use the
- * shared `@brainstorm/sdk/shortcut` syntax (`[<Mod>+]<Key>`); they are
+ * shared `@brainstorm-os/sdk/shortcut` syntax (`[<Mod>+]<Key>`); they are
  * bound in `app.ts` via `attachShortcut`. Centralised here (not inline
  * `e.key`) so the keyboard contract is greppable and the parser is the
  * shared one — per the no-raw-`e.key` convention.

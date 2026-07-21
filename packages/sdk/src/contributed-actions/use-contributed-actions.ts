@@ -16,7 +16,7 @@ import {
 	type ContributedAction,
 	type ContributedActionGroup,
 	groupContributedActions,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseContributedActionsInput } from "./types";
 

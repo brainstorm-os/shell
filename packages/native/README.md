@@ -1,4 +1,4 @@
-# `@brainstorm/native`
+# `@brainstorm-os/native`
 
 Native NAPI-RS bindings for the Brainstorm shell. Foundation for the post-beta `NAPI-1..4` performance track:
 
@@ -17,10 +17,10 @@ Native NAPI-RS bindings for the Brainstorm shell. Foundation for the post-beta `
 
 ```sh
 # host triple (release)
-bun run --filter @brainstorm/native build
+bun run --filter @brainstorm-os/native build
 
 # host triple (debug — faster compile, big binary, used by tests)
-bun run --filter @brainstorm/native build:debug
+bun run --filter @brainstorm-os/native build:debug
 ```
 
 Produces `brainstorm-native.<platform>-<arch>.node` + an auto-generated `index.js` + `index.d.ts` at the package root. All three are gitignored; consumers run `build` before importing.
@@ -28,7 +28,7 @@ Produces `brainstorm-native.<platform>-<arch>.node` + an auto-generated `index.j
 ## Test
 
 ```sh
-bun run --filter @brainstorm/native test
+bun run --filter @brainstorm-os/native test
 ```
 
 Builds debug + runs the smoke vitest at `test/smoke.test.ts`. The test is package-local on purpose — the root `bun run test` does **not** invoke it (the `.node` binary isn't part of the workspace include glob) so a fresh `bun install` doesn't fail before the first build.
@@ -36,8 +36,8 @@ Builds debug + runs the smoke vitest at `test/smoke.test.ts`. The test is packag
 ## Adding a function
 
 1. Add `#[napi] pub fn my_thing(...) -> ...` to `src/lib.rs`. Use `napi_derive` types — `String`, `Vec<u8>`, `Option<T>`, simple primitives all marshal cleanly.
-2. `bun run --filter @brainstorm/native build` to regenerate `index.js` + `index.d.ts`.
-3. Import from `@brainstorm/native` in the consumer (shell main, app worker, etc.). The package is a Bun workspace member, so the name resolves without extra config.
+2. `bun run --filter @brainstorm-os/native build` to regenerate `index.js` + `index.d.ts`.
+3. Import from `@brainstorm-os/native` in the consumer (shell main, app worker, etc.). The package is a Bun workspace member, so the name resolves without extra config.
 4. Add a unit test under `test/` mirroring `smoke.test.ts`.
 
 ## Distribution

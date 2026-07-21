@@ -9,8 +9,8 @@
  * with the shell-side store re-validating at the broker boundary.
  */
 
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { PropertyKindPreset, ValueType } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { PropertyKindPreset, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	SUPPORTED_PRESETS,

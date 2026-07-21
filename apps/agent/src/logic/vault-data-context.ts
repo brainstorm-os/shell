@@ -13,8 +13,8 @@
  * (like `AGENT_TOOL_SYSTEM_PROMPT`), no `t()`.
  */
 
-import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+import { COLLECTION_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 
 /** Types listed in the tally before collapsing the tail into "and N more". */
 const MAX_TYPES_RENDERED = 12;

@@ -3,7 +3,7 @@
  * `window.__brainstormNotesDev`, so the dogfood harness can write a
  * daily-log body without synthetic keystrokes (which corrupt the
  * Yjs-bound editor in headless Electron — see the shared
- * `@brainstorm/editor` dev-bench primitives this builds on).
+ * `@brainstorm-os/editor` dev-bench primitives this builds on).
  *
  * Minimal surface: Journal's in-place day editor is intentionally light
  * (no tables / code / embeds — power users open the day in Notes for the
@@ -17,7 +17,7 @@
  * harness working without a rebuild.
  */
 
-import { EditorCapturePlugin, devAppendParagraph } from "@brainstorm/editor";
+import { EditorCapturePlugin, devAppendParagraph } from "@brainstorm-os/editor";
 import type { LexicalEditor } from "lexical";
 import { type ReactElement, useCallback } from "react";
 

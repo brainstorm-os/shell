@@ -19,7 +19,7 @@
  * hydrates. The host caps remounts so a genuinely unhydratable doc can't loop.
  */
 
-import { universalBodyBlockCount } from "@brainstorm/react-yjs";
+import { universalBodyBlockCount } from "@brainstorm-os/react-yjs";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot } from "lexical";
 import { useEffect } from "react";

@@ -1,5 +1,5 @@
 /* Structural rules only. Colours, the `.app-header` chrome, glass, and the
-   primary button come from the shell-injected @brainstorm/sdk app-theme. */
+   primary button come from the shell-injected @brainstorm-os/sdk app-theme. */
 :root {
 	color-scheme: light dark;
 }
@@ -31,7 +31,7 @@ body {
 
 /* Header chrome — flex skeleton, left/right groups, the `<h1>` title face,
  * height / padding / drag region — is the shared `.app-header` rule in
- * `@brainstorm/sdk/app-theme.css`. Only the agent-specific delta stays local. */
+ * `@brainstorm-os/sdk/app-theme.css`. Only the agent-specific delta stays local. */
 .app-header__left {
 	flex: 1 1 auto;
 }

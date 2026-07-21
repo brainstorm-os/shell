@@ -5,7 +5,7 @@ import type { UserConfig } from "vite";
  * Shared Vite config factory for a first-party app's BP block bundle build
  * (`vite.blocks.config.ts`). Each declared block compiles to a SINGLE
  * self-contained IIFE that runs inside the sandboxed opaque-origin block frame
- * — the host inlines it into the frame's srcdoc (`@brainstorm/sdk/block-frame`
+ * — the host inlines it into the frame's srcdoc (`@brainstorm-os/sdk/block-frame`
  * buildBlockSrcdoc). The frame CSP is `default-src 'none'` (no network), so
  * EVERYTHING is inlined: no externals, no code-split chunks, no asset URLs.
  *

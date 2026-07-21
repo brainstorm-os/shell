@@ -18,9 +18,9 @@
  * This module owns only the shared, app-dep-free pieces: the type id, the
  * `templateKind` enum, the `Template` app-facing shape, and the property-bag
  * partition (which keys are template control/presentation vs the prototype
- * to copy). The codec + instantiation live in `@brainstorm/sdk`
+ * to copy). The codec + instantiation live in `@brainstorm-os/sdk`
  * (`template-entity-codec`), and the picker / slash-menu surfaces live in the
- * apps that already host a create-flow / `@brainstorm/editor`.
+ * apps that already host a create-flow / `@brainstorm-os/editor`.
  */
 
 import type { Cover } from "./cover";

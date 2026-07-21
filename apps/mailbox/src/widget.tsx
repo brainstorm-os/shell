@@ -12,14 +12,14 @@
  * server-side to `Email/v1`.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
-import { openEntity } from "@brainstorm/sdk";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
 import {
 	WidgetEmpty,
 	type WidgetLaunch,
 	WidgetRoot,
 	useWidgetVisible,
-} from "@brainstorm/sdk/widget";
+} from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
 import { plural, t } from "./i18n";
 import { useMailboxT } from "./i18n-hooks";

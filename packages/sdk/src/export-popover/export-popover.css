@@ -59,7 +59,7 @@
 }
 
 /* The export button's glossy primary face comes from the shared
- * `data-bs-primary` hook in @brainstorm/sdk/app-theme.css. */
+ * `data-bs-primary` hook in @brainstorm-os/sdk/app-theme.css. */
 
 .bs-export-popover__btn:disabled {
 	opacity: 0.5;

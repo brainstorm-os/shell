@@ -1,6 +1,6 @@
 /**
  * Notes' `TextSearchProvider` (B9.1b adapter) — bridges the shared
- * `@brainstorm/sdk/find-replace` controller to the Lexical editor's
+ * `@brainstorm-os/sdk/find-replace` controller to the Lexical editor's
  * MODEL, never the DOM (doc 59, load-bearing from OQ-185): search walks
  * `EditorState` text nodes, a `Match` is a `{nodeKey,start,end}` model
  * handle (not a DOM range), `revealMatch` sets the editor's *model*
@@ -12,8 +12,8 @@
  * `@lexical/headless` (no renderer), the same way `table-ops` is.
  */
 
-import { FIND_SEED_MAX_LEN } from "@brainstorm/sdk/find-replace";
-import type { FindQuery, Match, TextSearchProvider } from "@brainstorm/sdk/find-replace";
+import { FIND_SEED_MAX_LEN } from "@brainstorm-os/sdk/find-replace";
+import type { FindQuery, Match, TextSearchProvider } from "@brainstorm-os/sdk/find-replace";
 import {
 	$createRangeSelection,
 	$getNodeByKey,

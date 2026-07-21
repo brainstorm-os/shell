@@ -21,8 +21,13 @@
  * `entity-icon-index`; one fetch now feeds both maps.)
  */
 
-import { type Icon, IconKind, type VaultEntity, defaultIconForType } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import {
+	type Icon,
+	IconKind,
+	type VaultEntity,
+	defaultIconForType,
+} from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 
 /** Coerce a raw `properties.icon` value into an `Icon`. Mirrors the SDK's
  *  `parseIcon` (incl. its cross-app image-egress guard) but additionally

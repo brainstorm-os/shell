@@ -13,7 +13,7 @@
  * (component-scoped through the shortcut registry, never raw `e.key`).
  */
 
-import { useFocusTrap } from "@brainstorm/sdk/a11y";
+import { useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HelpArticle as HelpArticleType, HelpHit } from "../../preload";

@@ -17,7 +17,7 @@
  * when possible AND at the render layer always).
  */
 
-import { typeDisplayName } from "@brainstorm/sdk/system-entities";
+import { typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import { t } from "../i18n/t";
 import type { EntityRow } from "../logic/in-memory-graph";
 

@@ -7,7 +7,7 @@
  * the BP *host*, mounting another app's block bundle through the proven 9.5.x
  * `bsblock://` loader.
  *
- * It mirrors the React `@brainstorm/sdk/block-mount` seam's lifecycle but
+ * It mirrors the React `@brainstorm-os/sdk/block-mount` seam's lifecycle but
  * imperatively, because the whiteboard renderer is pure DOM (no React, per the
  * frontend-stack rule for self-contained draw surfaces): resolve the providing
  * app's block id (an explicit `#block-<id>` fragment, else `services.blocks
@@ -32,9 +32,9 @@ import {
 	createBlockFrame,
 	createBlockFrameTransport,
 	defaultMintChannelId,
-} from "@brainstorm/sdk/block-frame";
-import { BlockControlKind, collectBlockThemeVars } from "@brainstorm/sdk/block-runtime";
-import { parseBrainstormEntityUri } from "@brainstorm/sdk/note-references";
+} from "@brainstorm-os/sdk/block-frame";
+import { BlockControlKind, collectBlockThemeVars } from "@brainstorm-os/sdk/block-runtime";
+import { parseBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 
 /** Hard ceiling on a live embed's reported height — a runaway block can't blow
  *  the node box past this; beyond it the iframe scrolls internally. */

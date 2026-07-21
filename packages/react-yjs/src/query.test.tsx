@@ -1,4 +1,4 @@
-import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "@brainstorm/sdk-types";
+import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "@brainstorm-os/sdk-types";
 // @vitest-environment jsdom
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";

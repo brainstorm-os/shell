@@ -16,8 +16,8 @@ import {
 	type CommentThread,
 	buildThreads,
 	openThreadCount,
-} from "@brainstorm/sdk-types";
-import type { ComposerContextHost } from "@brainstorm/sdk/composer-context";
+} from "@brainstorm-os/sdk-types";
+import type { ComposerContextHost } from "@brainstorm-os/sdk/composer-context";
 import {
 	type ReactNode,
 	createContext,

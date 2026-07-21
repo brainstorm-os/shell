@@ -1,4 +1,4 @@
-import { AuthState, type ConnectorAccountDef } from "@brainstorm/sdk-types";
+import { AuthState, type ConnectorAccountDef } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { ConnectorEgress, ConnectorEgressResponse } from "./egress";
 import {

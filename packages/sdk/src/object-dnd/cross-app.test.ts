@@ -4,7 +4,7 @@ import {
 	type DropDelivery,
 	DropEffect,
 	type ObjectDragPayload,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CROSS_APP_DRAG_LEAVE_EVENT,

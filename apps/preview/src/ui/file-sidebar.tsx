@@ -6,14 +6,14 @@
  * highlighted by id.
  *
  * The list is a vertical listbox via the shared composite-keyboard reducer
- * (`useCompositeKeyboard` from `@brainstorm/sdk/a11y`) — ArrowUp/Down rove,
+ * (`useCompositeKeyboard` from `@brainstorm-os/sdk/a11y`) — ArrowUp/Down rove,
  * Enter/Space opens — matching the Notes sidebar's keyboard model. Arrow-move
  * also opens the file (select === open), so the keyboard walk is a live
  * preview, the same single select-and-open action Notes uses.
  */
 
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ReactElement, useCallback, useMemo, useState } from "react";
 import type { PreviewFile } from "../demo/dataset";
 import { t } from "../i18n";

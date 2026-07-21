@@ -31,10 +31,10 @@ import {
 	StepKind,
 	TriggerKind,
 	type WorkflowStep,
-} from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
-import { SelectMenu, type SelectMenuOption } from "@brainstorm/sdk/select-menu";
+} from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { type ReactElement, useMemo, useState } from "react";
 import { type AutomationsI18nKey, t } from "../i18n";
 import {

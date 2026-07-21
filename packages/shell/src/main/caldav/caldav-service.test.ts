@@ -1,4 +1,4 @@
-import { CALDAV_ACCOUNT_TYPE_URL, CALDAV_CALENDAR_TYPE_URL } from "@brainstorm/sdk-types";
+import { CALDAV_ACCOUNT_TYPE_URL, CALDAV_CALENDAR_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import type { ConnectorEgress, ConnectorEgressResponse } from "../connectors/egress";

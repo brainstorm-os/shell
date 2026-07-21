@@ -20,7 +20,7 @@ const SECRETS = [
 	new Uint8Array(32).map((_, i) => (i * 17) & 0xff),
 ] as const;
 
-describe("@brainstorm/native — x25519 (NAPI-3c)", () => {
+describe("@brainstorm-os/native — x25519 (NAPI-3c)", () => {
 	it("derives the same public key as @noble/curves x25519 across fixed secrets", async () => {
 		const { x25519GetPublicKey } = await loadNative();
 		for (const secret of SECRETS) {

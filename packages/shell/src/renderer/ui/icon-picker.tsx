@@ -13,14 +13,14 @@
  * (task #36) when Stage 8 lands.
  */
 
-import { type Icon, IconKind, type SkinTone } from "@brainstorm/sdk-types";
-import { SkinTone as ST } from "@brainstorm/sdk-types";
+import { type Icon, IconKind, type SkinTone } from "@brainstorm-os/sdk-types";
+import { SkinTone as ST } from "@brainstorm-os/sdk-types";
 import {
 	Orientation,
 	SelectionAttribute,
 	useCompositeKeyboard,
 	useEscapeStackEntry,
-} from "@brainstorm/sdk/a11y";
+} from "@brainstorm-os/sdk/a11y";
 import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { IconEntry } from "../../preload";
 import { t } from "../i18n/t";

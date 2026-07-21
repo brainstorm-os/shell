@@ -20,7 +20,7 @@
  * (`useReducer`) changes.
  *
  * The range/toggle math + the `SelectionModifier` enum + `modifierFromEvent`
- * live in `@brainstorm/sdk/selection` (shared with the Database views);
+ * live in `@brainstorm-os/sdk/selection` (shared with the Database views);
  * this module keeps the Files content pane's frozen reducer state shape.
  */
 
@@ -29,9 +29,9 @@ import {
 	computeRange,
 	modifierFromEvent,
 	toggleId,
-} from "@brainstorm/sdk/selection";
+} from "@brainstorm-os/sdk/selection";
 
-export { SelectionModifier, modifierFromEvent } from "@brainstorm/sdk/selection";
+export { SelectionModifier, modifierFromEvent } from "@brainstorm-os/sdk/selection";
 
 export type SelectionState = {
 	readonly anchorId: string | null;

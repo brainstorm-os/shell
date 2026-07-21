@@ -36,9 +36,9 @@
  * like `DashboardStore`.
  */
 
-import { defForPreset, validateDictionary, validatePropertyDef } from "@brainstorm/sdk";
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { PropertyKindPreset } from "@brainstorm/sdk-types";
+import { defForPreset, validateDictionary, validatePropertyDef } from "@brainstorm-os/sdk";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { PropertyKindPreset } from "@brainstorm-os/sdk-types";
 import type * as Y from "yjs";
 import type { YDocStore } from "../storage/ydoc-store";
 

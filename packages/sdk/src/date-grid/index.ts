@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/date-grid` — one canonical set of week/month-grid
+ * `@brainstorm-os/sdk/date-grid` — one canonical set of week/month-grid
  * date math + `GridCell` builder used by every app with a date axis.
  * See `./date-grid.ts` for the rationale.
  */

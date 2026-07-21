@@ -9,8 +9,8 @@
  * whole journal app (which mounts the Lexical editor on import).
  */
 
-import { Orientation, attachCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import type { CompositeKeyboardHandle } from "@brainstorm/sdk/a11y";
+import { Orientation, attachCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import type { CompositeKeyboardHandle } from "@brainstorm-os/sdk/a11y";
 
 export type OverviewKeyboardOptions = {
 	count: () => number;

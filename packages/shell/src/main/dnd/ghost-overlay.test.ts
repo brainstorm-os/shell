@@ -1,4 +1,4 @@
-import { type DragGhostSpec, DropEffect } from "@brainstorm/sdk-types";
+import { type DragGhostSpec, DropEffect } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `ghost-overlay` imports `electron` at module scope for `createElectronGhostWindow`;

@@ -1,4 +1,4 @@
-import type { FormatContext } from "@brainstorm/sdk-types";
+import type { FormatContext } from "@brainstorm-os/sdk-types";
 // @vitest-environment jsdom
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";

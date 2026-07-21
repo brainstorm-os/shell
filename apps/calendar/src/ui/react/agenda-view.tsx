@@ -3,8 +3,8 @@
  * Tomorrow / This week / Later), with per-day sub-headings inside each bucket.
  */
 
-import { EmptyState } from "@brainstorm/sdk/empty-state";
-import { IconName } from "@brainstorm/sdk/icon";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import { t } from "../../i18n/t";
 import type { CompiledAgendaView } from "../../logic/compile-view";
 import type { ScheduledItem } from "../../logic/scheduled-item";

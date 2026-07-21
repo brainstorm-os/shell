@@ -12,7 +12,7 @@
  *   - typing + Enter in the footer adds the option and selects it.
  */
 
-import { BrainstormMenuProvider, getActiveMenuStore } from "@brainstorm/sdk/menus";
+import { BrainstormMenuProvider, getActiveMenuStore } from "@brainstorm-os/sdk/menus";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getNodeByKey, $getRoot, type LexicalEditor, type NodeKey } from "lexical";

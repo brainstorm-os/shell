@@ -29,7 +29,7 @@
 	transition: transform var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 	/* Column so an optional Properties|Comments tab strip (the shared
-	 * `@brainstorm/editor` CommentsRightPanel) sits above a filling panel —
+	 * `@brainstorm-os/editor` CommentsRightPanel) sits above a filling panel —
 	 * mirrors `.notes__props` / `.preview__inspector`. */
 	display: flex;
 	flex-direction: column;

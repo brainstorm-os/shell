@@ -28,7 +28,7 @@
  *     Graph renderer's scene path needs no rewrite.
  */
 
-import type { LinkDirection, PropertyDef } from "@brainstorm/sdk-types";
+import type { LinkDirection, PropertyDef } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type {
 	EntityLink,
@@ -440,7 +440,7 @@ export async function queryVaultPattern(
 /**
  * Resolve a saved List's `ListSource` to its live member id set (9.12.3).
  * SQL fast paths when the real repo is behind the accessor; the shared
- * `@brainstorm/sdk/predicate-eval` evaluator (the renderer's own code) for
+ * `@brainstorm-os/sdk/predicate-eval` evaluator (the renderer's own code) for
  * the filter-shaped kinds over a lazily-materialized row set. Repo
  * acquisition failures resolve ok-empty (the `list()` fail-soft posture);
  * malformed / oversized sources return the structured error.

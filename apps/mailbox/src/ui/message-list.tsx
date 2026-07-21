@@ -4,9 +4,9 @@
  *  `threadKey` collapse into one expandable thread row (Mailbox-6 threading
  *  UI — `deriveThreadKey` / OQ-MB-3 shipped in Mailbox-1). */
 
-import { CountBadge, CountBadgeTone } from "@brainstorm/sdk/count-badge";
-import { EmptyState, EmptyStateTone } from "@brainstorm/sdk/empty-state";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
+import { CountBadge, CountBadgeTone } from "@brainstorm-os/sdk/count-badge";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { plural, t } from "../i18n";

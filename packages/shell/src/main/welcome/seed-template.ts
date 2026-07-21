@@ -15,8 +15,8 @@
  * namespace.
  */
 
-import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm/sdk";
-import type { List, MemberInclude } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE, listToEntityProperties } from "@brainstorm-os/sdk";
+import type { List, MemberInclude } from "@brainstorm-os/sdk-types";
 import type { TemplateManifest } from "./template-codec";
 import type { WelcomeBody } from "./welcome-content";
 import type { WelcomeSeedEntitySpec } from "./welcome-seed";

@@ -10,7 +10,7 @@
  * sites stay untouched.
  */
 
-import { createT } from "@brainstorm/sdk/i18n";
+import { createT } from "@brainstorm-os/sdk/i18n";
 
 const DEFAULTS: Record<string, string> = {
 	// Block selection — aria-live announcements.
@@ -117,7 +117,7 @@ const DEFAULTS: Record<string, string> = {
 
 	// Block commands — Notes-only entries; the generic catalogue (paragraph /
 	// headings / lists / quote / code / callout / divider / toggle / table /
-	// columns + the action set) reads from the shared `@brainstorm/editor`
+	// columns + the action set) reads from the shared `@brainstorm-os/editor`
 	// catalogue since 9.18.3c(d).
 	"notes.command.image.label": "Image",
 	"notes.command.image.description": "Embed a picture",
@@ -509,7 +509,7 @@ const DEFAULTS: Record<string, string> = {
 export type TranslationParams = Record<string, string | number>;
 
 // Lookup + `{param}` interpolation come from the shared SDK primitive
-// (`@brainstorm/sdk/i18n`) — there is exactly one app-side `t()`
+// (`@brainstorm-os/sdk/i18n`) — there is exactly one app-side `t()`
 // implementation now, not a per-app re-roll. Notes keeps a thin wrapper
 // only for its dev-time missing-key signal (the SDK falls back to the
 // raw key; Notes wants a loud warning + a visible `[?key]` sentinel so a

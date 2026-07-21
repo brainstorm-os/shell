@@ -19,7 +19,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { x25519GetPublicKey } from "@brainstorm/native";
+import { x25519GetPublicKey } from "@brainstorm-os/native";
 import {
 	assertSecret as assertSecretLen,
 	publicKeyFromBase64 as publicKeyFromBase64Len,

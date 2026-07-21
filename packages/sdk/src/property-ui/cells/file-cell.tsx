@@ -6,7 +6,7 @@
  * forward-compatible. `layout` only changes the resting chrome.
  */
 
-import { type CellProps, type LabeledValue, isMultiValued } from "@brainstorm/sdk-types";
+import { type CellProps, type LabeledValue, isMultiValued } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { usePropertyUiSeams } from "../use-properties";

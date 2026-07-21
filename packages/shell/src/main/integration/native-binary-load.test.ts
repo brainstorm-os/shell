@@ -1,5 +1,5 @@
 /**
- * 13.1b / NAPI-1b — integration check: the @brainstorm/native loader resolves
+ * 13.1b / NAPI-1b — integration check: the @brainstorm-os/native loader resolves
  * via `process.resourcesPath/native/...` in packaged Electron mode.
  *
  * We can't truly run electron-builder in a unit test, so we simulate packaged
@@ -26,7 +26,7 @@ interface NativeResolverShim {
 	getNapiShortname: (platform: string, arch: string) => string | null;
 }
 
-describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
+describe("@brainstorm-os/native — packaged-mode binary load (13.1b)", () => {
 	let tempDir: string;
 	let savedEnv: string | undefined;
 	let savedResourcesPath: unknown;
@@ -62,7 +62,7 @@ describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
 	});
 
 	it("primes NAPI_RS_NATIVE_LIBRARY_PATH to the resourcesPath/native/<file> copy, and the binding still works end-to-end", async () => {
-		const shim = require("@brainstorm/native/packaged-resolver.cjs") as NativeResolverShim;
+		const shim = require("@brainstorm-os/native/packaged-resolver.cjs") as NativeResolverShim;
 		const shortname = shim.getNapiShortname(process.platform, process.arch);
 		if (!shortname) {
 			// Host platform isn't one of the six we ship for — the loader can't
@@ -71,7 +71,7 @@ describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
 			return;
 		}
 
-		const sourceBinary = require.resolve(`@brainstorm/native/brainstorm-native.${shortname}.node`);
+		const sourceBinary = require.resolve(`@brainstorm-os/native/brainstorm-native.${shortname}.node`);
 		const stagedNativeDir = join(tempDir, "native");
 		mkdirSync(stagedNativeDir, { recursive: true });
 		const stagedBinary = join(stagedNativeDir, `brainstorm-native.${shortname}.node`);
@@ -86,7 +86,7 @@ describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
 		// The loader (index.js) honours NAPI_RS_NATIVE_LIBRARY_PATH on first
 		// require — invoke that path fresh so we can prove the env var was the
 		// resolution driver, not the dev-mode fallback.
-		const nativeJsPath = require.resolve("@brainstorm/native/index.js");
+		const nativeJsPath = require.resolve("@brainstorm-os/native/index.js");
 		delete require.cache[nativeJsPath];
 		const binding = require(nativeJsPath) as {
 			ed25519GetPublicKey: (seed: Uint8Array) => Uint8Array;
@@ -100,7 +100,7 @@ describe("@brainstorm/native — packaged-mode binary load (13.1b)", () => {
 	});
 
 	it("falls back to the dev loader when process.resourcesPath is unset", async () => {
-		const shim = require("@brainstorm/native/packaged-resolver.cjs") as NativeResolverShim;
+		const shim = require("@brainstorm-os/native/packaged-resolver.cjs") as NativeResolverShim;
 		// resourcesPath stays unset (deleted in beforeEach).
 		const applied = shim.applyPackagedNativeEnv();
 		expect(applied).toBeNull();

@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let USER_DATA_DIR = "";
 vi.mock("electron", () => ({ app: { getPath: () => USER_DATA_DIR } }));
 
-import { LIST_ENTITY_TYPE } from "@brainstorm/sdk";
-import { ValueType } from "@brainstorm/sdk-types";
+import { LIST_ENTITY_TYPE } from "@brainstorm-os/sdk";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { __resetAtRestProbeForTests } from "../storage/at-rest-mode";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { __setSqlcipherDriverForTests } from "../storage/sqlite";

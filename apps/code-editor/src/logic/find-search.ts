@@ -11,7 +11,7 @@
  * overlay side.
  */
 
-import type { FindQuery } from "@brainstorm/sdk/find-replace";
+import type { FindQuery } from "@brainstorm-os/sdk/find-replace";
 import { RegExpCursor, SearchCursor } from "@codemirror/search";
 import { Text } from "@codemirror/state";
 

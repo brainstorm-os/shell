@@ -5,7 +5,7 @@
  * projection code.
  */
 
-import { AuthKind, MailFlag, MailProtocol, SyncWindow } from "@brainstorm/sdk-types";
+import { AuthKind, MailFlag, MailProtocol, SyncWindow } from "@brainstorm-os/sdk-types";
 import {
 	EMAIL_TYPE_URL,
 	FolderRole,

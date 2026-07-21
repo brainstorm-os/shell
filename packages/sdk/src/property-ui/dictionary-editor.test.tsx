@@ -5,8 +5,8 @@
  * the row menu rewrites bound note values through `onRewriteNotes`.
  */
 
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

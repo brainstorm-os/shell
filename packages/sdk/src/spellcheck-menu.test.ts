@@ -1,4 +1,4 @@
-import type { SpellcheckBridge, SpellcheckContext } from "@brainstorm/sdk-types";
+import type { SpellcheckBridge, SpellcheckContext } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	DEFAULT_SPELLCHECK_MENU_LABELS,

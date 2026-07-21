@@ -15,8 +15,8 @@ import {
 	TYPOGRAPHY_SCALES,
 	type TypographyDef,
 	type TypographyScale,
-} from "@brainstorm/sdk-types";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+} from "@brainstorm-os/sdk-types";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import type { ReactElement } from "react";
 import type { Translate } from "./translate";
 

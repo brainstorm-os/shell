@@ -13,7 +13,7 @@
  * cap so a large vault can't blow up the prompt.
  */
 
-import type { PlatformCatalog, PlatformCatalogIntent } from "@brainstorm/sdk-types";
+import type { PlatformCatalog, PlatformCatalogIntent } from "@brainstorm-os/sdk-types";
 
 /** Properties listed per object type in the prose (the catalog caps the source
  *  at 64; this keeps a single line readable). */

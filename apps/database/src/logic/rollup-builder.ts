@@ -18,7 +18,7 @@
  * to `humanize` — so a `prop_…` key reads "Fee", not "Prop Mpx6…".
  */
 
-import { type ColumnSpec, ValueType } from "@brainstorm/sdk-types";
+import { type ColumnSpec, ValueType } from "@brainstorm-os/sdk-types";
 import { AggregationKind, aggregationLabel, aggregationsForValueType } from "./aggregations";
 import { inferPropertyDef } from "./effective-def";
 import type { EntityRow } from "./in-memory-entities";

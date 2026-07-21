@@ -9,7 +9,7 @@
  * `bootstrap()`); the bar/chords themselves are covered by the SDK suite.
  */
 
-import { createDomTextSearchProvider, createFindController } from "@brainstorm/sdk/find-replace";
+import { createDomTextSearchProvider, createFindController } from "@brainstorm-os/sdk/find-replace";
 import { beforeEach, describe, expect, it } from "vitest";
 
 function mountJournal(bodyHtml: string): HTMLElement {

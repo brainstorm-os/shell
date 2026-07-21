@@ -13,7 +13,7 @@
  *   - `--brainstorm-handshake=...` (base64 JSON of `AppHandshake`).
  *
  * Exposes `window.brainstorm` via `contextBridge` — the SDK runtime built
- * from `@brainstorm/sdk` `buildRuntime(...)`.
+ * from `@brainstorm-os/sdk` `buildRuntime(...)`.
  *
  * Ordering is load-bearing: the bridge is exposed BEFORE the theme/chrome
  * styles are pushed. A DOM-side failure in styling must never prevent
@@ -26,7 +26,7 @@ import {
 	buildRuntimeWithEmitter,
 	decodeHandshake,
 	newMessageId,
-} from "@brainstorm/sdk";
+} from "@brainstorm-os/sdk";
 import {
 	APP_DRAG_LEAVE_CHANNEL,
 	APP_DRAG_OVER_CHANNEL,
@@ -36,7 +36,7 @@ import {
 	CROSS_APP_DRAG_LEAVE_EVENT,
 	CROSS_APP_DRAG_OVER_EVENT,
 	CROSS_APP_DROP_EVENT,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type {
 	DragOverNotice,
 	DropDelivery,
@@ -48,9 +48,9 @@ import type {
 	SpellcheckContext,
 	TabCommand,
 	WebViewEvent,
-} from "@brainstorm/sdk-types";
-import { MOTION_DURATION_ENTRANCE_MS } from "@brainstorm/sdk/motion";
-import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm/tokens";
+} from "@brainstorm-os/sdk-types";
+import { MOTION_DURATION_ENTRANCE_MS } from "@brainstorm-os/sdk/motion";
+import { DEFAULT_THEME, flattenTokens, isThemeName, themes } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
 import { setAppLockOverlay } from "./app-lock-overlay";
 import { APP_THEME_STYLE_ID, appIconVarPairs, buildAppIconVarsCss } from "./app-theme";
@@ -95,7 +95,7 @@ if (handshake.app.id !== appId) {
 console.info(`[app:${appId}] build ${buildArg ?? "unknown"} v${handshake.app.version}`);
 
 // The shared component CSS (aliases / glass / buttons / find-bar / …) is
-// bundled into the app at build time via `import "@brainstorm/sdk/app-
+// bundled into the app at build time via `import "@brainstorm-os/sdk/app-
 // theme.css"` in the app's TS entry. The only piece that varies per app
 // is the `.app-header__icon` chip face — preload pushes the four
 // `--app-icon-*` custom properties the shared CSS reads.
@@ -259,7 +259,7 @@ ipcRenderer.on("app:files-watch", (_event, payload: FilesWatchEvent) => {
 // Browser-2 — `webView` metadata-event delivery. The shell-side WebView host
 // service fans one of these per tab metadata change; the preload dispatches to
 // every `services.webView.onEvent` listener the chrome registered. Channel must
-// match `APP_WEBVIEW_EVENT_CHANNEL` in `@brainstorm/sdk-types`.
+// match `APP_WEBVIEW_EVENT_CHANNEL` in `@brainstorm-os/sdk-types`.
 const webViewEventListeners = new Set<(event: WebViewEvent) => void>();
 ipcRenderer.on(APP_WEBVIEW_EVENT_CHANNEL, (_event, payload: WebViewEvent) => {
 	if (!payload || typeof payload !== "object" || typeof payload.kind !== "string") return;
@@ -610,7 +610,7 @@ function stampPlatform(): void {
 }
 
 // The frozen `data-bs-region` app-frame hooks (the shared `.app-header`
-// chrome — `@brainstorm/sdk-types` `STYLE_HOOK_REGIONS`). Stamped from the
+// chrome — `@brainstorm-os/sdk-types` `STYLE_HOOK_REGIONS`). Stamped from the
 // single preload chokepoint so StylePack CSS can target stable anchors in
 // every app window without each of the 18 apps hand-writing the attribute.
 // Literals are inlined (not imported) to keep the preload bundle isolated;
@@ -1008,14 +1008,14 @@ ipcRenderer.on("window:visibility-changed", (_event, visible: boolean) => {
 // it routes the command here instead of acting on the window-container, so the
 // app mutates its own tab model. Re-dispatched as a `brainstorm:tab-command`
 // CustomEvent, mirroring the visibility seam above. Channel must match
-// `APP_TAB_COMMAND_CHANNEL` in `@brainstorm/sdk-types`.
+// `APP_TAB_COMMAND_CHANNEL` in `@brainstorm-os/sdk-types`.
 ipcRenderer.on(APP_TAB_COMMAND_CHANNEL, (_event, payload: TabCommand) => {
 	if (!payload || typeof payload.kind !== "string") return;
 	window.dispatchEvent(new CustomEvent("brainstorm:tab-command", { detail: payload }));
 });
 
 // Cross-app drag session (DND-2/3) shell→app push channels re-dispatched as DOM
-// CustomEvents on `window`, so `@brainstorm/sdk/object-dnd`'s drop registry can
+// CustomEvents on `window`, so `@brainstorm-os/sdk/object-dnd`'s drop registry can
 // subscribe without preload coupling. PRIVACY (OQ-DND-2): `drag-over` carries
 // kinds + within-window point ONLY; the full payload arrives only on `drop`.
 ipcRenderer.on(APP_DRAG_OVER_CHANNEL, (_event, notice: DragOverNotice) => {

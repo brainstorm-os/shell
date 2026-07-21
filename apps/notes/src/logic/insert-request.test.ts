@@ -1,4 +1,4 @@
-import { InsertPosition } from "@brainstorm/sdk-types";
+import { InsertPosition } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { InsertRefusal, decideInsertIntent, refusalNoticeKey } from "./insert-request";
 

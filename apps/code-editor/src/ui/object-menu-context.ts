@@ -11,8 +11,8 @@
  * (e.g. the renderer booted outside a vault, so there is no runtime).
  */
 
-import { IconName } from "@brainstorm/sdk/icon";
-import type { ObjectMenuContext } from "@brainstorm/sdk/object-menu";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import type { ObjectMenuContext } from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n";
 import { fileName } from "../logic/code-view";
 import { CODE_FILE_ENTITY_TYPE, type CodeEditorRuntime } from "../runtime";

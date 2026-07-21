@@ -3,7 +3,7 @@
  *
  * Three apps shipped near-identical 6×7 grids with their own class
  * namespaces (`.cal-month__*`, `.dbv-cal__*`, `.dbv-cal__mini-*`) — the
- * math came from `@brainstorm/sdk/date-grid` but rendering, weekday
+ * math came from `@brainstorm-os/sdk/date-grid` but rendering, weekday
  * headers, today/other-month/selected states and weekend tinting each
  * lived per-app. Per `[[feedback_extract_to_sdk_at_copy_two]]` this is
  * the second-copy promotion: the grid renders here, the host supplies

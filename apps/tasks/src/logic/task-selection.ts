@@ -6,7 +6,7 @@
  * Mod-click / Shift-click build this copy-selection without opening anything.
  *
  * The range/toggle math + `SelectionModifier` + `modifierFromEvent` live in
- * `@brainstorm/sdk/selection`; per that module's contract each app keeps its
+ * `@brainstorm-os/sdk/selection`; per that module's contract each app keeps its
  * own state container. This mirrors the Files content-pane reducer
  * (`apps/files/src/logic/selection.ts`) — a frozen reducer so a stale snapshot
  * can never be mutated under a pending render.
@@ -17,9 +17,9 @@ import {
 	computeRange,
 	modifierFromEvent,
 	toggleId,
-} from "@brainstorm/sdk/selection";
+} from "@brainstorm-os/sdk/selection";
 
-export { SelectionModifier, modifierFromEvent } from "@brainstorm/sdk/selection";
+export { SelectionModifier, modifierFromEvent } from "@brainstorm-os/sdk/selection";
 
 export type TaskSelectionState = {
 	readonly anchorId: string | null;

@@ -9,8 +9,8 @@
  * epub.js-backed renderer; the pure model under src/logic/ stays.
  */
 
-import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm/sdk/popover";
-import { type ShortcutDisposer, attachShortcut } from "@brainstorm/sdk/shortcut";
+import { PopoverBodyPadding, PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
+import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { type BooksI18nKey, t } from "../i18n";
 import { BlockKind, type BookContent } from "../logic/content";
 import {

@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/color-picker` — chrome for the custom-body colour picker
+ * `@brainstorm-os/sdk/color-picker` — chrome for the custom-body colour picker
  * mounted inside a fancy-menus surface. The menu shell paints the glass
  * panel; these rules style the picker's own controls. All colours are theme
  * tokens (with literal fallbacks for the static gradients that have no token
@@ -101,7 +101,7 @@
 }
 
 /* Action buttons (Cancel / Apply) use the shared `.bs-btn` primitive from
- * @brainstorm/sdk/app-theme.css; Apply's glossy primary face comes from the
+ * @brainstorm-os/sdk/app-theme.css; Apply's glossy primary face comes from the
  * `data-bs-primary` hook there. No bespoke button box lives here. */
 
 .bs-color-picker__area:focus-visible,

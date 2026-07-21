@@ -26,14 +26,14 @@
  * keeping the shell-side body walker's edge extraction a single-pass scan.
  */
 
-import { navModeFromEvent } from "@brainstorm/sdk";
-import { BpBlockMount, type BpBlockMountHandle } from "@brainstorm/sdk/block-mount";
+import { navModeFromEvent } from "@brainstorm-os/sdk";
+import { BpBlockMount, type BpBlockMountHandle } from "@brainstorm-os/sdk/block-mount";
 import {
 	BlockRendererKind,
 	SHELL_ENTITY_CARD_BLOCK_ID,
 	useBlockRenderer,
-} from "@brainstorm/sdk/block-registry";
-import { BlockControlKind, collectBlockThemeVars } from "@brainstorm/sdk/block-runtime";
+} from "@brainstorm-os/sdk/block-registry";
+import { BlockControlKind, collectBlockThemeVars } from "@brainstorm-os/sdk/block-runtime";
 import {
 	type DOMConversionMap,
 	type DOMConversionOutput,

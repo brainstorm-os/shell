@@ -18,7 +18,7 @@ import {
 	type OpenQuestionEntity,
 	OpenQuestionStatus,
 	SelfHostingEntityType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { VaultSnapshot } from "../runtime";
 
 export enum CitationKind {

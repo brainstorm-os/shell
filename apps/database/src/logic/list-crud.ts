@@ -9,7 +9,7 @@
  * `demo/dataset.ts` + persisted user mutations.
  */
 
-import { type Icon, IconKind } from "@brainstorm/sdk-types";
+import { type Icon, IconKind } from "@brainstorm-os/sdk-types";
 import type { List } from "../types/list";
 import type { ListSource } from "../types/list-source";
 import { type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";

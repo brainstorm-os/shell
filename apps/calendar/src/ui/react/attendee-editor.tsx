@@ -8,8 +8,8 @@
  * Controlled: the host owns `value` and updates it from `onChange`.
  */
 
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type KeyboardEvent as ReactKeyboardEvent, useState } from "react";
 import { type TKey, t } from "../../i18n/t";
 import { ATTENDEE_RSVPS, makeAttendee, rsvpCounts } from "../../logic/attendees";

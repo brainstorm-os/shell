@@ -1,10 +1,10 @@
 /**
  * Pure immutable edits for the StylePack pane (9.9.4). The sanitizer +
- * structural validators live in `@brainstorm/sdk-types`; this is just the
+ * structural validators live in `@brainstorm-os/sdk-types`; this is just the
  * state-transition layer the app owns (mirrors `token-set-edit.ts`).
  */
 
-import { STYLE_PACK_CSS_MIME, type StylePackDef } from "@brainstorm/sdk-types";
+import { STYLE_PACK_CSS_MIME, type StylePackDef } from "@brainstorm-os/sdk-types";
 
 export function setStylePackCss(def: StylePackDef, css: string): StylePackDef {
 	return { ...def, css, mime: STYLE_PACK_CSS_MIME };

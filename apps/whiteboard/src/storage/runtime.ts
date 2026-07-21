@@ -51,7 +51,7 @@ type LifecycleEvent =
 type LifecycleHandler = (event: LifecycleEvent) => void;
 
 /** A live vault entity as the aggregator returns it. Narrowed to the fields
- *  the embed picker (9.17.4) reads; mirrors `@brainstorm/sdk-types::VaultEntity`. */
+ *  the embed picker (9.17.4) reads; mirrors `@brainstorm-os/sdk-types::VaultEntity`. */
 export type VaultEntitySummary = {
 	id: string;
 	type: string;
@@ -72,14 +72,14 @@ export type VaultEntitiesService = {
 
 /** Block-registry slice (9.17.4) — resolve which app renders an entity type +
  *  fetch the providing app's block bundle source. Mirrors
- *  `@brainstorm/sdk-types::BlocksService`. */
+ *  `@brainstorm-os/sdk-types::BlocksService`. */
 export type BlocksService = {
 	source(blockId: string): Promise<string | null>;
 	forType(entityType: string): Promise<string | null>;
 };
 
 /** BP host-router slice (9.17.4) — forwards a block's graph-module message to
- *  the host and returns the response. Mirrors `@brainstorm/sdk-types::BpService`. */
+ *  the host and returns the response. Mirrors `@brainstorm-os/sdk-types::BpService`. */
 export type BpService = {
 	dispatch(entityId: string, message: unknown): Promise<unknown>;
 };
@@ -92,7 +92,7 @@ export type IntentsService = {
 
 /** Files-host save surface (Stage 9.10) — only the slice the 9.17.8b
  *  Save-as-file flow consumes. The full surface lives in
- *  `@brainstorm/sdk-types::FilesService`; this narrowed type mirrors the
+ *  `@brainstorm-os/sdk-types::FilesService`; this narrowed type mirrors the
  *  Graph app's `9.13.13b` pattern so Whiteboard doesn't pull in the
  *  full `EntitiesService` etc. just to wire one menu row. */
 export type FilesService = {

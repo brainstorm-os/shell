@@ -15,7 +15,7 @@
  * theme-editor reads/writes it directly and the validators + composite read
  * it. The code-editor edits it cross-app by adapting the entity into a CSS
  * file: it seeds its code buffer (the `Y.Text` named
- * {@link STYLE_PACK_BODY_ROOT}, the root `@brainstorm/editor`'s
+ * {@link STYLE_PACK_BODY_ROOT}, the root `@brainstorm-os/editor`'s
  * `getCodeBuffer` binds) from `properties.css` and saves edits back to
  * `properties.css`. The StylePack declares {@link STYLE_PACK_CSS_MIME} so
  * the code-editor's `text/css` opener routes to it on the `open` intent.
@@ -36,7 +36,7 @@ export const STYLE_PACK_TYPE_URL = "brainstorm/StylePack/v1";
 export const STYLE_PACK_CSS_MIME = "text/css";
 
 /** Root name of the `Y.Text` holding the canonical CSS in a StylePack
- *  entity's Y.Doc. Matches `@brainstorm/editor` `getCodeBuffer`'s root so
+ *  entity's Y.Doc. Matches `@brainstorm-os/editor` `getCodeBuffer`'s root so
  *  the code-editor binds the same buffer when it opens the entity. */
 export const STYLE_PACK_BODY_ROOT = "content";
 

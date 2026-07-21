@@ -6,7 +6,7 @@ import {
 	StepKind,
 	WorkflowRunStatus,
 	type WorkflowStep,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type InterpreterRegistry,

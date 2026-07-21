@@ -7,7 +7,7 @@
  * It lives in this dependency-free contract leaf precisely so neither consumer
  * has to import the other: the loop is **pure orchestration over injected
  * ports** (`AgentLoopPorts.generate` calls the broker; `dispatchTool` dispatches
- * an intent). No network, no `@brainstorm/shell`, no DOM — so the whole
+ * an intent). No network, no `@brainstorm-os/shell`, no DOM — so the whole
  * generate → tool-call → dispatch → feed-back → repeat path is exhaustively
  * unit-testable, and the two front-ends share identical behaviour and security.
  *

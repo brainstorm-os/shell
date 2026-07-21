@@ -32,14 +32,14 @@
  * Bun's Vitest.
  */
 
-import { OsHandoffConsent } from "@brainstorm/sdk-types";
+import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import {
 	DEFAULT_THEME_BY_APPEARANCE,
 	ThemeAppearance,
 	type ThemeName,
 	isThemeName,
 	themeAppearance,
-} from "@brainstorm/tokens";
+} from "@brainstorm-os/tokens";
 import * as Y from "yjs";
 import {
 	AppearanceMode,

@@ -1,11 +1,11 @@
 /**
- * `@brainstorm/sdk/find-replace` — the ONE in-document find & replace
+ * `@brainstorm-os/sdk/find-replace` — the ONE in-document find & replace
  * model every text-capable app reuses (Notes / Code-editor / Journal),
  * per doc 59. The **payback for the OQ-185 virtualization trade**: find
  * operates on the editor *model*, never the DOM, so it is correct even
  * when the matching block isn't rendered.
  *
- * Same shape as `@brainstorm/sdk/nav-history` (B8): a *pure* controller
+ * Same shape as `@brainstorm-os/sdk/nav-history` (B8): a *pure* controller
  * owns query / option / match-cursor state; a thin per-app
  * `TextSearchProvider` bridges it to that app's text model; a shared
  * `<FindBar>` (B9.1b) is identical everywhere. This file is the pure

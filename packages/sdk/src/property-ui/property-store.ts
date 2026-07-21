@@ -22,7 +22,7 @@
  * writes. The provider in `use-properties.tsx` is the central caller.
  */
 
-import type { PropertyDef } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
 
 /** Narrow slice of the SDK `PropertiesService` the property store needs.
  *  Tests inject a `vi.fn()`-backed fake. */

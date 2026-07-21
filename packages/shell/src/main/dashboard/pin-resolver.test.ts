@@ -4,7 +4,7 @@
  * label / icon / opener-badge / tombstone purely from injected lookups.
  */
 
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { IconRecord } from "./dashboard-store";
 import { type PinResolverDeps, resolvePins } from "./pin-resolver";

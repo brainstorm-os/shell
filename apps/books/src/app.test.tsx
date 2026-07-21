@@ -8,13 +8,13 @@
  * assert the React shell around them.
  */
 
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BooksApp } from "./app";
 
-vi.mock("@brainstorm/sdk/object-menu", () => ({
+vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
 	openObjectMenu: vi.fn(),
 	closeObjectMenu: vi.fn(),

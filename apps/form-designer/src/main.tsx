@@ -1,10 +1,10 @@
-import "@brainstorm/sdk/app-theme.css";
-import "@brainstorm/sdk/segmented.css";
-import { initAnalytics } from "@brainstorm/sdk/analytics";
-import "@brainstorm/sdk/property-ui/cells.css";
-import "@brainstorm/sdk/select-menu.css";
-import { AppErrorBoundary } from "@brainstorm/sdk/error-boundary";
-import { mountMenuHost } from "@brainstorm/sdk/menus";
+import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/sdk/segmented.css";
+import { initAnalytics } from "@brainstorm-os/sdk/analytics";
+import "@brainstorm-os/sdk/property-ui/cells.css";
+import "@brainstorm-os/sdk/select-menu.css";
+import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
+import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { FormDesignerApp } from "./app";

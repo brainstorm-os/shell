@@ -10,8 +10,8 @@
  * Done-equivalent — it carries the timestamp recurrence math needs.
  */
 
-import type { Icon, Recurrence } from "@brainstorm/sdk-types";
-import type { ValuesMap } from "@brainstorm/sdk/property-ui/pure";
+import type { Icon, Recurrence } from "@brainstorm-os/sdk-types";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui/pure";
 
 /** Five priority levels — values are stored as the string discriminator,
  *  per the project-wide "no raw string literals as discriminators" rule

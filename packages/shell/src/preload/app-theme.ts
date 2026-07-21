@@ -3,7 +3,7 @@
  *
  * The shared component CSS — aliases, glass, buttons, find-bar, header-nav,
  * panel-toggle, icon-pick, searchbar, resize-suppress, app-header drag
- * region — lives in `@brainstorm/sdk/app-theme.css` and is BUNDLED INTO
+ * region — lives in `@brainstorm-os/sdk/app-theme.css` and is BUNDLED INTO
  * EACH APP at build time (apps import it from their TS entry). The only
  * piece that varies per app is the `.app-header__icon` chip face (URL +
  * palette gradient keyed on appId), and the shared CSS reads it from
@@ -22,7 +22,7 @@ export const APP_THEME_STYLE_ID = "brainstorm-app-theme";
 /**
  * Returns the four `:root` custom properties that pin `.app-header__icon`
  * to this app's declared icon + palette gradient fallback. The shared
- * `@brainstorm/sdk/app-theme.css` reads them via `var(--app-icon-*)`.
+ * `@brainstorm-os/sdk/app-theme.css` reads them via `var(--app-icon-*)`.
  */
 export function buildAppIconVarsCss(appId: string): string {
 	const g = gradientFor(appId);

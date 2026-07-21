@@ -6,8 +6,8 @@
  * appends a new widget below the lowest existing one.
  */
 
-import type { ContextMenuItem, sdkMenuIcon } from "@brainstorm/sdk/menus";
-import { openAnchoredMenu } from "@brainstorm/sdk/object-menu";
+import type { ContextMenuItem, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
+import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import type { ReactNode } from "react";
 import type { DashboardWidget, RegisteredWidget } from "../../preload";
 import { t } from "../i18n/t";

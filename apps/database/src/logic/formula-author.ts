@@ -12,7 +12,7 @@
  * user leaves the name field blank.
  */
 
-import type { ColumnSpec } from "@brainstorm/sdk-types";
+import type { ColumnSpec } from "@brainstorm-os/sdk-types";
 import { MAX_FORMULA_LENGTH, buildFormulaColumn, compileFormula } from "./formula";
 
 /** Why a formula reference can be flagged before the column is built. */

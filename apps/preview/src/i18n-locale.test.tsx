@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { type LocaleRuntime, useLocalePackT } from "@brainstorm/sdk/i18n-react";
+import { type LocaleRuntime, useLocalePackT } from "@brainstorm-os/sdk/i18n-react";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

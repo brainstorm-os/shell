@@ -2,7 +2,7 @@
  * App-side translations per
  * §Localization and.
  *
- * `t` is produced by the shared `@brainstorm/sdk/i18n` `createT` (the B-2
+ * `t` is produced by the shared `@brainstorm-os/sdk/i18n` `createT` (the B-2
  * app-side `t()`): call sites depend on the **id**, the default-English
  * manifest fills in until the locale layer (Stage 12) lands, and overlay
  * packs merge per-locale partials at runtime. The `brainstorm.files.*` id
@@ -15,7 +15,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const DEFAULTS = enCatalog as typeof enCatalog;

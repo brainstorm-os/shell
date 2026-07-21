@@ -1,7 +1,7 @@
 /**
  * `<EntityIcon>` — Notes' React mounting shim over the SDK's shared
  * object-icon primitive. The validation + emoji/image rendering + the
- * cross-app `img.src` egress guard all live in `@brainstorm/sdk/entity-icon`
+ * cross-app `img.src` egress guard all live in `@brainstorm-os/sdk/entity-icon`
  * (`parseIcon` + `createEntityIconElement`) — this file is *not* a second
  * implementation of that logic, it is the React twin the SDK's docstring
  * explicitly anticipates: it mounts the SDK DOM element into the React
@@ -10,19 +10,19 @@
  * The one branch the SDK DOM helper deliberately can't render is Phosphor
  * *pack* glyphs (the dataset isn't bundled in DOM-only apps, so it
  * degrades to the fallback). Notes already depends on the lazy
- * `@brainstorm/sdk/icon-picker` Phosphor-React chunk for its icon picker,
+ * `@brainstorm-os/sdk/icon-picker` Phosphor-React chunk for its icon picker,
  * so pack icons are kept here via that same shared chunk — a colour-true
  * pack glyph in a mention / page-ref, not a degraded dot. Everything
  * else (emoji, image, missing) goes straight through the SDK element.
  */
 
-import { IconKind } from "@brainstorm/sdk-types";
-import { type Icon, createEntityIconElement, parseIcon } from "@brainstorm/sdk/entity-icon";
+import { IconKind } from "@brainstorm-os/sdk-types";
+import { type Icon, createEntityIconElement, parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import {
 	loadPhosphorReact,
 	subscribePhosphorReact,
 	tryGetPhosphorComponent,
-} from "@brainstorm/sdk/icon-picker";
+} from "@brainstorm-os/sdk/icon-picker";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 export type EntityIconProps = {

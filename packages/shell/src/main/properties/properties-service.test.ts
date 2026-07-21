@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Dictionary, PropertyDef } from "@brainstorm/sdk-types";
-import { ValueType } from "@brainstorm/sdk-types";
+import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { YDocStore } from "../storage/ydoc-store";

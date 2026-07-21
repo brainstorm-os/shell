@@ -1,5 +1,5 @@
 /**
- * The `PdfPagePort` over the shared `@brainstorm/sdk/pdf-engine` (the one
+ * The `PdfPagePort` over the shared `@brainstorm-os/sdk/pdf-engine` (the one
  * pdf.js stack, shared with Preview — 9.21.5's "no second PDF stack").
  * Fit-to-stage scale comes from the engine's shared `fitScale`; rendering
  * goes through `renderPdfPage` (canvas sizing + dpr). Disposal destroys the
@@ -14,7 +14,7 @@ import {
 	pdfPageLinks,
 	renderPdfPage,
 	terminatePdfWorker,
-} from "@brainstorm/sdk/pdf-engine";
+} from "@brainstorm-os/sdk/pdf-engine";
 import type { PdfPagePort, PdfPageRenderHandle } from "./pdf-reader";
 
 /** Fit scale (CSS px per PDF point) for a page inside `maxWidth × maxHeight` —

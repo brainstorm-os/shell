@@ -13,7 +13,7 @@ import type {
 	AutomationsService,
 	IntentsService,
 	VaultEntitiesService,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 export type EntityRecord = {
 	id: string;

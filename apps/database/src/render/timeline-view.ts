@@ -12,8 +12,8 @@
  * arrows (one non-interactive SVG overlay).
  */
 
-import { attachOrderedGridCellKeyboard } from "@brainstorm/sdk/a11y";
-import { attachResizable } from "@brainstorm/sdk/resizable";
+import { attachOrderedGridCellKeyboard } from "@brainstorm-os/sdk/a11y";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
 import { t } from "../i18n";
 import { datePropertyCandidates } from "../logic/auto-group";
 import type { CompiledView } from "../logic/compile-view";

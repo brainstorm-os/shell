@@ -16,7 +16,12 @@
  * engine import it without pulling heavy deps into the worker bundle.
  */
 
-import type { FolderRole, MailAttachmentPart, MailFlag, MailProtocol } from "@brainstorm/sdk-types";
+import type {
+	FolderRole,
+	MailAttachmentPart,
+	MailFlag,
+	MailProtocol,
+} from "@brainstorm-os/sdk-types";
 
 /** A server folder/label as the driver sees it. `role` is the driver's best
  *  guess (e.g. IMAP `\Sent` special-use, Gmail label); the projection

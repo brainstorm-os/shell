@@ -7,8 +7,8 @@
  * everywhere.
  */
 
-import type { Cover } from "@brainstorm/sdk-types";
-import { createEntityCoverElement } from "@brainstorm/sdk/entity-cover";
+import type { Cover } from "@brainstorm-os/sdk-types";
+import { createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
 import { useEffect, useRef } from "react";
 
 export type CoverBandProps = {

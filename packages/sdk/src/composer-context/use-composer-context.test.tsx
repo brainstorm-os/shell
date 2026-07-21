@@ -1,4 +1,4 @@
-import { AttachmentKind } from "@brainstorm/sdk-types";
+import { AttachmentKind } from "@brainstorm-os/sdk-types";
 // @vitest-environment jsdom
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";

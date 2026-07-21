@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/composer-context` — shared types + mapping helpers for the
+ * `@brainstorm-os/sdk/composer-context` — shared types + mapping helpers for the
  * composer "context rail": the affordance that lets a chat composer attach
  * explicit context to a turn (a pinned document, an @-mentioned person, an
  * uploaded media asset) so it reaches the agent. The durable wire shape is
@@ -14,7 +14,7 @@ import {
 	type MediaAttachment,
 	type MessageAttachment,
 	type PersonAttachment,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon";
 import { type NoteReference, NoteReferenceKind, extractNoteReferences } from "../note-references";
 

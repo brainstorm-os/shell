@@ -4,8 +4,8 @@
  * its tests share one implementation.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { plural, t } from "../i18n";
 import {
 	type Entity,
@@ -60,4 +60,4 @@ export function formatTimeAgo(when: number): string {
 	return new Date(when).toLocaleDateString();
 }
 
-export { formatBytes } from "@brainstorm/sdk/format-bytes";
+export { formatBytes } from "@brainstorm-os/sdk/format-bytes";

@@ -1,4 +1,4 @@
-import type { ObjectDragItem } from "@brainstorm/sdk-types";
+import type { ObjectDragItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { dragItemsForSelection } from "./drag-items";
 

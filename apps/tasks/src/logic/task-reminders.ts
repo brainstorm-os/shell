@@ -1,6 +1,6 @@
 /**
  * Due / scheduled alerts (9.14.9) — pure mapping from open tasks to the
- * shared `@brainstorm/sdk/reminder-schedule` `ReminderSource` shape, so the
+ * shared `@brainstorm-os/sdk/reminder-schedule` `ReminderSource` shape, so the
  * one product-wide scheduler (Calendar's, extracted at copy two) drives Task
  * notifications.
  *
@@ -12,7 +12,7 @@
  * so the notifier can word the two differently without a side-channel.
  */
 
-import type { ReminderSource } from "@brainstorm/sdk/reminder-schedule";
+import type { ReminderSource } from "@brainstorm-os/sdk/reminder-schedule";
 import type { Task } from "../types/task";
 
 export enum TaskAlertKind {

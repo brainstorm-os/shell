@@ -1,4 +1,4 @@
-import type { PropertyPredicate } from "@brainstorm/sdk-types";
+import type { PropertyPredicate } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type FormField, cellsToFields, fieldsToCells } from "./form-model";
 import {

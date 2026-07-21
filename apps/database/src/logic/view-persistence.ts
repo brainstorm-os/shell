@@ -17,8 +17,8 @@ import {
 	LIST_VIEW_ENTITY_TYPE,
 	entityToListView,
 	listViewToEntityProperties,
-} from "@brainstorm/sdk";
-import type { EntitiesService, ListView } from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk";
+import type { EntitiesService, ListView } from "@brainstorm-os/sdk-types";
 import { type ReconcilePlan, planEntityReconcile } from "./list-persistence";
 
 /** The slice of the entities service this adapter needs — identical to

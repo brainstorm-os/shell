@@ -14,10 +14,10 @@
  * so they degrade to the fallback — the correct degraded rendering.
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { IconKind } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 
-export type { Icon } from "@brainstorm/sdk-types";
+export type { Icon } from "@brainstorm-os/sdk-types";
 
 export type EntityIconInput = Icon | null | undefined;
 

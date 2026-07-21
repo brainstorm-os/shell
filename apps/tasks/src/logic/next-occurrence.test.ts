@@ -1,4 +1,4 @@
-import { RecurrenceKind, Weekday } from "@brainstorm/sdk-types";
+import { RecurrenceKind, Weekday } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { nextOccurrence } from "./next-occurrence";
 

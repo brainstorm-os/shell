@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/a11y` composite-keyboard controller — the pure index-walk
+ * `@brainstorm-os/sdk/a11y` composite-keyboard controller — the pure index-walk
  * half of `useCompositeKeyboard`. NO DOM, NO React, NO event listeners. KBN-1b
  * will bind this to live nodes (roving `tabindex`, focus management) but the
  * arithmetic — wrap / no-wrap, disabled-skip, grid row/column moves, page-by,

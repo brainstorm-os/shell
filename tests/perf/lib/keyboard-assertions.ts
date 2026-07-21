@@ -13,7 +13,7 @@
 
 import type { Page } from "@playwright/test";
 
-/** The same focusable selector `@brainstorm/sdk/a11y/use-focus-trap` uses, so
+/** The same focusable selector `@brainstorm-os/sdk/a11y/use-focus-trap` uses, so
  *  the Playwright probe matches the production trap's idea of "focusable". */
 export const FOCUSABLE_SELECTOR = [
 	"a[href]",
@@ -126,7 +126,7 @@ export async function isFocusVisible(page: Page): Promise<boolean> {
 }
 
 /** Whether the document's `:focus-visible` JS twin (`useFocusVisible` from
- *  `@brainstorm/sdk/a11y`) currently reports keyboard modality. Reads the
+ *  `@brainstorm-os/sdk/a11y`) currently reports keyboard modality. Reads the
  *  body element's modality marker if present, otherwise falls back to the
  *  CSS `:focus-visible` selector — both should agree in production. */
 export async function focusModalityIsKeyboard(page: Page): Promise<boolean> {

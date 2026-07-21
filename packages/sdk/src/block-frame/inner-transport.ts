@@ -2,7 +2,7 @@
  * Block-side mirror of the host's `createBlockFrameTransport` (9.5.2). This
  * is the primitive a Block Protocol block author runs *inside* the sandboxed
  * iframe to talk to its host. It is a separate subpath
- * (`@brainstorm/sdk/block-frame/inner`) so block authors can pull only the
+ * (`@brainstorm-os/sdk/block-frame/inner`) so block authors can pull only the
  * inner-side surface without dragging the host-side `createBlockFrame` /
  * IntersectionObserver / DOM-construction code into their bundle.
  *

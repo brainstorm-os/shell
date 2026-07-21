@@ -11,7 +11,7 @@ import {
 	MailFlag,
 	formatMailAddress,
 	isMailFlag,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	type AccountView,
 	EMAIL_TYPE_URL,

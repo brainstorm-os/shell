@@ -10,16 +10,16 @@
  * formatter.
  */
 
-import { type DateValue, type PropertyDef, ValueType } from "@brainstorm/sdk-types";
-import { DateGranularity, PropertyFormat } from "@brainstorm/sdk-types";
+import { type DateValue, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { DateGranularity, PropertyFormat } from "@brainstorm-os/sdk-types";
 import {
 	CoverRenderKind,
 	type CoverViewSource,
 	ViewCoverMode,
 	resolveCoverForView,
-} from "@brainstorm/sdk/entity-cover";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { formatScalar } from "@brainstorm/sdk/property-ui/pure";
+} from "@brainstorm-os/sdk/entity-cover";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { formatScalar } from "@brainstorm-os/sdk/property-ui/pure";
 import { TYPE_LABELS } from "../demo/dataset";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";
 import {

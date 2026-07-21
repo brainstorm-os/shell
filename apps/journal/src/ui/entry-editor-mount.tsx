@@ -15,8 +15,8 @@
  * editor never mounts there.
  */
 
-import type { SelectionCommentAnchor } from "@brainstorm/editor";
-import { YDocProvider } from "@brainstorm/react-yjs";
+import type { SelectionCommentAnchor } from "@brainstorm-os/editor";
+import { YDocProvider } from "@brainstorm-os/react-yjs";
 import type { SerializedEditorState } from "lexical";
 import { type Root, createRoot } from "react-dom/client";
 import { getYDocResolverApi } from "../store/ydoc-resolver";

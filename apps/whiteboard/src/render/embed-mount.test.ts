@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { BlockFramePhase } from "@brainstorm/sdk/block-frame";
+import { BlockFramePhase } from "@brainstorm-os/sdk/block-frame";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	EmbedMountController,

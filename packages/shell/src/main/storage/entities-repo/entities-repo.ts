@@ -24,7 +24,7 @@ import {
 	type LinkPredicate,
 	type PropertyPredicate,
 	isPropertyRef,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
 import {
 	type CompileOptions,

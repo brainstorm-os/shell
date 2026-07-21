@@ -4,7 +4,7 @@ import {
 	MAIL_FOLDER_TYPE_URL,
 	MailFlag,
 	SyncWindow,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FakeMailDriver, type FakeServerState } from "./fake-mail-driver";
 import type { ExistingEmail, MailSyncPorts } from "./mail-sync-engine";

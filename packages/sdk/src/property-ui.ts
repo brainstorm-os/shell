@@ -1,11 +1,11 @@
 /**
- * `@brainstorm/sdk/property-ui` — the React face of the shared property
+ * `@brainstorm-os/sdk/property-ui` — the React face of the shared property
  * layer: the cell registry, the vault-scoped stores + their provider,
  * the host seams, and the DictionaryEditor.
  *
  * Importing this barrel pulls `react` (peer dep) and runs the cell
  * registry's `register(...)` side effect on load. DOM/React-free
- * consumers (the Database app) MUST import `@brainstorm/sdk/property-ui/
+ * consumers (the Database app) MUST import `@brainstorm-os/sdk/property-ui/
  * pure` instead — the pure barrel never statically reaches this file.
  *
  * Individual cells + `CellPopover` are intentionally NOT exported:
@@ -137,4 +137,4 @@ export type {
 	PropertyDef,
 	PropertyView,
 	ValueType,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";

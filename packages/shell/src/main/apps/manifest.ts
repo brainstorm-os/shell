@@ -39,7 +39,7 @@ import {
 	type LayoutContext,
 	isHardBlockedScheme,
 	validateAppLayouts,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { normalizeChord } from "../shortcuts/chord";
 import { compareDottedVersions } from "../util/schema-version";
 import { isBlockIdForApp, isValidBlockId } from "./block-id";
@@ -110,7 +110,7 @@ export const INTENT_VERBS = [
 export type IntentVerb = (typeof INTENT_VERBS)[number];
 
 /** Grouping buckets a contributed action may declare (doc 63 §Anti-rot). Wire
- *  values mirror the `ActionGroup` enum in `@brainstorm/sdk-types`; an unknown
+ *  values mirror the `ActionGroup` enum in `@brainstorm-os/sdk-types`; an unknown
  *  group falls back to `actions` at render time, but the manifest validator
  *  rejects a non-curated value so the catalog stays honest. */
 export const ACTION_GROUPS = ["share", "convert", "actions"] as const;
@@ -754,7 +754,7 @@ function collectOwnedEntityTypes(v: Record<string, unknown>): string[] {
 
 /**
  * Install-time validation of the manifest's `layouts:` array. Delegates
- * to the frozen `@brainstorm/sdk-types` `validateAppLayouts` contract
+ * to the frozen `@brainstorm-os/sdk-types` `validateAppLayouts` contract
  * (Stage 8.1) — the single source of truth, so install rejects the same
  * malformed app-default layouts the resolver/editor would (DRY; replaces
  * the prior ad-hoc shallow check). Enforces doc 27 §App-shipped defaults:

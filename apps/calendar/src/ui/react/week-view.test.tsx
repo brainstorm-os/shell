@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { IconKind } from "@brainstorm/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CompiledDayView, CompiledWeekView, WeekDayBucket } from "../../logic/compile-view";
 import { EVENT_SOURCE_KEY, type ScheduledItem } from "../../logic/scheduled-item";

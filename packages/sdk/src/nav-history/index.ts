@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/nav-history` — one in-app back/forward model + one
+ * `@brainstorm-os/sdk/nav-history` — one in-app back/forward model + one
  * back/forward control, adopted by every first-party app so navigation is
  * identical everywhere (per CLAUDE.md DRY / design-system rules).
  *

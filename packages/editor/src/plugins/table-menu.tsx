@@ -4,7 +4,7 @@
  * from the floating trigger the `TablesPlugin` renders at the table's
  * top-left — never on cell focus.
  *
- * Renders through the shared fancy-menus runtime (`@brainstorm/sdk/menus`) so
+ * Renders through the shared fancy-menus runtime (`@brainstorm-os/sdk/menus`) so
  * it matches every other menu's chrome / escape-stack / glass / keyboard
  * model and carries leading icons. Each editor icon is a pre-rendered React
  * node, so we wrap it in an `IconParam` whose component renders that node
@@ -16,7 +16,7 @@ import {
 	type IconComponent,
 	type IconParam,
 	openContextMenu,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import type { LexicalEditor } from "lexical";
 import type { ReactNode } from "react";
 import type { EditorT } from "../i18n";

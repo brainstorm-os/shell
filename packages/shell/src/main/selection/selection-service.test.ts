@@ -1,4 +1,4 @@
-import type { ObjectDragItem } from "@brainstorm/sdk-types";
+import type { ObjectDragItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import type { CapabilityLedger } from "../capabilities/ledger";

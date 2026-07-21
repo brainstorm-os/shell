@@ -1,4 +1,4 @@
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { collectRemoteImageSrcs, isRemoteHttpImageSrc, rewriteImageSrcs } from "./enrich-blocks";
 

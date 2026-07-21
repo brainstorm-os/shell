@@ -11,7 +11,7 @@
  * (OQ-WV-4 lean; a signed updatable feed is post-v1).
  */
 
-import { TabSecurityState } from "@brainstorm/sdk-types";
+import { TabSecurityState } from "@brainstorm-os/sdk-types";
 import { matchesHostPattern } from "../network/host-patterns";
 
 /** Bundled tracker/ad host patterns blocked by default (OQ-WV-4: static v1

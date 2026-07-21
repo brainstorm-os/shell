@@ -22,12 +22,12 @@
  *     `DEMO_TASKS` / `DEMO_PROJECTS`; mutations patch the local snapshot.
  */
 
-import { getEntityTitle, subscribeEntityTitles } from "@brainstorm/editor";
-import { type LiveEntitiesSource, useLiveEntities } from "@brainstorm/react-yjs";
-import type { Icon, Intent } from "@brainstorm/sdk-types";
-import { IconName, Icon as IconView } from "@brainstorm/sdk/icon";
-import { LockButton } from "@brainstorm/sdk/lock-button";
-import { NavButtons, createNavHistory } from "@brainstorm/sdk/nav-history";
+import { getEntityTitle, subscribeEntityTitles } from "@brainstorm-os/editor";
+import { type LiveEntitiesSource, useLiveEntities } from "@brainstorm-os/react-yjs";
+import type { Icon, Intent } from "@brainstorm-os/sdk-types";
+import { IconName, Icon as IconView } from "@brainstorm-os/sdk/icon";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
+import { NavButtons, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
 	type AnchoredMenuItem,
 	type DelegatedMenuTarget,
@@ -35,23 +35,23 @@ import {
 	type ObjectMenuRuntime,
 	openAnchoredMenu,
 	openObjectMenu,
-} from "@brainstorm/sdk/object-menu";
-import { ObjectMenuMoreButton } from "@brainstorm/sdk/object-menu";
-import { readPanelOpen, writePanelOpen } from "@brainstorm/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm/sdk/panel-toggle";
-import { createIconPickerButton, openIconPicker } from "@brainstorm/sdk/picker-host";
-import { PopoverBodyPadding, createPopoverElement } from "@brainstorm/sdk/popover";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm/sdk/presence-stack";
+} from "@brainstorm-os/sdk/object-menu";
+import { ObjectMenuMoreButton } from "@brainstorm-os/sdk/object-menu";
+import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { createIconPickerButton, openIconPicker } from "@brainstorm-os/sdk/picker-host";
+import { PopoverBodyPadding, createPopoverElement } from "@brainstorm-os/sdk/popover";
+import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import {
 	type EntityTitleSource,
 	PropertiesProvider,
 	type ValuesMap,
-} from "@brainstorm/sdk/property-ui";
-import { RepeatKind } from "@brainstorm/sdk/recurrence-edit";
-import type { RecurrenceEditorLabels } from "@brainstorm/sdk/recurrence-editor";
-import { createReminderScheduler } from "@brainstorm/sdk/reminder-schedule";
-import { attachResizable } from "@brainstorm/sdk/resizable";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
+} from "@brainstorm-os/sdk/property-ui";
+import { RepeatKind } from "@brainstorm-os/sdk/recurrence-edit";
+import type { RecurrenceEditorLabels } from "@brainstorm-os/sdk/recurrence-editor";
+import { createReminderScheduler } from "@brainstorm-os/sdk/reminder-schedule";
+import { attachResizable } from "@brainstorm-os/sdk/resizable";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEMO_NOW, DEMO_PROJECTS, DEMO_TASKS } from "./demo/dataset";
 import { recurrenceLabels } from "./i18n/recurrence-labels";

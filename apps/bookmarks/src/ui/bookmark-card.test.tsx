@@ -7,8 +7,8 @@
  * context (`null`) is a no-op (no destructive surface).
  */
 
-import { closeObjectMenu } from "@brainstorm/sdk/object-menu";
-import type { OpenObjectMenuOptions } from "@brainstorm/sdk/object-menu";
+import { closeObjectMenu } from "@brainstorm-os/sdk/object-menu";
+import type { OpenObjectMenuOptions } from "@brainstorm-os/sdk/object-menu";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

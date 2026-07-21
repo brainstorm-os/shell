@@ -10,7 +10,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { LIST_ENTITY_TYPE } from "@brainstorm/sdk";
+import { LIST_ENTITY_TYPE } from "@brainstorm-os/sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { makeEnvelope } from "../../ipc/envelope";

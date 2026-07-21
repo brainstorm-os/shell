@@ -16,7 +16,7 @@
  * the *decision* (which languages) is the pure `resolveSpellCheckLanguages`.
  */
 
-import type { SpellcheckContext } from "@brainstorm/sdk-types";
+import type { SpellcheckContext } from "@brainstorm-os/sdk-types";
 import type { Session } from "electron";
 
 /** Shell → renderer: a right-click landed on a misspelled word; carries the

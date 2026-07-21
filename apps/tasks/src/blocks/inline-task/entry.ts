@@ -4,10 +4,10 @@
  * checkbox / title / due chip, and a checkbox toggle writes the done state
  * back through the BP graph (`updateEntity`). A title click opens the task in
  * the Tasks app. Runs in the sandbox (no ambient authority) via
- * `@brainstorm/sdk/block-runtime`. Pure DOM.
+ * `@brainstorm-os/sdk/block-runtime`. Pure DOM.
  */
 
-import { type BlockRuntimeContext, startBlock } from "@brainstorm/sdk/block-runtime";
+import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
 import { TaskStatus } from "../../types/task";
 
 interface BpEntity {

@@ -118,7 +118,7 @@ import type {
 	WebViewClient,
 	WebViewEvent,
 	WebViewRect,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import {
 	DEFAULT_FORMAT_CONTEXT,
 	DEFAULT_LOCALE,
@@ -127,7 +127,7 @@ import {
 	WEB_CAPTURE_CAP,
 	WebViewMethod,
 	mcpServerCapability,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { Bridge } from "./bridge";
 import { makeSdkError } from "./errors";
 

@@ -1,7 +1,7 @@
 /**
  * Books app i18n manifest. Per
  * §Localization every user-visible string flows through the shared app-side
- * `t()` (`createT` from `@brainstorm/sdk/i18n`) — no bare literals.
+ * `t()` (`createT` from `@brainstorm-os/sdk/i18n`) — no bare literals.
  * `{name}` interpolation only — NO ICU (the app doesn't bundle a formatter).
  */
 
@@ -11,7 +11,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const BOOKS_I18N = enCatalog as typeof enCatalog;

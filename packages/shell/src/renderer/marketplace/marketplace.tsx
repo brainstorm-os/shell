@@ -24,8 +24,8 @@ import {
 	useCompositeKeyboard,
 	useFocusTrap,
 	useRegionNavigation,
-} from "@brainstorm/sdk/a11y";
-import { Searchbar } from "@brainstorm/sdk/searchbar";
+} from "@brainstorm-os/sdk/a11y";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { MarketplaceListing } from "../../preload/marketplace-types";

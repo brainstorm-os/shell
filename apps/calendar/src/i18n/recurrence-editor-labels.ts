@@ -1,12 +1,12 @@
 /**
  * Calendar → shared `<RecurrenceEditor>` label mapping. The editor behaviour +
- * DOM live in `@brainstorm/sdk/recurrence-editor`; this owns only the
+ * DOM live in `@brainstorm-os/sdk/recurrence-editor`; this owns only the
  * Calendar-namespace label pack (the imperative `ui/recurrence-editor.ts`
  * adapter's job, now inlined for the React twin).
  */
 
-import { RepeatKind } from "@brainstorm/sdk/recurrence-edit";
-import type { RecurrenceEditorLabels } from "@brainstorm/sdk/recurrence-editor";
+import { RepeatKind } from "@brainstorm-os/sdk/recurrence-edit";
+import type { RecurrenceEditorLabels } from "@brainstorm-os/sdk/recurrence-editor";
 import { t } from "./t";
 
 export function calendarRecurrenceEditorLabels(): RecurrenceEditorLabels {

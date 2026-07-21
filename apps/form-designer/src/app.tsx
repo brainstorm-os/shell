@@ -12,28 +12,28 @@
  *     cells, collect values, and Create the target entity.
  *
  * Reactivity: the saved-forms sidebar derives from the live whole-vault
- * snapshot read through the ONE shared stack — `@brainstorm/react-yjs`
+ * snapshot read through the ONE shared stack — `@brainstorm-os/react-yjs`
  * `useVaultEntities` — never a hand-rolled `onChange → list → setState`.
  *
  * Outside the shell there is no entities/properties service, so the app
  * runs read-only against an empty catalog per the preview-drop pattern.
  */
 
-import { useVaultEntities } from "@brainstorm/react-yjs";
+import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import {
 	LAYOUT_TYPE_URL,
 	type PropertiesService,
 	type PropertyDef,
 	defaultViewFor,
-} from "@brainstorm/sdk-types";
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { MenuAlign } from "@brainstorm/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
-import { Popover } from "@brainstorm/sdk/popover";
-import { PropertiesProvider, getCell } from "@brainstorm/sdk/property-ui";
-import { useResizable } from "@brainstorm/sdk/resizable";
-import { SelectMenu } from "@brainstorm/sdk/select-menu";
+} from "@brainstorm-os/sdk-types";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import { Popover } from "@brainstorm-os/sdk/popover";
+import { PropertiesProvider, getCell } from "@brainstorm-os/sdk/property-ui";
+import { useResizable } from "@brainstorm-os/sdk/resizable";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "./i18n";
 import { useFormDesignerT } from "./i18n-hooks";

@@ -15,7 +15,7 @@
  * so the bounded / fail-soft behaviour is unit-testable in isolation.
  */
 
-import type { SearchHit, SearchQuery, SearchService } from "@brainstorm/sdk-types";
+import type { SearchHit, SearchQuery, SearchService } from "@brainstorm-os/sdk-types";
 import { formatCitationLine } from "./citation-format";
 
 /** Top-K hits fetched per turn — bounds both the search cost and the number of

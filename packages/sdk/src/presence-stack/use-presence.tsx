@@ -7,7 +7,7 @@
  * the result straight to `<PresenceStack peers={...} />`. It rebinds on an
  * entity change and clears our presence on unmount.
  *
- * The dependency shape: this couples the transport (`@brainstorm/react-yjs`:
+ * The dependency shape: this couples the transport (`@brainstorm-os/react-yjs`:
  * `createSyncedAwareness` / `createPresenceTransport` / `useAwareness`) to the
  * read-side (`awarenessToPeers` / `buildLocalPresence`, this package). It reads
  * the sandbox runtime off `window.brainstorm` — the same coupling `useVaultEntities`
@@ -20,7 +20,7 @@ import {
 	createPresenceTransport,
 	createSyncedAwareness,
 	useAwareness,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { useEffect, useMemo, useState } from "react";
 import {
 	PRESENCE_STATE_KEY,

@@ -15,13 +15,13 @@
  *     host store.
  */
 
-import { BASELINE_NODES } from "@brainstorm/editor";
+import { BASELINE_NODES } from "@brainstorm-os/editor";
 import {
 	BrainstormMenuProvider,
 	SEARCH_PICKER_ID,
 	type SearchPickerItem,
 	getActiveMenuStore,
-} from "@brainstorm/sdk/menus";
+} from "@brainstorm-os/sdk/menus";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";

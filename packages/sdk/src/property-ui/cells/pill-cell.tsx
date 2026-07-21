@@ -5,7 +5,7 @@
  * Enter, revert on Escape.
  */
 
-import { type CellProps, ValueType } from "@brainstorm/sdk-types";
+import { type CellProps, ValueType } from "@brainstorm-os/sdk-types";
 import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import { coerceValue } from "../../properties-validate";

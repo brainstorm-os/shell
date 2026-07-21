@@ -5,7 +5,7 @@
  * widgets.
  */
 
-import { CONVERSATION_TYPE_URL } from "@brainstorm/sdk-types";
+import { CONVERSATION_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { AGENT_I18N } from "./i18n";
 import { type WidgetConversationEntity, shapeConversations, updatedLabel } from "./widget-data";

@@ -3,7 +3,7 @@ import {
 	AiContentPartKind,
 	type AiGenerateResult,
 	MessageRole,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type AnthropicHttp, createAnthropicProvider } from "./anthropic-provider";
 

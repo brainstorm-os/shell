@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/a11y` escape stack — the renderer-wide LIFO of overlay
+ * `@brainstorm-os/sdk/a11y` escape stack — the renderer-wide LIFO of overlay
  * closers and the one document-level `Escape` listener that drains them.
  *
  * Builds on KBN-1a:

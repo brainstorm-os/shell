@@ -4,7 +4,7 @@
  * ship the live token values across the transport.
  *
  * The original harvest iterated only `documentElement.style` — but in app
- * renderers the theme tokens live in STYLESHEETS (`@brainstorm/sdk`'s
+ * renderers the theme tokens live in STYLESHEETS (`@brainstorm-os/sdk`'s
  * app-theme + the tokens css), not inline, so blocks received exactly the
  * three preload header-padding vars and painted with their light fallbacks
  * inside dark themes (F-210). This collector reads COMPUTED values:

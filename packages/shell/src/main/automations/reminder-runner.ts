@@ -11,7 +11,7 @@
  * is unit-testable with fakes and carries no broker / scheduler import.
  */
 
-import type { ReminderDef } from "@brainstorm/sdk-types";
+import type { ReminderDef } from "@brainstorm-os/sdk-types";
 import {
 	completeReminder,
 	reminderNotification,

@@ -1,4 +1,4 @@
-import { ThemeName } from "@brainstorm/tokens";
+import { ThemeName } from "@brainstorm-os/tokens";
 import { describe, expect, it } from "vitest";
 import {
 	AppearanceMode,

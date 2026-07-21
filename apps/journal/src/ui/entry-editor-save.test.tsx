@@ -14,7 +14,7 @@
  * the mount-settle echo.
  */
 
-import { AutosavePlugin } from "@brainstorm/editor";
+import { AutosavePlugin } from "@brainstorm-os/editor";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {

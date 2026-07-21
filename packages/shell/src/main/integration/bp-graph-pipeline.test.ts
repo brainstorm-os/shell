@@ -17,16 +17,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { BpModule, BpSource, makeBpHookRouter, makeBpRouter } from "@brainstorm-os/block-protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
-import { BpModule, BpSource } from "../bp/envelope";
 import { makeBpGraphRouter } from "../bp/graph-router";
-import { makeBpHookRouter } from "../bp/hook-router";
-import { makeBpRouter } from "../bp/router";
 import { CapabilityLedger } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { makeEntitiesServiceHandler } from "../entities/entities-service";

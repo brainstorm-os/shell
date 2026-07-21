@@ -1,7 +1,7 @@
 /**
  * B11.4 — Shiki syntax highlighting in Notes code blocks. CodeHighlightPlugin
  * paints a per-block token overlay (`.notes__code-highlight`) over the
- * transparent block text, themed via the shared `@brainstorm/sdk/code-highlight`
+ * transparent block text, themed via the shared `@brainstorm-os/sdk/code-highlight`
  * tokenizer. Verified in the real shell: a TypeScript code block grows a
  * highlight overlay carrying coloured token spans. Driven through the
  * `__brainstormNotesDev` hooks (Playwright keystrokes corrupt the Yjs editor).

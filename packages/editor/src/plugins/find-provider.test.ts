@@ -1,5 +1,5 @@
 // Pure model ops only (no DOM) → default node env; no jsdom pragma.
-import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm/sdk/find-replace";
+import { DEFAULT_FIND_OPTIONS, type FindQuery } from "@brainstorm-os/sdk/find-replace";
 import { createHeadlessEditor } from "@lexical/headless";
 import {
 	$createParagraphNode,

@@ -1,7 +1,7 @@
 /**
  * Preview app i18n manifest. Per
  * §Localization every user-visible string flows through the shared
- * app-side `t()` (`createT` from `@brainstorm/sdk/i18n`) over this
+ * app-side `t()` (`createT` from `@brainstorm-os/sdk/i18n`) over this
  * default-English manifest — no bare literals in app.ts / inspector.ts.
  *
  * `{name}` placeholders are interpolated by `createT`. Keys are stable
@@ -14,7 +14,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const PREVIEW_I18N = enCatalog as typeof enCatalog;

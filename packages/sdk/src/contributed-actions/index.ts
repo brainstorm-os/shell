@@ -1,10 +1,10 @@
 /**
- * `@brainstorm/sdk/contributed-actions` — the host framework of the action
+ * `@brainstorm-os/sdk/contributed-actions` — the host framework of the action
  * surface (doc 63). One hook (`useContributedActions`) that resolves +
  * groups the contributed actions for a target, and one primitive
  * (`<ActionMenu>`) that drops a contribution-aware menu into a React tree over
  * the shared object-menu renderer. The flat grouping/cap/trust logic lives in
- * `@brainstorm/sdk-types` (`groupContributedActions`) and is re-exported here
+ * `@brainstorm-os/sdk-types` (`groupContributedActions`) and is re-exported here
  * for hosts that render their own layout.
  */
 
@@ -26,4 +26,4 @@ export {
 	contributedActionId,
 	groupContributedActions,
 	groupForVerb,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";

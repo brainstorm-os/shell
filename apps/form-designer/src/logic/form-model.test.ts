@@ -5,7 +5,7 @@ import {
 	LayoutMode,
 	validateAppLayouts,
 	validateLayout,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TARGET_TYPE,

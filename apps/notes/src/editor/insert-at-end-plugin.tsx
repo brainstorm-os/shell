@@ -12,7 +12,7 @@
  * normal autosave/`bodyRefs` flow — see `append-markdown.ts`).
  */
 
-import { BASELINE_NODES, BLOCK_MARKDOWN_TRANSFORMERS } from "@brainstorm/editor";
+import { BASELINE_NODES, BLOCK_MARKDOWN_TRANSFORMERS } from "@brainstorm-os/editor";
 import { TRANSFORMERS, type Transformer } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import type { Klass, LexicalNode } from "lexical";

@@ -12,7 +12,7 @@
  * connector never sees the token (doc 56 §The custody invariant).
  */
 
-import { isWildcardAll, validateConnectorRequest } from "@brainstorm/sdk-types";
+import { isWildcardAll, validateConnectorRequest } from "@brainstorm-os/sdk-types";
 import type { CapabilityLedger } from "../capabilities/ledger";
 import { LedgerUnavailableError } from "../capabilities/ledger";
 import type { ConnectorEgress } from "./egress";

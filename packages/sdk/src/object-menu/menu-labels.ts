@@ -4,7 +4,7 @@
  * label the *items*). These label the *shell* around them: the menu's
  * `aria-label` region and the visible ⋯ overflow trigger.
  *
- * Same labels-injection convention as `@brainstorm/sdk/i18n`
+ * Same labels-injection convention as `@brainstorm-os/sdk/i18n`
  * (`common-labels.ts`) and `popover-labels.ts`: a host passes nothing for
  * the canonical English; a localised host passes a `Partial<…Labels>` of
  * just the keys it translates (merged over the defaults). No bare strings

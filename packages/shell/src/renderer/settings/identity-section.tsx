@@ -10,9 +10,9 @@
  * `ed25519:<hex>` the device-pairing SAS uses).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
-import { IconKind } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import type { Icon } from "@brainstorm-os/sdk-types";
+import { IconKind } from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { initialsFor } from "../dashboard/app-icon-palette";
 import { t } from "../i18n/t";

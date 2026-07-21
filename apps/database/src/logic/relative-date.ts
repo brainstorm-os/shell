@@ -1,6 +1,6 @@
 /**
  * Re-export shim — the live-rolling relative-date resolver (9.12.20) is now
- * canonical in `@brainstorm/sdk/predicate-eval` (promoted at 9.12.3 so the
+ * canonical in `@brainstorm-os/sdk/predicate-eval` (promoted at 9.12.3 so the
  * shell's `ListSource` query path resolves "$relativeDate" identically).
  * In-app import sites are untouched.
  */
@@ -14,4 +14,4 @@ export {
 	relativeRangeLabel,
 	resolveRelativeRange,
 	toTimestamp,
-} from "@brainstorm/sdk/predicate-eval";
+} from "@brainstorm-os/sdk/predicate-eval";

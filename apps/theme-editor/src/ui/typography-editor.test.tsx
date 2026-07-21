@@ -1,5 +1,5 @@
-import { FontRole, SYSTEM_TYPOGRAPHY, TypographyScale } from "@brainstorm/sdk-types";
-import { openContextMenu } from "@brainstorm/sdk/menus";
+import { FontRole, SYSTEM_TYPOGRAPHY, TypographyScale } from "@brainstorm-os/sdk-types";
+import { openContextMenu } from "@brainstorm-os/sdk/menus";
 // @vitest-environment jsdom
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { seedTypography } from "../logic/typography-edit";
 import { renderInto, typeInto } from "../test/render";
 import { TypographyEditor } from "./typography-editor";
 
-vi.mock("@brainstorm/sdk/menus", () => ({
+vi.mock("@brainstorm-os/sdk/menus", () => ({
 	openContextMenu: vi.fn(() => true),
 	sdkMenuIcon: vi.fn(() => ({ icon: () => null })),
 	blankMenuIcon: { icon: () => null },

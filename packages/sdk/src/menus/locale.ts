@@ -1,7 +1,7 @@
 /**
  * Canonical English strings for the fancy-menus chrome (filter placeholder,
  * empty / loading states, footer buttons). Follows the SDK i18n convention
- * ([[project_sdk_shared_properties_panel]] / `@brainstorm/sdk/i18n`): the
+ * ([[project_sdk_shared_properties_panel]] / `@brainstorm-os/sdk/i18n`): the
  * English source lives here once; a localised host passes a
  * `Partial<MenuLocale>` of just the keys it translates, merged over these.
  *

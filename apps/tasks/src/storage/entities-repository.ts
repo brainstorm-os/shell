@@ -7,10 +7,10 @@
  * keyed on the stable, app-owned id (iteration ids, `proj-<stage>`). The
  * app's domain `createdAt`/`updatedAt` stay in the property bag — the store
  * owns entity-level timestamps and would clobber them on every write.
- * Plumbing lives in `@brainstorm/sdk/storage-repository`.
+ * Plumbing lives in `@brainstorm-os/sdk/storage-repository`.
  */
 
-import { deleteEntity, queryEntityRows, upsertEntity } from "@brainstorm/sdk/storage-repository";
+import { deleteEntity, queryEntityRows, upsertEntity } from "@brainstorm-os/sdk/storage-repository";
 import type { Project } from "../types/project";
 import type { Task } from "../types/task";
 import { parseStoredProject, parseStoredTask, serializeProject, serializeTask } from "./codec";

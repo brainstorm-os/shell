@@ -10,7 +10,7 @@
  * later through the normal "Add column" path).
  */
 
-import { ValueType } from "@brainstorm/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import { type InferredCsvColumn, inferCsvColumns } from "./csv-infer";
 import { GENERIC_OBJECT_TYPE } from "./row-create";
 

@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, themes } from "@brainstorm/tokens";
+import { DEFAULT_THEME, themes } from "@brainstorm-os/tokens";
 import type { BrowserWindow } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import type { AppWindow } from "../apps/launcher";
@@ -144,7 +144,7 @@ describe("broadcastThemeToWindows", () => {
 		expect(healthy.send).toHaveBeenCalledTimes(1);
 	});
 
-	it("ships the theme name as a plain string — preload resolves it through @brainstorm/tokens", () => {
+	it("ships the theme name as a plain string — preload resolves it through @brainstorm-os/tokens", () => {
 		const notes = makeFakeAppWindow("io.brainstorm.notes");
 		broadcastThemeToWindows(DEFAULT_THEME, null, [notes.appWindow]);
 		const [, payload] = notes.send.mock.calls[0] ?? [];

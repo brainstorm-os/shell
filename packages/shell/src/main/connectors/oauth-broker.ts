@@ -37,7 +37,7 @@ import {
 	AuthState,
 	type ConnectorAccountDef,
 	validateConnectorRequest,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type ConnectorEgress, decodeJsonResponse, encodeForm } from "./egress";
 import {
 	buildAuthorizationUrl,

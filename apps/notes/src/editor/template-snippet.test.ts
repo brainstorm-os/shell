@@ -1,5 +1,5 @@
-import { type Template, TemplateKind } from "@brainstorm/sdk-types";
-import { TEMPLATE_SNIPPET_KEY } from "@brainstorm/sdk/templates";
+import { type Template, TemplateKind } from "@brainstorm-os/sdk-types";
+import { TEMPLATE_SNIPPET_KEY } from "@brainstorm-os/sdk/templates";
 import { describe, expect, it } from "vitest";
 import { SNIPPET_NAME_MAX, deriveSnippetName, templatesToSnippetOptions } from "./template-snippet";
 

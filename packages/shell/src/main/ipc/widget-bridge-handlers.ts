@@ -2,7 +2,7 @@
  * Widget bridge handlers (Stage 7.3b → OQ-6 reversal). Dashboard widgets render
  * in sandboxed `<iframe>`s (DOM) instead of native `WebContentsView` overlays.
  * A sandboxed iframe has no preload, so its `window.brainstorm` is built in the
- * renderer over `postMessage` (see `@brainstorm/sdk/widget` iframe-bridge); the
+ * renderer over `postMessage` (see `@brainstorm-os/sdk/widget` iframe-bridge); the
  * DASHBOARD renderer proxies each call here, tagging it with the widget's appId.
  *
  * SECURITY (gated on a `/security-review`): this is a new privileged surface —

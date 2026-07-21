@@ -14,14 +14,14 @@
  * construction. Per §The install/update engines + §14.34.
  *
  * Crypto: sha256 (node:crypto — hashing, not keystore) + Ed25519 over the
- * bundle content hash (`@brainstorm/native`, the same verify primitive the
+ * bundle content hash (`@brainstorm-os/native`, the same verify primitive the
  * manifest-signature + catalog-index paths use; never a keystore import).
  */
 
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import { ed25519Sign, ed25519Verify } from "@brainstorm/native";
+import { ed25519Sign, ed25519Verify } from "@brainstorm-os/native";
 import { packBundle, unpackBundle } from "../bundle/bundle-archive";
 import { BundleCompression } from "../bundle/bundle-format";
 

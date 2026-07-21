@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/picker-host` — the ONE imperative bridge for mounting
+ * `@brainstorm-os/sdk/picker-host` — the ONE imperative bridge for mounting
  * the shared React pickers inside an otherwise plain-DOM app.
  *
  * Most first-party apps are imperative DOM; the icon/cover pickers are
@@ -10,20 +10,20 @@
  * created container, one persistent root, a picker rendered on demand
  * and unmounted on close so there is never a stale overlay.
  *
- * Labels default to the canonical `@brainstorm/sdk/i18n` set; a
+ * Labels default to the canonical `@brainstorm-os/sdk/i18n` set; a
  * localised app passes a `Partial<…Labels>` of just the keys it
  * translates. React apps should use `<IconPicker>` / `<CoverPicker>`
  * directly inside their own tree instead of this bridge.
  */
 
-import type { Cover, Icon } from "@brainstorm/sdk-types";
+import type { Cover, Icon } from "@brainstorm-os/sdk-types";
 import {
 	CoverPicker,
 	type CoverPickerLabels,
 	type CoverPickerService,
-} from "@brainstorm/sdk/cover-picker";
-import { createEntityIconElement } from "@brainstorm/sdk/entity-icon";
-import { IconPicker, type IconPickerLabels } from "@brainstorm/sdk/icon-picker";
+} from "@brainstorm-os/sdk/cover-picker";
+import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { IconPicker, type IconPickerLabels } from "@brainstorm-os/sdk/icon-picker";
 import { type ReactNode, useEffect, useRef } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import {

@@ -10,7 +10,7 @@
  * than a Text the user can re-map.
  */
 
-import { ValueType } from "@brainstorm/sdk-types";
+import { ValueType } from "@brainstorm-os/sdk-types";
 import type { ColumnMapping, MappingPlan, ParsedTable } from "./import-types";
 
 const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2})?/;

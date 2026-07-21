@@ -27,8 +27,8 @@
  * read-only fallback paragraph instead of mounting this island.
  */
 
-import type { SelectionCommentAnchor } from "@brainstorm/editor";
-import { YDocProvider, type YDocResolver, useBlankRecoveryGap } from "@brainstorm/react-yjs";
+import type { SelectionCommentAnchor } from "@brainstorm-os/editor";
+import { YDocProvider, type YDocResolver, useBlankRecoveryGap } from "@brainstorm-os/react-yjs";
 import { JournalEntryEditor } from "../entry-editor";
 import type { JournalCommentHooks, JournalDenormalizeFn } from "../entry-editor-mount";
 

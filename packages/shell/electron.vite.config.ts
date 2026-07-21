@@ -18,10 +18,10 @@ export default defineConfig(({ command }) => {
 					// deps, which point at workspace:* — that resolver doesn't run
 					// inside the production main process).
 					exclude: [
-						"@brainstorm/sdk",
-						"@brainstorm/sdk-types",
-						"@brainstorm/tokens",
-						"@brainstorm/editor",
+						"@brainstorm-os/sdk",
+						"@brainstorm-os/sdk-types",
+						"@brainstorm-os/tokens",
+						"@brainstorm-os/editor",
 					],
 				}),
 			],
@@ -46,12 +46,12 @@ export default defineConfig(({ command }) => {
 		preload: {
 			// No dependency externalization for the preload. The sandboxed
 			// preload runtime cannot resolve `require()`; every dependency the
-			// preload (or anything it imports — `@brainstorm/sdk`, `ulid`, etc.)
+			// preload (or anything it imports — `@brainstorm-os/sdk`, `ulid`, etc.)
 			// must be inlined into the bundle. Electron + node built-ins are
 			// already considered external by Vite's preload preset. Since
 			// electron-vite 5, omitting `externalizeDepsPlugin` is NOT enough —
 			// the plugin is auto-applied unless `externalizeDeps: false` (a bare
-			// `require("@brainstorm/sdk-types")` in out/preload kills
+			// `require("@brainstorm-os/sdk-types")` in out/preload kills
 			// `window.brainstorm` in every sandboxed window).
 			build: {
 				externalizeDeps: false,
@@ -109,7 +109,7 @@ export default defineConfig(({ command }) => {
 			resolve: {
 				alias: {
 					"@renderer": resolve(__dirname, "src/renderer"),
-					"@brainstorm/tokens": resolve(__dirname, "../tokens/src/index.ts"),
+					"@brainstorm-os/tokens": resolve(__dirname, "../tokens/src/index.ts"),
 				},
 			},
 		},

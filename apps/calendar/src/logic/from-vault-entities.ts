@@ -21,8 +21,8 @@
  * `if` ladder.
  */
 
-import { yearlyRecurrenceForDate } from "@brainstorm/sdk-types";
-import { parseIcon } from "@brainstorm/sdk/entity-icon";
+import { yearlyRecurrenceForDate } from "@brainstorm-os/sdk-types";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { type TKey, t } from "../i18n/t";
 import { JOURNAL_ENTRY_TYPE, type VaultEntity, type VaultSnapshot } from "../runtime";
 import { EVENT_TYPE } from "../storage/entities-repository";

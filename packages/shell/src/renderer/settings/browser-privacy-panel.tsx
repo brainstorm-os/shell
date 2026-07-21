@@ -14,7 +14,7 @@
  * `network-egress__*` chrome so the groups read as one panel.
  */
 
-import { SitePermissionKind } from "@brainstorm/sdk-types";
+import { SitePermissionKind } from "@brainstorm-os/sdk-types";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { SitePermissionGrant, SiteTrustGrant, WebEgressHostSummary } from "../../preload";
 import { t } from "../i18n/t";

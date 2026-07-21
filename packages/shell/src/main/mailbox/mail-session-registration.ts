@@ -12,7 +12,7 @@
  * schedule is unit-tested without waiting.
  */
 
-import { MAIL_ACCOUNT_TYPE_URL } from "@brainstorm/sdk-types";
+import { MAIL_ACCOUNT_TYPE_URL } from "@brainstorm-os/sdk-types";
 
 /** Matches the Gmail connector's `defaultSyncInterval` (900 s). */
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;

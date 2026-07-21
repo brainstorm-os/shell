@@ -13,11 +13,11 @@ import { NODE_LABEL_MAX_CHARS, nodeLabel, rawNodeLabel } from "./node-label";
 // Spy-wrap `typeDisplayName` (behavior unchanged) so the memoization test
 // can prove the untitled caption is computed once per type id, not per call
 // — the caption sits on the per-frame pan/zoom label path.
-vi.mock("@brainstorm/sdk/system-entities", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@brainstorm/sdk/system-entities")>();
+vi.mock("@brainstorm-os/sdk/system-entities", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@brainstorm-os/sdk/system-entities")>();
 	return { ...actual, typeDisplayName: vi.fn(actual.typeDisplayName) };
 });
-import { typeDisplayName } from "@brainstorm/sdk/system-entities";
+import { typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 
 function entity(props: Record<string, unknown>, id = "abcdef0123456789"): EntityRow {
 	return { id, type: "io.brainstorm.notes/Note/v1", properties: props } as EntityRow;

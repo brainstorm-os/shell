@@ -11,7 +11,7 @@ import {
 	type OpenTarget,
 	OpenTargetKind,
 	OsHandoffConsent,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { BaseWindow, WebContentsView, app, nativeTheme, screen, shell } from "electron";
 import { regionalToFormatContext } from "../../shared/format-context";
 import { resolveAppName } from "../apps/app-name";

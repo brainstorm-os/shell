@@ -14,8 +14,8 @@
  * the file.
  */
 
-import { STYLE_PACK_TYPE_URL } from "@brainstorm/sdk-types";
-import { type Icon, parseIcon } from "@brainstorm/sdk/entity-icon";
+import { STYLE_PACK_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { type Icon, parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { CODE_FILE_ENTITY_TYPE, type VaultEntity, type VaultSnapshot } from "../runtime";
 import { type CodeFile, LanguageKey, isLanguageKey } from "../types/code-file";
 import { resolveLanguage } from "./language-detect";

@@ -1,5 +1,5 @@
 /**
- * AudioBlockNode — extracted to `@brainstorm/editor` (the shared media
+ * AudioBlockNode — extracted to `@brainstorm-os/editor` (the shared media
  * stack). Re-exported here for Notes' node set + commands.
  */
 
@@ -9,4 +9,4 @@ export {
 	AUDIO_BLOCK_TYPE,
 	AudioBlockNode,
 	type SerializedAudioBlockNode,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";

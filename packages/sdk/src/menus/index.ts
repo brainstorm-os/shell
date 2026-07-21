@@ -1,5 +1,5 @@
 /**
- * `@brainstorm/sdk/menus` — the one menu layer for the shell + every
+ * `@brainstorm-os/sdk/menus` — the one menu layer for the shell + every
  * first-party app. Wraps `@react-fancy-menus/core` (the declarative menu
  * constructor: a typed `MenuConfig` → the runtime renders, positions, and
  * handles input) behind the SDK so the version is pinned once (OQ-32) and
@@ -7,8 +7,8 @@
  *
  * Usage:
  *   import "@react-fancy-menus/core/runtime.css";
- *   import "@brainstorm/sdk/menus.css";
- *   import { BrainstormMenuProvider, defineMenu, BodyKind, RowKind } from "@brainstorm/sdk/menus";
+ *   import "@brainstorm-os/sdk/menus.css";
+ *   import { BrainstormMenuProvider, defineMenu, BodyKind, RowKind } from "@brainstorm-os/sdk/menus";
  *
  * Mount one `<BrainstormMenuProvider>` per renderer root; declare each menu
  * with `defineMenu({...})`; open it imperatively via `useMenu().open(id)`.

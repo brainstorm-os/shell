@@ -17,7 +17,7 @@
  *   - the payload carries identifiers only, never property values.
  */
 
-import type { EntityEventVerb } from "@brainstorm/sdk-types";
+import type { EntityEventVerb } from "@brainstorm-os/sdk-types";
 
 export type EntityChange = {
 	verb: EntityEventVerb;

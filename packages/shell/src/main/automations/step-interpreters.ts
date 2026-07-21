@@ -51,7 +51,7 @@ import {
 	aggregateWorkflowCapabilities,
 	missingCapabilities,
 	runAgentLoop,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type ExprScope, ExpressionError, evaluateExpression } from "./code-expression";
 import type {
 	ChildRunResult,

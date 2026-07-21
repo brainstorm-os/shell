@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ed25519GetPublicKey } from "@brainstorm/native";
+import { ed25519GetPublicKey } from "@brainstorm-os/native";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	bundleSha256Hex,

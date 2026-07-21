@@ -39,11 +39,15 @@
  *   semantics.
  */
 
-import { getBlockAnchorsController, revealBlockByKey } from "@brainstorm/editor";
-import { NavigationMode, navModeFromEvent } from "@brainstorm/sdk";
-import type { VaultEntity } from "@brainstorm/sdk-types";
-import { type SearchPickerItem, closeSearchPicker, openSearchPicker } from "@brainstorm/sdk/menus";
-import { friendlyTypeName } from "@brainstorm/sdk/system-entities";
+import { getBlockAnchorsController, revealBlockByKey } from "@brainstorm-os/editor";
+import { NavigationMode, navModeFromEvent } from "@brainstorm-os/sdk";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import {
+	type SearchPickerItem,
+	closeSearchPicker,
+	openSearchPicker,
+} from "@brainstorm-os/sdk/menus";
+import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { $toggleLink } from "@lexical/link";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {

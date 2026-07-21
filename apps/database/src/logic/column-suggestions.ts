@@ -1,6 +1,6 @@
 /**
  * Distinct existing values for a column, feeding the select-like combobox
- * editor (`@brainstorm/sdk` formatted cell `suggestions`). Returns the values
+ * editor (`@brainstorm-os/sdk` formatted cell `suggestions`). Returns the values
  * a status/select column already uses so editing offers a type-or-pick list
  * instead of a bare text field.
  *

@@ -1,5 +1,5 @@
-import type { PropertyDef } from "@brainstorm/sdk-types";
-import { DateGranularity, PropertyFormat, ValueType } from "@brainstorm/sdk-types";
+import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { DateGranularity, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	dateFormatter,

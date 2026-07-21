@@ -14,7 +14,7 @@
  * `<Button>` primitive — no bespoke action chrome.
  */
 
-import { isThemeName } from "@brainstorm/tokens";
+import { isThemeName } from "@brainstorm-os/tokens";
 import {
 	MarketplaceContentKind,
 	MarketplaceInstallState,

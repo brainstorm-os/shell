@@ -28,7 +28,7 @@ import {
 	OLLAMA_PROVIDER_ID,
 	capabilityImplies,
 	estimateTokens,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 // ─── Tool grants ─────────────────────────────────────────────────────────────
 

@@ -85,11 +85,11 @@
 }
 
 /* The block action menu now renders through the shared fancy-menus runtime
- * (`openBlockActionMenu` → `@brainstorm/sdk/menus`); its chrome lives in the
+ * (`openBlockActionMenu` → `@brainstorm-os/sdk/menus`); its chrome lives in the
  * SDK menu theme, so the old hand-rolled `.bs-editor__action-menu*` rules are
  * gone. */
 
 /* The slash menu now renders through the shared controlled-list typeahead
- * runtime (`@brainstorm/sdk/menus` `openTypeaheadMenu`); its chrome + the
+ * runtime (`@brainstorm-os/sdk/menus` `openTypeaheadMenu`); its chrome + the
  * caption/name row layout live in the SDK menu theme (`.bs-typeahead-row`), so
  * the old hand-rolled `.bs-editor__slash-menu*` rules are gone. */

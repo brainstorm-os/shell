@@ -26,7 +26,7 @@
  * at survives. All three pinned by OQ-227 (60 s + 16 pending, 2026-05-23).
  */
 
-import { OsHandoffPromptDecision } from "@brainstorm/sdk-types";
+import { OsHandoffPromptDecision } from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
 
 export { OsHandoffPromptDecision };

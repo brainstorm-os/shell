@@ -44,7 +44,7 @@ import {
 	aggregateWorkflowCapabilities,
 	isStepKind,
 	missingCapabilities,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** The step kinds the v1 builder palette offers — the engine-spine set plus
  *  the AI steps (11b.7), which the runner now has interpreters for. `Trigger`

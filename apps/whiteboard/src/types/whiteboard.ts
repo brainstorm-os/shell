@@ -4,7 +4,7 @@
  * `WhiteboardEdge/v1` entities (per OQ-WB-1).
  */
 
-import type { Icon } from "@brainstorm/sdk-types";
+import type { Icon } from "@brainstorm-os/sdk-types";
 import type { WhiteboardNode } from "./node";
 
 export type Whiteboard = {

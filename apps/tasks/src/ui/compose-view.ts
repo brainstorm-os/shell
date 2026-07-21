@@ -14,8 +14,8 @@
  * (no builder yet — change via the row's recurrence chip).
  */
 
-import { openCalendarPopover } from "@brainstorm/sdk/calendar";
-import { type SelectMenuHandle, createSelectMenu } from "@brainstorm/sdk/select-menu";
+import { openCalendarPopover } from "@brainstorm-os/sdk/calendar";
+import { type SelectMenuHandle, createSelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { t } from "../i18n/t";
 import type { Project } from "../types/project";
 import { PRIORITIES, Priority, type Task } from "../types/task";
@@ -236,7 +236,7 @@ function prioritySelectControl(value: Priority): {
 }
 
 /** A themed single-date picker that pops the shared
- *  `@brainstorm/sdk/calendar` `openCalendarPopover` instead of a native
+ *  `@brainstorm-os/sdk/calendar` `openCalendarPopover` instead of a native
  *  `<input type="date">` — consistent with every other date surface in the
  *  product (the inline row date chip, Journal "go to date"). The chosen
  *  value lives in a closure; `read()` returns the epoch (local midnight) or

@@ -7,7 +7,7 @@
  * and Graph edges never disagree.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import type { SerializedEditorState } from "lexical";
 import { entityTitleOf } from "../store/entity-title-index";
 import { extractReferences } from "./extract-references";

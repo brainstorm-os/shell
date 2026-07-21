@@ -52,8 +52,8 @@
 import {
 	BASELINE_NODES,
 	plantSerializedStateIntoDoc as plantViaSharedHelper,
-} from "@brainstorm/editor";
-import { getUniversalBody, isUniversalBodyEmpty } from "@brainstorm/react-yjs";
+} from "@brainstorm-os/editor";
+import { getUniversalBody, isUniversalBodyEmpty } from "@brainstorm-os/react-yjs";
 import type { Klass, LexicalNode, SerializedEditorState } from "lexical";
 import type { Doc, XmlText } from "yjs";
 import { migrateTitleIntoBody } from "../editor/migrate-title";
@@ -169,7 +169,7 @@ export type MigrationSummary = Readonly<{
 }>;
 
 /** Subset of the renderer-side resolver this module needs. Mirrors the
- *  `YDocHandle` shape from `@brainstorm/react-yjs` so the orchestrator
+ *  `YDocHandle` shape from `@brainstorm-os/react-yjs` so the orchestrator
  *  can be tested with a fake that hands back any Y.Doc. */
 export type MigrationDocHandle = {
 	doc: Doc;
@@ -544,7 +544,7 @@ export function clearUniversalBody(doc: Doc): void {
 	});
 }
 
-/** Thin alias for the shared `@brainstorm/editor` helper — kept for
+/** Thin alias for the shared `@brainstorm-os/editor` helper — kept for
  *  call-site readability. Notes' plant must include `MIGRATION_NODES`
  *  (BASELINE + every Notes-specific custom node referenced by the
  *  legacy state); Journal's plant only needs BASELINE. */

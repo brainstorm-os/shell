@@ -8,7 +8,7 @@
  *     that ship with the product). Catalog apps that aren't currently
  *     installed surface as `NotInstalled` so uninstalling a built-in app
  *     leaves it reinstallable in the store rather than vanishing.
- *   - **Themes** — the 5 built-in themes from `@brainstorm/tokens`.
+ *   - **Themes** — the 5 built-in themes from `@brainstorm-os/tokens`.
  *
  * Forward-compat:
  *   - Remote catalogs (per `47 §Distribution channels`) plug in by
@@ -22,7 +22,7 @@
  * (single source of truth, per §Dashboard).
  */
 
-import { type ThemeName, themeCatalog } from "@brainstorm/tokens";
+import { type ThemeName, themeCatalog } from "@brainstorm-os/tokens";
 import { ContentKind } from "./kinds";
 import { InstallState, ListingSource, type MarketplaceListing } from "./listing";
 

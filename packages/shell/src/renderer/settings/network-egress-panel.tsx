@@ -26,7 +26,7 @@
  *   - Outline-on-border focus mirrors `feedback_focus_outline_replaces_border`.
  */
 
-import { isPublicBeta } from "@brainstorm/sdk/analytics";
+import { isPublicBeta } from "@brainstorm-os/sdk/analytics";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type ChangeEvent,

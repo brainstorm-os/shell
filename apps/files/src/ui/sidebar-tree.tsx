@@ -4,14 +4,14 @@
  * project-wide app-panel-sides convention.
  */
 
-import { DragPayloadKind } from "@brainstorm/sdk-types";
+import { DragPayloadKind } from "@brainstorm-os/sdk-types";
 import {
 	type TreeNode as KbnTreeNode,
 	type TreeItemProps,
 	useTreeKeyboard,
-} from "@brainstorm/sdk/a11y";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm/sdk/object-dnd";
+} from "@brainstorm-os/sdk/a11y";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm-os/sdk/object-dnd";
 import { useMemo, useState } from "react";
 import { t } from "../i18n";
 import { flattenVisibleTree } from "../logic/tree-flatten";

@@ -16,7 +16,7 @@ import {
 	type StylePackDef,
 	isStylePackCssSafe,
 	resolveStylePack,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import type { EntitiesService, EntityRecord } from "./runtime";
 
 export function stylePackToProperties(def: StylePackDef): Record<string, unknown> {

@@ -1,9 +1,11 @@
 {
-  "name": "@brainstorm/native",
+  "name": "@brainstorm-os/native",
   "version": "0.0.1",
-  "private": true,
   "description": "Native NAPI-RS bindings for Brainstorm — Argon2id KDF, crypto suite, Graph force simulation. See docs/implementation-plan.md §Native acceleration.",
   "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "loader.cjs",
   "module": "native.mjs",
   "types": "index.d.ts",

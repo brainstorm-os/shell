@@ -8,7 +8,7 @@
  * and the logic lives here once (CLAUDE.md DRY: two call sites → one helper).
  */
 
-import type { ObjectDragItem } from "@brainstorm/sdk-types";
+import type { ObjectDragItem } from "@brainstorm-os/sdk-types";
 
 export function dragItemsForSelection<T>(
 	dragged: T,

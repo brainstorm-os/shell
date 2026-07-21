@@ -5,7 +5,7 @@
  * cannot drift apart visually or in keyboard behaviour.
  */
 
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { t } from "../i18n";
 
 /** Shortcut ids mirror the renderer-side chord registry (per the keyboard

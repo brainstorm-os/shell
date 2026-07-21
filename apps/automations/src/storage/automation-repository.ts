@@ -1,7 +1,7 @@
 /**
  * Workflow / Reminder entity load/save — the persistence half of the
  * 11b.1 scaffold. Routes through `services.entities`. The pure
- * `*ToProperties` / `propertiesTo*` mappers live in `@brainstorm/sdk-types`
+ * `*ToProperties` / `propertiesTo*` mappers live in `@brainstorm-os/sdk-types`
  * (`automation-codec.ts`) so the shell's session-open scheduler hydration
  * (11b.6) decodes the same persisted rows with the same code; they are
  * re-exported here for the app's existing call sites.
@@ -25,7 +25,7 @@ import {
 	reminderToProperties,
 	triggerToProperties,
 	workflowToProperties,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 import { type BuilderState, builderStateToWorkflow } from "../logic/builder-model";
 import { type BuilderTrigger, builderTriggerToDef } from "../logic/builder-trigger";
 import { type RunView, toRunViews } from "../logic/run-view";
@@ -48,7 +48,7 @@ export type LoadedReminder = { id: string; def: ReminderDef };
 
 /** Live entities of one type out of a whole-vault snapshot, skipping
  *  tombstones — the shared projection the snapshot-derived lists run on
- *  (the snapshot itself flows through `@brainstorm/react-yjs`
+ *  (the snapshot itself flows through `@brainstorm-os/react-yjs`
  *  `useVaultEntities`, never a hand-rolled `onChange → list`). */
 function entitiesOfType(snapshot: ReadonlyArray<VaultEntity>, type: string): VaultEntity[] {
 	return snapshot.filter((e) => e.type === type && e.deletedAt === null);

@@ -14,9 +14,9 @@
  * search box launches the top-ranked app.
  */
 
-import { Orientation, useCompositeKeyboard } from "@brainstorm/sdk/a11y";
-import { IconName } from "@brainstorm/sdk/icon";
-import { openContextMenu, sdkMenuIcon } from "@brainstorm/sdk/menus";
+import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { openContextMenu, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InstalledApp } from "../../preload";
 import { t } from "../i18n/t";

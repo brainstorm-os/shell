@@ -8,8 +8,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RosterMember, RosterSelf } from "@brainstorm/sdk-types";
-import { RosterRole } from "@brainstorm/sdk-types";
+import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
+import { RosterRole } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import type { Envelope } from "../../ipc/envelope";

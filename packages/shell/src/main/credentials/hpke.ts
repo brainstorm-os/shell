@@ -7,7 +7,7 @@
  *   - AEAD: ChaCha20-Poly1305            aead_id = 0x0003
  *
  * NAPI-3d swap: the noble-{curves,hashes,ciphers}-composed implementation
- * was replaced by `hpkeSealBase` / `hpkeOpenBase` in `@brainstorm/native`.
+ * was replaced by `hpkeSealBase` / `hpkeOpenBase` in `@brainstorm-os/native`.
  * Public API surface (HPKE_SUITE, SealResult, SealBaseOptions, sealBase,
  * openBase) is unchanged — the existing `hpke.test.ts` parity proof
  * (RFC 9180 A.2.1 KAT + round-trip + negative cases) passes verbatim.
@@ -22,7 +22,7 @@
  * leaves serialisation to the wrap codec.
  */
 
-import { hpkeOpenBase, hpkeSealBase } from "@brainstorm/native";
+import { hpkeOpenBase, hpkeSealBase } from "@brainstorm-os/native";
 
 const N_PK = 32;
 const N_ENC = 32;

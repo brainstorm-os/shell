@@ -1,6 +1,6 @@
 /**
  * buildJournalDenormalizer — the Journal half of the shared editor save
- * contract (see `@brainstorm/editor`'s `denormalizeBody`).
+ * contract (see `@brainstorm-os/editor`'s `denormalizeBody`).
  *
  * The rich body persists automatically through the Y.Doc resolver
  * (`services.entities.applyDoc`). This callback keeps the entity's
@@ -18,7 +18,7 @@
  * the entry from every Journal surface.
  */
 
-import { denormalizeBody } from "@brainstorm/editor";
+import { denormalizeBody } from "@brainstorm-os/editor";
 import type { SerializedEditorState } from "lexical";
 
 export type EntryUpdateFn = (id: string, patch: Record<string, unknown>) => unknown;

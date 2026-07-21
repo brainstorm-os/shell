@@ -1,4 +1,4 @@
-import type { VaultEntitiesSnapshot } from "@brainstorm/sdk-types";
+import type { VaultEntitiesSnapshot } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { entityValuesFromSnapshot } from "./entity-values";
 

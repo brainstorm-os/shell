@@ -29,7 +29,7 @@
  * against a real vault session without Electron.
  */
 
-import type { ValueType } from "@brainstorm/sdk-types";
+import type { ValueType } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { VaultSession } from "../vault/session";

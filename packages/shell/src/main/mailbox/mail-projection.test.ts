@@ -1,4 +1,4 @@
-import { EMAIL_TYPE_URL, FolderRole, MailFlag } from "@brainstorm/sdk-types";
+import { EMAIL_TYPE_URL, FolderRole, MailFlag } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { RawMessage } from "./mail-driver";
 import { folderRoleForPath, projectFolder, projectMessage } from "./mail-projection";

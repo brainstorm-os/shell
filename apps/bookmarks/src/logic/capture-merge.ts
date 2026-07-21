@@ -4,7 +4,7 @@
  * unit-tested without the shell / network broker.
  */
 
-import type { SerializedBlock } from "@brainstorm/sdk-types";
+import type { SerializedBlock } from "@brainstorm-os/sdk-types";
 
 /**
  * The captured blocks that should replace a bookmark's stored body, or null to

@@ -1,4 +1,4 @@
-import { COMMENT_TYPE_URL, type VaultEntitiesSnapshot } from "@brainstorm/sdk-types";
+import { COMMENT_TYPE_URL, type VaultEntitiesSnapshot } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { commentEntitiesFromSnapshot } from "./use-entity-comments-adapter";
 

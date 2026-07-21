@@ -6,7 +6,7 @@
  * / reset / path) it renders the local stroke-only paths inline.
  */
 
-import { Icon } from "@brainstorm/sdk/icon";
+import { Icon } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import {
 	GRAPH_LOCAL_ICON_PATHS,

@@ -9,10 +9,10 @@
  * it's additive and self-contained. Preview / reclaim land as follow-ups.
  */
 
-import type { StoredAsset } from "@brainstorm/sdk-types";
-import { StoredAssetKind } from "@brainstorm/sdk-types";
-import { Icon, IconName } from "@brainstorm/sdk/icon";
-import { Popover, PopoverSize } from "@brainstorm/sdk/popover";
+import type { StoredAsset } from "@brainstorm-os/sdk-types";
+import { StoredAssetKind } from "@brainstorm-os/sdk-types";
+import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { type ReactElement, useEffect, useState } from "react";
 import { plural, t } from "../i18n";
 import { formatBytes } from "./entity-view";

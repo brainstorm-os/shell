@@ -22,13 +22,13 @@ import {
 	FullEditorPlugins,
 	plainTextToSerializedState,
 	richTextTheme,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import {
 	useUniversalBody,
 	useYDoc,
 	useYDocApplyPending,
 	useYDocLoaded,
-} from "@brainstorm/react-yjs";
+} from "@brainstorm-os/react-yjs";
 import { $getRoot, type LexicalEditor, type SerializedEditorState } from "lexical";
 import { useMemo } from "react";
 import { t } from "../i18n";

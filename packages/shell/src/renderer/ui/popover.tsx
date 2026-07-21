@@ -25,7 +25,7 @@
  * `@react-fancy-menus/core`; the call-site contract stays.
  */
 
-import { InitialFocusMode, useFocusTrap } from "@brainstorm/sdk/a11y";
+import { InitialFocusMode, useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { motion } from "framer-motion";
 import { useId, useState } from "react";
 import { createPortal } from "react-dom";

@@ -25,7 +25,7 @@
  * / `TASK_TYPE` / its `project` ref key). They are frozen reverse-DNS wire
  * identifiers; the main process cannot import a sandboxed app, so this is their
  * main-process mirror. `MESSAGE_TYPE_URL` already lives canonically in
- * `@brainstorm/sdk-types`, so it is imported rather than re-declared.
+ * `@brainstorm-os/sdk-types`, so it is imported rather than re-declared.
  */
 
 import {
@@ -33,7 +33,7 @@ import {
 	type ListSource,
 	ListSourceKind,
 	MESSAGE_TYPE_URL,
-} from "@brainstorm/sdk-types";
+} from "@brainstorm-os/sdk-types";
 
 /** One collection kind: a `parentType` container whose `childType` children
  *  each carry the container's entity id under `childParentProp`. */

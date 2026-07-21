@@ -14,8 +14,8 @@
  * Link editors reach the vault catalog.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm/sdk-types";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm/sdk/properties-panel";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
 import type { ReactElement } from "react";
 import { effectiveColumnDef } from "../logic/effective-def";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";

@@ -7,7 +7,7 @@
  * the network broker.
  */
 
-import type { Cover, Icon, SerializedBlock } from "@brainstorm/sdk-types";
+import type { Cover, Icon, SerializedBlock } from "@brainstorm-os/sdk-types";
 
 /** The canonical Block-Protocol type id this app owns. Single source of
  *  truth — storage + the object-menu target both read it from here. */

@@ -2,7 +2,7 @@
  * Semantic-model download status (plan 11.3 — first-run-download progress UX).
  *
  * The local embedding model (`bge-small-en-v1.5`, ~130 MB) downloads on first
- * run inside the `@brainstorm/native-embed` addon. Until now that happened
+ * run inside the `@brainstorm-os/native-embed` addon. Until now that happened
  * silently: a fresh install would spend a minute fetching weights with zero
  * feedback, and a user watching semantic search "not work yet" had no way to
  * tell it was downloading vs broken. This module is the pure, network-free

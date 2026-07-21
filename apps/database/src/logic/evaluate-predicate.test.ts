@@ -6,7 +6,7 @@
  *  §Predicate semantics.
  */
 
-import type { PropertyPredicate } from "@brainstorm/sdk-types";
+import type { PropertyPredicate } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { evaluatePredicate } from "./evaluate-predicate";
 import type { EntityRow } from "./in-memory-entities";

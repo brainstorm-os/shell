@@ -13,7 +13,7 @@
  * testable without the editor surface.
  */
 
-import type { VaultEntity } from "@brainstorm/sdk-types";
+import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import { type DateMention, dateMentionCandidates } from "./date-mention";
 import { type EntityFilterResult, filterEntities } from "./mention-ops";
 

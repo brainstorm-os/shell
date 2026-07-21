@@ -10,7 +10,7 @@
  * jsdom-testable; the rows come from the pure `logic/diff-rows` core.
  */
 
-import { IconName, createIconElement } from "@brainstorm/sdk/icon";
+import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { type DiffRow, DiffRowKind, buildDiffRows, diffStats } from "../logic/diff-rows";
 
 export enum DiffViewMode {

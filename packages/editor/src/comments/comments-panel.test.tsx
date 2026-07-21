@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { type CommentDef, CommentKind } from "@brainstorm/sdk-types";
+import { type CommentDef, CommentKind } from "@brainstorm-os/sdk-types";
 import { $createParagraphNode, $createTextNode, $getRoot, type LexicalEditor } from "lexical";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -78,7 +78,7 @@ function render(
 	authorName?: string,
 	focusRequest?: CommentsFocusRequest,
 	extra?: {
-		pendingAnchor?: import("@brainstorm/sdk-types").CommentAnchor;
+		pendingAnchor?: import("@brainstorm-os/sdk-types").CommentAnchor;
 		onApplySuggestion?: (comment: CommentDef) => boolean | Promise<boolean>;
 	},
 ): void {

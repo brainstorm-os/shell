@@ -1,5 +1,5 @@
 /**
- * Stage 10.9a — launch the `@brainstorm/relay-server` CLI under a child
+ * Stage 10.9a — launch the `@brainstorm-os/relay-server` CLI under a child
  * process for the soak harness. Two real `_electron.launch` shell
  * instances connect to this relay via `ws://localhost:<port>` and exchange
  * encrypted frames; the audit log captured at `auditLogPath` is the input

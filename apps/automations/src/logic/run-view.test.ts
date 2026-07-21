@@ -1,4 +1,4 @@
-import { WorkflowRunStatus } from "@brainstorm/sdk-types";
+import { WorkflowRunStatus } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntityRecord } from "../storage/runtime";
 import { decodeStepLog, toRunView, toRunViews } from "./run-view";

@@ -16,7 +16,7 @@
  * the Settings MCP handlers go through these helpers.
  */
 
-import { mcpServerCredentialKeyName } from "@brainstorm/sdk-types";
+import { mcpServerCredentialKeyName } from "@brainstorm-os/sdk-types";
 import type { CredentialKey, CredentialStore } from "./store";
 
 /** The credential `app` namespace for shell-owned MCP server auth secrets.

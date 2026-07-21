@@ -6,13 +6,13 @@
  *   • reflow (EPUB / sample): every spine item is a chapter — its locator
  *     is the chapter start (`{spineIndex, 0}`);
  *   • PDF: the document outline, flattened by the shared
- *     `resolvePdfOutline` (`@brainstorm/sdk/pdf-engine`) into 0-based page
+ *     `resolvePdfOutline` (`@brainstorm-os/sdk/pdf-engine`) into 0-based page
  *     indices, which ARE the PDF locator's spine indices (9.21.5).
  *
  * Pure — no DOM, no pdf.js dep (the resolved outline entries come in).
  */
 
-import type { PdfOutlineEntry } from "@brainstorm/sdk/pdf-engine";
+import type { PdfOutlineEntry } from "@brainstorm-os/sdk/pdf-engine";
 import { type Locator, makeLocator } from "../types/locator";
 import type { BookContent } from "./content";
 

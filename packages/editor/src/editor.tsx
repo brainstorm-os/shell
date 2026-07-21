@@ -23,7 +23,7 @@
  * client to attach sees a non-empty root and skips its own bootstrap.
  */
 
-import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm/sdk/spellcheck";
+import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm-os/sdk/spellcheck";
 import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import type { InitialEditorStateType } from "@lexical/react/LexicalComposer";
@@ -104,7 +104,7 @@ export type BrainstormEditorProps = BrainstormEditorConfigOptions & {
 	 *  with a stable colour + label. Omit on solo surfaces — awareness
 	 *  stays quiet and no presence is broadcast. Derive `color` from
 	 *  `peerColor(doc.clientID)` and bound `name` with `sanitizePeerName`
-	 *  (`@brainstorm/editor`). */
+	 *  (`@brainstorm-os/editor`). */
 	presence?: { name: string; color: string };
 	/** Container the remote-cursor DOM (caret + label + selection rects)
 	 *  is portalled into. Defaults to `document.body` (upstream default).

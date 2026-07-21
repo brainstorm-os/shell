@@ -1,7 +1,7 @@
 /**
  * Contacts app i18n manifest. Per
  * §Localization every user-visible string flows through the shared app-side
- * `t()` (`createT` from `@brainstorm/sdk/i18n`) — no bare literals. The
+ * `t()` (`createT` from `@brainstorm-os/sdk/i18n`) — no bare literals. The
  * app-side `t()` does `{name}` interpolation only (no ICU plurals — that is
  * the renderer catalog's job), so count-sensitive copy is split into
  * semantic keys (today / tomorrow / future) rather than a plural rule.
@@ -13,7 +13,7 @@ import {
 	type TParams,
 	createT,
 	plural as sdkPlural,
-} from "@brainstorm/sdk/i18n";
+} from "@brainstorm-os/sdk/i18n";
 import enCatalog from "./i18n/en.json";
 
 export const CONTACTS_I18N = enCatalog as typeof enCatalog;

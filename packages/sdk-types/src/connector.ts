@@ -23,7 +23,7 @@
  * three-line mirror of the shell ledger's `parseCapability`, doc 09
  * §Capabilities) and host patterns matched locally (a mirror of the
  * shell's `main/network/host-patterns.ts`) to keep this a dependency-free
- * contract leaf — sdk-types cannot import from `@brainstorm/shell`.
+ * contract leaf — sdk-types cannot import from `@brainstorm-os/shell`.
  */
 
 import { enumGuard } from "./enum-guard";

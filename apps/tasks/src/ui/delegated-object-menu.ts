@@ -1,6 +1,6 @@
 /**
  * Tasks' delegated object-menu wiring. The implementation lives in
- * `@brainstorm/sdk/object-menu` (`bindDelegatedObjectMenu`, shared with
+ * `@brainstorm-os/sdk/object-menu` (`bindDelegatedObjectMenu`, shared with
  * Bookmarks / Journal); this thin wrapper supplies the Tasks menu labels so
  * the list/sidebar call sites stay label-free (`bindDelegatedObjectMenu` with
  * 3 args, `createMoreButton()` with none).
@@ -13,10 +13,10 @@ import {
 	type ObjectMenuRuntime,
 	bindDelegatedObjectMenu as bindShared,
 	createMoreButton as createSharedMoreButton,
-} from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/object-menu";
 import { t } from "../i18n/t";
 
-export { ENTITY_ID_ATTR, ENTITY_TYPE_ATTR, closeObjectMenu } from "@brainstorm/sdk/object-menu";
+export { ENTITY_ID_ATTR, ENTITY_TYPE_ATTR, closeObjectMenu } from "@brainstorm-os/sdk/object-menu";
 
 export type TaskMenuResolver = DelegatedMenuResolver;
 

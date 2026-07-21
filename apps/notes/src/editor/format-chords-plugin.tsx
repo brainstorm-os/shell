@@ -19,7 +19,7 @@ import {
 	TURN_INTO_COMMAND,
 	formatTextInBlocks,
 	useBlockSelectionStore,
-} from "@brainstorm/editor";
+} from "@brainstorm-os/editor";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { FORMAT_TEXT_COMMAND, type TextFormatType } from "lexical";
 import { useCallback, useEffect } from "react";

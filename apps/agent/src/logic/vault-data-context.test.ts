@@ -1,4 +1,4 @@
-import { COLLECTION_TYPE_URL } from "@brainstorm/sdk-types";
+import { COLLECTION_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type VaultDataEntity, buildVaultDataContextBlock } from "./vault-data-context";
 

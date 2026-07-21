@@ -1,7 +1,7 @@
 /**
  * `buildNoteExportItems` — the Markdown / HTML / PDF "Export…" entries
  * spliced into a note's shared object menu (B11.12). Each item serialises the
- * open note's live `SerializedEditorState` through the `@brainstorm/editor`
+ * open note's live `SerializedEditorState` through the `@brainstorm-os/editor`
  * keystones (`serializedStateToMarkdown` / `serializedStateToHtml`) and saves
  * the bytes via the Files-host flow (`requestSaveBytes`), exactly as Graph /
  * Whiteboard do for their exports.
@@ -17,17 +17,17 @@
  * Files surface) so it unit-tests against stubs without a shell.
  */
 
-import { serializedStateToHtml, serializedStateToMarkdown } from "@brainstorm/editor";
+import { serializedStateToHtml, serializedStateToMarkdown } from "@brainstorm-os/editor";
 import {
 	type SaveDisposition,
 	type SaveFileService,
 	requestSaveBytes,
 	suggestedFilename,
 	textToBytes,
-} from "@brainstorm/sdk/export-file";
-import { openExportPopover } from "@brainstorm/sdk/export-popover";
-import { IconName } from "@brainstorm/sdk/icon";
-import type { ObjectMenuExtraItem } from "@brainstorm/sdk/object-menu";
+} from "@brainstorm-os/sdk/export-file";
+import { openExportPopover } from "@brainstorm-os/sdk/export-popover";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import type { ObjectMenuExtraItem } from "@brainstorm-os/sdk/object-menu";
 import type { SerializedEditorState } from "lexical";
 
 export enum NoteExportFormat {
