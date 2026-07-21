@@ -72,14 +72,16 @@ export function decodeTimeTriggerConfig(config: Record<string, unknown>): TimeTr
  * Project the persisted automation entities into the registration the
  * host hydrates from. Only enabled workflows bound to enabled triggers
  * register; `Manual` triggers register nothing (they run via `runNow`);
- * gated trigger kinds (webhook / file-watch / startup / intent) are
- * skipped until their surfaces land.
+ * `Startup` workflows collect into `startups` (fired once on launch, 11b.10);
+ * the still-gated kinds (webhook ingress / file-watch / intent) are skipped
+ * until their surfaces land.
  */
 export function deriveScheduleRegistration(rows: AutomationEntityRows): ScheduleRegistration {
 	const triggersById = new Map(rows.triggers.map((t) => [t.id, propertiesToTrigger(t.properties)]));
 
 	const workflows: ScheduleRegistration["workflows"] = [];
 	const entityEvents: EntityEventTrigger[] = [];
+	const startups: string[] = [];
 	for (const row of rows.workflows) {
 		const workflow = propertiesToWorkflow(row.properties);
 		if (!workflow.enabled || workflow.triggerId === "") continue;
@@ -107,6 +109,10 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 				}
 				break;
 			}
+			case TriggerKind.Startup:
+				// 11b.10 — fires once on shell launch; no config to decode.
+				startups.push(row.id);
+				break;
 			default:
 				break;
 		}
@@ -118,5 +124,5 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 		if (config) reminders.push({ reminderId: row.id, config });
 	}
 
-	return { workflows, reminders, entityEvents };
+	return { workflows, reminders, entityEvents, startups };
 }

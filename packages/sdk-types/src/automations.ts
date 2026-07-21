@@ -127,12 +127,14 @@ export const TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Startup,
 ]) as readonly TriggerKind[];
 
-/** The trigger kinds wired to the scheduler in the engine spine (11b.6).
- *  Webhook (Net-1) / FileWatch (9.10) / Startup land in later slices. */
+/** The trigger kinds the engine handles (11b.6 + 11b.10). `Startup` fires
+ *  once on shell launch (not scheduler-driven); Webhook (Net-1 ingress) and
+ *  FileWatch (Files-host watch) land in their own slices. */
 export const ENGINE_TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Time,
 	TriggerKind.EntityEvent,
 	TriggerKind.Manual,
+	TriggerKind.Startup,
 ]) as readonly TriggerKind[];
 
 /** Lifecycle verb for an `entity-event` trigger. */

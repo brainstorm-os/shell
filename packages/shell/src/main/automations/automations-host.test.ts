@@ -421,3 +421,51 @@ describe("AutomationsHost — lifecycle", () => {
 		expect(isRunning()).toBe(false);
 	});
 });
+
+describe("AutomationsHost — Startup triggers (11b.10)", () => {
+	const loaded: LoadedWorkflow = { steps: [notifyStep("n")], capabilities: ["notifications.post"] };
+
+	it("fires each Startup workflow once on start()", async () => {
+		const { intervals } = manualIntervals();
+		const { host, persisted } = hostWith({ intervals, loadWorkflow: vi.fn(async () => loaded) });
+		await host.hydrate(
+			{ workflows: [], reminders: [], entityEvents: [], startups: ["boot-a", "boot-b"] },
+			T0,
+		);
+		host.start();
+		await vi.waitFor(() => expect(persisted).toHaveLength(2));
+		expect(persisted.map((r) => r.triggeredBy).sort()).toEqual(["startup:boot-a", "startup:boot-b"]);
+		expect(persisted.every((r) => r.status === WorkflowRunStatus.Succeeded)).toBe(true);
+		host.stop();
+	});
+
+	it("does not re-fire Startups on a second start() (host re-claim)", async () => {
+		const { intervals } = manualIntervals();
+		const { host, persisted } = hostWith({ intervals, loadWorkflow: vi.fn(async () => loaded) });
+		await host.hydrate({ workflows: [], reminders: [], entityEvents: [], startups: ["boot"] }, T0);
+		host.start();
+		await vi.waitFor(() => expect(persisted).toHaveLength(1));
+		host.stop();
+		host.start();
+		await new Promise((r) => setTimeout(r, 5));
+		expect(persisted).toHaveLength(1);
+		host.stop();
+	});
+
+	it("does not fire a Startup added by a re-hydrate after start()", async () => {
+		const { intervals } = manualIntervals();
+		const { host, persisted } = hostWith({ intervals, loadWorkflow: vi.fn(async () => loaded) });
+		await host.hydrate({ workflows: [], reminders: [], entityEvents: [], startups: ["boot"] }, T0);
+		host.start();
+		await vi.waitFor(() => expect(persisted).toHaveLength(1));
+		// A later re-hydrate adds a new Startup workflow — it waits for the next
+		// launch, never fires mid-session.
+		await host.hydrate(
+			{ workflows: [], reminders: [], entityEvents: [], startups: ["boot", "boot-late"] },
+			T0,
+		);
+		await new Promise((r) => setTimeout(r, 5));
+		expect(persisted).toHaveLength(1);
+		host.stop();
+	});
+});
