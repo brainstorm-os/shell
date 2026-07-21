@@ -40,6 +40,14 @@
 	min-height: 0;
 	overflow-y: auto;
 	--widget-pad: var(--space-1);
+	/* Shared header-row height for every glance widget's toolbar (the label /
+	 * sort control on the left, the live count on the right). Pinning it here
+	 * keeps the header on one baseline across the fleet whether the toolbar
+	 * carries a 26px sort <select> (Contacts/Notes/Tasks/Bookmarks) or just a
+	 * text label (Calendar/Journal/…) — otherwise a select-bearing header sits
+	 * ~8px taller than a label-only one. Sized to contain the 26px control plus
+	 * the toolbar's space-1 vertical padding and its 1px bottom border. */
+	--widget-toolbar-height: calc(26px + var(--space-1) * 2 + var(--border-width));
 }
 
 /* A large/tall tile (the 320×320 footprint leaves ~290px of body under the 30px

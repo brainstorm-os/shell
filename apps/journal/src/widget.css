@@ -15,6 +15,7 @@
 	gap: var(--space-2);
 	flex-shrink: 0;
 	padding: var(--space-1) var(--space-2);
+	min-height: var(--widget-toolbar-height);
 	border-bottom: var(--border-width) solid var(--border);
 }
 
