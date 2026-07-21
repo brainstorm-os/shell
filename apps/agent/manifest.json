@@ -28,7 +28,8 @@
     "entities.write:brainstorm/Trigger/v1",
     "entities.write:brainstorm/Workflow/v1",
     "intents.dispatch:open",
-    "intents.dispatch:insert"
+    "intents.dispatch:insert",
+    "intents.dispatch:compose"
   ],
   "registrations": {
     "entityTypes": [

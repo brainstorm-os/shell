@@ -82,6 +82,7 @@ import {
 	providerForRequest,
 	resolveProvider,
 } from "./logic/conversation-settings";
+import { buildComposeEmailEnvelope } from "./logic/draft-as-email";
 import {
 	type AddToNoteMode,
 	type NoteCandidate,
@@ -1244,6 +1245,23 @@ export function AgentApp(): ReactElement {
 		[rt],
 	);
 
+	// Agent-9 — hand an assistant reply to Mailbox's composer as a draft. The
+	// shell re-checks `intents.dispatch:compose` and routes to Mailbox; the
+	// Agent never sends. `dispatch`'s verb type is narrowed to `IntentVerb`, so
+	// widen for the send-family `compose` verb (the broker validates it).
+	const draftAsEmail = useCallback(
+		async (body: string) => {
+			if (!intentsSvc || body.trim().length === 0) return;
+			const envelope = buildComposeEmailEnvelope(body);
+			try {
+				await intentsSvc.dispatch(envelope as Parameters<typeof intentsSvc.dispatch>[0]);
+			} catch (err) {
+				console.warn("[agent] draft-as-email dispatch failed:", err);
+			}
+		},
+		[intentsSvc],
+	);
+
 	// The active conversation IS the header object — the title right-click
 	// and the trailing ⋯ open the shared object menu on it. A fresh chat has
 	// no object yet, so the ⋯ renders disabled (never absent).
@@ -1444,6 +1462,18 @@ export function AgentApp(): ReactElement {
 													>
 														<Icon name={IconName.KindFile} size={12} />
 														{t("insert.action")}
+													</button>
+												) : null}
+												{m.role === MessageRole.Assistant && intentsSvc ? (
+													<button
+														type="button"
+														className="agent__remember"
+														onClick={() => void draftAsEmail(m.body)}
+														title={t("draftEmail.action.hint")}
+														data-testid="agent-draft-email"
+													>
+														<Icon name={IconName.KindEmail} size={12} />
+														{t("draftEmail.action")}
 													</button>
 												) : null}
 												{memoryEnabled ? (
