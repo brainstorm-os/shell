@@ -12,8 +12,8 @@
  * partial index on `bound_at IS NULL` keeps the TTL-reap scan cheap.
  */
 
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import type { AssetKind } from "../../assets/asset-types";
-import type { SqliteDatabase, SqliteStatement } from "../sqlite";
 
 export type AssetRecord = {
 	assetId: string;

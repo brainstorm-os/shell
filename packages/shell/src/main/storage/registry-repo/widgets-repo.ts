@@ -3,7 +3,7 @@
  * per app on install/update.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 export type WidgetRecord = {
 	id: string;

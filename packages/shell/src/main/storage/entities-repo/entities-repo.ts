@@ -25,6 +25,7 @@ import {
 	type PropertyPredicate,
 	isPropertyRef,
 } from "@brainstorm-os/sdk-types";
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
 import {
 	type CompileOptions,
@@ -32,7 +33,6 @@ import {
 	MULTI_HOP_CTE_ROW_LIMIT,
 	compilePattern,
 } from "../../entities/pattern-compiler";
-import type { SqliteDatabase, SqliteStatement } from "../sqlite";
 import { AssetRefsRepository } from "./asset-refs-repo";
 
 export type EntityRow = {

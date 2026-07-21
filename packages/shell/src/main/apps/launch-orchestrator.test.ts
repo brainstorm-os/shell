@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { DashboardStore } from "../dashboard/dashboard-store";
 import type { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { YDocStore } from "../storage/ydoc-store";

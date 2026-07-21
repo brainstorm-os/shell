@@ -8,13 +8,13 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
 import { RosterRole } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { AccessRole, grantAccess } from "../collab/access-record";
 import {
 	generateIdentity,

@@ -11,12 +11,12 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CapabilityLedger, GrantedVia } from "@brainstorm-os/capabilities/ledger";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { AppSignatureStatus } from "../apps/app-signature";
 import { DEFAULT_INSTALL_PROVENANCE } from "../apps/install-provenance";
-import { CapabilityLedger, GrantedVia } from "../capabilities/ledger";
 import { DataStores } from "../storage/data-stores";
 import { RegistryRepositories } from "../storage/registry-repo/index";
 import { PLATFORM_READ_CAPABILITY, makePlatformServiceHandler } from "./platform-service";

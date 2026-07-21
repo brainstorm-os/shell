@@ -1,3 +1,4 @@
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	type WindowBounds,
 	type WindowEntry,
@@ -6,7 +7,6 @@ import {
 import { DragPayloadKind, DropEffect, type ObjectDragItem } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import {
 	APP_DRAG_LEAVE_CHANNEL,
 	APP_DRAG_OVER_CHANNEL,

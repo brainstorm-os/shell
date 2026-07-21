@@ -23,6 +23,7 @@
 
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	CALDAV_ACCOUNT_TYPE_URL,
 	CALDAV_CALENDAR_REF_PROP,
@@ -34,7 +35,6 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { requireServiceCapability } from "../connectors/connectors-service";
 import type { ConnectorEgress } from "../connectors/egress";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo/entities-repo";

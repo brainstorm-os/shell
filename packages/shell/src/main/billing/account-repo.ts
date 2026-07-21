@@ -9,7 +9,7 @@
  * repository-pattern convention (CLAUDE.md §Repository pattern for SQL).
  */
 
-import type { SqliteDatabase, SqliteStatement } from "../storage/sqlite";
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { PlanTier, asPlanTier } from "./plan";
 
 export type AccountRecord = {

@@ -23,6 +23,7 @@
  * broker, egress, and entities closures).
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	AuthKind,
 	CONNECTOR_TYPE_URL,
@@ -42,7 +43,6 @@ import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import type { AssetStore } from "../assets/asset-store";
 import { AssetKind } from "../assets/asset-types";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { requireServiceCapability } from "../connectors/connectors-service";
 import { type ConnectorEgress, decodeJsonResponse } from "../connectors/egress";
 import type { OAuthBroker, ProviderConfig } from "../connectors/oauth-broker";

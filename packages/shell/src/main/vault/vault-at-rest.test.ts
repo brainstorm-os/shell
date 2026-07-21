@@ -1,9 +1,9 @@
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { FakeSqlcipherDb } from "@brainstorm-os/sqlite/at-rest-fake-driver";
+import { AtRestMode } from "@brainstorm-os/sqlite/at-rest-mode";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeSqlcipherDb } from "../storage/at-rest-fake-driver";
-import { AtRestMode } from "../storage/at-rest-mode";
 import { removeTestDir } from "../test-support/remove-test-dir";
 
 let USER_DATA_DIR = "";
@@ -33,8 +33,8 @@ describe("vault.json atRestMode stamp + reconcile", () => {
 		// driver + probe result — re-importing them is what reapplies the
 		// test seams against the fresh module instance).
 		vi.resetModules();
-		const sqliteMod = await import("../storage/sqlite");
-		const atRestMod = await import("../storage/at-rest-mode");
+		const sqliteMod = await import("@brainstorm-os/sqlite");
+		const atRestMod = await import("@brainstorm-os/sqlite/at-rest-mode");
 		sqliteMod.__setSqlcipherDriverForTests(
 			opts.encryptedDriver ? (FakeSqlcipherDb as unknown as new (path: string) => never) : null,
 		);

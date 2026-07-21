@@ -16,11 +16,11 @@ vi.mock("electron", () => ({
 	dialog: { showOpenDialog: () => undefined, showSaveDialog: () => undefined },
 }));
 
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { FileHandleMode, FileHandleRegistry } from "../files/file-handle-registry";
 import { type StoreUploadAsset, makeFilesServiceHandler } from "../files/files-service";
 import { DataStores } from "../storage/data-stores";

@@ -20,6 +20,8 @@
  */
 
 import { Buffer } from "node:buffer";
+import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	type Entity,
 	type EntityDocLink,
@@ -29,8 +31,6 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { AssetKind } from "../assets/asset-types";
-import { LedgerUnavailableError } from "../capabilities/ledger";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";

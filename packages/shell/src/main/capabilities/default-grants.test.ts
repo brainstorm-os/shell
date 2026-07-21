@@ -9,17 +9,17 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { ENVELOPE_PROTOCOL_VERSION, isEnvelope } from "../../ipc/envelope";
-import { DataStores } from "../storage/data-stores";
 import {
 	DEFAULT_APP_CAPABILITIES,
 	SHELL_CAPABILITIES,
 	SHELL_IDENTITY,
 	applyDefaultAppGrants,
 	applyShellGrants,
-} from "./default-grants";
-import { CapabilityLedger } from "./ledger";
+} from "@brainstorm-os/capabilities/default-grants";
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
+import { describe, expect, it } from "vitest";
+import { ENVELOPE_PROTOCOL_VERSION, isEnvelope } from "../../ipc/envelope";
+import { DataStores } from "../storage/data-stores";
 
 const OPEN_EXTERNAL = "system.open-external";
 

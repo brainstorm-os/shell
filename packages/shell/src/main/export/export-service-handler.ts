@@ -17,9 +17,9 @@
  * a clean error rather than a hung request).
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import { type ExportEntity, ExportFormat, exportEntities } from "./export-formats";

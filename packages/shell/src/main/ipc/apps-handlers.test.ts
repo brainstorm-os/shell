@@ -32,10 +32,10 @@ vi.mock("../vault/session", () => ({
 	getActiveVaultSession: () => activeSession,
 }));
 
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { BrowserWindow } from "electron";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { DashboardStore } from "../dashboard/dashboard-store";
 import { DataStores } from "../storage/data-stores";
 import { YDocStore } from "../storage/ydoc-store";

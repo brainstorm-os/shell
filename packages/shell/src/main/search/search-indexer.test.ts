@@ -1,7 +1,7 @@
+import { type SqliteDatabase, open } from "@brainstorm-os/sqlite";
 import { describe, expect, it } from "vitest";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { type SqliteDatabase, open } from "../storage/sqlite";
 import {
 	type IndexableEntity,
 	MatchMode,

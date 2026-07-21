@@ -467,6 +467,14 @@
         "@blockprotocol/core": "0.1.4",
       },
     },
+    "packages/capabilities": {
+      "name": "@brainstorm-os/capabilities",
+      "version": "0.0.1",
+      "dependencies": {
+        "@brainstorm-os/sqlite": "workspace:*",
+        "ulid": "^3.0.2",
+      },
+    },
     "packages/cli": {
       "name": "@brainstorm-os/cli",
       "version": "0.0.1",
@@ -609,6 +617,7 @@
         "@blockprotocol/hook": "0.1.8",
         "@blockprotocol/type-system": "0.2.1",
         "@brainstorm-os/block-protocol": "workspace:*",
+        "@brainstorm-os/capabilities": "workspace:*",
         "@brainstorm-os/editor": "workspace:*",
         "@brainstorm-os/native": "workspace:*",
         "@brainstorm-os/native-embed": "workspace:*",
@@ -616,6 +625,7 @@
         "@brainstorm-os/react-yjs": "workspace:*",
         "@brainstorm-os/sdk": "workspace:*",
         "@brainstorm-os/sdk-types": "workspace:*",
+        "@brainstorm-os/sqlite": "workspace:*",
         "@brainstorm-os/tokens": "workspace:*",
         "@formatjs/intl": "^4.1.12",
         "@mozilla/readability": "^0.6.0",
@@ -657,6 +667,24 @@
         "electron-vite": "^5.0.0",
         "vite": "^6.4.3",
       },
+    },
+    "packages/sqlite": {
+      "name": "@brainstorm-os/sqlite",
+      "version": "0.0.1",
+      "dependencies": {
+        "@brainstorm-os/native": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/better-sqlite3": "^7.6.13",
+      },
+      "peerDependencies": {
+        "better-sqlite3-multiple-ciphers": "*",
+        "sqlite-vec": "*",
+      },
+      "optionalPeers": [
+        "better-sqlite3-multiple-ciphers",
+        "sqlite-vec",
+      ],
     },
     "packages/tokens": {
       "name": "@brainstorm-os/tokens",
@@ -853,6 +881,8 @@
 
     "@brainstorm-os/block-protocol": ["@brainstorm-os/block-protocol@workspace:packages/block-protocol"],
 
+    "@brainstorm-os/capabilities": ["@brainstorm-os/capabilities@workspace:packages/capabilities"],
+
     "@brainstorm-os/cli": ["@brainstorm-os/cli@workspace:packages/cli"],
 
     "@brainstorm-os/editor": ["@brainstorm-os/editor@workspace:packages/editor"],
@@ -872,6 +902,8 @@
     "@brainstorm-os/sdk-types": ["@brainstorm-os/sdk-types@workspace:packages/sdk-types"],
 
     "@brainstorm-os/shell": ["@brainstorm-os/shell@workspace:packages/shell"],
+
+    "@brainstorm-os/sqlite": ["@brainstorm-os/sqlite@workspace:packages/sqlite"],
 
     "@brainstorm-os/tokens": ["@brainstorm-os/tokens@workspace:packages/tokens"],
 

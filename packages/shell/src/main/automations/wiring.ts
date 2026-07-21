@@ -23,6 +23,7 @@
  * checked entities service under the automations app identity.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	REMINDER_TYPE_URL,
 	TRIGGER_TYPE_URL,
@@ -33,7 +34,6 @@ import {
 	propertiesToWorkflow,
 	reminderToProperties,
 } from "@brainstorm-os/sdk-types";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { UiNotification } from "../ui/notify-host";
 import {
 	AUTOMATION_HOST_ENTITY_ID,

@@ -16,7 +16,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { SqliteDatabase } from "../storage/sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import type { TextEmbedder } from "./embedder";
 import { type IndexableEntity, isIndexable, pickIndexable } from "./search-indexer";
 import { SqliteVecStore } from "./sqlite-vec-store";

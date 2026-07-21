@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { ShortcutRegistry } from "../shortcuts/shortcut-registry";
 import { DataStores } from "../storage/data-stores";
 import { ed25519 } from "../test-support/crypto-test-helpers";

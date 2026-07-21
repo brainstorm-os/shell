@@ -18,7 +18,7 @@
  * SQL lives only here (CLAUDE.md §Repository pattern for SQL).
  */
 
-import type { SqliteDatabase, SqliteStatement } from "../storage/sqlite";
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 
 export enum CreditEntryKind {
 	/** Credits added (plan grant / top-up). */

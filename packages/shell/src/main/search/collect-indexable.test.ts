@@ -1,10 +1,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { open } from "@brainstorm-os/sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { open } from "../storage/sqlite";
 import { collectIndexableEntities } from "./collect-indexable";
 import { SearchIndexer } from "./search-indexer";
 

@@ -6,9 +6,9 @@
  * adversarial checks on entity isolation and the forged-type service gate.
  */
 
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { AWARENESS_DEBOUNCE_MS } from "./awareness-broadcaster";
 import type { PipelineContext } from "./envelope-pipeline";
 import { PresenceManager } from "./presence-manager";

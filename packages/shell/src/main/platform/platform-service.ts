@@ -20,14 +20,14 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { PlatformCatalog } from "@brainstorm-os/sdk-types";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { EntityTypesRepository } from "../storage/registry-repo/entity-types-repo";
 import { IntentsRepository } from "../storage/registry-repo/intents-repo";
-import type { SqliteDatabase } from "../storage/sqlite";
 import { type AppManifestMeta, buildPlatformCatalog } from "./catalog";
 
 /** The capability gating the catalog. Scarce — not a default grant. */

@@ -5,7 +5,7 @@
  * Rows are replaced wholesale per app on install/update.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 export type BlockRecord = {
 	id: string; // <app-id>/<block-name>

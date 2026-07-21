@@ -11,8 +11,8 @@
  * rotation path; today exactly one row is written per asset at create.
  */
 
+import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { type SealedSecret, isSealedSecret } from "../../credentials/crypto";
-import type { SqliteDatabase, SqliteStatement } from "../sqlite";
 
 export type AssetDekRecord = {
 	dekId: string;

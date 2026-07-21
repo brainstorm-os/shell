@@ -17,8 +17,14 @@
 
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
+import {
+	AtRestKeyError,
+	type OpenOptions,
+	type SqliteDatabase,
+	open as openSqlite,
+} from "@brainstorm-os/sqlite";
+import { AtRestDb, deriveAtRestKey, keyToHex, zeroKey } from "@brainstorm-os/sqlite/at-rest-key";
 import { ACCOUNT_MIGRATIONS } from "./account-schema";
-import { AtRestDb, deriveAtRestKey, keyToHex, zeroKey } from "./at-rest-key";
 import { COOKIES_MIGRATIONS } from "./cookies-schema";
 import { ENTITIES_MIGRATIONS } from "./entities-schema";
 import { LEDGER_MIGRATIONS } from "./ledger-schema";
@@ -32,12 +38,6 @@ import {
 import { REGISTRY_MIGRATIONS } from "./registry-schema";
 import { SEARCH_MIGRATIONS } from "./search-schema";
 import { SETTINGS_MIGRATIONS } from "./settings-schema";
-import {
-	AtRestKeyError,
-	type OpenOptions,
-	type SqliteDatabase,
-	open as openSqlite,
-} from "./sqlite";
 
 export type DataStoreKind =
 	| "ledger"

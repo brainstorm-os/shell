@@ -8,10 +8,10 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { EntityEventVerb } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";

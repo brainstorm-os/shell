@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let USER_DATA_DIR = "";
 vi.mock("electron", () => ({ app: { getPath: () => USER_DATA_DIR } }));
 
-import { __resetAtRestProbeForTests } from "../storage/at-rest-mode";
+import { __setSqlcipherDriverForTests } from "@brainstorm-os/sqlite";
+import { __resetAtRestProbeForTests } from "@brainstorm-os/sqlite/at-rest-mode";
 import { EntitiesRepository } from "../storage/entities-repo";
-import { __setSqlcipherDriverForTests } from "../storage/sqlite";
 import { closeActiveVaultSession, getActiveVaultSession } from "../vault/session";
 import { createVault } from "../vault/vault";
 import {

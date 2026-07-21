@@ -2,16 +2,21 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FakeSqlcipherDb } from "./at-rest-fake-driver";
-import { AtRestDb, deriveAtRestKey, keyToHex } from "./at-rest-key";
+import {
+	__setSqlcipherDriverForTests,
+	getDriverName,
+	isSqlcipherAvailable,
+	open,
+} from "@brainstorm-os/sqlite";
+import { FakeSqlcipherDb } from "@brainstorm-os/sqlite/at-rest-fake-driver";
+import { AtRestDb, deriveAtRestKey, keyToHex } from "@brainstorm-os/sqlite/at-rest-key";
 import {
 	AtRestState,
 	classifyAtRest,
 	migratePlaintextToEncrypted,
 	migrationTempPath,
-} from "./at-rest-migration";
-import { __setSqlcipherDriverForTests, getDriverName, isSqlcipherAvailable, open } from "./sqlite";
+} from "@brainstorm-os/sqlite/at-rest-migration";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const MASTER = new Uint8Array(32).map((_, i) => (i * 13 + 1) & 0xff);
 const rawOpen = (p: string) => new FakeSqlcipherDb(p);

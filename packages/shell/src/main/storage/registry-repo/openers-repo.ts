@@ -6,7 +6,7 @@
  * are cleared, new ones inserted.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 /** What an opener row's `target` is keyed by. `EntityType`/`Mime` are the
  *  original surface; `Scheme`/`Extension` were added for the open-resolution

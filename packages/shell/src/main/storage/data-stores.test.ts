@@ -1,11 +1,11 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { AtRestKeyError, __setSqlcipherDriverForTests } from "@brainstorm-os/sqlite";
+import { FakeSqlcipherDb } from "@brainstorm-os/sqlite/at-rest-fake-driver";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FakeSqlcipherDb } from "./at-rest-fake-driver";
 import { DataStores, archiveCorruptDb } from "./data-stores";
 import { CorruptionRecovery, VaultCorruptionError } from "./recovery-plan";
-import { AtRestKeyError, __setSqlcipherDriverForTests } from "./sqlite";
 
 describe("DataStores", () => {
 	let vaultDir: string;

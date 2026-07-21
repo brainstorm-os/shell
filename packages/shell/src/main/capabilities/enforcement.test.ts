@@ -12,12 +12,15 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	applyDefaultAppGrants,
+	applyShellGrants,
+} from "@brainstorm-os/capabilities/default-grants";
+import { CapabilityLedger, GrantedVia } from "@brainstorm-os/capabilities/ledger";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Broker } from "../../ipc/broker";
 import { makeEnvelope } from "../../ipc/envelope";
 import { DataStores } from "../storage/data-stores";
-import { applyDefaultAppGrants, applyShellGrants } from "./default-grants";
-import { CapabilityLedger, GrantedVia } from "./ledger";
 
 async function setup() {
 	const vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-cap-enforce-"));

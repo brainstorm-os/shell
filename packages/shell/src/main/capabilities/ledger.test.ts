@@ -1,15 +1,20 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DataStores } from "../storage/data-stores";
 import {
 	DEFAULT_APP_CAPABILITIES,
 	SHELL_IDENTITY,
 	applyDefaultAppGrants,
 	applyShellGrants,
-} from "./default-grants";
-import { CapabilityLedger, GrantedVia, LedgerUnavailableError, parseCapability } from "./ledger";
+} from "@brainstorm-os/capabilities/default-grants";
+import {
+	CapabilityLedger,
+	GrantedVia,
+	LedgerUnavailableError,
+	parseCapability,
+} from "@brainstorm-os/capabilities/ledger";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DataStores } from "../storage/data-stores";
 
 async function setup() {
 	const vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-cap-"));

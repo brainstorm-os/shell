@@ -2,12 +2,12 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import { ENTITY_PROPS_MAP_NAME, UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import { AssetKind, AssetRefRole } from "../assets/asset-types";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import {

@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	MCP_SPAWN_LOCAL_CAP,
 	type McpToolDescriptor,
@@ -10,7 +11,6 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import { McpCallOutcome, type McpCallRecord } from "./mcp-audit-log";
 import { setApprovedFingerprints, setMcpServerEnabled, upsertMcpServer } from "./mcp-config-store";
 import { type McpConnection, type McpServiceOptions, makeMcpServiceHandler } from "./mcp-service";

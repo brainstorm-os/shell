@@ -1,0 +1,21 @@
+{
+  "name": "@brainstorm-os/capabilities",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Brainstorm's per-vault capability ledger — the fail-closed authority deciding whether an app may call a host service. CapabilityLedger (backed by SqliteDatabase) + the default-grants policy.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/ledger.ts",
+    "./ledger": "./src/ledger.ts",
+    "./default-grants": "./src/default-grants.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@brainstorm-os/sqlite": "workspace:*",
+    "ulid": "^3.0.2"
+  }
+}

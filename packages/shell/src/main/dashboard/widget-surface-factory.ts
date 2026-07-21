@@ -26,12 +26,12 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { encodeHandshake } from "@brainstorm-os/sdk";
 import type { AppHandshake, FormatContext } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { backgroundColorForTheme } from "../apps/launcher";
 import type { Rectangle, WebContentsViewHandle } from "../apps/window-container";
-import type { CapabilityLedger } from "../capabilities/ledger";
 import type { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import type { AppsRepository } from "../storage/registry-repo/apps-repo";
 import type { WidgetPlacement, WidgetRect, WidgetSurface } from "./widget-host";

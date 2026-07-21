@@ -43,6 +43,7 @@ import {
 	validateLayout,
 } from "@brainstorm-os/sdk-types";
 import { resolveLayout } from "@brainstorm-os/sdk/layout-resolver";
+import { type SqliteDatabase, open } from "@brainstorm-os/sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { makeBenchCorpus } from "../search/bench-corpus";
@@ -51,7 +52,6 @@ import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { type SqliteDatabase, open } from "../storage/sqlite";
 import { DEFAULT_COMPACT_THRESHOLD, YDocStore } from "../storage/ydoc-store";
 
 /**

@@ -18,9 +18,9 @@
  * the injected `Authorization` header stripped (doc 56 §custody).
  */
 
+import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
-import { type CapabilityLedger, LedgerUnavailableError } from "../capabilities/ledger";
 import type { ConnectorRequestFn, ResolvedAccount, ResolvedConnector } from "./connectors-request";
 import type { OAuthBroker } from "./oauth-broker";
 import type { RedirectProvider } from "./oauth-redirect";

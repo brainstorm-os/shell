@@ -1,8 +1,8 @@
+import { type SqliteDatabase, open } from "@brainstorm-os/sqlite";
 import { describe, expect, it } from "vitest";
 import { buildMatchExpression } from "../search/search-indexer";
 import { applyMigrations } from "../storage/migrations";
 import { SEARCH_MIGRATIONS } from "../storage/search-schema";
-import { type SqliteDatabase, open } from "../storage/sqlite";
 import { HELP_CORPUS_FORMAT, type HelpArticle, type HelpCorpus } from "./help-corpus";
 import { HelpIndexer, articleByTopicId } from "./help-indexer";
 

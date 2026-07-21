@@ -34,7 +34,7 @@
  *   - `main/index.ts` — vault-activation lifecycle + reindex-on-note-write.
  */
 
-import type { SqliteDatabase } from "../storage/sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 /** What goes into the FTS5 row for one entity. */
 export type IndexableEntity = {

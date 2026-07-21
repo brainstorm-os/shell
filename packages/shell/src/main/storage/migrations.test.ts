@@ -1,6 +1,6 @@
+import { open } from "@brainstorm-os/sqlite";
 import { describe, expect, it } from "vitest";
 import { type SqliteMigration, applyMigrations, getSchemaVersion } from "./migrations";
-import { open } from "./sqlite";
 
 function mkMigration(version: number, sql: string, description = `m${version}`): SqliteMigration {
 	return {

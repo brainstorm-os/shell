@@ -47,9 +47,9 @@ describe("vault format 10.8 — integration roundtrip", () => {
 		closeActiveVaultSession: typeof import("../vault/session").closeActiveVaultSession;
 	}> {
 		vi.resetModules();
-		const sqliteMod = await import("../storage/sqlite");
+		const sqliteMod = await import("@brainstorm-os/sqlite");
 		sqliteMod.__setSqlcipherDriverForTests(null);
-		const atRestMod = await import("../storage/at-rest-mode");
+		const atRestMod = await import("@brainstorm-os/sqlite/at-rest-mode");
 		atRestMod.__resetAtRestProbeForTests();
 		const vault = await import("../vault/vault");
 		const session = await import("../vault/session");

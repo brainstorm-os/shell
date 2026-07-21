@@ -30,10 +30,10 @@ vi.mock("electron", () => ({
 	},
 }));
 
+import { __setSqlcipherDriverForTests } from "@brainstorm-os/sqlite";
+import { __resetAtRestProbeForTests } from "@brainstorm-os/sqlite/at-rest-mode";
 import { unpackBundle } from "../bundle/bundle-archive";
-import { __resetAtRestProbeForTests } from "../storage/at-rest-mode";
 import { EntitiesRepository } from "../storage/entities-repo";
-import { __setSqlcipherDriverForTests } from "../storage/sqlite";
 import { closeActiveVaultSession, getActiveVaultSession } from "../vault/session";
 import { createVault } from "../vault/vault";
 import {

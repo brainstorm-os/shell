@@ -10,7 +10,7 @@
  * discriminator columns are wildcards within their dimension.
  */
 
-import type { SqliteDatabase } from "../sqlite";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 export type IntentRecord = {
 	appId: string;

@@ -18,7 +18,7 @@
  * mapping cannot persist.
  */
 
-import { SHELL_IDENTITY } from "../capabilities/default-grants";
+import { SHELL_IDENTITY } from "@brainstorm-os/capabilities/default-grants";
 
 export type RendererIdentitySource = {
 	/** WebContents.id (Electron). Stable for the lifetime of the renderer. */

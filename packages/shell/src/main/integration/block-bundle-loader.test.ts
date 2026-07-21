@@ -38,9 +38,9 @@ import {
 } from "@brainstorm-os/sdk/block-frame";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
-import { CapabilityLedger } from "../capabilities/ledger";
 import { DataStores } from "../storage/data-stores";
 import { BlocksRepository } from "../storage/registry-repo/blocks-repo";
 

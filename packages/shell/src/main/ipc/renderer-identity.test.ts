@@ -1,5 +1,5 @@
+import { SHELL_IDENTITY } from "@brainstorm-os/capabilities/default-grants";
 import { describe, expect, it } from "vitest";
-import { SHELL_IDENTITY } from "../capabilities/default-grants";
 import { RendererIdentityRegistry, registerDashboard } from "./renderer-identity";
 
 describe("RendererIdentityRegistry", () => {
