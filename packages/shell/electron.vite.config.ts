@@ -18,6 +18,7 @@ export default defineConfig(({ command }) => {
 					// deps, which point at workspace:* — that resolver doesn't run
 					// inside the production main process).
 					exclude: [
+						"@brainstorm-os/block-protocol",
 						"@brainstorm-os/sdk",
 						"@brainstorm-os/sdk-types",
 						"@brainstorm-os/tokens",
