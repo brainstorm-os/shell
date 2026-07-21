@@ -59,6 +59,7 @@ import {
 import {
 	BUILDER_TRIGGER_KINDS,
 	type BuilderTrigger,
+	SUGGESTED_TRIGGER_TYPES,
 	TIME_PRESETS,
 	type TimePreset,
 	emptyBuilderTrigger,
@@ -73,6 +74,10 @@ export type WorkflowBuilderProps = {
 	appCapabilities: readonly string[];
 	initialState?: BuilderState;
 	initialTrigger?: BuilderTrigger;
+	/** Entity types to suggest for an `EntityEvent` trigger (Mailbox-8) —
+	 *  curated + vault-present, from `triggerTypeSuggestions`. Optional so
+	 *  tests/hosts without a vault snapshot still render. */
+	knownTriggerTypes?: readonly string[];
 	onClose: () => void;
 	onSave: (result: BuilderResult) => void;
 };
@@ -481,9 +486,11 @@ function StepCard({
 function TriggerSection({
 	trigger,
 	onChange,
+	knownTypes,
 }: {
 	trigger: BuilderTrigger;
 	onChange: (next: BuilderTrigger) => void;
+	knownTypes: readonly string[];
 }): ReactElement {
 	return (
 		<section className="au-builder__section">
@@ -515,13 +522,22 @@ function TriggerSection({
 				<>
 					<label className="au-field">
 						<span className="au-field__label">{t("builder.trigger.entityType")}</span>
+						{/* Combobox: suggest known types (curated + vault-present) but keep
+						    free-text so a custom / app-specific type is still authorable —
+						    a fixed <select> can't. */}
 						<input
 							className="bs-input"
 							type="text"
+							list="au-trigger-entity-types"
 							value={trigger.entityType}
-							placeholder="brainstorm/Bookmark/v1"
+							placeholder="brainstorm/Email/v1"
 							onChange={(e) => onChange({ ...trigger, entityType: e.target.value })}
 						/>
+						<datalist id="au-trigger-entity-types">
+							{knownTypes.map((type) => (
+								<option key={type} value={type} />
+							))}
+						</datalist>
 					</label>
 					<div className="au-field">
 						<span className="au-field__label">{t("builder.trigger.verb")}</span>
@@ -673,7 +689,11 @@ export function WorkflowBuilder(props: WorkflowBuilderProps): ReactElement {
 					/>
 				</label>
 
-				<TriggerSection trigger={trigger} onChange={setTrigger} />
+				<TriggerSection
+					trigger={trigger}
+					onChange={setTrigger}
+					knownTypes={props.knownTriggerTypes ?? SUGGESTED_TRIGGER_TYPES}
+				/>
 
 				<section className="au-builder__section">
 					<div className="au-builder__steps-head">

@@ -1,4 +1,5 @@
 import {
+	type AiChatMessage,
 	EntityEventVerb,
 	StepKind,
 	type WorkflowRunDef,
@@ -321,6 +322,77 @@ describe("AutomationsHost — entity-event triggers", () => {
 		bus.emit?.({ verb: EntityEventVerb.Create, entityId: "n1", type: "Note/v1" });
 		await new Promise((r) => setTimeout(r, 5));
 		expect(persisted).toHaveLength(1);
+		host.stop();
+	});
+
+	// Mailbox-8 — a new Email fires an EntityEvent trigger whose AICall step
+	// triages it. Proves the whole path end-to-end: mail-created Email entities
+	// already emit changes (they write through the same entities handler), the
+	// generic EntityEvent framework matches `Email/v1`, and the AICall
+	// interpreter runs once the host wires the AI broker port.
+	it("triages a new Email through an AICall step when the AI port is wired", async () => {
+		const bus: { emit: ((c: EntityChange) => void) | null } = { emit: null };
+		const entityChanges = {
+			subscribe: (l: (c: EntityChange) => void) => {
+				bus.emit = l;
+				return () => {};
+			},
+		};
+		const aiCalls: Array<{ messages: readonly AiChatMessage[] }> = [];
+		const ai = vi.fn(async (req: { messages: readonly AiChatMessage[] }) => {
+			aiCalls.push({ messages: req.messages });
+			return { content: "priority: high" };
+		});
+		const loaded: LoadedWorkflow = {
+			steps: [{ id: "triage", kind: StepKind.AICall, instructions: "Classify this email." }],
+			capabilities: ["ai.use"],
+		};
+		const { host, persisted } = hostWith({
+			entityChanges,
+			loadWorkflow: vi.fn(async () => loaded),
+			// The production harness always wires `ai`; the default test harness
+			// doesn't, so override to prove the interpreter runs.
+			makeInterpreterPorts: (caps) => ({
+				intents: { dispatch: vi.fn(async () => null) },
+				entities: {
+					create: vi.fn(),
+					update: vi.fn(),
+					get: vi.fn(),
+					query: vi.fn(),
+					delete: vi.fn(),
+				},
+				notify: vi.fn(async () => {}),
+				sleep: vi.fn(async () => {}),
+				loadWorkflowSteps: vi.fn(async () => null),
+				ai,
+				capabilities: caps,
+			}),
+		});
+		await host.hydrate(
+			{
+				workflows: [],
+				reminders: [],
+				entityEvents: [
+					{ workflowId: "triageMail", type: "brainstorm/Email/v1", verb: EntityEventVerb.Create },
+				],
+			},
+			T0,
+		);
+		host.start();
+		bus.emit?.({
+			verb: EntityEventVerb.Create,
+			entityId: "em1",
+			type: "brainstorm/Email/v1",
+		});
+		await vi.waitFor(() => expect(persisted).toHaveLength(1));
+
+		expect(persisted[0]?.status).toBe(WorkflowRunStatus.Succeeded);
+		expect(ai).toHaveBeenCalledTimes(1);
+		// The triage instructions are the system turn; the trigger payload (the
+		// new email's ref) is the user turn the model triages.
+		const system = aiCalls[0]?.messages[0];
+		expect(system?.content).toBe("Classify this email.");
+		expect(JSON.stringify(aiCalls[0]?.messages)).toContain("em1");
 		host.stop();
 	});
 });
