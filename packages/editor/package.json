@@ -2,7 +2,7 @@
   "name": "@brainstorm-os/editor",
   "version": "0.0.1",
   "description": "brainstorm-editor — pre-configured Lexical editor + Yjs binding + baseline node set.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
@@ -50,5 +50,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "yjs": "^13.6.30"
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.dts.json && node ../../scripts/prepare-publish.mjs editor",
+    "prepublishOnly": "bun run build"
   }
 }

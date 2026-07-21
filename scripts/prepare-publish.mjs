@@ -4,13 +4,17 @@
  * can be published with `npm publish <pkg>/dist` — no reliance on npm/bun
  * applying `publishConfig` field overrides (npm ignores them; bun is
  * unverifiable here). The published tarball root is `dist/`, so entry points
- * are bare (`index.js` / `index.d.ts`) and `workspace:*` deps are pinned to the
- * concrete workspace version.
+ * are bare and `workspace:*` deps are pinned to the concrete workspace version.
+ *
+ * The dist `exports` map is derived from the source `exports` map, transforming
+ * `./src/X.ts` → `{types:./X.d.ts, default:./X.js}` and `./src/X.css` → `./X.css`
+ * (the .css file is copied into dist). If tsup extracted component CSS from
+ * side-effect imports into `dist/index.css`, it is exposed as `./styles.css`.
  *
  * Usage: node scripts/prepare-publish.mjs <package-dir-name>
  */
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const pkgName = process.argv[2];
 if (!pkgName) {
@@ -19,8 +23,8 @@ if (!pkgName) {
 }
 
 const root = resolve(import.meta.dirname, "..");
-const srcPkgPath = resolve(root, "packages", pkgName, "package.json");
-const src = JSON.parse(readFileSync(srcPkgPath, "utf8"));
+const pkgDir = resolve(root, "packages", pkgName);
+const src = JSON.parse(readFileSync(resolve(pkgDir, "package.json"), "utf8"));
 
 const workspaceVersion = (dep) => {
 	const p = JSON.parse(
@@ -28,16 +32,39 @@ const workspaceVersion = (dep) => {
 	);
 	return `^${p.version}`;
 };
-
 const resolveDeps = (deps) => {
 	if (!deps) return undefined;
-	const out = {};
-	for (const [name, range] of Object.entries(deps)) {
-		out[name] = range.startsWith("workspace:") ? workspaceVersion(name) : range;
-	}
-	return out;
+	return Object.fromEntries(
+		Object.entries(deps).map(([n, r]) => [n, r.startsWith("workspace:") ? workspaceVersion(n) : r]),
+	);
 };
 
+// `./src/foo.ts` → `./foo`, `./src/foo/index.ts` → `./foo/index`, `./src/foo.css` → `./foo.css`
+const toDist = (v) => v.replace(/^\.\/src\//, "./");
+const copyCss = (rel) => {
+	const from = resolve(pkgDir, "src", rel.replace(/^\.\//, ""));
+	const to = resolve(pkgDir, "dist", rel.replace(/^\.\//, ""));
+	mkdirSync(dirname(to), { recursive: true });
+	copyFileSync(from, to);
+};
+
+const distExports = {};
+for (const [subpath, value] of Object.entries(src.exports ?? { ".": "./src/index.ts" })) {
+	const dist = toDist(value);
+	if (dist.endsWith(".css")) {
+		copyCss(dist);
+		distExports[subpath] = dist;
+	} else {
+		const base = dist.replace(/\.tsx?$/, "");
+		distExports[subpath] = { types: `${base}.d.ts`, default: `${base}.js` };
+	}
+}
+// component CSS tsup extracted from side-effect imports
+if (existsSync(resolve(pkgDir, "dist", "index.css")) && !distExports["./styles.css"]) {
+	distExports["./styles.css"] = "./index.css";
+}
+
+const rootEntry = distExports["."];
 const out = {
 	name: src.name,
 	version: src.version,
@@ -45,10 +72,10 @@ const out = {
 	license: src.license,
 	type: "module",
 	sideEffects: src.sideEffects ?? false,
-	main: "./index.js",
-	module: "./index.js",
-	types: "./index.d.ts",
-	exports: { ".": { types: "./index.d.ts", default: "./index.js" } },
+	main: rootEntry?.default ?? "./index.js",
+	module: rootEntry?.default ?? "./index.js",
+	types: rootEntry?.types ?? "./index.d.ts",
+	exports: distExports,
 	publishConfig: { access: "public" },
 };
 const deps = resolveDeps(src.dependencies);
@@ -56,7 +83,6 @@ if (deps) out.dependencies = deps;
 if (src.peerDependencies) out.peerDependencies = src.peerDependencies;
 if (src.peerDependenciesMeta) out.peerDependenciesMeta = src.peerDependenciesMeta;
 
-const pkgDir = resolve(root, "packages", pkgName);
 writeFileSync(resolve(pkgDir, "dist", "package.json"), `${JSON.stringify(out, null, 2)}\n`);
 for (const asset of ["LICENSE", "README.md"]) {
 	if (existsSync(resolve(pkgDir, asset)))
@@ -65,6 +91,6 @@ for (const asset of ["LICENSE", "README.md"]) {
 console.log(
 	`wrote packages/${pkgName}/dist/package.json →`,
 	out.name,
-	out.version,
-	deps ? `deps=${JSON.stringify(deps)}` : "(no deps)",
+	`(${Object.keys(distExports).length} exports)`,
+	deps ? `deps=${Object.keys(deps).length}` : "",
 );

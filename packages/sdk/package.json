@@ -2,7 +2,7 @@
   "name": "@brainstorm-os/sdk",
   "version": "0.0.1",
   "description": "The Brainstorm app SDK: service proxies marshalled over IPC + shared property helpers + reusable React surfaces.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
@@ -15,7 +15,9 @@
     "./src/pdf-engine/pdf-worker.ts"
   ],
   "scripts": {
-    "build:glyphs": "node scripts/build-glyphs.mjs && biome format --write src/icon/icon-glyphs.ts"
+    "build:glyphs": "node scripts/build-glyphs.mjs && biome format --write src/icon/icon-glyphs.ts",
+    "build": "tsup && tsc -p tsconfig.dts.json && node ../../scripts/prepare-publish.mjs sdk",
+    "prepublishOnly": "bun run build"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -129,7 +131,6 @@
     "./export-popover/export-popover.css": "./src/export-popover/export-popover.css"
   },
   "dependencies": {
-    "@amplitude/unified": "^1.1.22",
     "@brainstorm-os/react-yjs": "workspace:*",
     "@brainstorm-os/sdk-types": "workspace:*",
     "@phosphor-icons/core": "^2.1.1",
@@ -142,10 +143,14 @@
     "unicode-emoji-json": "^0.9.0"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "@amplitude/unified": "^1.1.22"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "@amplitude/unified": {
       "optional": true
     }
   },
