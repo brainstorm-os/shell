@@ -30,7 +30,7 @@ import {
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm/sdk/object-menu";
 import { attachShortcut, useShortcut } from "@brainstorm/sdk/shortcut";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { FindBar, type FindMatchState } from "./find-bar";
 import { plural, t } from "./i18n";
 import { useBrowserT } from "./i18n-hooks";
@@ -859,6 +859,38 @@ export function BrowserApp(): ReactElement {
 		});
 	}, [onNewPrivateTab, onClearBrowsingData, activeOrigin, activeTrusted, onToggleTrust]);
 
+	// F-426 — the blocked-tracker shield is actionable: instead of leaving the
+	// count as trivia, clicking it explains that strict privacy may break the
+	// page and offers the one-click trust escape hatch (Browser-8) right where
+	// the user notices the breakage.
+	const onOpenShield = useCallback(
+		(event: ReactMouseEvent<HTMLButtonElement>) => {
+			const anchor = event.currentTarget;
+			const blocked = active?.blockedTrackerCount ?? 0;
+			const items: AnchoredMenuItem[] = [
+				{
+					label: plural(blocked, "shield.menu.blocked.one", "shield.menu.blocked.other"),
+					section: true,
+				},
+			];
+			if (activeOrigin) {
+				items.push({ label: t("shield.menu.mayBreak"), section: true });
+				items.push({
+					label: activeTrusted ? t("trust.untrust") : t("shield.menu.trust"),
+					icon: IconName.CheckCircle,
+					onSelect: onToggleTrust,
+				});
+			}
+			const rect = anchor.getBoundingClientRect();
+			openAnchoredMenu({ x: rect.left, y: rect.bottom }, items, {
+				menuLabel: t("shield.menu.label"),
+				anchor,
+				align: MenuAlign.Start,
+			});
+		},
+		[active, activeOrigin, activeTrusted, onToggleTrust],
+	);
+
 	const [clipAttempt, setClipAttempt] = useState<ClipAttempt | null>(null);
 	const clipResetTimer = useRef<number | null>(null);
 	const [dataCleared, setDataCleared] = useState(false);
@@ -1114,13 +1146,17 @@ export function BrowserApp(): ReactElement {
 					/>
 				</div>
 				{blockedTrackers > 0 && (
-					<span
+					<button
+						type="button"
 						className="browser__shield"
 						aria-label={plural(blockedTrackers, "shield.blocked.one", "shield.blocked.other")}
 						data-bs-tooltip={plural(blockedTrackers, "shield.blocked.one", "shield.blocked.other")}
+						aria-haspopup="menu"
+						onClick={onOpenShield}
+						data-testid="browser-shield"
 					>
 						<span aria-hidden="true">🛡</span> <span aria-hidden="true">{blockedTrackers}</span>
-					</span>
+					</button>
 				)}
 				<button
 					type="button"

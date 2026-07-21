@@ -52,6 +52,11 @@
   "security.local": "Página local",
   "shield.blocked.one": "{count} rastreador bloqueado",
   "shield.blocked.other": "{count} rastreadores bloqueados",
+  "shield.menu.label": "Protección de rastreo",
+  "shield.menu.blocked.one": "{count} rastreador bloqueado en esta página",
+  "shield.menu.blocked.other": "{count} rastreadores bloqueados en esta página",
+  "shield.menu.mayBreak": "Algunas funciones pueden no funcionar con la protección activada.",
+  "shield.menu.trust": "Confiar en este sitio y recargar",
   "unavailable.title": "Navegador",
   "unavailable.blurb": "El motor del navegador se ejecuta en el shell de Brainstorm. Abre esta app desde Brainstorm para navegar."
 }
