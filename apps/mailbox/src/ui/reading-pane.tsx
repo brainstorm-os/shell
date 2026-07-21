@@ -9,6 +9,7 @@ import { t } from "../i18n";
 import { messageDateLabel } from "../logic/format";
 import { recipientSummary, senderLabel } from "../logic/mail-view";
 import type { MessageView } from "../types/mail-view";
+import { AttachmentChips } from "./attachment-chips";
 import { MailBody } from "./mail-body";
 
 export type ReadingPaneProps = {
@@ -22,6 +23,9 @@ export type ReadingPaneProps = {
 	/** Absent ⇒ sending unavailable (demo mode) — the buttons hide. */
 	onReply?: () => void;
 	onForward?: () => void;
+	/** Fetch-then-open one attachment (Mailbox-6). Absent ⇒ chips render
+	 *  inert as a record of what the message carries. */
+	onOpenAttachment?: (partRef: string) => Promise<void>;
 };
 
 export function ReadingPane({
@@ -33,6 +37,7 @@ export function ReadingPane({
 	onToggleFlag,
 	onReply,
 	onForward,
+	onOpenAttachment,
 }: ReadingPaneProps): ReactElement {
 	if (!message) {
 		return (
@@ -105,6 +110,12 @@ export function ReadingPane({
 					</div>
 				) : null}
 			</div>
+
+			<AttachmentChips
+				key={message.id}
+				parts={message.attachmentParts}
+				{...(onOpenAttachment ? { onOpen: onOpenAttachment } : {})}
+			/>
 
 			<MailBody
 				bodyHtmlSafe={message.bodyHtmlSafe}

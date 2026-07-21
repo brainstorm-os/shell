@@ -24,6 +24,7 @@
     "./perf": "./src/perf.ts",
     "./date-buckets": "./src/date-buckets.ts",
     "./date-formatters": "./src/date-formatters.ts",
+    "./format-bytes": "./src/format-bytes.ts",
     "./find-replace": "./src/find-replace/index.ts",
     "./frustum-cull": "./src/frustum-cull.ts",
     "./in-memory-entities": "./src/in-memory-entities.ts",

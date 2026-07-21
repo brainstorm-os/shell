@@ -548,6 +548,78 @@ body {
 	opacity: 0.8;
 }
 
+/* ── Attachments (Mailbox-6) ─────────────────────────────────────────── */
+
+.mb-attachments {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+	padding: var(--space-2) var(--space-4);
+	border-bottom: 1px solid var(--color-border-subtle);
+	flex-shrink: 0;
+}
+
+.mb-attachments__label {
+	font-size: var(--text-size-xs);
+	font-weight: var(--text-weight-medium);
+	color: var(--text-dim, var(--text));
+}
+
+.mb-attachments__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.mb-attachment {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	max-width: 20rem;
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	background: var(--bg-elev);
+	color: var(--text);
+	font-size: var(--text-size-sm);
+	cursor: pointer;
+}
+
+.mb-attachment:hover:not(:disabled) {
+	background: var(--hover);
+}
+
+.mb-attachment:disabled {
+	cursor: default;
+	opacity: 0.7;
+}
+
+.mb-attachment.is-error {
+	border-color: var(--danger-border);
+}
+
+.mb-attachment__icon {
+	flex-shrink: 0;
+	opacity: 0.75;
+}
+
+.mb-attachment__name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mb-attachment__size,
+.mb-attachment__status {
+	flex-shrink: 0;
+	font-size: var(--text-size-xs);
+	color: var(--text-dim, var(--text));
+}
+
 /* ── Body ────────────────────────────────────────────────────────────── */
 
 .mb-body {

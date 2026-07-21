@@ -30,6 +30,7 @@ function message(overrides: Partial<MessageView> = {}): MessageView {
 		bodyText: "line one\nline two",
 		bodyHtmlSafe: "",
 		attachments: [],
+		attachmentParts: [],
 		flags: [MailFlag.Unread],
 		tags: [],
 		unread: true,
