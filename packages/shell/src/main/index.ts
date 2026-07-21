@@ -345,16 +345,15 @@ const isMac = process.platform === "darwin";
 // lock screen and exposes renderer state. Not safe to distribute while true.
 const DEVTOOLS_ENABLED = true;
 
-// Packaged builds run under the product name "Brainstorm" so their userData
-// (and the single-instance lock keyed on it) is distinct from a developer's
-// `electron-vite dev` session, whose app name stays the package name
-// `@brainstorm-os/shell`. Without this, launching the packaged app while `bun run
-// dev` is open makes `requestSingleInstanceLock()` fail and the packaged app
-// silently quits. Must run before the first `getPath("userData")` access
-// (the single-instance lock below). Dev is intentionally left untouched.
-if (!isDev) {
-	app.setName("Brainstorm");
-}
+// Pin the app name (→ userData dir + single-instance-lock key) to a STABLE
+// value that does not depend on the npm package name. Packaged builds are
+// "Brainstorm"; dev is a distinct "brainstorm-dev" so a running `electron-vite
+// dev` session can't collide with the packaged app's single-instance lock.
+// Leaving dev on the package name (the old behaviour) meant a scope rename
+// (`@brainstorm/shell` → `@brainstorm-os/shell`) silently moved dev's userData
+// to a fresh, empty dir and orphaned the vault registry. Must run before the
+// first `getPath("userData")` access (the single-instance lock below).
+app.setName(isDev ? "brainstorm-dev" : "Brainstorm");
 
 // Bundled brand wallpapers copied into each new vault's `dashboard/wallpapers/`
 // so a fresh vault opens on-brand. The light slot opens on the green-valley
