@@ -46,6 +46,8 @@
   "shell.toasts.region": "Notifications",
   "shell.dashboard.body": "Dashboard",
   "shell.dashboard.iconGrid": "Dashboard icons",
+  "shell.dashboard.badge.count": "{app}: {count, plural, one {# notification} other {# notifications}}",
+  "shell.dashboard.badge.dot": "{app}: attention needed",
   "shell.dashboard.region.tray": "Window strip and status tray",
   "shell.dashboard.vaultInfo.label": "Vault info",
   "shell.dashboard.vaultInfo.title": "Vault info",

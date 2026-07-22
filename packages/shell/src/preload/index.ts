@@ -31,6 +31,7 @@ import {
 	type UpdatePrefs,
 } from "@brainstorm-os/protocol/update-wire-types";
 import {
+	type BadgeSpec,
 	type Dictionary,
 	type OpenRefusal,
 	type OpenRung,
@@ -444,6 +445,14 @@ export type InstalledApp = {
 const APPS_RUNNING_CHANGED_CHANNEL = "apps:running-changed";
 const onAppsRunningChanged = (listener: (running: string[]) => void): (() => void) =>
 	subscribe<string[]>(APPS_RUNNING_CHANGED_CHANNEL, listener);
+
+/** 7.14 — the composed per-app badge model pushed from main. Structurally the
+ *  main `ComposedBadge[]`, redefined here (channels don't cross the layering
+ *  as an import), mirroring `apps:running-changed`. */
+export type BadgeUpdate = { appId: string } & BadgeSpec;
+const BADGES_CHANGED_CHANNEL = "ui:badges-changed";
+const onBadgesChanged = (listener: (badges: BadgeUpdate[]) => void): (() => void) =>
+	subscribe<BadgeUpdate[]>(BADGES_CHANGED_CHANNEL, listener);
 
 export type UninstallSummary = {
 	ok: boolean;
@@ -1047,6 +1056,10 @@ const apps = {
 	 *  actions, for the Settings → Apps & contributions toggle. */
 	listContributingApps: (): Promise<string[]> => ipcRenderer.invoke("apps:list-contributing"),
 	onRunningChanged: onAppsRunningChanged,
+	/** 7.14 — the per-app dashboard-icon badge model changed (an app set/cleared
+	 *  its badge, or the vault switched). The dashboard keys entries by `appId`
+	 *  onto its app tiles. Returns an unsubscribe. */
+	onBadgesChanged,
 	/** Fires when the installed app set / registrations change (install, update,
 	 *  uninstall, dev registration refresh) — the dashboard re-reads its
 	 *  app-derived caches (widget titles + entries, icon cache) on this edge

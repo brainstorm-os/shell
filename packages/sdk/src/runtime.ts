@@ -768,6 +768,10 @@ function uiProxy(bridge: Bridge): UiService {
 			publish: (spec) => callService<void>(bridge, "ui", "tray.publish", [spec], ["tray.publish"]),
 			clear: () => callService<void>(bridge, "ui", "tray.clear", [], ["tray.publish"]),
 		},
+		badge: {
+			set: (spec) => callService<void>(bridge, "ui", "badge.set", [spec], ["ui.badge"]),
+			clear: () => callService<void>(bridge, "ui", "badge.clear", [], ["ui.badge"]),
+		},
 	};
 }
 

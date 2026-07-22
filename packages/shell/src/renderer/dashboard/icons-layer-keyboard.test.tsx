@@ -45,6 +45,7 @@ describe("DashboardIconsLayer — KBN-S-dashboard spatial keyboard", () => {
 			apps: {
 				listRunning: () => Promise.resolve([]),
 				onRunningChanged: () => () => undefined,
+				onBadgesChanged: () => () => undefined,
 				listInstalled: () => Promise.resolve([]),
 				iconUrl: (id: string) => `brainstorm://app-icon/${id}`,
 			},

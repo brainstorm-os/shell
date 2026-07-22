@@ -18,7 +18,8 @@
     "entities.write:brainstorm/MailAccount/v1",
     "entities.write:brainstorm/Connector/v1",
     "entities.write:brainstorm/ConnectorAccount/v1",
-    "entities.read:*"
+    "entities.read:*",
+    "ui.badge"
   ],
   "registrations": {
     "entityTypes": [
