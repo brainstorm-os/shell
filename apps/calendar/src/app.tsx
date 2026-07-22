@@ -44,7 +44,7 @@ import {
 } from "./logic/compile-view";
 import { parseComposePayload } from "./logic/compose-payload";
 import { copyEventBlockRef } from "./logic/copy-event-block-ref";
-import { addDays, addMonths, startOfDay, startOfMonth, startOfWeek } from "./logic/date-range";
+import { addDays, addMonths, startOfDay, startOfMonth } from "./logic/date-range";
 import { defaultEventStart } from "./logic/default-event-start";
 import {
 	eventToScheduledItem,
@@ -62,6 +62,7 @@ import {
 } from "./logic/scheduled-item";
 import { defaultHiddenSources, loadHiddenSources, saveHiddenSources } from "./logic/source-prefs";
 import { useDateKeyInfo } from "./logic/use-date-key-info";
+import { viewSwitchAnchor } from "./logic/view-anchor";
 import { JOURNAL_ENTRY_TYPE, getCalendarRuntime } from "./runtime";
 import { ActionId, bindShortcut } from "./shortcuts";
 import { EVENT_TYPE, createEntitiesRepository } from "./storage/entities-repository";
@@ -95,10 +96,6 @@ function entityTypeForItem(item: ScheduledItem): string {
 	if (item.sourceKey === EVENT_SOURCE_KEY) return EVENT_TYPE;
 	if (item.sourceKey === JOURNAL_SOURCE_KEY) return JOURNAL_ENTRY_TYPE;
 	return parseSourceKey(item.sourceKey)?.entityType ?? "";
-}
-
-function startOfYear(epochMs: number): number {
-	return new Date(new Date(epochMs).getFullYear(), 0, 1).getTime();
 }
 
 type NavLoc = { viewKind: CalendarViewKind; anchor: number };
@@ -267,11 +264,7 @@ export function CalendarApp() {
 	// ── Navigation actions ──────────────────────────────────────────────
 	const setView = useCallback(
 		(kind: CalendarViewKind) => {
-			const cur = anchorRef.current;
-			let next = cur;
-			if (kind === CalendarViewKind.Day) next = startOfDay(cur);
-			if (kind === CalendarViewKind.Week) next = startOfWeek(cur, weekStartsOn);
-			if (kind === CalendarViewKind.Year) next = startOfYear(cur);
+			const next = viewSwitchAnchor(kind, anchorRef.current, weekStartsOn);
 			setAnchorState(next);
 			setViewKind(kind);
 			recordNav({ viewKind: kind, anchor: next });
