@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
+import { BadgeHost } from "./badge-host";
 import { UiNotifyHost } from "./notify-host";
 import { TrayHost } from "./tray-host";
 import { makeUiServiceHandler } from "./ui-service";
@@ -78,6 +79,60 @@ describe("makeUiServiceHandler — tray", () => {
 		expect(tray.compose()).not.toBeNull();
 		handler(envelope("tray.clear", "a"));
 		expect(tray.compose()).toBeNull();
+	});
+});
+
+describe("makeUiServiceHandler — badge (7.14)", () => {
+	function badgeHandler() {
+		const badge = new BadgeHost();
+		const handler = makeUiServiceHandler({
+			getHost: () => new UiNotifyHost(),
+			getTrayHost: () => new TrayHost(),
+			getBadgeHost: () => badge,
+		});
+		return { handler, badge };
+	}
+
+	it("sets a validated badge under the broker-verified envelope app", () => {
+		const { handler, badge } = badgeHandler();
+		expect(handler(envelope("badge.set", "io.example.chat", { count: 4 }))).toBeUndefined();
+		expect(badge.compose()).toEqual([{ appId: "io.example.chat", count: 4 }]);
+	});
+
+	it("cannot badge another app's icon — the id is the envelope app, not the payload", () => {
+		const { handler, badge } = badgeHandler();
+		// A hostile `appId` in the payload is ignored; only envelope.app is used.
+		handler(envelope("badge.set", "io.example.chat", { count: 1, appId: "io.example.mailbox" }));
+		expect(badge.compose()).toEqual([{ appId: "io.example.chat", count: 1 }]);
+	});
+
+	it("a count<=0 set clears the app's badge", () => {
+		const { handler, badge } = badgeHandler();
+		handler(envelope("badge.set", "a", { count: 3 }));
+		handler(envelope("badge.set", "a", { count: 0 }));
+		expect(badge.compose()).toEqual([]);
+	});
+
+	it("clears the calling app's badge", () => {
+		const { handler, badge } = badgeHandler();
+		handler(envelope("badge.set", "a", { dot: true }));
+		expect(badge.compose()).not.toEqual([]);
+		handler(envelope("badge.clear", "a"));
+		expect(badge.compose()).toEqual([]);
+	});
+
+	it("throws Invalid on a malformed badge spec", () => {
+		const { handler } = badgeHandler();
+		expect(() => handler(envelope("badge.set", "a", { nope: 1 }))).toThrowError(
+			expect.objectContaining({ name: "Invalid" }),
+		);
+	});
+
+	it("throws Unavailable when no badge host is wired", () => {
+		const { handler } = handlerWith();
+		expect(() => handler(envelope("badge.set", "a", { count: 1 }))).toThrowError(
+			expect.objectContaining({ name: "Unavailable" }),
+		);
 	});
 });
 

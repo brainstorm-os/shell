@@ -1759,6 +1759,25 @@ export type TrayService = {
 	clear(): Promise<void>;
 };
 
+/** A badge an app paints on its own dashboard icon (Stage 7.14) — an
+ *  iOS-style ambient state cue visible without opening the app (Chat
+ *  unread, Mailbox inbox, Agent "response ready", Automations failed
+ *  runs). Either a numeric count or a plain dot ("attention, no number").
+ *  A `count <= 0` is treated as a clear. Gated by the `ui.badge`
+ *  capability. The shell owns rendering (icon-corner chip) and mirrors the
+ *  vault-wide app-badge total onto the OS dock/taskbar badge. */
+export type BadgeSpec = { count: number } | { dot: true };
+
+/** Set / clear this app's dashboard-icon badge (Stage 7.14). Gated by the
+ *  `ui.badge` capability. `set` replaces any prior badge for the app;
+ *  `clear` removes it. The badge is per-app scoped — an app can only badge
+ *  its own icon (the shell stamps the calling app id, never trusting the
+ *  client), and it clears automatically when the vault closes. */
+export type BadgeService = {
+	set(spec: BadgeSpec): Promise<void>;
+	clear(): Promise<void>;
+};
+
 export type UiService = {
 	openWindow(spec: WindowSpec): Promise<string>;
 	closeWindow(id: string): Promise<void>;
@@ -1769,6 +1788,8 @@ export type UiService = {
 	 *  close its own search UI. Cap `search.open` (install-time grant). */
 	openSearch(args: { query?: string }): Promise<void>;
 	tray: TrayService;
+	/** 7.14 — app-icon notification badges. Cap `ui.badge`. */
+	badge: BadgeService;
 };
 
 /** Transient cross-surface theme preview (9.9.6; cap `theme.preview`). The
