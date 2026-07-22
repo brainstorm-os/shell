@@ -155,6 +155,9 @@ export function builderTriggerToDef(trigger: BuilderTrigger): TriggerDef {
 			};
 			return { kind: TriggerKind.Webhook, config: { ...webhook }, enabled: true };
 		}
+		case TriggerKind.Startup:
+			// Fires once on shell launch — no config (like Manual, but engine-driven).
+			return { kind: TriggerKind.Startup, config: {}, enabled: true };
 		default:
 			return { kind: TriggerKind.Manual, config: {}, enabled: true };
 	}

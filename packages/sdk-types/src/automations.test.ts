@@ -51,15 +51,15 @@ describe("type urls + enum tables", () => {
 		expect(ENGINE_STEP_KINDS).not.toContain(StepKind.Code);
 	});
 
-	it("the engine trigger subset is the wired kinds (incl. Webhook, 11b.8) and excludes file/startup", () => {
+	it("the engine trigger subset is the wired kinds (incl. Webhook 11b.8 + Startup 11b.10) and excludes FileWatch", () => {
 		expect(ENGINE_TRIGGER_KINDS).toEqual([
 			TriggerKind.Time,
 			TriggerKind.EntityEvent,
 			TriggerKind.Manual,
 			TriggerKind.Webhook,
+			TriggerKind.Startup,
 		]);
 		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.FileWatch);
-		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.Startup);
 	});
 
 	it("guards reject non-members", () => {

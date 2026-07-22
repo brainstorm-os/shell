@@ -109,6 +109,11 @@ export type ScheduleRegistration = {
 	 *  re-derives (the wiring's rehydrate), so e.g. a completed task's alert
 	 *  unregisters instead of firing stale. Optional like `syncMappings`. */
 	itemAlerts?: ItemAlertRegistration[];
+	/** 11b.10 — workflow ids bound to an enabled `Startup` trigger. They fire
+	 *  exactly once per host lifetime (shell launch), in `start()`, NOT on
+	 *  every re-hydrate — so adding a Startup workflow mid-session waits for
+	 *  the next launch. Optional like the fields above. */
+	startups?: string[];
 };
 
 /** Connector-4 — drives one `SyncMapping`'s pull (→ `connectors.sync`). */
@@ -170,6 +175,10 @@ export class AutomationsHost {
 	private entityEvents: EntityEventTrigger[] = [];
 	private webhooks: WebhookTrigger[] = [];
 	private webhookIngress: WebhookIngressPort | undefined;
+	private startups: string[] = [];
+	/** Startups fire once per host lifetime — this latches after the first
+	 *  `start()` so a later re-hydrate + re-start never re-fires them. */
+	private startupsFired = false;
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private unsubscribe: (() => void) | null = null;
 	private unsubscribeWebhooks: (() => void) | null = null;
@@ -212,6 +221,7 @@ export class AutomationsHost {
 		this.entityEvents = [...registration.entityEvents];
 		this.webhooks = [...(registration.webhooks ?? [])];
 		this.webhookIngress?.register(this.webhooks);
+		this.startups = [...(registration.startups ?? [])];
 		for (const w of registration.workflows) {
 			if (w.config) await this.ports.scheduler.register(w.triggerId, [w.workflowId], w.config, now);
 		}
@@ -246,6 +256,24 @@ export class AutomationsHost {
 			this.unsubscribeWebhooks = this.webhookIngress.subscribe((hit) => {
 				void this.onWebhookHit(hit);
 			});
+		}
+		// 11b.10 — Startup workflows fire once, on the first start() of this host
+		// (shell launch). The latch survives a stop()/start() (host-takeover
+		// re-claim) so they never double-fire within a session.
+		if (!this.startupsFired) {
+			this.startupsFired = true;
+			void this.fireStartups();
+		}
+	}
+
+	/** Fire every `Startup`-triggered workflow once. Each runs under its own
+	 *  caps via the shared `runWorkflow` path; one failure never blocks the
+	 *  rest. */
+	private async fireStartups(): Promise<void> {
+		for (const workflowId of this.startups) {
+			await this.runWorkflow(workflowId, `startup:${workflowId}`, { startup: true }).catch((e) =>
+				this.fail(`startup ${workflowId}`, e),
+			);
 		}
 	}
 

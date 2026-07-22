@@ -66,6 +66,13 @@ describe("builder trigger", () => {
 		expect(def.enabled).toBe(true);
 	});
 
+	it("maps a Startup trigger to an empty-config def (11b.10)", () => {
+		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Startup });
+		expect(def.kind).toBe(TriggerKind.Startup);
+		expect(def.config).toEqual({});
+		expect(def.enabled).toBe(true);
+	});
+
 	it("maps a daily Time preset to a Daily recurrence", () => {
 		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Time });
 		expect(def.kind).toBe(TriggerKind.Time);

@@ -98,6 +98,27 @@ describe("deriveScheduleRegistration", () => {
 		expect(reg.webhooks).toEqual([]);
 	});
 
+	it("collects enabled Startup workflows into startups (11b.10)", () => {
+		const reg = deriveScheduleRegistration({
+			workflows: [
+				workflowRow("wf_boot", "t_boot"),
+				workflowRow("wf_boot_off", "t_boot", false),
+				workflowRow("wf_boot_trigoff", "t_boot_off"),
+			],
+			triggers: [
+				triggerRow("t_boot", TriggerKind.Startup, {}),
+				triggerRow("t_boot_off", TriggerKind.Startup, {}, false),
+			],
+			reminders: [],
+		});
+		// Only the enabled workflow on the enabled Startup trigger; a Startup
+		// registers nothing in workflows/entityEvents (fires on launch, not the
+		// scheduler).
+		expect(reg.startups).toEqual(["wf_boot"]);
+		expect(reg.workflows).toEqual([]);
+		expect(reg.entityEvents).toEqual([]);
+	});
+
 	it("refuses an EntityEvent trigger on WorkflowRun/v1 (self-amplifying loop)", () => {
 		const reg = deriveScheduleRegistration({
 			workflows: [workflowRow("wf_loop", "t_loop")],

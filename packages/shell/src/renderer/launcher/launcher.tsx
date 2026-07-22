@@ -47,7 +47,7 @@ import { LauncherRowKind, buildRows } from "./grouped-results";
 import type { LauncherAppRow, LauncherEntityRow, LauncherRow } from "./grouped-results";
 import "./launcher.css";
 import { track } from "@brainstorm-os/sdk/analytics";
-import { launchApp } from "../analytics/track-app-launch";
+import { launchApp, rememberAppNames } from "../analytics/track-app-launch";
 import { prettyEntityType, sanitizeSnippet } from "./launcher-text";
 
 export type LauncherProps = {
@@ -239,7 +239,9 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 		setEntities([]);
 		let cancelled = false;
 		void window.brainstorm.apps.listInstalled().then((list) => {
-			if (!cancelled) setApps(list);
+			if (cancelled) return;
+			setApps(list);
+			rememberAppNames(list);
 		});
 		return () => {
 			cancelled = true;
@@ -340,7 +342,7 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 }
 
 function activateApp(row: LauncherAppRow, onClose: () => void): void {
-	launchApp(row.app.id, "launcher");
+	launchApp(row.app.id, "launcher", row.app.name);
 	onClose();
 }
 

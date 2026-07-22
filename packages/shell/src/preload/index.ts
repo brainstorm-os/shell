@@ -1789,6 +1789,10 @@ function resolveAnalyticsDeviceId(): string {
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
+	// getSystemVersion isn't guaranteed in the sandboxed `process` subset —
+	// guard so a missing method can't throw and tear down the whole bridge.
+	osVersion: typeof process.getSystemVersion === "function" ? process.getSystemVersion() : "",
+	arch: process.arch,
 	/** Anonymous per-install id for product analytics. Never a user / vault / key. */
 	analyticsDeviceId: resolveAnalyticsDeviceId(),
 	windowState,

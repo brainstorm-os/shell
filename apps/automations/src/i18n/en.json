@@ -125,6 +125,7 @@
   "trigger.kind.entity-event": "An entity change",
   "trigger.kind.manual": "Run on demand",
   "trigger.kind.webhook": "An incoming webhook",
+  "trigger.kind.startup": "When the app starts",
   "builder.trigger.webhook.hint": "Send a POST request to this URL to run the workflow. Keep the secret private — anyone with the full URL can trigger it.",
   "builder.trigger.webhook.needsGrant": "Grant inbound access in Settings → Privacy → Network before using a webhook trigger.",
   "builder.trigger.webhook.localUrl": "Local URL",
