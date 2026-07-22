@@ -1,5 +1,7 @@
+import { AnalyticsErrorScope, trackError } from "@brainstorm-os/sdk/analytics";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import type { CloudSyncWarning, WelcomeTemplateSummary } from "../../preload";
+import { classifyVaultError } from "../analytics/classify-vault-error";
 import { t } from "../i18n/t";
 import { BrandMark } from "../ui/brand-mark";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
@@ -137,6 +139,7 @@ export function Welcome() {
 			if (templateId) {
 				const result = await window.brainstorm.welcome.importTemplate(templateId);
 				if (!result.ok) {
+					trackError(AnalyticsErrorScope.TemplateImport, "import_failed");
 					pushToast({
 						kind: ToastKind.Error,
 						title: t("shell.welcome.templates.importFailedTitle"),
@@ -145,6 +148,7 @@ export function Welcome() {
 				}
 			}
 		} catch (e) {
+			trackError(AnalyticsErrorScope.VaultCreate, classifyVaultError(e));
 			setError(e instanceof Error ? e.message : t("shell.welcome.createFailed"));
 		} finally {
 			setBusy(false);
@@ -171,6 +175,7 @@ export function Welcome() {
 		try {
 			await openByPath(chosen);
 		} catch (e) {
+			trackError(AnalyticsErrorScope.VaultOpen, classifyVaultError(e));
 			setError(e instanceof Error ? e.message : t("shell.welcome.openFailed"));
 			setMode(WelcomeMode.Menu);
 		} finally {

@@ -19,7 +19,20 @@
  */
 
 import { isPublicBeta } from "./beta";
+import {
+	type AnalyticsErrorScope,
+	AnalyticsEvent,
+	AnalyticsProp,
+	type LocaleParts,
+	parseLocale,
+} from "./events";
 
+export {
+	AnalyticsErrorScope,
+	AnalyticsEvent,
+	AnalyticsProp,
+	parseLocale,
+} from "./events";
 export { isPublicBeta } from "./beta";
 export {
 	BETA_ANALYTICS_NOTICE_ID,
@@ -70,17 +83,23 @@ let amplitudeModule: AmplitudeModule | null = null;
 type AnalyticsBridge = {
 	version?: string;
 	platform?: string;
+	osVersion?: string;
+	arch?: string;
 	/** Anonymous install id from main (preferred Amplitude deviceId). */
 	analyticsDeviceId?: string;
-	app?: { id?: string; version?: string };
+	app?: { id?: string; version?: string; name?: string };
 };
 
 type AnalyticsContext = {
 	surface: "shell" | "app";
 	appId?: string;
+	appName?: string;
 	appVersion?: string;
 	platform?: string;
+	osVersion?: string;
+	arch?: string;
 	shellVersion?: string;
+	locale?: LocaleParts;
 };
 
 function readBridge(): AnalyticsBridge | null {
@@ -99,17 +118,51 @@ export function resolveAnalyticsDeviceId(bridge: AnalyticsBridge | null = readBr
 	return bridge?.analyticsDeviceId?.trim() ?? "";
 }
 
+/** OS locale (BCP-47) from the renderer — a privacy-safe geography/language
+ *  signal that needs no IP geolocation. */
+function readLocaleTag(): string | undefined {
+	if (typeof navigator === "undefined") return undefined;
+	return navigator.language || navigator.languages?.[0];
+}
+
 function readContext(): AnalyticsContext {
 	const bridge = readBridge();
-	if (!bridge) return { surface: "shell" };
+	const locale = parseLocale(readLocaleTag());
 	const base: AnalyticsContext = { surface: "shell" };
+	if (locale) base.locale = locale;
+	if (!bridge) return base;
 	if (bridge.platform) base.platform = bridge.platform;
+	if (bridge.osVersion) base.osVersion = bridge.osVersion;
+	if (bridge.arch) base.arch = bridge.arch;
 	if (bridge.version) base.shellVersion = bridge.version;
 	const app = bridge.app;
 	if (!app?.id) return base;
 	const context: AnalyticsContext = { ...base, surface: "app", appId: app.id };
+	if (app.name) context.appName = app.name;
 	if (app.version) context.appVersion = app.version;
 	return context;
+}
+
+/**
+ * Normalized context attached to EVERY event so any event (launch, error, …)
+ * is segmentable by version / os / locale without relying on user-property
+ * back-fill. Keys are the canonical `AnalyticsProp` names.
+ */
+function contextProps(context: AnalyticsContext): Record<string, string> {
+	const props: Record<string, string> = { [AnalyticsProp.Surface]: context.surface };
+	if (context.platform) props[AnalyticsProp.Platform] = context.platform;
+	if (context.osVersion) props[AnalyticsProp.OsVersion] = context.osVersion;
+	if (context.arch) props[AnalyticsProp.Arch] = context.arch;
+	if (context.locale) {
+		props[AnalyticsProp.Locale] = context.locale.locale;
+		if (context.locale.language) props[AnalyticsProp.Language] = context.locale.language;
+		if (context.locale.region) props[AnalyticsProp.Region] = context.locale.region;
+	}
+	if (context.shellVersion) props[AnalyticsProp.ShellVersion] = context.shellVersion;
+	if (context.appId) props[AnalyticsProp.AppId] = context.appId;
+	if (context.appName) props[AnalyticsProp.AppName] = context.appName;
+	if (context.appVersion) props[AnalyticsProp.AppVersion] = context.appVersion;
+	return props;
 }
 
 /** Drop identity / key material from event property bags. */
@@ -149,20 +202,14 @@ async function ensureInitialized(): Promise<AmplitudeModule | null> {
 				sessionReplay: { sampleRate: 1 },
 			});
 
-			const context = readContext();
 			// Non-identifying product context only — no vault, user, or keys.
-			const userProps: Record<string, string> = { surface: context.surface };
-			if (context.platform) userProps.platform = context.platform;
-			if (context.shellVersion) userProps.shell_version = context.shellVersion;
-			if (context.appId) userProps.app_id = context.appId;
-			if (context.appVersion) userProps.app_version = context.appVersion;
-
+			const userProps = contextProps(readContext());
 			const identify = new amplitude.Identify();
 			for (const [key, value] of Object.entries(userProps)) {
 				identify.set(key, value);
 			}
 			amplitude.identify(identify);
-			amplitude.track("Application Started", userProps);
+			amplitude.track(AnalyticsEvent.ApplicationStarted, userProps);
 			amplitudeModule = amplitude;
 		})().catch((error: unknown) => {
 			initPromise = null;
@@ -190,14 +237,37 @@ export function initAnalytics(): void {
 	void ensureInitialized();
 }
 
-/** Track a named product event. No-ops until initialization completes. */
+/**
+ * Track a named product event. No-ops until initialization completes. Every
+ * event is enriched with normalized context (version / os / locale / app) so
+ * any event is segmentable without relying on user-property back-fill;
+ * explicit `properties` win over context on a key clash.
+ */
 export function track(
-	event: string,
+	event: AnalyticsEvent | string,
 	properties?: Record<string, string | number | boolean | null | undefined>,
 ): void {
 	if (!analyticsEnabled || !initialized || typeof window === "undefined") return;
-	const cleaned = sanitizeEventProperties(properties);
+	const cleaned = sanitizeEventProperties({ ...contextProps(readContext()), ...properties });
 	void ensureInitialized().then((amplitude) => {
 		amplitude?.track(event, cleaned);
+	});
+}
+
+/**
+ * Report a user-facing failure as a normalized `Error Encountered` event.
+ * Only a stable `scope` + `code` (and optional pre-normalized extras) are sent
+ * — never raw error messages or paths, which embed the OS username and other
+ * PII. Callers classify the raw error into a code before calling.
+ */
+export function trackError(
+	scope: AnalyticsErrorScope,
+	code: string,
+	extra?: Record<string, string | number | boolean | null | undefined>,
+): void {
+	track(AnalyticsEvent.ErrorEncountered, {
+		...extra,
+		[AnalyticsProp.ErrorScope]: scope,
+		[AnalyticsProp.ErrorCode]: code,
 	});
 }

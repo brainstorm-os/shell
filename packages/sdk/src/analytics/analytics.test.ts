@@ -77,9 +77,42 @@ describe("initAnalytics", () => {
 		);
 
 		track("Vault Opened", { vault_id: "vault-1", source: "welcome" });
-		await vi.waitFor(() =>
-			expect(trackFn).toHaveBeenCalledWith("Vault Opened", { source: "welcome" }),
-		);
+		await vi.waitFor(() => {
+			const call = trackFn.mock.calls.find((c) => c[0] === "Vault Opened");
+			expect(call).toBeDefined();
+			const props = call?.[1] as Record<string, unknown>;
+			// Explicit prop kept, blocked identity stripped, context merged in.
+			expect(props.source).toBe("welcome");
+			expect(props.vault_id).toBeUndefined();
+			expect(props.surface).toBe("shell");
+			expect(props.platform).toBe("darwin");
+			expect(props.shell_version).toBe("0.4.2");
+		});
+	});
+
+	it("trackError emits a normalized Error Encountered event (no raw message)", async () => {
+		globalThis.window = {
+			brainstorm: {
+				version: "0.4.2",
+				platform: "win32",
+				analyticsDeviceId: "01INSTALLCONSTANTID0000001",
+			},
+			localStorage: { getItem: () => null, setItem: () => {} },
+		} as unknown as Window & typeof globalThis;
+
+		const { initAnalytics, trackError, AnalyticsErrorScope } = await import("./index");
+		initAnalytics();
+		await vi.waitFor(() => expect(initAll).toHaveBeenCalled());
+
+		trackError(AnalyticsErrorScope.VaultCreate, "directory_not_empty");
+		await vi.waitFor(() => {
+			const call = trackFn.mock.calls.find((c) => c[0] === "Error Encountered");
+			expect(call).toBeDefined();
+			const props = call?.[1] as Record<string, unknown>;
+			expect(props.error_scope).toBe("vault_create");
+			expect(props.error_code).toBe("directory_not_empty");
+			expect(props.platform).toBe("win32");
+		});
 	});
 
 	it("does not initialize on GA builds (1.0+)", async () => {

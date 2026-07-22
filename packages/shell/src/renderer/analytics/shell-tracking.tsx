@@ -1,4 +1,4 @@
-import { track } from "@brainstorm-os/sdk/analytics";
+import { AnalyticsEvent, track } from "@brainstorm-os/sdk/analytics";
 import { useEffect, useRef } from "react";
 import { useVault } from "../vault-context";
 
@@ -12,16 +12,16 @@ export function ShellTracking() {
 		if (current) {
 			if (lastVaultId.current !== current.id) {
 				// Event name only — never send vault / identity ids to analytics.
-				track("Vault Opened");
+				track(AnalyticsEvent.VaultOpened);
 				lastVaultId.current = current.id;
 			}
 			return;
 		}
 		if (lastVaultId.current) {
-			track("Vault Closed");
+			track(AnalyticsEvent.VaultClosed);
 			lastVaultId.current = null;
 		}
-		track("Welcome Viewed");
+		track(AnalyticsEvent.WelcomeViewed);
 	}, [loading, current]);
 
 	return null;
