@@ -87,7 +87,13 @@ export function emojiFilename(char: string): string {
 	for (const c of char) {
 		const cp = c.codePointAt(0);
 		if (cp === undefined) continue;
-		parts.push(cp.toString(16));
+		// The iamcal/img-apple-160 art pack zero-pads every codepoint to a
+		// minimum of 4 hex digits (`0030-fe0f-20e3.webp`, `00a9-fe0f.webp`).
+		// Without the pad, BMP emoji < U+1000 — the number keycaps 0️⃣–9️⃣,
+		// #️⃣, *️⃣, and ©️/®️ — resolve to an unpadded name (`30-fe0f-20e3`) that
+		// 404s and renders blank in the picker. Codepoints ≥ 4 digits are
+		// unchanged (`padStart(4)` is a no-op for `1f600`, `2640`).
+		parts.push(cp.toString(16).padStart(4, "0"));
 	}
 	return `${parts.join("-")}.webp`;
 }
