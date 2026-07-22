@@ -5,16 +5,18 @@
  * unread, Mailbox inbox, Agent "response ready", Automations failed runs)
  * — an iOS-style corner chip visible without opening the app. Either a
  * numeric count or a plain dot. The shell owns rendering (the dashboard
- * icon-corner chip) and mirrors the vault-wide app-badge *total* onto the
- * OS dock / taskbar badge.
+ * icon-corner chip). Mirroring the vault-wide total onto the OS dock /
+ * taskbar badge is a deferred follow-up — the OS badge is already owned by
+ * the notification-unread mirror (`dashboard-handlers.updateNotificationBadge`),
+ * so a single-owner reconciliation is needed before app badges join it.
  *
  * `BadgeHost` is **pure** (no Electron imports) so validation + the
  * per-app compose is unit-tested without a window: it stores one badge per
  * app, keyed by the broker-verified calling app id (never client-supplied,
  * so an app can only badge its own icon), recomputes a plain-data model,
- * and hands it to an injected `onChange`. The Electron `app.setBadgeCount`
- * mirror + the dashboard-renderer forward live in `main/index.ts`,
- * mirroring how `tray-host` keeps Electron out of the testable core.
+ * and hands it to an injected `onChange`. The dashboard-renderer forward
+ * lives in `main/index.ts`, mirroring how `tray-host` keeps Electron out of
+ * the testable core.
  */
 
 import type { BadgeSpec } from "@brainstorm-os/sdk-types";
@@ -23,12 +25,6 @@ import type { BadgeSpec } from "@brainstorm-os/sdk-types";
  *  (7.14). The preload redefines this string (channels can't cross the
  *  main/preload layering as an import), mirroring `apps:running-changed`. */
 export const BADGES_CHANGED_CHANNEL = "ui:badges-changed" as const;
-
-/** A badge is a count or a dot (enum discriminant, not a bare literal). */
-export enum BadgeKind {
-	Count = "count",
-	Dot = "dot",
-}
 
 /** Defensive ceiling so a misbehaving app can't push an absurd number into
  *  the icon chip. Real unread/pending counts never approach this; the chip
@@ -69,8 +65,8 @@ export class BadgeHost {
 		if (this.byApp.delete(appId)) this.emit();
 	}
 
-	/** Drop every app's badge (e.g. on vault close) — the icons + OS badge
-	 *  reset so a new vault never inherits the previous one's counts. */
+	/** Drop every app's badge (e.g. on vault close) — the icons reset so a
+	 *  new vault never inherits the previous one's counts. */
 	reset(): void {
 		if (this.byApp.size === 0) return;
 		this.byApp.clear();
@@ -82,18 +78,6 @@ export class BadgeHost {
 		const out: ComposedBadge[] = [];
 		for (const [appId, spec] of this.byApp) out.push({ appId, ...spec });
 		return out;
-	}
-
-	/** Vault-wide numeric total for the OS badge — the sum of every app's
-	 *  count. Dot-only badges contribute 0 (the OS badge is numeric; a dot
-	 *  has no number), so an app showing only a dot doesn't inflate the
-	 *  dock count. */
-	total(): number {
-		let sum = 0;
-		for (const spec of this.byApp.values()) {
-			if ("count" in spec) sum += spec.count;
-		}
-		return sum;
 	}
 
 	private emit(): void {

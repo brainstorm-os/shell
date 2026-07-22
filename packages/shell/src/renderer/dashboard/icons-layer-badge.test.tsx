@@ -83,13 +83,16 @@ describe("DashboardIconsLayer — app-icon badges (7.14)", () => {
 		expect(badges().length).toBe(0);
 	});
 
-	it("renders a count chip, attributes it to the app, and caps at 99+", async () => {
+	it("renders a count chip (aria-hidden) and folds the count into the tile's name, capping at 99+", async () => {
 		await mount();
 		await act(async () => emit([{ appId: "chat", count: 3 }]));
 		const chip = host.querySelector<HTMLElement>(".dashboard-icons__badge");
 		expect(chip?.textContent).toBe("3");
-		expect(chip?.getAttribute("role")).toBe("status");
-		expect(chip?.getAttribute("aria-label")).toContain("CHAT");
+		// The chip is purely visual; the accessible name lives on the tile button.
+		expect(chip?.getAttribute("aria-hidden")).toBe("true");
+		const btn = host.querySelector<HTMLElement>('[data-testid="dashboard-icon-chat"]');
+		expect(btn?.getAttribute("aria-label")).toContain("CHAT");
+		expect(btn?.getAttribute("aria-label")).toContain("3");
 
 		await act(async () => emit([{ appId: "chat", count: 250 }]));
 		expect(host.querySelector(".dashboard-icons__badge")?.textContent).toBe("99+");

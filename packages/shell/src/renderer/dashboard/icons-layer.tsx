@@ -519,6 +519,16 @@ function DashboardIconsLayerInner({
 				// it so CSS takes back over.
 				const cell = placements.get(id) ?? storedIconCell(icon);
 				const isRunning = icon.kind === "app" && running.has(icon.target);
+				// 7.14 — fold the badge count into the tile's accessible name so a
+				// screen-reader user can read it on demand when tabbing to the icon
+				// (the visual chip is aria-hidden). Unbadged icons leave this
+				// undefined and fall back to the visible label child.
+				const appBadge = icon.kind === "app" ? badges.get(icon.target) : undefined;
+				const badgeAriaLabel = appBadge
+					? "count" in appBadge
+						? t("shell.dashboard.badge.count", { app: icon.label, count: appBadge.count })
+						: t("shell.dashboard.badge.dot", { app: icon.label })
+					: undefined;
 				return (
 					<button
 						key={id}
@@ -535,6 +545,7 @@ function DashboardIconsLayerInner({
 								"--icon-row": cell.row,
 							} as CSSProperties
 						}
+						aria-label={badgeAriaLabel}
 						onPointerDown={(e) => onPointerDown(e, id, icon)}
 						onPointerMove={onPointerMove}
 						onPointerUp={onPointerUp}
@@ -556,7 +567,7 @@ function DashboardIconsLayerInner({
 									withRunningIndicator={true}
 									running={isRunning}
 								/>
-								<IconBadge badge={badges.get(icon.target)} appLabel={icon.label} />
+								<IconBadge badge={badges.get(icon.target)} />
 							</>
 						) : icon.kind === "shell-surface" && isShellSurfaceId(icon.target) ? (
 							<ShellSurfaceTile surfaceId={icon.target} tileSize={iconSize.tile} />
@@ -614,35 +625,19 @@ function resolveLabel(resolution: PinResolution | undefined, fallback: string): 
 /**
  * 7.14 — the notification badge chip an app paints on its dashboard icon:
  * a numeric count (capped `99+`) or a plain dot ("attention, no number").
- * The chip is `aria-hidden` visual; the count is announced to screen
- * readers via the parent tile button's `aria-label` extension below (a
- * `role="status"` label on the chip itself), so a badge change is spoken
- * without the visual glyph being read as stray digits.
+ * Purely **visual** (`aria-hidden`) — the accessible name lives on the
+ * parent tile button's `aria-label` (folded in at the render site above),
+ * so a screen-reader reads "Mailbox, 3 notifications" as one name on
+ * demand rather than a stray `role="status"` live region per icon.
  */
-function IconBadge({
-	badge,
-	appLabel,
-}: {
-	badge: BadgeUpdate | undefined;
-	appLabel: string;
-}): ReactElement | null {
+function IconBadge({ badge }: { badge: BadgeUpdate | undefined }): ReactElement | null {
 	if (!badge) return null;
 	if ("dot" in badge) {
-		return (
-			<span
-				className="dashboard-icons__badge dashboard-icons__badge--dot"
-				role="status"
-				aria-label={t("shell.dashboard.badge.dot", { app: appLabel })}
-			/>
-		);
+		return <span className="dashboard-icons__badge dashboard-icons__badge--dot" aria-hidden="true" />;
 	}
 	return (
-		<span
-			className="dashboard-icons__badge"
-			role="status"
-			aria-label={t("shell.dashboard.badge.count", { app: appLabel, count: badge.count })}
-		>
-			<span aria-hidden="true">{badge.count > 99 ? "99+" : String(badge.count)}</span>
+		<span className="dashboard-icons__badge" aria-hidden="true">
+			{badge.count > 99 ? "99+" : String(badge.count)}
 		</span>
 	);
 }

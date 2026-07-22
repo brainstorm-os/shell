@@ -89,14 +89,6 @@ describe("BadgeHost", () => {
 		expect(last()).toEqual([]);
 	});
 
-	it("total() sums counts and ignores dots", () => {
-		const { host } = withListener();
-		host.set("chat", { count: 2 });
-		host.set("mailbox", { count: 5 });
-		host.set("agent", { dot: true });
-		expect(host.total()).toBe(7);
-	});
-
 	it("reset() drops everything and emits once (no-op when already empty)", () => {
 		const { host, last, calls } = withListener();
 		host.set("chat", { count: 2 });

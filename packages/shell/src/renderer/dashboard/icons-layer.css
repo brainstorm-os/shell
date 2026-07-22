@@ -322,8 +322,10 @@
 	justify-content: center;
 	border-radius: 999px;
 	background: var(--color-state-error);
+	/* Fixed white-on-error semantics — no on-error text token exists, and one
+	 * for this single use would violate the no-abstraction-without-3-uses rule. */
 	color: #fff;
-	font-size: 11px;
+	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-semibold);
 	line-height: 1;
 	pointer-events: none;
