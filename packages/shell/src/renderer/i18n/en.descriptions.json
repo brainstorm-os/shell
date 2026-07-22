@@ -457,5 +457,19 @@
   "shell.widgets.resize": "Button label in the dashboard widgets layer: “Resize widget”.",
   "shell.windowMenu.region": "Accessible label for the running-windows strip / window-switcher toolbar region in the dashboard footer. Very short.",
   "shell.windowStrip.scrollLeft": "Button label in the dashboard window strip (open-window switcher): “Scroll windows left”.",
-  "shell.windowStrip.scrollRight": "Button label in the dashboard window strip (open-window switcher): “Scroll windows right”."
+  "shell.windowStrip.scrollRight": "Button label in the dashboard window strip (open-window switcher): “Scroll windows right”.",
+  "shell.settings.network.ingress.title": "Settings → Privacy → Network: title of the section that grants or revokes the Automations app's inbound-webhook (network.ingress) capability.",
+  "shell.settings.network.ingress.warning": "Explainer under the Automation-inbound section: enabling it lets Automations expose webhook endpoints external services POST to, running under the caps already granted.",
+  "shell.settings.network.ingress.enabled": "Status pill shown when the Automations app currently holds the network.ingress grant.",
+  "shell.settings.network.ingress.disabled": "Status pill shown when the Automations app does NOT hold the network.ingress grant.",
+  "shell.settings.network.ingress.enable": "Button that requests the network.ingress grant for the Automations app (opens the capability prompt).",
+  "shell.settings.network.ingress.revoke": "Button that revokes the Automations app's network.ingress grant (disables inbound webhooks).",
+  "shell.settings.network.ingress.revokeConfirm.title": "Confirm-dialog title shown before disabling inbound webhooks for Automations.",
+  "shell.settings.network.ingress.revokeConfirm.body": "Confirm-dialog body warning that existing webhook triggers will stop firing when inbound webhooks are disabled.",
+  "shell.settings.network.fileWatch.title": "Settings → Privacy → Network: title of the section listing the files the Automations app watches (FileWatch triggers).",
+  "shell.settings.network.fileWatch.warning": "Explainer under the Automation-file-access section: a FileWatch trigger keeps watching the picked file across restarts until revoked here.",
+  "shell.settings.network.fileWatch.empty": "Empty-state text shown when Automations is watching no files.",
+  "shell.settings.network.fileWatch.revoke": "Button/label that revokes a single file-watch grant (stops watching that file).",
+  "shell.settings.network.fileWatch.revokeConfirm.title": "Confirm-dialog title shown before revoking a file-watch grant; {name} is the file's display name.",
+  "shell.settings.network.fileWatch.revokeConfirm.body": "Confirm-dialog body warning that FileWatch triggers using this file will stop firing."
 }
