@@ -431,6 +431,16 @@ async function persistEntry(
 	return registry;
 }
 
+/**
+ * OS-generated metadata files that routinely appear in "empty" folders and
+ * must not count as real content when deciding whether a target folder is
+ * usable for a new vault. Windows drops `desktop.ini` into Downloads /
+ * OneDrive-synced folders (and `Thumbs.db` for image thumbnails); macOS drops
+ * `.DS_Store`. Treating these as content wrongly rejected a freshly-made
+ * folder with "Directory is not empty" — the exact Windows-Downloads report.
+ */
+const IGNORABLE_DIR_ENTRIES = new Set(["desktop.ini", "thumbs.db", ".ds_store"]);
+
 async function ensureDirectoryUsable(path: string): Promise<void> {
 	try {
 		const info = await stat(path);
@@ -438,7 +448,8 @@ async function ensureDirectoryUsable(path: string): Promise<void> {
 			throw new Error(`Not a directory: ${path}`);
 		}
 		const entries = await readdir(path);
-		if (entries.length > 0 && !entries.includes("vault.json")) {
+		const meaningful = entries.filter((entry) => !IGNORABLE_DIR_ENTRIES.has(entry.toLowerCase()));
+		if (meaningful.length > 0 && !meaningful.includes("vault.json")) {
 			throw new Error(`Directory is not empty: ${path}`);
 		}
 	} catch (error) {
