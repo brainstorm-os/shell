@@ -16,7 +16,10 @@ export function emojiFilename(char: string): string {
 	for (const c of char) {
 		const cp = c.codePointAt(0);
 		if (cp === undefined) continue;
-		parts.push(cp.toString(16));
+		// Zero-pad to a min of 4 hex digits, matching the art pack naming
+		// (`0030-fe0f-20e3.webp`); without it BMP emoji < U+1000 (keycaps, ©️,
+		// ®️) 404 and render blank. Codepoints ≥ 4 digits are unchanged.
+		parts.push(cp.toString(16).padStart(4, "0"));
 	}
 	return `${parts.join("-")}.webp`;
 }

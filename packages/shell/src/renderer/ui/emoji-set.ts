@@ -217,19 +217,23 @@ export const EMOJI_CATEGORIES: readonly EmojiCategory[] = [
 export const ALL_EMOJI: readonly EmojiEntry[] = EMOJI_CATEGORIES.flatMap((c) => c.emojis);
 
 /** Turn a unicode emoji character (possibly multi-codepoint with ZWJ + VS-16)
- *  into the iamcal/emoji-data filename: lowercase hex codepoints joined with
- *  `-`, plus `.webp`. Examples:
+ *  into the iamcal/emoji-data filename: lowercase hex codepoints (zero-padded
+ *  to a minimum of 4 digits, matching the art pack) joined with `-`, plus
+ *  `.webp`. Examples:
  *    "👋"      → "1f44b.webp"
  *    "❤️"      → "2764-fe0f.webp"
+ *    "©️"      → "00a9-fe0f.webp"
+ *    "0️⃣"     → "0030-fe0f-20e3.webp"
  *    "👨‍💻"   → "1f468-200d-1f4bb.webp"
  *  Spread iterates by code-point (not UTF-16 code-unit), so surrogate pairs
- *  collapse correctly. */
+ *  collapse correctly. The `padStart(4)` is load-bearing for BMP emoji < U+1000
+ *  (keycaps 0️⃣–9️⃣ #️⃣ *️⃣, ©️, ®️) — without it they 404 and render blank. */
 export function emojiFilename(char: string): string {
 	const parts: string[] = [];
 	for (const c of char) {
 		const cp = c.codePointAt(0);
 		if (cp === undefined) continue;
-		parts.push(cp.toString(16));
+		parts.push(cp.toString(16).padStart(4, "0"));
 	}
 	return `${parts.join("-")}.webp`;
 }

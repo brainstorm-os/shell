@@ -38,3 +38,21 @@ describe("applySkinTone", () => {
 		expect(SKIN_TONE_BASE_CHARS.has("😀")).toBe(false);
 	});
 });
+
+describe("emojiFilename", () => {
+	it("zero-pads BMP codepoints < U+1000 to 4 hex digits (matches the art pack)", () => {
+		// The bug: without padding these 404'd and rendered blank in the picker.
+		expect(emojiFilename("0️⃣")).toBe("0030-fe0f-20e3.webp");
+		expect(emojiFilename("9️⃣")).toBe("0039-fe0f-20e3.webp");
+		expect(emojiFilename("#️⃣")).toBe("0023-fe0f-20e3.webp");
+		expect(emojiFilename("*️⃣")).toBe("002a-fe0f-20e3.webp");
+		expect(emojiFilename("©️")).toBe("00a9-fe0f.webp");
+		expect(emojiFilename("®️")).toBe("00ae-fe0f.webp");
+	});
+
+	it("leaves codepoints already ≥ 4 hex digits unchanged", () => {
+		expect(emojiFilename("👋")).toBe("1f44b.webp");
+		expect(emojiFilename("❤️")).toBe("2764-fe0f.webp");
+		expect(emojiFilename("👨‍💻")).toBe("1f468-200d-1f4bb.webp");
+	});
+});

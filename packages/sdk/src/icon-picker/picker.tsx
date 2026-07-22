@@ -335,7 +335,14 @@ function EmojiCell({
 				loading="lazy"
 				decoding="async"
 				onError={(e) => {
-					e.currentTarget.style.visibility = "hidden";
+					// An emoji with no bundled art (a handful of Unicode-16
+					// additions + ♀️/♂️/⚕️) must not leave an empty but clickable
+					// cell — picking it would stamp a glyph that renders blank
+					// everywhere. Hide the whole cell so it drops out of the grid
+					// entirely (self-healing: onError re-fires if the virtualizer
+					// remounts the row).
+					const cell = e.currentTarget.closest("button");
+					if (cell instanceof HTMLElement) cell.style.display = "none";
 				}}
 			/>
 		</button>
