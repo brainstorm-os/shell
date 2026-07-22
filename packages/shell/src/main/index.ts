@@ -304,6 +304,7 @@ import { RestoreEngine } from "./sync/restore-engine";
 import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
+import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
 import { makeOsNotifier } from "./ui/os-notification-host";
 import { type ComposedTray, getTrayHost } from "./ui/tray-host";
@@ -1405,6 +1406,9 @@ void app.whenReady().then(async () => {
 	// the vault locks / closes / switches away.
 	onActiveVaultSessionChanged((session) => {
 		if (!session) widgetController.destroyAll();
+		// 7.14 — app-icon badges are per-vault app state; drop them on any vault
+		// change so a newly-opened vault never inherits the previous one's counts.
+		getBadgeHost().reset();
 	});
 	// Renderer-reported geometry + visibility for the native overlays.
 	ipcMain.handle("dashboard:layout-widgets", (_event, layouts: unknown) => {
@@ -4456,11 +4460,17 @@ void app.whenReady().then(async () => {
 	// is built from it below (after the dashboard window exists so a
 	// click can fall back to focusing it).
 	const trayHost = getTrayHost();
+	// 7.14 — app-icon badge host. The broker checks `ui.badge`; the pure host
+	// tracks one badge per app (keyed by the broker-verified caller) and its
+	// listener (set below, once the dashboard window exists) forwards the
+	// composed model to the dashboard renderer for the icon-corner chip.
+	const badgeHost = getBadgeHost();
 	workers.broker.registerService(
 		"ui",
 		makeUiServiceHandler({
 			getHost: () => uiNotifyHost,
 			getTrayHost: () => trayHost,
+			getBadgeHost: () => badgeHost,
 			// 9.8.9 — `ui.openSearch` (cap `search.open`): surface the global
 			// search palette on the dashboard, pre-filled. Same focus dance as
 			// a shell shortcut fired from an app window (shortcut-setup).
@@ -4734,6 +4744,15 @@ void app.whenReady().then(async () => {
 		tray.setContextMenu(Menu.buildFromTemplate(template));
 	};
 	trayHost.setListener(renderTray);
+	// 7.14 — forward the composed per-app badge model to the dashboard renderer
+	// (the icon-corner chip). Same push shape as `apps:running-changed`; the
+	// renderer keys entries by `appId` onto its app tiles.
+	badgeHost.setListener((badges) => {
+		const dash = dashboardWindow;
+		if (dash && !dash.isDestroyed() && !dash.webContents.isDestroyed()) {
+			dash.webContents.send(BADGES_CHANGED_CHANNEL, badges);
+		}
+	});
 	app.on("before-quit", () => {
 		tray?.destroy();
 		tray = null;

@@ -304,3 +304,36 @@
 	color: var(--color-text-tertiary);
 	font-size: var(--text-size-sm);
 }
+
+/* 7.14 — app-icon notification badge chip (count or dot), pinned to the
+ * app tile's top-right corner. The ring (box-shadow) separates it from a
+ * busy icon on either theme. `pointer-events:none` so it never eats the
+ * tile's click/drag. */
+.dashboard-icons__badge {
+	position: absolute;
+	top: 2px;
+	inset-inline-end: 2px;
+	box-sizing: border-box;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	background: var(--color-state-error);
+	color: #fff;
+	font-size: 11px;
+	font-weight: var(--text-weight-semibold);
+	line-height: 1;
+	pointer-events: none;
+	box-shadow: 0 0 0 2px var(--color-background-elevated);
+}
+.dashboard-icons__badge--dot {
+	top: 4px;
+	inset-inline-end: 4px;
+	min-width: 0;
+	width: 10px;
+	height: 10px;
+	padding: 0;
+}

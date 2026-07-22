@@ -19,6 +19,11 @@
 
 import type { BadgeSpec } from "@brainstorm-os/sdk-types";
 
+/** Main→dashboard-renderer push carrying the composed per-app badge model
+ *  (7.14). The preload redefines this string (channels can't cross the
+ *  main/preload layering as an import), mirroring `apps:running-changed`. */
+export const BADGES_CHANGED_CHANNEL = "ui:badges-changed" as const;
+
 /** A badge is a count or a dot (enum discriminant, not a bare literal). */
 export enum BadgeKind {
 	Count = "count",

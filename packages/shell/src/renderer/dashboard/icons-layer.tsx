@@ -12,6 +12,7 @@ import { IconName } from "@brainstorm-os/sdk/icon";
 import { type ContextMenuItem, openContextMenu, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
 import {
 	type CSSProperties,
+	type ReactElement,
 	memo,
 	useCallback,
 	useEffect,
@@ -20,7 +21,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { DashboardIcon, PinResolution } from "../../preload";
+import type { BadgeUpdate, DashboardIcon, PinResolution } from "../../preload";
 import { t } from "../i18n/t";
 import { EntityIcon } from "../ui/entity-icon";
 import { confirmAndUninstallApp } from "./app-actions";
@@ -97,6 +98,9 @@ function DashboardIconsLayerInner({
 	const dragRef = useRef<DragState | null>(null);
 	const [draggingId, setDraggingId] = useState<string | null>(null);
 	const [running, setRunning] = useState<Set<string>>(new Set());
+	// 7.14 — per-app icon badges, keyed by appId. Pushed from main via
+	// `apps.onBadgesChanged`; drives the corner chip on each app tile.
+	const [badges, setBadges] = useState<Map<string, BadgeUpdate>>(new Map());
 	// App-icon presence/version lives in a module-scope + localStorage cache
 	// (see `app-icon-cache`) so it survives the lock→unlock unmount and the
 	// first paint after unlock already resolves real icon `src`s. This tick
@@ -164,6 +168,15 @@ function DashboardIconsLayerInner({
 			cancelled = true;
 			off();
 		};
+	}, []);
+
+	// 7.14 — subscribe to per-app badge pushes. Push-only: main re-emits on
+	// every set/clear and resets on vault change, so the map tracks live state.
+	useEffect(() => {
+		const off = window.brainstorm.apps.onBadgesChanged((entries) => {
+			setBadges(new Map(entries.map((entry) => [entry.appId, entry])));
+		});
+		return off;
 	}, []);
 
 	// Refetch installed apps when the visible icon set changes — so newly
@@ -534,14 +547,17 @@ function DashboardIconsLayerInner({
 						data-testid={`dashboard-icon-${id}`}
 					>
 						{icon.kind === "app" ? (
-							<AppIcon
-								name={icon.label}
-								seed={icon.target}
-								size={iconSize.tile}
-								src={resolveAppIconSrc(icon.target)}
-								withRunningIndicator={true}
-								running={isRunning}
-							/>
+							<>
+								<AppIcon
+									name={icon.label}
+									seed={icon.target}
+									size={iconSize.tile}
+									src={resolveAppIconSrc(icon.target)}
+									withRunningIndicator={true}
+									running={isRunning}
+								/>
+								<IconBadge badge={badges.get(icon.target)} appLabel={icon.label} />
+							</>
 						) : icon.kind === "shell-surface" && isShellSurfaceId(icon.target) ? (
 							<ShellSurfaceTile surfaceId={icon.target} tileSize={iconSize.tile} />
 						) : (
@@ -593,6 +609,42 @@ function centerInCell(
  *  once the object is gone). */
 function resolveLabel(resolution: PinResolution | undefined, fallback: string): string {
 	return resolution?.label || fallback;
+}
+
+/**
+ * 7.14 — the notification badge chip an app paints on its dashboard icon:
+ * a numeric count (capped `99+`) or a plain dot ("attention, no number").
+ * The chip is `aria-hidden` visual; the count is announced to screen
+ * readers via the parent tile button's `aria-label` extension below (a
+ * `role="status"` label on the chip itself), so a badge change is spoken
+ * without the visual glyph being read as stray digits.
+ */
+function IconBadge({
+	badge,
+	appLabel,
+}: {
+	badge: BadgeUpdate | undefined;
+	appLabel: string;
+}): ReactElement | null {
+	if (!badge) return null;
+	if ("dot" in badge) {
+		return (
+			<span
+				className="dashboard-icons__badge dashboard-icons__badge--dot"
+				role="status"
+				aria-label={t("shell.dashboard.badge.dot", { app: appLabel })}
+			/>
+		);
+	}
+	return (
+		<span
+			className="dashboard-icons__badge"
+			role="status"
+			aria-label={t("shell.dashboard.badge.count", { app: appLabel, count: badge.count })}
+		>
+			<span aria-hidden="true">{badge.count > 99 ? "99+" : String(badge.count)}</span>
+		</span>
+	);
 }
 
 /** Glyph hue for shell surfaces (Bin today). Shell chrome isn't a branded
