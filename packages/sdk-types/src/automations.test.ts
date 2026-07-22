@@ -51,15 +51,16 @@ describe("type urls + enum tables", () => {
 		expect(ENGINE_STEP_KINDS).not.toContain(StepKind.Code);
 	});
 
-	it("the engine trigger subset is the wired kinds (incl. Webhook 11b.8 + Startup 11b.10) and excludes FileWatch", () => {
+	it("the engine trigger subset is the wired kinds (Webhook 11b.8 + Startup + FileWatch 11b.10) and excludes Intent", () => {
 		expect(ENGINE_TRIGGER_KINDS).toEqual([
 			TriggerKind.Time,
 			TriggerKind.EntityEvent,
 			TriggerKind.Manual,
 			TriggerKind.Webhook,
 			TriggerKind.Startup,
+			TriggerKind.FileWatch,
 		]);
-		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.FileWatch);
+		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.Intent);
 	});
 
 	it("guards reject non-members", () => {
@@ -339,6 +340,15 @@ describe("structural validators", () => {
 			validateTrigger({ kind: TriggerKind.Webhook, config: { routeId: "r1" }, enabled: true }).map(
 				(i) => i.code,
 			),
+		).toContain(AutomationIssueCode.MissingTriggerConfig);
+	});
+
+	it("requires a FileWatch trigger to carry a watchId", () => {
+		expect(
+			validateTrigger({ kind: TriggerKind.FileWatch, config: { watchId: "fw_1" }, enabled: true }),
+		).toEqual([]);
+		expect(
+			validateTrigger({ kind: TriggerKind.FileWatch, config: {}, enabled: true }).map((i) => i.code),
 		).toContain(AutomationIssueCode.MissingTriggerConfig);
 	});
 

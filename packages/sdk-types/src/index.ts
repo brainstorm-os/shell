@@ -1240,6 +1240,15 @@ export type FilesService = {
 		readonly filters?: readonly FileDialogFilter[];
 		readonly multi?: boolean;
 	}): Promise<readonly FileHandle[]>;
+	/** 11b.10 — pick a file and persist a **file-watch grant** that survives a
+	 *  vault reopen (unlike a session-only handle). Returns the opaque `watchId`
+	 *  to store on a FileWatch automation trigger + a `displayName` (the file's
+	 *  basename); the path never reaches the app. Cancellation returns `null`.
+	 *  Grants are revocable in Settings → Privacy. */
+	requestWatchGrant(opts?: {
+		readonly title?: string;
+		readonly filters?: readonly FileDialogFilter[];
+	}): Promise<{ watchId: string; displayName: string } | null>;
 	/** Show the OS save-dialog. Cancellation returns `null`. The app may
 	 *  suggest a basename; the shell strips any path component. */
 	requestSave(opts?: {
@@ -2419,6 +2428,7 @@ export {
 	isValidWorkflowRun,
 	isWorkflowRunStatus,
 	missingCapabilities,
+	readFileWatchTriggerConfig,
 	readWebhookTriggerConfig,
 	stepCapabilities,
 	validateCapabilityTiers,
@@ -2440,6 +2450,7 @@ export type {
 	EntityStep,
 	ExportStep,
 	ExportTextFormat,
+	FileWatchTriggerConfig,
 	ForEachStep,
 	HTTPStep,
 	IntentStep,

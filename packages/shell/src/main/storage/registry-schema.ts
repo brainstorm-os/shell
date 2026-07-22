@@ -246,4 +246,33 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 11,
+		description: "registry.db v11 — file_watch_grants (11b.10 FileWatch persistent file grants)",
+		up: (db) => {
+			// 11b.10 — persistent file-access grants for FileWatch triggers. File
+			// HANDLES are session-only by design (re-granted each vault open as the
+			// audit trail), but an unattended FileWatch trigger must keep firing
+			// after a reopen — so the user's explicit file pick persists here as an
+			// opaque `watch_id → (app, path, mode)`. The PATH is shell-internal
+			// only (never returned to an app; the app holds the opaque watch_id).
+			// On vault open the automations wiring resolves each watch_id and
+			// re-mints a live session handle. Revocable in Settings. LOCAL — never
+			// syncs (paths are device-specific).
+			db.exec(`
+				CREATE TABLE file_watch_grants (
+					watch_id   TEXT PRIMARY KEY,
+					app_id     TEXT NOT NULL,
+					path       TEXT NOT NULL,
+					mode       TEXT NOT NULL,
+					created_at INTEGER NOT NULL
+				);
+			`);
+			// Idempotent mint: re-granting the same (app, path, mode) returns the
+			// existing watch_id instead of growing the table unbounded.
+			db.exec(
+				"CREATE UNIQUE INDEX idx_file_watch_grants_grant ON file_watch_grants (app_id, path, mode);",
+			);
+		},
+	},
 ];

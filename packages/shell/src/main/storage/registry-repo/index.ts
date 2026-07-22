@@ -11,6 +11,7 @@ import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { AppsRepository } from "./apps-repo";
 import { BlocksRepository } from "./blocks-repo";
 import { EntityTypesRepository } from "./entity-types-repo";
+import { FileWatchGrantsRepository } from "./file-watch-grants-repo";
 import { IntentsRepository } from "./intents-repo";
 import { OpenersRepository } from "./openers-repo";
 import { SchedulerFiresRepository } from "./scheduler-fires-repo";
@@ -20,6 +21,7 @@ export {
 	AppsRepository,
 	BlocksRepository,
 	EntityTypesRepository,
+	FileWatchGrantsRepository,
 	IntentsRepository,
 	OpenersRepository,
 	SchedulerFiresRepository,
@@ -28,6 +30,7 @@ export {
 export type { AppRecord } from "./apps-repo";
 export type { BlockRecord } from "./blocks-repo";
 export type { EntityTypeRecord } from "./entity-types-repo";
+export type { FileWatchGrant, FileWatchGrantSummary } from "./file-watch-grants-repo";
 export type { IntentQuery, IntentRecord } from "./intents-repo";
 export type { OpenerRecord } from "./openers-repo";
 export { OpenerTargetKind } from "./openers-repo";
@@ -42,6 +45,7 @@ export class RegistryRepositories {
 	readonly widgets: WidgetsRepository;
 	readonly intents: IntentsRepository;
 	readonly schedulerFires: SchedulerFiresRepository;
+	readonly fileWatchGrants: FileWatchGrantsRepository;
 
 	constructor(db: SqliteDatabase) {
 		this.apps = new AppsRepository(db);
@@ -51,5 +55,6 @@ export class RegistryRepositories {
 		this.widgets = new WidgetsRepository(db);
 		this.intents = new IntentsRepository(db);
 		this.schedulerFires = new SchedulerFiresRepository(db);
+		this.fileWatchGrants = new FileWatchGrantsRepository(db);
 	}
 }

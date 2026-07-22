@@ -129,14 +129,15 @@ export const TRIGGER_KINDS = Object.freeze([
 
 /** The trigger kinds the engine handles (11b.6 + 11b.8 + 11b.10). `Startup`
  *  fires once on shell launch (not scheduler-driven); `Webhook` (11b.8, Net-1
- *  ingress) fires on an authenticated inbound; FileWatch (Files-host watch)
- *  lands in its own slice. */
+ *  ingress) fires on an authenticated inbound; `FileWatch` (11b.10, Files-host
+ *  watch) fires when a granted file changes on disk. */
 export const ENGINE_TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Time,
 	TriggerKind.EntityEvent,
 	TriggerKind.Manual,
 	TriggerKind.Webhook,
 	TriggerKind.Startup,
+	TriggerKind.FileWatch,
 ]) as readonly TriggerKind[];
 
 /**
@@ -159,6 +160,27 @@ export function readWebhookTriggerConfig(
 	if (typeof routeId !== "string" || routeId.length === 0) return null;
 	if (typeof secret !== "string" || secret.length === 0) return null;
 	return { routeId, secret };
+}
+
+/**
+ * `file-watch` trigger config (11b.10). `watchId` is the opaque id of a
+ * persistent file-watch grant the shell holds (`watchId → path`, shell-internal
+ * — the app never sees the path); `displayName` is the picked file's basename,
+ * for the builder to render. The shell re-resolves `watchId` to a live handle
+ * on each vault open so the trigger survives a restart.
+ */
+export type FileWatchTriggerConfig = {
+	watchId: string;
+	displayName?: string;
+};
+
+export function readFileWatchTriggerConfig(
+	config: Record<string, unknown>,
+): FileWatchTriggerConfig | null {
+	const watchId = config.watchId;
+	if (typeof watchId !== "string" || watchId.length === 0) return null;
+	const displayName = config.displayName;
+	return typeof displayName === "string" ? { watchId, displayName } : { watchId };
 }
 
 /** Lifecycle verb for an `entity-event` trigger. */
@@ -637,6 +659,11 @@ export function validateTrigger(def: TriggerDef): AutomationIssue[] {
 		issues.push({
 			code: AutomationIssueCode.MissingTriggerConfig,
 			message: "Webhook trigger needs a routeId and secret.",
+		});
+	} else if (def.kind === TriggerKind.FileWatch && !readFileWatchTriggerConfig(def.config)) {
+		issues.push({
+			code: AutomationIssueCode.MissingTriggerConfig,
+			message: "File-watch trigger needs a watchId.",
 		});
 	}
 	return issues;

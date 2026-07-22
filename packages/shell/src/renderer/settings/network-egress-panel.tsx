@@ -215,6 +215,7 @@ export function NetworkEgressPanel() {
 
 			<AutomationEgressSection />
 			<AutomationIngressSection />
+			<AutomationFileWatchSection />
 
 			<RecentSection
 				title={t("shell.settings.network.recent.title")}
@@ -945,6 +946,61 @@ function AutomationIngressSection() {
 					</Button>
 				)}
 			</div>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// Section: Automation file access (11b.10 — persistent file-watch grants)
+// ---------------------------------------------------------------------
+
+/** The Automations app holds persistent file-watch grants (a picked file that a
+ *  FileWatch trigger keeps watching across restarts). Listed here (displayName
+ *  only — the path never leaves the main process) with one-click revoke. */
+function AutomationFileWatchSection() {
+	const [grants, setGrants] = useState<readonly { watchId: string; displayName: string }[]>([]);
+
+	const reload = useCallback(async () => {
+		const list = await window.brainstorm.ledger.listFileWatchGrants();
+		setGrants(list.map((g) => ({ watchId: g.watchId, displayName: g.displayName })));
+	}, []);
+
+	useEffect(() => {
+		void reload();
+	}, [reload]);
+
+	const revoke = async (watchId: string, displayName: string) => {
+		const confirmed = await confirm({
+			title: t("shell.settings.network.fileWatch.revokeConfirm.title", { name: displayName }),
+			body: t("shell.settings.network.fileWatch.revokeConfirm.body"),
+			confirmLabel: t("shell.settings.network.fileWatch.revoke"),
+			confirmVariant: ConfirmVariant.Destructive,
+		});
+		if (!confirmed) return;
+		await window.brainstorm.ledger.revokeFileWatchGrant(watchId);
+		await reload();
+	};
+
+	return (
+		<div className="network-egress__group" data-testid="network-egress-file-watch">
+			<h4 className="network-egress__group-title">{t("shell.settings.network.fileWatch.title")}</h4>
+			<p className="network-egress__hint">{t("shell.settings.network.fileWatch.warning")}</p>
+			{grants.length === 0 ? (
+				<p className="network-egress__empty">{t("shell.settings.network.fileWatch.empty")}</p>
+			) : (
+				<ul className="network-egress__pills">
+					{grants.map((g) => (
+						<li key={g.watchId} className="network-egress__pill network-egress__pill--removable">
+							<span>{g.displayName}</span>
+							<IconButton
+								icon={IconName.Close}
+								label={t("shell.settings.network.fileWatch.revoke")}
+								onClick={() => void revoke(g.watchId, g.displayName)}
+							/>
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	);
 }

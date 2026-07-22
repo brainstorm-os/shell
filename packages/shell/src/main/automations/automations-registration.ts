@@ -25,9 +25,15 @@ import {
 	propertiesToReminder,
 	propertiesToTrigger,
 	propertiesToWorkflow,
+	readFileWatchTriggerConfig,
 	readWebhookTriggerConfig,
 } from "@brainstorm-os/sdk-types";
-import type { EntityEventTrigger, ScheduleRegistration, WebhookTrigger } from "./automations-host";
+import type {
+	EntityEventTrigger,
+	FileWatchTrigger,
+	ScheduleRegistration,
+	WebhookTrigger,
+} from "./automations-host";
 import { reminderToTriggerConfig } from "./reminder-schedule";
 import type { TimeTriggerConfig } from "./trigger-schedule";
 
@@ -73,9 +79,9 @@ export function decodeTimeTriggerConfig(config: Record<string, unknown>): TimeTr
  * Project the persisted automation entities into the registration the
  * host hydrates from. Only enabled workflows bound to enabled triggers
  * register; `Manual` triggers register nothing (they run via `runNow`);
- * `Webhook` triggers register a route (11b.8); `Startup` workflows collect
- * into `startups` (fired once on launch, 11b.10); the still-gated kinds
- * (file-watch / intent) are skipped until their surfaces land.
+ * `Webhook` triggers register a route (11b.8); `FileWatch` triggers register a
+ * watch (11b.10); `Startup` workflows collect into `startups` (fired once on
+ * launch); the still-gated `intent` kind is skipped until its surface lands.
  */
 export function deriveScheduleRegistration(rows: AutomationEntityRows): ScheduleRegistration {
 	const triggersById = new Map(rows.triggers.map((t) => [t.id, propertiesToTrigger(t.properties)]));
@@ -83,6 +89,7 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 	const workflows: ScheduleRegistration["workflows"] = [];
 	const entityEvents: EntityEventTrigger[] = [];
 	const webhooks: WebhookTrigger[] = [];
+	const fileWatches: FileWatchTrigger[] = [];
 	const startups: string[] = [];
 	for (const row of rows.workflows) {
 		const workflow = propertiesToWorkflow(row.properties);
@@ -120,6 +127,13 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 				}
 				break;
 			}
+			case TriggerKind.FileWatch: {
+				// 11b.10 — fail-closed: a file-watch trigger missing its watchId
+				// registers nothing (the plane re-mints a live handle per watchId).
+				const config = readFileWatchTriggerConfig(trigger.config);
+				if (config) fileWatches.push({ workflowId: row.id, watchId: config.watchId });
+				break;
+			}
 			case TriggerKind.Startup:
 				// 11b.10 — fires once on shell launch; no config to decode.
 				startups.push(row.id);
@@ -135,5 +149,5 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 		if (config) reminders.push({ reminderId: row.id, config });
 	}
 
-	return { workflows, reminders, entityEvents, webhooks, startups };
+	return { workflows, reminders, entityEvents, webhooks, fileWatches, startups };
 }

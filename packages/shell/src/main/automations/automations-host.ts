@@ -88,6 +88,33 @@ export type WebhookIngressPort = {
 	subscribe(listener: (hit: WebhookHit) => void): () => void;
 };
 
+/** A `FileWatch` trigger (11b.10): run `workflowId` when the file behind
+ *  `watchId` (a persistent file-watch grant) changes on disk. */
+export type FileWatchTrigger = {
+	workflowId: string;
+	watchId: string;
+};
+
+/** A file-change hit, as the watch plane hands it to the host. `kind` is the
+ *  `WatchEventKind` wire value (`changed` / `errored`); typed as a string so
+ *  the host stays decoupled from the files service. */
+export type FileWatchHit = {
+	workflowId: string;
+	watchId: string;
+	kind: string;
+};
+
+/** The file-watch plane (backed by the files-host watcher + the persistent
+ *  grant store). The host hands it the active watch set; the plane re-mints a
+ *  live handle per `watchId` and emits a hit when the file changes. Injected so
+ *  the host is testable with a fake and inert (undefined) in tests. */
+export type FileWatchPort = {
+	/** Replace the active watch set. Idempotent — re-registering overwrites. */
+	register(watches: readonly FileWatchTrigger[]): void;
+	/** Subscribe to file-change hits; returns an unsubscribe. */
+	subscribe(listener: (hit: FileWatchHit) => void): () => void;
+};
+
 /** The entity-derived schedule to register on vault open. Entities are the
  *  source of truth — re-registering on each boot recomputes the next fire
  *  from `now` (a late wake jumps to the next future slot, doc 39). */
@@ -99,6 +126,9 @@ export type ScheduleRegistration = {
 	 *  hydrate; empty (and the plane inert) without `network.ingress`. Optional
 	 *  like `syncMappings`/`itemAlerts` so prior callers need no change. */
 	webhooks?: WebhookTrigger[];
+	/** 11b.10 — file-watch triggers. Registered with the watch plane on hydrate;
+	 *  each re-mints a live handle from its persistent grant. Optional. */
+	fileWatches?: FileWatchTrigger[];
 	/** Connector-4 — each `SyncMapping`'s scheduled pull. The mapping id is
 	 *  both the scheduler trigger id and the routing key. Optional so prior
 	 *  callers (pre-connector) need no change. */
@@ -159,6 +189,9 @@ export type AutomationsHostPorts = {
 	/** 11b.8 — inbound-webhook plane. Absent keeps webhook triggers registered
 	 *  but never firing (no `network.ingress` / tests). */
 	webhookIngress?: WebhookIngressPort;
+	/** 11b.10 — file-watch plane. Absent keeps file-watch triggers registered
+	 *  but never firing (tests / a headless host). */
+	fileWatch?: FileWatchPort;
 	/** Drain interval; defaults to 5s. */
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -175,6 +208,7 @@ export class AutomationsHost {
 	private entityEvents: EntityEventTrigger[] = [];
 	private webhooks: WebhookTrigger[] = [];
 	private webhookIngress: WebhookIngressPort | undefined;
+	private fileWatches: FileWatchTrigger[] = [];
 	private startups: string[] = [];
 	/** Startups fire once per host lifetime — this latches after the first
 	 *  `start()` so a later re-hydrate + re-start never re-fires them. */
@@ -182,6 +216,7 @@ export class AutomationsHost {
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private unsubscribe: (() => void) | null = null;
 	private unsubscribeWebhooks: (() => void) | null = null;
+	private unsubscribeFileWatch: (() => void) | null = null;
 	private readonly intervals: IntervalFactory;
 
 	constructor(private readonly ports: AutomationsHostPorts) {
@@ -221,6 +256,8 @@ export class AutomationsHost {
 		this.entityEvents = [...registration.entityEvents];
 		this.webhooks = [...(registration.webhooks ?? [])];
 		this.webhookIngress?.register(this.webhooks);
+		this.fileWatches = [...(registration.fileWatches ?? [])];
+		this.ports.fileWatch?.register(this.fileWatches);
 		this.startups = [...(registration.startups ?? [])];
 		for (const w of registration.workflows) {
 			if (w.config) await this.ports.scheduler.register(w.triggerId, [w.workflowId], w.config, now);
@@ -257,6 +294,11 @@ export class AutomationsHost {
 				void this.onWebhookHit(hit);
 			});
 		}
+		if (!this.unsubscribeFileWatch && this.ports.fileWatch) {
+			this.unsubscribeFileWatch = this.ports.fileWatch.subscribe((hit) => {
+				void this.onFileWatchHit(hit);
+			});
+		}
 		// 11b.10 — Startup workflows fire once, on the first start() of this host
 		// (shell launch). The latch survives a stop()/start() (host-takeover
 		// re-claim) so they never double-fire within a session.
@@ -287,6 +329,8 @@ export class AutomationsHost {
 		this.unsubscribe = null;
 		this.unsubscribeWebhooks?.();
 		this.unsubscribeWebhooks = null;
+		this.unsubscribeFileWatch?.();
+		this.unsubscribeFileWatch = null;
 	}
 
 	/** Drain everything due at `now`, routing each fire to its runner. */
@@ -419,6 +463,20 @@ export class AutomationsHost {
 			headers: hit.headers,
 			body: hit.bodyText,
 		}).catch((e) => this.fail(`webhook ${hit.workflowId}`, e));
+	}
+
+	/** A watched file changed — fire its bound workflow under the workflow's own
+	 *  frozen caps. The change (watchId + kind) rides as the trigger payload.
+	 *  Guarded on the registered watch set (drops a hit for a watch no longer
+	 *  registered — a rehydrate race). */
+	private async onFileWatchHit(hit: FileWatchHit): Promise<void> {
+		if (!this.fileWatches.some((w) => w.workflowId === hit.workflowId && w.watchId === hit.watchId)) {
+			return;
+		}
+		await this.runWorkflow(hit.workflowId, `file-watch:${hit.watchId}`, {
+			watchId: hit.watchId,
+			kind: hit.kind,
+		}).catch((e) => this.fail(`file-watch ${hit.workflowId}`, e));
 	}
 
 	private fail(context: string, error: unknown): void {

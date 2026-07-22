@@ -59,6 +59,24 @@ describe("builder trigger", () => {
 		}
 	});
 
+	it("offers the FileWatch kind (engine-wired in 11b.10)", () => {
+		expect(BUILDER_TRIGGER_KINDS).toContain(TriggerKind.FileWatch);
+	});
+
+	it("round-trips a FileWatch trigger (watchId + displayName)", () => {
+		const fileWatch = { watchId: "fw_abc", displayName: "report.csv" };
+		const def = builderTriggerToDef({
+			...emptyBuilderTrigger(),
+			kind: TriggerKind.FileWatch,
+			fileWatch,
+		});
+		expect(def.kind).toBe(TriggerKind.FileWatch);
+		expect(def.config).toEqual(fileWatch);
+		const recovered = builderTriggerFromDef(def);
+		expect(recovered.kind).toBe(TriggerKind.FileWatch);
+		expect(recovered.fileWatch).toEqual(fileWatch);
+	});
+
 	it("maps a Manual trigger to an empty-config def", () => {
 		const def = builderTriggerToDef(emptyBuilderTrigger());
 		expect(def.kind).toBe(TriggerKind.Manual);

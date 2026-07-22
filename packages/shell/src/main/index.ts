@@ -77,6 +77,7 @@ import {
 } from "./assets/upload-on-bind";
 import { VaultMediaDomain, isSealedMedia } from "./assets/vault-media-crypto";
 import { makeAutomationsServiceHandler } from "./automations/automations-service";
+import { type FileWatchPortHandle, createFileWatchPort } from "./automations/file-watch-port";
 import { RegistrySchedulerStore } from "./automations/scheduler-store";
 import {
 	AUTOMATIONS_APP_ID,
@@ -284,6 +285,7 @@ import { AssetRefsRepository, AssetsRepository, EntitiesRepository } from "./sto
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
 import { EntityTypesRepository } from "./storage/registry-repo/entity-types-repo";
+import { FileWatchGrantsRepository } from "./storage/registry-repo/file-watch-grants-repo";
 import { SchedulerFiresRepository } from "./storage/registry-repo/scheduler-fires-repo";
 import { SettingsRepository } from "./storage/settings-repo";
 import { getActiveRelay } from "./sync/active-relay";
@@ -3949,18 +3951,64 @@ void app.whenReady().then(async () => {
 		appId: AUTOMATIONS_APP_ID,
 	});
 	let automationsDeployment: AutomationsDeployment | null = null;
+	// 11b.10 — the per-session file-watch plane + its persistent grant store,
+	// read by the composed `emitWatch` (below) and `files.requestWatchGrant`.
+	let activeFileWatchPort: FileWatchPortHandle | null = null;
+	let activeFileWatchGrants: FileWatchGrantsRepository | null = null;
 	const startAutomationsForActiveSession = async (): Promise<void> => {
 		automationsDeployment?.stop();
 		automationsDeployment = null;
+		void activeFileWatchPort?.close();
+		activeFileWatchPort = null;
+		activeFileWatchGrants = null;
 		const session = getActiveVaultSession();
 		if (!session) return;
 		try {
 			const registryDb = await session.dataStores.open("registry");
+			// 11b.10 — persistent file-watch grants + the file-watch plane the
+			// AutomationsHost consumes. The grant store re-resolves a picked file's
+			// path (shell-internal) on each session so a FileWatch trigger survives
+			// a reopen; the plane re-mints a live handle and watches via the files
+			// service under the automations app id.
+			const fileWatchGrants = new FileWatchGrantsRepository(registryDb);
+			activeFileWatchGrants = fileWatchGrants;
+			const callFilesHandler = (method: string, args: unknown[]): Promise<unknown> => {
+				const handler = workersRef.broker.getServiceHandler("files");
+				if (!handler) return Promise.reject(new Error("files service not registered"));
+				return Promise.resolve(
+					handler({
+						v: 1,
+						msg: `filewatch-${method}-${Date.now()}`,
+						app: AUTOMATIONS_APP_ID,
+						service: "files",
+						method,
+						args,
+						caps: ["files.read"],
+					} as unknown as Parameters<typeof handler>[0]),
+				);
+			};
+			const fileWatchPort = createFileWatchPort({
+				resolveGrant: (watchId) => {
+					const g = fileWatchGrants.resolve(watchId, AUTOMATIONS_APP_ID);
+					return g ? { path: g.path, mode: g.mode } : null;
+				},
+				mintHandle: (path, mode) =>
+					(getActiveVaultSession() ?? session).fileHandles.mint(AUTOMATIONS_APP_ID, path, mode),
+				watch: async (handleId) =>
+					((await callFilesHandler("watch", [{ handleId }])) as { subscriptionId: string })
+						.subscriptionId,
+				unwatch: async (subscriptionId) => {
+					await callFilesHandler("unwatch", [{ subscriptionId }]);
+				},
+				onError: (ctx, e) => console.error(`[automations] ${ctx}:`, e),
+			});
+			activeFileWatchPort = fileWatchPort;
 			const deployment = buildAutomationsDeployment({
 				callEntities: (method, arg) => connectorsCallEntities(AUTOMATIONS_APP_ID, method, arg),
 				getServiceHandler: (name) => workersRef.broker.getServiceHandler(name),
 				getLedger: connectorsGetLedger,
 				schedulerStore: new RegistrySchedulerStore(new SchedulerFiresRepository(registryDb)),
+				fileWatch: fileWatchPort,
 				entityChanges: automationsChangeEmitter,
 				notify: (n) =>
 					getUiNotifyHost().post({
@@ -3982,6 +4030,7 @@ void app.whenReady().then(async () => {
 			// already replaced the slot, so this deployment must shut down.
 			if (automationsDeployment !== deployment) {
 				deployment.stop();
+				void fileWatchPort.close();
 				return;
 			}
 			console.log(
@@ -4006,6 +4055,25 @@ void app.whenReady().then(async () => {
 			getLedger: connectorsGetLedger,
 		}),
 	);
+
+	// 11b.10 — Settings → Privacy revoke surface for the Automations app's
+	// persistent file-watch grants. List is app-safe (displayName only, no path);
+	// revoke removes the grant and re-hydrates so the file-watch port drops it.
+	ipcMain.handle("files:list-watch-grants", async () => {
+		const session = getActiveVaultSession();
+		if (!session) return [];
+		const db = await session.dataStores.open("registry");
+		return new FileWatchGrantsRepository(db).listByApp(AUTOMATIONS_APP_ID);
+	});
+	ipcMain.handle("files:revoke-watch-grant", async (_event, watchId: unknown) => {
+		if (typeof watchId !== "string" || watchId.length === 0) return false;
+		const session = getActiveVaultSession();
+		if (!session) return false;
+		const db = await session.dataStores.open("registry");
+		const removed = new FileWatchGrantsRepository(db).revoke(watchId);
+		if (removed) await automationsDeployment?.rehydrate().catch(() => {});
+		return removed;
+	});
 
 	// B7.2c — capability-gated cover content store. The broker checks
 	// `covers.write` (uploadBytes/delete) / `covers.read` (list); this
@@ -4042,6 +4110,9 @@ void app.whenReady().then(async () => {
 		"files",
 		makeFilesServiceHandler({
 			getRegistry: () => getActiveVaultSession()?.fileHandles ?? null,
+			// 11b.10 — persistent file-watch grants for `requestWatchGrant`. Set
+			// per session when the automations deployment builds (registry.db open).
+			getFileWatchGrants: () => activeFileWatchGrants,
 			showOpenDialog: async (normalized, appId) => {
 				const open: Electron.OpenDialogOptions = {
 					filters: normalized.filters.slice(),
@@ -4075,6 +4146,11 @@ void app.whenReady().then(async () => {
 					} catch (error) {
 						console.warn(`[brainstorm] files watch emit to ${appId} failed:`, error);
 					}
+				}
+				// 11b.10 — feed the automations file-watch plane (main-side) so a
+				// FileWatch trigger fires with the app window closed.
+				if (appId === AUTOMATIONS_APP_ID) {
+					activeFileWatchPort?.onFileChange({ handleId: event.handleId, kind: event.kind });
 				}
 			},
 			// `files.import` — seal upload bytes into the active vault's

@@ -52,6 +52,12 @@ export type FilesService = {
 	}): Promise<AutomationFileHandle | null>;
 	read(handle: AutomationFileHandle): Promise<Uint8Array>;
 	write(handle: AutomationFileHandle, data: Uint8Array | ArrayBuffer): Promise<void>;
+	/** 11b.10 — pick a file for a FileWatch trigger; the shell persists the grant
+	 *  and returns an opaque `watchId` + the file's basename (never the path). */
+	requestWatchGrant(opts?: {
+		title?: string;
+		filters?: readonly AutomationFilesFilter[];
+	}): Promise<{ watchId: string; displayName: string } | null>;
 };
 
 type LifecycleEvent =

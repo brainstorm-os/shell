@@ -854,6 +854,14 @@ function filesProxy(bridge: Bridge): FilesService {
 	return {
 		requestOpen: (opts) =>
 			callService<readonly FileHandle[]>(bridge, "files", "requestOpen", [opts ?? {}], ["files.read"]),
+		requestWatchGrant: (opts) =>
+			callService<{ watchId: string; displayName: string } | null>(
+				bridge,
+				"files",
+				"requestWatchGrant",
+				[opts ?? {}],
+				["files.read"],
+			),
 		requestSave: (opts) =>
 			callService<FileHandle | null>(bridge, "files", "requestSave", [opts ?? {}], ["files.write"]),
 		read: async (handle) => {
