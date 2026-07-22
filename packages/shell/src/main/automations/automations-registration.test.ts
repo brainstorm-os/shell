@@ -77,6 +77,27 @@ describe("deriveScheduleRegistration", () => {
 		]);
 	});
 
+	it("registers a Webhook trigger with a valid route + secret", () => {
+		const reg = deriveScheduleRegistration({
+			workflows: [workflowRow("wf_hook", "t_hook")],
+			triggers: [triggerRow("t_hook", TriggerKind.Webhook, { routeId: "r1", secret: "s1" })],
+			reminders: [],
+		});
+		expect(reg.webhooks).toEqual([{ workflowId: "wf_hook", routeId: "r1", secret: "s1" }]);
+	});
+
+	it("fails closed on a Webhook trigger missing its route/secret", () => {
+		const reg = deriveScheduleRegistration({
+			workflows: [workflowRow("wf_a", "t_a"), workflowRow("wf_b", "t_b")],
+			triggers: [
+				triggerRow("t_a", TriggerKind.Webhook, { routeId: "r1" }),
+				triggerRow("t_b", TriggerKind.Webhook, {}),
+			],
+			reminders: [],
+		});
+		expect(reg.webhooks).toEqual([]);
+	});
+
 	it("refuses an EntityEvent trigger on WorkflowRun/v1 (self-amplifying loop)", () => {
 		const reg = deriveScheduleRegistration({
 			workflows: [workflowRow("wf_loop", "t_loop")],

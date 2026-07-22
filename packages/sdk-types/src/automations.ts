@@ -128,12 +128,36 @@ export const TRIGGER_KINDS = Object.freeze([
 ]) as readonly TriggerKind[];
 
 /** The trigger kinds wired to the scheduler in the engine spine (11b.6).
- *  Webhook (Net-1) / FileWatch (9.10) / Startup land in later slices. */
+ *  Webhook landed in 11b.8 (ingress trigger); FileWatch (9.10) / Startup
+ *  land in later slices. */
 export const ENGINE_TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Time,
 	TriggerKind.EntityEvent,
 	TriggerKind.Manual,
+	TriggerKind.Webhook,
 ]) as readonly TriggerKind[];
+
+/**
+ * `webhook` trigger config (11b.8, OQ-163 → single shared endpoint, path-
+ * routed). `routeId` is the stable opaque path segment (`/wh/<routeId>/…`);
+ * `secret` is a high-entropy token the ingress plane verifies (constant-time)
+ * before firing. Both are minted by the builder on first save; `secret`
+ * rotates in place without changing `routeId`.
+ */
+export type WebhookTriggerConfig = {
+	routeId: string;
+	secret: string;
+};
+
+export function readWebhookTriggerConfig(
+	config: Record<string, unknown>,
+): WebhookTriggerConfig | null {
+	const routeId = config.routeId;
+	const secret = config.secret;
+	if (typeof routeId !== "string" || routeId.length === 0) return null;
+	if (typeof secret !== "string" || secret.length === 0) return null;
+	return { routeId, secret };
+}
 
 /** Lifecycle verb for an `entity-event` trigger. */
 export enum EntityEventVerb {
@@ -606,6 +630,11 @@ export function validateTrigger(def: TriggerDef): AutomationIssue[] {
 		issues.push({
 			code: AutomationIssueCode.MissingTriggerConfig,
 			message: "Trigger has no config object.",
+		});
+	} else if (def.kind === TriggerKind.Webhook && !readWebhookTriggerConfig(def.config)) {
+		issues.push({
+			code: AutomationIssueCode.MissingTriggerConfig,
+			message: "Webhook trigger needs a routeId and secret.",
 		});
 	}
 	return issues;

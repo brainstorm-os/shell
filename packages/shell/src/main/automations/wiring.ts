@@ -24,6 +24,7 @@
  */
 
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
+import type { AutomationsWebhookInfo } from "@brainstorm-os/sdk-types";
 import {
 	REMINDER_TYPE_URL,
 	TRIGGER_TYPE_URL,
@@ -49,6 +50,7 @@ import {
 	type EntityChangeSource,
 	type IntervalFactory,
 	type LoadedWorkflow,
+	type WebhookIngressPort,
 } from "./automations-host";
 import {
 	AUTOMATION_SCHEDULE_TYPES,
@@ -63,9 +65,24 @@ import {
 import { EVENT_TYPE_URL, ITEM_ALERT_TYPES, TASK_TYPE_URL, deriveItemAlerts } from "./item-alerts";
 import { ReminderRunner } from "./reminder-runner";
 import { SchedulerService, type SchedulerStore } from "./scheduler-service";
+import { fanInWebhookPorts } from "./webhook-ingress-fanin";
+import { type WebhookLoopbackListener, createWebhookLoopbackListener } from "./webhook-listener";
+import { type WebhookRelayTransport, createWebhookRelayPort } from "./webhook-relay-port";
 import type { WorkflowRunResult } from "./workflow-runner";
 
 export const AUTOMATIONS_APP_ID = "io.brainstorm.automations";
+
+/** The capability the automations app must hold for inbound webhooks. Granted
+ *  at runtime via Settings → Privacy → Network (never a static manifest cap),
+ *  mirroring the 11b.8b `network.egress:<origin>` model. */
+export const NETWORK_INGRESS_CAP = "network.ingress";
+
+/** Persists the loopback port so the endpoint URL stays stable across
+ *  restarts (external tunnels reference a fixed local port). Optional. */
+export type WebhookPortStore = {
+	get(): Promise<number | null>;
+	set(port: number): Promise<void>;
+};
 
 export type AutomationsWiringDeps = {
 	/** Capability-checked entities call under the automations app identity
@@ -92,6 +109,14 @@ export type AutomationsWiringDeps = {
 	/** 11b.8 — outbound HTTP for `HTTP` steps (Net-1 backed). Optional:
 	 *  absent keeps the step kind gated. */
 	egress?: WorkflowEgress;
+	/** 11b.8 — relay webhook transport (a WebSocket to the vault's relay).
+	 *  Absent ⇒ loopback-only ingress (the relay node is deployed separately). */
+	webhookRelayTransport?: WebhookRelayTransport;
+	/** 11b.8 — persists the loopback webhook port for a stable endpoint URL. */
+	webhookPortStore?: WebhookPortStore;
+	/** 11b.8 — public relay base (`https://<relay>`) when a webhook relay is
+	 *  paired; surfaced to the app so it can render the public endpoint URL. */
+	webhookRelayBaseUrl?: string;
 	clock?: () => number;
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -110,6 +135,8 @@ export type AutomationsDeployment = {
 	runNow(workflowId: string): Promise<WorkflowRunResult | null>;
 	hostStatus(): Promise<AutomationsDeploymentStatus>;
 	claimHost(): Promise<AutomationsDeploymentStatus>;
+	/** 11b.8 — inbound-webhook endpoint bases + grant state for the app UI. */
+	webhookInfo(): Promise<AutomationsWebhookInfo>;
 	/** Exposed for tests / introspection. */
 	host: AutomationsHost;
 	scheduler: SchedulerService;
@@ -213,6 +240,45 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		}
 	};
 
+	// 11b.8 — the inbound-webhook plane. Built lazily on start ONLY when the app
+	// holds `network.ingress` (a later grant needs a reopen — matches the egress
+	// "next open" posture); torn down on stop. Kept null when ungranted so no
+	// loopback socket binds for the majority who never enable webhooks.
+	let webhookListener: WebhookLoopbackListener | null = null;
+	let webhookRelayClose: (() => void) | null = null;
+
+	const hasIngressGrant = async (): Promise<boolean> =>
+		(await appGrantCeiling(deps.getLedger)).includes(NETWORK_INGRESS_CAP);
+
+	const ensureWebhookIngress = async (): Promise<void> => {
+		if (webhookListener || !(await hasIngressGrant())) return;
+		const preferredPort = (await deps.webhookPortStore?.get().catch(() => null)) ?? undefined;
+		const listener = createWebhookLoopbackListener(
+			preferredPort !== undefined ? { preferredPort } : {},
+		);
+		webhookListener = listener;
+		const ports: WebhookIngressPort[] = [listener];
+		if (deps.webhookRelayTransport) {
+			const relay = createWebhookRelayPort(deps.webhookRelayTransport);
+			webhookRelayClose = () => relay.close();
+			ports.push(relay);
+		}
+		host.setWebhookIngress(fanInWebhookPorts(ports));
+		// Persist the bound port for a stable endpoint URL on the next launch.
+		listener
+			.whenReady()
+			.then((port) => deps.webhookPortStore?.set(port))
+			.catch((error) => onError("webhook listen", error));
+	};
+
+	const teardownWebhookIngress = (): void => {
+		host.setWebhookIngress(undefined);
+		webhookRelayClose?.();
+		webhookRelayClose = null;
+		void webhookListener?.close();
+		webhookListener = null;
+	};
+
 	const hydrateFromEntities = async (): Promise<void> => {
 		const [workflows, triggers, reminders, tasks, events] = await Promise.all([
 			entityRows(WORKFLOW_TYPE_URL),
@@ -222,6 +288,10 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 			entityRows(EVENT_TYPE_URL),
 		]);
 		const registration = deriveScheduleRegistration({ workflows, triggers, reminders });
+		// Fail-closed: without `network.ingress` no webhook route registers, even
+		// if a listener is somehow live — a revoke takes effect on the next
+		// re-derive (routes emptied), the socket goes inert (404s everything).
+		if (!(await hasIngressGrant())) registration.webhooks = [];
 		// 9.14.9b — task due/scheduled + event alerts ride the same schedule.
 		// 0.3.1 — register alerts whose instant is `> lastRun` (the scheduler's
 		// persisted watermark), not just `> now`: a reminder that came due while
@@ -283,6 +353,7 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		unsubscribeRehydrate?.();
 		unsubscribeRehydrate = null;
 		host.stop();
+		teardownWebhookIngress();
 	};
 
 	// 11b.15 — honour an explicit takeover from another device: the designation
@@ -299,6 +370,9 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 	const startScheduling = async (): Promise<void> => {
 		if (scheduling) return;
 		scheduling = true;
+		// Bind the webhook plane (if granted) BEFORE hydrate, so the derived
+		// routes register against it.
+		await ensureWebhookIngress();
 		await scheduler.hydrate();
 		await hydrateFromEntities();
 		host.start();
@@ -334,11 +408,20 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 			unsubscribeRehydrate?.();
 			unsubscribeRehydrate = null;
 			host.stop();
+			teardownWebhookIngress();
 		},
 		// Manual trigger — an explicit user action on THIS device, so it is
 		// deliberately NOT designation-gated (the designation exists to stop
 		// double-firing of schedules, not to block a clicked "Run now").
 		runNow: (workflowId) => host.runNow(workflowId),
+		async webhookInfo(): Promise<AutomationsWebhookInfo> {
+			const port = webhookListener?.port() ?? null;
+			return {
+				ingressGranted: await hasIngressGrant(),
+				loopbackBaseUrl: port !== null ? `http://127.0.0.1:${port}` : null,
+				relayBaseUrl: deps.webhookRelayBaseUrl ?? null,
+			};
+		},
 		hostStatus: status,
 		async claimHost() {
 			const designation = claimAutomationHost(deps.deviceId, clock());

@@ -18,10 +18,31 @@ import {
 	Weekday,
 	isEntityEventVerb,
 	isTriggerKind,
+	readWebhookTriggerConfig,
 } from "@brainstorm-os/sdk-types";
 
 /** The trigger kinds the v1 builder palette offers — the engine-wired set. */
 export const BUILDER_TRIGGER_KINDS = ENGINE_TRIGGER_KINDS;
+
+/** A URL-safe random token (base64url, no padding) for webhook route ids +
+ *  secrets. Uses Web Crypto, available in the app renderer. */
+function randomToken(bytes: number): string {
+	const buf = new Uint8Array(bytes);
+	crypto.getRandomValues(buf);
+	let binary = "";
+	for (const byte of buf) binary += String.fromCharCode(byte);
+	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Mint a fresh webhook route id (path segment) — a shorter token. */
+export function mintWebhookRouteId(): string {
+	return randomToken(9);
+}
+
+/** Mint a fresh webhook secret — a high-entropy token (128-bit). */
+export function mintWebhookSecret(): string {
+	return randomToken(24);
+}
 
 /** Common user-facing types worth suggesting for an `EntityEvent` trigger so
  *  authoring (e.g. "when a new Email arrives, triage it") does not require
@@ -74,6 +95,10 @@ export type BuilderTrigger = {
 	/** `EntityEvent`: the watched type + lifecycle verb. */
 	entityType: string;
 	verb: EntityEventVerb;
+	/** `Webhook`: the endpoint's stable route id + rotating secret. Minted on
+	 *  first save; carried across edits so the URL the user pasted stays valid
+	 *  (the secret rotates only on an explicit "rotate"). */
+	webhook?: { routeId: string; secret: string };
 };
 
 export function emptyBuilderTrigger(): BuilderTrigger {
@@ -121,6 +146,15 @@ export function builderTriggerToDef(trigger: BuilderTrigger): TriggerDef {
 				config: { entityType: trigger.entityType.trim(), verb: trigger.verb },
 				enabled: true,
 			};
+		case TriggerKind.Webhook: {
+			// Mint the route + secret on first save; preserve them on re-save so
+			// the endpoint URL the user already pasted keeps working.
+			const webhook = trigger.webhook ?? {
+				routeId: mintWebhookRouteId(),
+				secret: mintWebhookSecret(),
+			};
+			return { kind: TriggerKind.Webhook, config: { ...webhook }, enabled: true };
+		}
 		default:
 			return { kind: TriggerKind.Manual, config: {}, enabled: true };
 	}
@@ -139,6 +173,10 @@ export function builderTriggerFromDef(def: TriggerDef): BuilderTrigger {
 	if (def.kind === TriggerKind.Time) {
 		const recurrence = config.recurrence as Recurrence | undefined;
 		base.timePreset = presetFromRecurrence(recurrence);
+	}
+	if (def.kind === TriggerKind.Webhook) {
+		const webhook = readWebhookTriggerConfig(config);
+		if (webhook) base.webhook = webhook;
 	}
 	return base;
 }

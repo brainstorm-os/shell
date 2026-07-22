@@ -57,6 +57,37 @@ export type EntityEventTrigger = {
 	verb: EntityEventVerb;
 };
 
+/** A `Webhook` trigger (11b.8): run `workflowId` when an inbound request hits
+ *  `/wh/<routeId>/<secret>`. The secret is verified constant-time by the
+ *  ingress plane (loopback listener / relay client) before a hit is emitted. */
+export type WebhookTrigger = {
+	workflowId: string;
+	routeId: string;
+	secret: string;
+};
+
+/** A verified inbound webhook, as the ingress plane hands it to the host —
+ *  the secret has already been matched, so it never rides the hit. */
+export type WebhookHit = {
+	workflowId: string;
+	routeId: string;
+	method: string;
+	headers: Record<string, string>;
+	bodyText: string;
+};
+
+/** The inbound-webhook plane (loopback listener and/or relay client). The host
+ *  hands it the active route table; the plane authenticates each request
+ *  (constant-time secret match), forms its own HTTP response, and emits a hit
+ *  only for authenticated requests. Injected so the host is testable with a
+ *  fake and inert (undefined) without `network.ingress`. */
+export type WebhookIngressPort = {
+	/** Replace the active route set. Idempotent — re-registering overwrites. */
+	register(routes: readonly WebhookTrigger[]): void;
+	/** Subscribe to authenticated inbound hits; returns an unsubscribe. */
+	subscribe(listener: (hit: WebhookHit) => void): () => void;
+};
+
 /** The entity-derived schedule to register on vault open. Entities are the
  *  source of truth — re-registering on each boot recomputes the next fire
  *  from `now` (a late wake jumps to the next future slot, doc 39). */
@@ -64,6 +95,10 @@ export type ScheduleRegistration = {
 	workflows: Array<{ triggerId: string; workflowId: string; config: TimeTriggerConfig | null }>;
 	reminders: Array<{ reminderId: string; config: TimeTriggerConfig | null }>;
 	entityEvents: EntityEventTrigger[];
+	/** 11b.8 — inbound-webhook triggers. Registered with the ingress plane on
+	 *  hydrate; empty (and the plane inert) without `network.ingress`. Optional
+	 *  like `syncMappings`/`itemAlerts` so prior callers need no change. */
+	webhooks?: WebhookTrigger[];
 	/** Connector-4 — each `SyncMapping`'s scheduled pull. The mapping id is
 	 *  both the scheduler trigger id and the routing key. Optional so prior
 	 *  callers (pre-connector) need no change. */
@@ -116,6 +151,9 @@ export type AutomationsHostPorts = {
 	appCapabilities: readonly string[] | (() => Promise<readonly string[]> | readonly string[]);
 	clock(): number;
 	entityChanges?: EntityChangeSource;
+	/** 11b.8 — inbound-webhook plane. Absent keeps webhook triggers registered
+	 *  but never firing (no `network.ingress` / tests). */
+	webhookIngress?: WebhookIngressPort;
 	/** Drain interval; defaults to 5s. */
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -130,12 +168,36 @@ export class AutomationsHost {
 	private readonly syncMappingIds = new Set<string>();
 	private readonly itemAlertsById = new Map<string, UiNotification>();
 	private entityEvents: EntityEventTrigger[] = [];
+	private webhooks: WebhookTrigger[] = [];
+	private webhookIngress: WebhookIngressPort | undefined;
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private unsubscribe: (() => void) | null = null;
+	private unsubscribeWebhooks: (() => void) | null = null;
 	private readonly intervals: IntervalFactory;
 
 	constructor(private readonly ports: AutomationsHostPorts) {
 		this.intervals = ports.intervals ?? productionIntervalFactory;
+		this.webhookIngress = ports.webhookIngress;
+	}
+
+	/** Swap the inbound-webhook plane after construction. Production reads the
+	 *  `network.ingress` grant async at start and only then binds a listener, so
+	 *  it sets the port here before `hydrate`/`start`. Setting it live re-points
+	 *  the subscription (drops the old, wires the new) if already started. */
+	setWebhookIngress(port: WebhookIngressPort | undefined): void {
+		if (port === this.webhookIngress) return;
+		const wasSubscribed = this.unsubscribeWebhooks !== null;
+		this.unsubscribeWebhooks?.();
+		this.unsubscribeWebhooks = null;
+		this.webhookIngress = port;
+		if (port) {
+			port.register(this.webhooks);
+			if (wasSubscribed) {
+				this.unsubscribeWebhooks = port.subscribe((hit) => {
+					void this.onWebhookHit(hit);
+				});
+			}
+		}
 	}
 
 	/** Register the entity-derived schedule with the scheduler. Idempotent —
@@ -148,6 +210,8 @@ export class AutomationsHost {
 		this.syncMappingIds.clear();
 		this.itemAlertsById.clear();
 		this.entityEvents = [...registration.entityEvents];
+		this.webhooks = [...(registration.webhooks ?? [])];
+		this.webhookIngress?.register(this.webhooks);
 		for (const w of registration.workflows) {
 			if (w.config) await this.ports.scheduler.register(w.triggerId, [w.workflowId], w.config, now);
 		}
@@ -178,6 +242,11 @@ export class AutomationsHost {
 				void this.onEntityChange(change);
 			});
 		}
+		if (!this.unsubscribeWebhooks && this.webhookIngress) {
+			this.unsubscribeWebhooks = this.webhookIngress.subscribe((hit) => {
+				void this.onWebhookHit(hit);
+			});
+		}
 	}
 
 	/** Stop the timer + unsubscribe (vault dispose). Idempotent. */
@@ -188,6 +257,8 @@ export class AutomationsHost {
 		}
 		this.unsubscribe?.();
 		this.unsubscribe = null;
+		this.unsubscribeWebhooks?.();
+		this.unsubscribeWebhooks = null;
 	}
 
 	/** Drain everything due at `now`, routing each fire to its runner. */
@@ -303,6 +374,23 @@ export class AutomationsHost {
 				verb: change.verb,
 			}).catch((e) => this.fail(`entity-event ${trigger.workflowId}`, e));
 		}
+	}
+
+	/** An authenticated inbound webhook (secret already verified by the ingress
+	 *  plane) fires its bound workflow under the workflow's own frozen caps. The
+	 *  request rides as the trigger payload so a `Code`/`AICall` step can read
+	 *  the body/headers. Guard on the registered route set so a hit for a route
+	 *  no longer registered (rehydrate race) is dropped. */
+	private async onWebhookHit(hit: WebhookHit): Promise<void> {
+		if (!this.webhooks.some((w) => w.workflowId === hit.workflowId && w.routeId === hit.routeId)) {
+			return;
+		}
+		await this.runWorkflow(hit.workflowId, `webhook:${hit.routeId}`, {
+			routeId: hit.routeId,
+			method: hit.method,
+			headers: hit.headers,
+			body: hit.bodyText,
+		}).catch((e) => this.fail(`webhook ${hit.workflowId}`, e));
 	}
 
 	private fail(context: string, error: unknown): void {

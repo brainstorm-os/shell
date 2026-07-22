@@ -1985,6 +1985,20 @@ export type AutomationsHostStatus = {
 	scheduling: boolean;
 };
 
+/** 11b.8 — where inbound webhooks reach this device. The app pairs a
+ *  trigger's `routeId`/`secret` with these bases to render the full endpoint
+ *  URL(s). `ingressGranted` false ⇒ the app holds no `network.ingress`, so it
+ *  prompts the user to grant it in Settings instead of showing an endpoint. */
+export type AutomationsWebhookInfo = {
+	ingressGranted: boolean;
+	/** Loopback base (`http://127.0.0.1:<port>`) once the listener is bound,
+	 *  else null. Reachable on this machine (local tools / a user-run tunnel). */
+	loopbackBaseUrl: string | null;
+	/** Public relay base (`https://<relay>`) when a relay is paired, else null
+	 *  (the relay node is deployed separately). */
+	relayBaseUrl: string | null;
+};
+
 export type AutomationsService = {
 	/** Run a workflow immediately (Manual trigger). */
 	runNow(input: { workflowId: string }): Promise<AutomationsRunResult>;
@@ -1992,6 +2006,8 @@ export type AutomationsService = {
 	hostStatus(): Promise<AutomationsHostStatus>;
 	/** Claim / take over automation hosting for this device. */
 	claimHost(): Promise<AutomationsHostStatus>;
+	/** 11b.8 — the inbound-webhook endpoint bases + grant state. */
+	webhookInfo(): Promise<AutomationsWebhookInfo>;
 };
 
 // ─── The runtime exposed via window.brainstorm ──────────────────────────────
@@ -2403,6 +2419,7 @@ export {
 	isValidWorkflowRun,
 	isWorkflowRunStatus,
 	missingCapabilities,
+	readWebhookTriggerConfig,
 	stepCapabilities,
 	validateCapabilityTiers,
 	validateReminder,
@@ -2433,6 +2450,7 @@ export type {
 	TriggerDef,
 	TriggerStep,
 	WaitStep,
+	WebhookTriggerConfig,
 	WorkflowDef,
 	WorkflowRunDef,
 	WorkflowStep,

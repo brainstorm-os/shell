@@ -23,6 +23,7 @@ import type {
 	AutomationsHostStatus,
 	AutomationsRunResult,
 	AutomationsService,
+	AutomationsWebhookInfo,
 	BlockInfo,
 	BlocksService,
 	BpMessage,
@@ -1158,6 +1159,14 @@ function automationsProxy(bridge: Bridge): AutomationsService {
 				bridge,
 				"automations",
 				"claimHost",
+				[{}],
+				["automations.run"],
+			),
+		webhookInfo: () =>
+			callService<AutomationsWebhookInfo>(
+				bridge,
+				"automations",
+				"webhookInfo",
 				[{}],
 				["automations.run"],
 			),

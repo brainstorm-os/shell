@@ -25,8 +25,9 @@ import {
 	propertiesToReminder,
 	propertiesToTrigger,
 	propertiesToWorkflow,
+	readWebhookTriggerConfig,
 } from "@brainstorm-os/sdk-types";
-import type { EntityEventTrigger, ScheduleRegistration } from "./automations-host";
+import type { EntityEventTrigger, ScheduleRegistration, WebhookTrigger } from "./automations-host";
 import { reminderToTriggerConfig } from "./reminder-schedule";
 import type { TimeTriggerConfig } from "./trigger-schedule";
 
@@ -72,14 +73,15 @@ export function decodeTimeTriggerConfig(config: Record<string, unknown>): TimeTr
  * Project the persisted automation entities into the registration the
  * host hydrates from. Only enabled workflows bound to enabled triggers
  * register; `Manual` triggers register nothing (they run via `runNow`);
- * gated trigger kinds (webhook / file-watch / startup / intent) are
- * skipped until their surfaces land.
+ * `Webhook` triggers register a route (11b.8); the remaining gated kinds
+ * (file-watch / startup / intent) are skipped until their surfaces land.
  */
 export function deriveScheduleRegistration(rows: AutomationEntityRows): ScheduleRegistration {
 	const triggersById = new Map(rows.triggers.map((t) => [t.id, propertiesToTrigger(t.properties)]));
 
 	const workflows: ScheduleRegistration["workflows"] = [];
 	const entityEvents: EntityEventTrigger[] = [];
+	const webhooks: WebhookTrigger[] = [];
 	for (const row of rows.workflows) {
 		const workflow = propertiesToWorkflow(row.properties);
 		if (!workflow.enabled || workflow.triggerId === "") continue;
@@ -107,6 +109,15 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 				}
 				break;
 			}
+			case TriggerKind.Webhook: {
+				// Fail-closed like the EntityEvent arm: a webhook trigger missing
+				// its routeId/secret registers nothing (never fires).
+				const config = readWebhookTriggerConfig(trigger.config);
+				if (config) {
+					webhooks.push({ workflowId: row.id, routeId: config.routeId, secret: config.secret });
+				}
+				break;
+			}
 			default:
 				break;
 		}
@@ -118,5 +129,5 @@ export function deriveScheduleRegistration(rows: AutomationEntityRows): Schedule
 		if (config) reminders.push({ reminderId: row.id, config });
 	}
 
-	return { workflows, reminders, entityEvents };
+	return { workflows, reminders, entityEvents, webhooks };
 }

@@ -24,6 +24,7 @@
 import {
 	type AIAgentStep,
 	type AgentTool,
+	type AutomationsWebhookInfo,
 	ENTITY_EVENT_VERBS,
 	EXPORT_TEXT_FORMATS,
 	EntityOp,
@@ -35,7 +36,7 @@ import {
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
-import { type ReactElement, useMemo, useState } from "react";
+import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { type AutomationsI18nKey, t } from "../i18n";
 import {
 	BUILDER_STEP_KINDS,
@@ -63,7 +64,10 @@ import {
 	TIME_PRESETS,
 	type TimePreset,
 	emptyBuilderTrigger,
+	mintWebhookRouteId,
+	mintWebhookSecret,
 } from "../logic/builder-trigger";
+import { getBrainstorm } from "../storage/runtime";
 
 export type BuilderResult = {
 	state: BuilderState;
@@ -501,7 +505,7 @@ function TriggerSection({
 					value={trigger.kind}
 					ariaLabel={t("builder.trigger.kind")}
 					options={BUILDER_TRIGGER_KINDS.map((k) => ({ value: k, label: triggerKindLabel(k) }))}
-					onChange={(kind) => onChange({ ...trigger, kind })}
+					onChange={(kind) => onChange(withTriggerKind(trigger, kind))}
 				/>
 			</div>
 			{trigger.kind === TriggerKind.Time ? (
@@ -553,7 +557,106 @@ function TriggerSection({
 					</div>
 				</>
 			) : null}
+			{trigger.kind === TriggerKind.Webhook ? (
+				<WebhookTriggerFields trigger={trigger} onChange={onChange} />
+			) : null}
 		</section>
+	);
+}
+
+/** Switch trigger kind, minting a webhook route + secret the moment the user
+ *  picks Webhook so the endpoint URL renders immediately (preserved on save). */
+function withTriggerKind(trigger: BuilderTrigger, kind: TriggerKind): BuilderTrigger {
+	if (kind === TriggerKind.Webhook && !trigger.webhook) {
+		return {
+			...trigger,
+			kind,
+			webhook: { routeId: mintWebhookRouteId(), secret: mintWebhookSecret() },
+		};
+	}
+	return { ...trigger, kind };
+}
+
+/** Webhook trigger config: the endpoint URL(s) to POST to, gated on the
+ *  `network.ingress` grant. Fetches the endpoint bases from the shell once. */
+function WebhookTriggerFields({
+	trigger,
+	onChange,
+}: {
+	trigger: BuilderTrigger;
+	onChange: (next: BuilderTrigger) => void;
+}): ReactElement {
+	const [info, setInfo] = useState<AutomationsWebhookInfo | null>(null);
+	useEffect(() => {
+		let cancelled = false;
+		void getBrainstorm()
+			?.services?.automations?.webhookInfo()
+			.then((next) => {
+				if (!cancelled) setInfo(next);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const webhook = trigger.webhook;
+	const rotate = (): void => {
+		onChange({
+			...trigger,
+			webhook: {
+				routeId: webhook?.routeId ?? mintWebhookRouteId(),
+				secret: mintWebhookSecret(),
+			},
+		});
+	};
+
+	if (info && !info.ingressGranted) {
+		return (
+			<p className="au-field__hint" role="note">
+				{t("builder.trigger.webhook.needsGrant")}
+			</p>
+		);
+	}
+
+	const urls: { label: string; url: string }[] = [];
+	if (webhook) {
+		if (info?.loopbackBaseUrl) {
+			urls.push({
+				label: t("builder.trigger.webhook.localUrl"),
+				url: `${info.loopbackBaseUrl}/wh/${webhook.routeId}/${webhook.secret}`,
+			});
+		}
+		if (info?.relayBaseUrl) {
+			urls.push({
+				label: t("builder.trigger.webhook.publicUrl"),
+				url: `${info.relayBaseUrl}/wh/${webhook.routeId}/${webhook.secret}`,
+			});
+		}
+	}
+
+	return (
+		<div className="au-webhook">
+			<p className="au-field__hint">{t("builder.trigger.webhook.hint")}</p>
+			{urls.map((entry) => (
+				<div className="au-webhook__url" key={entry.label}>
+					<span className="au-field__label">{entry.label}</span>
+					<div className="au-webhook__url-row">
+						<code className="au-webhook__value">{entry.url}</code>
+						<button
+							type="button"
+							className="bs-btn bs-btn--ghost"
+							onClick={() => void navigator.clipboard?.writeText(entry.url)}
+						>
+							{t("builder.trigger.webhook.copy")}
+						</button>
+					</div>
+				</div>
+			))}
+			<button type="button" className="bs-btn bs-btn--ghost" onClick={rotate}>
+				{t("builder.trigger.webhook.rotate")}
+			</button>
+		</div>
 	);
 }
 
