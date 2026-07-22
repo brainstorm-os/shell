@@ -121,8 +121,7 @@ export function MonthGrid({
 						// The keyboard path into a cell is the focusable date <button>
 						// (present whenever a host wires interaction); onEmptyCellClick is
 						// a pointer-only convenience that mirrors the imperative helper.
-						// kbn-onclick-exempt: the cell's focusable date <button> owns keyboard activation.
-						// biome-ignore lint/a11y/useKeyWithClickEvents: date button owns keyboard activation
+						// biome-ignore lint/a11y/useKeyWithClickEvents: date <button> owns keyboard activation — kbn-onclick-exempt (this line must sit directly above <div>: both biome and the onclick audit read the element line).
 						<div
 							key={raw.dateKey}
 							className={cellClass(cell)}
