@@ -212,6 +212,11 @@ const ledger = {
 		origin: string,
 	): Promise<{ granted: boolean; origin: string | null }> =>
 		ipcRenderer.invoke("ledger:request-egress-grant", appId, origin),
+	/** 11b.8 — request the un-scoped `network.ingress` grant for an app (the
+	 *  Automations webhook-trigger gate). Routes through the same fail-safe
+	 *  capability prompt; resolves whether it was granted. */
+	requestIngressGrant: (appId: string): Promise<{ granted: boolean }> =>
+		ipcRenderer.invoke("ledger:request-ingress-grant", appId),
 };
 
 /** Shell-action channel (main → dashboard). Used by the application menu. */

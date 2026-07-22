@@ -527,6 +527,44 @@ body {
 	font-size: var(--text-size-xs);
 }
 
+/* 11b.8 — webhook trigger config: endpoint URL(s) + rotate. */
+.au-field__hint {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+
+.au-webhook {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.au-webhook__url {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.au-webhook__url-row {
+	display: flex;
+	gap: var(--space-2);
+	align-items: center;
+}
+
+.au-webhook__value {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-x: auto;
+	white-space: nowrap;
+	padding: var(--space-1) var(--space-2);
+	font-family: var(--text-family-code, ui-monospace, monospace);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-primary);
+	background: var(--hover);
+	border-radius: var(--radius-sm);
+}
+
 .au-tools {
 	list-style: none;
 	margin: 0;

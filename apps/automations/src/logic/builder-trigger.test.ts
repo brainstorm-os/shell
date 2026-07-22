@@ -13,6 +13,8 @@ import {
 	builderTriggerFromDef,
 	builderTriggerToDef,
 	emptyBuilderTrigger,
+	mintWebhookRouteId,
+	mintWebhookSecret,
 	triggerTypeSuggestions,
 } from "./builder-trigger";
 
@@ -23,6 +25,38 @@ describe("builder trigger", () => {
 
 	it("defaults to a Manual trigger", () => {
 		expect(emptyBuilderTrigger().kind).toBe(TriggerKind.Manual);
+	});
+
+	it("offers the Webhook kind (engine-wired in 11b.8)", () => {
+		expect(BUILDER_TRIGGER_KINDS).toContain(TriggerKind.Webhook);
+	});
+
+	it("mints a route id + secret when a Webhook trigger is first saved", () => {
+		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Webhook });
+		expect(def.kind).toBe(TriggerKind.Webhook);
+		expect(typeof def.config.routeId).toBe("string");
+		expect(typeof def.config.secret).toBe("string");
+		expect((def.config.secret as string).length).toBeGreaterThan(16);
+	});
+
+	it("preserves an existing route + secret on re-save (stable URL)", () => {
+		const webhook = { routeId: "route-1", secret: "secret-1" };
+		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Webhook, webhook });
+		expect(def.config).toEqual(webhook);
+	});
+
+	it("round-trips a Webhook trigger through from/to def", () => {
+		const webhook = { routeId: mintWebhookRouteId(), secret: mintWebhookSecret() };
+		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Webhook, webhook });
+		const recovered = builderTriggerFromDef(def);
+		expect(recovered.kind).toBe(TriggerKind.Webhook);
+		expect(recovered.webhook).toEqual(webhook);
+	});
+
+	it("mints url-safe tokens (no +/= chars)", () => {
+		for (const token of [mintWebhookRouteId(), mintWebhookSecret()]) {
+			expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
+		}
 	});
 
 	it("maps a Manual trigger to an empty-config def", () => {

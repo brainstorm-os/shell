@@ -96,4 +96,18 @@ export function registerLedgerHandlers(): void {
 			return { granted, origin };
 		},
 	);
+
+	// 11b.8 — request the un-scoped `network.ingress` grant for an app (the
+	// Automations webhook-trigger gate). Like the egress grant, the grant flows
+	// through the sanctioned Deny-default capability prompt; this handler only
+	// mediates it — never a silent Settings-side grant.
+	ipcMain.handle(
+		"ledger:request-ingress-grant",
+		async (_event, appId: unknown): Promise<{ granted: boolean }> => {
+			if (typeof appId !== "string" || appId.length === 0) return { granted: false };
+			const reason = `Let ${appId} accept inbound web requests that trigger your workflows. A workflow fired this way runs with the automations you already granted it — only allow this if you intend to expose webhook endpoints.`;
+			const granted = await getCapabilityPromptHost().request(appId, "network.ingress", reason);
+			return { granted };
+		},
+	);
 }

@@ -214,6 +214,7 @@ export function NetworkEgressPanel() {
 			/>
 
 			<AutomationEgressSection />
+			<AutomationIngressSection />
 
 			<RecentSection
 				title={t("shell.settings.network.recent.title")}
@@ -871,6 +872,79 @@ function AutomationEgressSection() {
 					{t("shell.settings.network.automation.add")}
 				</Button>
 			</form>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// Section: Automation inbound (11b.8 — webhook-trigger network.ingress gate)
+// ---------------------------------------------------------------------
+
+/** The Automations app must hold `network.ingress` to define webhook triggers.
+ *  A single un-scoped grant; toggled here through the fail-safe capability
+ *  prompt in main (never a silent Settings-side grant). */
+function AutomationIngressSection() {
+	const [granted, setGranted] = useState(false);
+	const [busy, setBusy] = useState(false);
+
+	const reload = useCallback(async () => {
+		const byApp = await window.brainstorm.ledger.listGrantsByApp();
+		const grants = byApp[AUTOMATIONS_APP_ID] ?? [];
+		setGranted(grants.some((g) => g.capability === "network.ingress"));
+	}, []);
+
+	useEffect(() => {
+		void reload();
+	}, [reload]);
+
+	const enable = async () => {
+		if (busy) return;
+		setBusy(true);
+		try {
+			const { granted: ok } = await window.brainstorm.ledger.requestIngressGrant(AUTOMATIONS_APP_ID);
+			if (ok) await reload();
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const revoke = async () => {
+		const confirmed = await confirm({
+			title: t("shell.settings.network.ingress.revokeConfirm.title"),
+			body: t("shell.settings.network.ingress.revokeConfirm.body"),
+			confirmLabel: t("shell.settings.network.ingress.revoke"),
+			confirmVariant: ConfirmVariant.Destructive,
+		});
+		if (!confirmed) return;
+		await window.brainstorm.ledger.revoke(AUTOMATIONS_APP_ID, "network.ingress", null);
+		await reload();
+	};
+
+	return (
+		<div className="network-egress__group" data-testid="network-egress-ingress">
+			<h4 className="network-egress__group-title">{t("shell.settings.network.ingress.title")}</h4>
+			<p className="network-egress__hint">{t("shell.settings.network.ingress.warning")}</p>
+			<div className="network-egress__row">
+				<span className="network-egress__pill">
+					{granted
+						? t("shell.settings.network.ingress.enabled")
+						: t("shell.settings.network.ingress.disabled")}
+				</span>
+				{granted ? (
+					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={() => void revoke()}>
+						{t("shell.settings.network.ingress.revoke")}
+					</Button>
+				) : (
+					<Button
+						variant={ButtonVariant.Ghost}
+						size={ButtonSize.Md}
+						disabled={busy}
+						onClick={() => void enable()}
+					>
+						{t("shell.settings.network.ingress.enable")}
+					</Button>
+				)}
+			</div>
 		</div>
 	);
 }

@@ -127,15 +127,39 @@ export const TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Startup,
 ]) as readonly TriggerKind[];
 
-/** The trigger kinds the engine handles (11b.6 + 11b.10). `Startup` fires
- *  once on shell launch (not scheduler-driven); Webhook (Net-1 ingress) and
- *  FileWatch (Files-host watch) land in their own slices. */
+/** The trigger kinds the engine handles (11b.6 + 11b.8 + 11b.10). `Startup`
+ *  fires once on shell launch (not scheduler-driven); `Webhook` (11b.8, Net-1
+ *  ingress) fires on an authenticated inbound; FileWatch (Files-host watch)
+ *  lands in its own slice. */
 export const ENGINE_TRIGGER_KINDS = Object.freeze([
 	TriggerKind.Time,
 	TriggerKind.EntityEvent,
 	TriggerKind.Manual,
+	TriggerKind.Webhook,
 	TriggerKind.Startup,
 ]) as readonly TriggerKind[];
+
+/**
+ * `webhook` trigger config (11b.8, OQ-163 → single shared endpoint, path-
+ * routed). `routeId` is the stable opaque path segment (`/wh/<routeId>/…`);
+ * `secret` is a high-entropy token the ingress plane verifies (constant-time)
+ * before firing. Both are minted by the builder on first save; `secret`
+ * rotates in place without changing `routeId`.
+ */
+export type WebhookTriggerConfig = {
+	routeId: string;
+	secret: string;
+};
+
+export function readWebhookTriggerConfig(
+	config: Record<string, unknown>,
+): WebhookTriggerConfig | null {
+	const routeId = config.routeId;
+	const secret = config.secret;
+	if (typeof routeId !== "string" || routeId.length === 0) return null;
+	if (typeof secret !== "string" || secret.length === 0) return null;
+	return { routeId, secret };
+}
 
 /** Lifecycle verb for an `entity-event` trigger. */
 export enum EntityEventVerb {
@@ -608,6 +632,11 @@ export function validateTrigger(def: TriggerDef): AutomationIssue[] {
 		issues.push({
 			code: AutomationIssueCode.MissingTriggerConfig,
 			message: "Trigger has no config object.",
+		});
+	} else if (def.kind === TriggerKind.Webhook && !readWebhookTriggerConfig(def.config)) {
+		issues.push({
+			code: AutomationIssueCode.MissingTriggerConfig,
+			message: "Webhook trigger needs a routeId and secret.",
 		});
 	}
 	return issues;

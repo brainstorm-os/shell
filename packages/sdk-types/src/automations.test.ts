@@ -51,14 +51,14 @@ describe("type urls + enum tables", () => {
 		expect(ENGINE_STEP_KINDS).not.toContain(StepKind.Code);
 	});
 
-	it("the engine trigger subset includes startup but excludes the network/file kinds", () => {
+	it("the engine trigger subset is the wired kinds (incl. Webhook 11b.8 + Startup 11b.10) and excludes FileWatch", () => {
 		expect(ENGINE_TRIGGER_KINDS).toEqual([
 			TriggerKind.Time,
 			TriggerKind.EntityEvent,
 			TriggerKind.Manual,
+			TriggerKind.Webhook,
 			TriggerKind.Startup,
 		]);
-		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.Webhook);
 		expect(ENGINE_TRIGGER_KINDS).not.toContain(TriggerKind.FileWatch);
 	});
 
@@ -325,6 +325,21 @@ describe("structural validators", () => {
 		}).map((i) => i.code);
 		expect(bad).toContain(AutomationIssueCode.InvalidTriggerKind);
 		expect(bad).toContain(AutomationIssueCode.MissingTriggerConfig);
+	});
+
+	it("requires a Webhook trigger to carry a routeId + secret", () => {
+		expect(
+			validateTrigger({
+				kind: TriggerKind.Webhook,
+				config: { routeId: "r1", secret: "s1" },
+				enabled: true,
+			}),
+		).toEqual([]);
+		expect(
+			validateTrigger({ kind: TriggerKind.Webhook, config: { routeId: "r1" }, enabled: true }).map(
+				(i) => i.code,
+			),
+		).toContain(AutomationIssueCode.MissingTriggerConfig);
 	});
 
 	it("validates runs structurally", () => {

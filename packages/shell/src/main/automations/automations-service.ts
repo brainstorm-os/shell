@@ -62,6 +62,8 @@ export function makeAutomationsServiceHandler(deps: AutomationsServiceDeps): Ser
 				return deployment.hostStatus();
 			case "claimHost":
 				return deployment.claimHost();
+			case "webhookInfo":
+				return deployment.webhookInfo();
 			default:
 				throw makeError("Invalid", `unknown automations method: ${envelope.method}`);
 		}
