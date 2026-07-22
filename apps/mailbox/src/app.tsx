@@ -144,6 +144,16 @@ export function MailboxApp(): ReactElement {
 
 	const unifiedUnread = useMemo(() => unifiedUnreadCount(messages, folders), [messages, folders]);
 
+	// 7.14 — mirror the unified unread count onto the dashboard app-icon badge
+	// (cap `ui.badge`). `set({count})` treats count<=0 as a clear, so this also
+	// covers "all read". Keyed on the derived count (not a raw change loop);
+	// fire-and-forget, and a no-op on older shells that lack the badge service.
+	useEffect(() => {
+		const badge = getBrainstorm()?.services?.ui?.badge;
+		if (!badge) return;
+		void badge.set({ count: unifiedUnread }).catch(() => undefined);
+	}, [unifiedUnread]);
+
 	const activeMessage = useMemo(
 		() => (activeId ? (messages.find((m) => m.id === activeId) ?? null) : null),
 		[activeId, messages],

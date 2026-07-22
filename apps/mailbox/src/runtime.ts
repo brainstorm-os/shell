@@ -15,6 +15,7 @@ import type {
 	IntentsService,
 	LaunchContext,
 	MailService,
+	UiService,
 	VaultEntitiesService,
 } from "@brainstorm-os/sdk-types";
 
@@ -36,6 +37,10 @@ export type MailboxRuntime = {
 		/** Mailbox-4 — the composer dispatches the `send` intent through the
 		 *  shared bus (gated on `intents.dispatch:send`). */
 		intents?: IntentsService;
+		/** 7.14 — mirror the unread count onto the dashboard app icon (cap
+		 *  `ui.badge`). Only `badge` is used; typed as the full service so the
+		 *  proxy shape stays honest. */
+		ui?: UiService;
 	} | null;
 };
 
