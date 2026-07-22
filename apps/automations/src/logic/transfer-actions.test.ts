@@ -81,6 +81,7 @@ function filesStub(over: Partial<FilesService>): FilesService {
 		requestSave: async () => null,
 		read: async () => new Uint8Array(),
 		write: async () => undefined,
+		requestWatchGrant: async () => null,
 		...over,
 	};
 }

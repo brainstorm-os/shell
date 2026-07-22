@@ -560,7 +560,57 @@ function TriggerSection({
 			{trigger.kind === TriggerKind.Webhook ? (
 				<WebhookTriggerFields trigger={trigger} onChange={onChange} />
 			) : null}
+			{trigger.kind === TriggerKind.FileWatch ? (
+				<FileWatchTriggerFields trigger={trigger} onChange={onChange} />
+			) : null}
 		</section>
+	);
+}
+
+/** FileWatch trigger config: pick a file to watch. The shell mints a persistent
+ *  grant (`files.requestWatchGrant`) and hands back an opaque watchId + the
+ *  file's name — the path never reaches the app. */
+function FileWatchTriggerFields({
+	trigger,
+	onChange,
+}: {
+	trigger: BuilderTrigger;
+	onChange: (next: BuilderTrigger) => void;
+}): ReactElement {
+	const [busy, setBusy] = useState(false);
+	const choose = async (): Promise<void> => {
+		if (busy) return;
+		setBusy(true);
+		try {
+			const grant = await getBrainstorm()?.services?.files?.requestWatchGrant();
+			if (grant) onChange({ ...trigger, fileWatch: grant });
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<div className="au-field">
+			<span className="au-field__label">{t("builder.trigger.fileWatch.label")}</span>
+			<p className="au-field__hint">{t("builder.trigger.fileWatch.hint")}</p>
+			<div className="au-webhook__url-row">
+				{trigger.fileWatch ? (
+					<code className="au-webhook__value">{trigger.fileWatch.displayName}</code>
+				) : (
+					<span className="au-field__hint">{t("builder.trigger.fileWatch.none")}</span>
+				)}
+				<button
+					type="button"
+					className="bs-btn bs-btn--ghost"
+					disabled={busy}
+					onClick={() => void choose()}
+				>
+					{trigger.fileWatch
+						? t("builder.trigger.fileWatch.rechoose")
+						: t("builder.trigger.fileWatch.choose")}
+				</button>
+			</div>
+		</div>
 	);
 }
 

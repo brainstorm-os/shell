@@ -217,6 +217,13 @@ const ledger = {
 	 *  capability prompt; resolves whether it was granted. */
 	requestIngressGrant: (appId: string): Promise<{ granted: boolean }> =>
 		ipcRenderer.invoke("ledger:request-ingress-grant", appId),
+	/** 11b.10 — list the Automations app's persistent file-watch grants
+	 *  (displayName only, no path) for the Settings revoke panel. */
+	listFileWatchGrants: (): Promise<{ watchId: string; displayName: string; createdAt: number }[]> =>
+		ipcRenderer.invoke("files:list-watch-grants"),
+	/** 11b.10 — revoke a file-watch grant; the FileWatch trigger then stops. */
+	revokeFileWatchGrant: (watchId: string): Promise<boolean> =>
+		ipcRenderer.invoke("files:revoke-watch-grant", watchId),
 };
 
 /** Shell-action channel (main → dashboard). Used by the application menu. */

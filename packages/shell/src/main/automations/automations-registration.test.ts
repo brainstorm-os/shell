@@ -98,6 +98,18 @@ describe("deriveScheduleRegistration", () => {
 		expect(reg.webhooks).toEqual([]);
 	});
 
+	it("registers a FileWatch trigger with a valid watchId (11b.10)", () => {
+		const reg = deriveScheduleRegistration({
+			workflows: [workflowRow("wf_fw", "t_fw"), workflowRow("wf_bad", "t_bad")],
+			triggers: [
+				triggerRow("t_fw", TriggerKind.FileWatch, { watchId: "fw_1", displayName: "a.csv" }),
+				triggerRow("t_bad", TriggerKind.FileWatch, {}),
+			],
+			reminders: [],
+		});
+		expect(reg.fileWatches).toEqual([{ workflowId: "wf_fw", watchId: "fw_1" }]);
+	});
+
 	it("collects enabled Startup workflows into startups (11b.10)", () => {
 		const reg = deriveScheduleRegistration({
 			workflows: [

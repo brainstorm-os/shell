@@ -18,6 +18,7 @@ import {
 	Weekday,
 	isEntityEventVerb,
 	isTriggerKind,
+	readFileWatchTriggerConfig,
 	readWebhookTriggerConfig,
 } from "@brainstorm-os/sdk-types";
 
@@ -99,6 +100,10 @@ export type BuilderTrigger = {
 	 *  first save; carried across edits so the URL the user pasted stays valid
 	 *  (the secret rotates only on an explicit "rotate"). */
 	webhook?: { routeId: string; secret: string };
+	/** `FileWatch`: the persistent file-watch grant (opaque `watchId` + the
+	 *  picked file's basename). Minted by the shell when the user chooses a file
+	 *  (`files.requestWatchGrant`); the path never reaches the app. */
+	fileWatch?: { watchId: string; displayName: string };
 };
 
 export function emptyBuilderTrigger(): BuilderTrigger {
@@ -158,6 +163,14 @@ export function builderTriggerToDef(trigger: BuilderTrigger): TriggerDef {
 		case TriggerKind.Startup:
 			// Fires once on shell launch — no config (like Manual, but engine-driven).
 			return { kind: TriggerKind.Startup, config: {}, enabled: true };
+		case TriggerKind.FileWatch:
+			// The persistent grant is minted by the shell when the user picks a
+			// file; without one the save fails validation (needs a watchId).
+			return {
+				kind: TriggerKind.FileWatch,
+				config: trigger.fileWatch ? { ...trigger.fileWatch } : {},
+				enabled: true,
+			};
 		default:
 			return { kind: TriggerKind.Manual, config: {}, enabled: true };
 	}
@@ -180,6 +193,11 @@ export function builderTriggerFromDef(def: TriggerDef): BuilderTrigger {
 	if (def.kind === TriggerKind.Webhook) {
 		const webhook = readWebhookTriggerConfig(config);
 		if (webhook) base.webhook = webhook;
+	}
+	if (def.kind === TriggerKind.FileWatch) {
+		const fileWatch = readFileWatchTriggerConfig(config);
+		if (fileWatch)
+			base.fileWatch = { watchId: fileWatch.watchId, displayName: fileWatch.displayName ?? "" };
 	}
 	return base;
 }

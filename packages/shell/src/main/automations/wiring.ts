@@ -48,6 +48,7 @@ import {
 import {
 	AutomationsHost,
 	type EntityChangeSource,
+	type FileWatchPort,
 	type IntervalFactory,
 	type LoadedWorkflow,
 	type WebhookIngressPort,
@@ -117,6 +118,10 @@ export type AutomationsWiringDeps = {
 	/** 11b.8 — public relay base (`https://<relay>`) when a webhook relay is
 	 *  paired; surfaced to the app so it can render the public endpoint URL. */
 	webhookRelayBaseUrl?: string;
+	/** 11b.10 — file-watch plane (files-host watcher + persistent grant store).
+	 *  Constructed in `index.ts` where those live; absent keeps file-watch
+	 *  triggers registered but never firing (tests / headless). */
+	fileWatch?: FileWatchPort;
 	clock?: () => number;
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -137,6 +142,9 @@ export type AutomationsDeployment = {
 	claimHost(): Promise<AutomationsDeploymentStatus>;
 	/** 11b.8 — inbound-webhook endpoint bases + grant state for the app UI. */
 	webhookInfo(): Promise<AutomationsWebhookInfo>;
+	/** 11b.10 — re-derive + re-register the schedule now (e.g. after a
+	 *  file-watch grant is revoked in Settings, so the port drops the watch). */
+	rehydrate(): Promise<void>;
 	/** Exposed for tests / introspection. */
 	host: AutomationsHost;
 	scheduler: SchedulerService;
@@ -221,6 +229,7 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		clock,
 		entityChanges: deps.entityChanges,
 		onError,
+		...(deps.fileWatch ? { fileWatch: deps.fileWatch } : {}),
 		...(deps.postAlert ? { postAlert: deps.postAlert } : {}),
 		...(deps.intervalMs !== undefined ? { intervalMs: deps.intervalMs } : {}),
 		...(deps.intervals ? { intervals: deps.intervals } : {}),
@@ -414,6 +423,9 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		// deliberately NOT designation-gated (the designation exists to stop
 		// double-firing of schedules, not to block a clicked "Run now").
 		runNow: (workflowId) => host.runNow(workflowId),
+		// 11b.10 — re-derive now (e.g. a Settings file-watch revoke: the grant is
+		// gone, so hydrate re-registers the port without the dropped watch).
+		rehydrate: () => hydrateFromEntities(),
 		async webhookInfo(): Promise<AutomationsWebhookInfo> {
 			const port = webhookListener?.port() ?? null;
 			return {

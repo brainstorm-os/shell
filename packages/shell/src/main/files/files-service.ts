@@ -62,6 +62,7 @@ import { basename } from "node:path";
 import type { StoredAsset } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import type { FileWatchGrantsRepository } from "../storage/registry-repo/file-watch-grants-repo";
 import {
 	type NormalizedOpenDialog,
 	type NormalizedSaveDialog,
@@ -153,6 +154,11 @@ export type FilesServiceOptions = {
 	 *  (→ Unavailable). One-call accessor so the handler stays vault-aware
 	 *  without holding a stale reference across `setActiveVaultSession`. */
 	getRegistry: () => FileHandleRegistry | null;
+	/** 11b.10 — the active vault's persistent file-watch grant store, or null
+	 *  when no session is open. Backs `requestWatchGrant` (a picked file that
+	 *  survives a vault reopen); the path stays shell-internal. Absent (older
+	 *  test wires) ⇒ `requestWatchGrant` returns `Unavailable`. */
+	getFileWatchGrants?: (() => FileWatchGrantsRepository | null) | undefined;
 	/** Electron `dialog.showOpenDialog` wrapper. Injected so unit tests can
 	 *  mock the picker — the broker still passes normalised options. */
 	showOpenDialog: ShowOpenDialog;
@@ -283,6 +289,23 @@ export function makeFilesServiceHandler(options: FilesServiceOptions): ServiceHa
 			handles.push({ handleId: token, displayName: basename(path) });
 		}
 		return handles;
+	}
+
+	/** 11b.10 — pick a file for a FileWatch trigger and persist the grant so it
+	 *  survives a vault reopen. Same dialog as `requestOpen`, but the pick is
+	 *  recorded in the persistent `file_watch_grants` store (path shell-internal)
+	 *  and the app gets only the opaque `watchId` + a displayName. */
+	async function handleRequestWatchGrant(
+		envelope: Envelope,
+	): Promise<{ watchId: string; displayName: string } | null> {
+		const grants = options.getFileWatchGrants?.();
+		if (!grants) throw unavailable("files.requestWatchGrant: no active vault session");
+		const normalized = normalizeOpenDialog(envelope.args[0]);
+		const result = await options.showOpenDialog(normalized, envelope.app);
+		if (result.canceled || result.filePaths.length === 0) return null;
+		const path = result.filePaths[0] as string;
+		const watchId = grants.mint(envelope.app, path, FileHandleMode.Read);
+		return { watchId, displayName: basename(path) };
 	}
 
 	async function handleRequestSave(envelope: Envelope): Promise<FileHandleWire | null> {
@@ -453,6 +476,8 @@ export function makeFilesServiceHandler(options: FilesServiceOptions): ServiceHa
 		switch (envelope.method) {
 			case "requestOpen":
 				return handleRequestOpen(envelope);
+			case "requestWatchGrant":
+				return handleRequestWatchGrant(envelope);
 			case "requestSave":
 				return handleRequestSave(envelope);
 			case "read":
