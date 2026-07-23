@@ -15,12 +15,18 @@ export { SOURCE_LANGUAGE, localeFallbackChain } from "@brainstorm-os/sdk/i18n";
 
 /** Languages with a shipped catalog, source language first. Grows as seed /
  *  community packs land. */
-export const AVAILABLE_LANGUAGES = ["en", "es", "de"] as const;
+export const AVAILABLE_LANGUAGES = ["en", "es", "de", "fr", "it", "pt"] as const;
 export type AvailableLanguage = (typeof AVAILABLE_LANGUAGES)[number];
 
 /** Languages whose catalog is a machine-translated first pass (shown with a
  *  badge in the picker; English is excluded — it's the human source). */
-export const MACHINE_TRANSLATED_LANGUAGES: ReadonlySet<string> = new Set(["es", "de"]);
+export const MACHINE_TRANSLATED_LANGUAGES: ReadonlySet<string> = new Set([
+	"es",
+	"de",
+	"fr",
+	"it",
+	"pt",
+]);
 
 export function isAvailableLanguage(value: string): value is AvailableLanguage {
 	return (AVAILABLE_LANGUAGES as readonly string[]).includes(value);
@@ -45,6 +51,9 @@ const STATIC_LABELS: Record<string, string> = {
 	en: "English",
 	es: "Español",
 	de: "Deutsch",
+	fr: "Français",
+	it: "Italiano",
+	pt: "Português",
 };
 
 function capitalize(value: string): string {
