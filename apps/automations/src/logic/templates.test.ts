@@ -42,6 +42,17 @@ describe("WORKFLOW_TEMPLATES", () => {
 		const ids = WORKFLOW_TEMPLATES.map((t) => t.id);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
+
+	it("offers mailbox triage + follow-up starters", () => {
+		const triage = templateById("triage-new-email");
+		expect(triage?.trigger.kind).toBe(TriggerKind.EntityEvent);
+		expect(triage?.trigger.config).toMatchObject({ entityType: "brainstorm/Email/v1" });
+		expect(triage?.tags).toContain("mailbox");
+
+		const followUp = templateById("email-follow-up-nudge");
+		expect(followUp?.trigger.kind).toBe(TriggerKind.Time);
+		expect(followUp?.tags).toContain("follow-up");
+	});
 });
 
 describe("instantiateTemplate", () => {

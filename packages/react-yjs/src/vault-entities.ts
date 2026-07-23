@@ -16,7 +16,7 @@ import type {
 	VaultEntitiesSnapshot,
 	VaultEntity,
 	VaultEntityLink,
-} from "@brainstorm-os/sdk-types";
+} from "./brainstorm-types";
 import { type QueryStore, createQueryStore } from "./query-store";
 
 /** The only part of the vault service `createVaultListStore` touches — the

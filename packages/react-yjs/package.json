@@ -2,11 +2,32 @@
   "name": "@brainstorm-os/react-yjs",
   "version": "0.0.1",
   "description": "React hooks bridging Yjs CRDT state into React components.",
+  "keywords": [
+    "yjs",
+    "react",
+    "crdt",
+    "hooks",
+    "collaborative",
+    "realtime",
+    "y-doc",
+    "awareness",
+    "presence",
+    "useSyncExternalStore"
+  ],
   "license": "MIT",
+  "homepage": "https://github.com/brainstorm-os/react-yjs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brainstorm-os/react-yjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brainstorm-os/react-yjs/issues"
+  },
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "sideEffects": false,
+  "files": ["dist", "README.md", "LICENSE"],
   "exports": {
     ".": "./src/index.ts"
   },
@@ -16,9 +37,6 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --outDir dist --tsconfig tsconfig.build.json && node ../../scripts/prepare-publish.mjs react-yjs",
     "prepublishOnly": "bun run build"
-  },
-  "dependencies": {
-    "@brainstorm-os/sdk-types": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0",
