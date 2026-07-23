@@ -794,6 +794,12 @@ export function ContactsApp(): ReactElement {
 								<p className="contacts__placeholder-blurb">{t("company.empty")}</p>
 							)}
 						</div>
+					) : visiblePersons.length === 0 && sidebarOpen ? (
+						// The sidebar already renders the "No contacts yet" empty state with
+						// its own New-contact CTA; a second one in the detail pane doubles it
+						// up. Suppress this one while the sidebar shows it. When the sidebar is
+						// collapsed there's no other empty state, so NoSelection stays.
+						<div className="contacts__content-empty" aria-hidden="true" />
 					) : (
 						<NoSelection listOpen={sidebarOpen} onCreate={() => setComposeOpen(true)} />
 					)}

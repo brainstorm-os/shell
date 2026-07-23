@@ -20,7 +20,7 @@ import { Doc, encodeStateAsUpdate } from "yjs";
 import { bytesToBase64 } from "../credentials/crypto";
 import { EntitiesRepository } from "../storage/entities-repo/entities-repo";
 import type { VaultSession } from "../vault/session";
-import type { WelcomeBody } from "./welcome-content";
+import type { WelcomeBody, WelcomeSeedLink } from "./welcome-content";
 import type { WelcomeSeedEntitySpec } from "./welcome-seed";
 
 /** Every node type a bundled body may reference (baseline blocks + the
@@ -37,6 +37,9 @@ export type ApplyDocUpdate = (entityId: string, updateB64: string) => Promise<vo
 export type SeedEntityDeps = {
 	createEntity: (spec: WelcomeSeedEntitySpec) => void;
 	plantBody: (entityId: string, body: WelcomeBody) => Promise<void>;
+	/** Persist a note→entity link (idempotent by id via `INSERT OR REPLACE`), so
+	 *  the seeded `@`-mention graph is populated on first open. */
+	createLink: (link: WelcomeSeedLink) => void;
 };
 
 /** Build the privileged create+plant deps from a live session. `createEntity`
@@ -57,6 +60,15 @@ export async function makeSeedEntityDeps(
 				createdBy: spec.createdBy,
 				now: spec.now,
 				dekId: null,
+			});
+		},
+		createLink: (link) => {
+			repo.putLink({
+				id: link.id,
+				sourceEntityId: link.sourceEntityId,
+				destEntityId: link.destEntityId,
+				linkType: link.linkType,
+				createdAt: link.createdAt,
 			});
 		},
 		plantBody: async (entityId, body) => {
