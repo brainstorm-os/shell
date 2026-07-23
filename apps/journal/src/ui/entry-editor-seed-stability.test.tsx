@@ -38,7 +38,6 @@ vi.mock("@brainstorm-os/editor", () => {
 		BlankRecoveryPlugin: Noop,
 		CommentHighlightPlugin: Noop,
 		EditorCapturePlugin: Noop,
-		TitlePlugin: Noop,
 		FULL_EDITOR_NODES: [],
 		TitleNode: class {},
 		richTextTheme: {},

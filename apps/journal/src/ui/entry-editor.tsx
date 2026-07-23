@@ -43,7 +43,6 @@ import {
 	FullEditorPlugins,
 	type SelectionCommentAnchor,
 	TitleNode,
-	TitlePlugin,
 	richTextTheme,
 } from "@brainstorm-os/editor";
 import { useYDoc, useYDocApplyPending, useYDocLoaded } from "@brainstorm-os/react-yjs";
@@ -302,7 +301,13 @@ export function JournalEntryEditor({
 				autoFocus
 				{...(onCommentSelection ? { onComment: onCommentSelection } : {})}
 			>
-				<TitlePlugin />
+				{/* F-455: do not mount the title-invariant plugin. Journal
+				    paints the date in its own chrome and hides any TitleNode
+				    via CSS. The invariant always injects an empty TitleNode
+				    as root[0], which makes Lexical's $canShowPlaceholder
+				    false — so the writeHint ("Start writing your entry…")
+				    never rendered on a fresh day. TitleNode stays registered
+				    so Notes-seeded bodies still parse; we just don't enforce. */}
 				{onChange ? <AutosavePlugin onChange={onChange} /> : null}
 				{onCommentSelection ? (
 					<CommentHighlightPlugin
