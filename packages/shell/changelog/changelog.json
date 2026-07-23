@@ -3,6 +3,206 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.9.0",
+      "date": "2026-07-23",
+      "icon": "🤝",
+      "title": "Work with the agent",
+      "summary": "Your agent now builds real things with you — propose a note, task, event, bookmark, or contact right in chat, and approve what you want to keep. Plus same-network sync, four new languages, and Notion import.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "The agent makes things — you decide"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Propose & approve",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — ask the agent in chat and it drafts real "
+            },
+            {
+              "text": "notes, tasks, events, bookmarks and contacts",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " as cards. Edit a field, approve what's right, discard the rest."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔒",
+          "text": [
+            {
+              "text": "You always commit. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Nothing is written to your vault until you approve it — even a hidden instruction in a document can only draft a card, never save one. The "
+            },
+            {
+              "text": "approve button",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " is yours."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Work together on one network"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "LAN sync",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — two devices on the "
+            },
+            {
+              "text": "same network",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " share a vault directly, with no relay server in between."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Now in your language"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "French, German, Italian & Portuguese",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the shell and every built-in app now speak "
+            },
+            {
+              "text": "four more languages",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", alongside English and Spanish."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Bring your work in"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notion import",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — pages from Notion come across as clean "
+            },
+            {
+              "text": "Markdown notes",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Smarter forms",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — form fields can "
+            },
+            {
+              "text": "show and hide based on earlier answers",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in the Form designer."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notification badges",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — apps can show a count on their dashboard icon."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Live Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the graph updates as events stream in."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Fixes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — Calendar's Year view keeps the current month, the dashboard snap grid shows only while dragging, and callout icons are legible again."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.8.0",
       "date": "2026-07-22",
       "icon": "🌐",
