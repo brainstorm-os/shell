@@ -1,4 +1,5 @@
 import { BrainstormMenuProvider } from "@brainstorm-os/sdk/menus";
+import * as Sentry from "@sentry/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
@@ -29,6 +30,17 @@ import { installFocusNav } from "./focus-nav";
 import { installErrorBridge } from "./ui/error-bridge";
 import { installUpdateToastBridge } from "./update/update-toast-bridge";
 import { VaultProvider } from "./vault-context";
+
+Sentry.init({
+	dsn: "https://5bcd818c37400c11963e227dd2652cca@o4511783230636032.ingest.de.sentry.io/4511783234830417",
+	dataCollection: {
+		// To disable sending user data and HTTP bodies, uncomment the lines below.
+		// For more info visit:
+		// https://docs.sentry.io/platforms/javascript/guides/react/configuration/options/#dataCollection
+		// userInfo: false,
+		// httpBodies: []
+	},
+});
 
 initAnalytics();
 
