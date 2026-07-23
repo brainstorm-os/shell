@@ -50,6 +50,7 @@ import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
+import { createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
 import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
@@ -3417,6 +3418,14 @@ void app.whenReady().then(async () => {
 		}),
 		{ default: true },
 	);
+	// Capture-only: the scripted demo provider powers the Agent-11 propose→approve
+	// promo reel without a live model (the rig is deterministic + model-free).
+	// Gated behind BRAINSTORM_DEMO_AGENT — never registered in normal dev/prod;
+	// registered as the default so a demo-vault agent turn (no pinned provider)
+	// routes here and drives the real agent loop with scripted proposals.
+	if (process.env.BRAINSTORM_DEMO_AGENT) {
+		aiProviders.register(createDemoAgentProvider(), { default: true });
+	}
 	// 11.6 — BYO cloud provider (Anthropic Claude). Reached over the same
 	// network broker as Ollama but WITHOUT `allowPrivate` (the Claude API is a
 	// public host); the `x-api-key` header is forwarded by `executeNetworkFetch`
