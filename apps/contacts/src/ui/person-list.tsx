@@ -259,7 +259,7 @@ export function PersonSidebar({
 			<div className="contacts-list__scroll">
 				{persons.length === 0 ? (
 					<EmptyState
-						icon={IconName.Entity}
+						icon={IconName.AddressBook}
 						title={t("list.empty.title")}
 						hint={t("list.empty.blurb")}
 						action={
