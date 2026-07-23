@@ -24,6 +24,10 @@ export type CodeEditorMessageKey = keyof typeof CODE_EDITOR_MESSAGES;
 /** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
 export const LOCALE_PACK_IMPORTERS: LocalePackImporters<typeof CODE_EDITOR_MESSAGES> = {
 	es: () => import("./i18n/es.json"),
+	de: () => import("./i18n/de.json"),
+	fr: () => import("./i18n/fr.json"),
+	it: () => import("./i18n/it.json"),
+	pt: () => import("./i18n/pt.json"),
 };
 
 let activeT: TFunction<typeof CODE_EDITOR_MESSAGES> = createT(CODE_EDITOR_MESSAGES);

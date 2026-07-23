@@ -17,6 +17,9 @@ import { applyLocalePack } from "./t";
 const PACK_IMPORTERS: Record<string, () => Promise<{ default: Record<string, string> }>> = {
 	es: () => import("./es.json"),
 	de: () => import("./de.json"),
+	fr: () => import("./fr.json"),
+	it: () => import("./it.json"),
+	pt: () => import("./pt.json"),
 };
 
 /** Resolve + apply the pack for `language`. Walks the fallback chain (e.g.
