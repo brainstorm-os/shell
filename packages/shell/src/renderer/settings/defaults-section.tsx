@@ -110,14 +110,17 @@ export function DefaultsSection() {
 					<ul className="settings__defaults-list">
 						{entries.map((entry) => {
 							const current = pins[`${verb}:${entry.entityType}`] ?? AUTOMATIC;
+							// Human caption on the face; full wire id stays on title=
+							// for power users / support (F-414).
+							const label = entry.label || entry.entityType;
 							return (
 								<li key={entry.entityType} className="settings__defaults-row">
 									<span className="settings__defaults-type" title={entry.entityType}>
-										{entry.entityType}
+										{label}
 									</span>
 									<SelectMenu
 										className="settings__defaults-select"
-										ariaLabel={t("shell.settings.defaults.pick", { type: entry.entityType })}
+										ariaLabel={t("shell.settings.defaults.pick", { type: label })}
 										value={current}
 										options={defaultsOptions(entry.apps)}
 										onChange={(next) => onPick(entry.entityType, next)}

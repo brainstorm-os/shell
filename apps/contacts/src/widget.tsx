@@ -26,7 +26,7 @@ import { useMemo, useState } from "react";
 import { plural, t } from "./i18n";
 import { useContactsT } from "./i18n-hooks";
 import { getBrainstorm } from "./runtime";
-import { PERSON_TYPE } from "./types/person";
+import { COMPANY_TYPE, PERSON_TYPE } from "./types/person";
 import {
 	CONTACTS_WIDGET_LIST,
 	ContactsSort,
@@ -36,8 +36,9 @@ import {
 import "./widget.css";
 
 /** Server-side narrowing for the widget's entity subscription (F-384) —
- *  module-level so the reference is stable across renders. */
-const WIDGET_QUERY = { types: [PERSON_TYPE] } as const;
+ *  module-level so the reference is stable across renders. Companies come
+ *  along so linked `Person.company` refs resolve to names (F-403). */
+const WIDGET_QUERY = { types: [PERSON_TYPE, COMPANY_TYPE] } as const;
 
 /** Empty-state CTA (F-381): an entityType-only `open` routes to the type's
  *  registered opener and launches the full Contacts app. */

@@ -483,7 +483,7 @@ function ImportSection() {
 
 			{phase.kind === "idle" && (
 				<Button
-					variant={ButtonVariant.Primary}
+					variant={ButtonVariant.Neutral}
 					size={ButtonSize.Md}
 					iconLeft={IconName.Folder}
 					loading={busy}
@@ -628,7 +628,7 @@ function ObsidianSection() {
 
 			{phase.kind === "idle" && (
 				<Button
-					variant={ButtonVariant.Primary}
+					variant={ButtonVariant.Neutral}
 					size={ButtonSize.Md}
 					iconLeft={IconName.Folder}
 					loading={busy}
@@ -750,7 +750,7 @@ function AnytypeSection() {
 
 			{phase.kind === "idle" && (
 				<Button
-					variant={ButtonVariant.Primary}
+					variant={ButtonVariant.Neutral}
 					size={ButtonSize.Md}
 					iconLeft={IconName.Archive}
 					loading={busy}
@@ -870,7 +870,7 @@ function NotionSection() {
 
 			{phase.kind === "idle" && (
 				<Button
-					variant={ButtonVariant.Primary}
+					variant={ButtonVariant.Neutral}
 					size={ButtonSize.Md}
 					iconLeft={IconName.Archive}
 					loading={busy}

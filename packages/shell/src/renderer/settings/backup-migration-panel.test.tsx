@@ -21,6 +21,32 @@ describe("BackupMigrationPanel", () => {
 		expect(html).not.toContain("shell.settings.backupMigration");
 	});
 
+	it("gives Export the only primary face; import entry points are neutral (F-415)", () => {
+		const html = renderToStaticMarkup(<BackupMigrationPanel />);
+		// Export vault is the headline action — filled primary.
+		const exportIdx = html.indexOf('data-testid="backup-migration-export-btn"');
+		expect(exportIdx).toBeGreaterThan(-1);
+		// The button opens just before its testid; walk back to the nearest class=.
+		const exportOpen = html.lastIndexOf("<button", exportIdx);
+		const exportTag = html.slice(exportOpen, exportIdx);
+		expect(exportTag).toContain("button--primary");
+
+		// Import / Obsidian / Anytype / Notion entry points are quieter neutrals.
+		for (const id of [
+			"backup-migration-import-pick",
+			"backup-migration-obsidian-pick",
+			"backup-migration-anytype-pick",
+			"backup-migration-notion-pick",
+		]) {
+			const idx = html.indexOf(`data-testid="${id}"`);
+			expect(idx).toBeGreaterThan(-1);
+			const open = html.lastIndexOf("<button", idx);
+			const tag = html.slice(open, idx);
+			expect(tag).toContain("button--neutral");
+			expect(tag).not.toContain("button--primary");
+		}
+	});
+
 	it("registers a stable section enum value", () => {
 		expect(SettingsSection.BackupMigration).toBe("backup-migration");
 	});

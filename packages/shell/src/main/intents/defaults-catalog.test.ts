@@ -23,6 +23,7 @@ describe("buildDefaultsCatalog", () => {
 		expect(catalog.verb).toBe(DEFAULT_HANDLER_VERB);
 		const entry = catalog.entries[0];
 		expect(entry?.entityType).toBe("brainstorm/Person/v1");
+		expect(entry?.label).toBe("Person");
 		// notes appears once (capable + generic), database too; sorted by label.
 		expect(entry?.apps.map((a) => a.appId)).toEqual([
 			"io.brainstorm.database",
@@ -31,15 +32,25 @@ describe("buildDefaultsCatalog", () => {
 		expect(entry?.defaultAppId).toBeNull();
 	});
 
-	it("always includes the generic editor even when no app claims the type", () => {
+	it("drops types no app claims — generic editor alone is not enough (F-414)", () => {
+		// Pre-F-414 every type inherited Notes as a pick and flooded the
+		// list with TokenSet / WhiteboardEdge / AutomationHostDesignation.
 		const catalog = buildDefaultsCatalog({
 			...base,
-			entityTypes: ["brainstorm/Person/v1"],
-			capableApps: () => [],
+			entityTypes: ["brainstorm/Person/v1", "brainstorm/TokenSet/v1"],
+			capableApps: (type) => (type === "brainstorm/Person/v1" ? ["io.brainstorm.contacts"] : []),
 		});
-		expect(catalog.entries[0]?.apps).toEqual([
-			{ appId: GENERIC_OBJECT_EDITOR_APP_ID, label: "notes" },
-		]);
+		expect(catalog.entries.map((e) => e.entityType)).toEqual(["brainstorm/Person/v1"]);
+		expect(catalog.entries[0]?.label).toBe("Person");
+	});
+
+	it("drops plumbing types even when an opener claims them (F-414)", () => {
+		const catalog = buildDefaultsCatalog({
+			...base,
+			entityTypes: ["brainstorm/Person/v1", "brainstorm/BrowsingSession/v1"],
+			capableApps: () => ["io.brainstorm.browser"],
+		});
+		expect(catalog.entries.map((e) => e.entityType)).toEqual(["brainstorm/Person/v1"]);
 	});
 
 	it("reflects the current pin from the dashboard snapshot", () => {
@@ -52,14 +63,14 @@ describe("buildDefaultsCatalog", () => {
 		expect(catalog.entries[0]?.defaultAppId).toBe("io.brainstorm.database");
 	});
 
-	it("sorts entity types and omits a pin for an unrelated key", () => {
+	it("sorts entity types by human label and omits a pin for an unrelated key", () => {
 		const catalog = buildDefaultsCatalog({
 			...base,
-			entityTypes: ["b/Z/v1", "a/A/v1"],
-			capableApps: () => [],
+			entityTypes: ["brainstorm/Zebra/v1", "brainstorm/Apple/v1"],
+			capableApps: () => ["io.brainstorm.notes"],
 			currentDefaults: { "open:something/else/v1": "io.brainstorm.notes" },
 		});
-		expect(catalog.entries.map((e) => e.entityType)).toEqual(["a/A/v1", "b/Z/v1"]);
+		expect(catalog.entries.map((e) => e.label)).toEqual(["Apple", "Zebra"]);
 		expect(catalog.entries.every((e) => e.defaultAppId === null)).toBe(true);
 	});
 
@@ -68,9 +79,9 @@ describe("buildDefaultsCatalog", () => {
 			...base,
 			genericEditorAppId: null,
 			entityTypes: ["t/T/v1"],
-			capableApps: () => [],
+			capableApps: () => ["io.brainstorm.notes"],
 		});
-		expect(catalog.entries[0]?.apps).toEqual([]);
+		expect(catalog.entries[0]?.apps).toEqual([{ appId: "io.brainstorm.notes", label: "notes" }]);
 	});
 
 	it("emits empty schemes + extensions arrays when no scheme/ext data is passed (back-compat)", () => {
@@ -80,7 +91,7 @@ describe("buildDefaultsCatalog", () => {
 		const catalog = buildDefaultsCatalog({
 			...base,
 			entityTypes: ["t/T/v1"],
-			capableApps: () => [],
+			capableApps: () => ["io.brainstorm.notes"],
 		});
 		expect(catalog.schemes).toEqual([]);
 		expect(catalog.extensions).toEqual([]);

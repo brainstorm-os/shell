@@ -12,7 +12,7 @@ import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainsto
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
 import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { t } from "../i18n";
 
@@ -64,6 +64,9 @@ export function ConnectAccountDialog(props: {
 	reconnect?: ReconnectSeed;
 }): ReactElement {
 	const seed = props.reconnect;
+	// Stable form id so the sticky Popover footer can host type=submit buttons
+	// that still submit this form (HTML `form="…"` association — F-447).
+	const formId = useId();
 	const [mode, setMode] = useState<ConnectMode>(seed ? ConnectMode.Imap : ConnectMode.Gmail);
 	const [clientId, setClientId] = useState("");
 	const [clientSecret, setClientSecret] = useState("");
@@ -186,8 +189,27 @@ export function ConnectAccountDialog(props: {
 			onClose={props.onClose}
 			size={PopoverSize.Medium}
 			testId="mb-connect"
+			footer={
+				<>
+					{/* Stays enabled while busy: the consent tab continues in the
+					    browser either way, so closing the dialog is harmless —
+					    and matches backdrop/Escape, which also close. */}
+					<button type="button" className="bs-btn bs-btn--secondary" onClick={props.onClose}>
+						{t("connect.cancel")}
+					</button>
+					<button
+						type="submit"
+						form={formId}
+						className="bs-btn"
+						data-bs-primary
+						disabled={busy || !ready}
+					>
+						{busy ? t("connect.connecting") : t("connect.submit")}
+					</button>
+				</>
+			}
 		>
-			<form className="mb-connect" onSubmit={submit}>
+			<form id={formId} className="mb-connect" onSubmit={submit}>
 				{props.onConnectImap && seed === undefined ? (
 					<div
 						className="bs-segmented mb-connect__modes"
@@ -234,9 +256,12 @@ export function ConnectAccountDialog(props: {
 					</>
 				) : (
 					<>
-						<p className="mb-connect__help">
-							{t(seed !== undefined ? "connect.imap.help.reconnect" : "connect.imap.help")}
-						</p>
+						{/* Reconnect drops the how-to lecture (F-447) — user is
+						    fixing one field, not learning IMAP. Create mode keeps
+						    the help for first-time setup. */}
+						{seed === undefined ? (
+							<p className="mb-connect__help">{t("connect.imap.help")}</p>
+						) : null}
 						{field("connect.imap.address", address, setAddress, {
 							placeholder: t("connect.imap.address.placeholder"),
 							required: true,
@@ -293,17 +318,6 @@ export function ConnectAccountDialog(props: {
 						{t("connect.error", { message: error })}
 					</p>
 				) : null}
-				<div className="mb-connect__actions">
-					{/* Stays enabled while busy: the consent tab continues in the
-					    browser either way, so closing the dialog is harmless —
-					    and matches backdrop/Escape, which also close. */}
-					<button type="button" className="bs-btn bs-btn--secondary" onClick={props.onClose}>
-						{t("connect.cancel")}
-					</button>
-					<button type="submit" className="bs-btn" data-bs-primary disabled={busy || !ready}>
-						{busy ? t("connect.connecting") : t("connect.submit")}
-					</button>
-				</div>
 			</form>
 		</Popover>
 	);

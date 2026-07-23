@@ -152,6 +152,7 @@
   "shell.settings.ai.title": "AI providers",
   "shell.settings.ai.intro": "Bring your own API key for a cloud model. Keys are stored encrypted in this vault and never leave your device except to call the provider you configure. The built-in local model needs no key.",
   "shell.settings.ai.anthropic.name": "Anthropic (Claude)",
+  "shell.settings.ai.anthropic.tile": "Anthropic",
   "shell.settings.ai.anthropic.hint": "Used when an app or workflow requests the Anthropic provider. Get a key from console.anthropic.com.",
   "shell.settings.ai.openai.name": "OpenAI",
   "shell.settings.ai.openai.hint": "OpenAI and OpenAI-compatible endpoints (OpenRouter, Together, Groq, local servers). Get a key from platform.openai.com.",

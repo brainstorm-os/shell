@@ -399,6 +399,8 @@ export type DashboardSnapshot = {
 export type DefaultsCatalogApp = { appId: string; label: string };
 export type DefaultsCatalogEntry = {
 	entityType: string;
+	/** Human caption (`Note`) — F-414. Wire id stays on `entityType`. */
+	label: string;
 	apps: DefaultsCatalogApp[];
 	defaultAppId: string | null;
 };
