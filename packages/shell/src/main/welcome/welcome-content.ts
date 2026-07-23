@@ -24,6 +24,13 @@
  * seeder gates on a per-vault `welcome:seedVersion` stamp so it runs once.
  */
 
+import { NoteReferenceKind, extractNoteReferences } from "../entities/extract-note-references";
+import {
+	NOTE_MENTION_LINK_TYPE,
+	NOTE_REFERENCE_LINK_TYPE,
+	noteLinkId,
+} from "../entities/note-entities-codec";
+
 /** Canonical BP type ids the starter entities use (verified against the
  *  in-use strings across `packages/`, `apps/`, `tools/`). */
 export enum WelcomeEntityType {
@@ -236,4 +243,40 @@ export function buildWelcomeStarterSet(now: number): WelcomeStarterEntity[] {
 	};
 
 	return [hub, task, project, folder, event, whiteboard, bookmark, journal];
+}
+
+/** A note→entity link the seeder materialises for the starter set. */
+export type WelcomeSeedLink = {
+	readonly id: string;
+	readonly sourceEntityId: string;
+	readonly destEntityId: string;
+	readonly linkType: string;
+	readonly createdAt: number;
+};
+
+/**
+ * Mention links for the starter set, derived from the SAME
+ * `extractNoteReferences` the Notes codec runs on a saved note — so the link
+ * ids and types are byte-identical to what a later edit of the hub note would
+ * produce (idempotent: re-extraction on first edit never duplicates a seeded
+ * link). Materialising these at seed time is what makes Graph + backlinks paint
+ * a connected subgraph on first open; without it the `@`-mentions become real
+ * links only after the note is first edited, and the Graph opens edge-less.
+ */
+export function buildWelcomeStarterLinks(now: number): WelcomeSeedLink[] {
+	const links: WelcomeSeedLink[] = [];
+	for (const entity of buildWelcomeStarterSet(now)) {
+		if (!entity.body) continue;
+		for (const ref of extractNoteReferences(entity.body)) {
+			links.push({
+				id: noteLinkId(entity.id, ref.kind, ref.entityId),
+				sourceEntityId: entity.id,
+				destEntityId: ref.entityId,
+				linkType:
+					ref.kind === NoteReferenceKind.Mention ? NOTE_MENTION_LINK_TYPE : NOTE_REFERENCE_LINK_TYPE,
+				createdAt: now,
+			});
+		}
+	}
+	return links;
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { NoteReferenceKind, extractNoteReferences } from "../entities/extract-note-references";
+import { NOTE_MENTION_LINK_TYPE, noteLinkId } from "../entities/note-entities-codec";
 import {
 	WELCOME_ID_PREFIX,
 	WELCOME_SEED_VERSION,
 	WelcomeEntityType,
+	buildWelcomeStarterLinks,
 	buildWelcomeStarterSet,
 } from "./welcome-content";
 
@@ -61,6 +63,36 @@ describe("buildWelcomeStarterSet", () => {
 			expect(mentioned.has(e.id)).toBe(true);
 		}
 		expect(refs.every((r) => r.kind === NoteReferenceKind.Mention)).toBe(true);
+	});
+
+	it("materialises a mention link from the hub note to every other starter (the seed's graph edges)", () => {
+		const set = buildWelcomeStarterSet(NOW);
+		const [hub, ...rest] = set;
+		const links = buildWelcomeStarterLinks(NOW);
+
+		// Every leaf entity has a hub→leaf mention link, so Graph paints edges on
+		// first open rather than an edge-less scatter.
+		for (const leaf of rest) {
+			const link = links.find((l) => l.sourceEntityId === hub?.id && l.destEntityId === leaf.id);
+			expect(link, `no seeded link hub→${leaf.id}`).toBeDefined();
+			expect(link?.linkType).toBe(NOTE_MENTION_LINK_TYPE);
+		}
+	});
+
+	it("seeded link ids match the Notes codec, so a later edit is idempotent (no dupes)", () => {
+		const links = buildWelcomeStarterLinks(NOW);
+		for (const link of links) {
+			// The codec derives `noteLinkId(note, Mention, dest)` for the same
+			// mentions; a byte-identical id means re-extraction on edit upserts
+			// the same row instead of creating a duplicate edge.
+			expect(link.id).toBe(
+				noteLinkId(link.sourceEntityId, NoteReferenceKind.Mention, link.destEntityId),
+			);
+			expect(link.createdAt).toBe(NOW);
+		}
+		expect(links.length).toBeGreaterThan(0);
+		// Ids are unique.
+		expect(new Set(links.map((l) => l.id)).size).toBe(links.length);
 	});
 
 	it("no mention targets a non-existent entity (no dangling edges)", () => {

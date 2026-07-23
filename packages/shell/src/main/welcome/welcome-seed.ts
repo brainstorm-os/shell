@@ -25,6 +25,8 @@ import {
 	WELCOME_SEED_CREATED_BY,
 	WELCOME_SEED_VERSION,
 	type WelcomeBody,
+	type WelcomeSeedLink,
+	buildWelcomeStarterLinks,
 	buildWelcomeStarterSet,
 } from "./welcome-content";
 
@@ -56,6 +58,10 @@ export type WelcomeSeedDeps = {
 	readonly createEntity: (spec: WelcomeSeedEntitySpec) => void | Promise<void>;
 	/** Plant a serialized body into the entity's universal-body Y.Doc. */
 	readonly plantBody: (entityId: string, body: WelcomeBody) => void | Promise<void>;
+	/** Materialise a note→entity mention link. Optional so in-process tests that
+	 *  only exercise entity/body seeding can omit it; production always wires it
+	 *  (`makeSeedEntityDeps`) so Graph/backlinks are populated on first open. */
+	readonly createLink?: (link: WelcomeSeedLink) => void | Promise<void>;
 	/** The vault's last-seeded version (`0` when never seeded). */
 	readonly readVersion: () => number | Promise<number>;
 	/** Persist the seeded version. */
@@ -91,6 +97,20 @@ export async function seedWelcomeContent(deps: WelcomeSeedDeps): Promise<Welcome
 			}
 		} catch (error) {
 			errors.push(`${entity.id}: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	// Second pass: materialise the hub note's `@`-mention links now that every
+	// dest entity exists (a link's endpoints must both be present). Isolated,
+	// idempotent (`putLink` upserts by a deterministic id), and cosmetic — a
+	// failure is collected, never propagated, same posture as entity seeding.
+	if (deps.createLink) {
+		for (const link of buildWelcomeStarterLinks(deps.now)) {
+			try {
+				await deps.createLink(link);
+			} catch (error) {
+				errors.push(`link ${link.id}: ${error instanceof Error ? error.message : String(error)}`);
+			}
 		}
 	}
 
