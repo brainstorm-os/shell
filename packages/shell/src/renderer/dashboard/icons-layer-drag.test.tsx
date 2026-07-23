@@ -39,7 +39,7 @@ function pointer(type: string, init: PointerEventInit): Event {
 describe("DashboardIconsLayer — drag reveals the snap grid, a click does not", () => {
 	let host: HTMLDivElement;
 	let root: Root;
-	let onMoveIcon: ReturnType<typeof vi.fn>;
+	let onMoveIcon: ReturnType<typeof vi.fn<(id: string, x: number, y: number) => void>>;
 
 	beforeEach(() => {
 		(globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserverStub;
@@ -55,7 +55,7 @@ describe("DashboardIconsLayer — drag reveals the snap grid, a click does not",
 				iconUrl: (id: string) => `brainstorm://app-icon/${id}`,
 			},
 		};
-		onMoveIcon = vi.fn();
+		onMoveIcon = vi.fn<(id: string, x: number, y: number) => void>();
 		host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
@@ -83,7 +83,8 @@ describe("DashboardIconsLayer — drag reveals the snap grid, a click does not",
 	}
 
 	const surface = () => host.querySelector<HTMLElement>(".dashboard-icons");
-	const btn = (id: string) => host.querySelector<HTMLElement>(`[data-testid="dashboard-icon-${id}"]`);
+	const btn = (id: string) =>
+		host.querySelector<HTMLElement>(`[data-testid="dashboard-icon-${id}"]`);
 
 	it("keeps the grid hidden through a press-and-release click", async () => {
 		await mount();
@@ -94,7 +95,9 @@ describe("DashboardIconsLayer — drag reveals the snap grid, a click does not",
 		// Still just a press — no grid.
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(false);
 
-		act(() => target?.dispatchEvent(pointer("pointerup", { button: 0, clientX: 42, clientY: 41, buttons: 0 })));
+		act(() =>
+			target?.dispatchEvent(pointer("pointerup", { button: 0, clientX: 42, clientY: 41, buttons: 0 })),
+		);
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(false);
 		expect(onMoveIcon).not.toHaveBeenCalled();
 	});
@@ -107,14 +110,22 @@ describe("DashboardIconsLayer — drag reveals the snap grid, a click does not",
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(false);
 
 		// Under the slop — still hidden.
-		act(() => target?.dispatchEvent(pointer("pointermove", { clientX: 43, clientY: 42, buttons: 1 })));
+		act(() =>
+			target?.dispatchEvent(pointer("pointermove", { clientX: 43, clientY: 42, buttons: 1 })),
+		);
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(false);
 
 		// Past the 5px slop — grid appears.
-		act(() => target?.dispatchEvent(pointer("pointermove", { clientX: 120, clientY: 90, buttons: 1 })));
+		act(() =>
+			target?.dispatchEvent(pointer("pointermove", { clientX: 120, clientY: 90, buttons: 1 })),
+		);
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(true);
 
-		act(() => target?.dispatchEvent(pointer("pointerup", { button: 0, clientX: 120, clientY: 90, buttons: 0 })));
+		act(() =>
+			target?.dispatchEvent(
+				pointer("pointerup", { button: 0, clientX: 120, clientY: 90, buttons: 0 }),
+			),
+		);
 		expect(surface()?.classList.contains("dashboard-icons--dragging")).toBe(false);
 		expect(onMoveIcon).toHaveBeenCalledTimes(1);
 	});

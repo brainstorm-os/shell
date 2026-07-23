@@ -24,20 +24,20 @@ import {
 	MessageRole,
 	StepKind,
 	type WorkflowRunDef,
-	type WorkflowStep,
 	WorkflowRunStatus,
+	type WorkflowStep,
 	aggregateWorkflowCapabilities,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { makeAiServiceHandler } from "../ai/ai-service";
 import type { ModelProvider } from "../ai/provider";
-import { createBrokerInterpreterPorts } from "../automations/broker-interpreter-ports";
 import {
 	AutomationsHost,
 	type EntityChange,
 	type EntityChangeSource,
 	type LoadedWorkflow,
 } from "../automations/automations-host";
+import { createBrokerInterpreterPorts } from "../automations/broker-interpreter-ports";
 import type { ReminderRunner } from "../automations/reminder-runner";
 import type { SchedulerService } from "../automations/scheduler-service";
 
@@ -52,12 +52,18 @@ function stubProvider(record: { generateCalls: AiGenerateRequest[] }): ModelProv
 		id: "stub",
 		generate: async (req: AiGenerateRequest): Promise<AiGenerateResult> => {
 			record.generateCalls.push(req);
-			const system = req.messages.find((m) => m.role === MessageRole.System)?.content ?? "";
+			// `AiChatMessage.content` is `string | AiContentPart[]` (multimodal); this
+			// stub only ever deals with text turns, so coerce to the text.
+			const textOf = (role: MessageRole): string => {
+				const c = req.messages.find((m) => m.role === role)?.content;
+				return typeof c === "string" ? c : "";
+			};
+			const system = textOf(MessageRole.System);
 			const hasToolResult = req.messages.some((m) => m.role === MessageRole.Tool);
 			let content: string;
 			if (system.includes("triage classifier")) {
 				// The classifier sees the email JSON as the user turn.
-				const user = req.messages.find((m) => m.role === MessageRole.User)?.content ?? "";
+				const user = textOf(MessageRole.User);
 				content = user.includes("server is down") ? "urgent" : "normal";
 			} else if (system.includes("compose:")) {
 				// The reply-drafting agent: call the compose tool once, then finish.
@@ -220,14 +226,16 @@ describe("business triage flow (trigger → AI classify → AI-agent draft)", ()
 		host.start();
 
 		// An incoming email fires the trigger.
-		for (const l of listeners) l({ verb: EntityEventVerb.Create, entityId: "email-1", type: EMAIL_TYPE });
+		for (const l of listeners)
+			l({ verb: EntityEventVerb.Create, entityId: "email-1", type: EMAIL_TYPE });
 		// Let the async fire settle.
 		await new Promise((r) => setTimeout(r, 0));
 		host.stop();
 
 		// One run persisted, succeeded end to end.
 		expect(runs).toHaveLength(1);
-		const run = runs[0]!;
+		const run = runs[0];
+		if (!run) throw new Error("expected one persisted run");
 		expect(run.status).toBe(WorkflowRunStatus.Succeeded);
 
 		// The classifier saw the email and produced the label (recorded in provenance).
@@ -237,8 +245,10 @@ describe("business triage flow (trigger → AI classify → AI-agent draft)", ()
 
 		// The AI-agent step drafted a reply by dispatching the `compose` intent.
 		expect(dispatched).toHaveLength(1);
-		expect(dispatched[0]!.verb).toBe("compose");
-		expect((dispatched[0]!.payload as { body?: string }).body).toContain("outage");
+		const dispatch = dispatched[0];
+		if (!dispatch) throw new Error("expected one dispatched intent");
+		expect(dispatch.verb).toBe("compose");
+		expect((dispatch.payload as { body?: string }).body).toContain("outage");
 	});
 
 	it("BOUNDARY: the pure step set cannot assemble a new entity's fields from AI output", () => {

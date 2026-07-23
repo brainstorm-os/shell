@@ -125,8 +125,16 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 		});
 		const host = new LanRelayHost({ admit });
 		const ctor = host.webSocketCtor();
-		const portA = new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor, onChallenge: a.responder });
-		const portB = new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor, onChallenge: b.responder });
+		const portA = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: ctor,
+			onChallenge: a.responder,
+		});
+		const portB = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: ctor,
+			onChallenge: b.responder,
+		});
 		try {
 			portA.connect();
 			portB.connect();

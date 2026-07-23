@@ -4740,11 +4740,7 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 		onCommit: async ({ def, dictionary }) => {
 			// Same name + type already exists → reuse, never mint a twin that
 			// silently splits values across two defs (F-419 / F-034).
-			const reusable = findReusablePropertyDef(
-				cachedVaultProperties,
-				def.name ?? "",
-				def.valueType,
-			);
+			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
 			if (reusable) {
 				flashStatus(
 					`Property "${reusable.name || reusable.key}" already exists — reuse it instead of creating a twin`,

@@ -90,7 +90,11 @@ describe("ConnectAccountDialog — reconnect-in-place (Mailbox-13)", () => {
 	it("pins Cancel/Connect in the sticky popover footer (F-447)", () => {
 		act(() => {
 			root.render(
-				<ConnectAccountDialog onClose={() => {}} onConnect={async () => {}} onConnectImap={async () => {}} />,
+				<ConnectAccountDialog
+					onClose={() => {}}
+					onConnect={async () => {}}
+					onConnectImap={async () => {}}
+				/>,
 			);
 		});
 		const footer = host.querySelector(".bs-popover__footer");

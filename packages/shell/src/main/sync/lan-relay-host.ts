@@ -171,9 +171,8 @@ export class LanRelayHost {
 		if (!state) return;
 		if (!state.authed) {
 			// Only an `auth` control can move an unauthenticated connection forward.
-			const auth = bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE
-				? decodeAuth(bytes.subarray(1))
-				: null;
+			const auth =
+				bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE ? decodeAuth(bytes.subarray(1)) : null;
 			if (!auth) return; // drop subscribe / frame / anything else pre-auth.
 			void this.#tryAdmit(connId, state, auth, sendToClient, closeClient);
 			return;
