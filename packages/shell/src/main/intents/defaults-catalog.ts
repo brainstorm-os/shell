@@ -19,13 +19,13 @@
  * memory; this one's the explicit user choice).
  */
 
-import { isPlumbingEntityType, typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import {
 	OS_HANDOFF_APP_ID,
 	OS_HANDOFF_APP_LABEL,
 	OsHandoffSignatureKind,
 	osHandoffSignature,
 } from "@brainstorm-os/sdk-types";
+import { isPlumbingEntityType, typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import { defaultHandlerKey } from "../dashboard/dashboard-store";
 
 /** The verb the Settings → Defaults surface configures. `open` is the one
@@ -155,9 +155,7 @@ export function buildDefaultsCatalog(input: BuildDefaultsCatalogInput): Defaults
 				defaultAppId: pinned ?? null,
 			};
 		})
-		.sort(
-			(a, b) => a.label.localeCompare(b.label) || a.entityType.localeCompare(b.entityType),
-		);
+		.sort((a, b) => a.label.localeCompare(b.label) || a.entityType.localeCompare(b.entityType));
 
 	const schemes = [...(input.schemes ?? [])]
 		.sort((a, b) => a.localeCompare(b))

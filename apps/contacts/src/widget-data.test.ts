@@ -18,11 +18,7 @@ function person(
 	return { id, type: PERSON_TYPE, properties, updatedAt, deletedAt };
 }
 
-function company(
-	id: string,
-	name: string,
-	deletedAt: number | null = null,
-): WidgetPersonEntity {
+function company(id: string, name: string, deletedAt: number | null = null): WidgetPersonEntity {
 	return { id, type: COMPANY_TYPE, properties: { name }, updatedAt: 0, deletedAt };
 }
 

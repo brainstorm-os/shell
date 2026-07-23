@@ -259,9 +259,7 @@ export function ConnectAccountDialog(props: {
 						{/* Reconnect drops the how-to lecture (F-447) — user is
 						    fixing one field, not learning IMAP. Create mode keeps
 						    the help for first-time setup. */}
-						{seed === undefined ? (
-							<p className="mb-connect__help">{t("connect.imap.help")}</p>
-						) : null}
+						{seed === undefined ? <p className="mb-connect__help">{t("connect.imap.help")}</p> : null}
 						{field("connect.imap.address", address, setAddress, {
 							placeholder: t("connect.imap.address.placeholder"),
 							required: true,

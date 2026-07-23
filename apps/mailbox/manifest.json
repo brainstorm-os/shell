@@ -262,6 +262,6 @@
   },
   "i18n": {
     "source": "en",
-    "locales": ["en", "es"]
+    "locales": ["en", "es", "de", "fr", "it", "pt"]
   }
 }
