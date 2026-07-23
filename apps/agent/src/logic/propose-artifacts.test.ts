@@ -58,17 +58,15 @@ describe("propose tool catalogue", () => {
 			"intents.dispatch:propose-bookmark",
 			"intents.dispatch:propose-contact",
 			"intents.dispatch:propose-event",
-			"intents.dispatch:propose-journal",
 			"intents.dispatch:propose-note",
 			"intents.dispatch:propose-task",
 		]);
 	});
 
-	it("dedupes the entities.write caps needed at approval (Note + Journal share a type)", () => {
+	it("exposes the entities.write caps needed at approval, one per distinct type", () => {
 		const caps = proposeEntityWriteCapabilities();
 		expect(caps).toContain("entities.write:io.brainstorm.notes/Note/v1");
 		expect(caps).toContain("entities.write:brainstorm/Task/v1");
-		// Note + Journal collapse to a single write cap.
 		expect(caps.filter((c) => c.includes("Note/v1"))).toHaveLength(1);
 		expect(caps).toEqual([...caps].sort());
 	});
@@ -77,6 +75,8 @@ describe("propose tool catalogue", () => {
 		expect(proposeDescriptorForVerb("propose-task")?.kind).toBe(ProposeKind.Task);
 		expect(proposeDescriptorForVerb("open")).toBeNull();
 		expect(proposeDescriptorForVerb("propose-database")).toBeNull();
+		// Journal is deliberately not a propose kind (stable per-day id + CRDT body).
+		expect(proposeDescriptorForVerb("propose-journal")).toBeNull();
 	});
 });
 
@@ -150,13 +150,12 @@ describe("buildProposal — fail-closed field mapping", () => {
 		});
 	});
 
-	it("note and journal share a type but keep distinct kinds + primary fields", () => {
-		const note = buildOk("propose-note", { title: "Ideas" });
-		const journal = buildOk("propose-journal", { date: "2026-07-23", body: "today" });
-		expect(note.entityType).toBe(journal.entityType);
+	it("stages a note with its title as the summary and body allowlisted", () => {
+		const note = buildOk("propose-note", { title: "Ideas", body: "- one\n- two" });
 		expect(note.kind).toBe(ProposeKind.Note);
-		expect(journal.kind).toBe(ProposeKind.Journal);
-		expect(journal.summary).toBe("2026-07-23");
+		expect(note.entityType).toBe("io.brainstorm.notes/Note/v1");
+		expect(note.summary).toBe("Ideas");
+		expect(note.fields.body).toBe("- one\n- two");
 	});
 });
 

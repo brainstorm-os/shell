@@ -22,13 +22,17 @@
 
 import type { AgentTool } from "@brainstorm-os/sdk-types";
 
-/** The artifact kinds the agent can propose (Agent-11a: simple entities;
+/** The artifact kinds the agent can propose (Agent-11a/b: simple entities;
  *  database rows / new databases are Agent-11d/11e). Each kind is its OWN tool
  *  because the shared loop addresses a tool by its `verb` alone — one verb per
- *  kind keeps them distinct AND gives per-kind grants in the Agent-5 UI. */
+ *  kind keeps them distinct AND gives per-kind grants in the Agent-5 UI.
+ *
+ *  Journal is deliberately NOT here: a journal entry is not a plain entity
+ *  create — it keys a STABLE per-day id (`journalEntryIdForKey`) and its body
+ *  lives in the entry's Y.Doc, not a property. Proposing one needs the day-merge
+ *  + CRDT-body path, so it rides a later rung, not the property-create mapper. */
 export const ProposeKind = {
 	Note: "note",
-	Journal: "journal",
 	Task: "task",
 	Event: "event",
 	Bookmark: "bookmark",
@@ -56,10 +60,10 @@ export type ProposeDescriptor = {
 	longFields: readonly string[];
 };
 
-/** The Note entity type Notes + Journal actually render (Agent-10's
- *  `insert-to-note` writes this same id — real-shell verified). A journal entry
- *  is a Note with a date-key title, so it shares the type but keeps its own
- *  verb + primary field. */
+/** The Note entity type Notes actually renders (Agent-10's `insert-to-note`
+ *  writes this same id — real-shell verified). The proposed `body` rides the
+ *  plain-text property; the Notes editor rebuilds its state from that body when
+ *  no `richBody` is present (the supported legacy-body path). */
 const NOTE_ENTITY_TYPE = "io.brainstorm.notes/Note/v1";
 
 export const PROPOSE_DESCRIPTORS: readonly ProposeDescriptor[] = [
@@ -70,15 +74,6 @@ export const PROPOSE_DESCRIPTORS: readonly ProposeDescriptor[] = [
 		labelKey: "propose.note.label",
 		primaryField: "title",
 		fields: ["title", "body"],
-		longFields: ["body"],
-	},
-	{
-		kind: ProposeKind.Journal,
-		verb: "propose-journal",
-		entityType: NOTE_ENTITY_TYPE,
-		labelKey: "propose.journal.label",
-		primaryField: "date",
-		fields: ["date", "body"],
 		longFields: ["body"],
 	},
 	{

@@ -23,21 +23,43 @@ import {
 	runAgentLoop,
 } from "@brainstorm-os/sdk-types";
 import { toolCallToIntent } from "./agent-tools";
+import {
+	PROPOSE_TOOL_GUIDANCE,
+	type ProposedArtifact,
+	buildProposal,
+	buildProposalAck,
+	proposeDescriptorForVerb,
+} from "./propose-artifacts";
 import { withRetrievalContext } from "./retrieval";
 import { AGENT_GROUNDING_GUIDANCE } from "./transcript";
 
 /** The instruction region the agent loop seeds. Mirrors the plain-chat system
- *  prompt but names the tool affordance, so the model knows it may act. */
-export const AGENT_TOOL_SYSTEM_PROMPT = `You are a helpful assistant inside the user's Brainstorm knowledge workspace. Answer concisely and directly. Use a tool only when it genuinely helps the user. ${AGENT_GROUNDING_GUIDANCE}`;
+ *  prompt but names the tool affordance, so the model knows it may act. The
+ *  propose guidance keeps the model honest about the propose-not-persist tools:
+ *  it stages drafts for the user's approval, never claims a save (Agent-11b). */
+export const AGENT_TOOL_SYSTEM_PROMPT = `You are a helpful assistant inside the user's Brainstorm knowledge workspace. Answer concisely and directly. Use a tool only when it genuinely helps the user. ${PROPOSE_TOOL_GUIDANCE} ${AGENT_GROUNDING_GUIDANCE}`;
+
+/** Mint an id for a staged proposal. Host-side (never the model's) so two
+ *  proposals in one turn can't collide on a model-chosen id. */
+function mintProposalId(): string {
+	return `proposal-${crypto.randomUUID()}`;
+}
 
 /** Build the loop's `dispatchTool` port over the intents service. SECURITY:
  *  the offered set the loop computed already proved `call.tool`; we re-key the
  *  call to its DECLARED tool ({@link toolCallToIntent}) so the dispatched verb +
  *  entityType come from the curated tool, never the model. The ledger re-checks
- *  `intents.dispatch:<verb>` server-side (defence in depth). */
+ *  `intents.dispatch:<verb>` server-side (defence in depth).
+ *
+ *  A propose-* verb is intercepted BEFORE any dispatch: it stages a bounded
+ *  draft ({@link buildProposal}) via `onPropose` and returns a "pending
+ *  approval" ack. It never calls `intents.dispatch` and never writes — so no
+ *  model output (a prompt injection included) can persist to the vault. The
+ *  real `entities.create` runs only when the user approves the staged draft. */
 export function makeDispatchTool(
 	intents: IntentsService,
 	tools: readonly AgentTool[],
+	onPropose?: (artifact: ProposedArtifact) => void,
 ): (call: AgentToolCall) => Promise<unknown> {
 	const byVerb = new Map(tools.map((tool) => [tool.verb, tool] as const));
 	return async (call: AgentToolCall) => {
@@ -45,6 +67,12 @@ export function makeDispatchTool(
 		// Defence in depth: a verb not in the curated set never dispatches (the
 		// loop refuses it too, but we fail closed independently).
 		if (!tool) throw new Error(`unknown tool: ${call.tool}`);
+		// Propose-not-persist: stage a draft, never touch the vault.
+		if (proposeDescriptorForVerb(tool.verb)) {
+			const result = buildProposal({ verb: tool.verb, args: call.args, id: mintProposalId() });
+			if (result.ok) onPropose?.(result.artifact);
+			return buildProposalAck(result);
+		}
 		const intent = toolCallToIntent(tool, call);
 		// The curated verbs are members of the `IntentVerb` union (`open`); the
 		// dispatch surface types `verb` as that union. The verb came from the
@@ -104,6 +132,10 @@ export function runAgentTurn(
 		provider?: string;
 		model?: string;
 		maxIterations?: number;
+		/** Agent-11b — a sink for each draft the model proposes this turn. The
+		 *  host collects them into the conversation's pending buffer and renders
+		 *  approve/edit/discard cards; nothing is persisted until the user acts. */
+		onPropose?: (artifact: ProposedArtifact) => void;
 	},
 ): Promise<AgentLoopResult> {
 	const ports: AgentLoopPorts = {
@@ -111,7 +143,7 @@ export function runAgentTurn(
 			...(input.provider ? { provider: input.provider } : {}),
 			...(input.model ? { model: input.model } : {}),
 		}),
-		dispatchTool: makeDispatchTool(services.intents, input.tools),
+		dispatchTool: makeDispatchTool(services.intents, input.tools, input.onPropose),
 	};
 	const config: AgentLoopConfig = {
 		instructions: withRetrievalContext(AGENT_TOOL_SYSTEM_PROMPT, input.retrievalContext ?? ""),

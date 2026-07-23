@@ -56,7 +56,7 @@ import {
 } from "@brainstorm-os/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { AddToNotePopover } from "./add-to-note-popover";
 import { ConversationSettingsPopover } from "./conversation-settings-popover";
@@ -100,6 +100,13 @@ import {
 } from "./logic/memory";
 import { seedFromProcessIntent } from "./logic/process-intent";
 import {
+	ProposalActionKind,
+	type ProposedArtifact,
+	emptyProposalState,
+	proposalReducer,
+} from "./logic/propose-artifacts";
+import { proposalToEntityProperties } from "./logic/propose-persist";
+import {
 	type CitationLink,
 	RETRIEVAL_TOP_K,
 	buildRetrievalContextBlock,
@@ -123,6 +130,7 @@ import { runAgentTurn, usedToolNames } from "./logic/turn";
 import { buildVaultDataContextBlock } from "./logic/vault-data-context";
 import { buildWorkspaceContextBlock, joinContextBlocks } from "./logic/workspace-context";
 import { MemoryPopover } from "./memory-popover";
+import { ProposalTray } from "./proposal-tray";
 import { getBrainstorm } from "./runtime";
 import { SaveAsAutomationPopover } from "./save-as-automation-popover";
 
@@ -463,6 +471,59 @@ export function AgentApp(): ReactElement {
 	const [draftEmpty, setDraftEmpty] = useState(true);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	// Agent-11b — the pending propose buffer. The model STAGES artifacts during a
+	// turn (`onPropose`); they render as approve/edit/discard cards above the
+	// composer. `entities.create` runs ONLY on the approve gesture (below), so no
+	// model output can persist. The buffer is conversation-scoped: switching
+	// conversations clears it (a draft belongs to the chat it was proposed in).
+	const [proposalState, dispatchProposal] = useReducer(proposalReducer, emptyProposalState);
+	const [approvingIds, setApprovingIds] = useState<ReadonlySet<string>>(() => new Set());
+	const [proposalNotice, setProposalNotice] = useState<string | null>(null);
+	// Reset the buffer the moment the active conversation changes — a draft
+	// belongs to the chat it was proposed in. React's sanctioned "adjust state
+	// during render" pattern (a prev-value compare) resets synchronously, so the
+	// previous conversation's cards never flash on the new one.
+	const proposalConvRef = useRef(activeId);
+	if (proposalConvRef.current !== activeId) {
+		proposalConvRef.current = activeId;
+		dispatchProposal({ kind: ProposalActionKind.Clear });
+		if (proposalNotice !== null) setProposalNotice(null);
+	}
+
+	// Approve = the human gesture that persists a staged draft. THIS is the only
+	// place `entities.write:<type>` is exercised for a proposed artifact; the
+	// model never reaches it. Maps the draft to its owner-app schema, creates,
+	// then drops the card and confirms.
+	const approveProposal = useCallback(
+		async (artifact: ProposedArtifact) => {
+			if (!entitiesSvc || approvingIds.has(artifact.id)) return;
+			setApprovingIds((prev) => new Set(prev).add(artifact.id));
+			setError(null);
+			try {
+				const plan = proposalToEntityProperties(artifact, Date.now());
+				await entitiesSvc.create(plan.entityType, plan.properties);
+				dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
+				setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
+			} catch (err) {
+				console.error("[agent] approve proposal failed:", err);
+				setError(t("propose.card.approveFailed"));
+			} finally {
+				setApprovingIds((prev) => {
+					const next = new Set(prev);
+					next.delete(artifact.id);
+					return next;
+				});
+			}
+		},
+		[entitiesSvc, approvingIds],
+	);
+	const discardProposal = useCallback((id: string) => {
+		dispatchProposal({ kind: ProposalActionKind.Discard, id });
+	}, []);
+	const editProposalField = useCallback((id: string, field: string, value: string) => {
+		dispatchProposal({ kind: ProposalActionKind.Edit, id, fields: { [field]: value } });
+	}, []);
 
 	// Composer context rail (the @mention / doc-link attach affordance). The
 	// user pins documents / people the turn should ground on; the host search
@@ -1071,6 +1132,7 @@ export function AgentApp(): ReactElement {
 						...(retrievalContext ? { retrievalContext } : {}),
 						...(conversationProvider ? { provider: conversationProvider } : {}),
 						...(conversationModel ? { model: conversationModel } : {}),
+						onPropose: (artifact) => dispatchProposal({ kind: ProposalActionKind.Add, artifact }),
 					},
 				);
 				if (loop.stopReason === AgentStopReason.GenerateFailed) {
@@ -1529,6 +1591,20 @@ export function AgentApp(): ReactElement {
 						<div ref={endRef} />
 					</div>
 
+					<ProposalTray
+						proposals={proposalState.pending}
+						busyIds={approvingIds}
+						onApprove={approveProposal}
+						onDiscard={discardProposal}
+						onEditField={editProposalField}
+					/>
+					{proposalNotice ? (
+						<div className="agent__error-row">
+							<div className="agent__notice" role="status" data-testid="agent-proposal-notice">
+								{proposalNotice}
+							</div>
+						</div>
+					) : null}
 					{insertNotice ? (
 						<div className="agent__error-row">
 							<div className="agent__notice" role="status" data-testid="agent-insert-notice">
