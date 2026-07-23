@@ -26,6 +26,10 @@ export type TranslationKey = keyof FilesManifest;
 /** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
 export const LOCALE_PACK_IMPORTERS: LocalePackImporters<FilesManifest> = {
 	es: () => import("./i18n/es.json"),
+	de: () => import("./i18n/de.json"),
+	fr: () => import("./i18n/fr.json"),
+	it: () => import("./i18n/it.json"),
+	pt: () => import("./i18n/pt.json"),
 };
 
 let activeT: TFunction<FilesManifest> = createT(DEFAULTS);
