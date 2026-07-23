@@ -209,7 +209,10 @@ body.is-resizing .journal__props-resize {
 /* Day-body editor island: hosts the live <BrainstormEditor>. The host
  * div carries no chrome of its own — the editor's contenteditable
  * paints inline text directly into the entry-body column. */
+/* Positioned host so the Lexical placeholder (absolute) overlays the
+ * empty writing surface instead of flowing below it (F-455). */
 .journal__entry-editor-host {
+	position: relative;
 	margin: 0 0 var(--space-3);
 }
 

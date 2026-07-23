@@ -76,6 +76,26 @@
 	outline: none;
 }
 
+/* Lexical RichTextPlugin placeholder — sibling of the contenteditable,
+ *  rendered only while `$canShowPlaceholder` is true (truly empty root).
+ *  Without this rule the text is unstyled and often invisible against the
+ *  page (F-455 Journal writeHint). Consumers need a positioned ancestor
+ *  (e.g. `.notes__body`, `.journal__entry-editor-host`). */
+.bs-editor__placeholder {
+	position: absolute;
+	inset-inline-start: 0;
+	inset-block-start: 0;
+	color: var(--text-faint, var(--color-text-tertiary, rgba(127, 127, 127, 0.7)));
+	pointer-events: none;
+	user-select: none;
+	font-size: inherit;
+	line-height: inherit;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+
 /* Block-family styles (Lexical theme classnames) */
 .notes__paragraph {
 	margin: 0 0 var(--space-1);
