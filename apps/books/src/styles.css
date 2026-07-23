@@ -980,7 +980,6 @@ body {
 .books__hl-preview {
 	margin: 0;
 	padding: var(--space-2) var(--space-2);
-	border-left: 3px solid var(--accent);
 	border-radius: var(--radius-sm);
 	background: var(--bg-elev);
 	color: var(--text);

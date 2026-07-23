@@ -474,13 +474,12 @@ body.is-resizing .calendar-resize {
 	margin: 0 -1px;
 	padding: 0 var(--space-1);
 	border: none;
-	background: color-mix(in srgb, var(--chip-color) 24%, transparent);
+	background: color-mix(in srgb, var(--chip-color) 30%, transparent);
 	color: var(--text);
 	font: inherit;
 	font-size: var(--text-size-xs);
 	text-align: start;
 	cursor: pointer;
-	border-left: 3px solid transparent;
 	white-space: nowrap;
 	overflow: hidden;
 	position: relative;
@@ -490,7 +489,6 @@ body.is-resizing .calendar-resize {
 	border-top-left-radius: 5px;
 	border-bottom-left-radius: 5px;
 	margin-left: 0;
-	border-left: 3px solid var(--chip-color);
 }
 
 .cal-month__ribbon[data-cap-right="true"] {
@@ -613,8 +611,7 @@ body.is-resizing .calendar-resize {
 	font-size: var(--text-size-xs);
 	line-height: 1.2;
 	color: var(--text);
-	background: color-mix(in srgb, var(--chip-color) 22%, transparent);
-	border-inline-start: var(--border-width-thick) solid var(--chip-color);
+	background: color-mix(in srgb, var(--chip-color) 30%, transparent);
 	min-height: 0;
 }
 
@@ -640,7 +637,6 @@ body.is-resizing .calendar-resize {
 .cal-chip--compact[data-all-day="true"] {
 	background: var(--chip-color);
 	color: var(--accent-fg);
-	border-inline-start-color: transparent;
 }
 
 .cal-chip:hover {
@@ -664,7 +660,6 @@ body.is-resizing .calendar-resize {
 	gap: var(--space-0_5);
 	padding: var(--space-1);
 	background: color-mix(in srgb, var(--chip-color) 30%, transparent);
-	border-inline-start: 3px solid var(--chip-color);
 	border-radius: var(--radius-sm);
 	color: var(--text);
 	overflow: hidden;
