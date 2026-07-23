@@ -3,6 +3,147 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.8.0",
+      "date": "2026-07-22",
+      "icon": "🌐",
+      "title": "Reach out",
+      "summary": "Your mail now reaches Gmail, Microsoft 365, and Fastmail, and your automations react to the outside world — an incoming webhook, a file changing on disk, or the app starting up.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Mailbox"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Gmail, Microsoft 365 & Fastmail",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — connect over "
+            },
+            {
+              "text": "Gmail, Microsoft 365, or JMAP",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " for full send and sync, not just IMAP. Add an account, sign in, and your mail syncs both ways."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Automations"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Webhook triggers",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a workflow can run whenever something "
+            },
+            {
+              "text": "POSTs to its own URL",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Wire up a form, a service, or a script to kick off an automation."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "File & startup triggers",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — run a workflow when a "
+            },
+            {
+              "text": "watched file changes",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on disk, or once each time the app starts."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish & fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "New vaults on Windows",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — creating a vault in "
+            },
+            {
+              "text": "Downloads or a OneDrive folder",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " no longer fails on hidden housekeeping files."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Emoji picker",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the number keycaps, ©, and ® show up again instead of blank tiles."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Widgets",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — every glance widget's toolbar lines up on one baseline."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.7.0",
       "date": "2026-07-21",
       "icon": "📬",

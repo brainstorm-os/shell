@@ -24,6 +24,8 @@ import {
 	LAYOUT_TYPE_URL,
 	type PropertiesService,
 	type PropertyDef,
+	type PropertyPredicate,
+	ValueType,
 	defaultViewFor,
 } from "@brainstorm-os/sdk-types";
 import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
@@ -39,17 +41,27 @@ import { t } from "./i18n";
 import { useFormDesignerT } from "./i18n-hooks";
 import { toCellValue, toDbValue } from "./logic/cell-bridge";
 import {
+	type ConditionClause,
+	ConditionOp,
+	clauseToPredicate,
+	opNeedsValue,
+	predicateToClause,
+} from "./logic/condition-model";
+import {
 	DEFAULT_TARGET_TYPE,
 	type FormField,
 	type FormProperties,
 	buildFormProperties,
 	cellsToFields,
-	emptyFillFields,
-	fillValuesToProperties,
 	moveField as moveField_,
 	readFormProperties,
 } from "./logic/form-model";
 import { INVOICE_TYPE, invoiceFromProperties } from "./logic/invoice";
+import {
+	requiredEmptyFields,
+	visibleFields,
+	visibleFillProperties,
+} from "./logic/visibility-rules";
 import { type EntitiesService, getBrainstorm } from "./storage/runtime";
 import { type InvoiceEntity, InvoicesSurface } from "./ui/invoices";
 
@@ -231,19 +243,21 @@ export function FormDesignerApp(): ReactElement {
 	}, []);
 
 	// Editing a field clears its own validation mark — the error message is
-	// transient feedback, not a sticky state.
-	const onFillValues = useCallback((next: Record<string, unknown>): void => {
-		setFillValues(next);
-		setInvalidFields((prev) => {
-			if (prev.size === 0) return prev;
-			const remaining = new Set(
-				[...prev].filter(
-					(key) => emptyFillFields({ fields: [{ property: key }], values: next }).length > 0,
-				),
-			);
-			return remaining.size === prev.size ? prev : remaining;
-		});
-	}, []);
+	// transient feedback, not a sticky state. A mark also clears when its
+	// field goes hidden (a now-unmet condition can't leave a stale error),
+	// so this recomputes against the currently-required-and-empty set.
+	const onFillValues = useCallback(
+		(next: Record<string, unknown>): void => {
+			setFillValues(next);
+			setInvalidFields((prev) => {
+				if (prev.size === 0) return prev;
+				const stillRequired = new Set(requiredEmptyFields(fields, next).map((f) => f.property));
+				const remaining = new Set([...prev].filter((key) => stillRequired.has(key)));
+				return remaining.size === prev.size ? prev : remaining;
+			});
+		},
+		[fields],
+	);
 
 	const propertyDefs = useMemo(
 		() => Object.values(catalog).sort((a, b) => (a.name ?? a.key).localeCompare(b.name ?? b.key)),
@@ -314,6 +328,25 @@ export function FormDesignerApp(): ReactElement {
 		);
 	}, []);
 
+	// Set / clear a field's conditional-visibility rule (8.10.4). An
+	// `undefined` predicate drops the key so an unconditional field
+	// round-trips as `{ property }` (no empty `condition`).
+	const setFieldCondition = useCallback(
+		(index: number, condition: PropertyPredicate | undefined): void => {
+			setFields((prev) =>
+				prev.map((field, i) => {
+					if (i !== index) return field;
+					if (!condition) {
+						const { condition: _drop, ...rest } = field;
+						return rest;
+					}
+					return { ...field, condition };
+				}),
+			);
+		},
+		[],
+	);
+
 	const onSave = useCallback(async (): Promise<void> => {
 		const entities = entitiesService();
 		if (!entities) {
@@ -360,7 +393,7 @@ export function FormDesignerApp(): ReactElement {
 			setStatus(t("status.offline"));
 			return;
 		}
-		const empties = emptyFillFields({ fields, values: fillValues });
+		const empties = requiredEmptyFields(fields, fillValues);
 		if (empties.length > 0) {
 			setInvalidFields(new Set(empties.map((field) => field.property)));
 			setStatus(t("status.needsFill"));
@@ -371,7 +404,7 @@ export function FormDesignerApp(): ReactElement {
 		setInvalidFields(new Set());
 		setStatus(t("fill.creating"));
 		try {
-			const properties = fillValuesToProperties({
+			const properties = visibleFillProperties({
 				fields,
 				values: fillValues,
 				fallbackName: name.trim() || t("sidebar.untitled"),
@@ -611,6 +644,7 @@ export function FormDesignerApp(): ReactElement {
 								onReorder={reorderFieldByProperty}
 								onRemove={removeField}
 								onRelabel={relabelField}
+								onCondition={setFieldCondition}
 								onSave={() => void onSave()}
 							/>
 						) : (
@@ -702,6 +736,7 @@ function BuilderPane(props: {
 	onReorder: (draggedProperty: string, beforeIndex: number) => void;
 	onRemove: (index: number) => void;
 	onRelabel: (index: number, label: string) => void;
+	onCondition: (index: number, condition: PropertyPredicate | undefined) => void;
 	onSave: () => void;
 }): ReactElement {
 	return (
@@ -763,11 +798,13 @@ function BuilderPane(props: {
 								field={field}
 								index={index}
 								count={props.fields.length}
+								siblings={props.fields}
 								catalog={props.catalog}
 								onMove={props.onMove}
 								onReorder={props.onReorder}
 								onRemove={props.onRemove}
 								onRelabel={props.onRelabel}
+								onCondition={props.onCondition}
 							/>
 						))}
 					</ul>
@@ -787,16 +824,28 @@ function FieldCard(props: {
 	field: FormField;
 	index: number;
 	count: number;
+	siblings: readonly FormField[];
 	catalog: Readonly<Record<string, PropertyDef>>;
 	onMove: (index: number, delta: number) => void;
 	onReorder: (draggedProperty: string, beforeIndex: number) => void;
 	onRemove: (index: number) => void;
 	onRelabel: (index: number, label: string) => void;
+	onCondition: (index: number, condition: PropertyPredicate | undefined) => void;
 }): ReactElement {
 	const { field, index, count } = props;
 	const [dropEdge, setDropEdge] = useState<"before" | "after" | null>(null);
+	const [showCondition, setShowCondition] = useState<boolean>(() => field.condition !== undefined);
 	const display = fieldDisplayName(field, props.catalog);
 	const propName = props.catalog[field.property]?.name ?? field.property;
+
+	const toggleCondition = useCallback((): void => {
+		setShowCondition((prev) => {
+			// Collapsing an active condition drops it — the panel is the only
+			// place it lives, so hiding it clears the rule.
+			if (prev && field.condition !== undefined) props.onCondition(index, undefined);
+			return !prev;
+		});
+	}, [field.condition, index, props.onCondition]);
 
 	const onDragStart = useCallback(
 		(event: React.DragEvent<HTMLLIElement>): void => {
@@ -831,7 +880,12 @@ function FieldCard(props: {
 		[field.property, index, props.onReorder],
 	);
 
-	const className = dropEdge ? `fd-field-card fd-field-card--drop-${dropEdge}` : "fd-field-card";
+	const otherFields = props.siblings.filter((sibling) => sibling.property !== field.property);
+	const className = dropEdge
+		? `fd-field-card fd-field-card--drop-${dropEdge}`
+		: showCondition
+			? "fd-field-card fd-field-card--open"
+			: "fd-field-card";
 
 	return (
 		<li
@@ -842,53 +896,182 @@ function FieldCard(props: {
 			onDragLeave={onDragLeave}
 			onDrop={onDrop}
 		>
-			<span
-				className="fd-field-card__grip"
-				aria-hidden="true"
-				title={t("builder.dragHint", { name: display })}
-			>
-				<Icon name={IconName.DragHandle} />
-			</span>
-			<div className="fd-field-card__main">
-				<span className="fd-field-card__name">{propName}</span>
-				<input
-					type="text"
-					className="fd-input bs-input bs-input--sm"
-					value={field.label ?? ""}
-					placeholder={t("builder.fieldLabelPlaceholder")}
-					aria-label={t("builder.fieldLabelAria", { name: propName })}
-					onChange={(e) => props.onRelabel(index, e.target.value)}
+			<div className="fd-field-card__row">
+				<span
+					className="fd-field-card__grip"
+					aria-hidden="true"
+					title={t("builder.dragHint", { name: display })}
+				>
+					<Icon name={IconName.DragHandle} />
+				</span>
+				<div className="fd-field-card__main">
+					<span className="fd-field-card__name">{propName}</span>
+					<input
+						type="text"
+						className="fd-input bs-input bs-input--sm"
+						value={field.label ?? ""}
+						placeholder={t("builder.fieldLabelPlaceholder")}
+						aria-label={t("builder.fieldLabelAria", { name: propName })}
+						onChange={(e) => props.onRelabel(index, e.target.value)}
+					/>
+				</div>
+				<div className="fd-field-card__actions">
+					<button
+						type="button"
+						className={
+							showCondition
+								? "bs-btn bs-btn--icon bs-btn--ghost is-active"
+								: "bs-btn bs-btn--icon bs-btn--ghost"
+						}
+						aria-pressed={showCondition}
+						aria-label={t("builder.condition.toggle", { name: display })}
+						data-bs-tooltip={t("builder.condition.toggle", { name: display })}
+						onClick={toggleCondition}
+					>
+						<Icon name={IconName.View} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--icon bs-btn--ghost"
+						aria-label={t("builder.moveUp", { name: display })}
+						disabled={index === 0}
+						onClick={() => props.onMove(index, -1)}
+					>
+						<Icon name={IconName.CaretUp} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--icon bs-btn--ghost"
+						aria-label={t("builder.moveDown", { name: display })}
+						disabled={index === count - 1}
+						onClick={() => props.onMove(index, 1)}
+					>
+						<Icon name={IconName.CaretDown} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--icon bs-btn--ghost bs-btn--danger"
+						aria-label={t("builder.removeField", { name: display })}
+						onClick={() => props.onRemove(index)}
+					>
+						<Icon name={IconName.Close} />
+					</button>
+				</div>
+			</div>
+			{showCondition ? (
+				<ConditionEditor
+					condition={field.condition}
+					otherFields={otherFields}
+					catalog={props.catalog}
+					onCommit={(next) => props.onCondition(index, next)}
 				/>
-			</div>
-			<div className="fd-field-card__actions">
-				<button
-					type="button"
-					className="bs-btn bs-btn--icon bs-btn--ghost"
-					aria-label={t("builder.moveUp", { name: display })}
-					disabled={index === 0}
-					onClick={() => props.onMove(index, -1)}
-				>
-					<Icon name={IconName.CaretUp} />
-				</button>
-				<button
-					type="button"
-					className="bs-btn bs-btn--icon bs-btn--ghost"
-					aria-label={t("builder.moveDown", { name: display })}
-					disabled={index === count - 1}
-					onClick={() => props.onMove(index, 1)}
-				>
-					<Icon name={IconName.CaretDown} />
-				</button>
-				<button
-					type="button"
-					className="bs-btn bs-btn--icon bs-btn--ghost bs-btn--danger"
-					aria-label={t("builder.removeField", { name: display })}
-					onClick={() => props.onRemove(index)}
-				>
-					<Icon name={IconName.Close} />
-				</button>
-			</div>
+			) : null}
 		</li>
+	);
+}
+
+/** Single-clause conditional-visibility editor (8.10.4) — "only show this
+ *  field when <field> <operator> <value>". The clause is derived from the
+ *  field's persisted `condition` each render (controlled); a predicate the
+ *  simple editor can't represent shows a read-only advanced state. */
+function ConditionEditor(props: {
+	condition: PropertyPredicate | undefined;
+	otherFields: readonly FormField[];
+	catalog: Readonly<Record<string, PropertyDef>>;
+	onCommit: (condition: PropertyPredicate | undefined) => void;
+}): ReactElement {
+	const parsed = predicateToClause(props.condition);
+	const advanced = props.condition !== undefined && parsed === null;
+
+	if (props.otherFields.length === 0) {
+		return (
+			<div className="fd-cond">
+				<p className="fd-cond__hint">{t("builder.condition.noFields")}</p>
+			</div>
+		);
+	}
+	if (advanced) {
+		return (
+			<div className="fd-cond">
+				<p className="fd-cond__hint">{t("builder.condition.advanced")}</p>
+				<button
+					type="button"
+					className="bs-btn bs-btn--sm bs-btn--ghost"
+					onClick={() => props.onCommit(undefined)}
+				>
+					<span>{t("builder.condition.clear")}</span>
+				</button>
+			</div>
+		);
+	}
+
+	const firstOther = props.otherFields[0]?.property ?? "";
+	const clause: ConditionClause = parsed ?? { when: firstOther, op: ConditionOp.Is, value: "" };
+	const refDef = clause.when ? (props.catalog[clause.when] ?? null) : null;
+	const emit = (next: ConditionClause): void => props.onCommit(clauseToPredicate(next));
+
+	const whenOptions = props.otherFields.map((f) => ({
+		value: f.property,
+		label: fieldDisplayName(f, props.catalog),
+	}));
+	const opOptions = [
+		{ value: ConditionOp.Is, label: t("builder.condition.op.is") },
+		{ value: ConditionOp.IsNot, label: t("builder.condition.op.isNot") },
+		{ value: ConditionOp.IsSet, label: t("builder.condition.op.isSet") },
+		{ value: ConditionOp.IsEmpty, label: t("builder.condition.op.isEmpty") },
+	];
+
+	return (
+		<div className="fd-cond">
+			<span className="fd-cond__label">{t("builder.condition.prefix")}</span>
+			<SelectMenu
+				value={clause.when}
+				options={whenOptions}
+				onChange={(value) => emit({ ...clause, when: value })}
+				ariaLabel={t("builder.condition.whenLabel")}
+				className="fd-cond__select"
+			/>
+			<SelectMenu
+				value={clause.op}
+				options={opOptions}
+				onChange={(value) => emit({ ...clause, op: value as ConditionOp })}
+				ariaLabel={t("builder.condition.opLabel")}
+				className="fd-cond__select"
+			/>
+			{opNeedsValue(clause.op) ? (
+				refDef?.valueType === ValueType.Boolean ? (
+					<SelectMenu
+						value={clause.value === true ? "true" : "false"}
+						options={[
+							{ value: "true", label: t("builder.condition.checked") },
+							{ value: "false", label: t("builder.condition.unchecked") },
+						]}
+						onChange={(value) => emit({ ...clause, value: value === "true" })}
+						ariaLabel={t("builder.condition.valueLabel")}
+						className="fd-cond__select"
+					/>
+				) : (
+					<input
+						type={refDef?.valueType === ValueType.Number ? "number" : "text"}
+						className="fd-input bs-input bs-input--sm fd-cond__value"
+						value={clause.value === null || clause.value === undefined ? "" : String(clause.value)}
+						placeholder={t("builder.condition.valuePlaceholder")}
+						aria-label={t("builder.condition.valueLabel")}
+						onChange={(e) =>
+							emit({
+								...clause,
+								value:
+									refDef?.valueType === ValueType.Number
+										? e.target.value === ""
+											? null
+											: Number(e.target.value)
+										: e.target.value,
+							})
+						}
+					/>
+				)
+			) : null}
+		</div>
 	);
 }
 
@@ -916,13 +1099,18 @@ function FillPane(props: {
 		props.onValues({ ...props.values, [key]: value });
 	};
 
+	// Only currently-visible fields render (8.10.4) — a field whose
+	// condition is unmet against the in-progress values is hidden, and (in
+	// `onCreateEntity`) neither validated nor persisted.
+	const shown = visibleFields(props.fields, props.values);
+
 	const body = (
 		<div className="fd-fill">
 			<h2 className="fd-fill__heading">
 				{t("fill.heading", { name: props.name.trim() || t("sidebar.untitled") })}
 			</h2>
 			<ul className="fd-fill__list">
-				{props.fields.map((field) => {
+				{shown.map((field) => {
 					const def = props.catalog[field.property] ?? null;
 					const label = fieldDisplayName(field, props.catalog);
 					const Cell = def ? getCell(def.valueType, defaultViewFor(def)) : undefined;

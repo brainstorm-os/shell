@@ -59,6 +59,10 @@ type DragState = {
 	startClientX: number;
 	startClientY: number;
 	element: HTMLElement;
+	/** Flips true once the pointer has moved past `CLICK_MOVEMENT_THRESHOLD_PX`.
+	 *  Until then the gesture is still a potential click, so we neither move the
+	 *  icon nor surface the snap grid (`draggingId` stays null). */
+	moved: boolean;
 };
 
 /** Below this much pointer movement we treat pointer-down/up as a click, not
@@ -289,8 +293,12 @@ function DashboardIconsLayerInner({
 				startClientX: event.clientX,
 				startClientY: event.clientY,
 				element: event.currentTarget,
+				moved: false,
 			};
-			setDraggingId(id);
+			// Don't enter the dragging state (which surfaces the snap grid and
+			// lifts the icon) on press — wait for the pointer to cross the
+			// click/drag slop in `onPointerMove`. A plain click must never flash
+			// the grid.
 		},
 		[placements, viewport, iconSize, cellSize],
 	);
@@ -305,8 +313,19 @@ function DashboardIconsLayerInner({
 			// icon keeps chasing the cursor — it "runs away from the mouse"
 			// because `dragRef` is still set so every move re-positions it.
 			if ((event.buttons & 1) === 0) {
-				commitDrop(drag);
+				if (drag.moved) commitDrop(drag);
+				else endDrag();
 				return;
+			}
+			// Below the slop the gesture is still a potential click: leave the
+			// icon where it is and keep the grid hidden until movement crosses
+			// the threshold.
+			if (!drag.moved) {
+				const dx = Math.abs(event.clientX - drag.startClientX);
+				const dy = Math.abs(event.clientY - drag.startClientY);
+				if (dx <= CLICK_MOVEMENT_THRESHOLD_PX && dy <= CLICK_MOVEMENT_THRESHOLD_PX) return;
+				drag.moved = true;
+				setDraggingId(drag.id);
 			}
 			const x = event.clientX - drag.offsetX;
 			const y = event.clientY - drag.offsetY;
@@ -314,7 +333,7 @@ function DashboardIconsLayerInner({
 			drag.y = y;
 			drag.element.style.transform = `translate(${x}px, ${y}px)`;
 		},
-		[commitDrop],
+		[commitDrop, endDrag],
 	);
 
 	const onPointerUp = useCallback(
@@ -322,11 +341,10 @@ function DashboardIconsLayerInner({
 			const drag = dragRef.current;
 			if (!drag || event.pointerId !== drag.pointerId) return;
 			event.currentTarget.releasePointerCapture(event.pointerId);
-			const dx = Math.abs(event.clientX - drag.startClientX);
-			const dy = Math.abs(event.clientY - drag.startClientY);
-			if (dx <= CLICK_MOVEMENT_THRESHOLD_PX && dy <= CLICK_MOVEMENT_THRESHOLD_PX) {
-				// Below the slop — treat as a click. Let the trailing `onClick`
-				// fire to activate (it also handles keyboard Enter/Space).
+			if (!drag.moved) {
+				// Never crossed the slop — treat as a click. Let the trailing
+				// `onClick` fire to activate (it also handles keyboard
+				// Enter/Space). The grid was never shown.
 				endDrag();
 				return;
 			}

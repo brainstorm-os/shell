@@ -17,6 +17,8 @@ import {
 	__testing,
 } from "./graph-canvas-controller";
 import { RELATED_TO_DEF } from "./logic/create-link";
+import { bucketTimestamps } from "./logic/history-buckets";
+import type { InMemoryGraph } from "./logic/in-memory-graph";
 import { LocalDirection } from "./logic/local-scope";
 import { DEFAULT_LAYOUT_PARAMS } from "./render/force-layout";
 import { LayoutDriver } from "./render/layout-driver";
@@ -34,6 +36,7 @@ const {
 	writeCreateLink,
 	applyPersistedState,
 	reconcileScene,
+	effectiveDb,
 } = __testing;
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
@@ -395,5 +398,68 @@ describe("applyPersistedState — empty-canvas self-heal", () => {
 		);
 		expect(state.cutoffAt).toBe(future);
 		expect(state.scene.renderNodes.length).toBeGreaterThan(0);
+	});
+});
+
+/**
+ * 9.13.10e — the live tail of the history scrubber. The Stage-3 reactivity
+ * refactor feeds `useVaultEntities` deltas into the controller via
+ * `setVaultData` → `applyVaultData`, which rebuilds `state.db` + reconciles
+ * the scene (recomputing `bounds` off every entity/link `createdAt`). So a
+ * node created while the graph is open must extend the timeline and enter
+ * the density histogram — no separate `entities.subscribe` channel needed.
+ */
+describe("live bucketed event stream (9.13.10e)", () => {
+	function withNewEntity(db: InMemoryGraph, id: string, createdAt: number): InMemoryGraph {
+		const sample = db.entities[0];
+		if (!sample) throw new Error("fixture graph has no entities");
+		return {
+			...db,
+			entities: [
+				...db.entities,
+				{
+					id,
+					type: sample.type,
+					properties: { name: id },
+					createdAt,
+					updatedAt: createdAt,
+					deletedAt: null,
+				},
+			],
+		};
+	}
+
+	it("a live-fed node extends the timeline bounds and enters the density buckets", () => {
+		const state = makeState();
+		reconcileScene(state);
+		const before = computeSnapshot(state).bounds;
+		if (!before) throw new Error("expected bounds after the initial reconcile");
+
+		// Simulate `applyVaultData` delivering a newer entity mid-session.
+		const later = before.max + 1000 * 60 * 60 * 24 * 400; // ~400 days after the latest event
+		state.db = withNewEntity(state.db, "ent_live_new", later);
+		reconcileScene(state);
+
+		const after = computeSnapshot(state).bounds;
+		if (!after) throw new Error("expected bounds after the live feed");
+		expect(after.max).toBe(later); // ceiling extended to the new event
+		expect(after.min).toBe(before.min); // floor unchanged
+		expect(effectiveDb(state).entities.some((e) => e.id === "ent_live_new")).toBe(true);
+
+		// The strip the histogram renders now buckets the new event into the
+		// final (most-recent) column over the extended range.
+		const timestamps = effectiveDb(state).entities.map((e) => e.createdAt);
+		const counts = bucketTimestamps(timestamps, after.min, after.max, 8);
+		expect(counts.at(-1)).toBeGreaterThanOrEqual(1);
+		expect(counts.reduce((sum, c) => sum + c, 0)).toBe(timestamps.length);
+	});
+
+	it("does not extend bounds when nothing new is fed (idempotent reconcile)", () => {
+		const state = makeState();
+		reconcileScene(state);
+		const first = computeSnapshot(state).bounds;
+		reconcileScene(state);
+		const second = computeSnapshot(state).bounds;
+		expect(second).toEqual(first);
 	});
 });

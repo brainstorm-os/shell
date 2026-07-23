@@ -193,12 +193,21 @@ body.is-resizing .fd-resize {
 .fd-field-card {
 	position: relative;
 	display: flex;
-	align-items: center;
-	gap: var(--space-3);
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--space-2);
 	padding: var(--space-2) var(--space-2);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 	background: var(--bg-elev);
+}
+.fd-field-card--open {
+	border-color: var(--color-border-strong);
+}
+.fd-field-card__row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
 }
 .fd-field-card__grip {
 	display: inline-flex;
@@ -250,6 +259,31 @@ body.is-resizing .fd-resize {
 	display: flex;
 	gap: var(--space-1);
 	flex-shrink: 0;
+}
+
+/* Conditional-visibility editor (8.10.4) — a wrapped clause row that
+ * drops below the field card when opened. */
+.fd-cond {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 0 0;
+	margin-inline-start: calc(var(--space-3) + 1.1em);
+	border-top: var(--border-width) solid var(--color-border-subtle);
+}
+.fd-cond__label {
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+	white-space: nowrap;
+}
+.fd-cond__hint {
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+	margin: 0;
+}
+.fd-cond__value {
+	max-width: 12rem;
 }
 
 /* ── Fill mode ─────────────────────────────────────────────────────── */
