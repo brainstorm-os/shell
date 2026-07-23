@@ -552,9 +552,6 @@
     "packages/react-yjs": {
       "name": "@brainstorm-os/react-yjs",
       "version": "0.0.1",
-      "dependencies": {
-        "@brainstorm-os/sdk-types": "workspace:*",
-      },
       "devDependencies": {
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
@@ -611,7 +608,7 @@
     },
     "packages/shell": {
       "name": "@brainstorm-os/shell",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "@blockprotocol/core": "0.1.4",
         "@blockprotocol/graph": "0.4.2",

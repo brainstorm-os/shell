@@ -1,8 +1,8 @@
-import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "@brainstorm-os/sdk-types";
 // @vitest-environment jsdom
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "./brainstorm-types";
 import { useLiveEntities, useVaultEntities } from "./query";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -14,13 +14,13 @@
  * Read-only by contract: mutations go through `entities.update`.
  */
 
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type {
 	Subscription,
 	VaultEntitiesListQuery,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
-} from "@brainstorm-os/sdk-types";
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+} from "./brainstorm-types";
 import { createQueryStore } from "./query-store";
 import { EMPTY_VAULT_SNAPSHOT, vaultSnapshotEquals } from "./vault-entities";
 

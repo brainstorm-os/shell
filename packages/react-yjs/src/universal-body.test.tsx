@@ -1,9 +1,9 @@
-// @vitest-environment jsdom
-import { UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm-os/sdk-types";
 import { type ReactNode, act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
+// @vitest-environment jsdom
+import { UNIVERSAL_BODY_FRAGMENT_NAME } from "./brainstorm-types";
 import { getUniversalBody, useUniversalBody } from "./universal-body";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

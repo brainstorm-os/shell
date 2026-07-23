@@ -1,5 +1,5 @@
-import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
+import type { Subscription, VaultEntitiesSnapshot, VaultEntity } from "./brainstorm-types";
 import {
 	createVaultEntitiesStore,
 	createVaultListStore,

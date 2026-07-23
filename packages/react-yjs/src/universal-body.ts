@@ -19,9 +19,9 @@
  * `universal-body.test.tsx` lazy-zero-bytes test pins that property.
  */
 
-import { UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm-os/sdk-types";
 import { useMemo } from "react";
 import * as Y from "yjs";
+import { UNIVERSAL_BODY_FRAGMENT_NAME } from "./brainstorm-types";
 import { useYXmlText } from "./hooks";
 
 /**
