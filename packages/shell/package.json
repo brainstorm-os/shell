@@ -1,6 +1,6 @@
 {
   "name": "@brainstorm-os/shell",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "description": "The Brainstorm shell (Electron main + preload + dashboard renderer).",
   "author": "Brainstorm <hello@getbrainstorm.online>",
