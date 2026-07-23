@@ -30,10 +30,14 @@ import "./ai-panel.css";
 const AUTO_ROUTING_VALUE = "auto";
 
 /** A managed cloud provider. `monogram` is the single-glyph avatar face; the
- *  per-provider accent is keyed off `id` via CSS `data-provider`. */
+ *  per-provider accent is keyed off `id` via CSS `data-provider`.
+ *  `tileNameKey` is optional — when set, the grid tile uses the shorter label
+ *  (F-416: drop parentheticals that truncate mid-word on fixed-width tiles)
+ *  while the credential dialog keeps the full `nameKey`. */
 type ProviderMeta = {
 	id: string;
 	nameKey: string;
+	tileNameKey?: string;
 	hintKey: string;
 	monogram: string;
 };
@@ -44,6 +48,7 @@ const CLOUD_PROVIDERS: ReadonlyArray<ProviderMeta> = [
 	{
 		id: ANTHROPIC_PROVIDER_ID,
 		nameKey: "shell.settings.ai.anthropic.name",
+		tileNameKey: "shell.settings.ai.anthropic.tile",
 		hintKey: "shell.settings.ai.anthropic.hint",
 		monogram: "A",
 	},
@@ -80,6 +85,7 @@ function ProviderTile({
 	configured,
 	onOpen,
 }: { provider: ProviderMeta; configured: boolean; onOpen: () => void }) {
+	const tileLabel = t(provider.tileNameKey ?? provider.nameKey);
 	return (
 		<button
 			type="button"
@@ -94,7 +100,7 @@ function ProviderTile({
 				{provider.monogram}
 				<span className="settings__ai-dot" />
 			</span>
-			<span className="settings__ai-tile-name">{t(provider.nameKey)}</span>
+			<span className="settings__ai-tile-name">{tileLabel}</span>
 			<span className="settings__ai-tile-status">
 				{configured ? t("shell.settings.ai.statusConfigured") : t("shell.settings.ai.statusUnset")}
 			</span>

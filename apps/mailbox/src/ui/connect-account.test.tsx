@@ -86,4 +86,38 @@ describe("ConnectAccountDialog — reconnect-in-place (Mailbox-13)", () => {
 		});
 		expect(host.querySelector(".bs-segmented")).not.toBeNull();
 	});
+
+	it("pins Cancel/Connect in the sticky popover footer (F-447)", () => {
+		act(() => {
+			root.render(
+				<ConnectAccountDialog onClose={() => {}} onConnect={async () => {}} onConnectImap={async () => {}} />,
+			);
+		});
+		const footer = host.querySelector(".bs-popover__footer");
+		expect(footer).not.toBeNull();
+		// Primary submit lives in the footer, not buried under the IMAP form.
+		const submit = footer?.querySelector<HTMLButtonElement>("button[data-bs-primary]");
+		expect(submit).not.toBeNull();
+		expect(submit?.type).toBe("submit");
+		// Form association keeps submit wired even though the button is outside <form>.
+		const form = host.querySelector("form.mb-connect");
+		expect(form?.id).toBeTruthy();
+		expect(submit?.getAttribute("form")).toBe(form?.id);
+		// Actions no longer sit inside the scrollable form body.
+		expect(host.querySelector(".mb-connect__actions")).toBeNull();
+	});
+
+	it("drops the IMAP how-to lecture in reconnect mode (F-447)", () => {
+		act(() => {
+			root.render(
+				<ConnectAccountDialog
+					onClose={() => {}}
+					onConnect={async () => {}}
+					onConnectImap={async () => {}}
+					reconnect={seed}
+				/>,
+			);
+		});
+		expect(host.querySelector(".mb-connect__help")).toBeNull();
+	});
 });

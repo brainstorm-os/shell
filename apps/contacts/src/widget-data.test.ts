@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { PERSON_TYPE } from "./types/person";
+import { COMPANY_TYPE, PERSON_TYPE } from "./types/person";
 import { ContactsSort, type WidgetPersonEntity, shapeContacts } from "./widget-data";
 
 function person(
@@ -16,6 +16,14 @@ function person(
 	deletedAt: number | null = null,
 ): WidgetPersonEntity {
 	return { id, type: PERSON_TYPE, properties, updatedAt, deletedAt };
+}
+
+function company(
+	id: string,
+	name: string,
+	deletedAt: number | null = null,
+): WidgetPersonEntity {
+	return { id, type: COMPANY_TYPE, properties: { name }, updatedAt: 0, deletedAt };
 }
 
 describe("shapeContacts", () => {
@@ -64,6 +72,23 @@ describe("shapeContacts", () => {
 		expect(byId.get("c")).toBe("Globex");
 		expect(byId.get("o")).toBe("");
 		expect(byId.get("n")).toBe("");
+	});
+
+	it("resolves linked company entity ids to names (F-403)", () => {
+		const entities = [
+			company("ent_vertex", "Vertex Labs"),
+			person("p1", { name: "Jonas", company: "ent_vertex" }),
+			// Unresolved ent_ id must not leak onto the tile.
+			person("p2", { name: "Unresolved", company: "ent_mrq2jeakonfzl4aj" }),
+			// Free-text company names still show as-is.
+			person("p3", { name: "Free text", company: "Acme Corp" }),
+		];
+		const byId = new Map(
+			shapeContacts(entities, ContactsSort.Name).contacts.map((c) => [c.id, c.subtitle]),
+		);
+		expect(byId.get("p1")).toBe("Vertex Labs");
+		expect(byId.get("p2")).toBe("");
+		expect(byId.get("p3")).toBe("Acme Corp");
 	});
 
 	it("falls back to the shared unnamed label when a person has no name", () => {

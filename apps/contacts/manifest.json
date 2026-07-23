@@ -19,7 +19,8 @@
     "properties.write",
     "intents.dispatch:open",
     "files.read",
-    "files.write"
+    "files.write",
+    "notifications.post"
   ],
   "registrations": {
     "entityTypes": [

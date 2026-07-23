@@ -21,7 +21,15 @@ describe("AiPanel", () => {
 		for (const id of ["anthropic", "openai", "glm", "mistral", "gemini"]) {
 			expect(html).toContain(`data-testid="ai-provider-${id}"`);
 		}
-		expect(html).toContain("Anthropic (Claude)");
+		// Tile face drops the parenthetical so it fits the fixed-width face (F-416);
+		// the full "Anthropic (Claude)" name stays on title= (hover) + dialog title.
+		expect(html).toMatch(
+			/<span class="settings__ai-tile-name">Anthropic<\/span>/,
+		);
+		expect(html).not.toMatch(
+			/<span class="settings__ai-tile-name">Anthropic \(Claude\)<\/span>/,
+		);
+		expect(html).toContain('title="Anthropic (Claude)"');
 		expect(html).toContain("z.ai (GLM)");
 		// Strings resolved, not raw t() keys.
 		expect(html).not.toContain("shell.settings.ai");

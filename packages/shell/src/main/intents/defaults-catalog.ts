@@ -19,6 +19,7 @@
  * memory; this one's the explicit user choice).
  */
 
+import { isPlumbingEntityType, typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import {
 	OS_HANDOFF_APP_ID,
 	OS_HANDOFF_APP_LABEL,
@@ -44,6 +45,9 @@ export type DefaultsCatalogApp = { appId: string; label: string };
 
 export type DefaultsCatalogEntry = {
 	entityType: string;
+	/** Human caption for the type (`brainstorm/Note/v1` → `Note`) — F-414.
+	 *  The wire id stays on `entityType` for pins / tooltips / dev views. */
+	label: string;
 	/** Capable open handlers ∪ the generic editor, deduped, label-sorted. */
 	apps: DefaultsCatalogApp[];
 	/** The user's pinned default for this type, or `null` (built-in pick). */
@@ -129,8 +133,14 @@ export type BuildDefaultsCatalogInput = {
 };
 
 export function buildDefaultsCatalog(input: BuildDefaultsCatalogInput): DefaultsCatalog {
+	// F-414: Settings → Default apps is a *user* surface. Drop plumbing types
+	// the product writes (BrowsingSession, WorkflowRun, …) and types no app
+	// actually claims as an opener — those only appeared because every type
+	// inherited the generic Notes editor. Wire ids stay on `entityType` for
+	// pins; the human caption is `label`.
 	const entries = [...input.entityTypes]
-		.sort((a, b) => a.localeCompare(b))
+		.filter((entityType) => !isPlumbingEntityType(entityType))
+		.filter((entityType) => input.capableApps(entityType).length > 0)
 		.map<DefaultsCatalogEntry>((entityType) => {
 			const appIds = new Set<string>(input.capableApps(entityType));
 			if (input.genericEditorAppId) appIds.add(input.genericEditorAppId);
@@ -140,10 +150,14 @@ export function buildDefaultsCatalog(input: BuildDefaultsCatalogInput): Defaults
 			const pinned = input.currentDefaults[defaultHandlerKey(DEFAULT_HANDLER_VERB, entityType)];
 			return {
 				entityType,
+				label: typeDisplayName(entityType),
 				apps,
 				defaultAppId: pinned ?? null,
 			};
-		});
+		})
+		.sort(
+			(a, b) => a.label.localeCompare(b.label) || a.entityType.localeCompare(b.entityType),
+		);
 
 	const schemes = [...(input.schemes ?? [])]
 		.sort((a, b) => a.localeCompare(b))
