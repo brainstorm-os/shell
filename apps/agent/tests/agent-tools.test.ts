@@ -30,18 +30,39 @@ const APP_CAPS = [
 const id = (s: string): string => s;
 
 describe("curated agent tools", () => {
-	it("exposes a single read-only `open` tool (verb-collision-safe)", () => {
+	it("leads with the read-only `open` tool (verb-collision-safe)", () => {
 		const tools = curatedAgentTools(id);
-		expect(tools).toHaveLength(1);
 		expect(tools[0]?.verb).toBe(AGENT_TOOL_VERB.Open);
 		// No declared entityType — the shell resolves the id's type server-side.
 		expect(tools[0]?.entityType).toBeUndefined();
 	});
 
-	it("the manifest caps cover the curated tools' full footprint", () => {
-		const required = curatedToolCapabilities();
-		expect(required).toEqual(["intents.dispatch:open"]);
-		for (const cap of required) expect(APP_CAPS).toContain(cap);
+	it("exposes the Agent-11 propose-* tools alongside `open`", () => {
+		const verbs = curatedAgentTools(id).map((t) => t.verb);
+		expect(verbs).toEqual([
+			"open",
+			"propose-note",
+			"propose-task",
+			"propose-event",
+			"propose-bookmark",
+			"propose-contact",
+		]);
+		// A propose tool never declares an entityType (so it can't require
+		// read/write) — it only ever stages a draft for the user's approval.
+		for (const tool of curatedAgentTools(id)) {
+			if (tool.verb !== AGENT_TOOL_VERB.Open) expect(tool.entityType).toBeUndefined();
+		}
+	});
+
+	it("the curated footprint is exactly the open + propose dispatch verbs", () => {
+		expect(curatedToolCapabilities()).toEqual([
+			"intents.dispatch:open",
+			"intents.dispatch:propose-bookmark",
+			"intents.dispatch:propose-contact",
+			"intents.dispatch:propose-event",
+			"intents.dispatch:propose-note",
+			"intents.dispatch:propose-task",
+		]);
 	});
 });
 

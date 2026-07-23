@@ -38,6 +38,7 @@ import {
 	agentToolCapabilities,
 	capabilityImplies,
 } from "@brainstorm-os/sdk-types";
+import { proposeTools } from "./propose-artifacts";
 
 /** The verbs the curated tools dispatch. `open` is the universal cross-app
  *  navigation verb every type's owner app handles (doc 37) — it only routes /
@@ -49,12 +50,16 @@ export const AGENT_TOOL_VERB = {
 } as const;
 export type AgentToolVerb = (typeof AGENT_TOOL_VERB)[keyof typeof AGENT_TOOL_VERB];
 
-/** The single curated `open` tool (no declared `entityType` — the shell
- *  resolves the id's type). `label` is the human-facing description fed to the
- *  model; `translate` localises it. The model still addresses the tool by its
- *  stable `verb`. */
+/** The curated tool catalogue offered to the model: the read-only `open`
+ *  navigation verb plus the Agent-11 propose-* tools (each stages a draft the
+ *  user approves — see `propose-artifacts.ts`). `translate` localises each
+ *  label; the model addresses a tool by its stable `verb`. The three-tier
+ *  ceiling + the loop's fail-closed intersection still gate every one. */
 export function curatedAgentTools(translate: (key: string) => string): AgentTool[] {
-	return [{ verb: AGENT_TOOL_VERB.Open, label: translate("tool.open.label") }];
+	return [
+		{ verb: AGENT_TOOL_VERB.Open, label: translate("tool.open.label") },
+		...proposeTools(translate),
+	];
 }
 
 /** The full capability footprint the curated tools COULD require — the union of

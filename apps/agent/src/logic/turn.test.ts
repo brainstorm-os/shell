@@ -1,0 +1,70 @@
+/**
+ * Agent-11b — the propose-not-persist security invariant, at the turn seam.
+ * A `propose-*` tool call must STAGE a draft and NEVER reach `intents.dispatch`
+ * (and therefore never `entities.create`). This is the prompt-injection
+ * mitigation: model output can only ever queue a draft for the user's approval.
+ */
+
+import type { AgentToolCall, IntentsService } from "@brainstorm-os/sdk-types";
+import { describe, expect, it, vi } from "vitest";
+import type { ProposedArtifact } from "./propose-artifacts";
+import { makeDispatchTool } from "./turn";
+
+const openTool = { verb: "open", label: "Open" };
+const proposeNote = { verb: "propose-note", label: "Propose a note" };
+
+function fakeIntents(): IntentsService & { dispatch: ReturnType<typeof vi.fn> } {
+	return { dispatch: vi.fn(async () => ({ handled: true, value: { ok: true } })) } as never;
+}
+
+describe("makeDispatchTool — propose is staged, never dispatched", () => {
+	it("stages a propose-note draft and NEVER calls intents.dispatch", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [openTool, proposeNote], (a) => staged.push(a));
+
+		const ack = (await dispatch({
+			tool: "propose-note",
+			args: { title: "Weekly review", body: "notes" },
+		})) as Record<string, unknown>;
+
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(staged).toHaveLength(1);
+		expect(staged[0]?.entityType).toBe("io.brainstorm.notes/Note/v1");
+		expect(staged[0]?.fields).toEqual({ title: "Weekly review", body: "notes" });
+		expect(staged[0]?.id).toMatch(/^proposal-/);
+		expect(ack.staged).toBe(true);
+		expect(ack.status).toBe("pending-approval");
+	});
+
+	it("a propose call that fails validation stages nothing but still acks honestly", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [proposeNote], (a) => staged.push(a));
+
+		// Missing the required primary (`title`) → rejected, nothing staged.
+		const ack = (await dispatch({ tool: "propose-note", args: { body: "orphan" } })) as Record<
+			string,
+			unknown
+		>;
+
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(staged).toHaveLength(0);
+		expect(ack.staged).toBe(false);
+	});
+
+	it("a real (non-propose) tool still dispatches through the intents bus", async () => {
+		const intents = fakeIntents();
+		const dispatch = makeDispatchTool(intents, [openTool]);
+
+		await dispatch({ tool: "open", args: { entityId: "ent_1" } } satisfies AgentToolCall);
+
+		expect(intents.dispatch).toHaveBeenCalledTimes(1);
+		expect(intents.dispatch).toHaveBeenCalledWith({ verb: "open", payload: { entityId: "ent_1" } });
+	});
+
+	it("fails closed on a tool name outside the offered set", async () => {
+		const dispatch = makeDispatchTool(fakeIntents(), [proposeNote]);
+		await expect(dispatch({ tool: "propose-secret", args: {} })).rejects.toThrow(/unknown tool/);
+	});
+});

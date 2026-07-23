@@ -767,3 +767,124 @@ body {
 	gap: var(--space-1);
 	flex-shrink: 0;
 }
+
+/* Agent-11b — the propose-confirm tray above the composer. */
+.agent-proposal-tray {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin: 0 var(--space-3) var(--space-2);
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+}
+
+.agent-proposal-tray__head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.agent-proposal-tray__title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--color-text-primary);
+}
+
+.agent-proposal-tray__subtitle {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.agent-proposal {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+}
+
+.agent-proposal__kind {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--color-text-secondary);
+}
+
+.agent-proposal__fields {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.agent-proposal__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.agent-proposal__field-label {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.agent-proposal__input {
+	width: 100%;
+}
+
+.agent-proposal__actions {
+	display: flex;
+	gap: var(--space-2);
+	margin-top: var(--space-1);
+}
+
+.agent-proposal__btn {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	height: var(--control-height-sm, 24px);
+	padding: 0 var(--space-3);
+	border-radius: var(--radius-md);
+	border: var(--border-width) solid var(--color-border-subtle);
+	background: transparent;
+	color: var(--color-text-secondary);
+	font: inherit;
+	font-size: var(--text-size-xs);
+	cursor: pointer;
+}
+
+.agent-proposal__btn:hover:not(:disabled) {
+	background: var(--hover);
+	color: var(--color-text-primary);
+}
+
+.agent-proposal__btn:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: 2px;
+}
+
+.agent-proposal__btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.agent-proposal__btn--approve {
+	border-color: transparent;
+	background: var(--accent);
+	color: var(--accent-fg);
+}
+
+.agent-proposal__btn--approve:hover:not(:disabled) {
+	background: var(--accent-strong);
+	color: var(--accent-fg);
+}

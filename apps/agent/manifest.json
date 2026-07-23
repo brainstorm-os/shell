@@ -1,13 +1,13 @@
 {
   "id": "io.brainstorm.agent",
   "name": "Agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "sdk": "1",
   "description": "Conversational AI workspace \u2014 chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
   "icon": "icon.svg",
   "i18n": {
     "source": "en",
-    "locales": ["en", "es"]
+    "locales": ["en", "es", "de", "fr", "it", "pt"]
   },
   "entry": "dist/index.html",
   "capabilities": [
@@ -27,9 +27,19 @@
     "entities.write:brainstorm/Memory/v1",
     "entities.write:brainstorm/Trigger/v1",
     "entities.write:brainstorm/Workflow/v1",
+    "entities.write:io.brainstorm.notes/Note/v1",
+    "entities.write:brainstorm/Task/v1",
+    "entities.write:brainstorm/Event/v1",
+    "entities.write:brainstorm/Bookmark/v1",
+    "entities.write:brainstorm/Person/v1",
     "intents.dispatch:open",
     "intents.dispatch:insert",
-    "intents.dispatch:compose"
+    "intents.dispatch:compose",
+    "intents.dispatch:propose-note",
+    "intents.dispatch:propose-task",
+    "intents.dispatch:propose-event",
+    "intents.dispatch:propose-bookmark",
+    "intents.dispatch:propose-contact"
   ],
   "registrations": {
     "entityTypes": [
