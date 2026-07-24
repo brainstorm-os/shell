@@ -154,7 +154,9 @@ export async function resolveWidgetSpec(
 		return null;
 	}
 	const ledger = await ctx.getLedger();
-	const capabilities = ledger.listActive(placement.appId).map((grant) => grant.capability);
+	const capabilities = ledger
+		.listActive(placement.appId)
+		.map((grant) => (grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`));
 	return buildWidgetSpec({
 		placement,
 		record,

@@ -261,7 +261,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			label: t("editor.block.table"),
 			description: t("editor.block.table.description"),
 			icon: <TableIcon />,
-			keywords: ["table", "grid", "rows", "columns", "spreadsheet"],
+			keywords: ["table", "grid", "rows", "spreadsheet"],
 			run: ({ editor }) =>
 				editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: "3", rows: "3", includeHeaders: true }),
 		},

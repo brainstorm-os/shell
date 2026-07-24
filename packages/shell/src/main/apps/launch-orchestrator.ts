@@ -95,7 +95,9 @@ export class LaunchOrchestrator {
 		const entryPath = await this.resolveEntryPath(request.appId, record);
 		const capabilities = this.options.ledger
 			.listActive(request.appId)
-			.map((grant) => grant.capability);
+			.map((grant) =>
+				grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`,
+			);
 
 		const theme = this.options.getActiveTheme
 			? await this.options.getActiveTheme().catch((error) => {

@@ -96,6 +96,14 @@ describe("LaunchOrchestrator", () => {
 					grantedAt: 1,
 					grantedVia: "install",
 				},
+				{
+					id: "g3",
+					appId: "io.x.app",
+					capability: "intents.dispatch",
+					scope: "propose-note",
+					grantedAt: 1,
+					grantedVia: "install",
+				},
 			]),
 		} as unknown as CapabilityLedger;
 		const { launcher, launches } = makeLauncher();
@@ -111,7 +119,15 @@ describe("LaunchOrchestrator", () => {
 			version: "1.2.3",
 			sdk: "1",
 		});
-		expect(opts?.capabilities).toEqual(["ui.notify", "storage.read"]);
+		// Scopes MUST be reconstructed onto the verb — dropping them (as this path
+		// once did) silently broke every renderer that reasons over scoped caps,
+		// e.g. the Agent's tool-offering (`intents.dispatch:propose-note` never
+		// matched a bare `intents.dispatch`, so no propose tool was ever offered).
+		expect(opts?.capabilities).toEqual([
+			"ui.notify",
+			"storage.read:*",
+			"intents.dispatch:propose-note",
+		]);
 		expect(opts?.launch).toEqual({ reason: "fresh" });
 	});
 
