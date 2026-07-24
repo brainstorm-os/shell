@@ -119,5 +119,8 @@
   "insert.search.label": "Notizen durchsuchen",
   "insert.empty": "Keine passenden Notizen.",
   "insert.success": "Zu „{note}“ hinzugefügt",
-  "insert.failed": "Konnte nicht zur Notiz hinzugefügt werden."
+  "insert.failed": "Konnte nicht zur Notiz hinzugefügt werden.",
+  "created.title": "In diesem Chat erstellt",
+  "created.open": "{label} öffnen",
+  "created.untitled": "Ohne Titel"
 }

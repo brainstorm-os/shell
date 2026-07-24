@@ -14,6 +14,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */ // declarations only
 
+import type { AgentProvenanceRequest } from "./agent-provenance";
 import type { ExportTextFormat } from "./automations";
 import type { CalDavService } from "./caldav";
 import type {
@@ -270,8 +271,17 @@ export type EntitiesService = {
 	subscribe(query: EntityQuery, onUpdate: (entities: Entity[]) => void): Subscription;
 	/** `id` (optional) preserves a caller's stable id when migrating off a
 	 *  per-app store onto the shared space — entity ids are local opaque
-	 *  strings. A collision with a live entity rejects (`Invalid`). */
-	create(type: string, properties: Record<string, unknown>, id?: EntityId): Promise<Entity>;
+	 *  strings. A collision with a live entity rejects (`Invalid`).
+	 *  `provenance` (optional, Agent-11c) records WHICH conversation this create
+	 *  was made on behalf of; the shell stamps a server-authoritative provenance
+	 *  block (its `agent` forced from the broker-verified caller, never trusted
+	 *  from the client) onto the created entity. */
+	create(
+		type: string,
+		properties: Record<string, unknown>,
+		id?: EntityId,
+		provenance?: AgentProvenanceRequest,
+	): Promise<Entity>;
 	update(id: EntityId, patch: Record<string, unknown>): Promise<Entity>;
 	delete(id: EntityId): Promise<void>;
 	/** Merge duplicate entities of ONE type into a survivor (F-158): applies
@@ -2607,6 +2617,16 @@ export type {
 	ToolSender,
 	UserSender,
 } from "./conversation";
+
+// ─── Agent provenance + back-links (Agent-11c) ──────────────────────────────
+export {
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	buildAgentProvenance,
+	parseProvenanceRequest,
+	readAgentProvenance,
+	stripAgentProvenance,
+} from "./agent-provenance";
+export type { AgentProvenance, AgentProvenanceRequest } from "./agent-provenance";
 
 // ─── Shared agent loop (11b.7 — Automations AIAgent + Agent app) ────────────
 export {

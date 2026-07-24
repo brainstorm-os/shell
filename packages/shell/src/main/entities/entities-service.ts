@@ -23,11 +23,15 @@ import { Buffer } from "node:buffer";
 import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
+	AGENT_PROVENANCE_PROPERTY_KEY,
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
 	type EntityMergeResult,
 	type EntityQuery,
+	buildAgentProvenance,
+	parseProvenanceRequest,
+	stripAgentProvenance,
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { AssetKind } from "../assets/asset-types";
@@ -432,10 +436,24 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!can(EntityAccess.Write, type)) {
 					throw named("Denied", `entities.create: no entities.write for ${type}`);
 				}
-				const properties =
+				const rawProperties =
 					a.properties && typeof a.properties === "object"
 						? (a.properties as Record<string, unknown>)
 						: {};
+				// Agent-11c — provenance is SERVICE-OWNED. Always strip any caller-
+				// supplied reserved key first (an app must not be able to forge a
+				// provenance stamp by smuggling it in its plain property bag), then
+				// re-stamp server-side from the broker-verified `envelope.app` when a
+				// provenance request accompanies the create. The `agent` field can
+				// therefore only ever be the true calling app — a compromised app can
+				// attribute a create to ITSELF, never to another agent.
+				const provReq = parseProvenanceRequest(a.provenance);
+				const properties: Record<string, unknown> = provReq
+					? {
+							...stripAgentProvenance(rawProperties),
+							[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(app, provReq.conversationId, clock()),
+						}
+					: stripAgentProvenance(rawProperties);
 				// Optional caller-supplied id (9.3.5.3): entity ids are local
 				// opaque strings (05-data-and-blocks-protocol §Decision), so an
 				// app migrating off its kv silo may preserve its stable ids
@@ -549,8 +567,12 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!can(EntityAccess.Write, existing.type)) {
 					throw named("Denied", `entities.update: no entities.write for ${existing.type}`);
 				}
-				const patch =
-					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {};
+				// Agent-11c — provenance is create-time + immutable; strip the
+				// reserved key from an update patch so an app can neither inject it
+				// after the fact nor overwrite an existing server stamp.
+				const patch = stripAgentProvenance(
+					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {},
+				);
 				const updated = await writePropsThroughDoc(repo, existing, patch);
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);

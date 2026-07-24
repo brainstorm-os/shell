@@ -315,6 +315,27 @@ body {
 	color: var(--color-text-secondary);
 }
 
+/* Agent-11c — created-object back-links: objects the agent created in this
+ * conversation, rendered as chips that open via the cap-checked `open` intent. */
+.agent__created {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+	padding: var(--space-2) 0 0;
+}
+
+.agent__created-label {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.agent__created-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-1);
+}
+
 /* ── Add to note (F-241 / doc 75) ── */
 .agent-insert {
 	display: flex;
