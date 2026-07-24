@@ -154,7 +154,12 @@ export async function resolveWidgetSpec(
 		return null;
 	}
 	const ledger = await ctx.getLedger();
-	const capabilities = ledger.listActive(placement.appId).map((grant) => grant.capability);
+	// Reconstruct the full `service.verb[:scope]` — a widget reasons over scoped
+	// caps the same as a full app; dropping the scope here strips them to bare
+	// verbs (the launch-orchestrator scope bug, same shape).
+	const capabilities = ledger
+		.listActive(placement.appId)
+		.map((grant) => (grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`));
 	return buildWidgetSpec({
 		placement,
 		record,
