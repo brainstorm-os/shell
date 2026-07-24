@@ -11,11 +11,15 @@
  *
  * Kept pure + app-local (no React, no catalog) so it's unit-testable; the
  * Database app's `effective-def` / `EditableCell` are coupled to its own
- * catalog bridge and can't be reused here. Label humanisation mirrors the
- * Database inspector so a generated key reads legibly.
+ * catalog bridge and can't be reused here. Labels come from the shared
+ * `humanizeKey` (`@brainstorm-os/sdk`) so a generated key reads the same here,
+ * in the Database inspector, and on the Agent's row cards.
  */
 
+import { humanizeKey } from "@brainstorm-os/sdk";
 import type { EntityProperties } from "../types/entity";
+
+export { humanizeKey };
 
 /** Keys the inspector already renders (system metadata rows / the
  *  Preview tab) — excluded from the custom-property enumeration so they
@@ -47,34 +51,6 @@ export type PropertyRow = {
 	label: string;
 	value: string;
 };
-
-const LABEL_OVERRIDES: Record<string, string> = {
-	id: "ID",
-	url: "URL",
-	uri: "URI",
-	uuid: "UUID",
-};
-
-function capitalize(word: string): string {
-	return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
-/** `startDate` → "Start date", `due_date` → "Due date", `url` → "URL". */
-export function humanizeKey(key: string): string {
-	if (!key) return key;
-	const tokens = key
-		.replace(/[_-]+/g, " ")
-		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-		.toLowerCase()
-		.split(/\s+/)
-		.filter(Boolean);
-	if (tokens.length === 0) return key;
-	const first = tokens.shift() as string;
-	const head = LABEL_OVERRIDES[first] ?? capitalize(first);
-	const tail = tokens.map((token) => LABEL_OVERRIDES[token] ?? token).join(" ");
-	return tail ? `${head} ${tail}` : head;
-}
 
 /** Render a property-bag value as a single display string, or `null` when
  *  it carries nothing legible (empty string, empty array, empty object). A

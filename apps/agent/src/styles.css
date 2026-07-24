@@ -841,10 +841,40 @@ body {
 	color: var(--color-text-secondary);
 }
 
+.agent-proposal__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.agent-proposal__target {
+	min-width: 0;
+	overflow: hidden;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .agent-proposal__fields {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2);
+}
+
+/* A proposed database row reads as the row it will become: a label column and
+   an editable value column per cell (`display: contents` promotes each field's
+   label + input to grid items so they share the two tracks). */
+.agent-proposal__fields--row {
+	display: grid;
+	grid-template-columns: minmax(72px, 30%) 1fr;
+	align-items: center;
+	gap: var(--space-1) var(--space-2);
+}
+
+.agent-proposal__fields--row .agent-proposal__field {
+	display: contents;
 }
 
 .agent-proposal__field {

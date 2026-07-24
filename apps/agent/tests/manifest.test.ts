@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { COLLECTION_TYPE_URL, GENERIC_OBJECT_TYPE } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { validateManifest } from "../../../packages/shell/src/main/apps/manifest";
 import { curatedToolCapabilities } from "../src/logic/agent-tools";
@@ -57,6 +58,22 @@ describe("apps/agent/manifest.json", () => {
 		const result = validateManifest(readManifest());
 		if (!result.ok) throw new Error(result.reason);
 		for (const cap of curatedToolCapabilities()) {
+			expect(result.manifest.capabilities, `manifest declares ${cap}`).toContain(cap);
+		}
+	});
+
+	it("declares the write caps an approved database-row proposal exercises (Agent-11d)", () => {
+		// A row lands as its database's own type (the generic Object for a manual
+		// collection), and a manual collection also needs its membership patched.
+		// Undeclared caps would mean the model is offered a row tool whose approval
+		// is denied — so the offer filter and the manifest have to agree.
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		for (const cap of [
+			"intents.dispatch:propose-row",
+			`entities.write:${GENERIC_OBJECT_TYPE}`,
+			`entities.write:${COLLECTION_TYPE_URL}`,
+		]) {
 			expect(result.manifest.capabilities, `manifest declares ${cap}`).toContain(cap);
 		}
 	});

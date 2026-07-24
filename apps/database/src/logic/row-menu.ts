@@ -12,8 +12,8 @@
  *     vault-wide destroy that "Remove from list" was mistaken for (F-217).
  */
 
+import { GENERIC_OBJECT_TYPE } from "@brainstorm-os/sdk-types";
 import { ListViewKind } from "../types/list-view";
-import { GENERIC_OBJECT_TYPE } from "./row-create";
 
 export type RowMenuPlan = {
 	offerRename: boolean;

@@ -30,6 +30,12 @@ import {
 	buildProposalAck,
 	proposeDescriptorForVerb,
 } from "./propose-artifacts";
+import {
+	type DatabaseSchema,
+	PROPOSE_ROW_VERB,
+	buildRowProposal,
+	buildRowProposalAck,
+} from "./propose-row";
 import { withRetrievalContext } from "./retrieval";
 import { AGENT_GROUNDING_GUIDANCE } from "./transcript";
 
@@ -60,6 +66,7 @@ export function makeDispatchTool(
 	intents: IntentsService,
 	tools: readonly AgentTool[],
 	onPropose?: (artifact: ProposedArtifact) => void,
+	rowSchemas: readonly DatabaseSchema[] = [],
 ): (call: AgentToolCall) => Promise<unknown> {
 	const byVerb = new Map(tools.map((tool) => [tool.verb, tool] as const));
 	return async (call: AgentToolCall) => {
@@ -67,6 +74,19 @@ export function makeDispatchTool(
 		// Defence in depth: a verb not in the curated set never dispatches (the
 		// loop refuses it too, but we fail closed independently).
 		if (!tool) throw new Error(`unknown tool: ${call.tool}`);
+		// Agent-11d — a row is staged against the TARGET DATABASE's own columns
+		// (resolved from the live vault, not from the model), so it needs the
+		// schemas rather than a static descriptor. Same propose-not-persist rule.
+		if (tool.verb === PROPOSE_ROW_VERB) {
+			const result = buildRowProposal({
+				verb: tool.verb,
+				args: call.args,
+				id: mintProposalId(),
+				schemas: rowSchemas,
+			});
+			if (result.ok) onPropose?.(result.artifact);
+			return buildRowProposalAck(result);
+		}
 		// Propose-not-persist: stage a draft, never touch the vault.
 		if (proposeDescriptorForVerb(tool.verb)) {
 			const result = buildProposal({ verb: tool.verb, args: call.args, id: mintProposalId() });
@@ -136,6 +156,9 @@ export function runAgentTurn(
 		 *  host collects them into the conversation's pending buffer and renders
 		 *  approve/edit/discard cards; nothing is persisted until the user acts. */
 		onPropose?: (artifact: ProposedArtifact) => void;
+		/** Agent-11d — the databases a proposed row may target, derived from the
+		 *  live vault snapshot. A row naming anything else is refused. */
+		rowSchemas?: readonly DatabaseSchema[];
 	},
 ): Promise<AgentLoopResult> {
 	const ports: AgentLoopPorts = {
@@ -143,7 +166,12 @@ export function runAgentTurn(
 			...(input.provider ? { provider: input.provider } : {}),
 			...(input.model ? { model: input.model } : {}),
 		}),
-		dispatchTool: makeDispatchTool(services.intents, input.tools, input.onPropose),
+		dispatchTool: makeDispatchTool(
+			services.intents,
+			input.tools,
+			input.onPropose,
+			input.rowSchemas ?? [],
+		),
 	};
 	const config: AgentLoopConfig = {
 		instructions: withRetrievalContext(AGENT_TOOL_SYSTEM_PROMPT, input.retrievalContext ?? ""),

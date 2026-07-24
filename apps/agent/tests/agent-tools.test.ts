@@ -16,6 +16,7 @@ import {
 	effectiveAgentCapabilities,
 	toolCallToIntent,
 } from "../src/logic/agent-tools";
+import { PROPOSE_ROW_VERB } from "../src/logic/propose-row";
 
 const APP_CAPS = [
 	"storage.kv",
@@ -61,8 +62,17 @@ describe("curated agent tools", () => {
 			"intents.dispatch:propose-contact",
 			"intents.dispatch:propose-event",
 			"intents.dispatch:propose-note",
+			"intents.dispatch:propose-row",
 			"intents.dispatch:propose-task",
 		]);
+	});
+
+	it("offers the row tool only when the vault actually has databases (Agent-11d)", () => {
+		const verbs = (options?: { hasDatabases: boolean }) =>
+			curatedAgentTools(id, options).map((tool) => tool.verb);
+		expect(verbs()).not.toContain(PROPOSE_ROW_VERB);
+		expect(verbs({ hasDatabases: false })).not.toContain(PROPOSE_ROW_VERB);
+		expect(verbs({ hasDatabases: true })).toContain(PROPOSE_ROW_VERB);
 	});
 });
 

@@ -1,6 +1,6 @@
+import { GENERIC_OBJECT_TYPE } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { ListViewKind } from "../types/list-view";
-import { GENERIC_OBJECT_TYPE } from "./row-create";
 import { rowMenuPlan } from "./row-menu";
 
 const isVaultDerived = (id: string): boolean => id.startsWith("list_vault_");

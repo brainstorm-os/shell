@@ -3,7 +3,7 @@
   "name": "Agent",
   "version": "0.3.0",
   "sdk": "1",
-  "description": "Conversational AI workspace \u2014 chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
+  "description": "Conversational AI workspace — chat over a local model, grounded in your vault. Intents as tools, cited answers, and save-as-automation land in later rungs.",
   "icon": "icon.svg",
   "i18n": {
     "source": "en",
@@ -39,7 +39,10 @@
     "intents.dispatch:propose-task",
     "intents.dispatch:propose-event",
     "intents.dispatch:propose-bookmark",
-    "intents.dispatch:propose-contact"
+    "intents.dispatch:propose-contact",
+    "intents.dispatch:propose-row",
+    "entities.write:brainstorm/Object/v1",
+    "entities.write:brainstorm/List/v1"
   ],
   "registrations": {
     "entityTypes": [

@@ -179,6 +179,7 @@ export {
 	type PopoverLabels,
 	resolvePopoverLabels,
 } from "./popover/popover-labels";
+export { humanizeKey } from "./humanize-key";
 export {
 	createT,
 	type TFunction,
