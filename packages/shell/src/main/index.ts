@@ -50,7 +50,7 @@ import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
-import { createDemoAgentProvider } from "./ai/demo-agent-provider";
+import { DEMO_AGENT_PROVIDER_ID, createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
 import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
@@ -3532,8 +3532,14 @@ void app.whenReady().then(async () => {
 	// `defaultProvider` (Settings → AI) pins routing; `null` restores the
 	// built-in default (local Ollama, registered first). Applied per vault open
 	// (onVaultOpened) + immediately for an already-open vault.
+	// In capture-only demo mode the built-in fallback IS the scripted provider —
+	// otherwise a vault open with no persisted default resets routing to Ollama
+	// and the demo turn fails "no model reached".
+	const fallbackProviderId = process.env.BRAINSTORM_DEMO_AGENT
+		? DEMO_AGENT_PROVIDER_ID
+		: OLLAMA_PROVIDER_ID;
 	applyAiDefaultProvider = (id) => {
-		aiProviders.setDefault(id && aiProviders.has(id) ? id : OLLAMA_PROVIDER_ID);
+		aiProviders.setDefault(id && aiProviders.has(id) ? id : fallbackProviderId);
 	};
 	{
 		const openSession = getActiveVaultSession();

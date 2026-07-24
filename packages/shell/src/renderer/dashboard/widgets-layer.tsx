@@ -29,13 +29,13 @@ import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { AppIcon } from "./app-icon";
 import {
+	GRID_OUTER_MARGIN,
+	type GridCell,
 	type GridPoint,
-	WIDGET_MIN_H,
-	WIDGET_MIN_W,
 	WIDGET_UNIT,
 	WidgetSize,
 	clampWidgetOrigin,
-	clampWidgetSize,
+	clampWidgetSizeToSurface,
 	migrateWidgetRecord,
 	widgetFootprint,
 	widgetPointToCell,
@@ -434,21 +434,27 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		[effectiveWidgets],
 	);
 
-	const onHeaderPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-		const drag = dragRef.current;
-		if (!drag || event.pointerId !== drag.pointerId) return;
-		if ((event.buttons & 1) === 0) return;
-		const dx = event.clientX - drag.startClientX;
-		const dy = event.clientY - drag.startClientY;
-		// Card (+ its iframe child) follows the cursor 1:1 via live React geometry.
-		setGesture({
-			id: drag.id,
-			x: drag.originX + dx,
-			y: drag.originY + dy,
-			width: drag.baseW,
-			height: drag.baseH,
-		});
-	}, []);
+	const onHeaderPointerMove = useCallback(
+		(event: React.PointerEvent<HTMLDivElement>) => {
+			const drag = dragRef.current;
+			if (!drag || event.pointerId !== drag.pointerId) return;
+			if ((event.buttons & 1) === 0) return;
+			const dx = event.clientX - drag.startClientX;
+			const dy = event.clientY - drag.startClientY;
+			// Card (+ its iframe child) follows the cursor 1:1 via live React geometry,
+			// clamped so the WHOLE card stays inside the working area — it can't be
+			// dragged partly off any edge (the drop clamp then agrees, so there's no
+			// snap-back). A card wider/taller than the surface floors at the margin.
+			let x = drag.originX + dx;
+			let y = drag.originY + dy;
+			if (surface.x > 0 && surface.y > 0) {
+				x = Math.max(GRID_OUTER_MARGIN, Math.min(x, surface.x - drag.baseW));
+				y = Math.max(GRID_OUTER_MARGIN, Math.min(y, surface.y - drag.baseH));
+			}
+			setGesture({ id: drag.id, x, y, width: drag.baseW, height: drag.baseH });
+		},
+		[surface],
+	);
 
 	const onHeaderPointerUp = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>) => {
@@ -503,38 +509,57 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		[effectiveWidgets],
 	);
 
-	const onResizePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-		const r = resizeRef.current;
-		if (!r || event.pointerId !== r.pointerId) return;
-		if ((event.buttons & 1) === 0) return;
-		const w = Math.max(
-			WIDGET_MIN_W,
-			r.startW + Math.round((event.clientX - r.startClientX) / WIDGET_UNIT),
-		);
-		const h = Math.max(
-			WIDGET_MIN_H,
-			r.startH + Math.round((event.clientY - r.startClientY) / WIDGET_UNIT),
-		);
-		setGesture({ id: r.id, x: r.cardX, y: r.cardY, width: w * WIDGET_UNIT, height: h * WIDGET_UNIT });
-	}, []);
+	const onResizePointerMove = useCallback(
+		(event: React.PointerEvent<HTMLDivElement>) => {
+			const r = resizeRef.current;
+			if (!r || event.pointerId !== r.pointerId) return;
+			if ((event.buttons & 1) === 0) return;
+			const origin: GridCell = {
+				col: Math.round((r.cardX - GRID_OUTER_MARGIN) / WIDGET_UNIT),
+				row: Math.round((r.cardY - GRID_OUTER_MARGIN) / WIDGET_UNIT),
+			};
+			// Cap the live footprint so it can't grow past the working-area edge —
+			// the origin is fixed, so only the size is bounded (no snap on drop).
+			const size = clampWidgetSizeToSurface(
+				origin,
+				{
+					w: r.startW + Math.round((event.clientX - r.startClientX) / WIDGET_UNIT),
+					h: r.startH + Math.round((event.clientY - r.startClientY) / WIDGET_UNIT),
+				},
+				surface,
+			);
+			setGesture({
+				id: r.id,
+				x: r.cardX,
+				y: r.cardY,
+				width: size.w * WIDGET_UNIT,
+				height: size.h * WIDGET_UNIT,
+			});
+		},
+		[surface],
+	);
 
 	const onResizePointerUp = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>) => {
 			const r = resizeRef.current;
 			if (!r || event.pointerId !== r.pointerId) return;
 			event.currentTarget.releasePointerCapture(event.pointerId);
-			const size = clampWidgetSize({
-				w: r.startW + Math.round((event.clientX - r.startClientX) / WIDGET_UNIT),
-				h: r.startH + Math.round((event.clientY - r.startClientY) / WIDGET_UNIT),
-			});
 			const record = effectiveWidgets[r.id];
 			if (record) {
+				const size = clampWidgetSizeToSurface(
+					{ col: record.x, row: record.y },
+					{
+						w: r.startW + Math.round((event.clientX - r.startClientX) / WIDGET_UNIT),
+						h: r.startH + Math.round((event.clientY - r.startClientY) / WIDGET_UNIT),
+					},
+					surface,
+				);
 				setPending({ id: r.id, w: size.w, h: size.h });
 				void window.brainstorm.dashboard.upsertWidget(r.id, { ...record, w: size.w, h: size.h });
 			}
 			endResize();
 		},
-		[effectiveWidgets, endResize],
+		[effectiveWidgets, endResize, surface],
 	);
 
 	const openApp = useCallback((appId: string) => {
@@ -563,11 +588,15 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		(id: string, dw: number, dh: number) => {
 			const record = effectiveWidgets[id];
 			if (!record) return;
-			const size = clampWidgetSize({ w: record.w + dw, h: record.h + dh });
+			const size = clampWidgetSizeToSurface(
+				{ col: record.x, row: record.y },
+				{ w: record.w + dw, h: record.h + dh },
+				surface,
+			);
 			setPending({ id, w: size.w, h: size.h });
 			void window.brainstorm.dashboard.upsertWidget(id, { ...record, w: size.w, h: size.h });
 		},
-		[effectiveWidgets],
+		[effectiveWidgets, surface],
 	);
 
 	const openWidgetMenu = useCallback(

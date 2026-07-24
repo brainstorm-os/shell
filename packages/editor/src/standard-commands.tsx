@@ -261,7 +261,9 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			label: t("editor.block.table"),
 			description: t("editor.block.table.description"),
 			icon: <TableIcon />,
-			keywords: ["table", "grid", "rows", "columns", "spreadsheet"],
+			// NOT "columns" — that keyword ranked Table above the actual Columns
+			// layout blocks, so `/columns` inserted a table (editor audit 2026-07-24).
+			keywords: ["table", "grid", "rows", "spreadsheet"],
 			run: ({ editor }) =>
 				editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: "3", rows: "3", includeHeaders: true }),
 		},
