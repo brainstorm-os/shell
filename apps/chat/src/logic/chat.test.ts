@@ -2,6 +2,7 @@ import {
 	AttachmentKind,
 	MessageRole,
 	type RosterMember,
+	RosterMemberKind,
 	RosterRole,
 	SenderKind,
 } from "@brainstorm-os/sdk-types";
@@ -242,6 +243,7 @@ describe("membersFromMessages", () => {
 describe("toPanelMembers", () => {
 	const rosterMember = (over: Partial<RosterMember> & { pubkey: string }): RosterMember => ({
 		role: RosterRole.Editor,
+		kind: RosterMemberKind.Human,
 		isSelf: false,
 		fingerprint: `ed25519:${over.pubkey.slice(0, 16).padEnd(16, "0")}`,
 		...over,
