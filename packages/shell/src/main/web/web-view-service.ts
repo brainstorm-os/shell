@@ -26,6 +26,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import type { BaseWindowHandle } from "../apps/window-container";
+import { clampLiveDomHtml } from "./web-live-dom";
 import { upgradeToHttps } from "./web-policy";
 import { BrowseMode, resolveBrowseMode } from "./web-readonly";
 
@@ -62,6 +63,10 @@ export interface ManagedWebView {
 	setBounds(rect: WebViewRect): void;
 	setVisible(visible: boolean): void;
 	focus(): void;
+	/** Net-3 — the page's RENDERED DOM, read out of the live view (what the user
+	 *  can actually see, not what a second GET would return). `null` when the
+	 *  page can't be read (no live view, an internal page, a failed eval). */
+	captureHtml(): Promise<string | null>;
 	/** Destroy the view and its throwaway partition (private-by-default). */
 	destroy(): void;
 }
@@ -133,9 +138,15 @@ export type WebViewServiceOptions = {
 	emitEvent: (appId: string, event: WebViewEvent) => void;
 	/** Reader-extract the page → `Bookmark/v1`; returns the entity id. */
 	capture?: (appId: string, spec: CaptureSpec) => Promise<string>;
-	/** Browser-8 — reader-extract the page and RETURN its text (no vault write).
-	 *  Absent ⇒ {@link WebViewMethod.ExtractText} resolves `null`. */
-	extractText?: (appId: string, spec: CaptureSpec) => Promise<WebViewExtractedText | null>;
+	/** Browser-8 / Net-3 — turn a page's RENDERED DOM into its reader projection
+	 *  (no vault write). The service pulls the DOM off the live view and passes
+	 *  it here; production binds this to the Net-2 extraction worker, so the
+	 *  CPU-heavy parse stays off the broker loop. Absent ⇒
+	 *  {@link WebViewMethod.ExtractText} resolves `null`. */
+	extractText?: (
+		appId: string,
+		spec: CaptureSpec & { html: string },
+	) => Promise<WebViewExtractedText | null>;
 	/** Browser-7 — persist a per-origin device-permission decision. Absent ⇒
 	 *  the method is a no-op (deny-default stands). */
 	setSitePermission?: (
@@ -384,11 +395,17 @@ export class WebViewService {
 	private async extractText(appId: string, tabId: string): Promise<WebViewExtractedText | null> {
 		const entry = this.tabs.get(tabId);
 		if (!entry || !this.options.extractText) return null;
+		// Net-3 — a suspended tab has no DOM to read; re-mounting one behind the
+		// user's back to answer a read would be a surprising navigation, so an
+		// unreadable tab honestly reports "nothing".
+		const html = await entry.view?.captureHtml();
+		if (!html) return null;
 		return this.options.extractText(appId, {
 			tabId,
 			url: entry.url,
 			title: entry.title,
 			selectionOnly: false,
+			html: clampLiveDomHtml(html),
 		});
 	}
 

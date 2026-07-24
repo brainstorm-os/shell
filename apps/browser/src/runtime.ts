@@ -7,6 +7,7 @@
  */
 
 import type {
+	AiService,
 	Intent,
 	LaunchContext,
 	LifecycleEvent,
@@ -63,6 +64,10 @@ export type BrowserRuntime = {
 		 *  `network.readable`) — absent outside the shell or when the grant is
 		 *  withheld, in which case a clip saves link-only. */
 		network?: NetworkReadableService;
+		/** Browser-8 — the AI broker, for summarize-this-page (gated on
+		 *  `ai.use`). Absent outside the shell or when the grant is withheld,
+		 *  in which case the summary action reports "no model". */
+		ai?: AiService;
 	} | null;
 };
 
@@ -78,6 +83,12 @@ export function getBrainstorm(): BrowserRuntime | null {
 
 export function getWebView(): WebViewClient | null {
 	return getBrainstorm()?.services?.webView ?? null;
+}
+
+/** Browser-8 — the AI broker, for summarize-this-page. `null` when the shell
+ *  exposes no AI service (the summary action then reports "no model"). */
+export function getAi(): AiService | null {
+	return getBrainstorm()?.services?.ai ?? null;
 }
 
 export function getEntities(): EntitiesClient | null {

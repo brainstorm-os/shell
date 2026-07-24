@@ -58,5 +58,14 @@
   "shield.menu.mayBreak": "Con la protezione attiva alcune funzionalità potrebbero non funzionare.",
   "shield.menu.trust": "Fidati di questo sito e ricarica",
   "unavailable.title": "Browser",
-  "unavailable.blurb": "Il motore del browser gira nella shell di Brainstorm. Avvia questa app da Brainstorm per navigare."
+  "unavailable.blurb": "Il motore del browser gira nella shell di Brainstorm. Avvia questa app da Brainstorm per navigare.",
+  "summary.action": "Riassumi questa pagina",
+  "summary.title": "Riepilogo della pagina",
+  "summary.dismiss": "Chiudi il riepilogo",
+  "summary.reading": "Lettura della pagina…",
+  "summary.summarizing": "Riepilogo in corso…",
+  "summary.note": "Generato dalla pagina che stai visualizzando: verifica le informazioni importanti nell'originale.",
+  "summary.failed.noContent": "In questa pagina non c'è testo leggibile da riassumere.",
+  "summary.failed.noModel": "Nessun modello IA configurato. Aggiungine uno in Impostazioni → IA.",
+  "summary.failed.generic": "Impossibile riassumere questa pagina: riprova."
 }

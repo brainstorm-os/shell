@@ -338,6 +338,7 @@ import {
 	downloadSourceUrl,
 	sanitizeDownloadFilename,
 } from "./web/web-download";
+import { toExtractedText } from "./web/web-live-dom";
 import { createWebPrivacyRuntime } from "./web/web-privacy-runtime";
 import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
@@ -4287,6 +4288,21 @@ void app.whenReady().then(async () => {
 		WEBVIEW_SERVICE,
 		makeWebViewServiceHandler({
 			clearBrowsingData: () => webCookieJar?.clear(),
+			// Net-3 — the live-DOM feeder: the page the user is actually looking at
+			// (logged-in, script-rendered, personalised) goes to the SAME Net-2
+			// extraction core the static `network.readable` feeder uses, in the
+			// same worker, so an in-browser read and a fetched URL agree — and the
+			// CPU-heavy parse never lands on the broker loop.
+			extractText: async (_appId, spec) => {
+				if (!workers) return null;
+				const result = await workers.extraction.extract({ html: spec.html, baseUrl: spec.url });
+				return toExtractedText({
+					url: spec.url,
+					fallbackTitle: spec.title,
+					extractedTitle: result.meta?.title ?? null,
+					textContent: result.textContent,
+				});
+			},
 			setSitePermission: (origin, permission, allow) =>
 				webPrivacy.permissions.set(origin, permission, allow),
 			// Browser-8 — the in-browser trust twin: the sandboxed Browser (gated on

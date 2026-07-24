@@ -10,6 +10,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BaseWindowHandle } from "../apps/window-container";
+import { LIVE_DOM_MAX_CHARS } from "./web-live-dom";
 import { BrowseMode } from "./web-readonly";
 import {
 	type CaptureSpec,
@@ -36,6 +37,7 @@ function fakeView() {
 		setBounds: vi.fn(),
 		setVisible: vi.fn(),
 		focus: vi.fn(),
+		captureHtml: vi.fn(async () => "<html><body><p>page</p></body></html>" as string | null),
 		destroy: vi.fn(),
 	} satisfies ManagedWebView;
 }
@@ -476,8 +478,14 @@ describe("Browser-8 — read-only browsing (OQ-WV-5)", () => {
 describe("Browser-8 — extract-text", () => {
 	const extracted = { url: "https://a.test/", title: "A", text: "body text", truncated: false };
 
-	it("returns the reader projection of a tab's page", async () => {
-		const s = setup({ extractText: async () => extracted });
+	it("feeds the live DOM to the extractor and returns its projection (Net-3)", async () => {
+		const seen: string[] = [];
+		const s = setup({
+			extractText: async (_appId, spec) => {
+				seen.push(spec.html);
+				return extracted;
+			},
+		});
 		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
 			WEB_BROWSE_CAP,
 		]);
@@ -486,6 +494,38 @@ describe("Browser-8 — extract-text", () => {
 				WEB_CAPTURE_CAP,
 			]),
 		).toEqual(extracted);
+		expect(seen[0]).toContain("<p>page</p>");
+	});
+
+	it("reports nothing when the page has no readable DOM (Net-3)", async () => {
+		const s = setup({ extractText: async () => extracted });
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		s.created.get("t1")?.captureHtml.mockResolvedValueOnce(null);
+		expect(
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [
+				WEB_CAPTURE_CAP,
+			]),
+		).toBeNull();
+	});
+
+	it("clamps an enormous DOM before it reaches the parser (Net-3)", async () => {
+		let received = "";
+		const s = setup({
+			extractText: async (_appId, spec) => {
+				received = spec.html;
+				return extracted;
+			},
+		});
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		s.created.get("t1")?.captureHtml.mockResolvedValueOnce("x".repeat(LIVE_DOM_MAX_CHARS + 1_000));
+		await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [
+			WEB_CAPTURE_CAP,
+		]);
+		expect(received.length).toBe(LIVE_DOM_MAX_CHARS);
 	});
 
 	it("resolves null for an unknown tab", async () => {

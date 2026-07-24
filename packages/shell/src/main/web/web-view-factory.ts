@@ -276,6 +276,21 @@ export function createLockedWebView(
 		focus: () => {
 			if (!wc.isDestroyed()) wc.focus();
 		},
+		// Net-3 — read the RENDERED DOM out of the live page. Runs in the page's
+		// own isolated world (`executeJavaScript`'s default), returns a string,
+		// and is clamped by the caller; a destroyed / internal / script-blocked
+		// page yields null rather than throwing into the capture path.
+		captureHtml: async () => {
+			if (wc.isDestroyed()) return null;
+			try {
+				const html = await wc.executeJavaScript(
+					"document.documentElement ? document.documentElement.outerHTML : null",
+				);
+				return typeof html === "string" && html.length > 0 ? html : null;
+			} catch {
+				return null;
+			}
+		},
 		destroy: () => {
 			if (!spec.window.baseWindow.isDestroyed()) {
 				spec.window.baseWindow.contentView.removeChildView(view as unknown as WebContentsViewHandle);

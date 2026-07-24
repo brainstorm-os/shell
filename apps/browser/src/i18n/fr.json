@@ -58,5 +58,14 @@
   "shield.menu.mayBreak": "Certaines fonctionnalités peuvent ne pas fonctionner avec la protection activée.",
   "shield.menu.trust": "Faire confiance à ce site et recharger",
   "unavailable.title": "Navigateur",
-  "unavailable.blurb": "Le moteur du navigateur s'exécute dans le shell Brainstorm. Lancez cette application depuis Brainstorm pour naviguer."
+  "unavailable.blurb": "Le moteur du navigateur s'exécute dans le shell Brainstorm. Lancez cette application depuis Brainstorm pour naviguer.",
+  "summary.action": "Résumer cette page",
+  "summary.title": "Résumé de la page",
+  "summary.dismiss": "Fermer le résumé",
+  "summary.reading": "Lecture de la page…",
+  "summary.summarizing": "Résumé en cours…",
+  "summary.note": "Généré à partir de la page affichée — vérifiez l'essentiel dans l'original.",
+  "summary.failed.noContent": "Cette page ne contient aucun texte lisible à résumer.",
+  "summary.failed.noModel": "Aucun modèle d'IA configuré. Ajoutez-en un dans Réglages → IA.",
+  "summary.failed.generic": "Impossible de résumer cette page — réessayez."
 }
