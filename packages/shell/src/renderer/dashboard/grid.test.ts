@@ -286,8 +286,8 @@ describe("clampWidgetSizeToSurface", () => {
 	});
 
 	it("caps nothing against an unknown (zero) surface", () => {
-		expect(clampWidgetSizeToSurface({ col: 500, row: 500 }, { w: 40, h: 40 }, { x: 0, y: 0 })).toEqual(
-			{ w: 40, h: 40 },
-		);
+		expect(
+			clampWidgetSizeToSurface({ col: 500, row: 500 }, { w: 40, h: 40 }, { x: 0, y: 0 }),
+		).toEqual({ w: 40, h: 40 });
 	});
 });

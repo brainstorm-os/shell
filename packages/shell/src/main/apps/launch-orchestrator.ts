@@ -100,7 +100,9 @@ export class LaunchOrchestrator {
 		// `intents.dispatch:propose-*` never match a bare `intents.dispatch`).
 		const capabilities = this.options.ledger
 			.listActive(request.appId)
-			.map((grant) => (grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`));
+			.map((grant) =>
+				grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`,
+			);
 
 		const theme = this.options.getActiveTheme
 			? await this.options.getActiveTheme().catch((error) => {

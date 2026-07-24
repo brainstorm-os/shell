@@ -79,6 +79,20 @@
 	gap: var(--space-2);
 }
 
+/* Connect/act row — a token field or a pair of buttons on one line (IE-7's
+   Notion API section). Wraps so a narrow Settings pane keeps both reachable. */
+.backup-migration__row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.backup-migration__row .bs-input {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
 /* Target-type picker — labelled select of friendly type names (Note, Task),
  * not a free-text raw entity-type id. */
 .backup-migration__type-field {

@@ -323,3 +323,154 @@ describe("IE-3 import handlers", () => {
 		expect(files.has("manifest.json")).toBe(true);
 	});
 });
+
+describe("IE-7 Notion API handlers", () => {
+	/** A canned Notion workspace served through the Net-1 fetch seam: one
+	 *  database with two rows, one standalone page with a body. */
+	function notionExecuteOptions(overrides: { usersMeStatus?: number } = {}) {
+		const json = (value: unknown) => ({
+			status: 200,
+			headers: { "content-type": "application/json" },
+			body: (async function* () {
+				yield new TextEncoder().encode(JSON.stringify(value));
+			})(),
+		});
+		const database = {
+			id: "db1",
+			object: "database",
+			title: [{ plain_text: "Tasks" }],
+			properties: { Name: { type: "title" }, Status: { type: "select" } },
+		};
+		const row = (id: string, name: string, status: string) => ({
+			id,
+			object: "page",
+			parent: { type: "database_id", database_id: "db1" },
+			properties: {
+				Name: { type: "title", title: [{ plain_text: name }] },
+				Status: { type: "select", select: { name: status } },
+			},
+		});
+		const fetchImpl = vi.fn(async (_ip: string, req: { url: string }) => {
+			const path = new URL(req.url).pathname;
+			if (path === "/v1/users/me") {
+				const status = overrides.usersMeStatus ?? 200;
+				return status === 200
+					? json({ name: "Brainstorm Import" })
+					: {
+							status,
+							headers: {},
+							body: (async function* () {
+								yield new TextEncoder().encode('{"message":"unauthorized"}');
+							})(),
+						};
+			}
+			if (path === "/v1/search") {
+				return json({
+					results: [
+						database,
+						{
+							id: "pg1",
+							object: "page",
+							parent: { type: "workspace" },
+							properties: { title: { type: "title", title: [{ plain_text: "Roadmap" }] } },
+						},
+					],
+					has_more: false,
+				});
+			}
+			if (path === "/v1/databases/db1") return json(database);
+			if (path === "/v1/databases/db1/query") {
+				return json({ results: [row("r1", "Ship it", "Doing"), row("r2", "Test it", "Todo")] });
+			}
+			if (path.startsWith("/v1/blocks/pg1/children")) {
+				return json({
+					results: [
+						{ type: "paragraph", paragraph: { rich_text: [{ plain_text: "Q3 plan." }] } },
+					],
+				});
+			}
+			return json({ results: [] });
+		});
+		return {
+			fetchImpl: fetchImpl as never,
+			lookupHost: (async () => ["93.184.216.34"]) as never,
+			auditSink: (() => undefined) as never,
+		};
+	}
+
+	function registerWithNotion(overrides?: { usersMeStatus?: number }) {
+		handlers.clear();
+		const executeOptions = notionExecuteOptions(overrides ?? {});
+		registerImportExportHandlers({
+			getDashboard: () => null,
+			networkExecuteOptions: () => executeOptions,
+		});
+	}
+
+	it("connects a workspace, previews it, and imports pages + database rows", async () => {
+		registerWithNotion();
+		expect(await invoke("import-export:notion-api-status")).toEqual({
+			connected: false,
+			botName: null,
+		});
+
+		const connection = (await invoke("import-export:connect-notion-api", "secret_abc")) as {
+			connected: boolean;
+			botName: string | null;
+		};
+		expect(connection).toEqual({ connected: true, botName: "Brainstorm Import" });
+		expect(await invoke("import-export:notion-api-status")).toMatchObject({ connected: true });
+
+		const preview = (await invoke("import-export:preview-notion-api")) as {
+			pageCount: number;
+			databaseCount: number;
+		};
+		expect(preview).toEqual({ pageCount: 3, databaseCount: 1 });
+
+		const report = (await invoke("import-export:run-notion-api", TYPE)) as { created: number };
+		expect(report.created).toBe(3);
+		const repo = await entitiesRepo();
+		expect(repo.query({ type: [TYPE] })).toHaveLength(3);
+	});
+
+	it("re-importing the same workspace updates instead of duplicating", async () => {
+		registerWithNotion();
+		await invoke("import-export:connect-notion-api", "secret_abc");
+		await invoke("import-export:preview-notion-api");
+		await invoke("import-export:run-notion-api", TYPE);
+
+		await invoke("import-export:preview-notion-api");
+		const second = (await invoke("import-export:run-notion-api", TYPE)) as { created: number };
+		expect(second.created).toBe(0);
+		expect((await entitiesRepo()).query({ type: [TYPE] })).toHaveLength(3);
+	});
+
+	it("refuses a token Notion rejects, and stores nothing", async () => {
+		registerWithNotion({ usersMeStatus: 401 });
+		await expect(invoke("import-export:connect-notion-api", "bad")).rejects.toThrow(/rejected/);
+		expect(await invoke("import-export:notion-api-status")).toMatchObject({ connected: false });
+	});
+
+	it("refuses an empty token without touching the network", async () => {
+		registerWithNotion();
+		await expect(invoke("import-export:connect-notion-api", "   ")).rejects.toThrow(/required/);
+	});
+
+	it("refuses to preview before a workspace is connected", async () => {
+		registerWithNotion();
+		await expect(invoke("import-export:preview-notion-api")).rejects.toThrow(/connect/);
+	});
+
+	it("refuses to run without a preview (never writes a workspace nobody saw)", async () => {
+		registerWithNotion();
+		await invoke("import-export:connect-notion-api", "secret_abc");
+		await expect(invoke("import-export:run-notion-api", TYPE)).rejects.toThrow(/previewed/);
+	});
+
+	it("disconnecting clears the stored token", async () => {
+		registerWithNotion();
+		await invoke("import-export:connect-notion-api", "secret_abc");
+		expect(await invoke("import-export:disconnect-notion-api")).toBe(true);
+		expect(await invoke("import-export:notion-api-status")).toMatchObject({ connected: false });
+	});
+});

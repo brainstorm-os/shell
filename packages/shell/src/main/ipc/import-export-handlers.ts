@@ -37,10 +37,20 @@ import {
 	type ImportRunReport,
 	type MappingPlan,
 } from "../import/import-types";
+import { NotionApiError } from "../import/notion-api-client";
+import { planNotionApiImport } from "../import/notion-api-source";
+import {
+	clearNotionToken,
+	makeNotionTransport,
+	notionTokenFromStore,
+	storeNotionToken,
+} from "../import/notion-api-transport";
 import {
 	type NotionAttachment,
 	type NotionFile,
+	type NotionImportPlan,
 	importNotionExport,
+	importNotionPlan,
 	parseNotionExport,
 } from "../import/notion-import";
 import { type CanvasFile, importObsidianCanvas } from "../import/obsidian-canvas";
@@ -52,6 +62,7 @@ import {
 } from "../import/obsidian-import";
 import { importRecordsIntoVault, planRecordsImport } from "../import/vault-import-engine";
 import { type ZipReadLimits, readZip, zipEntryText } from "../import/zip-read";
+import type { ExecuteOptions } from "../network/network-service";
 import type { VaultSession } from "../vault/session";
 import { getActiveVaultSession } from "../vault/session";
 
@@ -107,6 +118,17 @@ type PendingNotion = {
 };
 let pendingNotion: PendingNotion | null = null;
 
+/** A fetched Notion **API** workspace plan, bound to its vault (IE-7). Held
+ *  between preview and run exactly like the export-zip pick, so the run writes
+ *  what the user was shown instead of re-fetching a workspace that may have
+ *  changed mid-review. */
+type PendingNotionApi = {
+	readonly plan: NotionImportPlan;
+	readonly vaultId: string;
+	readonly fetchedAt: number;
+};
+let pendingNotionApi: PendingNotionApi | null = null;
+
 /** Limits on a Notion export extraction (zip-slip + zip-bomb defence; same
  *  bounds apply to a folder walk of an unzipped export). */
 const NOTION_ZIP_LIMITS: ZipReadLimits = {
@@ -120,6 +142,19 @@ const NOTION_TEXT_EXT = /\.(md|markdown|csv|html|htm)$/i;
 export type NotionSourcePreview = {
 	readonly archiveName: string;
 	readonly pageCount: number;
+};
+
+/** Whether this vault has a Notion workspace token stored (IE-7). The token
+ *  itself NEVER crosses IPC — only this flag and the integration's own name. */
+export type NotionApiConnection = {
+	readonly connected: boolean;
+	readonly botName: string | null;
+};
+
+/** Preview after fetching the authorized Notion workspace over the API. */
+export type NotionApiSourcePreview = {
+	readonly pageCount: number;
+	readonly databaseCount: number;
 };
 
 /** A picked Anytype export (`.zip` or folder), bound to its vault. The
@@ -373,6 +408,10 @@ export type ImportExportHandlersOptions = {
 	 *  worker `snapshot`). Importers use it to REPLACE an existing body on
 	 *  re-import instead of appending a duplicate copy (F-398). */
 	makeLoadDocSnapshot?: (vaultPath: string) => (entityId: string) => Promise<string | null>;
+	/** Net-1 execution context for the IE-7 Notion **API** source. Absent (tests
+	 *  / a host with no network broker) → the API source reports "unavailable"
+	 *  rather than falling back to an unchecked fetch. */
+	networkExecuteOptions?: () => ExecuteOptions | null;
 };
 
 function formatFromExt(path: string): ImportFormat | null {
@@ -728,6 +767,112 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 		const pageCount = parseNotionExport(files).entities.length;
 		return { archiveName: basename(archivePath), pageCount };
 	});
+
+	/** IE-7 — the Notion **API** source. Three steps, mirroring the export-zip
+	 *  flow: connect (store the workspace token, main-side only), preview (fetch
+	 *  + plan, report what would land), run (write the previewed plan through the
+	 *  SAME idempotent tail as the export path). */
+	ipcMain.handle(
+		"import-export:connect-notion-api",
+		async (_event, token: unknown): Promise<NotionApiConnection> => {
+			const session = requireSession();
+			if (typeof token !== "string" || token.trim().length === 0) {
+				throw new Error("import-export: a Notion integration token is required");
+			}
+			const execute = options.networkExecuteOptions?.();
+			if (!execute) throw new Error("import-export: the network broker is unavailable");
+			// Verify BEFORE storing: a typo'd token should surface as "that token
+			// didn't work", not as a connected workspace that fails at import.
+			const transport = makeNotionTransport({ token: token.trim(), executeOptions: execute });
+			const probe = await transport({ method: "GET", path: "/v1/users/me" });
+			if (probe.status === 401 || probe.status === 403) {
+				throw new Error("import-export: Notion rejected that token");
+			}
+			if (probe.status < 200 || probe.status >= 300) {
+				throw new Error(`import-export: Notion returned ${probe.status}`);
+			}
+			await storeNotionToken(session, token);
+			const name = (probe.json as { name?: unknown } | null)?.name;
+			return { connected: true, botName: typeof name === "string" ? name : null };
+		},
+	);
+
+	ipcMain.handle("import-export:notion-api-status", async (): Promise<NotionApiConnection> => {
+		const session = requireSession();
+		const token = await notionTokenFromStore(session);
+		return { connected: token !== null, botName: null };
+	});
+
+	ipcMain.handle("import-export:disconnect-notion-api", async (): Promise<boolean> => {
+		const session = requireSession();
+		pendingNotionApi = null;
+		return clearNotionToken(session);
+	});
+
+	ipcMain.handle("import-export:preview-notion-api", async (): Promise<NotionApiSourcePreview> => {
+		const session = requireSession();
+		const token = await notionTokenFromStore(session);
+		if (!token) throw new Error("import-export: connect a Notion workspace first");
+		const execute = options.networkExecuteOptions?.();
+		if (!execute) throw new Error("import-export: the network broker is unavailable");
+		const win = options.getDashboard();
+		const transport = makeNotionTransport({ token, executeOptions: execute });
+		let plan: NotionImportPlan;
+		try {
+			plan = await planNotionApiImport(transport, {
+				onProgress: (_stage, done, total) =>
+					win?.webContents.send("import-export:progress", { done, total }),
+			});
+		} catch (err) {
+			if (err instanceof NotionApiError && (err.status === 401 || err.status === 403)) {
+				throw new Error("import-export: Notion rejected the stored token — reconnect");
+			}
+			throw err;
+		}
+		pendingNotionApi = { plan, vaultId: session.vaultId, fetchedAt: Date.now() };
+		const databases = new Set(
+			plan.entities.map((entity) => entity.database).filter((name): name is string => !!name),
+		);
+		return { pageCount: plan.entities.length, databaseCount: databases.size };
+	});
+
+	ipcMain.handle(
+		"import-export:run-notion-api",
+		async (_event, targetType: unknown): Promise<ImportRunReport> => {
+			const session = requireSession();
+			const type = requireTargetType(targetType);
+			if (!pendingNotionApi || pendingNotionApi.vaultId !== session.vaultId) {
+				pendingNotionApi = null;
+				throw new Error("import-export: no Notion workspace previewed");
+			}
+			const pending = pendingNotionApi;
+			const applyDocUpdate = applyDocUpdateFor(session);
+			const controller = new AbortController();
+			activeRun = controller;
+			const win = options.getDashboard();
+			try {
+				const report = await importNotionPlan(session, pending.plan, {
+					targetType: type,
+					source: "notion:api",
+					now: Date.now(),
+					importedBy: IMPORT_AUTHOR,
+					signal: controller.signal,
+					onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+					...(applyDocUpdate ? { applyDocUpdate } : {}),
+				});
+				pendingNotionApi = null;
+				return {
+					created: report.created + report.filesCreated,
+					updated: report.updated,
+					skipped: 0,
+					failed: [],
+					...(report.cancelled ? { cancelled: true } : {}),
+				};
+			} finally {
+				activeRun = null;
+			}
+		},
+	);
 
 	ipcMain.handle(
 		"import-export:run-notion",

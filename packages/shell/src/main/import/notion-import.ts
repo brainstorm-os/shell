@@ -394,6 +394,19 @@ export async function importNotionExport(
 		files,
 		attachments.map((a) => a.path),
 	);
+	return importNotionPlan(session, plan, options, attachments);
+}
+
+/** Commit an already-built {@link NotionImportPlan}. Split out at IE-7 so the
+ *  API Source (`notion-api-source.ts`, no files on disk) writes through the very
+ *  same idempotent upsert + attachment + link tail as the export-zip path —
+ *  one write path, one dedupe rule, one Map tail. */
+export async function importNotionPlan(
+	session: VaultSession,
+	plan: NotionImportPlan,
+	options: NotionImportOptions,
+	attachments: readonly NotionAttachment[] = [],
+): Promise<NotionImportReport> {
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 	// Resolve every page + attachment dedupe key in one batched query up front —
 	// one map hit per row in the loops below instead of one full-table
