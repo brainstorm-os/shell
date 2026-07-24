@@ -58,6 +58,8 @@ function fakeWebView(): FakeWebView {
 		findInPage: noop,
 		stopFind: noop,
 		capture: () => Promise.resolve(null),
+		openReadOnly: noop,
+		extractText: () => Promise.resolve(null),
 		setSitePermission: noop,
 		clearBrowsingData: () => Promise.resolve(),
 		setSiteTrust: () => Promise.resolve(),

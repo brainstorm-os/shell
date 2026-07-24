@@ -104,6 +104,8 @@ function fakeWebView(): FakeWebView {
 			return Promise.resolve();
 		},
 		capture: () => Promise.resolve(null),
+		openReadOnly: noop,
+		extractText: () => Promise.resolve(null),
 		setSitePermission: (tabId, origin, permission, allow) => {
 			view.permissions.push({ tabId, origin, permission, allow });
 			return Promise.resolve();

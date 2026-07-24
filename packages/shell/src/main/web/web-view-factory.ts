@@ -42,6 +42,7 @@ import {
 	withoutCookieHeader,
 	withoutSetCookieHeaders,
 } from "./web-policy";
+import { BrowseMode, isReadOnlyRequestAllowed } from "./web-readonly";
 import { WebViewBackgroundController } from "./web-view-background";
 import type {
 	CreateViewSpec,
@@ -384,6 +385,14 @@ function configureSessionPolicy(
 	// service, so no risky per-subresource redirect here). Every request also
 	// lands one per-host tick in the Browser-7 egress aggregate.
 	ses.webRequest.onBeforeRequest((details, callback) => {
+		// Browser-8 — a read-only view (an autonomous loop's) may only READ.
+		// Checked before the blocklist so a state-changing request is refused
+		// even to an allowed host; the session is per-view for read-only tabs,
+		// so this rule can never leak onto a normal browsing session.
+		if (spec.mode === BrowseMode.ReadOnly && !isReadOnlyRequestAllowed(details.method)) {
+			callback({ cancel: true });
+			return;
+		}
 		const blocked = isBlockedRequest(details.url, blocklist) && !trustedFirstParty(details);
 		const host = networkEgressHostOf(details.url);
 		if (host.length > 0) deps.recordEgress?.(host, blocked);

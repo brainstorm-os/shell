@@ -118,6 +118,7 @@ import type {
 	VaultEntitiesSnapshot,
 	WebViewClient,
 	WebViewEvent,
+	WebViewExtractedText,
 	WebViewRect,
 } from "@brainstorm-os/sdk-types";
 import {
@@ -125,6 +126,7 @@ import {
 	DEFAULT_LOCALE,
 	WEBVIEW_SERVICE,
 	WEB_BROWSE_CAP,
+	WEB_BROWSE_READONLY_CAP,
 	WEB_CAPTURE_CAP,
 	WebViewMethod,
 	mcpServerCapability,
@@ -641,6 +643,25 @@ function webViewProxy(bridge: Bridge): WebViewClient {
 				WebViewMethod.StopFind,
 				[{ method: WebViewMethod.StopFind, tabId }],
 				browse,
+			),
+		openReadOnly: (tabId, url) =>
+			callService<void>(
+				bridge,
+				WEBVIEW_SERVICE,
+				WebViewMethod.Open,
+				[{ method: WebViewMethod.Open, tabId, url, private: false }],
+				// The NARROW cap: the shell derives the view's mode from what the
+				// broker verified here, so this call can only ever mint a
+				// read-only view (Browser-8 / OQ-WV-5).
+				[WEB_BROWSE_READONLY_CAP],
+			),
+		extractText: (tabId) =>
+			callService<WebViewExtractedText | null>(
+				bridge,
+				WEBVIEW_SERVICE,
+				WebViewMethod.ExtractText,
+				[{ method: WebViewMethod.ExtractText, tabId }],
+				[WEB_CAPTURE_CAP],
 			),
 		capture: (tabId, selectionOnly) =>
 			callService<{ bookmarkId: string } | null>(
