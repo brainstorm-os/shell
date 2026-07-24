@@ -95,6 +95,27 @@ export type CaptureSpec = {
 	selectionOnly: boolean;
 };
 
+/** Browser-6 — a completed download the factory hands to the vault-side seal.
+ *  `bytes` are UNTRUSTED (the page's response body); the seal sanitizes the
+ *  name, applies the served-mime allow-list, and writes a `File/v1` entity. */
+export type DownloadCapture = {
+	tabId: string;
+	/** The app whose chrome owns the browsing session (the Browser). */
+	appId: string;
+	/** The download's originating URL (validated http(s) vault-side). */
+	url: string;
+	/** Server-supplied filename (Content-Disposition) — sanitized vault-side. */
+	suggestedFilename: string;
+	/** Server-reported Content-Type — advisory; the served mime is re-derived
+	 *  from the sanitized name vault-side. */
+	serverMimeType: string;
+	bytes: Uint8Array;
+};
+
+/** The seal's reply: the created `File/v1` entity id + the stored (sanitized)
+ *  filename the chrome surfaces on the DownloadCompleted event. */
+export type DownloadOutcome = { fileId: string; name: string };
+
 export type WebViewServiceOptions = {
 	/** Construct + attach a locked-down view to the target window and wire its
 	 *  native events to `spec.onEvent`. The Electron half lives here. */

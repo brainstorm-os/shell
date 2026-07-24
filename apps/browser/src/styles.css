@@ -379,3 +379,46 @@ body {
 .browser__permission-block:hover {
 	background: var(--hover);
 }
+
+/* Browser-6 — downloads notice. Lives in the top chrome flow (like the
+ * permission banner): a bottom-overlay would be hidden behind the native
+ * WebContentsView, which paints over renderer content. */
+.browser__downloads {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+
+.browser__download {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	background: var(--bg-elev);
+	color: var(--text);
+	font-size: var(--text-size-sm);
+}
+
+.browser__download + .browser__download {
+	border-top: var(--border-width) solid var(--color-border-subtle);
+}
+
+.browser__download-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: var(--text-weight-medium);
+}
+
+.browser__download-status {
+	flex: none;
+	color: var(--text-dim);
+	font-size: var(--text-size-xs);
+}
+
+.browser__download[data-status="failed"] .browser__download-status {
+	color: var(--danger);
+}
