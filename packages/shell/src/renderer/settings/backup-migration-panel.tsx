@@ -74,7 +74,23 @@ export function BackupMigrationPanel() {
 
 /** Icon-led card header shared by every flow: an accent icon chip beside the
  *  title + one-line description. */
-function SectionHead({ icon, title, hint }: { icon: IconName; title: string; hint: string }) {
+/** One flow's header. `action` is the flow's primary control, pinned to the
+ *  right of the title row rather than stacked under the description: with six
+ *  flows on this panel, a button under each paragraph scatters the actions down
+ *  the page and makes the section read like documentation instead of a control
+ *  surface. Actions in a column are scannable, and each flow collapses from a
+ *  tall card to one row. */
+function SectionHead({
+	icon,
+	title,
+	hint,
+	action,
+}: {
+	icon: IconName;
+	title: string;
+	hint: string;
+	action?: ReactNode;
+}) {
 	return (
 		<div className="backup-migration__group-head">
 			<span className="backup-migration__group-icon" aria-hidden="true">
@@ -84,6 +100,7 @@ function SectionHead({ icon, title, hint }: { icon: IconName; title: string; hin
 				<h4 className="backup-migration__group-title">{title}</h4>
 				<p className="settings__hint">{hint}</p>
 			</div>
+			{action ? <div className="backup-migration__group-action">{action}</div> : null}
 		</div>
 	);
 }
@@ -359,17 +376,19 @@ function ExportSection() {
 				icon={IconName.Download}
 				title={t("shell.settings.backupMigration.export.title")}
 				hint={t("shell.settings.backupMigration.export.hint")}
+				action={
+					<Button
+						variant={ButtonVariant.Primary}
+						size={ButtonSize.Md}
+						iconLeft={IconName.Download}
+						loading={busy}
+						onClick={() => void onExport()}
+						data-testid="backup-migration-export-btn"
+					>
+						{t("shell.settings.backupMigration.export.action")}
+					</Button>
+				}
 			/>
-			<Button
-				variant={ButtonVariant.Primary}
-				size={ButtonSize.Md}
-				iconLeft={IconName.Download}
-				loading={busy}
-				onClick={() => void onExport()}
-				data-testid="backup-migration-export-btn"
-			>
-				{t("shell.settings.backupMigration.export.action")}
-			</Button>
 			{savedPath && (
 				<p className="settings__hint" data-testid="backup-migration-export-done">
 					{t("shell.settings.backupMigration.export.done", { path: savedPath })}
@@ -480,20 +499,21 @@ function ImportSection() {
 				icon={IconName.KindFile}
 				title={t("shell.settings.backupMigration.import.title")}
 				hint={t("shell.settings.backupMigration.import.hint")}
+				action={
+					phase.kind === "idle" && (
+						<Button
+							variant={ButtonVariant.Neutral}
+							size={ButtonSize.Md}
+							iconLeft={IconName.Folder}
+							loading={busy}
+							onClick={() => void onPick()}
+							data-testid="backup-migration-import-pick"
+						>
+							{t("shell.settings.backupMigration.import.pick")}
+						</Button>
+					)
+				}
 			/>
-
-			{phase.kind === "idle" && (
-				<Button
-					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Md}
-					iconLeft={IconName.Folder}
-					loading={busy}
-					onClick={() => void onPick()}
-					data-testid="backup-migration-import-pick"
-				>
-					{t("shell.settings.backupMigration.import.pick")}
-				</Button>
-			)}
 
 			<AnimatePresence>
 				{(phase.kind === "picked" || phase.kind === "planned") && (
@@ -625,20 +645,21 @@ function ObsidianSection() {
 				icon={IconName.Folder}
 				title={t("shell.settings.backupMigration.obsidian.title")}
 				hint={t("shell.settings.backupMigration.obsidian.hint")}
+				action={
+					phase.kind === "idle" && (
+						<Button
+							variant={ButtonVariant.Neutral}
+							size={ButtonSize.Md}
+							iconLeft={IconName.Folder}
+							loading={busy}
+							onClick={() => void onPick()}
+							data-testid="backup-migration-obsidian-pick"
+						>
+							{t("shell.settings.backupMigration.obsidian.pick")}
+						</Button>
+					)
+				}
 			/>
-
-			{phase.kind === "idle" && (
-				<Button
-					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Md}
-					iconLeft={IconName.Folder}
-					loading={busy}
-					onClick={() => void onPick()}
-					data-testid="backup-migration-obsidian-pick"
-				>
-					{t("shell.settings.backupMigration.obsidian.pick")}
-				</Button>
-			)}
 
 			<AnimatePresence>
 				{phase.kind === "picked" && (
@@ -747,20 +768,21 @@ function AnytypeSection() {
 				icon={IconName.Archive}
 				title={t("shell.settings.backupMigration.anytype.title")}
 				hint={t("shell.settings.backupMigration.anytype.hint")}
+				action={
+					phase.kind === "idle" && (
+						<Button
+							variant={ButtonVariant.Neutral}
+							size={ButtonSize.Md}
+							iconLeft={IconName.Archive}
+							loading={busy}
+							onClick={() => void onPick()}
+							data-testid="backup-migration-anytype-pick"
+						>
+							{t("shell.settings.backupMigration.anytype.pick")}
+						</Button>
+					)
+				}
 			/>
-
-			{phase.kind === "idle" && (
-				<Button
-					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Md}
-					iconLeft={IconName.Archive}
-					loading={busy}
-					onClick={() => void onPick()}
-					data-testid="backup-migration-anytype-pick"
-				>
-					{t("shell.settings.backupMigration.anytype.pick")}
-				</Button>
-			)}
 
 			<AnimatePresence>
 				{phase.kind === "picked" && (
@@ -931,6 +953,30 @@ function NotionApiSection() {
 				icon={IconName.Update}
 				title={t("shell.settings.backupMigration.notionApi.title")}
 				hint={t("shell.settings.backupMigration.notionApi.hint")}
+				action={
+					connected === true && phase.kind !== "previewed" ? (
+						<>
+							<Button
+								variant={ButtonVariant.Neutral}
+								size={ButtonSize.Md}
+								iconLeft={IconName.Update}
+								loading={busy}
+								onClick={() => void onPreview()}
+								data-testid="backup-migration-notion-api-preview"
+							>
+								{t("shell.settings.backupMigration.notionApi.preview")}
+							</Button>
+							<Button
+								variant={ButtonVariant.Neutral}
+								size={ButtonSize.Md}
+								onClick={() => void onDisconnect()}
+								data-testid="backup-migration-notion-api-disconnect"
+							>
+								{t("shell.settings.backupMigration.notionApi.disconnect")}
+							</Button>
+						</>
+					) : null
+				}
 			/>
 
 			{connected === false && (
@@ -952,29 +998,6 @@ function NotionApiSection() {
 						data-testid="backup-migration-notion-api-connect"
 					>
 						{t("shell.settings.backupMigration.notionApi.connect")}
-					</Button>
-				</div>
-			)}
-
-			{connected === true && phase.kind !== "previewed" && (
-				<div className="backup-migration__row">
-					<Button
-						variant={ButtonVariant.Neutral}
-						size={ButtonSize.Md}
-						iconLeft={IconName.Update}
-						loading={busy}
-						onClick={() => void onPreview()}
-						data-testid="backup-migration-notion-api-preview"
-					>
-						{t("shell.settings.backupMigration.notionApi.preview")}
-					</Button>
-					<Button
-						variant={ButtonVariant.Neutral}
-						size={ButtonSize.Md}
-						onClick={() => void onDisconnect()}
-						data-testid="backup-migration-notion-api-disconnect"
-					>
-						{t("shell.settings.backupMigration.notionApi.disconnect")}
 					</Button>
 				</div>
 			)}
@@ -1084,20 +1107,21 @@ function NotionSection() {
 				icon={IconName.Archive}
 				title={t("shell.settings.backupMigration.notion.title")}
 				hint={t("shell.settings.backupMigration.notion.hint")}
+				action={
+					phase.kind === "idle" && (
+						<Button
+							variant={ButtonVariant.Neutral}
+							size={ButtonSize.Md}
+							iconLeft={IconName.Archive}
+							loading={busy}
+							onClick={() => void onPick()}
+							data-testid="backup-migration-notion-pick"
+						>
+							{t("shell.settings.backupMigration.notion.pick")}
+						</Button>
+					)
+				}
 			/>
-
-			{phase.kind === "idle" && (
-				<Button
-					variant={ButtonVariant.Neutral}
-					size={ButtonSize.Md}
-					iconLeft={IconName.Archive}
-					loading={busy}
-					onClick={() => void onPick()}
-					data-testid="backup-migration-notion-pick"
-				>
-					{t("shell.settings.backupMigration.notion.pick")}
-				</Button>
-			)}
 
 			<AnimatePresence>
 				{phase.kind === "picked" && (
