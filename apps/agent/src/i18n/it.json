@@ -125,5 +125,9 @@
   "created.untitled": "Senza titolo",
   "propose.row.label": "Proponi una nuova riga in uno dei database dell'utente. args: {\"database\": \"<nome esatto del database>\", \"values\": {\"<colonna>\": \"<valore>\"}}",
   "propose.kind.row": "Riga di database",
-  "propose.row.into": "in {database}"
+  "propose.row.into": "in {database}",
+  "propose.database.label": "Proponi un database completamente nuovo. args: {\"name\": \"<nome>\", \"columns\": [{\"name\": \"<colonna>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<colonna>\": \"<valore>\"}]}",
+  "propose.kind.database": "Nuovo database",
+  "propose.database.name": "Nome del database",
+  "propose.database.schema": "Colonne: {columns}"
 }

@@ -16,6 +16,7 @@ import {
 	effectiveAgentCapabilities,
 	toolCallToIntent,
 } from "../src/logic/agent-tools";
+import { PROPOSE_DATABASE_VERB } from "../src/logic/propose-database";
 import { PROPOSE_ROW_VERB } from "../src/logic/propose-row";
 
 const APP_CAPS = [
@@ -47,6 +48,7 @@ describe("curated agent tools", () => {
 			"propose-event",
 			"propose-bookmark",
 			"propose-contact",
+			"propose-database",
 		]);
 		// A propose tool never declares an entityType (so it can't require
 		// read/write) — it only ever stages a draft for the user's approval.
@@ -60,11 +62,16 @@ describe("curated agent tools", () => {
 			"intents.dispatch:open",
 			"intents.dispatch:propose-bookmark",
 			"intents.dispatch:propose-contact",
+			"intents.dispatch:propose-database",
 			"intents.dispatch:propose-event",
 			"intents.dispatch:propose-note",
 			"intents.dispatch:propose-row",
 			"intents.dispatch:propose-task",
 		]);
+	});
+
+	it("always offers the new-database tool — it needs no existing database (Agent-11e)", () => {
+		expect(curatedAgentTools(id).map((tool) => tool.verb)).toContain(PROPOSE_DATABASE_VERB);
 	});
 
 	it("offers the row tool only when the vault actually has databases (Agent-11d)", () => {

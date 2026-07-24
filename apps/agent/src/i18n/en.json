@@ -157,5 +157,9 @@
   "insert.search.label": "Search notes",
   "insert.empty": "No notes match.",
   "insert.success": "Added to “{note}”",
-  "insert.failed": "Couldn't add to the note."
+  "insert.failed": "Couldn't add to the note.",
+  "propose.database.label": "Propose a brand-new database for the user. args: {\"name\": \"<database name>\", \"columns\": [{\"name\": \"<column>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<column>\": \"<value>\"}]}",
+  "propose.kind.database": "New database",
+  "propose.database.name": "Database name",
+  "propose.database.schema": "Columns: {columns}"
 }

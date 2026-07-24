@@ -19,6 +19,7 @@ import {
 	type AiImagePart,
 	type AiProvenance,
 	AttachmentKind,
+	COLLECTION_TYPE_URL,
 	CONVERSATION_TYPE_URL,
 	ConversationMemoryMode,
 	MEMORY_TYPE_URL,
@@ -107,6 +108,7 @@ import {
 	emptyProposalState,
 	proposalReducer,
 } from "./logic/propose-artifacts";
+import { persistProposedDatabase } from "./logic/propose-database-persist";
 import { persistApprovedProposal } from "./logic/propose-persist";
 import {
 	buildDatabaseContextBlock,
@@ -471,6 +473,17 @@ export function AgentApp(): ReactElement {
 		() => writableDatabaseSchemas(databaseSchemasFromEntities(all), frozenCapabilities),
 		[all, frozenCapabilities],
 	);
+	// Agent-11e — every collection's name, so a proposed NEW database is
+	// uniquified against the vault instead of shadowing one the user already has.
+	// Deliberately the FULL set (not the writable subset `databaseSchemas`): a
+	// name must not collide with a collection this app can't write either.
+	const existingDatabases = useMemo(
+		() =>
+			all
+				.filter((e) => e.type === COLLECTION_TYPE_URL)
+				.map((e) => ({ name: typeof e.properties.name === "string" ? e.properties.name : "" })),
+		[all],
+	);
 	const databasesBlock = useMemo(
 		() => buildDatabaseContextBlock(databaseSchemas),
 		[databaseSchemas],
@@ -545,6 +558,17 @@ export function AgentApp(): ReactElement {
 				const collection = artifact.row
 					? all.find((e) => e.id === artifact.row?.databaseId)
 					: undefined;
+				if (artifact.database) {
+					// Agent-11e — a new database is Collection + view + one entity per
+					// seed row; same human-gesture gate, just more than one write.
+					await persistProposedDatabase(entitiesSvc, artifact, {
+						conversationId: activeId,
+						now: Date.now(),
+					});
+					dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
+					setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
+					return;
+				}
 				await persistApprovedProposal(entitiesSvc, artifact, {
 					conversationId: activeId,
 					collectionMembers: collection?.properties.members as MemberOverrides | undefined,
@@ -1182,6 +1206,7 @@ export function AgentApp(): ReactElement {
 						...(conversationModel ? { model: conversationModel } : {}),
 						onPropose: (artifact) => dispatchProposal({ kind: ProposalActionKind.Add, artifact }),
 						rowSchemas: databaseSchemas,
+						existingDatabases,
 					},
 				);
 				if (loop.stopReason === AgentStopReason.GenerateFailed) {
@@ -1306,6 +1331,7 @@ export function AgentApp(): ReactElement {
 		vaultBlock,
 		databasesBlock,
 		databaseSchemas,
+		existingDatabases,
 		all,
 		attachments,
 	]);

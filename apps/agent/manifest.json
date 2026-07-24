@@ -42,7 +42,9 @@
     "intents.dispatch:propose-contact",
     "intents.dispatch:propose-row",
     "entities.write:brainstorm/Object/v1",
-    "entities.write:brainstorm/List/v1"
+    "entities.write:brainstorm/List/v1",
+    "intents.dispatch:propose-database",
+    "entities.write:brainstorm/ListView/v1"
   ],
   "registrations": {
     "entityTypes": [

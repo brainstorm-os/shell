@@ -10,6 +10,7 @@ import { GENERIC_OBJECT_TYPE, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProposeKind, type ProposedArtifact, buildProposal } from "./logic/propose-artifacts";
+import { PROPOSE_DATABASE_VERB, buildDatabaseProposal, rowCellKey } from "./logic/propose-database";
 import { PROPOSE_ROW_VERB, buildRowProposal } from "./logic/propose-row";
 import { ProposalTray } from "./proposal-tray";
 import { type RenderHandle, renderInto } from "./test/render";
@@ -235,5 +236,94 @@ describe("ProposalTray — database rows (Agent-11d)", () => {
 			"[data-testid='agent-proposal-approve']",
 		);
 		expect(approve?.disabled).toBe(true);
+	});
+});
+
+describe("ProposalTray — a proposed new database (Agent-11e)", () => {
+	const stageDb = (args: Record<string, unknown>): ProposedArtifact => {
+		const r = buildDatabaseProposal({
+			verb: PROPOSE_DATABASE_VERB,
+			args,
+			id: "d1",
+			existing: [],
+		});
+		if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
+		return r.artifact;
+	};
+	const READING_LIST = {
+		name: "Reading list",
+		columns: [{ name: "Author" }, { name: "Pages", type: "number" }],
+		rows: [{ Name: "Dune", Author: "Herbert", Pages: "412" }],
+	};
+
+	it("shows the inferred schema and an editable name", async () => {
+		handle = await renderInto(
+			<ProposalTray
+				proposals={[stageDb(READING_LIST)]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={noop}
+			/>,
+		);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		expect(card?.getAttribute("data-kind")).toBe(ProposeKind.Database);
+		const schema = handle.container.querySelector("[data-testid='agent-proposal-schema']");
+		expect(schema?.textContent).toContain("Author");
+		expect(schema?.textContent).toContain("Pages");
+		const nameInput = handle.container.querySelector<HTMLInputElement>(".agent-proposal__input");
+		expect(nameInput?.value).toBe("Reading list");
+	});
+
+	it("renders the seed rows as a grid of editable cells", async () => {
+		handle = await renderInto(
+			<ProposalTray
+				proposals={[stageDb(READING_LIST)]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={noop}
+			/>,
+		);
+		const grid = handle.container.querySelector("[data-testid='agent-proposal-seed-rows']");
+		expect(grid).not.toBeNull();
+		const heads = grid?.querySelectorAll(".agent-proposal__seed-head");
+		expect([...(heads ?? [])].map((h) => h.textContent)).toEqual(["Name", "Author", "Pages"]);
+		const cells = grid?.querySelectorAll<HTMLInputElement>("input");
+		expect([...(cells ?? [])].map((c) => c.value)).toEqual(["Dune", "Herbert", "412"]);
+	});
+
+	it("edits a seed cell under its rowCellKey (what the persist step reads back)", async () => {
+		const onEditField = vi.fn();
+		handle = await renderInto(
+			<ProposalTray
+				proposals={[stageDb(READING_LIST)]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={onEditField}
+			/>,
+		);
+		const grid = handle.container.querySelector("[data-testid='agent-proposal-seed-rows']");
+		const pages = grid?.querySelectorAll<HTMLInputElement>("input")[2];
+		const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+		await act(async () => {
+			setter?.call(pages, "500");
+			pages?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(onEditField).toHaveBeenCalledWith("d1", rowCellKey(0, "pages"), "500");
+	});
+
+	it("renders no seed grid for a database proposed without rows", async () => {
+		handle = await renderInto(
+			<ProposalTray
+				proposals={[stageDb({ name: "Empty", columns: ["Stage"] })]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={noop}
+			/>,
+		);
+		expect(handle.container.querySelector("[data-testid='agent-proposal-seed-rows']")).toBeNull();
 	});
 });

@@ -31,6 +31,11 @@ import {
 	proposeDescriptorForVerb,
 } from "./propose-artifacts";
 import {
+	PROPOSE_DATABASE_VERB,
+	buildDatabaseProposal,
+	buildDatabaseProposalAck,
+} from "./propose-database";
+import {
 	type DatabaseSchema,
 	PROPOSE_ROW_VERB,
 	buildRowProposal,
@@ -67,6 +72,7 @@ export function makeDispatchTool(
 	tools: readonly AgentTool[],
 	onPropose?: (artifact: ProposedArtifact) => void,
 	rowSchemas: readonly DatabaseSchema[] = [],
+	existingDatabases: ReadonlyArray<{ name: string }> = [],
 ): (call: AgentToolCall) => Promise<unknown> {
 	const byVerb = new Map(tools.map((tool) => [tool.verb, tool] as const));
 	return async (call: AgentToolCall) => {
@@ -86,6 +92,18 @@ export function makeDispatchTool(
 			});
 			if (result.ok) onPropose?.(result.artifact);
 			return buildRowProposalAck(result);
+		}
+		// Agent-11e — a whole new database: schema + seed rows, staged as one
+		// draft. `existingDatabases` only uniquifies the name; it grants nothing.
+		if (tool.verb === PROPOSE_DATABASE_VERB) {
+			const result = buildDatabaseProposal({
+				verb: tool.verb,
+				args: call.args,
+				id: mintProposalId(),
+				existing: existingDatabases,
+			});
+			if (result.ok) onPropose?.(result.artifact);
+			return buildDatabaseProposalAck(result);
 		}
 		// Propose-not-persist: stage a draft, never touch the vault.
 		if (proposeDescriptorForVerb(tool.verb)) {
@@ -159,6 +177,9 @@ export function runAgentTurn(
 		/** Agent-11d — the databases a proposed row may target, derived from the
 		 *  live vault snapshot. A row naming anything else is refused. */
 		rowSchemas?: readonly DatabaseSchema[];
+		/** Agent-11e — the vault's existing collection names, so a proposed NEW
+		 *  database is uniquified against them instead of shadowing one. */
+		existingDatabases?: ReadonlyArray<{ name: string }>;
 	},
 ): Promise<AgentLoopResult> {
 	const ports: AgentLoopPorts = {
@@ -171,6 +192,7 @@ export function runAgentTurn(
 			input.tools,
 			input.onPropose,
 			input.rowSchemas ?? [],
+			input.existingDatabases ?? [],
 		),
 	};
 	const config: AgentLoopConfig = {

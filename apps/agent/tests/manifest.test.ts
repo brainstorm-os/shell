@@ -78,6 +78,21 @@ describe("apps/agent/manifest.json", () => {
 		}
 	});
 
+	it("declares the write caps a proposed NEW database exercises (Agent-11e)", () => {
+		// Approving one creates a Collection, its Grid view, and one generic
+		// Object per seed row — three types, all human-gesture-gated.
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		for (const cap of [
+			"intents.dispatch:propose-database",
+			`entities.write:${COLLECTION_TYPE_URL}`,
+			"entities.write:brainstorm/ListView/v1",
+			`entities.write:${GENERIC_OBJECT_TYPE}`,
+		]) {
+			expect(result.manifest.capabilities, `manifest declares ${cap}`).toContain(cap);
+		}
+	});
+
 	it("holds search.read + search.hybrid so the broker assembles retrieval (Agent-4)", () => {
 		// Grounding rides the capability-gated search service ONLY — the app has
 		// no direct entity-read path for retrieval. `search.hybrid` is the gated

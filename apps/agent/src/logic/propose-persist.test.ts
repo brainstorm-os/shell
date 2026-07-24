@@ -110,7 +110,10 @@ describe("proposalToEntityProperties — schema-aware coercion", () => {
 	it("every fixed-schema kind produces its canonical owner-app type", () => {
 		// A Row's type is the target database's, not a build-time constant — it is
 		// covered by the database-row cases below.
-		const byKind: Record<Exclude<ProposeKind, typeof ProposeKind.Row>, string> = {
+		const byKind: Record<
+			Exclude<ProposeKind, typeof ProposeKind.Row | typeof ProposeKind.Database>,
+			string
+		> = {
 			[ProposeKind.Note]: "io.brainstorm.notes/Note/v1",
 			[ProposeKind.Task]: "brainstorm/Task/v1",
 			[ProposeKind.Event]: "brainstorm/Event/v1",
@@ -127,7 +130,9 @@ describe("proposalToEntityProperties — schema-aware coercion", () => {
 			const artifact = stage(verb, primary);
 			const plan = proposalToEntityProperties(artifact, NOW);
 			expect(plan.entityType).toBe(
-				byKind[artifact.kind as Exclude<ProposeKind, typeof ProposeKind.Row>],
+				byKind[
+					artifact.kind as Exclude<ProposeKind, typeof ProposeKind.Row | typeof ProposeKind.Database>
+				],
 			);
 		}
 	});
@@ -301,5 +306,23 @@ describe("persistApprovedProposal (the approve gesture's write path)", () => {
 			undefined,
 			undefined,
 		);
+	});
+});
+
+describe("proposalToEntityProperties — the database guard", () => {
+	it("refuses to map a new-database proposal (its persist path is multi-entity)", () => {
+		expect(() =>
+			proposalToEntityProperties(
+				{
+					id: "d1",
+					kind: ProposeKind.Database,
+					entityType: "brainstorm/List/v1",
+					fields: { name: "CRM" },
+					summary: "CRM",
+					database: { columns: [], rowCount: 0 },
+				},
+				NOW,
+			),
+		).toThrow(/persistProposedDatabase/);
 	});
 });

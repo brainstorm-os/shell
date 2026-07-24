@@ -39,6 +39,7 @@ import {
 	capabilityImplies,
 } from "@brainstorm-os/sdk-types";
 import { proposeTools } from "./propose-artifacts";
+import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";
 
 /** The verbs the curated tools dispatch. `open` is the universal cross-app
@@ -70,6 +71,7 @@ export function curatedAgentTools(
 		...(options.hasDatabases
 			? [{ verb: PROPOSE_ROW_VERB, label: translate("propose.row.label") }]
 			: []),
+		{ verb: PROPOSE_DATABASE_VERB, label: translate("propose.database.label") },
 	];
 }
 

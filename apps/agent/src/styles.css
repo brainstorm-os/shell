@@ -892,6 +892,26 @@ body {
 	width: 100%;
 }
 
+/* A proposed NEW database (Agent-11e): the inferred schema, then its seed rows
+   as the grid they will become — one editable input per cell. */
+.agent-proposal__schema {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.agent-proposal__seed {
+	display: grid;
+	gap: var(--space-1);
+	overflow-x: auto;
+}
+
+.agent-proposal__seed-head {
+	font-size: var(--text-size-xs);
+	font-weight: 600;
+	color: var(--color-text-secondary);
+}
+
 .agent-proposal__actions {
 	display: flex;
 	gap: var(--space-2);
