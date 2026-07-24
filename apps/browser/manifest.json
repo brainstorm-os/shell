@@ -5,7 +5,10 @@
   "sdk": "1",
   "description": "In-app web browser with tabbed chrome, reader mode, and clip-to-vault capture as bookmarks.",
   "icon": "icon.svg",
-  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
+  "i18n": {
+    "source": "en",
+    "locales": ["en", "es", "de", "fr", "it", "pt"]
+  },
   "entry": "dist/index.html",
   "capabilities": [
     "web.browse",
@@ -17,10 +20,20 @@
     "entities.write:brainstorm/BrowsingHistory/v1",
     "entities.read:brainstorm/Bookmark/v1",
     "entities.write:brainstorm/Bookmark/v1",
-    "entities.write:brainstorm/File/v1"
+    "entities.write:brainstorm/File/v1",
+    "ai.use"
   ],
   "registrations": {
-    "openers": [{ "kind": "primary", "scheme": "https" }, { "kind": "primary", "scheme": "http" }],
+    "openers": [
+      {
+        "kind": "primary",
+        "scheme": "https"
+      },
+      {
+        "kind": "primary",
+        "scheme": "http"
+      }
+    ],
     "entityTypes": [
       {
         "id": "brainstorm/BrowsingSession/v1",
@@ -37,24 +50,51 @@
             "updatedAt"
           ],
           "properties": {
-            "windowId": { "type": "string" },
-            "activeTabId": { "type": ["string", "null"] },
-            "retainHistory": { "type": "boolean" },
-            "createdAt": { "type": "number" },
-            "updatedAt": { "type": "number" },
+            "windowId": {
+              "type": "string"
+            },
+            "activeTabId": {
+              "type": ["string", "null"]
+            },
+            "retainHistory": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            },
             "tabs": {
               "type": "array",
               "items": {
                 "type": "object",
                 "required": ["id", "url", "title", "pinned", "history", "historyIndex"],
                 "properties": {
-                  "id": { "type": "string" },
-                  "url": { "type": "string" },
-                  "title": { "type": "string" },
-                  "faviconUrl": { "type": ["string", "null"] },
-                  "pinned": { "type": "boolean" },
-                  "history": { "type": "array", "items": { "type": "string" } },
-                  "historyIndex": { "type": "number" }
+                  "id": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "faviconUrl": {
+                    "type": ["string", "null"]
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "history": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "historyIndex": {
+                    "type": "number"
+                  }
                 }
               }
             },
@@ -64,13 +104,30 @@
                 "type": "object",
                 "required": ["id", "url", "title", "pinned", "history", "historyIndex"],
                 "properties": {
-                  "id": { "type": "string" },
-                  "url": { "type": "string" },
-                  "title": { "type": "string" },
-                  "faviconUrl": { "type": ["string", "null"] },
-                  "pinned": { "type": "boolean" },
-                  "history": { "type": "array", "items": { "type": "string" } },
-                  "historyIndex": { "type": "number" }
+                  "id": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "faviconUrl": {
+                    "type": ["string", "null"]
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "history": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "historyIndex": {
+                    "type": "number"
+                  }
                 }
               }
             }
@@ -84,18 +141,30 @@
           "type": "object",
           "required": ["visits", "createdAt", "updatedAt"],
           "properties": {
-            "createdAt": { "type": "number" },
-            "updatedAt": { "type": "number" },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            },
             "visits": {
               "type": "array",
               "items": {
                 "type": "object",
                 "required": ["url", "title", "visitCount", "lastVisitedAt"],
                 "properties": {
-                  "url": { "type": "string" },
-                  "title": { "type": "string" },
-                  "visitCount": { "type": "number" },
-                  "lastVisitedAt": { "type": "number" }
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "visitCount": {
+                    "type": "number"
+                  },
+                  "lastVisitedAt": {
+                    "type": "number"
+                  }
                 }
               }
             }

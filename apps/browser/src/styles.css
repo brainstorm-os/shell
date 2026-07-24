@@ -380,6 +380,67 @@ body {
 	background: var(--hover);
 }
 
+/* Browser-8 — the page summary. Same reasoning as the downloads notice: it
+ * lives in the top chrome flow, because a bottom overlay would be painted over
+ * by the native WebContentsView. A glance, not a mode — it never resizes the
+ * page. */
+.browser__summary {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	padding: var(--space-2);
+	background: var(--bg-elev);
+	color: var(--text);
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+
+.browser__summary-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.browser__summary-title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--color-text-secondary);
+}
+
+.browser__summary-source {
+	margin: 0;
+	overflow: hidden;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.browser__summary-body {
+	margin: 0;
+	max-height: 9rem;
+	overflow-y: auto;
+	font-size: var(--text-size-sm);
+	line-height: 1.5;
+}
+
+.browser__summary-body--failed {
+	color: var(--danger);
+}
+
+/* The provenance line: a generated summary is not the page. */
+.browser__summary-note {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
 /* Browser-6 — downloads notice. Lives in the top chrome flow (like the
  * permission banner): a bottom-overlay would be hidden behind the native
  * WebContentsView, which paints over renderer content. */

@@ -65,5 +65,14 @@
   "shield.menu.mayBreak": "Some features may not work with protection on.",
   "shield.menu.trust": "Trust this site & reload",
   "unavailable.title": "Browser",
-  "unavailable.blurb": "The browser engine runs in the Brainstorm shell. Launch this app from Brainstorm to browse."
+  "unavailable.blurb": "The browser engine runs in the Brainstorm shell. Launch this app from Brainstorm to browse.",
+  "summary.action": "Summarize this page",
+  "summary.title": "Page summary",
+  "summary.dismiss": "Dismiss summary",
+  "summary.reading": "Reading the page…",
+  "summary.summarizing": "Summarizing…",
+  "summary.note": "Generated from the page you're viewing — check anything important against the original.",
+  "summary.failed.noContent": "There's nothing readable on this page to summarize.",
+  "summary.failed.noModel": "No AI model is set up. Add one in Settings → AI.",
+  "summary.failed.generic": "Couldn't summarize this page — try again."
 }
