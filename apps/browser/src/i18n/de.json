@@ -58,5 +58,14 @@
   "shield.menu.mayBreak": "Mit aktiviertem Schutz funktionieren einige Funktionen möglicherweise nicht.",
   "shield.menu.trust": "Dieser Website vertrauen & neu laden",
   "unavailable.title": "Browser",
-  "unavailable.blurb": "Die Browser-Engine läuft in der Brainstorm-Shell. Starte diese App aus Brainstorm, um zu surfen."
+  "unavailable.blurb": "Die Browser-Engine läuft in der Brainstorm-Shell. Starte diese App aus Brainstorm, um zu surfen.",
+  "summary.action": "Diese Seite zusammenfassen",
+  "summary.title": "Seitenzusammenfassung",
+  "summary.dismiss": "Zusammenfassung schließen",
+  "summary.reading": "Seite wird gelesen…",
+  "summary.summarizing": "Wird zusammengefasst…",
+  "summary.note": "Aus der angezeigten Seite erzeugt – Wichtiges bitte im Original prüfen.",
+  "summary.failed.noContent": "Auf dieser Seite gibt es keinen lesbaren Text zum Zusammenfassen.",
+  "summary.failed.noModel": "Kein KI-Modell eingerichtet. Füge eines unter Einstellungen → KI hinzu.",
+  "summary.failed.generic": "Diese Seite konnte nicht zusammengefasst werden – bitte erneut versuchen."
 }

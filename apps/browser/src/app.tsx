@@ -90,16 +90,24 @@ import {
 	reopenClosedTabAt,
 	toRecord,
 } from "./logic/session";
+import {
+	SummaryFailure,
+	SummaryPhase,
+	summaryRequestFor,
+	summarySourceFrom,
+} from "./logic/summarize";
 import { type PendingPermission, PermissionBanner } from "./permission-banner";
 import {
 	type EntitiesClient,
 	type NetworkReadableService,
+	getAi,
 	getEntities,
 	getLaunch,
 	getNetwork,
 	getWebView,
 	onIntent,
 } from "./runtime";
+import { SummaryPanel } from "./summary-panel";
 import {
 	BROWSING_SESSION_ENTITY_TYPE,
 	type BrowserTab,
@@ -875,6 +883,60 @@ export function BrowserApp(): ReactElement {
 	// Browser overflow ⋯ menu — the trailing element in the toolbar (catch-all
 	// for actions without a dedicated control): new private tab + clear data.
 	const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+	// Browser-8 — summarize the page the user is looking at. Two hops, both
+	// gated on this menu gesture: Net-3 reads the LIVE page (`extractText`,
+	// `web.capture`), then the broker summarizes it (`ai.use`). The page text
+	// rides `ai.transform`'s `source`, so third-party content can only land in
+	// the user role — never as an instruction (see `logic/summarize.ts`).
+	const [summaryPhase, setSummaryPhase] = useState<SummaryPhase>(SummaryPhase.Idle);
+	const [summaryText, setSummaryText] = useState("");
+	const [summaryTitle, setSummaryTitle] = useState("");
+	const [summaryFailure, setSummaryFailure] = useState<SummaryFailure | null>(null);
+	const dismissSummary = useCallback(() => {
+		setSummaryPhase(SummaryPhase.Idle);
+		setSummaryText("");
+		setSummaryFailure(null);
+	}, []);
+	const onSummarize = useCallback(async () => {
+		const tabId = active?.id;
+		if (!tabId || !webView) return;
+		setSummaryTitle(active?.title || active?.url || "");
+		setSummaryFailure(null);
+		setSummaryText("");
+		setSummaryPhase(SummaryPhase.Reading);
+		try {
+			const extracted = await webView.extractText(tabId);
+			const source = summarySourceFrom(extracted);
+			if (!source.ok) {
+				setSummaryFailure(source.reason);
+				setSummaryPhase(SummaryPhase.Failed);
+				return;
+			}
+			const ai = getAi();
+			if (!ai) {
+				setSummaryFailure(SummaryFailure.NoModel);
+				setSummaryPhase(SummaryPhase.Failed);
+				return;
+			}
+			setSummaryPhase(SummaryPhase.Summarizing);
+			const result = await ai.transform(summaryRequestFor(source.source));
+			const content = (result?.content ?? "").trim();
+			if (content.length === 0) {
+				setSummaryFailure(SummaryFailure.Failed);
+				setSummaryPhase(SummaryPhase.Failed);
+				return;
+			}
+			setSummaryText(content);
+			setSummaryPhase(SummaryPhase.Ready);
+		} catch {
+			// A missing / unreachable model and a failed call are different
+			// stories to the user, but from here both arrive as a throw; the
+			// broker's own message isn't safe to surface verbatim.
+			setSummaryFailure(SummaryFailure.Failed);
+			setSummaryPhase(SummaryPhase.Failed);
+		}
+	}, [active?.id, active?.title, active?.url, webView]);
+
 	const onOpenBrowserMenu = useCallback(() => {
 		const anchor = menuButtonRef.current;
 		if (!anchor) return;
@@ -899,6 +961,12 @@ export function BrowserApp(): ReactElement {
 		items.push(
 			{ label: t("menu.label"), section: true },
 			{
+				label: t("summary.action"),
+				icon: IconName.Sparkle,
+				disabled: !active,
+				onSelect: () => void onSummarize(),
+			},
+			{
 				label: t("data.clear"),
 				icon: IconName.Trash,
 				destructive: true,
@@ -911,7 +979,15 @@ export function BrowserApp(): ReactElement {
 			anchor,
 			align: MenuAlign.End,
 		});
-	}, [onNewPrivateTab, onClearBrowsingData, activeOrigin, activeTrusted, onToggleTrust]);
+	}, [
+		onNewPrivateTab,
+		onClearBrowsingData,
+		activeOrigin,
+		activeTrusted,
+		onToggleTrust,
+		onSummarize,
+		active,
+	]);
 
 	// F-426 — the blocked-tracker shield is actionable: instead of leaving the
 	// count as trivia, clicking it explains that strict privacy may break the
@@ -1267,6 +1343,13 @@ export function BrowserApp(): ReactElement {
 					onDismiss={() => resolvePermission(activePermissionAsk, null)}
 				/>
 			)}
+			<SummaryPanel
+				phase={summaryPhase}
+				title={summaryTitle}
+				summary={summaryText}
+				failure={summaryFailure}
+				onDismiss={dismissSummary}
+			/>
 			<DownloadTray notices={downloadNotices} onDismiss={dismissNotice} />
 			<div ref={regionRef} className="browser__region" />
 		</div>
