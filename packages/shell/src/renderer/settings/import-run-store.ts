@@ -28,6 +28,7 @@ export enum ImportRunSection {
 	Csv = "csv",
 	Obsidian = "obsidian",
 	Notion = "notion",
+	NotionApi = "notion-api",
 	Anytype = "anytype",
 }
 

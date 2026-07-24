@@ -1772,6 +1772,13 @@ void app.whenReady().then(async () => {
 	registerCoversHandlers({ getDashboard: () => dashboardWindow });
 	registerImportExportHandlers({
 		getDashboard: () => dashboardWindow,
+		// IE-7 — the Notion API source egresses through Net-1 like every other
+		// outbound call (SSRF guard + caps + the per-host audit log).
+		networkExecuteOptions: () => ({
+			fetchImpl: productionFetchImpl,
+			lookupHost: productionLookupHost,
+			auditSink: makeFileAuditSink(networkAuditPath),
+		}),
 		// Plant imported markdown into each entity's universal-body Y.Doc so
 		// Notes / Journal editors are non-empty (they bind to the Y.Doc, not
 		// properties.body). Same ydoc-worker path as Welcome seed / templates.

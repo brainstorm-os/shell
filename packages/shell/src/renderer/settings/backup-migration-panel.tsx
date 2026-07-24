@@ -66,6 +66,7 @@ export function BackupMigrationPanel() {
 			<ImportSection />
 			<ObsidianSection />
 			<NotionSection />
+			<NotionApiSection />
 			<AnytypeSection />
 		</section>
 	);
@@ -809,6 +810,223 @@ function AnytypeSection() {
 
 			{error && (
 				<p className="settings__error" role="alert">
+					{error}
+				</p>
+			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Notion API import (IE-7) — the non-file Source: connect the workspace once,
+// preview what the integration can see, then import through the same tail as
+// the export-zip path. The token is sent to main ONCE and never comes back.
+// ---------------------------------------------------------------------
+
+type NotionApiPhase =
+	| { kind: "idle" }
+	| { kind: "connecting" }
+	| { kind: "previewed"; pageCount: number; databaseCount: number };
+
+function NotionApiSection() {
+	const [connected, setConnected] = useState<boolean | null>(null);
+	const [token, setToken] = useState("");
+	const [phase, setPhase] = useState<NotionApiPhase>({ kind: "idle" });
+	const [targetType, setTargetType] = useState(DEFAULT_IMPORT_TARGET_TYPE);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		void window.brainstorm.importExport
+			.notionApiStatus()
+			.then((status) => {
+				if (!cancelled) setConnected(status.connected);
+			})
+			.catch(() => {
+				if (!cancelled) setConnected(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const onConnect = useCallback(async () => {
+		const value = token.trim();
+		if (value.length === 0) {
+			setError(t("shell.settings.backupMigration.notionApi.tokenRequired"));
+			return;
+		}
+		setBusy(true);
+		setError(null);
+		setPhase({ kind: "connecting" });
+		try {
+			await window.brainstorm.importExport.connectNotionApi(value);
+			setConnected(true);
+			setToken("");
+			setPhase({ kind: "idle" });
+		} catch (e) {
+			setPhase({ kind: "idle" });
+			setError(
+				e instanceof Error ? e.message : t("shell.settings.backupMigration.notionApi.connectFailed"),
+			);
+		} finally {
+			setBusy(false);
+		}
+	}, [token]);
+
+	const onDisconnect = useCallback(async () => {
+		setBusy(true);
+		setError(null);
+		try {
+			await window.brainstorm.importExport.disconnectNotionApi();
+			setConnected(false);
+			setPhase({ kind: "idle" });
+		} finally {
+			setBusy(false);
+		}
+	}, []);
+
+	const onPreview = useCallback(async () => {
+		setBusy(true);
+		setError(null);
+		try {
+			const preview = await window.brainstorm.importExport.previewNotionApi();
+			setPhase({
+				kind: "previewed",
+				pageCount: preview.pageCount,
+				databaseCount: preview.databaseCount,
+			});
+		} catch (e) {
+			setError(
+				e instanceof Error ? e.message : t("shell.settings.backupMigration.notionApi.previewFailed"),
+			);
+		} finally {
+			setBusy(false);
+		}
+	}, []);
+
+	const onRun = useCallback(() => {
+		const type = targetType.trim();
+		if (type.length === 0) {
+			setError(t("shell.settings.backupMigration.import.typeRequired"));
+			return;
+		}
+		setError(null);
+		if (
+			!startImportRun(ImportRunSection.NotionApi, () =>
+				window.brainstorm.importExport.runNotionApi(type),
+			)
+		) {
+			setError(t("shell.settings.backupMigration.import.runBusy"));
+			return;
+		}
+		setPhase({ kind: "idle" });
+	}, [targetType]);
+
+	return (
+		<div className="backup-migration__group" data-testid="backup-migration-notion-api">
+			<SectionHead
+				icon={IconName.Update}
+				title={t("shell.settings.backupMigration.notionApi.title")}
+				hint={t("shell.settings.backupMigration.notionApi.hint")}
+			/>
+
+			{connected === false && (
+				<div className="backup-migration__row">
+					<input
+						type="password"
+						className="bs-input"
+						value={token}
+						placeholder={t("shell.settings.backupMigration.notionApi.tokenPlaceholder")}
+						aria-label={t("shell.settings.backupMigration.notionApi.tokenLabel")}
+						onChange={(e) => setToken(e.target.value)}
+						data-testid="backup-migration-notion-api-token"
+					/>
+					<Button
+						variant={ButtonVariant.Neutral}
+						size={ButtonSize.Md}
+						loading={busy}
+						onClick={() => void onConnect()}
+						data-testid="backup-migration-notion-api-connect"
+					>
+						{t("shell.settings.backupMigration.notionApi.connect")}
+					</Button>
+				</div>
+			)}
+
+			{connected === true && phase.kind !== "previewed" && (
+				<div className="backup-migration__row">
+					<Button
+						variant={ButtonVariant.Neutral}
+						size={ButtonSize.Md}
+						iconLeft={IconName.Update}
+						loading={busy}
+						onClick={() => void onPreview()}
+						data-testid="backup-migration-notion-api-preview"
+					>
+						{t("shell.settings.backupMigration.notionApi.preview")}
+					</Button>
+					<Button
+						variant={ButtonVariant.Neutral}
+						size={ButtonSize.Md}
+						onClick={() => void onDisconnect()}
+						data-testid="backup-migration-notion-api-disconnect"
+					>
+						{t("shell.settings.backupMigration.notionApi.disconnect")}
+					</Button>
+				</div>
+			)}
+
+			<AnimatePresence>
+				{phase.kind === "previewed" && (
+					<ImportFlowPopover
+						title={t("shell.settings.backupMigration.notionApi.title")}
+						formTestId="backup-migration-notion-api-form"
+						sourceLine={t("shell.settings.backupMigration.notionApi.source", {
+							count: phase.pageCount,
+							databases: phase.databaseCount,
+						})}
+						targetType={targetType}
+						onTargetType={setTargetType}
+						targetTypeHint={t("shell.settings.backupMigration.notionApi.targetTypeHint")}
+						targetTypeTestId="backup-migration-notion-api-type"
+						onClose={() => setPhase({ kind: "idle" })}
+						footer={
+							<>
+								<Button
+									variant={ButtonVariant.Neutral}
+									size={ButtonSize.Md}
+									onClick={() => setPhase({ kind: "idle" })}
+								>
+									{t("shell.settings.backupMigration.import.cancel")}
+								</Button>
+								<Button
+									variant={ButtonVariant.Primary}
+									size={ButtonSize.Md}
+									loading={busy}
+									onClick={() => void onRun()}
+									data-testid="backup-migration-notion-api-run"
+								>
+									{t("shell.settings.backupMigration.notionApi.run")}
+								</Button>
+							</>
+						}
+					/>
+				)}
+			</AnimatePresence>
+
+			<SectionRunState
+				section={ImportRunSection.NotionApi}
+				againLabel={t("shell.settings.backupMigration.notionApi.again")}
+				doneTestId="backup-migration-notion-api-done"
+				progressTestId="backup-migration-notion-api-progress"
+				stopTestId="backup-migration-notion-api-stop"
+			/>
+
+			{error && (
+				<p className="backup-migration__error" role="alert">
 					{error}
 				</p>
 			)}

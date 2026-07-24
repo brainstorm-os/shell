@@ -473,6 +473,8 @@ export type {
 	ImportMappingEdit,
 	ObsidianSourcePreview,
 	NotionSourcePreview,
+	NotionApiConnection,
+	NotionApiSourcePreview,
 	AnytypeSourcePreview,
 	ImportPlan,
 	ImportRunReport,
@@ -519,6 +521,18 @@ const importExport = {
 		ipcRenderer.invoke("import-export:pick-notion"),
 	runNotion: (targetType: string): Promise<ImportRunReport> =>
 		ipcRenderer.invoke("import-export:run-notion", targetType),
+	// IE-7 — the Notion API source. The token goes IN once and never comes back
+	// out: `notionApiStatus` reports only whether one is stored.
+	connectNotionApi: (token: string): Promise<NotionApiConnection> =>
+		ipcRenderer.invoke("import-export:connect-notion-api", token),
+	notionApiStatus: (): Promise<NotionApiConnection> =>
+		ipcRenderer.invoke("import-export:notion-api-status"),
+	disconnectNotionApi: (): Promise<boolean> =>
+		ipcRenderer.invoke("import-export:disconnect-notion-api"),
+	previewNotionApi: (): Promise<NotionApiSourcePreview> =>
+		ipcRenderer.invoke("import-export:preview-notion-api"),
+	runNotionApi: (targetType: string): Promise<ImportRunReport> =>
+		ipcRenderer.invoke("import-export:run-notion-api", targetType),
 	pickAnytype: (): Promise<AnytypeSourcePreview | null> =>
 		ipcRenderer.invoke("import-export:pick-anytype"),
 	runAnytype: (targetType: string): Promise<ImportRunReport> =>
@@ -776,6 +790,8 @@ import type {
 	ImportMappingEdit,
 	ImportMappingPreview,
 	ImportSourcePreview,
+	NotionApiConnection,
+	NotionApiSourcePreview,
 	NotionSourcePreview,
 	ObsidianSourcePreview,
 } from "../main/ipc/import-export-handlers";
