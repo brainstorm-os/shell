@@ -8,7 +8,7 @@
  */
 
 import type { RosterMember, RosterService, SharingService } from "@brainstorm-os/sdk-types";
-import { RosterRole } from "@brainstorm-os/sdk-types";
+import { RosterMemberKind, RosterRole } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,6 +50,7 @@ function member(
 	return {
 		pubkey,
 		role,
+		kind: RosterMemberKind.Human,
 		isSelf,
 		fingerprint: `ed25519:${pubkey}`,
 		...(displayName ? { displayName } : {}),

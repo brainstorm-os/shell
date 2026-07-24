@@ -16,7 +16,7 @@
  *     by pubkey, for a stable cross-device reading order.
  */
 
-import { type RosterMember, RosterRole } from "@brainstorm-os/sdk-types";
+import { type RosterMember, RosterMemberKind, RosterRole } from "@brainstorm-os/sdk-types";
 
 /** A pubkey + role drawn from the access record (already filtered to active). */
 export type ActiveMemberRef = {
@@ -30,6 +30,9 @@ export type ResolvedDisplay = {
 	fingerprint: string;
 	displayName?: string;
 	avatarRef?: string;
+	/** Human (default) or agent. Absent resolves to Human — an agent is only
+	 *  distinguished once its `Agent/v1` record is resolved for the pubkey. */
+	kind?: RosterMemberKind;
 };
 
 const ROLE_RANK: Readonly<Record<RosterRole, number>> = {
@@ -62,6 +65,7 @@ export function joinRoster(opts: {
 		members.push({
 			pubkey,
 			role,
+			kind: display.kind ?? RosterMemberKind.Human,
 			isSelf: pubkey === opts.selfPubkey,
 			fingerprint: display.fingerprint,
 			...(display.displayName ? { displayName: display.displayName } : {}),

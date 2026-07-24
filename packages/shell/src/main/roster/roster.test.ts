@@ -5,7 +5,7 @@
  * stable ordering, and graceful unknown-profile handling.
  */
 
-import { type RosterMember, RosterRole } from "@brainstorm-os/sdk-types";
+import { type RosterMember, RosterMemberKind, RosterRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type ResolvedDisplay, joinRoster } from "./roster";
 
@@ -32,6 +32,25 @@ describe("joinRoster", () => {
 		expect(members[0]?.isSelf).toBe(true);
 		expect(members[0]?.role).toBe(RosterRole.Owner);
 		expect(members[0]?.fingerprint).toBe(`fp:${SELF}`);
+		expect(members[0]?.kind).toBe(RosterMemberKind.Human);
+	});
+
+	it("defaults member kind to Human and honours an Agent kind from resolve", () => {
+		const members = joinRoster({
+			selfPubkey: SELF,
+			active: [
+				{ pubkey: "human1", role: RosterRole.Editor },
+				{ pubkey: "agent1", role: RosterRole.Editor },
+			],
+			resolve: (pk) =>
+				pk === "agent1"
+					? { fingerprint: `fp:${pk}`, displayName: "Researcher", kind: RosterMemberKind.Agent }
+					: { fingerprint: `fp:${pk}`, displayName: pk },
+		});
+		const by = byKey(members);
+		expect(by[SELF]?.kind).toBe(RosterMemberKind.Human);
+		expect(by.human1?.kind).toBe(RosterMemberKind.Human);
+		expect(by.agent1?.kind).toBe(RosterMemberKind.Agent);
 	});
 
 	it("includes silent members granted access but never resolved to a name", () => {

@@ -1571,6 +1571,14 @@ export enum RosterRole {
 	Viewer = "viewer",
 }
 
+/** Whether a roster member is a human identity (`Profile/v1`) or an agent
+ *  (`Agent/v1`). Agents are first-class members you permission like a hire, so
+ *  the roster distinguishes them. Per [69-agent-teams-and-orchestration]. */
+export enum RosterMemberKind {
+	Human = "human",
+	Agent = "agent",
+}
+
 /** One resolved member of a channel / shared entity. The `pubkey` is the durable
  *  cross-device identity (the join key); the display fields are a best-effort
  *  resolution that may be absent until the member's signed profile snapshot has
@@ -1579,6 +1587,8 @@ export type RosterMember = {
 	/** base64 sovereign Ed25519 public key — the durable identity + join key. */
 	pubkey: string;
 	role: RosterRole;
+	/** Human identity or agent — agents render distinctly in member lists. */
+	kind: RosterMemberKind;
 	/** True for the local vault owner ("you"). */
 	isSelf: boolean;
 	/** `ed25519:<hex>` short fingerprint — always derivable from the pubkey. */
@@ -1615,6 +1625,74 @@ export type RosterService = {
 	 *  key — an app can only ever write its own vault's profile). Requires
 	 *  `roster.write`. */
 	setSelf(input: RosterProfileInput): Promise<RosterSelf>;
+};
+
+// ─── Agent teams (agents as first-class vault members) ───────────────────────
+//
+// An agent is a persona shell over a capability ceiling: its own Ed25519 key (a
+// distinct principal, so its actions are attributable + independently revocable),
+// editable persona/skills/traits, and a capability CEILING that lives in the
+// CapabilityLedger — never a field here, changed only through the consenting
+// grant/revoke gesture. Per [69-agent-teams-and-orchestration].
+
+export const AGENT_TYPE = "brainstorm/Agent/v1";
+
+/** How an agent's model calls may be routed. */
+export enum AgentRouting {
+	LocalOnly = "local-only",
+	CloudAllowed = "cloud-allowed",
+}
+
+/** How autonomously an agent acts within its frozen capability ceiling. */
+export enum AgentAutonomy {
+	ConfirmOnWrite = "confirm-on-write",
+	AutonomousWithinCaps = "autonomous-within-caps",
+}
+
+/** The persistence scope of an agent's own `Memory/v1` partition. */
+export enum AgentMemoryScope {
+	PerConversation = "per-conversation",
+	LongTerm = "long-term",
+}
+
+/** What backs a skill an agent can use. */
+export enum AgentSkillKind {
+	/** A granted intent verb (e.g. a `propose-<type>`). */
+	Intent = "intent",
+	/** A saved `Workflow/v1` procedure. */
+	Workflow = "workflow",
+}
+
+/** One skill an agent can use — a granted intent verb or a saved workflow. */
+export type AgentSkillRef = {
+	kind: AgentSkillKind;
+	/** The intent verb id or the `Workflow/v1` entity id. */
+	ref: string;
+};
+
+/** The persona + traits of an agent member (`brainstorm/Agent/v1`). Its identity
+ *  is its own Ed25519 key (`pubkey` / `fingerprint`); its capability CEILING is
+ *  ledger state, NOT a field here (that changes only through grant/revoke). The
+ *  persona prose, skills, and traits are ordinary editable fields. */
+export type AgentDef = {
+	/** base64 own Ed25519 public key — a distinct principal in the ledger. */
+	pubkey: string;
+	/** `ed25519:<hex>` fingerprint — the roster anchor. */
+	fingerprint: string;
+	/** Human-facing name ("Researcher"). */
+	displayName: string;
+	/** Encrypted media blob ref for the avatar, or null. */
+	avatarRef: string | null;
+	/** System-prompt preamble prepended to the harness self-model. */
+	persona: string;
+	/** Granted intents + saved workflows offered to this agent's loop. */
+	skills: AgentSkillRef[];
+	/** Local-only vs cloud-allowed model routing. */
+	routing: AgentRouting;
+	/** Confirm-on-write vs autonomous-within-caps posture. */
+	autonomy: AgentAutonomy;
+	/** Per-conversation vs long-term memory partition. */
+	memoryScope: AgentMemoryScope;
 };
 
 /** A collaborator's self-signed share invite, serialized as a compact,
