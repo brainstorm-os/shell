@@ -2788,6 +2788,7 @@ export type {
 export {
 	APP_WEBVIEW_EVENT_CHANNEL,
 	APP_TAB_COMMAND_CHANNEL,
+	DownloadFailReason,
 	SitePermissionKind,
 	TabCommandKind,
 	TabLoadState,

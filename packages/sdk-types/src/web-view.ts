@@ -120,6 +120,20 @@ export enum WebViewMethod {
 	IsSiteTrusted = "is-site-trusted",
 }
 
+/** Why a browser download did not land in the vault (Browser-6). Wire payload
+ *  of a {@link WebViewEventKind.DownloadFailed} event — a small closed set, so
+ *  it is an enum, never a raw string. */
+export enum DownloadFailReason {
+	/** Declared or received size exceeded the download ceiling. */
+	TooLarge = "too-large",
+	/** The transfer was cancelled or interrupted before completing. */
+	Interrupted = "interrupted",
+	/** Completed with zero bytes — nothing to seal. */
+	Empty = "empty",
+	/** Sealing the bytes / writing the File/v1 entity failed vault-side. */
+	WriteFailed = "write-failed",
+}
+
 export type WebViewRect = { x: number; y: number; width: number; height: number };
 
 export type WebViewRequest =
@@ -165,6 +179,15 @@ export enum WebViewEventKind {
 	PermissionRequested = "permission-requested",
 	/** A capture finished; carries the written `Bookmark/v1` entity id. */
 	Captured = "captured",
+	/** Browser-6 — a download began; the host is buffering + sealing it into
+	 *  the vault (the bytes never reach the chrome). */
+	DownloadStarted = "download-started",
+	/** Browser-6 — a download was sealed into the vault as a `File/v1` entity;
+	 *  carries the created entity id + the stored (sanitized) filename. */
+	DownloadCompleted = "download-completed",
+	/** Browser-6 — a download did not land in the vault (too large, cancelled,
+	 *  empty, or a vault-side write failure). */
+	DownloadFailed = "download-failed",
 	/** The view closed (crash, host-side teardown, or user close). */
 	Closed = "closed",
 }
@@ -221,4 +244,21 @@ export type WebViewEvent =
 			permission: SitePermissionKind;
 	  }
 	| { kind: WebViewEventKind.Captured; tabId: string; bookmarkId: string }
+	| { kind: WebViewEventKind.DownloadStarted; tabId: string; downloadId: string; filename: string }
+	| {
+			kind: WebViewEventKind.DownloadCompleted;
+			tabId: string;
+			downloadId: string;
+			/** The stored (server-side sanitized) filename. */
+			filename: string;
+			/** The created `brainstorm/File/v1` entity id. */
+			fileId: string;
+	  }
+	| {
+			kind: WebViewEventKind.DownloadFailed;
+			tabId: string;
+			downloadId: string;
+			filename: string;
+			reason: DownloadFailReason;
+	  }
 	| { kind: WebViewEventKind.Closed; tabId: string };

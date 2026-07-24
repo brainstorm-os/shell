@@ -157,6 +157,7 @@ import { FeedbackSettingsStore, feedbackSettingsPath } from "./feedback/feedback
 import { getSharedRecentLogBuffer, scopeForUrl } from "./feedback/recent-log-buffer";
 import { APP_FILES_WATCH_CHANNEL, makeFilesServiceHandler } from "./files/files-service";
 import { gatherStorageInventory } from "./files/gather-storage-inventory";
+import { servedMimeForName } from "./files/upload-mime";
 import { listWallpaperEntries } from "./files/wallpaper-entries";
 import {
 	ALLOWED_ICON_EXTS,
@@ -331,6 +332,12 @@ import {
 } from "./vault/session";
 import { activateVault, getDefaultVault } from "./vault/vault";
 import { CookieJarRepository, createWebCookieJar } from "./web/web-cookie-jar";
+import {
+	DOWNLOAD_FILE_ENTITY_TYPE,
+	downloadFileProperties,
+	downloadSourceUrl,
+	sanitizeDownloadFilename,
+} from "./web/web-download";
 import { createWebPrivacyRuntime } from "./web/web-privacy-runtime";
 import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
@@ -4299,6 +4306,51 @@ void app.whenReady().then(async () => {
 							.getLauncherSync()
 							?.getExistingWindow(spec.appId, spec.window.windowId);
 						win?.webContents.send(APP_TAB_COMMAND_CHANNEL, { kind: TabCommandKind.CloseTab });
+					},
+					// Browser-6 — a page download is sealed into the vault as a
+					// `File/v1` entity (bytes into the encrypted asset store) instead
+					// of a raw disk drop. Runs vault-side (trusted main): the server
+					// filename is sanitized, the STORED mime comes from the conservative
+					// served-mime allow-list (so the asset protocol can never serve
+					// active content), and the entity is written through the same
+					// `entities` create path apps use — so the per-type capability
+					// (`entities.write:brainstorm/File/v1`, granted to the Browser),
+					// the per-entity DEK, asset-ref binding, and the live change event
+					// (Files updates in place) all apply.
+					onDownload: async ({ appId, url, suggestedFilename, bytes }) => {
+						const session = getActiveVaultSession();
+						if (!session) throw new Error("download: no active vault session");
+						const name = sanitizeDownloadFilename(suggestedFilename);
+						const mime = servedMimeForName(name);
+						const store = await session.assetStore();
+						const { assetId, contentHash } = await store.writeAsset({
+							bytes,
+							mime,
+							kind: AssetKind.Upload,
+						});
+						// The download IS the binding intent — mark bound so a stored
+						// blob is never orphan-reap-eligible before its File/v1 row lands.
+						store.markBound(assetId);
+						const properties = downloadFileProperties({
+							name,
+							mime,
+							size: bytes.byteLength,
+							hash: contentHash,
+							assetId,
+							sourceUrl: downloadSourceUrl(url),
+						});
+						const reply = (await entitiesHandler({
+							v: 1,
+							msg: `dl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+							app: appId,
+							service: "entities",
+							method: "create",
+							args: [{ type: DOWNLOAD_FILE_ENTITY_TYPE, properties }],
+							caps: [],
+						})) as { id?: unknown } | null;
+						const fileId = typeof reply?.id === "string" ? reply.id : "";
+						if (!fileId) throw new Error("download: entity create returned no id");
+						return { fileId, name };
 					},
 				});
 				webViewOwners.set(view.webContentsId, {

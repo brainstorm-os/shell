@@ -16,7 +16,8 @@
     "entities.read:brainstorm/BrowsingHistory/v1",
     "entities.write:brainstorm/BrowsingHistory/v1",
     "entities.read:brainstorm/Bookmark/v1",
-    "entities.write:brainstorm/Bookmark/v1"
+    "entities.write:brainstorm/Bookmark/v1",
+    "entities.write:brainstorm/File/v1"
   ],
   "registrations": {
     "openers": [{ "kind": "primary", "scheme": "https" }, { "kind": "primary", "scheme": "http" }],

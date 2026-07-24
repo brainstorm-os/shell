@@ -18,11 +18,20 @@
  * `javascript:` / custom schemes.
  */
 
-import { type SitePermissionKind, TabLoadState, WebViewEventKind } from "@brainstorm-os/sdk-types";
-import { type Session, WebContentsView, app } from "electron";
+import { readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+	DownloadFailReason,
+	type SitePermissionKind,
+	TabLoadState,
+	WebViewEventKind,
+} from "@brainstorm-os/sdk-types";
+import { type DownloadItem, type Session, type WebContents, WebContentsView, app } from "electron";
 import { TabChord, type WebContentsViewHandle, tabChordFor } from "../apps/window-container";
 import { networkEgressHostOf } from "../network/audit-log";
 import { sitePermissionKindsFor, webOriginOf } from "./site-permissions";
+import { MAX_DOWNLOAD_BYTES, sanitizeDownloadFilename } from "./web-download";
 import {
 	DEFAULT_TRACKER_BLOCKLIST,
 	chromeEquivalentUserAgent,
@@ -34,7 +43,12 @@ import {
 	withoutSetCookieHeaders,
 } from "./web-policy";
 import { WebViewBackgroundController } from "./web-view-background";
-import type { CreateViewSpec, ManagedWebView } from "./web-view-service";
+import type {
+	CreateViewSpec,
+	DownloadCapture,
+	DownloadOutcome,
+	ManagedWebView,
+} from "./web-view-service";
 
 export type WebViewFactoryDeps = {
 	/** Tracker/ad host patterns to block (OQ-WV-4). Defaults to the bundled
@@ -66,6 +80,11 @@ export type WebViewFactoryDeps = {
 	 *  the strict Browser-2/4 default. Keyed by the page's FIRST PARTY, never the
 	 *  request URL. */
 	isTrustedOrigin?: (origin: string) => boolean;
+	/** Browser-6 — seal a completed download's bytes into the vault + write a
+	 *  `File/v1` entity. Absent ⇒ downloads fall back to Electron's default
+	 *  (a save dialog); present ⇒ the factory intercepts `will-download`,
+	 *  buffers with a size cap, and routes the bytes here. */
+	onDownload?: (input: DownloadCapture) => Promise<DownloadOutcome>;
 };
 
 /** Sessions whose locked-down policy (permissions + webRequest) is already
@@ -423,6 +442,128 @@ function configureSessionPolicy(
 		}
 		callback({});
 	});
+
+	// Browser-6 — downloads never hit disk directly: the response body is
+	// buffered to a throwaway temp file, size-capped, then sealed into the
+	// encrypted vault asset store as a `File/v1` entity (`deps.onDownload`).
+	// Registered once per session (like the handlers above); the item's owning
+	// tab is resolved per event via `spec.resolveTabContext`.
+	if (deps.onDownload) {
+		ses.on("will-download", (_event, item, itemWc) => {
+			void captureDownload(item, itemWc, spec, deps).catch(() => {
+				// A capture failure surfaces as a DownloadFailed event inside
+				// `captureDownload`; the outer catch only guards an unexpected throw
+				// so a broken download never crashes the session.
+			});
+		});
+	}
+}
+
+/** Buffer a `DownloadItem` to a temp file under a size cap, then hand the bytes
+ *  to the vault-side seal and emit lifecycle events to the owning app. The
+ *  bytes are UNTRUSTED — the seal (vault-side) sanitizes the name + applies the
+ *  served-mime allow-list; here we only bound the size and clean up the temp. */
+async function captureDownload(
+	item: DownloadItem,
+	itemWc: WebContents,
+	spec: CreateViewSpec,
+	deps: WebViewFactoryDeps,
+): Promise<void> {
+	const onDownload = deps.onDownload;
+	if (!onDownload) return;
+	// A download that can't be attributed to a live tab (teardown race) still
+	// gets sealed — fall back to the configuring tab for event routing.
+	const tabId = spec.resolveTabContext(itemWc.id)?.tabId ?? spec.tabId;
+	const downloadId = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+	const suggestedFilename = item.getFilename();
+	const url = item.getURL();
+	const serverMimeType = item.getMimeType();
+	// The server filename is untrusted — never surface it to the chrome raw
+	// (bidi / control spoofing). The Started/Failed events carry the sanitized
+	// display name; the Completed event carries the seal's stored name.
+	const displayName = sanitizeDownloadFilename(suggestedFilename);
+
+	const emitFailed = (reason: DownloadFailReason): void => {
+		spec.emitForApp({
+			kind: WebViewEventKind.DownloadFailed,
+			tabId,
+			downloadId,
+			filename: displayName,
+			reason,
+		});
+	};
+
+	// Declared-size guard (Content-Length): cancel before a byte lands.
+	if (item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+		item.cancel();
+		emitFailed(DownloadFailReason.TooLarge);
+		return;
+	}
+
+	const tmpPath = join(tmpdir(), `bs-dl-${downloadId}`);
+	item.setSavePath(tmpPath);
+	spec.emitForApp({
+		kind: WebViewEventKind.DownloadStarted,
+		tabId,
+		downloadId,
+		filename: displayName,
+	});
+
+	// Received-size guard: a chunked / lying Content-Length still gets bounded.
+	let oversize = false;
+	item.on("updated", () => {
+		if (!oversize && item.getReceivedBytes() > MAX_DOWNLOAD_BYTES) {
+			oversize = true;
+			item.cancel();
+		}
+	});
+
+	const doneState = await new Promise<string>((resolve) => {
+		item.once("done", (_e, state) => resolve(state));
+	});
+	if (doneState !== "completed") {
+		await rm(tmpPath, { force: true }).catch(() => {});
+		emitFailed(oversize ? DownloadFailReason.TooLarge : DownloadFailReason.Interrupted);
+		return;
+	}
+
+	let bytes: Uint8Array;
+	try {
+		bytes = new Uint8Array(await readFile(tmpPath));
+	} catch {
+		emitFailed(DownloadFailReason.WriteFailed);
+		return;
+	} finally {
+		await rm(tmpPath, { force: true }).catch(() => {});
+	}
+	if (bytes.byteLength === 0) {
+		emitFailed(DownloadFailReason.Empty);
+		return;
+	}
+	if (bytes.byteLength > MAX_DOWNLOAD_BYTES) {
+		emitFailed(DownloadFailReason.TooLarge);
+		return;
+	}
+
+	try {
+		const outcome = await onDownload({
+			tabId,
+			appId: spec.appId,
+			url,
+			suggestedFilename,
+			serverMimeType,
+			bytes,
+		});
+		spec.emitForApp({
+			kind: WebViewEventKind.DownloadCompleted,
+			tabId,
+			downloadId,
+			filename: outcome.name,
+			fileId: outcome.fileId,
+		});
+	} catch {
+		emitFailed(DownloadFailReason.WriteFailed);
+	}
 }
 
 /** The webContents id on a webRequest details object (present for requests that

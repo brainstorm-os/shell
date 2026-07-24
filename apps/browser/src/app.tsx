@@ -31,6 +31,7 @@ import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/obje
 import { attachShortcut, useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
+import { DownloadTray } from "./download-tray";
 import { FindBar, type FindMatchState } from "./find-bar";
 import { plural, t } from "./i18n";
 import { useBrowserT } from "./i18n-hooks";
@@ -44,6 +45,13 @@ import {
 	clipBookmarkProperties,
 	clipPhaseFor,
 } from "./logic/clip";
+import {
+	DOWNLOAD_NOTICE_DISMISS_MS,
+	type DownloadNotice,
+	DownloadStatus,
+	dismissDownload,
+	reduceDownloads,
+} from "./logic/downloads";
 import { externalUrlFromIntent, externalUrlFromLaunch } from "./logic/external-open";
 import {
 	BROWSING_HISTORY_ENTITY_TYPE,
@@ -273,6 +281,44 @@ export function BrowserApp(): ReactElement {
 	// is the explicit grant surface).
 	const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
 
+	// Browser-6 — downloads sealed into the vault as File/v1 entities. The shell
+	// pushes lifecycle events; this transient notice list is chrome-local.
+	const [downloadNotices, setDownloadNotices] = useState<readonly DownloadNotice[]>([]);
+	const dismissNotice = useCallback((downloadId: string) => {
+		setDownloadNotices((prev) => dismissDownload(prev, downloadId));
+	}, []);
+	// Auto-dismiss a completed notice after a beat (the file is already in the
+	// vault); a failed notice persists until the user dismisses it. Timers are
+	// tracked per download id so a re-render doesn't stack duplicates or leak.
+	const noticeTimers = useRef<Map<string, number>>(new Map());
+	useEffect(() => {
+		const timers = noticeTimers.current;
+		for (const notice of downloadNotices) {
+			if (notice.status !== DownloadStatus.Completed || timers.has(notice.downloadId)) continue;
+			const id = notice.downloadId;
+			timers.set(
+				id,
+				window.setTimeout(() => {
+					timers.delete(id);
+					setDownloadNotices((prev) => dismissDownload(prev, id));
+				}, DOWNLOAD_NOTICE_DISMISS_MS),
+			);
+		}
+		for (const [id, timer] of timers) {
+			if (!downloadNotices.some((n) => n.downloadId === id)) {
+				window.clearTimeout(timer);
+				timers.delete(id);
+			}
+		}
+	}, [downloadNotices]);
+	useEffect(
+		() => () => {
+			for (const timer of noticeTimers.current.values()) window.clearTimeout(timer);
+			noticeTimers.current.clear();
+		},
+		[],
+	);
+
 	// Stand up the fancy-menus runtime once so the recently-closed anchored menu
 	// renders through the shared menu host (theme + keyboard + glass chrome).
 	useEffect(() => mountMenuHost(), []);
@@ -316,6 +362,14 @@ export function BrowserApp(): ReactElement {
 				openedTabs.current.delete(event.tabId);
 				setFindResults(({ [event.tabId]: _dropped, ...rest }) => rest);
 				setPendingPermissions((prev) => prev.filter((p) => p.tabId !== event.tabId));
+			}
+			// Browser-6 — download lifecycle → the transient notice tray.
+			if (
+				event.kind === WebViewEventKind.DownloadStarted ||
+				event.kind === WebViewEventKind.DownloadCompleted ||
+				event.kind === WebViewEventKind.DownloadFailed
+			) {
+				setDownloadNotices((prev) => reduceDownloads(prev, event, Date.now()));
 			}
 			// History feeds off the same metadata stream: a committed navigation
 			// records the visit; the page's title backfills the recorded row.
@@ -1213,6 +1267,7 @@ export function BrowserApp(): ReactElement {
 					onDismiss={() => resolvePermission(activePermissionAsk, null)}
 				/>
 			)}
+			<DownloadTray notices={downloadNotices} onDismiss={dismissNotice} />
 			<div ref={regionRef} className="browser__region" />
 		</div>
 	);
