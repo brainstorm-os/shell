@@ -10,9 +10,8 @@
  * later through the normal "Add column" path).
  */
 
-import { ValueType } from "@brainstorm-os/sdk-types";
+import { GENERIC_OBJECT_TYPE, coerceScalarValue } from "@brainstorm-os/sdk-types";
 import { type InferredCsvColumn, inferCsvColumns } from "./csv-infer";
-import { GENERIC_OBJECT_TYPE } from "./row-create";
 
 export type CsvEntityImport = {
 	/** The column whose value becomes each row's title (`name`). */
@@ -34,43 +33,12 @@ export function csvToEntityImport(text: string): CsvEntityImport | null {
 	const rows = inferred.dataRows.map((cells) => {
 		const props: Record<string, unknown> = { name: (cells[nameColumn.index] ?? "").trim() };
 		for (const col of propertyColumns) {
-			const value = coerceCell(cells[col.index], col.valueType);
+			const value = coerceScalarValue(cells[col.index], col.valueType);
 			if (value !== undefined) props[col.name] = value;
 		}
 		return props;
 	});
 	return { nameColumn, propertyColumns, rows };
-}
-
-/** Coerce a raw cell to the inferred type's storage shape (mirrors what
- *  `effective-def` infers back): a Date becomes a Unix-ms timestamp (so the
- *  Database reads it as a date, not a string), Number a finite number, Boolean
- *  from `true/false/yes/no`, else the trimmed string. A blank / unparseable
- *  cell is `undefined` → the property is omitted (an empty cell, not a `0`). */
-function coerceCell(cell: string | undefined, type: ValueType): unknown {
-	const v = (cell ?? "").trim();
-	if (v === "") return undefined;
-	switch (type) {
-		case ValueType.Number: {
-			const n = Number(v);
-			return Number.isFinite(n) ? n : undefined;
-		}
-		case ValueType.Boolean:
-			return parseBoolean(v);
-		case ValueType.Date: {
-			const ms = Date.parse(v);
-			return Number.isNaN(ms) ? undefined : ms;
-		}
-		default:
-			return v;
-	}
-}
-
-function parseBoolean(v: string): boolean | undefined {
-	const lower = v.toLowerCase();
-	if (lower === "true" || lower === "yes") return true;
-	if (lower === "false" || lower === "no") return false;
-	return undefined;
 }
 
 /** The minimal entities-service surface the commit needs. */

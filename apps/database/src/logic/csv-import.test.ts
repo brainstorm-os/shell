@@ -1,6 +1,6 @@
+import { GENERIC_OBJECT_TYPE } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { commitCsvImport, csvToEntityImport } from "./csv-import";
-import { GENERIC_OBJECT_TYPE } from "./row-create";
 
 const CSV = ["Name,Age,Active,Joined", "Alice,30,true,2024-01-15", "Bob,25,no,2023-12-01"].join(
 	"\n",

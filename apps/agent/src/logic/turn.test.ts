@@ -5,9 +5,15 @@
  * mitigation: model output can only ever queue a draft for the user's approval.
  */
 
-import type { AgentToolCall, IntentsService } from "@brainstorm-os/sdk-types";
+import {
+	type AgentToolCall,
+	GENERIC_OBJECT_TYPE,
+	type IntentsService,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { ProposedArtifact } from "./propose-artifacts";
+import { PROPOSE_ROW_VERB } from "./propose-row";
 import { makeDispatchTool } from "./turn";
 
 const openTool = { verb: "open", label: "Open" };
@@ -66,5 +72,61 @@ describe("makeDispatchTool — propose is staged, never dispatched", () => {
 	it("fails closed on a tool name outside the offered set", async () => {
 		const dispatch = makeDispatchTool(fakeIntents(), [proposeNote]);
 		await expect(dispatch({ tool: "propose-secret", args: {} })).rejects.toThrow(/unknown tool/);
+	});
+});
+
+describe("makeDispatchTool — database rows (Agent-11d)", () => {
+	const proposeRow = { verb: PROPOSE_ROW_VERB, label: "Propose a row" };
+	const schema = {
+		id: "list_crm",
+		name: "Pipeline",
+		entityType: GENERIC_OBJECT_TYPE,
+		addToMembers: true,
+		columns: [
+			{ key: "name", label: "Name", valueType: ValueType.Text },
+			{ key: "amount", label: "Amount", valueType: ValueType.Number },
+		],
+	};
+
+	it("stages a row against the named database and NEVER calls intents.dispatch", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [proposeRow], (a) => staged.push(a), [schema]);
+
+		const ack = (await dispatch({
+			tool: PROPOSE_ROW_VERB,
+			args: { database: "Pipeline", values: { name: "Globex", amount: "5400" } },
+		})) as Record<string, unknown>;
+
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(staged).toHaveLength(1);
+		expect(staged[0]?.row?.databaseId).toBe("list_crm");
+		expect(ack.staged).toBe(true);
+		expect(ack.status).toBe("pending-approval");
+	});
+
+	it("refuses a row into a database the host did not offer (stages nothing)", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [proposeRow], (a) => staged.push(a), [schema]);
+
+		const ack = (await dispatch({
+			tool: PROPOSE_ROW_VERB,
+			args: { database: "Payroll", values: { name: "Globex" } },
+		})) as Record<string, unknown>;
+
+		expect(staged).toHaveLength(0);
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(ack.staged).toBe(false);
+		expect(ack.reason).toBe("unknown-database");
+	});
+
+	it("refuses every row when the host passed no schemas (fail-closed default)", async () => {
+		const dispatch = makeDispatchTool(fakeIntents(), [proposeRow]);
+		const ack = (await dispatch({
+			tool: PROPOSE_ROW_VERB,
+			args: { database: "Pipeline", values: { name: "x" } },
+		})) as Record<string, unknown>;
+		expect(ack.staged).toBe(false);
 	});
 });

@@ -43,6 +43,7 @@ import {
 	type Dictionary,
 	type Entity,
 	type EntityQuery,
+	GENERIC_OBJECT_TYPE,
 	type Icon,
 	type ObjectDragPayload,
 	type PropertiesService,
@@ -52,6 +53,7 @@ import {
 	type SourceQueryResult,
 	ValueType,
 	type VaultEntity,
+	decideRowCreate,
 	isMultiValued,
 } from "@brainstorm-os/sdk-types";
 import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
@@ -230,7 +232,6 @@ import {
 import { ALL_RELATIVE_DATE_RANGES, relativeRangeLabel } from "./logic/relative-date";
 import { entitiesById } from "./logic/rollup";
 import { rollupRelationCandidates, rollupTargetCandidates } from "./logic/rollup-builder";
-import { GENERIC_OBJECT_TYPE, decideRowCreate } from "./logic/row-create";
 import { rowMenuPlan } from "./logic/row-menu";
 import {
 	type SelectionModifiers,

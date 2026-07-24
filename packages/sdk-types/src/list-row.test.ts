@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ListSourceKind } from "../types/list-source";
-import { GENERIC_OBJECT_TYPE, decideRowCreate } from "./row-create";
+import { ListSourceKind } from "./list";
+import { GENERIC_OBJECT_TYPE, decideRowCreate } from "./list-row";
 
 describe("decideRowCreate", () => {
 	it("creates the concrete type for a ByType list and lets the source own it", () => {

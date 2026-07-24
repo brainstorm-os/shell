@@ -39,6 +39,7 @@ import {
 	capabilityImplies,
 } from "@brainstorm-os/sdk-types";
 import { proposeTools } from "./propose-artifacts";
+import { PROPOSE_ROW_VERB } from "./propose-row";
 
 /** The verbs the curated tools dispatch. `open` is the universal cross-app
  *  navigation verb every type's owner app handles (doc 37) — it only routes /
@@ -54,11 +55,21 @@ export type AgentToolVerb = (typeof AGENT_TOOL_VERB)[keyof typeof AGENT_TOOL_VER
  *  navigation verb plus the Agent-11 propose-* tools (each stages a draft the
  *  user approves — see `propose-artifacts.ts`). `translate` localises each
  *  label; the model addresses a tool by its stable `verb`. The three-tier
- *  ceiling + the loop's fail-closed intersection still gate every one. */
-export function curatedAgentTools(translate: (key: string) => string): AgentTool[] {
+ *  ceiling + the loop's fail-closed intersection still gate every one.
+ *
+ *  `hasDatabases` (Agent-11d) gates the row tool: with no Collection in the
+ *  vault every row proposal would refuse, so the tool isn't offered at all —
+ *  the model is never shown an affordance it cannot use. */
+export function curatedAgentTools(
+	translate: (key: string) => string,
+	options: { hasDatabases?: boolean } = {},
+): AgentTool[] {
 	return [
 		{ verb: AGENT_TOOL_VERB.Open, label: translate("tool.open.label") },
 		...proposeTools(translate),
+		...(options.hasDatabases
+			? [{ verb: PROPOSE_ROW_VERB, label: translate("propose.row.label") }]
+			: []),
 	];
 }
 
@@ -67,7 +78,7 @@ export function curatedAgentTools(translate: (key: string) => string): AgentTool
  *  offered; the manifest test asserts the declared caps cover them. */
 export function curatedToolCapabilities(): string[] {
 	const caps = new Set<string>();
-	for (const tool of curatedAgentTools(() => "")) {
+	for (const tool of curatedAgentTools(() => "", { hasDatabases: true })) {
 		for (const cap of agentToolCapabilities(tool)) caps.add(cap);
 	}
 	return [...caps].sort();

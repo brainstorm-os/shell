@@ -20,7 +20,7 @@
  * pending-buffer reducer are all unit-tested without a runtime.
  */
 
-import type { AgentTool } from "@brainstorm-os/sdk-types";
+import type { AgentTool, ValueType } from "@brainstorm-os/sdk-types";
 
 /** The artifact kinds the agent can propose (Agent-11a/b: simple entities;
  *  database rows / new databases are Agent-11d/11e). Each kind is its OWN tool
@@ -37,6 +37,10 @@ export const ProposeKind = {
 	Event: "event",
 	Bookmark: "bookmark",
 	Contact: "contact",
+	/** A row in one of the user's databases (Agent-11d). Unlike the kinds above
+	 *  its fields are NOT fixed at build time — they are the target database's
+	 *  own columns, carried on the artifact's `row` payload. */
+	Row: "row",
 } as const;
 export type ProposeKind = (typeof ProposeKind)[keyof typeof ProposeKind];
 
@@ -144,6 +148,26 @@ export function proposeEntityWriteCapabilities(): string[] {
 	return [...new Set(PROPOSE_DESCRIPTORS.map((d) => `entities.write:${d.entityType}`))].sort();
 }
 
+/** One column of a proposed row: the property key the value is written under,
+ *  the humanized label the card shows, and the type the approved value is
+ *  coerced to (Agent-11d). */
+export type RowColumn = {
+	key: string;
+	label: string;
+	valueType: ValueType;
+};
+
+/** The target-database payload a {@link ProposeKind.Row} artifact carries: which
+ *  Collection the row lands in, whether it must be pinned into that
+ *  Collection's manual members, and the columns its `fields` are keyed by (the
+ *  allowlist `buildRowProposal` filtered against — Agent-11d). */
+export type ProposedRow = {
+	databaseId: string;
+	databaseName: string;
+	addToMembers: boolean;
+	columns: readonly RowColumn[];
+};
+
 /** A staged draft awaiting the user's approval. `id` is host-minted when the
  *  draft is staged; `fields` are already allowlisted + clamped; `summary` is the
  *  primary field value (the card's headline). */
@@ -153,6 +177,8 @@ export type ProposedArtifact = {
 	entityType: string;
 	fields: Record<string, string>;
 	summary: string;
+	/** Set only for {@link ProposeKind.Row} — the target database + its columns. */
+	row?: ProposedRow;
 };
 
 /** Why a propose call could not be staged (fed back to the model so it can
@@ -272,8 +298,10 @@ export function proposalReducer(state: ProposalState, action: ProposalAction): P
 				pending: state.pending.map((p) => {
 					if (p.id !== action.id) return p;
 					const fields = { ...p.fields, ...action.fields };
-					const descriptor = PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind);
-					const summary = descriptor ? (fields[descriptor.primaryField] ?? p.summary) : p.summary;
+					const primaryField = p.row
+						? (p.row.columns[0]?.key ?? "")
+						: (PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind)?.primaryField ?? "");
+					const summary = primaryField ? (fields[primaryField] ?? p.summary) : p.summary;
 					return { ...p, fields, summary };
 				}),
 			};

@@ -3044,6 +3044,9 @@ export {
 	TimelineMode,
 } from "./list";
 
+export { decideRowCreate, GENERIC_OBJECT_TYPE, type RowCreatePlan } from "./list-row";
+export { coerceScalarValue } from "./value-coerce";
+
 // ─── Self-hosting entity types (Brainstorm-builds-Brainstorm) ───────────────
 
 export {

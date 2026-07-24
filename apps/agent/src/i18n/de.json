@@ -122,5 +122,8 @@
   "insert.failed": "Konnte nicht zur Notiz hinzugefügt werden.",
   "created.title": "In diesem Chat erstellt",
   "created.open": "{label} öffnen",
-  "created.untitled": "Ohne Titel"
+  "created.untitled": "Ohne Titel",
+  "propose.row.label": "Schlage eine neue Zeile in einer der Datenbanken des Nutzers vor. args: {\"database\": \"<exakter Datenbankname>\", \"values\": {\"<Spalte>\": \"<Wert>\"}}",
+  "propose.kind.row": "Datenbankzeile",
+  "propose.row.into": "in {database}"
 }

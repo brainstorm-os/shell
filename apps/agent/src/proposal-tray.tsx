@@ -8,6 +8,10 @@
  * that exercises `entities.write:<type>` (the injection mitigation). The card is
  * pure presentation over the {@link ProposedArtifact} buffer; the create + the
  * field-merge live in `app.tsx` (so the write cap stays on a user gesture).
+ *
+ * Agent-11d adds the database-row card: same chrome, but its editable lines are
+ * the TARGET DATABASE's own columns (carried on the artifact's `row` payload),
+ * laid out as the row it will become — label column, value column.
  */
 
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
@@ -22,6 +26,7 @@ const KIND_LABEL_KEY: Record<ProposeKind, AgentI18nKey> = {
 	[ProposeKind.Event]: "propose.kind.event",
 	[ProposeKind.Bookmark]: "propose.kind.bookmark",
 	[ProposeKind.Contact]: "propose.kind.contact",
+	[ProposeKind.Row]: "propose.kind.row",
 };
 
 const KIND_ICON: Record<ProposeKind, IconName> = {
@@ -30,10 +35,41 @@ const KIND_ICON: Record<ProposeKind, IconName> = {
 	[ProposeKind.Event]: IconName.KindDate,
 	[ProposeKind.Bookmark]: IconName.KindLink,
 	[ProposeKind.Contact]: IconName.AddressBook,
+	[ProposeKind.Row]: IconName.Entity,
 };
 
 const descriptorFor = (artifact: ProposedArtifact) =>
 	PROPOSE_DESCRIPTORS.find((d) => d.kind === artifact.kind) ?? null;
+
+/** One editable line on a card: the field key, its label, and whether it takes
+ *  a textarea. A simple entity's lines come from its descriptor; a database
+ *  row's come from the target database's own columns (Agent-11d). */
+type CardField = { key: string; label: string; multiline: boolean };
+
+function cardFields(
+	artifact: ProposedArtifact,
+): { fields: CardField[]; primaryField: string } | null {
+	if (artifact.row) {
+		return {
+			fields: artifact.row.columns.map((column) => ({
+				key: column.key,
+				label: column.label,
+				multiline: false,
+			})),
+			primaryField: artifact.row.columns[0]?.key ?? "",
+		};
+	}
+	const descriptor = descriptorFor(artifact);
+	if (!descriptor) return null;
+	return {
+		fields: descriptor.fields.map((field) => ({
+			key: field,
+			label: t(`propose.field.${field}` as AgentI18nKey),
+			multiline: descriptor.longFields.includes(field),
+		})),
+		primaryField: descriptor.primaryField,
+	};
+}
 
 export type ProposalTrayProps = {
 	proposals: readonly ProposedArtifact[];
@@ -57,10 +93,10 @@ function ProposalCard({
 	onDiscard: (id: string) => void;
 	onEditField: (id: string, field: string, value: string) => void;
 }): ReactElement | null {
-	const descriptor = descriptorFor(artifact);
-	if (!descriptor) return null;
+	const layout = cardFields(artifact);
+	if (!layout) return null;
 	const kindLabel = t(KIND_LABEL_KEY[artifact.kind]);
-	const primaryEmpty = !(artifact.fields[descriptor.primaryField] ?? "").trim();
+	const primaryEmpty = !(artifact.fields[layout.primaryField] ?? "").trim();
 
 	return (
 		<div
@@ -75,24 +111,31 @@ function ProposalCard({
 					<Icon name={KIND_ICON[artifact.kind]} size={13} />
 					{kindLabel}
 				</span>
+				{artifact.row ? (
+					<span className="agent-proposal__target" data-testid="agent-proposal-database">
+						{t("propose.row.into", { database: artifact.row.databaseName })}
+					</span>
+				) : null}
 			</div>
-			<div className="agent-proposal__fields">
-				{descriptor.fields.map((field) => {
-					const multiline = descriptor.longFields.includes(field);
-					const value = artifact.fields[field] ?? "";
-					const fieldLabel = t(`propose.field.${field}` as AgentI18nKey);
-					const inputId = `${artifact.id}-${field}`;
+			<div
+				className={
+					artifact.row ? "agent-proposal__fields agent-proposal__fields--row" : "agent-proposal__fields"
+				}
+			>
+				{layout.fields.map((field) => {
+					const value = artifact.fields[field.key] ?? "";
+					const inputId = `${artifact.id}-${field.key}`;
 					return (
-						<label key={field} className="agent-proposal__field" htmlFor={inputId}>
-							<span className="agent-proposal__field-label">{fieldLabel}</span>
-							{multiline ? (
+						<label key={field.key} className="agent-proposal__field" htmlFor={inputId}>
+							<span className="agent-proposal__field-label">{field.label}</span>
+							{field.multiline ? (
 								<textarea
 									id={inputId}
 									className="bs-input bs-input--multiline agent-proposal__input"
 									value={value}
 									rows={3}
 									disabled={busy}
-									onChange={(e) => onEditField(artifact.id, field, e.target.value)}
+									onChange={(e) => onEditField(artifact.id, field.key, e.target.value)}
 								/>
 							) : (
 								<input
@@ -101,7 +144,7 @@ function ProposalCard({
 									className="bs-input agent-proposal__input"
 									value={value}
 									disabled={busy}
-									onChange={(e) => onEditField(artifact.id, field, e.target.value)}
+									onChange={(e) => onEditField(artifact.id, field.key, e.target.value)}
 								/>
 							)}
 						</label>

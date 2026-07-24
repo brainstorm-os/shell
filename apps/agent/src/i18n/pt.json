@@ -122,5 +122,8 @@
   "insert.failed": "Não foi possível adicionar à nota.",
   "created.title": "Criado neste chat",
   "created.open": "Abrir {label}",
-  "created.untitled": "Sem título"
+  "created.untitled": "Sem título",
+  "propose.row.label": "Proponha uma nova linha em uma das bases de dados do usuário. args: {\"database\": \"<nome exato da base de dados>\", \"values\": {\"<coluna>\": \"<valor>\"}}",
+  "propose.kind.row": "Linha de base de dados",
+  "propose.row.into": "em {database}"
 }

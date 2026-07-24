@@ -122,5 +122,8 @@
   "insert.failed": "Impossible d'ajouter à la note.",
   "created.title": "Créé dans cette conversation",
   "created.open": "Ouvrir {label}",
-  "created.untitled": "Sans titre"
+  "created.untitled": "Sans titre",
+  "propose.row.label": "Proposez une nouvelle ligne dans l'une des bases de données de l'utilisateur. args: {\"database\": \"<nom exact de la base de données>\", \"values\": {\"<colonne>\": \"<valeur>\"}}",
+  "propose.kind.row": "Ligne de base de données",
+  "propose.row.into": "dans {database}"
 }

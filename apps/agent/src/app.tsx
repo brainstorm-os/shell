@@ -23,6 +23,7 @@ import {
 	ConversationMemoryMode,
 	MEMORY_TYPE_URL,
 	MESSAGE_TYPE_URL,
+	type MemberOverrides,
 	type MessageAttachment,
 	MessageRole,
 	OLLAMA_PROVIDER_ID,
@@ -106,7 +107,12 @@ import {
 	emptyProposalState,
 	proposalReducer,
 } from "./logic/propose-artifacts";
-import { proposalToEntityProperties } from "./logic/propose-persist";
+import { persistApprovedProposal } from "./logic/propose-persist";
+import {
+	buildDatabaseContextBlock,
+	databaseSchemasFromEntities,
+	writableDatabaseSchemas,
+} from "./logic/propose-row";
 import {
 	type CitationLink,
 	RETRIEVAL_TOP_K,
@@ -378,6 +384,10 @@ export function AgentApp(): ReactElement {
 		[all, activeId],
 	);
 
+	// Agent-11d — the databases a proposed row may target, derived from the same
+	// live snapshot (Collections + their default view's columns + the types of
+	// their existing rows). Recomputes as the vault changes, so a column added in
+	// the Database app is fillable on the very next turn.
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	// Agent-6 — the save-as-automation review dialog. `draft` is the generalized
 	// Workflow/v1 the user reviews before it is written; null = closed.
@@ -454,15 +464,29 @@ export function AgentApp(): ReactElement {
 		() => effectiveAgentCapabilities(appCaps ?? [], conversationGrants),
 		[appCaps, conversationGrants],
 	);
+	// Fail-closed at offer time: a database whose row type (or, for a manual
+	// collection, whose membership) this app can't write is dropped, so the model
+	// is never shown a target whose approval would be denied.
+	const databaseSchemas = useMemo(
+		() => writableDatabaseSchemas(databaseSchemasFromEntities(all), frozenCapabilities),
+		[all, frozenCapabilities],
+	);
+	const databasesBlock = useMemo(
+		() => buildDatabaseContextBlock(databaseSchemas),
+		[databaseSchemas],
+	);
+
 	const offeredTools = useMemo(
 		// `t` is typed to the app's catalog keys; the curated-tool labels ARE
 		// catalog keys, so widen the callable to the helper's `(string) => string`.
 		() =>
 			intersectAgentTools(
-				curatedAgentTools((k) => t(k as AgentI18nKey)),
+				curatedAgentTools((k) => t(k as AgentI18nKey), {
+					hasDatabases: databaseSchemas.length > 0,
+				}),
 				frozenCapabilities,
 			),
-		[frozenCapabilities],
+		[frozenCapabilities, databaseSchemas],
 	);
 	const toolsEnabled = intentsSvc !== null && offeredTools.length > 0;
 	const [sidebarOpen, setSidebarOpen] = useState<boolean>(readSidebarOpen);
@@ -513,19 +537,19 @@ export function AgentApp(): ReactElement {
 			setApprovingIds((prev) => new Set(prev).add(artifact.id));
 			setError(null);
 			try {
-				const plan = proposalToEntityProperties(artifact, Date.now());
-				// Agent-11c — stamp the proposal's source conversation as provenance.
-				// The app supplies ONLY the conversation id (from its own active-chat
-				// state, never model output); the shell forces the `agent` field from
-				// the broker-verified caller, so provenance can't be forged to
-				// attribute the create to another agent. The stamped entity is what the
-				// created-object chips (below) derive from — the durable back-link.
-				await entitiesSvc.create(
-					plan.entityType,
-					plan.properties,
-					undefined,
-					activeId ? { conversationId: activeId } : undefined,
-				);
+				// Agent-11c/11d — the persist step: map to the owner-app schema, create
+				// with the conversation as provenance (the app supplies ONLY the
+				// conversation id from its own active-chat state; the shell forces the
+				// `agent` field from the broker-verified caller, so provenance can't be
+				// forged), then pin a manual collection's membership for a row.
+				const collection = artifact.row
+					? all.find((e) => e.id === artifact.row?.databaseId)
+					: undefined;
+				await persistApprovedProposal(entitiesSvc, artifact, {
+					conversationId: activeId,
+					collectionMembers: collection?.properties.members as MemberOverrides | undefined,
+					now: Date.now(),
+				});
 				dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
 				setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
 			} catch (err) {
@@ -539,7 +563,7 @@ export function AgentApp(): ReactElement {
 				});
 			}
 		},
-		[entitiesSvc, approvingIds, activeId],
+		[entitiesSvc, approvingIds, activeId, all],
 	);
 	const discardProposal = useCallback((id: string) => {
 		dispatchProposal({ kind: ProposalActionKind.Discard, id });
@@ -1111,6 +1135,7 @@ export function AgentApp(): ReactElement {
 			const retrievalContext = joinContextBlocks([
 				workspaceBlock,
 				vaultBlock,
+				databasesBlock,
 				attachmentsBlock,
 				mediaBlock,
 				retrievalBlock,
@@ -1156,6 +1181,7 @@ export function AgentApp(): ReactElement {
 						...(conversationProvider ? { provider: conversationProvider } : {}),
 						...(conversationModel ? { model: conversationModel } : {}),
 						onPropose: (artifact) => dispatchProposal({ kind: ProposalActionKind.Add, artifact }),
+						rowSchemas: databaseSchemas,
 					},
 				);
 				if (loop.stopReason === AgentStopReason.GenerateFailed) {
@@ -1278,6 +1304,8 @@ export function AgentApp(): ReactElement {
 		memories,
 		workspaceBlock,
 		vaultBlock,
+		databasesBlock,
+		databaseSchemas,
 		all,
 		attachments,
 	]);

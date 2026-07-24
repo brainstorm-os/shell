@@ -15,6 +15,11 @@
  * caller's, so this stays framework-free and exhaustively unit-testable.
  */
 
+import {
+	MEMBERS_HARD_CAP,
+	type MemberOverrides,
+	coerceScalarValue,
+} from "@brainstorm-os/sdk-types";
 import { ProposeKind, type ProposedArtifact } from "./propose-artifacts";
 
 /** A ready-to-persist plan: the canonical owner-app type + the full property bag
@@ -123,5 +128,90 @@ export function proposalToEntityProperties(
 					...opt("bio", f.notes),
 				},
 			};
+		case ProposeKind.Row: {
+			// Agent-11d — the columns ARE the allowlist: only a column the target
+			// database declares is written, each value coerced to that column's
+			// type so the Database renders it as the right cell (a number as a
+			// number, a date as Unix-ms) rather than a string that looks right.
+			const properties: Record<string, unknown> = { createdAt: now, updatedAt: now };
+			for (const column of artifact.row?.columns ?? []) {
+				const value = coerceScalarValue(f[column.key], column.valueType);
+				if (value !== undefined) properties[column.key] = value;
+			}
+			properties.name = f.name ?? "";
+			return { entityType: type, properties };
+		}
 	}
+}
+
+/** The entities-service surface an approval needs. Narrowed to the two calls so
+ *  the persist step is testable with a stub and the write footprint is legible:
+ *  ONE create, plus ONE additive membership patch for a manual collection. */
+export type ProposalEntitiesService = {
+	create(
+		type: string,
+		properties: Record<string, unknown>,
+		id?: string,
+		provenance?: { conversationId: string },
+	): Promise<{ id: string } | null>;
+	update(id: string, patch: Record<string, unknown>): Promise<unknown>;
+};
+
+/**
+ * Persist an APPROVED proposal — the one place a proposal becomes vault bytes.
+ * Called only from the approve gesture in `app.tsx` (never the model loop):
+ * map → create (provenance-stamped, Agent-11c) → pin membership when the target
+ * is a manual collection (Agent-11d). The membership patch is computed by
+ * {@link memberPinPatch}, so an approval can only ever ADD the row it just
+ * created to the collection the proposal named.
+ */
+export async function persistApprovedProposal(
+	entities: ProposalEntitiesService,
+	artifact: ProposedArtifact,
+	context: {
+		/** The conversation the proposal was made in — the provenance back-link.
+		 *  Comes from the app's own active-chat state, never from model output. */
+		conversationId: string | null;
+		/** The target collection's current membership overrides (row proposals into
+		 *  a manual collection only); read from the live snapshot. */
+		collectionMembers?: MemberOverrides | undefined;
+		now: number;
+	},
+): Promise<{ id: string } | null> {
+	const plan = proposalToEntityProperties(artifact, context.now);
+	const created = await entities.create(
+		plan.entityType,
+		plan.properties,
+		undefined,
+		context.conversationId ? { conversationId: context.conversationId } : undefined,
+	);
+	if (artifact.row?.addToMembers && created?.id) {
+		const patch = memberPinPatch(context.collectionMembers, created.id, context.now);
+		if (patch) await entities.update(artifact.row.databaseId, patch);
+	}
+	return created;
+}
+
+/**
+ * The additive member-pin patch for a row created in a MANUAL collection (one
+ * with no type source to pick the row up). Pure + minimal on purpose: it
+ * returns the collection's existing overrides with exactly one `include` entry
+ * appended, so the approval can never rewrite membership it didn't add. `null`
+ * when the row is already a member or the collection is at the hard cap.
+ */
+export function memberPinPatch(
+	members: MemberOverrides | undefined,
+	entityId: string,
+	now: number,
+): { members: MemberOverrides } | null {
+	const include = members?.include ?? [];
+	const exclude = members?.exclude ?? [];
+	if (include.some((entry) => entry.entityId === entityId)) return null;
+	if (include.length + exclude.length >= MEMBERS_HARD_CAP) return null;
+	return {
+		members: {
+			include: [...include, { entityId, addedAt: now, by: "app:io.brainstorm.agent" }],
+			exclude: [...exclude],
+		},
+	};
 }
