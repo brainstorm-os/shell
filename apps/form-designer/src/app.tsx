@@ -53,6 +53,7 @@ import {
 	type FormProperties,
 	buildFormProperties,
 	cellsToFields,
+	formLayoutIssues,
 	moveField as moveField_,
 	readFormProperties,
 } from "./logic/form-model";
@@ -379,6 +380,47 @@ export function FormDesignerApp(): ReactElement {
 		}
 	}, [name, targetType, fields, formId]);
 
+	// Apply-to-type (8.10.5): promote the form to be the default `Layout/v1`
+	// for its target type. It runs the layout through the SAME frozen
+	// `validateAppLayouts` contract the shell enforces on app-shipped default
+	// layouts at install (form-model `formLayoutIssues`), so a designer can
+	// never publish a default the installer would reject; on pass it persists
+	// the type-scoped layout (the resolver then returns it for that type). The
+	// visible render of that default is gated on the 8.3 pipeline.
+	const onApplyToType = useCallback(async (): Promise<void> => {
+		const entities = entitiesService();
+		if (!entities) {
+			setStatus(t("status.offline"));
+			return;
+		}
+		if (name.trim().length === 0) {
+			setStatus(t("status.needsName"));
+			return;
+		}
+		if (fields.length === 0) {
+			setStatus(t("status.needsFields"));
+			return;
+		}
+		const props = buildFormProperties({ name, targetType, fields });
+		if (formLayoutIssues(props).length > 0) {
+			setStatus(t("status.applyInvalid"));
+			return;
+		}
+		setStatus(t("status.applying"));
+		try {
+			const payload = props as unknown as Record<string, unknown>;
+			if (formId) {
+				await entities.update(formId, payload);
+			} else {
+				const created = await entities.create(LAYOUT_TYPE_URL, payload);
+				setFormId(created.id);
+			}
+			setStatus(t("status.appliedToType", { type: targetTypeLabel(targetType) }));
+		} catch {
+			setStatus(t("status.applyFailed"));
+		}
+	}, [name, targetType, fields, formId]);
+
 	const focusFillRow = useCallback((property: string): void => {
 		const row = fillRowRefs.current.get(property);
 		const focusable = row?.querySelector<HTMLElement>(
@@ -646,6 +688,7 @@ export function FormDesignerApp(): ReactElement {
 								onRelabel={relabelField}
 								onCondition={setFieldCondition}
 								onSave={() => void onSave()}
+								onApplyToType={() => void onApplyToType()}
 							/>
 						) : (
 							<FillPane
@@ -738,6 +781,7 @@ function BuilderPane(props: {
 	onRelabel: (index: number, label: string) => void;
 	onCondition: (index: number, condition: PropertyPredicate | undefined) => void;
 	onSave: () => void;
+	onApplyToType: () => void;
 }): ReactElement {
 	return (
 		<div className="fd-builder">
@@ -812,6 +856,14 @@ function BuilderPane(props: {
 			</div>
 
 			<div className="fd-builder__footer">
+				<button
+					type="button"
+					className="bs-btn bs-btn--neutral"
+					data-bs-tooltip={t("action.applyToTypeHint", { type: targetTypeLabel(props.targetType) })}
+					onClick={props.onApplyToType}
+				>
+					<span>{t("action.applyToType")}</span>
+				</button>
 				<button type="button" className="bs-btn" data-bs-primary onClick={props.onSave}>
 					<span>{t("action.save")}</span>
 				</button>

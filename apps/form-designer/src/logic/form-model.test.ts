@@ -1,23 +1,28 @@
 import {
-	type AppLayoutManifestEntry,
+	AppLayoutIssueCode,
 	LayoutCellKind,
 	LayoutContext,
 	LayoutMode,
 	validateAppLayouts,
 	validateLayout,
 } from "@brainstorm-os/sdk-types";
+import { LayoutResolveSource, resolveLayout } from "@brainstorm-os/sdk/layout-resolver";
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TARGET_TYPE,
+	type FormProperties,
 	buildFormProperties,
 	cellsToFields,
 	emptyFillFields,
 	fieldsToCells,
 	fillValuesToProperties,
+	formLayoutIssues,
 	formScope,
 	isEmptyValue,
+	isFormApplicableToType,
 	moveField,
 	readFormProperties,
+	toAppLayoutEntry,
 	toLayoutDef,
 } from "./form-model";
 
@@ -32,6 +37,7 @@ describe("form-model", () => {
 		expect(props.name).toBe("New client");
 		expect(props.mode).toBe(LayoutMode.Stacked);
 		expect(props.context).toBeNull();
+		expect(props.scope).toEqual({ kind: "type", target: "brainstorm/Object/v1" });
 		expect(props.cells).toHaveLength(2);
 		expect(props.cells[0]).toMatchObject({
 			kind: LayoutCellKind.Property,
@@ -59,36 +65,119 @@ describe("form-model", () => {
 	// contract closes here; the visible render path is gated on 8.3.
 	it("projects a built form that clears validateAppLayouts for its target type", () => {
 		const targetType = "io.example/Lead/v1";
-		const def = toLayoutDef(
+		const props = buildFormProperties({
+			name: "New lead",
+			targetType,
+			fields: [
+				{ property: "name" },
+				{ property: "email", label: "Work email" },
+				{ property: "owner" },
+			],
+		});
+		expect(validateAppLayouts([toAppLayoutEntry(props)], [targetType])).toEqual([]);
+	});
+
+	it("toAppLayoutEntry carries the target type, context, and scope-free body", () => {
+		const props = buildFormProperties({
+			name: "Lead",
+			targetType: "io.example/Lead/v1",
+			fields: [{ property: "name" }],
+		});
+		const entry = toAppLayoutEntry(props);
+		expect(entry.type).toBe("io.example/Lead/v1");
+		expect(entry.context).toBeNull();
+		expect(entry.config).toEqual({
+			mode: LayoutMode.Stacked,
+			cells: props.cells,
+			readingOrder: props.readingOrder,
+		});
+		expect("scope" in entry.config).toBe(false);
+	});
+
+	describe("formLayoutIssues / isFormApplicableToType (8.10.5 apply gate)", () => {
+		it("a form built through the UI clears the frozen install contract", () => {
+			const props = buildFormProperties({
+				name: "New lead",
+				targetType: "io.example/Lead/v1",
+				fields: [{ property: "name" }, { property: "email" }],
+			});
+			expect(formLayoutIssues(props)).toEqual([]);
+			expect(isFormApplicableToType(props)).toBe(true);
+		});
+
+		it("delegates to validateLayout — a malformed cell body is rejected", () => {
+			const props: FormProperties = {
+				name: "Broken",
+				mode: LayoutMode.Stacked,
+				scope: formScope("io.example/Lead/v1"),
+				context: null,
+				targetType: "io.example/Lead/v1",
+				// two property cells share an id → DuplicateCellId inside the body
+				cells: [
+					{ kind: LayoutCellKind.Property, id: "dup", property: "name" },
+					{ kind: LayoutCellKind.Property, id: "dup", property: "email" },
+				],
+			};
+			const issues = formLayoutIssues(props);
+			expect(issues.length).toBeGreaterThan(0);
+			expect(issues[0]?.code).toBe(AppLayoutIssueCode.InvalidConfig);
+			expect(isFormApplicableToType(props)).toBe(false);
+		});
+
+		it("rejects an empty target type (the installer's EmptyType rule)", () => {
+			const props = buildFormProperties({
+				name: "No type",
+				targetType: "",
+				fields: [{ property: "name" }],
+			});
+			// buildFormProperties defaults an empty target type only via the app;
+			// the pure model keeps it empty, so the contract flags it.
+			expect(
+				formLayoutIssues({ ...props, targetType: "" }).some(
+					(i) => i.code === AppLayoutIssueCode.EmptyType,
+				),
+			).toBe(true);
+		});
+	});
+
+	// 8.10.5 apply-to-type: a saved form is a type-scoped Layout/v1, so the
+	// 8.2 resolver returns it as the winning default layout for its target
+	// type in any render context. Proven against the REAL resolver (not a
+	// re-implementation) — this is the render-side round-trip the visible
+	// pipeline (8.3) will consume.
+	it("resolves as the type-scoped default layout for its target type", () => {
+		const targetType = "io.example/Lead/v1";
+		const layout = toLayoutDef(
 			buildFormProperties({
 				name: "New lead",
 				targetType,
-				fields: [
-					{ property: "name" },
-					{ property: "email", label: "Work email" },
-					{ property: "owner" },
-				],
+				fields: [{ property: "name" }, { property: "email" }],
 			}),
 		);
-		const entry: AppLayoutManifestEntry = {
-			type: targetType,
-			context: null,
-			config: { mode: def.mode, cells: def.cells, readingOrder: def.readingOrder ?? [] },
-		};
-		expect(validateAppLayouts([entry], [targetType])).toEqual([]);
+		const resolution = resolveLayout(
+			{ entityId: "ent_x", types: [targetType], context: LayoutContext.Full },
+			[{ layout }],
+		);
+		expect(resolution.source).toBe(LayoutResolveSource.Scope);
+		if (resolution.source === LayoutResolveSource.Scope) {
+			expect(resolution.scope).toEqual({ kind: "type", target: targetType });
+			expect(resolution.layout).toBe(layout);
+		}
 	});
 
-	it("the round-trip projection also clears a context-scoped app layout", () => {
-		const targetType = "io.example/Lead/v1";
-		const def = toLayoutDef(
-			buildFormProperties({ name: "Lead card", targetType, fields: [{ property: "name" }] }),
+	it("does not resolve for an unrelated entity type", () => {
+		const layout = toLayoutDef(
+			buildFormProperties({
+				name: "Lead",
+				targetType: "io.example/Lead/v1",
+				fields: [{ property: "name" }],
+			}),
 		);
-		const entry: AppLayoutManifestEntry = {
-			type: targetType,
-			context: LayoutContext.Full,
-			config: { mode: def.mode, cells: def.cells, readingOrder: def.readingOrder ?? [] },
-		};
-		expect(validateAppLayouts([entry], [targetType])).toEqual([]);
+		const resolution = resolveLayout(
+			{ entityId: "ent_y", types: ["brainstorm/Task/v1"], context: LayoutContext.Full },
+			[{ layout }],
+		);
+		expect(resolution.source).toBe(LayoutResolveSource.None);
 	});
 
 	it("round-trips fields → cells → fields, preserving order and labels", () => {
@@ -131,6 +220,21 @@ describe("form-model", () => {
 		expect(props.targetType).toBe(DEFAULT_TARGET_TYPE);
 		expect(props.readingOrder).toEqual(["field-0"]);
 		expect(props.mode).toBe(LayoutMode.Stacked);
+		// Scope is derived from the target type even when the persisted entity
+		// predates scope persistence (back-compat with v1 forms).
+		expect(props.scope).toEqual({ kind: "type", target: DEFAULT_TARGET_TYPE });
+	});
+
+	it("derives scope from the target type, the single source of truth", () => {
+		// Even a stale/mismatched persisted scope is ignored — the form's
+		// targetType is authoritative, so scope can never drift from it.
+		const props = readFormProperties({
+			name: "Lead",
+			targetType: "io.example/Lead/v1",
+			scope: { kind: "type", target: "stale/Type/v1" },
+			cells: [],
+		});
+		expect(props.scope).toEqual({ kind: "type", target: "io.example/Lead/v1" });
 	});
 
 	describe("fillValuesToProperties", () => {

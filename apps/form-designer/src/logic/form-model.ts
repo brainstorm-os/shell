@@ -19,6 +19,8 @@
  */
 
 import {
+	type AppLayoutIssue,
+	type AppLayoutManifestEntry,
 	type LayoutCell,
 	LayoutCellKind,
 	type LayoutContext,
@@ -27,6 +29,7 @@ import {
 	type PropertyCell,
 	type PropertyPredicate,
 	type Scope,
+	validateAppLayouts,
 } from "@brainstorm-os/sdk-types";
 
 /** Default target type for a new form — the generic `Object/v1` the
@@ -45,10 +48,16 @@ export type FormField = {
 	condition?: PropertyPredicate;
 };
 
-/** The `properties` payload of a Form's `Layout/v1` entity. */
+/** The `properties` payload of a Form's `Layout/v1` entity. `scope` is
+ *  persisted (type-scoped to `targetType`) so the saved entity is a
+ *  self-describing `Layout/v1` the resolver can place as that type's
+ *  default layout — not an app-private blob (8.10.5). It is always
+ *  derived from `targetType` on read (the single source of truth), so the
+ *  two can never drift. */
 export type FormProperties = {
 	name: string;
 	mode: LayoutMode;
+	scope: Scope;
 	context: LayoutContext | null;
 	targetType: string;
 	cells: PropertyCell[];
@@ -131,6 +140,7 @@ export function buildFormProperties(input: {
 	return {
 		name: input.name.trim(),
 		mode: LayoutMode.Stacked,
+		scope: formScope(input.targetType),
 		context: null,
 		targetType: input.targetType,
 		cells,
@@ -144,11 +154,45 @@ export function buildFormProperties(input: {
 export function toLayoutDef(props: FormProperties): LayoutDef {
 	return {
 		mode: props.mode,
-		scope: formScope(props.targetType),
+		scope: props.scope,
 		context: props.context,
 		cells: props.cells,
 		...(props.readingOrder ? { readingOrder: props.readingOrder } : {}),
 	};
+}
+
+/** Project a saved form to the install-contract manifest-entry shape (doc
+ *  27 §App-shipped defaults): the target `type`, the form's render
+ *  `context`, and the layout `config` body sans `scope`/`context`. The
+ *  bridge the apply-to-type flow validates through the SAME
+ *  `validateAppLayouts` contract the installer runs (manifest.ts →
+ *  `validateLayouts`), so a designer-authored default clears exactly the
+ *  bar an app-shipped default must (8.10.5 round-trip). */
+export function toAppLayoutEntry(props: FormProperties): AppLayoutManifestEntry {
+	return {
+		type: props.targetType,
+		context: props.context,
+		config: {
+			mode: props.mode,
+			cells: props.cells,
+			...(props.readingOrder ? { readingOrder: props.readingOrder } : {}),
+		},
+	};
+}
+
+/** Validate a form's layout through the frozen `validateAppLayouts`
+ *  contract — the SAME single source of truth the shell runs at install —
+ *  scoping the form's own `targetType` as the owned set (a user form
+ *  legitimately targets the type it was authored for, so ownership is
+ *  satisfied by construction; the check that bites is the well-formed
+ *  `config` body + a non-empty type + a valid context). `[]` ⇒ the layout
+ *  is contract-clean and safe to apply as that type's default. */
+export function formLayoutIssues(props: FormProperties): AppLayoutIssue[] {
+	return validateAppLayouts([toAppLayoutEntry(props)], [props.targetType]);
+}
+
+export function isFormApplicableToType(props: FormProperties): boolean {
+	return formLayoutIssues(props).length === 0;
 }
 
 /** Read a saved entity's `properties` into a typed `FormProperties`,
@@ -166,6 +210,7 @@ export function readFormProperties(raw: Record<string, unknown>): FormProperties
 	return {
 		name,
 		mode: LayoutMode.Stacked,
+		scope: formScope(targetType),
 		context: null,
 		targetType,
 		cells,
