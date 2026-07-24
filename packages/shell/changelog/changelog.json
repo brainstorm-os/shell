@@ -4,7 +4,7 @@
   "releases": [
     {
       "version": "0.9.0",
-      "date": "2026-07-23",
+      "date": "2026-07-24",
       "icon": "🤝",
       "title": "Work with the agent",
       "summary": "Your agent now builds real things with you — propose a note, task, event, bookmark, or contact right in chat, and approve what you want to keep. Plus same-network sync, four new languages, and Notion import.",
@@ -114,6 +114,25 @@
             },
             {
               "text": "Markdown notes",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Browser downloads",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — files you download in the built-in browser save straight into your "
+            },
+            {
+              "text": "vault",
               "marks": ["highlight"]
             },
             {
