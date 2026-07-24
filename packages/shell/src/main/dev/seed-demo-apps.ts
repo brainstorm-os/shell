@@ -26,6 +26,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { hashBundleDirectory } from "../apps/app-bundle-hash";
@@ -38,6 +39,7 @@ import { pruneOrphanAppIcons } from "../dashboard/prune-orphan-app-icons";
 import { getActiveShortcutRegistry } from "../shortcuts/active-registry";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { getActiveVaultSession } from "../vault/session";
+import { isBundleBuildStale } from "./bundle-staleness";
 
 const GRID_COLS = 12;
 
@@ -202,7 +204,14 @@ type BuildInstallPinResult = InstallPrebuiltBundleResult;
 /** Dev composition: build the app's source bundle (vite spawn) then call
  *  `installPrebuiltBundle`. Used by the dev seeder loop and the
  *  marketplace reinstall path. Uninstall vacuums the vault bundle, so the
- *  rebuild is mandatory — there's no cached copy to fall back to. */
+ *  rebuild is mandatory — there's no cached copy to fall back to.
+ *
+ *  The build is now GATED on staleness. The install side already skipped an
+ *  unchanged bundle (content hash), but the shell paid the full vite spawn
+ *  before reaching that check — 20 apps × a build, on every boot, almost
+ *  always producing byte-identical output. `isBundleBuildStale` compares the
+ *  app's sources AND the shared packages it compiles in against its `dist/`;
+ *  a boot that changed nothing now spawns nothing. Any doubt rebuilds. */
 async function buildInstallPin(
 	app: FirstPartyApp,
 	appsDir: string,
@@ -210,10 +219,35 @@ async function buildInstallPin(
 ): Promise<BuildInstallPinResult> {
 	const bundleDir = join(appsDir, app.dir);
 
-	const buildResult = await buildVitebundle(bundleDir);
-	if (!buildResult.ok) return { ok: false, reason: `build: ${buildResult.reason}` };
+	if (
+		isBundleBuildStale({ appBundleDir: bundleDir, sharedSourceRoots: sharedSourceRoots(appsDir) })
+	) {
+		const buildResult = await buildVitebundle(bundleDir);
+		if (!buildResult.ok) return { ok: false, reason: `build: ${buildResult.reason}` };
+	} else {
+		console.info(`[seed] ${app.expectedAppId}: dist is current — skipped the source rebuild`);
+	}
 
 	return installPrebuiltBundle(app, bundleDir, deps);
+}
+
+/** The shared package sources every app bundle compiles in. A change in any of
+ *  them invalidates every app's `dist/` — without this a dev could edit the SDK
+ *  and watch a running app not change, which is a far worse failure than a
+ *  needless rebuild. Cached per boot: the walk is cheap, but it is the same
+ *  answer for all 20 apps. */
+let sharedRootsCache: readonly string[] | null = null;
+function sharedSourceRoots(appsDir: string): readonly string[] {
+	if (sharedRootsCache) return sharedRootsCache;
+	const packagesDir = join(appsDir, "..", "packages");
+	let names: string[] = [];
+	try {
+		names = readdirSync(packagesDir);
+	} catch {
+		names = [];
+	}
+	sharedRootsCache = names.map((name) => join(packagesDir, name, "src"));
+	return sharedRootsCache;
 }
 
 export type ReinstallResult = { ok: true } | { ok: false; reason: string };
