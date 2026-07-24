@@ -3,7 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
-import { ENTITY_PROPS_MAP_NAME, UNIVERSAL_BODY_FRAGMENT_NAME } from "@brainstorm-os/sdk-types";
+import {
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	ENTITY_PROPS_MAP_NAME,
+	UNIVERSAL_BODY_FRAGMENT_NAME,
+	readAgentProvenance,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
@@ -201,6 +206,104 @@ describe("entities service handler", () => {
 		expect(created.createdBy).toBe("io.x");
 		expect(created.properties).toEqual({ t: 1 });
 		expect(e.repo.get(created.id)).not.toBeNull();
+	});
+
+	// ── Agent-11c: server-authoritative provenance stamping ─────────────
+	it("create stamps server-authoritative provenance (agent = calling app) from a provenance arg", async () => {
+		const created = (await e.handler(
+			env("io.brainstorm.agent", "create", {
+				type: "io.x/Note/v1",
+				properties: { title: "N" },
+				provenance: { conversationId: "ent_conv_1" },
+			}),
+		)) as { id: string; properties: Record<string, unknown> };
+		const prov = readAgentProvenance(created.properties);
+		expect(prov).toEqual({
+			agent: "io.brainstorm.agent",
+			conversationId: "ent_conv_1",
+			createdAt: 1000,
+		});
+		// Persisted on the row, not just the response.
+		expect(readAgentProvenance(e.repo.get(created.id)?.properties)?.agent).toBe(
+			"io.brainstorm.agent",
+		);
+	});
+
+	it("create forces the agent from envelope.app, ignoring a client-supplied agent in the provenance arg", async () => {
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Note/v1",
+				properties: {},
+				// A malicious app tries to attribute the create to a different agent.
+				provenance: { conversationId: "ent_conv_1", agent: "io.brainstorm.agent" },
+			}),
+		)) as { id: string; properties: Record<string, unknown> };
+		expect(readAgentProvenance(created.properties)?.agent).toBe("io.x");
+	});
+
+	it("create STRIPS a forged provenance key smuggled in plain properties", async () => {
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Note/v1",
+				properties: {
+					title: "N",
+					[AGENT_PROVENANCE_PROPERTY_KEY]: {
+						agent: "io.brainstorm.agent",
+						conversationId: "c",
+						createdAt: 1,
+					},
+				},
+			}),
+		)) as { id: string; properties: Record<string, unknown> };
+		// No provenance arg → the smuggled key is dropped, nothing re-stamped.
+		expect(AGENT_PROVENANCE_PROPERTY_KEY in created.properties).toBe(false);
+	});
+
+	it("create with a provenance arg overrides a forged plain-property key with the server stamp", async () => {
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Note/v1",
+				properties: {
+					[AGENT_PROVENANCE_PROPERTY_KEY]: {
+						agent: "io.brainstorm.agent",
+						conversationId: "forged",
+						createdAt: 1,
+					},
+				},
+				provenance: { conversationId: "ent_real" },
+			}),
+		)) as { id: string; properties: Record<string, unknown> };
+		expect(readAgentProvenance(created.properties)).toEqual({
+			agent: "io.x",
+			conversationId: "ent_real",
+			createdAt: 1000,
+		});
+	});
+
+	it("update cannot inject or overwrite provenance (reserved key stripped from the patch)", async () => {
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Note/v1",
+				properties: { title: "N" },
+				provenance: { conversationId: "ent_conv_1" },
+			}),
+		)) as { id: string };
+		const updated = (await e.handler(
+			env("io.x", "update", {
+				id: created.id,
+				patch: {
+					title: "N2",
+					[AGENT_PROVENANCE_PROPERTY_KEY]: { agent: "io.evil", conversationId: "z", createdAt: 9 },
+				},
+			}),
+		)) as { properties: Record<string, unknown> };
+		// The original server stamp survives untouched; the forged patch key is gone.
+		expect(readAgentProvenance(updated.properties)).toEqual({
+			agent: "io.x",
+			conversationId: "ent_conv_1",
+			createdAt: 1000,
+		});
+		expect(updated.properties.title).toBe("N2");
 	});
 
 	// ── Stage 10.1: per-entity DEK on create ────────────────────────────

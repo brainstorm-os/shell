@@ -288,3 +288,97 @@ describe("AgentApp stored transcript rendering (F-319)", () => {
 		expect(links).toContain("Northbound Q3 plan 21788");
 	});
 });
+
+describe("AgentApp created-object back-links (Agent-11c)", () => {
+	function installWithCreatedObject(): { dispatch: ReturnType<typeof vi.fn> } {
+		const dispatch = vi.fn((_envelope: unknown) => Promise.resolve(null));
+		const snapshot = {
+			entities: [
+				{
+					id: "conv_1",
+					type: "brainstorm/Conversation/v1",
+					properties: { title: "Trip planning" },
+					createdAt: 1,
+					updatedAt: 1,
+					deletedAt: null,
+					ownerAppId: "io.brainstorm.agent",
+				},
+				{
+					// A note the agent created in conv_1 (server-stamped provenance).
+					id: "note_1",
+					type: "io.brainstorm.notes/Note/v1",
+					properties: {
+						title: "Packing list",
+						agentProvenance: {
+							agent: "io.brainstorm.agent",
+							conversationId: "conv_1",
+							createdAt: 5,
+						},
+					},
+					createdAt: 5,
+					updatedAt: 5,
+					deletedAt: null,
+					ownerAppId: "io.brainstorm.notes",
+				},
+				{
+					// A note created in a DIFFERENT conversation — must NOT surface.
+					id: "note_2",
+					type: "io.brainstorm.notes/Note/v1",
+					properties: {
+						title: "Other chat note",
+						agentProvenance: {
+							agent: "io.brainstorm.agent",
+							conversationId: "conv_other",
+							createdAt: 6,
+						},
+					},
+					createdAt: 6,
+					updatedAt: 6,
+					deletedAt: null,
+					ownerAppId: "io.brainstorm.notes",
+				},
+			],
+			links: [],
+		};
+		window.brainstorm = {
+			capabilities: ["entities.read:*"],
+			services: {
+				vaultEntities: {
+					list: async () => snapshot,
+					onChange: () => ({ unsubscribe: () => undefined }),
+				},
+				intents: { dispatch },
+			},
+		} as unknown as typeof window.brainstorm;
+		return { dispatch };
+	}
+
+	it("renders a chip for the object created in the active conversation, and only that one", async () => {
+		installWithCreatedObject();
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const chips = Array.from(
+			handle.container.querySelectorAll('[data-testid="agent-created-chip"]'),
+		).map((c) => c.textContent);
+		expect(chips).toEqual(["Packing list"]);
+	});
+
+	it("clicking a created chip opens the entity via the cap-checked open intent", async () => {
+		const { dispatch } = installWithCreatedObject();
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		const chip = handle.container.querySelector<HTMLButtonElement>(
+			'[data-testid="agent-created-chip"]',
+		);
+		expect(chip).not.toBeNull();
+		chip?.click();
+		await flush();
+		const openCall = dispatch.mock.calls
+			.map((c) => c[0] as { verb: string; payload: { entityId?: string } })
+			.find((e) => e.verb === "open");
+		expect(openCall).toBeTruthy();
+		expect(openCall?.payload.entityId).toBe("note_1");
+	});
+});

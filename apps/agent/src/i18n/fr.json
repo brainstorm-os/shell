@@ -119,5 +119,8 @@
   "insert.search.label": "Rechercher des notes",
   "insert.empty": "Aucune note correspondante.",
   "insert.success": "Ajouté à « {note} »",
-  "insert.failed": "Impossible d'ajouter à la note."
+  "insert.failed": "Impossible d'ajouter à la note.",
+  "created.title": "Créé dans cette conversation",
+  "created.open": "Ouvrir {label}",
+  "created.untitled": "Sans titre"
 }

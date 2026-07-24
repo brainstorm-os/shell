@@ -801,12 +801,19 @@ function entitiesProxy(bridge: Bridge): EntitiesService {
 		get: (id) => callService<Entity | null>(bridge, "entities", "get", [{ id }], []),
 		query: (query: EntityQuery) =>
 			callService<Entity[]>(bridge, "entities", "query", [{ query }], []),
-		create: (type, properties, id) =>
+		create: (type, properties, id, provenance) =>
 			callService<Entity>(
 				bridge,
 				"entities",
 				"create",
-				[id === undefined ? { type, properties } : { type, properties, id }],
+				[
+					{
+						type,
+						properties,
+						...(id === undefined ? {} : { id }),
+						...(provenance === undefined ? {} : { provenance }),
+					},
+				],
 				[],
 			),
 		update: (id, patch) => callService<Entity>(bridge, "entities", "update", [{ id, patch }], []),

@@ -82,6 +82,7 @@ import {
 	providerForRequest,
 	resolveProvider,
 } from "./logic/conversation-settings";
+import { type CreatedObjectChip, createdObjectsForConversation } from "./logic/created-objects";
 import { buildComposeEmailEnvelope } from "./logic/draft-as-email";
 import {
 	type AddToNoteMode,
@@ -366,6 +367,17 @@ export function AgentApp(): ReactElement {
 	);
 
 	const [activeId, setActiveId] = useState<string | null>(null);
+
+	// Agent-11c — objects the agent created in THIS conversation (propose→approve),
+	// derived from the same live snapshot via their server-stamped provenance
+	// back-link. Reactive-by-derivation: no per-conversation bookkeeping, survives
+	// reload, appears the moment the created row lands. Rendered as chips that
+	// `open` via the cap-checked `open` intent (below).
+	const createdObjects = useMemo<CreatedObjectChip[]>(
+		() => (activeId ? createdObjectsForConversation(all, activeId) : []),
+		[all, activeId],
+	);
+
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	// Agent-6 — the save-as-automation review dialog. `draft` is the generalized
 	// Workflow/v1 the user reviews before it is written; null = closed.
@@ -502,7 +514,18 @@ export function AgentApp(): ReactElement {
 			setError(null);
 			try {
 				const plan = proposalToEntityProperties(artifact, Date.now());
-				await entitiesSvc.create(plan.entityType, plan.properties);
+				// Agent-11c — stamp the proposal's source conversation as provenance.
+				// The app supplies ONLY the conversation id (from its own active-chat
+				// state, never model output); the shell forces the `agent` field from
+				// the broker-verified caller, so provenance can't be forged to
+				// attribute the create to another agent. The stamped entity is what the
+				// created-object chips (below) derive from — the durable back-link.
+				await entitiesSvc.create(
+					plan.entityType,
+					plan.properties,
+					undefined,
+					activeId ? { conversationId: activeId } : undefined,
+				);
 				dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
 				setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
 			} catch (err) {
@@ -516,7 +539,7 @@ export function AgentApp(): ReactElement {
 				});
 			}
 		},
-		[entitiesSvc, approvingIds],
+		[entitiesSvc, approvingIds, activeId],
 	);
 	const discardProposal = useCallback((id: string) => {
 		dispatchProposal({ kind: ProposalActionKind.Discard, id });
@@ -1604,6 +1627,31 @@ export function AgentApp(): ReactElement {
 								{proposalNotice}
 							</div>
 						</div>
+					) : null}
+					{createdObjects.length > 0 ? (
+						<section
+							className="agent__created"
+							aria-label={t("created.title")}
+							data-testid="agent-created-objects"
+						>
+							<span className="agent__created-label">{t("created.title")}</span>
+							<div className="agent__created-chips">
+								{createdObjects.map((obj) => (
+									<button
+										type="button"
+										key={obj.id}
+										className="agent__attachment agent__attachment--link"
+										onClick={() => openCitation(obj.id)}
+										data-testid="agent-created-chip"
+										data-bs-tooltip={t("created.open", { label: obj.title || obj.id })}
+										aria-label={t("created.open", { label: obj.title || obj.id })}
+									>
+										<Icon name={IconName.KindLink} size={12} />
+										{obj.title || t("created.untitled")}
+									</button>
+								))}
+							</div>
+						</section>
 					) : null}
 					{insertNotice ? (
 						<div className="agent__error-row">
