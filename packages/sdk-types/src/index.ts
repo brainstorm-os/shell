@@ -2892,6 +2892,7 @@ export {
 	TabLoadState,
 	TabSecurityState,
 	WEB_BROWSE_CAP,
+	WEB_BROWSE_READONLY_CAP,
 	WEB_CAPTURE_CAP,
 	WEBVIEW_SERVICE,
 	WebViewEventKind,
@@ -2901,6 +2902,7 @@ export type {
 	TabCommand,
 	WebViewClient,
 	WebViewEvent,
+	WebViewExtractedText,
 	WebViewRect,
 	WebViewRequest,
 } from "./web-view";

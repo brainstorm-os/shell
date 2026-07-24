@@ -384,9 +384,7 @@ describe("IE-7 Notion API handlers", () => {
 			}
 			if (path.startsWith("/v1/blocks/pg1/children")) {
 				return json({
-					results: [
-						{ type: "paragraph", paragraph: { rich_text: [{ plain_text: "Q3 plan." }] } },
-					],
+					results: [{ type: "paragraph", paragraph: { rich_text: [{ plain_text: "Q3 plan." }] } }],
 				});
 			}
 			return json({ results: [] });

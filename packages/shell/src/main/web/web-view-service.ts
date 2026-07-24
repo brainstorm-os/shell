@@ -19,6 +19,7 @@ import {
 	type SitePermissionKind,
 	type WebViewEvent,
 	WebViewEventKind,
+	type WebViewExtractedText,
 	WebViewMethod,
 	type WebViewRect,
 	type WebViewRequest,
@@ -26,6 +27,7 @@ import {
 import type { Envelope } from "../../ipc/envelope";
 import type { BaseWindowHandle } from "../apps/window-container";
 import { upgradeToHttps } from "./web-policy";
+import { BrowseMode, resolveBrowseMode } from "./web-readonly";
 
 /** OQ-WV-1: one `WebContentsView` per tab with its own ephemeral partition.
  *  OQ-WV-2: this many stay live per service; beyond it the least-recently-
@@ -74,6 +76,10 @@ export type CreateViewSpec = {
 	/** True for a private tab (throwaway single-view partition); false for the
 	 *  shared persistent partition (many views — session policy installs once). */
 	private: boolean;
+	/** Browser-8 — the mode this view runs in, decided ONCE from the caps the
+	 *  broker verified on the opening call. `ReadOnly` makes the factory refuse
+	 *  every state-changing request the page tries to send. */
+	mode: BrowseMode;
 	window: WindowTarget;
 	/** Native metadata events for this tab, already tagged with `tabId`. */
 	onEvent: (event: WebViewEvent) => void;
@@ -127,6 +133,9 @@ export type WebViewServiceOptions = {
 	emitEvent: (appId: string, event: WebViewEvent) => void;
 	/** Reader-extract the page → `Bookmark/v1`; returns the entity id. */
 	capture?: (appId: string, spec: CaptureSpec) => Promise<string>;
+	/** Browser-8 — reader-extract the page and RETURN its text (no vault write).
+	 *  Absent ⇒ {@link WebViewMethod.ExtractText} resolves `null`. */
+	extractText?: (appId: string, spec: CaptureSpec) => Promise<WebViewExtractedText | null>;
 	/** Browser-7 — persist a per-origin device-permission decision. Absent ⇒
 	 *  the method is a no-op (deny-default stands). */
 	setSitePermission?: (
@@ -161,6 +170,9 @@ type TabEntry = {
 	lastActiveAt: number;
 	/** Live view, or null when suspended (URL retained for reload). */
 	view: ManagedWebView | null;
+	/** Browser-8 — the browse mode fixed at open. Carried on the entry so a
+	 *  suspension remount rebuilds the same mode instead of silently widening. */
+	mode: BrowseMode;
 	/** Last bounds the chrome pushed. A freshly created `WebContentsView` is
 	 *  0×0 until someone sizes it, and the chrome only re-pushes bounds when its
 	 *  active-tab id changes — so a remount (suspension restore, omnibox
@@ -179,11 +191,17 @@ type TabEntry = {
  *  exact partition string, so it is the single source of truth for its name. */
 export const PERSISTENT_WEB_PARTITION = "bs-web-persist";
 
-function partitionFor(tabId: string, isPrivate: boolean): string {
+function partitionFor(tabId: string, isolated: boolean): string {
 	// Private tabs keep a throwaway, per-tab, non-`persist:` partition (no
 	// persistence, no cross-tab linkage — true incognito). Normal tabs share
 	// the persistent partition so a login sticks across tabs and restarts.
-	return isPrivate ? `bs-web-${tabId}` : PERSISTENT_WEB_PARTITION;
+	//
+	// Browser-8: a READ-ONLY tab is isolated the same way. Two reasons — the
+	// per-request method guard is a session-level handler (installed once per
+	// session, so a read-only view must not share a session with a full one),
+	// and an autonomous loop should never be browsing inside the user's logged-in
+	// cookie jar in the first place.
+	return isolated ? `bs-web-${tabId}` : PERSISTENT_WEB_PARTITION;
 }
 
 /**
@@ -211,10 +229,22 @@ export class WebViewService {
 		return n;
 	}
 
-	handle(appId: string, req: WebViewRequest): Promise<unknown> | unknown {
+	handle(
+		appId: string,
+		req: WebViewRequest,
+		/** The capabilities the broker VERIFIED for this call — the only input
+		 *  the browse mode is derived from (Browser-8). */
+		declaredCaps: readonly string[] = [],
+	): Promise<unknown> | unknown {
 		switch (req.method) {
 			case WebViewMethod.Open:
-				return this.open(appId, req.tabId, req.url, req.private === true);
+				return this.open(
+					appId,
+					req.tabId,
+					req.url,
+					req.private === true,
+					resolveBrowseMode(declaredCaps),
+				);
 			case WebViewMethod.Navigate:
 				return this.navigate(appId, req.tabId, req.url);
 			case WebViewMethod.Back:
@@ -245,10 +275,18 @@ export class WebViewService {
 				return this.options.setSiteTrust?.(req.origin, req.trusted);
 			case WebViewMethod.IsSiteTrusted:
 				return this.options.isSiteTrusted?.(req.origin) ?? false;
+			case WebViewMethod.ExtractText:
+				return this.extractText(appId, req.tabId);
 		}
 	}
 
-	private open(appId: string, tabId: string, url: string, isPrivate: boolean): void {
+	private open(
+		appId: string,
+		tabId: string,
+		url: string,
+		isPrivate: boolean,
+		mode: BrowseMode,
+	): void {
 		if (this.tabs.has(tabId)) {
 			// Idempotent re-open ⇒ treat as a navigate (privacy is fixed at mint).
 			this.navigate(appId, tabId, url);
@@ -269,7 +307,7 @@ export class WebViewService {
 			tabId,
 			appId,
 			window,
-			partition: partitionFor(tabId, isPrivate),
+			partition: partitionFor(tabId, isPrivate || mode === BrowseMode.ReadOnly),
 			private: isPrivate,
 			url: target,
 			title: "",
@@ -277,6 +315,7 @@ export class WebViewService {
 			lastActiveAt: this.now(),
 			view: null,
 			bounds: null,
+			mode,
 		};
 		this.tabs.set(tabId, entry);
 		this.mountView(entry);
@@ -288,8 +327,10 @@ export class WebViewService {
 		const entry = this.tabs.get(tabId);
 		if (!entry) {
 			// A navigate before open mints a normal (non-private) tab; a private
-			// tab is always created through an explicit private open.
-			this.open(appId, tabId, url, false);
+			// tab is always created through an explicit private open. The mode
+			// is the fail-closed one — a tab that was never explicitly opened
+			// with `web.browse` doesn't get full browsing by the back door.
+			this.open(appId, tabId, url, false, BrowseMode.ReadOnly);
 			return;
 		}
 		entry.url = upgradeToHttps(url) ?? url;
@@ -337,6 +378,20 @@ export class WebViewService {
 		return { bookmarkId };
 	}
 
+	/** Browser-8 — the reader projection of a tab, returned to the caller. Same
+	 *  extraction the capture path uses, minus the vault write; `null` when the
+	 *  tab is unknown or the host wired no extractor. */
+	private async extractText(appId: string, tabId: string): Promise<WebViewExtractedText | null> {
+		const entry = this.tabs.get(tabId);
+		if (!entry || !this.options.extractText) return null;
+		return this.options.extractText(appId, {
+			tabId,
+			url: entry.url,
+			title: entry.title,
+			selectionOnly: false,
+		});
+	}
+
 	private withLiveView(tabId: string, fn: (view: ManagedWebView) => void): void {
 		const view = this.tabs.get(tabId)?.view;
 		if (view) fn(view);
@@ -357,6 +412,7 @@ export class WebViewService {
 			appId: entry.appId,
 			partition: entry.partition,
 			private: entry.private,
+			mode: entry.mode,
 			window: entry.window,
 			onEvent: (event) => {
 				// Keep the registry's title in sync so a later capture has it.
@@ -438,6 +494,6 @@ export function makeWebViewServiceHandler(
 		if (!req || typeof req !== "object" || !("method" in req)) {
 			throw new Error("webView: malformed request");
 		}
-		return service.handle(envelope.app, req);
+		return service.handle(envelope.app, req, envelope.caps ?? []);
 	};
 }

@@ -1,18 +1,23 @@
 import {
 	SitePermissionKind,
 	TabLoadState,
+	WEB_BROWSE_CAP,
+	WEB_BROWSE_READONLY_CAP,
+	WEB_CAPTURE_CAP,
 	type WebViewEvent,
 	WebViewEventKind,
 	WebViewMethod,
 } from "@brainstorm-os/sdk-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BaseWindowHandle } from "../apps/window-container";
+import { BrowseMode } from "./web-readonly";
 import {
 	type CaptureSpec,
 	type CreateViewSpec,
 	DEFAULT_MAX_LIVE_VIEWS,
 	type ManagedWebView,
 	WebViewService,
+	type WebViewServiceOptions,
 	type WindowTarget,
 } from "./web-view-service";
 
@@ -42,10 +47,13 @@ const WINDOW: WindowTarget = {
 	bodyOrigin: () => ({ x: 0, y: 0 }),
 };
 
-function setup(overrides: { maxLiveViews?: number } = {}) {
+function setup(overrides: Partial<WebViewServiceOptions> = {}) {
 	const events: WebViewEvent[] = [];
 	const created = new Map<string, ReturnType<typeof fakeView>>();
 	const specs = new Map<string, CreateViewSpec>();
+	/** Every createView call in order — a remount appends, so a suspension
+	 *  restore is observable (the `specs` map only keeps the latest). */
+	const specOrder: CreateViewSpec[] = [];
 	const captures: CaptureSpec[] = [];
 	let clock = 0;
 
@@ -54,6 +62,7 @@ function setup(overrides: { maxLiveViews?: number } = {}) {
 			const v = fakeView();
 			created.set(spec.tabId, v);
 			specs.set(spec.tabId, spec);
+			specOrder.push(spec);
 			return v;
 		},
 		resolveWindow: () => WINDOW,
@@ -66,7 +75,7 @@ function setup(overrides: { maxLiveViews?: number } = {}) {
 		...overrides,
 	});
 
-	return { service, events, created, specs, captures };
+	return { service, events, created, specs, specOrder, captures };
 }
 
 describe("WebViewService", () => {
@@ -84,14 +93,19 @@ describe("WebViewService", () => {
 	});
 
 	it("normal tabs share the persistent partition; private tabs are isolated (Browser-10)", () => {
-		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
-		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" });
-		h.service.handle(APP, {
-			method: WebViewMethod.Open,
-			tabId: "p1",
-			url: "https://c.com",
-			private: true,
-		});
+		// Full-mode opens (what the Browser's own chrome sends) — a read-only
+		// open is isolated instead, which Browser-8's suite covers.
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" }, [
+			WEB_BROWSE_CAP,
+		]);
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" }, [
+			WEB_BROWSE_CAP,
+		]);
+		h.service.handle(
+			APP,
+			{ method: WebViewMethod.Open, tabId: "p1", url: "https://c.com", private: true },
+			[WEB_BROWSE_CAP],
+		);
 		const p1 = h.specs.get("t1")?.partition ?? "";
 		const p2 = h.specs.get("t2")?.partition ?? "";
 		const pv = h.specs.get("p1")?.partition ?? "";
@@ -106,8 +120,12 @@ describe("WebViewService", () => {
 	});
 
 	it("closing one normal tab leaves a sibling's shared session untouched", () => {
-		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
-		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" });
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" }, [
+			WEB_BROWSE_CAP,
+		]);
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" }, [
+			WEB_BROWSE_CAP,
+		]);
 		h.service.handle(APP, { method: WebViewMethod.Close, tabId: "t1" });
 		// t2 keeps the same persistent partition; only t1's view was destroyed.
 		expect(h.created.get("t1")?.destroy).toHaveBeenCalledOnce();
@@ -394,5 +412,107 @@ describe("WebViewService — site permissions (Browser-7)", () => {
 				}),
 			),
 		).resolves.toBeUndefined();
+	});
+});
+
+describe("Browser-8 — read-only browsing (OQ-WV-5)", () => {
+	it("opens a full-mode view for a caller that declared web.browse", () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(s.specs.get("t1")?.mode).toBe(BrowseMode.Full);
+	});
+
+	it("opens a READ-ONLY view for a caller that declared only the sub-cap", () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_READONLY_CAP,
+		]);
+		expect(s.specs.get("t1")?.mode).toBe(BrowseMode.ReadOnly);
+	});
+
+	it("isolates a read-only tab in its own throwaway partition", () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "ro", url: "https://a.test/" }, [
+			WEB_BROWSE_READONLY_CAP,
+		]);
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "full", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(s.specs.get("ro")?.partition).toContain("ro");
+		expect(s.specs.get("ro")?.partition).not.toBe(s.specs.get("full")?.partition);
+	});
+
+	it("fails closed: a navigate that mints a tab gets read-only, not full", () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Navigate, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(s.specs.get("t1")?.mode).toBe(BrowseMode.ReadOnly);
+	});
+
+	it("fails closed when no browse capability was declared at all", () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, []);
+		expect(s.specs.get("t1")?.mode).toBe(BrowseMode.ReadOnly);
+	});
+
+	it("keeps the mode across a suspension remount (never widens)", () => {
+		const s = setup({ maxLiveViews: 1 });
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_READONLY_CAP,
+		]);
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		s.service.handle(APP, { method: WebViewMethod.Activate, tabId: "t1" }, [WEB_BROWSE_READONLY_CAP]);
+		const mounts = s.specOrder.filter((spec) => spec.tabId === "t1");
+		expect(mounts.length).toBeGreaterThan(1);
+		expect(mounts[mounts.length - 1]?.mode).toBe(BrowseMode.ReadOnly);
+	});
+});
+
+describe("Browser-8 — extract-text", () => {
+	const extracted = { url: "https://a.test/", title: "A", text: "body text", truncated: false };
+
+	it("returns the reader projection of a tab's page", async () => {
+		const s = setup({ extractText: async () => extracted });
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [
+				WEB_CAPTURE_CAP,
+			]),
+		).toEqual(extracted);
+	});
+
+	it("resolves null for an unknown tab", async () => {
+		const s = setup({ extractText: async () => extracted });
+		expect(
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "nope" }, []),
+		).toBeNull();
+	});
+
+	it("resolves null when the host wired no extractor", async () => {
+		const s = setup();
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, []),
+		).toBeNull();
+	});
+
+	it("writes nothing to the vault (it is the read path, not capture)", async () => {
+		const s = setup({ extractText: async () => extracted });
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [
+			WEB_CAPTURE_CAP,
+		]);
+		expect(s.captures).toHaveLength(0);
 	});
 });

@@ -18,6 +18,17 @@
  *  broadest egress surface a user can grant — **High** severity. */
 export const WEB_BROWSE_CAP = "web.browse";
 
+/** Browser-8 (OQ-WV-5 → yes) — the NARROW browse capability an autonomous loop
+ *  gets: navigate + read, but the view refuses any state-changing request
+ *  (form POST / PUT / PATCH / DELETE), so a loop that reads a hostile page
+ *  cannot be steered into submitting anything. It is a *separate* scope, not a
+ *  weaker spelling of {@link WEB_BROWSE_CAP}: `capabilityImplies` treats an
+ *  unscoped cap and a scoped one as disjoint, so granting `web.browse` does not
+ *  silently confer this and holding only this can never widen to full browsing.
+ *  The mode a view runs in is decided from the caps the broker VERIFIED on the
+ *  call, never from a flag the caller passes. */
+export const WEB_BROWSE_READONLY_CAP = "web.browse:read-only";
+
 /** Ask the shell to extract a reader snapshot of the current page into a
  *  `brainstorm/Bookmark/v1`. Medium — no raw bytes reach the app. */
 export const WEB_CAPTURE_CAP = "web.capture";
@@ -118,7 +129,24 @@ export enum WebViewMethod {
 	/** Browser-8 — whether `origin` is currently trusted (drives the chrome's
 	 *  Trust / Untrust affordance). */
 	IsSiteTrusted = "is-site-trusted",
+	/** Browser-8 — reader-extract the current page and RETURN its text to the
+	 *  caller (where {@link WebViewMethod.Capture} writes a Bookmark instead).
+	 *  The agentic read path: an app can summarize / extract from a page without
+	 *  a round-trip through the vault. Needs `web.capture`; the raw DOM still
+	 *  never crosses — only the cleaned reader projection. */
+	ExtractText = "extract-text",
 }
+
+/** What {@link WebViewMethod.ExtractText} returns: the reader projection of the
+ *  page, already length-capped by the extractor. `null` when the tab has no
+ *  extractable content (an error page, a PDF, a blank tab). */
+export type WebViewExtractedText = {
+	readonly url: string;
+	readonly title: string;
+	readonly text: string;
+	/** True when the extractor hit its cap and the text is a prefix. */
+	readonly truncated: boolean;
+};
 
 /** Why a browser download did not land in the vault (Browser-6). Wire payload
  *  of a {@link WebViewEventKind.DownloadFailed} event — a small closed set, so
@@ -158,7 +186,8 @@ export type WebViewRequest =
 	  }
 	| { method: WebViewMethod.ClearBrowsingData }
 	| { method: WebViewMethod.SetSiteTrust; origin: string; trusted: boolean }
-	| { method: WebViewMethod.IsSiteTrusted; origin: string };
+	| { method: WebViewMethod.IsSiteTrusted; origin: string }
+	| { method: WebViewMethod.ExtractText; tabId: string };
 
 /** Metadata-only events the host pushes to the chrome. The page DOM, bytes,
  *  and live history never cross this boundary — only these projections. */
@@ -211,6 +240,13 @@ export interface WebViewClient {
 	findInPage(tabId: string, query: string, forward: boolean): Promise<void>;
 	stopFind(tabId: string): Promise<void>;
 	capture(tabId: string, selectionOnly: boolean): Promise<{ bookmarkId: string } | null>;
+	/** Browser-8 — open a tab in READ-ONLY mode (needs `web.browse:read-only`).
+	 *  The view refuses every state-changing request, and runs in its own
+	 *  throwaway partition — the shape an autonomous loop browses in. */
+	openReadOnly(tabId: string, url: string): Promise<void>;
+	/** Browser-8 — the reader projection of a tab's page (needs `web.capture`).
+	 *  `null` when there is nothing extractable. */
+	extractText(tabId: string): Promise<WebViewExtractedText | null>;
 	setSitePermission(
 		tabId: string,
 		origin: string,
