@@ -13,6 +13,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { ProposedArtifact } from "./propose-artifacts";
+import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";
 import { makeDispatchTool } from "./turn";
 
@@ -128,5 +129,56 @@ describe("makeDispatchTool — database rows (Agent-11d)", () => {
 			args: { database: "Pipeline", values: { name: "x" } },
 		})) as Record<string, unknown>;
 		expect(ack.staged).toBe(false);
+	});
+});
+
+describe("makeDispatchTool — a proposed new database (Agent-11e)", () => {
+	const proposeDatabase = { verb: PROPOSE_DATABASE_VERB, label: "Propose a database" };
+
+	it("stages the schema + seed rows and NEVER calls intents.dispatch", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [proposeDatabase], (a) => staged.push(a), [], []);
+
+		const ack = (await dispatch({
+			tool: PROPOSE_DATABASE_VERB,
+			args: {
+				name: "Reading list",
+				columns: [{ name: "Pages", type: "number" }],
+				rows: [{ Name: "Dune", Pages: "412" }],
+			},
+		})) as Record<string, unknown>;
+
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(staged).toHaveLength(1);
+		expect(staged[0]?.database?.rowCount).toBe(1);
+		expect(ack.staged).toBe(true);
+		expect(ack.status).toBe("pending-approval");
+		expect(ack.rows).toBe(1);
+	});
+
+	it("uniquifies the staged name against the vault's existing collections", async () => {
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(
+			fakeIntents(),
+			[proposeDatabase],
+			(a) => staged.push(a),
+			[],
+			[{ name: "Pipeline" }],
+		);
+		await dispatch({ tool: PROPOSE_DATABASE_VERB, args: { name: "Pipeline" } });
+		expect(staged[0]?.summary).toBe("Pipeline 2");
+	});
+
+	it("refuses an unnamed database (stages nothing)", async () => {
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(fakeIntents(), [proposeDatabase], (a) => staged.push(a));
+		const ack = (await dispatch({
+			tool: PROPOSE_DATABASE_VERB,
+			args: { columns: ["Name"] },
+		})) as Record<string, unknown>;
+		expect(staged).toHaveLength(0);
+		expect(ack.staged).toBe(false);
+		expect(ack.reason).toBe("missing-name");
 	});
 });

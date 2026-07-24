@@ -125,5 +125,9 @@
   "created.untitled": "Sin título",
   "propose.row.label": "Propón una nueva fila en una de las bases de datos del usuario. args: {\"database\": \"<nombre exacto de la base de datos>\", \"values\": {\"<columna>\": \"<valor>\"}}",
   "propose.kind.row": "Fila de base de datos",
-  "propose.row.into": "en {database}"
+  "propose.row.into": "en {database}",
+  "propose.database.label": "Propón una base de datos totalmente nueva. args: {\"name\": \"<nombre>\", \"columns\": [{\"name\": \"<columna>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<columna>\": \"<valor>\"}]}",
+  "propose.kind.database": "Nueva base de datos",
+  "propose.database.name": "Nombre de la base de datos",
+  "propose.database.schema": "Columnas: {columns}"
 }

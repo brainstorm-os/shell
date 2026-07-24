@@ -21,6 +21,7 @@
  */
 
 import type { AgentTool, ValueType } from "@brainstorm-os/sdk-types";
+import type { ProposedDatabase } from "./propose-database";
 
 /** The artifact kinds the agent can propose (Agent-11a/b: simple entities;
  *  database rows / new databases are Agent-11d/11e). Each kind is its OWN tool
@@ -41,6 +42,10 @@ export const ProposeKind = {
 	 *  its fields are NOT fixed at build time — they are the target database's
 	 *  own columns, carried on the artifact's `row` payload. */
 	Row: "row",
+	/** A whole new database — Collection + columns + seed rows (Agent-11e).
+	 *  Its schema rides the `database` payload; its seed-row cells ride
+	 *  `fields` under `rowCellKey(i, column)`. */
+	Database: "database",
 } as const;
 export type ProposeKind = (typeof ProposeKind)[keyof typeof ProposeKind];
 
@@ -179,6 +184,9 @@ export type ProposedArtifact = {
 	summary: string;
 	/** Set only for {@link ProposeKind.Row} — the target database + its columns. */
 	row?: ProposedRow;
+	/** Set only for {@link ProposeKind.Database} — the proposed schema + how
+	 *  many seed rows the `fields` cell keys describe (Agent-11e). */
+	database?: ProposedDatabase;
 };
 
 /** Why a propose call could not be staged (fed back to the model so it can
@@ -300,7 +308,9 @@ export function proposalReducer(state: ProposalState, action: ProposalAction): P
 					const fields = { ...p.fields, ...action.fields };
 					const primaryField = p.row
 						? (p.row.columns[0]?.key ?? "")
-						: (PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind)?.primaryField ?? "");
+						: p.database
+							? "name"
+							: (PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind)?.primaryField ?? "");
 					const summary = primaryField ? (fields[primaryField] ?? p.summary) : p.summary;
 					return { ...p, fields, summary };
 				}),

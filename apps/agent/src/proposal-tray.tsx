@@ -18,7 +18,13 @@ import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import type { AgentI18nKey } from "./i18n";
 import { t } from "./i18n";
-import { PROPOSE_DESCRIPTORS, ProposeKind, type ProposedArtifact } from "./logic/propose-artifacts";
+import {
+	PROPOSE_DESCRIPTORS,
+	ProposeKind,
+	type ProposedArtifact,
+	type RowColumn,
+} from "./logic/propose-artifacts";
+import { rowCellKey } from "./logic/propose-database";
 
 const KIND_LABEL_KEY: Record<ProposeKind, AgentI18nKey> = {
 	[ProposeKind.Note]: "propose.kind.note",
@@ -27,6 +33,7 @@ const KIND_LABEL_KEY: Record<ProposeKind, AgentI18nKey> = {
 	[ProposeKind.Bookmark]: "propose.kind.bookmark",
 	[ProposeKind.Contact]: "propose.kind.contact",
 	[ProposeKind.Row]: "propose.kind.row",
+	[ProposeKind.Database]: "propose.kind.database",
 };
 
 const KIND_ICON: Record<ProposeKind, IconName> = {
@@ -36,6 +43,7 @@ const KIND_ICON: Record<ProposeKind, IconName> = {
 	[ProposeKind.Bookmark]: IconName.KindLink,
 	[ProposeKind.Contact]: IconName.AddressBook,
 	[ProposeKind.Row]: IconName.Entity,
+	[ProposeKind.Database]: IconName.KindDictionary,
 };
 
 const descriptorFor = (artifact: ProposedArtifact) =>
@@ -49,6 +57,12 @@ type CardField = { key: string; label: string; multiline: boolean };
 function cardFields(
 	artifact: ProposedArtifact,
 ): { fields: CardField[]; primaryField: string } | null {
+	if (artifact.database) {
+		return {
+			fields: [{ key: "name", label: t("propose.database.name"), multiline: false }],
+			primaryField: "name",
+		};
+	}
 	if (artifact.row) {
 		return {
 			fields: artifact.row.columns.map((column) => ({
@@ -69,6 +83,55 @@ function cardFields(
 		})),
 		primaryField: descriptor.primaryField,
 	};
+}
+
+/** Agent-11e — the seed-row grid of a proposed NEW database: a header row of
+ *  column labels, then one editable input per cell. Read-only preview would be
+ *  a weaker promise than every other card makes, so the cells edit in place
+ *  (keyed by `rowCellKey`, exactly what the persist step reads back). */
+function SeedRows({
+	artifact,
+	columns,
+	rowCount,
+	busy,
+	onEditField,
+}: {
+	artifact: ProposedArtifact;
+	columns: readonly RowColumn[];
+	rowCount: number;
+	busy: boolean;
+	onEditField: (id: string, field: string, value: string) => void;
+}): ReactElement | null {
+	if (rowCount === 0) return null;
+	return (
+		<div
+			className="agent-proposal__seed"
+			style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+			data-testid="agent-proposal-seed-rows"
+		>
+			{columns.map((column) => (
+				<span key={column.key} className="agent-proposal__seed-head">
+					{column.label}
+				</span>
+			))}
+			{Array.from({ length: rowCount }, (_, index) =>
+				columns.map((column) => {
+					const key = rowCellKey(index, column.key);
+					return (
+						<input
+							key={key}
+							type="text"
+							className="bs-input agent-proposal__input"
+							aria-label={`${column.label} ${index + 1}`}
+							value={artifact.fields[key] ?? ""}
+							disabled={busy}
+							onChange={(e) => onEditField(artifact.id, key, e.target.value)}
+						/>
+					);
+				}),
+			)}
+		</div>
+	);
 }
 
 export type ProposalTrayProps = {
@@ -117,6 +180,13 @@ function ProposalCard({
 					</span>
 				) : null}
 			</div>
+			{artifact.database ? (
+				<p className="agent-proposal__schema" data-testid="agent-proposal-schema">
+					{t("propose.database.schema", {
+						columns: artifact.database.columns.map((column) => column.label).join(", "),
+					})}
+				</p>
+			) : null}
 			<div
 				className={
 					artifact.row ? "agent-proposal__fields agent-proposal__fields--row" : "agent-proposal__fields"
@@ -151,6 +221,15 @@ function ProposalCard({
 					);
 				})}
 			</div>
+			{artifact.database ? (
+				<SeedRows
+					artifact={artifact}
+					columns={artifact.database.columns}
+					rowCount={artifact.database.rowCount}
+					busy={busy}
+					onEditField={onEditField}
+				/>
+			) : null}
 			<div className="agent-proposal__actions">
 				<button
 					type="button"

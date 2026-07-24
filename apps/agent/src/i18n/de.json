@@ -125,5 +125,9 @@
   "created.untitled": "Ohne Titel",
   "propose.row.label": "Schlage eine neue Zeile in einer der Datenbanken des Nutzers vor. args: {\"database\": \"<exakter Datenbankname>\", \"values\": {\"<Spalte>\": \"<Wert>\"}}",
   "propose.kind.row": "Datenbankzeile",
-  "propose.row.into": "in {database}"
+  "propose.row.into": "in {database}",
+  "propose.database.label": "Schlage eine ganz neue Datenbank vor. args: {\"name\": \"<Name>\", \"columns\": [{\"name\": \"<Spalte>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<Spalte>\": \"<Wert>\"}]}",
+  "propose.kind.database": "Neue Datenbank",
+  "propose.database.name": "Datenbankname",
+  "propose.database.schema": "Spalten: {columns}"
 }

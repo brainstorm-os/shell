@@ -128,6 +128,13 @@ export function proposalToEntityProperties(
 					...opt("bio", f.notes),
 				},
 			};
+		case ProposeKind.Database:
+			// A new database is a MULTI-entity create (Collection + its view + one
+			// entity per seed row), so there is no single property bag to map:
+			// `persistProposedDatabase` owns that path and `app.tsx` routes to it
+			// before reaching here. Throwing keeps the switch exhaustive AND makes
+			// a future mis-route loud instead of silently writing a half database.
+			throw new Error("propose-database is persisted by persistProposedDatabase");
 		case ProposeKind.Row: {
 			// Agent-11d — the columns ARE the allowlist: only a column the target
 			// database declares is written, each value coerced to that column's

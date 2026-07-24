@@ -180,6 +180,7 @@ export {
 	resolvePopoverLabels,
 } from "./popover/popover-labels";
 export { humanizeKey } from "./humanize-key";
+export { uniqueName } from "./unique-name";
 export {
 	createT,
 	type TFunction,

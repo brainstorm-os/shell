@@ -9,6 +9,7 @@
  * `demo/dataset.ts` + persisted user mutations.
  */
 
+import { uniqueName } from "@brainstorm-os/sdk";
 import { type Icon, IconKind } from "@brainstorm-os/sdk-types";
 import type { List } from "../types/list";
 import type { ListSource } from "../types/list-source";
@@ -25,16 +26,9 @@ function newId(prefix: string): string {
 	return `${prefix}_${nowMs().toString(36)}_${idCounter.toString(36)}`;
 }
 
-/** Pick the first name in `base, base 2, base 3, …` that doesn't collide with
- *  any existing name. Used so repeated "New list" clicks produce
- *  `New list`, `New list 2`, … instead of duplicates. */
-export function uniqueName(base: string, existing: ReadonlyArray<{ name: string }>): string {
-	const taken = new Set(existing.map((e) => e.name));
-	if (!taken.has(base)) return base;
-	let n = 2;
-	while (taken.has(`${base} ${n}`)) n += 1;
-	return `${base} ${n}`;
-}
+/** Re-exported from `@brainstorm-os/sdk` — the Agent's proposed new database
+ *  (Agent-11e) mints names against the same rule. */
+export { uniqueName };
 
 /* ── List CRUD ─────────────────────────────────────────────────────────── */
 
