@@ -204,22 +204,27 @@ function maxWidgetOriginCell(surfacePx: number, minCells: number): number {
 	return Math.floor((surfacePx - GRID_OUTER_MARGIN) / WIDGET_UNIT) - minCells;
 }
 
-/** Clamp a widget's stored origin back onto the surface: the card's top-left
- *  must start far enough inside that at least a minimum footprint
- *  (`WIDGET_MIN_W`×`WIDGET_MIN_H` cells — header grip included) is visible and
- *  reachable. Rescues records stranded off-surface — the F-379 ×10 teleport
- *  baked origins like row 500 (≈4000px below an 800px fold) into the store,
- *  and nothing ever pulled them back, so the widget was unreachable forever.
- *  Position-only (`w`/`h` untouched — a card may legitimately overhang an
- *  edge); identity-preserving when already on-surface; a zero/unknown surface
- *  clamps nothing (pre-layout mount must not yank every card to the origin). */
-export function clampWidgetOrigin<T extends { x: number; y: number }>(
+/** Clamp a widget's stored origin so its WHOLE footprint stays inside the
+ *  working area: the card's top-left is pulled in far enough that `origin + w/h`
+ *  never spills past the surface edge (no card is draggable/placeable partly
+ *  off-screen). When the record carries no size we fall back to the minimum
+ *  footprint (`WIDGET_MIN_W`×`WIDGET_MIN_H`). Also rescues records stranded
+ *  off-surface — the F-379 ×10 teleport baked origins like row 500 (≈4000px
+ *  below an 800px fold) into the store, and nothing ever pulled them back, so
+ *  the widget was unreachable forever. Position-only (`w`/`h` untouched);
+ *  identity-preserving when already fully on-surface; a zero/unknown surface
+ *  clamps nothing (pre-layout mount must not yank every card to the origin). A
+ *  card larger than the surface floors at the origin (0,0) and overhangs the
+ *  far edge — unavoidable, but its grips stay reachable. */
+export function clampWidgetOrigin<T extends { x: number; y: number; w?: number; h?: number }>(
 	record: T,
 	surface: GridPoint,
 ): T {
 	if (surface.x <= 0 || surface.y <= 0) return record;
-	const x = Math.max(0, Math.min(record.x, maxWidgetOriginCell(surface.x, WIDGET_MIN_W)));
-	const y = Math.max(0, Math.min(record.y, maxWidgetOriginCell(surface.y, WIDGET_MIN_H)));
+	const spanW = typeof record.w === "number" ? Math.max(WIDGET_MIN_W, record.w) : WIDGET_MIN_W;
+	const spanH = typeof record.h === "number" ? Math.max(WIDGET_MIN_H, record.h) : WIDGET_MIN_H;
+	const x = Math.max(0, Math.min(record.x, maxWidgetOriginCell(surface.x, spanW)));
+	const y = Math.max(0, Math.min(record.y, maxWidgetOriginCell(surface.y, spanH)));
 	if (x === record.x && y === record.y) return record;
 	return { ...record, x, y };
 }
@@ -237,6 +242,26 @@ export function clampWidgetSize(size: GridSize): GridSize {
 	return {
 		w: Math.max(WIDGET_MIN_W, Math.round(size.w)),
 		h: Math.max(WIDGET_MIN_H, Math.round(size.h)),
+	};
+}
+
+/** Clamp a footprint to both the widget floor AND the working area: a card
+ *  resized/grown from a FIXED origin cell can't spill past the surface edge
+ *  (the origin stays put, only the size is capped — so the corner the user
+ *  isn't dragging doesn't jump). A zero/unknown surface caps nothing. The floor
+ *  wins if the origin sits closer to the edge than the minimum footprint. */
+export function clampWidgetSizeToSurface(
+	origin: GridCell,
+	size: GridSize,
+	surface: GridPoint,
+): GridSize {
+	const floored = clampWidgetSize(size);
+	if (surface.x <= 0 || surface.y <= 0) return floored;
+	const maxW = Math.floor((surface.x - GRID_OUTER_MARGIN) / WIDGET_UNIT) - origin.col;
+	const maxH = Math.floor((surface.y - GRID_OUTER_MARGIN) / WIDGET_UNIT) - origin.row;
+	return {
+		w: Math.max(WIDGET_MIN_W, Math.min(floored.w, maxW)),
+		h: Math.max(WIDGET_MIN_H, Math.min(floored.h, maxH)),
 	};
 }
 

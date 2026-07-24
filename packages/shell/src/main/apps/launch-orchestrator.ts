@@ -93,9 +93,14 @@ export class LaunchOrchestrator {
 			throw makeLaunchError("NotInstalled", `app ${request.appId} is not installed`);
 		}
 		const entryPath = await this.resolveEntryPath(request.appId, record);
+		// Reconstruct the full `service.verb[:scope]` grant string — dropping the
+		// scope here strips every app's capabilities down to bare verbs, which
+		// silently breaks any renderer feature that reasons over scoped caps
+		// (e.g. the Agent's three-tier tool-offering: `intents.dispatch:open` /
+		// `intents.dispatch:propose-*` never match a bare `intents.dispatch`).
 		const capabilities = this.options.ledger
 			.listActive(request.appId)
-			.map((grant) => grant.capability);
+			.map((grant) => (grant.scope === null ? grant.capability : `${grant.capability}:${grant.scope}`));
 
 		const theme = this.options.getActiveTheme
 			? await this.options.getActiveTheme().catch((error) => {

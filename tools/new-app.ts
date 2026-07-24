@@ -150,7 +150,7 @@ export default defineConfig({
 		<meta charset="utf-8" />
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: brainstorm:; script-src 'self'"
+			content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: brainstorm:; media-src 'self' data: brainstorm: blob:; script-src 'self'"
 		/>
 		<title>${displayName}</title>
 	</head>

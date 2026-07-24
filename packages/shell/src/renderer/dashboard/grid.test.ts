@@ -13,6 +13,7 @@ import {
 	clampCell,
 	clampWidgetOrigin,
 	clampWidgetSize,
+	clampWidgetSizeToSurface,
 	firstFreeCell,
 	getCellSize,
 	isLegacyIconLayout,
@@ -205,35 +206,43 @@ describe("migrateWidgetRecord", () => {
 
 describe("clampWidgetOrigin", () => {
 	const SURFACE = { x: 1024, y: 768 };
-	const maxCol = Math.floor((SURFACE.x - GRID_OUTER_MARGIN) / WIDGET_UNIT) - WIDGET_MIN_W;
-	const maxRow = Math.floor((SURFACE.y - GRID_OUTER_MARGIN) / WIDGET_UNIT) - WIDGET_MIN_H;
+	// Max origin so the WHOLE footprint (`w`/`h` cells) stays inside the surface.
+	const maxOriginCol = (w: number) => Math.floor((SURFACE.x - GRID_OUTER_MARGIN) / WIDGET_UNIT) - w;
+	const maxOriginRow = (h: number) => Math.floor((SURFACE.y - GRID_OUTER_MARGIN) / WIDGET_UNIT) - h;
 
 	it("returns an on-surface record untouched (identity-preserving)", () => {
 		const rec = { x: 4, y: 50, w: 40, h: 20 };
 		expect(clampWidgetOrigin(rec, SURFACE)).toBe(rec);
 	});
 
-	it("pulls a record stranded below the fold back onto the surface (F-379)", () => {
-		// The baked ×10-teleport geometry from session 375: row 500 ≈ 4000px
-		// below the fold. Position-only — footprint untouched.
-		const rescued = clampWidgetOrigin({ x: 40, y: 500, w: 27, h: 20 }, SURFACE);
-		expect(rescued).toEqual({ x: 40, y: maxRow, w: 27, h: 20 });
-		// At least a minimum footprint's pocket starts inside the surface.
-		expect(GRID_OUTER_MARGIN + rescued.y * WIDGET_UNIT).toBeLessThanOrEqual(
-			SURFACE.y - WIDGET_MIN_H * WIDGET_UNIT,
-		);
+	it("keeps the whole footprint on-surface — a card can't overhang the far edge", () => {
+		const rec = { x: 40, y: 500, w: 27, h: 20 };
+		const clamped = clampWidgetOrigin(rec, SURFACE);
+		expect(clamped).toEqual({ x: 40, y: maxOriginRow(20), w: 27, h: 20 });
+		// The card's bottom edge sits at or above the surface edge (fully visible).
+		expect(GRID_OUTER_MARGIN + (clamped.y + clamped.h) * WIDGET_UNIT).toBeLessThanOrEqual(SURFACE.y);
 	});
 
-	it("clamps a stranded horizontal origin too", () => {
-		expect(clampWidgetOrigin({ x: 400, y: 2, w: 20, h: 20 }, SURFACE)).toEqual({
-			x: maxCol,
-			y: 2,
-			w: 20,
-			h: 20,
+	it("clamps a stranded horizontal origin so the full width fits", () => {
+		const clamped = clampWidgetOrigin({ x: 400, y: 2, w: 20, h: 20 }, SURFACE);
+		expect(clamped).toEqual({ x: maxOriginCol(20), y: 2, w: 20, h: 20 });
+		expect(GRID_OUTER_MARGIN + (clamped.x + clamped.w) * WIDGET_UNIT).toBeLessThanOrEqual(SURFACE.x);
+	});
+
+	it("clamps a wider card in further than a narrow one at the same origin", () => {
+		const narrow = clampWidgetOrigin({ x: 400, y: 2, w: 20, h: 20 }, SURFACE);
+		const wide = clampWidgetOrigin({ x: 400, y: 2, w: 40, h: 20 }, SURFACE);
+		expect(wide.x).toBeLessThan(narrow.x);
+	});
+
+	it("falls back to the minimum footprint for a bare {x,y} record with no size", () => {
+		expect(clampWidgetOrigin({ x: 400, y: 500 }, SURFACE)).toEqual({
+			x: maxOriginCol(WIDGET_MIN_W),
+			y: maxOriginRow(WIDGET_MIN_H),
 		});
 	});
 
-	it("floors at the origin when the surface is smaller than the minimum pocket", () => {
+	it("floors at the origin when the surface is smaller than the card", () => {
 		expect(clampWidgetOrigin({ x: 12, y: 12, w: 20, h: 20 }, { x: 40, y: 40 })).toEqual({
 			x: 0,
 			y: 0,
@@ -245,5 +254,40 @@ describe("clampWidgetOrigin", () => {
 	it("clamps nothing against an unknown (zero) surface", () => {
 		const rec = { x: 40, y: 500, w: 27, h: 20 };
 		expect(clampWidgetOrigin(rec, { x: 0, y: 0 })).toBe(rec);
+	});
+});
+
+describe("clampWidgetSizeToSurface", () => {
+	const SURFACE = { x: 1024, y: 768 };
+	const maxW = Math.floor((SURFACE.x - GRID_OUTER_MARGIN) / WIDGET_UNIT);
+	const maxH = Math.floor((SURFACE.y - GRID_OUTER_MARGIN) / WIDGET_UNIT);
+
+	it("returns a fitting footprint unchanged (past the floor)", () => {
+		expect(clampWidgetSizeToSurface({ col: 4, row: 4 }, { w: 40, h: 20 }, SURFACE)).toEqual({
+			w: 40,
+			h: 20,
+		});
+	});
+
+	it("caps a footprint that would spill past the right/bottom edge from its origin", () => {
+		const origin = { col: 100, row: 80 };
+		const size = clampWidgetSizeToSurface(origin, { w: 60, h: 60 }, SURFACE);
+		expect(size.w).toBe(maxW - origin.col);
+		expect(size.h).toBe(maxH - origin.row);
+		expect(GRID_OUTER_MARGIN + (origin.col + size.w) * WIDGET_UNIT).toBeLessThanOrEqual(SURFACE.x);
+		expect(GRID_OUTER_MARGIN + (origin.row + size.h) * WIDGET_UNIT).toBeLessThanOrEqual(SURFACE.y);
+	});
+
+	it("still honours the minimum floor", () => {
+		expect(clampWidgetSizeToSurface({ col: 0, row: 0 }, { w: 1, h: 1 }, SURFACE)).toEqual({
+			w: WIDGET_MIN_W,
+			h: WIDGET_MIN_H,
+		});
+	});
+
+	it("caps nothing against an unknown (zero) surface", () => {
+		expect(clampWidgetSizeToSurface({ col: 500, row: 500 }, { w: 40, h: 40 }, { x: 0, y: 0 })).toEqual(
+			{ w: 40, h: 40 },
+		);
 	});
 });
