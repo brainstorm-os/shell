@@ -27,10 +27,24 @@
 
 /* Header row: an accent-tinted icon chip anchors the section, with the title
  * and one-line description stacked beside it. */
+/* The flow's one row: icon chip, the title + description column, and the
+   flow's primary action pinned right. Actions line up in a column down the
+   panel instead of sitting under each paragraph, so the section scans as a
+   set of controls rather than as documentation. Wraps on a narrow pane so the
+   action drops below the text instead of crushing it. */
 .backup-migration__group-head {
 	display: flex;
 	align-items: flex-start;
+	flex-wrap: wrap;
 	gap: var(--space-3);
+}
+
+.backup-migration__group-action {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex: 0 0 auto;
+	margin-inline-start: auto;
 }
 
 .backup-migration__group-icon {
@@ -49,6 +63,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-0_5);
+	flex: 1 1 16rem;
 	min-width: 0;
 }
 
