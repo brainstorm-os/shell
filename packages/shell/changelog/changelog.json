@@ -3,6 +3,89 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.9.1",
+      "date": "2026-07-24",
+      "icon": "🔧",
+      "title": "Agent proposals fixed",
+      "summary": "A quick patch: the agent's propose-and-approve tools work again (0.9.0 fell back to plain chat), and uploaded video and audio render in the editor.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The agent works with you again",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — its "
+            },
+            {
+              "text": "propose-and-approve tools",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " (notes, tasks, events, bookmarks, contacts) are back."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Media in the editor",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — uploaded "
+            },
+            {
+              "text": "video and audio",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " render again."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Slash menu",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — “/columns” inserts a columns layout, not a table."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.9.0",
       "date": "2026-07-24",
       "icon": "🤝",
