@@ -43,7 +43,11 @@ import {
 	useSyncExternalStore,
 } from "react";
 import type { EntityRow } from "../in-memory-entities";
-import { getCell } from "../property-ui/cells";
+// Explicit `/index` — `../property-ui/cells` is ambiguous to esbuild,
+// which resolves it to the sibling `cells.css` and then fails with "no
+// matching export for getCell". Only the package build hits this; the
+// app builds and vitest both resolve the directory.
+import { getCell } from "../property-ui/cells/index";
 import {
 	type CellStyle,
 	cellStyle,
