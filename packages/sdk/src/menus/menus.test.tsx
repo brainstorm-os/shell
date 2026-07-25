@@ -10,6 +10,7 @@
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { IconName } from "../icon";
 import { openAnchoredMenu } from "../object-menu/anchored-menu";
 import { openObjectMenu } from "../object-menu/open-object-menu";
 import { isAnyShortcutSuppressed } from "../shortcut";
@@ -21,11 +22,13 @@ import {
 	CONTEXT_MENU_ID,
 	CONTEXT_SUBMENU_ID,
 	MenuAlign,
+	blankMenuIcon,
 	closeContextMenu,
 	contextMenuConfig,
 	contextSubMenuConfig,
 	defineMenu,
 	openContextMenu,
+	sdkMenuIcon,
 	useMenu,
 } from "./index";
 import { DEFAULT_MENU_LOCALE, resolveMenuLocale } from "./locale";
@@ -468,5 +471,118 @@ describe("context-menu cascade (submenus)", () => {
 			});
 			expect(find("Syntax theme")?.submenu).toHaveLength(1);
 		});
+	});
+});
+
+/**
+ * F-461 — one menu, one icon gutter.
+ *
+ * A menu mixing icon-bearing and icon-less action rows reads as two menus
+ * stacked (the reported case: the dashboard widget ⋯ menu's Size group sat
+ * glyph-less above two iconed actions). The gutter is a property of the
+ * rendered list, so `openContextMenu` reserves it for the whole list rather
+ * than trusting ~200 call sites to remember.
+ */
+describe("icon gutter is consistent within a menu (F-461)", () => {
+	let host: HTMLDivElement;
+	let root: Root;
+
+	beforeEach(() => {
+		_resetShortcutSuppressionForTests();
+		host = document.createElement("div");
+		document.body.appendChild(host);
+		root = createRoot(host);
+		act(() => {
+			root.render(
+				<BrainstormMenuProvider>
+					<div />
+				</BrainstormMenuProvider>,
+			);
+		});
+	});
+	afterEach(() => {
+		act(() => closeContextMenu());
+		act(() => root.unmount());
+		host.remove();
+		document.body.innerHTML = "";
+		_resetShortcutSuppressionForTests();
+	});
+
+	type Row = { label: string; icon?: unknown; section?: boolean; submenu?: Row[] };
+	function openedItems(): Row[] {
+		const open = getActiveMenuStore()
+			?.getAll()
+			.find((m) => (m.param.data as { items?: Row[] } | undefined)?.items);
+		return (open?.param.data as { items?: Row[] } | undefined)?.items ?? [];
+	}
+	const iconOf = (label: string) => openedItems().find((i) => i.label === label)?.icon;
+
+	it("gives icon-less action rows a blank glyph when any sibling row has one", () => {
+		// The widget menu in miniature: an enumerated Size group (only the
+		// chosen row carries a check) above two iconed actions.
+		act(() =>
+			openContextMenu({ x: 0, y: 0 }, [
+				{ id: "size", label: "Size", section: true },
+				{ id: "small", label: "Small", onSelect: () => undefined },
+				{ id: "medium", label: "Medium", icon: sdkMenuIcon(IconName.Check), selected: true },
+				{ id: "remove", label: "Remove widget", icon: sdkMenuIcon(IconName.Trash) },
+			]),
+		);
+		// Every ACTION row ends up with a glyph, so the labels line up down the
+		// whole menu — the unchecked sizes get the no-op spacer.
+		expect(iconOf("Small")).toBe(blankMenuIcon);
+		// A row that brought its own icon keeps it (not overwritten by the blank).
+		expect(iconOf("Medium")).not.toBe(blankMenuIcon);
+		expect(iconOf("Remove widget")).not.toBe(blankMenuIcon);
+		// The section header never takes a gutter slot.
+		expect(iconOf("Size")).toBeUndefined();
+	});
+
+	it("leaves an all-icon-less menu alone (no gutter is a consistent gutter)", () => {
+		act(() =>
+			openContextMenu({ x: 0, y: 0 }, [
+				{ id: "a", label: "Cut", onSelect: () => undefined },
+				{ id: "b", label: "Copy", onSelect: () => undefined },
+			]),
+		);
+		expect(iconOf("Cut")).toBeUndefined();
+		expect(iconOf("Copy")).toBeUndefined();
+	});
+
+	it("normalizes each cascade child as its own list", () => {
+		// A submenu opens as a separate popup, so the parent's icons must not
+		// force a gutter on children that are uniformly icon-less.
+		act(() =>
+			openContextMenu({ x: 0, y: 0 }, [
+				{ id: "open", label: "Open", icon: sdkMenuIcon(IconName.OpenExternal) },
+				{
+					id: "theme",
+					label: "Syntax theme",
+					submenu: [
+						{ id: "light", label: "GitHub Light", onSelect: () => undefined },
+						{ id: "dark", label: "GitHub Dark", onSelect: () => undefined },
+					],
+				},
+			]),
+		);
+		// The parent row itself sits in an iconed list, so it takes the spacer...
+		expect(iconOf("Syntax theme")).toBe(blankMenuIcon);
+		// ...but its children are their own list, and that list has no icons.
+		const child = openedItems().find((i) => i.label === "Syntax theme")?.submenu ?? [];
+		expect(child.map((c) => c.icon)).toEqual([undefined, undefined]);
+	});
+
+	it("reserves the gutter through openAnchoredMenu (the app-facing opener)", () => {
+		act(() =>
+			openAnchoredMenu(
+				{ x: 0, y: 0 },
+				[
+					{ label: "Rename", onSelect: () => undefined },
+					{ label: "Delete", icon: sdkMenuIcon(IconName.Trash), onSelect: () => undefined },
+				],
+				{ menuLabel: "Object" },
+			),
+		);
+		expect(iconOf("Rename")).toBe(blankMenuIcon);
 	});
 });
