@@ -35,6 +35,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_PATH = join(ROOT, "tools", "panel-toggle-baseline.json");
 
+/** Repo-relative with forward slashes — the baseline is checked in POSIX-style,
+ *  and `relative()` yields backslashes on Windows CI. */
+const toPosix = (p) => relative(ROOT, p).split("\\").join("/");
+
 function walk(dir, exts, out = []) {
 	let entries;
 	try {
@@ -95,7 +99,7 @@ function main() {
 	const sources = readdirSync(appsDir)
 		.flatMap((app) => walk(join(appsDir, app, "src"), [".ts", ".tsx"]))
 		.filter((file) => !file.includes(".test."))
-		.map((file) => ({ file: relative(ROOT, file), src: readFileSync(file, "utf8") }));
+		.map((file) => ({ file: toPosix(file), src: readFileSync(file, "utf8") }));
 
 	const baseline = JSON.parse(readFileSync(BASELINE_PATH, "utf8")).alwaysLive;
 	const { handRolled, newViolations, staleBaseline } = auditPanelToggles({ sources, baseline });
