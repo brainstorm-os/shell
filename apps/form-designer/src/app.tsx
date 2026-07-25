@@ -22,6 +22,8 @@
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import {
 	LAYOUT_TYPE_URL,
+	type LayoutCell,
+	LayoutCellKind,
 	type PropertiesService,
 	type PropertyDef,
 	type PropertyPredicate,
@@ -30,6 +32,8 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
+import { LayoutView, createLayoutValueSource } from "@brainstorm-os/sdk/layout-view";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { Popover } from "@brainstorm-os/sdk/popover";
@@ -39,7 +43,8 @@ import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "./i18n";
 import { useFormDesignerT } from "./i18n-hooks";
-import { toCellValue, toDbValue } from "./logic/cell-bridge";
+import "@brainstorm-os/sdk/layout-view.css";
+import { toDbValue } from "./logic/cell-bridge";
 import {
 	type ConditionClause,
 	ConditionOp,
@@ -51,11 +56,15 @@ import {
 	DEFAULT_TARGET_TYPE,
 	type FormField,
 	type FormProperties,
+	MAX_GRID_COLUMNS,
+	MIN_GRID_COLUMNS,
 	buildFormProperties,
 	cellsToFields,
 	formLayoutIssues,
+	gridColumns,
 	moveField as moveField_,
 	readFormProperties,
+	toLayoutDef,
 } from "./logic/form-model";
 import { INVOICE_TYPE, invoiceFromProperties } from "./logic/invoice";
 import {
@@ -133,6 +142,8 @@ export function FormDesignerApp(): ReactElement {
 	const [targetType, setTargetType] = useState<string>(DEFAULT_TARGET_TYPE);
 	const [customType, setCustomType] = useState(false);
 	const [fields, setFields] = useState<FormField[]>(EMPTY_FIELDS);
+	// 0 ⇒ stacked; ≥2 ⇒ grid with that many tracks (8.10.2).
+	const [columns, setColumns] = useState(0);
 	const [catalog, setCatalog] = useState<Readonly<Record<string, PropertyDef>>>({});
 	const [fillValues, setFillValues] = useState<Record<string, unknown>>({});
 	const [invalidFields, setInvalidFields] = useState<ReadonlySet<string>>(() => new Set());
@@ -225,6 +236,7 @@ export function FormDesignerApp(): ReactElement {
 		setName("");
 		setTargetType(DEFAULT_TARGET_TYPE);
 		setCustomType(false);
+		setColumns(0);
 		setFields(EMPTY_FIELDS);
 		setFillValues({});
 		setInvalidFields(new Set());
@@ -238,6 +250,7 @@ export function FormDesignerApp(): ReactElement {
 		setTargetType(form.props.targetType);
 		setCustomType(!KNOWN_TARGET_TYPES.some((known) => known.url === form.props.targetType));
 		setFields(cellsToFields(form.props.cells));
+		setColumns(gridColumns(form.props.columns) ?? 0);
 		setFillValues({});
 		setInvalidFields(new Set());
 		setStatus(t("status.loaded"));
@@ -364,7 +377,7 @@ export function FormDesignerApp(): ReactElement {
 		}
 		setStatus(t("status.saving"));
 		try {
-			const props = buildFormProperties({ name, targetType, fields });
+			const props = buildFormProperties({ name, targetType, fields, columns });
 			if (formId) {
 				await entities.update(formId, props as unknown as Record<string, unknown>);
 			} else {
@@ -378,7 +391,7 @@ export function FormDesignerApp(): ReactElement {
 		} catch {
 			setStatus(t("status.saveFailed"));
 		}
-	}, [name, targetType, fields, formId]);
+	}, [name, targetType, fields, formId, columns]);
 
 	// Apply-to-type (8.10.5): promote the form to be the default `Layout/v1`
 	// for its target type. It runs the layout through the SAME frozen
@@ -401,7 +414,7 @@ export function FormDesignerApp(): ReactElement {
 			setStatus(t("status.needsFields"));
 			return;
 		}
-		const props = buildFormProperties({ name, targetType, fields });
+		const props = buildFormProperties({ name, targetType, fields, columns });
 		if (formLayoutIssues(props).length > 0) {
 			setStatus(t("status.applyInvalid"));
 			return;
@@ -419,7 +432,7 @@ export function FormDesignerApp(): ReactElement {
 		} catch {
 			setStatus(t("status.applyFailed"));
 		}
-	}, [name, targetType, fields, formId]);
+	}, [name, targetType, fields, formId, columns]);
 
 	const focusFillRow = useCallback((property: string): void => {
 		const row = fillRowRefs.current.get(property);
@@ -687,6 +700,8 @@ export function FormDesignerApp(): ReactElement {
 								onRemove={removeField}
 								onRelabel={relabelField}
 								onCondition={setFieldCondition}
+								columns={columns}
+								onColumns={setColumns}
 								onSave={() => void onSave()}
 								onApplyToType={() => void onApplyToType()}
 							/>
@@ -696,6 +711,7 @@ export function FormDesignerApp(): ReactElement {
 								name={name}
 								targetType={targetType}
 								fields={fields}
+								columns={columns}
 								catalog={catalog}
 								values={fillValues}
 								onValues={onFillValues}
@@ -750,6 +766,20 @@ export function FormDesignerApp(): ReactElement {
 	);
 }
 
+/** Stacked, or a grid of N tracks. The form persists the track count and
+ *  derives each cell's `{col,row}` from it (8.10.2); `LayoutDef` itself
+ *  has no notion of "the form's columns". */
+function LAYOUT_OPTIONS(): ReadonlyArray<{ value: string; label: string }> {
+	const options = [{ value: "0", label: t("builder.layoutStacked") }];
+	for (let tracks = MIN_GRID_COLUMNS; tracks <= MAX_GRID_COLUMNS; tracks++) {
+		options.push({
+			value: String(tracks),
+			label: t("builder.layoutGrid", { count: String(tracks) }),
+		});
+	}
+	return options;
+}
+
 function targetTypeLabel(url: string): string {
 	return KNOWN_TARGET_TYPES.find((k) => k.url === url)?.label ?? url;
 }
@@ -780,6 +810,8 @@ function BuilderPane(props: {
 	onRemove: (index: number) => void;
 	onRelabel: (index: number, label: string) => void;
 	onCondition: (index: number, condition: PropertyPredicate | undefined) => void;
+	columns: number;
+	onColumns: (next: number) => void;
 	onSave: () => void;
 	onApplyToType: () => void;
 }): ReactElement {
@@ -817,6 +849,16 @@ function BuilderPane(props: {
 						onChange={(e) => props.onCustomType(e.target.value)}
 					/>
 				) : null}
+				<div className="fd-field-row">
+					<span className="fd-label">{t("builder.layoutLabel")}</span>
+					<SelectMenu
+						value={String(props.columns)}
+						options={LAYOUT_OPTIONS()}
+						onChange={(value) => props.onColumns(Number(value))}
+						ariaLabel={t("builder.layoutLabel")}
+						className="fd-select"
+					/>
+				</div>
 			</div>
 
 			<div className="fd-fields" aria-label={t("builder.fieldsLegend")}>
@@ -1132,6 +1174,7 @@ function FillPane(props: {
 	name: string;
 	targetType: string;
 	fields: FormField[];
+	columns: number;
 	catalog: Readonly<Record<string, PropertyDef>>;
 	values: Record<string, unknown>;
 	onValues: (next: Record<string, unknown>) => void;
@@ -1139,6 +1182,120 @@ function FillPane(props: {
 	rowRefs: React.RefObject<Map<string, HTMLLIElement | null>>;
 	onCreate: () => void;
 }): ReactElement {
+	// The fill surface renders through the SHARED 8.3 pipeline rather than
+	// its own field loop: the form IS a `Layout/v1`, so `<LayoutView>` is
+	// what draws it, and each field cell subscribes to its own key — a
+	// keystroke in one field repaints that field, not the form. The
+	// designer keeps only what a *form* adds around a cell (label,
+	// required marker, validation message), through the `renderCell` seam.
+	const layout = useMemo(
+		() =>
+			toLayoutDef(
+				buildFormProperties({
+					name: props.name,
+					targetType: props.targetType,
+					fields: props.fields,
+					columns: props.columns,
+				}),
+			),
+		[props.name, props.targetType, props.fields, props.columns],
+	);
+
+	// One stable store for the whole fill, mutated per key — a per-render
+	// source would resubscribe every cell on every keystroke, which is the
+	// opposite of what the per-cell subscription is for. Switching forms
+	// needs no new store: `loadForm` clears the values, and the reset below
+	// notifies exactly the keys that changed.
+	const source = useMemo(() => createLayoutValueSource({}), []);
+	const valuesRef = useRef(props.values);
+	valuesRef.current = props.values;
+	useEffect(() => {
+		source.reset(props.values);
+	}, [source, props.values]);
+
+	const onChange = useCallback(
+		(property: string, next: unknown): void => {
+			const def = props.catalog[property];
+			props.onValues({
+				...valuesRef.current,
+				[property]: def ? toDbValue(def, next) : next,
+			});
+		},
+		[props.catalog, props.onValues],
+	);
+
+	const fieldByProperty = useMemo(
+		() => new Map(props.fields.map((field) => [field.property, field])),
+		[props.fields],
+	);
+	const fieldByPropertyRef = useRef(fieldByProperty);
+	fieldByPropertyRef.current = fieldByProperty;
+
+	// A form must stay fillable even when the property catalog can't draw
+	// the field — an app with no properties service, or a value type whose
+	// view has no registered cell. The pipeline's own placeholder is
+	// visible but not editable, which for a form means a field the user
+	// cannot complete, so the designer supplies a plain text input.
+	const renderMissingCell = useCallback(
+		(cell: { property: string }): React.ReactNode => {
+			const field = fieldByPropertyRef.current.get(cell.property) ?? {
+				property: cell.property,
+			};
+			const label = fieldDisplayName(field, props.catalog);
+			const invalid = props.invalidFields.has(cell.property);
+			return (
+				<input
+					type="text"
+					className="fd-input bs-input"
+					aria-label={label}
+					aria-invalid={invalid || undefined}
+					aria-describedby={invalid ? `form-fill-error-${cell.property}` : undefined}
+					value={
+						typeof valuesRef.current[cell.property] === "string"
+							? (valuesRef.current[cell.property] as string)
+							: ""
+					}
+					onChange={(e) => onChange(cell.property, e.target.value)}
+				/>
+			);
+		},
+		[props.catalog, props.invalidFields, onChange],
+	);
+
+	const renderCell = useCallback(
+		(cell: LayoutCell, body: React.ReactNode): React.ReactNode => {
+			if (cell.kind !== LayoutCellKind.Property) return body;
+			const field = fieldByProperty.get(cell.property) ?? { property: cell.property };
+			const label = fieldDisplayName(field, props.catalog);
+			const invalid = props.invalidFields.has(cell.property);
+			const errorId = `form-fill-error-${cell.property}`;
+			return (
+				<div
+					className={invalid ? "fd-fill__row fd-fill__row--invalid" : "fd-fill__row"}
+					data-field={cell.property}
+					ref={(el) => {
+						props.rowRefs.current?.set(cell.property, el as HTMLLIElement | null);
+					}}
+				>
+					<span className="fd-label">
+						{label}{" "}
+						<span className="fd-required" aria-hidden="true">
+							*
+						</span>
+						<span className="fd-visually-hidden"> {t("fill.required")}</span>
+					</span>
+					{body}
+					{invalid ? (
+						<span id={errorId} className="fd-fill__error" role="alert">
+							{t("fill.fieldRequired", { name: label })}
+						</span>
+					) : null}
+				</div>
+			);
+		},
+		[fieldByProperty, props.catalog, props.invalidFields, props.rowRefs],
+	);
+
 	if (props.fields.length === 0) {
 		return (
 			<div className="fd-fill">
@@ -1147,74 +1304,31 @@ function FillPane(props: {
 		);
 	}
 
-	const setValue = (key: string, value: unknown): void => {
-		props.onValues({ ...props.values, [key]: value });
+	// `condition` is evaluated by the pipeline against this entity's
+	// properties — the in-progress fill values ARE the entity here (8.10.4).
+	const draft: EntityRow = {
+		id: `form-fill-${props.formId ?? "new"}`,
+		type: props.targetType,
+		properties: props.values,
+		createdAt: 0,
+		updatedAt: 0,
+		deletedAt: null,
 	};
-
-	// Only currently-visible fields render (8.10.4) — a field whose
-	// condition is unmet against the in-progress values is hidden, and (in
-	// `onCreateEntity`) neither validated nor persisted.
-	const shown = visibleFields(props.fields, props.values);
 
 	const body = (
 		<div className="fd-fill">
 			<h2 className="fd-fill__heading">
 				{t("fill.heading", { name: props.name.trim() || t("sidebar.untitled") })}
 			</h2>
-			<ul className="fd-fill__list">
-				{shown.map((field) => {
-					const def = props.catalog[field.property] ?? null;
-					const label = fieldDisplayName(field, props.catalog);
-					const Cell = def ? getCell(def.valueType, defaultViewFor(def)) : undefined;
-					const invalid = props.invalidFields.has(field.property);
-					const errorId = `form-fill-error-${field.property}`;
-					return (
-						<li
-							key={field.property}
-							ref={(el) => {
-								props.rowRefs.current?.set(field.property, el);
-							}}
-							className={invalid ? "fd-fill__row fd-fill__row--invalid" : "fd-fill__row"}
-						>
-							<span className="fd-label">
-								{label}{" "}
-								<span className="fd-required" aria-hidden="true">
-									*
-								</span>
-								<span className="fd-visually-hidden"> {t("fill.required")}</span>
-							</span>
-							{def && Cell ? (
-								<Cell
-									property={def}
-									value={toCellValue(def, props.values[field.property])}
-									onChange={(next) => setValue(field.property, toDbValue(def, next))}
-									readOnly={false}
-									noteId={`form-fill-${field.property}`}
-								/>
-							) : (
-								<input
-									type="text"
-									className="fd-input bs-input"
-									aria-label={label}
-									aria-invalid={invalid || undefined}
-									aria-describedby={invalid ? errorId : undefined}
-									value={
-										typeof props.values[field.property] === "string"
-											? (props.values[field.property] as string)
-											: ""
-									}
-									onChange={(e) => setValue(field.property, e.target.value)}
-								/>
-							)}
-							{invalid ? (
-								<span id={errorId} className="fd-fill__error" role="alert">
-									{t("fill.fieldRequired", { name: label })}
-								</span>
-							) : null}
-						</li>
-					);
-				})}
-			</ul>
+			<LayoutView
+				className="fd-fill__layout"
+				layout={layout}
+				entity={draft}
+				propertyDef={(key) => props.catalog[key]}
+				values={source}
+				onChange={onChange}
+				seams={{ renderCell, renderMissingCell }}
+			/>
 			<div className="fd-fill__footer">
 				<button type="button" className="bs-btn" data-bs-primary onClick={props.onCreate}>
 					<span>{t("fill.create")}</span>

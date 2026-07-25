@@ -11,13 +11,18 @@ import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_TARGET_TYPE,
 	type FormProperties,
+	MAX_GRID_COLUMNS,
+	MIN_GRID_COLUMNS,
 	buildFormProperties,
 	cellsToFields,
 	emptyFillFields,
 	fieldsToCells,
 	fillValuesToProperties,
+	flowPlacement,
 	formLayoutIssues,
+	formMode,
 	formScope,
+	gridColumns,
 	isEmptyValue,
 	isFormApplicableToType,
 	moveField,
@@ -350,5 +355,76 @@ describe("form-model", () => {
 			moveField(input, 0, 3);
 			expect(input).toEqual(f);
 		});
+	});
+});
+
+describe("grid mode (8.10.2)", () => {
+	it("a form with no columns stays stacked and places nothing", () => {
+		const props = buildFormProperties({
+			name: "F",
+			targetType: DEFAULT_TARGET_TYPE,
+			fields: [{ property: "a" }, { property: "b" }],
+		});
+		expect(props.mode).toBe(LayoutMode.Stacked);
+		expect(props.columns).toBeUndefined();
+		expect(props.cells.every((cell) => cell.grid === undefined)).toBe(true);
+	});
+
+	it("one column is stacked — a single-track grid is ceremony", () => {
+		expect(gridColumns(1)).toBeNull();
+		expect(formMode(1)).toBe(LayoutMode.Stacked);
+	});
+
+	it("two or more columns switch the form to grid and place every cell", () => {
+		const props = buildFormProperties({
+			name: "F",
+			targetType: DEFAULT_TARGET_TYPE,
+			fields: [{ property: "a" }, { property: "b" }, { property: "c" }],
+			columns: 2,
+		});
+		expect(props.mode).toBe(LayoutMode.Grid);
+		expect(props.columns).toBe(2);
+		expect(props.cells.map((cell) => cell.grid)).toEqual([
+			{ col: 1, row: 1 },
+			{ col: 2, row: 1 },
+			{ col: 1, row: 2 },
+		]);
+	});
+
+	it("caps at the maximum track count rather than rejecting", () => {
+		expect(gridColumns(99)).toBe(MAX_GRID_COLUMNS);
+		expect(gridColumns(MIN_GRID_COLUMNS)).toBe(MIN_GRID_COLUMNS);
+	});
+
+	it("ignores a non-finite column count", () => {
+		expect(gridColumns(Number.NaN)).toBeNull();
+		expect(gridColumns(undefined)).toBeNull();
+	});
+
+	it("flow placement is row-major and 1-based (CSS Grid line numbering)", () => {
+		expect(flowPlacement(0, 3)).toEqual({ col: 1, row: 1 });
+		expect(flowPlacement(2, 3)).toEqual({ col: 3, row: 1 });
+		expect(flowPlacement(3, 3)).toEqual({ col: 1, row: 2 });
+	});
+
+	it("round-trips: a saved grid form reloads with its track count", () => {
+		const props = buildFormProperties({
+			name: "F",
+			targetType: DEFAULT_TARGET_TYPE,
+			fields: [{ property: "a" }, { property: "b" }],
+			columns: 3,
+		});
+		expect(gridColumns(props.columns)).toBe(3);
+		expect(cellsToFields(props.cells).map((f) => f.property)).toEqual(["a", "b"]);
+	});
+
+	it("grid cells still validate as a well-formed layout", () => {
+		const props = buildFormProperties({
+			name: "F",
+			targetType: DEFAULT_TARGET_TYPE,
+			fields: [{ property: "a" }, { property: "b" }],
+			columns: 2,
+		});
+		expect(validateLayout(toLayoutDef(props))).toEqual([]);
 	});
 });

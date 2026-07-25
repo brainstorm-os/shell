@@ -67,6 +67,19 @@ export type LayoutViewSeams = {
 	/** Resolve a `textKey` / `labelKey` to display text. Absent ⇒ the key
 	 *  itself, which is visible-but-wrong rather than blank. */
 	t?: (key: string) => string;
+	/** Wrap each cell's rendered body in host chrome — a field label, a
+	 *  required marker, a validation message. The layout owns *which*
+	 *  cells exist and *where*; a host still owns what surrounds one, and
+	 *  without this seam every such host would fork the pipeline to get a
+	 *  label (which is exactly what the form-designer's fill pane did).
+	 *  Absent ⇒ the body renders bare. */
+	renderCell?: (cell: LayoutCell, body: ReactNode) => ReactNode;
+	/** Render a property cell the registry cannot draw — the key has no
+	 *  `PropertyDef`, or no cell is registered for its (valueType, view).
+	 *  Hosts that must stay fillable regardless (a form) supply a plain
+	 *  text input here; absent ⇒ the labelled placeholder, which is
+	 *  visible but not editable. */
+	renderMissingCell?: (cell: PropertyCell, def: PropertyDef | undefined) => ReactNode;
 };
 
 export type LayoutViewProps = {
@@ -142,15 +155,16 @@ type CellViewProps = {
 };
 
 function CellView(props: CellViewProps): ReactElement {
-	const { cell, mode } = props;
+	const { cell, mode, seams } = props;
 	const style = cellStyle(cell, mode) as CellStyle;
+	const body = <CellBody {...props} />;
 	return (
 		<div
 			className={`bs-layout__cell bs-layout__cell--${cell.kind}`}
 			data-cell-id={cell.id}
 			style={style}
 		>
-			<CellBody {...props} />
+			{seams?.renderCell ? seams.renderCell(cell, body) : body}
 		</div>
 	);
 }
@@ -194,12 +208,19 @@ function PropertyCellView(props: CellViewProps & { cell: PropertyCell }): ReactE
 	const commit = useCallback((next: unknown) => onChange?.(key, next), [onChange, key]);
 
 	const def = propertyDef(key);
-	if (!def) return <UnknownProperty property={key} />;
+	const missing = props.seams?.renderMissingCell;
+	if (!def) {
+		const fallback = missing?.(cell, undefined);
+		return fallback ? <>{fallback}</> : <UnknownProperty property={key} />;
+	}
 
 	// A layout cell may override the property's default display (doc 27).
 	const effectiveDef: PropertyDef = cell.display ? { ...def, display: cell.display } : def;
 	const Cell = getCell(effectiveDef.valueType, defaultViewFor(effectiveDef));
-	if (!Cell) return <UnknownProperty property={key} />;
+	if (!Cell) {
+		const fallback = missing?.(cell, def);
+		return fallback ? <>{fallback}</> : <UnknownProperty property={key} />;
+	}
 
 	return (
 		<Cell

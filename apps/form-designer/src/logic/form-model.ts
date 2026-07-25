@@ -62,6 +62,12 @@ export type FormProperties = {
 	targetType: string;
 	cells: PropertyCell[];
 	readingOrder?: string[];
+	/** Track count for `LayoutMode.Grid` (8.10.2). `LayoutDef` places
+	 *  cells individually — it has no notion of "the form's columns" —
+	 *  so the designer keeps the authoring-level number here and derives
+	 *  each cell's `{col,row}` from it on save. Read back on load so a
+	 *  round-trip is lossless. Absent / <2 ⇒ the form is stacked. */
+	columns?: number;
 };
 
 /** Stable cell id for the nth field. Deterministic so re-saving an
@@ -72,7 +78,11 @@ export function fieldCellId(index: number): string {
 
 /** Build the ordered `PropertyCell` list from a field list. The optional
  *  per-field label rides on `display.options.label`. */
-export function fieldsToCells(fields: readonly FormField[]): PropertyCell[] {
+export function fieldsToCells(
+	fields: readonly FormField[],
+	columns = MIN_GRID_COLUMNS - 1,
+): PropertyCell[] {
+	const tracks = gridColumns(columns);
 	return fields.map((field, index) => {
 		const cell: PropertyCell = {
 			kind: LayoutCellKind.Property,
@@ -82,8 +92,36 @@ export function fieldsToCells(fields: readonly FormField[]): PropertyCell[] {
 		const label = field.label?.trim();
 		if (label) cell.display = { options: { label } };
 		if (field.condition) cell.condition = field.condition;
+		if (tracks) cell.grid = flowPlacement(index, tracks);
 		return cell;
 	});
+}
+
+/** Below this a "grid" is just a stacked form with extra ceremony, so
+ *  the designer treats it as stacked. */
+export const MIN_GRID_COLUMNS = 2;
+/** More tracks than this and a form field is narrower than its own
+ *  label on any reasonable window. */
+export const MAX_GRID_COLUMNS = 4;
+
+/** The usable track count, or `null` when the form is stacked. */
+export function gridColumns(columns: number | undefined): number | null {
+	if (typeof columns !== "number" || !Number.isFinite(columns)) return null;
+	const floored = Math.floor(columns);
+	if (floored < MIN_GRID_COLUMNS) return null;
+	return Math.min(floored, MAX_GRID_COLUMNS);
+}
+
+/** Row-major flow placement for the nth field over `tracks` columns.
+ *  1-based, matching CSS Grid's line numbering. */
+export function flowPlacement(index: number, tracks: number): { col: number; row: number } {
+	return { col: (index % tracks) + 1, row: Math.floor(index / tracks) + 1 };
+}
+
+/** The mode a form saves as — grid only when it has usable tracks, so a
+ *  form can never persist `grid` with nothing to place against. */
+export function formMode(columns: number | undefined): LayoutMode {
+	return gridColumns(columns) === null ? LayoutMode.Stacked : LayoutMode.Grid;
 }
 
 /** Move the field at `from` to sit at index `to`, returning a new array
@@ -135,16 +173,20 @@ export function buildFormProperties(input: {
 	name: string;
 	targetType: string;
 	fields: readonly FormField[];
+	/** Track count for grid mode (8.10.2). Absent / <2 ⇒ stacked. */
+	columns?: number;
 }): FormProperties {
-	const cells = fieldsToCells(input.fields);
+	const tracks = gridColumns(input.columns);
+	const cells = fieldsToCells(input.fields, input.columns);
 	return {
 		name: input.name.trim(),
-		mode: LayoutMode.Stacked,
+		mode: formMode(input.columns),
 		scope: formScope(input.targetType),
 		context: null,
 		targetType: input.targetType,
 		cells,
 		readingOrder: cells.map((cell) => cell.id),
+		...(tracks ? { columns: tracks } : {}),
 	};
 }
 
@@ -207,14 +249,20 @@ export function readFormProperties(raw: Record<string, unknown>): FormProperties
 	const readingOrder = Array.isArray(raw.readingOrder)
 		? (raw.readingOrder as string[])
 		: cells.map((cell) => cell.id);
+	// The track count is authoring-level state the designer persists
+	// alongside the LayoutDef; the mode is derived from it so the two can
+	// never disagree on read (a form saved with `mode: "grid"` and no
+	// usable tracks would otherwise reload as an unplaceable grid).
+	const columns = gridColumns(typeof raw.columns === "number" ? raw.columns : undefined);
 	return {
 		name,
-		mode: LayoutMode.Stacked,
+		mode: columns === null ? LayoutMode.Stacked : LayoutMode.Grid,
 		scope: formScope(targetType),
 		context: null,
 		targetType,
 		cells,
 		readingOrder,
+		...(columns ? { columns } : {}),
 	};
 }
 

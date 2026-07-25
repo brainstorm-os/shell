@@ -298,6 +298,13 @@ body.is-resizing .fd-resize {
 	flex-direction: column;
 	gap: var(--space-2);
 }
+/* The fill surface renders through the shared `<LayoutView>` (8.3), which
+   owns the stacked / grid geometry — the designer only sets the gap it
+   wants between fields. A grid form's tracks come from the layout's own
+   per-cell placement, so there is nothing to declare here. */
+.fd-fill__layout {
+	gap: var(--space-3);
+}
 .fd-fill__row--invalid .fd-input {
 	border-color: var(--danger);
 }
