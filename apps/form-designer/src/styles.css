@@ -682,3 +682,39 @@ body.is-resizing .fd-resize {
 	border-radius: var(--radius-sm);
 	box-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
 }
+
+/* Section + page-element cards (8.10.3). They share `.fd-field-card`'s box
+   so the builder list reads as one column of cards, and add only what a
+   section needs: the nested field list and its empty hint. */
+.fd-group-card__fields {
+	list-style: none;
+	margin: 0;
+	padding: 0 0 0 var(--space-4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+.fd-group-card__field {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	min-width: 0;
+}
+.fd-group-card__field-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}
+.fd-group-card__empty {
+	margin: 0;
+	padding-left: var(--space-4);
+	font-size: var(--text-size-sm);
+	color: var(--text-faint);
+}
+.fd-chrome-card__name {
+	font-size: var(--text-size-sm);
+	color: var(--color-text-secondary);
+}

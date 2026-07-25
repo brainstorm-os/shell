@@ -118,5 +118,20 @@
   "invoice.status.exportCancelled": "Export annulé.",
   "invoice.status.exportFailed": "Impossible d'exporter la facture.",
   "invoice.status.created": "Nouvelle facture prête — remplissez les détails.",
-  "invoice.status.offline": "Exécution hors de la coquille — l'export PDF nécessite l'app."
+  "invoice.status.offline": "Exécution hors de la coquille — l'export PDF nécessite l'app.",
+  "builder.nestField": "Déplacer dans la section au-dessus",
+  "builder.unnestField": "Sortir de cette section",
+  "builder.groupLabel": "Nom de la section",
+  "builder.groupLabelPlaceholder": "Section",
+  "builder.groupEmpty": "Aucun champ dans cette section pour l'instant.",
+  "builder.removeGroup": "Supprimer la section",
+  "builder.removeChrome": "Supprimer l'élément",
+  "builder.addGroup": "Section",
+  "builder.addChrome": "Élément de page",
+  "chrome.actionBar": "Barre d'actions",
+  "chrome.breadcrumb": "Fil d'Ariane",
+  "chrome.meta": "Créé / modifié",
+  "chrome.windowControls": "Contrôles de fenêtre",
+  "chrome.entityHeader": "En-tête (icône + titre + actions)",
+  "chrome.tabs": "Onglets"
 }

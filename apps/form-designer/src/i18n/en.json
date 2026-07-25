@@ -124,5 +124,20 @@
   "invoice.status.exportCancelled": "Export cancelled.",
   "invoice.status.exportFailed": "Could not export the invoice.",
   "invoice.status.created": "New invoice ready — fill in the details.",
-  "invoice.status.offline": "Running outside the shell — PDF export needs the app."
+  "invoice.status.offline": "Running outside the shell — PDF export needs the app.",
+  "builder.nestField": "Move into the section above",
+  "builder.unnestField": "Move out of this section",
+  "builder.groupLabel": "Section name",
+  "builder.groupLabelPlaceholder": "Section",
+  "builder.groupEmpty": "No fields in this section yet.",
+  "builder.removeGroup": "Remove section",
+  "builder.removeChrome": "Remove element",
+  "builder.addGroup": "Section",
+  "builder.addChrome": "Page element",
+  "chrome.actionBar": "Action bar",
+  "chrome.breadcrumb": "Breadcrumb",
+  "chrome.meta": "Created / modified",
+  "chrome.windowControls": "Window controls",
+  "chrome.entityHeader": "Header (icon + title + actions)",
+  "chrome.tabs": "Tabs"
 }
