@@ -115,6 +115,7 @@ export default defineConfig({
 				"packages/sdk/src/property-ui/dictionary-editor.tsx",
 			),
 			"@brainstorm-os/sdk/property-ui": resolve(__dirname, "packages/sdk/src/property-ui.ts"),
+			"@brainstorm-os/sdk/layout-view": resolve(__dirname, "packages/sdk/src/layout-view/index.ts"),
 			"@brainstorm-os/sdk/segmented.css": resolve(
 				__dirname,
 				"packages/sdk/src/segmented/segmented.css",
