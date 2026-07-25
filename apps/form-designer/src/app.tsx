@@ -21,6 +21,7 @@
 
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import {
+	ChromeKind,
 	LAYOUT_TYPE_URL,
 	type LayoutCell,
 	LayoutCellKind,
@@ -33,6 +34,8 @@ import {
 import { Orientation, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
+import { chromeSeam } from "@brainstorm-os/sdk/layout-chrome";
+import "@brainstorm-os/sdk/layout-chrome.css";
 import { LayoutView, createLayoutValueSource } from "@brainstorm-os/sdk/layout-view";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
@@ -53,13 +56,27 @@ import {
 	predicateToClause,
 } from "./logic/condition-model";
 import {
+	type FormGroup,
+	type FormItem,
+	FormItemKind,
+	cellsToItems,
+	chromeItem,
+	fieldItem,
+	groupItem,
+	itemFields,
+	itemsContainProperty,
+	moveFieldIntoGroup,
+	moveFieldOutOfGroup,
+	moveItem,
+	newItemId,
+} from "./logic/form-items";
+import {
 	DEFAULT_TARGET_TYPE,
 	type FormField,
 	type FormProperties,
 	MAX_GRID_COLUMNS,
 	MIN_GRID_COLUMNS,
 	buildFormProperties,
-	cellsToFields,
 	formLayoutIssues,
 	gridColumns,
 	moveField as moveField_,
@@ -106,7 +123,18 @@ const CUSTOM_TYPE_SENTINEL = "__custom__";
  *  any re-render that happens mid-drag. */
 const FIELD_DND_MIME = "application/x-bs-form-field";
 
-const EMPTY_FIELDS: FormField[] = [];
+const EMPTY_ITEMS: FormItem[] = [];
+
+/** The curated chrome kinds a form can place (OQ-90 (a) — the set is
+ *  shell-owned and closed, so this palette is the whole of it). */
+const CHROME_PALETTE: readonly ChromeKind[] = [
+	ChromeKind.EntityHeader,
+	ChromeKind.ActionBar,
+	ChromeKind.Breadcrumb,
+	ChromeKind.Meta,
+	ChromeKind.Tabs,
+	ChromeKind.WindowControls,
+];
 
 type SavedForm = {
 	id: string;
@@ -141,7 +169,10 @@ export function FormDesignerApp(): ReactElement {
 	const [name, setName] = useState("");
 	const [targetType, setTargetType] = useState<string>(DEFAULT_TARGET_TYPE);
 	const [customType, setCustomType] = useState(false);
-	const [fields, setFields] = useState<FormField[]>(EMPTY_FIELDS);
+	const [items, setItems] = useState<FormItem[]>(EMPTY_ITEMS);
+	// Fill, validation and the create path all work on the flat leaf list —
+	// a group is presentation, not a data boundary (8.10.3).
+	const fields = useMemo(() => itemFields(items), [items]);
 	// 0 ⇒ stacked; ≥2 ⇒ grid with that many tracks (8.10.2).
 	const [columns, setColumns] = useState(0);
 	const [catalog, setCatalog] = useState<Readonly<Record<string, PropertyDef>>>({});
@@ -237,7 +268,7 @@ export function FormDesignerApp(): ReactElement {
 		setTargetType(DEFAULT_TARGET_TYPE);
 		setCustomType(false);
 		setColumns(0);
-		setFields(EMPTY_FIELDS);
+		setItems(EMPTY_ITEMS);
 		setFillValues({});
 		setInvalidFields(new Set());
 		setMode(FormMode.Builder);
@@ -249,7 +280,7 @@ export function FormDesignerApp(): ReactElement {
 		setName(form.props.name);
 		setTargetType(form.props.targetType);
 		setCustomType(!KNOWN_TARGET_TYPES.some((known) => known.url === form.props.targetType));
-		setFields(cellsToFields(form.props.cells));
+		setItems(cellsToItems(form.props.cells));
 		setColumns(gridColumns(form.props.columns) ?? 0);
 		setFillValues({});
 		setInvalidFields(new Set());
@@ -279,9 +310,17 @@ export function FormDesignerApp(): ReactElement {
 	);
 
 	const addField = useCallback((propertyKey: string): void => {
-		setFields((prev) =>
-			prev.some((f) => f.property === propertyKey) ? prev : [...prev, { property: propertyKey }],
+		setItems((prev) =>
+			itemsContainProperty(prev, propertyKey) ? prev : [...prev, fieldItem({ property: propertyKey })],
 		);
+	}, []);
+
+	const addGroup = useCallback((): void => {
+		setItems((prev) => [...prev, groupItem({ id: newItemId(FormItemKind.Group), fields: [] })]);
+	}, []);
+
+	const addChrome = useCallback((chrome: ChromeKind): void => {
+		setItems((prev) => [...prev, chromeItem({ id: newItemId(FormItemKind.Chrome), chrome })]);
 	}, []);
 
 	const openAddFieldMenu = useCallback((): void => {
@@ -302,15 +341,49 @@ export function FormDesignerApp(): ReactElement {
 				disabled: true,
 			});
 		}
+		// A form is a layout, so the same "add" gesture places the other two
+		// authorable cell kinds — a section (group) and a shell-rendered page
+		// element (chrome, 8.4) — rather than hiding them behind a second
+		// control the user has to find.
+		items.push({ divider: true });
+		items.push({ label: t("builder.addGroup"), onSelect: () => addGroup() });
+		items.push({
+			label: t("builder.addChrome"),
+			submenu: CHROME_PALETTE.map((kind) => ({
+				label: chromeLabel(kind),
+				onSelect: () => addChrome(kind),
+			})),
+		});
 		openAnchoredMenu({ x: rect.left, y: rect.bottom }, items, {
 			menuLabel: t("builder.addFieldHint"),
 			anchor,
 			align: MenuAlign.Start,
 		});
-	}, [propertyDefs, fields, addField]);
+	}, [propertyDefs, fields, addField, addGroup, addChrome]);
 
 	const moveField = useCallback((index: number, delta: number): void => {
-		setFields((prev) => moveField_(prev, index, index + delta));
+		setItems((prev) => moveItem(prev, index, index + delta));
+	}, []);
+
+	/** Move a top-level field into the group directly above it, or lift a
+	 *  grouped field back out — the two directions of one gesture. */
+	const nestField = useCallback((index: number, groupIndex: number): void => {
+		setItems((prev) => moveFieldIntoGroup(prev, index, groupIndex));
+	}, []);
+
+	const unnestField = useCallback((groupIndex: number, fieldIndex: number): void => {
+		setItems((prev) => moveFieldOutOfGroup(prev, groupIndex, fieldIndex));
+	}, []);
+
+	const relabelGroup = useCallback((index: number, label: string): void => {
+		setItems((prev) =>
+			prev.map((item, i) => {
+				if (i !== index || item.kind !== FormItemKind.Group) return item;
+				const trimmed = label.trim();
+				const { label: _drop, ...rest } = item.group;
+				return groupItem(trimmed ? { ...rest, label: trimmed } : rest);
+			}),
+		);
 	}, []);
 
 	// Drag-to-reorder commits ONLY here (on drop), keyed by the dragged
@@ -320,25 +393,29 @@ export function FormDesignerApp(): ReactElement {
 	// `moveField` ordering rule.
 	const reorderFieldByProperty = useCallback(
 		(draggedProperty: string, beforeIndex: number): void => {
-			setFields((prev) => {
-				const from = prev.findIndex((f) => f.property === draggedProperty);
+			setItems((prev) => {
+				const from = prev.findIndex(
+					(item) => item.kind === FormItemKind.Field && item.field.property === draggedProperty,
+				);
 				if (from < 0) return prev;
 				const to = from < beforeIndex ? beforeIndex - 1 : beforeIndex;
-				return moveField_(prev, from, to);
+				return moveItem(prev, from, to);
 			});
 		},
 		[],
 	);
 
 	const removeField = useCallback((index: number): void => {
-		setFields((prev) => prev.filter((_, i) => i !== index));
+		setItems((prev) => prev.filter((_, i) => i !== index));
 	}, []);
 
 	const relabelField = useCallback((index: number, label: string): void => {
-		setFields((prev) =>
-			prev.map((field, i) =>
-				i === index ? (label.trim() ? { ...field, label } : { property: field.property }) : field,
-			),
+		setItems((prev) =>
+			prev.map((item, i) => {
+				if (i !== index || item.kind !== FormItemKind.Field) return item;
+				const field = item.field;
+				return fieldItem(label.trim() ? { ...field, label } : { property: field.property });
+			}),
 		);
 	}, []);
 
@@ -347,14 +424,14 @@ export function FormDesignerApp(): ReactElement {
 	// round-trips as `{ property }` (no empty `condition`).
 	const setFieldCondition = useCallback(
 		(index: number, condition: PropertyPredicate | undefined): void => {
-			setFields((prev) =>
-				prev.map((field, i) => {
-					if (i !== index) return field;
+			setItems((prev) =>
+				prev.map((item, i) => {
+					if (i !== index || item.kind !== FormItemKind.Field) return item;
 					if (!condition) {
-						const { condition: _drop, ...rest } = field;
-						return rest;
+						const { condition: _drop, ...rest } = item.field;
+						return fieldItem(rest);
 					}
-					return { ...field, condition };
+					return fieldItem({ ...item.field, condition });
 				}),
 			);
 		},
@@ -377,7 +454,7 @@ export function FormDesignerApp(): ReactElement {
 		}
 		setStatus(t("status.saving"));
 		try {
-			const props = buildFormProperties({ name, targetType, fields, columns });
+			const props = buildFormProperties({ name, targetType, items, columns });
 			if (formId) {
 				await entities.update(formId, props as unknown as Record<string, unknown>);
 			} else {
@@ -391,7 +468,7 @@ export function FormDesignerApp(): ReactElement {
 		} catch {
 			setStatus(t("status.saveFailed"));
 		}
-	}, [name, targetType, fields, formId, columns]);
+	}, [name, targetType, items, fields.length, formId, columns]);
 
 	// Apply-to-type (8.10.5): promote the form to be the default `Layout/v1`
 	// for its target type. It runs the layout through the SAME frozen
@@ -414,7 +491,7 @@ export function FormDesignerApp(): ReactElement {
 			setStatus(t("status.needsFields"));
 			return;
 		}
-		const props = buildFormProperties({ name, targetType, fields, columns });
+		const props = buildFormProperties({ name, targetType, items, columns });
 		if (formLayoutIssues(props).length > 0) {
 			setStatus(t("status.applyInvalid"));
 			return;
@@ -432,7 +509,7 @@ export function FormDesignerApp(): ReactElement {
 		} catch {
 			setStatus(t("status.applyFailed"));
 		}
-	}, [name, targetType, fields, formId, columns]);
+	}, [name, targetType, items, fields.length, formId, columns]);
 
 	const focusFillRow = useCallback((property: string): void => {
 		const row = fillRowRefs.current.get(property);
@@ -691,7 +768,11 @@ export function FormDesignerApp(): ReactElement {
 								targetSelectOptions={targetSelectOptions}
 								onSelectTargetType={onSelectTargetType}
 								onCustomType={setTargetType}
+								items={items}
 								fields={fields}
+								onNest={nestField}
+								onUnnest={unnestField}
+								onRelabelGroup={relabelGroup}
 								catalog={catalog}
 								addFieldRef={addFieldRef}
 								onOpenAddField={openAddFieldMenu}
@@ -801,9 +882,13 @@ function BuilderPane(props: {
 	targetSelectOptions: ReadonlyArray<{ value: string; label: string }>;
 	onSelectTargetType: (value: string) => void;
 	onCustomType: (value: string) => void;
+	items: FormItem[];
 	fields: FormField[];
 	catalog: Readonly<Record<string, PropertyDef>>;
 	addFieldRef: React.RefObject<HTMLButtonElement | null>;
+	onNest: (index: number, groupIndex: number) => void;
+	onUnnest: (groupIndex: number, fieldIndex: number) => void;
+	onRelabelGroup: (index: number, label: string) => void;
 	onOpenAddField: () => void;
 	onMove: (index: number, delta: number) => void;
 	onReorder: (draggedProperty: string, beforeIndex: number) => void;
@@ -874,25 +959,61 @@ function BuilderPane(props: {
 						<span>{t("builder.addField")}</span>
 					</button>
 				</div>
-				{props.fields.length === 0 ? (
+				{props.items.length === 0 ? (
 					<p className="fd-fields__empty">{t("builder.fieldsEmpty")}</p>
 				) : (
 					<ul className="fd-fields__list">
-						{props.fields.map((field, index) => (
-							<FieldCard
-								key={field.property}
-								field={field}
-								index={index}
-								count={props.fields.length}
-								siblings={props.fields}
-								catalog={props.catalog}
-								onMove={props.onMove}
-								onReorder={props.onReorder}
-								onRemove={props.onRemove}
-								onRelabel={props.onRelabel}
-								onCondition={props.onCondition}
-							/>
-						))}
+						{props.items.map((item, index) => {
+							if (item.kind === FormItemKind.Group) {
+								return (
+									<GroupCard
+										key={item.group.id}
+										group={item.group}
+										index={index}
+										count={props.items.length}
+										catalog={props.catalog}
+										onMove={props.onMove}
+										onRemove={props.onRemove}
+										onRelabelGroup={props.onRelabelGroup}
+										onUnnest={props.onUnnest}
+									/>
+								);
+							}
+							if (item.kind === FormItemKind.Chrome) {
+								return (
+									<ChromeCard
+										key={item.chrome.id}
+										chrome={item.chrome.chrome}
+										index={index}
+										count={props.items.length}
+										onMove={props.onMove}
+										onRemove={props.onRemove}
+									/>
+								);
+							}
+							// The group a field can drop into is the one directly above
+							// it — a single unambiguous target keeps the gesture a
+							// button rather than a drag-into-tree interaction.
+							const above = props.items[index - 1];
+							const groupAbove = above?.kind === FormItemKind.Group ? index - 1 : null;
+							return (
+								<FieldCard
+									key={item.field.property}
+									field={item.field}
+									index={index}
+									count={props.items.length}
+									siblings={props.fields}
+									catalog={props.catalog}
+									groupAbove={groupAbove}
+									onNest={props.onNest}
+									onMove={props.onMove}
+									onReorder={props.onReorder}
+									onRemove={props.onRemove}
+									onRelabel={props.onRelabel}
+									onCondition={props.onCondition}
+								/>
+							);
+						})}
 					</ul>
 				)}
 			</div>
@@ -920,6 +1041,10 @@ function FieldCard(props: {
 	count: number;
 	siblings: readonly FormField[];
 	catalog: Readonly<Record<string, PropertyDef>>;
+	/** Index of the group directly above, if any — the one target this
+	 *  field can be nested into. `null` ⇒ no nest affordance. */
+	groupAbove: number | null;
+	onNest: (index: number, groupIndex: number) => void;
 	onMove: (index: number, delta: number) => void;
 	onReorder: (draggedProperty: string, beforeIndex: number) => void;
 	onRemove: (index: number) => void;
@@ -1010,6 +1135,18 @@ function FieldCard(props: {
 					/>
 				</div>
 				<div className="fd-field-card__actions">
+					{props.groupAbove !== null ? (
+						<button
+							type="button"
+							className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+							aria-label={t("builder.nestField")}
+							data-bs-tooltip={t("builder.nestField")}
+							data-nest-field={field.property}
+							onClick={() => props.onNest(index, props.groupAbove as number)}
+						>
+							<Icon name={IconName.CaretRight} size={14} />
+						</button>
+					) : null}
 					<button
 						type="button"
 						className={
@@ -1068,6 +1205,152 @@ function FieldCard(props: {
  *  field when <field> <operator> <value>". The clause is derived from the
  *  field's persisted `condition` each render (controlled); a predicate the
  *  simple editor can't represent shows a read-only advanced state. */
+/** A labelled section (doc 27 `group` cell). Its fields are shown
+ *  read-only here with a "lift out" control — nesting is edited from the
+ *  field side (one gesture, one direction each), never in two places. */
+function GroupCard(props: {
+	group: FormGroup;
+	index: number;
+	count: number;
+	catalog: Readonly<Record<string, PropertyDef>>;
+	onMove: (index: number, delta: number) => void;
+	onRemove: (index: number) => void;
+	onRelabelGroup: (index: number, label: string) => void;
+	onUnnest: (groupIndex: number, fieldIndex: number) => void;
+}): ReactElement {
+	const { group, index, count } = props;
+	return (
+		<li className="fd-field-card fd-group-card" data-group-index={index}>
+			<div className="fd-field-card__head">
+				<input
+					type="text"
+					className="fd-input bs-input bs-input--sm"
+					value={group.label ?? ""}
+					placeholder={t("builder.groupLabelPlaceholder")}
+					aria-label={t("builder.groupLabel")}
+					onChange={(e) => props.onRelabelGroup(index, e.target.value)}
+				/>
+				<div className="fd-field-card__actions">
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.moveUp")}
+						disabled={index === 0}
+						onClick={() => props.onMove(index, -1)}
+					>
+						<Icon name={IconName.CaretUp} size={14} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.moveDown")}
+						disabled={index === count - 1}
+						onClick={() => props.onMove(index, 1)}
+					>
+						<Icon name={IconName.CaretDown} size={14} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.removeGroup")}
+						onClick={() => props.onRemove(index)}
+					>
+						<Icon name={IconName.Close} size={14} />
+					</button>
+				</div>
+			</div>
+			{group.fields.length === 0 ? (
+				<p className="fd-group-card__empty">{t("builder.groupEmpty")}</p>
+			) : (
+				<ul className="fd-group-card__fields">
+					{group.fields.map((field, fieldIndex) => (
+						<li key={field.property} className="fd-group-card__field">
+							<span className="fd-group-card__field-name">{fieldDisplayName(field, props.catalog)}</span>
+							<button
+								type="button"
+								className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+								aria-label={t("builder.unnestField")}
+								data-bs-tooltip={t("builder.unnestField")}
+								data-unnest-field={field.property}
+								onClick={() => props.onUnnest(index, fieldIndex)}
+							>
+								<Icon name={IconName.CaretLeft} size={14} />
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</li>
+	);
+}
+
+/** A shell-rendered chrome cell (8.4). The designer places it; what it
+ *  draws is the shell's business, so the card is a name + placement
+ *  controls, with no options surface to drift from the registry. */
+function ChromeCard(props: {
+	chrome: ChromeKind;
+	index: number;
+	count: number;
+	onMove: (index: number, delta: number) => void;
+	onRemove: (index: number) => void;
+}): ReactElement {
+	const { chrome, index, count } = props;
+	return (
+		<li className="fd-field-card fd-chrome-card" data-chrome-kind={chrome}>
+			<div className="fd-field-card__head">
+				<span className="fd-chrome-card__name">{chromeLabel(chrome)}</span>
+				<div className="fd-field-card__actions">
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.moveUp")}
+						disabled={index === 0}
+						onClick={() => props.onMove(index, -1)}
+					>
+						<Icon name={IconName.CaretUp} size={14} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.moveDown")}
+						disabled={index === count - 1}
+						onClick={() => props.onMove(index, 1)}
+					>
+						<Icon name={IconName.CaretDown} size={14} />
+					</button>
+					<button
+						type="button"
+						className="bs-btn bs-btn--sm bs-btn--ghost bs-btn--icon"
+						aria-label={t("builder.removeChrome")}
+						onClick={() => props.onRemove(index)}
+					>
+						<Icon name={IconName.Close} size={14} />
+					</button>
+				</div>
+			</div>
+		</li>
+	);
+}
+
+/** The curated chrome kinds, labelled. Closed set per OQ-90 (a), so this
+ *  map is exhaustive by construction. */
+function chromeLabel(kind: ChromeKind): string {
+	switch (kind) {
+		case ChromeKind.ActionBar:
+			return t("chrome.actionBar");
+		case ChromeKind.Breadcrumb:
+			return t("chrome.breadcrumb");
+		case ChromeKind.Meta:
+			return t("chrome.meta");
+		case ChromeKind.WindowControls:
+			return t("chrome.windowControls");
+		case ChromeKind.EntityHeader:
+			return t("chrome.entityHeader");
+		default:
+			return t("chrome.tabs");
+	}
+}
+
 function ConditionEditor(props: {
 	condition: PropertyPredicate | undefined;
 	otherFields: readonly FormField[];
@@ -1262,6 +1545,26 @@ function FillPane(props: {
 		[props.catalog, props.invalidFields, onChange],
 	);
 
+	// Chrome cells draw through the shared 8.4 registry — the designer
+	// places them, the shell owns what they look like. The fill surface is
+	// a preview of a not-yet-created entity, so the host data is what a
+	// draft actually has: its title, and nothing that needs an id.
+	const renderChrome = useMemo(
+		() =>
+			chromeSeam({
+				entity: {
+					id: `form-fill-${props.formId ?? "new"}`,
+					type: props.targetType,
+					properties: props.values,
+					createdAt: 0,
+					updatedAt: 0,
+					deletedAt: null,
+				},
+				title: props.name.trim() || t("sidebar.untitled"),
+			}),
+		[props.formId, props.targetType, props.values, props.name],
+	);
+
 	const renderCell = useCallback(
 		(cell: LayoutCell, body: React.ReactNode): React.ReactNode => {
 			if (cell.kind !== LayoutCellKind.Property) return body;
@@ -1327,7 +1630,7 @@ function FillPane(props: {
 				propertyDef={(key) => props.catalog[key]}
 				values={source}
 				onChange={onChange}
-				seams={{ renderCell, renderMissingCell }}
+				seams={{ renderCell, renderMissingCell, renderChrome }}
 			/>
 			<div className="fd-fill__footer">
 				<button type="button" className="bs-btn" data-bs-primary onClick={props.onCreate}>

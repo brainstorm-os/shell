@@ -118,5 +118,20 @@
   "invoice.status.exportCancelled": "Exportação cancelada.",
   "invoice.status.exportFailed": "Não foi possível exportar a fatura.",
   "invoice.status.created": "Nova fatura pronta — preencha os detalhes.",
-  "invoice.status.offline": "Executando fora do shell — a exportação de PDF precisa do app."
+  "invoice.status.offline": "Executando fora do shell — a exportação de PDF precisa do app.",
+  "builder.nestField": "Mover para a seção acima",
+  "builder.unnestField": "Tirar desta seção",
+  "builder.groupLabel": "Nome da seção",
+  "builder.groupLabelPlaceholder": "Seção",
+  "builder.groupEmpty": "Ainda não há campos nesta seção.",
+  "builder.removeGroup": "Remover seção",
+  "builder.removeChrome": "Remover elemento",
+  "builder.addGroup": "Seção",
+  "builder.addChrome": "Elemento de página",
+  "chrome.actionBar": "Barra de ações",
+  "chrome.breadcrumb": "Trilha de navegação",
+  "chrome.meta": "Criado / modificado",
+  "chrome.windowControls": "Controles da janela",
+  "chrome.entityHeader": "Cabeçalho (ícone + título + ações)",
+  "chrome.tabs": "Abas"
 }

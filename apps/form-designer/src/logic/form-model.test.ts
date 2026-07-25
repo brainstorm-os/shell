@@ -3,6 +3,7 @@ import {
 	LayoutCellKind,
 	LayoutContext,
 	LayoutMode,
+	type PropertyCell,
 	validateAppLayouts,
 	validateLayout,
 } from "@brainstorm-os/sdk-types";
@@ -49,7 +50,7 @@ describe("form-model", () => {
 			id: "field-0",
 			property: "name",
 		});
-		expect(props.cells[1]?.display?.options?.label).toBe("Work email");
+		expect((props.cells[1] as PropertyCell)?.display?.options?.label).toBe("Work email");
 		expect(props.readingOrder).toEqual(["field-0", "field-1"]);
 	});
 

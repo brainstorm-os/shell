@@ -29,8 +29,10 @@ import {
 	type PropertyCell,
 	type PropertyPredicate,
 	type Scope,
+	collectCellIds,
 	validateAppLayouts,
 } from "@brainstorm-os/sdk-types";
+import { type FormItem, fieldItem, itemsToCells } from "./form-items";
 
 /** Default target type for a new form — the generic `Object/v1` the
  *  Database app registers. The builder lets the user pick another. */
@@ -60,7 +62,7 @@ export type FormProperties = {
 	scope: Scope;
 	context: LayoutContext | null;
 	targetType: string;
-	cells: PropertyCell[];
+	cells: LayoutCell[];
 	readingOrder?: string[];
 	/** Track count for `LayoutMode.Grid` (8.10.2). `LayoutDef` places
 	 *  cells individually — it has no notion of "the form's columns" —
@@ -155,7 +157,7 @@ export function cellsToFields(cells: readonly LayoutCell[]): FormField[] {
 	return fields;
 }
 
-function readCellLabel(cell: PropertyCell): string | undefined {
+export function readCellLabel(cell: PropertyCell): string | undefined {
 	const raw = cell.display?.options?.label;
 	return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : undefined;
 }
@@ -172,12 +174,16 @@ export function formScope(targetType: string): Scope {
 export function buildFormProperties(input: {
 	name: string;
 	targetType: string;
-	fields: readonly FormField[];
+	/** The authoring tree (8.10.3). A `fields`-only caller is the flat
+	 *  special case and still works — it maps to one field item each. */
+	items?: readonly FormItem[];
+	fields?: readonly FormField[];
 	/** Track count for grid mode (8.10.2). Absent / <2 ⇒ stacked. */
 	columns?: number;
 }): FormProperties {
 	const tracks = gridColumns(input.columns);
-	const cells = fieldsToCells(input.fields, input.columns);
+	const items = input.items ?? (input.fields ?? []).map(fieldItem);
+	const cells = itemsToCells(items, (index) => (tracks ? flowPlacement(index, tracks) : undefined));
 	return {
 		name: input.name.trim(),
 		mode: formMode(input.columns),
@@ -185,7 +191,7 @@ export function buildFormProperties(input: {
 		context: null,
 		targetType: input.targetType,
 		cells,
-		readingOrder: cells.map((cell) => cell.id),
+		readingOrder: collectCellIds(cells),
 		...(tracks ? { columns: tracks } : {}),
 	};
 }
@@ -245,7 +251,7 @@ export function readFormProperties(raw: Record<string, unknown>): FormProperties
 		typeof raw.targetType === "string" && raw.targetType.length > 0
 			? raw.targetType
 			: DEFAULT_TARGET_TYPE;
-	const cells = Array.isArray(raw.cells) ? (raw.cells as PropertyCell[]) : [];
+	const cells = Array.isArray(raw.cells) ? (raw.cells as LayoutCell[]) : [];
 	const readingOrder = Array.isArray(raw.readingOrder)
 		? (raw.readingOrder as string[])
 		: cells.map((cell) => cell.id);

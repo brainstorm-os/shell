@@ -118,5 +118,20 @@
   "invoice.status.exportCancelled": "Export abgebrochen.",
   "invoice.status.exportFailed": "Die Rechnung konnte nicht exportiert werden.",
   "invoice.status.created": "Neue Rechnung bereit — fülle die Details aus.",
-  "invoice.status.offline": "Läuft außerhalb der Shell — der PDF-Export benötigt die App."
+  "invoice.status.offline": "Läuft außerhalb der Shell — der PDF-Export benötigt die App.",
+  "builder.nestField": "In den Abschnitt darüber verschieben",
+  "builder.unnestField": "Aus diesem Abschnitt herausnehmen",
+  "builder.groupLabel": "Abschnittsname",
+  "builder.groupLabelPlaceholder": "Abschnitt",
+  "builder.groupEmpty": "Noch keine Felder in diesem Abschnitt.",
+  "builder.removeGroup": "Abschnitt entfernen",
+  "builder.removeChrome": "Element entfernen",
+  "builder.addGroup": "Abschnitt",
+  "builder.addChrome": "Seitenelement",
+  "chrome.actionBar": "Aktionsleiste",
+  "chrome.breadcrumb": "Brotkrümelnavigation",
+  "chrome.meta": "Erstellt / geändert",
+  "chrome.windowControls": "Fenstersteuerung",
+  "chrome.entityHeader": "Kopfzeile (Symbol + Titel + Aktionen)",
+  "chrome.tabs": "Tabs"
 }
