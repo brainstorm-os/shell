@@ -35,7 +35,7 @@ function panel(): HTMLElement | null {
 
 describe("<AnalyticsBetaNotice>", () => {
 	it("shows once on beta builds and hides after dismiss", () => {
-		act(() => root.render(<AnalyticsBetaNotice />));
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen />));
 		expect(panel()).not.toBeNull();
 
 		const dismiss = document.querySelector<HTMLButtonElement>(
@@ -49,13 +49,30 @@ describe("<AnalyticsBetaNotice>", () => {
 
 		act(() => root.unmount());
 		root = createRoot(container);
-		act(() => root.render(<AnalyticsBetaNotice />));
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen />));
 		expect(panel()).toBeNull();
+	});
+
+	// The welcome screen is a modal-free zone: this popover centres over the
+	// viewport, so on a fresh 0.x install it landed on top of the create /
+	// open / join tiles and made the first launch unclickable (it also broke
+	// the onboarding e2e on the Linux runner, which is the only place the
+	// version reads as a beta).
+	it("stays closed while no vault is open — the welcome screen must stay clickable", () => {
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen={false} />));
+		expect(panel()).toBeNull();
+	});
+
+	it("opens as soon as a vault is opened", () => {
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen={false} />));
+		expect(panel()).toBeNull();
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen />));
+		expect(panel()).not.toBeNull();
 	});
 
 	it("does not show on GA builds", () => {
 		window.brainstorm = { version: "1.0.0", platform: "darwin" } as typeof window.brainstorm;
-		act(() => root.render(<AnalyticsBetaNotice />));
+		act(() => root.render(<AnalyticsBetaNotice vaultOpen />));
 		expect(panel()).toBeNull();
 	});
 });

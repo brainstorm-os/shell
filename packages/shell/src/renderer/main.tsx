@@ -24,7 +24,7 @@ import { ThemeProvider, applyThemeVars } from "./theme/theme-provider";
 import { ErrorBoundary } from "./ui/error-boundary";
 import "./ui/error-boundary.css";
 import { initAnalytics } from "@brainstorm-os/sdk/analytics";
-import { AnalyticsBetaNotice } from "./analytics/beta-notice";
+import { AnalyticsBetaNoticeHost } from "./analytics/beta-notice";
 import { ShellTracking } from "./analytics/shell-tracking";
 import { installFocusNav } from "./focus-nav";
 import { installErrorBridge } from "./ui/error-bridge";
@@ -76,7 +76,7 @@ createRoot(rootElement).render(
 					 *  bridge resolves against the live theme tokens. */}
 					<BrainstormMenuProvider>
 						<LocaleGate>
-							<AnalyticsBetaNotice />
+							<AnalyticsBetaNoticeHost />
 							<ShellTracking />
 							<App />
 						</LocaleGate>
