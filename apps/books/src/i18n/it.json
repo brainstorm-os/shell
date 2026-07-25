@@ -43,6 +43,7 @@
   "import.dismiss": "Ignora",
   "inspector.show": "Mostra info sul libro",
   "inspector.hide": "Nascondi info sul libro",
+  "inspector.disabledHint": "Seleziona un libro per vederne le informazioni",
   "inspector.title": "Libro",
   "toc.title": "Indice",
   "toc.empty": "Nessun indice.",

@@ -1003,6 +1003,7 @@ export function NotesApp() {
 						}}
 						controls="notes-props"
 						disabled={!note}
+						{...(note ? {} : { hint: t("notes.properties.disabledHint") })}
 					/>
 					{note && (
 						<ObjectMenuMoreButton

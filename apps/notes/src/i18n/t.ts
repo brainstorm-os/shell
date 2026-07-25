@@ -461,6 +461,7 @@ const DEFAULTS: Record<string, string> = {
 	"notes.properties.region": "Note properties",
 	"notes.properties.show": "Show properties",
 	"notes.properties.hide": "Hide properties",
+	"notes.properties.disabledHint": "Open a note to see its properties",
 	"notes.properties.resize": "Resize properties panel",
 	"notes.properties.empty": "No properties on this note yet.",
 	"notes.properties.add": "Add property",

@@ -1046,14 +1046,14 @@ export function BookmarksApp() {
 						labels={{ show: t("header.sidebar.show"), hide: t("header.sidebar.hide") }}
 					/>
 					{showTagsOverview ? <GroupByButton active={grouping} onSet={onSetGrouping} /> : null}
-					{openBookmark ? (
-						<PanelToggleButton
-							side={PanelSide.Right}
-							open={propsOpen}
-							onClick={toggleProps}
-							labels={{ show: t("header.inspector.show"), hide: t("header.inspector.hide") }}
-						/>
-					) : null}
+					<PanelToggleButton
+						side={PanelSide.Right}
+						open={propsOpen && Boolean(openBookmark)}
+						onClick={toggleProps}
+						labels={{ show: t("header.inspector.show"), hide: t("header.inspector.hide") }}
+						disabled={!openBookmark}
+						{...(openBookmark ? {} : { hint: t("header.inspector.disabledHint") })}
+					/>
 					<ObjectMenuMoreButton
 						className="bookmarks__header-more"
 						moreActionsLabel={t("action.moreActions")}

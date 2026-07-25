@@ -326,6 +326,7 @@ const DEFAULTS = {
 	"tasks.dependencies.noCandidates": "No other tasks to block on",
 	"tasks.header.inspector.show": "Show properties",
 	"tasks.header.inspector.hide": "Hide properties",
+	"tasks.header.inspector.disabled": "Open a task to see its properties",
 
 	// Seeded `task-status` vocabulary labels (a user-renamed / custom state
 	// falls back to its humanized key).

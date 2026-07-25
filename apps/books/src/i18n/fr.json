@@ -43,6 +43,7 @@
   "import.dismiss": "Ignorer",
   "inspector.show": "Afficher les infos du livre",
   "inspector.hide": "Masquer les infos du livre",
+  "inspector.disabledHint": "Sélectionnez un livre pour voir ses informations",
   "inspector.title": "Livre",
   "toc.title": "Sommaire",
   "toc.empty": "Aucune table des matières.",

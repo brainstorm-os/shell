@@ -2108,6 +2108,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 							show: t("tasks.header.inspector.show"),
 							hide: t("tasks.header.inspector.hide"),
 						}}
+						{...(openTaskRecord && propertiesSvc ? {} : { hint: t("tasks.header.inspector.disabled") })}
 					/>
 					{openTaskRecord ? (
 						<LockButton

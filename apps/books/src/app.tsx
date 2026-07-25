@@ -819,6 +819,7 @@ export function BooksApp(): ReactElement {
 						}
 						labels={{ show: t("inspector.show"), hide: t("inspector.hide") }}
 						disabled={!selectedBook}
+						{...(selectedBook ? {} : { hint: t("inspector.disabledHint") })}
 					/>
 					<button
 						ref={headerMoreRef}
