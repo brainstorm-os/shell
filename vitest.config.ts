@@ -115,7 +115,17 @@ export default defineConfig({
 				"packages/sdk/src/property-ui/dictionary-editor.tsx",
 			),
 			"@brainstorm-os/sdk/property-ui": resolve(__dirname, "packages/sdk/src/property-ui.ts"),
+			// `.css` first — the prefix matcher would otherwise rewrite
+			// `…/layout-view.css` to `…/layout-view/index.ts.css`.
+			"@brainstorm-os/sdk/layout-view.css": resolve(
+				__dirname,
+				"packages/sdk/src/layout-view/layout-view.css",
+			),
 			"@brainstorm-os/sdk/layout-view": resolve(__dirname, "packages/sdk/src/layout-view/index.ts"),
+			"@brainstorm-os/sdk/layout-chrome.css": resolve(
+				__dirname,
+				"packages/sdk/src/layout-chrome/layout-chrome.css",
+			),
 			"@brainstorm-os/sdk/layout-chrome": resolve(
 				__dirname,
 				"packages/sdk/src/layout-chrome/index.ts",
