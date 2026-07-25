@@ -16,6 +16,7 @@
 
 import { type ChromeCell, ChromeKind } from "@brainstorm-os/sdk-types";
 import type { ReactElement } from "react";
+import { Orientation, useCompositeKeyboard } from "../a11y";
 import {
 	type ActionBarOptions,
 	BREADCRUMB_ELLIPSIS_ID,
@@ -170,17 +171,39 @@ function EntityHeader({
 	);
 }
 
+/** A tab strip is the canonical composite widget, so it routes through
+ *  the shared `useCompositeKeyboard` rather than hand-writing
+ *  tablist/tab roles — that hook owns the roving tabindex, the arrow /
+ *  Home / End model and the selection attribute, and a chrome cell that
+ *  reimplemented them would drift from every other tab strip. The active
+ *  tab is host state, so navigating IS selecting: both the arrow move and
+ *  Enter route to the tab's own `onSelect`. */
 function Tabs({ host }: { host: ChromeHost }): ReactElement {
 	const tabs = host.tabs ?? [];
+	const activeIndex = Math.max(
+		0,
+		tabs.findIndex((tab) => tab.active),
+	);
+	const select = (index: number): void => {
+		tabs[index]?.onSelect();
+	};
+	const keyboard = useCompositeKeyboard({
+		orientation: Orientation.Horizontal,
+		count: tabs.length,
+		activeIndex,
+		onActiveIndexChange: select,
+		onActivate: select,
+		role: "tablist",
+		itemRole: "tab",
+	});
 	return (
-		<div className="bs-chrome bs-chrome__tabs" role="tablist">
-			{tabs.map((tab) => (
+		<div {...keyboard.containerProps} className="bs-chrome bs-chrome__tabs">
+			{tabs.map((tab, index) => (
 				<button
+					{...keyboard.getItemProps(index)}
 					key={tab.id}
 					type="button"
-					role="tab"
 					className="bs-chrome__tab"
-					aria-selected={Boolean(tab.active)}
 					data-tab-id={tab.id}
 					onClick={tab.onSelect}
 				>
