@@ -73,10 +73,10 @@ describe("renderer cost of one vault snapshot refresh", () => {
 		try {
 			const snapshot = makeSnapshot(200);
 			const load = vi.fn(async () => snapshot);
-			let fire: (() => void) | null = null;
+			const listeners: Array<() => void> = [];
 			const store = createQueryStore<VaultEntitiesSnapshot>({
 				subscribe: (onChange) => {
-					fire = onChange;
+					listeners.push(onChange);
 					return () => undefined;
 				},
 				load,
@@ -89,7 +89,7 @@ describe("renderer cost of one vault snapshot refresh", () => {
 
 			// 50 writes in quick succession — a seed drain, a sync burst, a
 			// paste. Every one of them signals every open app.
-			for (let i = 0; i < 50; i += 1) fire?.();
+			for (let i = 0; i < 50; i += 1) for (const fire of listeners) fire();
 			await vi.runAllTimersAsync();
 
 			const burstReloads = load.mock.calls.length - afterBind;
@@ -110,10 +110,10 @@ describe("renderer cost of one vault snapshot refresh", () => {
 			// A fresh object every load — the realistic case (IPC always returns
 			// new objects), so identity can never short-circuit.
 			const load = vi.fn(async () => JSON.parse(JSON.stringify(snapshot)));
-			let fire: (() => void) | null = null;
+			const listeners: Array<() => void> = [];
 			const store = createQueryStore<VaultEntitiesSnapshot>({
 				subscribe: (onChange) => {
-					fire = onChange;
+					listeners.push(onChange);
 					return () => undefined;
 				},
 				load,
@@ -128,7 +128,7 @@ describe("renderer cost of one vault snapshot refresh", () => {
 			const afterFirst = notifications;
 
 			for (let i = 0; i < 5; i += 1) {
-				fire?.();
+				for (const fire of listeners) fire();
 				await vi.runAllTimersAsync();
 			}
 
