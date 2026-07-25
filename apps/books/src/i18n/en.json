@@ -43,6 +43,7 @@
   "import.dismiss": "Dismiss",
   "inspector.show": "Show book info",
   "inspector.hide": "Hide book info",
+  "inspector.disabledHint": "Select a book to see its info",
   "inspector.title": "Book",
   "toc.title": "Contents",
   "toc.empty": "No table of contents.",

@@ -24,22 +24,10 @@
 					aria-label="Search"
 					title="Search"
 				></button>
-				<button
-					type="button"
-					class="bs-panel-toggle"
-					id="header-btn-sidebar"
-					aria-pressed="true"
-					aria-label="Toggle source list"
-					title="Toggle source list"
-				></button>
-				<button
-					type="button"
-					class="bs-panel-toggle"
-					id="header-btn-inspector"
-					aria-pressed="false"
-					aria-label="Toggle inspector"
-					title="Toggle inspector"
-				></button>
+				<!-- The sidebar + inspector toggles are built by the shared
+				     `createPanelToggleButton` at boot (mountPanelToggles) so their
+				     chrome, aria contract and localized show/hide labels match
+				     every other app. -->
 			</div>
 		</header>
 

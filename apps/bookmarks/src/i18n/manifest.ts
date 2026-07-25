@@ -22,6 +22,7 @@ export const BOOKMARKS_MESSAGES = {
 	"header.sidebar.hide": "Hide sidebar",
 	"header.inspector.show": "Show properties",
 	"header.inspector.hide": "Hide properties",
+	"header.inspector.disabledHint": "Open a bookmark to see its properties",
 
 	"nav.surfaces": "Surfaces",
 	"sidebar.tags": "Tags",

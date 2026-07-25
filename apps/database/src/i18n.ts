@@ -90,6 +90,13 @@ const DEFAULTS = {
 	"brainstorm.database.sidebar.system": "System",
 	"brainstorm.database.sidebar.systemToggle": "Toggle the System section",
 
+	// Header panel toggles (shared `createPanelToggleButton`)
+	"brainstorm.database.chrome.sidebar.show": "Show source list",
+	"brainstorm.database.chrome.sidebar.hide": "Hide source list",
+	"brainstorm.database.chrome.inspector.show": "Show inspector",
+	"brainstorm.database.chrome.inspector.hide": "Hide inspector",
+	"brainstorm.database.chrome.inspector.disabled": "Nothing to inspect — this view has no rows",
+
 	// Read-only record lock (inspector header toggle)
 	"brainstorm.database.record.lock": "Lock record (read-only)",
 	"brainstorm.database.record.unlock": "Unlock record",

@@ -43,6 +43,7 @@
   "import.dismiss": "Dispensar",
   "inspector.show": "Mostrar informações do livro",
   "inspector.hide": "Ocultar informações do livro",
+  "inspector.disabledHint": "Selecione um livro para ver suas informações",
   "inspector.title": "Livro",
   "toc.title": "Sumário",
   "toc.empty": "Sem sumário.",

@@ -83,4 +83,50 @@ describe("createPanelToggleButton", () => {
 		expect(element.getAttribute("aria-controls")).toBe("notes-nav");
 		expect(element.dataset.testid).toBe("toolbar-sidebar");
 	});
+
+	it("hint overrides the show/hide label so a disabled toggle explains itself", () => {
+		const { element } = createPanelToggleButton({
+			side: PanelSide.Right,
+			open: false,
+			onClick: () => {},
+			labels: LABELS,
+			disabled: true,
+			hint: "Select a row first",
+		});
+		expect(element.getAttribute("aria-label")).toBe("Select a row first");
+		expect(element.dataset.bsTooltip).toBe("Select a row first");
+		// A disabled control fires no pointer events, so the animated tooltip
+		// chip can't open — the native title is what explains it.
+		expect(element.title).toBe("Select a row first");
+	});
+
+	it("setHint swaps the override and restores the show/hide label when cleared", () => {
+		const { element, setHint, setDisabled } = createPanelToggleButton({
+			side: PanelSide.Right,
+			open: false,
+			onClick: () => {},
+			labels: LABELS,
+		});
+		setDisabled(true);
+		setHint("Nothing to inspect");
+		expect(element.getAttribute("aria-label")).toBe("Nothing to inspect");
+		expect(element.title).toBe("Nothing to inspect");
+		setDisabled(false);
+		setHint(undefined);
+		expect(element.getAttribute("aria-label")).toBe("Show sidebar");
+		expect(element.hasAttribute("title")).toBe(false);
+	});
+
+	it("setHint keeps the current open-state (does not reset the icon)", () => {
+		const { element, render, setHint } = createPanelToggleButton({
+			side: PanelSide.Left,
+			open: false,
+			onClick: () => {},
+			labels: LABELS,
+		});
+		render(true);
+		setHint("Busy");
+		expect(element.getAttribute("aria-pressed")).toBe("true");
+		expect(element.querySelectorAll("rect")).toHaveLength(2);
+	});
 });

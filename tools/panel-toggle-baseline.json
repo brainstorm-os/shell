@@ -1,0 +1,12 @@
+{
+  "alwaysLive": [
+    "apps/files/src/app.tsx",
+    "apps/journal/src/app.tsx",
+    "apps/preview/src/ui/header-actions.tsx"
+  ],
+  "whyAlwaysLive": {
+    "apps/files/src/app.tsx": "The inspector renders with no selection — its body falls back to an `inspector__empty` hint and the Preview/Properties/Comments tab strip stays usable, so the toggle always changes what is on screen. Disabling it would remove a working panel.",
+    "apps/journal/src/app.tsx": "The properties aside is always in the DOM and toggles via `aria-hidden`/`inert` + the `data-props-open` CSS collapse. Journal is date-addressed — there is always a focused day — so there is no selection to gate on.",
+    "apps/preview/src/ui/header-actions.tsx": "The inspector is CSS-collapsed through `preview--inspector-collapsed` rather than conditionally rendered; the panel is mounted whenever the app is, so the toggle is never a no-op."
+  }
+}

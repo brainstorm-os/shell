@@ -74,7 +74,11 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, panelToggleIcon } from "@brainstorm-os/sdk/panel-toggle";
+import {
+	PanelSide,
+	type PanelToggleButtonHandle,
+	createPanelToggleButton,
+} from "@brainstorm-os/sdk/panel-toggle";
 import { createAddIconGlyph } from "@brainstorm-os/sdk/picker-host";
 import "@brainstorm-os/sdk/presence-stack.css";
 import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
@@ -416,6 +420,8 @@ type PersistedState = {
 // every piece of module state lives above the call. (Caught by the
 // real-DOM boot smoke test.)
 let statusTimer: ReturnType<typeof setTimeout> | null = null;
+let sidebarToggle: PanelToggleButtonHandle | null = null;
+let inspectorToggle: PanelToggleButtonHandle | null = null;
 let vaultReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let lastVaultSignature: string | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -589,6 +595,7 @@ function bootApp(): void {
 
 	renderHeaderIcons();
 	renderToolbarIcons();
+	mountPanelToggles(state);
 	bindHeaderButtons(state);
 	bindToolbarButtons(state);
 	bindStageKeyboard(state);
@@ -1133,12 +1140,18 @@ function renderActiveViewInner(state: AppState): void {
 	if (!compiled) {
 		body.className = "db-stage__body";
 		delete body.dataset.viewKind;
+		setInspectorAvailable(false);
 		renderEmpty(body, emptyStateContent(state));
 		return;
 	}
 	const { view, entities } = compiled;
 	const compiledView = time("db.compileView", () =>
 		compileViewCached(view, entities, groupLabelResolver(state), groupOrderResolver(state)),
+	);
+	setInspectorAvailable(
+		compiledView.groups.length === 0
+			? compiledView.rows.length > 0
+			: compiledView.groups.some((group) => group.rows.length > 0),
 	);
 
 	// className/data-view-kind stay imperative on the host (#stage-body);
@@ -2435,16 +2448,8 @@ function applyChrome(state: AppState): void {
 		main.dataset.inspectorOpen = String(state.chrome.inspectorOpen);
 	}
 	writeBoolPref(LS_SIDEBAR_OPEN_KEY, state.chrome.sidebarOpen);
-	const sidebarBtn = document.getElementById("header-btn-sidebar");
-	const inspectorBtn = document.getElementById("header-btn-inspector");
-	if (sidebarBtn) {
-		sidebarBtn.setAttribute("aria-pressed", String(state.chrome.sidebarOpen));
-		sidebarBtn.replaceChildren(panelToggleIcon(PanelSide.Left, state.chrome.sidebarOpen));
-	}
-	if (inspectorBtn) {
-		inspectorBtn.setAttribute("aria-pressed", String(state.chrome.inspectorOpen));
-		inspectorBtn.replaceChildren(panelToggleIcon(PanelSide.Right, state.chrome.inspectorOpen));
-	}
+	sidebarToggle?.render(state.chrome.sidebarOpen);
+	inspectorToggle?.render(state.chrome.inspectorOpen);
 }
 
 /* ── View mutations (calendar drag, board drag, settings popover) ──── */
@@ -3591,10 +3596,54 @@ function renderHeaderIcons(): void {
 	if (search) setSharedIcon(search, IconName.Search);
 	if (newList) setSharedIcon(newList, IconName.Plus);
 	if (inspectorClose) setSharedIcon(inspectorClose, IconName.Close);
-	// Sidebar + inspector toggles use the shared `panelToggleIcon` SVG so
-	// they read identically with every other first-party app's header
-	// toggle. `applyChrome` repaints the glyph on every state flip so the
-	// active fill tracks open/closed.
+}
+
+/** Build the header's sidebar + inspector toggles through the shared
+ *  `createPanelToggleButton` — same chrome, same aria contract and the same
+ *  state-tracking show/hide label as every other first-party app. */
+function mountPanelToggles(state: AppState): void {
+	const right = document.querySelector(".app-header__right");
+	if (!right) return;
+	sidebarToggle = createPanelToggleButton({
+		side: PanelSide.Left,
+		open: state.chrome.sidebarOpen,
+		labels: {
+			show: t("brainstorm.database.chrome.sidebar.show"),
+			hide: t("brainstorm.database.chrome.sidebar.hide"),
+		},
+		ariaControls: "db-sidebar",
+		onClick: () => {
+			state.chrome.sidebarOpen = !state.chrome.sidebarOpen;
+			applyChrome(state);
+			schedulePersist(state);
+		},
+	});
+	inspectorToggle = createPanelToggleButton({
+		side: PanelSide.Right,
+		open: state.chrome.inspectorOpen,
+		labels: {
+			show: t("brainstorm.database.chrome.inspector.show"),
+			hide: t("brainstorm.database.chrome.inspector.hide"),
+		},
+		onClick: () => openInspectorFromHeader(state),
+	});
+	// The ids are the long-standing selector contract for the dogfood session
+	// specs (`#header-btn-inspector`); the shared helper owns everything else.
+	sidebarToggle.element.id = "header-btn-sidebar";
+	inspectorToggle.element.id = "header-btn-inspector";
+	right.append(sidebarToggle.element, inspectorToggle.element);
+}
+
+/** The inspector always has a row to show once the view has one: opening with
+ *  an empty selection seeds the first visible row. With *no* visible rows there
+ *  is nothing to seed, so the toggle disables itself rather than becoming a
+ *  button that does nothing (the cross-app panel-toggle availability rule). */
+function setInspectorAvailable(available: boolean): void {
+	if (!inspectorToggle) return;
+	inspectorToggle.setDisabled(!available);
+	inspectorToggle.setHint(
+		available ? undefined : t("brainstorm.database.chrome.inspector.disabled"),
+	);
 }
 
 function renderToolbarIcons(): void {
@@ -3639,35 +3688,33 @@ function bindResizableChrome(): void {
 	}
 }
 
-function bindHeaderButtons(state: AppState): void {
-	document.getElementById("header-btn-sidebar")?.addEventListener("click", () => {
-		state.chrome.sidebarOpen = !state.chrome.sidebarOpen;
-		applyChrome(state);
-		schedulePersist(state);
-	});
-	document.getElementById("header-btn-inspector")?.addEventListener("click", () => {
-		const opening = !state.chrome.inspectorOpen;
-		// Opening with nothing selected would render an empty panel that
-		// renderInspector then immediately closes (no selection → closed). Seed
-		// the first visible row so the toggle always shows something to inspect
-		// (a no-op only on a genuinely empty grid).
-		if (opening && state.selection.selectedIds.size === 0) {
-			const first = orderedVisibleIds(state)[0];
-			if (first) {
-				state.selection = applyClick(
-					state.selection,
-					first,
-					{ shiftKey: false, metaKey: false },
-					orderedVisibleIds(state),
-				);
-			}
+function openInspectorFromHeader(state: AppState): void {
+	const opening = !state.chrome.inspectorOpen;
+	// Opening with nothing selected would render an empty panel that
+	// renderInspector then immediately closes (no selection → closed). Seed
+	// the first visible row so the toggle always shows something to inspect;
+	// on a genuinely empty view the toggle is disabled instead
+	// (`setInspectorAvailable`), so this never no-ops.
+	if (opening && state.selection.selectedIds.size === 0) {
+		const visible = orderedVisibleIds(state);
+		const first = visible[0];
+		if (first) {
+			state.selection = applyClick(
+				state.selection,
+				first,
+				{ shiftKey: false, metaKey: false },
+				visible,
+			);
 		}
-		state.chrome.inspectorOpen = opening;
-		applyChrome(state);
-		renderInspector(state);
-		repaintSelection(state);
-		schedulePersist(state);
-	});
+	}
+	state.chrome.inspectorOpen = opening;
+	applyChrome(state);
+	renderInspector(state);
+	repaintSelection(state);
+	schedulePersist(state);
+}
+
+function bindHeaderButtons(state: AppState): void {
 	document.getElementById("inspector-close")?.addEventListener("click", () => {
 		state.chrome.inspectorOpen = false;
 		applyChrome(state);

@@ -29,6 +29,10 @@ export interface PanelToggleButtonOptions {
 	/** Optional disabled flag — Files/Notes disable the inspector toggle
 	 *  when no entity is selected. Updates re-paint via `setDisabled`. */
 	disabled?: boolean;
+	/** Overrides the title / aria-label — used to explain a disabled state
+	 *  ("Select a contact first"). Falls back to the show/hide label. The
+	 *  React twin's `hint` prop; updates re-paint via `setHint`. */
+	hint?: string;
 	/** Optional `data-testid` — handy when tests target the toggle by role
 	 *  is fragile (multiple toggles per app). */
 	testId?: string;
@@ -40,6 +44,8 @@ export interface PanelToggleButtonHandle {
 	render(open: boolean): void;
 	/** Repaint disabled-state. */
 	setDisabled(disabled: boolean): void;
+	/** Swap the label override (see `hint`) and repaint. */
+	setHint(hint: string | undefined): void;
 }
 
 /** Build the toggle button + paint its initial state. The host owns the
@@ -56,8 +62,12 @@ export function createPanelToggleButton(opts: PanelToggleButtonOptions): PanelTo
 		opts.onClick();
 	});
 
+	let hint = opts.hint;
+	let isOpen = opts.open;
+
 	const render = (open: boolean): void => {
-		const label = open ? opts.labels.hide : opts.labels.show;
+		isOpen = open;
+		const label = hint ?? (open ? opts.labels.hide : opts.labels.show);
 		element.setAttribute("aria-pressed", String(open));
 		element.setAttribute("aria-label", label);
 		// The animated `.bs-tooltip` chip renders off `data-bs-tooltip`; the
@@ -76,8 +86,14 @@ export function createPanelToggleButton(opts: PanelToggleButtonOptions): PanelTo
 		else element.removeAttribute("title");
 	};
 
+	const setHint = (next: string | undefined): void => {
+		hint = next;
+		render(isOpen);
+		setDisabled(element.disabled);
+	};
+
 	render(opts.open);
 	if (opts.disabled) setDisabled(true);
 
-	return { element, render, setDisabled };
+	return { element, render, setDisabled, setHint };
 }
