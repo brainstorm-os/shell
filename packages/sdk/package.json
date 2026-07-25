@@ -96,6 +96,8 @@
     "./select-menu.css": "./src/select-menu/select-menu.css",
     "./layout-resolver": "./src/layout-resolver.ts",
     "./layout-view": "./src/layout-view/index.ts",
+    "./layout-chrome": "./src/layout-chrome/index.ts",
+    "./layout-chrome.css": "./src/layout-chrome/layout-chrome.css",
     "./layout-view.css": "./src/layout-view/layout-view.css",
     "./widget": "./src/widget/index.tsx",
     "./block-frame": "./src/block-frame/index.ts",
