@@ -3,6 +3,205 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.10.0",
+      "date": "2026-07-25",
+      "icon": "🧩",
+      "title": "Compose your own",
+      "summary": "Design your own forms and layouts — fields, sections and page elements, arranged how you want and rendered live. Plus a browser your automations can read, Notion import without an export file, and an agent that can propose a whole database.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Design your own forms"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sections and page elements",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the form designer no longer builds only fields. Group related fields into a "
+            },
+            {
+              "text": "section",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", and drop in real "
+            },
+            {
+              "text": "page elements",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " — all from the same add button."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Arrange it your way",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a new "
+            },
+            {
+              "text": "grid mode",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " lays fields out side by side instead of one per row, and what you build is what you get: the form you fill in renders through the same layout you designed."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "A browser your automations can read"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Summarize this page",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — ask the browser for the gist of whatever you're reading, right from its "
+            },
+            {
+              "text": "⋯ menu",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". The summary says where it came from — it's a summary, not the page."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Read-only browsing",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — automations can now read the web for you. They browse in a "
+            },
+            {
+              "text": "separate, signed-out session",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " that can only read — never your logged-in tabs, and never submitting anything."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Bring your work in"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notion import",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — connect your Notion account and pull pages straight across. "
+            },
+            {
+              "text": "No export file",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " to download first."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "The agent goes further"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Propose a database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the agent can now draft a "
+            },
+            {
+              "text": "row in one of your databases",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", or design a whole new database, and hand it to you as a card. As always, nothing is saved until you approve it."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Panels tell you what they need",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a side-panel button that can't do anything yet is now clearly off, and says what to select first."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Backup & Migration",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — clearer settings for moving and backing up your vault."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Fixes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the welcome message no longer covers the app on first launch, and Brainstorm starts faster."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "⬇️",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from Settings → Updates."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.9.1",
       "date": "2026-07-24",
       "icon": "🔧",
