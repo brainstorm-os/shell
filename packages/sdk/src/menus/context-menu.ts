@@ -24,6 +24,7 @@ import {
 	defineMenu,
 } from "@react-fancy-menus/core";
 import { getActiveMenuStore } from "./active-store";
+import { blankMenuIcon } from "./sdk-icon";
 
 /** How the menu aligns to its trigger on the cross axis. `Start` = the
  *  menu's left edge tracks the trigger's left (cursor / left-side rows);
@@ -76,6 +77,40 @@ function isHeader(it: ContextMenuItem): boolean {
 
 function hasSubmenu(it: ContextMenuItem): boolean {
 	return Array.isArray(it.submenu) && it.submenu.length > 0;
+}
+
+/**
+ * Keep one menu's leading icon gutter consistent (F-461).
+ *
+ * A menu that mixes icon-bearing and icon-less action rows reads as two
+ * menus stacked: the gutter is empty for one half and occupied for the
+ * other, so the labels step sideways mid-list. The reported case was the
+ * dashboard widget ⋯ menu — a Size group (no glyph, selection shown only as
+ * a row highlight) sitting above Open app / Remove widget (both iconed).
+ *
+ * The rule is applied here rather than at the ~200 call sites because a
+ * per-menu fix re-drifts the moment someone adds a row: the gutter is a
+ * property of the *rendered list*, so the list's one entry point owns it.
+ * When any action row in a list carries an icon, every other action row in
+ * that same list gets `blankMenuIcon` — a no-op glyph that reserves the
+ * column. A menu whose rows are ALL icon-less is left alone (no gutter is
+ * a consistent gutter); headers and dividers never take one.
+ *
+ * Each cascade child is its own popup, so a `submenu` is normalized as its
+ * own list — a parent's icons don't force a gutter on children.
+ */
+function normalizeIconGutter(items: ContextMenuItem[]): ContextMenuItem[] {
+	const anyIcon = items.some((it) => !isHeader(it) && it.icon !== undefined);
+	return items.map((it) => {
+		const submenu = hasSubmenu(it) ? normalizeIconGutter(it.submenu ?? []) : undefined;
+		const needsBlank = anyIcon && !isHeader(it) && it.icon === undefined;
+		if (!needsBlank && submenu === undefined) return it;
+		return {
+			...it,
+			...(needsBlank ? { icon: blankMenuIcon } : {}),
+			...(submenu ? { submenu } : {}),
+		};
+	});
 }
 
 export const CONTEXT_MENU_ID = "bs/context-menu";
@@ -346,7 +381,7 @@ export function openContextMenu(
 	if (activeContextMenuId !== config.id) store.close(activeContextMenuId);
 	activeContextMenuId = config.id;
 	store.open(config.id, {
-		data: { items },
+		data: { items: normalizeIconGutter(items) },
 		...(anchor ? { element: anchor } : { rect: anchorRectAt(point) }),
 		...(options?.minWidth ? { position: { minWidth: options.minWidth } } : {}),
 	});
