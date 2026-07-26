@@ -3,6 +3,119 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.10.1",
+      "date": "2026-07-26",
+      "icon": "🏷️",
+      "title": "Automations learn to file",
+      "summary": "Your automations can now write down what they figure out — set a task's priority to the AI's answer, straight from the builder. Plus every menu lines up, and the widget Size menu tells the truth.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Automations can file what they figure out"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Fields to write",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a Create or Update step can now set each field from an earlier step's answer: "
+            },
+            {
+              "text": "priority = the AI's classification",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "title = the email's subject",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Pick the step, name the field, done — right in the builder."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "No more glue steps",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a "
+            },
+            {
+              "text": "When an email arrives",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " trigger now feeds the next step directly. The workflow you'd naturally build just runs."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Everything in its place"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Menus line up",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — when any row in a menu carries an icon, every row now shares the same gutter, so labels read straight down instead of stepping sideways halfway through."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The Size menu tells the truth",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a dashboard widget's ⋯ menu now shows its real size ("
+            },
+            {
+              "text": "Size — 20×21",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ") and marks "
+            },
+            {
+              "text": "Custom",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " when you've resized it by hand. Picking a preset still snaps to it."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "⬇️",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from Settings → Updates."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.10.0",
       "date": "2026-07-25",
       "icon": "🧩",
