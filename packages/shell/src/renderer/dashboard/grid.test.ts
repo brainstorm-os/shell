@@ -18,6 +18,7 @@ import {
 	getCellSize,
 	isLegacyIconLayout,
 	layoutIcons,
+	matchedWidgetSize,
 	migrateWidgetRecord,
 	pointToCell,
 	repackIcons,
@@ -289,5 +290,34 @@ describe("clampWidgetSizeToSurface", () => {
 		expect(
 			clampWidgetSizeToSurface({ col: 500, row: 500 }, { w: 40, h: 40 }, { x: 0, y: 0 }),
 		).toEqual({ w: 40, h: 40 });
+	});
+});
+
+/**
+ * F-462 — the widget Size menu has to be able to say "none of these".
+ *
+ * `current = w === fp.w && h === fp.h` against three presets left every row
+ * unmarked for any hand-resized widget, because the resize grip writes
+ * arbitrary units. `matchedWidgetSize` makes that state representable.
+ */
+describe("matchedWidgetSize (F-462)", () => {
+	it("names each preset footprint", () => {
+		expect(matchedWidgetSize(widgetFootprint(WidgetSize.Small))).toBe(WidgetSize.Small);
+		expect(matchedWidgetSize(widgetFootprint(WidgetSize.Medium))).toBe(WidgetSize.Medium);
+		expect(matchedWidgetSize(widgetFootprint(WidgetSize.Large))).toBe(WidgetSize.Large);
+	});
+
+	it("returns null for a size the user dragged to", () => {
+		// The reported case: any freehand resize lands between presets, and the
+		// menu must not claim one of them is current.
+		expect(matchedWidgetSize({ w: 33, h: 27 })).toBeNull();
+		expect(matchedWidgetSize({ w: 21, h: 20 })).toBeNull();
+	});
+
+	it("compares BOTH axes — presets share a width and a height", () => {
+		// Small (20x20) and Medium (40x20) share a height; Medium (40x20) and
+		// Large (40x40) share a width. Matching one axis would mislabel these.
+		expect(matchedWidgetSize({ w: 20, h: 40 })).toBeNull();
+		expect(matchedWidgetSize({ w: 40, h: 30 })).toBeNull();
 	});
 });
