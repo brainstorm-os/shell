@@ -16,7 +16,7 @@ import { bytesToBase64Url } from "../pairing/pairing-channel";
 import { ed25519 } from "../test-support/crypto-test-helpers";
 import { type LanRosterEntry, makeLanClientHandshake, makeLanHostHandshake } from "./lan-admission";
 import { LanRelayHost } from "./lan-relay-host";
-import { LanRelayListener, lanInterfaces } from "./lan-relay-listener";
+import { LanRelayListener, lanInterfaces, normalizeSourceAddress } from "./lan-relay-listener";
 import { WebSocketRelayPort } from "./websocket-relay-port";
 
 const testVerify = (pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean =>
@@ -159,6 +159,42 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 			await listener.stop();
 			relayHost.close();
 		}
+	});
+
+	it("ANSWERS a plain HTTP request instead of hanging forever", async () => {
+		// Found by probing this listener: with no request handler a plain GET
+		// hung with no response and no timeout, and the rate limiter never saw
+		// it (that only fires on a WebSocket `connection`) — so any LAN host
+		// could hold un-upgraded sockets against us having proven nothing.
+		//
+		// The companion defense — reaping sockets that connect and send NOTHING
+		// — is deliberately not asserted here: Bun's `node:http` never emits
+		// `connection`, so it cannot work under this runner. It is verified
+		// under Node (the runtime Electron uses); see the note in the source.
+		const host = new LanRelayHost();
+		const listener = new LanRelayListener({ host, address: "127.0.0.1" });
+		try {
+			const bound = await listener.start();
+			const res = await fetch(`http://127.0.0.1:${bound.port}/`, {
+				signal: AbortSignal.timeout(3_000),
+			});
+			expect(res.status).toBe(426); // Upgrade Required
+		} finally {
+			await listener.stop();
+			host.close();
+		}
+	});
+
+	it("normalizes IPv4-mapped IPv6 so one peer cannot claim two budgets", () => {
+		// `::ffff:10.0.0.5` and `10.0.0.5` are the same host. Keying the rate
+		// limiter on the raw string would give it double the allowance, which is
+		// the entire correctness of the limit.
+		expect(normalizeSourceAddress("::ffff:10.0.0.5")).toBe("10.0.0.5");
+		expect(normalizeSourceAddress("::FFFF:10.0.0.5")).toBe("10.0.0.5");
+		expect(normalizeSourceAddress("10.0.0.5")).toBe("10.0.0.5");
+		expect(normalizeSourceAddress("::ffff:10.0.0.5")).toBe(normalizeSourceAddress("10.0.0.5"));
+		// A genuine IPv6 peer is left alone.
+		expect(normalizeSourceAddress("fe80::1")).toBe("fe80::1");
 	});
 
 	it("RATE-LIMITS one source address (the G9 half that needs a real socket)", async () => {

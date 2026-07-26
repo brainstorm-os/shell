@@ -52,6 +52,18 @@ export function lanInterfaces(): LanInterface[] {
 	return out;
 }
 
+/**
+ * Collapse the IPv4-mapped IPv6 form to its IPv4 spelling. A dual-stack accept
+ * reports `::ffff:10.0.0.5` while the same host over IPv4 reports `10.0.0.5`;
+ * keying the rate limiter on the raw string would hand one peer two
+ * independent budgets. Exported so the collapse is testable on its own — it is
+ * the whole correctness of the limit.
+ */
+export function normalizeSourceAddress(raw: string): string {
+	const lower = raw.trim().toLowerCase();
+	return lower.startsWith("::ffff:") ? lower.slice("::ffff:".length) : lower;
+}
+
 function isPrivateIpv4(address: string): boolean {
 	const parts = address.split(".").map(Number);
 	if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
@@ -72,6 +84,13 @@ export const DEFAULT_LAN_RATE_LIMIT = 10;
 export const DEFAULT_LAN_RATE_WINDOW_MS = 10_000;
 /** Refuse an oversized frame at the socket edge, before it is buffered. */
 export const DEFAULT_LAN_MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
+/** A peer has 5s to send request headers, 10s to finish the request. Node's
+ *  defaults are minutes — far too generous for a listener whose callers have
+ *  proven nothing yet. */
+export const DEFAULT_LAN_HEADERS_TIMEOUT_MS = 5_000;
+export const DEFAULT_LAN_REQUEST_TIMEOUT_MS = 10_000;
+/** Ceiling on raw TCP sockets, upgraded or not. */
+export const DEFAULT_LAN_MAX_SOCKETS = 64;
 
 export type LanRelayListenerOptions = {
 	host: LanRelayHost;
@@ -84,6 +103,12 @@ export type LanRelayListenerOptions = {
 	maxConnectionsPerSource?: number;
 	rateWindowMs?: number;
 	maxPayloadBytes?: number;
+	/** Reap a socket that connects but never completes request headers. */
+	headersTimeoutMs?: number;
+	requestTimeoutMs?: number;
+	/** Ceiling on TCP sockets regardless of upgrade state — the pre-upgrade
+	 *  phase must not be able to outflank the host's post-upgrade cap. */
+	maxSockets?: number;
 	now?: () => number;
 };
 
@@ -113,6 +138,9 @@ export class LanRelayListener {
 			maxConnectionsPerSource: opts.maxConnectionsPerSource ?? DEFAULT_LAN_RATE_LIMIT,
 			rateWindowMs: opts.rateWindowMs ?? DEFAULT_LAN_RATE_WINDOW_MS,
 			maxPayloadBytes: opts.maxPayloadBytes ?? DEFAULT_LAN_MAX_PAYLOAD_BYTES,
+			headersTimeoutMs: opts.headersTimeoutMs ?? DEFAULT_LAN_HEADERS_TIMEOUT_MS,
+			requestTimeoutMs: opts.requestTimeoutMs ?? DEFAULT_LAN_REQUEST_TIMEOUT_MS,
+			maxSockets: opts.maxSockets ?? DEFAULT_LAN_MAX_SOCKETS,
 			now: opts.now ?? Date.now,
 		};
 	}
@@ -126,7 +154,62 @@ export class LanRelayListener {
 	 *  already bound rather than opening a second port. */
 	async start(): Promise<LanListenerAddress> {
 		if (this.#bound) return this.#bound;
-		const http = createServer();
+		// A plain HTTP request must get a definite answer and be closed. Found by
+		// probing this listener: with no request handler the connection HUNG
+		// FOREVER — no response, no timeout — and the rate limiter never saw it,
+		// because that only fires on a WebSocket `connection`. So any LAN host
+		// could hold unlimited un-upgraded sockets against us with no roster
+		// membership and no crypto: pre-auth exhaustion (T1/T7) through the one
+		// door the admission machinery doesn't cover.
+		const http = createServer((_req, res) => {
+			res.writeHead(426, { "content-type": "text/plain" }); // Upgrade Required
+			res.end("brainstorm-lan: websocket only\n");
+		});
+		// Reap sockets that connect and then stall without completing a request
+		// (the raw-TCP variant of the same attack — it never reaches the handler
+		// above). Node's defaults are minutes; on a LAN listener that is far too
+		// generous for a peer that has proven nothing.
+		http.headersTimeout = this.#opts.headersTimeoutMs;
+		http.requestTimeout = this.#opts.requestTimeoutMs;
+		// Hard ceiling on TCP sockets regardless of upgrade state, so the
+		// pre-upgrade phase cannot outflank the host's post-upgrade cap.
+		http.maxConnections = this.#opts.maxSockets;
+		// `headersTimeout` alone is NOT enough: probing showed 10/10 raw TCP
+		// sockets that connect and send nothing surviving well past it (the
+		// runtime does not always honour it, and a security control must not
+		// depend on that). So reap them explicitly — every socket gets a
+		// handshake deadline, cleared the moment it upgrades.
+		//
+		// The clear-on-upgrade half is essential: an established WebSocket is
+		// long-lived and often idle, so leaving an inactivity timeout armed
+		// would kill healthy peers.
+		//
+		// ⚠️ RUNTIME NOTE — this defense is NOT covered by the test suite. Bun's
+		// `node:http` shim never emits `connection` at all (measured: 0 events),
+		// so under `bun --bun vitest` stalled sockets are not reaped and a test
+		// asserting they are would fail for a reason that does not exist in
+		// production. Verified directly under Node instead — `connection events:
+		// 5 | closed by server: 5` — which is the runtime Electron actually uses.
+		// Re-check this by hand under Node if the hook ever changes.
+		const upgraded = new WeakSet<object>();
+		http.on("upgrade", (_req, socket) => upgraded.add(socket));
+		http.on("connection", (socket) => {
+			// An EXPLICIT timer, not `socket.setTimeout` and not
+			// `headersTimeout`: probing showed 0 of 10 stalled sockets reaped by
+			// either. A security control cannot rest on timer semantics that vary
+			// by runtime, so this owns its own deadline.
+			//
+			// Cleared once the socket upgrades — an established WebSocket is
+			// long-lived and often idle, so a deadline left armed would kill
+			// healthy peers.
+			const timer = setTimeout(() => {
+				if (!upgraded.has(socket)) socket.destroy();
+			}, this.#opts.headersTimeoutMs);
+			if (typeof (timer as { unref?: () => void }).unref === "function") {
+				(timer as { unref: () => void }).unref();
+			}
+			socket.once("close", () => clearTimeout(timer));
+		});
 		const wss = new WebSocketServer({
 			server: http,
 			maxPayload: this.#opts.maxPayloadBytes,
@@ -204,15 +287,21 @@ export class LanRelayListener {
 	/** G9 (per-source half) — bound how fast one address may reconnect. The
 	 *  in-process host caps TOTAL connections; without this a single hostile
 	 *  peer can churn through that budget and lock legitimate devices out. */
-	#allowSource(source: string): boolean {
-		if (!source) return false;
+	#allowSource(rawSource: string): boolean {
+		if (!rawSource) return false;
+		const source = normalizeSourceAddress(rawSource);
 		const now = this.#opts.now();
 		const cutoff = now - this.#opts.rateWindowMs;
-		const seen = (this.#recent.get(source) ?? []).filter((t) => t > cutoff);
-		if (seen.length >= this.#opts.maxConnectionsPerSource) {
-			this.#recent.set(source, seen);
-			return false;
+		// Evict every stale bucket, not just this source's: the map is keyed by
+		// ATTACKER-CHOSEN addresses, so pruning only the current key lets a peer
+		// with a subnet grow it without bound.
+		for (const [key, times] of this.#recent) {
+			const live = times.filter((t) => t > cutoff);
+			if (live.length === 0) this.#recent.delete(key);
+			else this.#recent.set(key, live);
 		}
+		const seen = this.#recent.get(source) ?? [];
+		if (seen.length >= this.#opts.maxConnectionsPerSource) return false;
 		seen.push(now);
 		this.#recent.set(source, seen);
 		return true;
