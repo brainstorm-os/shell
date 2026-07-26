@@ -310,6 +310,27 @@ export type IntentStep = StepBase<StepKind.Intent> & {
 export type EntityStep = StepBase<StepKind.Entity> & {
 	op: EntityOp;
 	entityType: string;
+	/**
+	 * Field values to write, each one an expression in the `Code` step's
+	 * grammar, evaluated against the same scope (prior-step outputs +
+	 * `input`) — e.g. `{ priority: "classify", title: "input.subject" }`
+	 * (F-458).
+	 *
+	 * Why this exists: before it, a Create/Update step could only write
+	 * whatever the previous step *already produced* as a whole object, so a
+	 * workflow could have an AI classify an email and still have nowhere to
+	 * put the answer — "set priority to the AI's output" was unexpressible.
+	 * Reusing the audited expression grammar keeps the write path legible in
+	 * the builder (a key → expression list) and adds no new evaluation
+	 * surface.
+	 *
+	 * When present these are the AUTHORITATIVE field set — the operand-derived
+	 * record is not merged underneath, because with an entity trigger that
+	 * operand is `{ entityId, type, verb }` and merging would stamp the event
+	 * metadata onto the record. Omit `properties` entirely to keep the old
+	 * operand-passthrough behaviour.
+	 */
+	properties?: Readonly<Record<string, string>>;
 };
 
 export type NotifyStep = StepBase<StepKind.Notify> & {

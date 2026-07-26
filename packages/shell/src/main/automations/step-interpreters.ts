@@ -299,6 +299,44 @@ function operandProperties(input: unknown): Record<string, unknown> {
 	return {};
 }
 
+/**
+ * Resolve an Entity step's declared field expressions (F-458).
+ *
+ * Each value is an expression in the `Code` step's grammar, evaluated
+ * against the same scope, so "set priority to what the AI decided" is
+ * `{ priority: "classify" }` — no Code step and no object-literal grammar.
+ * When a step declares fields they are AUTHORITATIVE — the operand-derived
+ * record is not merged underneath. Merging looked friendlier ("pass a base
+ * record, override one field") but it writes whatever happens to be upstream:
+ * with an entity trigger the operand is `{ entityId, type, verb }`, so a
+ * declared `priority` would also stamp the event metadata onto the record.
+ * Writing fields nobody asked for is the same class of silent-wrong-write
+ * this field exists to remove. No `properties` at all leaves the old
+ * operand behaviour untouched.
+ *
+ * Returns the resolved map, or the name of the field whose expression blew
+ * up so the step can fail loudly: silently writing `undefined` onto a record
+ * is how a wrong value lands and nobody notices.
+ */
+function resolveStepProperties(
+	declared: Readonly<Record<string, string>> | undefined,
+	scope: ExprScope,
+):
+	| { ok: true; declared: boolean; values: Record<string, unknown> }
+	| { ok: false; field: string; reason: string } {
+	if (!declared) return { ok: true, declared: false, values: {} };
+	const values: Record<string, unknown> = {};
+	for (const [field, expression] of Object.entries(declared)) {
+		try {
+			values[field] = evaluateExpression(expression, scope);
+		} catch (e) {
+			const reason = e instanceof ExpressionError ? e.message : String(e);
+			return { ok: false, field, reason };
+		}
+	}
+	return { ok: true, declared: true, values };
+}
+
 // ─────────────────────────── interpreters ───────────────────────────
 
 const intentInterpreter =
@@ -314,18 +352,27 @@ const entityInterpreter =
 	async (step, ctx) => {
 		const s = step as EntityStep;
 		switch (s.op) {
-			case EntityOp.Create:
+			case EntityOp.Create: {
+				const fields = resolveStepProperties(s.properties, expressionScope(ctx));
+				if (!fields.ok) return failField("create", fields.field, fields.reason);
 				return {
 					ok: true,
-					output: await ports.entities.create(s.entityType, operandProperties(ctx.input)),
+					output: await ports.entities.create(
+						s.entityType,
+						fields.declared ? fields.values : operandProperties(ctx.input),
+					),
 				};
+			}
 			case EntityOp.Update: {
 				const id = operandId(ctx.input);
 				if (!id) return failOperand("update", "an entity id");
 				const existing = await ports.entities.get(id);
 				if (!existing) return notFound("update", id);
 				if (existing.type !== s.entityType) return outOfScope("update", existing.type, s.entityType);
-				return { ok: true, output: await ports.entities.update(id, operandProperties(ctx.input)) };
+				const fields = resolveStepProperties(s.properties, expressionScope(ctx));
+				if (!fields.ok) return failField("update", fields.field, fields.reason);
+				const patch = fields.declared ? fields.values : operandProperties(ctx.input);
+				return { ok: true, output: await ports.entities.update(id, patch) };
 			}
 			case EntityOp.Get: {
 				const id = operandId(ctx.input);
@@ -361,6 +408,16 @@ const entityInterpreter =
 
 function failOperand(op: string, needs: string): StepOutcome {
 	return { ok: false, error: `entity-${op}-needs ${needs}`, retriable: false };
+}
+
+/** A declared field expression that could not be evaluated — named, so the
+ *  run log says WHICH field rather than just "the step failed". */
+function failField(op: string, field: string, reason: string): StepOutcome {
+	return {
+		ok: false,
+		error: `entity-${op}-field ${field}: ${reason}`,
+		retriable: false,
+	};
 }
 
 /** 11b.6 security gate — runtime entity-type scope. The operand id comes from
