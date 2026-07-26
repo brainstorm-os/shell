@@ -27,13 +27,17 @@
  * and per-device revocation cannot be built on it; it is also the key that
  * signs roster records, which is what made the challenge a signing oracle (G1).
  *
- * ⚠️ **The mutual half is still MISSING (gate finding G2, blocking LAN-4).**
- * The design says the client verifies the host back; no such code exists, so a
- * rogue host can relay a live nonce from the real host and be admitted AS THE
- * VICTIM. Until that lands, this module authenticates only host→client.
+ * **Channel binding (G2, LAN-2b(a)).** The bottom of this file adds the
+ * HPKE-sealed challenge that makes admission relay-proof: a signature proves
+ * possession of a key, not that the key is on the other end of THIS connection,
+ * so the design's "mutual challenge" could not stop a relay. Sealing the nonce
+ * to the peer's roster X25519 key can. Wiring it through the port + host is
+ * LAN-2b(b) — until that lands the transport still uses the plaintext-nonce
+ * path above.
  */
 
 import { ed25519Verify } from "@brainstorm-os/native";
+import { openBase, sealBase } from "../credentials/hpke";
 import { base64UrlToBytes } from "../pairing/pairing-channel";
 import type { AuthResponse } from "./websocket-relay-port";
 
@@ -246,4 +250,127 @@ export function makeLanChallengeResponder(
  *  small (the decode we reuse from `pairing-channel`). */
 function bytesToBase64Url(bytes: Uint8Array): string {
 	return Buffer.from(bytes).toString("base64url");
+}
+
+// ────────────── channel-bound admission (LAN-2b(a) — gate finding G2) ──────────────
+
+/**
+ * **The G2 fix.** A signature proves possession of a key, NOT that the key is
+ * on the other end of *this* connection — so the design's prescribed "mutual
+ * challenge" cannot stop a relay: the attacker forwards each side's nonce to
+ * the other and both finish "authenticated" with it in the middle.
+ *
+ * Admission is therefore bound to an **X25519 key agreement**: the host seals
+ * the challenge nonce with HPKE to the connecting device's `deviceX25519Pub`
+ * (already in the roster from pairing), so only the holder of that secret can
+ * answer at all. A relay holds neither device's secret — it cannot open the
+ * ciphertext, and cannot re-seal the host's nonce to the victim.
+ *
+ * Design + full test plan: `docs/data/lan-channel-binding.md`.
+ */
+const LAN_HPKE_INFO = new TextEncoder().encode("brainstorm/lan-admission/v1");
+
+/** Which side a proof is for. A proof for one direction must never verify as
+ *  the other's — otherwise a rogue host reflects the client's own proof back
+ *  and "proves" itself with it. */
+export enum LanProofDirection {
+	Client = "client",
+	Host = "host",
+}
+
+const CLIENT_PROOF_TAG = new TextEncoder().encode("brainstorm/lan-admission/v1/client\0");
+const HOST_PROOF_TAG = new TextEncoder().encode("brainstorm/lan-admission/v1/host\0");
+
+export type SealedChallenge = { enc: string; ct: string };
+
+function concatBytes(...parts: readonly Uint8Array[]): Uint8Array {
+	let total = 0;
+	for (const p of parts) total += p.length;
+	const out = new Uint8Array(total);
+	let at = 0;
+	for (const p of parts) {
+		out.set(p, at);
+		at += p.length;
+	}
+	return out;
+}
+
+/** AAD for the sealed challenge: both device accounts in a fixed order, so a
+ *  ciphertext is bound to exactly this (host, client) pair and cannot be
+ *  replayed onto a different connection. */
+function challengeAad(hostAccount: string, clientAccount: string): Uint8Array {
+	return new TextEncoder().encode(`${hostAccount} ${clientAccount}`);
+}
+
+/** The bytes a party signs to prove it holds the device Ed25519 key AND opened
+ *  this connection's nonce. Both accounts are bound in, so the proof is useless
+ *  on any other connection. */
+export function lanProofBytes(
+	direction: LanProofDirection,
+	hostAccount: string,
+	clientAccount: string,
+	nonce: Uint8Array,
+): Uint8Array {
+	const tag = direction === LanProofDirection.Client ? CLIENT_PROOF_TAG : HOST_PROOF_TAG;
+	return concatBytes(tag, challengeAad(hostAccount, clientAccount), nonce);
+}
+
+/**
+ * HOST — seal `nonce` to the connecting device's X25519 public key. Only that
+ * device can open it: this is what makes holding the roster's X25519 secret a
+ * precondition for answering, and what a relay cannot fake.
+ */
+export function sealLanChallenge(args: {
+	clientX25519Pub: Uint8Array;
+	hostAccount: string;
+	clientAccount: string;
+	nonce: Uint8Array;
+	seal?: (
+		pkR: Uint8Array,
+		info: Uint8Array,
+		aad: Uint8Array,
+		pt: Uint8Array,
+	) => { enc: Uint8Array; ct: Uint8Array };
+}): SealedChallenge {
+	const seal = args.seal ?? ((pkR, info, aad, pt) => sealBase(pkR, info, aad, pt));
+	const { enc, ct } = seal(
+		args.clientX25519Pub,
+		LAN_HPKE_INFO,
+		challengeAad(args.hostAccount, args.clientAccount),
+		args.nonce,
+	);
+	return { enc: bytesToBase64Url(enc), ct: bytesToBase64Url(ct) };
+}
+
+/**
+ * CLIENT — open a sealed challenge with this device's X25519 secret. Returns
+ * null on ANY failure (wrong recipient, tampered ciphertext, mismatched
+ * account pair — the AAD covers all three). Fail-closed.
+ */
+export function openLanChallenge(args: {
+	sealed: SealedChallenge;
+	deviceX25519Secret: Uint8Array;
+	hostAccount: string;
+	clientAccount: string;
+	open?: (
+		enc: Uint8Array,
+		skR: Uint8Array,
+		info: Uint8Array,
+		aad: Uint8Array,
+		ct: Uint8Array,
+	) => Uint8Array;
+}): Uint8Array | null {
+	const open = args.open ?? ((enc, skR, info, aad, ct) => openBase(enc, skR, info, aad, ct));
+	try {
+		const nonce = open(
+			base64UrlToBytes(args.sealed.enc),
+			args.deviceX25519Secret,
+			LAN_HPKE_INFO,
+			challengeAad(args.hostAccount, args.clientAccount),
+			base64UrlToBytes(args.sealed.ct),
+		);
+		return nonce.length === CHALLENGE_NONCE_BYTES ? nonce : null;
+	} catch {
+		return null;
+	}
 }
