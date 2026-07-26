@@ -13,13 +13,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { generateDeviceX25519 } from "../credentials/device-x25519";
 import { base64UrlToBytes, bytesToBase64Url } from "../pairing/pairing-channel";
 import { ed25519 } from "../test-support/crypto-test-helpers";
 import { encodeFrame } from "./envelope-codec";
 import {
 	LanRole,
 	electLanRole,
-	lanRosterAdmissionSet,
+	lanRosterDirectory,
 	makeLanAdmissionVerifier,
 	makeLanChallengeResponder,
 } from "./lan-admission";
@@ -44,12 +45,29 @@ async function waitFor(pred: () => boolean, tries = 40): Promise<boolean> {
 /** A device identity for the roster + challenge signing. */
 function makeDevice() {
 	const kp = ed25519.keygen();
+	const x = generateDeviceX25519();
 	const account = bytesToBase64Url(new Uint8Array(kp.publicKey));
 	const responder = makeLanChallengeResponder({
 		deviceAccount: () => account,
 		signWithDeviceKey: (msg) => new Uint8Array(ed25519.sign(msg, kp.secretKey)),
 	});
-	return { kp, account, responder };
+	return {
+		kp,
+		account,
+		responder,
+		x25519Pub: new Uint8Array(x.publicKey),
+		x25519Secret: new Uint8Array(x.secretKey),
+	};
+}
+
+/** The roster directory a host admits against, from device fixtures. */
+function rosterOf(...devices: readonly { account: string; x25519Pub: Uint8Array }[]) {
+	return new Map(
+		devices.map((d) => [
+			d.account,
+			{ ed25519Pub: base64UrlToBytes(d.account), x25519Pub: d.x25519Pub },
+		]),
+	);
 }
 
 /** Inject the test ed25519 verify (arg order differs from native). */
@@ -119,7 +137,7 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 	it("admits a roster member with a valid nonce signature; frames fan out", async () => {
 		const a = makeDevice();
 		const b = makeDevice();
-		const roster = new Set([a.account, b.account]);
+		const roster = rosterOf(a, b);
 		const admit = makeLanAdmissionVerifier({
 			activeDeviceKeys: () => roster,
 			verify: testVerify,
@@ -158,7 +176,7 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 	it("rejects a non-roster peer (never admitted, socket closed)", async () => {
 		const member = makeDevice();
 		const intruder = makeDevice();
-		const roster = new Set([member.account]); // intruder NOT in roster
+		const roster = rosterOf(member); // intruder NOT in roster
 		let admitCalls = 0;
 		const admit = makeLanAdmissionVerifier({
 			activeDeviceKeys: () => {
@@ -187,7 +205,7 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 
 	it("rejects a roster member whose signature is forged", async () => {
 		const good = makeDevice();
-		const roster = new Set([good.account]);
+		const roster = rosterOf(good);
 		const admit = makeLanAdmissionVerifier({
 			activeDeviceKeys: () => roster,
 			verify: testVerify,
@@ -212,13 +230,13 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 	});
 });
 
-describe("lanRosterAdmissionSet — the admission principal (gate G3/G4/G8)", () => {
+describe("lanRosterDirectory — the admission principal (gate G3/G4/G8)", () => {
 	const b64 = (b: Uint8Array) => Buffer.from(b).toString("base64");
 
 	it("transcodes roster base64 to the canonical base64url the wire uses", () => {
 		const dev = ed25519.keygen();
 		const pub = new Uint8Array(dev.publicKey);
-		const set = lanRosterAdmissionSet([{ deviceEd25519Pub: b64(pub) }]);
+		const set = lanRosterDirectory([{ deviceEd25519Pub: b64(pub) }]);
 		// The roster stores base64; the wire account is base64url. A naive
 		// string-equality membership check would never match across the two.
 		expect(set.has(bytesToBase64Url(pub))).toBe(true);
@@ -233,13 +251,13 @@ describe("lanRosterAdmissionSet — the admission principal (gate G3/G4/G8)", ()
 			{ deviceEd25519Pub: b64(revoked), revokedAt: 123 },
 		];
 		const active = all.filter((r) => r.revokedAt === undefined);
-		const set = lanRosterAdmissionSet(active);
+		const set = lanRosterDirectory(active);
 		expect(set.has(bytesToBase64Url(kept))).toBe(true);
 		expect(set.has(bytesToBase64Url(revoked))).toBe(false);
 	});
 
 	it("drops malformed / wrong-length roster rows rather than admitting them", () => {
-		const set = lanRosterAdmissionSet([
+		const set = lanRosterDirectory([
 			{ deviceEd25519Pub: "" },
 			{ deviceEd25519Pub: "not-base64-!!!" },
 			{ deviceEd25519Pub: b64(new Uint8Array(16)) },
@@ -268,7 +286,7 @@ describe("lanRosterAdmissionSet — the admission principal (gate G3/G4/G8)", ()
 		expect([...base64UrlToBytes(variant)]).toEqual([...pub]);
 
 		const admit = makeLanAdmissionVerifier({
-			activeDeviceKeys: () => lanRosterAdmissionSet([{ deviceEd25519Pub: b64(pub) }]),
+			activeDeviceKeys: () => lanRosterDirectory([{ deviceEd25519Pub: b64(pub) }]),
 			verify: () => true, // isolate the encoding check from the signature check
 		});
 		const nonce = bytesToBase64Url(new Uint8Array(32).fill(1));
@@ -304,7 +322,7 @@ describe("LanRelayHost — admission limits (gate G9/G11) and the rotate verb (G
 		const timers = fakeTimers();
 		const host = new LanRelayHost({
 			admit: makeLanAdmissionVerifier({
-				activeDeviceKeys: () => new Set([member.account]),
+				activeDeviceKeys: () => rosterOf(member),
 				verify: testVerify,
 			}),
 			setTimer: timers.setTimer,
@@ -331,7 +349,7 @@ describe("LanRelayHost — admission limits (gate G9/G11) and the rotate verb (G
 		const timers = fakeTimers();
 		const host = new LanRelayHost({
 			admit: makeLanAdmissionVerifier({
-				activeDeviceKeys: () => new Set([member.account]),
+				activeDeviceKeys: () => rosterOf(member),
 				verify: testVerify,
 			}),
 			setTimer: timers.setTimer,
@@ -383,7 +401,7 @@ describe("LanRelayHost — admission limits (gate G9/G11) and the rotate verb (G
 		// verify would read 0 with or without the guard (a vacuous test).
 		let admitCalls = 0;
 		const inner = makeLanAdmissionVerifier({
-			activeDeviceKeys: () => new Set([member.account]),
+			activeDeviceKeys: () => rosterOf(member),
 			verify: testVerify,
 		});
 		const host = new LanRelayHost({
@@ -426,7 +444,7 @@ describe("LanRelayHost — admission limits (gate G9/G11) and the rotate verb (G
 		const a = makeDevice();
 		const host = new LanRelayHost({
 			admit: makeLanAdmissionVerifier({
-				activeDeviceKeys: () => new Set([a.account]),
+				activeDeviceKeys: () => rosterOf(a),
 				verify: testVerify,
 			}),
 		});

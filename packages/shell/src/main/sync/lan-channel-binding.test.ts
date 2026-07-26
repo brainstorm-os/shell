@@ -17,7 +17,11 @@ import { ed25519 } from "../test-support/crypto-test-helpers";
 import {
 	CHALLENGE_NONCE_BYTES,
 	LanProofDirection,
+	type LanRosterEntry,
+	type SealedChallenge,
 	lanProofBytes,
+	makeLanClientHandshake,
+	makeLanHostHandshake,
 	openLanChallenge,
 	sealLanChallenge,
 } from "./lan-admission";
@@ -227,5 +231,118 @@ describe("channel-bound LAN admission (G2)", () => {
 		// The reflected proof fails as a host proof, under either key.
 		expect(ed25519.verify(clientSig, hostMsg, client.edPublic)).toBe(false);
 		expect(ed25519.verify(clientSig, hostMsg, host.edPublic)).toBe(false);
+	});
+});
+
+describe("handshake builders (LAN-2b(b)) — host ⇄ client", () => {
+	const directoryOf = (...devices: ReturnType<typeof makeDevice>[]) =>
+		new Map(devices.map((d) => [d.account, { ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub }]));
+
+	function handshakePair(
+		host: ReturnType<typeof makeDevice>,
+		client: ReturnType<typeof makeDevice>,
+		directory: ReadonlyMap<string, LanRosterEntry> = directoryOf(host, client),
+	) {
+		const hostSide = makeLanHostHandshake({
+			hostAccount: () => host.account,
+			activeDevices: () => directory,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		const clientSide = makeLanClientHandshake({
+			deviceAccount: () => client.account,
+			deviceX25519Secret: () => client.x25519Secret,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
+			activeDevices: () => directory,
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		return { hostSide, clientSide };
+	}
+
+	it("completes: seal → open → prove → verify, in both directions", () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const { hostSide, clientSide } = handshakePair(host, client);
+
+		const sealed = hostSide.sealFor(client.account, NONCE);
+		expect(sealed).not.toBeNull();
+
+		const auth = clientSide.onSealedChallenge(host.account, sealed as SealedChallenge);
+		expect(auth).not.toBeNull();
+		expect(hostSide.verifyClient(client.account, (auth as { sig: string }).sig, NONCE)).toBe(true);
+
+		const proof = hostSide.proveToClient(client.account, NONCE);
+		expect(proof).not.toBeNull();
+		expect(clientSide.verifyHostProof(proof as string)).toBe(true);
+	});
+
+	it("refuses to seal for a device that is not in the roster", () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const stranger = makeDevice();
+		const { hostSide } = handshakePair(host, client);
+		expect(hostSide.sealFor(stranger.account, NONCE)).toBeNull();
+	});
+
+	it("refuses to seal for a roster row with no usable X25519 key (no plaintext fallback)", () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const directory: Map<string, LanRosterEntry> = new Map([
+			[host.account, { ed25519Pub: host.edPublic, x25519Pub: host.x25519Pub }],
+			[client.account, { ed25519Pub: client.edPublic }], // X25519 missing
+		]);
+		const { hostSide } = handshakePair(host, client, directory);
+		expect(hostSide.sealFor(client.account, NONCE)).toBeNull();
+	});
+
+	it("the CLIENT refuses a challenge from a host that is not itself rostered", () => {
+		// A rogue advertiser is not a paired device, whatever it claims to be.
+		const host = makeDevice();
+		const client = makeDevice();
+		const rogue = makeDevice();
+		const directory = directoryOf(host, client); // rogue absent
+		const { clientSide } = handshakePair(host, client, directory);
+		const rogueSide = makeLanHostHandshake({
+			hostAccount: () => rogue.account,
+			activeDevices: () =>
+				new Map([[client.account, { ed25519Pub: client.edPublic, x25519Pub: client.x25519Pub }]]),
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, rogue.edSecret)),
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		const sealed = rogueSide.sealFor(client.account, NONCE);
+		expect(sealed).not.toBeNull(); // the rogue CAN seal — public keys are public
+		// …but the client refuses it: the sender is not a paired device.
+		expect(clientSide.onSealedChallenge(rogue.account, sealed as SealedChallenge)).toBeNull();
+	});
+
+	it("RELAY — a forwarded challenge yields no usable proof", () => {
+		const realHost = makeDevice();
+		const victim = makeDevice();
+		const attacker = makeDevice();
+		// The attacker IS a paired device here — the strongest version of the
+		// attack (a malicious-but-rostered peer trying to impersonate another).
+		const directory = directoryOf(realHost, victim, attacker);
+		const { hostSide } = handshakePair(realHost, attacker, directory);
+		const victimSide = makeLanClientHandshake({
+			deviceAccount: () => victim.account,
+			deviceX25519Secret: () => victim.x25519Secret,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, victim.edSecret)),
+			activeDevices: () => directory,
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+
+		// The real host challenges the ATTACKER's connection.
+		const forAttacker = hostSide.sealFor(attacker.account, NONCE) as SealedChallenge;
+		// The attacker forwards it to the victim, hoping for a usable signature.
+		expect(victimSide.onSealedChallenge(realHost.account, forAttacker)).toBeNull();
+
+		// Even if the victim answers a re-sealed challenge, the resulting proof
+		// names the VICTIM, so it does not admit the attacker's connection.
+		const forVictim = hostSide.sealFor(victim.account, NONCE) as SealedChallenge;
+		const victimAuth = victimSide.onSealedChallenge(realHost.account, forVictim);
+		expect(victimAuth).not.toBeNull();
+		expect(hostSide.verifyClient(attacker.account, (victimAuth as { sig: string }).sig, NONCE)).toBe(
+			false,
+		);
 	});
 });
