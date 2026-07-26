@@ -64,6 +64,23 @@ export function normalizeSourceAddress(raw: string): string {
 	return lower.startsWith("::ffff:") ? lower.slice("::ffff:".length) : lower;
 }
 
+/**
+ * May we bind here? Private or loopback IPv4 literals only.
+ *
+ * Loopback is allowed so tests can bind without touching a real interface;
+ * everything else must satisfy `isPrivateIpv4`. Anything that is not a
+ * four-octet literal — a hostname, `0`, `0x0`, `::0`, a trailing dot — is
+ * refused, because those are exactly the forms that resolved to a wildcard.
+ */
+export function isBindableAddress(address: string): boolean {
+	const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address.trim());
+	if (!m) return false;
+	const octets = m.slice(1, 5).map(Number);
+	if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+	if (octets[0] === 127) return true; // loopback — test/local host client
+	return isPrivateIpv4(address.trim());
+}
+
 function isPrivateIpv4(address: string): boolean {
 	const parts = address.split(".").map(Number);
 	if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
@@ -109,6 +126,11 @@ export type LanRelayListenerOptions = {
 	/** Ceiling on TCP sockets regardless of upgrade state — the pre-upgrade
 	 *  phase must not be able to outflank the host's post-upgrade cap. */
 	maxSockets?: number;
+	/** Post-listen server errors (the socket is up, something went wrong). The
+	 *  wiring routes these to the shell's error log; unset ⇒ swallowed, never
+	 *  re-thrown, because an unhandled emitter error takes down the main
+	 *  process. */
+	onError?: (err: Error) => void;
 	now?: () => number;
 };
 
@@ -117,20 +139,29 @@ export type LanRelayListenerOptions = {
 export type LanListenerAddress = { address: string; port: number; url: string };
 
 export class LanRelayListener {
-	readonly #opts: Required<Omit<LanRelayListenerOptions, "host" | "port">> &
+	readonly #opts: Required<Omit<LanRelayListenerOptions, "host" | "port" | "onError">> &
 		Pick<LanRelayListenerOptions, "host" | "port">;
 	#http: Server | null = null;
 	#wss: WebSocketServer | null = null;
 	#bound: LanListenerAddress | null = null;
+	readonly #onError: ((err: Error) => void) | null;
 	/** source address → recent connection timestamps (rate limiting). */
 	readonly #recent = new Map<string, number[]>();
 
 	constructor(opts: LanRelayListenerOptions) {
-		if (!opts.address || opts.address === "0.0.0.0" || opts.address === "::") {
-			// Refuse the wildcard outright rather than trusting every caller to
-			// remember: this is the difference between "my LAN" and "the internet".
-			throw new Error("LanRelayListener: address must be a specific interface, not a wildcard");
+		if (!isBindableAddress(opts.address ?? "")) {
+			// An ALLOWLIST, not a wildcard blocklist. The first version compared
+			// against "0.0.0.0" and "::" and was trivially bypassed — the pentest
+			// bound `"0"`, `"::0"`, `"0x0"` and `"0.0.0.0."` and reached the port
+			// off-loopback on the machine's real LAN address. A blocklist also
+			// cannot express "not a public address": a hostname or a routable
+			// literal sailed through. So: must parse as an IPv4 LITERAL (never a
+			// name the resolver gets to interpret) and be private or loopback.
+			throw new Error(
+				"LanRelayListener: address must be a private or loopback IPv4 literal, not a wildcard or hostname",
+			);
 		}
+		this.#onError = opts.onError ?? null;
 		this.#opts = {
 			host: opts.host,
 			address: opts.address,
@@ -219,9 +250,25 @@ export class LanRelayListener {
 			perMessageDeflate: false,
 		});
 		wss.on("connection", (socket, request) => {
+			// FIRST, before any branch that might return: an unhandled 'error' on
+			// a `ws` socket throws, and both refusal paths below used to hand back
+			// a live socket with no listener attached. The pentest drove an
+			// UNCAUGHT EXCEPTION IN THE SHELL MAIN PROCESS from an unpaired LAN
+			// host with 11 connections and one malformed frame (RSV1 set). A
+			// global uncaughtException handler existed, so it did not hard-kill —
+			// it ran on post-exception, forwarded a flood to the renderer. Not a
+			// defense worth relying on.
+			socket.on("error", () => {
+				// A socket-level error on a peer we may not even have adopted is
+				// not actionable; adopted sockets get their real handler in #adopt.
+			});
 			const source = request.socket.remoteAddress ?? "";
 			if (!this.#allowSource(source)) {
-				socket.close();
+				// terminate(), not close(): a graceful close lets a peer that
+				// ignores the close frame keep the socket AND the `ws` object alive
+				// for the 30s close timeout (measured: 50/50 refused sockets still
+				// open at t+15s, gone only at t+31s).
+				socket.terminate();
 				return;
 			}
 			this.#adopt(socket);
@@ -229,17 +276,33 @@ export class LanRelayListener {
 		this.#http = http;
 		this.#wss = wss;
 
-		await new Promise<void>((resolve, reject) => {
-			const onError = (err: Error): void => {
-				http.off("listening", onListening);
+		// L2 — PERMANENT error handlers on BOTH emitters, installed before listen.
+		// `new WebSocketServer({ server })` makes `ws` re-emit the http server's
+		// 'error' on the WebSocketServer, which had no listener — so a bind
+		// failure threw instead of rejecting. That is the ordinary laptop case,
+		// not an exotic one: Wi-Fi flaps or the DHCP lease changes between
+		// `lanInterfaces()` and `start()` and the address is simply gone
+		// (EADDRNOTAVAIL), or the port is taken (EADDRINUSE). Post-listen server
+		// errors took the same unhandled path.
+		let rejectBind: ((err: Error) => void) | null = null;
+		const onServerError = (err: Error): void => {
+			const reject = rejectBind;
+			rejectBind = null;
+			if (reject) {
 				reject(err);
-			};
-			const onListening = (): void => {
-				http.off("error", onError);
+				return;
+			}
+			this.#onError?.(err);
+		};
+		wss.on("error", onServerError);
+		http.on("error", onServerError);
+
+		await new Promise<void>((resolve, reject) => {
+			rejectBind = reject;
+			http.once("listening", () => {
+				rejectBind = null;
 				resolve();
-			};
-			http.once("error", onError);
-			http.once("listening", onListening);
+			});
 			http.listen(this.#opts.port ?? 0, this.#opts.address);
 		});
 

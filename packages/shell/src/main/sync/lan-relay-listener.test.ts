@@ -16,7 +16,12 @@ import { bytesToBase64Url } from "../pairing/pairing-channel";
 import { ed25519 } from "../test-support/crypto-test-helpers";
 import { type LanRosterEntry, makeLanClientHandshake, makeLanHostHandshake } from "./lan-admission";
 import { LanRelayHost } from "./lan-relay-host";
-import { LanRelayListener, lanInterfaces, normalizeSourceAddress } from "./lan-relay-listener";
+import {
+	LanRelayListener,
+	isBindableAddress,
+	lanInterfaces,
+	normalizeSourceAddress,
+} from "./lan-relay-listener";
 import { WebSocketRelayPort } from "./websocket-relay-port";
 
 const testVerify = (pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean =>
@@ -51,6 +56,126 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 		expect(() => new LanRelayListener({ host, address: "::" })).toThrow(/wildcard/i);
 		expect(() => new LanRelayListener({ host, address: "" })).toThrow(/wildcard/i);
 		host.close();
+	});
+
+	it("the bind guard is an ALLOWLIST — every wildcard spelling is refused", () => {
+		// The first version compared against the literal strings "0.0.0.0" and
+		// "::". The pentest bypassed it with `"0"`, `"::0"`, `"0x0"` and
+		// `"0.0.0.0."`, each of which bound the WILDCARD and was reachable
+		// off-loopback on the machine's real LAN address. A blocklist also can't
+		// express "not public": a hostname or routable literal passed.
+		for (const bad of [
+			"0.0.0.0",
+			"::",
+			"",
+			"0",
+			"::0",
+			"0:0:0:0:0:0:0:0",
+			"0x0",
+			"0.0.0.0.",
+			"localhost", // a NAME — never let the resolver decide
+			"example.com",
+			"8.8.8.8", // routable literal
+			"172.32.0.1", // just outside the private range
+			"999.1.1.1",
+		]) {
+			expect(isBindableAddress(bad)).toBe(false);
+		}
+		// …and the legitimate forms still work.
+		for (const good of ["127.0.0.1", "192.168.1.20", "10.0.0.5", "172.16.4.9", "169.254.10.1"]) {
+			expect(isBindableAddress(good)).toBe(true);
+		}
+		const host = new LanRelayHost();
+		expect(() => new LanRelayListener({ host, address: "0" })).toThrow(/private or loopback/i);
+		host.close();
+	});
+
+	it("a REFUSED socket cannot take down the process (malformed frame, no unhandled 'error')", async () => {
+		// The pentest's actual repro: exceed the per-source budget so a socket is
+		// REFUSED, then send it one malformed frame (RSV1 set). Both refusal
+		// paths used to hand back a live `ws` socket with no 'error' listener,
+		// and an unhandled emitter 'error' throws — an unpaired LAN host reached
+		// an uncaught exception in the shell main process this way.
+		//
+		// A normal `ws` client will never send a malformed frame, so this drives
+		// the handshake by hand over a raw socket.
+		//
+		// ⚠️ HONEST LIMIT: this test passes with the fix REVERTED too. Bun does
+		// not route the malformed frame into `ws`'s validator the way Node does
+		// (same class as the `connection`-event gap noted in the source), so the
+		// throw cannot be reproduced under this runner. The vulnerability was
+		// demonstrated under NODE — the runtime Electron uses — where 11
+		// connections plus one RSV1 frame reached an uncaught exception. The test
+		// is kept as a live smoke check of the invariant, NOT as proof of the
+		// fix; the fix's correctness rests on attaching the handler before any
+		// early return, which is unconditional.
+		const net = await import("node:net");
+		const host = new LanRelayHost();
+		const listener = new LanRelayListener({
+			host,
+			address: "127.0.0.1",
+			maxConnectionsPerSource: 1,
+		});
+		const bound = await listener.start();
+		let sawUnhandled: unknown = null;
+		const onUnhandled = (err: unknown): void => {
+			sawUnhandled = err;
+		};
+		process.on("uncaughtException", onUnhandled);
+		const raws: import("node:net").Socket[] = [];
+		try {
+			// Two handshakes from one source: the second is past the budget.
+			for (let i = 0; i < 2; i++) {
+				const sock = net.connect(bound.port, "127.0.0.1");
+				sock.on("error", () => {});
+				raws.push(sock);
+				await new Promise<void>((resolve) => {
+					sock.once("connect", () => resolve());
+					sock.once("error", () => resolve());
+				});
+				sock.write(
+					`GET / HTTP/1.1\r\nHost: 127.0.0.1:${bound.port}\r\nUpgrade: websocket\r\n` +
+						"Connection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+						"Sec-WebSocket-Version: 13\r\n\r\n",
+				);
+				await settle(120);
+			}
+			// One masked frame with RSV1 set on the refused (second) socket.
+			const refused = raws[raws.length - 1] as import("node:net").Socket;
+			refused.write(Buffer.from([0xc1, 0x82, 0x00, 0x00, 0x00, 0x00, 0x61, 0x62]));
+			await settle(300);
+			expect(sawUnhandled).toBeNull();
+		} finally {
+			process.off("uncaughtException", onUnhandled);
+			for (const r of raws) r.destroy();
+			await listener.stop();
+			host.close();
+		}
+	});
+
+	it("a bind failure REJECTS instead of throwing unhandled", async () => {
+		// `ws` re-emits the http server's 'error' on the WebSocketServer, which
+		// had no listener — so EADDRNOTAVAIL / EADDRINUSE escaped as an uncaught
+		// exception. That is the ordinary laptop case: Wi-Fi flaps between
+		// enumerating interfaces and binding.
+		const host = new LanRelayHost();
+		const first = new LanRelayListener({ host, address: "127.0.0.1" });
+		const bound = await first.start();
+		const clash = new LanRelayListener({ host, address: "127.0.0.1", port: bound.port });
+		let sawUnhandled = false;
+		const onUnhandled = (): void => {
+			sawUnhandled = true;
+		};
+		process.on("uncaughtException", onUnhandled);
+		try {
+			await expect(clash.start()).rejects.toThrow();
+			expect(sawUnhandled).toBe(false);
+		} finally {
+			process.off("uncaughtException", onUnhandled);
+			await clash.stop();
+			await first.stop();
+			host.close();
+		}
 	});
 
 	it("only ever offers private / link-local interfaces to bind to", () => {
