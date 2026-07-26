@@ -13,6 +13,7 @@ import {
 	disposeActiveRelay,
 	getActiveRelay,
 	installActiveRelay,
+	isLanRelayUrl,
 } from "./active-relay";
 import { LoopbackRelayPort, type RelayPort } from "./relay-port";
 
@@ -69,14 +70,14 @@ describe("ActiveRelayOrchestrator", () => {
 	it("onSessionChanged with a relay URL rotates to WebSocket port", async () => {
 		const make = vi.fn((url: string) => new FakePort(url));
 		const orch = new ActiveRelayOrchestrator({
-			readSyncRelayUrl: async () => "ws://localhost:9999",
+			readSyncRelayUrl: async () => "wss://relay.example.com:9999",
 			makeRelayPort: make,
 		});
 		const loopback = orch.currentPort();
 		await orch.onSessionChanged({ vaultId: "v1", vaultPath: "/tmp/v1" });
-		expect(make).toHaveBeenCalledWith("ws://localhost:9999");
+		expect(make).toHaveBeenCalledWith("wss://relay.example.com:9999");
 		expect(orch.state().kind).toBe(ActiveRelayKind.WebSocket);
-		expect(orch.state().syncRelayUrl).toBe("ws://localhost:9999");
+		expect(orch.state().syncRelayUrl).toBe("wss://relay.example.com:9999");
 		expect(orch.currentPort()).not.toBe(loopback);
 		orch.dispose();
 	});
@@ -255,5 +256,38 @@ describe("ActiveRelayOrchestrator", () => {
 		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/" });
 		expect(orch.hasAssetPlane()).toBe(true);
 		orch.dispose();
+	});
+});
+
+describe("isLanRelayUrl (LAN-4 transport classification)", () => {
+	it("classifies loopback and private ranges as LAN", () => {
+		// The elected host's OWN client dials 127.0.0.1, so loopback is a real
+		// LAN case in production, not just a test convenience.
+		for (const url of [
+			"ws://127.0.0.1:8443",
+			"ws://localhost:8443",
+			"ws://[::1]:8443",
+			"ws://192.168.1.20:8443",
+			"ws://10.0.0.5:8443",
+			"ws://172.16.4.9:8443",
+			"ws://169.254.10.1:8443",
+		]) {
+			expect(isLanRelayUrl(url)).toBe(true);
+		}
+	});
+
+	it("does NOT classify a public relay as LAN", () => {
+		// Anything not provably local must read as a relay: LAN-5's "no server"
+		// copy hangs on this, and claiming it falsely would be a privacy lie.
+		for (const url of [
+			"wss://relay.example.com",
+			"ws://8.8.8.8:80",
+			"ws://172.32.0.1:8443",
+			"ws://11.0.0.1:8443",
+			"not-a-url",
+			"http://192.168.1.20",
+		]) {
+			expect(isLanRelayUrl(url)).toBe(false);
+		}
 	});
 });

@@ -54,6 +54,11 @@ export type SyncStatusSnapshot = {
 	pairKeyCount: number;
 	/** 14.7 — why attachment uploads are paused (storage quota), or null. */
 	attachmentSyncPausedReason: AttachmentSyncPauseReason | null;
+	/** LAN-5 — which transport is carrying sync, so the UI can say "on your
+	 *  local network (no server)" instead of showing a peer link as a relay.
+	 *  The distinction is real, not cosmetic: on LAN no third party, not even a
+	 *  blind one, sees the traffic. */
+	transportKind: ActiveRelayKind;
 };
 
 export const RECENT_TRAFFIC_MS = 5_000;
@@ -272,6 +277,7 @@ export class SyncStatusStore {
 				droppedInbound: 0,
 				...this.#readSeqDiagnostics(session.vaultPath),
 				attachmentSyncPausedReason: this.#pausedReasonSafe(),
+				transportKind: relayState.kind,
 			};
 		}
 		const transport = readTransport(this.#activeRelay);
@@ -289,6 +295,7 @@ export class SyncStatusStore {
 			droppedInbound: transport?.droppedInbound() ?? 0,
 			...this.#readSeqDiagnostics(session.vaultPath),
 			attachmentSyncPausedReason: this.#pausedReasonSafe(),
+			transportKind: relayState.kind,
 		};
 	}
 
@@ -348,9 +355,16 @@ export class SyncStatusStore {
 	}
 }
 
+/** LAN and cloud both ride `WebSocketRelayPort` — only the address and the
+ *  admission handshake differ — so transport diagnostics read the same way for
+ *  both. Only Loopback has no socket. */
+function isSocketTransport(kind: ActiveRelayKind): boolean {
+	return kind === ActiveRelayKind.WebSocket || kind === ActiveRelayKind.Lan;
+}
+
 function readTransport(activeRelay: ActiveRelayOrchestrator): WebSocketRelayPort | null {
 	const state = activeRelay.state();
-	if (state.kind !== ActiveRelayKind.WebSocket) return null;
+	if (!isSocketTransport(state.kind)) return null;
 	const port = state.port as WebSocketRelayPort;
 	if (typeof port?.state !== "string") return null;
 	return port;

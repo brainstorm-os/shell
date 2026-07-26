@@ -326,6 +326,7 @@ describe("SyncStatusStore", () => {
 		store.start();
 		const snap = store.snapshot();
 		const expectedKeys = [
+			"transportKind",
 			"state",
 			"transportState",
 			"relayUrl",
