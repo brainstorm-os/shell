@@ -93,7 +93,13 @@ export type RelayControlMessage =
 	| UnsubscribeControl
 	| CatalogControl
 	| RotateControl
+	| HelloControl
 	| AuthControl;
+
+/** LAN-2b(b) — the first control on a channel-bound connection: it names the
+ *  connecting device so the host can seal its challenge to that device's
+ *  roster X25519 key. Carries no secret; the proof comes later. */
+export type HelloControl = { op: "hello"; account: string };
 
 /** SYNC-4b — the credential payload an `onChallenge` callback returns. */
 export type AuthResponse = { token: string; account: string; sig: string };
@@ -171,6 +177,24 @@ export type WebSocketRelayPortOptions = {
 	 *  config rather than a wire-derived inference precisely so a hostile peer
 	 *  cannot downgrade it by omitting its challenge. */
 	requireAdmission?: boolean;
+	/** Channel-bound LAN handshake hooks (LAN-2b(b), gate finding G2). All three
+	 *  are injected closures built by `lan-admission.ts` — this port stays
+	 *  relay-blind and only shuttles opaque strings. When present the port
+	 *  announces itself with `hello`, answers the SEALED challenge through
+	 *  `onSealedChallenge`, and refuses to be admitted unless the host's
+	 *  `auth-ok` carries a proof that `verifyHostProof` accepts. */
+	/** LAN-7 — the host asks us to re-emit for a routing key because a peer just
+	 *  joined it. The wiring turns this into the engine's snapshot emit, which is
+	 *  what makes a reconnecting peer's backfill automatic. */
+	onResync?: (routingKey: string) => void;
+	lanHandshake?: {
+		helloAccount: () => string | null;
+		onSealedChallenge: (
+			hostAccount: string,
+			sealed: { enc: string; ct: string },
+		) => AuthResponse | null;
+		verifyHostProof: (proof: string) => boolean;
+	};
 };
 
 export class WebSocketRelayPort implements RelayPort {
@@ -185,6 +209,8 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #assetTimeoutMs: number;
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #requireAdmission: boolean;
+	readonly #lanHandshake: WebSocketRelayPortOptions["lanHandshake"] | null;
+	readonly #onResync: ((routingKey: string) => void) | null;
 	readonly #emitter = new EventEmitter();
 	readonly #subscriptions = new Set<string>();
 	readonly #listeners = new Set<(frame: Uint8Array) => void>();
@@ -249,6 +275,8 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#assetTimeoutMs = opts.assetTimeoutMs ?? 30_000;
 		this.#onChallenge = opts.onChallenge ?? null;
 		this.#requireAdmission = opts.requireAdmission ?? false;
+		this.#lanHandshake = opts.lanHandshake ?? null;
+		this.#onResync = opts.onResync ?? null;
 	}
 
 	get state(): WebSocketRelayState {
@@ -663,7 +691,14 @@ export class WebSocketRelayPort implements RelayPort {
 		// An OPEN node never challenges, so on those transports holding would
 		// deadlock — hence the flag is explicit config, not inferred from the
 		// wire (a wire-derived rule would also be downgrade-attackable).
-		if (this.#requireAdmission) return;
+		if (this.#requireAdmission) {
+			// Channel-bound path: name ourselves so the host can seal its
+			// challenge to this device's X25519 key. Nothing else goes out until
+			// `auth-ok` carries a proof we accept.
+			const account = this.#lanHandshake?.helloAccount() ?? null;
+			if (account) this.#sendControl({ op: "hello", account });
+			return;
+		}
 		// Re-emit every active subscription so the relay's routing table
 		// re-builds after a reconnect. `bundle:true` lets a durable node serve
 		// the re-backfill bundled (10.10) — an old node ignores it.
@@ -751,11 +786,46 @@ export class WebSocketRelayPort implements RelayPort {
 			}
 			const op = decodeControlOp(bytes);
 			if (op === "challenge") {
+				// Channel-bound (LAN): the nonce arrives SEALED to this device's
+				// X25519 key, so only we can answer it — the property a plaintext
+				// nonce cannot give (a relay can forward that verbatim).
+				const sealed = decodeSealedChallenge(bytes);
+				if (sealed && this.#lanHandshake) {
+					const reply = this.#lanHandshake.onSealedChallenge(sealed.account, {
+						enc: sealed.enc,
+						ct: sealed.ct,
+					});
+					// Refused (not rostered / can't open / no session): stay
+					// unauthenticated and let the host's deadline close us.
+					if (reply) this.#sendControl({ op: "auth", ...reply });
+					return;
+				}
 				const nonce = decodeChallengeNonce(bytes);
 				if (nonce) this.#respondToChallenge(nonce);
 				return;
 			}
+			if (op === "resync") {
+				const key = decodeResyncKey(bytes);
+				if (key && this.#onResync) {
+					try {
+						this.#onResync(key);
+					} catch {
+						// A throwing consumer must not kill the socket callback.
+					}
+				}
+				return;
+			}
 			if (op === "auth-ok") {
+				// With a channel-bound handshake the host must prove ITSELF before
+				// we treat this connection as admitted; a bare "auth-ok" string is
+				// something any rogue peer can say (gate finding G2).
+				if (this.#lanHandshake) {
+					const proof = decodeAuthOkProof(bytes);
+					if (!proof || !this.#lanHandshake.verifyHostProof(proof)) {
+						this.#closeSocketOnly();
+						return;
+					}
+				}
 				this.#onAuthenticated();
 				return;
 			}
@@ -841,6 +911,23 @@ export class WebSocketRelayPort implements RelayPort {
 				// A signing/token failure leaves us unauthenticated; the node closes
 				// + we reconnect. Never throw into the socket callback.
 			});
+	}
+
+	/** Drop the socket WITHOUT disposing the port: the peer failed to prove
+	 *  itself, so this connection is worthless, but the reconnect path should
+	 *  still get a crack at a genuine host. Queued frames stay queued (they were
+	 *  never admitted, so `#flushSendQueue` is holding them). */
+	#closeSocketOnly(): void {
+		const ws = this.#ws;
+		this.#ws = null;
+		this.#gatedAdmission = false;
+		if (ws) {
+			try {
+				ws.close();
+			} catch {
+				// Already-closed sockets are noisy on some impls.
+			}
+		}
 	}
 
 	/** SYNC-4b — admitted: (re)send subscriptions + flush queued frames, since a
@@ -1068,6 +1155,57 @@ function decodeControlOp(wire: Uint8Array): string | null {
 		if (!parsed || typeof parsed !== "object") return null;
 		const op = (parsed as { op?: unknown }).op;
 		return typeof op === "string" ? op : null;
+	} catch {
+		return null;
+	}
+}
+
+/** LAN-2b(b) — a channel-bound `challenge` carries the host's account plus the
+ *  HPKE `enc`/`ct`; a legacy one carries a plaintext `nonce`. Null ⇒ not the
+ *  sealed shape (fall through to the legacy reader). */
+function decodeSealedChallenge(
+	bytes: Uint8Array,
+): { account: string; enc: string; ct: string } | null {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
+			op?: unknown;
+			account?: unknown;
+			enc?: unknown;
+			ct?: unknown;
+		};
+		if (v?.op !== "challenge") return null;
+		if (typeof v.account !== "string" || v.account.length === 0) return null;
+		if (typeof v.enc !== "string" || v.enc.length === 0) return null;
+		if (typeof v.ct !== "string" || v.ct.length === 0) return null;
+		return { account: v.account, enc: v.enc, ct: v.ct };
+	} catch {
+		return null;
+	}
+}
+
+/** LAN-7 — the routing key a `resync` control names, or null. */
+function decodeResyncKey(bytes: Uint8Array): string | null {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
+			op?: unknown;
+			key?: unknown;
+		};
+		if (v?.op !== "resync") return null;
+		return typeof v.key === "string" && v.key.length > 0 ? v.key : null;
+	} catch {
+		return null;
+	}
+}
+
+/** The host's own proof on `auth-ok`, or null when absent/malformed. */
+function decodeAuthOkProof(bytes: Uint8Array): string | null {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
+			op?: unknown;
+			proof?: unknown;
+		};
+		if (v?.op !== "auth-ok") return null;
+		return typeof v.proof === "string" && v.proof.length > 0 ? v.proof : null;
 	} catch {
 		return null;
 	}

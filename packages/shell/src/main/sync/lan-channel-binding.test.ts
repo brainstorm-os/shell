@@ -25,6 +25,8 @@ import {
 	openLanChallenge,
 	sealLanChallenge,
 } from "./lan-admission";
+import { LanRelayHost } from "./lan-relay-host";
+import { WebSocketRelayPort } from "./websocket-relay-port";
 
 const b64url = (b: Uint8Array) => Buffer.from(b).toString("base64url");
 
@@ -344,5 +346,200 @@ describe("handshake builders (LAN-2b(b)) — host ⇄ client", () => {
 		expect(hostSide.verifyClient(attacker.account, (victimAuth as { sig: string }).sig, NONCE)).toBe(
 			false,
 		);
+	});
+});
+
+describe("wired end-to-end: LanRelayHost ⇄ WebSocketRelayPort (LAN-2b(b))", () => {
+	const testVerify = (pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean =>
+		ed25519.verify(sig, msg, pub);
+
+	function directory(...devices: ReturnType<typeof makeDevice>[]) {
+		return new Map(
+			devices.map((d) => [d.account, { ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub }]),
+		);
+	}
+
+	function hostFor(host: ReturnType<typeof makeDevice>, dir: ReadonlyMap<string, LanRosterEntry>) {
+		return new LanRelayHost({
+			hostAccount: host.account,
+			handshake: makeLanHostHandshake({
+				hostAccount: () => host.account,
+				activeDevices: () => dir,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+				verify: testVerify,
+			}),
+		});
+	}
+
+	function portFor(
+		relayHost: LanRelayHost,
+		client: ReturnType<typeof makeDevice>,
+		dir: ReadonlyMap<string, LanRosterEntry>,
+	) {
+		return new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: makeLanClientHandshake({
+				deviceAccount: () => client.account,
+				deviceX25519Secret: () => client.x25519Secret,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
+				activeDevices: () => dir,
+				verify: testVerify,
+			}),
+		});
+	}
+
+	async function settle(tries = 60): Promise<void> {
+		for (let i = 0; i < tries; i++) await new Promise((r) => setTimeout(r, 0));
+	}
+
+	it("a rostered device completes the full hello → sealed challenge → proof → auth-ok", async () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const dir = directory(host, client);
+		const relayHost = hostFor(host, dir);
+		const port = portFor(relayHost, client, dir);
+		try {
+			port.connect();
+			await settle();
+			expect(port.gatedAdmission()).toBe(true);
+		} finally {
+			port.close();
+			relayHost.close();
+		}
+	});
+
+	it("a device NOT in the roster never gets a challenge and is never admitted", async () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const stranger = makeDevice();
+		const dir = directory(host, client); // stranger absent
+		const relayHost = hostFor(host, dir);
+		// The stranger's own client hooks — it will say hello and get closed.
+		const port = portFor(relayHost, stranger, directory(host, stranger));
+		try {
+			port.connect();
+			await settle();
+			expect(port.gatedAdmission()).toBe(false);
+		} finally {
+			port.close();
+			relayHost.close();
+		}
+	});
+
+	it("the client REFUSES a host whose auth-ok proof doesn't verify", async () => {
+		// A host that is rostered but answers with someone else's signature —
+		// i.e. it does not actually hold the device key it claims.
+		const host = makeDevice();
+		const impostor = makeDevice();
+		const client = makeDevice();
+		const dir = directory(host, client);
+		const relayHost = new LanRelayHost({
+			hostAccount: host.account,
+			handshake: {
+				...makeLanHostHandshake({
+					hostAccount: () => host.account,
+					activeDevices: () => dir,
+					signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+					verify: testVerify,
+				}),
+				// …but signs its own proof with the WRONG key.
+				proveToClient: (clientAccount, nonce) =>
+					Buffer.from(
+						ed25519.sign(
+							lanProofBytes(LanProofDirection.Host, host.account, clientAccount, nonce),
+							impostor.edSecret,
+						),
+					).toString("base64url"),
+			},
+		});
+		const port = portFor(relayHost, client, dir);
+		try {
+			port.connect();
+			await settle();
+			// The client opened the challenge and proved itself, but the host's
+			// proof is not its roster key ⇒ we must NOT be admitted.
+			expect(port.gatedAdmission()).toBe(false);
+		} finally {
+			port.close();
+			relayHost.close();
+		}
+	});
+});
+
+describe("LAN-7 — the host triggers backfill when a peer joins a channel", () => {
+	const testVerify2 = (pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean =>
+		ed25519.verify(sig, msg, pub);
+
+	async function settle2(tries = 60): Promise<void> {
+		for (let i = 0; i < tries; i++) await new Promise((r) => setTimeout(r, 0));
+	}
+
+	it("nudges the EXISTING subscriber, not the joiner", async () => {
+		const host = makeDevice();
+		const first = makeDevice();
+		const second = makeDevice();
+		const dir = new Map(
+			[host, first, second].map((d) => [
+				d.account,
+				{ ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub },
+			]),
+		);
+		const relayHost = new LanRelayHost({
+			hostAccount: host.account,
+			handshake: makeLanHostHandshake({
+				hostAccount: () => host.account,
+				activeDevices: () => dir,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+				verify: testVerify2,
+			}),
+		});
+		const clientHooks = (d: ReturnType<typeof makeDevice>) =>
+			makeLanClientHandshake({
+				deviceAccount: () => d.account,
+				deviceX25519Secret: () => d.x25519Secret,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, d.edSecret)),
+				activeDevices: () => dir,
+				verify: testVerify2,
+			});
+
+		const firstResyncs: string[] = [];
+		const secondResyncs: string[] = [];
+		const portA = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: clientHooks(first),
+			onResync: (k) => firstResyncs.push(k),
+		});
+		const portB = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: clientHooks(second),
+			onResync: (k) => secondResyncs.push(k),
+		});
+		try {
+			portA.connect();
+			await settle2();
+			portA.subscribe("shared-key");
+			await settle2();
+			expect(firstResyncs).toEqual([]); // nobody else there yet
+
+			portB.connect();
+			await settle2();
+			portB.subscribe("shared-key");
+			await settle2();
+
+			// The peer that was already on the channel is asked to re-emit…
+			expect(firstResyncs).toEqual(["shared-key"]);
+			// …and the joiner is not (it has nothing to offer).
+			expect(secondResyncs).toEqual([]);
+		} finally {
+			portA.close();
+			portB.close();
+			relayHost.close();
+		}
 	});
 });
