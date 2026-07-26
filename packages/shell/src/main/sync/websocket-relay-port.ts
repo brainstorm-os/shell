@@ -183,6 +183,10 @@ export type WebSocketRelayPortOptions = {
 	 *  announces itself with `hello`, answers the SEALED challenge through
 	 *  `onSealedChallenge`, and refuses to be admitted unless the host's
 	 *  `auth-ok` carries a proof that `verifyHostProof` accepts. */
+	/** LAN-7 — the host asks us to re-emit for a routing key because a peer just
+	 *  joined it. The wiring turns this into the engine's snapshot emit, which is
+	 *  what makes a reconnecting peer's backfill automatic. */
+	onResync?: (routingKey: string) => void;
 	lanHandshake?: {
 		helloAccount: () => string | null;
 		onSealedChallenge: (
@@ -206,6 +210,7 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #requireAdmission: boolean;
 	readonly #lanHandshake: WebSocketRelayPortOptions["lanHandshake"] | null;
+	readonly #onResync: ((routingKey: string) => void) | null;
 	readonly #emitter = new EventEmitter();
 	readonly #subscriptions = new Set<string>();
 	readonly #listeners = new Set<(frame: Uint8Array) => void>();
@@ -271,6 +276,7 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#onChallenge = opts.onChallenge ?? null;
 		this.#requireAdmission = opts.requireAdmission ?? false;
 		this.#lanHandshake = opts.lanHandshake ?? null;
+		this.#onResync = opts.onResync ?? null;
 	}
 
 	get state(): WebSocketRelayState {
@@ -798,6 +804,17 @@ export class WebSocketRelayPort implements RelayPort {
 				if (nonce) this.#respondToChallenge(nonce);
 				return;
 			}
+			if (op === "resync") {
+				const key = decodeResyncKey(bytes);
+				if (key && this.#onResync) {
+					try {
+						this.#onResync(key);
+					} catch {
+						// A throwing consumer must not kill the socket callback.
+					}
+				}
+				return;
+			}
 			if (op === "auth-ok") {
 				// With a channel-bound handshake the host must prove ITSELF before
 				// we treat this connection as admitted; a bare "auth-ok" string is
@@ -1161,6 +1178,20 @@ function decodeSealedChallenge(
 		if (typeof v.enc !== "string" || v.enc.length === 0) return null;
 		if (typeof v.ct !== "string" || v.ct.length === 0) return null;
 		return { account: v.account, enc: v.enc, ct: v.ct };
+	} catch {
+		return null;
+	}
+}
+
+/** LAN-7 — the routing key a `resync` control names, or null. */
+function decodeResyncKey(bytes: Uint8Array): string | null {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
+			op?: unknown;
+			key?: unknown;
+		};
+		if (v?.op !== "resync") return null;
+		return typeof v.key === "string" && v.key.length > 0 ? v.key : null;
 	} catch {
 		return null;
 	}

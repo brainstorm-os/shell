@@ -467,3 +467,79 @@ describe("wired end-to-end: LanRelayHost ⇄ WebSocketRelayPort (LAN-2b(b))", ()
 		}
 	});
 });
+
+describe("LAN-7 — the host triggers backfill when a peer joins a channel", () => {
+	const testVerify2 = (pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): boolean =>
+		ed25519.verify(sig, msg, pub);
+
+	async function settle2(tries = 60): Promise<void> {
+		for (let i = 0; i < tries; i++) await new Promise((r) => setTimeout(r, 0));
+	}
+
+	it("nudges the EXISTING subscriber, not the joiner", async () => {
+		const host = makeDevice();
+		const first = makeDevice();
+		const second = makeDevice();
+		const dir = new Map(
+			[host, first, second].map((d) => [
+				d.account,
+				{ ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub },
+			]),
+		);
+		const relayHost = new LanRelayHost({
+			hostAccount: host.account,
+			handshake: makeLanHostHandshake({
+				hostAccount: () => host.account,
+				activeDevices: () => dir,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+				verify: testVerify2,
+			}),
+		});
+		const clientHooks = (d: ReturnType<typeof makeDevice>) =>
+			makeLanClientHandshake({
+				deviceAccount: () => d.account,
+				deviceX25519Secret: () => d.x25519Secret,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, d.edSecret)),
+				activeDevices: () => dir,
+				verify: testVerify2,
+			});
+
+		const firstResyncs: string[] = [];
+		const secondResyncs: string[] = [];
+		const portA = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: clientHooks(first),
+			onResync: (k) => firstResyncs.push(k),
+		});
+		const portB = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: clientHooks(second),
+			onResync: (k) => secondResyncs.push(k),
+		});
+		try {
+			portA.connect();
+			await settle2();
+			portA.subscribe("shared-key");
+			await settle2();
+			expect(firstResyncs).toEqual([]); // nobody else there yet
+
+			portB.connect();
+			await settle2();
+			portB.subscribe("shared-key");
+			await settle2();
+
+			// The peer that was already on the channel is asked to re-emit…
+			expect(firstResyncs).toEqual(["shared-key"]);
+			// …and the joiner is not (it has nothing to offer).
+			expect(secondResyncs).toEqual([]);
+		} finally {
+			portA.close();
+			portB.close();
+			relayHost.close();
+		}
+	});
+});

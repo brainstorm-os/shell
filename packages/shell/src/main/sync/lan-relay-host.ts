@@ -354,6 +354,16 @@ export class LanRelayHost {
 		// Authenticated: hand off to the blind router (subscribe / unsubscribe /
 		// frame fan-out). The host never parses past the channel byte here.
 		this.#core.handlers.onMessage(serverWs, bytes);
+		// LAN-7 — a peer that JUST joined a channel has nothing; the peers already
+		// there hold the only copy of the history. Nudge them to re-emit so the
+		// joiner catches up on its own. LAN-6 proved backfill WORKS, but only when
+		// a test drove it by hand; this is what makes it automatic.
+		//
+		// Routing metadata only — the key is the same opaque token the router
+		// already fans out on, so the host stays blind.
+		if (bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE) {
+			this.#notifyResync(connId, decodeSubscribeKeys(bytes.subarray(1)));
+		}
 	}
 
 	/** Deregister a closed connection. */
@@ -364,6 +374,27 @@ export class LanRelayHost {
 			const state = this.#admission.get(connId);
 			if (state?.deadline) this.#clearTimer(state.deadline);
 			this.#admission.delete(connId);
+		}
+	}
+
+	/** Ask every EXISTING subscriber of each key to re-emit, so the connection
+	 *  that just joined gets caught up. The joiner is excluded — it has nothing
+	 *  to offer yet. */
+	#notifyResync(joinerConnId: string, keys: readonly string[]): void {
+		for (const key of keys) {
+			const existing = this.#core.router.subscribersFor(key, joinerConnId);
+			if (existing.length === 0) continue;
+			const wire = encodeControl({ op: "resync", key });
+			for (const connId of existing) {
+				const ws = this.#core.connections.get(connId);
+				if (!ws) continue;
+				try {
+					ws.send(wire);
+				} catch {
+					// A failed write must not stop the others (the router's own
+					// fan-out has the same posture).
+				}
+			}
 		}
 	}
 
@@ -519,6 +550,22 @@ function isRotateControl(body: Uint8Array): boolean {
 		return !!parsed && typeof parsed === "object" && parsed.op === "rotate";
 	} catch {
 		return false;
+	}
+}
+
+/** The routing keys a `subscribe` control is joining (empty for anything else).
+ *  Opaque tokens — the host never interprets them, it only needs to know who to
+ *  nudge (LAN-7). */
+function decodeSubscribeKeys(body: Uint8Array): string[] {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(body)) as {
+			op?: unknown;
+			entityIds?: unknown;
+		};
+		if (v?.op !== "subscribe" || !Array.isArray(v.entityIds)) return [];
+		return v.entityIds.filter((k): k is string => typeof k === "string" && k.length > 0);
+	} catch {
+		return [];
 	}
 }
 
