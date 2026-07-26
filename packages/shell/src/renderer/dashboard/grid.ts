@@ -178,6 +178,25 @@ export function widgetFootprint(size: WidgetSize): GridSize {
 	}
 }
 
+/**
+ * Which preset a stored footprint corresponds to, or `null` for a size the
+ * user made themselves (F-462).
+ *
+ * The presets are not the whole space: the resize grip writes arbitrary w/h
+ * in `WIDGET_UNIT` steps, so most real widgets match none of the three. A
+ * "pick one of three" menu therefore cannot just mark the matching row — it
+ * has to be able to say "none of these", which is what `null` is for. Note
+ * Small and Medium share a height and Medium and Large share a width, so the
+ * match must compare BOTH axes.
+ */
+export function matchedWidgetSize(footprint: GridSize): WidgetSize | null {
+	for (const size of [WidgetSize.Small, WidgetSize.Medium, WidgetSize.Large]) {
+		const fp = widgetFootprint(size);
+		if (footprint.w === fp.w && footprint.h === fp.h) return size;
+	}
+	return null;
+}
+
 /** Migrate one stored widget record onto the 8px grid. A pre-7.3b record (tiny
  *  icon-grid footprint) is scaled up so it keeps roughly its on-screen size +
  *  position; an already-8px record is returned unchanged. Width alone is the
