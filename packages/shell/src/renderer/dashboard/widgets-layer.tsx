@@ -36,6 +36,7 @@ import {
 	WidgetSize,
 	clampWidgetOrigin,
 	clampWidgetSizeToSurface,
+	matchedWidgetSize,
 	migrateWidgetRecord,
 	widgetFootprint,
 	widgetPointToCell,
@@ -617,11 +618,36 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 					},
 				};
 			};
+			// F-462: the three presets are not the whole space of sizes — the
+			// resize grip writes arbitrary w/h in WIDGET_UNIT steps. So a
+			// hand-resized widget matches NO preset and the group would show
+			// nothing chosen, leaving the menu unable to say what size you're on.
+			// Name that state instead of hiding it: the section header carries the
+			// real footprint, and a non-interactive "Custom" row takes the check
+			// when no preset matches. Selecting a preset still snaps to it.
+			const matchesPreset = matchedWidgetSize({ w: record.w, h: record.h }) !== null;
 			const items: ContextMenuItem[] = [
-				{ id: "size", label: t("shell.widgets.menu.size"), section: true },
+				{
+					id: "size",
+					label: t("shell.widgets.menu.sizeWithFootprint", { w: record.w, h: record.h }),
+					section: true,
+				},
 				sizeItem(WidgetSize.Small, t("shell.widgets.menu.size.small")),
 				sizeItem(WidgetSize.Medium, t("shell.widgets.menu.size.medium")),
 				sizeItem(WidgetSize.Large, t("shell.widgets.menu.size.large")),
+				// Only present when it's the truth — a permanent "Custom" row would
+				// read as a fourth size you can pick, which it isn't.
+				...(matchesPreset
+					? []
+					: [
+							{
+								id: "size-custom",
+								label: t("shell.widgets.menu.size.custom"),
+								selected: true,
+								icon: sdkMenuIcon(MenuIcon.Check),
+								disabled: true,
+							},
+						]),
 				{ id: "sep", label: "", divider: true },
 				{
 					id: "open-app",
