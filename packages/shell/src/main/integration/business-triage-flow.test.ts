@@ -192,9 +192,9 @@ describe("business triage flow (trigger → AI classify → AI-agent draft)", ()
 		]);
 		const steps: WorkflowStep[] = [
 			{ id: "trigger", kind: StepKind.Trigger },
-			// The EntityEvent payload uses `entityId`; a Code step lifts it to the
-			// bare id the Entity Get step consumes.
-			{ id: "id", kind: StepKind.Code, expression: "input.entityId" },
+			// F-459: no glue step. The EntityEvent payload's `entityId` feeds the
+			// Entity Get step directly — this used to need a `Code: input.entityId`
+			// in between purely to rename the field, which no author would guess.
 			{ id: "email", kind: StepKind.Entity, op: EntityOp.Get, entityType: EMAIL_TYPE },
 			{
 				id: "classify",
