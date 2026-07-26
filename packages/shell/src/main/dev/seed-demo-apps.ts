@@ -348,6 +348,22 @@ async function pathExists(path: string): Promise<boolean> {
  *
  *  Dev-only — the packaged-mode seeder reads prebuilt `dist/` from
  *  `process.resourcesPath/apps/<dir>/` and never spawns a child. */
+/**
+ * Condense a failed app build's stderr into something a dev can act on.
+ *
+ * `slice(-400)` was the original approach and is what F-436 called a
+ * "useless stack tail": vite/esbuild print the actionable part — the file,
+ * line and message — at the START of stderr, then a long node stack. Keeping
+ * only the tail threw away the error and kept the noise. Keep the head (where
+ * the cause is) and enough of the tail to catch a summary line.
+ */
+export function summarizeBuildStderr(stderr: string, headChars = 900, tailChars = 300): string {
+	const text = stderr.trim();
+	if (text.length <= headChars + tailChars) return text;
+	const omitted = text.length - headChars - tailChars;
+	return `${text.slice(0, headChars)}\n  … ${omitted} chars omitted …\n${text.slice(-tailChars)}`;
+}
+
 async function buildVitebundle(
 	appBundleDir: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -378,7 +394,11 @@ async function buildVitebundle(
 		});
 		child.on("exit", (code) => {
 			if (code === 0) resolve({ ok: true });
-			else resolve({ ok: false, reason: `build exited with code ${code}: ${stderr.slice(-400)}` });
+			else
+				resolve({
+					ok: false,
+					reason: `build exited with code ${code}: ${summarizeBuildStderr(stderr)}`,
+				});
 		});
 	});
 }

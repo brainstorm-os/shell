@@ -4912,13 +4912,38 @@ void app.whenReady().then(async () => {
 			void seedDemoApps(appsDir)
 				.then((result) => {
 					seedingVaults.delete(vaultPath);
-					seededVaults.add(vaultPath);
 					console.log(
 						`[brainstorm] dev: auto-seed installed ${result.installed} apps, pinned ${result.pinned}, ${result.errors.length} errors`,
 					);
-					for (const error of result.errors) {
-						console.warn(`[brainstorm] dev: auto-seed error: ${error}`);
+					// A per-app build that FAILS resolves normally — it lands in
+					// `result.errors` rather than throwing. Marking the vault seeded here
+					// is the F-436 trap: the failed app keeps its old dist, the unchanged
+					// bundle hash makes the installer skip it, every later session-changed
+					// event sees "already seeded", and `bun run dev` serves a two-day-old
+					// app forever while the dev concludes their fix didn't work. The
+					// invariant this block documents — a failed seed must NOT be marked
+					// seeded — has to cover this path, not just a thrown seed.
+					if (result.errors.length > 0) {
+						console.error(
+							`[brainstorm] dev: auto-seed attempt ${attempt} had ${result.errors.length} FAILED app build(s) — those apps are serving STALE bundles:`,
+						);
+						for (const error of result.errors) {
+							console.error(`[brainstorm] dev:   x ${error}`);
+						}
+						if ((seedAttempts.get(vaultPath) ?? 0) < MAX_SEED_ATTEMPTS) {
+							console.error("[brainstorm] dev: retrying the seed...");
+							setTimeout(() => {
+								void runDevSeed();
+							}, 1500);
+							return;
+						}
+						// Out of retries: mark it seeded so boot completes, but say plainly
+						// that what's running is not the current source.
+						console.error(
+							`[brainstorm] dev: auto-seed GAVE UP after ${MAX_SEED_ATTEMPTS} attempts — the apps listed above are STALE. Fix the build error and restart; do not trust what they render.`,
+						);
 					}
+					seededVaults.add(vaultPath);
 					markFirstSeedDone();
 				})
 				.catch((error) => {

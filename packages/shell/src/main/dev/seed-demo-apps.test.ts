@@ -11,7 +11,7 @@ import { validateManifest } from "../apps/manifest";
 import type { DashboardStore } from "../dashboard/dashboard-store";
 import { DataStores } from "../storage/data-stores";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
-import { FIRST_PARTY_APPS, installPrebuiltBundle } from "./seed-demo-apps";
+import { FIRST_PARTY_APPS, installPrebuiltBundle, summarizeBuildStderr } from "./seed-demo-apps";
 
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..", "..");
 
@@ -187,5 +187,33 @@ describe("installPrebuiltBundle", () => {
 			dashboard: env.dashboard,
 		});
 		expect(result.ok).toBe(false);
+	});
+});
+
+/**
+ * F-436 — a failed app build must report something a dev can act on.
+ *
+ * The original `stderr.slice(-400)` kept only the TAIL, which for vite /
+ * esbuild is the node stack; the actionable part (file, line, message) is
+ * printed first and was thrown away. That's why the owner's errors.log
+ * showed a "useless stack tail" and the root cause stayed unknown.
+ */
+describe("summarizeBuildStderr (F-436)", () => {
+	it("keeps short output verbatim", () => {
+		expect(summarizeBuildStderr("  boom  ")).toBe("boom");
+	});
+
+	it("keeps the HEAD, where vite prints the actual error", () => {
+		const cause = "ERROR: [plugin:vite] src/app.tsx:12:3: Unexpected token";
+		const out = summarizeBuildStderr(`${cause}\n${"at stack frame\n".repeat(400)}`);
+		expect(out).toContain(cause);
+	});
+
+	it("keeps a tail slice too, and says how much it dropped", () => {
+		const out = summarizeBuildStderr(`${"H".repeat(2000)}TAIL_MARKER`);
+		expect(out).toContain("TAIL_MARKER");
+		expect(out).toMatch(/chars omitted/);
+		// Bounded — the point is a log line, not the whole build output.
+		expect(out.length).toBeLessThan(1600);
 	});
 });
