@@ -41,6 +41,7 @@ import {
 	type ServerWebSocketLike,
 	createRelayCore,
 } from "../../../../relay-server/src/server";
+import type { LanHostHandshake } from "./lan-admission";
 import type { WebSocketCtor, WebSocketLike } from "./websocket-relay-port";
 
 const CONTROL_CHANNEL_BYTE = 0x00;
@@ -50,7 +51,17 @@ const CONTROL_CHANNEL_BYTE = 0x00;
 export type LanAdmit = (account: string, sig: string, nonce: string) => boolean | Promise<boolean>;
 
 export type LanRelayHostOptions = {
-	/** Roster-verified admission callback (from `lan-admission.ts`). Absent ⇒
+	/** Channel-bound handshake (LAN-2b(b), gate finding G2) — the relay-proof
+	 *  path. When present the host waits for the client's `hello`, seals the
+	 *  nonce to that device's X25519 key, verifies the returned proof and
+	 *  answers with its OWN proof. Takes precedence over `admit`. */
+	handshake?: LanHostHandshake;
+	/** This host's device account, announced in the sealed challenge so the
+	 *  client can bind the AAD and check the host is itself rostered. */
+	hostAccount?: string;
+	/** Legacy plaintext-nonce admission (roster + signature only, no channel
+	 *  binding). Kept for the cloud-parity tests; a LAN wiring must use
+	 *  `handshake` — a plaintext challenge is relay-forgeable. Absent ⇒
 	 *  OPEN host (no challenge) — cloud-relay parity, tests only. When present the
 	 *  host challenges every connection and admits only on a true result. */
 	admit?: LanAdmit;
@@ -71,6 +82,8 @@ export type LanRelayHostOptions = {
 	 *  update is orders of magnitude smaller; this bounds the per-message copy
 	 *  an admitted-or-not peer can force. */
 	maxMessageBytes?: number;
+	/** Max routing keys one connection may hold (G7). */
+	maxSubscriptions?: number;
 	/** Timer seam so tests drive the deadline without real time. */
 	setTimer?: (fn: () => void, ms: number) => unknown;
 	clearTimer?: (handle: unknown) => void;
@@ -88,6 +101,11 @@ export const DEFAULT_LAN_MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 type AdmissionState = {
 	authed: boolean;
 	nonce: string;
+	/** Raw nonce bytes for the channel-bound path (the sealed challenge carries
+	 *  them encrypted; the host keeps the plaintext to verify the proof). */
+	nonceBytes: Uint8Array | null;
+	/** The account named in `hello`, set before the challenge is sealed. */
+	clientAccount: string | null;
 	/** One admission attempt per connection (G9): a second `auth` control is
 	 *  refused rather than queued, so a single socket cannot drive unbounded
 	 *  concurrent signature verifies against a never-rotated nonce. */
@@ -99,6 +117,13 @@ type AdmissionState = {
 /** Minimal control shapes the host reads/writes. Opaque JSON — the host never
  *  looks past `op` / the auth fields; it does NOT parse routing headers. */
 type AuthControl = { op: "auth"; token?: string; account?: string; sig?: string };
+
+/** G7 — bound how many routing keys one connection may join. LAN peers are all
+ *  devices in ONE vault's roster and already hold the DEKs, so key-level
+ *  authorization buys nothing there (see the doc's OQ-LAN-9 resolution); this
+ *  cap exists purely so a peer cannot grow the host's routing table without
+ *  limit. */
+export const DEFAULT_LAN_MAX_SUBSCRIPTIONS = 4096;
 
 function defaultMintNonce(): string {
 	const bytes = new Uint8Array(32);
@@ -114,22 +139,28 @@ function defaultMintNonce(): string {
  */
 export class LanRelayHost {
 	readonly #core: RelayCore;
+	readonly #handshake: LanHostHandshake | null;
+	readonly #hostAccount: string | null;
 	readonly #admit: LanAdmit | null;
 	readonly #mintNonce: () => string;
 	readonly #admission = new Map<string, AdmissionState>();
 	readonly #authDeadlineMs: number;
 	readonly #maxConnections: number;
 	readonly #maxMessageBytes: number;
+	readonly #maxSubscriptions: number;
 	readonly #setTimer: (fn: () => void, ms: number) => unknown;
 	readonly #clearTimer: (handle: unknown) => void;
 	#closed = false;
 
 	constructor(opts: LanRelayHostOptions = {}) {
+		this.#handshake = opts.handshake ?? null;
+		this.#hostAccount = opts.hostAccount ?? null;
 		this.#admit = opts.admit ?? null;
 		this.#mintNonce = opts.mintNonce ?? defaultMintNonce;
 		this.#authDeadlineMs = opts.authDeadlineMs ?? DEFAULT_LAN_AUTH_DEADLINE_MS;
 		this.#maxConnections = opts.maxConnections ?? DEFAULT_LAN_MAX_CONNECTIONS;
 		this.#maxMessageBytes = opts.maxMessageBytes ?? DEFAULT_LAN_MAX_MESSAGE_BYTES;
+		this.#maxSubscriptions = opts.maxSubscriptions ?? DEFAULT_LAN_MAX_SUBSCRIPTIONS;
 		this.#setTimer =
 			opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms) as unknown as ReturnType<typeof setTimeout>);
 		this.#clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
@@ -137,6 +168,18 @@ export class LanRelayHost {
 			...(opts.mintConnId ? { mintConnId: opts.mintConnId } : {}),
 			...(opts.now ? { now: opts.now } : {}),
 		});
+	}
+
+	/** Fresh nonce BYTES for the channel-bound path (the sealed challenge needs
+	 *  the raw value; the legacy path needs the base64url string). */
+	#mintNonceBytes(): Uint8Array {
+		return base64UrlToBytesLocal(this.#mintNonce());
+	}
+
+	/** The host account the challenge announces, so the client knows which
+	 *  device to bind the AAD to (and can check it is rostered). */
+	#handshakeHostAccount(): string {
+		return this.#hostAccount ?? "";
 	}
 
 	/** The routing/audit core — test-visible for asserting fan-out + that the
@@ -195,11 +238,13 @@ export class LanRelayHost {
 			return null;
 		}
 		const connId = this.#core.handlers.onOpen(serverWs);
-		if (this.#admit) {
+		if (this.#handshake || this.#admit) {
 			const nonce = this.#mintNonce();
 			const state: AdmissionState = {
 				authed: false,
 				nonce,
+				nonceBytes: null,
+				clientAccount: null,
 				attempted: false,
 				deadline: null,
 			};
@@ -210,9 +255,19 @@ export class LanRelayHost {
 				closeClient?.();
 			}, this.#authDeadlineMs);
 			this.#admission.set(connId, state);
-			sendToClient(encodeControl({ op: "challenge", nonce }));
+			// Channel-bound path: say nothing until the client names itself in
+			// `hello` — the challenge is sealed TO that device's X25519 key, so
+			// there is nothing to send before we know who is connecting.
+			if (!this.#handshake) sendToClient(encodeControl({ op: "challenge", nonce }));
 		} else {
-			this.#admission.set(connId, { authed: true, nonce: "", attempted: true, deadline: null });
+			this.#admission.set(connId, {
+				authed: true,
+				nonce: "",
+				nonceBytes: null,
+				clientAccount: null,
+				attempted: true,
+				deadline: null,
+			});
 		}
 		return connId;
 	}
@@ -233,10 +288,34 @@ export class LanRelayHost {
 		// G9 — bound the per-message copy any peer can force, admitted or not.
 		if (bytes.length > this.#maxMessageBytes) return;
 		if (!state.authed) {
-			// Only an `auth` control can move an unauthenticated connection forward.
-			const auth =
-				bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE ? decodeAuth(bytes.subarray(1)) : null;
-			if (!auth) return; // drop subscribe / frame / anything else pre-auth.
+			const control =
+				bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE ? bytes.subarray(1) : null;
+			if (!control) return; // drop subscribe / frame / anything else pre-auth.
+
+			// Channel-bound path (LAN-2b(b)): `hello` names the connecting device
+			// so the challenge can be SEALED to its roster X25519 key.
+			if (this.#handshake && state.clientAccount === null) {
+				const hello = decodeHello(control);
+				if (!hello) return;
+				const nonceBytes = this.#mintNonceBytes();
+				const sealed = this.#handshake.sealFor(hello.account, nonceBytes);
+				// Unknown, revoked, or no usable X25519 key ⇒ close. There is NO
+				// fallback to a plaintext challenge: that would be a downgrade an
+				// attacker could force by presenting an old-shaped roster row.
+				if (!sealed) {
+					closeClient();
+					return;
+				}
+				state.clientAccount = hello.account;
+				state.nonceBytes = nonceBytes;
+				sendToClient(
+					encodeControl({ op: "challenge", account: this.#handshakeHostAccount(), ...sealed }),
+				);
+				return;
+			}
+
+			const auth = decodeAuth(control);
+			if (!auth) return;
 			// G9 — exactly one attempt per connection: a second `auth` is refused
 			// rather than queued, so one socket can't drive unbounded concurrent
 			// verifies against a nonce that never rotates.
@@ -258,6 +337,19 @@ export class LanRelayHost {
 			isRotateControl(bytes.subarray(1))
 		) {
 			return;
+		}
+		// G7 — cap how many routing keys ONE connection may hold. Key-level
+		// authorization is deliberately NOT enforced (see the OQ-LAN-9
+		// resolution: every LAN peer is a device in the same vault's roster and
+		// already holds the DEKs, so restricting WHICH keys it may join buys no
+		// confidentiality). The cap is purely so a peer cannot grow the host's
+		// routing table without bound.
+		if (bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE) {
+			const joining = countSubscribeKeys(bytes.subarray(1));
+			if (joining > 0) {
+				const held = this.#core.router.connectionEntities(connId).length;
+				if (held + joining > this.#maxSubscriptions) return;
+			}
 		}
 		// Authenticated: hand off to the blind router (subscribe / unsubscribe /
 		// frame fan-out). The host never parses past the channel byte here.
@@ -282,11 +374,22 @@ export class LanRelayHost {
 		sendToClient: (wire: Uint8Array) => void,
 		closeClient: () => void,
 	): Promise<void> {
+		const handshake = this.#handshake;
 		const admit = this.#admit;
-		if (!admit) return;
+		if (!handshake && !admit) return;
 		let ok = false;
 		try {
-			ok = await admit(auth.account ?? "", auth.sig ?? "", state.nonce);
+			if (handshake) {
+				// The account is the one bound into the sealed challenge — NOT
+				// whatever this message claims, so a client cannot switch identity
+				// between `hello` and `auth`.
+				ok =
+					state.clientAccount !== null &&
+					state.nonceBytes !== null &&
+					handshake.verifyClient(state.clientAccount, auth.sig ?? "", state.nonceBytes);
+			} else if (admit) {
+				ok = await admit(auth.account ?? "", auth.sig ?? "", state.nonce);
+			}
 		} catch {
 			ok = false;
 		}
@@ -296,12 +399,26 @@ export class LanRelayHost {
 		// stale continuation mark a *new* connection authenticated.
 		if (this.#closed || this.#admission.get(connId) !== state) return;
 		if (ok) {
+			// The host proves ITSELF back before the client sends anything —
+			// without this the client has no way to tell a rostered host from a
+			// rogue one that merely said "auth-ok" (gate finding G2).
+			let proof: string | null = null;
+			if (handshake) {
+				proof =
+					state.clientAccount && state.nonceBytes
+						? handshake.proveToClient(state.clientAccount, state.nonceBytes)
+						: null;
+				if (!proof) {
+					closeClient();
+					return;
+				}
+			}
 			state.authed = true;
 			if (state.deadline) {
 				this.#clearTimer(state.deadline);
 				state.deadline = null;
 			}
-			sendToClient(encodeControl({ op: "auth-ok" }));
+			sendToClient(encodeControl(proof ? { op: "auth-ok", proof } : { op: "auth-ok" }));
 		} else {
 			closeClient();
 		}
@@ -403,6 +520,45 @@ function isRotateControl(body: Uint8Array): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** How many routing keys a `subscribe` control is asking for (0 for anything
+ *  else). Reads only the array length — the host stays blind to the keys. */
+function countSubscribeKeys(body: Uint8Array): number {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(body)) as {
+			op?: unknown;
+			entityIds?: unknown;
+		};
+		if (v?.op !== "subscribe" || !Array.isArray(v.entityIds)) return 0;
+		return v.entityIds.length;
+	} catch {
+		return 0;
+	}
+}
+
+/** `hello{account}` — the first control on a channel-bound connection. Reads
+ *  only the account string; the host stays blind to everything else. */
+function decodeHello(body: Uint8Array): { account: string } | null {
+	try {
+		const parsed = JSON.parse(new TextDecoder().decode(body)) as {
+			op?: unknown;
+			account?: unknown;
+		};
+		if (!parsed || typeof parsed !== "object") return null;
+		if (parsed.op !== "hello") return null;
+		if (typeof parsed.account !== "string" || parsed.account.length === 0) return null;
+		return { account: parsed.account };
+	} catch {
+		return null;
+	}
+}
+
+/** base64url → bytes, local so this file keeps its zero-crypto import surface
+ *  (a base64 decode is not crypto; importing the pairing module here would drag
+ *  a crypto-adjacent module into the relay-blind fence). */
+function base64UrlToBytesLocal(encoded: string): Uint8Array {
+	return new Uint8Array(Buffer.from(encoded, "base64url"));
 }
 
 function decodeAuth(body: Uint8Array): AuthControl | null {
