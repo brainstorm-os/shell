@@ -484,6 +484,8 @@
   "shell.widgets.layerLabel": "Field label in the dashboard widgets layer: “Dashboard widgets”.",
   "shell.widgets.menu.label": "Field label in the dashboard widgets layer: “Widget options”.",
   "shell.widgets.menu.remove": "Button label in the dashboard widgets layer: “Remove widget”.",
+  "shell.widgets.menu.size.custom": "Menu row in the dashboard widget's Size group, checked when the widget was hand-resized to match no preset: “Custom”. Non-interactive — it names the state, it is not a pickable size.",
+  "shell.widgets.menu.sizeWithFootprint": "Section header of the dashboard widget Size menu carrying the live footprint, e.g. “Size — 20×21”. Interpolates {w}/{h}, the widget's width/height in grid cells.",
   "shell.widgets.open": "Button label in the dashboard widgets layer: “Open {name}”. Interpolates {name}.",
   "shell.widgets.resize": "Button label in the dashboard widgets layer: “Resize widget”.",
   "shell.windowMenu.region": "Accessible label for the running-windows strip / window-switcher toolbar region in the dashboard footer. Very short.",
