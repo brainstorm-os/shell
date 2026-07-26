@@ -130,8 +130,8 @@ function buildDevice(
 	const account = bytesToBase64Url(devicePub);
 	const ctor = host.webSocketCtor();
 	const responder = makeLanChallengeResponder({
-		account: () => account,
-		signNonce: (nonce) => new Uint8Array(ed25519.sign(nonce, kp.secretKey)),
+		deviceAccount: () => account,
+		signWithDeviceKey: (msg) => new Uint8Array(ed25519.sign(msg, kp.secretKey)),
 	});
 	const makePort = (): WebSocketRelayPort =>
 		new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor, onChallenge: responder });
@@ -196,7 +196,7 @@ describe("LAN P2P sync (LAN-6) — two engines over a localhost blind host, no c
 
 		const host = new LanRelayHost({
 			admit: makeLanAdmissionVerifier({
-				isRosterMember: (acc) => roster.has(acc),
+				activeDeviceKeys: () => roster,
 				verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
 			}),
 		});

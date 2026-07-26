@@ -90,11 +90,15 @@ export function createRelayCore(
 		now?: () => number;
 		/** Stage 10.11 — dual-token grace window for routing rotation (ms). */
 		rotateGraceMs?: number;
+		/** In-memory audit retention (drop-oldest beyond it). Bounded by default
+		 *  so a connected peer cannot grow the host without limit. */
+		maxAuditEntries?: number;
 	} = {},
 ): RelayCore {
 	const audit = new AuditLog({
 		...(opts.auditSink ? { sink: opts.auditSink } : {}),
 		...(opts.now ? { now: opts.now } : {}),
+		...(opts.maxAuditEntries !== undefined ? { maxEntries: opts.maxAuditEntries } : {}),
 	});
 	const now = opts.now ?? Date.now;
 	const rotateGraceMs = opts.rotateGraceMs ?? DEFAULT_ROTATE_GRACE_MS;
