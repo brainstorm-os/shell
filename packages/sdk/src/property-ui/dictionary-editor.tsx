@@ -17,6 +17,7 @@
 
 import type { Dictionary, DictionaryItem, PropertyDef } from "@brainstorm-os/sdk-types";
 import { type JSX, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { IconName } from "../icon/icon-registry";
 import { openAnchoredMenu } from "../object-menu";
 import { SelectMenu } from "../select-menu";
 import {
@@ -407,9 +408,17 @@ function DictionaryRow({
 							openAnchoredMenu(
 								{ x: rect.right, y: rect.bottom },
 								[
+									// Archive + Delete take the fleet-standard glyphs the shared
+									// object menu uses for the same verbs; Merge has no glyph in
+									// the registry yet, so the runtime reserves its gutter slot.
 									{ label: labels.dictStartMerge, onSelect: onStartMerge },
-									{ label: labels.dictArchive, onSelect: onArchive },
-									{ label: labels.dictDelete, destructive: true, onSelect: onDelete },
+									{ label: labels.dictArchive, icon: IconName.Archive, onSelect: onArchive },
+									{
+										label: labels.dictDelete,
+										icon: IconName.Trash,
+										destructive: true,
+										onSelect: onDelete,
+									},
 								],
 								{ menuLabel: labels.dictRowMenu(item.label), anchor: el },
 							);
