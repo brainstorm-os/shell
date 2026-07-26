@@ -6,8 +6,9 @@
     "apps/notes/src/store/use-notes.ts"
   ],
   "whyStillBaselined": {
-    "apps/database/src/app.ts": "Real debt AND the largest: an imperative-DOM app (5.3k lines, 26 onChange refs) whose migration is the all-apps-React track rung 9.x, not a reactivity-only change.",
-    "apps/files/src/store/use-files-store.ts": "Real debt: `svc.onChange(() => loadFromVault())` is the exact hand-rolled reload the gate exists to remove.",
-    "apps/notes/src/store/use-notes.ts": "Real debt, and the canonical example of the harm: it wires onChange to its OWN coalescer, which is the per-app coalescer drift CLAUDE.md calls out."
-  }
+    "apps/database/src/app.ts": "Real debt, and the largest: an imperative-DOM app (5.3k lines, 26 onChange refs). Its migration is the all-apps-React track, not a reactivity-only change.",
+    "apps/files/src/store/use-files-store.ts": "BLOCKED on a missing shared-hook seam, not laziness. `loadFromVault()` RECONCILES over the previous view (tree expansion, nav history, resolved openers) and deliberately keeps the current view when `vaultEntities.list` throws. `useLiveEntities` offers only `equals`, which can suppress a render but cannot merge prev into next.",
+    "apps/notes/src/store/use-notes.ts": "BLOCKED on the same missing seam. Its refresh merges in-memory state OVER the disk snapshot: notes with a debounced save still in flight, and the currently-open note ALWAYS pinned -- because a snapshot that momentarily misses it drops `notes.get(selectedId)` to null, which UNMOUNTS the editor and made sub-pages vanish (a reported bug this code fixes). `equals` cannot express that; only a `reconcile(prev, next)` could."
+  },
+  "blocker": "Two of the three (files, notes) need a `reconcile(prev, next) => T` option on the shared reactivity options (query-store / subscription / vault-entities currently expose `equals` only). That seam is NOT added speculatively: per CLAUDE.md 'no abstraction without three uses', it should land WITH its first real migration, not ahead of it. Whoever migrates notes or files adds it then. Naive migration without it would reintroduce the editor-unmount / vanishing-sub-page bug."
 }
