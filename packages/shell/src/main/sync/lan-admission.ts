@@ -15,11 +15,22 @@
  * exactly as `challenge-responder.ts` sits outside it for the client side.
  *
  * The design INVERTS SYNC-4b: the cloud rule is "an open node never
- * challenges"; the LAN rule is "the host ALWAYS challenges, and the client
- * verifies the host back" (mutual). Proof of admission = an Ed25519 signature
- * over the host's nonce, checked against the vault's signed device roster
- * (`meta.devices`) both paired peers already hold. No new key material, no new
- * primitive — only a roster-membership verifier.
+ * challenges"; the LAN rule is "the host ALWAYS challenges". Proof of admission
+ * = an Ed25519 signature over the host's (domain-tagged) nonce, checked against
+ * the vault's signed device roster (`meta.devices`) both paired peers already
+ * hold. No new key material, no new primitive — only a roster verifier.
+ *
+ * **The principal is the PER-DEVICE key** (`session.deviceEd25519` /
+ * `signWithDeviceKey`), not the sovereign user key — security gate 2026-07-26
+ * finding G3, decision note `docs/data/lan-admission-principal.md` Option A.
+ * The user key is the same on every paired device, so it cannot name one device
+ * and per-device revocation cannot be built on it; it is also the key that
+ * signs roster records, which is what made the challenge a signing oracle (G1).
+ *
+ * ⚠️ **The mutual half is still MISSING (gate finding G2, blocking LAN-4).**
+ * The design says the client verifies the host back; no such code exists, so a
+ * rogue host can relay a live nonce from the real host and be admitted AS THE
+ * VICTIM. Until that lands, this module authenticates only host→client.
  */
 
 import { ed25519Verify } from "@brainstorm-os/native";
@@ -91,10 +102,56 @@ export function lanChallengeSigningBytes(nonce: Uint8Array): Uint8Array {
  *  satisfies the existing `auth` control shape the `WebSocketRelayPort` sends. */
 export const LAN_ADMISSION_TOKEN = "lan/v1";
 
+/**
+ * The set of device pubkeys currently allowed to connect, derived from the
+ * signed roster — **the only supported way to build the admission verifier.**
+ *
+ * Three traps this exists to make unreachable (security gate 2026-07-26,
+ * findings G3/G4/G8 — each was a `(account: string) => boolean` a future
+ * wiring could plausibly have written wrong):
+ *
+ *  1. **Wrong key space (G3).** The wire `account` on the LAN path is the
+ *     **per-device** `deviceEd25519Pub`, NOT the sovereign user key. The user
+ *     key is identical on every paired device, so admitting on it cannot name
+ *     ONE device — which makes per-device revocation unimplementable. Taking
+ *     roster records directly means the caller never chooses a key space.
+ *  2. **Revoked devices (G4).** Built from `listActive()`, so a revoked device
+ *     is excluded by construction. A hand-written predicate over `list()`
+ *     would have admitted revoked devices (`list()` includes them).
+ *  3. **Encoding (G8).** Roster records store base64; the wire is base64url,
+ *     and base64url decoding is lenient — ~16 distinct strings decode to the
+ *     same 32-byte key. Membership therefore compares **canonical bytes**, and
+ *     a non-canonical wire encoding is rejected outright rather than silently
+ *     normalized (so it can never diverge from a string-keyed revocation check).
+ */
+export function lanRosterAdmissionSet(
+	activeRecords: readonly { deviceEd25519Pub: string }[],
+): ReadonlySet<string> {
+	const out = new Set<string>();
+	for (const record of activeRecords) {
+		try {
+			const bytes = new Uint8Array(Buffer.from(record.deviceEd25519Pub, "base64"));
+			if (bytes.length !== DEVICE_PUBKEY_BYTES) continue;
+			out.add(canonicalBase64Url(bytes));
+		} catch {
+			// A malformed roster row is not a member.
+		}
+	}
+	return out;
+}
+
+const DEVICE_PUBKEY_BYTES = 32;
+
+function canonicalBase64Url(bytes: Uint8Array): string {
+	return Buffer.from(bytes).toString("base64url");
+}
+
 export type LanAdmissionVerifierDeps = {
-	/** Is this wire account (base64url device pubkey) in the vault's signed
-	 *  device roster? Supplied by the wiring over `meta.devices` (OQ-LAN-7). */
-	isRosterMember: (account: string) => boolean;
+	/** Devices allowed to connect, as canonical base64url pubkeys. Build it with
+	 *  `lanRosterAdmissionSet(devicesStore.listActive())` — see that function for
+	 *  why this is a set of roster-derived keys rather than a predicate. Read it
+	 *  fresh per connection so a revoke takes effect without a restart. */
+	activeDeviceKeys: () => ReadonlySet<string>;
 	/** Ed25519 verify. Default = native `ed25519Verify(pub, msg, sig)`. Injectable
 	 *  for deterministic tests. */
 	verify?: (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
@@ -117,17 +174,17 @@ export function makeLanAdmissionVerifier(
 	return (account: string, sig: string, nonce: string): boolean => {
 		try {
 			if (!account || !sig || !nonce) return false;
-			if (!deps.isRosterMember(account)) return false;
 			const pubkey = base64UrlToBytes(account);
+			// Reject a non-canonical encoding of a member key rather than
+			// normalizing it (G8): the roster's own revoke/isRevoked checks are
+			// string-keyed, so silently accepting a variant spelling would admit a
+			// device that every revocation check then misses.
+			if (pubkey.length !== DEVICE_PUBKEY_BYTES) return false;
+			if (canonicalBase64Url(pubkey) !== account) return false;
+			if (!deps.activeDeviceKeys().has(account)) return false;
 			const sigBytes = base64UrlToBytes(sig);
 			const nonceBytes = base64UrlToBytes(nonce);
-			if (
-				pubkey.length !== 32 ||
-				sigBytes.length !== 64 ||
-				nonceBytes.length !== CHALLENGE_NONCE_BYTES
-			) {
-				return false;
-			}
+			if (sigBytes.length !== 64 || nonceBytes.length !== CHALLENGE_NONCE_BYTES) return false;
 			return verify(pubkey, lanChallengeSigningBytes(nonceBytes), sigBytes);
 		} catch {
 			return false;
@@ -136,12 +193,18 @@ export function makeLanAdmissionVerifier(
 }
 
 export type LanChallengeResponderDeps = {
-	/** This device's wire account (base64url identity/device pubkey), or null
-	 *  when there's no open session. */
-	account: () => string | null;
-	/** Sign the raw nonce bytes with the device identity key, or null (no
-	 *  session). The secret never leaves the closure. */
-	signNonce: (nonce: Uint8Array) => Uint8Array | null;
+	/** This device's **per-device** Ed25519 pubkey (`session.deviceEd25519`) as
+	 *  canonical base64url, or null when there's no open session.
+	 *
+	 *  NOT the sovereign user key (`session.identity`): that key is identical on
+	 *  every paired device, so admitting on it cannot name one device and makes
+	 *  per-device revocation unimplementable (gate finding G3). It is also the
+	 *  key that signs roster records, which is what made the challenge a signing
+	 *  oracle (G1) — keeping it out of this path removes that class entirely. */
+	deviceAccount: () => string | null;
+	/** Sign with the **per-device** secret (`session.signWithDeviceKey`), or null
+	 *  (no session). The secret never leaves the closure. */
+	signWithDeviceKey: (message: Uint8Array) => Uint8Array | null;
 };
 
 /**
@@ -156,7 +219,7 @@ export function makeLanChallengeResponder(
 	deps: LanChallengeResponderDeps,
 ): (nonce: string) => Promise<AuthResponse | null> {
 	return async (nonce: string): Promise<AuthResponse | null> => {
-		const account = deps.account();
+		const account = deps.deviceAccount();
 		if (!account) return null;
 		let nonceBytes: Uint8Array;
 		try {
@@ -169,7 +232,7 @@ export function makeLanChallengeResponder(
 		// CHALLENGE_DOMAIN_TAG). Length guard + domain tag are independent
 		// defenses; either alone defeats the roster-forgery oracle.
 		if (nonceBytes.length !== CHALLENGE_NONCE_BYTES) return null;
-		const sig = deps.signNonce(lanChallengeSigningBytes(nonceBytes));
+		const sig = deps.signWithDeviceKey(lanChallengeSigningBytes(nonceBytes));
 		if (!sig) return null;
 		return {
 			token: LAN_ADMISSION_TOKEN,

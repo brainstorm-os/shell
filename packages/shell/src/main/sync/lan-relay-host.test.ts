@@ -19,6 +19,7 @@ import { encodeFrame } from "./envelope-codec";
 import {
 	LanRole,
 	electLanRole,
+	lanRosterAdmissionSet,
 	makeLanAdmissionVerifier,
 	makeLanChallengeResponder,
 } from "./lan-admission";
@@ -45,8 +46,8 @@ function makeDevice() {
 	const kp = ed25519.keygen();
 	const account = bytesToBase64Url(new Uint8Array(kp.publicKey));
 	const responder = makeLanChallengeResponder({
-		account: () => account,
-		signNonce: (nonce) => new Uint8Array(ed25519.sign(nonce, kp.secretKey)),
+		deviceAccount: () => account,
+		signWithDeviceKey: (msg) => new Uint8Array(ed25519.sign(msg, kp.secretKey)),
 	});
 	return { kp, account, responder };
 }
@@ -120,7 +121,7 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 		const b = makeDevice();
 		const roster = new Set([a.account, b.account]);
 		const admit = makeLanAdmissionVerifier({
-			isRosterMember: (acc) => roster.has(acc),
+			activeDeviceKeys: () => roster,
 			verify: testVerify,
 		});
 		const host = new LanRelayHost({ admit });
@@ -160,9 +161,9 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 		const roster = new Set([member.account]); // intruder NOT in roster
 		let admitCalls = 0;
 		const admit = makeLanAdmissionVerifier({
-			isRosterMember: (acc) => {
+			activeDeviceKeys: () => {
 				admitCalls += 1;
-				return roster.has(acc);
+				return roster;
 			},
 			verify: testVerify,
 		});
@@ -188,7 +189,7 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 		const good = makeDevice();
 		const roster = new Set([good.account]);
 		const admit = makeLanAdmissionVerifier({
-			isRosterMember: (acc) => roster.has(acc),
+			activeDeviceKeys: () => roster,
 			verify: testVerify,
 		});
 		const host = new LanRelayHost({ admit });
@@ -196,8 +197,8 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 		// A responder that claims `good.account` but signs with a DIFFERENT key.
 		const wrongKey = ed25519.keygen();
 		const forged = makeLanChallengeResponder({
-			account: () => good.account,
-			signNonce: (nonce) => new Uint8Array(ed25519.sign(nonce, wrongKey.secretKey)),
+			deviceAccount: () => good.account,
+			signWithDeviceKey: (msg) => new Uint8Array(ed25519.sign(msg, wrongKey.secretKey)),
 		});
 		const port = new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor, onChallenge: forged });
 		try {
@@ -208,5 +209,71 @@ describe("LanRelayHost — roster-verified admission (LAN-2)", () => {
 			port.close();
 			host.close();
 		}
+	});
+});
+
+describe("lanRosterAdmissionSet — the admission principal (gate G3/G4/G8)", () => {
+	const b64 = (b: Uint8Array) => Buffer.from(b).toString("base64");
+
+	it("transcodes roster base64 to the canonical base64url the wire uses", () => {
+		const dev = ed25519.keygen();
+		const pub = new Uint8Array(dev.publicKey);
+		const set = lanRosterAdmissionSet([{ deviceEd25519Pub: b64(pub) }]);
+		// The roster stores base64; the wire account is base64url. A naive
+		// string-equality membership check would never match across the two.
+		expect(set.has(bytesToBase64Url(pub))).toBe(true);
+	});
+
+	it("excludes revoked devices when built from listActive()", () => {
+		// listActive() is what a wiring must pass; a revoked row simply isn't in it.
+		const kept = new Uint8Array(ed25519.keygen().publicKey);
+		const revoked = new Uint8Array(ed25519.keygen().publicKey);
+		const all = [
+			{ deviceEd25519Pub: b64(kept), revokedAt: undefined },
+			{ deviceEd25519Pub: b64(revoked), revokedAt: 123 },
+		];
+		const active = all.filter((r) => r.revokedAt === undefined);
+		const set = lanRosterAdmissionSet(active);
+		expect(set.has(bytesToBase64Url(kept))).toBe(true);
+		expect(set.has(bytesToBase64Url(revoked))).toBe(false);
+	});
+
+	it("drops malformed / wrong-length roster rows rather than admitting them", () => {
+		const set = lanRosterAdmissionSet([
+			{ deviceEd25519Pub: "" },
+			{ deviceEd25519Pub: "not-base64-!!!" },
+			{ deviceEd25519Pub: b64(new Uint8Array(16)) },
+		]);
+		expect(set.size).toBe(0);
+	});
+
+	it("REJECTS a non-canonical encoding of a real member key", () => {
+		// base64url decoding is lenient: several strings decode to the same 32
+		// bytes. Accepting a variant would admit a device that the roster's
+		// string-keyed revocation checks then miss (G8), so the verifier
+		// demands the canonical spelling.
+		const dev = ed25519.keygen();
+		const pub = new Uint8Array(dev.publicKey);
+		const canonical = bytesToBase64Url(pub);
+		// 32 bytes encode to 43 base64url chars: the last char carries 4
+		// significant bits + 2 IGNORED ones, so flipping only its low bits gives
+		// a different string that decodes to the identical key. That malleability
+		// is the premise of this test, asserted rather than assumed — a naive
+		// `endsWith("A") ? "B" : "A"` flip silently changes the bytes for most
+		// keys and would make this pass for the wrong reason.
+		const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+		const lastIndex = ALPHABET.indexOf(canonical[canonical.length - 1] as string);
+		const variant = canonical.slice(0, -1) + (ALPHABET[lastIndex ^ 0b01] as string);
+		expect(variant).not.toBe(canonical);
+		expect([...base64UrlToBytes(variant)]).toEqual([...pub]);
+
+		const admit = makeLanAdmissionVerifier({
+			activeDeviceKeys: () => lanRosterAdmissionSet([{ deviceEd25519Pub: b64(pub) }]),
+			verify: () => true, // isolate the encoding check from the signature check
+		});
+		const nonce = bytesToBase64Url(new Uint8Array(32).fill(1));
+		const sig = bytesToBase64Url(new Uint8Array(64));
+		expect(admit(canonical, sig, nonce)).toBe(true);
+		expect(admit(variant, sig, nonce)).toBe(false);
 	});
 });

@@ -51,14 +51,24 @@ export type AuditEntryInput = {
 
 export type AuditSink = (line: string) => void;
 
+/** Default in-memory retention. The log is a debugging/inspection aid, not a
+ *  durable record (a durable sink is the `sink` callback's job), so it keeps a
+ *  bounded recent window. Unbounded growth is reachable from any connected
+ *  peer — one entry per delivery — which on the EMBEDDED LAN host means a
+ *  co-resident or admitted peer can grow the user's shell process without
+ *  limit. */
+export const DEFAULT_MAX_AUDIT_ENTRIES = 10_000;
+
 export class AuditLog {
 	readonly #entries: AuditEntry[] = [];
 	readonly #sink: AuditSink | null;
 	readonly #now: () => number;
+	readonly #maxEntries: number;
 
-	constructor(opts: { sink?: AuditSink; now?: () => number } = {}) {
+	constructor(opts: { sink?: AuditSink; now?: () => number; maxEntries?: number } = {}) {
 		this.#sink = opts.sink ?? null;
 		this.#now = opts.now ?? Date.now;
+		this.#maxEntries = Math.max(1, opts.maxEntries ?? DEFAULT_MAX_AUDIT_ENTRIES);
 	}
 
 	record(input: AuditEntryInput): AuditEntry {
@@ -71,6 +81,12 @@ export class AuditLog {
 			bytes: input.bytes,
 		};
 		this.#entries.push(entry);
+		// Drop-oldest so the window stays recent and memory stays bounded; the
+		// `sink` (if any) still sees every entry, so a durable consumer loses
+		// nothing.
+		if (this.#entries.length > this.#maxEntries) {
+			this.#entries.splice(0, this.#entries.length - this.#maxEntries);
+		}
 		if (this.#sink) {
 			this.#sink(JSON.stringify(entry));
 		}

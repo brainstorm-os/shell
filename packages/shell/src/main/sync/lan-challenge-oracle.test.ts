@@ -75,6 +75,7 @@ describe("challenge signature / roster domain overlap", () => {
 
 	it("the LAN responder REFUSES to sign roster-shaped bytes", async () => {
 		const user = generateIdentity();
+		const device = generateIdentity();
 		const attackerEd = generateIdentity();
 		const attackerX = generateIdentity();
 		const input = attackerRecordInput(user.publicKey, {
@@ -84,10 +85,10 @@ describe("challenge signature / roster domain overlap", () => {
 
 		let signedBytes: Uint8Array | null = null;
 		const respond = makeLanChallengeResponder({
-			account: () => b64url(user.publicKey),
-			signNonce: (nonce) => {
-				signedBytes = nonce;
-				return signPayload(user.secretKey, nonce);
+			deviceAccount: () => b64url(device.publicKey),
+			signWithDeviceKey: (msg) => {
+				signedBytes = msg;
+				return signPayload(device.secretKey, msg);
 			},
 		});
 
@@ -121,34 +122,34 @@ describe("challenge signature / roster domain overlap", () => {
 	it("even a 32-byte nonce yields a LAN signature that is not a roster record", async () => {
 		// Belt-and-braces: the length guard alone would let a hypothetical
 		// 32-byte signable message through; the domain tag closes that too.
-		const user = generateIdentity();
+		const device = generateIdentity();
 		const respond = makeLanChallengeResponder({
-			account: () => b64url(user.publicKey),
-			signNonce: (nonce) => signPayload(user.secretKey, nonce),
+			deviceAccount: () => b64url(device.publicKey),
+			signWithDeviceKey: (msg) => signPayload(device.secretKey, msg),
 		});
 		const nonce = new Uint8Array(32).fill(3);
 		const reply = await respond(b64url(nonce));
 		const sig = new Uint8Array(Buffer.from((reply as { sig: string }).sig, "base64url"));
 		// The signature does NOT verify over the bare nonce — only over the
 		// tagged bytes — so it can never be replayed into an untagged protocol.
-		expect(ed25519Verify(user.publicKey, nonce, sig)).toBe(false);
+		expect(ed25519Verify(device.publicKey, nonce, sig)).toBe(false);
 	});
 
 	it("signs the domain-tagged nonce, so an honest verifier still validates it", async () => {
-		const user = generateIdentity();
+		const device = generateIdentity();
 		const nonce = new Uint8Array(32).fill(7);
 
 		const respond = makeLanChallengeResponder({
-			account: () => b64url(user.publicKey),
-			signNonce: (bytes) => signPayload(user.secretKey, bytes),
+			deviceAccount: () => b64url(device.publicKey),
+			signWithDeviceKey: (bytes) => signPayload(device.secretKey, bytes),
 		});
 		const reply = await respond(b64url(nonce));
 		expect(reply).not.toBeNull();
 
 		const signed = new Uint8Array([...CHALLENGE_DOMAIN_TAG, ...nonce]);
 		const sig = new Uint8Array(Buffer.from((reply as { sig: string }).sig, "base64url"));
-		expect(ed25519Verify(user.publicKey, signed, sig)).toBe(true);
+		expect(ed25519Verify(device.publicKey, signed, sig)).toBe(true);
 		// …and the bare nonce alone does NOT verify — proof the tag is in the message.
-		expect(ed25519Verify(user.publicKey, nonce, sig)).toBe(false);
+		expect(ed25519Verify(device.publicKey, nonce, sig)).toBe(false);
 	});
 });
