@@ -91,8 +91,16 @@ export default defineConfig(({ command }) => {
 			root: "src/renderer",
 			plugins: [react()],
 			server: {
+				// PREFERRED, not required. `strictPort: true` made a stale dev
+				// server (or any other project already on 5173) a hard failure —
+				// electron-vite exits and you cannot start the app at all. With
+				// strictPort off, Vite takes the next free port and injects the
+				// real one as `ELECTRON_RENDERER_URL`, which is the only thing the
+				// main process reads (`main/index.ts`, `runtime/launch-setup.ts`);
+				// nothing pins 5173 (loopback is exempted from the HTTPS upgrade by
+				// HOST, not port), so a fallback port is fully functional.
 				port: 5173,
-				strictPort: true,
+				strictPort: false,
 			},
 			build: {
 				outDir: "out/renderer",
