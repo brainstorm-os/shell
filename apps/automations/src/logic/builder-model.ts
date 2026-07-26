@@ -211,6 +211,35 @@ export function updateStep(state: BuilderState, index: number, next: WorkflowSte
 	return { ...state, steps };
 }
 
+// ──────────────────────── entity write fields (F-458) ────────────────────────
+
+/** One editable row of an Entity Create/Update step's `properties` map —
+ *  the field name plus its value expression (the Code grammar, same scope
+ *  as every other binding). The UI edits rows; the step stores the record. */
+export type EntityPropertyRow = { key: string; value: string };
+
+/** The step's `properties` record as ordered editable rows (JS string-keyed
+ *  records preserve insertion order, so row order is stable across edits). */
+export function entityPropertyRows(step: EntityStep): EntityPropertyRow[] {
+	return Object.entries(step.properties ?? {}).map(([key, value]) => ({ key, value }));
+}
+
+/** Rebuild the step from edited rows. Duplicate keys collapse last-wins (a
+ *  record can't hold both); zero rows drop the `properties` key entirely,
+ *  which is the engine's documented "operand passthrough" mode — never an
+ *  empty record, and never `properties: undefined` under
+ *  exactOptionalPropertyTypes. */
+export function withEntityPropertyRows(
+	step: EntityStep,
+	rows: readonly EntityPropertyRow[],
+): EntityStep {
+	const { properties: _drop, ...rest } = step;
+	if (rows.length === 0) return rest;
+	const properties: Record<string, string> = {};
+	for (const row of rows) properties[row.key] = row.value;
+	return { ...rest, properties };
+}
+
 // ──────────────────────── output binding ────────────────────────
 
 /** Build a binding expression from a step id and optional member path —
@@ -232,6 +261,14 @@ export function bindingStepId(expression: string): string | null {
 	const head = trimmed.split(/[.[]/, 1)[0]?.trim() ?? "";
 	if (head.length === 0 || head === "input") return null;
 	return head;
+}
+
+/** True when the whole expression is one identifier followed by only member
+ *  or index accesses (`classify.content`, `email.properties["x"]`) — the
+ *  shape a binding takes. Anything else (literals, operators, calls) is a
+ *  computed expression the save-time dangle check must not second-guess. */
+export function isBareReferenceChain(expression: string): boolean {
+	return /^[A-Za-z_][\w-]*(\.[A-Za-z_$][\w$-]*|\[[^\]]*\])*$/.test(expression.trim());
 }
 
 /** All binding-bearing expression fields on a step (the operands the runner
@@ -349,6 +386,39 @@ function collectStepIssues(
 					stepId: step.id,
 					detail: "entityType",
 				});
+			}
+			for (const [key, value] of Object.entries(step.properties ?? {})) {
+				if (key.trim().length === 0) {
+					issues.push({
+						kind: BuilderIssueKind.EmptyStepConfig,
+						stepId: step.id,
+						detail: "propertyKey",
+					});
+					continue;
+				}
+				if (value.trim().length === 0) {
+					issues.push({
+						kind: BuilderIssueKind.EmptyStepConfig,
+						stepId: step.id,
+						detail: `property:${key}`,
+					});
+					continue;
+				}
+				// A field value is a full Code-grammar expression, so a literal
+				// (`'urgent'`, `1 + 2`) or a call (`now()`) is fine unbound —
+				// only a BARE reference chain whose head names no known step is
+				// a dangle worth blocking save over.
+				const ref = bindingStepId(value);
+				if (
+					value.trim() === UNBOUND ||
+					(ref !== null && isBareReferenceChain(value) && !knownIds.has(ref))
+				) {
+					issues.push({
+						kind: BuilderIssueKind.UnboundBinding,
+						stepId: step.id,
+						detail: `${key}: ${value}`,
+					});
+				}
 			}
 			break;
 		case StepKind.Notify:

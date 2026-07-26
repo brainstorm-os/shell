@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { StepKind } from "@brainstorm-os/sdk-types";
+import { EntityOp, type EntityStep, StepKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type BuilderState, triggerStep } from "../logic/builder-model";
 import { emptyBuilderTrigger } from "../logic/builder-trigger";
@@ -83,6 +83,70 @@ describe("WorkflowBuilder", () => {
 		await flush();
 		expect(result).not.toBeNull();
 		expect((result as unknown as BuilderResult).state.name).toBe("Greet");
+		await h.unmount();
+	});
+
+	it("shows the F-458 fields editor for a writing op and hides it for Query", async () => {
+		const entityState = (op: EntityOp): BuilderState => ({
+			name: "E",
+			steps: [triggerStep(), { id: "e", kind: StepKind.Entity, op, entityType: "brainstorm/Note/v1" }],
+		});
+		for (const [op, visible] of [
+			[EntityOp.Create, true],
+			[EntityOp.Update, true],
+			[EntityOp.Query, false],
+		] as const) {
+			const h = await renderInto(
+				<WorkflowBuilder
+					appCapabilities={APP_CAPS}
+					initialState={entityState(op)}
+					initialTrigger={emptyBuilderTrigger()}
+					onClose={() => {}}
+					onSave={() => {}}
+				/>,
+			);
+			expect(!!h.container.querySelector('[data-testid="entity-fields"]')).toBe(visible);
+			await h.unmount();
+		}
+	});
+
+	it("adds a field row and saves it into the step's properties", async () => {
+		let result: BuilderResult | null = null;
+		const caps = [...APP_CAPS, "entities.write:brainstorm/Note/v1"];
+		const h = await renderInto(
+			<WorkflowBuilder
+				appCapabilities={caps}
+				initialState={{
+					name: "E",
+					steps: [
+						triggerStep(),
+						{
+							id: "e",
+							kind: StepKind.Entity,
+							op: EntityOp.Create,
+							entityType: "brainstorm/Note/v1",
+						},
+					],
+				}}
+				initialTrigger={emptyBuilderTrigger()}
+				onClose={() => {}}
+				onSave={(r) => {
+					result = r;
+				}}
+			/>,
+		);
+		const fields = h.container.querySelector('[data-testid="entity-fields"]') as HTMLElement;
+		(fields.querySelector("button.bs-btn--neutral") as HTMLButtonElement).click();
+		await flush();
+		const key = h.container.querySelector(".au-entity-field__key") as HTMLInputElement;
+		await typeInto(key, "priority");
+		const expr = h.container.querySelector(".au-entity-field .au-binding__expr") as HTMLInputElement;
+		await typeInto(expr, "'urgent'");
+		(h.container.querySelector('[data-testid="builder-save"]') as HTMLButtonElement).click();
+		await flush();
+		expect(result).not.toBeNull();
+		const step = (result as unknown as BuilderResult).state.steps[1] as EntityStep;
+		expect(step.properties).toEqual({ priority: "'urgent'" });
 		await h.unmount();
 	});
 
