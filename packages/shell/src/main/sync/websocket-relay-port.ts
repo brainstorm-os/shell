@@ -163,6 +163,14 @@ export type WebSocketRelayPortOptions = {
 	 *  non-relay-blind module (`challenge-responder.ts`), keeping this port
 	 *  crypto-free. */
 	onChallenge?: (nonce: string) => Promise<AuthResponse | null>;
+	/** The peer is expected to CHALLENGE (a LAN host always does). When set, the
+	 *  port sends nothing — no subscriptions, no queued frames — until `auth-ok`
+	 *  lands, so a peer that has proven nothing never sees the routing-key set or
+	 *  any frame metadata (gate finding G5). Leave false for the cloud/open
+	 *  transports, where a node that never challenges would deadlock. It is local
+	 *  config rather than a wire-derived inference precisely so a hostile peer
+	 *  cannot downgrade it by omitting its challenge. */
+	requireAdmission?: boolean;
 };
 
 export class WebSocketRelayPort implements RelayPort {
@@ -176,6 +184,7 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #rotateTimeoutMs: number;
 	readonly #assetTimeoutMs: number;
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
+	readonly #requireAdmission: boolean;
 	readonly #emitter = new EventEmitter();
 	readonly #subscriptions = new Set<string>();
 	readonly #listeners = new Set<(frame: Uint8Array) => void>();
@@ -239,6 +248,7 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#rotateTimeoutMs = opts.rotateTimeoutMs ?? 15_000;
 		this.#assetTimeoutMs = opts.assetTimeoutMs ?? 30_000;
 		this.#onChallenge = opts.onChallenge ?? null;
+		this.#requireAdmission = opts.requireAdmission ?? false;
 	}
 
 	get state(): WebSocketRelayState {
@@ -643,6 +653,17 @@ export class WebSocketRelayPort implements RelayPort {
 		// A fresh socket is unauthenticated until the node's `auth-ok` lands.
 		this.#gatedAdmission = false;
 		this.#transition(WebSocketRelayState.Open);
+		// SECURITY (gate finding G5) — on a GATED transport (LAN), send NOTHING
+		// until `auth-ok`. Routing headers are plaintext, so the subscription set
+		// and every queued frame's `entityId`/`sender`/`seq` would otherwise be
+		// disclosed to a peer that has proven nothing — exactly the traffic-graph
+		// leak admission exists to close. `#onAuthenticated` does this work once
+		// the handshake completes.
+		//
+		// An OPEN node never challenges, so on those transports holding would
+		// deadlock — hence the flag is explicit config, not inferred from the
+		// wire (a wire-derived rule would also be downgrade-attackable).
+		if (this.#requireAdmission) return;
 		// Re-emit every active subscription so the relay's routing table
 		// re-builds after a reconnect. `bundle:true` lets a durable node serve
 		// the re-backfill bundled (10.10) — an old node ignores it.
@@ -889,6 +910,11 @@ export class WebSocketRelayPort implements RelayPort {
 
 	#flushSendQueue(): void {
 		if (!this.#ws || this.#ws.readyState !== OPEN_READY_STATE) return;
+		// Never drain into a socket that hasn't admitted us: a gated host DROPS
+		// pre-auth frames, and the old code spliced the queue empty regardless —
+		// so frames queued while connecting were silently LOST (gate finding G5,
+		// second half). Holding them here means `#onAuthenticated` delivers them.
+		if (this.#requireAdmission && !this.#gatedAdmission) return;
 		const queued = this.#sendQueue;
 		this.#sendQueue = [];
 		for (const wire of queued) {

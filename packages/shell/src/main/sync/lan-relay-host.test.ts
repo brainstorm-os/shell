@@ -23,7 +23,7 @@ import {
 	makeLanAdmissionVerifier,
 	makeLanChallengeResponder,
 } from "./lan-admission";
-import { LanRelayHost } from "./lan-relay-host";
+import { DEFAULT_LAN_MAX_CONNECTIONS, LanRelayHost } from "./lan-relay-host";
 import { type RoutingHeader, WireKind } from "./routing-header";
 import { WebSocketRelayPort } from "./websocket-relay-port";
 
@@ -275,5 +275,214 @@ describe("lanRosterAdmissionSet — the admission principal (gate G3/G4/G8)", ()
 		const sig = bytesToBase64Url(new Uint8Array(64));
 		expect(admit(canonical, sig, nonce)).toBe(true);
 		expect(admit(variant, sig, nonce)).toBe(false);
+	});
+});
+
+describe("LanRelayHost — admission limits (gate G9/G11) and the rotate verb (G6)", () => {
+	/** A manual clock for the auth deadline: nothing fires until we say so. */
+	function fakeTimers() {
+		const pending = new Map<number, () => void>();
+		let next = 1;
+		return {
+			setTimer: (fn: () => void) => {
+				const id = next++;
+				pending.set(id, fn);
+				return id;
+			},
+			clearTimer: (h: unknown) => {
+				pending.delete(h as number);
+			},
+			fireAll: () => {
+				for (const [, fn] of [...pending]) fn();
+			},
+			pendingCount: () => pending.size,
+		};
+	}
+
+	it("REAPS a connection that never authenticates (the deadline)", async () => {
+		const member = makeDevice();
+		const timers = fakeTimers();
+		const host = new LanRelayHost({
+			admit: makeLanAdmissionVerifier({
+				activeDeviceKeys: () => new Set([member.account]),
+				verify: testVerify,
+			}),
+			setTimer: timers.setTimer,
+			clearTimer: timers.clearTimer,
+		});
+		try {
+			const ctor = host.webSocketCtor();
+			// No onChallenge: this client never answers.
+			const port = new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor });
+			port.connect();
+			await waitFor(() => host.connectionCount() === 1);
+			expect(host.connectionCount()).toBe(1);
+			timers.fireAll(); // the auth deadline expires
+			await waitFor(() => host.connectionCount() === 0);
+			expect(host.connectionCount()).toBe(0);
+			port.close();
+		} finally {
+			host.close();
+		}
+	});
+
+	it("clears the deadline once admitted, so a live peer is never reaped", async () => {
+		const member = makeDevice();
+		const timers = fakeTimers();
+		const host = new LanRelayHost({
+			admit: makeLanAdmissionVerifier({
+				activeDeviceKeys: () => new Set([member.account]),
+				verify: testVerify,
+			}),
+			setTimer: timers.setTimer,
+			clearTimer: timers.clearTimer,
+		});
+		try {
+			const port = new WebSocketRelayPort({
+				url: "lan://host",
+				wsImpl: host.webSocketCtor(),
+				onChallenge: member.responder,
+			});
+			port.connect();
+			await waitFor(() => port.gatedAdmission());
+			expect(timers.pendingCount()).toBe(0); // cleared on admit
+			timers.fireAll();
+			expect(host.connectionCount()).toBe(1);
+			port.close();
+		} finally {
+			host.close();
+		}
+	});
+
+	it("REFUSES connections beyond the ceiling", async () => {
+		const host = new LanRelayHost({ maxConnections: 2 });
+		try {
+			const ctor = host.webSocketCtor();
+			const ports = [0, 1, 2, 3].map(
+				() => new WebSocketRelayPort({ url: "lan://host", wsImpl: ctor }),
+			);
+			for (const p of ports) p.connect();
+			await waitFor(() => host.connectionCount() === 2);
+			// Settle: the refused sockets must not sneak in late.
+			for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+			expect(host.connectionCount()).toBe(2);
+			for (const p of ports) p.close();
+		} finally {
+			host.close();
+		}
+	});
+
+	it("exposes a sane default ceiling (two devices plus reconnect headroom)", () => {
+		expect(DEFAULT_LAN_MAX_CONNECTIONS).toBeGreaterThanOrEqual(2);
+	});
+
+	it("allows only ONE admission attempt per connection", async () => {
+		const member = makeDevice();
+		// Count ADMIT invocations, not verify(): the verifier rejects a
+		// wrong-length signature before it ever reaches verify, so counting
+		// verify would read 0 with or without the guard (a vacuous test).
+		let admitCalls = 0;
+		const inner = makeLanAdmissionVerifier({
+			activeDeviceKeys: () => new Set([member.account]),
+			verify: testVerify,
+		});
+		const host = new LanRelayHost({
+			// ASYNC admit — the shape the type allows and a real roster lookup
+			// would have (reading a Y.Doc, awaiting a store). With a synchronous
+			// verifier the first failure closes the socket before the next
+			// message lands, which hides the concurrency this guard exists for.
+			admit: async (account, sig, nonce) => {
+				admitCalls += 1;
+				await new Promise((r) => setTimeout(r, 5));
+				return inner(account, sig, nonce);
+			},
+		});
+		try {
+			const ctor = host.webSocketCtor();
+			const sock = new ctor("lan://host") as unknown as {
+				onmessage: ((ev: { data: unknown }) => void) | null;
+				send: (b: Uint8Array) => void;
+				close: () => void;
+			};
+			await waitFor(() => host.connectionCount() === 1);
+			// Ten forged auth attempts on one socket.
+			const bogus = new TextEncoder().encode(
+				JSON.stringify({ op: "auth", account: member.account, sig: "AAAA" }),
+			);
+			const wire = new Uint8Array(1 + bogus.length);
+			wire.set(bogus, 1);
+			for (let i = 0; i < 10; i++) sock.send(wire);
+			for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+			// The first attempt is consumed; the other nine are refused before
+			// they can reach the verifier at all.
+			expect(admitCalls).toBe(1);
+			sock.close();
+		} finally {
+			host.close();
+		}
+	});
+
+	it("does NOT serve `rotate` — an admitted peer cannot hijack a routing key", async () => {
+		const a = makeDevice();
+		const host = new LanRelayHost({
+			admit: makeLanAdmissionVerifier({
+				activeDeviceKeys: () => new Set([a.account]),
+				verify: testVerify,
+			}),
+		});
+		try {
+			const ctor = host.webSocketCtor();
+			// Drive the handshake by hand so we hold the RAW socket of a
+			// genuinely ADMITTED connection. Sending through an unauthenticated
+			// socket would prove nothing — pre-auth messages are dropped anyway,
+			// which is exactly how the first version of this test passed with the
+			// rotate-drop reverted.
+			const sock = new ctor("lan://host") as unknown as {
+				onmessage: ((ev: { data: unknown }) => void) | null;
+				send: (b: Uint8Array) => void;
+				close: () => void;
+			};
+			let admitted = false;
+			sock.onmessage = (ev) => {
+				const bytes = ev.data as Uint8Array;
+				if (bytes[0] !== 0x00) return;
+				const msg = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
+					op?: string;
+					nonce?: string;
+				};
+				if (msg.op === "challenge" && msg.nonce) {
+					void a.responder(msg.nonce).then((reply) => {
+						if (!reply) return;
+						const body = new TextEncoder().encode(JSON.stringify({ op: "auth", ...reply }));
+						const wire = new Uint8Array(1 + body.length);
+						wire.set(body, 1);
+						sock.send(wire);
+					});
+				}
+				if (msg.op === "auth-ok") admitted = true;
+			};
+			await waitFor(() => admitted);
+			expect(admitted).toBe(true); // we are a fully admitted roster member
+
+			const victimKey = "victim-routing-key";
+			const attackerKey = "attacker-routing-key";
+			host.core.router.subscribe("someone-else", victimKey);
+			expect(host.core.router.subscriberCount(victimKey)).toBe(1);
+
+			const body = new TextEncoder().encode(
+				JSON.stringify({ op: "rotate", from: victimKey, to: attackerKey }),
+			);
+			const wire = new Uint8Array(1 + body.length);
+			wire.set(body, 1);
+			sock.send(wire);
+			for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+
+			// Unmoved: an admitted peer cannot migrate someone else's subscribers.
+			expect(host.core.router.subscriberCount(victimKey)).toBe(1);
+			expect(host.core.router.subscriberCount(attackerKey)).toBe(0);
+			sock.close();
+		} finally {
+			host.close();
+		}
 	});
 });

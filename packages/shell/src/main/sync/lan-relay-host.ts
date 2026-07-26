@@ -60,11 +60,40 @@ export type LanRelayHostOptions = {
 	/** Deterministic connection ids for tests. */
 	mintConnId?: () => string;
 	now?: () => number;
+	/** Close a connection that hasn't proven itself within this window
+	 *  (gate finding G9 — an unauthenticated socket used to be held FOREVER,
+	 *  so an unpaired LAN peer could pin connections and memory with no crypto
+	 *  and no roster membership). */
+	authDeadlineMs?: number;
+	/** Refuse a new connection beyond this many live ones (G9). */
+	maxConnections?: number;
+	/** Drop any single client→host message larger than this (G9). A sealed
+	 *  update is orders of magnitude smaller; this bounds the per-message copy
+	 *  an admitted-or-not peer can force. */
+	maxMessageBytes?: number;
+	/** Timer seam so tests drive the deadline without real time. */
+	setTimer?: (fn: () => void, ms: number) => unknown;
+	clearTimer?: (handle: unknown) => void;
 };
+
+/** Close an unproven connection after 5s — long enough for a slow device to
+ *  sign a nonce, far short of anything an idle attacker can exploit. */
+export const DEFAULT_LAN_AUTH_DEADLINE_MS = 5_000;
+/** Two paired devices need 2 (the host's own loopback client + the guest);
+ *  the headroom covers reconnect overlap without inviting a flood. */
+export const DEFAULT_LAN_MAX_CONNECTIONS = 16;
+/** 8 MiB — comfortably above any real sealed frame, well below a memory DoS. */
+export const DEFAULT_LAN_MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
 type AdmissionState = {
 	authed: boolean;
 	nonce: string;
+	/** One admission attempt per connection (G9): a second `auth` control is
+	 *  refused rather than queued, so a single socket cannot drive unbounded
+	 *  concurrent signature verifies against a never-rotated nonce. */
+	attempted: boolean;
+	/** Auth-deadline handle, cleared on admit / close. */
+	deadline: unknown;
 };
 
 /** Minimal control shapes the host reads/writes. Opaque JSON — the host never
@@ -88,11 +117,22 @@ export class LanRelayHost {
 	readonly #admit: LanAdmit | null;
 	readonly #mintNonce: () => string;
 	readonly #admission = new Map<string, AdmissionState>();
+	readonly #authDeadlineMs: number;
+	readonly #maxConnections: number;
+	readonly #maxMessageBytes: number;
+	readonly #setTimer: (fn: () => void, ms: number) => unknown;
+	readonly #clearTimer: (handle: unknown) => void;
 	#closed = false;
 
 	constructor(opts: LanRelayHostOptions = {}) {
 		this.#admit = opts.admit ?? null;
 		this.#mintNonce = opts.mintNonce ?? defaultMintNonce;
+		this.#authDeadlineMs = opts.authDeadlineMs ?? DEFAULT_LAN_AUTH_DEADLINE_MS;
+		this.#maxConnections = opts.maxConnections ?? DEFAULT_LAN_MAX_CONNECTIONS;
+		this.#maxMessageBytes = opts.maxMessageBytes ?? DEFAULT_LAN_MAX_MESSAGE_BYTES;
+		this.#setTimer =
+			opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms) as unknown as ReturnType<typeof setTimeout>);
+		this.#clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
 		this.#core = createRelayCore({
 			...(opts.mintConnId ? { mintConnId: opts.mintConnId } : {}),
 			...(opts.now ? { now: opts.now } : {}),
@@ -144,14 +184,35 @@ export class LanRelayHost {
 
 	/** Register a freshly-opened connection. Returns its connId. Challenges when
 	 *  an `admit` callback is configured; otherwise the connection is open. */
-	_onOpen(serverWs: ServerWebSocketLike, sendToClient: (wire: Uint8Array) => void): string {
+	_onOpen(
+		serverWs: ServerWebSocketLike,
+		sendToClient: (wire: Uint8Array) => void,
+		closeClient?: () => void,
+	): string | null {
+		// G9 — refuse beyond the ceiling rather than accepting unboundedly.
+		if (this.#core.connections.size >= this.#maxConnections) {
+			closeClient?.();
+			return null;
+		}
 		const connId = this.#core.handlers.onOpen(serverWs);
 		if (this.#admit) {
 			const nonce = this.#mintNonce();
-			this.#admission.set(connId, { authed: false, nonce });
+			const state: AdmissionState = {
+				authed: false,
+				nonce,
+				attempted: false,
+				deadline: null,
+			};
+			// G9 — an unproven connection is reaped, not held forever.
+			state.deadline = this.#setTimer(() => {
+				const live = this.#admission.get(connId);
+				if (!live || live.authed) return;
+				closeClient?.();
+			}, this.#authDeadlineMs);
+			this.#admission.set(connId, state);
 			sendToClient(encodeControl({ op: "challenge", nonce }));
 		} else {
-			this.#admission.set(connId, { authed: true, nonce: "" });
+			this.#admission.set(connId, { authed: true, nonce: "", attempted: true, deadline: null });
 		}
 		return connId;
 	}
@@ -169,12 +230,33 @@ export class LanRelayHost {
 		if (!connId) return;
 		const state = this.#admission.get(connId);
 		if (!state) return;
+		// G9 — bound the per-message copy any peer can force, admitted or not.
+		if (bytes.length > this.#maxMessageBytes) return;
 		if (!state.authed) {
 			// Only an `auth` control can move an unauthenticated connection forward.
 			const auth =
 				bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE ? decodeAuth(bytes.subarray(1)) : null;
 			if (!auth) return; // drop subscribe / frame / anything else pre-auth.
+			// G9 — exactly one attempt per connection: a second `auth` is refused
+			// rather than queued, so one socket can't drive unbounded concurrent
+			// verifies against a nonce that never rotates.
+			if (state.attempted) return;
+			state.attempted = true;
 			void this.#tryAdmit(connId, state, auth, sendToClient, closeClient);
+			return;
+		}
+		// G6 — the LAN host does NOT serve `rotate`. `applyRotation` has no
+		// ownership check on `from`, so an admitted peer could migrate every
+		// subscriber of someone else's routing key onto its own — undetectable
+		// interception. The design already says LAN has "NO requestRotate", but
+		// that only removed the CLIENT method; the verb was still served. Routing
+		// tokens are a durable-node concern and there is no durable node on LAN,
+		// so the verb is simply not offered here.
+		if (
+			bytes.length >= 1 &&
+			bytes[0] === CONTROL_CHANNEL_BYTE &&
+			isRotateControl(bytes.subarray(1))
+		) {
 			return;
 		}
 		// Authenticated: hand off to the blind router (subscribe / unsubscribe /
@@ -186,7 +268,11 @@ export class LanRelayHost {
 	_onClose(serverWs: ServerWebSocketLike): void {
 		const connId = serverWs.data?.connId;
 		this.#core.handlers.onClose(serverWs);
-		if (connId) this.#admission.delete(connId);
+		if (connId) {
+			const state = this.#admission.get(connId);
+			if (state?.deadline) this.#clearTimer(state.deadline);
+			this.#admission.delete(connId);
+		}
 	}
 
 	async #tryAdmit(
@@ -205,9 +291,16 @@ export class LanRelayHost {
 			ok = false;
 		}
 		// The connection may have closed while the async verify was in flight.
-		if (this.#closed || !this.#admission.has(connId)) return;
+		// Compare STATE IDENTITY, not just presence (G11): `mintConnId` is
+		// injectable, so a wiring supplying non-unique ids would otherwise let a
+		// stale continuation mark a *new* connection authenticated.
+		if (this.#closed || this.#admission.get(connId) !== state) return;
 		if (ok) {
 			state.authed = true;
+			if (state.deadline) {
+				this.#clearTimer(state.deadline);
+				state.deadline = null;
+			}
 			sendToClient(encodeControl({ op: "auth-ok" }));
 		} else {
 			closeClient();
@@ -249,7 +342,17 @@ class LanHostConnection implements WebSocketLike {
 		setTimeout(() => {
 			if (this.readyState !== 0) return;
 			this.readyState = 1;
-			this.#host._onOpen(this.#serverWs, (wire) => this.#serverWs.send(wire));
+			const connId = this.#host._onOpen(
+				this.#serverWs,
+				(wire) => this.#serverWs.send(wire),
+				() => this.#serverClose(),
+			);
+			// Refused at the connection ceiling — never signal `open`.
+			if (connId === null) {
+				this.readyState = 3;
+				setTimeout(() => this.onclose?.(), 0);
+				return;
+			}
 			this.onopen?.();
 		}, 0);
 	}
@@ -289,6 +392,17 @@ function encodeControl(message: Record<string, unknown>): Uint8Array {
 	wire[0] = CONTROL_CHANNEL_BYTE;
 	wire.set(body, 1);
 	return wire;
+}
+
+/** Is this control body a `rotate` request? Reads only `op` — the host stays
+ *  blind to everything else (same posture as `decodeAuth`). */
+function isRotateControl(body: Uint8Array): boolean {
+	try {
+		const parsed = JSON.parse(new TextDecoder().decode(body)) as { op?: unknown };
+		return !!parsed && typeof parsed === "object" && parsed.op === "rotate";
+	} catch {
+		return false;
+	}
 }
 
 function decodeAuth(body: Uint8Array): AuthControl | null {
