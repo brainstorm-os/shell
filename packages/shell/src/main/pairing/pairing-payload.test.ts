@@ -10,6 +10,7 @@ import {
 	type PairingPayload,
 	decodePairingPayload,
 	encodePairingPayload,
+	isDialableRelayUrl,
 	isPairingPayloadExpired,
 } from "./pairing-payload";
 
@@ -160,5 +161,26 @@ describe("pairing-payload codec", () => {
 
 	it("default TTL constant matches OQ-201 (120 seconds)", () => {
 		expect(PAIRING_DEFAULT_TTL_SECONDS).toBe(120);
+	});
+});
+
+describe("relayUrl scheme allow-list (LAN-3 / gate pentest #6)", () => {
+	it("accepts ws:// and wss://, including a LAN bootstrap address", () => {
+		expect(isDialableRelayUrl("wss://relay.example.com")).toBe(true);
+		expect(isDialableRelayUrl("ws://192.168.1.20:8443")).toBe(true);
+	});
+
+	it("refuses every other scheme, and anything unparseable", () => {
+		for (const url of [
+			"http://evil.example.com",
+			"https://evil.example.com",
+			"file:///etc/passwd",
+			"javascript:alert(1)",
+			"ftp://host/x",
+			"not a url",
+			"ws://",
+		]) {
+			expect(isDialableRelayUrl(url)).toBe(false);
+		}
 	});
 });

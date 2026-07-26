@@ -97,6 +97,15 @@ export function encodePairingPayload(payload: PairingPayload): string {
 	if (typeof payload.relayUrl !== "string" || payload.relayUrl.length === 0) {
 		throwInvalid("relayUrl must be a non-empty string");
 	}
+	// SECURITY (LAN-3 / gate pentest #6) — the pairing payload comes from a QR
+	// the user scanned, and this URL is dialed unattended afterwards. Without a
+	// scheme allow-list a malicious payload could point the target at an
+	// arbitrary scheme or host. Content stays E2EE either way, but the dial
+	// itself (and the subscribe traffic that follows) should never be steerable
+	// to a non-relay endpoint.
+	if (!isDialableRelayUrl(payload.relayUrl)) {
+		throwInvalid("relayUrl must be a ws:// or wss:// URL");
+	}
 	const relayBytes = new TextEncoder().encode(payload.relayUrl);
 	if (relayBytes.length > PAIRING_MAX_RELAY_URL_BYTES) {
 		throwInvalid(
@@ -249,4 +258,23 @@ function throwInvalid(message: string): never {
 	const err = new Error(`pairing-payload: ${message}`);
 	err.name = "Invalid";
 	throw err;
+}
+
+/**
+ * Is `url` something we are willing to dial as a relay? `ws:`/`wss:` only, with
+ * a host. Deliberately strict: an allow-list, not a deny-list, so a scheme we
+ * have not thought about is refused rather than tried.
+ *
+ * LAN bootstrap (LAN-3) puts `ws://<lan-ip>:<port>` here at pair time, which
+ * this accepts; a plaintext `ws://` is only sound because admission is
+ * channel-bound (see `lan-channel-binding.md`).
+ */
+export function isDialableRelayUrl(url: string): boolean {
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") return false;
+		return parsed.hostname.length > 0;
+	} catch {
+		return false;
+	}
 }
