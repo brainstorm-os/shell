@@ -33,7 +33,7 @@
 import { type ReactNode, useMemo } from "react";
 import type { BlockCommand } from "../block-command";
 import type { SelectionCommentAnchor } from "../comments/selection-anchor";
-import { useEditorT } from "../i18n";
+import { type EditorT, useEditorT } from "../i18n";
 import { createMediaBlockCommands } from "../media-commands";
 import { createEntityEmbedCommand, createTransclusionCommand } from "../standard-commands";
 import { BlockEmbedPickerPlugin } from "./block-embed-picker-plugin";
@@ -112,6 +112,33 @@ export type FullEditorPluginsProps = {
 	children?: ReactNode;
 };
 
+/**
+ * The slash commands a full-editor host appends on top of the standard
+ * palette (F-405). Pure so the catalogue a host actually offers can be
+ * asserted without mounting Lexical — the parity question "does Journal's
+ * `/` menu reach Embed / Reference the way Notes' does" is answered here.
+ *
+ * `entityEmbed` / `transclusion` are the resolved flags, not the raw props:
+ * the host earns them by supplying a `currentEntityId`, since both commands
+ * need an entity context to embed *into*.
+ */
+export function fullEditorExtraCommands(
+	t: EditorT,
+	options: {
+		extraCommands?: readonly BlockCommand[];
+		media?: boolean;
+		entityEmbed?: boolean;
+		transclusion?: boolean;
+	} = {},
+): readonly BlockCommand[] {
+	const extras = options.extraCommands ? [...options.extraCommands] : [];
+	if (options.media) extras.push(...createMediaBlockCommands(t));
+	// Order mirrors Notes' catalogue: Embed before Reference.
+	if (options.entityEmbed) extras.push(createEntityEmbedCommand(t));
+	if (options.transclusion) extras.push(createTransclusionCommand(t));
+	return extras;
+}
+
 export function FullEditorPlugins({
 	scrollContainerSelector,
 	autoFocus = false,
@@ -145,13 +172,16 @@ export function FullEditorPlugins({
 	// another vault object in any app's editor, gated on the host providing
 	// an entity context. Order mirrors Notes' catalogue: Embed before
 	// Reference.
-	const mergedCommands = useMemo<readonly BlockCommand[]>(() => {
-		const extras = extraCommands ? [...extraCommands] : [];
-		if (media) extras.push(...createMediaBlockCommands(t));
-		if (showEntityEmbed) extras.push(createEntityEmbedCommand(t));
-		if (showTransclusion) extras.push(createTransclusionCommand(t));
-		return extras;
-	}, [t, extraCommands, showTransclusion, showEntityEmbed, media]);
+	const mergedCommands = useMemo<readonly BlockCommand[]>(
+		() =>
+			fullEditorExtraCommands(t, {
+				...(extraCommands ? { extraCommands } : {}),
+				media,
+				entityEmbed: showEntityEmbed,
+				transclusion: showTransclusion,
+			}),
+		[t, extraCommands, showTransclusion, showEntityEmbed, media],
+	);
 	return (
 		<StandardEditingPlugins
 			autoFocus={autoFocus}
