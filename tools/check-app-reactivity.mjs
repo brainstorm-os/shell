@@ -40,11 +40,41 @@ function stripComments(src) {
 	return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
-/** A file "subscribes to the coarse vault signal" when it references the
- *  `vaultEntities` service AND calls some `.onChange` in real code. */
+/**
+ * Seams where handing the coarse signal onward is the SANCTIONED pattern, not
+ * debt. Both take an `{ list, onChange }` source and own the coalescing
+ * themselves, which is exactly what this gate wants apps to do:
+ *
+ *   - `useLiveEntities` / `useVaultEntities` — the shared reactivity hooks. An
+ *     app that reads through a type-scoped `entities.query` (because it holds
+ *     per-type caps rather than the `entities.read:*` wildcard) MUST pass
+ *     `onChange` in as the change tap; there is no other way to drive it.
+ *   - `setEntityIndexSource` — `@brainstorm-os/editor`'s entity index is
+ *     deliberately decoupled from any app runtime, so the host injects the
+ *     source once at boot.
+ *
+ * Flagging these was actively harmful, not just noisy: a reader draining the
+ * baseline would "migrate" Books to `vaultEntities.list()` — the wildcard
+ * capability Books deliberately does NOT hold, which is the exact mismatch that
+ * once made imported books silently invisible.
+ */
+const SANCTIONED_SINKS = /\b(useLiveEntities|useVaultEntities|setEntityIndexSource)\b/;
+
+/**
+ * A file "subscribes to the coarse vault signal" when it references the
+ * `vaultEntities` service AND calls some `.onChange` in real code — UNLESS every
+ * such reference is being handed to one of the sanctioned sinks above.
+ *
+ * The heuristic is file-grade, matching the rest of this gate: if the file
+ * mentions a sanctioned sink at all, its `onChange` is presumed to be feeding
+ * it. That trades a little precision for zero false alarms on compliant code,
+ * and the ratchet still catches a NEW hand-rolled loop in any file that does not
+ * use the shared hooks — which is the case it exists for.
+ */
 function subscribesToVault(src) {
 	const code = stripComments(src);
-	return /\bvaultEntities\b/.test(code) && /\.onChange\b/.test(code);
+	if (!/\bvaultEntities\b/.test(code) || !/\.onChange\b/.test(code)) return false;
+	return !SANCTIONED_SINKS.test(code);
 }
 
 function* walk(dir) {

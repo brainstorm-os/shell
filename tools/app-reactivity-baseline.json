@@ -1,10 +1,13 @@
 {
-  "_doc": "Files that subscribe to the coarse `vaultEntities.onChange` signal directly instead of through @brainstorm-os/react-yjs's useVaultEntities/useLiveEntities. This list is a RATCHET enforced by tools/check-app-reactivity.mjs: it may only shrink. New apps/files MUST use the shared hooks (the gate rejects additions). As apps migrate (implementation-plan Step 3), delete the migrated file's line. When empty, delete this baseline and make the gate an absolute ban.",
+  "_doc": "Files that hand-roll a change loop on the coarse `vaultEntities.onChange` signal instead of going through @brainstorm-os/react-yjs's useVaultEntities/useLiveEntities. A RATCHET enforced by tools/check-app-reactivity.mjs: it may only shrink. New apps/files MUST use the shared hooks (the gate rejects additions). As apps migrate, delete the migrated file's line. When empty, delete this baseline and make the gate an absolute ban. NOTE: passing `onChange` INTO a sanctioned sink (useLiveEntities / useVaultEntities / setEntityIndexSource) is compliant and is no longer flagged \u2014 see SANCTIONED_SINKS in the checker. Two files were wrongly listed here on that basis and have been removed.",
   "files": [
-    "apps/books/src/app.tsx",
     "apps/database/src/app.ts",
     "apps/files/src/store/use-files-store.ts",
-    "apps/notes/src/main.tsx",
     "apps/notes/src/store/use-notes.ts"
-  ]
+  ],
+  "whyStillBaselined": {
+    "apps/database/src/app.ts": "Real debt AND the largest: an imperative-DOM app (5.3k lines, 26 onChange refs) whose migration is the all-apps-React track rung 9.x, not a reactivity-only change.",
+    "apps/files/src/store/use-files-store.ts": "Real debt: `svc.onChange(() => loadFromVault())` is the exact hand-rolled reload the gate exists to remove.",
+    "apps/notes/src/store/use-notes.ts": "Real debt, and the canonical example of the harm: it wires onChange to its OWN coalescer, which is the per-app coalescer drift CLAUDE.md calls out."
+  }
 }
