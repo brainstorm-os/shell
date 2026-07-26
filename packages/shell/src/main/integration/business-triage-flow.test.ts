@@ -81,12 +81,26 @@ function stubProvider(record: { generateCalls: AiGenerateRequest[] }): ModelProv
 type EntityRow = { id: string; type: string; properties: Record<string, unknown> };
 
 /** A minimal in-memory entities service handler (get only is exercised here). */
-function entitiesHandler(rows: Map<string, EntityRow>) {
+function entitiesHandler(
+	rows: Map<string, EntityRow>,
+	created?: Array<{ type: string; properties: Record<string, unknown> }>,
+) {
 	return async (envelope: { method: string; args: unknown[] }): Promise<unknown> => {
 		const [arg] = envelope.args as [Record<string, unknown>];
 		switch (envelope.method) {
 			case "get":
 				return rows.get(String(arg.id)) ?? null;
+			// Records what an Entity Create step actually wrote, so a test can
+			// assert on the fields rather than just that the run succeeded (F-458).
+			case "create": {
+				const type = String(arg.type);
+				const properties = (arg.properties ?? {}) as Record<string, unknown>;
+				created?.push({ type, properties });
+				const id = `created-${(created?.length ?? 0) || 1}`;
+				const row = { id, type, properties } as EntityRow;
+				rows.set(id, row);
+				return row;
+			}
 			case "query": {
 				const q = (arg.query ?? {}) as { type?: string };
 				return [...rows.values()].filter((r) => !q.type || r.type === q.type);
@@ -132,9 +146,10 @@ function buildHost(opts: {
 	dispatched: Array<{ verb: string; payload: unknown }>;
 	runs: WorkflowRunDef[];
 	entityChanges: EntityChangeSource;
+	created?: Array<{ type: string; properties: Record<string, unknown> }>;
 }): AutomationsHost {
 	const aiHandler = makeAiServiceHandler({ getProvider: () => opts.provider });
-	const entities = entitiesHandler(opts.rows);
+	const entities = entitiesHandler(opts.rows, opts.created);
 	const intents = intentsHandler(opts.dispatched);
 	const getServiceHandler = (name: string) => {
 		if (name === "ai") return aiHandler as never;
@@ -251,21 +266,88 @@ describe("business triage flow (trigger → AI classify → AI-agent draft)", ()
 		expect((dispatch.payload as { body?: string }).body).toContain("outage");
 	});
 
-	it("BOUNDARY: the pure step set cannot assemble a new entity's fields from AI output", () => {
-		// The Entity step takes its properties ONLY from the pipeline operand
-		// (`operandProperties(ctx.input)`); the Code step's grammar has no
-		// object-literal syntax. So there is no pure-engine way to turn the
-		// AICall's `{content:"urgent"}` into a `{priority:"urgent", title:…}`
-		// patch/props. This test documents that boundary: mutation-with-computed-
-		// fields must go through an AIAgent tool (an intent), not Entity steps.
+	// This replaces a BOUNDARY test that documented the F-458 limitation: the
+	// Entity step took its properties ONLY from the pipeline operand and the Code
+	// grammar has no object literals, so "classify the email, then file a task
+	// with that priority" was unexpressible in the pure step set. `EntityStep`
+	// now declares field expressions, so the boundary is gone — this asserts the
+	// workflow the report actually wanted.
+	it("classifies an email and FILES a task carrying the AI's answer (F-458)", async () => {
+		const rows = new Map<string, EntityRow>([
+			[
+				"email-1",
+				{
+					id: "email-1",
+					type: EMAIL_TYPE,
+					properties: { subject: "URGENT: outage", body: "Our server is down since 9am." },
+				},
+			],
+		]);
 		const steps: WorkflowStep[] = [
 			{ id: "trigger", kind: StepKind.Trigger },
-			{ id: "make", kind: StepKind.Code, expression: '{"title": "x"}' },
+			{ id: "email", kind: StepKind.Entity, op: EntityOp.Get, entityType: EMAIL_TYPE },
+			{
+				id: "classify",
+				kind: StepKind.AICall,
+				instructions:
+					"You are a support triage classifier. Reply with exactly one word: urgent, normal, or spam.",
+			},
+			// The step that was impossible: the priority comes from the AI's answer
+			// and the title from the email, both by expression.
+			{
+				id: "file",
+				kind: StepKind.Entity,
+				op: EntityOp.Create,
+				entityType: "Task/v1",
+				properties: { priority: "classify.content", title: "email.properties.subject" },
+			} as EntityStep,
 		];
-		// `{"title":"x"}` is not valid in the expression grammar (no object
-		// literals) — it parses `{` as unexpected. aggregateWorkflowCapabilities
-		// still resolves (Code needs no caps), proving the step is authorable but
-		// inert for object construction.
-		expect(aggregateWorkflowCapabilities(steps)).toEqual([]);
+		const capabilities = aggregateWorkflowCapabilities(steps);
+
+		const listeners: Array<(c: EntityChange) => void> = [];
+		const entityChanges: EntityChangeSource = {
+			subscribe: (l) => {
+				listeners.push(l);
+				return () => {};
+			},
+		};
+		const created: Array<{ type: string; properties: Record<string, unknown> }> = [];
+		const runs: WorkflowRunDef[] = [];
+		const host = buildHost({
+			workflow: { steps, capabilities },
+			rows,
+			provider: stubProvider({ generateCalls: [] }),
+			dispatched: [],
+			runs,
+			entityChanges,
+			created,
+		});
+		await host.hydrate(
+			{
+				workflows: [],
+				reminders: [],
+				entityEvents: [{ workflowId: "wf-triage", type: EMAIL_TYPE, verb: EntityEventVerb.Create }],
+			},
+			1_000,
+		);
+		host.start();
+		for (const l of listeners)
+			l({ verb: EntityEventVerb.Create, entityId: "email-1", type: EMAIL_TYPE });
+		await new Promise((r) => setTimeout(r, 0));
+		host.stop();
+
+		const run = runs[0];
+		if (!run) throw new Error("expected one persisted run");
+		expect(run.status).toBe(WorkflowRunStatus.Succeeded);
+
+		// The task exists and carries the classifier's label — the automation can
+		// now FILE, not just think.
+		expect(created).toHaveLength(1);
+		expect(created[0]?.type).toBe("Task/v1");
+		expect(created[0]?.properties).toEqual({
+			priority: "urgent",
+			title: "URGENT: outage",
+		});
 	});
+
 });

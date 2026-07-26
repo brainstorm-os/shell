@@ -121,6 +121,87 @@ describe("Entity interpreter", () => {
 		expect(p.entities.get).toHaveBeenCalledWith("e7");
 	});
 
+	// F-458: an AI step could classify an email but there was nowhere to put the
+	// answer — Create/Update only wrote what a prior step already produced as a
+	// whole object, so "set priority to the AI's output" was unexpressible.
+	it("create writes declared field expressions from prior step output (F-458)", async () => {
+		const p = ports();
+		const steps: WorkflowStep[] = [
+			{ id: "trig", kind: StepKind.Trigger },
+			{ id: "classify", kind: StepKind.Code, expression: '"urgent"' },
+			{
+				id: "file",
+				kind: StepKind.Entity,
+				op: EntityOp.Create,
+				entityType: "Task/v1",
+				properties: { priority: "classify", title: "trig.subject" },
+			} as EntityStep,
+		];
+		await runWith(p, steps, { subject: "Server down" });
+		expect(p.entities.create).toHaveBeenCalledWith("Task/v1", {
+			priority: "urgent",
+			title: "Server down",
+		});
+	});
+
+	it("declared fields are authoritative — the operand is not merged in (F-458)", async () => {
+		// Merging would stamp whatever is upstream onto the record: with an entity
+		// trigger the operand is `{ entityId, type, verb }`, so a declared
+		// `priority` would also write the event metadata. The step writes exactly
+		// the fields it declares.
+		const p = ports();
+		const steps: WorkflowStep[] = [
+			{ id: "trig", kind: StepKind.Trigger },
+			{
+				id: "file",
+				kind: StepKind.Entity,
+				op: EntityOp.Create,
+				entityType: "Task/v1",
+				properties: { priority: '"urgent"' },
+			} as EntityStep,
+		];
+		await runWith(p, steps, { title: "not written", priority: "low" });
+		expect(p.entities.create).toHaveBeenCalledWith("Task/v1", { priority: "urgent" });
+	});
+
+	it("update sets a computed field on the target entity (F-458)", async () => {
+		// The whole point of the report: classify the email, then label THAT email.
+		const entities = fakeEntities();
+		entities.get = vi.fn(async (id: string) => entity(id, "Email/v1"));
+		const p = ports({ entities });
+		const steps: WorkflowStep[] = [
+			{ id: "trig", kind: StepKind.Trigger },
+			{
+				id: "label",
+				kind: StepKind.Entity,
+				op: EntityOp.Update,
+				entityType: "Email/v1",
+				properties: { priority: '"urgent"' },
+			} as EntityStep,
+		];
+		await runWith(p, steps, { id: "mail-9", type: "Email/v1" });
+		expect(p.entities.update).toHaveBeenCalledWith("mail-9", { priority: "urgent" });
+	});
+
+	it("fails loudly and names the field when an expression is bad (F-458)", async () => {
+		// A silently-undefined write is how a wrong value lands unnoticed.
+		const p = ports();
+		const steps: WorkflowStep[] = [
+			{ id: "trig", kind: StepKind.Trigger },
+			{
+				id: "file",
+				kind: StepKind.Entity,
+				op: EntityOp.Create,
+				entityType: "Task/v1",
+				properties: { priority: "!!!" },
+			} as EntityStep,
+		];
+		const result = await runWith(p, steps, {});
+		expect(result.status).toBe(WorkflowRunStatus.Failed);
+		expect(result.error).toContain("entity-create-field priority");
+		expect(p.entities.create).not.toHaveBeenCalled();
+	});
+
 	it("update fails cleanly when input carries no id", async () => {
 		const p = ports();
 		const trig: WorkflowStep = { id: "trig", kind: StepKind.Trigger };
