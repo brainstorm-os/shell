@@ -50,6 +50,40 @@ export function electLanRole(selfDeviceId: string, peerDeviceId: string): LanRol
 	return selfDeviceId < peerDeviceId ? LanRole.Host : LanRole.Guest;
 }
 
+/**
+ * Domain-separation tag prefixed to the challenge nonce before signing.
+ *
+ * **Why this exists (security).** `signNonce` is `VaultSession.signPayload` —
+ * the SOVEREIGN USER Ed25519 key — and that same key signs `add-device` roster
+ * records over `canonicalAddDeviceBytes` (plain, unprefixed JSON). Without a
+ * tag the two signature domains OVERLAP, and since the *host* chooses the
+ * nonce, a rogue host (rogue advert, stale pairing address, MITM on plaintext
+ * `ws://`) could send `nonce = canonicalAddDeviceBytes(<its own device>)` and
+ * get back a signature that is a **valid roster record adding the attacker's
+ * device to the victim's vault**. Prefixing makes a challenge signature
+ * unusable as any other message: no roster record ever starts with these bytes.
+ *
+ * Pinned by `lan-challenge-oracle.test.ts` (which still demonstrates the raw
+ * attack against the primitives, so the reason for the tag stays visible).
+ */
+export const CHALLENGE_DOMAIN_TAG = new TextEncoder().encode("brainstorm/lan-challenge/v1\0");
+
+/** Exact nonce length both challengers mint (LAN host + the hosted sync node's
+ *  `NONCE_BYTES`). The responders REJECT any other length: a structural guard
+ *  that independently defeats the oracle above (a canonical roster record is
+ *  never 32 bytes), and the only protection available on the cloud path, whose
+ *  verifier is deployed separately and still checks the untagged nonce. */
+export const CHALLENGE_NONCE_BYTES = 32;
+
+/** Prefix `nonce` with the domain tag — the exact bytes the LAN responder signs
+ *  and the LAN verifier checks. */
+export function lanChallengeSigningBytes(nonce: Uint8Array): Uint8Array {
+	const out = new Uint8Array(CHALLENGE_DOMAIN_TAG.length + nonce.length);
+	out.set(CHALLENGE_DOMAIN_TAG, 0);
+	out.set(nonce, CHALLENGE_DOMAIN_TAG.length);
+	return out;
+}
+
 /** Placeholder token the LAN client sends in the `auth` control. LAN admission
  *  proves ROSTER MEMBERSHIP (the signed device roster), not a metered
  *  entitlement, so there is no `brainstorm-cloud` token here — the host ignores
@@ -87,10 +121,14 @@ export function makeLanAdmissionVerifier(
 			const pubkey = base64UrlToBytes(account);
 			const sigBytes = base64UrlToBytes(sig);
 			const nonceBytes = base64UrlToBytes(nonce);
-			if (pubkey.length !== 32 || sigBytes.length !== 64 || nonceBytes.length === 0) {
+			if (
+				pubkey.length !== 32 ||
+				sigBytes.length !== 64 ||
+				nonceBytes.length !== CHALLENGE_NONCE_BYTES
+			) {
 				return false;
 			}
-			return verify(pubkey, nonceBytes, sigBytes);
+			return verify(pubkey, lanChallengeSigningBytes(nonceBytes), sigBytes);
 		} catch {
 			return false;
 		}
@@ -126,8 +164,12 @@ export function makeLanChallengeResponder(
 		} catch {
 			return null;
 		}
-		if (nonceBytes.length === 0) return null;
-		const sig = deps.signNonce(nonceBytes);
+		// Never sign a nonce that isn't the exact minted shape — the host picks
+		// these bytes, and the signing key is the sovereign user key (see
+		// CHALLENGE_DOMAIN_TAG). Length guard + domain tag are independent
+		// defenses; either alone defeats the roster-forgery oracle.
+		if (nonceBytes.length !== CHALLENGE_NONCE_BYTES) return null;
+		const sig = deps.signNonce(lanChallengeSigningBytes(nonceBytes));
 		if (!sig) return null;
 		return {
 			token: LAN_ADMISSION_TOKEN,

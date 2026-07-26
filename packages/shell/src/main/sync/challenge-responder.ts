@@ -19,6 +19,7 @@
  * refresh; an open node never challenges anyway).
  */
 
+import { CHALLENGE_NONCE_BYTES } from "./lan-admission";
 import type { AuthResponse } from "./websocket-relay-port";
 
 export type ChallengeResponderDeps = {
@@ -54,7 +55,23 @@ export function makeChallengeResponder(
 		} catch {
 			return null;
 		}
-		if (nonceBytes.length === 0) return null;
+		// SECURITY — refuse any nonce that is not the exact minted shape.
+		//
+		// `signNonce` is the SOVEREIGN USER key, which also signs `add-device`
+		// roster records over `canonicalAddDeviceBytes` (unprefixed JSON). The
+		// NODE chooses the nonce, and the blind relay is untrusted by design, so
+		// a malicious node could otherwise send
+		// `nonce = canonicalAddDeviceBytes(<its device>)` and get back a valid
+		// roster record for the victim's vault. A canonical record is never 32
+		// bytes, so this length check closes that oracle.
+		//
+		// The principled fix is domain separation (the LAN path already prefixes
+		// `CHALLENGE_DOMAIN_TAG` — see `lan-admission.ts`), but the cloud
+		// verifier is DEPLOYED SEPARATELY and still checks the untagged nonce
+		// (`sync/src/admission.ts` `#verifyIdentity`), so tagging here
+		// unilaterally would lock clients out. Sequencing: teach the node to
+		// accept both, deploy it, then tag here and drop the legacy branch.
+		if (nonceBytes.length !== CHALLENGE_NONCE_BYTES) return null;
 
 		const sig = deps.signNonce(nonceBytes);
 		if (!sig) return null;
