@@ -357,9 +357,10 @@ const entityInterpreter =
 				if (!fields.ok) return failField("create", fields.field, fields.reason);
 				return {
 					ok: true,
-					output: await ports.entities.create(s.entityType, fields.declared
-						? fields.values
-						: operandProperties(ctx.input)),
+					output: await ports.entities.create(
+						s.entityType,
+						fields.declared ? fields.values : operandProperties(ctx.input),
+					),
 				};
 			}
 			case EntityOp.Update: {

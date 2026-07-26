@@ -21,6 +21,7 @@ import {
 	type AiGenerateResult,
 	EntityEventVerb,
 	EntityOp,
+	type EntityStep,
 	MessageRole,
 	StepKind,
 	type WorkflowRunDef,
@@ -349,5 +350,4 @@ describe("business triage flow (trigger → AI classify → AI-agent draft)", ()
 			title: "URGENT: outage",
 		});
 	});
-
 });
