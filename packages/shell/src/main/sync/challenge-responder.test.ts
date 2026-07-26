@@ -8,7 +8,11 @@ import { describe, expect, it } from "vitest";
 import { makeChallengeResponder } from "./challenge-responder";
 
 const b64url = (b: Uint8Array) => Buffer.from(b).toString("base64url");
-const NONCE = b64url(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+/** A realistic challenge nonce: every challenger (the hosted node's
+ *  `NONCE_BYTES`, the LAN host) mints exactly 32 random bytes, and the
+ *  responder now refuses anything else — see `CHALLENGE_NONCE_BYTES`. */
+const NONCE_BYTES = new Uint8Array(32).map((_, i) => i + 1);
+const NONCE = b64url(NONCE_BYTES);
 
 describe("makeChallengeResponder (SYNC-4b)", () => {
 	it("returns the signed auth payload when account + token are present", async () => {
@@ -28,7 +32,7 @@ describe("makeChallengeResponder (SYNC-4b)", () => {
 			sig: b64url(new Uint8Array([9, 9, 9])),
 		});
 		// The nonce was decoded from base64url before signing.
-		expect([...(signed[0] ?? [])]).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+		expect([...(signed[0] ?? [])]).toEqual([...NONCE_BYTES]);
 	});
 
 	it("returns null when there is no session (no account)", async () => {
@@ -56,5 +60,24 @@ describe("makeChallengeResponder (SYNC-4b)", () => {
 			loadToken: async () => "tok",
 		});
 		expect(await respond(NONCE)).toBeNull();
+	});
+
+	it("REFUSES a nonce that is not the minted 32-byte shape, without signing", async () => {
+		// The node picks these bytes and the signing key is the sovereign user
+		// key, so an off-shape nonce is a signing-oracle attempt (a forged
+		// add-device roster record) — see lan-challenge-oracle.test.ts.
+		for (const size of [8, 31, 33, 200]) {
+			let asked = false;
+			const respond = makeChallengeResponder({
+				account: () => "ACCT",
+				signNonce: () => {
+					asked = true;
+					return new Uint8Array(64);
+				},
+				loadToken: () => "tok",
+			});
+			expect(await respond(b64url(new Uint8Array(size)))).toBeNull();
+			expect(asked).toBe(false);
+		}
 	});
 });
