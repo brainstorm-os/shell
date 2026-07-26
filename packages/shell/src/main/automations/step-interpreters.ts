@@ -247,11 +247,27 @@ export const defaultCollectionResolver: CollectionResolver = (reference, ctx) =>
 
 // ───────────────────────── operand coercion ─────────────────────────
 
-/** Pull an entity id out of an operand: a bare string, or `{ id }`. */
+/**
+ * Pull an entity id out of an operand: a bare string, `{ id }`, or
+ * `{ entityId }`.
+ *
+ * `entityId` is here because of F-459. An entity trigger ("when a new Email
+ * arrives") hands the next step the event payload
+ * `{ entityId, type, verb }` — the shape `AutomationsHost.onEntityChange`
+ * emits — but this reader only knew `id`, so the trigger did not line up with
+ * the Entity step that is the obvious thing to connect it to. The workflow
+ * silently produced nothing until the author inserted a Code step containing
+ * `input.entityId` purely to rename the field. Accepting both here removes
+ * that glue step from every entity-triggered workflow, and keeps the fix in
+ * one place rather than rewriting the event payload (which other consumers
+ * already read as `entityId`).
+ */
 function operandId(input: unknown): string | null {
 	if (typeof input === "string" && input.length > 0) return input;
-	if (input && typeof input === "object" && typeof (input as { id?: unknown }).id === "string") {
-		return (input as { id: string }).id;
+	if (input && typeof input === "object") {
+		const obj = input as { id?: unknown; entityId?: unknown };
+		if (typeof obj.id === "string" && obj.id.length > 0) return obj.id;
+		if (typeof obj.entityId === "string" && obj.entityId.length > 0) return obj.entityId;
 	}
 	return null;
 }

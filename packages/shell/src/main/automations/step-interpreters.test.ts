@@ -121,6 +121,57 @@ describe("Entity interpreter", () => {
 		expect(p.entities.get).toHaveBeenCalledWith("e7");
 	});
 
+	// F-459: an entity trigger ("when a new Email arrives") hands the next step
+	// the event payload `{ entityId, type, verb }`. Before this, the operand
+	// reader only knew `id`, so the trigger didn't line up with the Entity step
+	// and the workflow produced nothing until the author inserted a Code step
+	// containing `input.entityId` just to rename the field.
+	it("get accepts the entity trigger's { entityId } payload — no glue step (F-459)", async () => {
+		const p = ports();
+		const trig: WorkflowStep = { id: "trig", kind: StepKind.Trigger };
+		const get: EntityStep = {
+			id: "g",
+			kind: StepKind.Entity,
+			op: EntityOp.Get,
+			entityType: "Email/v1",
+		};
+		// Exactly what AutomationsHost.onEntityChange emits.
+		await runWith(p, [trig, get], { entityId: "mail-1", type: "Email/v1", verb: "created" });
+		expect(p.entities.get).toHaveBeenCalledWith("mail-1");
+	});
+
+	it("update accepts { entityId } too, so a triggered update needs no glue (F-459)", async () => {
+		// Update re-reads the entity and gates on its type, so the fake has to
+		// hand back an Email for the step's `entityType` to match.
+		const entities = fakeEntities();
+		entities.get = vi.fn(async (id: string) => entity(id, "Email/v1"));
+		const p = ports({ entities });
+		const trig: WorkflowStep = { id: "trig", kind: StepKind.Trigger };
+		const step: EntityStep = {
+			id: "u",
+			kind: StepKind.Entity,
+			op: EntityOp.Update,
+			entityType: "Email/v1",
+		};
+		await runWith(p, [trig, step], { entityId: "mail-2", patch: { priority: "urgent" } });
+		expect(p.entities.update).toHaveBeenCalledWith("mail-2", { priority: "urgent" });
+	});
+
+	it("prefers an explicit id over entityId when both are present (F-459)", async () => {
+		// `{ id }` is the operand shape a prior step produces; `entityId` is the
+		// trigger's. If both appear, the step's own operand wins.
+		const p = ports();
+		const trig: WorkflowStep = { id: "trig", kind: StepKind.Trigger };
+		const get: EntityStep = {
+			id: "g",
+			kind: StepKind.Entity,
+			op: EntityOp.Get,
+			entityType: "Note/v1",
+		};
+		await runWith(p, [trig, get], { id: "explicit", entityId: "from-trigger" });
+		expect(p.entities.get).toHaveBeenCalledWith("explicit");
+	});
+
 	it("update fails cleanly when input carries no id", async () => {
 		const p = ports();
 		const trig: WorkflowStep = { id: "trig", kind: StepKind.Trigger };
