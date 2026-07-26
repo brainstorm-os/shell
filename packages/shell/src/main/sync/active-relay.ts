@@ -37,6 +37,45 @@ import { WebSocketRelayPort } from "./websocket-relay-port";
 export enum ActiveRelayKind {
 	Loopback = "loopback",
 	WebSocket = "websocket",
+	/** LAN-4 — a peer on the same network, no server in the middle. The wire is
+	 *  the SAME `WebSocketRelayPort`; only the address and the admission
+	 *  handshake differ (channel-bound, see `lan-channel-binding.md`). Kept a
+	 *  distinct kind so the sync-status surface can say "no server" honestly
+	 *  (LAN-5) rather than showing it as a relay. */
+	Lan = "lan",
+}
+
+/** A `ws://…` address that resolves to this machine or the local network.
+ *  Used to classify a configured relay URL as LAN rather than cloud — the
+ *  classification is what LAN-5's "no server" copy hangs on, so it must not
+ *  guess: anything not provably local is treated as a relay. */
+export function isLanRelayUrl(url: string): boolean {
+	let host: string;
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") return false;
+		host = parsed.hostname.toLowerCase();
+	} catch {
+		return false;
+	}
+	if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]")
+		return true;
+	// RFC1918 + link-local + CGNAT-free private ranges.
+	const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+	if (v4) {
+		const [a, b] = [Number(v4[1]), Number(v4[2])];
+		if (a === 10) return true;
+		if (a === 127) return true;
+		if (a === 192 && b === 168) return true;
+		if (a === 172 && b >= 16 && b <= 31) return true;
+		if (a === 169 && b === 254) return true; // link-local
+		return false;
+	}
+	// IPv6 unique-local (fc00::/7) and link-local (fe80::/10).
+	const v6 = host.replace(/^\[|\]$/g, "");
+	if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;
+	if (/^fe[89ab][0-9a-f]:/.test(v6)) return true;
+	return false;
 }
 
 export type ActiveRelayState = {
@@ -354,16 +393,25 @@ export class ActiveRelayOrchestrator {
 		const desiredUrl =
 			session && desiredKind === null ? await this.#readSyncRelayUrl(session.vaultPath) : null;
 		const resolvedKind =
-			desiredKind ?? (desiredUrl ? ActiveRelayKind.WebSocket : ActiveRelayKind.Loopback);
+			desiredKind ??
+			(desiredUrl
+				? isLanRelayUrl(desiredUrl)
+					? ActiveRelayKind.Lan
+					: ActiveRelayKind.WebSocket
+				: ActiveRelayKind.Loopback);
 		const before = this.#current;
 		if (before.kind === resolvedKind && (before.syncRelayUrl ?? null) === (desiredUrl ?? null)) {
 			// Same transport already live — no port flap, no port build.
 			return;
 		}
 		const desired: ActiveRelayState =
-			resolvedKind === ActiveRelayKind.WebSocket && desiredUrl
+			(resolvedKind === ActiveRelayKind.WebSocket || resolvedKind === ActiveRelayKind.Lan) &&
+			desiredUrl
 				? {
-						kind: ActiveRelayKind.WebSocket,
+						kind: resolvedKind,
+						// Same port either way — LAN-4 reuses the proven wire path
+						// verbatim; what differs is the address and the admission
+						// handshake the wiring injects.
 						port: this.#makeRelayPort(desiredUrl),
 						syncRelayUrl: desiredUrl,
 					}

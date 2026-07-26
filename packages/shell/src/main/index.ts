@@ -847,7 +847,13 @@ const quotaService = new QuotaService({
 	isGatedRelay: async () => {
 		const { ActiveRelayKind, getActiveRelay } = await import("./sync/active-relay");
 		const state = getActiveRelay()?.state();
-		if (!state || state.kind !== ActiveRelayKind.WebSocket) return false;
+		// LAN counts as gated too — a LAN host ALWAYS challenges (and, since
+		// LAN-2b, channel-binds), so treating it as ungated would misreport the
+		// one transport whose admission is strictest.
+		if (!state) return false;
+		if (state.kind !== ActiveRelayKind.WebSocket && state.kind !== ActiveRelayKind.Lan) {
+			return false;
+		}
 		const port = state.port as { gatedAdmission?: () => boolean };
 		return typeof port.gatedAdmission === "function" ? port.gatedAdmission() : false;
 	},
