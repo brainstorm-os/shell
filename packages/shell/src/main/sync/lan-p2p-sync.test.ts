@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { XCHACHA_NONCE_BYTES, generateSymmetricKey } from "../credentials/crypto";
 import type { EntityDekHandle, EntityDekStore } from "../entities/entity-dek-store";
-import { bytesToBase64Url } from "../pairing/pairing-channel";
+import { base64UrlToBytes, bytesToBase64Url } from "../pairing/pairing-channel";
 import { ed25519 } from "../test-support/crypto-test-helpers";
 import { makeLanAdmissionVerifier, makeLanChallengeResponder } from "./lan-admission";
 import { LanRelayHost } from "./lan-relay-host";
@@ -192,7 +192,10 @@ describe("LAN P2P sync (LAN-6) — two engines over a localhost blind host, no c
 		const kpB = ed25519.keygen();
 		const accountA = bytesToBase64Url(new Uint8Array(kpA.publicKey));
 		const accountB = bytesToBase64Url(new Uint8Array(kpB.publicKey));
-		const roster = new Set([accountA, accountB]);
+		const roster = new Map([
+			[accountA, { ed25519Pub: base64UrlToBytes(accountA) }],
+			[accountB, { ed25519Pub: base64UrlToBytes(accountB) }],
+		]);
 
 		const host = new LanRelayHost({
 			admit: makeLanAdmissionVerifier({

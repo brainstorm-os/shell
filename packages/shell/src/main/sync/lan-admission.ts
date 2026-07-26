@@ -128,21 +128,33 @@ export const LAN_ADMISSION_TOKEN = "lan/v1";
  *     a non-canonical wire encoding is rejected outright rather than silently
  *     normalized (so it can never diverge from a string-keyed revocation check).
  */
-export function lanRosterAdmissionSet(
-	activeRecords: readonly { deviceEd25519Pub: string }[],
-): ReadonlySet<string> {
-	const out = new Set<string>();
+export function lanRosterDirectory(
+	activeRecords: readonly { deviceEd25519Pub: string; deviceX25519Pub?: string }[],
+): ReadonlyMap<string, LanRosterEntry> {
+	const out = new Map<string, LanRosterEntry>();
 	for (const record of activeRecords) {
 		try {
 			const bytes = new Uint8Array(Buffer.from(record.deviceEd25519Pub, "base64"));
 			if (bytes.length !== DEVICE_PUBKEY_BYTES) continue;
-			out.add(canonicalBase64Url(bytes));
+			const entry: LanRosterEntry = { ed25519Pub: bytes };
+			if (record.deviceX25519Pub) {
+				const x = new Uint8Array(Buffer.from(record.deviceX25519Pub, "base64"));
+				// A row without a usable X25519 key can still be a MEMBER (the
+				// Ed25519 half admits it), but it cannot be channel-bound — the
+				// handshake refuses rather than falling back to a plaintext nonce.
+				if (x.length === DEVICE_PUBKEY_BYTES) entry.x25519Pub = x;
+			}
+			out.set(canonicalBase64Url(bytes), entry);
 		} catch {
 			// A malformed roster row is not a member.
 		}
 	}
 	return out;
 }
+
+/** What the LAN layer needs about one rostered device: the Ed25519 key it
+ *  authenticates with, and the X25519 key the challenge is sealed to. */
+export type LanRosterEntry = { ed25519Pub: Uint8Array; x25519Pub?: Uint8Array };
 
 const DEVICE_PUBKEY_BYTES = 32;
 
@@ -151,11 +163,11 @@ function canonicalBase64Url(bytes: Uint8Array): string {
 }
 
 export type LanAdmissionVerifierDeps = {
-	/** Devices allowed to connect, as canonical base64url pubkeys. Build it with
-	 *  `lanRosterAdmissionSet(devicesStore.listActive())` — see that function for
-	 *  why this is a set of roster-derived keys rather than a predicate. Read it
+	/** Devices allowed to connect, keyed by canonical base64url Ed25519 pubkey.
+	 *  Build it with `lanRosterDirectory(devicesStore.listActive())` — see that
+	 *  function for why this is roster-derived rather than a predicate. Read it
 	 *  fresh per connection so a revoke takes effect without a restart. */
-	activeDeviceKeys: () => ReadonlySet<string>;
+	activeDeviceKeys: () => ReadonlyMap<string, LanRosterEntry>;
 	/** Ed25519 verify. Default = native `ed25519Verify(pub, msg, sig)`. Injectable
 	 *  for deterministic tests. */
 	verify?: (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
@@ -373,4 +385,149 @@ export function openLanChallenge(args: {
 	} catch {
 		return null;
 	}
+}
+
+// ────────── handshake builders — the seam the blind host + port wire to ──────────
+
+/**
+ * HOST side of the channel-bound handshake (LAN-2b(b)). The blind
+ * `LanRelayHost` mints the nonce and holds it per connection; every crypto
+ * step is one of these three calls, so the host itself stays inside the
+ * relay-blind fence.
+ */
+export type LanHostHandshake = {
+	/** Seal `nonce` for the connecting device. Null ⇒ unknown, revoked, or no
+	 *  usable X25519 key ⇒ the host must close rather than fall back. */
+	sealFor: (clientAccount: string, nonce: Uint8Array) => SealedChallenge | null;
+	/** Verify the client's proof over the nonce this connection issued. */
+	verifyClient: (clientAccount: string, sig: string, nonce: Uint8Array) => boolean;
+	/** This host's own proof back to the client (anti-reflection direction tag). */
+	proveToClient: (clientAccount: string, nonce: Uint8Array) => string | null;
+};
+
+export function makeLanHostHandshake(deps: {
+	/** This host's device account (canonical base64url Ed25519 pubkey). */
+	hostAccount: () => string | null;
+	/** Roster directory — `lanRosterDirectory(devicesStore.listActive())`. */
+	activeDevices: () => ReadonlyMap<string, LanRosterEntry>;
+	/** Sign with this device's Ed25519 secret. */
+	signWithDeviceKey: (message: Uint8Array) => Uint8Array | null;
+	verify?: (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
+}): LanHostHandshake {
+	const verify = deps.verify ?? ((pub, msg, sig) => ed25519Verify(pub, msg, sig));
+	return {
+		sealFor: (clientAccount, nonce) => {
+			try {
+				const host = deps.hostAccount();
+				const entry = deps.activeDevices().get(clientAccount);
+				if (!host || !entry?.x25519Pub) return null;
+				return sealLanChallenge({
+					clientX25519Pub: entry.x25519Pub,
+					hostAccount: host,
+					clientAccount,
+					nonce,
+				});
+			} catch {
+				return null;
+			}
+		},
+		verifyClient: (clientAccount, sig, nonce) => {
+			try {
+				const host = deps.hostAccount();
+				const entry = deps.activeDevices().get(clientAccount);
+				if (!host || !entry) return false;
+				const sigBytes = base64UrlToBytes(sig);
+				if (sigBytes.length !== 64) return false;
+				const msg = lanProofBytes(LanProofDirection.Client, host, clientAccount, nonce);
+				return verify(entry.ed25519Pub, msg, sigBytes);
+			} catch {
+				return false;
+			}
+		},
+		proveToClient: (clientAccount, nonce) => {
+			try {
+				const host = deps.hostAccount();
+				if (!host) return null;
+				const msg = lanProofBytes(LanProofDirection.Host, host, clientAccount, nonce);
+				const sig = deps.signWithDeviceKey(msg);
+				return sig ? bytesToBase64Url(sig) : null;
+			} catch {
+				return null;
+			}
+		},
+	};
+}
+
+/**
+ * CLIENT side. Stateful by design: the nonce recovered from the sealed
+ * challenge is kept in the closure so `verifyHostProof` can check the host's
+ * reply against it — which keeps the nonce out of the relay-blind port
+ * entirely (the port only shuttles opaque strings).
+ */
+export type LanClientHandshake = {
+	/** The `hello` account the port announces on connect. */
+	helloAccount: () => string | null;
+	/** Open a sealed challenge and return the `auth` payload, or null (refuse). */
+	onSealedChallenge: (hostAccount: string, sealed: SealedChallenge) => AuthResponse | null;
+	/** Verify the host's `auth-ok` proof. False ⇒ the port must close and stay
+	 *  unadmitted; the peer never proved it holds the host's device key. */
+	verifyHostProof: (proof: string) => boolean;
+};
+
+export function makeLanClientHandshake(deps: {
+	deviceAccount: () => string | null;
+	deviceX25519Secret: () => Uint8Array | null;
+	signWithDeviceKey: (message: Uint8Array) => Uint8Array | null;
+	activeDevices: () => ReadonlyMap<string, LanRosterEntry>;
+	verify?: (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
+}): LanClientHandshake {
+	const verify = deps.verify ?? ((pub, msg, sig) => ed25519Verify(pub, msg, sig));
+	// Per-connection state from the last challenge we opened.
+	let openedNonce: Uint8Array | null = null;
+	let peerHost: string | null = null;
+
+	return {
+		helloAccount: () => deps.deviceAccount(),
+		onSealedChallenge: (hostAccount, sealed) => {
+			openedNonce = null;
+			peerHost = null;
+			try {
+				const self = deps.deviceAccount();
+				const secret = deps.deviceX25519Secret();
+				if (!self || !secret) return null;
+				// The host must itself be a rostered device — a peer we have never
+				// paired with cannot be a host, whatever it claims.
+				if (!deps.activeDevices().has(hostAccount)) return null;
+				const nonce = openLanChallenge({
+					sealed,
+					deviceX25519Secret: secret,
+					hostAccount,
+					clientAccount: self,
+				});
+				if (!nonce) return null;
+				const sig = deps.signWithDeviceKey(
+					lanProofBytes(LanProofDirection.Client, hostAccount, self, nonce),
+				);
+				if (!sig) return null;
+				openedNonce = nonce;
+				peerHost = hostAccount;
+				return { token: LAN_ADMISSION_TOKEN, account: self, sig: bytesToBase64Url(sig) };
+			} catch {
+				return null;
+			}
+		},
+		verifyHostProof: (proof) => {
+			try {
+				const self = deps.deviceAccount();
+				const entry = peerHost ? deps.activeDevices().get(peerHost) : null;
+				if (!self || !peerHost || !entry || !openedNonce) return false;
+				const sigBytes = base64UrlToBytes(proof);
+				if (sigBytes.length !== 64) return false;
+				const msg = lanProofBytes(LanProofDirection.Host, peerHost, self, openedNonce);
+				return verify(entry.ed25519Pub, msg, sigBytes);
+			} catch {
+				return false;
+			}
+		},
+	};
 }
