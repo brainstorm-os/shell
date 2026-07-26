@@ -28,6 +28,7 @@ import {
 	ENTITY_EVENT_VERBS,
 	EXPORT_TEXT_FORMATS,
 	EntityOp,
+	type EntityStep,
 	type ExportTextFormat,
 	StepKind,
 	TriggerKind,
@@ -44,6 +45,7 @@ import {
 	BuilderIssueKind,
 	type BuilderState,
 	CapabilityRowState,
+	type EntityPropertyRow,
 	UNBOUND,
 	addStep,
 	bindableSteps,
@@ -52,10 +54,13 @@ import {
 	computeCapabilitySheet,
 	duplicateStep,
 	emptyBuilderState,
+	entityPropertyRows,
+	isBareReferenceChain,
 	moveStep,
 	removeStep,
 	updateStep,
 	validateBuilderWorkflow,
+	withEntityPropertyRows,
 } from "../logic/builder-model";
 import {
 	BUILDER_TRIGGER_KINDS,
@@ -131,35 +136,7 @@ function StepConfig({
 				</label>
 			);
 		case StepKind.Entity:
-			return (
-				<>
-					<div className="au-field">
-						<span className="au-field__label">{t("builder.entity.op")}</span>
-						<SelectMenu<EntityOp>
-							value={step.op}
-							ariaLabel={t("builder.entity.op")}
-							options={[
-								EntityOp.Create,
-								EntityOp.Update,
-								EntityOp.Query,
-								EntityOp.Get,
-								EntityOp.Delete,
-							].map((op) => ({ value: op, label: t(`entity.op.${op}` as AutomationsI18nKey) }))}
-							onChange={(op) => onChange({ ...step, op })}
-						/>
-					</div>
-					<label className="au-field">
-						<span className="au-field__label">{t("builder.entity.type")}</span>
-						<input
-							className="bs-input"
-							type="text"
-							value={step.entityType}
-							placeholder="brainstorm/Note/v1"
-							onChange={(e) => onChange({ ...step, entityType: e.target.value })}
-						/>
-					</label>
-				</>
-			);
+			return <EntityStepConfig step={step} priorSteps={priorSteps} onChange={onChange} />;
 		case StepKind.Wait:
 			return (
 				<label className="au-field">
@@ -258,6 +235,117 @@ function StepConfig({
 		default:
 			return null;
 	}
+}
+
+/** The Entity step config: op + entity type, plus — for the writing ops —
+ *  the F-458 field rows (`properties`): each row a field name and a value
+ *  expression in the Code grammar, with the shared prior-step binding
+ *  affordance. Without rows the step keeps the legacy operand-passthrough
+ *  write, which the empty-state line says out loud. */
+function EntityStepConfig({
+	step,
+	priorSteps,
+	onChange,
+}: {
+	step: EntityStep;
+	priorSteps: readonly WorkflowStep[];
+	onChange: (next: WorkflowStep) => void;
+}): ReactElement {
+	const rows = entityPropertyRows(step);
+	const writes = step.op === EntityOp.Create || step.op === EntityOp.Update;
+	const hasUnnamedRow = rows.some((row) => row.key.trim().length === 0);
+
+	const setRow = (index: number, patch: Partial<EntityPropertyRow>): void => {
+		const next = rows.map((row, i) => (i === index ? { ...row, ...patch } : row));
+		onChange(withEntityPropertyRows(step, next));
+	};
+	const addRow = (): void =>
+		onChange(withEntityPropertyRows(step, [...rows, { key: "", value: "" }]));
+	const removeRow = (index: number): void =>
+		onChange(
+			withEntityPropertyRows(
+				step,
+				rows.filter((_, i) => i !== index),
+			),
+		);
+
+	return (
+		<>
+			<div className="au-field">
+				<span className="au-field__label">{t("builder.entity.op")}</span>
+				<SelectMenu<EntityOp>
+					value={step.op}
+					ariaLabel={t("builder.entity.op")}
+					options={[EntityOp.Create, EntityOp.Update, EntityOp.Query, EntityOp.Get, EntityOp.Delete].map(
+						(op) => ({ value: op, label: t(`entity.op.${op}` as AutomationsI18nKey) }),
+					)}
+					onChange={(op) => onChange({ ...step, op })}
+				/>
+			</div>
+			<label className="au-field">
+				<span className="au-field__label">{t("builder.entity.type")}</span>
+				<input
+					className="bs-input"
+					type="text"
+					value={step.entityType}
+					placeholder="brainstorm/Note/v1"
+					onChange={(e) => onChange({ ...step, entityType: e.target.value })}
+				/>
+			</label>
+			{writes ? (
+				<div className="au-field" data-testid="entity-fields">
+					<div className="au-builder__steps-head">
+						<span className="au-field__label">{t("builder.entity.fields")}</span>
+						<button
+							type="button"
+							className="bs-btn bs-btn--neutral"
+							disabled={hasUnnamedRow}
+							title={hasUnnamedRow ? t("builder.entity.addFieldNeedsName") : undefined}
+							onClick={addRow}
+						>
+							{t("builder.entity.addField")}
+						</button>
+					</div>
+					{rows.length === 0 ? (
+						<p className="au-builder__steps-empty">{t("builder.entity.fieldsEmpty")}</p>
+					) : (
+						<ul className="au-entity-fields">
+							{rows.map((row, index) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable identity beyond position — the field name itself is editable
+								<li className="au-entity-field" key={index}>
+									<input
+										className="bs-input au-entity-field__key"
+										type="text"
+										value={row.key}
+										placeholder={t("builder.entity.fieldKeyPlaceholder")}
+										aria-label={t("builder.entity.fieldKey")}
+										onChange={(e) => setRow(index, { key: e.target.value })}
+									/>
+									<div className="au-entity-field__value">
+										<BindingControl
+											ariaLabel={t("builder.entity.fieldValue")}
+											value={row.value}
+											priorSteps={priorSteps}
+											computedOk
+											onChange={(value) => setRow(index, { value })}
+										/>
+									</div>
+									<button
+										type="button"
+										className="bs-btn bs-btn--icon bs-btn--danger"
+										aria-label={t("builder.entity.removeField")}
+										onClick={() => removeRow(index)}
+									>
+										<Icon name={IconName.Trash} size={16} />
+									</button>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			) : null}
+		</>
+	);
 }
 
 /** Set / clear an AI step's optional `provider`: a blank value removes the key
@@ -378,6 +466,41 @@ function BindingField({
 	priorSteps: readonly WorkflowStep[];
 	onChange: (next: string) => void;
 }): ReactElement {
+	return (
+		<div className="au-field">
+			<span className="au-field__label">{t(labelKey)}</span>
+			<BindingControl
+				ariaLabel={t(labelKey)}
+				value={value}
+				priorSteps={priorSteps}
+				onChange={onChange}
+			/>
+		</div>
+	);
+}
+
+/** The bare step-picker + expression pair (no label wrapper) — shared by
+ *  `BindingField` and the Entity step's field rows, so every expression
+ *  input offers the same "pick a prior step" affordance instead of asking
+ *  the user to type uuid step ids by hand. */
+function BindingControl({
+	ariaLabel,
+	value,
+	priorSteps,
+	onChange,
+	computedOk = false,
+}: {
+	ariaLabel: string;
+	value: string;
+	priorSteps: readonly WorkflowStep[];
+	onChange: (next: string) => void;
+	/** When true, a computed expression (a literal, an operator chain, a
+	 *  call) never shows the "references a missing step" note — only a bare
+	 *  reference chain with an unknown head does. The Entity field rows set
+	 *  this because `'urgent'` is a perfectly good field value; the
+	 *  Branch/ForEach/Code fields keep the stricter legacy note. */
+	computedOk?: boolean;
+}): ReactElement {
 	const options: SelectMenuOption[] = [
 		{ value: "input", label: t("builder.binding.input") },
 		...priorSteps.map((s, i) => ({
@@ -392,12 +515,12 @@ function BindingField({
 		return rest.replace(/^\./, "");
 	})();
 	const selectValue = selectedId ?? (value.trim() === "input" ? "input" : null);
+	const dangling = selectedId !== null && !priorSteps.some((s) => s.id === selectedId);
 	const unbound =
-		value.trim() === UNBOUND || (selectedId !== null && !priorSteps.some((s) => s.id === selectedId));
+		value.trim() === UNBOUND || (dangling && (!computedOk || isBareReferenceChain(value)));
 
 	return (
-		<div className="au-field">
-			<span className="au-field__label">{t(labelKey)}</span>
+		<>
 			<div className="au-binding">
 				<SelectMenu
 					value={selectValue}
@@ -411,12 +534,12 @@ function BindingField({
 					type="text"
 					value={value}
 					placeholder={t("builder.binding.exprPlaceholder")}
-					aria-label={t(labelKey)}
+					aria-label={ariaLabel}
 					onChange={(e) => onChange(e.target.value)}
 				/>
 			</div>
 			{unbound ? <p className="au-binding__unbound">{t("builder.binding.unbound")}</p> : null}
-		</div>
+		</>
 	);
 }
 

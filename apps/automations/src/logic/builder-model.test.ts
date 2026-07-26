@@ -23,6 +23,8 @@ import {
 	computeCapabilitySheet,
 	duplicateStep,
 	emptyBuilderState,
+	entityPropertyRows,
+	isBareReferenceChain,
 	makeStep,
 	moveStep,
 	removeStep,
@@ -30,6 +32,7 @@ import {
 	triggerStep,
 	updateStep,
 	validateBuilderWorkflow,
+	withEntityPropertyRows,
 } from "./builder-model";
 
 const APP_CAPS = [
@@ -346,5 +349,92 @@ describe("round-trip with WorkflowDef", () => {
 		const state = builderStateFromWorkflow(def);
 		expect(state.steps[0]?.kind).toBe(StepKind.Trigger);
 		expect(state.steps).toHaveLength(2);
+	});
+});
+
+describe("entity write fields (F-458)", () => {
+	const entity = (properties?: Record<string, string>) =>
+		({
+			id: "e",
+			kind: StepKind.Entity,
+			op: EntityOp.Create,
+			entityType: "brainstorm/Note/v1",
+			...(properties ? { properties } : {}),
+		}) as const;
+
+	it("round-trips the properties record through rows, preserving order", () => {
+		const step = entity({ priority: "classify.content", title: "input.subject" });
+		const rows = entityPropertyRows(step);
+		expect(rows).toEqual([
+			{ key: "priority", value: "classify.content" },
+			{ key: "title", value: "input.subject" },
+		]);
+		expect(withEntityPropertyRows(step, rows)).toEqual(step);
+	});
+
+	it("drops the properties key entirely for zero rows (operand passthrough)", () => {
+		const step = withEntityPropertyRows(entity({ a: "input.x" }), []);
+		expect("properties" in step).toBe(false);
+	});
+
+	it("collapses duplicate keys last-wins", () => {
+		const step = withEntityPropertyRows(entity(), [
+			{ key: "p", value: "one" },
+			{ key: "p", value: "two" },
+		]);
+		expect(step.properties).toEqual({ p: "two" });
+	});
+
+	it("classifies bare reference chains vs computed expressions", () => {
+		expect(isBareReferenceChain("classify.content")).toBe(true);
+		expect(isBareReferenceChain("step-1a2b.value[0]")).toBe(true);
+		expect(isBareReferenceChain("'urgent'")).toBe(false);
+		expect(isBareReferenceChain("1 + 2")).toBe(false);
+		expect(isBareReferenceChain("now()")).toBe(false);
+	});
+
+	it("flags an empty field name and an empty field value at save", () => {
+		const state: BuilderState = {
+			name: "x",
+			steps: [triggerStep(), entity({ "": "input.x", title: " " })],
+		};
+		const issues = validateBuilderWorkflow(state, APP_CAPS);
+		const details = issues
+			.filter((i) => i.kind === BuilderIssueKind.EmptyStepConfig)
+			.map((i) => i.detail);
+		expect(details).toContain("propertyKey");
+		expect(details).toContain("property:title");
+	});
+
+	it("flags a dangling bare reference but not a literal or computed value", () => {
+		const state: BuilderState = {
+			name: "x",
+			steps: [
+				triggerStep(),
+				entity({
+					gone: "step-ghost.value",
+					mood: "'urgent'",
+					sum: "1 + 2",
+					ok: "input.subject",
+				}),
+			],
+		};
+		const issues = validateBuilderWorkflow(state, APP_CAPS);
+		const unbound = issues.filter((i) => i.kind === BuilderIssueKind.UnboundBinding);
+		expect(unbound).toHaveLength(1);
+		expect(unbound[0]?.detail).toBe("gone: step-ghost.value");
+	});
+
+	it("accepts a field bound to a real prior step", () => {
+		const state: BuilderState = {
+			name: "x",
+			steps: [
+				triggerStep(),
+				{ id: "classify", kind: StepKind.AICall, instructions: "rate it" },
+				entity({ priority: "classify.content" }),
+			],
+		};
+		const issues = validateBuilderWorkflow(state, APP_CAPS);
+		expect(issues.filter((i) => i.kind === BuilderIssueKind.UnboundBinding)).toHaveLength(0);
 	});
 });
