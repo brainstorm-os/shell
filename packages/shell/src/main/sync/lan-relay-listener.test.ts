@@ -17,10 +17,13 @@ import { ed25519 } from "../test-support/crypto-test-helpers";
 import { type LanRosterEntry, makeLanClientHandshake, makeLanHostHandshake } from "./lan-admission";
 import { LanRelayHost } from "./lan-relay-host";
 import {
+	DEFAULT_LAN_MAX_SOCKETS,
 	LanRelayListener,
+	RESERVED_FOR_FRESH_SOURCES,
 	isBindableAddress,
 	lanInterfaces,
 	normalizeSourceAddress,
+	shouldAcceptUpgrade,
 } from "./lan-relay-listener";
 import { WebSocketRelayPort } from "./websocket-relay-port";
 
@@ -356,5 +359,134 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 			await listener.stop();
 			relayHost.close();
 		}
+	});
+});
+
+describe("LanRelayListener — GA hardening from the post-bind pentest", () => {
+	it("L6 — concurrent start() opens ONE port, and stop() leaves none listening", async () => {
+		// Two un-awaited calls in one tick used to open TWO ports; the second won
+		// `#bound` and the first was orphaned — still listening, still adopting
+		// peers, unreachable to close.
+		const net = await import("node:net");
+		const host = new LanRelayHost();
+		const listener = new LanRelayListener({ host, address: "127.0.0.1" });
+		try {
+			const [a, b] = await Promise.all([listener.start(), listener.start()]);
+			expect(a.port).toBe(b.port);
+			const port = a.port;
+			await listener.stop();
+			expect(listener.address()).toBeNull();
+			// Nothing may still accept on that port.
+			const reachable = await new Promise<boolean>((resolve) => {
+				const probe = net.connect(port, "127.0.0.1");
+				probe.on("connect", () => {
+					probe.destroy();
+					resolve(true);
+				});
+				probe.on("error", () => resolve(false));
+			});
+			expect(reachable).toBe(false);
+		} finally {
+			host.close();
+		}
+	});
+
+	it("L8 — an upgrade carrying Origin is refused before the handshake", () => {
+		// Tested as the pure decision, NOT end-to-end: Bun's ws client does not
+		// send an Origin header at all (measured — verifyClient runs but sees
+		// `undefined`), so a browser-shaped connection cannot be reproduced under
+		// this runner. An e2e test here would pass for the wrong reason.
+		const admitAll = () => true;
+		const sock = { remoteAddress: "127.0.0.1" };
+		// A browser — any origin at all — is refused.
+		for (const origin of ["https://evil.example", "null", "file://", ""]) {
+			expect(shouldAcceptUpgrade(origin, admitAll, sock)).toBe(false);
+		}
+		// A native peer sends no Origin and is accepted…
+		expect(shouldAcceptUpgrade(undefined, admitAll, sock)).toBe(true);
+		// …still subject to the per-source decision.
+		expect(shouldAcceptUpgrade(undefined, () => false, sock)).toBe(false);
+	});
+
+	it("L10 — the 426 body is empty (no product fingerprint)", async () => {
+		const host = new LanRelayHost();
+		const listener = new LanRelayListener({ host, address: "127.0.0.1" });
+		try {
+			const bound = await listener.start();
+			const res = await fetch(`http://127.0.0.1:${bound.port}/`, {
+				signal: AbortSignal.timeout(3_000),
+			});
+			expect(res.status).toBe(426);
+			const body = await res.text();
+			expect(body).toBe("");
+			expect(body.toLowerCase()).not.toContain("brainstorm");
+		} finally {
+			await listener.stop();
+			host.close();
+		}
+	});
+
+	it("L4 — a source holding sockets cannot exceed its cap once the rate window rolls", async () => {
+		// This is what accept-layer LIVE accounting adds over the old rate window,
+		// and the distinguishing case matters: the rate limiter only counts
+		// connections PER WINDOW, so a peer could hold N sockets open forever and,
+		// the moment the window expired, open N more — repeatedly. Live counting
+		// binds on concurrency instead, which is what actually starves the accept
+		// queue.
+		//
+		// (A naive "≤3 connections" assertion here passes with the live cap
+		// REVERTED, because the rate window caps at the same number. It did.)
+		const { WebSocket } = await import("ws");
+		const host = new LanRelayHost();
+		let clock = 1_000;
+		const listener = new LanRelayListener({
+			host,
+			address: "127.0.0.1",
+			maxConnectionsPerSource: 2,
+			rateWindowMs: 5_000,
+			now: () => clock,
+		});
+		const bound = await listener.start();
+		const sockets: import("ws").WebSocket[] = [];
+		const open = (): void => {
+			const ws = new WebSocket(bound.url);
+			ws.on("error", () => {});
+			sockets.push(ws);
+		};
+		try {
+			open();
+			open();
+			await settle(400);
+			const held = host.connectionCount();
+			expect(held).toBeLessThanOrEqual(2);
+
+			// Roll the rate window WITHOUT closing anything. The old limiter would
+			// hand out a fresh budget here; live accounting must not, because the
+			// source is still holding its slots.
+			clock += 60_000;
+			open();
+			open();
+			open();
+			await settle(400);
+			expect(host.connectionCount()).toBeLessThanOrEqual(2);
+		} finally {
+			for (const ws of sockets) {
+				try {
+					ws.terminate();
+				} catch {
+					// already gone
+				}
+			}
+			await listener.stop();
+			host.close();
+		}
+	});
+
+	it("L4 — the reserve keeps slots for sources we are not already talking to", () => {
+		// `http.maxConnections` is global and cannot tell peers apart, so alone it
+		// let one host deny the whole feature (measured: a fresh peer got
+		// ECONNRESET while an attacker held the ceiling).
+		expect(RESERVED_FOR_FRESH_SOURCES).toBeGreaterThan(0);
+		expect(DEFAULT_LAN_MAX_SOCKETS).toBeGreaterThan(RESERVED_FOR_FRESH_SOURCES * 2);
 	});
 });
