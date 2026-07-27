@@ -114,8 +114,7 @@ describe("NAPI-P · graph force-sim warm-tick cost", () => {
 		const b = measureWarmTick(2000).medianMs;
 		const ratio = b / Math.max(a, 0.0001);
 		console.log(
-			`[napi-p/force-layout] n=600 → n=2000 cost ratio ${ratio.toFixed(2)}× ` +
-				`(linear would be ~3.3×, quadratic ~11×)`,
+			`[napi-p/force-layout] n=600 → n=2000 cost ratio ${ratio.toFixed(2)}× (linear would be ~3.3×, quadratic ~11×)`,
 		);
 		expect(ratio).toBeGreaterThan(3.3);
 	});
