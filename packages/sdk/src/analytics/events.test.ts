@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { AnalyticsErrorScope, AnalyticsEvent, AnalyticsProp, parseLocale } from "./events";
+import {
+	AnalyticsErrorScope,
+	AnalyticsEvent,
+	AnalyticsProp,
+	RESERVED_AMPLITUDE_FIELDS,
+	parseLocale,
+} from "./events";
 
 describe("parseLocale", () => {
 	it("splits language + region from a BCP-47 tag", () => {
@@ -39,7 +45,41 @@ describe("analytics taxonomy", () => {
 		expect(AnalyticsEvent.ErrorEncountered).toBe("Error Encountered");
 		expect(AnalyticsEvent.AppLaunched).toBe("App Launched");
 		expect(AnalyticsProp.AppName).toBe("app_name");
-		expect(AnalyticsProp.Region).toBe("region");
+		expect(AnalyticsProp.Region).toBe("bs_region");
 		expect(AnalyticsErrorScope.VaultCreate).toBe("vault_create");
+	});
+});
+
+describe("reserved Amplitude field names", () => {
+	it("no AnalyticsProp may shadow an Amplitude built-in", () => {
+		// The bug this pins: `app_version`, `platform`, `os_version`, `language`
+		// and `region` were all custom properties named exactly like Amplitude's
+		// own fields. The stock charts then reported OUR value instead of
+		// Amplitude's — Version Composition showed the sandboxed APP's version
+		// (0.1.0) for app renderers and `(none)` for shell ones, so the real
+		// shell release appeared nowhere at all.
+		const reserved = new Set(RESERVED_AMPLITUDE_FIELDS);
+		const offenders = Object.entries(AnalyticsProp)
+			.filter(([, wire]) => reserved.has(wire))
+			.map(([name, wire]) => `${name} → "${wire}"`);
+		expect(
+			offenders,
+			"prefix it (bs_…) — a custom property named like an Amplitude built-in silently shadows the built-in in every stock chart",
+		).toEqual([]);
+	});
+
+	it("the five that used to collide are namespaced", () => {
+		expect(AnalyticsProp.AppVersion).toBe("bs_app_version");
+		expect(AnalyticsProp.Platform).toBe("bs_platform");
+		expect(AnalyticsProp.OsVersion).toBe("bs_os_version");
+		expect(AnalyticsProp.Language).toBe("bs_language");
+		expect(AnalyticsProp.Region).toBe("bs_region");
+	});
+
+	it("leaves the non-colliding names alone — renaming them would break history for nothing", () => {
+		expect(AnalyticsProp.Surface).toBe("surface");
+		expect(AnalyticsProp.ShellVersion).toBe("shell_version");
+		expect(AnalyticsProp.AppId).toBe("app_id");
+		expect(AnalyticsProp.ErrorScope).toBe("error_scope");
 	});
 });

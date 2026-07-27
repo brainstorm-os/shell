@@ -24,20 +24,73 @@ export enum AnalyticsEvent {
  */
 export const AnalyticsProp = {
 	Surface: "surface",
-	Platform: "platform",
-	OsVersion: "os_version",
+	// `bs_` on the five that collide with Amplitude BUILT-IN fields. Amplitude
+	// derives its own platform / os_version / language / region (and owns
+	// app_version), so writing those names shadowed the real ones and made the
+	// stock charts unreadable: Version Composition showed the SANDBOXED APP's
+	// version (0.1.0) for app renderers and `(none)` for shell renderers, so the
+	// actual shell release appeared nowhere. `region` was the most misleading —
+	// Amplitude's is geo-from-IP, which we deliberately disable, while ours is
+	// OS-locale-derived, so charts read like geolocation and were not.
+	//
+	// The other nine names are NOT prefixed on purpose: they collide with
+	// nothing, so renaming them would break historical continuity for zero
+	// correctness gain. Enforced by RESERVED_AMPLITUDE_FIELDS below.
+	Platform: "bs_platform",
+	OsVersion: "bs_os_version",
 	Arch: "arch",
 	Locale: "locale",
-	Language: "language",
-	Region: "region",
+	Language: "bs_language",
+	Region: "bs_region",
 	ShellVersion: "shell_version",
 	AppId: "app_id",
 	AppName: "app_name",
-	AppVersion: "app_version",
+	AppVersion: "bs_app_version",
 	Source: "source",
 	ErrorScope: "error_scope",
 	ErrorCode: "error_code",
 } as const;
+
+/**
+ * Fields Amplitude populates itself. Writing a custom property with one of
+ * these names shadows the built-in in the UI: the stock chart silently reports
+ * OUR value instead of Amplitude's, which is how "Version Composition" ended up
+ * showing per-app versions and `(none)`.
+ *
+ * Pinned by `events.test.ts` — a new `AnalyticsProp` using a reserved name
+ * fails the suite instead of quietly corrupting a dashboard months later.
+ */
+export const RESERVED_AMPLITUDE_FIELDS: readonly string[] = [
+	"app_version",
+	"platform",
+	"os_name",
+	"os_version",
+	"language",
+	"country",
+	"region",
+	"city",
+	"dma",
+	"carrier",
+	"device_id",
+	"device_brand",
+	"device_manufacturer",
+	"device_model",
+	"device_type",
+	"ip",
+	"library",
+	"version_name",
+	"start_version",
+	"user_id",
+	"session_id",
+	"event_id",
+	"insert_id",
+	"event_type",
+	"revenue",
+	"price",
+	"quantity",
+	"location_lat",
+	"location_lng",
+];
 
 /** Where a tracked error originated. */
 export enum AnalyticsErrorScope {
