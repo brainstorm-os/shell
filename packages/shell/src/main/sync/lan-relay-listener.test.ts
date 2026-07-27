@@ -137,9 +137,7 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 					sock.once("error", () => resolve());
 				});
 				sock.write(
-					`GET / HTTP/1.1\r\nHost: 127.0.0.1:${bound.port}\r\nUpgrade: websocket\r\n` +
-						"Connection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
-						"Sec-WebSocket-Version: 13\r\n\r\n",
+					`GET / HTTP/1.1\r\nHost: 127.0.0.1:${bound.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`,
 				);
 				await settle(120);
 			}
