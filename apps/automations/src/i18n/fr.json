@@ -215,5 +215,11 @@
   "builder.issue.noSteps": "Ajoutez au moins une étape.",
   "builder.issue.unbound": "Une entrée n'est pas liée : {detail}",
   "builder.issue.emptyConfig": "Une étape manque de configuration requise : {detail}",
-  "builder.issue.capExceeded": "Ce workflow nécessite une capacité dont l'application Automatisations ne dispose pas : {detail}"
+  "builder.issue.capExceeded": "Ce workflow nécessite une capacité dont l'application Automatisations ne dispose pas : {detail}",
+  "template.triage-new-email.name": "Tri des nouveaux e-mails",
+  "template.triage-new-email.desc": "À l'arrivée d'un e-mail, un rappel pour le classer : ranger, marquer ou relancer.",
+  "template.triage-new-email.trigger": "Lorsqu'un e-mail arrive",
+  "template.email-follow-up-nudge.name": "Rappel de relance d'e-mails",
+  "template.email-follow-up-nudge.desc": "Un rappel quotidien pour relancer les fils d'e-mails toujours sans réponse.",
+  "template.email-follow-up-nudge.trigger": "Chaque jour ouvré à 16h00"
 }
