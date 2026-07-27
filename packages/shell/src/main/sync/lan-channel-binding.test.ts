@@ -476,6 +476,74 @@ describe("LAN-7 — the host triggers backfill when a peer joins a channel", () 
 		for (let i = 0; i < tries; i++) await new Promise((r) => setTimeout(r, 0));
 	}
 
+	it("LAN-8 — carries the joiner's state vector to the peer asked to re-emit", async () => {
+		// Without this the emitter can only send a FULL snapshot. The vector is
+		// what turns backfill from "re-ship the document" into "send the gap"
+		// (measured at the worker seam: 38B vs 4744B for 3 missed edits of 203).
+		// The host must forward it WITHOUT decoding — it is opaque base64 here,
+		// exactly like the routing key, so the relay-blind fence still holds.
+		const host = makeDevice();
+		const first = makeDevice();
+		const second = makeDevice();
+		const dir = new Map(
+			[host, first, second].map((d) => [
+				d.account,
+				{ ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub },
+			]),
+		);
+		const relayHost = new LanRelayHost({
+			hostAccount: host.account,
+			handshake: makeLanHostHandshake({
+				hostAccount: () => host.account,
+				activeDevices: () => dir,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+				verify: testVerify2,
+			}),
+		});
+		const hooks = (d: ReturnType<typeof makeDevice>) =>
+			makeLanClientHandshake({
+				deviceAccount: () => d.account,
+				deviceX25519Secret: () => d.x25519Secret,
+				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, d.edSecret)),
+				activeDevices: () => dir,
+				verify: testVerify2,
+			});
+
+		const seen: { key: string; sv?: string }[] = [];
+		const portA = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: hooks(first),
+			onResync: (key, sv) => seen.push(sv === undefined ? { key } : { key, sv }),
+		});
+		const portB = new WebSocketRelayPort({
+			url: "lan://host",
+			wsImpl: relayHost.webSocketCtor(),
+			requireAdmission: true,
+			lanHandshake: hooks(second),
+		});
+		try {
+			portA.connect();
+			await settle2();
+			portA.subscribe("shared-key");
+			await settle2();
+
+			portB.connect();
+			await settle2();
+			// B advertises where it is: a real subscribe carrying a state vector.
+			portB as unknown as { sendControlForTest?: unknown };
+			portB.subscribe("shared-key", { stateVectors: { "shared-key": "U1Yx" } });
+			await settle2();
+
+			expect(seen).toEqual([{ key: "shared-key", sv: "U1Yx" }]);
+		} finally {
+			portA.close();
+			portB.close();
+			relayHost.close();
+		}
+	});
+
 	it("nudges the EXISTING subscriber, not the joiner", async () => {
 		const host = makeDevice();
 		const first = makeDevice();

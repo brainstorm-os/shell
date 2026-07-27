@@ -362,7 +362,8 @@ export class LanRelayHost {
 		// Routing metadata only — the key is the same opaque token the router
 		// already fans out on, so the host stays blind.
 		if (bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE) {
-			this.#notifyResync(connId, decodeSubscribeKeys(bytes.subarray(1)));
+			const body = bytes.subarray(1);
+			this.#notifyResync(connId, decodeSubscribeKeys(body), decodeSubscribeStateVectors(body));
 		}
 	}
 
@@ -380,11 +381,20 @@ export class LanRelayHost {
 	/** Ask every EXISTING subscriber of each key to re-emit, so the connection
 	 *  that just joined gets caught up. The joiner is excluded — it has nothing
 	 *  to offer yet. */
-	#notifyResync(joinerConnId: string, keys: readonly string[]): void {
+	#notifyResync(
+		joinerConnId: string,
+		keys: readonly string[],
+		stateVectors: Readonly<Record<string, string>> = {},
+	): void {
 		for (const key of keys) {
 			const existing = this.#core.router.subscribersFor(key, joinerConnId);
 			if (existing.length === 0) continue;
-			const wire = encodeControl({ op: "resync", key });
+			// LAN-8 — carry the joiner's state vector so the emitter can send only
+			// what that peer is MISSING instead of the whole document. The value is
+			// an opaque base64 string here: the host does not decode it, so this
+			// stays inside the relay-blind fence exactly like the routing key.
+			const sv = stateVectors[key];
+			const wire = encodeControl(sv ? { op: "resync", key, sinceSv: sv } : { op: "resync", key });
 			for (const connId of existing) {
 				const ws = this.#core.connections.get(connId);
 				if (!ws) continue;
@@ -566,6 +576,26 @@ function decodeSubscribeKeys(body: Uint8Array): string[] {
 		return v.entityIds.filter((k): k is string => typeof k === "string" && k.length > 0);
 	} catch {
 		return [];
+	}
+}
+
+/** Per-key state vectors a `subscribe` may advertise (LAN-8), as opaque base64.
+ *  Absent ⇒ the emitter falls back to a full snapshot, which is what LAN-6/7
+ *  already did — so an old client keeps working. */
+function decodeSubscribeStateVectors(body: Uint8Array): Record<string, string> {
+	try {
+		const v = JSON.parse(new TextDecoder().decode(body)) as {
+			op?: unknown;
+			stateVectors?: unknown;
+		};
+		if (v?.op !== "subscribe" || !v.stateVectors || typeof v.stateVectors !== "object") return {};
+		const out: Record<string, string> = {};
+		for (const [key, sv] of Object.entries(v.stateVectors as Record<string, unknown>)) {
+			if (typeof sv === "string" && sv.length > 0) out[key] = sv;
+		}
+		return out;
+	} catch {
+		return {};
 	}
 }
 

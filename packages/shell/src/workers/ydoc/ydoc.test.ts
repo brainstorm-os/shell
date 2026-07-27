@@ -467,4 +467,96 @@ describe("ydoc worker", () => {
 		expect(reply.ok).toBe(true);
 		expect(reply.msg).toBe(envelope.msg);
 	});
+
+	describe("LAN-8 · state-vector diff backfill", () => {
+		/** Apply `n` sizeable edits through the worker's real apply path. */
+		async function seed(entityId: string, chunks: number, text: string): Promise<void> {
+			const doc = new Y.Doc();
+			await handleYDocEnvelope(mk("load", { vaultPath: vaultDir, entityId }));
+			for (let i = 0; i < chunks; i += 1) {
+				const update = captureUpdate(doc, () => {
+					doc.getText("body").insert(doc.getText("body").length, `${text}${i} `);
+				});
+				await handleYDocEnvelope(
+					mk("applyUpdate", {
+						vaultPath: vaultDir,
+						entityId,
+						updateB64: Buffer.from(update).toString("base64"),
+					}),
+				);
+			}
+		}
+
+		async function snapshotBytes(entityId: string, sinceStateVectorB64?: string): Promise<number> {
+			const reply = await handleYDocEnvelope(
+				mk("snapshot", {
+					vaultPath: vaultDir,
+					entityId,
+					...(sinceStateVectorB64 ? { sinceStateVectorB64 } : {}),
+				}),
+			);
+			if (!reply.ok) throw new Error("snapshot failed");
+			const b64 = (reply.value as { snapshotB64: string }).snapshotB64;
+			return Buffer.from(b64, "base64").byteLength;
+		}
+
+		it("bounds backfill by the GAP, not by the document", async () => {
+			const entityId = "ent_lan8";
+			// A peer syncs, goes offline, and the doc keeps growing.
+			await seed(entityId, 200, "early-content-block-");
+			const svReply = await handleYDocEnvelope(mk("stateVector", { vaultPath: vaultDir, entityId }));
+			if (!svReply.ok) throw new Error("stateVector failed");
+			const peerSv = (svReply.value as { stateVectorB64: string }).stateVectorB64;
+
+			await seed(entityId, 3, "late-");
+
+			const full = await snapshotBytes(entityId);
+			const diff = await snapshotBytes(entityId, peerSv);
+			console.log(
+				`[lan-8] full snapshot ${full}B · state-vector diff ${diff}B ` +
+					`(${((diff / full) * 100).toFixed(1)}% — the peer missed 3 of 203 edits)`,
+			);
+			// The whole point of the rung: a peer that missed a little pays a
+			// little. Full-state backfill is what this replaces.
+			expect(diff).toBeLessThan(full / 10);
+		});
+
+		it("a state vector is tiny — it is clocks, not content", async () => {
+			const entityId = "ent_lan8_sv";
+			await seed(entityId, 200, "content-");
+			const svReply = await handleYDocEnvelope(mk("stateVector", { vaultPath: vaultDir, entityId }));
+			if (!svReply.ok) throw new Error("stateVector failed");
+			const svBytes = Buffer.from(
+				(svReply.value as { stateVectorB64: string }).stateVectorB64,
+				"base64",
+			).byteLength;
+			const full = await snapshotBytes(entityId);
+			console.log(`[lan-8] state vector ${svBytes}B vs full snapshot ${full}B`);
+			// Sending it costs nothing next to what it saves.
+			expect(svBytes).toBeLessThan(full / 50);
+		});
+
+		it("an up-to-date peer gets an (almost) empty diff", async () => {
+			const entityId = "ent_lan8_current";
+			await seed(entityId, 50, "block-");
+			const svReply = await handleYDocEnvelope(mk("stateVector", { vaultPath: vaultDir, entityId }));
+			if (!svReply.ok) throw new Error("stateVector failed");
+			const sv = (svReply.value as { stateVectorB64: string }).stateVectorB64;
+			const diff = await snapshotBytes(entityId, sv);
+			const full = await snapshotBytes(entityId);
+			console.log(`[lan-8] up-to-date peer diff ${diff}B (full would be ${full}B)`);
+			expect(diff).toBeLessThan(64);
+		});
+
+		it("a GARBAGE state vector degrades to the full snapshot, never to nothing", async () => {
+			// Yjs throws on a malformed vector. A peer that cannot be diffed must
+			// still be caught up — silently sending it nothing would be the worst
+			// outcome, since backfill would look like it succeeded.
+			const entityId = "ent_lan8_bad";
+			await seed(entityId, 30, "block-");
+			const full = await snapshotBytes(entityId);
+			const garbage = await snapshotBytes(entityId, "!!!not-base64-or-a-vector!!!");
+			expect(garbage).toBe(full);
+		});
+	});
 });
