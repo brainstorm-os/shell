@@ -331,6 +331,10 @@ body.is-resizing .fd-resize {
 .fd-fill__footer {
 	display: flex;
 	justify-content: flex-end;
+	/* Without this the two actions render edge-to-edge with no seam, so
+	 * "Apply to type" and "Save form" read as one control. `.fd-confirm__actions`
+	 * in this same file already had it; these two were simply missed. */
+	gap: var(--space-2);
 	padding-top: var(--space-2);
 }
 
