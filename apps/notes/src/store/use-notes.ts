@@ -161,8 +161,17 @@ export function useNotes(): UseNotes {
 						const sub = onChange(onInvalidate);
 						return () => sub.unsubscribe();
 					},
-					reconcile: (prev, next) =>
-						pinLocalNotes(prev, next, pendingRef.current.keys(), selectedIdRef.current),
+					// Pin against LIVE component state (`notesMapRef`), not the store's
+					// own `prev` snapshot. Optimistic edits — every keystroke's
+					// `update()` — call `setNotes` directly and never pass through the
+					// store, so the store's snapshot lags React by however long the
+					// user has been typing. Reconciling against it pins a STALE copy of
+					// the open note over the in-flight one, so a vault broadcast
+					// mid-edit reverts what you just typed and thrashes the sidebar.
+					// The pre-store code read React state via `setNotes(prev => …)`;
+					// this keeps that semantic.
+					reconcile: (_storeSnapshot, next) =>
+						pinLocalNotes(notesMapRef.current, next, pendingRef.current.keys(), selectedIdRef.current),
 					// The body migration + sibling writes fire a stream of `onChange`
 					// broadcasts; without this guard every one swaps in a new Map → the
 					// virtualised list re-renders and the scroll/order "jumps", even
