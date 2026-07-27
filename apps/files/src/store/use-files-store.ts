@@ -18,7 +18,11 @@
  * replaces only the read source behind this hook.
  */
 
-import { useOptionalYDocResolver } from "@brainstorm-os/react-yjs";
+import {
+	type QueryStore,
+	createQueryStore,
+	useOptionalYDocResolver,
+} from "@brainstorm-os/react-yjs";
 import { announce } from "@brainstorm-os/sdk/a11y";
 import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -73,6 +77,15 @@ import {
 	readName,
 } from "../types/entity";
 import type { VaultEntityShape, VaultLinkShape } from "../types/runtime";
+
+/** What `vaultEntities.list()` resolves to, as this store consumes it. */
+type VaultSnapshotShape = {
+	entities?: readonly VaultEntityShape[];
+	links?: readonly VaultLinkShape[];
+};
+
+/** Stable pre-load value, so the store's snapshot identity is steady. */
+const EMPTY_VAULT_SNAPSHOT: VaultSnapshotShape = { entities: [], links: [] };
 import { DEFAULT_TILE_SIZE, type TileSize, ViewMode } from "../view-mode";
 
 export enum InspectorTab {
@@ -323,9 +336,10 @@ export function useFilesStore() {
 	// reads — so files would land at the vault root permanently. The reload is
 	// suppressed during the batch and reconciled once after.
 	const uploadInFlightRef = useRef(false);
-	// `loadFromVault` is declared further down; upload helpers above it call it
-	// through this ref to avoid the temporal-dead-zone in their dep arrays.
-	const loadFromVaultRef = useRef<() => void>(() => {});
+	// The vault query store is created in the effect below; upload helpers above
+	// it force an immediate reload through this handle. `refresh` bypasses the
+	// debounce, matching the old direct call.
+	const vaultStoreRef = useRef<QueryStore<VaultSnapshotShape> | null>(null);
 	const selectionRef = useRef(selection);
 	selectionRef.current = selection;
 	const renameRef = useRef(rename);
@@ -653,10 +667,10 @@ export function useFilesStore() {
 		(parentId: string, createdIds: string[]) => {
 			uploadInFlightRef.current = false;
 			if (createdIds.length === 0) {
-				loadFromVaultRef.current();
+				void vaultStoreRef.current?.refresh();
 				return;
 			}
-			void persistFolderMembers(tree, parentId).finally(() => loadFromVaultRef.current());
+			void persistFolderMembers(tree, parentId).finally(() => vaultStoreRef.current?.refresh());
 			setSelection(
 				selectionReducer(EMPTY_SELECTION, {
 					kind: "set",
@@ -1112,93 +1126,116 @@ export function useFilesStore() {
 			// reads the just-grown set (setState hasn't flushed to the mirror yet).
 			browsableTypesRef.current = nextSet;
 			setBrowsableTypes(nextSet);
-			loadFromVaultRef.current();
+			void vaultStoreRef.current?.refresh();
 		})();
 	}, []);
 
-	const loadFromVault = useCallback(() => {
+	/**
+	 * Adopt a vault snapshot: resolve openers, short-circuit on the fingerprint,
+	 * rebuild the tree, and do the one-shot boot work.
+	 *
+	 * Fetching, coalescing, load-race ordering and teardown are NOT here — the
+	 * shared `createQueryStore` owns those (see the effect below). This is only
+	 * the "apply" half, which is the part that is genuinely Files-specific.
+	 */
+	const applyVaultSnapshot = useCallback(
+		(snapshot: VaultSnapshotShape) => {
+			// Don't rebuild the tree from a mid-upload snapshot — it lags the
+			// optimistic in-memory membership. `finishUpload` reconciles once the
+			// batch + the parent members write complete.
+			if (uploadInFlightRef.current) return;
+			const runtime = window.brainstorm;
+			const entities = snapshot.entities ?? [];
+			// Resolve any new types first (before the early-return) so a freshly
+			// appeared openable type gets a follow-up rebuild even when the
+			// browsable slice is otherwise unchanged this pass.
+			resolveOpeners(entities);
+			const browsable = browsableTypesRef.current;
+			const isInitial = !loadedOnceRef.current;
+			const fingerprint = fingerprintFilesSnapshot(entities, snapshot.links ?? [], browsable);
+			if (!isInitial && fingerprint === lastFingerprintRef.current) return;
+			lastFingerprintRef.current = fingerprint;
+			setVaultLinks(snapshot.links ?? []);
+			setVaultIndex(buildVaultEntityIndex(entities));
+			// Derive the per-vault discriminator for the view-options blob
+			// from the root Folder's per-vault `createdAt` (stamped once at
+			// `ensureRootFolder`). Stable for the life of the vault, distinct
+			// across vaults, and never leaves the renderer.
+			const derived = deriveVaultKey(entities);
+			if (derived) setVaultKey((cur) => (cur === derived ? cur : derived));
+			// Member ids that are live but hidden by the browsability filter
+			// (Messages/Comments, app-internal rows filed into a Folder) —
+			// carried on the tree so `persistFolderMembers` writes them back
+			// instead of erasing them (hide ≠ delete).
+			const retainedHidden: RetainedMembersMap = new Map();
+			const tree_ = buildVaultFileTree(
+				entities,
+				ROOT_FOLDER_ID,
+				Date.now(),
+				browsable,
+				retainedHidden,
+			);
+			if (isInitial) {
+				// One-shot boot diagnostic — confirms vault loaded + tree built
+				// when Files appears empty. `console.warn` (not info) so it
+				// lands in the runtime error log. Removed in a follow-up once
+				// the empty-vault report is root-caused.
+				const rootRow = tree_.find((e) => e.id === ROOT_FOLDER_ID);
+				const rootMembers = Array.isArray(rootRow?.properties.members)
+					? (rootRow.properties.members as readonly unknown[]).length
+					: 0;
+				const folderTypes = new Set<string>();
+				for (const e of entities) folderTypes.add(e.type);
+				console.warn(
+					`[files] boot: snapshot=${entities.length} entities, ` +
+						`tree=${tree_.length} nodes, root.members=${rootMembers}, ` +
+						`types=[${[...folderTypes].slice(0, 8).join(", ")}${folderTypes.size > 8 ? ", …" : ""}]`,
+				);
+			}
+			tree.applySnapshot(tree_);
+			tree.setRetainedHiddenMembers(retainedHidden);
+			if (isInitial) {
+				loadedOnceRef.current = true;
+				navHist.reset(ROOT_FOLDER_ID);
+				setExpandedFolders(new Set([ROOT_FOLDER_ID]));
+				setSelection(EMPTY_SELECTION);
+				const launch = runtime?.launch;
+				if (launch?.reason === "open-entity" && launch.entityId) {
+					revealEntityById(launch.entityId);
+				}
+			}
+		},
+		[tree, revealEntityById, navHist, resolveOpeners],
+	);
+
+	useEffect(() => {
 		const runtime = window.brainstorm;
 		const svc = runtime?.services?.vaultEntities;
 		const list = svc?.list;
-		if (!list) return;
-		// Don't rebuild the tree from a mid-upload snapshot — it lags the
-		// optimistic in-memory membership. `finishUpload` reconciles once the
-		// batch + the parent members write complete.
-		if (uploadInFlightRef.current) return;
-		void (async () => {
-			try {
-				const snapshot = await list.call(svc);
-				const entities = snapshot.entities ?? [];
-				// Resolve any new types first (before the early-return) so a freshly
-				// appeared openable type gets a follow-up rebuild even when the
-				// browsable slice is otherwise unchanged this pass.
-				resolveOpeners(entities);
-				const browsable = browsableTypesRef.current;
-				const isInitial = !loadedOnceRef.current;
-				const fingerprint = fingerprintFilesSnapshot(entities, snapshot.links ?? [], browsable);
-				if (!isInitial && fingerprint === lastFingerprintRef.current) return;
-				lastFingerprintRef.current = fingerprint;
-				setVaultLinks(snapshot.links ?? []);
-				setVaultIndex(buildVaultEntityIndex(entities));
-				// Derive the per-vault discriminator for the view-options blob
-				// from the root Folder's per-vault `createdAt` (stamped once at
-				// `ensureRootFolder`). Stable for the life of the vault, distinct
-				// across vaults, and never leaves the renderer.
-				const derived = deriveVaultKey(entities);
-				if (derived) setVaultKey((cur) => (cur === derived ? cur : derived));
-				// Member ids that are live but hidden by the browsability filter
-				// (Messages/Comments, app-internal rows filed into a Folder) —
-				// carried on the tree so `persistFolderMembers` writes them back
-				// instead of erasing them (hide ≠ delete).
-				const retainedHidden: RetainedMembersMap = new Map();
-				const tree_ = buildVaultFileTree(
-					entities,
-					ROOT_FOLDER_ID,
-					Date.now(),
-					browsable,
-					retainedHidden,
-				);
-				if (isInitial) {
-					// One-shot boot diagnostic — confirms vault loaded + tree built
-					// when Files appears empty. `console.warn` (not info) so it
-					// lands in the runtime error log. Removed in a follow-up once
-					// the empty-vault report is root-caused.
-					const rootRow = tree_.find((e) => e.id === ROOT_FOLDER_ID);
-					const rootMembers = Array.isArray(rootRow?.properties.members)
-						? (rootRow.properties.members as readonly unknown[]).length
-						: 0;
-					const folderTypes = new Set<string>();
-					for (const e of entities) folderTypes.add(e.type);
-					console.warn(
-						`[files] boot: snapshot=${entities.length} entities, ` +
-							`tree=${tree_.length} nodes, root.members=${rootMembers}, ` +
-							`types=[${[...folderTypes].slice(0, 8).join(", ")}${folderTypes.size > 8 ? ", …" : ""}]`,
-					);
-				}
-				tree.applySnapshot(tree_);
-				tree.setRetainedHiddenMembers(retainedHidden);
-				if (isInitial) {
-					loadedOnceRef.current = true;
-					navHist.reset(ROOT_FOLDER_ID);
-					setExpandedFolders(new Set([ROOT_FOLDER_ID]));
-					setSelection(EMPTY_SELECTION);
-					const launch = runtime?.launch;
-					if (launch?.reason === "open-entity" && launch.entityId) {
-						revealEntityById(launch.entityId);
-					}
-				}
-			} catch (error) {
-				console.warn("[files] vaultEntities.list failed; keeping current view", error);
-			}
-		})();
-	}, [tree, revealEntityById, navHist, resolveOpeners]);
-	loadFromVaultRef.current = loadFromVault;
-
-	useEffect(() => {
-		loadFromVault();
-		const runtime = window.brainstorm;
-		const svc = runtime?.services?.vaultEntities;
-		const sub = svc?.onChange?.call(svc, () => loadFromVault());
+		// The shared reactivity core owns fetching, coalescing, load-race ordering
+		// and teardown; `applyVaultSnapshot` owns what to do with the result. Files
+		// previously hand-rolled this with NO debounce and NO race guard, so a
+		// burst of writes fired a full `list()` each, and a slow one could land
+		// after a newer snapshot.
+		//
+		// `equals` stays at the default: `applyVaultSnapshot` runs its own
+		// fingerprint short-circuit, which must sit *after* `resolveOpeners` so a
+		// newly-openable type still triggers a rebuild. Moving that comparison into
+		// `equals` would run it before the side effect and lose that.
+		const store = list
+			? createQueryStore<VaultSnapshotShape>({
+					initial: EMPTY_VAULT_SNAPSHOT,
+					load: () => list.call(svc) as Promise<VaultSnapshotShape>,
+					subscribe: (onInvalidate) => {
+						const sub = svc?.onChange?.call(svc, onInvalidate);
+						return () => sub?.unsubscribe();
+					},
+					onError: (error) =>
+						console.warn("[files] vaultEntities.list failed; keeping current view", error),
+				})
+			: null;
+		vaultStoreRef.current = store;
+		const unsubscribeStore = store?.subscribe(() => applyVaultSnapshot(store.getSnapshot()));
 		const intentSub = runtime?.on?.("intent", (event) => {
 			if (event.type !== "intent") return;
 			const verb = event.intent?.verb;
@@ -1219,10 +1256,12 @@ export function useFilesStore() {
 			}
 		});
 		return () => {
-			sub?.unsubscribe();
+			unsubscribeStore?.();
+			store?.dispose();
+			vaultStoreRef.current = null;
 			intentSub?.unsubscribe();
 		};
-	}, [loadFromVault, revealEntityById, tree]);
+	}, [applyVaultSnapshot, revealEntityById, tree]);
 
 	return {
 		tree,
