@@ -233,14 +233,47 @@ export function isAnalyticsEnabled(): boolean {
 }
 
 /** Initialize Amplitude analytics + session replay once for this renderer. */
+/**
+ * Why analytics is off, when it is off. Returned so the reason can be LOGGED —
+ * silence was the actual problem: a dev build sends nothing (the install id is
+ * empty unless `app.isPackaged`), and with no output at all "disabled by design"
+ * and "broken" look identical. The owner reported exactly that: analytics
+ * appeared not to work and it was "not clear how to fix this".
+ */
+export enum AnalyticsDisabledReason {
+	/** 1.0+ build — the beta-only window has closed. */
+	NotPublicBeta = "not-public-beta",
+	/** No install id. In practice: an unpackaged dev/CI run. */
+	NoInstallId = "no-install-id",
+}
+
+export function analyticsDisabledReason(
+	bridge: AnalyticsBridge | null = readBridge(),
+): AnalyticsDisabledReason | null {
+	if (!isPublicBeta(bridge?.version ?? "0.0.0")) return AnalyticsDisabledReason.NotPublicBeta;
+	if (resolveAnalyticsDeviceId(bridge).length === 0) return AnalyticsDisabledReason.NoInstallId;
+	return null;
+}
+
 export function initAnalytics(): void {
 	if (initialized || typeof window === "undefined") return;
 	initialized = true;
 	const bridge = readBridge();
-	const version = bridge?.version ?? "0.0.0";
 	// Two gates: pre-1.0 public beta AND a packaged-shell install id.
-	analyticsEnabled = isPublicBeta(version) && resolveAnalyticsDeviceId(bridge).length > 0;
-	if (!analyticsEnabled) return;
+	const reason = analyticsDisabledReason(bridge);
+	analyticsEnabled = reason === null;
+	if (!analyticsEnabled) {
+		// Say so, once, at info level. Not a warning — being off in dev is
+		// correct behaviour, not a fault; the point is that it is now VISIBLE
+		// and names which gate closed.
+		console.info(
+			`[brainstorm] analytics disabled (${reason}).`,
+			reason === AnalyticsDisabledReason.NoInstallId
+				? "Expected in a dev build — the install id is only exposed when app.isPackaged. Package the app to exercise the real pipeline."
+				: "Build version is 1.0 or later, past the beta-only analytics window.",
+		);
+		return;
+	}
 	void ensureInitialized();
 }
 

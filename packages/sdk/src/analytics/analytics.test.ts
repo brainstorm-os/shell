@@ -210,3 +210,40 @@ describe("sanitizeEventProperties", () => {
 		).toEqual({ source: "launcher", count: 2 });
 	});
 });
+
+describe("analyticsDisabledReason", () => {
+	// `initialized` is module-level state, so without this the second test's
+	// initAnalytics() returns early and the log assertion fails for the wrong
+	// reason (it did, on the first run).
+	beforeEach(() => {
+		vi.resetModules();
+	});
+
+	it("names the gate that closed, so silence is never ambiguous", async () => {
+		const { analyticsDisabledReason, AnalyticsDisabledReason } = await import("./index");
+		// Dev build: version is fine, install id is empty (app.isPackaged false).
+		expect(analyticsDisabledReason({ version: "0.10.1", analyticsDeviceId: "" })).toBe(
+			AnalyticsDisabledReason.NoInstallId,
+		);
+		// Post-1.0: the beta-only window has closed.
+		expect(analyticsDisabledReason({ version: "1.0.0", analyticsDeviceId: "01ID" })).toBe(
+			AnalyticsDisabledReason.NotPublicBeta,
+		);
+		// Healthy packaged beta build.
+		expect(analyticsDisabledReason({ version: "0.10.1", analyticsDeviceId: "01ID" })).toBeNull();
+	});
+
+	it("LOGS the reason when it declines to initialize", async () => {
+		const info = vi.fn();
+		vi.stubGlobal("console", { ...console, info });
+		globalThis.window = {
+			brainstorm: { version: "0.10.1", analyticsDeviceId: "" },
+			localStorage: { getItem: () => null, setItem: () => {} },
+		} as unknown as Window & typeof globalThis;
+		const { initAnalytics } = await import("./index");
+		initAnalytics();
+		expect(info).toHaveBeenCalled();
+		expect(String(info.mock.calls[0]?.[0])).toContain("analytics disabled");
+		expect(String(info.mock.calls[0]?.[1])).toContain("dev build");
+	});
+});
