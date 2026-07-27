@@ -933,3 +933,117 @@ describe("AIAgent interpreter (11b.7 — shared loop, fail-closed tools)", () =>
 		expect(result.error).toContain("provider down");
 	});
 });
+
+// ─── Entity step: self-governing types ───────────────────────────────
+
+describe("Entity step — workflow self-modification", () => {
+	// A Workflow's own consent sheet (`capabilities`) and its program (`steps`,
+	// `enabled`) are ORDINARY PROPERTIES of a `brainstorm/Workflow/v1` entity —
+	// `propertiesToWorkflow` reads them straight back off the row at load. And an
+	// Entity/Update step's only static requirement is
+	// `entities.write:<entityType>` (`stepCapabilities`), which the automations
+	// app grants for Workflow/v1 so the builder can save.
+	//
+	// So a consent that reads as a narrow data permission ("this workflow may
+	// edit my workflows") is in fact a grant of everything in the app ceiling:
+	// the workflow rewrites its own `capabilities` and the next run loads them.
+	// The pre-run ceiling check (`automations-host`) validates the DECLARED steps
+	// before the run; it cannot see a sheet rewritten during it.
+	const WORKFLOW_TYPE = "brainstorm/Workflow/v1";
+
+	function workflowEntity(id: string, capabilities: string[]): EntityRecord {
+		return { id, type: WORKFLOW_TYPE, properties: { name: "victim", capabilities, enabled: true } };
+	}
+
+	it("REJECTS rewriting a workflow's capability sheet", async () => {
+		const stored = workflowEntity("wf-victim", ["notifications.post"]);
+		const entities: EntitiesPort = {
+			...fakeEntities(),
+			get: vi.fn(async () => stored),
+			update: vi.fn(async (id, patch) => ({ id, type: WORKFLOW_TYPE, properties: patch })),
+		};
+		const step: EntityStep = {
+			id: "escalate",
+			kind: StepKind.Entity,
+			op: EntityOp.Update,
+			entityType: WORKFLOW_TYPE,
+			// `split` is the grammar's array constructor, so a list value is
+			// expressible without any object-literal syntax.
+			properties: { capabilities: 'split("files.write,entities.read:*", ",")' },
+		};
+		const run = await runWith(ports({ entities }), [step], { id: "wf-victim" });
+
+		expect(run.status).toBe(WorkflowRunStatus.Failed);
+		expect(entities.update).not.toHaveBeenCalled();
+	});
+
+	it("REJECTS rewriting a workflow's program or enabled flag", async () => {
+		const stored = workflowEntity("wf-victim", ["notifications.post"]);
+		const entities: EntitiesPort = { ...fakeEntities(), get: vi.fn(async () => stored) };
+		for (const field of ["steps", "enabled"]) {
+			const step: EntityStep = {
+				id: `write-${field}`,
+				kind: StepKind.Entity,
+				op: EntityOp.Update,
+				entityType: WORKFLOW_TYPE,
+				properties: { [field]: "input.value" },
+			};
+			const run = await runWith(ports({ entities }), [step], { id: "wf-victim", value: true });
+			expect(run.status, `${field} must be refused`).toBe(WorkflowRunStatus.Failed);
+		}
+		expect(entities.update).not.toHaveBeenCalled();
+	});
+
+	it("REJECTS the same rewrite via the operand path, not just declared fields", async () => {
+		// Declaring no `properties` falls through to `operandProperties`, which
+		// hands the prior step's object to the write verbatim — the identical
+		// escalation with the field names never appearing in the step config.
+		const stored = workflowEntity("wf-victim", ["notifications.post"]);
+		const entities: EntitiesPort = { ...fakeEntities(), get: vi.fn(async () => stored) };
+		const step: EntityStep = {
+			id: "escalate-via-operand",
+			kind: StepKind.Entity,
+			op: EntityOp.Update,
+			entityType: WORKFLOW_TYPE,
+		};
+		const run = await runWith(ports({ entities }), [step], {
+			id: "wf-victim",
+			properties: { capabilities: ["files.write"] },
+		});
+		expect(run.status).toBe(WorkflowRunStatus.Failed);
+		expect(entities.update).not.toHaveBeenCalled();
+	});
+
+	it("still allows a workflow to write NON-governing fields of a Workflow entity", async () => {
+		// The builder's legitimate uses (rename, retag, describe) must survive;
+		// only the fields that decide what a workflow may DO are reserved.
+		const stored = workflowEntity("wf-victim", ["notifications.post"]);
+		const entities: EntitiesPort = { ...fakeEntities(), get: vi.fn(async () => stored) };
+		const step: EntityStep = {
+			id: "rename",
+			kind: StepKind.Entity,
+			op: EntityOp.Update,
+			entityType: WORKFLOW_TYPE,
+			properties: { name: '"renamed by automation"' },
+		};
+		const run = await runWith(ports({ entities }), [step], { id: "wf-victim" });
+		expect(run.status).toBe(WorkflowRunStatus.Succeeded);
+		expect(entities.update).toHaveBeenCalledWith("wf-victim", { name: "renamed by automation" });
+	});
+
+	it("leaves ordinary entity types completely alone", async () => {
+		// `capabilities` is only meaningful on a self-governing type; a Note with
+		// a field of that name is just a note.
+		const note: EntityRecord = { id: "n1", type: "Note/v1", properties: {} };
+		const entities: EntitiesPort = { ...fakeEntities(), get: vi.fn(async () => note) };
+		const step: EntityStep = {
+			id: "ok",
+			kind: StepKind.Entity,
+			op: EntityOp.Update,
+			entityType: "Note/v1",
+			properties: { capabilities: '"just a note field"' },
+		};
+		const run = await runWith(ports({ entities }), [step], { id: "n1" });
+		expect(run.status).toBe(WorkflowRunStatus.Succeeded);
+	});
+});

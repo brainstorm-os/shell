@@ -300,6 +300,40 @@ function operandProperties(input: unknown): Record<string, unknown> {
 }
 
 /**
+ * Properties that decide what an automation may DO, per self-governing type.
+ *
+ * A Workflow's consent sheet and program are ordinary properties of a
+ * `brainstorm/Workflow/v1` row — `propertiesToWorkflow` reads them straight back
+ * at load — and an Entity step's only static requirement is
+ * `entities.write:<entityType>`, which the automations app grants so the builder
+ * can save. Without this list, a consent that reads as a narrow data permission
+ * ("this workflow may edit my workflows") is really a grant of everything in the
+ * app ceiling: the workflow rewrites its own `capabilities` and the next run
+ * loads them. The pre-run ceiling check validates the DECLARED steps before the
+ * run and cannot see a sheet rewritten during it.
+ *
+ * Editing these is a user act, through the builder — not something a workflow
+ * does to itself. Non-governing fields (name, description, icon, tags) stay
+ * writable, so "rename my workflows" still works.
+ */
+const GOVERNING_PROPERTIES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+	["brainstorm/Workflow/v1", new Set(["capabilities", "steps", "enabled", "triggerId"])],
+]);
+
+/** The governing field this write would touch, if any. */
+function governingViolation(
+	entityType: string,
+	properties: Record<string, unknown>,
+): string | null {
+	const reserved = GOVERNING_PROPERTIES.get(entityType);
+	if (!reserved) return null;
+	for (const key of Object.keys(properties)) {
+		if (reserved.has(key)) return key;
+	}
+	return null;
+}
+
+/**
  * Resolve an Entity step's declared field expressions (F-458).
  *
  * Each value is an expression in the `Code` step's grammar, evaluated
@@ -355,13 +389,10 @@ const entityInterpreter =
 			case EntityOp.Create: {
 				const fields = resolveStepProperties(s.properties, expressionScope(ctx));
 				if (!fields.ok) return failField("create", fields.field, fields.reason);
-				return {
-					ok: true,
-					output: await ports.entities.create(
-						s.entityType,
-						fields.declared ? fields.values : operandProperties(ctx.input),
-					),
-				};
+				const properties = fields.declared ? fields.values : operandProperties(ctx.input);
+				const governing = governingViolation(s.entityType, properties);
+				if (governing) return refuseGoverning("create", s.entityType, governing);
+				return { ok: true, output: await ports.entities.create(s.entityType, properties) };
 			}
 			case EntityOp.Update: {
 				const id = operandId(ctx.input);
@@ -372,6 +403,11 @@ const entityInterpreter =
 				const fields = resolveStepProperties(s.properties, expressionScope(ctx));
 				if (!fields.ok) return failField("update", fields.field, fields.reason);
 				const patch = fields.declared ? fields.values : operandProperties(ctx.input);
+				// Checked against the STORED type, not the step's declaration: the
+				// two are already proven equal above, and the stored row is the one
+				// whose governing fields actually take effect.
+				const governing = governingViolation(existing.type, patch);
+				if (governing) return refuseGoverning("update", existing.type, governing);
 				return { ok: true, output: await ports.entities.update(id, patch) };
 			}
 			case EntityOp.Get: {
@@ -427,6 +463,14 @@ function failField(op: string, field: string, reason: string): StepOutcome {
  *  Refusing a type mismatch (and an unverifiable missing target for the
  *  mutating ops) keeps a step inside its declared `entityType`. Non-retriable
  *  — re-running won't change the target's type. */
+function refuseGoverning(op: string, entityType: string, field: string): StepOutcome {
+	return {
+		ok: false,
+		error: `entity-${op} refused: "${field}" governs what ${entityType} may do, so it is not writable by an automation — change it in the builder`,
+		retriable: false,
+	};
+}
+
 function outOfScope(op: string, actual: string, declared: string): StepOutcome {
 	return { ok: false, error: `entity-${op}-out-of-scope:${actual}!=${declared}`, retriable: false };
 }
