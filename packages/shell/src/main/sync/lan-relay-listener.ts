@@ -26,7 +26,7 @@
  * surface, and firewall prompts train users to click allow.
  */
 
-import { type Server, createServer } from "node:http";
+import { type IncomingMessage, type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { networkInterfaces } from "node:os";
 import { WebSocketServer } from "ws";
@@ -108,6 +108,12 @@ export const DEFAULT_LAN_HEADERS_TIMEOUT_MS = 5_000;
 export const DEFAULT_LAN_REQUEST_TIMEOUT_MS = 10_000;
 /** Ceiling on raw TCP sockets, upgraded or not. */
 export const DEFAULT_LAN_MAX_SOCKETS = 64;
+/** Slots kept free for sources not already connected, so a flooder that fills
+ *  the rest cannot deny the feature to a fresh legitimate device (L4). */
+export const RESERVED_FOR_FRESH_SOURCES = 8;
+/** Unread outbound bytes tolerated per connection before it is dropped (L5).
+ *  A few MiB absorbs a normal burst; beyond it the peer is not reading. */
+export const DEFAULT_LAN_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
 export type LanRelayListenerOptions = {
 	host: LanRelayHost;
@@ -126,6 +132,8 @@ export type LanRelayListenerOptions = {
 	/** Ceiling on TCP sockets regardless of upgrade state — the pre-upgrade
 	 *  phase must not be able to outflank the host's post-upgrade cap. */
 	maxSockets?: number;
+	/** Drop a connection whose unread outbound queue exceeds this (L5). */
+	maxBufferedBytes?: number;
 	/** Post-listen server errors (the socket is up, something went wrong). The
 	 *  wiring routes these to the shell's error log; unset ⇒ swallowed, never
 	 *  re-thrown, because an unhandled emitter error takes down the main
@@ -144,9 +152,15 @@ export class LanRelayListener {
 	#http: Server | null = null;
 	#wss: WebSocketServer | null = null;
 	#bound: LanListenerAddress | null = null;
+	/** In-flight `start()`, so concurrent callers share one bind (L6). */
+	#starting: Promise<LanListenerAddress> | null = null;
 	readonly #onError: ((err: Error) => void) | null;
 	/** source address → recent connection timestamps (rate limiting). */
 	readonly #recent = new Map<string, number[]>();
+	/** Live sockets per source, incremented on accept and decremented on close.
+	 *  Distinct from `#recent` (a RATE window): this is concurrency, which is
+	 *  what actually starves the accept queue. */
+	readonly #liveBySource = new Map<string, number>();
 
 	constructor(opts: LanRelayListenerOptions) {
 		if (!isBindableAddress(opts.address ?? "")) {
@@ -172,6 +186,7 @@ export class LanRelayListener {
 			headersTimeoutMs: opts.headersTimeoutMs ?? DEFAULT_LAN_HEADERS_TIMEOUT_MS,
 			requestTimeoutMs: opts.requestTimeoutMs ?? DEFAULT_LAN_REQUEST_TIMEOUT_MS,
 			maxSockets: opts.maxSockets ?? DEFAULT_LAN_MAX_SOCKETS,
+			maxBufferedBytes: opts.maxBufferedBytes ?? DEFAULT_LAN_MAX_BUFFERED_BYTES,
 			now: opts.now ?? Date.now,
 		};
 	}
@@ -185,6 +200,23 @@ export class LanRelayListener {
 	 *  already bound rather than opening a second port. */
 	async start(): Promise<LanListenerAddress> {
 		if (this.#bound) return this.#bound;
+		// L6/L9 — memoize the IN-FLIGHT start. The old guard checked `#bound`,
+		// which is only assigned AFTER the await, so two un-awaited calls in one
+		// tick opened TWO ports; the second won `#bound` and the first was
+		// ORPHANED — still listening, still adopting real peers onto the host,
+		// with no reference left to close it. `stop()` then reported success
+		// while a port stayed open, which is exactly the "not listening at idle"
+		// property (T8) the header claims. The wiring is event-driven ("a shared
+		// entity is open"), which is precisely the shape that produces two calls
+		// in one tick.
+		if (this.#starting) return this.#starting;
+		this.#starting = this.#startOnce().finally(() => {
+			this.#starting = null;
+		});
+		return this.#starting;
+	}
+
+	async #startOnce(): Promise<LanListenerAddress> {
 		// A plain HTTP request must get a definite answer and be closed. Found by
 		// probing this listener: with no request handler the connection HUNG
 		// FOREVER — no response, no timeout — and the rate limiter never saw it,
@@ -193,8 +225,12 @@ export class LanRelayListener {
 		// membership and no crypto: pre-auth exhaustion (T1/T7) through the one
 		// door the admission machinery doesn't cover.
 		const http = createServer((_req, res) => {
-			res.writeHead(426, { "content-type": "text/plain" }); // Upgrade Required
-			res.end("brainstorm-lan: websocket only\n");
+			// L10 — EMPTY body. It used to answer "brainstorm-lan: websocket only",
+			// which told any LAN port scan that this machine runs Brainstorm with
+			// LAN sync live. A bare 426 + Connection: close still closes the
+			// pre-upgrade hole (the reason this handler exists) and leaks nothing.
+			res.writeHead(426, { connection: "close" }); // Upgrade Required
+			res.end();
 		});
 		// Reap sockets that connect and then stall without completing a request
 		// (the raw-TCP variant of the same attack — it never reaches the handler
@@ -225,6 +261,17 @@ export class LanRelayListener {
 		const upgraded = new WeakSet<object>();
 		http.on("upgrade", (_req, socket) => upgraded.add(socket));
 		http.on("connection", (socket) => {
+			// L4 bookkeeping at the ACCEPT layer — before any upgrade, which is
+			// where the starvation happened.
+			const src = normalizeSourceAddress(socket.remoteAddress ?? "");
+			if (src) {
+				this.#liveBySource.set(src, (this.#liveBySource.get(src) ?? 0) + 1);
+				socket.once("close", () => {
+					const n = (this.#liveBySource.get(src) ?? 1) - 1;
+					if (n <= 0) this.#liveBySource.delete(src);
+					else this.#liveBySource.set(src, n);
+				});
+			}
 			// An EXPLICIT timer, not `socket.setTimeout` and not
 			// `headersTimeout`: probing showed 0 of 10 stalled sockets reaped by
 			// either. A security control cannot rest on timer semantics that vary
@@ -244,6 +291,15 @@ export class LanRelayListener {
 		const wss = new WebSocketServer({
 			server: http,
 			maxPayload: this.#opts.maxPayloadBytes,
+			// L7 + L8 — decide BEFORE the handshake. `connection` fires only after
+			// `ws` has already parsed the request and sent `101`, so refusing there
+			// cost a full handshake plus a `ws` object per attempt, at whatever
+			// rate the attacker liked (measured: 50/50 refused sockets still open
+			// at t+15s, gone only at t+31s on the close timeout).
+			verifyClient: (info: { req: IncomingMessage }) =>
+				shouldAcceptUpgrade(info.req.headers.origin, (source) => this.#admitSource(source), {
+					remoteAddress: info.req.socket.remoteAddress,
+				}),
 			// No compression: permessage-deflate on attacker-influenced data is a
 			// memory-amplification surface, and our frames are already sealed
 			// (ciphertext does not compress).
@@ -262,8 +318,15 @@ export class LanRelayListener {
 				// A socket-level error on a peer we may not even have adopted is
 				// not actionable; adopted sockets get their real handler in #adopt.
 			});
-			const source = request.socket.remoteAddress ?? "";
-			if (!this.#allowSource(source)) {
+			// NOTE: the admission decision already ran in `verifyClient`, BEFORE
+			// the 101 (L7). Re-running it here double-charged the rate budget —
+			// every accepted socket consumed two slots, so a cap of 2 admitted
+			// exactly one peer. Kept as a cheap belt-and-braces guard ONLY for the
+			// case where a runtime ignores verifyClient; it must not consume
+			// budget, so it reads the live counter rather than calling
+			// `#allowSource` again.
+			const source = normalizeSourceAddress(request.socket.remoteAddress ?? "");
+			if (!source) {
 				// terminate(), not close(): a graceful close lets a peer that
 				// ignores the close frame keep the socket AND the `ws` object alive
 				// for the 30s close timeout (measured: 50/50 refused sockets still
@@ -321,12 +384,17 @@ export class LanRelayListener {
 
 	/** Stop listening and drop every live connection. Idempotent. */
 	async stop(): Promise<void> {
+		// L6 — a start racing this would otherwise assign `#bound` (and leave a
+		// live server) *after* we finished tearing down. Await it, then tear down
+		// what it produced.
+		if (this.#starting) {
+			await this.#starting.catch(() => undefined);
+		}
 		const wss = this.#wss;
 		const http = this.#http;
-		this.#wss = null;
-		this.#http = null;
 		this.#bound = null;
 		this.#recent.clear();
+		this.#liveBySource.clear();
 		if (wss) {
 			for (const client of wss.clients) {
 				try {
@@ -345,11 +413,46 @@ export class LanRelayListener {
 			(http as { closeAllConnections?: () => void }).closeAllConnections?.();
 			await closeBounded((done) => http.close(done));
 		}
+		// Cleared only NOW, after the closes settled. Nulling them up front (the
+		// old order) meant a bounded-close timeout left a still-open server with
+		// no reference to it — unreachable forever, and silent.
+		this.#wss = null;
+		this.#http = null;
 	}
 
 	/** G9 (per-source half) — bound how fast one address may reconnect. The
 	 *  in-process host caps TOTAL connections; without this a single hostile
 	 *  peer can churn through that budget and lock legitimate devices out. */
+	/**
+	 * L4 — accept-layer admission for ONE source, counting both the rate window
+	 * and the live un-upgraded sockets that source is holding.
+	 *
+	 * `http.maxConnections` is global and cannot tell peers apart, so on its own
+	 * it converts an unbounded-memory problem into a cheaper, more reliable
+	 * denial of the whole feature: one unpaired host holding the ceiling in raw
+	 * TCP sockets locked every legitimate device out (measured — a fresh peer got
+	 * `ECONNRESET`). So a single source may never take more than its share, and
+	 * `RESERVED_FOR_FRESH_SOURCES` slots stay free so an unknown-but-legitimate
+	 * device can always land.
+	 */
+	#admitSource(source: string): boolean {
+		if (!source) return false;
+		const perSourceLive = this.#liveBySource.get(source) ?? 0;
+		// `>` not `>=`: the socket being decided is ALREADY counted — the raw TCP
+		// `connection` event fires before the HTTP upgrade reaches `verifyClient`.
+		// With `>=` a source could only ever hold cap-1 sockets (measured: cap 2
+		// admitted 1), which is a quiet, permanent under-provisioning of every
+		// legitimate peer.
+		if (perSourceLive > this.#opts.maxConnectionsPerSource) return false;
+		// Headroom: past the reserve line, only sources we are ALREADY talking to
+		// may take another slot — a flooder cannot consume the last few.
+		const totalLive = [...this.#liveBySource.values()].reduce((n, v) => n + v, 0);
+		if (totalLive >= this.#opts.maxSockets - RESERVED_FOR_FRESH_SOURCES && perSourceLive === 0) {
+			return false;
+		}
+		return this.#allowSource(source);
+	}
+
 	#allowSource(rawSource: string): boolean {
 		if (!rawSource) return false;
 		const source = normalizeSourceAddress(rawSource);
@@ -377,11 +480,31 @@ export class LanRelayListener {
 		on: (event: string, cb: (...args: unknown[]) => void) => void;
 		send: (data: Uint8Array) => void;
 		close: () => void;
+		terminate?: () => void;
+		bufferedAmount?: number;
 	}): void {
 		const host = this.#opts.host;
 		const serverWs = {
 			send: (data: Uint8Array | string): void => {
 				if (typeof data === "string") return;
+				// L5 — outbound backpressure. The relay core fans out to every
+				// subscriber unconditionally, and `ws` queues whatever the peer
+				// has not read. A rostered-but-malicious device (or just a
+				// suspended laptop) that stops reading turned that queue into the
+				// HOST's memory: measured 86 MB grown by two sockets, one
+				// subscribing and never reading while the other published 512 KiB
+				// frames. Past the budget the connection is dropped rather than
+				// buffered — a peer that cannot keep up is a dead peer, and
+				// noticing that here is faster than the WS close timeout.
+				const buffered = (socket as { bufferedAmount?: number }).bufferedAmount ?? 0;
+				if (buffered > this.#opts.maxBufferedBytes) {
+					try {
+						socket.terminate?.();
+					} catch {
+						// Already gone.
+					}
+					return;
+				}
 				try {
 					socket.send(data);
 				} catch {
@@ -415,6 +538,30 @@ export class LanRelayListener {
 		socket.on("close", () => host._onClose(serverWs));
 		socket.on("error", () => host._onClose(serverWs));
 	}
+}
+
+/**
+ * L8 — the pre-handshake accept decision, as a PURE function.
+ *
+ * `Origin` is the discriminator: a native peer never sends one, a browser always
+ * does. WebSocket is exempt from CORS, so without this check ANY web page that
+ * anyone on the LAN loads could reach the pre-auth path — scan for the port,
+ * fingerprint it, and burn the per-source budget. It could never pass HPKE
+ * admission, but it should not get that far.
+ *
+ * Pure and exported because it CANNOT be exercised end-to-end under the test
+ * runner: Bun's `ws` client does not send an `Origin` header at all (measured —
+ * `verifyClient` runs, but sees `origin: undefined`), so a browser-shaped
+ * connection is unreproducible there. Testing the decision directly is the
+ * honest alternative to a test that would pass for the wrong reason.
+ */
+export function shouldAcceptUpgrade(
+	origin: string | undefined,
+	admitSource: (source: string) => boolean,
+	socket: { remoteAddress?: string | undefined },
+): boolean {
+	if (origin !== undefined) return false;
+	return admitSource(normalizeSourceAddress(socket.remoteAddress ?? ""));
 }
 
 /** Await a close callback, but never longer than `ms`. Teardown must not be
