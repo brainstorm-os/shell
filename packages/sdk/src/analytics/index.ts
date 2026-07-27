@@ -189,12 +189,19 @@ async function ensureInitialized(): Promise<AmplitudeModule | null> {
 			const amplitude = await import("@amplitude/unified");
 			// deviceId only — never userId. trackingOptions.ipAddress off so
 			// Amplitude does not reverse-geolocate the install.
+			// `appVersion` is Amplitude's BUILT-IN version field — the one that
+			// powers Version Composition. It was never set, so every user read
+			// `(none)` there while our own `app_version` custom property shadowed
+			// it with the sandboxed APP's version. Set it from the SHELL version,
+			// which is the release a user is actually on.
+			const shellVersion = readBridge()?.version;
 			await amplitude.initAll(apiKey, {
 				serverZone: "EU",
 				analytics: {
 					autocapture: true,
 					deviceId,
 					identityStorage: "localStorage",
+					...(shellVersion ? { appVersion: shellVersion } : {}),
 					trackingOptions: {
 						ipAddress: false,
 					},

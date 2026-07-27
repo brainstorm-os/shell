@@ -71,7 +71,7 @@ describe("initAnalytics", () => {
 			"Application Started",
 			expect.objectContaining({
 				surface: "shell",
-				platform: "darwin",
+				bs_platform: "darwin",
 				shell_version: "0.4.2",
 			}),
 		);
@@ -85,7 +85,7 @@ describe("initAnalytics", () => {
 			expect(props.source).toBe("welcome");
 			expect(props.vault_id).toBeUndefined();
 			expect(props.surface).toBe("shell");
-			expect(props.platform).toBe("darwin");
+			expect(props.bs_platform).toBe("darwin");
 			expect(props.shell_version).toBe("0.4.2");
 		});
 	});
@@ -111,7 +111,7 @@ describe("initAnalytics", () => {
 			const props = call?.[1] as Record<string, unknown>;
 			expect(props.error_scope).toBe("vault_create");
 			expect(props.error_code).toBe("directory_not_empty");
-			expect(props.platform).toBe("win32");
+			expect(props.bs_platform).toBe("win32");
 		});
 	});
 
@@ -168,7 +168,7 @@ describe("initAnalytics", () => {
 			expect.objectContaining({
 				surface: "app",
 				app_id: "io.brainstorm.notes",
-				app_version: "1.2.0",
+				bs_app_version: "1.2.0",
 			}),
 		);
 	});
