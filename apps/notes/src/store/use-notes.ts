@@ -10,10 +10,10 @@
  * on read).
  */
 
+import { createQueryStore } from "@brainstorm-os/react-yjs";
 import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm-os/sdk-types";
 import { writeValue } from "@brainstorm-os/sdk/property-ui/pure";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createTrailingCoalescer } from "./coalesce";
 import { createEntitiesRepository, foreignEntityToNote } from "./entities-repository";
 import { runVaultBodyMigration } from "./migrate-body";
 import { type StoredNote, newNoteId } from "./note";
@@ -70,9 +70,9 @@ export function useNotes(): UseNotes {
 	// without re-creating on every keystroke.
 	const notesMapRef = useRef(notes);
 	notesMapRef.current = notes;
-	// Mirror of the open note id — the staleSub refresh reads it to keep the
+	// Mirror of the open note id — the store's `reconcile` reads it to keep the
 	// open note from ever dropping out of the list (which would unmount its
-	// editor mid-edit; see refresh()).
+	// editor mid-edit).
 	const selectedIdRef = useRef(selectedId);
 	selectedIdRef.current = selectedId;
 	// Notes created this session, for the abandoned-empty auto-discard (F-066).
@@ -85,7 +85,6 @@ export function useNotes(): UseNotes {
 			setError("Notes runtime missing — preload didn't expose the brainstorm bridge.");
 			return;
 		}
-		let staleSub: { unsubscribe: () => void } | null = null;
 		let cancelStaleRefresh: (() => void) | null = null;
 		const sub = bs.on("ready", () => {
 			// Notes lives in the single object space — the shared entities
@@ -135,73 +134,58 @@ export function useNotes(): UseNotes {
 			// Re-list whenever the vault-entities surface fires its staleness
 			// signal. This catches the dev `reseed-vault` flow: the seeder
 			// backfills entities.db AFTER Notes has booted on an empty vault,
-			// and without this hook the in-memory map stayed empty until the
-			// user reloaded the app window.
+			// and without this the in-memory map stayed empty until the user
+			// reloaded the app window.
 			//
-			// Coalesce: the boot migration itself fires N broadcasts (one per
-			// planted note), and a single user write (e.g. an icon pick) can
-			// race with concurrent worker writes. Without coalescing, each
-			// broadcast triggers a `listAll` + `setNotes(map)`, which re-renders
-			// the entire virtualised sidebar and detaches the open note's
-			// editor host mid-typing. A 250 ms trailing debounce batches the
-			// burst into one refresh; user-visible latency on the seeder
-			// reseed-vault flow is unchanged.
-			//
-			// We deliberately do NOT re-run `runMigration` here. The boot
-			// pass + per-note open-time fallback are sufficient, and chaining
-			// migration → save → broadcast → staleSub → migration formed a
-			// self-amplifying loop that thrashed the sidebar.
+			// Coalescing matters here: the boot migration alone fires N broadcasts
+			// (one per planted note), and a single user write (an icon pick, say)
+			// races concurrent worker writes. Un-batched, every broadcast re-renders
+			// the whole virtualised sidebar and detaches the open note's editor host
+			// mid-typing.
 			if (bs.services.vaultEntities?.onChange) {
-				const refresh = (): void => {
-					void repo.listAll().then((map) => {
-						// Merge the in-memory state over the fresh disk snapshot,
-						// preserving:
-						//  - any note with a save still in flight (the on-disk row
-						//    is stale until our debounced persist lands), and
-						//  - the currently-OPEN note, ALWAYS. A refresh whose
-						//    `listAll` snapshot momentarily misses the open note
-						//    (a freshly-created sub-page racing the entities
-						//    write, the background body migration, a sibling-app
-						//    write) would otherwise drop it from the map →
-						//    `note = notes.get(selectedId)` goes null → the editor
-						//    UNMOUNTS and remounts → the note "hides" from the
-						//    sidebar, the title re-seeds, and the selection resets
-						//    (the reported sub-page bug). Keeping the open note
-						//    pinned makes the refresh non-destructive to the
-						//    surface the user is editing; its canonical content
-						//    still lives in the Y.Doc, and a later refresh after
-						//    navigation re-adopts disk state.
-						setNotes((prev) => {
-							const pending = pendingRef.current;
-							const openId = selectedIdRef.current;
-							const preserve = new Set(pending.keys());
-							if (openId) preserve.add(openId);
-							const merged = new Map(map);
-							for (const id of preserve) {
-								const optimistic = prev.get(id);
-								if (optimistic) merged.set(id, optimistic);
-							}
-							// Skip the state update entirely when nothing the sidebar
-							// renders actually changed. The body migration + sibling
-							// writes fire a stream of `onChange` broadcasts; without
-							// this guard every one swaps in a new Map → the
-							// virtualised list re-renders and the scroll/order
-							// "jumps", even though no visible field moved. Returning
-							// the SAME reference makes React bail out of the render.
-							return sidebarEquivalent(prev, merged) ? prev : merged;
-						});
-					});
+				const onChange = bs.services.vaultEntities.onChange;
+				// The shared reactivity core (`@brainstorm-os/react-yjs`) owns the
+				// subscribe → coalesce → refetch → short-circuit → teardown dance
+				// that this file used to hand-roll. It is driven imperatively rather
+				// than via `useLiveEntities` because the repo is constructed inside
+				// this ready-callback, so there is no source to hand a hook at the
+				// top of the component.
+				//
+				// The one thing that kept Notes off the shared stack was the merge
+				// below, which `equals` cannot express — that is now the store's
+				// `reconcile` option.
+				const store = createQueryStore<Map<string, StoredNote>>({
+					initial: notesMapRef.current,
+					load: () => repo.listAll(),
+					subscribe: (onInvalidate) => {
+						const sub = onChange(onInvalidate);
+						return () => sub.unsubscribe();
+					},
+					reconcile: (prev, next) =>
+						pinLocalNotes(prev, next, pendingRef.current.keys(), selectedIdRef.current),
+					// The body migration + sibling writes fire a stream of `onChange`
+					// broadcasts; without this guard every one swaps in a new Map → the
+					// virtualised list re-renders and the scroll/order "jumps", even
+					// though no visible field moved.
+					equals: sidebarEquivalent,
+					coalesceMs: 250,
+				});
+				// We deliberately do NOT re-run `runMigration` on refresh. The boot
+				// pass + per-note open-time fallback are sufficient, and chaining
+				// migration → save → broadcast → refresh → migration formed a
+				// self-amplifying loop that thrashed the sidebar.
+				const unsubscribeStore = store.subscribe(() => setNotes(store.getSnapshot()));
+				cancelStaleRefresh = () => {
+					unsubscribeStore();
+					store.dispose();
 				};
-				const coalescer = createTrailingCoalescer(refresh, 250);
-				cancelStaleRefresh = coalescer.cancel;
-				staleSub = bs.services.vaultEntities.onChange(coalescer.schedule);
 			}
 		});
 		return () => {
 			sub.unsubscribe();
-			staleSub?.unsubscribe();
-			// Drop any armed trailing refresh — without this a broadcast within
-			// 250ms of teardown fires `setNotes` on an unmounted component.
+			// Drop the store: unbinds the signal and cancels any armed trailing
+			// reload, without which a broadcast within 250ms of teardown fires
+			// `setNotes` on an unmounted component.
 			cancelStaleRefresh?.();
 		};
 	}, []);
@@ -395,6 +379,47 @@ export function shouldDiscardAbandoned(
  *  order, and the same per-row fields the list/header actually show. Lets a
  *  no-op `vaultEntities.onChange` refresh bail out of `setNotes` so the
  *  virtualised sidebar doesn't re-render (and scroll-jump) for nothing. */
+/**
+ * Merge in-memory note state OVER a fresh disk snapshot — the store's
+ * `reconcile`, and the reason Notes could not use the shared reactivity stack
+ * until that option existed (`equals` can suppress a render but cannot merge).
+ *
+ * Two things are pinned:
+ *
+ *  - **any note with a save still in flight.** The on-disk row is stale until
+ *    our debounced persist lands, so adopting it would visibly revert the
+ *    user's last keystrokes.
+ *  - **the currently-open note, ALWAYS.** A refresh whose `listAll` snapshot
+ *    momentarily misses the open note — a freshly-created sub-page racing the
+ *    entities write, the background body migration, a sibling-app write —
+ *    would otherwise drop it from the map, so `notes.get(selectedId)` goes
+ *    null, the editor UNMOUNTS and remounts, the note "hides" from the
+ *    sidebar, the title re-seeds and the selection resets. That was a reported
+ *    sub-page bug; pinning the open note is its fix. Its canonical content
+ *    still lives in the Y.Doc, and a later refresh after navigation re-adopts
+ *    disk state.
+ *
+ * Returns `next` itself when nothing needed pinning, so the `equals`
+ * short-circuit downstream still sees an unchanged snapshot.
+ */
+export function pinLocalNotes(
+	prev: Map<string, StoredNote>,
+	next: Map<string, StoredNote>,
+	pendingIds: Iterable<string>,
+	openId: string | null,
+): Map<string, StoredNote> {
+	const preserve = new Set(pendingIds);
+	if (openId) preserve.add(openId);
+	let merged: Map<string, StoredNote> | null = null;
+	for (const id of preserve) {
+		const optimistic = prev.get(id);
+		if (!optimistic) continue;
+		merged ??= new Map(next);
+		merged.set(id, optimistic);
+	}
+	return merged ?? next;
+}
+
 function sidebarEquivalent(a: Map<string, StoredNote>, b: Map<string, StoredNote>): boolean {
 	if (a === b) return true;
 	if (a.size !== b.size) return false;
@@ -422,7 +447,7 @@ function schedulePersist(
 	const existing = pending.get(note.id);
 	if (existing) clearTimeout(existing);
 	// Keep the pending entry alive until the save IPC round-trip completes,
-	// so the staleSub refresh's `pending.size === 0` guard correctly skips
+	// so the store's `reconcile` still sees the id as pending and correctly pins
 	// the optimistic-state revert during the in-flight window (not just
 	// during the debounce window). Deleting in the timeout body (before
 	// awaiting `repo.save`) left a ~one-IPC-roundtrip gap where a refresh

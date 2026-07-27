@@ -58,7 +58,15 @@ function stripComments(src) {
  * capability Books deliberately does NOT hold, which is the exact mismatch that
  * once made imported books silently invisible.
  */
-const SANCTIONED_SINKS = /\b(useLiveEntities|useVaultEntities|setEntityIndexSource)\b/;
+// `createQueryStore` is the framework-free core the hooks are built on, and
+// its own contract sanctions driving it directly ("imperative apps can drive
+// the same core with subscribe/getSnapshot"). Notes needs that door: its repo
+// is constructed inside a ready-callback, so there is no source to hand a hook
+// at the top of the component. What this gate exists to stop is a SECOND
+// implementation of the reactivity layer — feeding the shared one is the fix,
+// whichever entry point it goes through.
+const SANCTIONED_SINKS =
+	/\b(useLiveEntities|useVaultEntities|setEntityIndexSource|createQueryStore)\b/;
 
 /**
  * A file "subscribes to the coarse vault signal" when it references the
