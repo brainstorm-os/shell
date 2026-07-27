@@ -59,6 +59,16 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: bun run test
 
+      # `verify` runs `lint:apps` (the ratchets) on every OS, but NOT
+      # `biome check .` — Windows checks out CRLF and there is no .gitattributes
+      # normalising line endings, so the formatter reports every file as
+      # mis-formatted (4144 diagnostics). That is exactly why biome had never
+      # run in CI at all, which is how formatting kept landing red on main.
+      # Run it on the one runner whose checkout matches the committed bytes.
+      - name: Formatter + biome lint (ubuntu — CRLF makes this Windows-hostile)
+        if: matrix.os == 'ubuntu-22.04'
+        run: bunx biome check .
+
       - name: Build shell bundle (sanity)
         run: bun run --filter @brainstorm-os/shell build
 
