@@ -262,10 +262,41 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 			projection: readEntityDocProjection(doc),
 		};
 	},
+	/**
+	 * Full state, or — with `sinceStateVectorB64` — only the updates the caller
+	 * is MISSING (LAN-8).
+	 *
+	 * `Y.encodeStateAsUpdate(doc, sv)` is the whole efficiency win: backfill cost
+	 * becomes proportional to the gap rather than to the document. A peer that
+	 * was briefly offline pays for the few edits it missed instead of re-shipping
+	 * a 50 MB doc, which is what makes reconnect-backfill viable on a LAN link.
+	 *
+	 * A malformed / foreign state vector must not fail the backfill: Yjs throws
+	 * on garbage input, and a peer that cannot be diffed should still be caught
+	 * up. So a bad vector degrades to the FULL snapshot — correct but expensive —
+	 * rather than leaving the joiner empty.
+	 */
 	snapshot: async (envelope) => {
-		const args = parseArgs<LoadArgs>(envelope, "snapshot");
+		const args = parseArgs<LoadArgs & { sinceStateVectorB64?: string }>(envelope, "snapshot");
 		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
-		return { snapshotB64: bytesToBase64(Y.encodeStateAsUpdate(doc)) };
+		const since = args.sinceStateVectorB64;
+		if (typeof since === "string" && since.length > 0) {
+			try {
+				const sv = new Uint8Array(Buffer.from(since, "base64"));
+				return { snapshotB64: bytesToBase64(Y.encodeStateAsUpdate(doc, sv)), diffed: true };
+			} catch {
+				// fall through to the full snapshot
+			}
+		}
+		return { snapshotB64: bytesToBase64(Y.encodeStateAsUpdate(doc)), diffed: false };
+	},
+	/** This doc's state vector — what a peer sends so the emitter can diff
+	 *  against it (LAN-8). Tiny compared to the doc: it is one clock per client
+	 *  id, not content. */
+	stateVector: async (envelope) => {
+		const args = parseArgs<LoadArgs>(envelope, "stateVector");
+		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
+		return { stateVectorB64: bytesToBase64(Y.encodeStateVector(doc)) };
 	},
 	// Y.Doc-first writes (Phase 2) — mutate the canonical doc's property /
 	// link roots directly, then persist. The entities service routes

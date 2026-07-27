@@ -72,7 +72,13 @@ export const BUNDLE_CHANNEL_BYTE = 0x03;
  *  client can decode `0x03` bundle messages — the durable node then serves
  *  backfill bundled instead of one message per frame. Additive: an old node's
  *  control parser drops unknown fields. */
-export type SubscribeControl = { op: "subscribe"; entityIds: string[]; bundle?: true };
+export type SubscribeControl = {
+	op: "subscribe";
+	entityIds: string[];
+	bundle?: true;
+	/** LAN-8 — per-key state vectors, opaque base64 of `Y.encodeStateVector`. */
+	stateVectors?: Record<string, string>;
+};
 export type UnsubscribeControl = { op: "unsubscribe"; entityIds: string[] };
 /** Stage 10.14 — request the account's catalog (client→server). `account` is
  *  the device's wire `sender` (base64url). */
@@ -186,7 +192,7 @@ export type WebSocketRelayPortOptions = {
 	/** LAN-7 — the host asks us to re-emit for a routing key because a peer just
 	 *  joined it. The wiring turns this into the engine's snapshot emit, which is
 	 *  what makes a reconnecting peer's backfill automatic. */
-	onResync?: (routingKey: string) => void;
+	onResync?: (routingKey: string, sinceStateVectorB64?: string) => void;
 	lanHandshake?: {
 		helloAccount: () => string | null;
 		onSealedChallenge: (
@@ -210,7 +216,7 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #requireAdmission: boolean;
 	readonly #lanHandshake: WebSocketRelayPortOptions["lanHandshake"] | null;
-	readonly #onResync: ((routingKey: string) => void) | null;
+	readonly #onResync: ((routingKey: string, sinceStateVectorB64?: string) => void) | null;
 	readonly #emitter = new EventEmitter();
 	readonly #subscriptions = new Set<string>();
 	readonly #listeners = new Set<(frame: Uint8Array) => void>();
@@ -368,13 +374,25 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#openSocket();
 	}
 
-	subscribe(entityId: string): void {
+	/**
+	 * @param opts.stateVectors LAN-8 — advertise where this peer already is, per
+	 * routing key (opaque base64 of `Y.encodeStateVector`). The host carries it
+	 * to whoever it asks to re-emit, so backfill sends only the GAP instead of
+	 * the whole document. Omitted ⇒ full snapshot, the LAN-7 behaviour, so an
+	 * older peer keeps working.
+	 */
+	subscribe(entityId: string, opts?: { stateVectors?: Record<string, string> }): void {
 		if (this.#disposed) return;
 		if (!entityId) throw new Error("WebSocketRelayPort.subscribe: empty entityId");
 		const fresh = !this.#subscriptions.has(entityId);
 		this.#subscriptions.add(entityId);
 		if (fresh && this.#state === WebSocketRelayState.Open) {
-			this.#sendControl({ op: "subscribe", entityIds: [entityId], bundle: true });
+			this.#sendControl({
+				op: "subscribe",
+				entityIds: [entityId],
+				bundle: true,
+				...(opts?.stateVectors ? { stateVectors: opts.stateVectors } : {}),
+			});
 		}
 	}
 
@@ -805,10 +823,13 @@ export class WebSocketRelayPort implements RelayPort {
 				return;
 			}
 			if (op === "resync") {
-				const key = decodeResyncKey(bytes);
+				const { key, sinceSv } = decodeResync(bytes);
 				if (key && this.#onResync) {
 					try {
-						this.#onResync(key);
+						// LAN-8 — pass the joiner's state vector through when the host
+						// carried one, so the wiring can emit a DIFF instead of the
+						// whole doc. Absent ⇒ full snapshot, the LAN-7 behaviour.
+						this.#onResync(key, sinceSv);
 					} catch {
 						// A throwing consumer must not kill the socket callback.
 					}
@@ -1183,17 +1204,22 @@ function decodeSealedChallenge(
 	}
 }
 
-/** LAN-7 — the routing key a `resync` control names, or null. */
-function decodeResyncKey(bytes: Uint8Array): string | null {
+/** LAN-7/8 — the routing key a `resync` names, plus the joiner's state vector
+ *  when the host carried one. */
+function decodeResync(bytes: Uint8Array): { key: string | null; sinceSv?: string } {
 	try {
 		const v = JSON.parse(new TextDecoder().decode(bytes.subarray(1))) as {
 			op?: unknown;
 			key?: unknown;
+			sinceSv?: unknown;
 		};
-		if (v?.op !== "resync") return null;
-		return typeof v.key === "string" && v.key.length > 0 ? v.key : null;
+		if (v?.op !== "resync") return { key: null };
+		const key = typeof v.key === "string" && v.key.length > 0 ? v.key : null;
+		return typeof v.sinceSv === "string" && v.sinceSv.length > 0
+			? { key, sinceSv: v.sinceSv }
+			: { key };
 	} catch {
-		return null;
+		return { key: null };
 	}
 }
 
