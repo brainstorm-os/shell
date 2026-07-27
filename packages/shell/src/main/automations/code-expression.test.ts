@@ -140,6 +140,101 @@ describe("evaluateExpression — security & errors", () => {
 	});
 });
 
+describe("evaluateExpression — output size cap", () => {
+	// The source cap bounds the wrong axis. Amplification is a function of the
+	// SCOPE VALUES, not the source: each expression below is a couple of dozen
+	// characters and, before the cap, produced tens of megabytes in milliseconds
+	// — which then *succeeded* and got written onto an entity (11b.18's Entity
+	// step evaluates field values through this same grammar).
+	const field = (bytes: number): ExprScope => ({ f: "a".repeat(bytes) });
+
+	it("blocks the quadratic amplifier — 21 characters over an 8KB field was 64MB", () => {
+		expect(() => evalAt('join(split(f, ""), f)', field(8192))).toThrow(/result too large/);
+	});
+
+	it("blocks it at sizes that used to exhaust the allocator outright", () => {
+		// |f|=100KB predicted 10.4 billion characters; unguarded this threw
+		// RangeError from the allocator rather than a clean step failure.
+		expect(() => evalAt('join(split(f, ""), f)', field(100 * 1024))).toThrow(/result too large/);
+	});
+
+	it("blocks the cubic chain — nesting the trick raises the exponent, not the source length", () => {
+		expect(() => evalAt('join(split(join(split(f, ""), f), ""), f)', field(200))).toThrow(
+			/result too large/,
+		);
+	});
+
+	it("blocks every multiplicative operator, not just join", () => {
+		expect(() => evalAt(`concat(${Array(400).fill("f").join(",")})`, field(64 * 1024))).toThrow(
+			/result too large/,
+		);
+		expect(() => evalAt("f+f+f+f", field(1024 * 1024))).toThrow(/result too large/);
+		expect(() => evalAt('replace(f, "a", "bbbb")', field(1024 * 1024))).toThrow(/result too large/);
+		expect(() => evalAt('split(f, "")', field(2 * 1024 * 1024))).toThrow(/result too large/);
+	});
+
+	it("rejects BEFORE allocating — a predicted size, not a post-hoc check", () => {
+		// `Array.prototype.join` builds the whole string internally, so a guard on
+		// the return value would run only once the damage was done. The predicted
+		// size appears in the message, which is only knowable pre-allocation.
+		expect(() => evalAt('join(split(f, ""), f)', field(100 * 1024))).toThrow(/10485760000/);
+	});
+
+	it("still allows large READS — scanning a 50MB body is legitimate", () => {
+		// The cap is on what an operation PRODUCES. `contains` over a big email
+		// body returns a boolean and must keep working, or the cap has broken the
+		// feature it was meant to protect.
+		expect(evalAt('contains(f, "urgent")', { f: `${"a".repeat(4 * 1024 * 1024)}urgent` })).toBe(true);
+	});
+
+	it("still allows a big haystack that splits into few pieces", () => {
+		// Counted, not assumed from the haystack length — otherwise splitting a
+		// large log on a rare delimiter would be rejected for no reason.
+		expect(evalAt('len(split(f, "|"))', { f: `${"a".repeat(4 * 1024 * 1024)}|b|c` })).toBe(3);
+	});
+
+	it("leaves ordinary field mapping untouched", () => {
+		expect(evalAt('concat("Task: ", f)', { f: "review PR" })).toBe("Task: review PR");
+		expect(evalAt('join(split("a,b,c", ","), "-")', {})).toBe("a-b-c");
+		expect(evalAt('replace(f, "o", "0")', { f: "foo" })).toBe("f00");
+	});
+});
+
+describe("evaluateExpression — work budget", () => {
+	// The size cap bounds SPACE, not TIME. Fifty nested `replace()` calls over a
+	// 1MB field each stay under the 1MB per-result cap and still burned ~4.5s —
+	// on the Electron main process, which freezes every window. The budget is
+	// counted in characters rather than measured on a wall clock so the limit is
+	// deterministic instead of varying with machine speed.
+	const megabyte = { f: "a".repeat(1024 * 1024) };
+	const nestedReplace = (n: number) => `len(${"replace(".repeat(n)}f${', "a", "a")'.repeat(n)})`;
+
+	it("rejects an expression whose operations are individually legal but collectively huge", () => {
+		expect(() => evalAt(nestedReplace(50), megabyte)).toThrow(/too expensive/);
+	});
+
+	it("still permits repeated scans of a large field, which is the legitimate case", () => {
+		// An email-triage workflow checking a 1MB body for several keywords is
+		// exactly what this feature is for and must not trip the budget.
+		const body = { f: `${"word ".repeat(200_000)}urgent` };
+		expect(
+			evalAt(
+				'contains(lower(f), "urgent") || contains(lower(f), "asap") || contains(lower(f), "help")',
+				body,
+			),
+		).toBe(true);
+	});
+
+	it("charges scans, not just allocations — a boolean result is still work", () => {
+		// `contains` returns one boolean however big the haystack, so charging only
+		// on produced values would leave the scan free and the budget bypassable.
+		const huge = { f: "a".repeat(1024 * 1024) };
+		expect(() =>
+			evalAt(`${Array(16).fill('contains(f, "zzz")').join(" || ")} || true`, huge),
+		).toThrow(/too expensive/);
+	});
+});
+
 // ─── Code-step interpreter ───────────────────────────────────────────
 
 function fakeContext(input: unknown, outputs: Record<string, unknown> = {}): RunContext {

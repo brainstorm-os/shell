@@ -42,6 +42,32 @@ const MAX_SOURCE_LENGTH = 4000;
 const MAX_DEPTH = 64;
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+/**
+ * Cap on any string or array a single operation may produce.
+ *
+ * `MAX_SOURCE_LENGTH` bounds the wrong axis. Amplification here is a function
+ * of the *scope values*, not the source: `join(split(f, ""), f)` is 21
+ * characters and produces |f|² bytes, so an 8 KB field becomes a 64 MB string
+ * in 17 ms, and a 100 KB field exhausts the string allocator outright. Chaining
+ * the same trick cubes it. The step catches the throw either way, so this is
+ * not a crash — but without a cap the successful cases are worse than the
+ * failures: a 64 MB value is *returned*, written onto an entity, and persisted.
+ *
+ * Bounding each operation bounds the whole expression, since every intermediate
+ * is itself an operation's result.
+ */
+const MAX_VALUE_LENGTH = 1 << 20;
+
+/**
+ * Total characters a single evaluation may process.
+ *
+ * Measured at roughly 37 characters/µs, so this budget caps one evaluation near
+ * 230 ms — against the ~4.5 s an unbudgeted expression could hold the main
+ * process for, and it degrades gracefully rather than at a cliff. Eight full
+ * passes over a 1 MB field is far more than field mapping needs.
+ */
+const MAX_WORK = 8 << 20;
+
 // ─────────────────────────────── tokens ───────────────────────────────
 
 enum TokKind {
@@ -382,6 +408,73 @@ function safeGet(obj: unknown, key: string | number): unknown {
 	return undefined;
 }
 
+/** Per-evaluation state: the pinned clock and the running work total. */
+interface EvalCtx {
+	readonly now: number;
+	work: number;
+}
+
+/**
+ * Charge work, and reject an over-large result *before* building it.
+ *
+ * Two separate bounds, because they fail differently:
+ *
+ * - **Size** (`MAX_VALUE_LENGTH`) is per operation. Checking it after the fact
+ *   is too late for the operations that matter — `join` allocates the whole
+ *   string inside `Array.prototype.join`, so a guard on the return value runs
+ *   only once the damage is done. Every multiplicative builtin can predict its
+ *   output length from its inputs, so it does.
+ * - **Work** (`MAX_WORK`) is per evaluation, and it is what stops the residual
+ *   *time* bomb the size cap alone leaves open: 50 nested `replace()` calls,
+ *   each individually under 1 MB, still block for ~4 seconds — on the Electron
+ *   **main process**, which freezes every window. A character budget is used
+ *   rather than a wall-clock deadline so the limit is deterministic and
+ *   testable instead of varying with machine speed.
+ */
+function charge(ctx: EvalCtx, count: number): void {
+	ctx.work += count;
+	if (ctx.work > MAX_WORK) {
+		throw new ExpressionError(`expression too expensive (work limit ${MAX_WORK} exceeded)`);
+	}
+}
+
+/** Charge a read-only pass over `s` (scanning is work even when the result is a
+ *  boolean), and hand it back so call sites stay one expression. */
+function scan(ctx: EvalCtx, s: string): string {
+	charge(ctx, s.length);
+	return s;
+}
+
+function produce(ctx: EvalCtx, count: number, unit: "characters" | "items"): void {
+	if (count > MAX_VALUE_LENGTH) {
+		throw new ExpressionError(`result too large (${count} ${unit}, limit ${MAX_VALUE_LENGTH})`);
+	}
+	charge(ctx, count);
+}
+
+/** Number of pieces `hay.split(sep)` would produce, without building the array. */
+function splitCount(hay: string, sep: string): number {
+	if (sep === "") return hay.length;
+	let count = 1;
+	let at = hay.indexOf(sep);
+	while (at !== -1) {
+		count++;
+		at = hay.indexOf(sep, at + sep.length);
+	}
+	return count;
+}
+
+/** Reject an over-large intermediate at the point it is produced. */
+function guardSize(v: unknown): unknown {
+	if (typeof v === "string" && v.length > MAX_VALUE_LENGTH) {
+		throw new ExpressionError(`result too large (${v.length} characters, limit ${MAX_VALUE_LENGTH})`);
+	}
+	if (Array.isArray(v) && v.length > MAX_VALUE_LENGTH) {
+		throw new ExpressionError(`result too large (${v.length} items, limit ${MAX_VALUE_LENGTH})`);
+	}
+	return v;
+}
+
 function toNumber(v: unknown): number {
 	if (typeof v === "number") return v;
 	if (typeof v === "string" && v.trim() !== "") {
@@ -396,7 +489,7 @@ function strictEqual(a: unknown, b: unknown): boolean {
 	return a === b;
 }
 
-function evalBinary(op: string, a: unknown, b: unknown): unknown {
+function evalBinary(ctx: EvalCtx, op: string, a: unknown, b: unknown): unknown {
 	switch (op) {
 		case "==":
 		case "===":
@@ -404,9 +497,15 @@ function evalBinary(op: string, a: unknown, b: unknown): unknown {
 		case "!=":
 		case "!==":
 			return !strictEqual(a, b);
-		case "+":
-			if (typeof a === "string" || typeof b === "string") return `${stringify(a)}${stringify(b)}`;
+		case "+": {
+			if (typeof a === "string" || typeof b === "string") {
+				const left = stringify(a);
+				const right = stringify(b);
+				produce(ctx, left.length + right.length, "characters");
+				return `${left}${right}`;
+			}
 			return toNumber(a) + toNumber(b);
+		}
 		case "-":
 			return toNumber(a) - toNumber(b);
 		case "*":
@@ -441,36 +540,40 @@ function stringify(v: unknown): string {
 	return String(v);
 }
 
-function evalNode(node: Node, scope: ExprScope, now: number): unknown {
+function evalNode(node: Node, scope: ExprScope, ctx: EvalCtx): unknown {
 	switch (node.t) {
 		case "lit":
 			return node.v;
 		case "var":
 			return safeGet(scope, node.name);
 		case "unary": {
-			const x = evalNode(node.x, scope, now);
+			const x = evalNode(node.x, scope, ctx);
 			return node.op === "!" ? !truthy(x) : -toNumber(x);
 		}
 		case "bin":
-			return evalBinary(node.op, evalNode(node.a, scope, now), evalNode(node.b, scope, now));
+			return evalBinary(ctx, node.op, evalNode(node.a, scope, ctx), evalNode(node.b, scope, ctx));
 		case "logical": {
-			const a = evalNode(node.a, scope, now);
-			if (node.op === "&&") return truthy(a) ? evalNode(node.b, scope, now) : a;
-			return truthy(a) ? a : evalNode(node.b, scope, now);
+			const a = evalNode(node.a, scope, ctx);
+			if (node.op === "&&") return truthy(a) ? evalNode(node.b, scope, ctx) : a;
+			return truthy(a) ? a : evalNode(node.b, scope, ctx);
 		}
 		case "ternary":
-			return truthy(evalNode(node.c, scope, now))
-				? evalNode(node.a, scope, now)
-				: evalNode(node.b, scope, now);
+			return truthy(evalNode(node.c, scope, ctx))
+				? evalNode(node.a, scope, ctx)
+				: evalNode(node.b, scope, ctx);
 		case "member":
-			return safeGet(evalNode(node.obj, scope, now), node.prop);
+			return safeGet(evalNode(node.obj, scope, ctx), node.prop);
 		case "index":
-			return safeGet(evalNode(node.obj, scope, now), asKey(evalNode(node.idx, scope, now)));
+			return safeGet(evalNode(node.obj, scope, ctx), asKey(evalNode(node.idx, scope, ctx)));
 		case "call":
-			return callBuiltin(
-				node.name,
-				node.args.map((a) => evalNode(a, scope, now)),
-				now,
+			// Backstop: the multiplicative builtins pre-check, but a future
+			// builtin that forgets to should still not return an unbounded value.
+			return guardSize(
+				callBuiltin(
+					node.name,
+					node.args.map((a) => evalNode(a, scope, ctx)),
+					ctx,
+				),
 			);
 	}
 }
@@ -481,7 +584,7 @@ function asKey(v: unknown): string | number {
 
 // ───────────────────────────── built-ins ─────────────────────────────
 
-function callBuiltin(name: string, args: unknown[], now: number): unknown {
+function callBuiltin(name: string, args: unknown[], ctx: EvalCtx): unknown {
 	switch (name) {
 		case "len": {
 			const v = args[0];
@@ -489,26 +592,50 @@ function callBuiltin(name: string, args: unknown[], now: number): unknown {
 			return 0;
 		}
 		case "lower":
-			return stringify(args[0]).toLowerCase();
+			return scan(ctx, stringify(args[0])).toLowerCase();
 		case "upper":
-			return stringify(args[0]).toUpperCase();
+			return scan(ctx, stringify(args[0])).toUpperCase();
 		case "trim":
-			return stringify(args[0]).trim();
+			return scan(ctx, stringify(args[0])).trim();
 		case "contains": {
 			const hay = args[0];
-			if (Array.isArray(hay)) return hay.some((x) => strictEqual(x, args[1]));
-			return stringify(hay).includes(stringify(args[1]));
+			if (Array.isArray(hay)) {
+				charge(ctx, hay.length);
+				return hay.some((x) => strictEqual(x, args[1]));
+			}
+			return scan(ctx, stringify(hay)).includes(stringify(args[1]));
 		}
 		case "startsWith":
-			return stringify(args[0]).startsWith(stringify(args[1]));
+			return scan(ctx, stringify(args[0])).startsWith(stringify(args[1]));
 		case "endsWith":
-			return stringify(args[0]).endsWith(stringify(args[1]));
-		case "replace":
-			return stringify(args[0]).split(stringify(args[1])).join(stringify(args[2]));
-		case "split":
-			return stringify(args[0]).split(stringify(args[1]));
-		case "join":
-			return Array.isArray(args[0]) ? args[0].map(stringify).join(stringify(args[1])) : "";
+			return scan(ctx, stringify(args[0])).endsWith(stringify(args[1]));
+		case "replace": {
+			const hay = scan(ctx, stringify(args[0]));
+			const needle = stringify(args[1]);
+			const rep = stringify(args[2]);
+			const pieces = splitCount(hay, needle);
+			produce(
+				ctx,
+				hay.length - (pieces - 1) * needle.length + (pieces - 1) * rep.length,
+				"characters",
+			);
+			return hay.split(needle).join(rep);
+		}
+		case "split": {
+			const hay = scan(ctx, stringify(args[0]));
+			const sep = stringify(args[1]);
+			produce(ctx, splitCount(hay, sep), "items");
+			return hay.split(sep);
+		}
+		case "join": {
+			if (!Array.isArray(args[0])) return "";
+			const parts = args[0].map(stringify);
+			const sep = stringify(args[1]);
+			const total =
+				parts.reduce((n, p) => n + p.length, 0) + Math.max(0, parts.length - 1) * sep.length;
+			produce(ctx, total, "characters");
+			return parts.join(sep);
+		}
 		case "number": {
 			try {
 				return toNumber(args[0]);
@@ -535,12 +662,19 @@ function callBuiltin(name: string, args: unknown[], now: number): unknown {
 			return Math.min(...args.map(toNumber));
 		case "max":
 			return Math.max(...args.map(toNumber));
-		case "concat":
-			return args.map(stringify).join("");
+		case "concat": {
+			const parts = args.map(stringify);
+			produce(
+				ctx,
+				parts.reduce((n, p) => n + p.length, 0),
+				"characters",
+			);
+			return parts.join("");
+		}
 		case "coalesce":
 			return args.find((a) => a !== null && a !== undefined) ?? null;
 		case "now":
-			return now;
+			return ctx.now;
 		default:
 			throw new ExpressionError(`unknown function "${name}"`);
 	}
@@ -560,6 +694,6 @@ export function evaluateExpression(
 		throw new ExpressionError("expression too long");
 	}
 	const ast = new Parser(tokenize(source)).parse();
-	const now = options.now ?? Date.now();
-	return evalNode(ast, scope, now);
+	const ctx: EvalCtx = { now: options.now ?? Date.now(), work: 0 };
+	return evalNode(ast, scope, ctx);
 }
