@@ -215,3 +215,91 @@ describe("shallowArrayEquals", () => {
 		expect(shallowArrayEquals([1, 2, 3], [1, 9, 3])).toBe(false);
 	});
 });
+
+describe("createQueryStore — reconcile", () => {
+	// `equals` can only answer "is this change worth a render". Two apps (Notes,
+	// Files) need "keep part of what I had" and were hand-rolling the entire
+	// subscribe/debounce/refetch/short-circuit dance purely to own this one step.
+	it("merges the cached snapshot into a freshly-loaded one", async () => {
+		let loaded = ["disk-a", "disk-b"];
+		const store = createQueryStore<string[]>({
+			initial: [],
+			load: async () => loaded,
+			subscribe: () => () => {},
+			// The Notes shape: pin an item the loaded snapshot may not have yet.
+			reconcile: (prev, next) => (prev.includes("open") ? [...next, "open"] : next),
+			equals: shallowArrayEquals,
+		});
+		store.subscribe(() => {});
+		await store.refresh();
+		expect(store.getSnapshot()).toEqual(["disk-a", "disk-b"]);
+
+		// Simulate the open item existing locally but missing from disk.
+		loaded = ["disk-a", "disk-b", "open"];
+		await store.refresh();
+		loaded = ["disk-a"];
+		await store.refresh();
+		expect(store.getSnapshot()).toContain("open");
+		store.dispose();
+	});
+
+	it("runs BEFORE equals, so a merge that restores the status quo does not re-render", async () => {
+		// This ordering is the whole point: reconciling after the comparison would
+		// notify on every reload that dropped the pinned item, which is exactly the
+		// sidebar thrash the shared store exists to prevent.
+		const notified = vi.fn();
+		const store = createQueryStore<string[]>({
+			initial: ["keep"],
+			load: async () => [],
+			subscribe: () => () => {},
+			reconcile: (prev) => prev,
+			equals: shallowArrayEquals,
+		});
+		store.subscribe(notified);
+		await store.refresh();
+		expect(notified).not.toHaveBeenCalled();
+		expect(store.getSnapshot()).toEqual(["keep"]);
+		store.dispose();
+	});
+
+	it("takes next wholesale when no reconciler is given", async () => {
+		const store = createQueryStore<string[]>({
+			initial: ["old"],
+			load: async () => ["new"],
+			subscribe: () => () => {},
+			equals: shallowArrayEquals,
+		});
+		store.subscribe(() => {});
+		await store.refresh();
+		expect(store.getSnapshot()).toEqual(["new"]);
+		store.dispose();
+	});
+
+	it("is not consulted for a load that lost the race", async () => {
+		// A superseded load is dropped before reconcile, so a stale merge can never
+		// resurrect content the newer snapshot deliberately removed.
+		const seen: string[][] = [];
+		const { load, resolve } = deferredLoader<string[]>();
+		const store = createQueryStore<string[]>({
+			initial: [],
+			load,
+			subscribe: () => () => {},
+			reconcile: (prev, next) => {
+				seen.push(next);
+				return next;
+			},
+			equals: shallowArrayEquals,
+		});
+		store.subscribe(() => {}); // load #0 (initial)
+		const slow = store.refresh(); // load #1
+		const fast = store.refresh(); // load #2 (newer)
+		resolve(2, ["fast"]);
+		resolve(1, ["slow"]); // the straggler, superseded
+		resolve(0, ["initial"]);
+		await Promise.all([slow, fast]);
+		await flush();
+		expect(seen).toEqual([["fast"]]);
+		expect(store.getSnapshot()).toEqual(["fast"]);
+		store.dispose();
+	});
+});

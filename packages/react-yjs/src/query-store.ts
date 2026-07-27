@@ -63,6 +63,23 @@ export type QueryStoreOptions<T> = {
 	 *  snapshots (`shallowArrayEquals`, `vaultSnapshotEquals`) so an
 	 *  equal-but-new array doesn't thrash React. */
 	equals?: (a: T, b: T) => boolean;
+	/**
+	 * Merge the cached snapshot into a freshly-loaded one before it is adopted.
+	 * Defaults to taking `next` wholesale.
+	 *
+	 * `equals` can only answer "is this change worth a render"; it cannot say
+	 * "keep part of what I had". Two apps need the latter and were blocked here:
+	 * Notes must pin the currently-open note and any note whose debounced save is
+	 * still in flight, because a snapshot that momentarily misses the open note
+	 * drops it from the map, unmounts the editor mid-edit, and makes sub-pages
+	 * vanish (a reported bug). Files must keep tree expansion, nav history and
+	 * resolved openers across a reload. Both were hand-rolling the whole
+	 * subscribe/debounce/refetch/short-circuit dance purely to own this one step.
+	 *
+	 * Must be pure and return `prev` itself when nothing merged, so the `equals`
+	 * short-circuit downstream still works.
+	 */
+	reconcile?: (prev: T, next: T) => T;
 	/** Trailing-debounce window (ms) collapsing a burst of signals into one
 	 *  reload. Default 250 — the cadence every app converged on for batching
 	 *  keystroke-driven saves. */
@@ -104,8 +121,11 @@ export function createQueryStore<T>(options: QueryStoreOptions<T>): QueryStore<T
 		}
 		// Superseded by a newer load, or disposed mid-flight → drop it.
 		if (disposed || mine !== loadSeq) return;
-		if (!equals(next, snapshot)) {
-			snapshot = next;
+		// Reconcile BEFORE the equals check, so a merge that restores exactly what
+		// was already there short-circuits instead of forcing a render.
+		const merged = options.reconcile ? options.reconcile(snapshot, next) : next;
+		if (!equals(merged, snapshot)) {
+			snapshot = merged;
 			notify();
 		}
 	}

@@ -41,6 +41,12 @@ export type UseLiveEntitiesOptions<T> = {
 	 *  re-render. Defaults to `Object.is`; for vault snapshots use
 	 *  `useVaultEntities`, which supplies `vaultSnapshotEquals`. */
 	equals?: (a: T, b: T) => boolean;
+	/** Merge the previous snapshot into a freshly-loaded one before adopting it
+	 *  — for state the loaded snapshot cannot know about (an in-flight optimistic
+	 *  write, the open item, local view state). See `QueryStoreOptions.reconcile`.
+	 *  Unlike `initial`/`equals`/`coalesceMs` this is read live per reload, so it
+	 *  may close over refs that change between renders. */
+	reconcile?: (prev: T, next: T) => T;
 	/** Trailing-debounce window (ms). Default 250. */
 	coalesceMs?: number;
 	/** Surfaced when a reload rejects; the cached snapshot is kept. */
@@ -79,6 +85,13 @@ export function useLiveEntities<T>(
 				load: () => {
 					const src = ref.current.source;
 					return src ? src.list() : Promise.resolve(ref.current.options.initial);
+				},
+				// Read live (like `load`/`onError`, unlike `equals`): a reconciler
+				// closes over the caller's current refs, so capturing the mount-time
+				// identity would pin it to stale state.
+				reconcile: (prev, next) => {
+					const fn = ref.current.options.reconcile;
+					return fn ? fn(prev, next) : next;
 				},
 				subscribe: (onInvalidate) => {
 					const sub = ref.current.source?.onChange?.(onInvalidate);
