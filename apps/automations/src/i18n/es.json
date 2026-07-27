@@ -202,5 +202,11 @@
   "builder.issue.noSteps": "Añade al menos un paso.",
   "builder.issue.unbound": "Una entrada no está vinculada: {detail}",
   "builder.issue.emptyConfig": "A un paso le falta configuración obligatoria: {detail}",
-  "builder.issue.capExceeded": "Este flujo de trabajo necesita una capacidad que la app Automatizaciones no tiene: {detail}"
+  "builder.issue.capExceeded": "Este flujo de trabajo necesita una capacidad que la app Automatizaciones no tiene: {detail}",
+  "template.triage-new-email.name": "Clasificar correos nuevos",
+  "template.triage-new-email.desc": "Cuando llega un correo nuevo, un aviso para clasificarlo: archivar, marcar o dar seguimiento.",
+  "template.triage-new-email.trigger": "Cuando llega un correo",
+  "template.email-follow-up-nudge.name": "Aviso de seguimiento de correos",
+  "template.email-follow-up-nudge.desc": "Un recordatorio diario para retomar los hilos de correo que siguen sin respuesta.",
+  "template.email-follow-up-nudge.trigger": "Cada día laborable a las 16:00"
 }

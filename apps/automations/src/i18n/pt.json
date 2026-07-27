@@ -215,5 +215,11 @@
   "builder.issue.noSteps": "Adicione pelo menos uma etapa.",
   "builder.issue.unbound": "Uma entrada não está vinculada: {detail}",
   "builder.issue.emptyConfig": "Uma etapa está sem a configuração obrigatória: {detail}",
-  "builder.issue.capExceeded": "Este workflow precisa de uma capacidade que o app Automações não possui: {detail}"
+  "builder.issue.capExceeded": "Este workflow precisa de uma capacidade que o app Automações não possui: {detail}",
+  "template.triage-new-email.name": "Triagem de novos e-mails",
+  "template.triage-new-email.desc": "Quando um novo e-mail chega, um lembrete para classificá-lo: arquivar, sinalizar ou dar seguimento.",
+  "template.triage-new-email.trigger": "Quando um e-mail chega",
+  "template.email-follow-up-nudge.name": "Lembrete de acompanhamento de e-mails",
+  "template.email-follow-up-nudge.desc": "Um lembrete diário para cobrar as conversas de e-mail que ainda aguardam resposta.",
+  "template.email-follow-up-nudge.trigger": "Todo dia útil às 16:00"
 }

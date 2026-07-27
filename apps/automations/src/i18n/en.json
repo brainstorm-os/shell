@@ -215,5 +215,11 @@
   "builder.issue.noSteps": "Add at least one step.",
   "builder.issue.unbound": "An input is unbound: {detail}",
   "builder.issue.emptyConfig": "A step is missing required config: {detail}",
-  "builder.issue.capExceeded": "This workflow needs a capability the Automations app lacks: {detail}"
+  "builder.issue.capExceeded": "This workflow needs a capability the Automations app lacks: {detail}",
+  "template.triage-new-email.name": "Triage new email",
+  "template.triage-new-email.desc": "When a new email lands, a nudge to classify it — file, flag, or follow up.",
+  "template.triage-new-email.trigger": "When an email arrives",
+  "template.email-follow-up-nudge.name": "Email follow-up nudge",
+  "template.email-follow-up-nudge.desc": "A daily prompt to chase down the email threads still waiting on a reply.",
+  "template.email-follow-up-nudge.trigger": "Every weekday at 16:00"
 }

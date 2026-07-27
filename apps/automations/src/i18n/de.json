@@ -215,5 +215,11 @@
   "builder.issue.noSteps": "Füge mindestens einen Schritt hinzu.",
   "builder.issue.unbound": "Eine Eingabe ist ungebunden: {detail}",
   "builder.issue.emptyConfig": "Einem Schritt fehlt erforderliche Konfiguration: {detail}",
-  "builder.issue.capExceeded": "Dieser Workflow benötigt eine Berechtigung, die der Automatisierungen-App fehlt: {detail}"
+  "builder.issue.capExceeded": "Dieser Workflow benötigt eine Berechtigung, die der Automatisierungen-App fehlt: {detail}",
+  "template.triage-new-email.name": "Neue E-Mails sichten",
+  "template.triage-new-email.desc": "Wenn eine neue E-Mail eintrifft, ein Anstoß sie einzuordnen: ablegen, markieren oder nachfassen.",
+  "template.triage-new-email.trigger": "Wenn eine E-Mail eintrifft",
+  "template.email-follow-up-nudge.name": "Anstoß für E-Mail-Nachfassen",
+  "template.email-follow-up-nudge.desc": "Eine tägliche Erinnerung, E-Mail-Verläufe nachzufassen, die noch auf Antwort warten.",
+  "template.email-follow-up-nudge.trigger": "Jeden Werktag um 16:00 Uhr"
 }

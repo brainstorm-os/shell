@@ -215,5 +215,11 @@
   "builder.issue.noSteps": "Aggiungi almeno un passaggio.",
   "builder.issue.unbound": "Un input non è associato: {detail}",
   "builder.issue.emptyConfig": "A un passaggio manca la configurazione richiesta: {detail}",
-  "builder.issue.capExceeded": "Questo workflow necessita di una capacità che l'app Automazioni non possiede: {detail}"
+  "builder.issue.capExceeded": "Questo workflow necessita di una capacità che l'app Automazioni non possiede: {detail}",
+  "template.triage-new-email.name": "Smistamento nuove email",
+  "template.triage-new-email.desc": "Quando arriva una nuova email, una spinta a classificarla: archivia, segnala o dai seguito.",
+  "template.triage-new-email.trigger": "Quando arriva un'email",
+  "template.email-follow-up-nudge.name": "Spinta al follow-up delle email",
+  "template.email-follow-up-nudge.desc": "Un promemoria quotidiano per sollecitare i thread email ancora in attesa di risposta.",
+  "template.email-follow-up-nudge.trigger": "Ogni giorno feriale alle 16:00"
 }
