@@ -3,6 +3,249 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.11.0",
+      "date": "2026-07-28",
+      "icon": "📎",
+      "title": "Bytes everywhere, fast",
+      "summary": "Attachments now follow you across devices — thumbnails arrive instantly, full files on demand. Plus sync over your local network, a reader mode in the Browser, app badges, and every app in five languages.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Your files, on every device"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Attachments sync",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — images and files attached to your notes and entities now travel with your vault. "
+            },
+            {
+              "text": "Thumbnails",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " are always synced so previews appear instantly; the full file downloads the moment you open it — nothing waits, nothing hogs your disk."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sync over your local network (early)",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — two devices on the same Wi-Fi can now sync directly, no server involved. Opt-in under "
+            },
+            {
+              "text": "Settings → Sync",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "; end-to-end encrypted with a device-bound handshake."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sharing fix",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — sharing over a self-hosted relay on a private address silently never delivered the keys to the other person. It does now."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Around the apps"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Web Browser",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a new "
+            },
+            {
+              "text": "reader mode",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " ("
+            },
+            {
+              "text": "Cmd/Ctrl+Shift+R",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ") strips a page to a clean article — and "
+            },
+            {
+              "text": "Save to vault",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " now captures the readable content with it, not just the link."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "App badges",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — "
+            },
+            {
+              "text": "Chat",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " counts unread messages, "
+            },
+            {
+              "text": "Agent",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " pending approvals, "
+            },
+            {
+              "text": "Automations",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " failed runs — on their dashboard icons, the running-apps strip, and one combined count on the dock icon."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Anytype import",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — imported tasks and bookmarks now become real "
+            },
+            {
+              "text": "Tasks",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Bookmarks",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " instead of plain notes. Vault export runs in the background with progress and cancel, like import already did."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Properties everywhere",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — "
+            },
+            {
+              "text": "Tasks",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Notes",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " now use the same properties panel as the rest of the suite, with the full add-property picker."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Cinco idiomas",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — every app now ships in "
+            },
+            {
+              "text": "Spanish, German, French, Italian, and Portuguese",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Switch in "
+            },
+            {
+              "text": "Settings → Language",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Polish",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — one consistent field face across every form, on-theme selection colors in Chat, feedback dialog cleanups, and connector webhooks so services like GitHub can ping your vault to sync the moment something changes."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.10.1",
       "date": "2026-07-26",
       "icon": "🏷️",
