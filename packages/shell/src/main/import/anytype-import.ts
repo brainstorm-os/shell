@@ -40,6 +40,7 @@ import { extensionForMime, servedMimeForName } from "../files/upload-mime";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
+import { WelcomeEntityType } from "../welcome/welcome-content";
 import { anytypeBlocksToLexical, anytypeDateToMs } from "./anytype-blocks-to-lexical";
 import { yieldToEventLoop } from "./import-engine";
 import { inferValueType } from "./import-map";
@@ -199,6 +200,24 @@ export type AnytypeAttachment = {
 	readonly bytes: Uint8Array;
 };
 
+/** Native-type routing for a draft (IE-10e full kind-routing): a Task-layout
+ *  object lands as `brainstorm/Task/v1`, a Bookmark-layout one as
+ *  `brainstorm/Bookmark/v1`; everything else takes the run's target type. */
+export enum AnytypeDraftKind {
+	Note = "note",
+	Task = "task",
+	Bookmark = "bookmark",
+}
+
+export type AnytypeDraftRoute =
+	| { readonly kind: AnytypeDraftKind.Note }
+	| { readonly kind: AnytypeDraftKind.Task; readonly done: boolean; readonly dueAt: number | null }
+	| {
+			readonly kind: AnytypeDraftKind.Bookmark;
+			readonly url: string;
+			readonly description: string | null;
+	  };
+
 export type AnytypeEntityDraft = {
 	readonly title: string;
 	/** Resolved details (relation key → value) + `body` snippet when present. */
@@ -210,6 +229,8 @@ export type AnytypeEntityDraft = {
 	/** Lexical editor state built from Anytype blocks — planted into the
 	 *  universal-body Y.Doc so Notes opens with real structure (not markdown). */
 	readonly bodyState: ImportedBodyState | null;
+	/** Which native entity type the object's layout routes to. */
+	readonly route: AnytypeDraftRoute;
 };
 
 export type AnytypeLinkSpec = {
@@ -293,10 +314,13 @@ const SYSTEM_OBJECT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Anytype `details.layout` — the object-KIND discriminator (subset we act
- *  on; values are the wire protocol's ObjectLayout enum). */
+ *  on; values are the wire protocol's ObjectLayout enum — `Task` is the
+ *  protocol's `todo`). */
 enum AnytypeObjectLayout {
+	Task = 2,
 	Dashboard = 7,
 	Space = 10,
+	Bookmark = 11,
 	Collection = 14,
 	Date = 17,
 	SpaceView = 18,
@@ -315,6 +339,31 @@ const CHROME_LAYOUTS: ReadonlySet<number> = new Set([
 
 /** File-bearing snapshot kinds — consumed as the attachment index. */
 const FILE_SB_TYPES: ReadonlySet<string> = new Set(["FileObject", "File"]);
+
+/** The Bookmarks codec drops rows whose url doesn't normalize to http(s) —
+ *  a Bookmark-layout object without one falls back to the Note route so it
+ *  stays visible instead of minting an invisible row. */
+const HTTP_URL_RE = /^https?:\/\//i;
+
+function routeForLayout(
+	layout: number | null,
+	details: Record<string, unknown>,
+): AnytypeDraftRoute {
+	if (layout === AnytypeObjectLayout.Task) {
+		return {
+			kind: AnytypeDraftKind.Task,
+			done: details.done === true,
+			dueAt: anytypeDateToMs(details.dueDate),
+		};
+	}
+	if (layout === AnytypeObjectLayout.Bookmark) {
+		const url = asString(details.source);
+		if (url && HTTP_URL_RE.test(url)) {
+			return { kind: AnytypeDraftKind.Bookmark, url, description: asString(details.description) };
+		}
+	}
+	return { kind: AnytypeDraftKind.Note };
+}
 
 /** Detail keys that are Anytype-internal bookkeeping, not user data. */
 const SYSTEM_DETAIL_KEYS: ReadonlySet<string> = new Set([
@@ -951,6 +1000,7 @@ export function parseAnytypeExport(
 			anytypeType,
 			externalId: snap.id,
 			bodyState: hasBodyContent ? bodyState : null,
+			route: routeForLayout(layout, snap.details),
 		});
 
 		if (snap.collectionMembers) {
@@ -1216,6 +1266,63 @@ export type AnytypeImportReport = {
 
 const ANYTYPE_YIELD_EVERY = 50;
 
+/**
+ * Route a draft onto its native row type, shaping the property bag to the
+ * owning app's stored codec (IE-10e full kind-routing): the Tasks and
+ * Bookmarks codecs DROP rows missing their required fields, so the overlay
+ * always writes the complete required shape — numeric domain timestamps
+ * included. Notes pass through untouched on the run's target type. Returns
+ * the entity type the row is created with.
+ */
+function overlayNativeProperties(
+	route: AnytypeDraftRoute,
+	properties: Record<string, unknown>,
+	title: string,
+	ctx: { targetType: string; createdMs: number; updatedMs: number },
+): string {
+	if (route.kind === AnytypeDraftKind.Task) {
+		// Anytype has no separate task notes field — the description relation
+		// is the closest analogue the Tasks detail panel surfaces.
+		if (typeof properties.description === "string" && properties.notes === undefined) {
+			properties.notes = properties.description;
+		}
+		Object.assign(properties, {
+			name: title,
+			// `completedAt` is the canonical done signal (the Tasks board derives
+			// status from it); the export carries no completion timestamp, so the
+			// object's last-modified time stands in.
+			completedAt: route.done ? ctx.updatedMs : null,
+			scheduledAt: null,
+			dueAt: route.dueAt,
+			projectId: null,
+			assigneeId: null,
+			parentId: null,
+			recurrence: null,
+			statusKey: null,
+			createdAt: ctx.createdMs,
+			updatedAt: ctx.updatedMs,
+		});
+		return WelcomeEntityType.Task;
+	}
+	if (route.kind === AnytypeDraftKind.Bookmark) {
+		Object.assign(properties, {
+			url: route.url,
+			title,
+			faviconUrl: null,
+			coverImageUrl: null,
+			savedAt: ctx.createdMs,
+			readAt: null,
+			archivedAt: null,
+			colorHint: null,
+			createdAt: ctx.createdMs,
+			updatedAt: ctx.updatedMs,
+			...(route.description !== null ? { description: route.description } : {}),
+		});
+		return WelcomeEntityType.Bookmark;
+	}
+	return ctx.targetType;
+}
+
 /** Commit a parsed Anytype export into the vault: idempotent upsert of every
  *  object (keyed on its Anytype id via {@link IMPORT_EXTERNAL_ID_PROP}),
  *  referenced file binaries as `File/v1` entities, the object-link graph,
@@ -1444,6 +1551,11 @@ export async function importAnytypeExport(
 		};
 		const createdMs = typeof properties.createdAt === "number" ? properties.createdAt : options.now;
 		const updatedMs = typeof properties.updatedAt === "number" ? properties.updatedAt : createdMs;
+		const rowType = overlayNativeProperties(draft.route, properties, draft.title, {
+			targetType: options.targetType,
+			createdMs,
+			updatedMs,
+		});
 		let entityId: string;
 		if (existing !== null) {
 			repo.update(existing, properties, updatedMs);
@@ -1454,7 +1566,7 @@ export async function importAnytypeExport(
 			const id = `ent_${ulid()}`;
 			repo.create({
 				id,
-				type: options.targetType,
+				type: rowType,
 				properties,
 				createdBy: options.importedBy,
 				now: createdMs,
