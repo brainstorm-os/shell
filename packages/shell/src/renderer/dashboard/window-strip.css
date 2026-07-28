@@ -86,6 +86,29 @@
 	 * windows fit before the track has to scroll. */
 	min-width: 0;
 	flex-shrink: 1;
+	/* 7.14 — anchor for the shared `.dashboard-icons__badge` chip. */
+	position: relative;
+}
+
+/* 7.14 — the shared badge chip (see `icon-badge.tsx`), condensed for the
+ * compact footer tile: same face, smaller box, ring against the footer
+ * glass rather than the elevated tile surface. */
+.window-strip__tile .dashboard-icons__badge {
+	top: 1px;
+	inset-inline-end: 1px;
+	min-width: 14px;
+	height: 14px;
+	padding: 0 4px;
+	box-shadow: none;
+}
+
+.window-strip__tile .dashboard-icons__badge--dot {
+	top: 3px;
+	inset-inline-end: 3px;
+	min-width: 0;
+	width: 8px;
+	height: 8px;
+	padding: 0;
 }
 
 .window-strip__tile:hover {

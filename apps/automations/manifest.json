@@ -23,7 +23,8 @@
     "intents.dispatch:open",
     "files.read",
     "files.write",
-    "automations.run"
+    "automations.run",
+    "ui.badge"
   ],
   "registrations": {
     "entityTypes": [

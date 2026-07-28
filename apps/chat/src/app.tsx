@@ -63,6 +63,14 @@ import {
 	toPanelMembers,
 } from "./logic/chat";
 import { type LocalIdentity, mintPersonRef } from "./logic/identity";
+import {
+	type ReadWatermarks,
+	ackChannels,
+	channelMaxSeqs,
+	loadWatermarks,
+	saveWatermarks,
+	unreadTotal,
+} from "./logic/unread";
 import { getBrainstorm } from "./runtime";
 import "./styles.css";
 
@@ -290,6 +298,58 @@ export function ChatApp(): ReactElement {
 	// PRES-3 — who's-here on the open channel (live avatars, distinct from the
 	// channel MEMBER roster). Cross-device in the shell; empty otherwise.
 	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf());
+
+	// ── 7.14 — the app-icon unread badge. Seen semantics are app-owned: the
+	// ACTIVE channel is continuously read (you're looking at it); a channel
+	// observed for the first time baselines at its current max seq (history
+	// never badges on first run); everything else counts others' messages
+	// above the per-channel watermark. Watermarks persist in the app-private
+	// kv store; `null` until loaded so a premature 0 never clears a live badge.
+	const [watermarks, setWatermarks] = useState<ReadWatermarks | null>(null);
+	useEffect(() => {
+		if (!storage) {
+			setWatermarks({});
+			return;
+		}
+		let live = true;
+		loadWatermarks(storage)
+			.then((marks) => {
+				if (live) setWatermarks(marks);
+			})
+			.catch(() => {
+				if (live) setWatermarks({});
+			});
+		return () => {
+			live = false;
+		};
+	}, [storage]);
+
+	useEffect(() => {
+		if (watermarks === null) return;
+		const maxes = channelMaxSeqs(entities);
+		const toAck = [...maxes.keys()].filter((id) => watermarks[id] === undefined);
+		if (activeId !== null) toAck.push(activeId);
+		const next = ackChannels(watermarks, maxes, toAck);
+		if (next === watermarks) return;
+		setWatermarks(next);
+		if (storage) void saveWatermarks(storage, next).catch(() => undefined);
+	}, [watermarks, entities, activeId, storage]);
+
+	const unread = useMemo(
+		() => (watermarks === null ? 0 : unreadTotal(entities, identity.personRef, watermarks)),
+		[entities, identity.personRef, watermarks],
+	);
+
+	// Mirror the unread count onto the dashboard app-icon badge (cap
+	// `ui.badge`; the Mailbox pattern). `set({count})` treats count<=0 as a
+	// clear, so draining to all-read clears the chip. Keyed on the derived
+	// count; fire-and-forget and a no-op on shells without the badge service.
+	useEffect(() => {
+		if (watermarks === null) return;
+		const badge = services?.ui?.badge;
+		if (!badge) return;
+		void badge.set({ count: unread }).catch(() => undefined);
+	}, [unread, watermarks, services]);
 
 	const persisted = useMemo(
 		() => (activeId ? channelMessages(entities, activeId) : []),

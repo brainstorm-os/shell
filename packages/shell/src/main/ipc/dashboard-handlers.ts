@@ -31,7 +31,7 @@ import {
 } from "@brainstorm-os/protocol/shell-prefs";
 import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm-os/sdk-types";
 import { type ThemeName, isThemeName, themes } from "@brainstorm-os/tokens";
-import { type BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme } from "electron";
+import { type BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme } from "electron";
 import { resolveAppName } from "../apps/app-name";
 import { type AppWindow, isAppWindowLive } from "../apps/launcher";
 import { type MediaSeal, VaultMediaDomain, isSealedMedia } from "../assets/vault-media-crypto";
@@ -56,6 +56,7 @@ import { EntityTypesRepository } from "../storage/registry-repo/entity-types-rep
 import { IntentsRepository } from "../storage/registry-repo/intents-repo";
 import { OpenerTargetKind, OpenersRepository } from "../storage/registry-repo/openers-repo";
 import { WidgetsRepository } from "../storage/registry-repo/widgets-repo";
+import { getOsBadgeAggregator } from "../ui/os-badge";
 import { type VaultSession, getActiveVaultSession } from "../vault/session";
 
 export const DASHBOARD_SNAPSHOT_CHANNEL = "dashboard:snapshot";
@@ -783,20 +784,13 @@ export async function ensureThumbnail(
 
 let nativeThemeListener: (() => void) | null = null;
 
-/** Mirror the unread notification count onto the OS app badge (macOS dock /
- *  Linux launcher; a no-op elsewhere). Diffed so unrelated store mutations
- *  don't re-touch the dock. */
-let lastBadgeCount = -1;
-
+/** Report the unread notification count to the OS-badge single owner (7.14
+ *  follow-up) — the aggregator composes it with the vault-wide app-badge
+ *  total and applies ONE diffed `app.setBadgeCount` (the applier is wired in
+ *  `main/index.ts`). Never call `app.setBadgeCount` directly. */
 function updateNotificationBadge(store: DashboardStore): void {
 	const unread = store.snapshot().notificationHistory.filter((n) => !n.read).length;
-	if (unread === lastBadgeCount) return;
-	lastBadgeCount = unread;
-	try {
-		app.setBadgeCount(unread);
-	} catch {
-		// `app` isn't available in test contexts.
-	}
+	getOsBadgeAggregator().setNotificationUnread(unread);
 }
 
 async function ensureSubscribed(

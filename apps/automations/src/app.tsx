@@ -34,6 +34,13 @@ import {
 	emptyBuilderTrigger,
 	triggerTypeSuggestions,
 } from "./logic/builder-trigger";
+import {
+	SEEN_FAILED_RUNS_KEY,
+	decodeSeenRunIds,
+	failedRunIds,
+	sameIdSet,
+	unseenFailedCount,
+} from "./logic/failure-badge";
 import type { WorkflowTemplate } from "./logic/templates";
 import {
 	ExportOutcome,
@@ -148,6 +155,57 @@ export function AutomationsApp(): ReactElement {
 		() => triggerTypeSuggestions(vault.entities.map((e) => e.type)),
 		[vault],
 	);
+
+	// ── 7.14 — the app-icon failed-run badge. Seen semantics are app-owned:
+	// opening the Runs tab acknowledges every currently-failed run (that's
+	// where failures are inspected), so the badge counts only failures that
+	// arrived since. The ack set persists in the app-private kv store; `null`
+	// until loaded so a premature 0 never clears a live badge.
+	const failedIds = useMemo(() => failedRunIds(runs), [runs]);
+	const [seenFailed, setSeenFailed] = useState<ReadonlySet<string> | null>(null);
+	useEffect(() => {
+		if (!ready) return undefined;
+		const storage = getBrainstorm()?.services?.storage;
+		if (!storage) {
+			setSeenFailed(new Set());
+			return undefined;
+		}
+		let live = true;
+		storage
+			.get(SEEN_FAILED_RUNS_KEY)
+			.then((raw) => {
+				if (live) setSeenFailed(decodeSeenRunIds(raw));
+			})
+			.catch(() => {
+				if (live) setSeenFailed(new Set());
+			});
+		return () => {
+			live = false;
+		};
+	}, [ready]);
+
+	useEffect(() => {
+		if (view !== View.Runs || seenFailed === null) return;
+		// Ack + prune in one step: the acknowledged set becomes exactly the
+		// live failed set, so vanished runs can't accumulate in storage.
+		const next = new Set(failedIds);
+		if (sameIdSet(next, seenFailed)) return;
+		setSeenFailed(next);
+		const storage = getBrainstorm()?.services?.storage;
+		if (storage) void storage.put(SEEN_FAILED_RUNS_KEY, [...next]).catch(() => undefined);
+	}, [view, failedIds, seenFailed]);
+
+	// Mirror the unseen count onto the dashboard app-icon badge (cap
+	// `ui.badge`; the Mailbox pattern). `set({count})` treats count<=0 as a
+	// clear, so viewing the Runs tab drains the chip. Fire-and-forget and a
+	// no-op on shells without the badge service.
+	const unseenFailures = seenFailed === null ? null : unseenFailedCount(failedIds, seenFailed);
+	useEffect(() => {
+		if (unseenFailures === null) return;
+		const badge = getBrainstorm()?.services?.ui?.badge;
+		if (!badge) return;
+		void badge.set({ count: unseenFailures }).catch(() => undefined);
+	}, [unseenFailures]);
 
 	// ── Boot: the runtime hands services over after first paint, so gate the
 	// live binding on the lifecycle `ready` handshake (fall through immediately

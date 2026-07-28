@@ -309,6 +309,7 @@ import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sy
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
 import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
+import { getOsBadgeAggregator } from "./ui/os-badge";
 import { makeOsNotifier } from "./ui/os-notification-host";
 import { type ComposedTray, getTrayHost } from "./ui/tray-host";
 import { makeUiServiceHandler } from "./ui/ui-service";
@@ -4997,10 +4998,25 @@ void app.whenReady().then(async () => {
 		tray.setContextMenu(Menu.buildFromTemplate(template));
 	};
 	trayHost.setListener(renderTray);
+	// 7.14 follow-up — the OS dock/taskbar badge single owner: BOTH signals
+	// (notification unread via `dashboard-handlers.updateNotificationBadge`,
+	// app badges via the BadgeHost listener below) report to the aggregator,
+	// which applies the ONE composed `app.setBadgeCount`. This is the only
+	// place the Electron setter is wired.
+	getOsBadgeAggregator().setApplier((count) => {
+		try {
+			app.setBadgeCount(count);
+		} catch {
+			// `app.setBadgeCount` isn't available in test contexts.
+		}
+	});
 	// 7.14 — forward the composed per-app badge model to the dashboard renderer
-	// (the icon-corner chip). Same push shape as `apps:running-changed`; the
-	// renderer keys entries by `appId` onto its app tiles.
+	// (the icon-corner chip + running-windows strip). Same push shape as
+	// `apps:running-changed`; the renderer keys entries by `appId` onto its
+	// tiles. The same composed model feeds the OS-badge aggregator, so a vault
+	// switch (BadgeHost.reset → empty model) also drops the dock total.
 	badgeHost.setListener((badges) => {
+		getOsBadgeAggregator().setAppBadges(badges);
 		const dash = dashboardWindow;
 		if (dash && !dash.isDestroyed() && !dash.webContents.isDestroyed()) {
 			dash.webContents.send(BADGES_CHANGED_CHANNEL, badges);

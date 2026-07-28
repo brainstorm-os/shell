@@ -16,7 +16,8 @@
     "roster.read",
     "roster.write",
     "sharing.read",
-    "sharing.share"
+    "sharing.share",
+    "ui.badge"
   ],
   "registrations": {
     "entityTypes": [

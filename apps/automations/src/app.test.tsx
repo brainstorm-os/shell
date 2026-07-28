@@ -8,6 +8,7 @@ import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutomationsApp } from "./app";
+import { SEEN_FAILED_RUNS_KEY } from "./logic/failure-badge";
 import { flush, renderInto } from "./test/render";
 
 vi.mock("@brainstorm-os/sdk/menus", () => ({
@@ -35,18 +36,23 @@ type HostState = { deviceId: string; hostDeviceId: string | null; scheduling: bo
 function installShell(
 	entities: SnapshotEntity[],
 	host?: HostState,
+	seedKv?: Record<string, unknown>,
 ): {
 	fireReady(): void;
 	writes: Array<{ op: string; args: unknown[] }>;
 	runNowCalls: Array<{ workflowId: string }>;
 	hostStatusCalls: number;
 	claimCalls: number;
+	kv: Map<string, unknown>;
+	badgeSet: ReturnType<typeof vi.fn>;
 } {
 	const readyHandlers: ReadyHandler[] = [];
 	const writes: Array<{ op: string; args: unknown[] }> = [];
 	const runNowCalls: Array<{ workflowId: string }> = [];
 	let hostStatusCalls = 0;
 	let claimCalls = 0;
+	const kv = new Map<string, unknown>(Object.entries(seedKv ?? {}));
+	const badgeSet = vi.fn(() => Promise.resolve());
 	const hostState: HostState = host ?? { deviceId: "d", hostDeviceId: null, scheduling: false };
 	const snapshot = {
 		entities: entities.map((e) => ({
@@ -82,6 +88,13 @@ function installShell(
 				queryPattern: async () => ({ ok: true, snapshot }),
 				onChange: () => ({ unsubscribe: () => undefined }),
 			},
+			storage: {
+				get: async (key: string) => kv.get(key) ?? null,
+				put: async (key: string, value: unknown) => {
+					kv.set(key, value);
+				},
+			},
+			ui: { badge: { set: badgeSet, clear: vi.fn(() => Promise.resolve()) } },
 			automations: {
 				runNow: async (input: { workflowId: string }) => {
 					runNowCalls.push(input);
@@ -116,6 +129,8 @@ function installShell(
 		get claimCalls() {
 			return claimCalls;
 		},
+		kv,
+		badgeSet,
 	};
 }
 
@@ -425,6 +440,58 @@ describe("AutomationsApp", () => {
 		await flush();
 		expect(container.querySelector("#app-root")).toBeTruthy();
 		expect(container.querySelector(".au-body")).toBeTruthy();
+		await unmount();
+	});
+});
+
+describe("AutomationsApp — app-icon failed-run badge (7.14)", () => {
+	function failedRun(id: string): SnapshotEntity {
+		return {
+			id,
+			type: WORKFLOW_RUN_TYPE_URL,
+			properties: { workflow: "wf-1", status: "failed", triggeredAt: "2026-02-01T09:00:00.000Z" },
+		};
+	}
+
+	async function openRunsTab(container: HTMLElement): Promise<void> {
+		const runsTab = [...container.querySelectorAll<HTMLButtonElement>(".au-tab")].find(
+			(b) => b.textContent === "Runs",
+		);
+		await act(async () => {
+			runsTab?.click();
+		});
+		await flush();
+		await flush();
+	}
+
+	it("badges unseen failures and clears when the Runs tab is opened (the seen gesture)", async () => {
+		const shell = installShell([workflow("wf-1", "Nightly", true), failedRun("run-bad")]);
+		const { container, unmount } = await renderInto(<AutomationsApp />);
+		await act(async () => {
+			shell.fireReady();
+		});
+		await flush();
+		await flush();
+		expect(shell.badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+
+		await openRunsTab(container);
+		expect(shell.badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+		// The ack persisted (and is exactly the live failed set — pruned).
+		expect(shell.kv.get(SEEN_FAILED_RUNS_KEY)).toEqual(["run-bad"]);
+		await unmount();
+	});
+
+	it("does not re-badge failures already acknowledged in a previous session", async () => {
+		const shell = installShell([workflow("wf-1", "Nightly", true), failedRun("run-bad")], undefined, {
+			[SEEN_FAILED_RUNS_KEY]: ["run-bad"],
+		});
+		const { unmount } = await renderInto(<AutomationsApp />);
+		await act(async () => {
+			shell.fireReady();
+		});
+		await flush();
+		await flush();
+		expect(shell.badgeSet).toHaveBeenLastCalledWith({ count: 0 });
 		await unmount();
 	});
 });

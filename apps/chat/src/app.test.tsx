@@ -13,6 +13,7 @@ import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatApp } from "./app";
 import { CHANNEL_TYPE, MESSAGE_TYPE } from "./logic/chat";
+import { READ_WATERMARKS_KEY } from "./logic/unread";
 
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
@@ -30,11 +31,16 @@ type StorageStub = {
 	put: (key: string, value: unknown) => Promise<void>;
 };
 
+/** 7.14 — records the app-icon badge mirror (`services.ui.badge`). */
+const badgeSet = vi.fn(() => Promise.resolve());
+
 function installShell(entities: StubEntity[], storageOverride?: StorageStub): void {
 	created.length = 0;
+	badgeSet.mockClear();
 	const kv = new Map<string, unknown>();
 	(window as { brainstorm?: unknown }).brainstorm = {
 		services: {
+			ui: { badge: { set: badgeSet, clear: vi.fn(() => Promise.resolve()) } },
 			vaultEntities: {
 				list: () => Promise.resolve({ entities, links: [] }),
 				onChange: () => ({ unsubscribe: () => {} }),
@@ -236,5 +242,64 @@ describe("ChatApp", () => {
 		});
 		const ch = created.find((c) => c.type === CHANNEL_TYPE);
 		expect(ch?.properties.name).toBe("announcements");
+	});
+});
+
+describe("ChatApp — app-icon unread badge (7.14)", () => {
+	function seededStorage(seed: Record<string, unknown>): {
+		kv: Map<string, unknown>;
+		stub: StorageStub;
+	} {
+		const kv = new Map<string, unknown>(Object.entries(seed));
+		return {
+			kv,
+			stub: {
+				get: (key) => Promise.resolve(kv.get(key) ?? null),
+				put: (key, value) => {
+					kv.set(key, value);
+					return Promise.resolve();
+				},
+			},
+		};
+	}
+
+	it("badges others' messages above the stored watermark and clears when the channel is opened", async () => {
+		const { kv, stub } = seededStorage({ [READ_WATERMARKS_KEY]: { c2: 0 } });
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m0", "c2", "Mira", "seen already"), // seq 0 — at the watermark
+				message("m1", "c2", "Mira", "new since"), // seq 1 — above it
+			],
+			stub,
+		);
+		await act(async () => undefined);
+		// c1 auto-selects; the c2 message above the watermark badges.
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+
+		// Opening the channel is the app-owned "seen" gesture — the watermark
+		// advances, the badge clears, and the ack persists.
+		const designBtn = [...container.querySelectorAll<HTMLButtonElement>(".chat__channel")].find((b) =>
+			b.textContent?.includes("design"),
+		);
+		await act(async () => {
+			designBtn?.click();
+		});
+		await act(async () => undefined);
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+		expect(kv.get(READ_WATERMARKS_KEY)).toMatchObject({ c2: 1 });
+	});
+
+	it("first observation baselines a channel — history never badges on first run", async () => {
+		const { kv, stub } = seededStorage({});
+		await mount(
+			[channel("c1", "general"), channel("c2", "design"), message("m3", "c2", "Mira", "old talk")],
+			stub,
+		);
+		await act(async () => undefined);
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+		// The baseline ack persisted, so the next arrival counts from here.
+		expect(kv.get(READ_WATERMARKS_KEY)).toMatchObject({ c2: 3 });
 	});
 });
