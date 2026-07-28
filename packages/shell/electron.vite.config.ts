@@ -29,6 +29,16 @@ export default defineConfig(({ command }) => {
 					],
 				}),
 			],
+			// The feedback/crash endpoint must be INLINED, not read from the
+			// environment: `process.env` in the main process is evaluated on the
+			// USER's machine at launch, where nothing sets it, so a CI-set variable
+			// never reaches a shipped build. Verified — building with it set left no
+			// trace of the value in `out/main/index.js`. Empty string ⇒ no endpoint.
+			define: {
+				__BRAINSTORM_FEEDBACK_ENDPOINT__: JSON.stringify(
+					process.env.BRAINSTORM_FEEDBACK_ENDPOINT ?? "",
+				),
+			},
 			build: {
 				outDir: "out/main",
 				minify,

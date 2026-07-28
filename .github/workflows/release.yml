@@ -99,6 +99,12 @@ jobs:
           # Cap parallel rustc units so ubuntu-arm / smaller runners don't OOM
           # mid-link (v0.4.3 lost the arm64 host; alpha.yml already uses 2).
           CARGO_BUILD_JOBS: 2
+          # BugTrack-1 — inlined into the bundle by electron-vite's `define`, NOT
+          # read from the environment at runtime: a packaged app evaluates
+          # `process.env` on the user's machine, where nothing sets this. Unset
+          # secret ⇒ empty ⇒ no endpoint, and the client silently keeps reports
+          # local (which is the pre-existing behaviour, not a regression).
+          BRAINSTORM_FEEDBACK_ENDPOINT: ${{ secrets.BRAINSTORM_FEEDBACK_ENDPOINT }}
         run: |
           if [ -n "${{ matrix.rust-extra }}" ]; then rustup target add ${{ matrix.rust-extra }}; fi
           bun run --filter @brainstorm-os/native ${{ matrix.napi-script }}
