@@ -22,10 +22,18 @@
  *   - `dev:collab:access` — resolved access log (active + revoked).
  *   - `dev:collab:state-vector` — `Y.encodeStateVector` of the persisted doc.
  *   - `dev:collab:read-text` — the scratch text (content-level convergence check).
+ *   - `dev:collab:bind-asset` — Asset-B4: mint an encrypted asset + bind it to an
+ *     entity through the production reconcile/upload paths.
+ *   - `dev:collab:asset-status` — row/blob/manifest observability for one pair.
+ *   - `dev:collab:materialize-asset` — Asset-B4: materialise bytes on access
+ *     (reconstruct → local blob, else lazy fetch off the durable node).
+ *   - `dev:collab:read-asset-local` — the LOCAL bytes only (lazy-fetch probe).
  */
 
+import { Buffer } from "node:buffer";
 import { ipcMain } from "electron";
 import {
+	type CollabAssetDeps,
 	CollabDevBridge,
 	type CollabRelayLike,
 	parseAccessRole,
@@ -35,7 +43,14 @@ import { getActiveRelay } from "../sync/active-relay";
 import { getActiveVaultSession } from "../vault/session";
 import { assertDevEntityId } from "./dev-entity-id";
 
+/** Asset bytes cross this dev IPC as base64; cap the decoded size well under
+ *  anything the harness needs so a runaway spec can't balloon the channel. */
+const MAX_DEV_ASSET_BYTES = 8 * 1024 * 1024;
+
+const PROPERTY_KEY_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+
 let bound: { bridge: CollabDevBridge; vaultId: string } | null = null;
+let boundAssetDeps: CollabAssetDeps | null = null;
 
 function bridgeForSession(): CollabDevBridge {
 	const session = getActiveVaultSession();
@@ -43,7 +58,11 @@ function bridgeForSession(): CollabDevBridge {
 	if (!bound || bound.vaultId !== session.vaultId) {
 		bound?.bridge.dispose();
 		bound = {
-			bridge: new CollabDevBridge(session, () => getActiveRelay() as CollabRelayLike | null),
+			bridge: new CollabDevBridge(
+				session,
+				() => getActiveRelay() as CollabRelayLike | null,
+				boundAssetDeps,
+			),
 			vaultId: session.vaultId,
 		};
 	}
@@ -56,7 +75,8 @@ function assertType(value: unknown): asserts value is string {
 	}
 }
 
-export function registerCollabDevHandlers(): () => void {
+export function registerCollabDevHandlers(assetDeps: CollabAssetDeps | null = null): () => void {
+	boundAssetDeps = assetDeps;
 	ipcMain.handle("dev:collab:whoami", async () => bridgeForSession().whoami());
 
 	ipcMain.handle("dev:collab:create-invite", async (_event, label: unknown) => {
@@ -177,6 +197,54 @@ export function registerCollabDevHandlers(): () => void {
 		return bridgeForSession().presenceRemotePeers(entityId);
 	});
 
+	// Asset-B4 — bind an encrypted asset to an entity through the production
+	// paths (AssetStore mint → entities.update with a `brainstorm://asset/` URL →
+	// implicit-bind reconcile → upload-on-bind → DEK re-home). Bytes ride base64.
+	ipcMain.handle(
+		"dev:collab:bind-asset",
+		async (_event, entityId: unknown, bytesB64: unknown, mime: unknown, propertyKey: unknown) => {
+			assertDevEntityId(entityId);
+			if (typeof bytesB64 !== "string" || bytesB64.length === 0) {
+				throw new Error("dev:collab:bind-asset: bytesB64 must be a non-empty base64 string");
+			}
+			if (typeof mime !== "string" || mime.length === 0) {
+				throw new Error("dev:collab:bind-asset: mime must be a non-empty string");
+			}
+			if (typeof propertyKey !== "string" || !PROPERTY_KEY_RE.test(propertyKey)) {
+				throw new Error("dev:collab:bind-asset: invalid propertyKey");
+			}
+			const bytes = new Uint8Array(Buffer.from(bytesB64, "base64"));
+			if (bytes.length === 0 || bytes.length > MAX_DEV_ASSET_BYTES) {
+				throw new Error(`dev:collab:bind-asset: bytes must be 1..${MAX_DEV_ASSET_BYTES}`);
+			}
+			return bridgeForSession().bindAsset(entityId, bytes, mime, propertyKey);
+		},
+	);
+
+	ipcMain.handle("dev:collab:asset-status", async (_event, entityId: unknown, assetId: unknown) => {
+		assertDevEntityId(entityId);
+		assertDevEntityId(assetId);
+		return bridgeForSession().assetStatus(entityId, assetId);
+	});
+
+	ipcMain.handle(
+		"dev:collab:materialize-asset",
+		async (_event, entityId: unknown, assetId: unknown) => {
+			assertDevEntityId(entityId);
+			assertDevEntityId(assetId);
+			const got = await bridgeForSession().materializeAssetOnAccess(entityId, assetId);
+			return got
+				? { bytesB64: Buffer.from(got.bytes).toString("base64"), mime: got.mime, source: got.source }
+				: null;
+		},
+	);
+
+	ipcMain.handle("dev:collab:read-asset-local", async (_event, assetId: unknown) => {
+		assertDevEntityId(assetId);
+		const got = await bridgeForSession().readAssetLocal(assetId);
+		return got ? { bytesB64: Buffer.from(got.bytes).toString("base64"), mime: got.mime } : null;
+	});
+
 	return () => {
 		for (const ch of [
 			"dev:collab:whoami",
@@ -192,10 +260,15 @@ export function registerCollabDevHandlers(): () => void {
 			"dev:collab:read-text",
 			"dev:collab:publish-presence",
 			"dev:collab:presence-remote-peers",
+			"dev:collab:bind-asset",
+			"dev:collab:asset-status",
+			"dev:collab:materialize-asset",
+			"dev:collab:read-asset-local",
 		]) {
 			ipcMain.removeHandler(ch);
 		}
 		bound?.bridge.dispose();
 		bound = null;
+		boundAssetDeps = null;
 	};
 }

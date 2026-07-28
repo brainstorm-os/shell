@@ -782,7 +782,13 @@ const onPairingDevicesChanged = (listener: PairingListener): (() => void) =>
 	subscribe<void>(PAIRING_DEVICES_CHANGED_CHANNEL, () => listener());
 
 import type { AccessRole } from "../main/collab/access-record";
-import type { CollabAccessView, CollabIdentity } from "../main/collab/collab-dev-bridge";
+import type {
+	CollabAccessView,
+	CollabAssetBindResult,
+	CollabAssetSource,
+	CollabAssetStatus,
+	CollabIdentity,
+} from "../main/collab/collab-dev-bridge";
 import type { ShareInvite } from "../main/collab/share-invite";
 import type { ImportPlan, ImportRunReport } from "../main/import/import-types";
 import type {
@@ -1780,6 +1786,23 @@ const dev = {
 			entityId: string,
 		): Promise<{ clientId: number; state: Record<string, unknown> }[]> =>
 			ipcRenderer.invoke("dev:collab:presence-remote-peers", entityId),
+		/** Asset-B4 dogfood — asset bytes cross this bridge as base64. */
+		bindAsset: (
+			entityId: string,
+			bytesB64: string,
+			mime: string,
+			propertyKey: string,
+		): Promise<CollabAssetBindResult> =>
+			ipcRenderer.invoke("dev:collab:bind-asset", entityId, bytesB64, mime, propertyKey),
+		assetStatus: (entityId: string, assetId: string): Promise<CollabAssetStatus> =>
+			ipcRenderer.invoke("dev:collab:asset-status", entityId, assetId),
+		materializeAsset: (
+			entityId: string,
+			assetId: string,
+		): Promise<{ bytesB64: string; mime: string; source: CollabAssetSource } | null> =>
+			ipcRenderer.invoke("dev:collab:materialize-asset", entityId, assetId),
+		readAssetLocal: (assetId: string): Promise<{ bytesB64: string; mime: string } | null> =>
+			ipcRenderer.invoke("dev:collab:read-asset-local", assetId),
 	},
 };
 

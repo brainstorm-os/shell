@@ -20,7 +20,11 @@
  * order through one promise chain.
  */
 
+import { GrantedVia } from "@brainstorm-os/capabilities/ledger";
 import * as Y from "yjs";
+import { parseAssetChunkManifest } from "../assets/asset-chunks";
+import { AssetKind } from "../assets/asset-types";
+import { AssetsRepository } from "../storage/entities-repo";
 import { decodeFrame } from "../sync/envelope-codec";
 import { receiveAndApply, receiveWrapBootstrap } from "../sync/envelope-pipeline";
 import { getLiveSyncEngine } from "../sync/live-sync-wiring";
@@ -43,10 +47,71 @@ export type { CollabAccessView, CollabIdentity, CollabRelayLike } from "./sharin
  *  collab session can prove convergence without booting the full editor. */
 const COLLAB_TEXT_KEY = "collab-text";
 
+/** App id the asset-bind verb writes entities as. The bridge grants it
+ *  `entities.read/write:*` in the vault ledger at bind time so the REAL
+ *  type-scoped entities service (the production implicit-bind reconcile path)
+ *  authorizes the write — no cap-check bypass. */
+export const COLLAB_DEV_APP_ID = "io.brainstorm.dev.collab";
+
+/** Where the bytes a `materializeAssetOnAccess` call returned came from — the
+ *  observable a dogfood spec asserts lazy fetch with (first access = relay,
+ *  later accesses = the restored local blob). */
+export enum CollabAssetSource {
+	LocalBlob = "local-blob",
+	RelayFetch = "relay-fetch",
+}
+
+export type CollabAssetBindResult = { assetId: string; url: string };
+
+export type CollabAssetStatus = {
+	/** A local `assets` metadata row exists. */
+	hasRow: boolean;
+	/** The encrypted blob is on this device (a local `readAsset` round-trips). */
+	hasLocalBytes: boolean;
+	/** The entity Y.Doc carries a valid chunk manifest for the asset — the
+	 *  upload-done marker `uploadBoundAsset` installs after every chunk lands.
+	 *  Read through the ydoc worker's cache (current on the binding device). */
+	manifestPresent: boolean;
+};
+
+export type CollabAssetBytes = { bytes: Uint8Array; mime: string };
+
+export type CollabAssetAccessResult = CollabAssetBytes & { source: CollabAssetSource };
+
+/** The Asset-B4 production paths the bridge's asset verbs drive — injected by
+ *  `collab-dev-handlers` from the main-process wiring so this class stays
+ *  unit-testable with fakes. */
+export type CollabAssetDeps = {
+	/** The REAL `entities` broker service (staleness-broadcast wrapper included):
+	 *  route a property patch through `entities.update` so the implicit-bind
+	 *  reconciler derives `asset_refs` and `onAssetBound` pushes the chunks. */
+	updateEntityProperties: (
+		appId: string,
+		entityId: string,
+		patch: Record<string, unknown>,
+	) => Promise<unknown>;
+	/** Raw (untrusted) chunk manifest off the entity Y.Doc (ydoc worker ferry). */
+	readManifest: (entityId: string, assetId: string) => Promise<unknown>;
+	/** The production asset-DEK re-home pass (normally a boot-time drain) — run
+	 *  after a bind so the wrap a peer's materialize needs lands mid-session. */
+	rehomeAssetDeks: () => Promise<void>;
+	/** Evict the ydoc worker's cached doc so its next read loads from disk. The
+	 *  dogfood receiver appends synced updates via the main-process doc store,
+	 *  which the worker's in-memory cache can never observe. */
+	evictWorkerDoc: (entityId: string) => Promise<void>;
+	/** The production Asset-B4c cold-device metadata reconstruction pass
+	 *  (`assets` + `asset_deks` + `asset_refs` rows from synced manifests). */
+	reconstructAssets: (entityIds: readonly string[]) => Promise<void>;
+	/** The production serve-on-miss materialisation — fetch + verify + reassemble
+	 *  the chunks from the durable node, restoring the local blob. */
+	materializeOnAccess: (assetId: string) => Promise<CollabAssetBytes | null>;
+};
+
 export class CollabDevBridge {
 	readonly #session: VaultSession;
 	readonly #getRelay: () => CollabRelayLike | null;
 	readonly #engine: SharingEngine;
+	readonly #assetDeps: CollabAssetDeps | null;
 	#receiver: ((frame: Uint8Array) => void) | null = null;
 	/** Every entity channel this shell currently subscribes to. The receiver is a
 	 *  single shared listener that dispatches each frame by its own header
@@ -56,10 +121,15 @@ export class CollabDevBridge {
 	readonly #receiverEntityIds = new Set<string>();
 	#receiveChain: Promise<unknown> = Promise.resolve();
 
-	constructor(session: VaultSession, getRelay: () => CollabRelayLike | null) {
+	constructor(
+		session: VaultSession,
+		getRelay: () => CollabRelayLike | null,
+		assetDeps: CollabAssetDeps | null = null,
+	) {
 		this.#session = session;
 		this.#getRelay = getRelay;
 		this.#engine = new SharingEngine(session, getRelay);
+		this.#assetDeps = assetDeps;
 	}
 
 	/** This shell's sovereign identity + wrapping key. */
@@ -192,12 +262,107 @@ export class CollabDevBridge {
 		return [...(getPresenceRouter()?.remotePeerSnapshots(entityId) ?? [])];
 	}
 
+	/**
+	 * Asset-B4 dogfood — create an encrypted asset from `bytes` through the REAL
+	 * `AssetStore` (per-asset random DEK, sealed blob), then reference it from
+	 * `entityId`'s properties as a `brainstorm://asset/<id>` URL through the REAL
+	 * entities service, so the implicit-bind reconciler derives the `asset_refs`
+	 * row and the post-commit `onAssetBound` hook pushes the chunks to the node.
+	 * Finishes with the production asset-DEK re-home pass (a boot-time drain in
+	 * normal operation) so the entity-doc wrap a peer's materialize needs exists
+	 * before this session shares the entity.
+	 */
+	async bindAsset(
+		entityId: string,
+		bytes: Uint8Array,
+		mime: string,
+		propertyKey: string,
+	): Promise<CollabAssetBindResult> {
+		const deps = this.#requireAssetDeps();
+		const store = await this.#session.assetStore();
+		const { assetId } = await store.writeAsset({ bytes, mime, kind: AssetKind.Upload });
+		const url = `brainstorm://asset/${assetId}`;
+		await this.#grantDevEntityCaps();
+		await deps.updateEntityProperties(COLLAB_DEV_APP_ID, entityId, { [propertyKey]: url });
+		await deps.rehomeAssetDeks();
+		return { assetId, url };
+	}
+
+	/** Local + wire observability for one (entity, asset) pair — what a spec
+	 *  polls to await the upload (manifest present) and to prove lazy fetch
+	 *  (no row / no local bytes before the first access on a peer). */
+	async assetStatus(entityId: string, assetId: string): Promise<CollabAssetStatus> {
+		const deps = this.#requireAssetDeps();
+		const store = await this.#session.assetStore();
+		const db = await this.#session.dataStores.open("entities");
+		const hasRow = new AssetsRepository(db).getById(assetId) !== null;
+		const hasLocalBytes = hasRow && (await store.readAsset(assetId)) !== null;
+		const manifestPresent =
+			parseAssetChunkManifest(await deps.readManifest(entityId, assetId)) !== null;
+		return { hasRow, hasLocalBytes, manifestPresent };
+	}
+
+	/**
+	 * Asset-B4 dogfood — materialise an asset ON ACCESS, exactly as production
+	 * lazy fetch does: reconstruct the local metadata from the synced manifest +
+	 * re-homed DEK wrap if this device never had it (Asset-B4c), serve the local
+	 * blob when present, else fetch + verify + reassemble the chunks from the
+	 * durable node (serve-on-miss), which restores the blob for later reads. The
+	 * returned `source` is the lazy-fetch observable.
+	 */
+	async materializeAssetOnAccess(
+		entityId: string,
+		assetId: string,
+	): Promise<CollabAssetAccessResult | null> {
+		const deps = this.#requireAssetDeps();
+		await deps.evictWorkerDoc(entityId);
+		await deps.reconstructAssets([entityId]);
+		const store = await this.#session.assetStore();
+		const local = await store.readAsset(assetId);
+		if (local) {
+			return { bytes: local.bytes, mime: local.mime, source: CollabAssetSource.LocalBlob };
+		}
+		const fetched = await deps.materializeOnAccess(assetId);
+		return fetched
+			? { bytes: fetched.bytes, mime: fetched.mime, source: CollabAssetSource.RelayFetch }
+			: null;
+	}
+
+	/** The asset's bytes from the LOCAL store only — never the wire. Null when
+	 *  the row or blob is absent (the "bytes not here before access" probe). */
+	async readAssetLocal(assetId: string): Promise<CollabAssetBytes | null> {
+		const store = await this.#session.assetStore();
+		const got = await store.readAsset(assetId);
+		return got ? { bytes: got.bytes, mime: got.mime } : null;
+	}
+
 	dispose(): void {
 		const relay = this.#getRelay();
 		if (relay) this.#detachReceiver(relay);
 	}
 
 	// --- internals ----------------------------------------------------------
+
+	#requireAssetDeps(): CollabAssetDeps {
+		if (!this.#assetDeps) {
+			throw new Error("collab-dev-bridge: asset deps not wired");
+		}
+		return this.#assetDeps;
+	}
+
+	/** Idempotent runtime grants so the type-scoped entities service authorizes
+	 *  the dev app's writes through its normal ledger check. */
+	async #grantDevEntityCaps(): Promise<void> {
+		const ledger = await this.#session.capabilityLedger();
+		for (const capability of ["entities.read", "entities.write"]) {
+			ledger.grant({
+				appId: COLLAB_DEV_APP_ID,
+				capability,
+				scope: "*",
+				grantedVia: GrantedVia.Runtime,
+			});
+		}
+	}
 
 	async #handleFrame(frame: Uint8Array): Promise<void> {
 		try {
