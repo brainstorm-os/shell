@@ -254,13 +254,14 @@ async function requireMappingOwner(
 		throw makeError("Unavailable", `connectors.${envelope.method}: webhook surface not wired`);
 	}
 	const owner = await deps.resolveMappingOwner(mappingRef);
-	if (!owner) {
-		throw makeError("Invalid", `connectors.${envelope.method}: unknown mapping ${mappingRef}`);
-	}
-	if (owner.connectorAppId !== envelope.app) {
+	// A mapping that does not exist and one owned by ANOTHER app produce the
+	// identical error: distinguishing them let any app holding
+	// `connectors.webhook` probe which mapping ids exist in the vault (the
+	// same oracle-free posture the ingress plane's uniform 404 takes).
+	if (!owner || owner.connectorAppId !== envelope.app) {
 		throw makeError(
 			"Denied",
-			`connectors.${envelope.method}: ${envelope.app} does not own mapping ${mappingRef}`,
+			`connectors.${envelope.method}: ${envelope.app} has no webhook surface for ${mappingRef}`,
 		);
 	}
 	return owner;

@@ -19,6 +19,7 @@ import {
 	CONNECTOR_ACCOUNT_TYPE_URL,
 	ConflictPolicy,
 	type ConnectorAccountDef,
+	SYNC_MAPPING_TYPE_URL,
 	SYNC_RUN_TYPE_URL,
 	SyncDirection,
 } from "@brainstorm-os/sdk-types";
@@ -301,6 +302,12 @@ export function buildConnectorsServiceDeps(deps: ConnectorsWiringDeps): Connecto
 		// Connector-6 — owner resolution rides the same server-side mapping
 		// resolve as the sync engine (never the caller's claim).
 		resolveMappingOwner: async (mappingRef: string) => {
+			// Resolve the TYPE server-side too — `resolveMapping` is structural
+			// (it only needs `accountRef` + `pull`), so without this an app could
+			// mint a webhook endpoint against any entity that happens to carry
+			// those shapes rather than a real `SyncMapping`.
+			const repo = await deps.getRepo();
+			if (repo?.get(mappingRef)?.type !== SYNC_MAPPING_TYPE_URL) return null;
 			const ctx = await resolveMapping(mappingRef);
 			if (!ctx) return null;
 			return { accountId: ctx.mapping.accountRef, connectorAppId: ctx.connectorAppId };

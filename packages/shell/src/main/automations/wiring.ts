@@ -241,6 +241,10 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		onError,
 		...(deps.fileWatch ? { fileWatch: deps.fileWatch } : {}),
 		...(deps.connectorSync ? { connectorSync: deps.connectorSync } : {}),
+		// Connector-6 — per-hit live grant re-check (defined below; only ever
+		// invoked at dispatch time, so the TDZ never bites).
+		connectorWebhookAllowed: (mappingId) =>
+			grantedConnectorWebhooks().then((rows) => rows.some((r) => r.mappingId === mappingId)),
 		...(deps.postAlert ? { postAlert: deps.postAlert } : {}),
 		...(deps.intervalMs !== undefined ? { intervalMs: deps.intervalMs } : {}),
 		...(deps.intervals ? { intervals: deps.intervals } : {}),

@@ -229,8 +229,10 @@ describe("connectors service — webhook endpoints (Connector-6)", () => {
 	it("webhookRegister rejects an unknown mapping (server-side resolve, never the caller's claim)", async () => {
 		const { deps } = makeWebhookDeps();
 		const handler = makeConnectorsServiceHandler(deps);
+		// `Denied`, not `Invalid` — an unknown mapping and someone else's
+		// mapping must be indistinguishable (no cross-app existence oracle).
 		await expect(handler(envelope("webhookRegister", { mappingRef: "nope" }))).rejects.toMatchObject({
-			name: "Invalid",
+			name: "Denied",
 		});
 	});
 

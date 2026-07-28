@@ -74,21 +74,26 @@ export class ConnectorWebhooksRepository {
 	}): MintedConnectorWebhook {
 		const routeId = this.ids.routeId();
 		const secret = this.ids.secret();
-		this.db.prepare("DELETE FROM connector_webhooks WHERE mapping_id = ?").run(input.mappingId);
-		this.db
-			.prepare(
-				`INSERT INTO connector_webhooks
-					(route_id, mapping_id, account_id, connector_app_id, secret_sha256, created_at)
-				VALUES (?, ?, ?, ?, ?, ?)`,
-			)
-			.run(
-				routeId,
-				input.mappingId,
-				input.accountId,
-				input.connectorAppId,
-				sha256Hex(secret),
-				this.now(),
-			);
+		// Rotation is atomic: a failed INSERT must not leave the mapping with
+		// its previous endpoint deleted and no replacement (a silent outage
+		// where the provider keeps POSTing to a dead URL).
+		this.db.transaction(() => {
+			this.db.prepare("DELETE FROM connector_webhooks WHERE mapping_id = ?").run(input.mappingId);
+			this.db
+				.prepare(
+					`INSERT INTO connector_webhooks
+						(route_id, mapping_id, account_id, connector_app_id, secret_sha256, created_at)
+					VALUES (?, ?, ?, ?, ?, ?)`,
+				)
+				.run(
+					routeId,
+					input.mappingId,
+					input.accountId,
+					input.connectorAppId,
+					sha256Hex(secret),
+					this.now(),
+				);
+		})();
 		return { routeId, secret };
 	}
 
