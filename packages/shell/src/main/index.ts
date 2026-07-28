@@ -155,6 +155,7 @@ import { newRequestId } from "./feedback/feedback-payload";
 import { FeedbackService, defaultFeedbackFetcher } from "./feedback/feedback-service";
 import { FeedbackSettingsStore, feedbackSettingsPath } from "./feedback/feedback-settings-store";
 import { getSharedRecentLogBuffer, scopeForUrl } from "./feedback/recent-log-buffer";
+import { bakedFeedbackEndpoint, resolveFeedbackEndpoint } from "./feedback/resolve-endpoint";
 import { APP_FILES_WATCH_CHANNEL, makeFilesServiceHandler } from "./files/files-service";
 import { gatherStorageInventory } from "./files/gather-storage-inventory";
 import { servedMimeForName } from "./files/upload-mime";
@@ -1608,10 +1609,10 @@ void app.whenReady().then(async () => {
 	// window via the `web-contents-created` hook below so app console
 	// output flows into the buffer too (the user typically wants to
 	// attach a recent app error when reporting an app bug).
-	const feedbackBuildTimeEndpoint =
-		process.env.BRAINSTORM_FEEDBACK_ENDPOINT && process.env.BRAINSTORM_FEEDBACK_ENDPOINT.length > 0
-			? process.env.BRAINSTORM_FEEDBACK_ENDPOINT
-			: null;
+	const feedbackBuildTimeEndpoint = resolveFeedbackEndpoint({
+		runtime: process.env.BRAINSTORM_FEEDBACK_ENDPOINT,
+		baked: bakedFeedbackEndpoint(),
+	});
 	const feedbackSettingsStore = new FeedbackSettingsStore({
 		path: feedbackSettingsPath(app.getPath("userData")),
 		buildTimeDefaultEndpoint: feedbackBuildTimeEndpoint,
