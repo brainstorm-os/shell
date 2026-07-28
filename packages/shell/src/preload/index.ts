@@ -830,6 +830,8 @@ export type { ActivitySnapshot };
 const ACTIVITY_SNAPSHOT_CHANNEL = "activity:snapshot";
 const SYNC_STATUS_SNAPSHOT_CHANNEL = "sync-status:snapshot";
 const SYNC_POLICY_GET_CHANNEL = "sync-status:get-policy";
+const SYNC_LAN_HOST_GET_CHANNEL = "sync-status:get-lan-host-mode";
+const SYNC_LAN_HOST_SET_CHANNEL = "sync-status:set-lan-host-mode";
 const SYNC_POLICY_SET_CHANNEL = "sync-status:set-policy";
 const SYNC_RESTORE_AVAILABLE_CHANNEL = "sync-status:restore-available";
 const SYNC_RESTORE_CHANNEL = "sync-status:restore";
@@ -865,6 +867,12 @@ const syncStatus = {
 	// Stage 10.13 — per-device selective-sync policy (dashboard-only). Null when
 	// no vault session is active yet (the surface is registered but inert).
 	getPolicy: (): Promise<SelectiveSyncPolicy | null> => ipcRenderer.invoke(SYNC_POLICY_GET_CHANNEL),
+	/** LAN-4c — the device's LAN host-listen mode ("off" | "when-vault-open" |
+	 *  "when-shared"). A plain string across IPC; main normalises anything
+	 *  unrecognised to "off". */
+	getLanHostMode: (): Promise<string | null> => ipcRenderer.invoke(SYNC_LAN_HOST_GET_CHANNEL),
+	setLanHostMode: (mode: string): Promise<string | null> =>
+		ipcRenderer.invoke(SYNC_LAN_HOST_SET_CHANNEL, mode),
 	setPolicy: (policy: SelectiveSyncPolicy): Promise<SelectiveSyncPolicy | null> =>
 		ipcRenderer.invoke(SYNC_POLICY_SET_CHANNEL, policy),
 	// Stage 10.14 — cold restore-from-zero (keystore-intact device). `available`

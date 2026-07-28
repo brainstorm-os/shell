@@ -9,6 +9,7 @@
 
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { LanHostMode } from "../sync/lan-host-policy";
 import type { SyncStatusSnapshot, SyncStatusStore } from "../sync/sync-status-store";
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
@@ -105,6 +106,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		expect(store.isStarted()).toBe(true);
 	});
@@ -122,6 +125,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		store.emitChange({
 			state: "syncing",
@@ -155,6 +160,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		store.emitChange(null);
 		expect(win.webContents.send).not.toHaveBeenCalled();
@@ -172,6 +179,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		store.emitChange(null);
 		// No throw + no crash is the contract here.
@@ -192,6 +201,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		registerSyncStatusHandlers({
 			getDashboard: () => winB as unknown as Electron.BrowserWindow,
@@ -203,6 +214,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		store.emitChange(null);
 		// Only winB receives the push — the prior subscription was disposed.
@@ -226,6 +239,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		expect(() => store.emitChange(null)).not.toThrow();
 	});
@@ -243,6 +258,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		store.stop();
 		registerSyncStatusHandlers({
@@ -255,6 +272,8 @@ describe("registerSyncStatusHandlers", () => {
 			onPolicyChanged: () => {},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		expect(store.isStarted()).toBe(true);
 	});
@@ -279,6 +298,8 @@ describe("registerSyncStatusHandlers", () => {
 			},
 			isRestoreAvailable: async () => false,
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
+			getLanHostMode: async () => LanHostMode.Off,
+			setLanHostMode: async () => LanHostMode.Off,
 		});
 		const setHandler = handlers.get("sync-status:set-policy");
 		expect(setHandler).toBeTypeOf("function");

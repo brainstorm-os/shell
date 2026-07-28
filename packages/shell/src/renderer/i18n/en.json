@@ -1400,5 +1400,10 @@
   "shell.settings.backupMigration.notify.title": "Import finished",
   "shell.settings.backupMigration.notify.body": "{created, plural, one {# item} other {# items}} created, {updated, plural, one {# updated} other {# updated}}. Open Settings → Backup & Migration for the report.",
   "shell.settings.backupMigration.import.running": "Import running…",
-  "shell.settings.backupMigration.import.runBusy": "Another import is already running — wait for it to finish (or stop it) first."
+  "shell.settings.backupMigration.import.runBusy": "Another import is already running — wait for it to finish (or stop it) first.",
+  "shell.settings.sync.lanHost.title": "Local network",
+  "shell.settings.sync.lanHost.summary": "Sync directly with your other devices over your local network, with no server in between. Turning this on opens a listening socket on this network; only devices already on your signed device list can connect.",
+  "shell.settings.sync.lanHost.label": "Accept connections",
+  "shell.settings.sync.lanHost.mode.off": "Off",
+  "shell.settings.sync.lanHost.mode.on": "While this vault is open"
 }
