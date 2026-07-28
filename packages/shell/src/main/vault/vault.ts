@@ -94,6 +94,13 @@ type VaultJson = {
 export type SyncRelayConfig = {
 	url: string;
 	addedAt: number;
+	/** LAN-4 — this peer is another DEVICE (a LAN host), not a relay server:
+	 *  the transport must run the channel-bound admission handshake and send
+	 *  nothing until admitted. Set ONLY by the LAN dial flow — never inferred
+	 *  from the address, because a relay/durable node legitimately runs on
+	 *  loopback or a private address (self-hosted, dev harness) and inferring
+	 *  LAN-ness from the URL silently swallows its subscriptions (F-466). */
+	lan?: boolean;
 };
 
 export type CreateVaultOptions = {
@@ -530,7 +537,11 @@ export async function setSyncRelayConfig(
 		next[key] = value;
 	}
 	if (config !== null) {
-		next.syncRelay = { url: config.url, addedAt: config.addedAt };
+		next.syncRelay = {
+			url: config.url,
+			addedAt: config.addedAt,
+			...(config.lan === true ? { lan: true } : {}),
+		};
 	}
 	const tmp = `${file}.tmp.${process.pid}.${Date.now()}`;
 	await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, "utf8");
@@ -557,7 +568,7 @@ export async function setSyncRelayConfig(
 function configsEqual(a: SyncRelayConfig | null, b: SyncRelayConfig | null): boolean {
 	if (a === null && b === null) return true;
 	if (a === null || b === null) return false;
-	return a.url === b.url && a.addedAt === b.addedAt;
+	return a.url === b.url && a.addedAt === b.addedAt && (a.lan === true) === (b.lan === true);
 }
 
 /**
@@ -574,7 +585,8 @@ export function isSyncRelayConfig(value: unknown): value is SyncRelayConfig {
 		typeof v.url === "string" &&
 		v.url.length > 0 &&
 		typeof v.addedAt === "number" &&
-		Number.isFinite(v.addedAt)
+		Number.isFinite(v.addedAt) &&
+		(v.lan === undefined || typeof v.lan === "boolean")
 	);
 }
 

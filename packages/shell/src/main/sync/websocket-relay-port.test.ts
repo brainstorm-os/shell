@@ -925,6 +925,79 @@ describe("SYNC-4b gated handshake (onChallenge)", () => {
 	});
 });
 
+describe("gated transport pre-admission silence (G5 / F-466)", () => {
+	const enc = new TextEncoder();
+	const control = (msg: unknown): Uint8Array => {
+		const body = enc.encode(JSON.stringify(msg));
+		const out = new Uint8Array(1 + body.length);
+		out[0] = CONTROL_CHANNEL_BYTE;
+		out.set(body, 1);
+		return out;
+	};
+	const tick = () => new Promise((r) => setTimeout(r, 0));
+
+	it("holds a POST-open subscribe until admission, then announces it on auth-ok", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor, requireAdmission: true });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		// Open but unadmitted — the routing-key set must stay off the wire.
+		port.subscribe("inbox:someone");
+		let subs = (ws?.sent ?? [])
+			.map((b) => decodeControlMessage(b))
+			.filter((m) => m?.op === "subscribe");
+		expect(subs.length).toBe(0);
+		ws?.deliver(control({ op: "auth-ok" }));
+		await tick();
+		subs = (ws?.sent ?? []).map((b) => decodeControlMessage(b)).filter((m) => m?.op === "subscribe");
+		expect(subs.length).toBe(1);
+		expect(subs[0]).toMatchObject({ entityIds: ["inbox:someone"] });
+		port.close();
+	});
+
+	it("holds POST-open sends + subscribeBatch + unsubscribe until admission", async () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor, requireAdmission: true });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		port.subscribeBatch(["e1", "e2"]);
+		port.send(new Uint8Array([7, 7, 7]));
+		port.unsubscribe("e2");
+		// Nothing but the (accountless ⇒ absent) hello may have gone out.
+		expect((ws?.sent ?? []).filter((b) => b[0] === FRAME_CHANNEL_BYTE).length).toBe(0);
+		expect(
+			(ws?.sent ?? []).map((b) => decodeControlMessage(b)).filter((m) => m !== null).length,
+		).toBe(0);
+		ws?.deliver(control({ op: "auth-ok" }));
+		await tick();
+		// Admitted: the surviving subscription set is announced and the queued
+		// frame flushes.
+		const subs = (ws?.sent ?? [])
+			.map((b) => decodeControlMessage(b))
+			.filter((m) => m?.op === "subscribe");
+		expect(subs.length).toBe(1);
+		expect(subs[0]).toMatchObject({ entityIds: ["e1"] });
+		expect((ws?.sent ?? []).filter((b) => b[0] === FRAME_CHANNEL_BYTE).length).toBe(1);
+		port.close();
+	});
+
+	it("an UNGATED port announces post-open subscribes immediately (the relay path)", () => {
+		const Ctor = makeFakeWsCtor();
+		const port = new WebSocketRelayPort({ url: "ws://x", wsImpl: Ctor });
+		port.connect();
+		const ws = Ctor.instances[0];
+		ws?.open();
+		port.subscribe("inbox:someone");
+		const subs = (ws?.sent ?? [])
+			.map((b) => decodeControlMessage(b))
+			.filter((m) => m?.op === "subscribe");
+		expect(subs.length).toBe(1);
+		port.close();
+	});
+});
+
 describe("bundle payload codec (10.10)", () => {
 	it("round-trips frames byte-identically", () => {
 		const frames = [new Uint8Array([1, 2, 3]), new Uint8Array([9]), new Uint8Array(600).fill(7)];

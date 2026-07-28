@@ -1843,9 +1843,7 @@ void app.whenReady().then(async () => {
 	// and rebuilds the port (`WebSocketRelayPort` when a `syncRelay` is
 	// configured, loopback otherwise).
 	{
-		const { ActiveRelayOrchestrator, installActiveRelay, isLanRelayUrl } = await import(
-			"./sync/active-relay"
-		);
+		const { ActiveRelayOrchestrator, installActiveRelay } = await import("./sync/active-relay");
 		const { WebSocketRelayPort } = await import("./sync/websocket-relay-port");
 		const { createLanSessionAccess, makeLanClientHandshakeForSession } = await import(
 			"./sync/lan-sync-wiring"
@@ -1951,12 +1949,15 @@ void app.whenReady().then(async () => {
 		primeLanDevices();
 		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
-				makeRelayPort: (url) => {
+				makeRelayPort: (url, target) => {
 					// A LAN peer authenticates with the channel-bound device handshake;
 					// a cloud relay uses the SYNC-4b entitlement challenge. The two are
-					// different trust models, so the transport picks by address rather
-					// than trying to satisfy both.
-					const port = isLanRelayUrl(url)
+					// different trust models, selected by the EXPLICIT `syncRelay.lan`
+					// flag — never by address: a relay/durable node legitimately runs
+					// on loopback or a private address, and the admission gate against
+					// a host that never admits silently swallows every pre-open
+					// subscription (F-466 — the inbox WrapBootstrap channel).
+					const port = target.lan
 						? new WebSocketRelayPort({
 								url,
 								requireAdmission: true,

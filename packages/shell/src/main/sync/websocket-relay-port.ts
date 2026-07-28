@@ -374,6 +374,15 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#openSocket();
 	}
 
+	/** True when routing metadata may go on the wire: socket Open AND — on a
+	 *  gated transport — admission proven. Pre-admission the peer has proven
+	 *  nothing, so it must not see the subscription set (gate finding G5;
+	 *  `#onAuthenticated` re-announces the full set once admitted). */
+	#mayAnnounce(): boolean {
+		if (this.#state !== WebSocketRelayState.Open) return false;
+		return !this.#requireAdmission || this.#gatedAdmission;
+	}
+
 	/**
 	 * @param opts.stateVectors LAN-8 — advertise where this peer already is, per
 	 * routing key (opaque base64 of `Y.encodeStateVector`). The host carries it
@@ -386,7 +395,7 @@ export class WebSocketRelayPort implements RelayPort {
 		if (!entityId) throw new Error("WebSocketRelayPort.subscribe: empty entityId");
 		const fresh = !this.#subscriptions.has(entityId);
 		this.#subscriptions.add(entityId);
-		if (fresh && this.#state === WebSocketRelayState.Open) {
+		if (fresh && this.#mayAnnounce()) {
 			this.#sendControl({
 				op: "subscribe",
 				entityIds: [entityId],
@@ -414,7 +423,7 @@ export class WebSocketRelayPort implements RelayPort {
 			this.#subscriptions.add(entityId);
 			fresh.push(entityId);
 		}
-		if (fresh.length === 0 || this.#state !== WebSocketRelayState.Open) return;
+		if (fresh.length === 0 || !this.#mayAnnounce()) return;
 		for (let i = 0; i < fresh.length; i += SUBSCRIBE_BATCH_MAX) {
 			this.#sendControl({
 				op: "subscribe",
@@ -427,7 +436,7 @@ export class WebSocketRelayPort implements RelayPort {
 	unsubscribe(entityId: string): void {
 		if (this.#disposed) return;
 		const had = this.#subscriptions.delete(entityId);
-		if (had && this.#state === WebSocketRelayState.Open) {
+		if (had && this.#mayAnnounce()) {
 			this.#sendControl({ op: "unsubscribe", entityIds: [entityId] });
 		}
 	}
@@ -616,11 +625,9 @@ export class WebSocketRelayPort implements RelayPort {
 			throw new Error("WebSocketRelayPort.send: port is closed");
 		}
 		const wire = wrapBinaryFrame(frame);
-		if (
-			this.#state === WebSocketRelayState.Open &&
-			this.#ws &&
-			this.#ws.readyState === OPEN_READY_STATE
-		) {
+		// `#mayAnnounce` (not bare Open) so a gated transport never puts frame
+		// metadata on the wire pre-admission — queued frames flush on `auth-ok`.
+		if (this.#mayAnnounce() && this.#ws && this.#ws.readyState === OPEN_READY_STATE) {
 			try {
 				this.#ws.send(wire);
 				return;
