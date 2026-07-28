@@ -479,8 +479,13 @@ async function fetchAndStoreImage(
  * image that fails any guard keeps its remote `src` (dropped at render). No-op
  * unless the asset store is wired (`storeImageAsset`). Never throws — a bad
  * image never breaks the capture.
+ *
+ * Exported for the Browser-5 live-tab capture seal (`web-view-service`'s
+ * `capture` wiring), which runs the SAME extraction worker over the rendered
+ * DOM and must store article images identically so the two `Bookmark/v1`
+ * feeders converge.
  */
-async function enrichBlocksWithAssets(
+export async function enrichBlocksWithAssets(
 	blocks: SerializedBlock[],
 	options: NetworkServiceOptions,
 	allowPrivate: boolean,

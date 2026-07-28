@@ -19,6 +19,7 @@ import {
 	type WebViewClient,
 	type WebViewEvent,
 	WebViewEventKind,
+	type WebViewExtractedText,
 } from "@brainstorm-os/sdk-types";
 import { Icon, IconDirection, IconName, IconWeight } from "@brainstorm-os/sdk/icon";
 import {
@@ -72,6 +73,7 @@ import {
 	sessionRecordFromProperties,
 	sessionRecordToProperties,
 } from "./logic/persistence";
+import { ReaderPhase, type ReaderState, canReader, readerFor } from "./logic/reader";
 import { recentlyClosedEntries } from "./logic/recently-closed";
 import {
 	activateTab,
@@ -97,6 +99,7 @@ import {
 	summarySourceFrom,
 } from "./logic/summarize";
 import { type PendingPermission, PermissionBanner } from "./permission-banner";
+import { ReaderView } from "./reader-view";
 import {
 	type EntitiesClient,
 	type NetworkReadableService,
@@ -285,6 +288,12 @@ export function BrowserApp(): ReactElement {
 	const [findQuery, setFindQuery] = useState("");
 	const [findResults, setFindResults] = useState<Record<string, FindMatchState>>({});
 
+	// Browser-5 — reader mode: a per-tab clean-article surface fed by the
+	// shell's Net-3 live-DOM extraction (`extractText`, gated on `web.capture`).
+	// The article is a plain-text projection rendered as React text nodes only.
+	const [reader, setReader] = useState<ReaderState | null>(null);
+	const activeReader = readerFor(reader, active?.id ?? null);
+
 	// Per-site permission asks pushed by the shell (deny-default; the banner
 	// is the explicit grant surface).
 	const [pendingPermissions, setPendingPermissions] = useState<PendingPermission[]>([]);
@@ -370,6 +379,12 @@ export function BrowserApp(): ReactElement {
 				openedTabs.current.delete(event.tabId);
 				setFindResults(({ [event.tabId]: _dropped, ...rest }) => rest);
 				setPendingPermissions((prev) => prev.filter((p) => p.tabId !== event.tabId));
+			}
+			// Reader mode shows ONE page's article — a navigation (or the view
+			// going away) invalidates it, so the sheet closes rather than sitting
+			// stale over the new page.
+			if (event.kind === WebViewEventKind.UrlChanged || event.kind === WebViewEventKind.Closed) {
+				setReader((r) => (r && r.tabId === event.tabId ? null : r));
 			}
 			// Browser-6 — download lifecycle → the transient notice tray.
 			if (
@@ -566,12 +581,25 @@ export function BrowserApp(): ReactElement {
 	// Report the web-region rect to the shell so it positions the WebContentsView
 	// under the chrome. Re-measure on resize + active-tab change (keyed on id, not
 	// the whole tab, so meta events don't re-run the measurement).
+	//
+	// Browser-5 — while the reader sheet is up the native view is parked at
+	// zero bounds: the `WebContentsView` composites ABOVE this renderer, so an
+	// in-chrome article surface can never be painted over it (same reasoning as
+	// the summary panel living in the top chrome flow). Closing the reader
+	// re-runs this effect and restores the measured rect.
+	const readerParked = activeReader !== null;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on tab switch, not every meta change
 	useLayoutEffect(() => {
 		if (!webView || !active) return;
 		const el = regionRef.current;
 		if (!el) return;
-		const push = () => pushBoundsFor(active.id);
+		const push = () => {
+			if (readerParked) {
+				void webView.setBounds(active.id, { x: 0, y: 0, width: 0, height: 0 });
+			} else {
+				pushBoundsFor(active.id);
+			}
+		};
 		push();
 		const ro = new ResizeObserver(push);
 		ro.observe(el);
@@ -580,7 +608,7 @@ export function BrowserApp(): ReactElement {
 			ro.disconnect();
 			window.removeEventListener("resize", push);
 		};
-	}, [webView, active?.id, pushBoundsFor]);
+	}, [webView, active?.id, pushBoundsFor, readerParked]);
 
 	const closeSuggestions = useCallback(() => {
 		setSuggestOpen(false);
@@ -737,6 +765,35 @@ export function BrowserApp(): ReactElement {
 		// Reload so the relaxed (or restored) cookie/blocklist policy takes effect.
 		void webView?.reload(active.id);
 	}, [activeOrigin, active, activeTrusted, webView]);
+
+	// Browser-5 — toggle the reader for the active tab. The extract runs on the
+	// toggle gesture; a stale result (the user closed the sheet or switched
+	// tabs mid-flight) is dropped rather than reopening the reader.
+	const closeReader = useCallback(() => setReader(null), []);
+	const onToggleReader = useCallback(async () => {
+		if (!active || !webView) return;
+		const tabId = active.id;
+		if (reader && reader.tabId === tabId) {
+			setReader(null);
+			return;
+		}
+		if (!canReader(active.url)) return;
+		setReader({ tabId, phase: ReaderPhase.Loading, article: null });
+		let extracted: WebViewExtractedText | null = null;
+		try {
+			extracted = await webView.extractText(tabId);
+		} catch {
+			extracted = null;
+		}
+		setReader((current) => {
+			if (!current || current.tabId !== tabId || current.phase !== ReaderPhase.Loading) {
+				return current;
+			}
+			return extracted
+				? { tabId, phase: ReaderPhase.Ready, article: extracted }
+				: { tabId, phase: ReaderPhase.Empty, article: null };
+		});
+	}, [active, webView, reader]);
 
 	const onActivate = useCallback(
 		(tabId: string) => {
@@ -1048,6 +1105,31 @@ export function BrowserApp(): ReactElement {
 			clipResetTimer.current = null;
 		}
 		setClipAttempt({ tabId, phase: ClipPhase.Saving });
+		const markSaved = () => {
+			setClipAttempt({ tabId, phase: ClipPhase.Saved });
+			clipResetTimer.current = window.setTimeout(() => {
+				clipResetTimer.current = null;
+				setClipAttempt(null);
+			}, CLIP_SAVED_RESET_MS);
+		};
+		// Browser-5 — prefer the shell-side capture seal: the page the user is
+		// ACTUALLY looking at (logged-in, script-rendered) goes through the Net-2
+		// extraction core host-side, article images land in the encrypted asset
+		// store, and the `Bookmark/v1` is written with the full scrape-parity
+		// metadata (description / site / author / published). The chrome-side
+		// re-fetch below stays as the fallback for a shell without the seal, so
+		// the button never regresses to a no-op.
+		if (webView) {
+			try {
+				const captured = await webView.capture(tabId, false);
+				if (captured?.bookmarkId) {
+					markSaved();
+					return;
+				}
+			} catch {
+				// Fall through to the chrome-side clip path.
+			}
+		}
 		// Capture the page's readable body so the saved bookmark renders content
 		// instead of a blank body (F-235). Best-effort: a withheld grant, a
 		// blocked egress, or a non-extractable page (SPA / paywall) leaves a
@@ -1067,15 +1149,11 @@ export function BrowserApp(): ReactElement {
 		}
 		try {
 			await entities.create(BOOKMARK_ENTITY_TYPE, properties);
-			setClipAttempt({ tabId, phase: ClipPhase.Saved });
-			clipResetTimer.current = window.setTimeout(() => {
-				clipResetTimer.current = null;
-				setClipAttempt(null);
-			}, CLIP_SAVED_RESET_MS);
+			markSaved();
 		} catch {
 			setClipAttempt({ tabId, phase: ClipPhase.Failed });
 		}
-	}, [active, entities, network]);
+	}, [active, entities, network, webView]);
 
 	const focusOmnibox = useCallback(() => {
 		const el = omniboxRef.current;
@@ -1177,6 +1255,27 @@ export function BrowserApp(): ReactElement {
 	// (the shell doesn't claim it; the Browser self-manages its tab strip).
 	useShortcut("CmdOrCtrl+Shift+T", onReopenLast);
 
+	// Cmd+Shift+R toggles reader mode (the Safari reader chord) — Browser-5.
+	useShortcut("CmdOrCtrl+Shift+R", () => void onToggleReader());
+
+	// Escape leaves the reader — bound like the find-bar Escape (no default
+	// swallow, so sibling handlers still see the event when the sheet is
+	// closed).
+	const activeReaderRef = useRef(activeReader);
+	activeReaderRef.current = activeReader;
+	useEffect(() => {
+		return attachShortcut(
+			window,
+			"Escape",
+			(event) => {
+				if (activeReaderRef.current === null) return;
+				event.preventDefault();
+				setReader(null);
+			},
+			{ allowWhileSuppressed: true, preventDefault: false },
+		);
+	}, []);
+
 	useEffect(() => {
 		const onCommand = (event: Event) => {
 			const command = (event as CustomEvent<TabCommand>).detail;
@@ -1190,6 +1289,8 @@ export function BrowserApp(): ReactElement {
 	const securityState = active?.securityState ?? TabSecurityState.Local;
 	const securityIcon = securityIconFor(securityState);
 	const blockedTrackers = active?.blockedTrackerCount ?? 0;
+	const readerEnabled = canReader(active?.url);
+	const readerLabel = activeReader ? t("reader.exit") : t("reader.enter");
 	const clipPhase = clipPhaseFor(clipAttempt, active?.id ?? null);
 	const clipEnabled = entities !== null && canClip(active?.url, clipPhase);
 	const activeFindResult = active ? (findResults[active.id] ?? null) : null;
@@ -1290,6 +1391,19 @@ export function BrowserApp(): ReactElement {
 				)}
 				<button
 					type="button"
+					className={`browser__navbtn browser__reader-toggle${activeReader ? " browser__reader-toggle--on" : ""}`}
+					aria-label={readerLabel}
+					data-bs-tooltip={readerLabel}
+					title={!readerEnabled ? readerLabel : undefined}
+					aria-pressed={activeReader !== null}
+					disabled={!readerEnabled}
+					onClick={() => void onToggleReader()}
+					data-testid="browser-reader-toggle"
+				>
+					<Icon name={IconName.View} size={16} />
+				</button>
+				<button
+					type="button"
 					className={`browser__clip browser__clip--${clipPhase}`}
 					aria-label={clipLabel(clipPhase)}
 					data-bs-tooltip={clipLabel(clipPhase)}
@@ -1351,7 +1465,9 @@ export function BrowserApp(): ReactElement {
 				onDismiss={dismissSummary}
 			/>
 			<DownloadTray notices={downloadNotices} onDismiss={dismissNotice} />
-			<div ref={regionRef} className="browser__region" />
+			<div ref={regionRef} className="browser__region">
+				{activeReader && <ReaderView state={activeReader} onClose={closeReader} />}
+			</div>
 		</div>
 	);
 }

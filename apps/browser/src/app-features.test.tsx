@@ -47,7 +47,7 @@ vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }))
 type FakeWebView = WebViewClient & {
 	opened: Array<{ tabId: string; url: string }>;
 	navigated: Array<{ tabId: string; url: string }>;
-	bounds: Array<{ tabId: string }>;
+	bounds: Array<{ tabId: string; rect: { x: number; y: number; width: number; height: number } }>;
 	closed: string[];
 	reloaded: string[];
 	finds: Array<{ tabId: string; query: string; forward: boolean }>;
@@ -91,8 +91,8 @@ function fakeWebView(): FakeWebView {
 			return Promise.resolve();
 		},
 		activate: noop,
-		setBounds: (tabId) => {
-			view.bounds.push({ tabId });
+		setBounds: (tabId, rect) => {
+			view.bounds.push({ tabId, rect });
 			return Promise.resolve();
 		},
 		findInPage: (tabId, query, forward) => {
@@ -692,6 +692,156 @@ describe("clip-to-vault (F-235)", () => {
 		) as [string, Record<string, unknown>] | undefined;
 		expect(bookmarkCreate).toBeDefined();
 		expect(bookmarkCreate?.[1]).not.toHaveProperty("contentBlocks");
+	});
+});
+
+describe("reader mode (Browser-5)", () => {
+	const article = {
+		url: "https://example.com/article",
+		title: "The Article",
+		byline: "By Jane Doe",
+		text: "First paragraph.\n\nSecond paragraph.",
+		truncated: false,
+	};
+
+	async function navigateActiveTabTo(url: string): Promise<void> {
+		await act(async () => {
+			webView.emit({ kind: WebViewEventKind.UrlChanged, tabId: "tab-1", url });
+		});
+	}
+
+	function readerToggle(): HTMLButtonElement {
+		const btn = container.querySelector<HTMLButtonElement>(".browser__reader-toggle");
+		if (!btn) throw new Error("reader toggle missing");
+		return btn;
+	}
+
+	function readerSheet(): HTMLElement | null {
+		return container.querySelector<HTMLElement>('[data-testid="browser-reader"]');
+	}
+
+	it("is disabled on a non-web page and enabled on one", async () => {
+		await render(<BrowserApp />);
+		await act(async () => {});
+		expect(readerToggle().disabled).toBe(true);
+		await navigateActiveTabTo("https://example.com/article");
+		expect(readerToggle().disabled).toBe(false);
+	});
+
+	it("renders the extracted article (title / byline / paragraphs) as text", async () => {
+		webView.extractText = vi.fn(async () => article);
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await navigateActiveTabTo("https://example.com/article");
+
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+
+		const sheet = readerSheet();
+		expect(sheet?.getAttribute("data-phase")).toBe("ready");
+		expect(sheet?.querySelector(".browser__reader-title")?.textContent).toBe("The Article");
+		expect(sheet?.querySelector(".browser__reader-byline")?.textContent).toBe("By Jane Doe");
+		const paragraphs = [...(sheet?.querySelectorAll(".browser__reader-article p") ?? [])].map(
+			(el) => el.textContent,
+		);
+		expect(paragraphs).toContain("First paragraph.");
+		expect(paragraphs).toContain("Second paragraph.");
+		// The mode latches on the toggle.
+		expect(readerToggle().getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("parks the native view at zero bounds while open and restores on close", async () => {
+		webView.extractText = vi.fn(async () => article);
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await navigateActiveTabTo("https://example.com/article");
+
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+		expect(webView.bounds.at(-1)?.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+		const parkedPushes = webView.bounds.length;
+
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+		expect(readerSheet()).toBeNull();
+		// Closing re-measures the region so the page comes back.
+		expect(webView.bounds.length).toBeGreaterThan(parkedPushes);
+	});
+
+	it("says why when the page has nothing readable", async () => {
+		webView.extractText = vi.fn(async () => null);
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await navigateActiveTabTo("https://example.com/spa");
+
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+		expect(readerSheet()?.getAttribute("data-phase")).toBe("empty");
+	});
+
+	it("Escape closes the sheet", async () => {
+		webView.extractText = vi.fn(async () => article);
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await navigateActiveTabTo("https://example.com/article");
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+		expect(readerSheet()).not.toBeNull();
+
+		await act(async () => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		});
+		expect(readerSheet()).toBeNull();
+	});
+
+	it("a navigation invalidates the article and closes the sheet", async () => {
+		webView.extractText = vi.fn(async () => article);
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await navigateActiveTabTo("https://example.com/article");
+		await act(async () => readerToggle().click());
+		await act(async () => {});
+		expect(readerSheet()).not.toBeNull();
+
+		await navigateActiveTabTo("https://example.com/next");
+		expect(readerSheet()).toBeNull();
+	});
+});
+
+describe("clip via the shell capture seal (Browser-5)", () => {
+	it("prefers the host-side capture and skips the chrome-side re-fetch", async () => {
+		webView = fakeWebView();
+		entities = fakeEntities([]);
+		const readable = vi.fn(async () => ({ blocks: null }));
+		webView.capture = vi.fn(async () => ({ bookmarkId: "bm-1" }));
+		(window as { brainstorm?: unknown }).brainstorm = {
+			services: { webView, entities, network: { readable } },
+		};
+		await render(<BrowserApp />);
+		await act(async () => {});
+		await act(async () => {
+			webView.emit({
+				kind: WebViewEventKind.UrlChanged,
+				tabId: "tab-1",
+				url: "https://example.com/article",
+			});
+		});
+
+		const btn = container.querySelector<HTMLButtonElement>(".browser__clip");
+		if (!btn) throw new Error("clip button missing");
+		await act(async () => btn.click());
+		await act(async () => {});
+
+		expect(webView.capture).toHaveBeenCalledWith("tab-1", false);
+		// The seal wrote the bookmark host-side — no chrome-side fetch or create.
+		expect(readable).not.toHaveBeenCalled();
+		expect(entities.create.mock.calls.some((call) => call[0] === "brainstorm/Bookmark/v1")).toBe(
+			false,
+		);
+		const statuses = [...container.querySelectorAll('[role="status"]')].map(
+			(el) => el.textContent ?? "",
+		);
+		expect(statuses).toContain("Saved to vault");
 	});
 });
 

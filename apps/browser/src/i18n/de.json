@@ -67,5 +67,12 @@
   "summary.note": "Aus der angezeigten Seite erzeugt – Wichtiges bitte im Original prüfen.",
   "summary.failed.noContent": "Auf dieser Seite gibt es keinen lesbaren Text zum Zusammenfassen.",
   "summary.failed.noModel": "Kein KI-Modell eingerichtet. Füge eines unter Einstellungen → KI hinzu.",
-  "summary.failed.generic": "Diese Seite konnte nicht zusammengefasst werden – bitte erneut versuchen."
+  "summary.failed.generic": "Diese Seite konnte nicht zusammengefasst werden – bitte erneut versuchen.",
+  "reader.enter": "Leseansicht",
+  "reader.exit": "Leseansicht beenden",
+  "reader.badge": "Leseansicht",
+  "reader.aria": "Leseansicht",
+  "reader.loading": "Leseansicht wird vorbereitet…",
+  "reader.empty": "Diese Seite enthält keinen lesbaren Artikel.",
+  "reader.truncated": "Der Artikel wurde gekürzt – öffne die Originalseite für den Rest."
 }

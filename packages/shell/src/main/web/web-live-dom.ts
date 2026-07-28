@@ -17,6 +17,7 @@
  */
 
 import type { WebViewExtractedText } from "@brainstorm-os/sdk-types";
+import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 
 /** Hard cap on the serialized DOM we accept from a page. A hostile or merely
  *  enormous document must not be able to push an unbounded string through IPC
@@ -28,6 +29,9 @@ export const LIVE_DOM_MAX_CHARS = 8_000_000;
  *  truncation marker). The marker itself is the caller's to render — the flag
  *  travels on the result so the UI can say so rather than silently eliding. */
 export const EXTRACTED_TEXT_MAX_CHARS = 1_000_000;
+
+/** Cap on a page-supplied byline before it crosses to the chrome. */
+export const EXTRACTED_BYLINE_MAX_CHARS = 200;
 
 /** Clamp a page's serialized DOM before it crosses into the parser. */
 export function clampLiveDomHtml(html: string): string {
@@ -45,15 +49,20 @@ export function toExtractedText(input: {
 	/** The tab's title, used when the extractor found no better one. */
 	fallbackTitle: string;
 	extractedTitle?: string | null;
+	/** Extractor's article byline — page-supplied, sanitized here before it
+	 *  crosses to the chrome (control/bidi strip + length clamp). */
+	byline?: string | null;
 	textContent: string;
 }): WebViewExtractedText | null {
 	const text = input.textContent.trim();
 	if (text.length === 0) return null;
 	const truncated = text.length > EXTRACTED_TEXT_MAX_CHARS;
 	const title = (input.extractedTitle ?? "").trim() || input.fallbackTitle;
+	const byline = sanitizeInlineText(input.byline ?? "", EXTRACTED_BYLINE_MAX_CHARS);
 	return {
 		url: input.url,
 		title,
+		byline: byline.length > 0 ? byline : null,
 		text: truncated ? text.slice(0, EXTRACTED_TEXT_MAX_CHARS) : text,
 		truncated,
 	};

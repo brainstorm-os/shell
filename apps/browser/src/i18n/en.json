@@ -74,5 +74,12 @@
   "summary.note": "Generated from the page you're viewing — check anything important against the original.",
   "summary.failed.noContent": "There's nothing readable on this page to summarize.",
   "summary.failed.noModel": "No AI model is set up. Add one in Settings → AI.",
-  "summary.failed.generic": "Couldn't summarize this page — try again."
+  "summary.failed.generic": "Couldn't summarize this page — try again.",
+  "reader.enter": "Reader view",
+  "reader.exit": "Exit reader view",
+  "reader.badge": "Reader view",
+  "reader.aria": "Reader view",
+  "reader.loading": "Preparing the readable view…",
+  "reader.empty": "This page has no readable article.",
+  "reader.truncated": "The article was shortened — open the original page for the rest."
 }

@@ -244,6 +244,8 @@ import { nodeStdioSpawn } from "./mcp/mcp-stdio-spawn";
 import { makeFileAuditSink } from "./network/audit-log";
 import { executeNetworkFetch } from "./network/network-service";
 import {
+	type NetworkServiceOptions,
+	enrichBlocksWithAssets,
 	makeNetworkServiceHandler,
 	productionApplyProxyConfig,
 	productionFetchImpl,
@@ -332,6 +334,7 @@ import {
 	onActiveVaultSessionChanged,
 } from "./vault/session";
 import { activateVault, getDefaultVault } from "./vault/vault";
+import { CAPTURE_BOOKMARK_ENTITY_TYPE, captureBookmarkProperties } from "./web/web-capture";
 import { CookieJarRepository, createWebCookieJar } from "./web/web-cookie-jar";
 import {
 	DOWNLOAD_FILE_ENTITY_TYPE,
@@ -3985,50 +3988,51 @@ void app.whenReady().then(async () => {
 	// that to apps so they can render the right affordance per doc-38
 	// §User control. Default-on missing session = `DEFAULT_ON_PRIVACY`
 	// (any URL previews) so a pre-vault-open paste still works.
-	workers.broker.registerService(
-		"network",
-		makeNetworkServiceHandler({
-			fetchImpl: productionFetchImpl,
-			lookupHost: productionLookupHost,
-			auditSink: makeFileAuditSink(networkAuditPath),
-			previewCache,
-			// SECURITY (Net-1a) — enforce the scarce egress caps
-			// (network.fetch / .preview / .readable, none default-minimum)
-			// against the live ledger server-side. The broker's declared-caps
-			// check is app-controlled and bypassable by omitting the cap; this
-			// is the authoritative gate. Mirrors the entities service.
-			getLedger: async () => {
-				const session = getActiveVaultSession();
-				if (!session) return null;
-				return await session.capabilityLedger();
-			},
-			getProxyConfig: () => {
-				const session = getActiveVaultSession();
-				const settings = session?.cachedVaultNetworkSettings;
-				return settings?.proxyOverride ?? DEFAULT_PROXY_CONFIG;
-			},
-			getPrivacyConfig: () => {
-				const session = getActiveVaultSession();
-				const settings = session?.cachedVaultNetworkSettings;
-				return settings?.privacy ?? DEFAULT_ON_PRIVACY;
-			},
-			applyProxyConfig: productionApplyProxyConfig,
-			// Net-2c — the readable service forwards fetched HTML to the
-			// extraction worker (CPU-heavy parse, off the broker loop).
-			extractReadable: (input) =>
-				workers ? workers.extraction.extract(input) : Promise.resolve({ blocks: null }),
-			// Asset subsystem — store a downloaded favicon/cover into the
-			// active vault's encrypted asset store. Throws with no vault open;
-			// the handler's `fetchAndStoreImage` catches and degrades to the
-			// remote URL.
-			storeImageAsset: async (input) => {
-				const session = getActiveVaultSession();
-				if (!session) throw new Error("no active vault session for asset storage");
-				const store = await session.assetStore();
-				return store.writeAsset(input);
-			},
-		}),
-	);
+	// Hoisted so the Browser-5 live-tab capture seal (webview registration
+	// below) can run the SAME image enrichment (`enrichBlocksWithAssets`)
+	// through the same guard chain the `network.readable` feeder uses.
+	const networkServiceOptions: NetworkServiceOptions = {
+		fetchImpl: productionFetchImpl,
+		lookupHost: productionLookupHost,
+		auditSink: makeFileAuditSink(networkAuditPath),
+		previewCache,
+		// SECURITY (Net-1a) — enforce the scarce egress caps
+		// (network.fetch / .preview / .readable, none default-minimum)
+		// against the live ledger server-side. The broker's declared-caps
+		// check is app-controlled and bypassable by omitting the cap; this
+		// is the authoritative gate. Mirrors the entities service.
+		getLedger: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			return await session.capabilityLedger();
+		},
+		getProxyConfig: () => {
+			const session = getActiveVaultSession();
+			const settings = session?.cachedVaultNetworkSettings;
+			return settings?.proxyOverride ?? DEFAULT_PROXY_CONFIG;
+		},
+		getPrivacyConfig: () => {
+			const session = getActiveVaultSession();
+			const settings = session?.cachedVaultNetworkSettings;
+			return settings?.privacy ?? DEFAULT_ON_PRIVACY;
+		},
+		applyProxyConfig: productionApplyProxyConfig,
+		// Net-2c — the readable service forwards fetched HTML to the
+		// extraction worker (CPU-heavy parse, off the broker loop).
+		extractReadable: (input) =>
+			workers ? workers.extraction.extract(input) : Promise.resolve({ blocks: null }),
+		// Asset subsystem — store a downloaded favicon/cover into the
+		// active vault's encrypted asset store. Throws with no vault open;
+		// the handler's `fetchAndStoreImage` catches and degrades to the
+		// remote URL.
+		storeImageAsset: async (input) => {
+			const session = getActiveVaultSession();
+			if (!session) throw new Error("no active vault session for asset storage");
+			const store = await session.assetStore();
+			return store.writeAsset(input);
+		},
+	};
+	workers.broker.registerService("network", makeNetworkServiceHandler(networkServiceOptions));
 
 	// Connector framework (doc 56) — the OAuth / request broker. `authorize`
 	// / `revoke` need `connectors.oauth`; `request` needs `connectors.request`
@@ -4451,6 +4455,51 @@ void app.whenReady().then(async () => {
 		WEBVIEW_SERVICE,
 		makeWebViewServiceHandler({
 			clearBrowsingData: () => webCookieJar?.clear(),
+			// Browser-5 — the clip-to-vault seal: the tab's RENDERED DOM (already
+			// clamped by the service) goes to the SAME Net-2 extraction core the
+			// static `network.readable` feeder uses, article images are pulled into
+			// the encrypted asset store through the same guard chain
+			// (`enrichBlocksWithAssets` — SSRF / privacy / size / MIME), and the
+			// `Bookmark/v1` is written through the shared entities create path — so
+			// the per-type capability (`entities.write:brainstorm/Bookmark/v1`,
+			// granted to the Browser), the per-entity DEK, and the live change
+			// event all apply. The property bag itself is the pure
+			// `captureBookmarkProperties` (hostile-input hardening lives there).
+			// An unreadable page (no html) degrades to a link-only bookmark.
+			capture: async (appId, spec) => {
+				const extraction =
+					workers && spec.html !== null
+						? await workers.extraction.extract({ html: spec.html, baseUrl: spec.url }).catch(() => null)
+						: null;
+				const blocks =
+					extraction?.blocks && extraction.blocks.length > 0
+						? await enrichBlocksWithAssets(extraction.blocks, networkServiceOptions, false)
+						: null;
+				const properties = captureBookmarkProperties({
+					url: spec.url,
+					title: spec.title,
+					meta: extraction?.meta ?? null,
+					blocks,
+					now: Date.now(),
+				});
+				if (!properties) {
+					const error = new Error("capture: page is not clippable");
+					error.name = "Invalid";
+					throw error;
+				}
+				const reply = (await entitiesHandler({
+					v: 1,
+					msg: `cap_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+					app: appId,
+					service: "entities",
+					method: "create",
+					args: [{ type: CAPTURE_BOOKMARK_ENTITY_TYPE, properties }],
+					caps: [],
+				})) as { id?: unknown } | null;
+				const bookmarkId = typeof reply?.id === "string" ? reply.id : "";
+				if (!bookmarkId) throw new Error("capture: entity create returned no id");
+				return bookmarkId;
+			},
 			// Net-3 — the live-DOM feeder: the page the user is actually looking at
 			// (logged-in, script-rendered, personalised) goes to the SAME Net-2
 			// extraction core the static `network.readable` feeder uses, in the
@@ -4463,6 +4512,7 @@ void app.whenReady().then(async () => {
 					url: spec.url,
 					fallbackTitle: spec.title,
 					extractedTitle: result.meta?.title ?? null,
+					byline: result.meta?.byline ?? null,
 					textContent: result.textContent,
 				});
 			},

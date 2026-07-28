@@ -67,5 +67,12 @@
   "summary.note": "Généré à partir de la page affichée — vérifiez l'essentiel dans l'original.",
   "summary.failed.noContent": "Cette page ne contient aucun texte lisible à résumer.",
   "summary.failed.noModel": "Aucun modèle d'IA configuré. Ajoutez-en un dans Réglages → IA.",
-  "summary.failed.generic": "Impossible de résumer cette page — réessayez."
+  "summary.failed.generic": "Impossible de résumer cette page — réessayez.",
+  "reader.enter": "Vue lecture",
+  "reader.exit": "Quitter la vue lecture",
+  "reader.badge": "Vue lecture",
+  "reader.aria": "Vue lecture",
+  "reader.loading": "Préparation de la vue lecture…",
+  "reader.empty": "Cette page ne contient aucun article lisible.",
+  "reader.truncated": "L'article a été raccourci — ouvrez la page d'origine pour lire la suite."
 }

@@ -13,7 +13,7 @@ import type { BaseWindowHandle } from "../apps/window-container";
 import { LIVE_DOM_MAX_CHARS } from "./web-live-dom";
 import { BrowseMode } from "./web-readonly";
 import {
-	type CaptureSpec,
+	type CapturePageSpec,
 	type CreateViewSpec,
 	DEFAULT_MAX_LIVE_VIEWS,
 	type ManagedWebView,
@@ -56,7 +56,7 @@ function setup(overrides: Partial<WebViewServiceOptions> = {}) {
 	/** Every createView call in order — a remount appends, so a suspension
 	 *  restore is observable (the `specs` map only keeps the latest). */
 	const specOrder: CreateViewSpec[] = [];
-	const captures: CaptureSpec[] = [];
+	const captures: CapturePageSpec[] = [];
 	let clock = 0;
 
 	const service = new WebViewService({
@@ -243,11 +243,11 @@ describe("WebViewService", () => {
 	it("capture() runs the port, emits Captured, and returns the bookmark id", async () => {
 		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
 		h.specs.get("t1")?.onEvent({ kind: WebViewEventKind.TitleChanged, tabId: "t1", title: "T" });
-		const result = await h.service.handle(APP, {
-			method: WebViewMethod.Capture,
-			tabId: "t1",
-			selectionOnly: false,
-		});
+		const result = await h.service.handle(
+			APP,
+			{ method: WebViewMethod.Capture, tabId: "t1", selectionOnly: false },
+			[WEB_CAPTURE_CAP],
+		);
 		expect(h.captures[0]).toMatchObject({ tabId: "t1", url: "https://a.com", title: "T" });
 		expect(result).toEqual({ bookmarkId: "bm_t1" });
 		expect(h.events).toContainEqual({
@@ -255,6 +255,48 @@ describe("WebViewService", () => {
 			tabId: "t1",
 			bookmarkId: "bm_t1",
 		});
+	});
+
+	it("capture() feeds the tab's live DOM to the seal (Browser-5)", async () => {
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
+		await h.service.handle(
+			APP,
+			{ method: WebViewMethod.Capture, tabId: "t1", selectionOnly: false },
+			[WEB_CAPTURE_CAP],
+		);
+		expect(h.captures[0]?.html).toContain("<p>page</p>");
+	});
+
+	it("capture() clamps an enormous DOM before it crosses to the seal (Browser-5)", async () => {
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
+		h.created.get("t1")?.captureHtml.mockResolvedValueOnce("x".repeat(LIVE_DOM_MAX_CHARS + 999));
+		await h.service.handle(
+			APP,
+			{ method: WebViewMethod.Capture, tabId: "t1", selectionOnly: false },
+			[WEB_CAPTURE_CAP],
+		);
+		expect(h.captures[0]?.html?.length).toBe(LIVE_DOM_MAX_CHARS);
+	});
+
+	it("capture() degrades to a link-only seal when the page DOM is unreadable (Browser-5)", async () => {
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
+		h.created.get("t1")?.captureHtml.mockResolvedValueOnce(null);
+		const result = await h.service.handle(
+			APP,
+			{ method: WebViewMethod.Capture, tabId: "t1", selectionOnly: false },
+			[WEB_CAPTURE_CAP],
+		);
+		expect(result).toEqual({ bookmarkId: "bm_t1" });
+		expect(h.captures[0]?.html).toBeNull();
+	});
+
+	it("capture() without a broker-verified web.capture cap is refused (fail closed)", async () => {
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
+		expect(() =>
+			h.service.handle(APP, { method: WebViewMethod.Capture, tabId: "t1", selectionOnly: false }),
+		).toThrowError(/web\.capture/);
+		expect(h.captures).toHaveLength(0);
+		expect(h.events.some((e) => e.kind === WebViewEventKind.Captured)).toBe(false);
 	});
 
 	it("suspends the LRU non-pinned tab past the live cap (OQ-WV-2)", () => {
@@ -476,7 +518,13 @@ describe("Browser-8 — read-only browsing (OQ-WV-5)", () => {
 });
 
 describe("Browser-8 — extract-text", () => {
-	const extracted = { url: "https://a.test/", title: "A", text: "body text", truncated: false };
+	const extracted = {
+		url: "https://a.test/",
+		title: "A",
+		byline: null,
+		text: "body text",
+		truncated: false,
+	};
 
 	it("feeds the live DOM to the extractor and returns its projection (Net-3)", async () => {
 		const seen: string[] = [];
@@ -531,7 +579,9 @@ describe("Browser-8 — extract-text", () => {
 	it("resolves null for an unknown tab", async () => {
 		const s = setup({ extractText: async () => extracted });
 		expect(
-			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "nope" }, []),
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "nope" }, [
+				WEB_CAPTURE_CAP,
+			]),
 		).toBeNull();
 	});
 
@@ -541,8 +591,20 @@ describe("Browser-8 — extract-text", () => {
 			WEB_BROWSE_CAP,
 		]);
 		expect(
-			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, []),
+			await s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [
+				WEB_CAPTURE_CAP,
+			]),
 		).toBeNull();
+	});
+
+	it("extract-text without a broker-verified web.capture cap is refused (fail closed)", () => {
+		const s = setup({ extractText: async () => extracted });
+		s.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.test/" }, [
+			WEB_BROWSE_CAP,
+		]);
+		expect(() =>
+			s.service.handle(APP, { method: WebViewMethod.ExtractText, tabId: "t1" }, [WEB_BROWSE_CAP]),
+		).toThrowError(/web\.capture/);
 	});
 
 	it("writes nothing to the vault (it is the read path, not capture)", async () => {

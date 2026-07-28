@@ -27,9 +27,21 @@ describe("toExtractedText", () => {
 		).toEqual({
 			url: "https://a.test/post",
 			title: "The Article",
+			byline: null,
 			text: "body",
 			truncated: false,
 		});
+	});
+
+	it("sanitizes a page-supplied byline before it crosses (Browser-5)", () => {
+		expect(
+			toExtractedText({ ...base, byline: "  by \u202eJane Doe\u202c  ", textContent: "body" })?.byline,
+		).toBe("by Jane Doe");
+		expect(toExtractedText({ ...base, byline: "x".repeat(999), textContent: "body" })?.byline).toBe(
+			"x".repeat(200),
+		);
+		expect(toExtractedText({ ...base, byline: "   ", textContent: "body" })?.byline).toBeNull();
+		expect(toExtractedText({ ...base, textContent: "body" })?.byline).toBeNull();
 	});
 
 	it("falls back to the tab's title when the extractor found none", () => {

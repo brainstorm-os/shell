@@ -67,5 +67,12 @@
   "summary.note": "Generato dalla pagina che stai visualizzando: verifica le informazioni importanti nell'originale.",
   "summary.failed.noContent": "In questa pagina non c'è testo leggibile da riassumere.",
   "summary.failed.noModel": "Nessun modello IA configurato. Aggiungine uno in Impostazioni → IA.",
-  "summary.failed.generic": "Impossibile riassumere questa pagina: riprova."
+  "summary.failed.generic": "Impossibile riassumere questa pagina: riprova.",
+  "reader.enter": "Vista lettura",
+  "reader.exit": "Esci dalla vista lettura",
+  "reader.badge": "Vista lettura",
+  "reader.aria": "Vista lettura",
+  "reader.loading": "Preparazione della vista lettura…",
+  "reader.empty": "Questa pagina non contiene un articolo leggibile.",
+  "reader.truncated": "L'articolo è stato accorciato: apri la pagina originale per il resto."
 }
