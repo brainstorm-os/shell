@@ -34,6 +34,7 @@ import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { ConfirmVariant, confirm } from "../ui/confirm";
 import { IconName } from "../ui/icon";
+import { openExternalUrl } from "../ui/open-external";
 import { TextField } from "../ui/text-field";
 import { SettingRow, SettingSelect } from "./settings-controls";
 import "./billing-section.css";
@@ -105,12 +106,6 @@ export function formatInvoiceDate(createdMs: number): string {
 	const date = new Date(createdMs);
 	if (Number.isNaN(date.getTime())) return "—";
 	return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
-}
-
-/** Open an external URL through the intent OS-handoff chokepoint (the same
- *  path the updates panel uses for the download page). */
-function openExternalUrl(url: string): void {
-	void window.brainstorm?.intents?.dispatch({ verb: "open", payload: { url } });
 }
 
 /** The effective-plan group: entitlement the shell holds + quota lines. */

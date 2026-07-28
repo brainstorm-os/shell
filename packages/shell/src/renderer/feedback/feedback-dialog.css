@@ -18,6 +18,24 @@
 	font-size: var(--text-size-sm);
 }
 
+/* Banner with a trailing action: the button sits right-aligned beside the
+ * text instead of flowing mid-sentence (a wrapped inline button reads as a
+ * layout accident and breaks the banner's line rhythm). */
+.feedback-dialog__banner--action {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.feedback-dialog__banner-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.feedback-dialog__banner--action > .button {
+	flex-shrink: 0;
+}
+
 /* Bordered inputs / textarea live on the shared `<TextField>` /
  * `<TextArea>` primitive (renderer/ui/text-field.css). The dialog only
  * owns the segmented controls, log preview, and footer chrome. */
