@@ -46,9 +46,14 @@ export enum ActiveRelayKind {
 }
 
 /** A `ws://…` address that resolves to this machine or the local network.
- *  Used to classify a configured relay URL as LAN rather than cloud — the
- *  classification is what LAN-5's "no server" copy hangs on, so it must not
- *  guess: anything not provably local is treated as a relay. */
+ *  A HINT for UX surfaces (e.g. the future LAN dial flow suggesting the
+ *  LAN trust model for a private address) — deliberately NOT the selector
+ *  of the transport's trust model. A relay server or durable node
+ *  legitimately runs on loopback or a private address (self-hosted, dev
+ *  harness), and classifying it as a LAN peer engages the fail-closed
+ *  admission gate against a host that never admits — silently swallowing
+ *  every pre-open subscription (F-466). The trust model comes from the
+ *  EXPLICIT `syncRelay.lan` config flag instead. */
 export function isLanRelayUrl(url: string): boolean {
 	let host: string;
 	try {
@@ -92,7 +97,16 @@ export type ActiveRelayVaultSession = {
 	vaultPath: string;
 };
 
-export type MakeRelayPort = (url: string) => RelayPort;
+/** The resolved transport target: the address plus the EXPLICIT trust model.
+ *  `lan: true` means "another device — run the channel-bound admission
+ *  handshake"; false means "a relay/durable node — entitlement challenge".
+ *  Never derived from the address (F-466). */
+export type SyncRelayTarget = {
+	url: string;
+	lan: boolean;
+};
+
+export type MakeRelayPort = (url: string, target: { lan: boolean }) => RelayPort;
 export type MakeLoopbackPort = () => RelayPort;
 
 export type ActiveRelayOptions = {
@@ -101,7 +115,7 @@ export type ActiveRelayOptions = {
 	/** Pluggable for tests. Defaults to a singleton-pair loopback (one self-bus). */
 	makeLoopback?: MakeLoopbackPort;
 	/** Pluggable for tests. Defaults to reading `<vaultPath>/vault.json`. */
-	readSyncRelayUrl?: (vaultPath: string) => Promise<string | null>;
+	readSyncRelayUrl?: (vaultPath: string) => Promise<string | SyncRelayTarget | null>;
 };
 
 const STATE_EVENT = "state";
@@ -121,19 +135,21 @@ function makeDefaultWebSocketPort(url: string): RelayPort {
 /**
  * Default `vault.json` reader. Resilient to a missing / malformed file —
  * returns `null` rather than throwing so a transient FS hiccup degrades to
- * loopback (which is the safe default for any uncertain state).
+ * loopback (which is the safe default for any uncertain state). The `lan`
+ * trust-model flag rides along verbatim: only an explicit `lan: true`
+ * selects the LAN admission handshake (F-466 — never the address).
  */
-export async function readVaultSyncRelayUrl(vaultPath: string): Promise<string | null> {
+export async function readVaultSyncRelayUrl(vaultPath: string): Promise<SyncRelayTarget | null> {
 	try {
 		const raw = await readFile(join(vaultPath, "vault.json"), "utf8");
-		const parsed = JSON.parse(raw) as { syncRelay?: { url?: unknown } };
+		const parsed = JSON.parse(raw) as { syncRelay?: { url?: unknown; lan?: unknown } };
 		if (
 			parsed.syncRelay &&
 			typeof parsed.syncRelay === "object" &&
 			typeof parsed.syncRelay.url === "string" &&
 			parsed.syncRelay.url.length > 0
 		) {
-			return parsed.syncRelay.url;
+			return { url: parsed.syncRelay.url, lan: parsed.syncRelay.lan === true };
 		}
 		return null;
 	} catch {
@@ -145,7 +161,7 @@ export class ActiveRelayOrchestrator {
 	readonly #emitter = new EventEmitter();
 	readonly #makeRelayPort: MakeRelayPort;
 	readonly #makeLoopback: MakeLoopbackPort;
-	readonly #readSyncRelayUrl: (vaultPath: string) => Promise<string | null>;
+	readonly #readSyncRelayUrl: (vaultPath: string) => Promise<string | SyncRelayTarget | null>;
 	readonly #frameListeners = new Set<(frame: Uint8Array) => void>();
 	readonly #subscribed = new Set<string>();
 	#current: ActiveRelayState;
@@ -390,30 +406,33 @@ export class ActiveRelayOrchestrator {
 		// path) and would happen every reconfigure call, even no-op ones,
 		// if we built unconditionally.
 		const desiredKind = !session ? ActiveRelayKind.Loopback : null;
-		const desiredUrl =
+		const rawTarget =
 			session && desiredKind === null ? await this.#readSyncRelayUrl(session.vaultPath) : null;
+		// A bare-string reader (tests, back-compat) means "relay" — the LAN
+		// trust model is only ever selected by the explicit flag (F-466).
+		const target: SyncRelayTarget | null =
+			typeof rawTarget === "string" ? { url: rawTarget, lan: false } : rawTarget;
 		const resolvedKind =
 			desiredKind ??
-			(desiredUrl
-				? isLanRelayUrl(desiredUrl)
+			(target
+				? target.lan
 					? ActiveRelayKind.Lan
 					: ActiveRelayKind.WebSocket
 				: ActiveRelayKind.Loopback);
 		const before = this.#current;
-		if (before.kind === resolvedKind && (before.syncRelayUrl ?? null) === (desiredUrl ?? null)) {
+		if (before.kind === resolvedKind && (before.syncRelayUrl ?? null) === (target?.url ?? null)) {
 			// Same transport already live — no port flap, no port build.
 			return;
 		}
 		const desired: ActiveRelayState =
-			(resolvedKind === ActiveRelayKind.WebSocket || resolvedKind === ActiveRelayKind.Lan) &&
-			desiredUrl
+			(resolvedKind === ActiveRelayKind.WebSocket || resolvedKind === ActiveRelayKind.Lan) && target
 				? {
 						kind: resolvedKind,
 						// Same port either way — LAN-4 reuses the proven wire path
 						// verbatim; what differs is the address and the admission
-						// handshake the wiring injects.
-						port: this.#makeRelayPort(desiredUrl),
-						syncRelayUrl: desiredUrl,
+						// handshake the wiring injects, selected by the explicit flag.
+						port: this.#makeRelayPort(target.url, { lan: target.lan }),
+						syncRelayUrl: target.url,
 					}
 				: this.#mintLoopbackState();
 		this.#current = desired;

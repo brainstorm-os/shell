@@ -75,7 +75,7 @@ describe("ActiveRelayOrchestrator", () => {
 		});
 		const loopback = orch.currentPort();
 		await orch.onSessionChanged({ vaultId: "v1", vaultPath: "/tmp/v1" });
-		expect(make).toHaveBeenCalledWith("wss://relay.example.com:9999");
+		expect(make).toHaveBeenCalledWith("wss://relay.example.com:9999", { lan: false });
 		expect(orch.state().kind).toBe(ActiveRelayKind.WebSocket);
 		expect(orch.state().syncRelayUrl).toBe("wss://relay.example.com:9999");
 		expect(orch.currentPort()).not.toBe(loopback);
@@ -255,6 +255,75 @@ describe("ActiveRelayOrchestrator", () => {
 		expect(orch.hasAssetPlane()).toBe(false);
 		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/" });
 		expect(orch.hasAssetPlane()).toBe(true);
+		orch.dispose();
+	});
+});
+
+describe("explicit LAN trust-model selection (F-466)", () => {
+	it("a loopback/private relay URL WITHOUT the lan flag builds the RELAY-shaped port", async () => {
+		// The regression: inferring LAN-ness from the address engaged the
+		// fail-closed admission gate against the dogfood/self-hosted relay
+		// server (which never admits), silently swallowing every pre-open
+		// subscription — the inbox WrapBootstrap channel first among them.
+		const seen: Array<{ url: string; lan: boolean }> = [];
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => ({ url: "ws://127.0.0.1:9443", lan: false }),
+			makeRelayPort: (url, target) => {
+				seen.push({ url, lan: target.lan });
+				return new FakePort(url);
+			},
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/tmp/x" });
+		expect(orch.state().kind).toBe(ActiveRelayKind.WebSocket);
+		expect(seen).toEqual([{ url: "ws://127.0.0.1:9443", lan: false }]);
+		orch.dispose();
+	});
+
+	it("a bare-string reader result (back-compat) also means relay, not LAN", async () => {
+		const seen: Array<{ url: string; lan: boolean }> = [];
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => "ws://192.168.1.20:9443",
+			makeRelayPort: (url, target) => {
+				seen.push({ url, lan: target.lan });
+				return new FakePort(url);
+			},
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/tmp/x" });
+		expect(orch.state().kind).toBe(ActiveRelayKind.WebSocket);
+		expect(seen).toEqual([{ url: "ws://192.168.1.20:9443", lan: false }]);
+		orch.dispose();
+	});
+
+	it("lan: true selects the LAN kind + LAN-shaped port — explicit config only", async () => {
+		const seen: Array<{ url: string; lan: boolean }> = [];
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => ({ url: "ws://192.168.1.20:9443", lan: true }),
+			makeRelayPort: (url, target) => {
+				seen.push({ url, lan: target.lan });
+				return new FakePort(url);
+			},
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/tmp/x" });
+		expect(orch.state().kind).toBe(ActiveRelayKind.Lan);
+		expect(seen).toEqual([{ url: "ws://192.168.1.20:9443", lan: true }]);
+		orch.dispose();
+	});
+
+	it("flipping the lan flag on the SAME url rebuilds the port (trust models differ)", async () => {
+		let lan = false;
+		const seen: boolean[] = [];
+		const orch = new ActiveRelayOrchestrator({
+			readSyncRelayUrl: async () => ({ url: "ws://192.168.1.20:9443", lan }),
+			makeRelayPort: (url, target) => {
+				seen.push(target.lan);
+				return new FakePort(url);
+			},
+		});
+		await orch.onSessionChanged({ vaultId: "v", vaultPath: "/tmp/x" });
+		lan = true;
+		await orch.reconfigure();
+		expect(seen).toEqual([false, true]);
+		expect(orch.state().kind).toBe(ActiveRelayKind.Lan);
 		orch.dispose();
 	});
 });
