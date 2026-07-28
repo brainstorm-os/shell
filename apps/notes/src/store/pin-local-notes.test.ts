@@ -7,6 +7,7 @@
  * is what finally makes it assertable.
  */
 
+import { createQueryStore } from "@brainstorm-os/react-yjs";
 import { describe, expect, it } from "vitest";
 import type { StoredNote } from "./note";
 import { pinLocalNotes } from "./use-notes";
@@ -72,5 +73,51 @@ describe("pinLocalNotes", () => {
 		const merged = pinLocalNotes(prev, next, ["saving"], "open");
 		expect([...merged.keys()].sort()).toEqual(["open", "saving", "x"]);
 		expect(merged.get("x")?.title).toBe("fresh");
+	});
+});
+
+describe("pinLocalNotes wired into the shared store", () => {
+	// The regression this exists for: `reconcile(prev, next)` hands you the
+	// STORE's cached snapshot, not React's live state. Optimistic edits — every
+	// keystroke's `update()` — call `setNotes` directly and never pass through
+	// the store, so its snapshot lags by however long the user has been typing.
+	// Pinning against it reverts in-flight edits on the next vault broadcast.
+	const note = (id: string, title: string, updatedAt = 1): StoredNote =>
+		({ id, title, body: "", updatedAt, createdAt: 0 }) as StoredNote;
+
+	async function runReload(pinAgainst: "store-snapshot" | "live-state") {
+		// Live component state, as `notesMapRef.current` mirrors it.
+		let live = new Map([["open", note("open", "on disk", 1)]]);
+		const disk = new Map([["open", note("open", "on disk", 1)]]);
+
+		const store = createQueryStore<Map<string, StoredNote>>({
+			initial: new Map(live),
+			load: async () => new Map(disk),
+			subscribe: () => () => {},
+			reconcile: (storeSnapshot, next) =>
+				pinLocalNotes(pinAgainst === "live-state" ? live : storeSnapshot, next, [], "open"),
+			equals: (a, b) => a.get("open")?.title === b.get("open")?.title,
+		});
+		store.subscribe(() => {});
+		await store.refresh();
+
+		// The user types: React state advances, the store knows nothing about it.
+		live = new Map([["open", note("open", "TYPED BY THE USER", 2)]]);
+
+		// A sibling write fires the coarse signal → the store reloads from disk.
+		await store.refresh();
+		const result = store.getSnapshot();
+		store.dispose();
+		return result.get("open")?.title;
+	}
+
+	it("reverts the user's in-flight edit when pinned against the store snapshot", async () => {
+		// This is what shipped: the open note is pinned from a map that predates
+		// the keystrokes, so the reload overwrites them.
+		expect(await runReload("store-snapshot")).toBe("on disk");
+	});
+
+	it("keeps the in-flight edit when pinned against live state", async () => {
+		expect(await runReload("live-state")).toBe("TYPED BY THE USER");
 	});
 });
