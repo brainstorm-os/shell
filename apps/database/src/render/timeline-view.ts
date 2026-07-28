@@ -62,7 +62,7 @@ export function renderTimelineView(host: HTMLElement, props: TimelineViewProps):
 	if (props.compiled.rows.length === 0) {
 		const empty = document.createElement("div");
 		empty.className = "dbv-empty";
-		empty.textContent = "No items match this view.";
+		empty.textContent = t("brainstorm.database.timeline.empty");
 		host.appendChild(empty);
 		return;
 	}
@@ -218,7 +218,7 @@ export function renderTimelineView(host: HTMLElement, props: TimelineViewProps):
 			line.style.top = "4px";
 			const tag = document.createElement("span");
 			tag.className = "dbv-tl__now-tag";
-			tag.textContent = "Now";
+			tag.textContent = t("brainstorm.database.timeline.now");
 			line.appendChild(tag);
 			track.appendChild(line);
 		}

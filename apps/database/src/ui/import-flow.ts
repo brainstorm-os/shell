@@ -20,6 +20,7 @@
  * free. When the shared SDK Popover gets a "modal" variant we'll swap.
  */
 
+import { t } from "../i18n";
 import type { ImportAction, ImportCommand, ImportPlanRow } from "../logic/contact-import-plan";
 import {
 	type ImportFileService,
@@ -136,16 +137,20 @@ export async function runImportFlow(
 			);
 			if (failed > 0) {
 				host.notify(
-					`Imported ${created + merged} of ${created + merged + failed} (${failed} failed)`,
+					t("brainstorm.database.status.importPartial", {
+						done: created + merged,
+						total: created + merged + failed,
+						failed,
+					}),
 					"warn",
 				);
 			} else if (created + merged === 0) {
 				// No-op path: every row was skipped, or the snapshot changed
 				// between plan + commit. Surface an honest nothing-happened
 				// message rather than a misleading success toast.
-				host.notify("Nothing to import", "ready");
+				host.notify(t("brainstorm.database.import.nothing"), "ready");
 			} else {
-				host.notify(`Imported ${created} new, merged ${merged}`, "ready");
+				host.notify(t("brainstorm.database.status.importMerged", { created, merged }), "ready");
 			}
 			await host.onCommitted();
 			return result;
@@ -219,7 +224,9 @@ export function openImportPreviewModal(opts: {
 
 		const title = document.createElement("h2");
 		title.className = "db-import-modal__title";
-		title.textContent = `Import ${opts.targetTypeLabel.toLowerCase()}`;
+		title.textContent = t("brainstorm.database.import.title", {
+			type: opts.targetTypeLabel.toLowerCase(),
+		});
 
 		const filenameLine = document.createElement("p");
 		filenameLine.className = "db-import-modal__filename";
@@ -238,7 +245,7 @@ export function openImportPreviewModal(opts: {
 		const cancelBtn = document.createElement("button");
 		cancelBtn.type = "button";
 		cancelBtn.className = "db-import-modal__cancel";
-		cancelBtn.textContent = "Cancel";
+		cancelBtn.textContent = t("brainstorm.database.import.cancel");
 
 		const importBtn = document.createElement("button");
 		importBtn.type = "button";
@@ -251,7 +258,10 @@ export function openImportPreviewModal(opts: {
 			const summary = opts.summarize(actionOverrides);
 			summaryLine.textContent = summaryText(summary);
 			const committable = summary.create + summary.merge;
-			importBtn.textContent = committable > 0 ? `Import ${committable}` : "Import";
+			importBtn.textContent =
+				committable > 0
+					? t("brainstorm.database.import.actionCount", { count: committable })
+					: t("brainstorm.database.import.action");
 			importBtn.disabled = committable === 0;
 		}
 
@@ -322,10 +332,13 @@ function buildRowElement(
 		actionBtn.textContent = actionVerb(action);
 		// The button cycles, so the SR label states the current verb (not a
 		// static "toggle"); the tooltip keeps the cycle hint for sighted use.
-		actionBtn.setAttribute("aria-label", `${actionVerb(action)} — click to change`);
+		actionBtn.setAttribute(
+			"aria-label",
+			t("brainstorm.database.import.actionAria", { verb: actionVerb(action) }),
+		);
 	};
 	applyActionLabel(currentAction(row));
-	actionBtn.title = "Toggle what happens to this row";
+	actionBtn.title = t("brainstorm.database.import.toggleRowHint");
 	actionBtn.addEventListener("click", () => {
 		const next = nextAction(currentAction(row), row.hasMatch);
 		if (next === row.defaultAction) delete actionOverrides[row.index];
@@ -340,7 +353,7 @@ function buildRowElement(
 	titleInput.className = "db-import-row__title";
 	titleInput.value = row.title === "(untitled)" ? "" : row.title;
 	titleInput.placeholder = "(untitled)";
-	titleInput.setAttribute("aria-label", "Name");
+	titleInput.setAttribute("aria-label", t("brainstorm.database.import.rowNameAria"));
 	titleInput.addEventListener("input", () => {
 		setOverride(propertyOverrides, row.index, "name", titleInput.value.trim());
 	});
@@ -348,7 +361,9 @@ function buildRowElement(
 	const expandBtn = document.createElement("button");
 	expandBtn.type = "button";
 	expandBtn.className = "db-import-row__expand";
-	expandBtn.textContent = row.hasMatch ? "Diff" : "Fields";
+	expandBtn.textContent = row.hasMatch
+		? t("brainstorm.database.import.diff")
+		: t("brainstorm.database.import.fields");
 	expandBtn.setAttribute("aria-expanded", "false");
 
 	head.append(actionBtn, titleInput, expandBtn);
@@ -444,11 +459,14 @@ function setOverride(
  *  emit clutter like "0 to merge". The "Nothing to import" copy is
  *  shipped only when every count is zero. */
 export function summaryText(summary: { create: number; merge: number; skip: number }): string {
-	if (totalCount(summary) === 0) return "Nothing to import";
+	if (totalCount(summary) === 0) return t("brainstorm.database.import.nothing");
 	const parts: string[] = [];
-	if (summary.create > 0) parts.push(`${summary.create} new`);
-	if (summary.merge > 0) parts.push(`${summary.merge} merge`);
-	if (summary.skip > 0) parts.push(`${summary.skip} skip`);
+	if (summary.create > 0)
+		parts.push(t("brainstorm.database.import.summary.new", { count: summary.create }));
+	if (summary.merge > 0)
+		parts.push(t("brainstorm.database.import.summary.merge", { count: summary.merge }));
+	if (summary.skip > 0)
+		parts.push(t("brainstorm.database.import.summary.skip", { count: summary.skip }));
 	return parts.join(" · ");
 }
 

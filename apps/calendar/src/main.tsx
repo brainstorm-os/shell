@@ -7,6 +7,7 @@ import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarApp } from "./app";
+import { CalendarI18nProvider } from "./i18n-provider";
 import { CalendarWidget } from "./widget";
 import "./styles.css";
 
@@ -26,7 +27,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="calendar">
-				<CalendarWidget launch={widgetLaunch} />
+				<CalendarI18nProvider>
+					<CalendarWidget launch={widgetLaunch} />
+				</CalendarI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -34,7 +37,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="calendar">
-				<CalendarApp />
+				<CalendarI18nProvider>
+					<CalendarApp />
+				</CalendarI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);

@@ -151,7 +151,8 @@ function writeBoolPref(key: string, value: boolean): void {
 import { ExportOptionKind, openExportPopover } from "@brainstorm-os/sdk/export-popover";
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { TYPE_LABELS } from "./demo/dataset";
-import { t } from "./i18n";
+import { type TranslationKey, plural, t } from "./i18n";
+import { onTranslatorChange, startLocaleSync } from "./i18n-boot";
 import { PERSON_TYPE } from "./logic/contact-import";
 import { commitCsvImport, csvToEntityImport } from "./logic/csv-import";
 import { registerBuiltInImportMappers } from "./logic/import-registry";
@@ -246,7 +247,7 @@ import {
 } from "./logic/selection";
 import { compileMembershipWith, createSourceIdsCache } from "./logic/source-ids-cache";
 import { type SidebarNavRow, SidebarRowKind, sidebarNavRows } from "./logic/system-lists";
-import { decideToggleMembership } from "./logic/toggle-membership";
+import { ToggleVerb, decideToggleMembership } from "./logic/toggle-membership";
 import {
 	buildVaultLists,
 	deriveColumns,
@@ -627,6 +628,17 @@ function bootApp(): void {
 
 	announceRuntime(state);
 	watchTokenChanges(state);
+
+	// 12.15 slice 15d — re-paint the imperative chrome when a locale pack
+	// lands or the shell language flips (menus/dialogs re-read `t` on open).
+	onTranslatorChange(() => {
+		renderListNav(state);
+		renderViewTabs(state);
+		renderStageHeader(state);
+		renderActiveView(state);
+		renderInspector(state);
+	});
+	startLocaleSync();
 
 	persistedReady = loadPersistedState(state);
 }
@@ -1018,7 +1030,7 @@ function renderStageHeader(state: AppState): void {
 			createIconPickerButton({
 				value: list.icon,
 				size: 18,
-				ariaLabel: "Change list icon",
+				ariaLabel: t("brainstorm.database.stage.changeListIcon"),
 				onChange: (icon) => commitListIcon(state, list.id, icon),
 			}),
 		);
@@ -1060,7 +1072,7 @@ function renderStageHeader(state: AppState): void {
 			createIconPickerButton({
 				value: list.icon,
 				size: 18,
-				ariaLabel: "Change list icon",
+				ariaLabel: t("brainstorm.database.stage.changeListIcon"),
 				onChange: (icon) => commitListIcon(state, list.id, icon),
 			}),
 		);
@@ -1083,11 +1095,11 @@ function renderStageHeader(state: AppState): void {
 function badgeLabel(mode: ListMode): string {
 	switch (mode) {
 		case ListMode.Query:
-			return "Query";
+			return t("brainstorm.database.mode.query");
 		case ListMode.Manual:
-			return "Manual";
+			return t("brainstorm.database.mode.manual");
 		case ListMode.Hybrid:
-			return "Hybrid";
+			return t("brainstorm.database.mode.hybrid");
 	}
 }
 
@@ -1098,14 +1110,13 @@ function badgeLabel(mode: ListMode): string {
 function emptyStateContent(state: AppState): { title: string; body: string } {
 	if (state.lists.length === 0) {
 		return {
-			title: "Nothing here yet",
-			body:
-				"This vault has no entities. Create notes, tasks, or other items in their apps and they'll show up here automatically.",
+			title: t("brainstorm.database.empty.vault.title"),
+			body: t("brainstorm.database.empty.vault.body"),
 		};
 	}
 	return {
-		title: "No view selected",
-		body: "Pick a list from the sidebar to get started.",
+		title: t("brainstorm.database.empty.noView.title"),
+		body: t("brainstorm.database.empty.noView.body"),
 	};
 }
 
@@ -1116,15 +1127,13 @@ function emptyStateContent(state: AppState): { title: string; body: string } {
 function grouplessViewEmptyState(kind: ListViewKind): { title: string; body: string } {
 	if (kind === ListViewKind.Calendar) {
 		return {
-			title: "No date to schedule by",
-			body:
-				"This calendar view needs a date property. Open view settings (the gear icon) and pick a date to lay your items out on the calendar.",
+			title: t("brainstorm.database.empty.noDate.title"),
+			body: t("brainstorm.database.empty.noDate.body"),
 		};
 	}
 	return {
-		title: "Nothing to group by",
-		body:
-			"This board view needs a property to group by. Open view settings (the gear icon) and choose one to see columns.",
+		title: t("brainstorm.database.empty.noGroup.title"),
+		body: t("brainstorm.database.empty.noGroup.body"),
 	};
 }
 
@@ -1417,7 +1426,7 @@ function renderInspector(state: AppState): void {
 		// leave an empty shell open eating horizontal space (the reported
 		// friction). The header toggle re-opens it (on the first row); the
 		// title-cell "Open" affordance opens it on a specific row.
-		title.textContent = "Details";
+		title.textContent = t("brainstorm.database.inspector.details");
 		if (state.chrome.inspectorOpen) {
 			state.chrome.inspectorOpen = false;
 			applyChrome(state);
@@ -1427,10 +1436,10 @@ function renderInspector(state: AppState): void {
 	}
 
 	if (selected.size > 1) {
-		title.textContent = `${selected.size} selected`;
+		title.textContent = t("brainstorm.database.selection.count", { count: selected.size });
 		const summary = document.createElement("p");
 		summary.className = "db-inspector__empty";
-		summary.textContent = `${selected.size} items selected. Use Cmd/Ctrl-click to toggle, Shift-click for ranges.`;
+		summary.textContent = t("brainstorm.database.inspector.multiSummary", { count: selected.size });
 		body.appendChild(summary);
 		const list = document.createElement("ul");
 		list.className = "db-inspector__multi-list";
@@ -1440,7 +1449,7 @@ function renderInspector(state: AppState): void {
 			if (i > 25) {
 				const more = document.createElement("li");
 				more.className = "db-inspector__multi-more";
-				more.textContent = `+${selected.size - 25} more`;
+				more.textContent = t("brainstorm.database.inspector.moreItems", { count: selected.size - 25 });
 				list.appendChild(more);
 				break;
 			}
@@ -1468,10 +1477,10 @@ function renderInspector(state: AppState): void {
 	const onlyId = [...selected][0];
 	const entity = onlyId ? state.db.entities.find((e) => e.id === onlyId) : undefined;
 	if (!entity) {
-		title.textContent = "Details";
+		title.textContent = t("brainstorm.database.inspector.details");
 		const empty = document.createElement("p");
 		empty.className = "db-inspector__empty";
-		empty.textContent = "Selection is no longer in the dataset.";
+		empty.textContent = t("brainstorm.database.inspector.selectionGone");
 		body.appendChild(empty);
 		return;
 	}
@@ -1505,7 +1514,7 @@ function renderInspector(state: AppState): void {
 		title.contentEditable = recordLocked ? "false" : "plaintext-only";
 		title.spellcheck = false;
 		title.setAttribute("role", "textbox");
-		title.setAttribute("aria-label", "Name");
+		title.setAttribute("aria-label", t("brainstorm.database.inspector.nameAria"));
 		title.onkeydown = (event) => {
 			if (event.key === "Enter") {
 				event.preventDefault();
@@ -1529,8 +1538,8 @@ function renderInspector(state: AppState): void {
 	const coverBtn = document.createElement("button");
 	coverBtn.type = "button";
 	coverBtn.className = "db-inspector__cover";
-	coverBtn.dataset.bsTooltip = "Change cover";
-	coverBtn.setAttribute("aria-label", "Change cover");
+	coverBtn.dataset.bsTooltip = t("brainstorm.database.inspector.changeCover");
+	coverBtn.setAttribute("aria-label", t("brainstorm.database.inspector.changeCover"));
 	coverBtn.disabled = recordLocked;
 	coverBtn.appendChild(createEntityCoverElement(entity, { aspect: 16 / 6 }));
 	coverBtn.addEventListener("click", () => {
@@ -1552,8 +1561,8 @@ function renderInspector(state: AppState): void {
 	const iconBtn = document.createElement("button");
 	iconBtn.type = "button";
 	iconBtn.className = "db-inspector__icon-btn";
-	iconBtn.dataset.bsTooltip = "Change icon";
-	iconBtn.setAttribute("aria-label", "Change icon");
+	iconBtn.dataset.bsTooltip = t("brainstorm.database.inspector.changeIcon");
+	iconBtn.setAttribute("aria-label", t("brainstorm.database.inspector.changeIcon"));
 	iconBtn.disabled = recordLocked;
 	// Empty icon slot shows the dashed-plus add affordance (not a blank box) so
 	// it reads as "click to add an icon".
@@ -1581,14 +1590,16 @@ function renderInspector(state: AppState): void {
 	const open = document.createElement("button");
 	open.type = "button";
 	open.className = "db-inspector__open";
-	open.textContent = `Open in ${TYPE_LABELS[entity.type] ?? "default app"}`;
+	open.textContent = t("brainstorm.database.inspector.openIn", {
+		app: TYPE_LABELS[entity.type] ?? t("brainstorm.database.inspector.defaultApp"),
+	});
 	open.addEventListener("click", () => onOpenEntity(state, entity));
 	actions.appendChild(open);
 	const quick = document.createElement("button");
 	quick.type = "button";
 	quick.className = "db-inspector__open";
-	quick.textContent = "Quick Look";
-	quick.title = "Quick Look (Space)";
+	quick.textContent = t("brainstorm.database.inspector.quickLook");
+	quick.title = t("brainstorm.database.inspector.quickLookHint");
 	quick.addEventListener("click", () => void dispatchQuickLook(entity));
 	actions.appendChild(quick);
 	body.appendChild(actions);
@@ -1635,25 +1646,25 @@ function renderInspector(state: AppState): void {
 
 	const metaHeader = document.createElement("h3");
 	metaHeader.className = "db-inspector__section-title";
-	metaHeader.textContent = "System";
+	metaHeader.textContent = t("brainstorm.database.inspector.system");
 	body.appendChild(metaHeader);
 
 	const metaList = document.createElement("dl");
 	metaList.className = "db-inspector__props db-inspector__props--meta";
 	const dt1 = document.createElement("dt");
-	dt1.textContent = "Created";
+	dt1.textContent = t("brainstorm.database.inspector.created");
 	const dd1 = document.createElement("dd");
 	dd1.textContent = formatDateTime(entity.createdAt);
 	metaList.append(dt1, dd1);
 	if (entity.updatedAt !== entity.createdAt) {
 		const dt2 = document.createElement("dt");
-		dt2.textContent = "Updated";
+		dt2.textContent = t("brainstorm.database.inspector.updated");
 		const dd2 = document.createElement("dd");
 		dd2.textContent = formatDateTime(entity.updatedAt);
 		metaList.append(dt2, dd2);
 	}
 	const dt3 = document.createElement("dt");
-	dt3.textContent = "ID";
+	dt3.textContent = t("brainstorm.database.inspector.id");
 	const dd3 = document.createElement("dd");
 	dd3.className = "db-inspector__mono";
 	dd3.textContent = entity.id;
@@ -1721,7 +1732,7 @@ function renderInspectorBacklinksSection(state: AppState, entity: EntityRow): HT
 
 	const title = document.createElement("h3");
 	title.className = "db-inspector__section-title";
-	title.textContent = "Referenced by";
+	title.textContent = t("brainstorm.database.inspector.referencedBy");
 	section.appendChild(title);
 
 	const ul = document.createElement("ul");
@@ -1740,7 +1751,7 @@ function renderBacklinkRow(state: AppState, { source, relationKey }: Backlink): 
 	const button = document.createElement("button");
 	button.type = "button";
 	button.className = "db-inspector__backlink-link";
-	button.title = `Open ${entityTitle(source)}`;
+	button.title = t("brainstorm.database.inspector.openEntity", { name: entityTitle(source) });
 	button.addEventListener("click", () => onOpenInspector(state, source));
 
 	const glyph = document.createElement("span");
@@ -1756,7 +1767,9 @@ function renderBacklinkRow(state: AppState, { source, relationKey }: Backlink): 
 
 	const rel = document.createElement("span");
 	rel.className = "db-inspector__backlink-rel";
-	rel.textContent = `via ${propertyDisplayName(relationKey)}`;
+	rel.textContent = t("brainstorm.database.inspector.viaRelation", {
+		relation: propertyDisplayName(relationKey),
+	});
 	button.appendChild(rel);
 
 	li.appendChild(button);
@@ -1776,7 +1789,7 @@ function openAddToCollectionMenu(
 	);
 
 	if (candidates.length === 0) {
-		flashStatus("No more user collections to add to", "warn");
+		flashStatus(t("brainstorm.database.status.noCollectionsToAdd"), "warn");
 		return;
 	}
 
@@ -1819,7 +1832,32 @@ function toggleEntityInList(
 	renderInspector(state);
 	schedulePersist(state);
 
-	flashStatus(`${verb} "${entity.id}" ${add ? "to" : "from"} "${next.name}"`, "ready");
+	flashStatus(
+		t(
+			add ? "brainstorm.database.status.membership.to" : "brainstorm.database.status.membership.from",
+			{
+				verb: t(membershipVerbKey(verb)),
+				id: entity.id,
+				name: next.name,
+			},
+		),
+		"ready",
+	);
+}
+
+function membershipVerbKey(verb: ToggleVerb): TranslationKey {
+	switch (verb) {
+		case ToggleVerb.Added:
+			return "brainstorm.database.membership.verb.added";
+		case ToggleVerb.ReAdded:
+			return "brainstorm.database.membership.verb.readded";
+		case ToggleVerb.Excluded:
+			return "brainstorm.database.membership.verb.excluded";
+		case ToggleVerb.Removed:
+			return "brainstorm.database.membership.verb.removed";
+		case ToggleVerb.NoChange:
+			return "brainstorm.database.membership.verb.noChange";
+	}
 }
 
 /* ── Selection / open / chrome ─────────────────────────────────────────── */
@@ -1902,7 +1940,7 @@ function updateSelectionBar(state: AppState): void {
 		const clear = document.createElement("button");
 		clear.type = "button";
 		clear.className = "bs-btn bs-btn--secondary bs-btn--sm db-selection-bar__clear";
-		clear.textContent = "Clear";
+		clear.textContent = t("brainstorm.database.selection.clear");
 		clear.addEventListener("click", () => {
 			state.selection = clearSelection();
 			renderActiveView(state);
@@ -1912,7 +1950,7 @@ function updateSelectionBar(state: AppState): void {
 		body.prepend(bar);
 	}
 	const text = bar.querySelector<HTMLElement>(".db-selection-bar__count");
-	if (text) text.textContent = `${count} selected`;
+	if (text) text.textContent = t("brainstorm.database.selection.count", { count });
 }
 
 function onOpenEntity(state: AppState, entity: EntityRow): void {
@@ -2185,7 +2223,7 @@ function bindHeaderObjectMenu(state: AppState): void {
 				...(extraItems.length > 0 ? { extraItems } : {}),
 			};
 		},
-		{ moreActionsLabel: "More actions" },
+		{ moreActionsLabel: t("brainstorm.database.menu.moreActions") },
 	);
 	const headerRight = document.querySelector<HTMLElement>(".app-header__right");
 	headerRight?.appendChild(menu.moreButton);
@@ -2216,7 +2254,7 @@ function buildHeaderExtraItems(
 		icon: IconName.Copy,
 		run: async () => {
 			if (await copyListBlockRef(list.id)) {
-				flashStatus("Embed link copied — paste into a document to embed this list", "ready");
+				flashStatus(t("brainstorm.database.status.embedLinkCopied"), "ready");
 			}
 		},
 	});
@@ -2261,17 +2299,17 @@ function buildHeaderExtraItems(
 							{
 								kind: ExportOptionKind.Select,
 								id: "scope",
-								label: "Rows",
+								label: t("brainstorm.database.export.rows"),
 								choices: [
-									{ value: "view", label: "Current view" },
-									{ value: "all", label: "All rows in list" },
+									{ value: "view", label: t("brainstorm.database.export.rows.currentView") },
+									{ value: "all", label: t("brainstorm.database.export.rows.all") },
 								],
 								default: "view",
 							},
 							{
 								kind: ExportOptionKind.Checklist,
 								id: "columns",
-								label: "Columns",
+								label: t("brainstorm.database.export.columns"),
 								choices: columnChoices,
 								default: visibleColumnIds,
 							},
@@ -2279,22 +2317,22 @@ function buildHeaderExtraItems(
 						formats: [
 							{
 								id: ListExportFormat.Csv,
-								label: "CSV",
+								label: t("brainstorm.database.export.format.csv"),
 								options: [
 									{
 										kind: ExportOptionKind.Toggle,
 										id: "header",
-										label: "Include header row",
+										label: t("brainstorm.database.export.csv.includeHeader"),
 										default: true,
 									},
 									{
 										kind: ExportOptionKind.Select,
 										id: "delimiter",
-										label: "Delimiter",
+										label: t("brainstorm.database.export.csv.delimiter"),
 										choices: [
-											{ value: ",", label: "Comma" },
-											{ value: ";", label: "Semicolon" },
-											{ value: "\t", label: "Tab" },
+											{ value: ",", label: t("brainstorm.database.export.csv.delimiter.comma") },
+											{ value: ";", label: t("brainstorm.database.export.csv.delimiter.semicolon") },
+											{ value: "\t", label: t("brainstorm.database.export.csv.delimiter.tab") },
 										],
 										default: ",",
 									},
@@ -2302,24 +2340,24 @@ function buildHeaderExtraItems(
 							},
 							{
 								id: ListExportFormat.Json,
-								label: "JSON",
+								label: t("brainstorm.database.export.format.json"),
 								options: [
 									{
 										kind: ExportOptionKind.Toggle,
 										id: "pretty",
-										label: "Pretty-print",
+										label: t("brainstorm.database.export.json.pretty"),
 										default: true,
 									},
 								],
 							},
-							{ id: ListExportFormat.Markdown, label: "Markdown" },
+							{ id: ListExportFormat.Markdown, label: t("brainstorm.database.export.format.markdown") },
 						],
 					},
 					labels: {
-						title: "Export list",
-						formatLegend: "Format",
-						exportAction: "Export",
-						cancel: "Cancel",
+						title: t("brainstorm.database.export.title"),
+						formatLegend: t("brainstorm.database.export.formatLegend"),
+						exportAction: t("brainstorm.database.export.action"),
+						cancel: t("brainstorm.database.export.cancel"),
 					},
 					onExport: ({ formatId, values }) => {
 						const selected = new Set(Array.isArray(values.columns) ? (values.columns as string[]) : []);
@@ -2365,13 +2403,13 @@ function buildHeaderExtraItems(
 						.filter((e) => e.type === PERSON_TYPE)
 						.map((e) => ({ id: e.id, properties: e.properties as Record<string, unknown> })),
 					targetType: PERSON_TYPE,
-					targetTypeLabel: "Contacts",
+					targetTypeLabel: t("brainstorm.database.import.contacts.typeLabel"),
 					notify: flashStatus,
 					onCommitted: () => loadVaultEntities(state),
 				},
 				{
-					title: "Import contacts",
-					filterName: "Contacts (vCard / CSV)",
+					title: t("brainstorm.database.import.contacts.title"),
+					filterName: t("brainstorm.database.import.contacts.filter"),
 				},
 			),
 	});
@@ -2464,7 +2502,12 @@ function onMoveToGroup(
 	mutateEntityProperty(state, entity.id, view.groupBy.propertyId, groupKey ?? "");
 	renderActiveView(state);
 	renderInspector(state);
-	flashStatus(groupKey === null ? "Cleared group" : `Moved to "${groupKey}"`, "ready");
+	flashStatus(
+		groupKey === null
+			? t("brainstorm.database.status.clearedGroup")
+			: t("brainstorm.database.status.movedToGroup", { group: groupKey }),
+		"ready",
+	);
 }
 
 /** DND-4 — a cross-app object dropped on a board column. Unlike `onMoveToGroup`
@@ -2481,7 +2524,7 @@ async function onDropObjectToGroup(
 ): Promise<void> {
 	const update = getRuntime()?.services?.entities?.update;
 	if (!update) {
-		flashStatus("Drop needs the entities service (not exposed by this shell)", "warn");
+		flashStatus(t("brainstorm.database.status.dropNeedsEntities"), "warn");
 		return;
 	}
 	const list = activeList(state);
@@ -2510,7 +2553,12 @@ async function onDropObjectToGroup(
 	await loadVaultEntities(state);
 	renderActiveView(state);
 	renderInspector(state);
-	flashStatus(groupKey === null ? "Added to column" : `Added to "${groupKey}"`, "ready");
+	flashStatus(
+		groupKey === null
+			? t("brainstorm.database.status.addedToColumn")
+			: t("brainstorm.database.status.addedToGroup", { group: groupKey }),
+		"ready",
+	);
 }
 
 function onMoveToDay(state: AppState, view: ListView, entity: EntityRow, dayStart: number): void {
@@ -2523,7 +2571,7 @@ function onMoveToDay(state: AppState, view: ListView, entity: EntityRow, dayStar
 	mutateEntityProperty(state, entity.id, dateProp, dayStart);
 	renderActiveView(state);
 	renderInspector(state);
-	flashStatus(`Moved to ${formatDate(dayStart)}`, "ready");
+	flashStatus(t("brainstorm.database.status.movedToDate", { date: formatDate(dayStart) }), "ready");
 }
 
 /** 9.12.10 — timeline bar drag-to-move: writes the whole-day-shifted
@@ -2963,7 +3011,9 @@ function openFilterOperatorMenu(
 /** The placeholder hint for a filter value input — list ops want a
  *  comma-separated hint, everything else a generic prompt. */
 function valuePlaceholder(op: FilterOp): string {
-	return opIsList(op) ? "value, value…" : "Type a value…";
+	return opIsList(op)
+		? t("brainstorm.database.filter.valueListPlaceholder")
+		: t("brainstorm.database.filter.valuePlaceholder");
 }
 
 /** Teardown for the single open value prompt, so re-opening (or closing) one
@@ -2995,8 +3045,8 @@ function promptInline(
 	input.type = "text";
 	input.className = "db-value-prompt__input";
 	input.value = initial;
-	input.placeholder = opts?.placeholder ?? "Type a value…";
-	input.setAttribute("aria-label", opts?.title ?? "Filter value");
+	input.placeholder = opts?.placeholder ?? t("brainstorm.database.filter.valuePlaceholder");
+	input.setAttribute("aria-label", opts?.title ?? t("brainstorm.database.filter.valueAria"));
 	popover.appendChild(input);
 
 	const r = anchor.getBoundingClientRect();
@@ -3048,12 +3098,12 @@ async function createEntityInActiveList(state: AppState): Promise<void> {
 	if (rowCreateInFlight) return;
 	const entities = getRuntime()?.services?.entities;
 	if (!entities?.create) {
-		flashStatus("Create needs the entities service (not exposed by this shell)", "warn");
+		flashStatus(t("brainstorm.database.status.createNeedsEntities"), "warn");
 		return;
 	}
 	const list = activeList(state);
 	if (!list) {
-		flashStatus("Open or create a collection to add an object here", "warn");
+		flashStatus(t("brainstorm.database.status.openCollectionFirst"), "warn");
 		return;
 	}
 	const plan = decideRowCreate(list);
@@ -3106,16 +3156,16 @@ async function performRowCreate(
 	if (rowCreateInFlight) return;
 	const entities = getRuntime()?.services?.entities;
 	if (!entities?.create) {
-		flashStatus("Create needs the entities service (not exposed by this shell)", "warn");
+		flashStatus(t("brainstorm.database.status.createNeedsEntities"), "warn");
 		return;
 	}
 	rowCreateInFlight = true;
 	try {
-		flashStatus("Creating…", "ready");
+		flashStatus(t("brainstorm.database.status.creating"), "ready");
 		const now = Date.now();
 		const baseDraft: TemplateDraft = {
 			type: plan.type,
-			properties: { name: "Untitled", createdAt: now, updatedAt: now },
+			properties: { name: t("brainstorm.database.row.untitled"), createdAt: now, updatedAt: now },
 		};
 		const draft = draftFromCreateOption(option, baseDraft);
 		const entity = await entities.create(draft.type ?? plan.type, draft.properties);
@@ -3147,10 +3197,10 @@ async function performRowCreate(
 		// bail on an unchanged signature — re-render so the still-pending title
 		// edit reaches the grid regardless of which reload painted the row.
 		if (state.pendingTitleEdit) renderActiveView(state);
-		flashStatus("Created", "ready");
+		flashStatus(t("brainstorm.database.status.created"), "ready");
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-		flashStatus(`Create failed — ${message}`, "warn");
+		flashStatus(t("brainstorm.database.status.createFailed", { message }), "warn");
 	} finally {
 		rowCreateInFlight = false;
 	}
@@ -3163,7 +3213,7 @@ async function performRowCreate(
 async function saveObjectAsTemplate(entity: EntityRow): Promise<void> {
 	const entities = getRuntime()?.services?.entities;
 	if (!entities?.create) {
-		flashStatus("Save as template needs the entities service (not exposed by this shell)", "warn");
+		flashStatus(t("brainstorm.database.status.saveTemplateNeedsEntities"), "warn");
 		return;
 	}
 	try {
@@ -3180,7 +3230,7 @@ async function saveObjectAsTemplate(entity: EntityRow): Promise<void> {
 		flashStatus(t("brainstorm.database.status.templateSaved"), "ready");
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-		flashStatus(`Save as template failed — ${message}`, "warn");
+		flashStatus(t("brainstorm.database.status.saveTemplateFailed", { message }), "warn");
 	}
 }
 
@@ -3263,10 +3313,10 @@ function renderFilterBar(state: AppState): void {
 				variant: "filter",
 				icon: DatabaseIcon.Filter,
 				text: describeGroup(group),
-				title: "Edit group",
+				title: t("brainstorm.database.filter.editGroup"),
 				onClick: () => openFilterGroupMenu(state, bar, view.id, draft, gi),
 				onRemove: remove,
-				removeLabel: "Remove group",
+				removeLabel: t("brainstorm.database.filter.removeGroup"),
 			}),
 		);
 	});
@@ -3276,10 +3326,14 @@ function renderFilterBar(state: AppState): void {
 	// Add directly from the bar where the conditions live — no round-trip to the
 	// toolbar. "+ Filter" drops onto the property list; "+ Sort" onto the sort menu.
 	bar.appendChild(
-		barAddButton("+ Filter", (anchor) => openFilterPropertyMenu(state, anchor, view.id, draft)),
+		barAddButton(t("brainstorm.database.filter.add"), (anchor) =>
+			openFilterPropertyMenu(state, anchor, view.id, draft),
+		),
 	);
 	if (sorts.length === 0) {
-		bar.appendChild(barAddButton("+ Sort", (anchor) => openSortMenu(state, anchor)));
+		bar.appendChild(
+			barAddButton(t("brainstorm.database.sort.add"), (anchor) => openSortMenu(state, anchor)),
+		);
 	}
 
 	// One affordance to wipe the whole bar once it's carrying more than a single
@@ -3288,7 +3342,7 @@ function renderFilterBar(state: AppState): void {
 		const clear = document.createElement("button");
 		clear.type = "button";
 		clear.className = "db-filter-bar__clear";
-		clear.textContent = "Clear all";
+		clear.textContent = t("brainstorm.database.filter.clearAll");
 		clear.addEventListener("click", () => {
 			updateViewFilters(state, view.id, null);
 			updateViewSorts(state, view.id, []);
@@ -3310,10 +3364,10 @@ function buildFilterRulePill(
 		variant: "filter",
 		icon: DatabaseIcon.Filter,
 		text: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
-		title: "Edit filter",
+		title: t("brainstorm.database.filter.editRule"),
 		onClick: (anchor) => openFilterRulePillMenu(state, anchor, viewId, draft, index),
 		onRemove: remove,
-		removeLabel: "Remove filter",
+		removeLabel: t("brainstorm.database.filter.removeRule"),
 	});
 }
 
@@ -3343,10 +3397,10 @@ function buildSortPill(
 	return createPill({
 		variant: "sort",
 		text,
-		title: "Toggle sort direction",
+		title: t("brainstorm.database.sort.toggle"),
 		onClick: flip,
 		onRemove: remove,
-		removeLabel: "Remove sort",
+		removeLabel: t("brainstorm.database.sort.remove"),
 	});
 }
 
@@ -3576,14 +3630,14 @@ async function persistEntityPatch(
 	renderInspector(state);
 	const update = getRuntime()?.services?.entities?.update;
 	if (!update) {
-		flashStatus("Saved locally — entities write not exposed by this shell", "warn");
+		flashStatus(t("brainstorm.database.status.savedLocally"), "warn");
 		return;
 	}
 	try {
 		await update(entity.id, patch);
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-		flashStatus(`Save failed — ${message}`, "warn");
+		flashStatus(t("brainstorm.database.status.saveFailed", { message }), "warn");
 	}
 }
 
@@ -3745,9 +3799,9 @@ function toggleSearch(state: AppState, anchor: HTMLElement): void {
 	input.id = "db-search-input";
 	input.type = "search";
 	input.className = "db-search-input";
-	input.placeholder = "Search rows…";
+	input.placeholder = t("brainstorm.database.search.placeholder");
 	input.value = searchQuery;
-	input.setAttribute("aria-label", "Search rows");
+	input.setAttribute("aria-label", t("brainstorm.database.search.aria"));
 	input.addEventListener("input", () => {
 		searchQuery = input.value;
 		renderActiveView(state);
@@ -3793,7 +3847,8 @@ function beginNewList(state: AppState, anchor: HTMLElement): void {
 		[
 			{
 				label: t("brainstorm.database.collection.newBlank"),
-				onSelect: () => createListWithSource(state, "New collection", null, []),
+				onSelect: () =>
+					createListWithSource(state, t("brainstorm.database.collection.defaultName"), null, []),
 			},
 			{
 				label: t("brainstorm.database.collection.newFromObjects"),
@@ -3817,12 +3872,12 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 	const files = runtime?.services?.files;
 	const create = runtime?.services?.entities?.create;
 	if (!files?.requestOpen || !create) {
-		flashStatus("Import needs the files + entities services (not exposed by this shell)", "warn");
+		flashStatus(t("brainstorm.database.status.importNeedsServices"), "warn");
 		return;
 	}
 	const handles = await files.requestOpen({
-		title: "Import CSV",
-		filters: [{ name: "CSV", extensions: ["csv"] }],
+		title: t("brainstorm.database.import.csv.title"),
+		filters: [{ name: t("brainstorm.database.export.format.csv"), extensions: ["csv"] }],
 		multi: false,
 	});
 	const handle = handles[0];
@@ -3832,24 +3887,26 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 		const bytes = await files.read(handle);
 		text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 	} catch {
-		flashStatus("Couldn't read the CSV file", "warn");
+		flashStatus(t("brainstorm.database.status.csvReadFailed"), "warn");
 		return;
 	}
 	const imported = csvToEntityImport(text);
 	if (!imported || imported.rows.length === 0) {
-		flashStatus("No rows found in that CSV", "warn");
+		flashStatus(t("brainstorm.database.status.csvNoRows"), "warn");
 		return;
 	}
 	let ids: string[];
 	try {
-		flashStatus("Importing…", "ready");
+		flashStatus(t("brainstorm.database.status.importing"), "ready");
 		ids = await commitCsvImport(imported, { create });
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-		flashStatus(`Import failed — ${message}`, "warn");
+		flashStatus(t("brainstorm.database.status.importFailed", { message }), "warn");
 		return;
 	}
-	const baseName = handle.displayName.replace(/\.csv$/i, "").trim() || "Imported CSV";
+	const baseName =
+		handle.displayName.replace(/\.csv$/i, "").trim() ||
+		t("brainstorm.database.import.csv.defaultName");
 	const columnIds = imported.propertyColumns.map((c) => c.name);
 	const { list, view } = createList({
 		name: baseName,
@@ -3878,7 +3935,12 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 	renderActiveView(state);
 	renderInspector(state);
 	flashStatus(
-		`Imported ${ids.length} ${ids.length === 1 ? "row" : "rows"} into "${list.name}"`,
+		plural(
+			ids.length,
+			"brainstorm.database.status.importedRows.one",
+			"brainstorm.database.status.importedRows.other",
+			{ name: list.name },
+		),
 		"ready",
 	);
 }
@@ -3888,21 +3950,24 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 function openExistingTypesPicker(state: AppState, anchor: HTMLElement): void {
 	const types = availableVaultTypes(state);
 	if (types.length === 0) {
-		createListWithSource(state, "New collection", null, []);
+		createListWithSource(state, t("brainstorm.database.collection.defaultName"), null, []);
 		return;
 	}
 	openSourcePicker({
 		anchor,
 		availableTypes: types,
 		selectedTypes: [],
-		title: "New list — choose what to show",
-		confirmLabel: "Create list",
+		title: t("brainstorm.database.sourcePicker.title"),
+		confirmLabel: t("brainstorm.database.sourcePicker.confirm"),
 		onConfirm: (chosen) => {
 			closeSourcePicker();
 			const source: ListSource = { kind: ListSourceKind.ByType, types: chosen };
 			const rows = state.db.entities.filter((e) => e.deletedAt === null && chosen.includes(e.type));
 			const first = chosen[0];
-			const name = chosen.length === 1 && first ? friendlyTypeName(first) : "New list";
+			const name =
+				chosen.length === 1 && first
+					? friendlyTypeName(first)
+					: t("brainstorm.database.list.defaultName");
 			createListWithSource(state, name, source, deriveColumns(rows));
 		},
 		onCancel: () => closeSourcePicker(),
@@ -4617,10 +4682,10 @@ function getRuntime(): BrainstormRuntime | null {
 function announceRuntime(state: AppState): void {
 	const runtime = getRuntime();
 	if (!runtime) {
-		setStatus("No vault — open in Brainstorm", "warn");
+		setStatus(t("brainstorm.database.status.noVault"), "warn");
 		return;
 	}
-	setStatus("Loading vault…", "warn");
+	setStatus(t("brainstorm.database.status.loadingVault"), "warn");
 	runtime.on("ready", () => {
 		void (async () => {
 			// Persisted deltas must be in `persistedUserDeltas` before the
@@ -4707,45 +4772,47 @@ async function loadVaultProperties(state: AppState): Promise<void> {
  * properties from the same picker.
  */
 
-const INLINE_PROPERTY_FORM_LABELS = {
-	region: "New property",
-	back: "Back",
-	nameLabel: "Name",
-	namePlaceholder: "Property name",
-	kindLabel: "Kind",
-	formatLabel: "Format",
-	multiLabel: "Allow multiple",
-	cancel: "Cancel",
-	submit: "Create",
-	kindText: "Text",
-	kindNumber: "Number",
-	kindBoolean: "Boolean",
-	kindDate: "Date",
-	kindSelect: "Select",
-	kindRelation: "Relation",
-	kindFile: "File",
-	kindFormula: "Formula",
-	formulaLabel: "Expression",
-	formulaPlaceholder: "{price} * {quantity}",
-	formulaHint: "Reference other properties with {braces}. Read-only, computed per row.",
-	formatPlain: "Plain",
-	formatUrl: "URL",
-	formatEmail: "Email",
-	formatPhone: "Phone",
-	formatCurrency: "Currency",
-	formatPercent: "Percent",
-	formatDuration: "Duration",
-	currencyLabel: "Currency",
-	optionsLabel: "Options",
-	optionsPlaceholder: "Lead, Qualified, Proposal, Won, Lost",
-	optionsHint: "One per line, or comma-separated. Add more later in Settings → Data.",
-	relationTargetLabel: "Links to",
-	relationTargetAny: "Anything",
-};
+function inlinePropertyFormLabels() {
+	return {
+		region: t("brainstorm.database.property.form.region"),
+		back: t("brainstorm.database.property.form.back"),
+		nameLabel: t("brainstorm.database.property.form.nameLabel"),
+		namePlaceholder: t("brainstorm.database.property.form.namePlaceholder"),
+		kindLabel: t("brainstorm.database.property.form.kindLabel"),
+		formatLabel: t("brainstorm.database.property.form.formatLabel"),
+		multiLabel: t("brainstorm.database.property.form.multiLabel"),
+		cancel: t("brainstorm.database.property.form.cancel"),
+		submit: t("brainstorm.database.property.form.submit"),
+		kindText: t("brainstorm.database.property.form.kindText"),
+		kindNumber: t("brainstorm.database.property.form.kindNumber"),
+		kindBoolean: t("brainstorm.database.property.form.kindBoolean"),
+		kindDate: t("brainstorm.database.property.form.kindDate"),
+		kindSelect: t("brainstorm.database.property.form.kindSelect"),
+		kindRelation: t("brainstorm.database.property.form.kindRelation"),
+		kindFile: t("brainstorm.database.property.form.kindFile"),
+		kindFormula: t("brainstorm.database.property.form.kindFormula"),
+		formulaLabel: t("brainstorm.database.property.form.formulaLabel"),
+		formulaPlaceholder: t("brainstorm.database.property.form.formulaPlaceholder"),
+		formulaHint: t("brainstorm.database.property.form.formulaHint"),
+		formatPlain: t("brainstorm.database.property.form.formatPlain"),
+		formatUrl: t("brainstorm.database.property.form.formatUrl"),
+		formatEmail: t("brainstorm.database.property.form.formatEmail"),
+		formatPhone: t("brainstorm.database.property.form.formatPhone"),
+		formatCurrency: t("brainstorm.database.property.form.formatCurrency"),
+		formatPercent: t("brainstorm.database.property.form.formatPercent"),
+		formatDuration: t("brainstorm.database.property.form.formatDuration"),
+		currencyLabel: t("brainstorm.database.property.form.currencyLabel"),
+		optionsLabel: t("brainstorm.database.property.form.optionsLabel"),
+		optionsPlaceholder: t("brainstorm.database.property.form.optionsPlaceholder"),
+		optionsHint: t("brainstorm.database.property.form.optionsHint"),
+		relationTargetLabel: t("brainstorm.database.property.form.relationTargetLabel"),
+		relationTargetAny: t("brainstorm.database.property.form.relationTargetAny"),
+	};
+}
 
 function openColumnPropertyConstructor(state: AppState, view: ListView, _seedName: string): void {
 	openInlinePropertyForm({
-		labels: INLINE_PROPERTY_FORM_LABELS,
+		labels: inlinePropertyFormLabels(),
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
 		onCommit: async ({ def, dictionary }) => {
 			// Reuse an existing catalog def with the same name + type instead of
@@ -4758,7 +4825,10 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, reusable.key));
 				renderActiveView(state);
 				schedulePersist(state);
-				flashStatus(`Added existing property "${reusable.name || reusable.key}"`, "ready");
+				flashStatus(
+					t("brainstorm.database.status.propertyReused", { name: reusable.name || reusable.key }),
+					"ready",
+				);
 				return;
 			}
 			// Bail before touching the view if the def never reached the vault
@@ -4772,7 +4842,10 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			updateViewColumns(state, view.id, [...view.columns, { propertyId: def.key, visible: true }]);
 			renderActiveView(state);
 			schedulePersist(state);
-			flashStatus(`Added property "${def.name || def.key}"`, "ready");
+			flashStatus(
+				t("brainstorm.database.status.propertyAdded", { name: def.name || def.key }),
+				"ready",
+			);
 		},
 	});
 }
@@ -4783,7 +4856,10 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
  * (`inheritedPropertyDefs`), not as a column on this list's grid. */
 function openCollectionPropertyConstructor(state: AppState, list: List): void {
 	openInlinePropertyForm({
-		labels: { ...INLINE_PROPERTY_FORM_LABELS, region: "New collection property" },
+		labels: {
+			...inlinePropertyFormLabels(),
+			region: t("brainstorm.database.property.form.collectionRegion"),
+		},
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
 		onCommit: async ({ def, dictionary }) => {
 			// Same name + type already exists → reuse, never mint a twin that
@@ -4791,7 +4867,7 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
 			if (reusable) {
 				flashStatus(
-					`Property "${reusable.name || reusable.key}" already exists — reuse it instead of creating a twin`,
+					t("brainstorm.database.status.propertyExists", { name: reusable.name || reusable.key }),
 					"ready",
 				);
 				return;
@@ -4801,7 +4877,10 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			await loadVaultProperties(state);
 			renderActiveView(state);
 			schedulePersist(state);
-			flashStatus(`Added "${scoped.name || scoped.key}" to this collection`, "ready");
+			flashStatus(
+				t("brainstorm.database.status.propertyAddedToCollection", { name: scoped.name || scoped.key }),
+				"ready",
+			);
 		},
 	});
 }
@@ -4815,7 +4894,7 @@ async function persistNewPropertyDef(
 ): Promise<boolean> {
 	const svc = getRuntime()?.services?.properties;
 	if (!svc?.setProperty) {
-		flashStatus("Couldn't save — properties service not exposed by this shell", "warn");
+		flashStatus(t("brainstorm.database.status.propertiesUnavailable"), "warn");
 		return false;
 	}
 	try {
@@ -4827,7 +4906,7 @@ async function persistNewPropertyDef(
 		return true;
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-		flashStatus(`Property save failed — ${message}`, "warn");
+		flashStatus(t("brainstorm.database.status.propertySaveFailed", { message }), "warn");
 		return false;
 	}
 }
@@ -4882,7 +4961,7 @@ async function loadVaultEntities(state: AppState): Promise<void> {
 	const runtime = getRuntime();
 	const service = runtime?.services?.vaultEntities;
 	if (!service) {
-		setStatus("No vault connected", "warn");
+		setStatus(t("brainstorm.database.status.noVaultConnected"), "warn");
 		return;
 	}
 	try {
@@ -4895,7 +4974,7 @@ async function loadVaultEntities(state: AppState): Promise<void> {
 	} catch (error) {
 		const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 		console.warn("[database] vaultEntities.list failed:", error);
-		setStatus(`Vault load failed — ${message}`, "warn");
+		setStatus(t("brainstorm.database.status.vaultLoadFailed", { message }), "warn");
 	}
 }
 
@@ -4936,7 +5015,12 @@ function applyVaultSnapshot(state: AppState, snapshot: VaultSnapshot): void {
 	renderActiveView(state);
 
 	const count = state.db.entities.length;
-	setStatus(count === 0 ? "Vault (empty)" : `Vault · ${count}`, count === 0 ? "warn" : "ready");
+	setStatus(
+		count === 0
+			? t("brainstorm.database.status.vaultEmpty")
+			: t("brainstorm.database.status.vaultCount", { count }),
+		count === 0 ? "warn" : "ready",
+	);
 
 	// A cross-app `intent.open` still wins over the restored selection,
 	// even though the rebuild lands after persisted-state load.

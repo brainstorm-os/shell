@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Daily-notes / Roam-Logseq-style rolling journal. Each day is a Journal/Entry whose title is the ISO date and whose body the user writes into (edited through the shared Notes editor). Date navigator, today pin, week + month overviews, backlinks panel.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

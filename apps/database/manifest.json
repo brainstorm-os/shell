@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Lists over your entities — grid, list, gallery, board, calendar, and timeline views with criteria-driven and manually-curated membership in one shape.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

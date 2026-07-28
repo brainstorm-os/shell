@@ -59,6 +59,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
 import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
 import { queuePendingEntityLinks } from "./editor/pending-link";
+import { useNotesT } from "./i18n-hooks";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
 import { matchesActionChord, useShortcut } from "./keyboard/use-shortcut";
@@ -143,6 +144,7 @@ const SHARE_DIALOG_LABELS: ShareDialogLabels = {
 };
 
 export function NotesApp() {
+	useNotesT();
 	const { ready, error, notes, selectedId, select, openEntity, create, update, setValue, remove } =
 		useNotes();
 	const note = selectedId ? (notes.get(selectedId) ?? null) : null;

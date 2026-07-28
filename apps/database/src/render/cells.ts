@@ -21,6 +21,7 @@ import {
 import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
 import { formatScalar } from "@brainstorm-os/sdk/property-ui/pure";
 import { TYPE_LABELS } from "../demo/dataset";
+import { t } from "../i18n";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";
 import {
 	resolvePropertyDef,
@@ -69,7 +70,12 @@ function renderCellFromDef(def: PropertyDef, propertyId: string, raw: unknown): 
 	}
 	switch (def.valueType) {
 		case ValueType.Boolean:
-			return { kind: "checkbox", text: raw === true ? "Yes" : "No", color: null, raw };
+			return {
+				kind: "checkbox",
+				text: raw === true ? t("brainstorm.database.cells.yes") : t("brainstorm.database.cells.no"),
+				color: null,
+				raw,
+			};
 		case ValueType.Date: {
 			const text = formatScalarValue(def, raw);
 			const withTime =
@@ -124,7 +130,12 @@ function renderCellHeuristic(propertyId: string, raw: unknown): CellRender {
 		return { kind: "tags", text, color: null, raw };
 	}
 	if (typeof raw === "boolean") {
-		return { kind: "checkbox", text: raw ? "Yes" : "No", color: null, raw };
+		return {
+			kind: "checkbox",
+			text: raw ? t("brainstorm.database.cells.yes") : t("brainstorm.database.cells.no"),
+			color: null,
+			raw,
+		};
 	}
 	if (typeof raw === "number") {
 		if (looksLikeTimestamp(raw)) {
@@ -154,7 +165,8 @@ function stringifyScalar(v: unknown): string {
 	if (v === null || v === undefined) return "";
 	if (typeof v === "string") return v;
 	if (typeof v === "number") return formatNumber(v);
-	if (typeof v === "boolean") return v ? "Yes" : "No";
+	if (typeof v === "boolean")
+		return v ? t("brainstorm.database.cells.yes") : t("brainstorm.database.cells.no");
 	if (typeof v !== "object") return String(v);
 	if ("value" in (v as Record<string, unknown>)) {
 		return stringifyScalar((v as { value: unknown }).value);

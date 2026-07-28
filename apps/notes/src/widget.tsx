@@ -17,6 +17,7 @@ import {
 	useWidgetVisible,
 } from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
+import { useNotesT } from "./i18n-hooks";
 import { t, tCount } from "./i18n/t";
 import { NOTE_TYPE } from "./store/entities-repository";
 import { getBrainstorm, openEntityInShell } from "./store/runtime";
@@ -111,6 +112,7 @@ function sortNotes(notes: readonly RecentNote[], sort: NotesSort): RecentNote[] 
 }
 
 export function NotesWidget({ launch }: { launch: WidgetLaunch }) {
+	useNotesT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

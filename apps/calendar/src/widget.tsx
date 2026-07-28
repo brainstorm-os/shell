@@ -16,6 +16,7 @@ import {
 	useWidgetVisible,
 } from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
+import { useCalendarT } from "./i18n-hooks";
 import { plural, t } from "./i18n/t";
 import { addDays, startOfDay } from "./logic/date-range";
 import { getCalendarRuntime } from "./runtime";
@@ -176,6 +177,7 @@ function WeekAhead({ groups, total, now }: { groups: DayGroup[]; total: number; 
 }
 
 export function CalendarWidget({ launch }: { launch: WidgetLaunch }) {
+	useCalendarT();
 	const runtime = getCalendarRuntime();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

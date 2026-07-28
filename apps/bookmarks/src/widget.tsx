@@ -23,6 +23,8 @@ import {
 } from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { useBookmarksT } from "./i18n-hooks";
+import { BookmarksI18nProvider } from "./i18n-provider";
 import { plural, t } from "./i18n/manifest";
 import { domainFromUrl } from "./logic/url-parse";
 import { getBrainstorm } from "./storage/runtime";
@@ -146,6 +148,7 @@ function sortBookmarks(
 }
 
 export function BookmarksWidget({ launch }: { launch: WidgetLaunch }) {
+	useBookmarksT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).
@@ -196,7 +199,9 @@ export function mountBookmarksWidget(root: HTMLElement, launch: WidgetLaunch): v
 	mountMenuHost();
 	createRoot(root).render(
 		<AppErrorBoundary appName="bookmarks">
-			<BookmarksWidget launch={launch} />
+			<BookmarksI18nProvider>
+				<BookmarksWidget launch={launch} />
+			</BookmarksI18nProvider>
 		</AppErrorBoundary>,
 	);
 }

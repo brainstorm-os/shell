@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "The vault as a typed-link graph — multi-subject pattern filters, three view kinds (full / local / path), temporal history animation.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

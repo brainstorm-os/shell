@@ -48,7 +48,7 @@ import {
 import { localPresenceName } from "@brainstorm-os/sdk/peer-presence";
 import { attachResizable } from "@brainstorm-os/sdk/resizable";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
-import { type WhiteboardMessageKey, createT, pluralWith } from "./i18n/t";
+import { type WhiteboardMessageKey, pluralWith, t } from "./i18n/t";
 import {
 	type AlignKind,
 	type AlignRect,
@@ -391,8 +391,6 @@ mountMenuHost();
 // B11.16c — spellcheck suggestion menu for sticky / shape text editing.
 mountSpellcheckMenuFromWindow();
 
-const t = createT();
-
 export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	const root = hosts.root;
 
@@ -673,7 +671,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 
 		nodeLayer.dataset.edgeCount = String(state.edges.length);
 
-		zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+		zoomLevel.textContent = t("whiteboard.zoom.level", { percent: Math.round(state.zoom * 100) });
 		renderLayers();
 		// publishPresence emits an awareness change, which repaints the
 		// presence overlay against the fresh node rects.
@@ -706,7 +704,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	function paintCamera(): void {
 		canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
 		canvas.style.setProperty("--wb-inv-zoom", String(1 / state.zoom));
-		zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+		zoomLevel.textContent = t("whiteboard.zoom.level", { percent: Math.round(state.zoom * 100) });
 		if (cullStale()) {
 			paintNodes(nodeLayer);
 			recordCullCamera();

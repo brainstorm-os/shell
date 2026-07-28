@@ -64,6 +64,7 @@ import {
 	useState,
 } from "react";
 import { buildJournalDemo } from "./demo/dataset";
+import { useJournalT } from "./i18n-hooks";
 import {
 	type Backlink,
 	type OutgoingLink,
@@ -90,7 +91,7 @@ import {
 	journalToHtml,
 	journalToMarkdown,
 } from "./logic/journal-export";
-import { buildJournalT, journalPlural } from "./logic/journal-i18n";
+import { journalPlural, t } from "./logic/journal-i18n";
 import {
 	dateKeyForJournal,
 	journalEntryIdForKey,
@@ -138,8 +139,6 @@ import { JournalPropertiesIsland, type JournalPropertiesOptions } from "./ui/pro
 import { EntityIcon } from "./ui/react/entity-icon";
 import { EntryEditorIsland } from "./ui/react/entry-editor-island";
 import { openJournalSearch } from "./ui/search-overlay";
-
-const t = buildJournalT();
 
 const ENTITY_LABEL_ATTR = "data-entity-label";
 
@@ -220,6 +219,7 @@ enum ExportFormat {
 }
 
 export function JournalApp(): ReactElement {
+	useJournalT();
 	const now = useMemo(() => new Date(), []);
 	const todayKey = useMemo(() => dateKeyForJournal(now), [now]);
 

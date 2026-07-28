@@ -393,7 +393,7 @@ export function GridView(props: GridViewProps): ReactElement {
 				onSelect: () => onChooseAggregation(propertyId, kind),
 			}));
 			openAnchoredMenu({ x: rect.left, y: rect.bottom + 4 }, items, {
-				menuLabel: "Choose aggregation",
+				menuLabel: t("brainstorm.database.grid.chooseAggregation"),
 				anchor,
 			});
 		},
@@ -422,12 +422,12 @@ export function GridView(props: GridViewProps): ReactElement {
 							<div
 								className="dbv-grid__cell dbv-grid__cell--head dbv-grid__cell--num"
 								role="columnheader"
-								aria-label="Row number"
+								aria-label={t("brainstorm.database.grid.rowNumberAria")}
 							>
 								#
 							</div>
 						) : null}
-						<PinnedHeaderCell width={TITLE_WIDTH} label="Name" />
+						<PinnedHeaderCell width={TITLE_WIDTH} label={t("brainstorm.database.grid.nameColumn")} />
 						<SortableContext items={reorderableIds} strategy={horizontalListSortingStrategy}>
 							{visible
 								.filter((c) => c.propertyId !== TITLE_COL)
@@ -1054,8 +1054,8 @@ export function OpenRecordButton({
 		<button
 			type="button"
 			className="dbv-grid__open"
-			data-bs-tooltip="Open"
-			aria-label="Open"
+			data-bs-tooltip={t("brainstorm.database.grid.open")}
+			aria-label={t("brainstorm.database.grid.open")}
 			onClick={handleClick}
 			onDoubleClick={(event) => event.stopPropagation()}
 			onPointerDown={(event) => event.stopPropagation()}
@@ -1138,7 +1138,7 @@ export function EditableTitle({
 				ref={inputRef}
 				className="dbv-grid__title-input bs-input"
 				defaultValue={raw}
-				aria-label="Name"
+				aria-label={t("brainstorm.database.grid.nameColumn")}
 				onBlur={commit}
 				onKeyDown={handleKeyDown}
 				onClick={(event) => event.stopPropagation()}

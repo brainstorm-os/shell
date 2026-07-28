@@ -20,6 +20,7 @@
 
 import { IconName } from "@brainstorm-os/sdk/icon";
 import { matchesChord } from "@brainstorm-os/sdk/shortcut";
+import { t } from "../i18n";
 import { setSharedIcon } from "./icons";
 
 export type SourceTypeOption = {
@@ -54,7 +55,9 @@ export function buildTypeChecklist(opts: TypeChecklistOptions): HTMLElement {
 	if (visible.length === 0) {
 		const empty = document.createElement("li");
 		empty.className = "db-source__empty";
-		empty.textContent = needle ? "No matching types" : "This vault has no objects yet";
+		empty.textContent = needle
+			? t("brainstorm.database.sourcePicker.emptyFiltered")
+			: t("brainstorm.database.sourcePicker.emptyVault");
 		list.appendChild(empty);
 		return list;
 	}
@@ -130,7 +133,7 @@ export function openSourcePicker(props: SourcePickerProps): void {
 	const close = document.createElement("button");
 	close.type = "button";
 	close.className = "db-popover__close";
-	close.setAttribute("aria-label", "Cancel");
+	close.setAttribute("aria-label", t("brainstorm.database.sourcePicker.cancel"));
 	setSharedIcon(close, IconName.Close);
 	close.addEventListener("click", () => props.onCancel());
 	header.appendChild(close);
@@ -146,8 +149,8 @@ export function openSourcePicker(props: SourcePickerProps): void {
 		searchInput = document.createElement("input");
 		searchInput.type = "search";
 		searchInput.className = "db-popover__input db-source__search";
-		searchInput.placeholder = "Filter object types…";
-		searchInput.setAttribute("aria-label", "Filter object types");
+		searchInput.placeholder = t("brainstorm.database.sourcePicker.filterPlaceholder");
+		searchInput.setAttribute("aria-label", t("brainstorm.database.sourcePicker.filterAria"));
 		body.appendChild(searchInput);
 	}
 
@@ -189,7 +192,7 @@ export function openSourcePicker(props: SourcePickerProps): void {
 	const cancel = document.createElement("button");
 	cancel.type = "button";
 	cancel.className = "bs-btn bs-btn--ghost";
-	cancel.textContent = "Cancel";
+	cancel.textContent = t("brainstorm.database.sourcePicker.cancel");
 	cancel.addEventListener("click", () => props.onCancel());
 	confirm.type = "button";
 	confirm.className = "bs-btn";

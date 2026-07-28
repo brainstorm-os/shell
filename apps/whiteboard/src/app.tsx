@@ -48,7 +48,8 @@ import {
 	type WhiteboardEngine,
 	createWhiteboardEngine,
 } from "./engine";
-import { type WhiteboardMessageKey, createT } from "./i18n/t";
+import { useWhiteboardT } from "./i18n-hooks";
+import { type WhiteboardMessageKey, t } from "./i18n/t";
 import { AlignKind, DistributeAxis } from "./logic/align";
 import { BOARD_TEMPLATES } from "./logic/templates";
 import { WhiteboardExportFormat } from "./logic/whiteboard-export";
@@ -57,8 +58,6 @@ import { getBrainstorm } from "./storage/runtime";
 import { ShapeKind } from "./types/node";
 import { WhiteboardIcon, iconParam } from "./ui/icons";
 import { WbIcon } from "./ui/icons-react";
-
-const t = createT();
 
 const EXPORT_CONFIRM_MS = 1600;
 
@@ -219,6 +218,8 @@ function HeaderMenuButton({
 }
 
 export function WhiteboardApp(): ReactElement {
+	// Locale-reactive re-render; the provider keeps the imperative `t` synced.
+	useWhiteboardT();
 	const rootRef = useRef<HTMLElement>(null);
 	const canvasHostRef = useRef<HTMLDivElement>(null);
 	const layersHostRef = useRef<HTMLDivElement>(null);
@@ -498,12 +499,17 @@ export function WhiteboardApp(): ReactElement {
 			},
 			onExport: ({ formatId, values }) => {
 				if (formatId === "png") {
-					saveAs("png", "PNG", () => svgToPng(e.exportText(WhiteboardExportFormat.Svg)));
+					saveAs("png", t("whiteboard.export.fmtPng"), () =>
+						svgToPng(e.exportText(WhiteboardExportFormat.Svg)),
+					);
 					return;
 				}
 				const fmt = formatId as WhiteboardExportFormat;
 				const ext = fmt === WhiteboardExportFormat.Svg ? "svg" : "json";
-				const name = fmt === WhiteboardExportFormat.Svg ? "SVG" : "JSON";
+				const name =
+					fmt === WhiteboardExportFormat.Svg
+						? t("whiteboard.export.fmtSvg")
+						: t("whiteboard.export.fmtJson");
 				if (values.destination === "save") {
 					saveAs(ext, name, () => textToBytes(e.exportText(fmt)));
 				} else {
@@ -653,7 +659,7 @@ export function WhiteboardApp(): ReactElement {
 							aria-label={t("whiteboard.zoom.resetLevel")}
 							onClick={() => eng()?.zoomTo(1)}
 						>
-							{`${snap?.zoomPercent ?? 100}%`}
+							{t("whiteboard.zoom.level", { percent: snap?.zoomPercent ?? 100 })}
 						</button>
 						<button
 							type="button"

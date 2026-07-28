@@ -5,6 +5,7 @@ import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { JournalApp } from "./app";
+import { JournalI18nProvider } from "./i18n-provider";
 import "./types";
 import "./styles.css";
 import { JournalWidget } from "./widget";
@@ -23,7 +24,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="journal">
-				<JournalWidget launch={widgetLaunch} />
+				<JournalI18nProvider>
+					<JournalWidget launch={widgetLaunch} />
+				</JournalI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);
@@ -31,7 +34,9 @@ if (widgetLaunch) {
 	createRoot(root).render(
 		<StrictMode>
 			<AppErrorBoundary appName="journal">
-				<JournalApp />
+				<JournalI18nProvider>
+					<JournalApp />
+				</JournalI18nProvider>
 			</AppErrorBoundary>
 		</StrictMode>,
 	);

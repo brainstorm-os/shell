@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Plain-text notes \u2014 the first-party reference app demonstrating the full Brainstorm stack (manifest, install, launch, SDK, storage, intents).",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",
