@@ -254,6 +254,13 @@ body.is-resizing .contacts__resize {
  * headers don't sit flush against the panel edges. */
 .contacts-list__scroll {
 	flex: 1;
+	/* A flex item defaults to `min-height: auto`, which refuses to shrink below
+	 * its content. Without this the scroller grows to the full height of the
+	 * list instead of the sidebar's available space, `overflow-y` never engages,
+	 * and the rows spill past the panel — the first one clipped behind the
+	 * group/sort controls. The parent already sets `min-height: 0`; a flex
+	 * SCROLLER has to set it on itself too. */
+	min-height: 0;
 	overflow-y: auto;
 	padding: var(--space-2) var(--space-2) var(--space-8);
 }
@@ -360,6 +367,9 @@ body.is-resizing .contacts__resize {
 
 .contacts-detail__scroll {
 	flex: 1;
+	/* Same trap as the list scroller: `.contacts-detail` is a column flex parent
+	 * with `min-height: 0`, but the scrolling child needs its own. */
+	min-height: 0;
 	overflow-y: auto;
 }
 
