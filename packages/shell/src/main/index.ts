@@ -1889,9 +1889,49 @@ void app.whenReady().then(async () => {
 			getSession: () => getActiveVaultSession(),
 			getDevices: () => lanDevices,
 		});
+		// LAN host — OFF unless the user turned it on (Settings → Sync). This is
+		// the shell's only inbound listening socket, so the decision lives in one
+		// tested predicate and the factory refuses to build an open host.
+		const { LanHostPrefsStore, lanHostPrefsPath } = await import("./sync/lan-host-prefs-store");
+		const { LanHostController } = await import("./sync/lan-host-controller");
+		const { createLanListener } = await import("./sync/lan-host-factory");
+		const { DEFAULT_LAN_HOST_MODE } = await import("./sync/lan-host-policy");
+		const { lanInterfaces } = await import("./sync/lan-relay-listener");
+		const lanHostPrefs = new LanHostPrefsStore({
+			path: lanHostPrefsPath(app.getPath("userData")),
+		});
+		const lanHost = new LanHostController({
+			readState: () => ({
+				// Prefs not loaded yet ⇒ the Off default, so a slow disk read cannot
+				// start a listener before the user's choice is known.
+				mode: lanHostPrefs.cached?.mode ?? DEFAULT_LAN_HOST_MODE,
+				hasSession: getActiveVaultSession() !== null,
+				// `WhenShared` needs a live shared-entity signal that does not exist
+				// yet. It is unreachable from the UI until it does, and `false` keeps
+				// it OFF rather than silently on if someone hand-edits the pref.
+				hasSharedEntities: false,
+			}),
+			createListener: () =>
+				createLanListener({
+					access: lanAccess,
+					addresses: () => lanInterfaces().map((iface) => iface.address),
+					onError: (error) => console.warn("[lan-host] listener error", error),
+				}),
+			onError: (error) => console.warn("[lan-host] could not bind", error),
+			onUrlChanged: (url) => console.info(`[lan-host] ${url ? `listening on ${url}` : "stopped"}`),
+		});
+		void lanHostPrefs.load().then(() => lanHost.apply());
+		app.on("before-quit", () => {
+			void lanHost.dispose();
+		});
+
 		// Re-prime on every vault change, and once now for a session that opened
-		// before this block ran.
-		onActiveVaultSessionChanged(() => primeLanDevices());
+		// before this block ran. The host re-applies too: closing a vault must stop
+		// the listener, since without a roster it could admit nobody anyway.
+		onActiveVaultSessionChanged(() => {
+			primeLanDevices();
+			void lanHost.apply();
+		});
 		primeLanDevices();
 		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
