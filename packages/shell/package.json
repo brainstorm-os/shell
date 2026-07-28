@@ -42,6 +42,8 @@
       "!**/node_modules/@brainstorm-os/native/{src,Cargo.toml,Cargo.lock,build.rs}",
       "!**/node_modules/@brainstorm-os/native-embed/target/**",
       "!**/node_modules/@brainstorm-os/native-embed/{src,Cargo.toml,Cargo.lock,build.rs}",
+      "!**/node_modules/@brainstorm-os/native-image/target/**",
+      "!**/node_modules/@brainstorm-os/native-image/{src,Cargo.toml,Cargo.lock,build.rs}",
       "!node_modules/@blockprotocol/**",
       "!node_modules/@phosphor-icons/**",
       "!node_modules/pdfjs-dist/**",
@@ -112,6 +114,10 @@
         {
           "from": "../native-embed/brainstorm-embed.darwin-${arch}.node",
           "to": "native/brainstorm-embed.darwin-${arch}.node"
+        },
+        {
+          "from": "../native-image/brainstorm-image.darwin-${arch}.node",
+          "to": "native/brainstorm-image.darwin-${arch}.node"
         }
       ]
     },
@@ -130,6 +136,10 @@
         {
           "from": "../native-embed/brainstorm-embed.win32-${arch}-msvc.node",
           "to": "native/brainstorm-embed.win32-${arch}-msvc.node"
+        },
+        {
+          "from": "../native-image/brainstorm-image.win32-${arch}-msvc.node",
+          "to": "native/brainstorm-image.win32-${arch}-msvc.node"
         }
       ]
     },
@@ -161,6 +171,10 @@
         {
           "from": "../native-embed/brainstorm-embed.linux-${arch}-gnu.node",
           "to": "native/brainstorm-embed.linux-${arch}-gnu.node"
+        },
+        {
+          "from": "../native-image/brainstorm-image.linux-${arch}-gnu.node",
+          "to": "native/brainstorm-image.linux-${arch}-gnu.node"
         }
       ]
     }
@@ -175,6 +189,7 @@
     "@brainstorm-os/editor": "workspace:*",
     "@brainstorm-os/native": "workspace:*",
     "@brainstorm-os/native-embed": "workspace:*",
+    "@brainstorm-os/native-image": "workspace:*",
     "@brainstorm-os/protocol": "workspace:*",
     "@brainstorm-os/react-yjs": "workspace:*",
     "@brainstorm-os/sdk": "workspace:*",

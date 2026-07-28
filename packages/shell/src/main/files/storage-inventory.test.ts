@@ -13,6 +13,7 @@ function asset(partial: Partial<AssetRecord> & { assetId: string; byteLen: numbe
 		originUrl: null,
 		createdAt: 1000,
 		boundAt: 2000,
+		thumbAssetId: null,
 		...partial,
 	};
 }

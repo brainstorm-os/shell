@@ -127,6 +127,8 @@ async function setup(grants: string[] = ["entities.read:*", "entities.write:*"])
 			if (assetKindThrows) throw new Error("boom-getAssetKind");
 			return assets.getById(id)?.kind ?? null;
 		},
+		// Asset-B4b — the thumbnail link closure, over the same real repo.
+		getThumbAssetId: async (id) => assets.getById(id)?.thumbAssetId ?? null,
 		// Asset-B4 — record immediate per-bind upload triggers.
 		onAssetBound: (entityId, assetId) => {
 			if (assetBoundThrows) throw new Error("boom-onAssetBound");
@@ -1123,6 +1125,25 @@ describe("entities service — live-sync hooks (10.12)", () => {
 		const refs = e.repo.assetRefs.listByEntity(created.id);
 		expect(refs.map((r) => r.assetId).sort()).toEqual(["cov1", "fav1"]);
 		expect(refs.find((r) => r.assetId === "cov1")?.role).toBe(AssetRefRole.Cover);
+	});
+
+	it("Asset-B4b: a bound parent's derived thumbnail binds under the thumbnail role and prunes with it", async () => {
+		e.seedAsset("cov1", AssetKind.Cover);
+		e.seedAsset("th1", AssetKind.Thumbnail);
+		e.assets.setThumbAssetIfUnset("cov1", "th1");
+		const created = (await e.handler(
+			env("io.x", "create", {
+				type: "io.x/Bookmark/v1",
+				properties: { coverUrl: assetUrl("cov1") },
+			}),
+		)) as { id: string };
+		const refs = e.repo.assetRefs.listByEntity(created.id);
+		expect(refs.map((r) => r.assetId).sort()).toEqual(["cov1", "th1"]);
+		expect(refs.find((r) => r.assetId === "th1")?.role).toBe(AssetRefRole.Thumbnail);
+
+		// Dropping the parent prunes BOTH in one reconcile.
+		await e.handler(env("io.x", "update", { id: created.id, patch: { coverUrl: "" } }));
+		expect(e.repo.assetRefs.listByEntity(created.id)).toHaveLength(0);
 	});
 
 	it("a dangling (non-local) asset URL binds no ref", async () => {

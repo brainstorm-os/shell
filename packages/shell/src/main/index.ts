@@ -62,14 +62,17 @@ import { validateManifest } from "./apps/manifest";
 import { appSelfManagesTabs } from "./apps/window-container";
 import type { WebContentsViewHandle } from "./apps/window-container";
 import { type AssetChunkManifest, parseAssetChunkManifest } from "./assets/asset-chunks";
-import { AssetKind } from "./assets/asset-types";
+import { AssetKind, AssetRefRole } from "./assets/asset-types";
+import { drainEagerThumbnails } from "./assets/eager-thumbnails";
+import { EnsureThumbnailOutcome, ensureThumbnailForBoundAsset } from "./assets/ensure-thumbnail";
 import { materializeAssetOnServe } from "./assets/materialize-on-serve";
 import { reconstructAssetMetadata } from "./assets/reconstruct-assets";
 import { recoverAssetDek } from "./assets/recover-asset-dek";
 import { RefReportOutcome, sendAssetRefReport } from "./assets/ref-report";
 import { relayAssetCas } from "./assets/relay-asset-cas";
-import { resolveAssetForServe } from "./assets/serve-asset";
+import { AssetServeTier, resolveAssetForServe } from "./assets/serve-asset";
 import { serveVaultMedia } from "./assets/serve-media";
+import { createNativeThumbnailer } from "./assets/thumbnailer";
 import {
 	UploadBoundOutcome,
 	type UploadOnBindDeps,
@@ -621,32 +624,47 @@ function registerBrainstormProtocol(): void {
 			if (!session) return new Response(null, { status: 404 });
 			const assetId = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 			const store = await session.assetStore();
-			const result = await resolveAssetForServe(store, assetId);
-			if (!result.ok) {
-				// Asset-B4 serve-on-miss: a 404 (row present, blob file absent —
-				// restored DB / evicted blob) triggers a lazy fetch from the durable
-				// node; a 400 (bad id) or a true miss (no ref) still 404s.
+			const respond = (mime: string, bytes: Uint8Array): Response => {
+				const headers = new Headers();
+				headers.set("Content-Type", mime);
+				// Decrypted vault bytes — don't let them linger in a shared cache.
+				headers.set("Cache-Control", "no-store");
+				// Defense-in-depth behind `serveSafeMime`: never let the browser
+				// sniff a materialised (peer-manifest-sourced) blob into a more
+				// active type than its declared Content-Type.
+				headers.set("X-Content-Type-Options", "nosniff");
+				return new Response(Buffer.from(bytes), { status: 200, headers });
+			};
+			// Serve one id: local decrypt first; on a 404 (row present, blob file
+			// absent — restored DB / evicted blob) the Asset-B4 serve-on-miss lazy
+			// fetch. Returns the failure status when neither produced bytes.
+			const tryServe = async (id: string): Promise<Response | 400 | 404> => {
+				const result = await resolveAssetForServe(store, id);
+				if (result.ok) return respond(result.mime, result.bytes);
 				if (result.status === 404) {
-					const fetched = await materializeAssetForServe(assetId);
-					if (fetched) {
-						const headers = new Headers();
-						headers.set("Content-Type", fetched.mime);
-						headers.set("Cache-Control", "no-store");
-						// Defense-in-depth behind `serveSafeMime`: never let the browser
-						// sniff a materialised (peer-manifest-sourced) blob into a more
-						// active type than its declared Content-Type.
-						headers.set("X-Content-Type-Options", "nosniff");
-						return new Response(Buffer.from(fetched.bytes), { status: 200, headers });
-					}
+					const fetched = await materializeAssetForServe(id);
+					if (fetched) return respond(fetched.mime, fetched.bytes);
 				}
-				return new Response(null, { status: result.status });
+				return result.status;
+			};
+			// Asset-B4b — `?tier=thumb` prefers the derived preview (local, or a
+			// small eager-tier fetch); a thumb-less or failed thumb falls through
+			// to the full blob so consumers can always request the tier blindly.
+			if (url.searchParams.get("tier") === AssetServeTier.Thumb) {
+				let thumbId: string | null = null;
+				try {
+					const db = await session.dataStores.open("entities");
+					thumbId = new AssetsRepository(db).getById(assetId)?.thumbAssetId ?? null;
+				} catch {
+					thumbId = null;
+				}
+				if (thumbId) {
+					const served = await tryServe(thumbId);
+					if (served instanceof Response) return served;
+				}
 			}
-			const headers = new Headers();
-			headers.set("Content-Type", result.mime);
-			// Decrypted vault bytes — don't let them linger in a shared cache.
-			headers.set("Cache-Control", "no-store");
-			headers.set("X-Content-Type-Options", "nosniff");
-			return new Response(Buffer.from(result.bytes), { status: 200, headers });
+			const outcome = await tryServe(assetId);
+			return outcome instanceof Response ? outcome : new Response(null, { status: outcome });
 		}
 		return new Response(null, { status: 404 });
 	});
@@ -721,6 +739,11 @@ async function reconstructRestoredAssets(entityIds: readonly string[]): Promise<
 					assetRefs.listByEntity(entityId).some((r) => r.assetId === assetId),
 				createRef: (entityId, assetId, role) =>
 					assetRefs.create({ entityId, assetId, role, now: Date.now() }),
+				// Asset-B4b — re-link parent → thumbnail from the manifest's
+				// validated `thumbOf` (SQL only-if-unset guard makes replays no-ops).
+				linkThumb: (parentAssetId, thumbAssetId) => {
+					assets.setThumbAssetIfUnset(parentAssetId, thumbAssetId);
+				},
 			},
 			entityIds,
 		);
@@ -729,6 +752,9 @@ async function reconstructRestoredAssets(entityIds: readonly string[]): Promise<
 				`[brainstorm] asset metadata reconstruct: created ${tally.created} (${tally.present} present, ${tally.badManifest} bad-manifest, ${tally.noDek} no-dek, ${tally.failed} failed)`,
 			);
 		}
+		// Asset-B4b — the eager tier: materialise the just-reconstructed
+		// thumbnails now (full blobs stay lazy per the B4/B5 design).
+		await drainEagerThumbnailsForActiveSession();
 	} catch (error) {
 		console.warn(`[brainstorm] asset metadata reconstruct failed: ${(error as Error).message}`);
 	}
@@ -893,7 +919,22 @@ function assetUploadDeps(
 			parseAssetChunkManifest(
 				(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
 			) !== null,
-		readAsset: (a) => store.readAsset(a),
+		// Asset-B4b — a thumbnail's manifest carries its parent's id (`thumbOf`)
+		// so a cold device can re-link the rows; resolved via the reverse lookup
+		// at upload time (best-effort — an unlinked derivative uploads plain).
+		readAsset: async (a) => {
+			const asset = await store.readAsset(a);
+			if (!asset || asset.kind !== AssetKind.Thumbnail) return asset;
+			const session = getActiveVaultSession();
+			if (!session) return asset;
+			try {
+				const db = await session.dataStores.open("entities");
+				const parent = new AssetsRepository(db).getParentOfThumb(a);
+				return parent ? { ...asset, thumbOf: parent } : asset;
+			} catch {
+				return asset;
+			}
+		},
 		recoverDek: recoverAssetDekForActiveSession,
 		uploadQuota: (bytes) => quotaService.decideUpload(bytes),
 	};
@@ -951,6 +992,116 @@ async function uploadBoundAssetNow(entityId: string, assetId: string): Promise<v
 	}
 }
 
+// Asset-B4b — the process-wide thumbnailer (native addon loads lazily on
+// first use; an absent addon disables derivation, never binds).
+const assetThumbnailer = createNativeThumbnailer();
+
+// Per-pair in-flight dedupe: the per-bind hook and the drain sweep may race
+// on the same pair; only one derivation runs, the SQL only-if-unset link is
+// the cross-process backstop.
+const thumbnailEnsureInFlight = new Set<string>();
+
+// Asset-B4b — derive + link + bind the thumbnail for one bound image asset.
+// Owner-device only (`readAsset` returns null on a cold device). Fail-soft:
+// any error is logged and the bind/upload path proceeds unchanged.
+async function ensureThumbnailNow(entityId: string, assetId: string): Promise<void> {
+	const key = `${entityId}::${assetId}`;
+	if (thumbnailEnsureInFlight.has(key)) return;
+	const session = getActiveVaultSession();
+	if (!session) return;
+	thumbnailEnsureInFlight.add(key);
+	try {
+		const db = await session.dataStores.open("entities");
+		const assets = new AssetsRepository(db);
+		const assetRefs = new AssetRefsRepository(db);
+		const store = await session.assetStore();
+		const outcome = await ensureThumbnailForBoundAsset(
+			{
+				getAsset: (id) => assets.getById(id),
+				readAsset: (id) => store.readAsset(id),
+				thumbnailer: assetThumbnailer,
+				writeThumbAsset: async (input) => {
+					const { assetId: thumbId } = await store.writeAsset({
+						bytes: input.bytes,
+						mime: input.mime,
+						kind: AssetKind.Thumbnail,
+					});
+					// Bound-by-construction (derived for a bound parent) — never a
+					// reap-eligible orphan.
+					store.markBound(thumbId);
+					return { assetId: thumbId };
+				},
+				linkThumb: (parentId, thumbId) => assets.setThumbAssetIfUnset(parentId, thumbId),
+				deleteAsset: (id) => store.deleteAsset(id),
+				createRef: (refEntityId, thumbId) => {
+					if (assetRefs.listByEntity(refEntityId).some((r) => r.assetId === thumbId)) return false;
+					assetRefs.create({
+						entityId: refEntityId,
+						assetId: thumbId,
+						role: AssetRefRole.Thumbnail,
+						now: Date.now(),
+					});
+					return true;
+				},
+				// Push the derivative promptly when the plane is live; the connect
+				// drain subsumes this for correctness.
+				onThumbBound: (refEntityId, thumbId) => {
+					void uploadBoundAssetNow(refEntityId, thumbId);
+				},
+			},
+			entityId,
+			assetId,
+		);
+		if (outcome === EnsureThumbnailOutcome.Created) {
+			console.log(`[brainstorm] thumbnail derived for ${assetId} (entity ${entityId})`);
+		}
+	} catch (error) {
+		console.warn(
+			`[brainstorm] thumbnail derivation failed for ${entityId}/${assetId}: ${(error as Error).message}`,
+		);
+	} finally {
+		thumbnailEnsureInFlight.delete(key);
+	}
+}
+
+// Asset-B4b — the eager tier's materialise pass: pull every absent thumbnail
+// blob from the node (full blobs stay lazy — serve-on-miss). Runs after the
+// upload drain and after a cold restore's metadata reconstruction; idempotent
+// (present blob files short-circuit) and self-guarded like the upload drain.
+async function drainEagerThumbnailsForActiveSession(): Promise<void> {
+	const session = getActiveVaultSession();
+	if (!session) return;
+	const { getActiveRelay } = await import("./sync/active-relay");
+	const relay = getActiveRelay();
+	if (!relay || !relay.hasAssetPlane()) return;
+	const cas = relayAssetCas(relay);
+	if (!cas) return;
+	try {
+		const db = await session.dataStores.open("entities");
+		const pairs = new AssetRefsRepository(db).listPairsByRole(AssetRefRole.Thumbnail);
+		if (pairs.length === 0) return;
+		const store = await session.assetStore();
+		const tally = await drainEagerThumbnails(
+			{
+				hasBlob: (id) => store.hasBlob(id),
+				recoverDek: recoverAssetDekForActiveSession,
+				readManifest: async (e, a) =>
+					(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", e, a))?.manifest ?? null,
+				cas,
+				restoreBlob: (id, bytes) => store.restoreBlob(id, bytes),
+			},
+			pairs,
+		);
+		if (tally.materialized > 0 || tally.failed > 0) {
+			console.log(
+				`[brainstorm] eager thumbnail drain: materialised ${tally.materialized} (${tally.alreadyLocal} local, ${tally.noManifest} no-manifest, ${tally.noDek} no-dek, ${tally.failed} failed)`,
+			);
+		}
+	} catch (error) {
+		console.warn(`[brainstorm] eager thumbnail drain failed: ${(error as Error).message}`);
+	}
+}
+
 let assetUploadDrainInFlight = false;
 
 // Asset-B4 upload-on-bind (connect-time drain) — push every bound-but-not-yet-
@@ -970,8 +1121,19 @@ async function drainAssetUploads(): Promise<void> {
 	assetUploadDrainInFlight = true;
 	try {
 		const db = await session.dataStores.open("entities");
-		const pairs = new AssetRefsRepository(db).listAllPairs();
-		if (pairs.length === 0) return;
+		const refs = new AssetRefsRepository(db);
+		const boundPairs = refs.listAllPairs();
+		if (boundPairs.length === 0) return;
+		// Asset-B4b — ensure every bound image asset carries its derivative
+		// BEFORE the push, so this same pass uploads the thumb chunks too. Also
+		// the retrofit path for assets bound before thumbnails existed. Cheap in
+		// steady state (a set `thumb_asset_id` or ineligible row short-circuits
+		// without touching the blob).
+		for (const { entityId, assetId } of boundPairs) {
+			await ensureThumbnailNow(entityId, assetId);
+		}
+		// Re-list: the sweep may have bound fresh thumbnail refs.
+		const pairs = refs.listAllPairs();
 		const store = await session.assetStore();
 		const r = await drainPendingUploads(assetUploadDeps(store, cas), pairs);
 		if (r.uploaded > 0 || r.failed > 0 || r.quotaExceeded > 0) {
@@ -1002,6 +1164,9 @@ async function drainAssetUploads(): Promise<void> {
 			}
 			// TooLarge / Aborted already logged by the sender.
 		}
+		// Asset-B4b — with the node converged, pull any thumbnails THIS device
+		// is missing (second device / post-restore). Full blobs stay lazy.
+		await drainEagerThumbnailsForActiveSession();
 	} catch (error) {
 		console.warn(`[brainstorm] asset upload drain failed: ${(error as Error).message}`);
 	} finally {
@@ -2321,6 +2486,20 @@ void app.whenReady().then(async () => {
 		}
 	};
 
+	// Asset-B4b — resolve a locally-stored asset's derived-thumbnail link for
+	// the reconcile writer's ref closure. Same lazy-per-call posture as the
+	// kind lookup above.
+	const getThumbAssetIdForActiveSession = async (assetId: string): Promise<string | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		try {
+			const db = await session.dataStores.open("entities");
+			return new AssetsRepository(db).getById(assetId)?.thumbAssetId ?? null;
+		} catch {
+			return null;
+		}
+	};
+
 	const getSettingsRepoForActiveSession = async (): Promise<SettingsRepository | null> => {
 		const session = getActiveVaultSession();
 		if (!session) return null;
@@ -2929,10 +3108,16 @@ void app.whenReady().then(async () => {
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
 		getAssetKind: getAssetKindForActiveSession,
+		// Asset-B4b — close the derived-ref set over thumbnails: a bound parent
+		// keeps its preview bound; a dropped parent drops both in one prune.
+		getThumbAssetId: getThumbAssetIdForActiveSession,
 		// Asset-B4 — a fresh ref landed: push its chunks now if the blob plane
 		// is live (fire-and-forget; the connect-time drain covers the rest).
+		// Asset-B4b — and derive its thumbnail (fail-soft, owner-device only);
+		// the ensure binds + pushes the derivative itself when it materialises.
 		onAssetBound: (entityId, assetId) => {
 			void uploadBoundAssetNow(entityId, assetId);
+			void ensureThumbnailNow(entityId, assetId);
 		},
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;

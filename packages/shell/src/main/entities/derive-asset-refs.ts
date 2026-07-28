@@ -53,8 +53,8 @@ function collect(value: unknown, ids: Set<string>): void {
 }
 
 /** Map a stored asset's `kind` to the `role` its owning entity's ref carries.
- *  Favicon/cover are 1:1; an `upload` binds as `inline` (the body-embedded
- *  file/image role — there is no distinct `upload` ref role). */
+ *  Favicon/cover/thumbnail are 1:1; an `upload` binds as `inline` (the
+ *  body-embedded file/image role — there is no distinct `upload` ref role). */
 export function assetRefRoleForKind(kind: AssetKind): AssetRefRole {
 	switch (kind) {
 		case AssetKind.Favicon:
@@ -63,5 +63,7 @@ export function assetRefRoleForKind(kind: AssetKind): AssetRefRole {
 			return AssetRefRole.Cover;
 		case AssetKind.Upload:
 			return AssetRefRole.Inline;
+		case AssetKind.Thumbnail:
+			return AssetRefRole.Thumbnail;
 	}
 }

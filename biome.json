@@ -20,7 +20,9 @@
       "packages/native/index.js",
       "packages/native/index.d.ts",
       "packages/native-embed/index.js",
-      "packages/native-embed/index.d.ts"
+      "packages/native-embed/index.d.ts",
+      "packages/native-image/index.js",
+      "packages/native-image/index.d.ts"
     ]
   },
   "formatter": {

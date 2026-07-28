@@ -1,0 +1,61 @@
+{
+  "name": "@brainstorm-os/native-image",
+  "version": "0.0.1",
+  "description": "Native NAPI-RS image addon for Brainstorm — thumbnail derivation for the eager asset tier (Asset-B4b). Separate from @brainstorm-os/native (image decoders never link into the crypto binary) and from @brainstorm-os/native-embed (thumbnails must exist in dev/CI where the release-only ONNX addon is absent). See docs/implementation-plan.md §Asset-B4b.",
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "loader.cjs",
+  "module": "native.mjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./native.mjs",
+      "require": "./loader.cjs"
+    },
+    "./packaged-resolver.cjs": "./packaged-resolver.cjs",
+    "./index.js": "./index.js",
+    "./brainstorm-image.*.node": "./brainstorm-image.*.node"
+  },
+  "napi": {
+    "binaryName": "brainstorm-image",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "aarch64-pc-windows-msvc",
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "native.mjs",
+    "loader.cjs",
+    "packaged-resolver.cjs",
+    "brainstorm-image.*.node"
+  ],
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "build:host": "napi build --platform --release",
+    "build:darwin-x64": "napi build --platform --release --target x86_64-apple-darwin",
+    "build:darwin-arm64": "napi build --platform --release --target aarch64-apple-darwin",
+    "build:windows-x64": "napi build --platform --release --target x86_64-pc-windows-msvc",
+    "build:windows-arm64": "napi build --platform --release --target aarch64-pc-windows-msvc",
+    "build:linux-x64": "napi build --platform --release --target x86_64-unknown-linux-gnu",
+    "build:linux-arm64": "napi build --platform --release --target aarch64-unknown-linux-gnu",
+    "_build:all_doc": "Documentation only — the CI matrix cross-compiles per-runner (13.1c pattern); local cross-compile needs the matching toolchain per the napi-rs CLI's --cross-compile flag.",
+    "build:all": "bun run build:darwin-x64 && bun run build:darwin-arm64 && bun run build:windows-x64 && bun run build:windows-arm64 && bun run build:linux-x64 && bun run build:linux-arm64",
+    "test": "bun run build:debug && bun --bun vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

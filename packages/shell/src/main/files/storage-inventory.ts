@@ -45,6 +45,9 @@ const ASSET_KIND_TO_STORED: Record<AssetKind, StoredAssetKind> = {
 	[AssetKind.Upload]: StoredAssetKind.Upload,
 	[AssetKind.Cover]: StoredAssetKind.Cover,
 	[AssetKind.Favicon]: StoredAssetKind.Favicon,
+	// Thumbnails never surface as their own inventory rows (skipped below);
+	// the mapping exists only to keep the record exhaustive.
+	[AssetKind.Thumbnail]: StoredAssetKind.Upload,
 };
 
 const MIME_EXT: Record<string, string> = {
@@ -71,6 +74,9 @@ export function buildStorageInventory(input: StorageInventoryInput): StoredAsset
 	const out: StoredAsset[] = [];
 
 	for (const asset of input.assets) {
+		// Asset-B4b — a derived thumbnail is its parent's preview, not a user
+		// artifact; it surfaces as the parent's `thumbUrl`, never its own row.
+		if (asset.kind === AssetKind.Thumbnail) continue;
 		out.push({
 			id: asset.assetId,
 			kind: ASSET_KIND_TO_STORED[asset.kind] ?? StoredAssetKind.Upload,
@@ -78,7 +84,7 @@ export function buildStorageInventory(input: StorageInventoryInput): StoredAsset
 			mime: asset.mime,
 			sizeBytes: asset.byteLen,
 			url: `brainstorm://asset/${asset.assetId}`,
-			thumbUrl: null,
+			thumbUrl: asset.thumbAssetId ? `brainstorm://asset/${asset.assetId}?tier=thumb` : null,
 			createdAt: asset.createdAt,
 		});
 	}

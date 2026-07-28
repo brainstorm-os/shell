@@ -1,0 +1,26 @@
+[package]
+name = "brainstorm_image"
+version = "0.0.1"
+edition = "2021"
+publish = false
+license = "UNLICENSED"
+description = "Native NAPI-RS image addon for Brainstorm (thumbnail derivation for the eager asset tier — plan Asset-B4b). Separate from the crypto crate so image decoders never link into the security-critical binary, and from the ONNX embed crate so thumbnails exist in dev/CI where the release-only embed addon is absent."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3", default-features = false, features = ["napi8"] }
+napi-derive = "3"
+# Decode-only formats mirror the serve-safe raster set (no AVIF: dav1d is a C
+# toolchain dependency; an AVIF source simply gets no thumbnail — fail-soft).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+strip = "symbols"
+codegen-units = 1
+opt-level = 3

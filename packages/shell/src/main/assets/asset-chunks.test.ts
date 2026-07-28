@@ -181,7 +181,7 @@ describe("parseAssetChunkManifest (untrusted input)", () => {
 			ASSET,
 			"image/png",
 			CHUNK,
-			AssetKind.Cover,
+			{ kind: AssetKind.Cover },
 		);
 		expect(manifest.kind).toBe(AssetKind.Cover);
 		const parsed = parseAssetChunkManifest(JSON.parse(JSON.stringify(manifest)));
@@ -192,6 +192,34 @@ describe("parseAssetChunkManifest (untrusted input)", () => {
 		// Absent kind (pre-B5 manifest) parses clean.
 		const { kind: _k, ...withoutKind } = manifest;
 		expect(parseAssetChunkManifest(withoutKind)).not.toBeNull();
+	});
+
+	it("Asset-B4b: carries a strictly-validated `thumbOf`; a hostile value rejects the manifest", () => {
+		const dek = generateSymmetricKey();
+		const { manifest } = sealAssetChunks(
+			new Uint8Array(randomBytes(CHUNK)),
+			dek,
+			ASSET,
+			"image/jpeg",
+			CHUNK,
+			{ kind: AssetKind.Thumbnail, thumbOf: "parent-asset-1" },
+		);
+		expect(manifest.thumbOf).toBe("parent-asset-1");
+		expect(manifest.kind).toBe(AssetKind.Thumbnail);
+		const parsed = parseAssetChunkManifest(JSON.parse(JSON.stringify(manifest)));
+		expect(parsed?.thumbOf).toBe("parent-asset-1");
+		// Hostile / malformed thumbOf is NOT advisory — it names another asset id
+		// the reconstruct pass will link rows by, so the manifest fails closed.
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: "../../etc/passwd" })).toBeNull();
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: "a b" })).toBeNull();
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: "" })).toBeNull();
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: 7 })).toBeNull();
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: "x".repeat(65) })).toBeNull();
+		// Self-reference is structurally impossible for a real derivative.
+		expect(parseAssetChunkManifest({ ...manifest, thumbOf: ASSET })).toBeNull();
+		// Absent thumbOf (every non-thumbnail manifest) parses clean.
+		const { thumbOf: _t, ...without } = manifest;
+		expect(parseAssetChunkManifest(without)?.thumbOf).toBeUndefined();
 	});
 
 	it("rejects malformed / lying manifests (fail closed → null)", () => {

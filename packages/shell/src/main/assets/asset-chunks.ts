@@ -72,7 +72,24 @@ export type AssetChunkManifest = {
 	 *  because pre-B5 manifests lack it and install is idempotent-no-overwrite,
 	 *  so they never upgrade in place. */
 	kind?: AssetKind;
+	/** Asset-B4b — present ONLY on a thumbnail's manifest: the asset id of the
+	 *  full-size parent this derivative previews. A cold device uses it to link
+	 *  the reconstructed parent row (`assets.thumb_asset_id`) so serve can
+	 *  answer `?tier=thumb` for the parent. UNLIKE `kind` this is NOT advisory
+	 *  — it names another asset id that row-linking will trust, so a present-
+	 *  but-malformed value rejects the whole manifest (fail closed). */
+	thumbOf?: string;
 };
+
+/** Optional advisory/link metadata a manifest carries beside the chunk list. */
+export type AssetManifestMeta = {
+	kind?: AssetKind;
+	thumbOf?: string;
+};
+
+/** The shape a manifest `thumbOf` must take: the minted-asset-id charset
+ *  (mirrors `derive-asset-refs`' URL id segment), length-bounded. */
+const THUMB_OF_RE = /^[A-Za-z0-9._~-]{1,64}$/;
 
 /** Validate an untrusted manifest `kind` against the enum; anything else is
  *  treated as absent (the reconstruction default `upload` applies). */
@@ -200,6 +217,13 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 		chunks.push({ hash: c.hash, encLen: c.encLen, rawLen: c.rawLen });
 	}
 	if (sumRaw !== m.totalRawLen) return null;
+	if (m.thumbOf !== undefined) {
+		// Fail closed on any deviation: a lying `thumbOf` would let a hostile
+		// peer point the parent-row link at an arbitrary asset id.
+		if (typeof m.thumbOf !== "string") return null;
+		if (!THUMB_OF_RE.test(m.thumbOf)) return null;
+		if (m.thumbOf === m.assetId) return null;
+	}
 	const kind = parseManifestKind(m.kind);
 	return {
 		v: 1,
@@ -209,6 +233,7 @@ export function parseAssetChunkManifest(value: unknown): AssetChunkManifest | nu
 		totalRawLen: m.totalRawLen,
 		chunks,
 		...(kind !== undefined ? { kind } : {}),
+		...(m.thumbOf !== undefined ? { thumbOf: m.thumbOf } : {}),
 	};
 }
 
@@ -267,7 +292,7 @@ export function sealAssetChunks(
 	assetId: string,
 	mime: string,
 	chunkBytes: number = ASSET_CHUNK_BYTES,
-	kind?: AssetKind,
+	meta: AssetManifestMeta = {},
 ): { manifest: AssetChunkManifest; sealed: Map<string, Uint8Array> } {
 	const count = chunkCount(plaintext.length, chunkBytes);
 	const chunks: AssetChunkRef[] = [];
@@ -287,7 +312,8 @@ export function sealAssetChunks(
 			chunkBytes,
 			totalRawLen: plaintext.length,
 			chunks,
-			...(kind !== undefined ? { kind } : {}),
+			...(meta.kind !== undefined ? { kind: meta.kind } : {}),
+			...(meta.thumbOf !== undefined ? { thumbOf: meta.thumbOf } : {}),
 		},
 		sealed,
 	};

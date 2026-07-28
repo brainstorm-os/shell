@@ -115,6 +115,11 @@ jobs:
           # and the shell degrades to lexical-only search where the .node is absent.
           bun run --filter @brainstorm-os/native-embed ${{ matrix.napi-script }}
           if [ -n "${{ matrix.napi-extra }}" ]; then bun run --filter @brainstorm-os/native-embed ${{ matrix.napi-extra }}; fi
+          # Asset-B4b — the image addon (thumbnail derivation for the eager
+          # asset tier). Small pure-Rust crate; built everywhere the crypto
+          # addon is, and the shell fail-softs to no-thumbnails if absent.
+          bun run --filter @brainstorm-os/native-image ${{ matrix.napi-script }}
+          if [ -n "${{ matrix.napi-extra }}" ]; then bun run --filter @brainstorm-os/native-image ${{ matrix.napi-extra }}; fi
           bun run --filter @brainstorm-os/shell build
           bun run build:apps
 

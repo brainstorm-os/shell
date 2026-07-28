@@ -541,6 +541,13 @@
         "@napi-rs/cli": "^3.0.0",
       },
     },
+    "packages/native-image": {
+      "name": "@brainstorm-os/native-image",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@napi-rs/cli": "^3.0.0",
+      },
+    },
     "packages/protocol": {
       "name": "@brainstorm-os/protocol",
       "version": "0.0.1",
@@ -619,6 +626,7 @@
         "@brainstorm-os/editor": "workspace:*",
         "@brainstorm-os/native": "workspace:*",
         "@brainstorm-os/native-embed": "workspace:*",
+        "@brainstorm-os/native-image": "workspace:*",
         "@brainstorm-os/protocol": "workspace:*",
         "@brainstorm-os/react-yjs": "workspace:*",
         "@brainstorm-os/sdk": "workspace:*",
@@ -890,6 +898,8 @@
     "@brainstorm-os/native": ["@brainstorm-os/native@workspace:packages/native"],
 
     "@brainstorm-os/native-embed": ["@brainstorm-os/native-embed@workspace:packages/native-embed"],
+
+    "@brainstorm-os/native-image": ["@brainstorm-os/native-image@workspace:packages/native-image"],
 
     "@brainstorm-os/protocol": ["@brainstorm-os/protocol@workspace:packages/protocol"],
 

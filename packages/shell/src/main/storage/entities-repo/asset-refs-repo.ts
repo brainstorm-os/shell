@@ -122,6 +122,16 @@ export class AssetRefsRepository {
 		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
 	}
 
+	/** Asset-B4b — every distinct (entity, asset) binding under one role; the
+	 *  eager-thumbnail drain walks the `thumbnail` role's pairs. Ordered for
+	 *  determinism. */
+	listPairsByRole(role: AssetRefRole): AssetRefPair[] {
+		const rows = this.stmt(
+			"SELECT DISTINCT entity_id, asset_id FROM asset_refs WHERE role = ? ORDER BY entity_id, asset_id",
+		).all(role) as Array<{ entity_id: string; asset_id: string }>;
+		return rows.map((r) => ({ entityId: r.entity_id, assetId: r.asset_id }));
+	}
+
 	/** Asset-B1 — stamp every role-row of a (entity, asset) pair re-homed.
 	 *  Returns the number of rows stamped. */
 	markRehomed(entityId: string, assetId: string, now: number): number {
