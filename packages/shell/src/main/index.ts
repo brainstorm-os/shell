@@ -2105,8 +2105,46 @@ void app.whenReady().then(async () => {
 			// dev-only env-gate discipline as the soak handlers; the bridge
 			// rebinds to the active session on a vault swap (unlike the soak
 			// wire-receiver, which is a single-vault-lifecycle closure).
+			// Asset-B4 — the bridge's asset verbs drive the PRODUCTION asset
+			// lifecycle paths; every dep resolves lazily at call time so
+			// registration order against the service wiring below is moot.
 			const { registerCollabDevHandlers } = await import("./ipc/collab-dev-handlers");
-			registerCollabDevHandlers();
+			registerCollabDevHandlers({
+				updateEntityProperties: async (appId, entityId, patch) => {
+					const handler = workersRef.broker.getServiceHandler("entities");
+					if (!handler) throw new Error("dev:collab: entities service unavailable");
+					return handler({
+						v: 1,
+						msg: `col_up_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+						app: appId,
+						service: "entities",
+						method: "update",
+						args: [{ id: entityId, patch }],
+						caps: [],
+					});
+				},
+				readManifest: async (entityId, assetId) =>
+					(await callYdocAssetRead<{ manifest: unknown }>("readAssetManifest", entityId, assetId))
+						?.manifest ?? null,
+				rehomeAssetDeks: () => runRehomeAssetDeks(),
+				evictWorkerDoc: async (entityId) => {
+					const session = getActiveVaultSession();
+					if (!session) return;
+					const handler = workersRef.broker.getServiceHandler("ydoc");
+					if (!handler) return;
+					await handler({
+						v: 1,
+						msg: `col_cl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+						app: "io.brainstorm.shell",
+						service: "ydoc",
+						method: "close",
+						args: [{ vaultPath: session.vaultPath, entityId }],
+						caps: [],
+					});
+				},
+				reconstructAssets: (entityIds) => reconstructRestoredAssets(entityIds),
+				materializeOnAccess: (assetId) => materializeAssetForServe(assetId),
+			});
 		}
 	}
 
