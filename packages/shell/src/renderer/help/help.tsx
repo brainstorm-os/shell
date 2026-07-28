@@ -23,15 +23,16 @@ import { useShortcut } from "../shortcuts/use-shortcut";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Icon, IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
+import { openExternalUrl } from "../ui/open-external";
 import { HelpArticle } from "./help-article";
 import "./help.css";
 import { HelpSearchbar } from "./help-searchbar";
 import { HelpSidebar } from "./help-sidebar";
 import { useHelpRoute } from "./use-help-route";
 
-/** Public tracker for the zero-infra feedback path — opens through the
- *  external-link ladder (`wireExternalLinkRouting` denies the popup and
- *  routes the URL), so the user lands on the prefilled issue templates. */
+/** Public tracker for the zero-infra feedback path — dispatched through the
+ *  open ladder via `openExternalUrl`, which also surfaces a refusal (denied
+ *  consent, no opener) as a toast instead of a silently dead button. */
 const GITHUB_ISSUES_URL = "https://github.com/brainstorm-os/shell/issues/new/choose";
 
 export type HelpProps = {
@@ -212,7 +213,7 @@ export function Help({
 							variant={ButtonVariant.Ghost}
 							size={ButtonSize.Md}
 							iconLeft={IconName.ArrowUpRight}
-							onClick={() => window.open(GITHUB_ISSUES_URL)}
+							onClick={() => openExternalUrl(GITHUB_ISSUES_URL)}
 							data-testid="help-report-github"
 						>
 							{t("shell.help.reportOnGithub")}

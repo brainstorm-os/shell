@@ -488,6 +488,7 @@
   "shell.osHandoff.prompt.allow": "Allow",
   "shell.osHandoff.prompt.deny": "Never for this kind",
   "shell.osHandoff.prompt.cancel": "Cancel",
+  "shell.openExternal.refused": "Couldn't open the link",
   "shell.openWith.prompt.title": "Open with…",
   "shell.openWith.prompt.intro": "More than one app can open {signature} targets. Which one should handle this?",
   "shell.openWith.prompt.listAria": "Candidate apps",

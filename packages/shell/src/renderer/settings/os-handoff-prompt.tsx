@@ -89,7 +89,9 @@ export function OsHandoffPromptHost() {
 					<p className="capability-prompt__capability">
 						<code>{request.uri}</code>
 					</p>
-					<p className="capability-prompt__reason">{t("shell.osHandoff.prompt.reason")}</p>
+					<p className="capability-prompt__reason">
+						{t("shell.osHandoff.prompt.reason", { signature: signatureLabel(request.signature) })}
+					</p>
 					<div className="capability-prompt__actions">
 						<Button
 							variant={ButtonVariant.Destructive}

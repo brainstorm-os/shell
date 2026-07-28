@@ -260,10 +260,10 @@ export function FeedbackDialog({
 		>
 			<form className="feedback-dialog" onSubmit={onSubmit} data-testid="feedback-form">
 				{optInBanner && (
-					<p className="feedback-dialog__banner" role="alert">
-						{t("shell.feedback.optInBanner")}{" "}
+					<p className="feedback-dialog__banner feedback-dialog__banner--action" role="alert">
+						<span className="feedback-dialog__banner-text">{t("shell.feedback.optInBanner")}</span>
 						<Button
-							variant={ButtonVariant.Neutral}
+							variant={ButtonVariant.Glass}
 							size={ButtonSize.Md}
 							loading={enabling}
 							onClick={() => {

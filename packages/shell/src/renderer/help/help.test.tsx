@@ -368,11 +368,15 @@ describe("<Help>", () => {
 		expect(onOpenWhatsNew).toHaveBeenCalledTimes(1);
 	});
 
-	it("Report-on-GitHub opens the public tracker through the external-link path", async () => {
+	it("Report-on-GitHub opens the public tracker through the open-intent ladder", async () => {
 		const fetchCorpus = vi.fn().mockResolvedValue(makeCorpus());
 		const fetchArticle = vi.fn(async () => makeCorpus().articles[0] ?? null);
 		const search = vi.fn().mockResolvedValue([]);
-		const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+		const dispatch = vi.fn().mockResolvedValue({ handled: true, handler: { appId: "browser" } });
+		(window as unknown as { brainstorm: { intents: { dispatch: typeof dispatch } } }).brainstorm = {
+			...(window as unknown as { brainstorm: object }).brainstorm,
+			intents: { dispatch },
+		} as never;
 		act(() =>
 			root.render(
 				<Help
@@ -387,8 +391,10 @@ describe("<Help>", () => {
 		const button = container.querySelector<HTMLButtonElement>('[data-testid="help-report-github"]');
 		expect(button).not.toBeNull();
 		act(() => button?.click());
-		expect(openSpy).toHaveBeenCalledWith("https://github.com/brainstorm-os/shell/issues/new/choose");
-		openSpy.mockRestore();
+		expect(dispatch).toHaveBeenCalledWith({
+			verb: "open",
+			payload: { url: "https://github.com/brainstorm-os/shell/issues/new/choose" },
+		});
 	});
 
 	it("hides the What's-new entry point when onOpenWhatsNew is not wired", async () => {
