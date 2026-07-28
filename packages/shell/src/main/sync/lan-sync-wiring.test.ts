@@ -12,6 +12,7 @@ import {
 	type ActiveDeviceRecord,
 	type LanSessionAccess,
 	activeRosterDirectory,
+	createLanSessionAccess,
 	deviceAccountId,
 	makeLanClientHandshakeForSession,
 	makeLanHostHandshakeForSession,
@@ -152,6 +153,81 @@ describe("session-backed handshakes", () => {
 		const hostSide = makeLanHostHandshakeForSession(accessFor(host, () => [recordOf(host)]));
 		expect(
 			hostSide.sealFor(stranger.account, new Uint8Array(CHALLENGE_NONCE_BYTES).fill(4)),
+		).toBeNull();
+	});
+});
+
+describe("createLanSessionAccess", () => {
+	// The production shape: a session that comes and goes, and a devices store
+	// resolved asynchronously that is simply absent until primed.
+	const sessionOf = (d: ReturnType<typeof makeDevice>) => ({
+		deviceEd25519: { publicKey: d.edPublic },
+		signWithDeviceKey: (m: Uint8Array) => new Uint8Array(ed25519.sign(m, d.edSecret)),
+		openLanSealedChallenge: (a: {
+			sealed: Parameters<typeof openLanChallenge>[0]["sealed"];
+			hostAccount: string;
+			clientAccount: string;
+		}) => openLanChallenge({ ...a, deviceX25519Secret: d.x25519Secret }),
+	});
+
+	it("declines everything with no session", () => {
+		const access = createLanSessionAccess({ getSession: () => null, getDevices: () => null });
+		expect(access.deviceEd25519Public()).toBeNull();
+		expect(access.signWithDeviceKey(new Uint8Array([1]))).toBeNull();
+		expect(access.activeDeviceRecords()).toEqual([]);
+		expect(
+			access.openSealed({ sealed: {} as never, hostAccount: "h", clientAccount: "c" }),
+		).toBeNull();
+	});
+
+	it("declines while the devices store is still resolving", () => {
+		// A session exists but the roster has not been primed yet. An empty roster
+		// means "we do not know who is rostered", and admission must refuse rather
+		// than admit — the fail-closed reading.
+		const d = makeDevice();
+		const access = createLanSessionAccess({ getSession: () => sessionOf(d), getDevices: () => null });
+		expect(access.deviceEd25519Public()).not.toBeNull();
+		expect(access.activeDeviceRecords()).toEqual([]);
+		const host = makeLanHostHandshakeForSession(access);
+		expect(host.sealFor(d.account, new Uint8Array(CHALLENGE_NONCE_BYTES).fill(1))).toBeNull();
+	});
+
+	it("picks up the roster once primed, without rebuilding the access object", () => {
+		const self = makeDevice();
+		const peer = makeDevice();
+		let devices: { listActive(): readonly ActiveDeviceRecord[] } | null = null;
+		const access = createLanSessionAccess({
+			getSession: () => sessionOf(self),
+			getDevices: () => devices,
+		});
+		const host = makeLanHostHandshakeForSession(access);
+		const nonce = new Uint8Array(CHALLENGE_NONCE_BYTES).fill(2);
+		expect(host.sealFor(peer.account, nonce)).toBeNull();
+
+		devices = { listActive: () => [recordOf(self), recordOf(peer)] };
+		expect(host.sealFor(peer.account, nonce)).not.toBeNull();
+	});
+
+	it("treats a session disposed mid-call as a refusal, not a crash", () => {
+		// `assertOpen` throws once the vault closes. That can land between the
+		// null-check and the call; a thrown error out of a handshake would take
+		// down the connection handler rather than decline the peer.
+		const d = makeDevice();
+		const access = createLanSessionAccess({
+			getSession: () => ({
+				...sessionOf(d),
+				signWithDeviceKey: () => {
+					throw new Error("vault session is closed");
+				},
+				openLanSealedChallenge: () => {
+					throw new Error("vault session is closed");
+				},
+			}),
+			getDevices: () => ({ listActive: () => [recordOf(d)] }),
+		});
+		expect(access.signWithDeviceKey(new Uint8Array([1]))).toBeNull();
+		expect(
+			access.openSealed({ sealed: {} as never, hostAccount: "h", clientAccount: "c" }),
 		).toBeNull();
 	});
 });

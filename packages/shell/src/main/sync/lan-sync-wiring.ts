@@ -92,3 +92,64 @@ export function makeLanClientHandshakeForSession(access: LanSessionAccess): LanC
 		activeDevices: () => activeRosterDirectory(access),
 	});
 }
+
+/**
+ * The slice of `VaultSession` this adapter needs, declared structurally.
+ *
+ * Structural rather than importing `VaultSession` on purpose: `session.ts` now
+ * imports `lan-admission` (for `openLanSealedChallenge`), so importing the
+ * session here would close a cycle. It also keeps the adapter testable with a
+ * plain object.
+ */
+export type LanSessionLike = {
+	readonly deviceEd25519: { publicKey: Uint8Array };
+	signWithDeviceKey(payload: Uint8Array): Uint8Array;
+	openLanSealedChallenge(args: {
+		sealed: Parameters<LanClientHandshake["onSealedChallenge"]>[1];
+		hostAccount: string;
+		clientAccount: string;
+	}): Uint8Array | null;
+};
+
+/** The devices-store slice: ACTIVE records only. */
+export type LanDevicesLike = {
+	listActive(): readonly ActiveDeviceRecord[];
+};
+
+/**
+ * Build the access object from a live session + its devices store.
+ *
+ * Both are supplied as getters returning `null`, because the session comes and
+ * goes (locked vault, vault switch) and the devices store is resolved
+ * asynchronously — the caller primes it and it is simply absent until then.
+ * Absent ⇒ every capability declines, which the handshakes treat as refuse.
+ */
+export function createLanSessionAccess(deps: {
+	getSession: () => LanSessionLike | null;
+	getDevices: () => LanDevicesLike | null;
+}): LanSessionAccess {
+	return {
+		deviceEd25519Public: () => deps.getSession()?.deviceEd25519.publicKey ?? null,
+		signWithDeviceKey: (message) => {
+			const session = deps.getSession();
+			if (!session) return null;
+			try {
+				return session.signWithDeviceKey(message);
+			} catch {
+				// A session disposed between the null-check and the call throws
+				// `assertOpen`; a refusal is the correct read of that race.
+				return null;
+			}
+		},
+		activeDeviceRecords: () => deps.getDevices()?.listActive() ?? [],
+		openSealed: (args) => {
+			const session = deps.getSession();
+			if (!session) return null;
+			try {
+				return session.openLanSealedChallenge(args);
+			} catch {
+				return null;
+			}
+		},
+	};
+}
