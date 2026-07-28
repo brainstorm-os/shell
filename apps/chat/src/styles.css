@@ -76,9 +76,11 @@ body {
 	color: var(--text);
 }
 
+/* Pressed state mirrors the shared `.bs-panel-toggle[aria-pressed]` face —
+ * accent-tinted, never the neutral grey `--selected` (POLISH-DSN sweep). */
 .chat__icon-btn[aria-pressed="true"] {
-	background: var(--selected);
-	color: var(--text);
+	background: var(--accent-soft);
+	color: var(--accent);
 }
 
 /* ── three-column body ────────────────────────────────────────── */
@@ -184,8 +186,10 @@ body {
 	color: var(--text);
 }
 
+/* Selected list row wears the product-wide accent-soft selection fill (the
+ * Notes / Bookmarks / Mailbox sidebar convention), not neutral grey. */
 .chat__channel--active {
-	background: var(--selected);
+	background: var(--accent-soft);
 	color: var(--text);
 	font-weight: 500;
 }

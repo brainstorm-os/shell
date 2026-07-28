@@ -15,9 +15,15 @@
 	padding: 0 var(--space-2);
 	max-width: 100%;
 	min-width: 0;
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-default);
+	/* Same field face as `.bs-input` (app-theme.css): a select IS a field-like
+	 * control, and the two routinely sit stacked in the same form (Form
+	 * Designer) or side by side (Theme Editor's theme picker next to the name
+	 * input). A grey surface-default select beside an elevated bordered input
+	 * read as two different design systems — one face, defined once here and
+	 * once in `.bs-input`, both bound to the same tokens. */
+	border: var(--border-width) solid var(--color-border-strong);
+	border-radius: var(--radius-sm);
+	background: var(--color-background-elevated);
 	color: var(--color-text-primary);
 	font: inherit;
 	font-size: var(--text-size-md);
@@ -29,7 +35,7 @@
 }
 
 .bs-select:hover:not(:disabled) {
-	border-color: var(--color-border-default);
+	border-color: var(--color-border-strong);
 	background: var(--color-interactive-hover);
 }
 

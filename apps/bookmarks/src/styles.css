@@ -569,6 +569,11 @@ body.is-resizing .bookmarks__resize {
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
+	/* Center against the fixed 64px thumb: a title-only card (no host, no
+	 * snippet) must not strand its single line at the top of the card with a
+	 * dead band under it (POLISH-LAY sweep). Full cards are taller than the
+	 * thumb, so centering is a no-op for them. */
+	justify-content: center;
 	gap: var(--space-1);
 }
 
