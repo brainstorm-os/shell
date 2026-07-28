@@ -1,69 +1,43 @@
 /**
- * Task properties inspector — a thin adapter over the SHARED
- * `@brainstorm-os/sdk/properties-panel`, mirroring the Bookmarks panel. It maps
- * the task's bridged fields (see `task-properties.ts`) to the generic `rows`
- * the shared panel renders; all chrome (glass slide-over, header, grid rows)
- * lives in the SDK component, identical to Notes / Journal / Bookmarks.
+ * Task properties inspector — the shared `<EntityPropertiesPanel>` hosting
+ * BOTH halves of the Tasks hybrid (Props-3):
  *
- * Every bridged row is edited in-place through its shared cell (status /
- * priority / tags via the vocabulary TagCell, scheduled / due via the DateCell,
- * project / assignee via the entity-ref Link cell, estimate / logged via the
- * Duration Number cell); created / updated stay read-only. Each cell's edited
- * value flows through a `task-properties` parser back to the typed `Task`
- * patch supplied by the host.
+ *   - the bridged typed rows (status / priority / schedule / project /
+ *     assignee / estimate / logged / tags / timestamps, see
+ *     `task-properties.ts`) ride in as `extraRows` — same grid, host-owned
+ *     per-field persisters, so a locked task (no handlers) freezes each row;
+ *   - the task's real `task.values` bag renders as the panel's own editable
+ *     rows, with remove + the shared rich add-property picker (search the
+ *     vault catalog / create-new inline) replacing the old flat
+ *     `openAnchoredMenu` list.
  *
- * Custom fields (9.14.16): below the bridged rows, the task's bound vault
- * properties (`task.values`) render as fully-editable rows through the same
- * shared cells, with a remove affordance and an "Add property" anchored menu
- * over the unbound catalog defs — the same model Notes / Journal entities
- * use, so a property created once in the vault catalog works on tasks too.
+ * `assigneeId` is excluded from the picker: it is the F-152 catalog def the
+ * bridged Assignee row already edits — binding it into `values` would create
+ * a second, divergent "Assignee" the chip / group-by / Graph edge ignore.
  */
 
 import { EntityCommentsPanel } from "@brainstorm-os/editor";
-import type { PropertyDef, PropertyValueByValueType } from "@brainstorm-os/sdk-types";
-import { ValueType } from "@brainstorm-os/sdk-types";
-import { IconName } from "@brainstorm-os/sdk/icon";
-import { MenuAlign } from "@brainstorm-os/sdk/menus";
-import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
-import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/properties-panel";
-import {
-	type ValuesMap,
-	bindValue,
-	clearValue,
-	readValue,
-	usePropertyStore,
-	writeValue,
-} from "@brainstorm-os/sdk/property-ui";
-import { useRef } from "react";
+import { EntityPropertiesPanel } from "@brainstorm-os/sdk/property-ui";
+import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import { t } from "../i18n/t";
 import {
+	ASSIGNEE_CATALOG_DEF,
 	type TaskFieldHandlers,
-	boundCustomDefs,
 	bridgedTaskRows,
-	unboundCustomDefs,
 } from "../properties/task-properties";
 import { getBrainstorm } from "../storage/runtime";
 import type { Task } from "../types/task";
 
-/** The SDK property-kind glyph for each value type, so the add-property
- *  picker rows carry the same type icon Notes' picker shows (each row is a
- *  distinct kind, so the icon is meaningful, not uniform decoration). */
-const VALUE_TYPE_ICON: Record<ValueType, IconName> = {
-	[ValueType.Text]: IconName.KindText,
-	[ValueType.Number]: IconName.KindNumber,
-	[ValueType.Boolean]: IconName.KindBoolean,
-	[ValueType.Date]: IconName.KindDate,
-	[ValueType.EntityRef]: IconName.KindLink,
-	[ValueType.RichText]: IconName.KindText,
-};
+/** Catalog keys shadowed by a bridged row — never offered by the picker. */
+const PICKER_EXCLUDE_KEYS: ReadonlySet<string> = new Set([ASSIGNEE_CATALOG_DEF.key]);
 
 export type TaskPropertiesPanelProps = {
 	task: Task;
 	open: boolean;
 	onClose: () => void;
 	/** Persists the task's custom vault-property bag (9.14.16). Absent
-	 *  (preview / no repository) → custom rows render read-only and the
-	 *  add-property affordance hides. */
+	 *  (preview / no repository / locked task) → custom rows render
+	 *  read-only and the add-property affordance hides. */
 	onValuesChange?: (next: ValuesMap) => void;
 } & TaskFieldHandlers;
 
@@ -74,51 +48,6 @@ export function TaskPropertiesPanel({
 	onValuesChange,
 	...handlers
 }: TaskPropertiesPanelProps): React.ReactElement {
-	const { properties: catalog, ready } = usePropertyStore();
-	const addButtonRef = useRef<HTMLButtonElement | null>(null);
-
-	const rows: PropertiesPanelRow[] = bridgedTaskRows(task, handlers);
-
-	// Custom vault-property rows (9.14.16) — editable through the same cells.
-	const customValues = task.values ?? {};
-	for (const def of boundCustomDefs(task.values, catalog)) {
-		rows.push({
-			def,
-			value: readValue(customValues, def),
-			...(onValuesChange
-				? {
-						onChange: (next: unknown) =>
-							onValuesChange(
-								writeValue(
-									customValues,
-									def as PropertyDef & { valueType: ValueType },
-									next as PropertyValueByValueType[ValueType],
-								),
-							),
-						onRemove: () => onValuesChange(clearValue(customValues, def.key)),
-					}
-				: { readOnly: true }),
-		});
-	}
-
-	const unbound = onValuesChange && ready ? unboundCustomDefs(task.values, catalog) : [];
-	const openAddMenu = (): void => {
-		const anchor = addButtonRef.current;
-		if (!anchor || unbound.length === 0 || !onValuesChange) return;
-		const rect = anchor.getBoundingClientRect();
-		const items: AnchoredMenuItem[] = unbound.map((def) => ({
-			label: def.name,
-			icon: VALUE_TYPE_ICON[def.valueType],
-			onSelect: () =>
-				onValuesChange(bindValue(customValues, def as PropertyDef & { valueType: ValueType })),
-		}));
-		openAnchoredMenu({ x: rect.left, y: rect.bottom }, items, {
-			menuLabel: t("tasks.props.add"),
-			anchor,
-			align: MenuAlign.Start,
-		});
-	};
-
 	const services = getBrainstorm()?.services ?? null;
 	return (
 		<aside
@@ -131,16 +60,19 @@ export function TaskPropertiesPanel({
 				services={services}
 				documentId={task.id}
 				properties={({ tabbed }) => (
-					<PropertiesPanel
+					<EntityPropertiesPanel
 						title={t("tasks.detail.properties")}
-						rows={rows}
 						entityId={task.id}
+						values={task.values ?? {}}
+						canMutate={Boolean(onValuesChange)}
+						onWriteValues={(next) => onValuesChange?.(next)}
+						addLabel={t("tasks.props.add")}
+						removeLabel={(name) => t("tasks.props.remove", { name })}
+						extraRows={bridgedTaskRows(task, handlers)}
+						pickerExcludeKeys={PICKER_EXCLUDE_KEYS}
 						{...(tabbed
 							? { hideHeader: true }
 							: { onClose, closeLabel: t("tasks.header.inspector.hide") })}
-						removeLabel={(name) => t("tasks.props.remove", { name })}
-						{...(unbound.length > 0 ? { onAdd: openAddMenu, addLabel: t("tasks.props.add") } : {})}
-						addButtonRef={addButtonRef}
 					/>
 				)}
 			/>

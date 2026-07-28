@@ -44,6 +44,11 @@ function buildRuntime(properties: Record<string, PropertyDef>): PropertiesRuntim
 	} as unknown as PropertiesRuntime;
 }
 
+// jsdom has no scrollIntoView; the picker scrolls its active row on open.
+beforeEach(() => {
+	Element.prototype.scrollIntoView = () => undefined;
+});
+
 type Harness = { container: HTMLDivElement; root: Root; cleanup: () => void };
 
 function mount(): Harness {
@@ -159,6 +164,101 @@ describe("EntityPropertiesPanel", () => {
 		});
 		expect(writes).toHaveLength(1);
 		expect(writes[0]).toEqual({});
+	});
+
+	it("renders host extraRows ahead of the bag rows in the same grid (Props-3)", async () => {
+		const runtime = buildRuntime({
+			author: defText("author", "Author"),
+			rating: defText("rating", "Rating"),
+		});
+		act(() => {
+			harness.root.render(
+				<PropertiesProvider runtime={runtime}>
+					<EntityPropertiesPanel
+						title="Details"
+						entityId="ent_1"
+						values={{ author: "Tolkien", rating: "5" }}
+						canMutate
+						onWriteValues={() => undefined}
+						extraRows={[
+							{ def: defText("t.status", "Zz Status"), value: "open", readOnly: true },
+							{ def: defText("t.due", "Aa Due"), value: "", readOnly: true },
+						]}
+						{...LABELS}
+					/>
+				</PropertiesProvider>,
+			);
+		});
+		await flush();
+
+		// Host order first (NOT name-sorted), then the alphabetised bag rows —
+		// all inside one `.bs-props__list`, so the grid stays aligned.
+		expect(harness.container.querySelectorAll(".bs-props__list")).toHaveLength(1);
+		const labels = Array.from(harness.container.querySelectorAll(".bs-props__row-label")).map(
+			(n) => n.textContent,
+		);
+		expect(labels).toEqual(["Zz Status", "Aa Due", "Author", "Rating"]);
+	});
+
+	it("keeps extraRows-only hosts working without an emptyLabel", async () => {
+		const runtime = buildRuntime({});
+		act(() => {
+			harness.root.render(
+				<PropertiesProvider runtime={runtime}>
+					<EntityPropertiesPanel
+						title="Details"
+						entityId="ent_1"
+						values={{}}
+						canMutate={false}
+						onWriteValues={() => undefined}
+						extraRows={[{ def: defText("t.status", "Status"), value: "open", readOnly: true }]}
+						addLabel={LABELS.addLabel}
+						removeLabel={LABELS.removeLabel}
+					/>
+				</PropertiesProvider>,
+			);
+		});
+		await flush();
+
+		expect(harness.container.querySelector(".bs-props__status")).toBeNull();
+		expect(harness.container.querySelector(".bs-props__row-label")?.textContent).toBe("Status");
+	});
+
+	it("threads pickerExcludeKeys + pickerLabels into the add-property picker", async () => {
+		const runtime = buildRuntime({
+			assigneeId: defText("assigneeId", "Assignee"),
+			mood: defText("mood", "Mood"),
+		});
+		act(() => {
+			harness.root.render(
+				<PropertiesProvider runtime={runtime}>
+					<EntityPropertiesPanel
+						title="Details"
+						entityId="ent_1"
+						values={{}}
+						canMutate
+						onWriteValues={() => undefined}
+						pickerExcludeKeys={new Set(["assigneeId"])}
+						pickerLabels={{ region: "Ajouter une propriété" }}
+						{...LABELS}
+					/>
+				</PropertiesProvider>,
+			);
+		});
+		await flush();
+
+		act(() => {
+			harness.container.querySelector<HTMLButtonElement>(".bs-props__add")?.click();
+		});
+		await flush();
+
+		const picker = document.querySelector(".bs-add-property");
+		expect(picker?.getAttribute("aria-label")).toBe("Ajouter une propriété");
+		const rowNames = Array.from(document.querySelectorAll(".bs-add-property .fm-row__name")).map(
+			(n) => n.textContent,
+		);
+		expect(rowNames).toContain("Mood");
+		expect(rowNames).not.toContain("Assignee");
 	});
 
 	it("shows the empty label when nothing is bound", async () => {

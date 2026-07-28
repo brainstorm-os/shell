@@ -1,41 +1,26 @@
 /**
  * PropertiesPanel (Notes) — a thin adapter over the SHARED
- * `@brainstorm-os/sdk/properties-panel`. It maps the open note's `values` bag to
- * the generic `rows` + `meta` the shared content renders; all chrome (header,
- * grid rows, add/remove affordances) lives in the SDK component, identical to
- * every other app. The resizable glass container (`.notes__props`) stays in
- * `app.tsx`.
- *
- * A property is "on the note" when its key is in `values`; "Add property" binds
- * a key via the shared picker (`AddPropertyTargetKind.BindToNote`), and each
- * row's remove clears the key.
+ * `@brainstorm-os/sdk/property-ui` `<EntityPropertiesPanel>` (Props-4): the
+ * open note's `values` bag becomes editable rows + remove + the shared rich
+ * add-property picker; Notes supplies only the whole-bag persister, the
+ * created/updated `meta` footer, and its localised picker labels (the same
+ * `useNotesPickerLabels` set the editor's `/property` flow uses, so the two
+ * mount points of the one picker can never drift). The resizable glass
+ * container (`.notes__props`) stays in `app.tsx`.
  */
 
-import type { PropertyDef } from "@brainstorm-os/sdk-types";
-import {
-	type PropertiesPanelMeta,
-	type PropertiesPanelRow,
-	PropertiesPanel as SharedPropertiesPanel,
-} from "@brainstorm-os/sdk/properties-panel";
-import { type ValuesMap, readValue, usePropertyStore } from "@brainstorm-os/sdk/property-ui";
-import { type JSX, useCallback, useMemo, useRef } from "react";
-import {
-	type AddPropertyTarget,
-	AddPropertyTargetKind,
-	addPropertyStore,
-} from "../editor/add-property-store";
+import { EntityPropertiesPanel, type ValuesMap } from "@brainstorm-os/sdk/property-ui";
+import { type JSX, useMemo } from "react";
 import { t } from "../i18n/t";
 import type { StoredNote } from "../store/note";
 import { relativeTime } from "../ui/relative-time";
+import { useNotesPickerLabels } from "./picker-labels";
 
 export type PropertiesPanelProps = {
 	note: StoredNote;
-	onSetValue: (def: PropertyDef, next: unknown) => void;
-	onClear: (key: string) => void;
-	/** Bind a property onto the note with no value yet (the "Add property"
-	 *  flow). Distinct from `onSetValue` because seeding the empty value
-	 *  through the value path unbinds instead of binds. */
-	onBind: (def: PropertyDef) => void;
+	/** Persist the note's next whole values bag (bind / edit / clear all
+	 *  funnel through it). The host gates it on the note's lock. */
+	onWriteValues: (next: ValuesMap) => void;
 	onClose: () => void;
 	/** Suppress the panel's own header when hosted inside the comments tab strip
 	 *  (the tab already says "Properties") — avoids a doubled header (F-252). */
@@ -47,37 +32,14 @@ export type PropertiesPanelProps = {
 
 export function PropertiesPanel({
 	note,
-	onSetValue,
-	onClear,
-	onBind,
+	onWriteValues,
 	onClose,
 	hideHeader,
 	readOnly,
 }: PropertiesPanelProps): JSX.Element {
-	const { store, properties } = usePropertyStore();
-	const addButtonRef = useRef<HTMLButtonElement | null>(null);
+	const pickerLabels = useNotesPickerLabels();
 
-	const rows = useMemo<PropertiesPanelRow[]>(() => {
-		const values: ValuesMap = note.values;
-		const out: { key: string; def: PropertyDef }[] = [];
-		for (const key of Object.keys(values)) {
-			const def = properties.get(key);
-			if (def) out.push({ key, def });
-		}
-		out.sort((a, b) => a.def.name.localeCompare(b.def.name));
-		return out.map(({ def }) =>
-			readOnly
-				? { def, value: readValue(values, def), readOnly: true }
-				: {
-						def,
-						value: readValue(values, def),
-						onChange: (next: unknown) => onSetValue(def, next),
-						onRemove: () => onClear(def.key),
-					},
-		);
-	}, [note.values, properties, onSetValue, onClear, readOnly]);
-
-	const meta = useMemo<PropertiesPanelMeta[]>(
+	const meta = useMemo(
 		() => [
 			{
 				label: t("notes.properties.meta.created"),
@@ -93,35 +55,20 @@ export function PropertiesPanel({
 		[note.createdAt, note.updatedAt],
 	);
 
-	const openAddProperty = useCallback(() => {
-		const rect = addButtonRef.current?.getBoundingClientRect();
-		if (!rect) return;
-		const target: AddPropertyTarget = {
-			kind: AddPropertyTargetKind.BindToNote,
-			anchor: rect,
-			onPick: (propertyKey) => {
-				const def = store.get(propertyKey);
-				// MUST bind (kind-empty) via `onBind`, not `onSetValue` — the value
-				// path treats an empty write as "unbind" and deletes the key.
-				if (def) onBind(def);
-			},
-		};
-		addPropertyStore.open(target);
-	}, [store, onBind]);
-
 	return (
-		<SharedPropertiesPanel
+		<EntityPropertiesPanel
 			title={t("notes.properties.title")}
-			rows={rows}
 			entityId={note.id}
+			values={note.values}
+			canMutate={!readOnly}
+			onWriteValues={onWriteValues}
 			emptyLabel={t("notes.properties.empty")}
+			addLabel={t("notes.properties.add")}
 			removeLabel={(name) => t("notes.properties.remove", { name })}
-			{...(hideHeader ? { hideHeader: true } : { onClose })}
-			closeLabel={t("notes.properties.hide")}
-			{...(readOnly
-				? {}
-				: { onAdd: openAddProperty, addLabel: t("notes.properties.add"), addButtonRef })}
+			pickerLabels={pickerLabels}
 			meta={meta}
+			closeLabel={t("notes.properties.hide")}
+			{...(hideHeader ? { hideHeader: true } : { onClose })}
 		/>
 	);
 }

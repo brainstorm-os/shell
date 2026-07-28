@@ -78,6 +78,10 @@ export type AddPropertyPickerProps = {
 	labels?: Partial<AddPropertyPickerLabels>;
 	/** Entity types a created Relation can target. Omit for link-to-anything. */
 	relationTargetTypes?: readonly RelationTargetType[];
+	/** Catalog keys the picker must not offer — for hosts whose fixed rows
+	 *  shadow a real catalog def (e.g. Tasks' `assigneeId`, where binding the
+	 *  def into the bag would create a second, divergent field). */
+	excludeKeys?: ReadonlySet<string>;
 };
 
 export function AddPropertyPicker({
@@ -86,6 +90,7 @@ export function AddPropertyPicker({
 	onClose,
 	labels: labelOverride,
 	relationTargetTypes,
+	excludeKeys,
 }: AddPropertyPickerProps): ReactNode {
 	useInjectedStyles();
 	const ref = useRef<HTMLDivElement | null>(null);
@@ -111,7 +116,12 @@ export function AddPropertyPicker({
 	const { store: propertyStore, properties, ready } = usePropertyStore();
 	const { store: dictionaryStore } = useDictionaryStore();
 
-	const results = useMemo(() => filterProperties(properties.values(), query), [properties, query]);
+	const results = useMemo(() => {
+		const offered = excludeKeys
+			? [...properties.values()].filter((def) => !excludeKeys.has(def.key))
+			: properties.values();
+		return filterProperties(offered, query);
+	}, [properties, query, excludeKeys]);
 	const createIndex = results.length;
 	const totalRows = results.length + 1;
 

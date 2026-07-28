@@ -1,20 +1,20 @@
 /**
  * Singleton pub-sub store driving the AddPropertyMenu overlay.
  *
- * Four callers open the picker:
+ * Three EDITOR callers open the picker (each needs a Lexical mutation):
  *   - The `/property` slash command — wants to *replace* the current
  *     empty paragraph with a new `PropertyBlockNode`.
  *   - The block-action menu / right-click "Add property" entry — wants
  *     to *insert* a new `PropertyBlockNode` after the targeted block.
  *   - The "+ Add property" affordance inside a `PropertyListBlockNode`
  *     — wants to *append* a key to that list's `__propertyKeys`.
- *   - The right-hand Properties panel's "Add property" button — wants
- *     to *bind* the picked key onto the open note's value bag (no
- *     editor mutation; the panel surfaces it as an editable row).
  *
  * All three converge on the same `AddPropertyMenu` UI; only the commit
  * handler differs. The discriminated `AddPropertyTarget` union encodes
- * which path the menu should take on selection.
+ * which path the menu should take on selection. (The right-hand
+ * Properties panel used to route its bind-to-note flow through here too;
+ * since Props-4 the shared `<EntityPropertiesPanel>` mounts the same SDK
+ * picker itself — no editor involvement, no store target.)
  *
  * Same shape as `mediaInspectorStore` — no context, no React deps;
  * consumers hook in via `useSyncExternalStore` from
@@ -28,7 +28,6 @@ export enum AddPropertyTargetKind {
 	ReplaceParagraph = "replace-paragraph",
 	InsertAfter = "insert-after",
 	AppendToList = "append-to-list",
-	BindToNote = "bind-to-note",
 }
 
 export type AddPropertyTarget =
@@ -51,15 +50,6 @@ export type AddPropertyTarget =
 			/** Key of the `PropertyListBlockNode` to append the picked
 			 *  property key into. Source: PropertyList's "+" affordance. */
 			listKey: NodeKey;
-			anchor: DOMRect;
-	  }
-	| {
-			kind: AddPropertyTargetKind.BindToNote;
-			/** Invoked with the picked (or freshly-created) property key.
-			 *  The Properties panel binds it onto the open note's value
-			 *  bag so it surfaces as an editable row. No editor mutation —
-			 *  this path never touches the Lexical tree. */
-			onPick: (propertyKey: string) => void;
 			anchor: DOMRect;
 	  };
 

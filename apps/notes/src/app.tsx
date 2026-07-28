@@ -46,8 +46,7 @@ import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { AddIconGlyph } from "@brainstorm-os/sdk/picker-host";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
-import { PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
-import { bindValue, clearValue } from "@brainstorm-os/sdk/property-ui/pure";
+import { PropertiesProvider, type ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import { attachResizable } from "@brainstorm-os/sdk/resizable";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { useSelfDisplayName } from "@brainstorm-os/sdk/self-display-name";
@@ -751,28 +750,12 @@ export function NotesApp() {
 
 	// A locked note is read-only — its property bag freezes alongside the body
 	// editor (the panel itself also renders read-only via `locked` below).
-	const onSetPropertyValue = useCallback(
-		<V extends ValueType>(def: PropertyDef & { valueType: V }, next: PropertyValueByValueType[V]) => {
-			if (!note || locked) return;
-			setValue(note.id, def, next);
-		},
-		[note, locked, setValue],
-	);
-
-	const onClearPropertyValue = useCallback(
-		(key: string) => {
-			if (!note || locked) return;
-			update(note.id, { values: clearValue(note.values, key) });
-		},
-		[note, locked, update],
-	);
-
-	const onBindProperty = useCallback(
-		(def: PropertyDef) => {
-			if (!note || locked) return;
-			const nextValues = bindValue(note.values, def as PropertyDef & { valueType: ValueType });
-			if (nextValues === note.values) return;
-			update(note.id, { values: nextValues });
+	// The shared panel computes the next bag (bind / edit / clear); this
+	// whole-bag persister is the ONE write path, so the lock gates them all.
+	const onWriteNoteValues = useCallback(
+		(next: ValuesMap) => {
+			if (!note || locked || next === note.values) return;
+			update(note.id, { values: next });
 		},
 		[note, locked, update],
 	);
@@ -910,9 +893,7 @@ export function NotesApp() {
 	const propertiesPanel = note ? (
 		<PropertiesPanel
 			note={note}
-			onSetValue={onSetPropertyValue}
-			onClear={onClearPropertyValue}
-			onBind={onBindProperty}
+			onWriteValues={onWriteNoteValues}
 			onClose={toggleProps}
 			readOnly={locked}
 			// Inside the comments tab strip the tab already says "Properties";
