@@ -30,6 +30,7 @@ export function SyncSection() {
 			<section className="settings__section sync-section" data-testid="sync-section">
 				<p className="settings__placeholder">{t("shell.settings.sync.unavailable")}</p>
 				<RestoreControl />
+				<LanHostControl />
 				<SelectiveSyncPolicyControl />
 			</section>
 		);
@@ -301,6 +302,59 @@ function RestoreControl() {
 						: t("shell.settings.sync.restore.action")}
 				</Button>
 			)}
+		</div>
+	);
+}
+
+/**
+ * LAN-4c — whether this device accepts LAN peer connections.
+ *
+ * Off by default. The copy names the trade honestly: turning it on opens a
+ * listening socket on your local network, and only devices already on your
+ * signed roster can be admitted.
+ */
+function LanHostControl() {
+	const [mode, setMode] = useState<string | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		const bridge = window.brainstorm?.syncStatus;
+		if (!bridge?.getLanHostMode) return;
+		void bridge.getLanHostMode().then((m) => {
+			if (!cancelled) setMode(m);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	if (mode === null) return null;
+
+	const apply = (next: string): void => {
+		setMode(next);
+		void window.brainstorm?.syncStatus
+			?.setLanHostMode?.(next)
+			// Main normalises an unrecognised mode to "off"; trust its answer over
+			// the optimistic local one.
+			.then((saved) => saved && setMode(saved));
+	};
+
+	return (
+		<div className="sync-section__group" data-testid="lan-host-mode">
+			<h4 className="sync-section__group-title">{t("shell.settings.sync.lanHost.title")}</h4>
+			<p className="sync-section__tooltip">{t("shell.settings.sync.lanHost.summary")}</p>
+			<div className="sync-section__row">
+				<span className="sync-section__label">{t("shell.settings.sync.lanHost.label")}</span>
+				<SelectMenu
+					value={mode}
+					ariaLabel={t("shell.settings.sync.lanHost.label")}
+					options={[
+						{ value: "off", label: t("shell.settings.sync.lanHost.mode.off") },
+						{ value: "when-vault-open", label: t("shell.settings.sync.lanHost.mode.on") },
+					]}
+					onChange={apply}
+				/>
+			</div>
 		</div>
 	);
 }

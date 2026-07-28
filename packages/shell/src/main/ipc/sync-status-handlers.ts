@@ -12,6 +12,7 @@
 import type { SelectiveSyncPolicy } from "@brainstorm-os/protocol/selective-sync-types";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
+import type { LanHostMode } from "../sync/lan-host-policy";
 import type { RestoreSummary } from "../sync/restore-engine";
 import type { SelectiveSyncStore } from "../sync/selective-sync-store";
 import type { SyncStatusSnapshot, SyncStatusStore } from "../sync/sync-status-store";
@@ -21,6 +22,9 @@ export const SYNC_STATUS_SNAPSHOT_CHANNEL = "sync-status:snapshot";
 export const SYNC_POLICY_GET_CHANNEL = "sync-status:get-policy";
 export const SYNC_POLICY_SET_CHANNEL = "sync-status:set-policy";
 /** Stage 10.14 — dashboard offers + drives cold restore-from-zero. */
+/** LAN-4c — dashboard reads/writes the device's LAN host-listen mode. */
+export const SYNC_LAN_HOST_GET_CHANNEL = "sync-status:get-lan-host-mode";
+export const SYNC_LAN_HOST_SET_CHANNEL = "sync-status:set-lan-host-mode";
 export const SYNC_RESTORE_AVAILABLE_CHANNEL = "sync-status:restore-available";
 export const SYNC_RESTORE_CHANNEL = "sync-status:restore";
 
@@ -38,6 +42,11 @@ export type SyncStatusHandlersOptions = {
 	/** 10.14 — run a restore-from-zero pass against the durable node. Rejects
 	 *  if no session / no durable node is active. */
 	runRestore: () => Promise<RestoreSummary>;
+	/** LAN-4c — read the device's LAN host-listen mode. */
+	getLanHostMode: () => Promise<LanHostMode>;
+	/** LAN-4c — persist the mode and re-apply the listener policy. Returns the
+	 *  mode actually stored (an unrecognised value normalises to `Off`). */
+	setLanHostMode: (mode: unknown) => Promise<LanHostMode>;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -73,6 +82,15 @@ export function registerSyncStatusHandlers(options: SyncStatusHandlersOptions): 
 				}
 				return next;
 			},
+		);
+		ipcMain.handle(
+			SYNC_LAN_HOST_GET_CHANNEL,
+			async (): Promise<LanHostMode | null> => (active ? active.getLanHostMode() : null),
+		);
+		ipcMain.handle(
+			SYNC_LAN_HOST_SET_CHANNEL,
+			async (_event, mode: unknown): Promise<LanHostMode | null> =>
+				active ? active.setLanHostMode(mode) : null,
 		);
 		ipcMain.handle(
 			SYNC_RESTORE_AVAILABLE_CHANNEL,
