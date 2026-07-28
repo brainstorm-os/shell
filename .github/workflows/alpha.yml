@@ -81,6 +81,8 @@ jobs:
           CARGO_BUILD_JOBS: 2
         run: |
           bun run --filter @brainstorm-os/native ${{ matrix.napi-script }}
+          # Asset-B4b — thumbnail-derivation addon (small pure-Rust crate).
+          bun run --filter @brainstorm-os/native-image ${{ matrix.napi-script }}
           bun run --filter @brainstorm-os/shell build
           bun run build:apps
 

@@ -18,6 +18,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import {
+	access as fsAccess,
 	mkdir as fsMkdir,
 	readFile as fsReadFile,
 	unlink as fsUnlink,
@@ -64,6 +65,7 @@ type AssetStoreFs = {
 	readFile: (path: string) => Promise<Uint8Array>;
 	unlink: (path: string) => Promise<void>;
 	mkdir: (path: string, opts: { recursive: boolean }) => Promise<unknown>;
+	exists: (path: string) => Promise<boolean>;
 };
 
 export type AssetStoreDeps = {
@@ -102,6 +104,13 @@ export class AssetStore {
 			readFile: deps.fs?.readFile ?? ((p) => fsReadFile(p)),
 			unlink: deps.fs?.unlink ?? ((p) => fsUnlink(p)),
 			mkdir: deps.fs?.mkdir ?? ((p, o) => fsMkdir(p, o)),
+			exists:
+				deps.fs?.exists ??
+				((p) =>
+					fsAccess(p).then(
+						() => true,
+						() => false,
+					)),
 		};
 	}
 
@@ -257,6 +266,12 @@ export class AssetStore {
 		return this.#assets.markBound(assetId, this.#clock());
 	}
 
+	/** Asset-B4b — cheap blob-file presence probe (no decrypt, no row read).
+	 *  The eager-thumbnail drain uses it to skip already-materialised pairs. */
+	hasBlob(assetId: string): Promise<boolean> {
+		return this.#fs.exists(this.#blobPath(assetId));
+	}
+
 	/** Every bound (saved) asset, newest first — the user-facing storage
 	 *  inventory. Orphans are excluded (they're transient preview-mints). */
 	listBound(): AssetRecord[] {
@@ -266,12 +281,16 @@ export class AssetStore {
 	/**
 	 * Delete an asset's rows (the `asset_deks` + `asset_refs` rows cascade off
 	 * the `assets` FK) and unlink its blob (best-effort; a missing file is
-	 * fine).
+	 * fine). Asset-B4b: a parent's derived thumbnail is deleted with it — the
+	 * derivative has no life of its own.
 	 */
 	async deleteAsset(assetId: string): Promise<void> {
+		const thumbAssetId = this.#assets.getById(assetId)?.thumbAssetId ?? null;
 		this.#transaction(() => {
+			if (thumbAssetId) this.#assets.delete(thumbAssetId);
 			this.#assets.delete(assetId);
 		});
+		if (thumbAssetId) await this.#fs.unlink(this.#blobPath(thumbAssetId)).catch(() => {});
 		await this.#fs.unlink(this.#blobPath(assetId)).catch(() => {});
 	}
 

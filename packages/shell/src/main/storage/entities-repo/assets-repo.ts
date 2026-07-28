@@ -25,6 +25,9 @@ export type AssetRecord = {
 	originUrl: string | null;
 	createdAt: number;
 	boundAt: number | null;
+	/** Asset-B4b — the derived preview asset (`kind = thumbnail`) for this
+	 *  full-size image, or null (not derivable / not yet derived). */
+	thumbAssetId: string | null;
 };
 
 export type CreateAssetInput = {
@@ -48,6 +51,7 @@ type DbAssetRow = {
 	origin_url: string | null;
 	created_at: number;
 	bound_at: number | null;
+	thumb_asset_id: string | null;
 };
 
 export class AssetsRepository {
@@ -80,7 +84,7 @@ export class AssetsRepository {
 
 	getById(assetId: string): AssetRecord | null {
 		const row = this.stmt(
-			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at FROM assets WHERE asset_id = ?",
+			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at, thumb_asset_id FROM assets WHERE asset_id = ?",
 		).get(assetId) as DbAssetRow | undefined;
 		return row ? rowToRecord(row) : null;
 	}
@@ -106,7 +110,7 @@ export class AssetsRepository {
 	 *  preview-minted assets the user never saved. */
 	listUnboundCreatedBefore(cutoff: number): AssetRecord[] {
 		const rows = this.stmt(
-			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at FROM assets WHERE bound_at IS NULL AND created_at < ?",
+			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at, thumb_asset_id FROM assets WHERE bound_at IS NULL AND created_at < ?",
 		).all(cutoff) as DbAssetRow[];
 		return rows.map(rowToRecord);
 	}
@@ -116,9 +120,30 @@ export class AssetsRepository {
 	 *  TTL reap, so they're excluded from the user-facing list. */
 	listBound(): AssetRecord[] {
 		const rows = this.stmt(
-			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at FROM assets WHERE bound_at IS NOT NULL ORDER BY created_at DESC",
+			"SELECT asset_id, dek_id, content_hash, mime, byte_len, kind, origin_url, created_at, bound_at, thumb_asset_id FROM assets WHERE bound_at IS NOT NULL ORDER BY created_at DESC",
 		).all() as DbAssetRow[];
 		return rows.map(rowToRecord);
+	}
+
+	/** Asset-B4b — reverse lookup: the parent asset whose `thumb_asset_id` is
+	 *  this thumbnail, or null. Drives the upload path's `thumbOf` manifest
+	 *  field (the cross-device link). */
+	getParentOfThumb(thumbAssetId: string): string | null {
+		const row = this.stmt("SELECT asset_id FROM assets WHERE thumb_asset_id = ?").get(thumbAssetId) as
+			| { asset_id: string }
+			| undefined;
+		return row?.asset_id ?? null;
+	}
+
+	/** Asset-B4b — link a parent asset to its derived thumbnail, ONLY while no
+	 *  link is set (the guard is in the SQL: a thumbnail is derived once; a
+	 *  concurrent second derivation loses and cleans itself up). Returns true
+	 *  when the link was written. */
+	setThumbAssetIfUnset(assetId: string, thumbAssetId: string): boolean {
+		const result = this.stmt(
+			"UPDATE assets SET thumb_asset_id = ? WHERE asset_id = ? AND thumb_asset_id IS NULL",
+		).run(thumbAssetId, assetId);
+		return Number(result.changes) > 0;
 	}
 
 	delete(assetId: string): boolean {
@@ -138,5 +163,6 @@ function rowToRecord(row: DbAssetRow): AssetRecord {
 		originUrl: row.origin_url,
 		createdAt: row.created_at,
 		boundAt: row.bound_at,
+		thumbAssetId: row.thumb_asset_id,
 	};
 }

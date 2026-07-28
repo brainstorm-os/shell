@@ -34,7 +34,7 @@ import {
 	stripAgentProvenance,
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
-import type { AssetKind } from "../assets/asset-types";
+import { type AssetKind, AssetRefRole } from "../assets/asset-types";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
@@ -128,6 +128,13 @@ export type EntitiesServiceOptions = {
 	 *  entity-write gate that already passed authorizes the reconcile
 	 *  (OQ-238 folds in). */
 	getAssetKind?: (assetId: string) => Promise<AssetKind | null>;
+	/** Asset-B4b — resolve a locally-stored asset's derived-thumbnail id
+	 *  (`assets.thumb_asset_id`), or null. When wired, the reconcile writer
+	 *  derives the ref CLOSURE: every property-referenced asset also binds its
+	 *  thumbnail under the `thumbnail` role, and the prune drops both together
+	 *  when the property reference goes — so the derivative is exactly as
+	 *  GC-reachable and drain-visible as its parent, with no writer of its own. */
+	getThumbAssetId?: (assetId: string) => Promise<string | null>;
 	/** Asset-B4 — a NEW `asset_refs` row was just written for this pair
 	 *  (post-commit, contained like the sibling hooks). The wired consumer
 	 *  attempts an immediate chunk upload to the durable node when the blob
@@ -226,6 +233,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			for (const assetId of extractAssetIds(properties)) {
 				const kind = await options.getAssetKind(assetId);
 				if (kind) desired.set(assetId, assetRefRoleForKind(kind));
+			}
+			// Asset-B4b — close over derived thumbnails: a bound parent keeps its
+			// preview bound; a dropped parent drops it in the same prune.
+			if (options.getThumbAssetId) {
+				for (const assetId of [...desired.keys()]) {
+					const thumbId = await options.getThumbAssetId(assetId);
+					if (thumbId && !desired.has(thumbId)) desired.set(thumbId, AssetRefRole.Thumbnail);
+				}
 			}
 			const existingIds = new Set(repo.assetRefs.listByEntity(entityId).map((r) => r.assetId));
 			const now = clock();

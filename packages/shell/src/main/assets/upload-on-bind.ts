@@ -52,11 +52,12 @@ export type UploadOnBindDeps = {
 	 *  upload-done marker. Skip the upload when so. */
 	manifestPresent: (entityId: string, assetId: string) => Promise<boolean>;
 	/** Open the LOCAL plaintext + mime (+ the row's `kind`, carried into the
-	 *  manifest so a cold device reconstructs a faithful row — Asset-B5); null
-	 *  when the blob isn't on this device. */
+	 *  manifest so a cold device reconstructs a faithful row — Asset-B5, and
+	 *  for a thumbnail its parent's id as `thumbOf` so a cold device can link
+	 *  the rows — Asset-B4b); null when the blob isn't on this device. */
 	readAsset: (
 		assetId: string,
-	) => Promise<{ bytes: Uint8Array; mime: string; kind?: AssetKind } | null>;
+	) => Promise<{ bytes: Uint8Array; mime: string; kind?: AssetKind; thumbOf?: string } | null>;
 	/** Recover the per-asset DEK the chunks are sealed under (a FRESH buffer this
 	 *  module zeroes), or null. */
 	recoverDek: (entityId: string, assetId: string) => Promise<Uint8Array | null>;
@@ -94,7 +95,10 @@ export async function uploadBoundAssetIfPending(
 			asset.mime,
 			asset.bytes,
 			dek,
-			asset.kind,
+			{
+				...(asset.kind !== undefined ? { kind: asset.kind } : {}),
+				...(asset.thumbOf !== undefined ? { thumbOf: asset.thumbOf } : {}),
+			},
 		);
 		return UploadBoundOutcome.Uploaded;
 	} finally {

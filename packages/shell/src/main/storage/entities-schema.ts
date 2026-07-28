@@ -286,4 +286,21 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 9,
+		description: "entities.db v9 — assets.thumb_asset_id (Asset-B4b eager thumbnail tier)",
+		up: (db) => {
+			// Asset-B4b — link a full-size image asset to its derived preview
+			// (`kind = thumbnail`), itself a first-class `assets` row riding the
+			// same encrypted pipeline. The serve path answers `?tier=thumb` off
+			// this pointer; the reconcile writer derives the thumbnail's
+			// `asset_refs` rows from it (bound wherever the parent is bound).
+			// ON DELETE SET NULL: deleting the derivative degrades the parent to
+			// thumb-less, never dangles. LOCAL derived state — the cross-device
+			// link travels as the thumbnail manifest's `thumbOf` field.
+			db.exec(
+				"ALTER TABLE assets ADD COLUMN thumb_asset_id TEXT REFERENCES assets(asset_id) ON DELETE SET NULL",
+			);
+		},
+	},
 ];

@@ -14,6 +14,7 @@ const upload: AssetRecord = {
 	originUrl: null,
 	createdAt: 10,
 	boundAt: 20,
+	thumbAssetId: null,
 };
 
 function entry(name: string, partial?: Partial<FsStoreEntry>): FsStoreEntry {

@@ -48,6 +48,11 @@ export type ReconstructDeps = {
 	hasRef: (entityId: string, assetId: string) => boolean;
 	/** Insert an `asset_refs` row (the entity → asset binding). */
 	createRef: (entityId: string, assetId: string, role: AssetRefRole) => void;
+	/** Asset-B4b — link a reconstructed parent row to its thumbnail
+	 *  (`assets.setThumbAssetIfUnset`; the SQL guard makes replays no-ops).
+	 *  Called after the row pass so ordering between the parent's and the
+	 *  thumbnail's manifests never matters. Optional (pre-B4b wirings). */
+	linkThumb?: (parentAssetId: string, thumbAssetId: string) => void;
 };
 
 export type ReconstructTally = {
@@ -73,6 +78,9 @@ export async function reconstructAssetMetadata(
 	entityIds: readonly string[],
 ): Promise<ReconstructTally> {
 	const tally: ReconstructTally = { created: 0, present: 0, badManifest: 0, noDek: 0, failed: 0 };
+	// (parent ← thumbOf, thumb = manifest.assetId) links, applied AFTER the row
+	// pass — a thumbnail's manifest may be listed before its parent's.
+	const thumbLinks: Array<{ parentAssetId: string; thumbAssetId: string }> = [];
 	for (const entityId of entityIds) {
 		let pairs: Array<{ assetId: string; manifest: unknown }>;
 		try {
@@ -90,6 +98,9 @@ export async function reconstructAssetMetadata(
 					continue;
 				}
 				const kind = manifest.kind ?? AssetKind.Upload;
+				if (manifest.thumbOf !== undefined) {
+					thumbLinks.push({ parentAssetId: manifest.thumbOf, thumbAssetId: assetId });
+				}
 				if (deps.hasAsset(assetId)) {
 					ensureRef(deps, entityId, assetId, kind);
 					tally.present += 1;
@@ -116,6 +127,20 @@ export async function reconstructAssetMetadata(
 			} catch (error) {
 				tally.failed += 1;
 				console.warn(`[reconstruct-assets] failed for ${entityId}/${assetId}:`, error);
+			}
+		}
+	}
+	if (deps.linkThumb) {
+		for (const { parentAssetId, thumbAssetId } of thumbLinks) {
+			try {
+				// Only meaningful when both rows made it; the unset-guard in the
+				// wiring makes a partial pass safely re-runnable.
+				if (deps.hasAsset(parentAssetId) && deps.hasAsset(thumbAssetId)) {
+					deps.linkThumb(parentAssetId, thumbAssetId);
+				}
+			} catch (error) {
+				tally.failed += 1;
+				console.warn(`[reconstruct-assets] thumb link failed for ${parentAssetId}:`, error);
 			}
 		}
 	}

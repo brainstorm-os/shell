@@ -28,6 +28,7 @@ export default defineConfig({
 			// binary is built by the root `pretest` script; without it these
 			// fail to import `../index.js` — a real signal, not a skip.
 			"packages/native/test/**/*.test.ts",
+			"packages/native-image/test/**/*.test.ts",
 			// Per-app tests for first-party apps under `apps/`. The implementation
 			// plan in docs/apps/42-file-manager-implementation.md (and future
 			// per-app plans) places tests under `apps/<name>/tests/`.

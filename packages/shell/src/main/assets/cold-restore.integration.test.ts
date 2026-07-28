@@ -33,7 +33,8 @@ import { MemoryAssetCas } from "./asset-cas";
 import { AssetDekStore } from "./asset-dek-store";
 import { AssetStore } from "./asset-store";
 import { uploadBoundAsset } from "./asset-sync";
-import { AssetKind } from "./asset-types";
+import { AssetKind, AssetRefRole } from "./asset-types";
+import { drainEagerThumbnails } from "./eager-thumbnails";
 import { materializeAssetOnServe } from "./materialize-on-serve";
 import { reconstructAssetMetadata } from "./reconstruct-assets";
 import { recoverAssetDek } from "./recover-asset-dek";
@@ -108,7 +109,7 @@ describe("Asset-B5 cold restore end-to-end", () => {
 			"image/png",
 			plaintext,
 			assetDek,
-			AssetKind.Cover,
+			{ kind: AssetKind.Cover },
 		);
 		assetDek.fill(0); // device A is gone from here on
 
@@ -171,6 +172,127 @@ describe("Asset-B5 cold restore end-to-end", () => {
 		const local = await cold.store.readAsset(ASSET);
 		if (!local) throw new Error("expected a local read after materialise");
 		expect(Buffer.from(local.bytes).equals(Buffer.from(plaintext))).toBe(true);
+	});
+
+	it("Asset-B4b: cold reconstruct links the thumb and the eager drain materialises ONLY it", async () => {
+		const THUMB = "asset-cold-1-thumb";
+		const node = new MemoryAssetCas();
+		const manifests = new Map<string, unknown>();
+		const entityDek = generateSymmetricKey();
+
+		// ── Device A (owner): full blob + derived thumbnail, two assets ────
+		const fullBytes = new Uint8Array(randomBytes(40 * 1024));
+		const thumbBytes = new Uint8Array(randomBytes(3 * 1024));
+		const fullDek = generateSymmetricKey();
+		const thumbDek = generateSymmetricKey();
+		const fullWrap = sealAssetDekUnderEntity(fullDek, entityDek, ENTITY, ASSET);
+		const thumbWrap = sealAssetDekUnderEntity(thumbDek, entityDek, ENTITY, THUMB);
+		const installManifest = async (_e: string, assetId: string, manifest: unknown) => {
+			manifests.set(assetId, JSON.parse(JSON.stringify(manifest)));
+		};
+		await uploadBoundAsset(
+			{ cas: node, installManifest },
+			ENTITY,
+			ASSET,
+			"image/jpeg",
+			fullBytes,
+			fullDek,
+			{ kind: AssetKind.Upload },
+		);
+		await uploadBoundAsset(
+			{ cas: node, installManifest },
+			ENTITY,
+			THUMB,
+			"image/jpeg",
+			thumbBytes,
+			thumbDek,
+			{ kind: AssetKind.Thumbnail, thumbOf: ASSET },
+		);
+		fullDek.fill(0);
+		thumbDek.fill(0);
+
+		// ── Device B (cold) ────────────────────────────────────────────────
+		const entityDekStore = fakeEntityDekStore(new Map([[ENTITY, entityDek]]));
+		const recoverDek = (entityId: string, assetId: string) =>
+			recoverAssetDek(
+				{
+					assetDekStore: cold.dekStore,
+					entityDekStore,
+					readAssetDekWrap: async (_e, a) => (a === ASSET ? fullWrap : a === THUMB ? thumbWrap : null),
+				},
+				entityId,
+				assetId,
+			);
+
+		const tally = await reconstructAssetMetadata(
+			{
+				listManifests: async (entityId) =>
+					entityId === ENTITY
+						? [...manifests.entries()].map(([assetId, manifest]) => ({ assetId, manifest }))
+						: [],
+				hasAsset: (id) => cold.assets.getById(id) !== null,
+				recoverDek,
+				registerSynced: (input) => cold.store.registerSynced(input),
+				hasRef: (entityId, assetId) =>
+					cold.refs.listByEntity(entityId).some((r) => r.assetId === assetId),
+				createRef: (entityId, assetId, role) =>
+					cold.refs.create({ entityId, assetId, role, now: 1000 }),
+				linkThumb: (parentId, thumbId) => {
+					cold.assets.setThumbAssetIfUnset(parentId, thumbId);
+				},
+			},
+			[ENTITY],
+		);
+		expect(tally.created).toBe(2);
+
+		// Rows faithful: kinds, roles, and the parent → thumb link.
+		expect(cold.assets.getById(ASSET)?.kind).toBe(AssetKind.Upload);
+		expect(cold.assets.getById(THUMB)?.kind).toBe(AssetKind.Thumbnail);
+		expect(cold.assets.getById(ASSET)?.thumbAssetId).toBe(THUMB);
+		expect(cold.refs.listByEntity(ENTITY).find((r) => r.assetId === THUMB)?.role).toBe(
+			AssetRefRole.Thumbnail,
+		);
+
+		// ── The eager tier: thumbnails materialise proactively ─────────────
+		const eagerTally = await drainEagerThumbnails(
+			{
+				hasBlob: (id) => cold.store.hasBlob(id),
+				recoverDek,
+				readManifest: async (_e, assetId) => manifests.get(assetId) ?? null,
+				cas: node,
+				restoreBlob: (id, bytes) => cold.store.restoreBlob(id, bytes),
+			},
+			cold.refs.listPairsByRole(AssetRefRole.Thumbnail),
+		);
+		expect(eagerTally).toEqual({
+			materialized: 1,
+			alreadyLocal: 0,
+			noDek: 0,
+			noManifest: 0,
+			failed: 0,
+		});
+
+		// The thumb is local (round-trips through the store); the FULL blob is
+		// still absent — lazy until first access, exactly as before B4b.
+		expect(await cold.store.hasBlob(THUMB)).toBe(true);
+		const thumbLocal = await cold.store.readAsset(THUMB);
+		expect(thumbLocal && Buffer.from(thumbLocal.bytes).equals(Buffer.from(thumbBytes))).toBe(true);
+		expect(await cold.store.hasBlob(ASSET)).toBe(false);
+		expect(await cold.store.readAsset(ASSET)).toBeNull();
+
+		// A second drain pass is a no-op (already local).
+		const second = await drainEagerThumbnails(
+			{
+				hasBlob: (id) => cold.store.hasBlob(id),
+				recoverDek,
+				readManifest: async (_e, assetId) => manifests.get(assetId) ?? null,
+				cas: node,
+				restoreBlob: (id, bytes) => cold.store.restoreBlob(id, bytes),
+			},
+			cold.refs.listPairsByRole(AssetRefRole.Thumbnail),
+		);
+		expect(second.alreadyLocal).toBe(1);
+		expect(second.materialized).toBe(0);
 	});
 
 	it("reconstruction is inert for an entity whose wrap this device cannot open", async () => {

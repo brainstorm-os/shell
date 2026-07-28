@@ -14,7 +14,14 @@ const DEK = () => new Uint8Array(32).fill(7);
 
 function manifestFor(assetId: string, kind?: AssetKind): unknown {
 	const bytes = new Uint8Array([1, 2, 3, 4]);
-	const { manifest } = sealAssetChunks(bytes, DEK(), assetId, "image/png", undefined, kind);
+	const { manifest } = sealAssetChunks(
+		bytes,
+		DEK(),
+		assetId,
+		"image/png",
+		undefined,
+		kind !== undefined ? { kind } : {},
+	);
 	return JSON.parse(JSON.stringify(manifest));
 }
 

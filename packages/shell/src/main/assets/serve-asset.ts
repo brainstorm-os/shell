@@ -16,6 +16,13 @@
  *  separators, `..`, and uppercase — no traversal reaches the store. */
 const ASSET_ID_RE = /^[0-9a-f-]{36}$/;
 
+/** Asset-B4b — the `?tier=` values a `brainstorm://asset/` request may name.
+ *  `thumb` prefers the parent's derived preview (eager tier) and falls back
+ *  to the full blob; absent/unknown serves the full blob. */
+export enum AssetServeTier {
+	Thumb = "thumb",
+}
+
 export type AssetReader = {
 	readAsset(assetId: string): Promise<{ bytes: Uint8Array; mime: string } | null>;
 };
