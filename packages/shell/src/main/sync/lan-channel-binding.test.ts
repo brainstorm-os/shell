@@ -253,7 +253,7 @@ describe("handshake builders (LAN-2b(b)) — host ⇄ client", () => {
 		});
 		const clientSide = makeLanClientHandshake({
 			deviceAccount: () => client.account,
-			deviceX25519Secret: () => client.x25519Secret,
+			openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: client.x25519Secret }),
 			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
 			activeDevices: () => directory,
 			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
@@ -327,7 +327,7 @@ describe("handshake builders (LAN-2b(b)) — host ⇄ client", () => {
 		const { hostSide } = handshakePair(realHost, attacker, directory);
 		const victimSide = makeLanClientHandshake({
 			deviceAccount: () => victim.account,
-			deviceX25519Secret: () => victim.x25519Secret,
+			openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: victim.x25519Secret }),
 			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, victim.edSecret)),
 			activeDevices: () => directory,
 			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
@@ -382,7 +382,7 @@ describe("wired end-to-end: LanRelayHost ⇄ WebSocketRelayPort (LAN-2b(b))", ()
 			requireAdmission: true,
 			lanHandshake: makeLanClientHandshake({
 				deviceAccount: () => client.account,
-				deviceX25519Secret: () => client.x25519Secret,
+				openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: client.x25519Secret }),
 				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
 				activeDevices: () => dir,
 				verify: testVerify,
@@ -503,7 +503,7 @@ describe("LAN-7 — the host triggers backfill when a peer joins a channel", () 
 		const hooks = (d: ReturnType<typeof makeDevice>) =>
 			makeLanClientHandshake({
 				deviceAccount: () => d.account,
-				deviceX25519Secret: () => d.x25519Secret,
+				openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: d.x25519Secret }),
 				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, d.edSecret)),
 				activeDevices: () => dir,
 				verify: testVerify2,
@@ -566,7 +566,7 @@ describe("LAN-7 — the host triggers backfill when a peer joins a channel", () 
 		const clientHooks = (d: ReturnType<typeof makeDevice>) =>
 			makeLanClientHandshake({
 				deviceAccount: () => d.account,
-				deviceX25519Secret: () => d.x25519Secret,
+				openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: d.x25519Secret }),
 				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, d.edSecret)),
 				activeDevices: () => dir,
 				verify: testVerify2,
@@ -609,5 +609,75 @@ describe("LAN-7 — the host triggers backfill when a peer joins a channel", () 
 			portB.close();
 			relayHost.close();
 		}
+	});
+});
+
+describe("the X25519 secret stays inside the session (LAN-2b(a) seam)", () => {
+	// `makeLanClientHandshake` takes a VERB (`openSealed`) rather than an accessor
+	// for the HPKE recipient secret. The distinction matters: a leaked Ed25519
+	// device secret lets an attacker sign, but a leaked X25519 recipient secret
+	// lets them decrypt EVERY challenge ever sealed to that device. The session's
+	// `exposeIdentityForPairing` already withholds it — it hands out
+	// `deviceX25519Public` only — and this seam preserves that property.
+	const rosterOf = (...devices: ReturnType<typeof makeDevice>[]) =>
+		new Map<string, LanRosterEntry>(
+			devices.map((d) => [d.account, { ed25519Pub: d.edPublic, x25519Pub: d.x25519Pub }]),
+		);
+
+	it("never asks for the secret — only for an envelope to be opened", () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const roster = rosterOf(host, client);
+
+		const seen: Array<{ hostAccount: string; clientAccount: string }> = [];
+		const clientSide = makeLanClientHandshake({
+			deviceAccount: () => client.account,
+			// The only capability handed over: open THIS envelope. The closure holds
+			// the secret; the handshake never sees it.
+			openSealed: (a) => {
+				seen.push({ hostAccount: a.hostAccount, clientAccount: a.clientAccount });
+				return openLanChallenge({ ...a, deviceX25519Secret: client.x25519Secret });
+			},
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
+			activeDevices: () => roster,
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		const hostSide = makeLanHostHandshake({
+			hostAccount: () => host.account,
+			activeDevices: () => roster,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+
+		const sealed = hostSide.sealFor(client.account, NONCE);
+		expect(sealed).not.toBeNull();
+		const auth = clientSide.onSealedChallenge(host.account, sealed as SealedChallenge);
+		expect(auth).not.toBeNull();
+		// The verb receives both accounts, so the AAD binding remains the opener's
+		// to enforce — moving the call site did not weaken it.
+		expect(seen).toEqual([{ hostAccount: host.account, clientAccount: client.account }]);
+		// And the round trip still authenticates end to end.
+		expect(hostSide.verifyClient(client.account, (auth as { sig: string }).sig, NONCE)).toBe(true);
+	});
+
+	it("fails closed when the opener declines — there is no plaintext fallback", () => {
+		const host = makeDevice();
+		const client = makeDevice();
+		const roster = rosterOf(host, client);
+		const clientSide = makeLanClientHandshake({
+			deviceAccount: () => client.account,
+			openSealed: () => null,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
+			activeDevices: () => roster,
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		const hostSide = makeLanHostHandshake({
+			hostAccount: () => host.account,
+			activeDevices: () => roster,
+			signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, host.edSecret)),
+			verify: (pub, msg, sig) => ed25519.verify(sig, msg, pub),
+		});
+		const sealed = hostSide.sealFor(client.account, NONCE);
+		expect(clientSide.onSealedChallenge(host.account, sealed as SealedChallenge)).toBeNull();
 	});
 });
