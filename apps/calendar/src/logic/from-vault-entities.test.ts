@@ -165,6 +165,26 @@ describe("entityToScheduledItems (catalog-driven)", () => {
 		expect(open?.done).toBe(false);
 	});
 
+	it("projects a locked source entity as readonly on every date property", () => {
+		// A locked task/note is read-only fleet-wide; the calendar must not
+		// rewrite its date properties via chip drag (`onReschedule` keys off
+		// `item.readonly`).
+		const items = entityToScheduledItems(
+			task({
+				id: "t1",
+				properties: { name: "T", locked: true, scheduledAt: MAY_2026, dueAt: MAY_2026 },
+			}),
+			FALLBACK_KEYS,
+		);
+		expect(items).toHaveLength(2);
+		expect(items.every((i) => i.readonly === true)).toBe(true);
+		const [unlocked] = entityToScheduledItems(
+			task({ id: "t2", properties: { name: "T", scheduledAt: MAY_2026 } }),
+			FALLBACK_KEYS,
+		);
+		expect(unlocked?.readonly).toBeUndefined();
+	});
+
 	it("prefers name → title → fullName → 'Untitled'", () => {
 		const keys = buildDateKeyInfo([{ key: "scheduledAt", name: "Scheduled" }]);
 		expect(
@@ -387,6 +407,14 @@ describe("eventToScheduledItem", () => {
 		expect(eventToScheduledItem(makeEvent({ icon: null })).icon).toBeNull();
 		const icon = { kind: IconKind.Emoji, value: "🏔️" } as const;
 		expect(eventToScheduledItem(makeEvent({ icon })).icon).toEqual(icon);
+	});
+
+	it("projects a locked event as readonly (no drag affordance, no reschedule)", () => {
+		// The per-object read-only lock must gate EVERY write path — including
+		// the week/month chip drag and the "Move to date…" twin, which both key
+		// off `item.readonly`.
+		expect(eventToScheduledItem(makeEvent({ locked: true })).readonly).toBe(true);
+		expect(eventToScheduledItem(makeEvent()).readonly).toBeUndefined();
 	});
 });
 

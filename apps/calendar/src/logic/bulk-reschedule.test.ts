@@ -56,6 +56,22 @@ describe("bulkShiftToDate", () => {
 	it("returns [] for an empty batch", () => {
 		expect(bulkShiftToDate([], NOW, NOW)).toEqual([]);
 	});
+
+	it("excludes locked events — they neither move nor anchor the batch", () => {
+		const target = new Date(2026, 4, 20, 0, 0).getTime();
+		const lockedEarliest = { ...ev("locked", d10, d10 + HOUR), locked: true };
+		const out = bulkShiftToDate([lockedEarliest, ev("b", d12, d12 + HOUR)], target, NOW);
+		// The locked event is dropped from the output (never saved), and the
+		// delta anchors on the earliest MOVABLE event (d12, May 12 → May 20: +8d).
+		expect(out).toHaveLength(1);
+		expect(out[0]?.id).toBe("b");
+		expect(out[0]?.start).toBe(d12 + 8 * DAY);
+	});
+
+	it("returns [] when every selected event is locked", () => {
+		const target = new Date(2026, 4, 20, 0, 0).getTime();
+		expect(bulkShiftToDate([{ ...ev("a", d10, null), locked: true }], target, NOW)).toEqual([]);
+	});
 });
 
 describe("bulkShiftByDays", () => {
@@ -68,5 +84,15 @@ describe("bulkShiftByDays", () => {
 	it("keeps an instant event's null end", () => {
 		const out = bulkShiftByDays([ev("a", d10, null)], 2, NOW);
 		expect(out[0]?.end).toBeNull();
+	});
+
+	it("excludes locked events from the nudge", () => {
+		const out = bulkShiftByDays(
+			[{ ...ev("a", d10, null), locked: true }, ev("b", d12, null)],
+			2,
+			NOW,
+		);
+		expect(out).toHaveLength(1);
+		expect(out[0]?.id).toBe("b");
 	});
 });

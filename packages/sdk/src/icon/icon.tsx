@@ -196,6 +196,11 @@ export function Icon({
 			size={size}
 			color={color ?? "currentColor"}
 			weight={weight as PhosphorWeight}
+			// Decorative: parity with the IconPack branch above and the pure-DOM
+			// twin (`createIconElement`) — without this every default glyph leaks
+			// an unnamed graphic into the a11y tree.
+			aria-hidden="true"
+			focusable="false"
 			data-icon-direction={directionAttr}
 			className={className}
 			style={style}

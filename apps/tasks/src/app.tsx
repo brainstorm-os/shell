@@ -800,7 +800,9 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	const moveTaskToStatus = useCallback(
 		(taskId: string, statusKey: string | null) => {
 			const existing = dataRef.current.tasks.find((x) => x.id === taskId);
-			if (!existing || existing.statusKey === statusKey) return;
+			// `locked` gates the commit too — the board card drops its drag
+			// affordance, but every move route lands here (defense in depth).
+			if (!existing || existing.locked || existing.statusKey === statusKey) return;
 			const now = nowAnchor();
 			let next: Task = { ...existing, statusKey, updatedAt: now };
 			if (statusKey === TaskStatus.Done) next = { ...next, completedAt: existing.completedAt ?? now };

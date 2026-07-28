@@ -466,16 +466,17 @@ export function CalendarApp() {
 						date: new Date(newStart).toLocaleDateString(undefined, { dateStyle: "medium" }),
 					}),
 				);
+			// Read-only items (birthday sources + any locked object) aren't
+			// draggable, but every reschedule route lands here — gate the commit
+			// too so the menu twin / cross-app rewrite can't move them either.
+			if (item.readonly) return;
 			if (item.sourceKey === EVENT_SOURCE_KEY) {
 				const owned = eventsRef.current.get(item.sourceEntityId);
-				if (!owned) return;
+				if (!owned || owned.locked) return;
 				applyDetailResult({ kind: EventDetailOutcome.Saved, event: rescheduleEvent(owned, newStart) });
 				announceMoved();
 				return;
 			}
-			// Property-derived items rewrite the *same* date property they were
-			// projected from; read-only sources (birthdays) aren't draggable.
-			if (item.readonly) return;
 			const parsed = parseSourceKey(item.sourceKey);
 			if (!parsed) return;
 			const entitiesSvc = storageRuntime?.services?.entities;
@@ -510,6 +511,8 @@ export function CalendarApp() {
 			for (const item of payload.items) {
 				const entity = byId.get(item.entityId);
 				if (!entity || entity.deletedAt !== null) continue;
+				// The per-object read-only lock gates the cross-app drop too.
+				if (entity.properties.locked === true) continue;
 				const key = resolveDropDateKey(entity.properties, dateKeys);
 				const value = dropDateValue(entity.properties[key], dayStart);
 				// Refresh only when the write actually lands — a fail-closed
@@ -549,6 +552,9 @@ export function CalendarApp() {
 	// Contact's anniversary, so "Delete" there would nuke the contact.
 	const deleteItem = useCallback(
 		(item: ScheduledItem) => {
+			// Read-only items (birthday sources + locked objects) are not
+			// deletable from the calendar — mirror of the object-menu gate.
+			if (item.readonly) return;
 			if (item.sourceKey === EVENT_SOURCE_KEY) {
 				applyDetailResult({ kind: EventDetailOutcome.Deleted, id: item.sourceEntityId });
 				return;
@@ -566,9 +572,10 @@ export function CalendarApp() {
 		(item: ScheduledItem): ObjectMenuContext => {
 			const isOwnedEvent =
 				item.sourceKey === EVENT_SOURCE_KEY && eventsRef.current.has(item.sourceEntityId);
-			// A read-only source (a birthday) must not offer Delete — that would
-			// nuke the underlying person, not a calendar placement.
-			const canDelete = isOwnedEvent || !item.readonly;
+			// A read-only item must not offer Delete: for a birthday that would
+			// nuke the underlying person, and a locked object (event or source
+			// entity) is read-only everywhere — delete included.
+			const canDelete = !item.readonly;
 			// DND-6 — "Move to date…" twin, gated exactly like the chip drag
 			// (recurring instances + read-only sources aren't draggable either).
 			const canMove = !item.isRecurringInstance && !item.readonly;

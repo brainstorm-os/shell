@@ -27,7 +27,6 @@ import { TextSurfaceKind, spellcheckForSurface } from "@brainstorm-os/sdk/spellc
 import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import type { InitialEditorStateType } from "@lexical/react/LexicalComposer";
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
@@ -35,12 +34,13 @@ import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import type { Provider } from "@lexical/yjs";
 import type { Klass, LexicalNode } from "lexical";
-import { type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo } from "react";
+import { type MutableRefObject, type ReactNode, useCallback, useMemo } from "react";
 import type { Doc } from "yjs";
 import { type BrainstormEditorConfigOptions, createEditorConfig } from "./config";
 import { EditorI18nProvider, type EditorManifest } from "./i18n";
 import { createLocalProvider } from "./local-provider";
 import { BASELINE_NODES } from "./nodes";
+import { EditablePlugin } from "./plugins/editable-plugin";
 import { VirtualizePlugin } from "./virtualize-plugin";
 
 export type BrainstormEditorProps = BrainstormEditorConfigOptions & {
@@ -193,13 +193,14 @@ export function BrainstormEditor(props: BrainstormEditorProps): ReactNode {
  * Reactively applies the `editable` prop after mount. `initialConfig.editable`
  * only seeds the FIRST render — Lexical never re-reads it — so without this a
  * lock/unlock toggle (e.g. a read-only object lock) wouldn't flip the live
- * contenteditable. `undefined` means "leave editable" (the default).
+ * contenteditable. `undefined` means "leave editable" (the default); a boolean
+ * delegates to the shared `EditablePlugin` (skip-when-matching + blur-on-lock,
+ * so the caret can't linger in a doc that just went read-only).
+ *
+ * Exported for its dedicated unit suite only — apps get this behaviour through
+ * `<BrainstormEditor editable={…}>`, never by mounting `EditableSync` directly.
  */
-function EditableSync({ editable }: { editable: boolean | undefined }): null {
-	const [editor] = useLexicalComposerContext();
-	useEffect(() => {
-		if (editable === undefined) return;
-		editor.setEditable(editable);
-	}, [editor, editable]);
-	return null;
+export function EditableSync({ editable }: { editable: boolean | undefined }): ReactNode {
+	if (editable === undefined) return null;
+	return <EditablePlugin editable={editable} />;
 }
