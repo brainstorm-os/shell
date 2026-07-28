@@ -24,6 +24,7 @@ import { EntitiesRepository } from "../storage/entities-repo";
 import { closeActiveVaultSession, getActiveVaultSession } from "../vault/session";
 import { createVault } from "../vault/vault";
 import {
+	AnytypeDraftKind,
 	type AnytypeFile,
 	anytypeCollectionId,
 	anytypeDictionaryId,
@@ -547,6 +548,53 @@ describe("parseAnytypeExport", () => {
 	});
 });
 
+describe("native kind routing (IE-10e residue)", () => {
+	const plan = parseAnytypeExport([
+		snapshotFile("obj-task", "Page", {
+			objectTypes: ["ot-task"],
+			details: { name: "Pay invoices", layout: 2, done: true, dueDate: 1774254674 },
+		}),
+		snapshotFile("obj-open", "Page", { details: { name: "Open task", layout: 2 } }),
+		snapshotFile("obj-bm", "Page", {
+			objectTypes: ["ot-bookmark"],
+			details: {
+				name: "Anytype",
+				layout: 11,
+				source: "https://anytype.io",
+				description: "Local-first workspace",
+			},
+		}),
+		snapshotFile("obj-bm-broken", "Page", { details: { name: "No url", layout: 11 } }),
+		snapshotFile("obj-note", "Page", { details: { name: "Plain" } }),
+	]);
+	const route = (id: string) => plan.entities.find((e) => e.externalId === id)?.route;
+
+	it("routes a Task layout with its done state and due date", () => {
+		expect(route("obj-task")).toEqual({
+			kind: AnytypeDraftKind.Task,
+			done: true,
+			dueAt: 1774254674 * 1000,
+		});
+		expect(route("obj-open")).toEqual({ kind: AnytypeDraftKind.Task, done: false, dueAt: null });
+	});
+
+	it("routes a Bookmark layout with its url and description", () => {
+		expect(route("obj-bm")).toEqual({
+			kind: AnytypeDraftKind.Bookmark,
+			url: "https://anytype.io",
+			description: "Local-first workspace",
+		});
+	});
+
+	it("a Bookmark layout without a usable http(s) url stays a Note", () => {
+		expect(route("obj-bm-broken")).toEqual({ kind: AnytypeDraftKind.Note });
+	});
+
+	it("everything else stays a Note", () => {
+		expect(route("obj-note")).toEqual({ kind: AnytypeDraftKind.Note });
+	});
+});
+
 describe("deriveTypeSchemas", () => {
 	it("derives per-type PropertyDefs with inferred value types", () => {
 		const schemas = deriveTypeSchemas(parseAnytypeExport(FILES, ATTACHMENTS));
@@ -803,6 +851,71 @@ describe("importAnytypeExport (vault binding)", () => {
 		expect(second.created).toBe(0);
 		expect(second.filesCreated).toBe(0);
 		expect(second.updated).toBe(3);
+	});
+
+	it("routes Task and Bookmark layouts to the native entity types (IE-10e residue)", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const files = [
+			snapshotFile("obj-task", "Page", {
+				details: {
+					name: "Pay invoices",
+					layout: 2,
+					done: true,
+					dueDate: 1774254674,
+					createdDate: 1_690_000_000,
+					lastModifiedDate: 1_690_000_100,
+				},
+			}),
+			snapshotFile("obj-bm", "Page", {
+				details: {
+					name: "Anytype",
+					layout: 11,
+					source: "https://anytype.io",
+					description: "Local-first workspace",
+					tag: ["reading"],
+				},
+			}),
+			snapshotFile("obj-note", "Page", { details: { name: "Plain note" } }),
+		];
+		const report = await importAnytypeExport(session, files, opts);
+		expect(report.created).toBe(3);
+
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const rowFor = (external: string) => {
+			const [id] = repo.listIdsWithProperty(IMPORT_EXTERNAL_ID_PROP, `${opts.source}:${external}`);
+			return id ? repo.get(id) : null;
+		};
+
+		const task = rowFor("obj-task");
+		expect(task?.type).toBe("brainstorm/Task/v1");
+		expect(task?.properties.name).toBe("Pay invoices");
+		// Done state carries as the canonical completedAt signal.
+		expect(typeof task?.properties.completedAt).toBe("number");
+		expect(task?.properties.dueAt).toBe(1774254674 * 1000);
+		// The Tasks codec requires numeric domain timestamps or it drops the row.
+		expect(task?.properties.createdAt).toBe(1_690_000_000_000);
+		expect(task?.properties.updatedAt).toBe(1_690_000_100_000);
+
+		const bookmark = rowFor("obj-bm");
+		expect(bookmark?.type).toBe("brainstorm/Bookmark/v1");
+		expect(bookmark?.properties.url).toBe("https://anytype.io");
+		expect(bookmark?.properties.title).toBe("Anytype");
+		expect(bookmark?.properties.description).toBe("Local-first workspace");
+		// The Bookmarks codec requires savedAt + numeric timestamps.
+		expect(typeof bookmark?.properties.savedAt).toBe("number");
+		expect(typeof bookmark?.properties.createdAt).toBe("number");
+		expect(typeof bookmark?.properties.updatedAt).toBe("number");
+		expect(bookmark?.properties.tags).toEqual(["reading"]);
+
+		const note = rowFor("obj-note");
+		expect(note?.type).toBe(opts.targetType);
+
+		// Idempotent: the re-import updates the same rows, native types intact.
+		const second = await importAnytypeExport(session, files, opts);
+		expect(second.created).toBe(0);
+		expect(second.updated).toBe(3);
+		expect(rowFor("obj-task")?.type).toBe("brainstorm/Task/v1");
 	});
 
 	it("seals a name-less pasted screenshot with a synthesized name + image mime", async () => {

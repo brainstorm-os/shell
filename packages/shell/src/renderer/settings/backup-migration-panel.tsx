@@ -36,13 +36,14 @@ import { Popover } from "../ui/popover";
 import { PopoverSize } from "../ui/popover-types";
 import { TextField, TextFieldSize } from "../ui/text-field";
 import {
-	ImportRunSection,
-	ImportRunStatus,
-	cancelImportRun,
-	dismissImportRun,
+	TransferRunSection,
+	TransferRunStatus,
+	cancelTransferRun,
+	dismissTransferRun,
+	startExportRun,
 	startImportRun,
-	useImportRun,
-} from "./import-run-store";
+	useTransferRun,
+} from "./transfer-run-store";
 import "./backup-migration-panel.css";
 
 /** Default import target — the Notes app's primary type. Prefer this when
@@ -294,15 +295,15 @@ function SectionRunState({
 	progressTestId,
 	stopTestId,
 }: {
-	section: ImportRunSection;
+	section: TransferRunSection;
 	againLabel: string;
 	doneTestId: string;
 	progressTestId: string;
 	stopTestId: string;
 }) {
-	const run = useImportRun();
+	const run = useTransferRun();
 	if (run.section !== section) return null;
-	if (run.status === ImportRunStatus.Running) {
+	if (run.status === TransferRunStatus.Running) {
 		return (
 			<div className="backup-migration__progress" data-testid={progressTestId}>
 				<p className="settings__hint" role="status">
@@ -316,7 +317,7 @@ function SectionRunState({
 				<Button
 					variant={ButtonVariant.Ghost}
 					size={ButtonSize.Md}
-					onClick={cancelImportRun}
+					onClick={cancelTransferRun}
 					data-testid={stopTestId}
 				>
 					{t("shell.settings.backupMigration.import.stop")}
@@ -324,21 +325,21 @@ function SectionRunState({
 			</div>
 		);
 	}
-	if (run.status === ImportRunStatus.Done && run.report) {
+	if (run.status === TransferRunStatus.Done && run.report) {
 		return (
 			<ImportDoneState
 				report={run.report}
-				onAgain={dismissImportRun}
+				onAgain={dismissTransferRun}
 				againLabel={againLabel}
 				testId={doneTestId}
 			/>
 		);
 	}
-	if (run.status === ImportRunStatus.Failed && run.error) {
+	if (run.status === TransferRunStatus.Failed && run.error) {
 		return (
 			<p className="settings__error" role="alert">
 				{run.error}{" "}
-				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissImportRun}>
+				<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissTransferRun}>
 					{againLabel}
 				</Button>
 			</p>
@@ -351,22 +352,20 @@ function SectionRunState({
 // Export
 // ---------------------------------------------------------------------
 
+/** The export runs through the same background transfer-run store as the
+ *  imports (IE-11 residue): starting it hands the run to the module-level
+ *  store, so navigating away keeps it alive and progress/stop render inline
+ *  here when the user comes back. */
 function ExportSection() {
-	const [busy, setBusy] = useState(false);
-	const [savedPath, setSavedPath] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const run = useTransferRun();
+	const [busyError, setBusyError] = useState<string | null>(null);
+	const mine = run.section === TransferRunSection.Export;
+	const running = mine && run.status === TransferRunStatus.Running;
 
-	const onExport = useCallback(async () => {
-		setBusy(true);
-		setError(null);
-		setSavedPath(null);
-		try {
-			const result = await window.brainstorm.importExport.exportVault();
-			if (result) setSavedPath(result.path);
-		} catch (e) {
-			setError(e instanceof Error ? e.message : t("shell.settings.backupMigration.export.failed"));
-		} finally {
-			setBusy(false);
+	const onExport = useCallback(() => {
+		setBusyError(null);
+		if (!startExportRun(() => window.brainstorm.importExport.exportVault())) {
+			setBusyError(t("shell.settings.backupMigration.export.runBusy"));
 		}
 	}, []);
 
@@ -381,22 +380,53 @@ function ExportSection() {
 						variant={ButtonVariant.Primary}
 						size={ButtonSize.Md}
 						iconLeft={IconName.Download}
-						loading={busy}
-						onClick={() => void onExport()}
+						loading={running}
+						onClick={onExport}
 						data-testid="backup-migration-export-btn"
 					>
 						{t("shell.settings.backupMigration.export.action")}
 					</Button>
 				}
 			/>
-			{savedPath && (
+			{running && (
+				<div className="backup-migration__progress" data-testid="backup-migration-export-progress">
+					<p className="settings__hint" role="status">
+						{run.progress
+							? t("shell.settings.backupMigration.export.progress", {
+									done: run.progress.done,
+									total: run.progress.total,
+								})
+							: t("shell.settings.backupMigration.export.running")}
+					</p>
+					<Button
+						variant={ButtonVariant.Ghost}
+						size={ButtonSize.Md}
+						onClick={cancelTransferRun}
+						data-testid="backup-migration-export-stop"
+					>
+						{t("shell.settings.backupMigration.import.stop")}
+					</Button>
+				</div>
+			)}
+			{mine && run.status === TransferRunStatus.Done && run.exportPath && (
 				<p className="settings__hint" data-testid="backup-migration-export-done">
-					{t("shell.settings.backupMigration.export.done", { path: savedPath })}
+					{t("shell.settings.backupMigration.export.done", { path: run.exportPath })}{" "}
+					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissTransferRun}>
+						{t("shell.settings.backupMigration.export.dismiss")}
+					</Button>
 				</p>
 			)}
-			{error && (
+			{mine && run.status === TransferRunStatus.Failed && run.error && (
 				<p className="settings__error" role="alert">
-					{error}
+					{run.error}{" "}
+					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissTransferRun}>
+						{t("shell.settings.backupMigration.export.dismiss")}
+					</Button>
+				</p>
+			)}
+			{busyError && (
+				<p className="settings__error" role="alert">
+					{busyError}
 				</p>
 			)}
 		</div>
@@ -481,7 +511,7 @@ function ImportSection() {
 		const edits = editsFor();
 		setError(null);
 		if (
-			!startImportRun(ImportRunSection.Csv, () => window.brainstorm.importExport.run(type, edits))
+			!startImportRun(TransferRunSection.Csv, () => window.brainstorm.importExport.run(type, edits))
 		) {
 			setError(t("shell.settings.backupMigration.import.runBusy"));
 			return;
@@ -575,7 +605,7 @@ function ImportSection() {
 			</AnimatePresence>
 
 			<SectionRunState
-				section={ImportRunSection.Csv}
+				section={TransferRunSection.Csv}
 				againLabel={t("shell.settings.backupMigration.import.again")}
 				doneTestId="backup-migration-import-done"
 				progressTestId="backup-migration-import-progress"
@@ -629,7 +659,7 @@ function ObsidianSection() {
 		}
 		setError(null);
 		if (
-			!startImportRun(ImportRunSection.Obsidian, () =>
+			!startImportRun(TransferRunSection.Obsidian, () =>
 				window.brainstorm.importExport.runObsidian(type),
 			)
 		) {
@@ -700,7 +730,7 @@ function ObsidianSection() {
 			</AnimatePresence>
 
 			<SectionRunState
-				section={ImportRunSection.Obsidian}
+				section={TransferRunSection.Obsidian}
 				againLabel={t("shell.settings.backupMigration.obsidian.again")}
 				doneTestId="backup-migration-obsidian-done"
 				progressTestId="backup-migration-obsidian-progress"
@@ -754,7 +784,9 @@ function AnytypeSection() {
 		}
 		setError(null);
 		if (
-			!startImportRun(ImportRunSection.Anytype, () => window.brainstorm.importExport.runAnytype(type))
+			!startImportRun(TransferRunSection.Anytype, () =>
+				window.brainstorm.importExport.runAnytype(type),
+			)
 		) {
 			setError(t("shell.settings.backupMigration.import.runBusy"));
 			return;
@@ -823,7 +855,7 @@ function AnytypeSection() {
 			</AnimatePresence>
 
 			<SectionRunState
-				section={ImportRunSection.Anytype}
+				section={TransferRunSection.Anytype}
 				againLabel={t("shell.settings.backupMigration.anytype.again")}
 				doneTestId="backup-migration-anytype-done"
 				progressTestId="backup-migration-anytype-progress"
@@ -937,7 +969,7 @@ function NotionApiSection() {
 		}
 		setError(null);
 		if (
-			!startImportRun(ImportRunSection.NotionApi, () =>
+			!startImportRun(TransferRunSection.NotionApi, () =>
 				window.brainstorm.importExport.runNotionApi(type),
 			)
 		) {
@@ -1041,7 +1073,7 @@ function NotionApiSection() {
 			</AnimatePresence>
 
 			<SectionRunState
-				section={ImportRunSection.NotionApi}
+				section={TransferRunSection.NotionApi}
 				againLabel={t("shell.settings.backupMigration.notionApi.again")}
 				doneTestId="backup-migration-notion-api-done"
 				progressTestId="backup-migration-notion-api-progress"
@@ -1093,7 +1125,7 @@ function NotionSection() {
 		}
 		setError(null);
 		if (
-			!startImportRun(ImportRunSection.Notion, () => window.brainstorm.importExport.runNotion(type))
+			!startImportRun(TransferRunSection.Notion, () => window.brainstorm.importExport.runNotion(type))
 		) {
 			setError(t("shell.settings.backupMigration.import.runBusy"));
 			return;
@@ -1162,7 +1194,7 @@ function NotionSection() {
 			</AnimatePresence>
 
 			<SectionRunState
-				section={ImportRunSection.Notion}
+				section={TransferRunSection.Notion}
 				againLabel={t("shell.settings.backupMigration.notion.again")}
 				doneTestId="backup-migration-notion-done"
 				progressTestId="backup-migration-notion-progress"
