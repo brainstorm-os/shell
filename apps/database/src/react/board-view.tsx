@@ -150,7 +150,7 @@ export function BoardView(props: BoardViewProps): ReactElement {
 
 	const baseGroups = compiled.groups.length
 		? (compiled.groups as Group[])
-		: [{ key: null, label: "All", rows: compiled.rows.slice() }];
+		: [{ key: null, label: t("brainstorm.database.board.allLane"), rows: compiled.rows.slice() }];
 	const groups = useMemo(
 		() => orderGroups(baseGroups, layout.groupOrder),
 		[baseGroups, layout.groupOrder],

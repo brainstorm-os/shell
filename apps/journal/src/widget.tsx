@@ -21,7 +21,8 @@ import {
 	useWidgetVisible,
 } from "@brainstorm-os/sdk/widget";
 import { useMemo } from "react";
-import { buildJournalT, journalPlural } from "./logic/journal-i18n";
+import { useJournalT } from "./i18n-hooks";
+import { journalPlural, t } from "./logic/journal-i18n";
 import { JOURNAL_ENTRY_TYPE, getJournalRuntime } from "./runtime";
 import {
 	JOURNAL_WIDGET_QUERY,
@@ -31,8 +32,6 @@ import {
 	shapeJournalWidget,
 } from "./widget-data";
 import "./widget.css";
-
-const t = buildJournalT();
 
 const OPEN_VERB = "open";
 
@@ -107,6 +106,7 @@ function JournalGlance({ model }: { model: JournalWidgetModel }) {
 }
 
 export function JournalWidget({ launch }: { launch: WidgetLaunch }) {
+	useJournalT();
 	const runtime = getJournalRuntime();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

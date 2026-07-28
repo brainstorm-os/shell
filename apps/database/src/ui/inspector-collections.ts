@@ -11,6 +11,7 @@
  * Lands as part of 9.3.5.U (multi-membership UX).
  */
 
+import { t } from "../i18n";
 import {
 	MembershipKind,
 	collectionsForEntity,
@@ -66,7 +67,7 @@ export function renderInspectorCollections(
 
 	const header = document.createElement("h3");
 	header.className = "db-inspector__section-title";
-	header.textContent = "Collections";
+	header.textContent = t("brainstorm.database.collections.title");
 	section.appendChild(header);
 
 	const memberships = collectionsForEntity(bindings.entityId, bindings.lists, bindings.db);
@@ -74,7 +75,7 @@ export function renderInspectorCollections(
 	if (memberships.length === 0) {
 		const empty = document.createElement("p");
 		empty.className = "db-inspector__empty";
-		empty.textContent = "Not in any collection.";
+		empty.textContent = t("brainstorm.database.collections.empty");
 		section.appendChild(empty);
 	} else {
 		const ul = document.createElement("ul");
@@ -152,7 +153,7 @@ function buildAddToCollectionButton(bindings: InspectorCollectionsBindings): HTM
 	btn.dataset.testid = INSPECTOR_ADD_TO_COLLECTION_TESTID;
 	btn.appendChild(bindings.createPlusIcon(14));
 	const label = document.createElement("span");
-	label.textContent = "Add to collection";
+	label.textContent = t("brainstorm.database.collections.add");
 	btn.appendChild(label);
 	// Disable the button when there are no candidates to add — the picker
 	// would otherwise pop up only to immediately flash an empty-state.
@@ -164,7 +165,7 @@ function buildAddToCollectionButton(bindings: InspectorCollectionsBindings): HTM
 	);
 	if (candidates.length === 0) {
 		btn.disabled = true;
-		btn.title = "All user collections already include this object";
+		btn.title = t("brainstorm.database.collections.allIncluded");
 	}
 	btn.addEventListener("click", () => {
 		if (btn.disabled) return;

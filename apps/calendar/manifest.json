@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Cross-app temporal browser. Surfaces every entity in the vault with a date property — Events, Tasks, Notes, Person birthdays — on Month / Week / Day / Agenda views. Recurrence is shared with Tasks via @brainstorm-os/sdk-types.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

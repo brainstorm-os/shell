@@ -17,6 +17,7 @@ import {
 	useWidgetVisible,
 } from "@brainstorm-os/sdk/widget";
 import { useMemo, useState } from "react";
+import { useTasksT } from "./i18n-hooks";
 import { t, tCount } from "./i18n/t";
 import { TASK_TYPE } from "./storage/entities-repository";
 import { getBrainstorm, openEntityInShell } from "./storage/runtime";
@@ -192,6 +193,7 @@ function TaskStats({
 }
 
 export function TasksWidget({ launch }: { launch: WidgetLaunch }) {
+	useTasksT();
 	const runtime = getBrainstorm();
 	// Reactive over the shell's live vault-entity index — pauses implicitly when
 	// the host scrolls the widget off-screen (the surface stops re-rendering).

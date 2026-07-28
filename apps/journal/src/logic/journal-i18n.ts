@@ -1,217 +1,55 @@
 /**
  * Journal app i18n manifest + `t()`. Built on the shared SDK `createT`
  * (`@brainstorm-os/sdk/i18n`) so every user-visible string flows through one
- * typed lookup with `{name}` interpolation — no bare literals in `app.ts`.
+ * typed lookup with `{name}` interpolation — no bare literals in components.
  *
- * English defaults live here; a localised build passes a `Partial<…>`
- * override to `buildJournalT`. Pluralisation that depends on a count
- * (word / words) is two manifest keys selected at the call site, matching
- * the shell's `t.ts` convention (no embedded ICU plural in v1).
+ * English defaults live in the extracted catalog (`../i18n/en.json`);
+ * per-locale overlay packs are lazy-loaded (12.15 slice 15d). Pluralisation
+ * that depends on a count (word / words) is two manifest keys selected via
+ * `journalPlural`, matching the shell's `t.ts` convention (no embedded ICU
+ * plural in v1).
  */
 
-import { createT, plural as sdkPlural } from "@brainstorm-os/sdk/i18n";
-import type { TFunction, TParams } from "@brainstorm-os/sdk/i18n";
+import {
+	type LocalePackImporters,
+	type TFunction,
+	type TParams,
+	createT,
+	plural as sdkPlural,
+} from "@brainstorm-os/sdk/i18n";
+import enCatalog from "../i18n/en.json";
 
-/** The frozen set of Journal string ids. The key set is fixed; values
- *  are `string` (not literal types) so a localised build can override
- *  any of them via `buildJournalT`. */
-export type JournalI18nKey =
-	| "previous"
-	| "next"
-	| "today"
-	| "noEntryYet"
-	| "writeHint"
-	| "openInNotes"
-	| "standaloneHint"
-	| "wordOne"
-	| "wordOther"
-	| "linkedFrom"
-	| "linksTo"
-	| "insertLink"
-	| "linkPickerTitle"
-	| "linkPickerEmpty"
-	| "link"
-	| "mention"
-	| "day"
-	| "week"
-	| "month"
-	| "hasEntry"
-	| "streakNone"
-	| "streakOne"
-	| "streakMany"
-	| "streakAtRisk"
-	| "reminder.label"
-	| "reminder.timeLabel"
-	| "reminder.notify.title"
-	| "reminder.notify.body"
-	| "reminder.notify.streak"
-	| "goToDate"
-	| "jumpToMonth"
-	| "overviewHeading"
-	| "overviewEmpty"
-	| "export.button"
-	| "export.title"
-	| "export.monthMd"
-	| "export.monthHtml"
-	| "export.allMd"
-	| "export.allHtml"
-	| "export.saveDialogTitle"
-	| "export.filterName"
-	| "periodic.heading"
-	| "periodic.thisWeek"
-	| "periodic.lastWeek"
-	| "periodic.thisMonth"
-	| "periodic.lastMonth"
-	| "templatesLabel"
-	| "template.dailyReview"
-	| "template.dailyReview.well"
-	| "template.dailyReview.hard"
-	| "template.dailyReview.tomorrow"
-	| "template.gratitude"
-	| "template.gratitude.heading"
-	| "template.gratitude.prompt"
-	| "template.freeWrite"
-	| "template.freeWrite.prompt"
-	| "checkIn.mood"
-	| "checkIn.habits"
-	| "mood.great"
-	| "mood.good"
-	| "mood.ok"
-	| "mood.low"
-	| "mood.bad"
-	| "habit.exercise"
-	| "habit.read"
-	| "habit.meditate"
-	| "habit.outside"
-	| "habit.sleepWell"
-	| "search.title"
-	| "search.placeholder"
-	| "search.hint"
-	| "search.empty"
-	| "search.filterMood"
-	| "search.filterHabits"
-	| "header.lock"
-	| "header.unlock"
-	| "moreActions"
-	| "iconPicker"
-	| "sidebar.show"
-	| "sidebar.hide"
-	| "properties.show"
-	| "properties.hide"
-	| "properties.title"
-	| "properties.empty"
-	| "properties.loading"
-	| "properties.add"
-	| "properties.remove"
-	| "properties.meta.created"
-	| "properties.meta.updated"
-	| "properties.meta.words"
-	| "properties.meta.dateKey"
-	| "properties.openInNotesHint"
-	| "widget.noEntryToday"
-	| "widget.writeToday";
+export const JOURNAL_I18N = enCatalog as typeof enCatalog;
+
+/** The frozen set of Journal string ids, derived from the catalog. */
+export type JournalI18nKey = keyof typeof JOURNAL_I18N;
 
 export type JournalManifest = Record<JournalI18nKey, string>;
 
-export const JOURNAL_I18N: JournalManifest = Object.freeze({
-	previous: "Previous",
-	next: "Next",
-	today: "Today",
-	noEntryYet: "No entry yet.",
-	writeHint: "Start writing your entry…",
-	openInNotes: "Open in Notes",
-	standaloneHint: "Running standalone — open Notes inside the shell to use this",
-	wordOne: "{count} word",
-	wordOther: "{count} words",
-	linkedFrom: "Linked from ({count})",
-	linksTo: "Links to ({count})",
-	insertLink: "Link an entry",
-	linkPickerTitle: "Link to entry",
-	linkPickerEmpty: "No other entries to link",
-	link: "link",
-	mention: "mention",
-	day: "Day",
-	week: "Week",
-	month: "Month",
-	hasEntry: "Has entry",
-	streakNone: "No active streak",
-	streakOne: "1-day streak",
-	streakMany: "{count}-day streak",
-	streakAtRisk: "Write today to keep your {count}-day streak",
-	"reminder.label": "Daily reminder",
-	"reminder.timeLabel": "Reminder time",
-	"reminder.notify.title": "Time to journal",
-	"reminder.notify.body": "Take a moment to write today's entry.",
-	"reminder.notify.streak": "Write today to keep your {count}-day streak.",
-	goToDate: "Go to date",
-	jumpToMonth: "Jump to month or year",
-	overviewHeading: "All entries",
-	overviewEmpty: "No entries yet.",
-	"export.button": "Export",
-	"export.title": "Export journal",
-	"export.monthMd": "This month — Markdown",
-	"export.monthHtml": "This month — HTML",
-	"export.allMd": "All entries — Markdown",
-	"export.allHtml": "All entries — HTML",
-	"export.saveDialogTitle": "Export journal",
-	"export.filterName": "Journal export",
-	"periodic.heading": "Rollups",
-	"periodic.thisWeek": "This week",
-	"periodic.lastWeek": "Last week",
-	"periodic.thisMonth": "This month",
-	"periodic.lastMonth": "Last month",
-	templatesLabel: "Start with a template",
-	"template.dailyReview": "Daily review",
-	"template.dailyReview.well": "What went well today?",
-	"template.dailyReview.hard": "What was hard?",
-	"template.dailyReview.tomorrow": "Tomorrow's focus",
-	"template.gratitude": "Gratitude",
-	"template.gratitude.heading": "Grateful for",
-	"template.gratitude.prompt": "Three things I'm grateful for…",
-	"template.freeWrite": "Free write",
-	"template.freeWrite.prompt": "Whatever's on your mind — just write.",
-	"checkIn.mood": "Mood",
-	"checkIn.habits": "Habits",
-	"mood.great": "Great",
-	"mood.good": "Good",
-	"mood.ok": "Okay",
-	"mood.low": "Low",
-	"mood.bad": "Rough",
-	"habit.exercise": "Exercise",
-	"habit.read": "Read",
-	"habit.meditate": "Meditate",
-	"habit.outside": "Outside",
-	"habit.sleepWell": "Slept well",
-	"search.title": "Search entries",
-	"search.placeholder": "Search all entries…",
-	"search.hint": "Type to search, or filter by mood and habits.",
-	"search.empty": "No matching entries.",
-	"search.filterMood": "Mood",
-	"search.filterHabits": "Habits",
-	"header.lock": "Lock entry (read-only)",
-	"header.unlock": "Unlock entry",
-	moreActions: "More actions",
-	iconPicker: "Change icon",
-	"sidebar.show": "Show calendar",
-	"sidebar.hide": "Hide calendar",
-	"properties.show": "Show properties",
-	"properties.hide": "Hide properties",
-	"properties.title": "Properties",
-	"properties.empty": "No properties bound yet.",
-	"properties.loading": "Loading properties…",
-	"properties.add": "Add property",
-	"properties.remove": "Remove {name}",
-	"properties.meta.created": "Created",
-	"properties.meta.updated": "Updated",
-	"properties.meta.words": "Words",
-	"properties.meta.dateKey": "Date",
-	"properties.openInNotesHint": "Use Notes for advanced property editing.",
-	"widget.noEntryToday": "No entry yet today",
-	"widget.writeToday": "Write today's entry",
-});
+/** Lazy overlay packs — code-split per locale (12.15 slice 15c). */
+export const LOCALE_PACK_IMPORTERS: LocalePackImporters<JournalManifest> = {
+	es: () => import("../i18n/es.json"),
+	de: () => import("../i18n/de.json"),
+	fr: () => import("../i18n/fr.json"),
+	it: () => import("../i18n/it.json"),
+	pt: () => import("../i18n/pt.json"),
+};
 
 export type JournalT = TFunction<JournalManifest>;
 
+let activeT: JournalT = createT(JOURNAL_I18N);
+
+/** Imperative surfaces read the latest reactive `t`. */
+export function syncActiveTranslator(next: JournalT): void {
+	activeT = next;
+}
+
+export function t(key: JournalI18nKey, params?: TParams): string {
+	return activeT(key, params);
+}
+
+/** Tests and standalone previews build a fixed `t` (English defaults plus an
+ *  optional `Partial<…>` override layer). */
 export function buildJournalT(overrides?: Partial<JournalManifest>): JournalT {
 	return createT(JOURNAL_I18N, overrides);
 }

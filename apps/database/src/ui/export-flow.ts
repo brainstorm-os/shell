@@ -14,6 +14,7 @@ import {
 	textToBytes,
 } from "@brainstorm-os/sdk/export-file";
 import type { EntityRow } from "@brainstorm-os/sdk/in-memory-entities";
+import { type TranslationKey, plural, t } from "../i18n";
 import {
 	type ExportColumn,
 	ListExportFormat,
@@ -36,10 +37,10 @@ export type ListExportInput = {
 	notify: (message: string) => void;
 };
 
-const FILTER_NAME: Record<ListExportFormat, string> = {
-	[ListExportFormat.Csv]: "CSV",
-	[ListExportFormat.Json]: "JSON",
-	[ListExportFormat.Markdown]: "Markdown",
+const FILTER_NAME_KEY: Record<ListExportFormat, TranslationKey> = {
+	[ListExportFormat.Csv]: "brainstorm.database.export.format.csv",
+	[ListExportFormat.Json]: "brainstorm.database.export.format.json",
+	[ListExportFormat.Markdown]: "brainstorm.database.export.format.markdown",
 };
 
 export async function runListExport(input: ListExportInput): Promise<void> {
@@ -47,7 +48,7 @@ export async function runListExport(input: ListExportInput): Promise<void> {
 	const extension = extensionFor(format);
 	const disposition = await requestSaveBytes(files, {
 		suggestedName: suggestedFilename(listTitle, extension, { defaultStem: "list" }),
-		filters: [{ name: FILTER_NAME[format], extensions: [extension] }],
+		filters: [{ name: t(FILTER_NAME_KEY[format]), extensions: [extension] }],
 		encode: () => {
 			const matrix = buildExportMatrix(rows, columns, titleOf);
 			return textToBytes(serializeList(format, matrix, options ?? {}));
@@ -56,13 +57,18 @@ export async function runListExport(input: ListExportInput): Promise<void> {
 	switch (disposition.kind) {
 		case SaveDispositionKind.Saved:
 			notify(
-				`Exported ${rows.length} ${rows.length === 1 ? "row" : "rows"} to ${disposition.handle.displayName}`,
+				plural(
+					rows.length,
+					"brainstorm.database.status.exported.one",
+					"brainstorm.database.status.exported.other",
+					{ file: disposition.handle.displayName },
+				),
 			);
 			return;
 		case SaveDispositionKind.Cancelled:
 			return;
 		case SaveDispositionKind.Failed:
-			notify("Export failed");
+			notify(t("brainstorm.database.status.exportFailed"));
 			return;
 	}
 }

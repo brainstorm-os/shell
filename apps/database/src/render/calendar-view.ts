@@ -94,7 +94,11 @@ function renderToolbar(props: CalendarViewProps): HTMLElement {
 	// the legacy `dbv-cal__controls` class on the root so existing layout
 	// CSS keeps working.
 	const controls = createDatePager({
-		labels: { today: "Today", prev: "Previous", next: "Next" },
+		labels: {
+			today: t("brainstorm.database.calendar.today"),
+			prev: t("brainstorm.database.calendar.prev"),
+			next: t("brainstorm.database.calendar.next"),
+		},
 		onToday: () => props.onToday(),
 		onPrev: () => props.onPrev(),
 		onNext: () => props.onNext(),
@@ -109,15 +113,15 @@ function renderToolbar(props: CalendarViewProps): HTMLElement {
 function rangeLabel(range: CalendarRange): string {
 	switch (range) {
 		case CalendarRange.Week:
-			return "Week";
+			return t("brainstorm.database.calendar.range.week");
 		case CalendarRange.Month:
-			return "Month";
+			return t("brainstorm.database.calendar.range.month");
 		case CalendarRange.Year:
-			return "Year";
+			return t("brainstorm.database.calendar.range.year");
 		case CalendarRange.Day:
-			return "Day";
+			return t("brainstorm.database.calendar.range.day");
 		case CalendarRange.Agenda:
-			return "Agenda";
+			return t("brainstorm.database.calendar.range.agenda");
 	}
 }
 
@@ -300,7 +304,15 @@ function renderYearView(props: CalendarViewProps): HTMLElement {
 	});
 
 	const narrowLabels = (() => {
-		const all = ["S", "M", "T", "W", "T", "F", "S"];
+		const all = [
+			t("brainstorm.database.calendar.weekdayNarrow.sun"),
+			t("brainstorm.database.calendar.weekdayNarrow.mon"),
+			t("brainstorm.database.calendar.weekdayNarrow.tue"),
+			t("brainstorm.database.calendar.weekdayNarrow.wed"),
+			t("brainstorm.database.calendar.weekdayNarrow.thu"),
+			t("brainstorm.database.calendar.weekdayNarrow.fri"),
+			t("brainstorm.database.calendar.weekdayNarrow.sat"),
+		];
 		const out: string[] = new Array(7);
 		for (let i = 0; i < 7; i += 1) out[i] = all[(weekStartsIdx + i) % 7] ?? "";
 		return out;
@@ -387,7 +399,15 @@ function renderYearView(props: CalendarViewProps): HTMLElement {
 function renderWeekdayHeader(weekStartsIdx: number): HTMLElement {
 	const weekHeader = document.createElement("div");
 	weekHeader.className = "dbv-cal__weekrow";
-	const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+	const weekdayLabels = [
+		t("brainstorm.database.calendar.weekdayShort.sun"),
+		t("brainstorm.database.calendar.weekdayShort.mon"),
+		t("brainstorm.database.calendar.weekdayShort.tue"),
+		t("brainstorm.database.calendar.weekdayShort.wed"),
+		t("brainstorm.database.calendar.weekdayShort.thu"),
+		t("brainstorm.database.calendar.weekdayShort.fri"),
+		t("brainstorm.database.calendar.weekdayShort.sat"),
+	];
 	for (let i = 0; i < 7; i += 1) {
 		const idx = (weekStartsIdx + i) % 7;
 		const label = document.createElement("span");

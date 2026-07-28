@@ -16,6 +16,7 @@ import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
 import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { BookmarksApp } from "./app";
+import { BookmarksI18nProvider } from "./i18n-provider";
 import { getBrainstorm } from "./storage/runtime";
 import { mountBookmarksWidget } from "./widget";
 import "./styles.css";
@@ -61,7 +62,9 @@ function bootstrapBookmarksApp(): void {
 
 	createRoot(root).render(
 		<AppErrorBoundary appName="bookmarks">
-			<BookmarksApp />
+			<BookmarksI18nProvider>
+				<BookmarksApp />
+			</BookmarksI18nProvider>
 		</AppErrorBoundary>,
 	);
 }

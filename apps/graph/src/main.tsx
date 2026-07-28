@@ -6,6 +6,7 @@ import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { GraphApp } from "./app";
+import { GraphI18nProvider } from "./i18n-provider";
 import "./styles.css";
 
 // Restore the sidebar width onto the body CSS var synchronously, before the
@@ -24,7 +25,9 @@ if (!root) throw new Error("graph: #root not found in index.html");
 createRoot(root).render(
 	<StrictMode>
 		<AppErrorBoundary appName="graph">
-			<GraphApp />
+			<GraphI18nProvider>
+				<GraphApp />
+			</GraphI18nProvider>
 		</AppErrorBoundary>
 	</StrictMode>,
 );

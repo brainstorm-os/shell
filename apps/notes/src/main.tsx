@@ -18,6 +18,7 @@ import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";
 import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { NotesApp } from "./app";
+import { NotesI18nProvider } from "./i18n-provider";
 import { getBrainstorm, openEntityInShell } from "./store/runtime";
 import { getYDocResolverApi } from "./store/ydoc-resolver";
 import { NotesWidget } from "./widget";
@@ -154,7 +155,9 @@ function mountFullApp(mountRoot: HTMLElement): void {
 
 	createRoot(mountRoot).render(
 		<AppErrorBoundary appName="notes">
-			{resolverApi ? <YDocProvider resolver={resolverApi.resolve}>{tree}</YDocProvider> : tree}
+			<NotesI18nProvider>
+				{resolverApi ? <YDocProvider resolver={resolverApi.resolve}>{tree}</YDocProvider> : tree}
+			</NotesI18nProvider>
 		</AppErrorBoundary>,
 	);
 }
@@ -166,7 +169,9 @@ if (widgetLaunch) {
 	mountMenuHost();
 	createRoot(root).render(
 		<AppErrorBoundary appName="notes">
-			<NotesWidget launch={widgetLaunch} />
+			<NotesI18nProvider>
+				<NotesWidget launch={widgetLaunch} />
+			</NotesI18nProvider>
 		</AppErrorBoundary>,
 	);
 } else {

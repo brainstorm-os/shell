@@ -40,6 +40,7 @@ import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-men
 import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
 import { TasksApp } from "./app";
+import { TasksI18nProvider } from "./i18n-provider";
 import { ASSIGNEE_CATALOG_DEF } from "./properties/task-properties";
 import { ensureTaskVocab } from "./properties/task-vocab";
 import { getBrainstorm } from "./storage/runtime";
@@ -167,7 +168,9 @@ function bootstrapTasksApp(): void {
 
 	createRoot(root).render(
 		<AppErrorBoundary appName="tasks">
-			<TasksApp entityTitleSource={entityTitleSource} />
+			<TasksI18nProvider>
+				<TasksApp entityTitleSource={entityTitleSource} />
+			</TasksI18nProvider>
 		</AppErrorBoundary>,
 	);
 }

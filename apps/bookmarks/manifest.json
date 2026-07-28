@@ -5,6 +5,7 @@
   "sdk": "1",
   "description": "Saved-link library + readable view. Scrapes each saved link's favicon (its icon) and OpenGraph share image (its cover), and captures the page's readable content for offline reading, through the shell network broker.",
   "icon": "icon.svg",
+  "i18n": { "source": "en", "locales": ["en", "es", "de", "fr", "it", "pt"] },
   "entry": "dist/index.html",
   "capabilities": [
     "storage.kv",

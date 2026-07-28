@@ -14,6 +14,7 @@ import {
 	closeAnchoredMenu,
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
+import { t } from "../i18n";
 
 export type MenuItem = {
 	label: string;
@@ -26,8 +27,6 @@ export type MenuItem = {
 	/** Tooltip explaining a `disabled` row. */
 	hint?: string;
 };
-
-const DATABASE_MENU_LABEL = "Database menu";
 
 export function closeContextMenu(): void {
 	closeAnchoredMenu();
@@ -50,7 +49,7 @@ export function openContextMenu(
 		...(it.hint ? { hint: it.hint } : {}),
 	}));
 	openAnchoredMenu(point, rows, {
-		menuLabel: DATABASE_MENU_LABEL,
+		menuLabel: t("brainstorm.database.menu.databaseMenu"),
 		...(anchor ? { anchor } : {}),
 	});
 }

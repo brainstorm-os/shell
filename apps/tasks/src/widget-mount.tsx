@@ -10,6 +10,7 @@ import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import type { WidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { createRoot } from "react-dom/client";
+import { TasksI18nProvider } from "./i18n-provider";
 import { TasksWidget } from "./widget";
 
 /** Clear the full-app chrome baked into index.html and mount the compact
@@ -23,7 +24,9 @@ export function mountTasksWidget(launch: WidgetLaunch): void {
 	mountMenuHost();
 	createRoot(root).render(
 		<AppErrorBoundary appName="tasks">
-			<TasksWidget launch={launch} />
+			<TasksI18nProvider>
+				<TasksWidget launch={launch} />
+			</TasksI18nProvider>
 		</AppErrorBoundary>,
 	);
 }
