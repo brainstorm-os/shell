@@ -21,12 +21,13 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { BadgeUpdate, DashboardIcon, PinResolution } from "../../preload";
+import type { DashboardIcon, PinResolution } from "../../preload";
 import { t } from "../i18n/t";
 import { EntityIcon } from "../ui/entity-icon";
 import { confirmAndUninstallApp } from "./app-actions";
 import { AppIcon } from "./app-icon";
 import { resolveAppIconSrc, setAppIcons } from "./app-icon-cache";
+import { IconBadge, badgeAriaLabel, useAppBadges } from "./icon-badge";
 import "./app-icon.css";
 import { Icon } from "../ui/icon";
 import {
@@ -102,9 +103,9 @@ function DashboardIconsLayerInner({
 	const dragRef = useRef<DragState | null>(null);
 	const [draggingId, setDraggingId] = useState<string | null>(null);
 	const [running, setRunning] = useState<Set<string>>(new Set());
-	// 7.14 — per-app icon badges, keyed by appId. Pushed from main via
-	// `apps.onBadgesChanged`; drives the corner chip on each app tile.
-	const [badges, setBadges] = useState<Map<string, BadgeUpdate>>(new Map());
+	// 7.14 — per-app icon badges, keyed by appId; drives the corner chip on
+	// each app tile. Shared subscription hook (also feeds the window strip).
+	const badges = useAppBadges();
 	// App-icon presence/version lives in a module-scope + localStorage cache
 	// (see `app-icon-cache`) so it survives the lock→unlock unmount and the
 	// first paint after unlock already resolves real icon `src`s. This tick
@@ -172,15 +173,6 @@ function DashboardIconsLayerInner({
 			cancelled = true;
 			off();
 		};
-	}, []);
-
-	// 7.14 — subscribe to per-app badge pushes. Push-only: main re-emits on
-	// every set/clear and resets on vault change, so the map tracks live state.
-	useEffect(() => {
-		const off = window.brainstorm.apps.onBadgesChanged((entries) => {
-			setBadges(new Map(entries.map((entry) => [entry.appId, entry])));
-		});
-		return off;
 	}, []);
 
 	// Refetch installed apps when the visible icon set changes — so newly
@@ -542,11 +534,7 @@ function DashboardIconsLayerInner({
 				// (the visual chip is aria-hidden). Unbadged icons leave this
 				// undefined and fall back to the visible label child.
 				const appBadge = icon.kind === "app" ? badges.get(icon.target) : undefined;
-				const badgeAriaLabel = appBadge
-					? "count" in appBadge
-						? t("shell.dashboard.badge.count", { app: icon.label, count: appBadge.count })
-						: t("shell.dashboard.badge.dot", { app: icon.label })
-					: undefined;
+				const tileBadgeAria = badgeAriaLabel(appBadge, icon.label);
 				return (
 					<button
 						key={id}
@@ -563,7 +551,7 @@ function DashboardIconsLayerInner({
 								"--icon-row": cell.row,
 							} as CSSProperties
 						}
-						aria-label={badgeAriaLabel}
+						aria-label={tileBadgeAria}
 						onPointerDown={(e) => onPointerDown(e, id, icon)}
 						onPointerMove={onPointerMove}
 						onPointerUp={onPointerUp}
@@ -638,26 +626,6 @@ function centerInCell(
  *  once the object is gone). */
 function resolveLabel(resolution: PinResolution | undefined, fallback: string): string {
 	return resolution?.label || fallback;
-}
-
-/**
- * 7.14 — the notification badge chip an app paints on its dashboard icon:
- * a numeric count (capped `99+`) or a plain dot ("attention, no number").
- * Purely **visual** (`aria-hidden`) — the accessible name lives on the
- * parent tile button's `aria-label` (folded in at the render site above),
- * so a screen-reader reads "Mailbox, 3 notifications" as one name on
- * demand rather than a stray `role="status"` live region per icon.
- */
-function IconBadge({ badge }: { badge: BadgeUpdate | undefined }): ReactElement | null {
-	if (!badge) return null;
-	if ("dot" in badge) {
-		return <span className="dashboard-icons__badge dashboard-icons__badge--dot" aria-hidden="true" />;
-	}
-	return (
-		<span className="dashboard-icons__badge" aria-hidden="true">
-			{badge.count > 99 ? "99+" : String(badge.count)}
-		</span>
-	);
 }
 
 /** Glyph hue for shell surfaces (Bin today). Shell chrome isn't a branded

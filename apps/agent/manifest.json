@@ -44,7 +44,8 @@
     "entities.write:brainstorm/Object/v1",
     "entities.write:brainstorm/List/v1",
     "intents.dispatch:propose-database",
-    "entities.write:brainstorm/ListView/v1"
+    "entities.write:brainstorm/ListView/v1",
+    "ui.badge"
   ],
   "registrations": {
     "entityTypes": [

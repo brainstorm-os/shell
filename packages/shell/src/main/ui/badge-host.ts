@@ -5,10 +5,10 @@
  * unread, Mailbox inbox, Agent "response ready", Automations failed runs)
  * — an iOS-style corner chip visible without opening the app. Either a
  * numeric count or a plain dot. The shell owns rendering (the dashboard
- * icon-corner chip). Mirroring the vault-wide total onto the OS dock /
- * taskbar badge is a deferred follow-up — the OS badge is already owned by
- * the notification-unread mirror (`dashboard-handlers.updateNotificationBadge`),
- * so a single-owner reconciliation is needed before app badges join it.
+ * icon-corner chip + the running-windows strip). The vault-wide countable
+ * total also feeds the OS dock/taskbar badge through the single-owner
+ * `OsBadgeAggregator` (`ui/os-badge.ts`), composed with the notification
+ * unread count — never a second `app.setBadgeCount` caller.
  *
  * `BadgeHost` is **pure** (no Electron imports) so validation + the
  * per-app compose is unit-tested without a window: it stores one badge per

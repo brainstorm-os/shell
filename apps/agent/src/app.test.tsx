@@ -5,6 +5,7 @@
  * conversation, live once one exists.
  */
 
+import { ToolRefusalReason } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentApp, unavailableMessage } from "./app";
 import { flush, renderInto } from "./test/render";
@@ -380,5 +381,82 @@ describe("AgentApp created-object back-links (Agent-11c)", () => {
 			.find((e) => e.verb === "open");
 		expect(openCall).toBeTruthy();
 		expect(openCall?.payload.entityId).toBe("note_1");
+	});
+});
+
+describe("AgentApp — app-icon attention badge (7.14)", () => {
+	const badgeSet = vi.fn(() => Promise.resolve());
+
+	/** A conversation whose STORED grants exclude `intents.dispatch:open`
+	 *  while the app holds it — with a capability-refused tool step, that's
+	 *  exactly the state that raises the inline escalation prompt (one
+	 *  pending attention item). */
+	function installShellForBadge(withRefusal: boolean): void {
+		badgeSet.mockClear();
+		const entities = [
+			{
+				id: "conv_1",
+				type: "brainstorm/Conversation/v1",
+				properties: { title: "Renewals", toolGrants: ["storage.kv"] },
+				createdAt: 1,
+				updatedAt: 1,
+				deletedAt: null,
+				ownerAppId: "io.brainstorm.agent",
+			},
+			...(withRefusal
+				? [
+						{
+							id: "msg_1",
+							type: "brainstorm/Message/v1",
+							properties: {
+								conversation: "conv_1",
+								role: "assistant",
+								body: "I can't open that without permission.",
+								createdAt: "2026-06-20T00:00:00.000Z",
+								seq: 0,
+								toolCalls: [
+									{
+										kind: "tool-refused",
+										reason: ToolRefusalReason.CapabilityDenied,
+										tool: "open",
+									},
+								],
+							},
+							createdAt: 1,
+							updatedAt: 1,
+							deletedAt: null,
+							ownerAppId: "io.brainstorm.agent",
+						},
+					]
+				: []),
+		];
+		window.brainstorm = {
+			capabilities: ["intents.dispatch:open", "storage.kv"],
+			services: {
+				vaultEntities: {
+					list: async () => ({ entities, links: [] }),
+					onChange: () => ({ unsubscribe: () => undefined }),
+				},
+				ui: { badge: { set: badgeSet, clear: vi.fn(() => Promise.resolve()) } },
+			},
+		} as unknown as typeof window.brainstorm;
+	}
+
+	it("reports count 0 when nothing needs attention (the badge stays clear)", async () => {
+		installShellForBadge(false);
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+	});
+
+	it("badges the open escalation prompt as a pending attention item", async () => {
+		installShellForBadge(true);
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		await flush();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		// The prompt is actually on screen — the badge mirrors visible state.
+		expect(handle.container.querySelector('[data-testid="agent-escalation"]')).not.toBeNull();
 	});
 });

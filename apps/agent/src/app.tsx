@@ -796,6 +796,19 @@ export function AgentApp(): ReactElement {
 		return null;
 	}, [all, activeId, appCaps, conversationGrants, dismissedEscalations]);
 
+	// 7.14 — mirror the pending-attention count onto the dashboard app-icon
+	// badge (cap `ui.badge`; the Mailbox pattern): staged proposals awaiting
+	// approve/discard plus the open escalation prompt. These are actionable
+	// items, so the "seen" semantic is acting on them — approving, discarding,
+	// or dismissing drains the count to 0, which clears the chip. Keyed on the
+	// derived count; fire-and-forget and a no-op on shells without the service.
+	const attentionCount = proposalState.pending.length + (pendingEscalationCap ? 1 : 0);
+	useEffect(() => {
+		const badge = rt?.services?.ui?.badge;
+		if (!badge) return;
+		void badge.set({ count: attentionCount }).catch(() => undefined);
+	}, [attentionCount, rt]);
+
 	// Persist a narrowed grant set / pinned provider / token budget on the active
 	// conversation (Agent-5). Each is a fail-soft `update` — a write hiccup
 	// surfaces in the console, never throws into the UI. No-op without an active

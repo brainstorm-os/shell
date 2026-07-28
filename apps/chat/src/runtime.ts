@@ -12,6 +12,7 @@ import type {
 	RosterService,
 	SharingService,
 	StorageService,
+	UiService,
 	VaultEntitiesService,
 } from "@brainstorm-os/sdk-types";
 
@@ -27,6 +28,10 @@ export type ChatAppRuntime = {
 		/** Routes the widget's row-click / CTA `open` back to a channel (cap
 		 *  `intents.dispatch:open`). */
 		intents?: IntentsService;
+		/** 7.14 — mirror the unread count onto the dashboard app icon (cap
+		 *  `ui.badge`). Only `badge` is used; typed as the full service so the
+		 *  proxy shape stays honest. */
+		ui?: UiService;
 	} | null;
 };
 

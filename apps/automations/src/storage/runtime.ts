@@ -12,6 +12,8 @@
 import type {
 	AutomationsService,
 	IntentsService,
+	StorageService,
+	UiService,
 	VaultEntitiesService,
 } from "@brainstorm-os/sdk-types";
 
@@ -83,6 +85,13 @@ export type AutomationsBrainstorm = {
 		/** Intent dispatch — the recent-runs widget's row-click → `intent.open`
 		 *  (cap `intents.dispatch:open`). */
 		intents?: IntentsService;
+		/** 7.14 — the app-private kv store persisting the acknowledged
+		 *  failed-run ids behind the app-icon badge (cap `storage.kv`). */
+		storage?: StorageService;
+		/** 7.14 — mirror the unseen failed-run count onto the dashboard app
+		 *  icon (cap `ui.badge`). Only `badge` is used; typed as the full
+		 *  service so the proxy shape stays honest. */
+		ui?: UiService;
 	} | null;
 	on?(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
 };

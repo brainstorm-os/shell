@@ -19,6 +19,7 @@ import type {
 	SearchService,
 	StorageService,
 	Subscription,
+	UiService,
 	VaultEntitiesService,
 } from "@brainstorm-os/sdk-types";
 
@@ -47,6 +48,11 @@ export type AgentRuntime = {
 		/** Agent-7 — the per-vault, app-private kv store holding the opt-in
 		 *  long-term-memory flag (`agent:memory-enabled`, OFF by default). */
 		storage?: StorageService;
+		/** 7.14 — mirror the pending-attention count (staged proposals + the
+		 *  open escalation prompt) onto the dashboard app icon (cap `ui.badge`).
+		 *  Only `badge` is used; typed as the full service so the proxy shape
+		 *  stays honest. */
+		ui?: UiService;
 	} | null;
 };
 

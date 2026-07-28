@@ -26,6 +26,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { AppIcon } from "./app-icon";
+import { IconBadge, badgeAriaLabel, useAppBadges } from "./icon-badge";
 
 export type WindowStripProps = {
 	entries: readonly WindowEntry[];
@@ -39,6 +40,10 @@ export type WindowStripProps = {
 
 function WindowStripInner(props: WindowStripProps) {
 	const { entries, monitors, onFocus, onClose, onMinimize, onTile, onMoveToMonitor } = props;
+
+	// 7.14 — the same per-app badge model the icon grid paints, on the running
+	// tiles (shared chip + subscription; keyed by the tile's appId).
+	const badges = useAppBadges();
 
 	// Right-click → the shared fancy-menu (same chrome / escape-stack / glass
 	// as every other context menu) anchored at the cursor. Built fresh per
@@ -185,39 +190,50 @@ function WindowStripInner(props: WindowStripProps) {
 				className="window-strip"
 				aria-label={t("shell.windowStrip.label")}
 			>
-				{ordered.map((entry, index) => (
-					<button
-						key={entry.id}
-						type="button"
-						{...getItemProps(index)}
-						className={
-							entry.focused ? "window-strip__tile window-strip__tile--focused" : "window-strip__tile"
-						}
-						data-state={entry.state}
-						onClick={() => {
-							setCursor(index);
-							onFocus(entry.id);
-						}}
-						onContextMenu={(e) => {
-							e.preventDefault();
-							openWindowMenu(entry, { x: e.clientX, y: e.clientY });
-						}}
-						title={entry.title ? `${entry.appName} — ${entry.title}` : entry.appName}
-						aria-label={t("shell.windowStrip.tile.aria", {
-							app: entry.appName,
-							title: entry.title || entry.appName,
-						})}
-					>
-						<AppIcon
-							name={entry.appName}
-							seed={entry.appId}
-							src={`brainstorm://app-icon/${encodeURIComponent(entry.appId)}`}
-							size={18}
-							glyph
-						/>
-						<span className="window-strip__label">{entry.appName}</span>
-					</button>
-				))}
+				{ordered.map((entry, index) => {
+					// 7.14 — mirror the icon grid's labelling: when badged, the tile's
+					// accessible name becomes "App: N notifications" (the chip itself
+					// is aria-hidden); unbadged tiles keep the app+title name.
+					const badge = badges.get(entry.appId);
+					const tileBadgeAria = badgeAriaLabel(badge, entry.appName);
+					return (
+						<button
+							key={entry.id}
+							type="button"
+							{...getItemProps(index)}
+							className={
+								entry.focused ? "window-strip__tile window-strip__tile--focused" : "window-strip__tile"
+							}
+							data-state={entry.state}
+							onClick={() => {
+								setCursor(index);
+								onFocus(entry.id);
+							}}
+							onContextMenu={(e) => {
+								e.preventDefault();
+								openWindowMenu(entry, { x: e.clientX, y: e.clientY });
+							}}
+							title={entry.title ? `${entry.appName} — ${entry.title}` : entry.appName}
+							aria-label={
+								tileBadgeAria ??
+								t("shell.windowStrip.tile.aria", {
+									app: entry.appName,
+									title: entry.title || entry.appName,
+								})
+							}
+						>
+							<AppIcon
+								name={entry.appName}
+								seed={entry.appId}
+								src={`brainstorm://app-icon/${encodeURIComponent(entry.appId)}`}
+								size={18}
+								glyph
+							/>
+							<span className="window-strip__label">{entry.appName}</span>
+							<IconBadge badge={badge} />
+						</button>
+					);
+				})}
 			</div>
 			{overflow.right && (
 				<button
