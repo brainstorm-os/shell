@@ -212,6 +212,17 @@ export type AutomationsHostPorts = {
 	reminderRunner: ReminderRunner;
 	/** Connector-4 — the sync engine a `SyncMapping` fire routes to. */
 	connectorSync?: ConnectorSyncPort;
+	/** Connector-6 — re-check, against the LIVE ledger, that a webhook-driven
+	 *  sync is still permitted (the endpoint's connector app still holds
+	 *  `network.ingress`) immediately BEFORE each dispatch. Mirrors
+	 *  `appCapabilities`' per-fire thunk: a Settings revoke takes effect on the
+	 *  next inbound hit, not on the next entity-write re-derive — otherwise a
+	 *  revoked app's endpoint keeps pulling from the provider and writing
+	 *  entities for as long as nothing else happens to re-hydrate. Absent ⇒ the
+	 *  registered route set is the only gate (tests / partial wirings). Applies
+	 *  ONLY to the webhook path; Connector-4's SCHEDULED mapping fires are
+	 *  unaffected (they are not an ingress surface). */
+	connectorWebhookAllowed?(mappingId: string): Promise<boolean>;
 	/** 9.14.9b — posts a due item alert through the shared ui notify host.
 	 *  Absent keeps item alerts registered but silent (tests / partial
 	 *  wirings), mirroring `connectorSync`'s optionality. */
@@ -550,7 +561,9 @@ export class AutomationsHost {
 
 	/** Coalesced `connectors.sync` dispatch: at most one in-flight sync per
 	 *  mapping, with one trailing run if hits arrived meanwhile. A failure
-	 *  drops the queued flag (the next hit re-arms) — never a retry storm. */
+	 *  drops the queued flag (the next hit re-arms) — never a retry storm.
+	 *  Every iteration re-checks the live grant first, so a mid-storm revoke
+	 *  stops the loop instead of riding it out. */
 	private dispatchConnectorWebhookSync(mappingId: string): void {
 		const inFlight = this.connectorSyncStates.get(mappingId);
 		if (inFlight) {
@@ -563,6 +576,7 @@ export class AutomationsHost {
 			try {
 				do {
 					state.queued = false;
+					if (!(await this.connectorWebhookStillAllowed(mappingId))) break;
 					await this.ports.connectorSync?.runSync(mappingId);
 				} while (state.queued);
 			} catch (e) {
@@ -571,6 +585,17 @@ export class AutomationsHost {
 				this.connectorSyncStates.delete(mappingId);
 			}
 		})();
+	}
+
+	/** Fail-closed live re-check of a connector endpoint's `network.ingress`
+	 *  grant. A throwing check denies — never approves. */
+	private async connectorWebhookStillAllowed(mappingId: string): Promise<boolean> {
+		if (!this.ports.connectorWebhookAllowed) return true;
+		try {
+			return await this.ports.connectorWebhookAllowed(mappingId);
+		} catch {
+			return false;
+		}
 	}
 
 	/** A watched file changed — fire its bound workflow under the workflow's own

@@ -42,7 +42,16 @@ export function normalizeEgressOrigin(raw: unknown): string | null {
 	return url.origin;
 }
 
-export function registerLedgerHandlers(): void {
+export type LedgerHandlerDeps = {
+	/** Connector-6 — a grant revoke must take effect on the LIVE ingress route
+	 *  table, not on the next automation-entity write. Without this hook a
+	 *  revoked `network.ingress` left every already-minted webhook URL
+	 *  answering `202` (and, before the host's per-hit re-check, still pulling
+	 *  from the provider) until something unrelated re-derived the schedule. */
+	onGrantsChanged?: () => void;
+};
+
+export function registerLedgerHandlers(deps: LedgerHandlerDeps = {}): void {
 	ipcMain.handle(
 		"ledger:list-grants-by-app",
 		async (): Promise<Record<string, SerializedGrant[]>> => {
@@ -68,7 +77,9 @@ export function registerLedgerHandlers(): void {
 			const session = getActiveVaultSession();
 			if (!session) return false;
 			const ledger = await session.capabilityLedger();
-			return ledger.revoke(appId, capability, scope);
+			const revoked = ledger.revoke(appId, capability, scope);
+			if (revoked) deps.onGrantsChanged?.();
+			return revoked;
 		},
 	);
 

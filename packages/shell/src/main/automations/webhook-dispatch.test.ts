@@ -165,11 +165,13 @@ describe("AutomationsHost connector webhook dispatch (Connector-6)", () => {
 
 	it("coalesces a hit storm: one in-flight sync + one trailing run", async () => {
 		const ingress = fakeIngress();
-		let release: (() => void) | null = null;
+		// A holder, not a `let` — TS narrows a `let` assigned only inside a
+		// callback to `null` and the later call fails to typecheck.
+		const gate: { release: (() => void) | null } = { release: null };
 		const runSync = vi.fn(
 			() =>
 				new Promise((resolve) => {
-					release = () => resolve({});
+					gate.release = () => resolve({});
 				}),
 		);
 		const host = makeHost(
@@ -187,10 +189,10 @@ describe("AutomationsHost connector webhook dispatch (Connector-6)", () => {
 		ingress.push(connectorHit());
 		ingress.push(connectorHit());
 		expect(runSync).toHaveBeenCalledTimes(1);
-		release?.();
+		gate.release?.();
 		// Exactly ONE trailing run for the whole storm.
 		await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(2));
-		release?.();
+		gate.release?.();
 		await new Promise((r) => setTimeout(r, 0));
 		expect(runSync).toHaveBeenCalledTimes(2);
 		host.stop();
