@@ -1047,12 +1047,24 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			? await dialog.showSaveDialog(win, saveOptions)
 			: await dialog.showSaveDialog(saveOptions);
 		if (result.canceled || !result.filePath) return null;
-		const bytes = await exportVaultBundle(session, {
-			scope: { kind: BundleExportScopeKind.WholeVault },
-			now: Date.now(),
-		});
-		await writeFile(result.filePath, bytes);
-		return { path: result.filePath };
+		// The export is a background run like the imports (IE-11 residue): it
+		// shares the single activeRun slot so `import-export:cancel` stops it,
+		// streams progress on the same channel, and an abort writes nothing.
+		const controller = new AbortController();
+		activeRun = controller;
+		try {
+			const bytes = await exportVaultBundle(session, {
+				scope: { kind: BundleExportScopeKind.WholeVault },
+				now: Date.now(),
+				signal: controller.signal,
+				onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+			});
+			if (bytes === null) return null;
+			await writeFile(result.filePath, bytes);
+			return { path: result.filePath };
+		} finally {
+			if (activeRun === controller) activeRun = null;
+		}
 	});
 }
 

@@ -49,6 +49,12 @@ async function makeBody(
 	doc.destroy();
 }
 
+/** Un-aborted exports always produce bytes — narrow the IE-11 nullable. */
+function requireBundle(bundle: Uint8Array | null): Uint8Array {
+	if (bundle === null) throw new Error("export unexpectedly aborted");
+	return bundle;
+}
+
 describe("IE-1 .bsbundle round-trip", () => {
 	let workDir = "";
 
@@ -120,10 +126,12 @@ describe("IE-1 .bsbundle round-trip", () => {
 		await makeBody(sessionA.ydocStore, "ent-1", "Hello rich text body.");
 		await makeBody(sessionA.ydocStore, "ent-2", "Another body with content.");
 
-		const bundleA = await exportVaultBundle(sessionA, {
-			scope: { kind: BundleExportScopeKind.WholeVault },
-			now: FIXED_NOW,
-		});
+		const bundleA = requireBundle(
+			await exportVaultBundle(sessionA, {
+				scope: { kind: BundleExportScopeKind.WholeVault },
+				now: FIXED_NOW,
+			}),
+		);
 		closeActiveVaultSession();
 
 		// --- vault B: import A, re-export ---
@@ -146,10 +154,12 @@ describe("IE-1 .bsbundle round-trip", () => {
 		expect(report.assetsWritten).toBe(1);
 		expect(report.failed).toEqual([]);
 
-		const bundleB = await exportVaultBundle(sessionB, {
-			scope: { kind: BundleExportScopeKind.WholeVault },
-			now: FIXED_NOW,
-		});
+		const bundleB = requireBundle(
+			await exportVaultBundle(sessionB, {
+				scope: { kind: BundleExportScopeKind.WholeVault },
+				now: FIXED_NOW,
+			}),
+		);
 		closeActiveVaultSession();
 
 		// --- compare A and B (byte-equivalent modulo volatile manifest fields) ---
@@ -209,10 +219,12 @@ describe("IE-1 .bsbundle round-trip", () => {
 			dekId: null,
 		});
 
-		const bundle = await exportVaultBundle(session, {
-			scope: { kind: BundleExportScopeKind.Types, types: ["x/Note/v1"] },
-			now: FIXED_NOW,
-		});
+		const bundle = requireBundle(
+			await exportVaultBundle(session, {
+				scope: { kind: BundleExportScopeKind.Types, types: ["x/Note/v1"] },
+				now: FIXED_NOW,
+			}),
+		);
 		closeActiveVaultSession();
 
 		const files = unpackBundle(bundle);
@@ -221,6 +233,54 @@ describe("IE-1 .bsbundle round-trip", () => {
 		const manifest = JSON.parse(new TextDecoder().decode(files.get("manifest.json")));
 		expect(manifest.counts.entities).toBe(2);
 		expect(manifest.scope.kind).toBe(BundleExportScopeKind.Types);
+	});
+
+	it("export reports progress and an aborted export returns null without output (IE-11)", async () => {
+		const path = join(workDir, "vault-bg");
+		await createVault({
+			name: "B",
+			path,
+			keystore: { forceInsecure: true },
+			seedStarterContent: false,
+		});
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no active session");
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		for (let i = 0; i < 3; i++) {
+			repo.create({
+				id: `p${i}`,
+				type: "x/Note/v1",
+				properties: {},
+				createdBy: AUTHOR,
+				now: FIXED_NOW,
+				dekId: null,
+			});
+		}
+
+		const seen: Array<{ done: number; total: number }> = [];
+		const bundle = await exportVaultBundle(session, {
+			scope: { kind: BundleExportScopeKind.WholeVault },
+			now: FIXED_NOW,
+			onProgress: (done, total) => seen.push({ done, total }),
+		});
+		expect(bundle).not.toBeNull();
+		expect(seen.length).toBeGreaterThan(0);
+		expect(seen.at(-1)?.done).toBe(seen.at(-1)?.total);
+		// Monotonic non-decreasing progress against a stable total.
+		for (let i = 1; i < seen.length; i++) {
+			expect(seen[i]?.done).toBeGreaterThanOrEqual(seen[i - 1]?.done ?? 0);
+			expect(seen[i]?.total).toBe(seen[0]?.total);
+		}
+
+		const controller = new AbortController();
+		controller.abort();
+		const aborted = await exportVaultBundle(session, {
+			scope: { kind: BundleExportScopeKind.WholeVault },
+			now: FIXED_NOW,
+			signal: controller.signal,
+		});
+		expect(aborted).toBeNull();
+		closeActiveVaultSession();
 	});
 
 	it("a Subtree-scoped export carries the root plus link-reachable entities only", async () => {
@@ -259,10 +319,12 @@ describe("IE-1 .bsbundle round-trip", () => {
 			createdAt: FIXED_NOW,
 		});
 
-		const bundle = await exportVaultBundle(session, {
-			scope: { kind: BundleExportScopeKind.Subtree, rootId: "root" },
-			now: FIXED_NOW,
-		});
+		const bundle = requireBundle(
+			await exportVaultBundle(session, {
+				scope: { kind: BundleExportScopeKind.Subtree, rootId: "root" },
+				now: FIXED_NOW,
+			}),
+		);
 		closeActiveVaultSession();
 
 		const files = unpackBundle(bundle);
@@ -321,10 +383,12 @@ describe("IE-1 .bsbundle round-trip", () => {
 			updatedAt: FIXED_NOW,
 			dekId: null,
 		});
-		const clean = await exportVaultBundle(src, {
-			scope: { kind: BundleExportScopeKind.WholeVault },
-			now: FIXED_NOW,
-		});
+		const clean = requireBundle(
+			await exportVaultBundle(src, {
+				scope: { kind: BundleExportScopeKind.WholeVault },
+				now: FIXED_NOW,
+			}),
+		);
 		closeActiveVaultSession();
 
 		const dec = new TextDecoder();
