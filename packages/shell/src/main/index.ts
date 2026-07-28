@@ -1828,8 +1828,13 @@ void app.whenReady().then(async () => {
 	// and rebuilds the port (`WebSocketRelayPort` when a `syncRelay` is
 	// configured, loopback otherwise).
 	{
-		const { ActiveRelayOrchestrator, installActiveRelay } = await import("./sync/active-relay");
+		const { ActiveRelayOrchestrator, installActiveRelay, isLanRelayUrl } = await import(
+			"./sync/active-relay"
+		);
 		const { WebSocketRelayPort } = await import("./sync/websocket-relay-port");
+		const { createLanSessionAccess, makeLanClientHandshakeForSession } = await import(
+			"./sync/lan-sync-wiring"
+		);
 		const { makeChallengeResponder } = await import("./sync/challenge-responder");
 		const { bytesToBase64Url } = await import("./pairing/pairing-channel");
 		// SYNC-4b — the gated-admission challenge responder. Reads the LIVE vault
@@ -1856,10 +1861,52 @@ void app.whenReady().then(async () => {
 				}
 			},
 		});
+		// LAN-2b — the devices roster the LAN handshake authenticates against.
+		// Resolved asynchronously (`propertiesStore()` is lazy), so it is primed on
+		// session change and simply absent until then; absent ⇒ the handshake
+		// declines, which is the correct fail-closed read of "we do not yet know
+		// who is rostered".
+		let lanDevices: {
+			listActive(): readonly { deviceEd25519Pub: string; deviceX25519Pub?: string }[];
+		} | null = null;
+		const primeLanDevices = (): void => {
+			const session = getActiveVaultSession();
+			if (!session) {
+				lanDevices = null;
+				return;
+			}
+			void import("./vault/vault-properties-store")
+				.then(({ VaultPropertiesStore }) => VaultPropertiesStore.open(session.ydocStore))
+				.then((props) => {
+					// Guard against a vault switch completing mid-resolve.
+					if (getActiveVaultSession() === session) lanDevices = props.devices();
+				})
+				.catch(() => {
+					lanDevices = null;
+				});
+		};
+		const lanAccess = createLanSessionAccess({
+			getSession: () => getActiveVaultSession(),
+			getDevices: () => lanDevices,
+		});
+		// Re-prime on every vault change, and once now for a session that opened
+		// before this block ran.
+		onActiveVaultSessionChanged(() => primeLanDevices());
+		primeLanDevices();
 		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
 				makeRelayPort: (url) => {
-					const port = new WebSocketRelayPort({ url, onChallenge });
+					// A LAN peer authenticates with the channel-bound device handshake;
+					// a cloud relay uses the SYNC-4b entitlement challenge. The two are
+					// different trust models, so the transport picks by address rather
+					// than trying to satisfy both.
+					const port = isLanRelayUrl(url)
+						? new WebSocketRelayPort({
+								url,
+								requireAdmission: true,
+								lanHandshake: makeLanClientHandshakeForSession(lanAccess),
+							})
+						: new WebSocketRelayPort({ url, onChallenge });
 					port.connect();
 					return port;
 				},
