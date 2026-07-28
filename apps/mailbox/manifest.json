@@ -18,6 +18,7 @@
     "entities.write:brainstorm/MailAccount/v1",
     "entities.write:brainstorm/Connector/v1",
     "entities.write:brainstorm/ConnectorAccount/v1",
+    "entities.write:brainstorm/File/v1",
     "entities.read:*",
     "ui.badge"
   ],
