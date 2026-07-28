@@ -100,6 +100,7 @@ import {
 	EntityDeksRepository,
 } from "../storage/entities-repo";
 import { YDocStore } from "../storage/ydoc-store";
+import { openLanChallenge } from "../sync/lan-admission";
 import { appLockCooldownMs, isAppLockCapped } from "./app-lock-policy";
 import { readAppLockSettings, writeAppLockSettings } from "./app-lock-settings";
 import {
@@ -785,6 +786,36 @@ export class VaultSession {
 	signWithDeviceKey(payload: Uint8Array): Uint8Array {
 		this.assertOpen();
 		return signWithDeviceKey(this.deviceEd25519Secret, payload);
+	}
+
+	/**
+	 * Open a LAN admission challenge sealed to this device's HPKE recipient key
+	 * (LAN-2b(a)) and return the recovered nonce, or `null` when the envelope is
+	 * not for us / is malformed.
+	 *
+	 * The X25519 **secret stays inside the session** — deliberately, and unlike
+	 * the Ed25519 device secret which `exposeIdentityForPairing` hands out. Note
+	 * that method already withholds this one: it exposes `deviceX25519Public`
+	 * only. A leaked signing key lets an attacker sign; a leaked HPKE recipient
+	 * key lets them *decrypt every challenge ever sealed to this device*, so the
+	 * seam is a verb ("open this envelope") rather than an accessor.
+	 *
+	 * `open` is injectable purely so tests can drive a deterministic HPKE.
+	 */
+	openLanSealedChallenge(args: {
+		sealed: Parameters<typeof openLanChallenge>[0]["sealed"];
+		hostAccount: string;
+		clientAccount: string;
+		open?: Parameters<typeof openLanChallenge>[0]["open"];
+	}): Uint8Array | null {
+		this.assertOpen();
+		return openLanChallenge({
+			sealed: args.sealed,
+			deviceX25519Secret: this.deviceX25519Secret,
+			hostAccount: args.hostAccount,
+			clientAccount: args.clientAccount,
+			...(args.open ? { open: args.open } : {}),
+		});
 	}
 
 	/** Expose the sovereign + per-device keypairs to the `PairingService`

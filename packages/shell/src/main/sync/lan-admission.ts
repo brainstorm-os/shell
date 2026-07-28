@@ -476,7 +476,19 @@ export type LanClientHandshake = {
 
 export function makeLanClientHandshake(deps: {
 	deviceAccount: () => string | null;
-	deviceX25519Secret: () => Uint8Array | null;
+	/**
+	 * Open a challenge sealed to this device and return the nonce, or null.
+	 *
+	 * A VERB, not an accessor for the X25519 secret — the secret stays inside
+	 * `VaultSession.openLanSealedChallenge`. A leaked Ed25519 signing key lets an
+	 * attacker sign; a leaked HPKE recipient key lets them decrypt every
+	 * challenge ever sealed to this device, so it is never handed out.
+	 */
+	openSealed: (args: {
+		sealed: SealedChallenge;
+		hostAccount: string;
+		clientAccount: string;
+	}) => Uint8Array | null;
 	signWithDeviceKey: (message: Uint8Array) => Uint8Array | null;
 	activeDevices: () => ReadonlyMap<string, LanRosterEntry>;
 	verify?: (publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) => boolean;
@@ -493,17 +505,11 @@ export function makeLanClientHandshake(deps: {
 			peerHost = null;
 			try {
 				const self = deps.deviceAccount();
-				const secret = deps.deviceX25519Secret();
-				if (!self || !secret) return null;
+				if (!self) return null;
 				// The host must itself be a rostered device — a peer we have never
 				// paired with cannot be a host, whatever it claims.
 				if (!deps.activeDevices().has(hostAccount)) return null;
-				const nonce = openLanChallenge({
-					sealed,
-					deviceX25519Secret: secret,
-					hostAccount,
-					clientAccount: self,
-				});
+				const nonce = deps.openSealed({ sealed, hostAccount, clientAccount: self });
 				if (!nonce) return null;
 				const sig = deps.signWithDeviceKey(
 					lanProofBytes(LanProofDirection.Client, hostAccount, self, nonce),

@@ -14,7 +14,12 @@ import { describe, expect, it } from "vitest";
 import { generateDeviceX25519 } from "../credentials/device-x25519";
 import { bytesToBase64Url } from "../pairing/pairing-channel";
 import { ed25519 } from "../test-support/crypto-test-helpers";
-import { type LanRosterEntry, makeLanClientHandshake, makeLanHostHandshake } from "./lan-admission";
+import {
+	type LanRosterEntry,
+	makeLanClientHandshake,
+	makeLanHostHandshake,
+	openLanChallenge,
+} from "./lan-admission";
 import { LanRelayHost } from "./lan-relay-host";
 import {
 	DEFAULT_LAN_MAX_SOCKETS,
@@ -231,7 +236,7 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 			requireAdmission: true,
 			lanHandshake: makeLanClientHandshake({
 				deviceAccount: () => client.account,
-				deviceX25519Secret: () => client.x25519Secret,
+				openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: client.x25519Secret }),
 				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, client.edSecret)),
 				activeDevices: () => dir,
 				verify: testVerify,
@@ -270,7 +275,7 @@ describe("LanRelayListener — the first inbound socket (LAN-4b)", () => {
 			requireAdmission: true,
 			lanHandshake: makeLanClientHandshake({
 				deviceAccount: () => stranger.account,
-				deviceX25519Secret: () => stranger.x25519Secret,
+				openSealed: (a) => openLanChallenge({ ...a, deviceX25519Secret: stranger.x25519Secret }),
 				signWithDeviceKey: (m) => new Uint8Array(ed25519.sign(m, stranger.edSecret)),
 				activeDevices: () => directoryOf(hostDev, stranger),
 				verify: testVerify,
