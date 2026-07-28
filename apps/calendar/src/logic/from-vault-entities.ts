@@ -143,7 +143,9 @@ export function entityToScheduledItems(
 			location: null,
 			recurrence: override?.yearlyRecurrence ? yearlyRecurrenceForDate(value) : null,
 			colorHint,
-			...(override?.readonly ? { readonly: true } : {}),
+			// Source-level readonly (birthdays) OR the per-object read-only lock —
+			// a locked entity's dates must not be rewritten from the calendar.
+			...(override?.readonly || props.locked === true ? { readonly: true } : {}),
 			done,
 		});
 	}
@@ -239,6 +241,8 @@ export function eventToScheduledItem(event: Event): ScheduledItem {
 		statusKey: event.statusKey,
 		attendeeCount: event.attendees.length,
 		timeZone: event.timeZone,
+		// The per-object read-only lock: no drag affordance, no reschedule.
+		...(event.locked ? { readonly: true } : {}),
 	};
 }
 

@@ -97,6 +97,23 @@ describe("renderBoardView", () => {
 		done.dispatchEvent(drop);
 		expect(onMoveToStatus).toHaveBeenCalledWith("t1", TaskStatus.Done);
 	});
+
+	it("a locked card gets no drag affordance (the read-only lock gates the status drag)", () => {
+		const board = renderBoardView({
+			columns: [
+				{
+					key: TaskStatus.Todo,
+					tasks: [{ ...task("lk", TaskStatus.Todo), locked: true }, task("t1", TaskStatus.Todo)],
+				},
+			],
+			labelFor: (key) => key,
+			renderCard: () => document.createElement("div"),
+			onMoveToStatus: vi.fn(),
+		});
+		const cards = board.querySelectorAll<HTMLElement>(".tasks-board__card");
+		expect(cards[0]?.draggable).toBe(false);
+		expect(cards[1]?.draggable).toBe(true);
+	});
 });
 
 describe("renderBoardView inline add (F-207)", () => {

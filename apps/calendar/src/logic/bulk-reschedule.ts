@@ -20,27 +20,36 @@ function shiftEvent(event: Event, deltaMs: number, now: number): Event {
 	};
 }
 
-/** Move the whole batch so its earliest event's *day* becomes
+/** The per-object read-only lock gates every write path: locked events are
+ *  dropped from a bulk shift (never rescheduled, never anchor the batch). */
+function movable(events: readonly Event[]): Event[] {
+	return events.filter((e) => e.locked !== true);
+}
+
+/** Move the whole batch so its earliest movable event's *day* becomes
  *  `targetDayStart`. The shift is a whole-day delta, so every event keeps
- *  its time-of-day and the batch keeps its internal spacing. */
+ *  its time-of-day and the batch keeps its internal spacing. Locked events
+ *  are excluded from the result (they stay put). */
 export function bulkShiftToDate(
 	events: readonly Event[],
 	targetDayStart: number,
 	now: number = Date.now(),
 ): Event[] {
-	if (events.length === 0) return [];
-	const earliest = Math.min(...events.map((e) => e.start));
+	const batch = movable(events);
+	if (batch.length === 0) return [];
+	const earliest = Math.min(...batch.map((e) => e.start));
 	const deltaMs = startOfDay(targetDayStart) - startOfDay(earliest);
-	if (deltaMs === 0) return events.map((e) => ({ ...e }));
-	return events.map((e) => shiftEvent(e, deltaMs, now));
+	if (deltaMs === 0) return batch.map((e) => ({ ...e }));
+	return batch.map((e) => shiftEvent(e, deltaMs, now));
 }
 
-/** Nudge every event by `days` (may be negative). */
+/** Nudge every movable event by `days` (may be negative). */
 export function bulkShiftByDays(
 	events: readonly Event[],
 	days: number,
 	now: number = Date.now(),
 ): Event[] {
-	if (days === 0) return events.map((e) => ({ ...e }));
-	return events.map((e) => shiftEvent(e, days * DAY_MS, now));
+	const batch = movable(events);
+	if (days === 0) return batch.map((e) => ({ ...e }));
+	return batch.map((e) => shiftEvent(e, days * DAY_MS, now));
 }

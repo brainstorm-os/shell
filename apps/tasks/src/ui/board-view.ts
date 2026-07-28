@@ -222,7 +222,8 @@ function renderColumnAdd(
 function renderCard(task: Task, props: BoardViewProps): HTMLElement {
 	const card = document.createElement("div");
 	card.className = "tasks-board__card";
-	card.draggable = true;
+	// The per-object read-only lock gates the status drag (Lock-3).
+	card.draggable = task.locked !== true;
 	card.dataset.taskId = task.id;
 	card.appendChild(props.renderCard(task));
 	card.addEventListener("dragstart", (e) => {
