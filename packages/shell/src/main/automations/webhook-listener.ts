@@ -20,8 +20,8 @@
  */
 
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
-import type { WebhookHit, WebhookIngressPort, WebhookTrigger } from "./automations-host";
-import { webhookSecretMatches } from "./webhook-secret";
+import type { WebhookHit, WebhookIngressPort, WebhookRoute } from "./automations-host";
+import { webhookRouteSecretMatches } from "./webhook-secret";
 
 /** Inbound body cap — mirrors the block-frame 256 KiB posture. */
 export const WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
@@ -87,7 +87,7 @@ function readCappedBody(req: IncomingMessage): Promise<string | null> {
 export function createWebhookLoopbackListener(
 	options: WebhookLoopbackOptions = {},
 ): WebhookLoopbackListener {
-	const routes = new Map<string, WebhookTrigger>();
+	const routes = new Map<string, WebhookRoute>();
 	const listeners = new Set<(hit: WebhookHit) => void>();
 	let boundPort: number | null = null;
 
@@ -99,7 +99,7 @@ export function createWebhookLoopbackListener(
 		const parsed = PATH_RE.exec(new URL(req.url ?? "/", "http://127.0.0.1").pathname);
 		const route = parsed ? routes.get(parsed[1] as string) : undefined;
 		// Auth first — an unknown route and a wrong secret are indistinguishable.
-		if (!parsed || !route || !webhookSecretMatches(parsed[2] as string, route.secret)) {
+		if (!parsed || !route || !webhookRouteSecretMatches(parsed[2] as string, route)) {
 			res.statusCode = 404;
 			res.end();
 			return;
@@ -120,7 +120,8 @@ export function createWebhookLoopbackListener(
 		res.statusCode = 202;
 		res.end();
 		emit({
-			workflowId: route.workflowId,
+			targetKind: route.targetKind,
+			targetId: route.targetId,
 			routeId: route.routeId,
 			method: "POST",
 			headers: flattenHeaders(req),
@@ -163,7 +164,7 @@ export function createWebhookLoopbackListener(
 	ready.catch(() => {});
 
 	return {
-		register(next: readonly WebhookTrigger[]): void {
+		register(next: readonly WebhookRoute[]): void {
 			routes.clear();
 			for (const route of next) routes.set(route.routeId, route);
 		},

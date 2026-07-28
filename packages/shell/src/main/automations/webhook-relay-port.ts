@@ -20,8 +20,8 @@
  * and cannot mint a hit for a route/secret it doesn't already carry.
  */
 
-import type { WebhookHit, WebhookIngressPort, WebhookTrigger } from "./automations-host";
-import { webhookSecretMatches } from "./webhook-secret";
+import type { WebhookHit, WebhookIngressPort, WebhookRoute } from "./automations-host";
+import { webhookRouteSecretMatches } from "./webhook-secret";
 
 /** One request the relay forwarded to the desktop. `secret` is the value from
  *  the inbound URL — re-verified here, never trusted from the relay. */
@@ -50,16 +50,17 @@ export type WebhookRelayPort = WebhookIngressPort & { close(): void };
  * uniformly (via `fanInWebhookPorts`).
  */
 export function createWebhookRelayPort(transport: WebhookRelayTransport): WebhookRelayPort {
-	const routes = new Map<string, WebhookTrigger>();
+	const routes = new Map<string, WebhookRoute>();
 	const listeners = new Set<(hit: WebhookHit) => void>();
 
 	const unsubscribeTransport = transport.onInbound((msg) => {
 		const route = routes.get(msg.routeId);
 		// Re-verify against the registered route — the relay is not trusted to
 		// have authenticated. Unknown route or bad secret ⇒ drop silently.
-		if (!route || !webhookSecretMatches(msg.secret, route.secret)) return;
+		if (!route || !webhookRouteSecretMatches(msg.secret, route)) return;
 		const hit: WebhookHit = {
-			workflowId: route.workflowId,
+			targetKind: route.targetKind,
+			targetId: route.targetId,
 			routeId: route.routeId,
 			method: msg.method,
 			headers: msg.headers,
@@ -69,7 +70,7 @@ export function createWebhookRelayPort(transport: WebhookRelayTransport): Webhoo
 	});
 
 	return {
-		register(next: readonly WebhookTrigger[]): void {
+		register(next: readonly WebhookRoute[]): void {
 			routes.clear();
 			for (const route of next) routes.set(route.routeId, route);
 			transport.setRoutes([...routes.keys()]);

@@ -66,10 +66,49 @@ export type WebhookTrigger = {
 	secret: string;
 };
 
+/** What an authenticated inbound webhook dispatches to (Connector-6). */
+export enum WebhookTargetKind {
+	/** 11b.8 — run a workflow under its own frozen caps. */
+	Workflow = "workflow",
+	/** Connector-6 — run `connectors.sync(mappingRef)` (doorbell semantics:
+	 *  the payload is discarded; the provider delta API is the source of
+	 *  truth, so a hostile body can never enter the projection). */
+	ConnectorSync = "connector-sync",
+}
+
+/** A webhook route as the ingress planes hold it: the path key, the secret
+ *  custody (plaintext for workflow triggers — the `Trigger/v1` entity owns
+ *  that secret — or a SHA-256 digest for connector endpoints, which are
+ *  hash-only at rest), and the dispatch target. A route with neither
+ *  verifier authenticates nothing (fail-closed). */
+export type WebhookRoute = {
+	routeId: string;
+	targetKind: WebhookTargetKind;
+	targetId: string;
+	/** Plaintext shared secret (workflow triggers). */
+	secret?: string;
+	/** Hex SHA-256 of the secret (connector endpoints — plaintext is never
+	 *  stored; the ingress plane hashes the presented secret to compare). */
+	secretSha256?: string;
+};
+
+/** Connector-6 — one connector webhook endpoint, as the wiring reads it from
+ *  the registry store: an authenticated hit on `routeId` runs
+ *  `connectors.sync(mappingId)`. Shell-internal (the digest never reaches an
+ *  app); `connectorAppId` is the app whose `network.ingress` grant gates the
+ *  route. */
+export type ConnectorWebhookRegistration = {
+	mappingId: string;
+	routeId: string;
+	secretSha256: string;
+	connectorAppId: string;
+};
+
 /** A verified inbound webhook, as the ingress plane hands it to the host —
  *  the secret has already been matched, so it never rides the hit. */
 export type WebhookHit = {
-	workflowId: string;
+	targetKind: WebhookTargetKind;
+	targetId: string;
 	routeId: string;
 	method: string;
 	headers: Record<string, string>;
@@ -83,7 +122,7 @@ export type WebhookHit = {
  *  fake and inert (undefined) without `network.ingress`. */
 export type WebhookIngressPort = {
 	/** Replace the active route set. Idempotent — re-registering overwrites. */
-	register(routes: readonly WebhookTrigger[]): void;
+	register(routes: readonly WebhookRoute[]): void;
 	/** Subscribe to authenticated inbound hits; returns an unsubscribe. */
 	subscribe(listener: (hit: WebhookHit) => void): () => void;
 };
@@ -126,6 +165,11 @@ export type ScheduleRegistration = {
 	 *  hydrate; empty (and the plane inert) without `network.ingress`. Optional
 	 *  like `syncMappings`/`itemAlerts` so prior callers need no change. */
 	webhooks?: WebhookTrigger[];
+	/** Connector-6 — connector webhook endpoints. An authenticated hit is a
+	 *  doorbell for `connectors.sync(mappingId)` (payload discarded). The
+	 *  wiring derives these from the registry store, already filtered to
+	 *  connector apps holding `network.ingress` (fail-closed). Optional. */
+	connectorWebhooks?: ConnectorWebhookRegistration[];
 	/** 11b.10 — file-watch triggers. Registered with the watch plane on hydrate;
 	 *  each re-mints a live handle from its persistent grant. Optional. */
 	fileWatches?: FileWatchTrigger[];
@@ -207,6 +251,11 @@ export class AutomationsHost {
 	private readonly itemAlertsById = new Map<string, UiNotification>();
 	private entityEvents: EntityEventTrigger[] = [];
 	private webhooks: WebhookTrigger[] = [];
+	private connectorWebhooks: ConnectorWebhookRegistration[] = [];
+	/** Per-mapping coalescer: a webhook storm collapses to one in-flight sync
+	 *  plus at most one trailing run (the rate bound — sync frequency is
+	 *  capped by sync duration, never by inbound request rate). */
+	private readonly connectorSyncStates = new Map<string, { queued: boolean }>();
 	private webhookIngress: WebhookIngressPort | undefined;
 	private fileWatches: FileWatchTrigger[] = [];
 	private startups: string[] = [];
@@ -235,8 +284,11 @@ export class AutomationsHost {
 		this.unsubscribeWebhooks = null;
 		this.webhookIngress = port;
 		if (port) {
-			port.register(this.webhooks);
-			if (wasSubscribed) {
+			port.register(this.webhookRoutes());
+			// Re-point a live subscription — and if the host is already running
+			// (a mid-session bind: the FIRST endpoint minted after start()),
+			// subscribe now or hits would be dropped until the next start().
+			if (wasSubscribed || this.timer !== null) {
 				this.unsubscribeWebhooks = port.subscribe((hit) => {
 					void this.onWebhookHit(hit);
 				});
@@ -255,7 +307,8 @@ export class AutomationsHost {
 		this.itemAlertsById.clear();
 		this.entityEvents = [...registration.entityEvents];
 		this.webhooks = [...(registration.webhooks ?? [])];
-		this.webhookIngress?.register(this.webhooks);
+		this.connectorWebhooks = [...(registration.connectorWebhooks ?? [])];
+		this.webhookIngress?.register(this.webhookRoutes());
 		this.fileWatches = [...(registration.fileWatches ?? [])];
 		this.ports.fileWatch?.register(this.fileWatches);
 		this.startups = [...(registration.startups ?? [])];
@@ -448,21 +501,76 @@ export class AutomationsHost {
 		}
 	}
 
+	/** The union route table the ingress planes verify against: workflow
+	 *  triggers (plaintext secret, owned by the `Trigger/v1` entity) plus
+	 *  connector endpoints (hash-only custody). */
+	private webhookRoutes(): WebhookRoute[] {
+		return [
+			...this.webhooks.map((w) => ({
+				routeId: w.routeId,
+				targetKind: WebhookTargetKind.Workflow,
+				targetId: w.workflowId,
+				secret: w.secret,
+			})),
+			...this.connectorWebhooks.map((c) => ({
+				routeId: c.routeId,
+				targetKind: WebhookTargetKind.ConnectorSync,
+				targetId: c.mappingId,
+				secretSha256: c.secretSha256,
+			})),
+		];
+	}
+
 	/** An authenticated inbound webhook (secret already verified by the ingress
-	 *  plane) fires its bound workflow under the workflow's own frozen caps. The
-	 *  request rides as the trigger payload so a `Code`/`AICall` step can read
-	 *  the body/headers. Guard on the registered route set so a hit for a route
-	 *  no longer registered (rehydrate race) is dropped. */
+	 *  plane) fires its target. A workflow target runs under the workflow's own
+	 *  frozen caps with the request as trigger payload (so a `Code`/`AICall`
+	 *  step can read body/headers). A connector-sync target is a doorbell: the
+	 *  payload is DISCARDED and `connectors.sync(mappingId)` pulls from the
+	 *  provider's API instead — hostile body bytes can never enter the
+	 *  projection. Guard on the registered route set so a hit for a route no
+	 *  longer registered (rehydrate race / revoke) is dropped. */
 	private async onWebhookHit(hit: WebhookHit): Promise<void> {
-		if (!this.webhooks.some((w) => w.workflowId === hit.workflowId && w.routeId === hit.routeId)) {
+		if (hit.targetKind === WebhookTargetKind.ConnectorSync) {
+			const registered = this.connectorWebhooks.some(
+				(c) => c.mappingId === hit.targetId && c.routeId === hit.routeId,
+			);
+			if (registered) this.dispatchConnectorWebhookSync(hit.targetId);
 			return;
 		}
-		await this.runWorkflow(hit.workflowId, `webhook:${hit.routeId}`, {
+		if (!this.webhooks.some((w) => w.workflowId === hit.targetId && w.routeId === hit.routeId)) {
+			return;
+		}
+		await this.runWorkflow(hit.targetId, `webhook:${hit.routeId}`, {
 			routeId: hit.routeId,
 			method: hit.method,
 			headers: hit.headers,
 			body: hit.bodyText,
-		}).catch((e) => this.fail(`webhook ${hit.workflowId}`, e));
+		}).catch((e) => this.fail(`webhook ${hit.targetId}`, e));
+	}
+
+	/** Coalesced `connectors.sync` dispatch: at most one in-flight sync per
+	 *  mapping, with one trailing run if hits arrived meanwhile. A failure
+	 *  drops the queued flag (the next hit re-arms) — never a retry storm. */
+	private dispatchConnectorWebhookSync(mappingId: string): void {
+		const inFlight = this.connectorSyncStates.get(mappingId);
+		if (inFlight) {
+			inFlight.queued = true;
+			return;
+		}
+		const state = { queued: false };
+		this.connectorSyncStates.set(mappingId, state);
+		void (async () => {
+			try {
+				do {
+					state.queued = false;
+					await this.ports.connectorSync?.runSync(mappingId);
+				} while (state.queued);
+			} catch (e) {
+				this.fail(`connector webhook sync ${mappingId}`, e);
+			} finally {
+				this.connectorSyncStates.delete(mappingId);
+			}
+		})();
 	}
 
 	/** A watched file changed — fire its bound workflow under the workflow's own

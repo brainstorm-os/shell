@@ -10,6 +10,7 @@
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { AppsRepository } from "./apps-repo";
 import { BlocksRepository } from "./blocks-repo";
+import { ConnectorWebhooksRepository } from "./connector-webhooks-repo";
 import { EntityTypesRepository } from "./entity-types-repo";
 import { FileWatchGrantsRepository } from "./file-watch-grants-repo";
 import { IntentsRepository } from "./intents-repo";
@@ -20,6 +21,7 @@ import { WidgetsRepository } from "./widgets-repo";
 export {
 	AppsRepository,
 	BlocksRepository,
+	ConnectorWebhooksRepository,
 	EntityTypesRepository,
 	FileWatchGrantsRepository,
 	IntentsRepository,
@@ -29,6 +31,7 @@ export {
 };
 export type { AppRecord } from "./apps-repo";
 export type { BlockRecord } from "./blocks-repo";
+export type { ConnectorWebhookRecord, MintedConnectorWebhook } from "./connector-webhooks-repo";
 export type { EntityTypeRecord } from "./entity-types-repo";
 export type { FileWatchGrant, FileWatchGrantSummary } from "./file-watch-grants-repo";
 export type { IntentQuery, IntentRecord } from "./intents-repo";
@@ -46,6 +49,7 @@ export class RegistryRepositories {
 	readonly intents: IntentsRepository;
 	readonly schedulerFires: SchedulerFiresRepository;
 	readonly fileWatchGrants: FileWatchGrantsRepository;
+	readonly connectorWebhooks: ConnectorWebhooksRepository;
 
 	constructor(db: SqliteDatabase) {
 		this.apps = new AppsRepository(db);
@@ -56,5 +60,6 @@ export class RegistryRepositories {
 		this.intents = new IntentsRepository(db);
 		this.schedulerFires = new SchedulerFiresRepository(db);
 		this.fileWatchGrants = new FileWatchGrantsRepository(db);
+		this.connectorWebhooks = new ConnectorWebhooksRepository(db);
 	}
 }

@@ -30,7 +30,11 @@ import {
 	type ResolvedConnector,
 	makeConnectorRequest,
 } from "./connectors-request";
-import type { ConnectorsServiceDeps } from "./connectors-service";
+import type {
+	ConnectorIngressInfo,
+	ConnectorWebhookStore,
+	ConnectorsServiceDeps,
+} from "./connectors-service";
 import {
 	type ConnectorsSync,
 	type SyncContext,
@@ -61,6 +65,13 @@ export type ConnectorsWiringDeps = {
 	openExternal: (url: string) => Promise<void>;
 	notify: (n: { title: string; body: string }) => void;
 	onRefused?: (info: { app: string; url: string; reason: string }) => void;
+	/** Connector-6 — per-session registry-backed webhook endpoint store. */
+	getWebhookStore?: () => Promise<ConnectorWebhookStore | null>;
+	/** Connector-6 — the live ingress bases (the automations deployment's
+	 *  `webhookInfo`, thunked — the deployment is per-session). */
+	ingressInfo?: () => Promise<ConnectorIngressInfo>;
+	/** Connector-6 — endpoints changed: re-derive the ingress route table. */
+	onWebhooksChanged?: () => Promise<void>;
 };
 
 /** A `CredentialStore`-backed Tier-2 token store (JSON value under the
@@ -287,6 +298,16 @@ export function buildConnectorsServiceDeps(deps: ConnectorsWiringDeps): Connecto
 		resolveAccount,
 		request: connectorRequest,
 		sync: (mappingRef: string) => sync.runSync(mappingRef),
+		// Connector-6 — owner resolution rides the same server-side mapping
+		// resolve as the sync engine (never the caller's claim).
+		resolveMappingOwner: async (mappingRef: string) => {
+			const ctx = await resolveMapping(mappingRef);
+			if (!ctx) return null;
+			return { accountId: ctx.mapping.accountRef, connectorAppId: ctx.connectorAppId };
+		},
+		...(deps.getWebhookStore ? { getWebhookStore: deps.getWebhookStore } : {}),
+		...(deps.ingressInfo ? { ingressInfo: deps.ingressInfo } : {}),
+		...(deps.onWebhooksChanged ? { onWebhooksChanged: deps.onWebhooksChanged } : {}),
 		getLedger: deps.getLedger,
 	};
 }

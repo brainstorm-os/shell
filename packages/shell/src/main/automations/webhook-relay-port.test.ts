@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { WebhookHit, WebhookTrigger } from "./automations-host";
+import { type WebhookHit, type WebhookRoute, WebhookTargetKind } from "./automations-host";
 import {
 	type WebhookRelayInbound,
 	type WebhookRelayTransport,
@@ -29,13 +29,21 @@ function fakeTransport() {
 	};
 }
 
-const route: WebhookTrigger = { workflowId: "wf1", routeId: "r1", secret: "s1" };
+const route: WebhookRoute = {
+	routeId: "r1",
+	targetKind: WebhookTargetKind.Workflow,
+	targetId: "wf1",
+	secret: "s1",
+};
 
 describe("webhook relay port (11b.8)", () => {
 	it("tells the transport which routeIds to forward on register", () => {
 		const t = fakeTransport();
 		const port = createWebhookRelayPort(t.transport);
-		port.register([route, { workflowId: "wf2", routeId: "r2", secret: "s2" }]);
+		port.register([
+			route,
+			{ routeId: "r2", targetKind: WebhookTargetKind.Workflow, targetId: "wf2", secret: "s2" },
+		]);
 		expect(t.setRoutes).toHaveBeenCalledWith(["r1", "r2"]);
 	});
 
@@ -48,7 +56,12 @@ describe("webhook relay port (11b.8)", () => {
 
 		t.deliver({ routeId: "r1", secret: "s1", method: "POST", headers: { a: "b" }, bodyText: "x" });
 		expect(hits).toHaveLength(1);
-		expect(hits[0]).toMatchObject({ workflowId: "wf1", routeId: "r1", bodyText: "x" });
+		expect(hits[0]).toMatchObject({
+			targetKind: WebhookTargetKind.Workflow,
+			targetId: "wf1",
+			routeId: "r1",
+			bodyText: "x",
+		});
 		expect((hits[0] as unknown as { secret?: string }).secret).toBeUndefined();
 	});
 

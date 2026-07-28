@@ -47,6 +47,8 @@ import {
 } from "./automation-host-designation";
 import {
 	AutomationsHost,
+	type ConnectorSyncPort,
+	type ConnectorWebhookRegistration,
 	type EntityChangeSource,
 	type FileWatchPort,
 	type IntervalFactory,
@@ -122,6 +124,14 @@ export type AutomationsWiringDeps = {
 	 *  Constructed in `index.ts` where those live; absent keeps file-watch
 	 *  triggers registered but never firing (tests / headless). */
 	fileWatch?: FileWatchPort;
+	/** Connector-6 — the connector sync engine an authenticated connector
+	 *  webhook hit dispatches to (`connectors.sync(mappingId)`). Absent keeps
+	 *  connector webhook routes registered but never firing. */
+	connectorSync?: ConnectorSyncPort;
+	/** Connector-6 — the registry-backed connector webhook endpoints
+	 *  (shell-internal, hash-only digests). Each is gated per connector app
+	 *  on `network.ingress` at hydrate — fail-closed. */
+	listConnectorWebhooks?: () => Promise<readonly ConnectorWebhookRegistration[]>;
 	clock?: () => number;
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -230,6 +240,7 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		entityChanges: deps.entityChanges,
 		onError,
 		...(deps.fileWatch ? { fileWatch: deps.fileWatch } : {}),
+		...(deps.connectorSync ? { connectorSync: deps.connectorSync } : {}),
 		...(deps.postAlert ? { postAlert: deps.postAlert } : {}),
 		...(deps.intervalMs !== undefined ? { intervalMs: deps.intervalMs } : {}),
 		...(deps.intervals ? { intervals: deps.intervals } : {}),
@@ -259,8 +270,48 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 	const hasIngressGrant = async (): Promise<boolean> =>
 		(await appGrantCeiling(deps.getLedger)).includes(NETWORK_INGRESS_CAP);
 
+	// Connector-6 — the registry endpoints, gated per CONNECTOR app on its own
+	// `network.ingress` grant (never the automations app's). A missing/failing
+	// ledger or store reads as no routes — fail-closed, nothing registers.
+	const grantedConnectorWebhooks = async (): Promise<ConnectorWebhookRegistration[]> => {
+		if (!deps.listConnectorWebhooks) return [];
+		let rows: readonly ConnectorWebhookRegistration[];
+		try {
+			rows = await deps.listConnectorWebhooks();
+		} catch (error) {
+			onError("connector webhook list", error);
+			return [];
+		}
+		if (rows.length === 0) return [];
+		let ledger: Awaited<ReturnType<typeof deps.getLedger>> = null;
+		try {
+			ledger = await deps.getLedger();
+		} catch {
+			return [];
+		}
+		if (!ledger) return [];
+		const grantedByApp = new Map<string, boolean>();
+		const out: ConnectorWebhookRegistration[] = [];
+		for (const row of rows) {
+			let granted = grantedByApp.get(row.connectorAppId);
+			if (granted === undefined) {
+				try {
+					granted = ledger.has(row.connectorAppId, NETWORK_INGRESS_CAP);
+				} catch {
+					granted = false;
+				}
+				grantedByApp.set(row.connectorAppId, granted);
+			}
+			if (granted) out.push(row);
+		}
+		return out;
+	};
+
 	const ensureWebhookIngress = async (): Promise<void> => {
-		if (webhookListener || !(await hasIngressGrant())) return;
+		if (webhookListener) return;
+		// Bind when EITHER plane needs ingress: the automations app's own grant,
+		// or at least one connector endpoint whose app holds the grant.
+		if (!(await hasIngressGrant()) && (await grantedConnectorWebhooks()).length === 0) return;
 		const preferredPort = (await deps.webhookPortStore?.get().catch(() => null)) ?? undefined;
 		const listener = createWebhookLoopbackListener(
 			preferredPort !== undefined ? { preferredPort } : {},
@@ -301,6 +352,9 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		// if a listener is somehow live — a revoke takes effect on the next
 		// re-derive (routes emptied), the socket goes inert (404s everything).
 		if (!(await hasIngressGrant())) registration.webhooks = [];
+		// Connector-6 — connector endpoints ride the same route table, each
+		// already filtered on ITS app's `network.ingress` grant (fail-closed).
+		registration.connectorWebhooks = await grantedConnectorWebhooks();
 		// 9.14.9b — task due/scheduled + event alerts ride the same schedule.
 		// 0.3.1 — register alerts whose instant is `> lastRun` (the scheduler's
 		// persisted watermark), not just `> now`: a reminder that came due while
@@ -425,7 +479,12 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 		runNow: (workflowId) => host.runNow(workflowId),
 		// 11b.10 — re-derive now (e.g. a Settings file-watch revoke: the grant is
 		// gone, so hydrate re-registers the port without the dropped watch).
-		rehydrate: () => hydrateFromEntities(),
+		// Connector-6 — a webhook mint mid-session may be the FIRST route, so
+		// bind the (lazily-created) listener before the routes register.
+		rehydrate: async () => {
+			if (scheduling && !stopped) await ensureWebhookIngress();
+			await hydrateFromEntities();
+		},
 		async webhookInfo(): Promise<AutomationsWebhookInfo> {
 			const port = webhookListener?.port() ?? null;
 			return {

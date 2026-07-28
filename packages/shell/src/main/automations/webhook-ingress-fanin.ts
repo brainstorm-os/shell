@@ -5,11 +5,11 @@
  * plane can be absent (loopback-only, or relay-only under a headless host).
  */
 
-import type { WebhookHit, WebhookIngressPort, WebhookTrigger } from "./automations-host";
+import type { WebhookHit, WebhookIngressPort, WebhookRoute } from "./automations-host";
 
 export function fanInWebhookPorts(ports: readonly WebhookIngressPort[]): WebhookIngressPort {
 	return {
-		register(routes: readonly WebhookTrigger[]): void {
+		register(routes: readonly WebhookRoute[]): void {
 			for (const port of ports) port.register(routes);
 		},
 		subscribe(listener: (hit: WebhookHit) => void): () => void {
