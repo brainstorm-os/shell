@@ -143,6 +143,10 @@ export enum WebViewMethod {
 export type WebViewExtractedText = {
 	readonly url: string;
 	readonly title: string;
+	/** Article byline (author line) when the extractor found one — already
+	 *  sanitized shell-side (page-supplied text never crosses raw). Null when
+	 *  the page declared none. */
+	readonly byline: string | null;
 	readonly text: string;
 	/** True when the extractor hit its cap and the text is a prefix. */
 	readonly truncated: boolean;

@@ -18,4 +18,9 @@ export {
 	WebViewEventKind,
 	WebViewMethod,
 } from "@brainstorm-os/sdk-types";
-export type { WebViewEvent, WebViewRect, WebViewRequest } from "@brainstorm-os/sdk-types";
+export type {
+	WebViewEvent,
+	WebViewExtractedText,
+	WebViewRect,
+	WebViewRequest,
+} from "@brainstorm-os/sdk-types";

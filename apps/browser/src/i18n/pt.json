@@ -67,5 +67,12 @@
   "summary.note": "Gerado a partir da página que estás a ver — confirma o que for importante no original.",
   "summary.failed.noContent": "Não há texto legível nesta página para resumir.",
   "summary.failed.noModel": "Nenhum modelo de IA configurado. Adiciona um em Definições → IA.",
-  "summary.failed.generic": "Não foi possível resumir esta página — tenta novamente."
+  "summary.failed.generic": "Não foi possível resumir esta página — tenta novamente.",
+  "reader.enter": "Vista de leitura",
+  "reader.exit": "Sair da vista de leitura",
+  "reader.badge": "Vista de leitura",
+  "reader.aria": "Vista de leitura",
+  "reader.loading": "A preparar a vista de leitura…",
+  "reader.empty": "Esta página não tem um artigo legível.",
+  "reader.truncated": "O artigo foi encurtado — abra a página original para ver o resto."
 }

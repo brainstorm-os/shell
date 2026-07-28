@@ -17,6 +17,7 @@
 
 import {
 	type SitePermissionKind,
+	WEB_CAPTURE_CAP,
 	type WebViewEvent,
 	WebViewEventKind,
 	type WebViewExtractedText,
@@ -106,6 +107,12 @@ export type CaptureSpec = {
 	selectionOnly: boolean;
 };
 
+/** Browser-5 — what the vault-side capture seal receives: the tab metadata
+ *  plus the page's RENDERED DOM (already clamped), or `html: null` when the
+ *  tab has no readable view (suspended, an internal page, a failed eval) —
+ *  the seal then writes a link-only bookmark instead of failing the clip. */
+export type CapturePageSpec = CaptureSpec & { html: string | null };
+
 /** Browser-6 — a completed download the factory hands to the vault-side seal.
  *  `bytes` are UNTRUSTED (the page's response body); the seal sanitizes the
  *  name, applies the served-mime allow-list, and writes a `File/v1` entity. */
@@ -136,8 +143,12 @@ export type WebViewServiceOptions = {
 	resolveWindow: (appId: string) => WindowTarget | null;
 	/** Push a metadata event to the app's chrome (the broadcast channel). */
 	emitEvent: (appId: string, event: WebViewEvent) => void;
-	/** Reader-extract the page → `Bookmark/v1`; returns the entity id. */
-	capture?: (appId: string, spec: CaptureSpec) => Promise<string>;
+	/** Browser-5 — reader-extract the page's RENDERED DOM → `Bookmark/v1`;
+	 *  returns the entity id. The service pulls the DOM off the live view
+	 *  (same feeder as {@link WebViewMethod.ExtractText}) and passes it here;
+	 *  production runs the Net-2 extraction worker over it and writes the
+	 *  bookmark through the entities service (per-type cap applies). */
+	capture?: (appId: string, spec: CapturePageSpec) => Promise<string>;
 	/** Browser-8 / Net-3 — turn a page's RENDERED DOM into its reader projection
 	 *  (no vault write). The service pulls the DOM off the live view and passes
 	 *  it here; production binds this to the Net-2 extraction worker, so the
@@ -201,6 +212,17 @@ type TabEntry = {
  *  persistence, encrypted under the vault master key. The jar attaches to this
  *  exact partition string, so it is the single source of truth for its name. */
 export const PERSISTENT_WEB_PARTITION = "bs-web-persist";
+
+/** Fail-closed gate for the reader-extraction methods (Capture / ExtractText):
+ *  the broker verified every DECLARED cap against the ledger, so requiring the
+ *  declaration here means requiring the grant — and an envelope that omits it
+ *  (the only way an unauthorized caller reaches this handler) is refused. */
+function requireCaptureCap(declaredCaps: readonly string[]): void {
+	if (declaredCaps.includes(WEB_CAPTURE_CAP)) return;
+	const error = new Error(`webView: method requires the ${WEB_CAPTURE_CAP} capability`);
+	error.name = "CapabilityDenied";
+	throw error;
+}
 
 function partitionFor(tabId: string, isolated: boolean): string {
 	// Private tabs keep a throwaway, per-tab, non-`persist:` partition (no
@@ -277,6 +299,14 @@ export class WebViewService {
 			case WebViewMethod.StopFind:
 				return this.withLiveView(req.tabId, (v) => v.stopFind());
 			case WebViewMethod.Capture:
+				// SECURITY — the mode-derivation rule (Browser-8) applied to the read
+				// paths: the right to reader-extract a page is derived from the caps
+				// the broker VERIFIED on this call, never assumed. An envelope that
+				// declares no `web.capture` (a caller bypassing the SDK proxy, which
+				// always stamps it) is refused outright — declaring a cap the app
+				// doesn't hold is already rejected broker-side, so a declared cap
+				// here is a granted one.
+				requireCaptureCap(declaredCaps);
 				return this.capture(appId, req.tabId, req.selectionOnly);
 			case WebViewMethod.SetSitePermission:
 				return this.options.setSitePermission?.(req.origin, req.permission, req.allow);
@@ -287,6 +317,8 @@ export class WebViewService {
 			case WebViewMethod.IsSiteTrusted:
 				return this.options.isSiteTrusted?.(req.origin) ?? false;
 			case WebViewMethod.ExtractText:
+				// SECURITY — same fail-closed gate as Capture (the read twin).
+				requireCaptureCap(declaredCaps);
 				return this.extractText(appId, req.tabId);
 		}
 	}
@@ -379,11 +411,18 @@ export class WebViewService {
 	private async capture(appId: string, tabId: string, selectionOnly: boolean): Promise<unknown> {
 		const entry = this.tabs.get(tabId);
 		if (!entry || !this.options.capture) return undefined;
+		// Browser-5 — the capture reads the page the user is actually looking at
+		// (logged-in, script-rendered, personalised), the same live-DOM feeder as
+		// extractText. An unreadable view (suspended tab, internal page) degrades
+		// to a link-only bookmark rather than a failed clip, so `html` is nullable
+		// where extractText honestly reports "nothing".
+		const html = await entry.view?.captureHtml();
 		const bookmarkId = await this.options.capture(appId, {
 			tabId,
 			url: entry.url,
 			title: entry.title,
 			selectionOnly,
+			html: html ? clampLiveDomHtml(html) : null,
 		});
 		this.options.emitEvent(appId, { kind: WebViewEventKind.Captured, tabId, bookmarkId });
 		return { bookmarkId };
