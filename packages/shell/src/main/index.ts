@@ -1285,7 +1285,12 @@ void app.whenReady().then(async () => {
 		},
 	});
 	registerSpellcheckHandlers();
-	registerLedgerHandlers();
+	// Connector-6 — a Settings revoke re-derives the ingress route table now, so
+	// a revoked `network.ingress` kills every live webhook URL immediately
+	// instead of on the next automation-entity write.
+	registerLedgerHandlers({
+		onGrantsChanged: () => void automationsDeployment?.rehydrate().catch(() => {}),
+	});
 	registerBrainstormProtocol();
 	registerBlockFrameProtocol({
 		getBlocksRepo: async () => {
