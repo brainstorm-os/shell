@@ -126,6 +126,15 @@ describe("personInitials", () => {
 	it("is empty for a blank name", () => {
 		expect(personInitials("   ")).toBe("");
 	});
+	it("skips punctuation-led words — a parenthesised suffix never lands in the chip", () => {
+		expect(personInitials("Ada Lovelace (work)")).toBe("AL");
+		expect(personInitials('Ada "Countess" Lovelace')).toBe("AL");
+		expect(personInitials("Ada — Lovelace")).toBe("AL");
+	});
+	it("falls back to the first letter/digit when every word is decorated", () => {
+		expect(personInitials("(Ada)")).toBe("A");
+		expect(personInitials("(...)")).toBe("");
+	});
 });
 
 describe("comparePersons", () => {

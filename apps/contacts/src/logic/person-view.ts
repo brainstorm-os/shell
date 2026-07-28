@@ -88,13 +88,23 @@ export function personsFromEntities(entities: readonly VaultEntityLike[]): Perso
 		.sort(comparePersons);
 }
 
-/** Initials for the avatar — first letter of the first two words, upper-cased.
- *  Empty string for an unnamed person (the caller renders a neutral glyph). */
+/** Initials for the avatar — first letter of the first and last words,
+ *  upper-cased. Only letters/digits may land in the chip: a word that opens
+ *  with punctuation ("Ada Lovelace (work)", 'Ada "Countess" Lovelace') is
+ *  decoration and is skipped outright — the old first-char-of-last-word rule
+ *  put a literal "(" in the avatar. If NO word opens with a letter/digit the
+ *  first letter/digit found anywhere is the fallback ("(Ada)" → "A"). Empty
+ *  string for an unnamed person (the caller renders a neutral glyph). */
 export function personInitials(name: string): string {
 	const words = name.trim().split(/\s+/).filter(Boolean);
-	if (words.length === 0) return "";
-	const first = words[0]?.[0] ?? "";
-	const second = words.length > 1 ? (words[words.length - 1]?.[0] ?? "") : "";
+	const leading = words.filter((w) => /^[\p{L}\p{N}]/u.test(w)).map((w) => w[0] ?? "");
+	const pool =
+		leading.length > 0
+			? leading
+			: words.map((w) => w.match(/[\p{L}\p{N}]/u)?.[0] ?? "").filter(Boolean);
+	if (pool.length === 0) return "";
+	const first = pool[0] ?? "";
+	const second = pool.length > 1 ? (pool[pool.length - 1] ?? "") : "";
 	return (first + second).toUpperCase();
 }
 
