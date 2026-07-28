@@ -275,4 +275,29 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			);
 		},
 	},
+	{
+		version: 12,
+		description: "registry.db v12 — connector_webhooks (Connector-6 webhook-in endpoints)",
+		up: (db) => {
+			// Connector-6 — shell-minted inbound webhook endpoints for connector
+			// SyncMappings (doc 56 §Sync model: a mapping's Webhook trigger whose
+			// handler is `connectors.sync(mappingRef)`). Custody invariant:
+			// `secret_sha256` is the ONLY stored form of the endpoint secret — the
+			// plaintext is returned exactly once at mint (registry.db is not yet
+			// encrypted at rest, Stage 3b, so a disk read must not recover a live
+			// secret). One endpoint per mapping (re-mint = rotate); rows die with
+			// the mapping's account on disconnect. LOCAL — never syncs.
+			db.exec(`
+				CREATE TABLE connector_webhooks (
+					route_id         TEXT PRIMARY KEY,
+					mapping_id       TEXT NOT NULL UNIQUE,
+					account_id       TEXT NOT NULL,
+					connector_app_id TEXT NOT NULL,
+					secret_sha256    TEXT NOT NULL,
+					created_at       INTEGER NOT NULL
+				);
+			`);
+			db.exec("CREATE INDEX idx_connector_webhooks_account ON connector_webhooks (account_id);");
+		},
+	},
 ];

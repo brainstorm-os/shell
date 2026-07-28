@@ -617,6 +617,28 @@ export type ConnectorRequestResult = {
 	finalUrl: string;
 };
 
+/** Connector-6 — the one-time result of registering (or rotating) a
+ *  mapping's inbound webhook endpoint. The URLs embed the per-endpoint
+ *  secret and are shown ONCE — the shell stores only a hash, and no later
+ *  call (status included) can return the secret again. */
+export type ConnectorWebhookEndpoint = {
+	routeId: string;
+	/** `/wh/<routeId>/<secret>` — appended to whichever base is reachable. */
+	endpointPath: string;
+	loopbackUrl: string | null;
+	relayUrl: string | null;
+};
+
+/** Connector-6 — a mapping's webhook endpoint state. Never carries the
+ *  secret. */
+export type ConnectorWebhookStatus = {
+	registered: boolean;
+	routeId: string | null;
+	createdAt: number | null;
+	loopbackBaseUrl: string | null;
+	relayBaseUrl: string | null;
+};
+
 /** App-facing connector broker (doc 56). The shell owns OAuth, token
  *  custody, and egress; the app holds only entity refs. */
 export type ConnectorsService = {
@@ -644,6 +666,15 @@ export type ConnectorsService = {
 		body?: unknown;
 		headers?: Record<string, string>;
 	}): Promise<ConnectorRequestResult>;
+	/** Connector-6 — mint (or rotate: re-mint replaces) the mapping's inbound
+	 *  webhook endpoint. An authenticated hit runs `connectors.sync` on the
+	 *  mapping — the payload is discarded (doorbell semantics). Requires the
+	 *  runtime `network.ingress` grant on the connector app; fail-closed. */
+	webhookRegister(input: { mappingRef: string }): Promise<ConnectorWebhookEndpoint>;
+	/** Connector-6 — the mapping's endpoint state (never the secret). */
+	webhookStatus(input: { mappingRef: string }): Promise<ConnectorWebhookStatus>;
+	/** Connector-6 — kill the mapping's endpoint (the URL goes dead live). */
+	webhookRevoke(input: { mappingRef: string }): Promise<{ ok: true; removed: boolean }>;
 };
 
 // ─── Mail service (shell-side transport + sync — doc 53, Mailbox-5) ─────────

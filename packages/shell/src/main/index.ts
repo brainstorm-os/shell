@@ -287,6 +287,7 @@ import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
 import { AssetRefsRepository, AssetsRepository, EntitiesRepository } from "./storage/entities-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
+import { ConnectorWebhooksRepository } from "./storage/registry-repo/connector-webhooks-repo";
 import { EntityTypesRepository } from "./storage/registry-repo/entity-types-repo";
 import { FileWatchGrantsRepository } from "./storage/registry-repo/file-watch-grants-repo";
 import { SchedulerFiresRepository } from "./storage/registry-repo/scheduler-fires-repo";
@@ -4065,6 +4066,14 @@ void app.whenReady().then(async () => {
 			}),
 		);
 	};
+	// Connector-6 — the per-session registry store for connector webhook
+	// endpoints (hash-only secret custody; see connector-webhooks-repo.ts).
+	const getConnectorWebhookStore = async (): Promise<ConnectorWebhooksRepository | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		const db = await session.dataStores.open("registry");
+		return new ConnectorWebhooksRepository(db);
+	};
 	const connectorsDeps = buildConnectorsServiceDeps({
 		egress: connectorsEgress,
 		getRepo: getEntitiesRepoForActiveSession,
@@ -4079,6 +4088,19 @@ void app.whenReady().then(async () => {
 				title: n.title,
 				body: n.body,
 			}),
+		getWebhookStore: getConnectorWebhookStore,
+		// Thunks over the per-session deployment (declared below, assigned on
+		// session open) — only ever invoked at request time.
+		ingressInfo: async () => {
+			const info = await automationsDeployment?.webhookInfo();
+			return {
+				loopbackBaseUrl: info?.loopbackBaseUrl ?? null,
+				relayBaseUrl: info?.relayBaseUrl ?? null,
+			};
+		},
+		onWebhooksChanged: async () => {
+			await automationsDeployment?.rehydrate().catch(() => {});
+		},
 	});
 	// Connector-SEC1: token-endpoint egress is allowlisted from STATIC shell
 	// code only — a `Connector/v1` entity can widen its `egressOrigins` but
@@ -4220,6 +4242,22 @@ void app.whenReady().then(async () => {
 				postAlert: (n) => getUiNotifyHost().post(n),
 				deviceId: session.deviceEd25519.publicKeyBase64,
 				egress: automationsEgress,
+				// Connector-6 — an authenticated connector webhook hit is a doorbell
+				// for the mapping's sync; routes come from the registry store, each
+				// gated on ITS connector app's `network.ingress` grant in the wiring.
+				connectorSync: {
+					runSync: (mappingId) => connectorsDeps.sync?.(mappingId) ?? Promise.resolve(null),
+				},
+				listConnectorWebhooks: async () => {
+					const store = await getConnectorWebhookStore();
+					if (!store) return [];
+					return store.listAll().map((r) => ({
+						mappingId: r.mappingId,
+						routeId: r.routeId,
+						secretSha256: r.secretSha256,
+						connectorAppId: r.connectorAppId,
+					}));
+				},
 			});
 			automationsDeployment = deployment;
 			const status = await deployment.start();

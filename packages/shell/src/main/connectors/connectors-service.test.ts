@@ -137,3 +137,141 @@ describe("connectors service handler", () => {
 		await expect(handler(envelope("authorize", null))).rejects.toMatchObject({ name: "Invalid" });
 	});
 });
+
+// ─── Connector-6: webhook endpoint surface ──────────────────────────────────
+
+function ledgerWithCaps(caps: string[]): CapabilityLedger {
+	return { has: (_app: string, cap: string) => caps.includes(cap) } as unknown as CapabilityLedger;
+}
+
+function makeWebhookDeps(over: Partial<ConnectorsServiceDeps> = {}) {
+	const mint = vi.fn(() => ({ routeId: "cw_r1", secret: "plain-secret" }));
+	const getByMapping = vi.fn(() => ({ routeId: "cw_r1", createdAt: 1000 }));
+	const revokeByMapping = vi.fn(() => true);
+	const revokeByAccount = vi.fn(() => 2);
+	const store = { mint, getByMapping, revokeByMapping, revokeByAccount };
+	const onWebhooksChanged = vi.fn(async () => {});
+	const { deps } = makeDeps({
+		getLedger: () =>
+			Promise.resolve(ledgerWithCaps(["connectors.webhook", "connectors.oauth", "network.ingress"])),
+		resolveMappingOwner: async (mappingRef: string) =>
+			mappingRef === "map-1"
+				? { accountId: "account-1", connectorAppId: "io.brainstorm.github-issues" }
+				: null,
+		getWebhookStore: async () => store,
+		ingressInfo: async () => ({
+			loopbackBaseUrl: "http://127.0.0.1:4242",
+			relayBaseUrl: null,
+		}),
+		onWebhooksChanged,
+		...over,
+	});
+	return { deps, mint, getByMapping, revokeByMapping, revokeByAccount, onWebhooksChanged };
+}
+
+describe("connectors service — webhook endpoints (Connector-6)", () => {
+	it("webhookRegister mints, re-registers routes, and reveals the secret exactly once (in the URL)", async () => {
+		const { deps, mint, onWebhooksChanged } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		const result = (await handler(envelope("webhookRegister", { mappingRef: "map-1" }))) as {
+			routeId: string;
+			endpointPath: string;
+			loopbackUrl: string | null;
+			relayUrl: string | null;
+		};
+		expect(mint).toHaveBeenCalledWith({
+			mappingId: "map-1",
+			accountId: "account-1",
+			connectorAppId: "io.brainstorm.github-issues",
+		});
+		expect(onWebhooksChanged).toHaveBeenCalledOnce();
+		expect(result).toEqual({
+			routeId: "cw_r1",
+			endpointPath: "/wh/cw_r1/plain-secret",
+			loopbackUrl: "http://127.0.0.1:4242/wh/cw_r1/plain-secret",
+			relayUrl: null,
+		});
+	});
+
+	it("denies webhookRegister without connectors.webhook", async () => {
+		const { deps } = makeWebhookDeps({
+			getLedger: () => Promise.resolve(ledgerWithCaps(["connectors.oauth", "network.ingress"])),
+		});
+		const handler = makeConnectorsServiceHandler(deps);
+		await expect(handler(envelope("webhookRegister", { mappingRef: "map-1" }))).rejects.toMatchObject(
+			{ name: "Denied" },
+		);
+	});
+
+	it("denies webhookRegister without the runtime network.ingress grant (fail-closed)", async () => {
+		const { deps, mint } = makeWebhookDeps({
+			getLedger: () => Promise.resolve(ledgerWithCaps(["connectors.webhook"])),
+		});
+		const handler = makeConnectorsServiceHandler(deps);
+		await expect(handler(envelope("webhookRegister", { mappingRef: "map-1" }))).rejects.toMatchObject(
+			{ name: "Denied" },
+		);
+		expect(mint).not.toHaveBeenCalled();
+	});
+
+	it("denies the webhook surface to an app that does not own the mapping", async () => {
+		const { deps, mint, revokeByMapping } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		for (const method of ["webhookRegister", "webhookStatus", "webhookRevoke"]) {
+			await expect(
+				handler(envelope(method, { mappingRef: "map-1" }, "io.evil.sibling")),
+			).rejects.toMatchObject({ name: "Denied" });
+		}
+		expect(mint).not.toHaveBeenCalled();
+		expect(revokeByMapping).not.toHaveBeenCalled();
+	});
+
+	it("webhookRegister rejects an unknown mapping (server-side resolve, never the caller's claim)", async () => {
+		const { deps } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		await expect(handler(envelope("webhookRegister", { mappingRef: "nope" }))).rejects.toMatchObject({
+			name: "Invalid",
+		});
+	});
+
+	it("webhookStatus never returns the secret", async () => {
+		const { deps } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		const result = await handler(envelope("webhookStatus", { mappingRef: "map-1" }));
+		expect(result).toEqual({
+			registered: true,
+			routeId: "cw_r1",
+			createdAt: 1000,
+			loopbackBaseUrl: "http://127.0.0.1:4242",
+			relayBaseUrl: null,
+		});
+		expect(JSON.stringify(result)).not.toContain("plain-secret");
+	});
+
+	it("webhookRevoke kills the endpoint and re-derives the route table", async () => {
+		const { deps, revokeByMapping, onWebhooksChanged } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		await expect(handler(envelope("webhookRevoke", { mappingRef: "map-1" }))).resolves.toEqual({
+			ok: true,
+			removed: true,
+		});
+		expect(revokeByMapping).toHaveBeenCalledWith("map-1");
+		expect(onWebhooksChanged).toHaveBeenCalledOnce();
+	});
+
+	it("account revoke cascades: every endpoint under the account dies with it", async () => {
+		const { deps, revokeByAccount, onWebhooksChanged } = makeWebhookDeps();
+		const handler = makeConnectorsServiceHandler(deps);
+		await handler(envelope("revoke", { accountId: "account-1" }));
+		expect(revokeByAccount).toHaveBeenCalledWith("account-1");
+		expect(onWebhooksChanged).toHaveBeenCalledOnce();
+	});
+
+	it("webhookRegister is Unavailable without a vault session (no store)", async () => {
+		const { deps } = makeWebhookDeps({ getWebhookStore: async () => null });
+		const handler = makeConnectorsServiceHandler(deps);
+		await expect(handler(envelope("webhookRegister", { mappingRef: "map-1" }))).rejects.toMatchObject(
+			{ name: "Unavailable" },
+		);
+	});
+});

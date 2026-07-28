@@ -32,6 +32,8 @@ import type {
 	CalDavService,
 	CalDavSyncSummary,
 	ConnectorRequestResult,
+	ConnectorWebhookEndpoint,
+	ConnectorWebhookStatus,
 	ConnectorsService,
 	ContributedAction,
 	ContributedActionTarget,
@@ -1243,6 +1245,30 @@ function connectorsProxy(bridge: Bridge): ConnectorsService {
 			),
 		sync: (input) =>
 			callService<unknown>(bridge, "connectors", "sync", [input], ["connectors.request"]),
+		webhookRegister: (input) =>
+			callService<ConnectorWebhookEndpoint>(
+				bridge,
+				"connectors",
+				"webhookRegister",
+				[input],
+				["connectors.webhook"],
+			),
+		webhookStatus: (input) =>
+			callService<ConnectorWebhookStatus>(
+				bridge,
+				"connectors",
+				"webhookStatus",
+				[input],
+				["connectors.webhook"],
+			),
+		webhookRevoke: (input) =>
+			callService<{ ok: true; removed: boolean }>(
+				bridge,
+				"connectors",
+				"webhookRevoke",
+				[input],
+				["connectors.webhook"],
+			),
 	};
 }
 

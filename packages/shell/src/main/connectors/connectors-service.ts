@@ -27,6 +27,30 @@ import type { RedirectProvider } from "./oauth-redirect";
 
 export const CONNECTORS_OAUTH_CAP = "connectors.oauth";
 export const CONNECTORS_REQUEST_CAP = "connectors.request";
+/** Connector-6 — gates the webhook endpoint surface (register / status /
+ *  revoke). Registration ADDITIONALLY requires the mapping's connector app to
+ *  hold the runtime `network.ingress` grant — fail-closed. */
+export const CONNECTORS_WEBHOOK_CAP = "connectors.webhook";
+export const NETWORK_INGRESS_CAP = "network.ingress";
+
+/** Connector-6 — the registry-backed endpoint store (satisfied by
+ *  `ConnectorWebhooksRepository`; a port so this module stays Electron-free
+ *  and unit-testable). `mint` is the ONLY reveal of a plaintext secret. */
+export type ConnectorWebhookStore = {
+	mint(input: { mappingId: string; accountId: string; connectorAppId: string }): {
+		routeId: string;
+		secret: string;
+	};
+	getByMapping(mappingId: string): { routeId: string; createdAt: number } | null;
+	revokeByMapping(mappingId: string): boolean;
+	revokeByAccount(accountId: string): number;
+};
+
+/** The ingress endpoint bases the running deployment exposes (11b.8). */
+export type ConnectorIngressInfo = {
+	loopbackBaseUrl: string | null;
+	relayBaseUrl: string | null;
+};
 
 export type ConnectorsServiceDeps = {
 	broker: OAuthBroker;
@@ -39,6 +63,18 @@ export type ConnectorsServiceDeps = {
 	request: ConnectorRequestFn;
 	/** Connector-4 — run a mapping's pull now (manual "Sync now" / scheduler). */
 	sync?: (mappingRef: string) => Promise<unknown>;
+	/** Connector-6 — resolve a `SyncMapping` to its owning account + connector
+	 *  app, SERVER-SIDE (never trusted from the caller). */
+	resolveMappingOwner?: (
+		mappingRef: string,
+	) => Promise<{ accountId: string; connectorAppId: string } | null>;
+	/** Connector-6 — per-session endpoint store (null without a vault). */
+	getWebhookStore?: () => Promise<ConnectorWebhookStore | null>;
+	/** Connector-6 — the live ingress bases for composing endpoint URLs. */
+	ingressInfo?: () => Promise<ConnectorIngressInfo>;
+	/** Connector-6 — endpoints changed (mint/rotate/revoke): re-derive the
+	 *  ingress route table (the automations deployment's rehydrate). */
+	onWebhooksChanged?: () => Promise<void>;
 	/** Server-side capability source; omit only in unit tests that presume
 	 *  the caller is authorized (mirrors the network handler). */
 	getLedger?: () => Promise<CapabilityLedger | null>;
@@ -119,6 +155,12 @@ export function makeConnectorsServiceHandler(deps: ConnectorsServiceDeps): Servi
 				return await handleRequest(envelope, deps);
 			case "sync":
 				return await handleSync(envelope, deps);
+			case "webhookRegister":
+				return await handleWebhookRegister(envelope, deps);
+			case "webhookStatus":
+				return await handleWebhookStatus(envelope, deps);
+			case "webhookRevoke":
+				return await handleWebhookRevoke(envelope, deps);
 			default:
 				throw makeError("Invalid", `unknown connectors method: ${envelope.method}`);
 		}
@@ -192,7 +234,129 @@ async function handleRevoke(
 	const resolved = await deps.resolveAccount(accountId);
 	if (!resolved) throw makeError("Invalid", `connectors.revoke: unknown account ${accountId}`);
 	await deps.broker.revoke({ connectorAppId: resolved.connectorAppId, accountId });
+	// Connector-6 — endpoints die with the account (doc 56 §Trust: disconnect
+	// is never a silent half-state). Route-table re-derive drops them live.
+	const store = await deps.getWebhookStore?.();
+	if (store && store.revokeByAccount(accountId) > 0) await deps.onWebhooksChanged?.();
 	return { ok: true };
+}
+
+/** Connector-6 — the mapping's owner, resolved server-side, with the caller's
+ *  identity pinned to it: only the mapping's own connector app may manage its
+ *  endpoint (defense-in-depth over the capability gate — a sibling app with
+ *  `connectors.webhook` cannot mint/see/kill another connector's endpoint). */
+async function requireMappingOwner(
+	envelope: Envelope,
+	deps: ConnectorsServiceDeps,
+	mappingRef: string,
+): Promise<{ accountId: string; connectorAppId: string }> {
+	if (!deps.resolveMappingOwner) {
+		throw makeError("Unavailable", `connectors.${envelope.method}: webhook surface not wired`);
+	}
+	const owner = await deps.resolveMappingOwner(mappingRef);
+	if (!owner) {
+		throw makeError("Invalid", `connectors.${envelope.method}: unknown mapping ${mappingRef}`);
+	}
+	if (owner.connectorAppId !== envelope.app) {
+		throw makeError(
+			"Denied",
+			`connectors.${envelope.method}: ${envelope.app} does not own mapping ${mappingRef}`,
+		);
+	}
+	return owner;
+}
+
+async function requireWebhookStore(
+	envelope: Envelope,
+	deps: ConnectorsServiceDeps,
+): Promise<ConnectorWebhookStore> {
+	const store = await deps.getWebhookStore?.();
+	if (!store) {
+		throw makeError("Unavailable", `connectors.${envelope.method}: no active vault session`);
+	}
+	return store;
+}
+
+async function ingressInfo(deps: ConnectorsServiceDeps): Promise<ConnectorIngressInfo> {
+	return (await deps.ingressInfo?.()) ?? { loopbackBaseUrl: null, relayBaseUrl: null };
+}
+
+async function handleWebhookRegister(
+	envelope: Envelope,
+	deps: ConnectorsServiceDeps,
+): Promise<{
+	routeId: string;
+	endpointPath: string;
+	loopbackUrl: string | null;
+	relayUrl: string | null;
+}> {
+	await requireCapability(envelope, deps, CONNECTORS_WEBHOOK_CAP);
+	const arg = objectArg(envelope);
+	const mappingRef = requireString(arg.mappingRef, "mappingRef", "webhookRegister");
+	const owner = await requireMappingOwner(envelope, deps, mappingRef);
+	// The runtime `network.ingress` grant on the CONNECTOR app is the ingress
+	// gate (11b.8 model) — no grant, no endpoint. Fail-closed.
+	await requireServiceCapability(envelope, deps.getLedger, NETWORK_INGRESS_CAP, "connectors");
+	const store = await requireWebhookStore(envelope, deps);
+	const minted = store.mint({
+		mappingId: mappingRef,
+		accountId: owner.accountId,
+		connectorAppId: owner.connectorAppId,
+	});
+	// Register the route (and lazily bind the listener) BEFORE returning the
+	// URL, so the endpoint is live the moment the caller can see it.
+	await deps.onWebhooksChanged?.();
+	const info = await ingressInfo(deps);
+	// Reveal-once: the plaintext secret exists only inside this response's
+	// path/URLs — at rest the store holds its SHA-256 and no later method
+	// (status included) can return it again.
+	const endpointPath = `/wh/${minted.routeId}/${minted.secret}`;
+	return {
+		routeId: minted.routeId,
+		endpointPath,
+		loopbackUrl: info.loopbackBaseUrl ? `${info.loopbackBaseUrl}${endpointPath}` : null,
+		relayUrl: info.relayBaseUrl ? `${info.relayBaseUrl}${endpointPath}` : null,
+	};
+}
+
+async function handleWebhookStatus(
+	envelope: Envelope,
+	deps: ConnectorsServiceDeps,
+): Promise<{
+	registered: boolean;
+	routeId: string | null;
+	createdAt: number | null;
+	loopbackBaseUrl: string | null;
+	relayBaseUrl: string | null;
+}> {
+	await requireCapability(envelope, deps, CONNECTORS_WEBHOOK_CAP);
+	const arg = objectArg(envelope);
+	const mappingRef = requireString(arg.mappingRef, "mappingRef", "webhookStatus");
+	await requireMappingOwner(envelope, deps, mappingRef);
+	const store = await requireWebhookStore(envelope, deps);
+	const record = store.getByMapping(mappingRef);
+	const info = await ingressInfo(deps);
+	return {
+		registered: record !== null,
+		routeId: record?.routeId ?? null,
+		createdAt: record?.createdAt ?? null,
+		loopbackBaseUrl: info.loopbackBaseUrl,
+		relayBaseUrl: info.relayBaseUrl,
+	};
+}
+
+async function handleWebhookRevoke(
+	envelope: Envelope,
+	deps: ConnectorsServiceDeps,
+): Promise<{ ok: true; removed: boolean }> {
+	await requireCapability(envelope, deps, CONNECTORS_WEBHOOK_CAP);
+	const arg = objectArg(envelope);
+	const mappingRef = requireString(arg.mappingRef, "mappingRef", "webhookRevoke");
+	await requireMappingOwner(envelope, deps, mappingRef);
+	const store = await requireWebhookStore(envelope, deps);
+	const removed = store.revokeByMapping(mappingRef);
+	if (removed) await deps.onWebhooksChanged?.();
+	return { ok: true, removed };
 }
 
 async function handleRequest(envelope: Envelope, deps: ConnectorsServiceDeps): Promise<unknown> {
