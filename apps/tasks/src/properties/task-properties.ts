@@ -279,44 +279,6 @@ export function bridgedTaskRows(
 	});
 }
 
-/** Catalog defs bound on the task (a key in `values` that resolves in the
- *  vault catalog), name-sorted — the editable custom rows (9.14.16). A key
- *  whose def was deleted from the catalog renders nothing (the value stays
- *  in the bag untouched). */
-export function boundCustomDefs(
-	values: ValuesMap | undefined,
-	catalog: ReadonlyMap<string, PropertyDef>,
-): PropertyDef[] {
-	if (!values) return [];
-	const out: PropertyDef[] = [];
-	for (const key of Object.keys(values)) {
-		const def = catalog.get(key);
-		if (def) out.push(def);
-	}
-	out.sort((a, b) => a.name.localeCompare(b.name));
-	return out;
-}
-
-/** Catalog defs not yet bound on the task — the add-property menu's
- *  candidates, name-sorted. Excludes keys already in `values` AND the
- *  fixed/bridged catalog keys shown as their own dedicated rows: `assigneeId`
- *  is the F-152 catalog def the app ensures at boot, and binding it into
- *  `values` would create a second, divergent "Assignee" the chip / group-by /
- *  Graph edge ignore (they read `task.assigneeId`). */
-export function unboundCustomDefs(
-	values: ValuesMap | undefined,
-	catalog: ReadonlyMap<string, PropertyDef>,
-): PropertyDef[] {
-	const bound = new Set(Object.keys(values ?? {}));
-	const fixed = new Set([ASSIGNEE_CATALOG_DEF.key]);
-	const out: PropertyDef[] = [];
-	for (const def of catalog.values()) {
-		if (!bound.has(def.key) && !fixed.has(def.key)) out.push(def);
-	}
-	out.sort((a, b) => a.name.localeCompare(b.name));
-	return out;
-}
-
 /** The vault-catalog EntityRef def for `Task.assigneeId` (F-152) — the def
  *  the shell's catalog-driven derivation reads to project the Task→Person
  *  "Assignee" edge into the Graph. Key + shape mirror the dev seeder

@@ -1,4 +1,4 @@
-import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
+import { PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { Priority, type Task } from "../types/task";
 import {
@@ -6,7 +6,6 @@ import {
 	PROJECT_ENTITY_TYPE,
 	TASK_PROPERTY_DEFS,
 	TASK_PROP_KEY,
-	boundCustomDefs,
 	parseAssigneeValue,
 	parseDateValue,
 	parseDurationValue,
@@ -15,7 +14,6 @@ import {
 	parseStatusValue,
 	parseTagsValue,
 	taskToValues,
-	unboundCustomDefs,
 } from "./task-properties";
 import { PRIORITY_DICT_ID, STATUS_DICT_ID, TAGS_DICT_ID } from "./task-vocab";
 
@@ -171,30 +169,6 @@ describe("write-back parsers", () => {
 		expect(parseDurationValue(0)).toBeNull();
 		expect(parseDurationValue(null)).toBeNull();
 		expect(parseDurationValue(-2)).toBeNull();
-	});
-});
-
-describe("custom-field defs (9.14.16)", () => {
-	const def = (key: string, name: string): PropertyDef => ({
-		key,
-		name,
-		icon: null,
-		valueType: ValueType.Text,
-	});
-	const catalog = new Map<string, PropertyDef>([
-		["p.b", def("p.b", "Beta")],
-		["p.a", def("p.a", "Alpha")],
-		["p.c", def("p.c", "Gamma")],
-	]);
-
-	it("bound defs are the catalog-resolvable keys of the bag, name-sorted", () => {
-		const bound = boundCustomDefs({ "p.c": "x", "p.a": "y", "p.gone": "z" }, catalog);
-		expect(bound.map((d) => d.key)).toEqual(["p.a", "p.c"]);
-	});
-
-	it("unbound defs are the rest of the catalog, name-sorted; empty bag = all", () => {
-		expect(unboundCustomDefs({ "p.a": "y" }, catalog).map((d) => d.key)).toEqual(["p.b", "p.c"]);
-		expect(unboundCustomDefs(undefined, catalog).map((d) => d.key)).toEqual(["p.a", "p.b", "p.c"]);
 	});
 });
 

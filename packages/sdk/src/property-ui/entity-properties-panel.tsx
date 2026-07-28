@@ -20,6 +20,8 @@
 
 import type { PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import type { AddPropertyPickerLabels } from "../i18n/common-labels";
+import type { RelationTargetType } from "../inline-property-form-logic";
 import {
 	PropertiesPanel,
 	type PropertiesPanelMeta,
@@ -44,9 +46,26 @@ export type EntityPropertiesPanelProps = {
 	/** Persist the next values bag. The host owns the update verb (and any
 	 *  on-demand entity creation); the panel only computes the next bag. */
 	onWriteValues: (next: ValuesMap) => void;
-	emptyLabel: string;
+	/** Optional for hosts whose `extraRows` guarantee a never-empty grid. */
+	emptyLabel?: string;
 	addLabel: string;
 	removeLabel: (name: string) => string;
+	/** Host-owned rows interleaved into the SAME `.bs-props__list` grid,
+	 *  rendered BEFORE the (name-sorted) bag-derived rows, in the order
+	 *  given (Props-3). For hybrid hosts — Tasks' typed status / due /
+	 *  project bridge rows — whose fields are not part of the values bag:
+	 *  each row carries its own cell value, `onChange` persister and
+	 *  `readOnly`, so per-field lock enforcement stays with the host. */
+	extraRows?: readonly PropertiesPanelRow[];
+	/** Catalog keys the add-property picker must not offer (threaded to
+	 *  `AddPropertyPicker.excludeKeys`) — for hosts whose `extraRows`
+	 *  shadow a real catalog def (Tasks' `assigneeId`). */
+	pickerExcludeKeys?: ReadonlySet<string>;
+	/** Localised labels for the panel's add-property picker, merged over
+	 *  the English SDK defaults. */
+	pickerLabels?: Partial<AddPropertyPickerLabels>;
+	/** Entity types a picker-created Relation can target. */
+	relationTargetTypes?: readonly RelationTargetType[];
 	meta?: readonly PropertiesPanelMeta[];
 	/** Suppress the panel's own header — set when hosted inside a tab strip
 	 *  that already labels it "Properties". */
@@ -66,6 +85,10 @@ export function EntityPropertiesPanel({
 	emptyLabel,
 	addLabel,
 	removeLabel,
+	extraRows,
+	pickerExcludeKeys,
+	pickerLabels,
+	relationTargetTypes,
 	meta,
 	hideHeader,
 	onClose,
@@ -84,7 +107,7 @@ export function EntityPropertiesPanel({
 			if (def) bound.push({ def });
 		}
 		bound.sort((a, b) => a.def.name.localeCompare(b.def.name));
-		return bound.map(({ def }) => ({
+		const bagRows = bound.map(({ def }) => ({
 			def,
 			value: readValue(values, def),
 			...(canMutate
@@ -104,7 +127,8 @@ export function EntityPropertiesPanel({
 					}
 				: {}),
 		}));
-	}, [values, properties, canMutate, onWriteValues]);
+		return extraRows ? [...extraRows, ...bagRows] : bagRows;
+	}, [values, properties, canMutate, onWriteValues, extraRows]);
 
 	const openAdd = useCallback(() => {
 		const rect = addButtonRef.current?.getBoundingClientRect();
@@ -131,7 +155,7 @@ export function EntityPropertiesPanel({
 				title={title}
 				rows={rows}
 				entityId={entityId}
-				emptyLabel={emptyLabel}
+				{...(emptyLabel ? { emptyLabel } : {})}
 				removeLabel={removeLabel}
 				{...(hideHeader ? { hideHeader: true } : onClose ? { onClose } : {})}
 				{...(closeLabel ? { closeLabel } : {})}
@@ -142,7 +166,14 @@ export function EntityPropertiesPanel({
 				{children}
 			</PropertiesPanel>
 			{addAnchor ? (
-				<AddPropertyPicker anchor={addAnchor} onPick={onPick} onClose={() => setAddAnchor(null)} />
+				<AddPropertyPicker
+					anchor={addAnchor}
+					onPick={onPick}
+					onClose={() => setAddAnchor(null)}
+					{...(pickerLabels ? { labels: pickerLabels } : {})}
+					{...(pickerExcludeKeys ? { excludeKeys: pickerExcludeKeys } : {})}
+					{...(relationTargetTypes ? { relationTargetTypes } : {})}
+				/>
 			) : null}
 		</>
 	);
