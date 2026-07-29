@@ -16,6 +16,7 @@
  * itself is destroyed (e.g. last file deleted).
  */
 
+import { shellAppearanceDark } from "@brainstorm-os/sdk/code-highlight";
 import {
 	attachFindBar,
 	attachFindShortcuts,
@@ -1002,6 +1003,19 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 	}
 	gutter.addEventListener("click", onGutterClick);
 
+	// Appearance flip while the pane is open: the preload rewrites `<body>`'s
+	// `color-scheme` and announces it. An `Auto` syntax theme must re-tokenise
+	// or the overlay keeps painting the departing palette on the new surface.
+	const onAppearanceChanged = (): void => {
+		if (state.syntaxTheme !== SyntaxThemePreference.Auto) return;
+		if (state.binding)
+			void tokenizeAndPaint(
+				state.foldView ? textarea.value : state.binding.snapshot(),
+				state.row.language,
+			);
+	};
+	window.addEventListener("brainstorm:theme-changed", onAppearanceChanged);
+
 	// ── Find & replace (B9.3 — shared FindBar over @codemirror/search) ────
 
 	function scrollOffsetIntoView(offset: number): void {
@@ -1234,6 +1248,7 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 			textarea.removeEventListener("click", onCaretMove);
 			textarea.removeEventListener("select", onCaretMove);
 			gutter.removeEventListener("click", onGutterClick);
+			window.removeEventListener("brainstorm:theme-changed", onAppearanceChanged);
 			hover.dispose();
 			completion.dispose();
 			state.binding?.dispose();
@@ -1319,12 +1334,15 @@ function renderGutterLine(line: GutterLine, fold?: GutterFoldInfo): HTMLElement 
 }
 
 /**
- * Whether the renderer is currently in dark mode. The shell theme is the
- * source of truth — we read `prefers-color-scheme` here because the shell's
- * `color-scheme: light dark` declaration is what the renderer honours. The
- * `Auto` syntax-theme preference resolves through this.
+ * Whether the renderer is currently in dark mode. The SHELL theme is the
+ * source of truth and can disagree with the OS setting — read the painted
+ * appearance first (`shellAppearanceDark`, see its doc for why `<body>`);
+ * the OS-level media query is only the no-shell fallback (unit tests,
+ * detached docs). The `Auto` syntax-theme preference resolves through this.
  */
 export function prefersDarkScheme(): boolean {
+	const painted = shellAppearanceDark();
+	if (painted !== null) return painted;
 	if (typeof window === "undefined" || !window.matchMedia) return false;
 	return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }

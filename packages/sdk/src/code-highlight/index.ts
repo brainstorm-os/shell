@@ -40,6 +40,27 @@ export enum HighlightTheme {
 	Dark = "github-dark",
 }
 
+/**
+ * The SHELL-painted appearance for this document, or `null` when no shell
+ * painted one (unit tests, detached docs). The preload writes the resolved
+ * appearance as `color-scheme` on `<body>` (the `#brainstorm-tokens` style);
+ * every app's own stylesheet says `:root { color-scheme: light dark }`, which
+ * out-specifies that rule on `<html>` — so `<html>`'s computed value is the
+ * constant "light dark" while `<body>` (no competing declaration) carries the
+ * real appearance. Consumers resolving a highlight theme MUST prefer this
+ * over the OS-level `prefers-color-scheme` media query: the shell theme can
+ * disagree with the OS setting, and reading the media query first is exactly
+ * how a Dark-appearance shell on a light-mode OS shipped github-light tokens
+ * on a near-black editor (dark-sweep 2026-07-29).
+ */
+export function shellAppearanceDark(): boolean | null {
+	if (typeof document === "undefined" || !document.body) return null;
+	const scheme = getComputedStyle(document.body).colorScheme?.trim();
+	if (scheme === "dark") return true;
+	if (scheme === "light") return false;
+	return null;
+}
+
 /** Grammar-chunk loader: resolve a Shiki language id to its `LanguageInput`,
  *  or `null` when unknown / unavailable (the consumer falls back to plain). */
 export type LoadLanguageChunk = (shikiId: string) => Promise<LanguageInput | null>;

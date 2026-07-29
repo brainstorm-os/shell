@@ -22,7 +22,7 @@ import type { CodeFileRow } from "../logic/code-projection";
 import { getCodeBuffer } from "../logic/code-y-buffer";
 import { SyntaxThemePreference } from "../logic/syntax-theme";
 import { LanguageKey } from "../types/code-file";
-import { createCodePane } from "./code-pane";
+import { createCodePane, prefersDarkScheme } from "./code-pane";
 import type { DiffViewMode } from "./diff-view";
 
 const NOOP_LABELS = {
@@ -482,5 +482,25 @@ describe("createCodePane", () => {
 		pane.setSyntaxTheme(SyntaxThemePreference.Dark);
 		expect(changes).toEqual([SyntaxThemePreference.Dark]);
 		pane.dispose();
+	});
+});
+
+describe("prefersDarkScheme — the shell appearance wins over the OS media query", () => {
+	// The preload paints the resolved appearance as `color-scheme` on <body>
+	// (#brainstorm-tokens). Reading the OS-level `prefers-color-scheme` first
+	// is exactly how a Dark-appearance shell on a light-mode OS shipped
+	// github-light tokens on a near-black editor (dark-sweep 2026-07-29).
+	it("follows the body's computed color-scheme in both directions", () => {
+		document.body.style.setProperty("color-scheme", "dark");
+		expect(prefersDarkScheme()).toBe(true);
+		document.body.style.setProperty("color-scheme", "light");
+		expect(prefersDarkScheme()).toBe(false);
+		document.body.style.removeProperty("color-scheme");
+	});
+
+	it("falls back to the media query when no scheme is painted (no shell)", () => {
+		document.body.style.removeProperty("color-scheme");
+		// jsdom's matchMedia never matches — the no-shell fallback is light.
+		expect(prefersDarkScheme()).toBe(false);
 	});
 });
