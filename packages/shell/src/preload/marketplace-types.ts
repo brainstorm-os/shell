@@ -26,6 +26,15 @@ export enum MarketplaceListingSource {
 	Catalog = "catalog",
 }
 
+/** Advisory manifest-signature status recorded at install — wire values
+ *  mirror the main process `AppSignatureStatus` (13.2). */
+export enum MarketplaceSignatureStatus {
+	Unsigned = "unsigned",
+	Verified = "verified",
+	Untrusted = "untrusted",
+	Invalid = "invalid",
+}
+
 export type MarketplaceListing = {
 	kind: MarketplaceContentKind;
 	id: string;
@@ -35,6 +44,9 @@ export type MarketplaceListing = {
 	source: MarketplaceListingSource;
 	sourceName: string;
 	installState: MarketplaceInstallState;
+	/** Set on installed app listings; `unsigned` marks a local/sideloaded
+	 *  install the UI surfaces honestly. */
+	signatureStatus?: MarketplaceSignatureStatus;
 	preview?: {
 		background: string;
 		surface: string;
@@ -50,6 +62,43 @@ export type MarketplaceSource = {
 };
 
 export type MarketplaceInstallResult = { ok: true } | { ok: false; reason: string };
+
+/** Sideload (folder / `.brainstorm`) install outcome — wire shape kept in
+ *  sync with `main/ipc/sideload-handlers.ts` (`SideloadInstallResult`; the
+ *  main process can't import preload types). */
+export enum MarketplaceSideloadStatus {
+	Installed = "installed",
+	Cancelled = "cancelled",
+	Failed = "failed",
+}
+
+export enum MarketplaceSideloadFailureCode {
+	NotAllowed = "not-allowed",
+	NoVaultSession = "no-vault-session",
+	BadManifest = "bad-manifest",
+	AlreadyInstalled = "already-installed",
+	BadArchive = "bad-archive",
+	ArchiveTooLarge = "archive-too-large",
+	InstallFailed = "install-failed",
+}
+
+export type MarketplaceSideloadResult =
+	| {
+			status: MarketplaceSideloadStatus.Installed;
+			app: {
+				id: string;
+				name: string;
+				version: string;
+				signatureStatus: MarketplaceSignatureStatus;
+			};
+			grantedCapabilities: string[];
+	  }
+	| { status: MarketplaceSideloadStatus.Cancelled }
+	| {
+			status: MarketplaceSideloadStatus.Failed;
+			code: MarketplaceSideloadFailureCode;
+			reason: string;
+	  };
 
 /** How an available update is gated (mirrors `UpdateClassification`). */
 export enum MarketplaceUpdateClassification {

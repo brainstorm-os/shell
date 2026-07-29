@@ -30,8 +30,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { MarketplaceListing } from "../../preload/marketplace-types";
 import { t } from "../i18n/t";
+import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Icon, IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
+import { openInstallFromMenu } from "./install-from-menu";
 import { ListingCard } from "./listing-card";
 import { ListingDetail } from "./listing-detail";
 import { countByKind, filterListings } from "./listing-filters";
@@ -324,6 +326,14 @@ export function Marketplace({ onClose, initialPanel = MarketplacePanel.Browse }:
 											ariaLabel={t("shell.marketplace.searchLabel")}
 											clearLabel={t("shell.marketplace.searchClear")}
 										/>
+										<Button
+											variant={ButtonVariant.Neutral}
+											size={ButtonSize.Md}
+											iconLeft={IconName.FolderPlus}
+											onClick={(e) => openInstallFromMenu(e.currentTarget, refresh)}
+										>
+											{t("shell.marketplace.install.button")}
+										</Button>
 									</div>
 									{loading ? (
 										<p className="marketplace__loading">{t("shell.common.loading")}</p>

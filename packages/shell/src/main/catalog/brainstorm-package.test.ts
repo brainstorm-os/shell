@@ -48,6 +48,16 @@ describe("brainstorm-package — pack/unpack", () => {
 		expect(Buffer.from(bytes.subarray(0, 4)).toString("ascii")).toBe("BSB1");
 		expect(bytes[5]).toBe(1);
 	});
+
+	it("bounds decompression (bomb defense): a tiny archive expanding past maxOutputBytes throws", () => {
+		// 256 KiB of zeros gzips to a few hundred bytes.
+		const files = new Map<string, Uint8Array>([["big.bin", new Uint8Array(256 * 1024)]]);
+		const bytes = packBrainstormBundle(files);
+		expect(bytes.length).toBeLessThan(4096);
+		expect(() => unpackBrainstormBundle(bytes, { maxOutputBytes: 4096 })).toThrow();
+		// Within the bound it still unpacks.
+		expect(unpackBrainstormBundle(bytes, { maxOutputBytes: 1024 * 1024 }).size).toBe(1);
+	});
 });
 
 describe("brainstorm-package — unpack to dir", () => {

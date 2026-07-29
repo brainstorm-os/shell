@@ -1242,14 +1242,18 @@ export {
 	MarketplaceContentKind,
 	MarketplaceInstallState,
 	MarketplaceListingSource,
+	MarketplaceSideloadFailureCode,
+	MarketplaceSideloadStatus,
 	type MarketplaceInstallResult,
 	type MarketplaceListing,
+	type MarketplaceSideloadResult,
 	type MarketplaceSource,
 } from "./marketplace-types";
 import type { BinItem } from "./bin-types";
 import type {
 	MarketplaceInstallResult,
 	MarketplaceListing,
+	MarketplaceSideloadResult,
 	MarketplaceSource,
 	MarketplaceUpdate,
 } from "./marketplace-types";
@@ -1265,6 +1269,12 @@ const marketplace = {
 		ipcRenderer.invoke("marketplace:apply-update", appId),
 	activateTheme: (theme: ThemeName): Promise<boolean> =>
 		ipcRenderer.invoke("marketplace:activate-theme", theme),
+	/** Sideload installs (AppForge-1) — the main process runs the OS dialog +
+	 *  validation; the renderer only ever sees a typed result. */
+	installFromFolder: (): Promise<MarketplaceSideloadResult> =>
+		ipcRenderer.invoke("apps:install-from-folder"),
+	installFromFile: (): Promise<MarketplaceSideloadResult> =>
+		ipcRenderer.invoke("apps:install-from-file"),
 };
 
 const bin = {

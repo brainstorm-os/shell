@@ -8,6 +8,7 @@ import {
 	firstPartyAppById,
 	firstPartyAppsDir,
 	readFirstPartyCatalog,
+	resolveFirstPartyAppsDir,
 } from "./first-party";
 
 describe("BOOTSTRAP_APPS", () => {
@@ -23,6 +24,26 @@ describe("BOOTSTRAP_APPS", () => {
 describe("firstPartyAppsDir", () => {
 	it("walks up four levels from the compiled main dir to <repo>/apps", () => {
 		expect(firstPartyAppsDir("/r/packages/shell/out/main")).toBe("/r/apps");
+	});
+});
+
+describe("resolveFirstPartyAppsDir", () => {
+	it("uses the dev relative walk when not packaged", () => {
+		expect(
+			resolveFirstPartyAppsDir("/r/packages/shell/out/main", {
+				isPackaged: false,
+				resourcesPath: "/unused",
+			}),
+		).toBe("/r/apps");
+	});
+
+	it("uses the extraResources tree when packaged — the asar-relative walk does not exist there", () => {
+		expect(
+			resolveFirstPartyAppsDir("/Applications/Brainstorm.app/Contents/Resources/app.asar/out/main", {
+				isPackaged: true,
+				resourcesPath: "/Applications/Brainstorm.app/Contents/Resources",
+			}),
+		).toBe("/Applications/Brainstorm.app/Contents/Resources/apps");
 	});
 });
 

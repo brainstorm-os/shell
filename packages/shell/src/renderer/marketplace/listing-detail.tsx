@@ -19,6 +19,7 @@ import {
 	MarketplaceContentKind,
 	MarketplaceInstallState,
 	type MarketplaceListing,
+	MarketplaceSignatureStatus,
 } from "../../preload/marketplace-types";
 import { AppIcon } from "../dashboard/app-icon";
 import "../dashboard/app-icon.css";
@@ -56,8 +57,16 @@ export function ListingDetail({ listing, onBack, onChanged }: ListingDetailProps
 						<span className="marketplace__detail-chip">
 							{t(`shell.marketplace.kind.${listing.kind}.label`)}
 						</span>
-						<span className="marketplace__detail-chip">{listing.sourceName}</span>
+						<span className="marketplace__detail-chip">{tIfKey(listing.sourceName)}</span>
 						<span className="marketplace__detail-chip">{listing.version}</span>
+						{listing.signatureStatus === MarketplaceSignatureStatus.Unsigned && (
+							<span
+								className="marketplace__detail-chip marketplace__detail-chip--unsigned"
+								title={t("shell.marketplace.signature.unsignedHint")}
+							>
+								{t("shell.marketplace.signature.unsigned")}
+							</span>
+						)}
 					</div>
 					{listing.summary && <p className="marketplace__detail-summary">{tIfKey(listing.summary)}</p>}
 					<DetailActions listing={listing} onChanged={onChanged} />
@@ -75,7 +84,7 @@ export function ListingDetail({ listing, onBack, onChanged }: ListingDetailProps
 					</div>
 					<div className="marketplace__detail-spec-row">
 						<dt>{t("shell.marketplace.detail.spec.source")}</dt>
-						<dd>{listing.sourceName}</dd>
+						<dd>{tIfKey(listing.sourceName)}</dd>
 					</div>
 					<div className="marketplace__detail-spec-row">
 						<dt>{t("shell.marketplace.detail.spec.state")}</dt>
@@ -83,6 +92,12 @@ export function ListingDetail({ listing, onBack, onChanged }: ListingDetailProps
 							<StateBadge state={listing.installState} />
 						</dd>
 					</div>
+					{listing.signatureStatus !== undefined && (
+						<div className="marketplace__detail-spec-row">
+							<dt>{t("shell.marketplace.detail.spec.signature")}</dt>
+							<dd>{t(`shell.marketplace.signature.${listing.signatureStatus}`)}</dd>
+						</div>
+					)}
 				</dl>
 			</section>
 		</article>

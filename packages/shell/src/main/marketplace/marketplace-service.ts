@@ -23,6 +23,8 @@
  */
 
 import { type ThemeName, themeCatalog } from "@brainstorm-os/tokens";
+import type { AppSignatureStatus } from "../apps/app-signature";
+import { InstallOrigin } from "../apps/install-provenance";
 import { ContentKind } from "./kinds";
 import { InstallState, ListingSource, type MarketplaceListing } from "./listing";
 
@@ -38,6 +40,12 @@ export type InstalledAppRecord = {
 	/** Manifest description — surfaces as the listing summary on cards
 	 *  and the detail page. Optional because legacy bundles may lack it. */
 	description?: string;
+	/** Registry-row install origin (doc 59). Local installs (`local-file` /
+	 *  `sideload`) get an honest "local install" source label. Optional so
+	 *  test fixtures and legacy callers keep working. */
+	origin?: InstallOrigin;
+	/** Advisory manifest-signature status recorded at install. */
+	signatureStatus?: AppSignatureStatus;
 };
 
 /** A listing resolved from a remote catalog (the `CatalogClient`, 14.31) — the
@@ -107,7 +115,12 @@ export class MarketplaceService {
 		const installedIds = new Set(installed.map((app) => app.id));
 
 		const installedListings = installed.map((app) =>
-			toAppListing(app, ListingSource.Sideload, InstallState.Installed),
+			toAppListing(
+				app,
+				ListingSource.Sideload,
+				InstallState.Installed,
+				isLocalOrigin(app.origin) ? LOCAL_SOURCE_NAME_KEY : BUILTIN_SOURCE_NAME,
+			),
 		);
 		// Built-in catalog apps not currently installed — keep them visible as
 		// reinstallable. They ship in the binary, so the source is BuiltIn.
@@ -157,6 +170,14 @@ export class MarketplaceService {
 	}
 }
 
+/** i18n key surfaced as `sourceName` for a local (folder / `.brainstorm`)
+ *  install — the renderer resolves keys via `tIfKey`, raw names pass through. */
+export const LOCAL_SOURCE_NAME_KEY = "shell.marketplace.source.local" as const;
+
+function isLocalOrigin(origin: InstallOrigin | undefined): boolean {
+	return origin === InstallOrigin.LocalFile || origin === InstallOrigin.Sideload;
+}
+
 function toAppListing(
 	app: InstalledAppRecord,
 	source: ListingSource,
@@ -172,6 +193,7 @@ function toAppListing(
 		source,
 		sourceName,
 		installState,
+		...(app.signatureStatus !== undefined ? { signatureStatus: app.signatureStatus } : {}),
 	};
 }
 

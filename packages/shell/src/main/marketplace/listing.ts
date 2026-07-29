@@ -47,6 +47,10 @@ export type MarketplaceListing = {
 	source: ListingSource;
 	sourceName: string;
 	installState: InstallState;
+	/** Advisory manifest-signature status recorded at install (13.2) — set on
+	 *  installed app listings so a local/sideloaded install can honestly read
+	 *  "unsigned" in the UI. Wire values mirror `AppSignatureStatus`. */
+	signatureStatus?: string;
 	/**
 	 * Optional preview swatch for themes (rendered as a small palette
 	 * gradient on the card). Apps get null until we render their icon —

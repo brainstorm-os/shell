@@ -225,6 +225,7 @@ import {
 import { registerDashboard } from "./ipc/renderer-identity";
 import { registerSearchHandlers } from "./ipc/search-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
+import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
 import { registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
 import { registerAutoUpdateHandlers, registerUpdateHandlers } from "./ipc/update-handlers";
@@ -1965,6 +1966,9 @@ void app.whenReady().then(async () => {
 	const activityStore = new BackgroundActivityStore();
 	registerActivityHandlers({ getDashboard: () => dashboardWindow, store: activityStore });
 	registerMarketplaceHandlers({ mainDir: __dirname });
+	// Local (folder / .brainstorm) app installs — dashboard-only, user-gesture
+	// gated (AppForge-1).
+	registerSideloadHandlers({ getDashboard: () => dashboardWindow });
 	registerIconsHandlers({ getDashboard: () => dashboardWindow });
 	registerCoversHandlers({ getDashboard: () => dashboardWindow });
 	registerImportExportHandlers({

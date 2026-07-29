@@ -76,6 +76,21 @@ export function firstPartyAppsDir(mainDir: string): string {
 	return join(mainDir, "..", "..", "..", "..", "apps");
 }
 
+/**
+ * Resolve the first-party bundle tree for the *running* build. In dev the
+ * repo's `apps/` sits four levels above the compiled main entry; in a
+ * packaged shell that walk lands inside (nonexistent next to) the asar, so
+ * the correct root is `process.resourcesPath/apps` — the same tree
+ * `bootstrapApps` installs from (electron-builder `extraResources`). Pure
+ * (packaging facts injected) so the branch is unit-testable.
+ */
+export function resolveFirstPartyAppsDir(
+	mainDir: string,
+	runtime: { isPackaged: boolean; resourcesPath: string },
+): string {
+	return runtime.isPackaged ? join(runtime.resourcesPath, "apps") : firstPartyAppsDir(mainDir);
+}
+
 export function firstPartyAppById(appId: string): FirstPartyApp | undefined {
 	return FIRST_PARTY_APPS.find((app) => app.expectedAppId === appId);
 }
