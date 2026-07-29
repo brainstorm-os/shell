@@ -65,7 +65,12 @@ export const DEMO_AGENT_SCRIPT: readonly string[] = [
 /** AppForge-3 — the "build a tiny app inside Brainstorm" act: the agent
  *  drafts a `manifest.json` + an `index.html` as `propose-code-file` cards the
  *  user approves into the vault. Same capture-only contract as the default
- *  script; selected via `BRAINSTORM_DEMO_AGENT=appforge`. */
+ *  script; selected via `BRAINSTORM_DEMO_AGENT=appforge`.
+ *
+ *  The drafted manifest MUST satisfy `validateManifest` — the whole point of
+ *  the act is that the approved files then install through
+ *  `apps:install-from-vault`, and the vault picker greys out any candidate
+ *  whose manifest is invalid. `demo-agent-provider.test.ts` pins that. */
 export const DEMO_AGENT_APPFORGE_SCRIPT: readonly string[] = [
 	JSON.stringify({
 		tool: "propose-code-file",
@@ -77,6 +82,7 @@ export const DEMO_AGENT_APPFORGE_SCRIPT: readonly string[] = [
 				'  "id": "io.brainstorm.hello",',
 				'  "name": "Hello",',
 				'  "version": "0.1.0",',
+				'  "sdk": "1",',
 				'  "entry": "index.html",',
 				'  "capabilities": []',
 				"}",

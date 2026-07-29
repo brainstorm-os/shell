@@ -1,5 +1,6 @@
 import { type AiChatMessage, MessageRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
+import { validateManifest } from "../apps/manifest";
 import {
 	DEMO_AGENT_APPFORGE_MODE,
 	DEMO_AGENT_APPFORGE_SCRIPT,
@@ -93,6 +94,20 @@ describe("demo-agent-provider — the AppForge propose-code-file script", () => 
 			expect(typeof call.args.content).toBe("string");
 			expect(call.args.content.length).toBeLessThan(256 * 1024);
 		}
+	});
+
+	it("the drafted manifest.json is INSTALLABLE — it passes the shell's manifest validator", () => {
+		// The act's payoff is that the approved files install through
+		// `apps:install-from-vault`, which validates the manifest server-side and
+		// disables the picker row when it fails. A script that stages cleanly but
+		// can't install is a silently broken demo — this is the guard.
+		const line = DEMO_AGENT_APPFORGE_SCRIPT[0];
+		expect(line).toBeDefined();
+		const call = JSON.parse(line as string);
+		expect(call.args.path).toBe("hello-app/manifest.json");
+		const result = validateManifest(JSON.parse(call.args.content));
+		expect(result.ok ? "" : `${result.reason} @ ${result.path ?? "?"}`).toBe("");
+		expect(result.ok).toBe(true);
 	});
 
 	it("the provider in appforge mode walks the code-file script and clamps at the final", async () => {
