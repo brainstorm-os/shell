@@ -61,6 +61,65 @@
           "kind": "li",
           "text": [
             {
+              "text": "Code, readable in the dark",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the "
+            },
+            {
+              "text": "Code editor",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and code blocks in "
+            },
+            {
+              "text": "Notes",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Journal",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ", and "
+            },
+            {
+              "text": "Tasks",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " now follow the app's theme instead of guessing — no more light-on-dark (or permanently dark) syntax colors, and they re-tint live when you switch themes. Fenced blocks like "
+            },
+            {
+              "text": "```ts",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " highlight properly too."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Calendar",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — event chips in week and day view no longer clip the time line; details show or hide based on the room each chip actually has."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
               "text": "Database",
               "marks": ["bold"]
             },
