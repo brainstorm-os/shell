@@ -88,6 +88,7 @@ import {
 	flatCellIndex,
 } from "../logic/grid-cell-nav";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";
+import { isNumericColumn } from "../logic/numeric-column";
 import { parseAggregationKind } from "../logic/rollup";
 import { entityIcon, entityTitle } from "../render/cells";
 import type { ColumnSpec, GridLayoutOptions } from "../types/list-view";
@@ -221,6 +222,20 @@ export function GridView(props: GridViewProps): ReactElement {
 		}
 		return map;
 	}, [visible, compiled.rows, hasEdit]);
+
+	// Numeric columns right-align header + cells + editors so numerals share
+	// an edge with the footer aggregate (POLISH-PROP-2). Computed from the
+	// effective def regardless of editability — a read-only grid aligns the
+	// same way. Kind logic lives in `logic/numeric-column`.
+	const numericById = useMemo<ReadonlySet<string>>(() => {
+		const set = new Set<string>();
+		for (const c of visible) {
+			if (c.propertyId === TITLE_COL) continue;
+			const def = c.rollup || c.formula ? null : effectiveColumnDef(c.propertyId, compiled.rows);
+			if (isNumericColumn(c, def)) set.add(c.propertyId);
+		}
+		return set;
+	}, [visible, compiled.rows]);
 
 	// Type-or-pick combobox source (DS-cell-combobox-1): the distinct existing
 	// values for each select-like editable Text column (no catalog vocabulary),
@@ -437,6 +452,7 @@ export function GridView(props: GridViewProps): ReactElement {
 										column={c}
 										label={columnLabel(c, columnDefs)}
 										isActive={activeColumn === c.propertyId}
+										numeric={numericById.has(c.propertyId)}
 										onResize={onResizeColumn}
 									/>
 								))}
@@ -473,6 +489,7 @@ export function GridView(props: GridViewProps): ReactElement {
 										columnSuggestions={columnSuggestions}
 										rollupById={rollupById}
 										rollupTargetDefs={rollupTargetDefs}
+										numericById={numericById}
 										pendingTitleEdit={pendingTitleEditId === entity.id}
 										onPendingTitleEditHandled={onPendingTitleEditHandled}
 										onSelect={onSelect}
@@ -635,11 +652,14 @@ function SortableHeaderCell({
 	column,
 	label,
 	isActive,
+	numeric,
 	onResize,
 }: {
 	column: ColumnSpec;
 	label: string;
 	isActive: boolean;
+	/** Numeric column → header right-aligns with its cells (POLISH-PROP-2). */
+	numeric: boolean;
 	onResize: ((propertyId: string, width: number) => void) | undefined;
 }): ReactElement {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -704,7 +724,11 @@ function SortableHeaderCell({
 	return (
 		<div
 			ref={setNodeRef}
-			className="dbv-grid__cell dbv-grid__cell--head"
+			className={
+				numeric
+					? "dbv-grid__cell dbv-grid__cell--head dbv-grid__cell--numeric"
+					: "dbv-grid__cell dbv-grid__cell--head"
+			}
 			{...attributes}
 			{...listeners}
 			style={style}
@@ -745,6 +769,8 @@ type GridRowProps = {
 	columnSuggestions: ReadonlyMap<string, readonly string[]>;
 	rollupById: ReadonlyMap<string, EntityRow>;
 	rollupTargetDefs: ColumnDefs;
+	/** Columns that render numerals → cells right-align (POLISH-PROP-2). */
+	numericById: ReadonlySet<string>;
 	/** This row should take the keyboard on mount (F-215/F-216): the title
 	 *  editor when editable, plain row focus otherwise. */
 	pendingTitleEdit: boolean;
@@ -777,6 +803,7 @@ const GridRow = memo(function GridRow({
 	columnSuggestions,
 	rollupById,
 	rollupTargetDefs,
+	numericById,
 	pendingTitleEdit,
 	onPendingTitleEditHandled,
 	onSelect,
@@ -919,6 +946,7 @@ const GridRow = memo(function GridRow({
 						suggestions={columnSuggestions.get(c.propertyId)}
 						rollupById={rollupById}
 						rollupTargetDef={rollupTargetDefs.get(c.propertyId) ?? null}
+						numeric={numericById.has(c.propertyId)}
 						cellProps={getCellProps(flat)}
 						autoEdit={editCell?.entityId === entity.id && editCell?.propertyId === c.propertyId}
 						onAutoEditHandled={onEditCellHandled}
@@ -940,6 +968,7 @@ function GridCell({
 	suggestions,
 	rollupById,
 	rollupTargetDef,
+	numeric,
 	cellProps,
 	autoEdit,
 	onAutoEditHandled,
@@ -956,6 +985,9 @@ function GridCell({
 	suggestions: readonly string[] | undefined;
 	rollupById: ReadonlyMap<string, EntityRow>;
 	rollupTargetDef: PropertyDef | null;
+	/** Numeric column → the cell (and its inline editor) right-aligns so
+	 *  numerals share an edge with the footer aggregate (POLISH-PROP-2). */
+	numeric: boolean;
 	/** Composite-keyboard props for this cell's flat cursor index — `id`
 	 *  (`aria-activedescendant` target), `role="gridcell"`, `aria-selected`
 	 *  (the cursor ring), `data-composite-index`, `tabIndex: -1`. */
@@ -971,9 +1003,14 @@ function GridCell({
 }): ReactElement {
 	const width =
 		column.width ?? (column.propertyId === TITLE_COL ? TITLE_WIDTH : DEFAULT_COLUMN_WIDTH);
+	const numericClass = numeric ? " dbv-grid__cell--numeric" : "";
 	if (column.rollup) {
 		return (
-			<div className="dbv-grid__cell dbv-grid__cell--rollup" style={{ width }} {...cellProps}>
+			<div
+				className={`dbv-grid__cell dbv-grid__cell--rollup${numericClass}`}
+				style={{ width }}
+				{...cellProps}
+			>
 				<RollupCell
 					rollup={column.rollup}
 					entity={entity}
@@ -985,7 +1022,11 @@ function GridCell({
 	}
 	if (column.formula) {
 		return (
-			<div className="dbv-grid__cell dbv-grid__cell--formula" style={{ width }} {...cellProps}>
+			<div
+				className={`dbv-grid__cell dbv-grid__cell--formula${numericClass}`}
+				style={{ width }}
+				{...cellProps}
+			>
 				<FormulaCell formula={column.formula} entity={entity} />
 			</div>
 		);
@@ -1017,7 +1058,11 @@ function GridCell({
 		);
 	}
 	return (
-		<div className="dbv-grid__cell dbv-grid__cell--editable" style={{ width }} {...cellProps}>
+		<div
+			className={`dbv-grid__cell dbv-grid__cell--editable${numericClass}`}
+			style={{ width }}
+			{...cellProps}
+		>
 			<EditableCell
 				entity={entity}
 				propertyId={column.propertyId}

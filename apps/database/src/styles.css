@@ -1151,6 +1151,26 @@ body.is-resizing .db-inspector__resize {
 	background: transparent;
 }
 
+/* Numeric columns (POLISH-PROP-2): number / currency / percent / duration,
+ * formula, and numeric-rollup cells right-align — header, cell value, and
+ * the inline editor — so numerals share an edge with the footer aggregate
+ * (the standard table convention). Which columns qualify is decided by
+ * `logic/numeric-column.ts`. */
+.dbv-grid__cell--numeric {
+	justify-content: flex-end;
+}
+
+.dbv-grid__cell--numeric > .bs-cell-pill,
+.dbv-grid__cell--numeric > .bs-cell-plain {
+	justify-content: flex-end;
+	text-align: end;
+}
+
+.dbv-grid__cell--numeric .bs-cell-plain-input,
+.dbv-grid__cell--numeric .bs-cell-input {
+	text-align: end;
+}
+
 /* Computed cell (9.12.17): a read-only rollup / formula value, shared by the
  * grid and the card views (board / gallery / list). Reads like the footer
  * value (tabular numerals) and is visibly non-editable (no hover affordance,

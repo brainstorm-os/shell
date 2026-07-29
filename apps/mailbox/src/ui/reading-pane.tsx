@@ -3,6 +3,7 @@
  *  Received mail is immutable; the only mutations are flags (server state)
  *  and reply/forward dispatch as intents. */
 
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import type { ReactElement } from "react";
 import { t } from "../i18n";
@@ -40,13 +41,15 @@ export function ReadingPane({
 	onOpenAttachment,
 }: ReadingPaneProps): ReactElement {
 	if (!message) {
+		// Shared <EmptyState> (POLISH-LAY-2) so this pane and the message
+		// list's empty read as one design — same primitive, both centred.
 		return (
 			<div className="mb-reading mb-reading--empty">
-				<div className="mb-reading__placeholder">
-					<Icon name={IconName.KindEmail} className="mb-reading__placeholder-icon" />
-					<p className="mb-reading__placeholder-title">{t("reading.empty.title")}</p>
-					<p className="mb-reading__placeholder-blurb">{t("reading.empty.blurb")}</p>
-				</div>
+				<EmptyState
+					icon={IconName.KindEmail}
+					title={t("reading.empty.title")}
+					hint={t("reading.empty.blurb")}
+				/>
 			</div>
 		);
 	}

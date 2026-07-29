@@ -126,6 +126,15 @@ export function NotesList({
 		return rows;
 	}, [notes, order]);
 
+	// Icon-gutter rule (POLISH-DSN-5, mirrors the F-461 menu-gutter rule):
+	// when ANY row in the list carries an icon, EVERY row reserves the icon
+	// slot so titles share a left edge; when none do, no gutter at all and
+	// titles sit flush.
+	const hasAnyIcon = useMemo(
+		() => flatRows.some((r) => r.kind === RowKind.Note && r.note.icon != null),
+		[flatRows],
+	);
+
 	// Disambiguate identical row labels — chiefly blank "Untitled" notes that
 	// share a minute and so collide on the time suffix (F-039): the 2nd, 3rd, …
 	// in display order get an "(n)" so a column of blanks is never ambiguous.
@@ -288,9 +297,11 @@ export function NotesList({
 										}
 									}}
 								>
-									<span className="notes__sidebar-icon" aria-hidden="true">
-										<EntityIcon icon={icon} size={16} />
-									</span>
+									{hasAnyIcon ? (
+										<span className="notes__sidebar-icon" aria-hidden="true">
+											<EntityIcon icon={icon} size={16} />
+										</span>
+									) : null}
 									<span className="notes__sidebar-title">{rowLabel}</span>
 								</button>
 							</ObjectMenuTrigger>

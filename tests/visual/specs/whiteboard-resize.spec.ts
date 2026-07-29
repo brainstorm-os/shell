@@ -66,9 +66,10 @@ test("whiteboard node resize snaps its moving edge to a neighbour", async () => 
 		// Two stickies at a known separation (the same dev seeding the perf
 		// suite uses — deterministic, no menu-chrome selectors).
 		await wb.evaluate(() => {
-			(
-				window as unknown as { __brainstormWhiteboardDev: WbDev }
-			).__brainstormWhiteboardDev.seedGrid(2, { cols: 2, cell: 300 });
+			(window as unknown as { __brainstormWhiteboardDev: WbDev }).__brainstormWhiteboardDev.seedGrid(
+				2,
+				{ cols: 2, cell: 300 },
+			);
 		});
 		await expect(wb.locator(".whiteboard__node")).toHaveCount(2, { timeout: 10_000 });
 

@@ -225,7 +225,7 @@ export function MessageList({
 			</div>
 			<ul className="mb-list__items" aria-label={t("list.aria")}>
 				{empty ? (
-					<li>
+					<li className="mb-list__empty-row">
 						{query.trim().length > 0 ? (
 							<EmptyState
 								tone={EmptyStateTone.Compact}

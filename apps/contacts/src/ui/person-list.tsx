@@ -14,6 +14,7 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
+import "@brainstorm-os/sdk/select-menu.css";
 import { useMemo, useRef } from "react";
 import { type ContactsI18nKey, plural, t } from "../i18n";
 import { type NextBirthday, isBirthdaySoon, nextBirthday } from "../logic/birthday";
@@ -113,8 +114,9 @@ type AxisPickerProps<T extends string> = {
 	onSet: (axis: T) => void;
 };
 
-// Mirrors the Tasks app's Group/Sort triggers: a leading glyph + label, no
-// trailing caret, sharing the borderless toggle chrome.
+// Group/Sort triggers on the shared `.bs-select` face (POLISH-DSN-4): one
+// boxed trigger face for every "pick one of N" toolbar control, matching the
+// Files toolbar. A leading glyph tells the two axes apart.
 function AxisPicker<T extends string>({
 	axes,
 	active,
@@ -129,7 +131,7 @@ function AxisPicker<T extends string>({
 		<button
 			ref={buttonRef}
 			type="button"
-			className="contacts-list__control"
+			className="bs-select bs-select--sm contacts-list__control"
 			aria-haspopup="menu"
 			onClick={() => {
 				const button = buttonRef.current;
@@ -147,7 +149,8 @@ function AxisPicker<T extends string>({
 			}}
 		>
 			<Icon name={leadingIcon} size={14} />
-			{t(captionKey, { axis: t(labelKeyOf(active)) })}
+			<span className="bs-select__value">{t(captionKey, { axis: t(labelKeyOf(active)) })}</span>
+			<Icon name={IconName.CaretDown} size={12} className="bs-select__caret" />
 		</button>
 	);
 }
