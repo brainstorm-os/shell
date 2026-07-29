@@ -339,6 +339,20 @@ function readSidebarOpen(): boolean {
 	}
 }
 
+/** Which thread the transcript is bound to. `Unresolved` is the boot state
+ *  (defaults to the most recent conversation once the snapshot lands);
+ *  `New` is the user's explicit "give me a blank thread" — never re-defaulted. */
+enum ChatSelectionKind {
+	Unresolved = "unresolved",
+	New = "new",
+	Conversation = "conversation",
+}
+
+type ChatSelection =
+	| { kind: ChatSelectionKind.Unresolved }
+	| { kind: ChatSelectionKind.New }
+	| { kind: ChatSelectionKind.Conversation; id: string };
+
 // Identity of a turn within a conversation: role + seq (NOT body), so two
 // identical messages stay distinct and an echo collapses only against its own
 // persisted twin. Falls back to id when seq is absent.
@@ -375,7 +389,15 @@ export function AgentApp(): ReactElement {
 		[all],
 	);
 
-	const [activeId, setActiveId] = useState<string | null>(null);
+	// `Unresolved` and `New` BOTH render an empty transcript, but collapsing
+	// them onto one `activeId = null` is what made New chat a no-op: the
+	// defaulting effect below read that null as "nothing chosen yet" and
+	// re-selected `conversations[0]` on the very next render, so the following
+	// turn appended to the previous thread (POLISH-FN-1). A conversation is
+	// minted lazily on the first message, so `New` deliberately persists
+	// nothing — clicking the button ten times creates zero empty conversations.
+	const [selection, setSelection] = useState<ChatSelection>({ kind: ChatSelectionKind.Unresolved });
+	const activeId = selection.kind === ChatSelectionKind.Conversation ? selection.id : null;
 
 	// Agent-11c — objects the agent created in THIS conversation (propose→approve),
 	// derived from the same live snapshot via their server-stamped provenance
@@ -695,12 +717,14 @@ export function AgentApp(): ReactElement {
 	// pruned once its persisted twin shows up in the snapshot.
 	const [pending, setPending] = useState<{ convId: string; msg: UiMessage }[]>([]);
 
-	// Default the selection to the most recent conversation once one exists.
+	// Default the selection to the most recent conversation once one exists —
+	// ONLY from the boot state. A `New` selection is the user's own choice and
+	// must survive every subsequent snapshot (POLISH-FN-1).
 	useEffect(() => {
-		if (activeId === null && conversations.length > 0) {
-			setActiveId(conversations[0]?.id ?? null);
-		}
-	}, [activeId, conversations]);
+		if (selection.kind !== ChatSelectionKind.Unresolved) return;
+		const first = conversations[0];
+		if (first) setSelection({ kind: ChatSelectionKind.Conversation, id: first.id });
+	}, [selection, conversations]);
 
 	// Agent-7 — load the per-vault opt-in flag once. Fail-safe: any read error
 	// (or a missing/malformed value) leaves memory OFF.
@@ -1030,7 +1054,7 @@ export function AgentApp(): ReactElement {
 	}, [displayMessages.length, sending]);
 
 	const newChat = useCallback(() => {
-		setActiveId(null);
+		setSelection({ kind: ChatSelectionKind.New });
 		setError(null);
 		editorRef.current?.clear();
 		clearDraftContext();
@@ -1040,7 +1064,7 @@ export function AgentApp(): ReactElement {
 	}, [clearDraftContext]);
 
 	const selectConversation = useCallback((id: string) => {
-		setActiveId(id);
+		setSelection({ kind: ChatSelectionKind.Conversation, id });
 		setError(null);
 		setSettingsOpen(false);
 		setSaveDraft(null);
@@ -1092,7 +1116,15 @@ export function AgentApp(): ReactElement {
 					memoryMode: ConversationMemoryMode.PerConversation,
 				});
 				convId = conv.id;
-				setActiveId(convId);
+				// Bind the view to the thread this turn is landing in — unless the
+				// user navigated to an existing conversation while generation was in
+				// flight, in which case their choice wins.
+				const boundId = convId;
+				setSelection((prev) =>
+					prev.kind === ChatSelectionKind.Conversation
+						? prev
+						: { kind: ChatSelectionKind.Conversation, id: boundId },
+				);
 			}
 
 			const now = new Date().toISOString();
@@ -1363,7 +1395,7 @@ export function AgentApp(): ReactElement {
 	const handleProcessIntent = useCallback((verb: string, payload: Record<string, unknown>) => {
 		const seed = seedFromProcessIntent(verb, payload);
 		if (!seed) return;
-		setActiveId(null);
+		setSelection({ kind: ChatSelectionKind.New });
 		setError(null);
 		setSettingsOpen(false);
 		setSaveDraft(null);
