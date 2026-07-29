@@ -121,6 +121,15 @@ import {
 	presencePeers,
 } from "./logic/presence";
 import { createLocalAwareness, presenceAwarenessFor } from "./logic/presence-channel";
+import {
+	RESIZE_HANDLES,
+	type ResizeBounds,
+	ResizeHandle,
+	computeResizeSnap,
+	isResizableKind,
+	minSizeFor,
+	resizeBounds,
+} from "./logic/resize";
 import { plainToRich, richRunsEqual } from "./logic/rich-text";
 import { selectionSummary, shouldSelectOnFocus } from "./logic/selection-announce";
 import { SnapAxis, type SnapGuide, type SnapRect, computeSnap } from "./logic/snap";
@@ -165,6 +174,7 @@ import {
 	isEmbedded,
 	isFrame,
 	isGroup,
+	isImage,
 	isSticky,
 	isText,
 } from "./types/node";
@@ -190,6 +200,18 @@ type ConnectorDrag = {
 	toPoint: Point;
 };
 
+type ResizeDrag = {
+	pointerId: number;
+	nodeId: string;
+	handle: ResizeHandle;
+	/** Node box at gesture start — every frame resolves from here with the
+	 *  cumulative pointer delta, so rounding never accumulates. */
+	start: ResizeBounds;
+	originClientX: number;
+	originClientY: number;
+	moved: boolean;
+};
+
 /** Authoring tools (instruments panel). */
 export const ToolId = {
 	Select: "select",
@@ -207,6 +229,7 @@ type AppState = {
 	pan: { x: number; y: number };
 	drag: DragState | null;
 	connector: ConnectorDrag | null;
+	resize: ResizeDrag | null;
 	ink: { pointerId: number; points: Point[] } | null;
 	selectedIds: Set<string>;
 	editingNodeId: string | null;
@@ -341,6 +364,19 @@ export type SaveDisposition =
 const SNAP_THRESHOLD_PX = 6;
 const EDGE_PICK_TOLERANCE_PX = 10;
 const NAV_PREF_KEY = "whiteboard.navOpen";
+/** Canvas px a keyboard resize step (Alt+Arrows) grows/shrinks the node. */
+const KEY_RESIZE_STEP_PX = 8;
+
+const RESIZE_HANDLE_ARIA: Record<ResizeHandle, WhiteboardMessageKey> = {
+	[ResizeHandle.NorthWest]: "whiteboard.resize.nw",
+	[ResizeHandle.North]: "whiteboard.resize.n",
+	[ResizeHandle.NorthEast]: "whiteboard.resize.ne",
+	[ResizeHandle.East]: "whiteboard.resize.e",
+	[ResizeHandle.SouthEast]: "whiteboard.resize.se",
+	[ResizeHandle.South]: "whiteboard.resize.s",
+	[ResizeHandle.SouthWest]: "whiteboard.resize.sw",
+	[ResizeHandle.West]: "whiteboard.resize.w",
+};
 
 /** Dev/test hook (parallel to Notes' `__brainstormNotesDev`): a Playwright
  *  synthetic pointer can't drive `setPointerCapture`, so node drags can't be
@@ -350,6 +386,18 @@ type WhiteboardDevGlobal = {
 	nodeIds: () => string[];
 	dragNodeBy: (id: string, dx: number, dy: number) => { x: number; y: number; guides: number };
 	endDrag: () => void;
+	/** Resize (9.17.23) — drives the same resize + snap primitives the grip
+	 *  pointer loop uses (a synthetic pointer can't drive `setPointerCapture`).
+	 *  Incremental like `dragNodeBy`; a locked / readonly / non-resizable node
+	 *  is refused (the returned box stays put). */
+	resizeNodeBy: (
+		id: string,
+		handle: ResizeHandle,
+		dx: number,
+		dy: number,
+		opts?: { shift?: boolean },
+	) => { x: number; y: number; width: number; height: number; guides: number };
+	endResize: () => void;
 	connect: (sourceId: string, destId: string) => string | null;
 	/** Perf/cull harness (9.17.20): seed a grid of N stickies and a full
 	 *  reconcile, with no per-node focus churn. Returns the seeded ids. */
@@ -403,6 +451,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		pan: { x: 0, y: 0 },
 		drag: null,
 		connector: null,
+		resize: null,
 		ink: null,
 		selectedIds: new Set<string>(),
 		editingNodeId: null,
@@ -888,6 +937,20 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		el.classList.toggle("whiteboard__node--selected", state.selectedIds.has(node.id));
 		el.setAttribute("aria-selected", String(state.selectedIds.has(node.id)));
 		el.classList.toggle("whiteboard__node--locked", node.locked === true);
+		el.classList.toggle("whiteboard__node--resizable", showsResizeHandles(node));
+	}
+
+	/** A node may be resized when it's a resizable kind, not locked, and the
+	 *  board isn't read-only — the shared gate for the grips, the keyboard
+	 *  path, the dev hook, and the commit check. */
+	function nodeResizable(node: WhiteboardNode): boolean {
+		return isResizableKind(node.kind) && node.locked !== true && !state.readonly;
+	}
+
+	/** Resize grips render only for a SINGLE selected resizable node (v1 —
+	 *  multi-select shows no grips; a locked node shows none either). */
+	function showsResizeHandles(node: WhiteboardNode): boolean {
+		return state.selectedIds.size === 1 && state.selectedIds.has(node.id) && nodeResizable(node);
 	}
 
 	function renderNode(node: WhiteboardNode): HTMLDivElement {
@@ -905,6 +968,22 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		for (const child of content.children) el.appendChild(child);
 
 		if (isEmbedded(node)) mountEmbed(node, el);
+
+		// Resize grips come BEFORE the connector handles in the DOM so the
+		// midpoint connector dots paint (and hit-test) above the edge strips.
+		for (const rh of RESIZE_HANDLES) {
+			const grip = document.createElement("div");
+			grip.className = `whiteboard__resize-handle whiteboard__resize-handle--${rh}`;
+			grip.dataset.resizeHandle = rh;
+			grip.setAttribute("role", "button");
+			grip.setAttribute("aria-label", t(RESIZE_HANDLE_ARIA[rh]));
+			grip.tabIndex = -1;
+			grip.addEventListener("pointerdown", (event) => beginResize(event, node.id, rh, grip));
+			grip.addEventListener("pointermove", onResizeMove);
+			grip.addEventListener("pointerup", onResizeEnd);
+			grip.addEventListener("pointercancel", onResizeEnd);
+			el.appendChild(grip);
+		}
 
 		for (const side of ["top", "right", "bottom", "left"] as const) {
 			const handle = document.createElement("span");
@@ -1444,6 +1523,152 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		}
 	}
 
+	// ── Node resize (9.17.23) ────────────────────────────────────────────────
+
+	/** Aspect behaviour per node: images keep their ratio by default and Shift
+	 *  frees them; every other kind is free by default and Shift locks. */
+	function aspectLockedFor(node: WhiteboardNode, shiftKey: boolean): boolean {
+		return isImage(node) ? !shiftKey : shiftKey;
+	}
+
+	function nodeById(id: string): WhiteboardNode | undefined {
+		return state.whiteboard.nodes.find((n) => n.id === id);
+	}
+
+	function beginResize(
+		event: PointerEvent,
+		nodeId: string,
+		handle: ResizeHandle,
+		grip: HTMLElement,
+	): void {
+		if (event.button !== 0) return;
+		// Resolve the LIVE node — the renderNode closure's object can go stale
+		// across an undo/restore while the element (same content signature)
+		// survives the keyed reconcile.
+		const node = nodeById(nodeId);
+		if (!node || !nodeResizable(node)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		grip.setPointerCapture?.(event.pointerId);
+		state.resize = {
+			pointerId: event.pointerId,
+			nodeId,
+			handle,
+			start: { x: node.x, y: node.y, width: node.width, height: node.height },
+			originClientX: event.clientX,
+			originClientY: event.clientY,
+			moved: false,
+		};
+	}
+
+	/** One resize frame from the gesture-start box + a cumulative delta:
+	 *  min-clamped anchored resize, then the edge magnet (skipped under aspect
+	 *  lock — a one-axis nudge would break the ratio), then the style-only
+	 *  repaint. Shared by the pointer loop and the dev hook. */
+	function applyResizeFrame(
+		node: WhiteboardNode,
+		start: ResizeBounds,
+		handle: ResizeHandle,
+		dx: number,
+		dy: number,
+		lockAspect: boolean,
+	): number {
+		const constraints = { ...minSizeFor(node.kind), lockAspect };
+		let next = resizeBounds(start, handle, dx, dy, constraints);
+		let guides: ReturnType<typeof computeResizeSnap>["guides"] = [];
+		if (!lockAspect) {
+			const snapped = computeResizeSnap(
+				next,
+				handle,
+				snapNeighbours(node),
+				SNAP_THRESHOLD_PX / state.zoom,
+				constraints,
+			);
+			next = snapped.bounds;
+			guides = snapped.guides;
+		}
+		renderGuides(guides);
+		node.x = next.x;
+		node.y = next.y;
+		node.width = next.width;
+		node.height = next.height;
+		paintDragFrame();
+		return guides.length;
+	}
+
+	function onResizeMove(event: PointerEvent): void {
+		const rz = state.resize;
+		if (!rz || rz.pointerId !== event.pointerId) return;
+		const node = nodeById(rz.nodeId);
+		// A lock landing mid-gesture freezes the surface (same fail-closed
+		// posture as the commit gate below).
+		if (!node || !nodeResizable(node)) return;
+		const dx = Math.round((event.clientX - rz.originClientX) / state.zoom);
+		const dy = Math.round((event.clientY - rz.originClientY) / state.zoom);
+		if (dx === 0 && dy === 0 && !rz.moved) return;
+		rz.moved = true;
+		applyResizeFrame(node, rz.start, rz.handle, dx, dy, aspectLockedFor(node, event.shiftKey));
+	}
+
+	function onResizeEnd(event: PointerEvent): void {
+		const rz = state.resize;
+		if (!rz || rz.pointerId !== event.pointerId) return;
+		state.resize = null;
+		renderGuides([]);
+		if (!rz.moved) return;
+		const node = nodeById(rz.nodeId);
+		// Commit gate (Lock-3 shape): the grip gate alone isn't enough — a
+		// lock/readonly that landed mid-gesture voids the whole resize.
+		if (!node || !nodeResizable(node)) {
+			if (node) {
+				node.x = rz.start.x;
+				node.y = rz.start.y;
+				node.width = rz.start.width;
+				node.height = rz.start.height;
+			}
+			paint();
+			return;
+		}
+		// ONE persist + ONE history entry per gesture — undo restores the
+		// pre-resize box in a single step (mirrors the drag commit).
+		persistBoard();
+		paint();
+		announceResize(node);
+	}
+
+	function announceResize(node: WhiteboardNode): void {
+		liveRegion.announce(
+			t("whiteboard.a11y.resized", {
+				width: Math.round(node.width),
+				height: Math.round(node.height),
+			}),
+		);
+	}
+
+	/** Keyboard resize (Alt+Arrows): grow/shrink the single selected node from
+	 *  its bottom-right corner (top-left anchored), nudge-style debounced
+	 *  persist so a key-repeat run lands as one save. */
+	function resizeSelectionBy(dw: number, dh: number): void {
+		if (state.selectedIds.size !== 1) return;
+		const id = firstSelectedId();
+		const node = id ? nodeById(id) : undefined;
+		if (!node || !nodeResizable(node)) return;
+		const next = resizeBounds(
+			{ x: node.x, y: node.y, width: node.width, height: node.height },
+			ResizeHandle.SouthEast,
+			dw,
+			dh,
+			{ ...minSizeFor(node.kind), lockAspect: false },
+		);
+		if (next.width === node.width && next.height === node.height) return;
+		node.width = next.width;
+		node.height = next.height;
+		scheduleNudgePersist();
+		paint();
+		focusSelectedNode();
+		announceResize(node);
+	}
+
 	type WhiteboardSnapshot = { whiteboard: Whiteboard; edges: WhiteboardEdge[] };
 
 	let boardHistory: HistoryState<WhiteboardSnapshot> = initialHistory({
@@ -1809,6 +2034,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 			state.editingNodeId = null;
 			state.drag = null;
 			state.connector = null;
+			state.resize = null;
 			state.ink = null;
 		}
 		paint();
@@ -1993,6 +2219,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	};
 
 	function applySelectionClasses(): void {
+		const byId = new Map(state.whiteboard.nodes.map((n) => [n.id, n] as const));
 		const els = nodeLayer.querySelectorAll<HTMLElement>(".whiteboard__node[data-node-id]");
 		for (const el of els) {
 			const id = el.dataset.nodeId;
@@ -2000,6 +2227,8 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 			const selected = state.selectedIds.has(id);
 			el.classList.toggle("whiteboard__node--selected", selected);
 			el.setAttribute("aria-selected", String(selected));
+			const node = byId.get(id);
+			if (node) el.classList.toggle("whiteboard__node--resizable", showsResizeHandles(node));
 		}
 		publishPresence();
 		emitChrome();
@@ -2112,6 +2341,30 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 				paint();
 				liveRegion.announce(t("whiteboard.a11y.cleared"));
 			}),
+		);
+		off(
+			bindShortcut(
+				ActionId.ResizeWiden,
+				unlessReadonly(() => resizeSelectionBy(KEY_RESIZE_STEP_PX, 0)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.ResizeNarrow,
+				unlessReadonly(() => resizeSelectionBy(-KEY_RESIZE_STEP_PX, 0)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.ResizeTaller,
+				unlessReadonly(() => resizeSelectionBy(0, KEY_RESIZE_STEP_PX)),
+			),
+		);
+		off(
+			bindShortcut(
+				ActionId.ResizeShorter,
+				unlessReadonly(() => resizeSelectionBy(0, -KEY_RESIZE_STEP_PX)),
+			),
 		);
 		off(
 			bindShortcut(
@@ -2355,6 +2608,27 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 				return { x: node.x, y: node.y, guides: snap.guides.length };
 			},
 			endDrag: () => {
+				renderGuides([]);
+				persistBoard();
+				paint();
+			},
+			resizeNodeBy: (id, handle, dx, dy, opts) => {
+				const node = state.whiteboard.nodes.find((n) => n.id === id);
+				if (!node) throw new Error(`[whiteboard/dev] resizeNodeBy: no node "${id}"`);
+				const box = () => ({ x: node.x, y: node.y, width: node.width, height: node.height });
+				// Refusal is observable: the box comes back unchanged.
+				if (!nodeResizable(node)) return { ...box(), guides: 0 };
+				const guides = applyResizeFrame(
+					node,
+					box(),
+					handle,
+					dx,
+					dy,
+					aspectLockedFor(node, opts?.shift === true),
+				);
+				return { ...box(), guides };
+			},
+			endResize: () => {
 				renderGuides([]);
 				persistBoard();
 				paint();

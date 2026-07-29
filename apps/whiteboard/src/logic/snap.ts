@@ -54,7 +54,7 @@ function linesY(r: SnapRect): readonly number[] {
 	return [r.y, r.y + r.height / 2, r.y + r.height];
 }
 
-interface AxisMatch {
+export interface AxisMatch {
 	delta: number;
 	pos: number;
 	other: SnapRect;
@@ -84,6 +84,18 @@ function bestMatch(
 		}
 	}
 	return best;
+}
+
+/** Best alignment of ONE moving line to any neighbour line on one axis —
+ *  the resize magnet (which moves a single edge, never the whole rect)
+ *  reuses the drag matcher instead of forking the tie-break rules. */
+export function snapLineMatch(
+	line: number,
+	others: readonly SnapRect[],
+	axis: SnapAxis,
+	threshold: number,
+): AxisMatch | null {
+	return bestMatch([line], others, axis === SnapAxis.Vertical ? linesX : linesY, threshold);
 }
 
 export function computeSnap(
