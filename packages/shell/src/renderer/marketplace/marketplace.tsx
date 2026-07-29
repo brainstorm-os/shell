@@ -34,6 +34,7 @@ import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Icon, IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
 import { openInstallFromMenu } from "./install-from-menu";
+import { InstallFromVaultDialog } from "./install-from-vault-dialog";
 import { ListingCard } from "./listing-card";
 import { ListingDetail } from "./listing-detail";
 import { countByKind, filterListings } from "./listing-filters";
@@ -79,6 +80,7 @@ export function Marketplace({ onClose, initialPanel = MarketplacePanel.Browse }:
 	const [kindFilter, setKindFilter] = useState<KindFilter>(KindFilter.All);
 	const [query, setQuery] = useState("");
 	const [selectedListingKey, setSelectedListingKey] = useState<string | null>(null);
+	const [vaultInstallOpen, setVaultInstallOpen] = useState(false);
 
 	const { listings, sources, updates, loading, refresh, applyUpdate } = useMarketplace();
 
@@ -330,7 +332,12 @@ export function Marketplace({ onClose, initialPanel = MarketplacePanel.Browse }:
 											variant={ButtonVariant.Neutral}
 											size={ButtonSize.Md}
 											iconLeft={IconName.FolderPlus}
-											onClick={(e) => openInstallFromMenu(e.currentTarget, refresh)}
+											onClick={(e) =>
+												openInstallFromMenu(e.currentTarget, {
+													onInstalled: refresh,
+													onInstallFromVault: () => setVaultInstallOpen(true),
+												})
+											}
 										>
 											{t("shell.marketplace.install.button")}
 										</Button>
@@ -360,6 +367,9 @@ export function Marketplace({ onClose, initialPanel = MarketplacePanel.Browse }:
 					</div>
 				</div>
 			</motion.div>
+			{vaultInstallOpen && (
+				<InstallFromVaultDialog onClose={() => setVaultInstallOpen(false)} onInstalled={refresh} />
+			)}
 		</div>
 	);
 }

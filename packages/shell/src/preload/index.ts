@@ -1248,6 +1248,8 @@ export {
 	type MarketplaceListing,
 	type MarketplaceSideloadResult,
 	type MarketplaceSource,
+	type MarketplaceVaultAppSource,
+	type MarketplaceVaultAppSourcesResult,
 } from "./marketplace-types";
 import type { BinItem } from "./bin-types";
 import type {
@@ -1256,6 +1258,7 @@ import type {
 	MarketplaceSideloadResult,
 	MarketplaceSource,
 	MarketplaceUpdate,
+	MarketplaceVaultAppSourcesResult,
 } from "./marketplace-types";
 
 const marketplace = {
@@ -1275,6 +1278,12 @@ const marketplace = {
 		ipcRenderer.invoke("apps:install-from-folder"),
 	installFromFile: (): Promise<MarketplaceSideloadResult> =>
 		ipcRenderer.invoke("apps:install-from-file"),
+	/** Install-from-vault (AppForge-2) — the renderer only ever passes entity
+	 *  ids; the main process resolves type, path, and content server-side. */
+	listVaultAppSources: (): Promise<MarketplaceVaultAppSourcesResult> =>
+		ipcRenderer.invoke("apps:list-vault-app-sources"),
+	installFromVault: (fileIds: string[]): Promise<MarketplaceSideloadResult> =>
+		ipcRenderer.invoke("apps:install-from-vault", fileIds),
 };
 
 const bin = {

@@ -80,6 +80,11 @@ export enum MarketplaceSideloadFailureCode {
 	BadArchive = "bad-archive",
 	ArchiveTooLarge = "archive-too-large",
 	InstallFailed = "install-failed",
+	BadRequest = "bad-request",
+	NotCodeFiles = "not-code-files",
+	BadPath = "bad-path",
+	NoManifest = "no-manifest",
+	SourceTooLarge = "source-too-large",
 }
 
 export type MarketplaceSideloadResult =
@@ -99,6 +104,30 @@ export type MarketplaceSideloadResult =
 			code: MarketplaceSideloadFailureCode;
 			reason: string;
 	  };
+
+/** One installable app root found in the vault's CodeFile tree (AppForge-2) —
+ *  wire shape kept in sync with `main/ipc/sideload-handlers.ts`
+ *  (`VaultAppSource`). */
+export type MarketplaceVaultAppSource = {
+	/** Directory prefix inside the CodeFile tree (`""` = top level). */
+	rootDir: string;
+	manifestEntityId: string;
+	/** The exact id list to pass to `installFromVault`. */
+	fileIds: string[];
+	fileCount: number;
+	totalBytes: number;
+	manifest: {
+		id: string;
+		name: string;
+		version: string;
+		capabilities: string[];
+	} | null;
+	problem: string | null;
+};
+
+export type MarketplaceVaultAppSourcesResult =
+	| { ok: true; sources: MarketplaceVaultAppSource[] }
+	| { ok: false; code: MarketplaceSideloadFailureCode; reason: string };
 
 /** How an available update is gated (mirrors `UpdateClassification`). */
 export enum MarketplaceUpdateClassification {

@@ -26,9 +26,14 @@ const FAILURE_MESSAGE_KEY: Record<MarketplaceSideloadFailureCode, string> = {
 	[MarketplaceSideloadFailureCode.BadArchive]: "shell.marketplace.install.fail.badArchive",
 	[MarketplaceSideloadFailureCode.ArchiveTooLarge]: "shell.marketplace.install.fail.archiveTooLarge",
 	[MarketplaceSideloadFailureCode.InstallFailed]: "shell.marketplace.install.fail.installFailed",
+	[MarketplaceSideloadFailureCode.BadRequest]: "shell.marketplace.install.fail.badRequest",
+	[MarketplaceSideloadFailureCode.NotCodeFiles]: "shell.marketplace.install.fail.notCodeFiles",
+	[MarketplaceSideloadFailureCode.BadPath]: "shell.marketplace.install.fail.badPath",
+	[MarketplaceSideloadFailureCode.NoManifest]: "shell.marketplace.install.fail.noManifest",
+	[MarketplaceSideloadFailureCode.SourceTooLarge]: "shell.marketplace.install.fail.sourceTooLarge",
 };
 
-async function runSideloadInstall(
+export async function runSideloadInstall(
 	invoke: () => Promise<MarketplaceSideloadResult>,
 	onInstalled: () => void,
 ): Promise<void> {
@@ -63,9 +68,16 @@ async function runSideloadInstall(
 	}
 }
 
-/** Open the install-from picker anchored to the toolbar button. `onInstalled`
- *  re-pulls listings after a successful install. */
-export function openInstallFromMenu(anchor: HTMLElement, onInstalled: () => void): void {
+export type InstallFromMenuActions = {
+	/** Re-pull listings after a successful install. */
+	onInstalled: () => void;
+	/** Open the shell-rendered vault (CodeFile) source picker (AppForge-2). */
+	onInstallFromVault: () => void;
+};
+
+/** Open the install-from picker anchored to the toolbar button. */
+export function openInstallFromMenu(anchor: HTMLElement, actions: InstallFromMenuActions): void {
+	const { onInstalled, onInstallFromVault } = actions;
 	const items: ContextMenuItem[] = [
 		{
 			id: "install-from-folder",
@@ -78,6 +90,11 @@ export function openInstallFromMenu(anchor: HTMLElement, onInstalled: () => void
 			label: t("shell.marketplace.install.fromFile"),
 			onSelect: () =>
 				void runSideloadInstall(() => window.brainstorm.marketplace.installFromFile(), onInstalled),
+		},
+		{
+			id: "install-from-vault",
+			label: t("shell.marketplace.install.fromVault"),
+			onSelect: onInstallFromVault,
 		},
 	];
 	openAnchoredMenu(anchor.getBoundingClientRect(), items, {
