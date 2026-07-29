@@ -22,6 +22,7 @@ import {
 	MarketplaceSignatureStatus,
 } from "../../preload/marketplace-types";
 import { AppIcon } from "../dashboard/app-icon";
+import { resolveAppIconSrc } from "../dashboard/app-icon-cache";
 import "../dashboard/app-icon.css";
 import { t, tIfKey } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
@@ -124,7 +125,7 @@ function HeroPreview({ listing }: { listing: MarketplaceListing }) {
 				<AppIcon
 					name={tIfKey(listing.name)}
 					seed={listing.id}
-					src={window.brainstorm.apps.iconUrl(listing.id, listing.version)}
+					src={resolveAppIconSrc(listing.id)}
 					size={128}
 				/>
 			</div>

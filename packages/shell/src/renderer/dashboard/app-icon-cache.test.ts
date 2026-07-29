@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
 	APP_ICON_CACHE_KEY,
 	appHasIcon,
@@ -10,19 +10,6 @@ import {
 	resolveAppIconSrc,
 	setAppIcons,
 } from "./app-icon-cache";
-
-beforeAll(() => {
-	// The module reads `window.brainstorm.apps.iconUrl` when resolving a src.
-	Object.defineProperty(window, "brainstorm", {
-		configurable: true,
-		value: {
-			apps: {
-				iconUrl: (appId: string, version?: string): string =>
-					version ? `brainstorm://app-icon/${appId}?v=${version}` : `brainstorm://app-icon/${appId}`,
-			},
-		},
-	});
-});
 
 describe("app-icon cache", () => {
 	// Module state starts cold (nothing persisted at import) — this case can
@@ -60,6 +47,21 @@ describe("app-icon cache", () => {
 		setAppIcons([{ id: "com.example.same", hasIcon: true, version: "1.0.0" }]);
 		const changed = setAppIcons([{ id: "com.example.same", hasIcon: true, version: "1.0.0" }]);
 		expect(changed).toBe(false);
+	});
+
+	// POLISH-LAY-8 — the widget header wants a per-install-epoch retry (F-380)
+	// AND the icon-less suppression. It used to hand-build its own URL to get
+	// the first, and so lost the second.
+	it("appends the caller's apps-changed epoch to a versioned URL", () => {
+		setAppIcons([{ id: "com.example.widget", hasIcon: true, version: "1.0.0" }]);
+		expect(resolveAppIconSrc("com.example.widget", 3)).toBe(
+			"brainstorm://app-icon/com.example.widget?v=1.0.0&e=3",
+		);
+	});
+
+	it("suppresses an epoch request for a known icon-less app too", () => {
+		setAppIcons([{ id: "com.example.noart", hasIcon: false, version: "1.0.0" }]);
+		expect(resolveAppIconSrc("com.example.noart", 3)).toBeNull();
 	});
 
 	it("reports a change when a version bumps", () => {

@@ -14,6 +14,8 @@ import { Orientation, useCompositeKeyboard, useFocusTrap } from "@brainstorm-os/
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { occupiedIconCells } from "../../shared/dashboard-icon-grid";
+import { firstFreeCell } from "../dashboard/grid";
 import { ShellSurfaceId, shellSurfacePinIconId } from "../dashboard/shell-surfaces";
 import { t } from "../i18n/t";
 import { Button, ButtonVariant } from "../ui/button";
@@ -86,12 +88,17 @@ export function Bin({ onClose }: BinProps) {
 			setPinned(false);
 			return;
 		}
-		// {0,0} is a deterministic seed; the dashboard's collision layer
-		// repositions onto the first free cell on display (the same
-		// guarantee 7.13 entity pins rely on).
+		// Place on the first free install slot, exactly as the app-pin and
+		// install paths do. {0,0} used to be written as a "deterministic
+		// seed the collision layer repositions" — but icon layout is FREE
+		// placement with no collision resolution, so that seed dropped the
+		// Bin tile on top of whatever sits at the origin (POLISH-LAY-6's
+		// family).
+		const snap = await window.brainstorm.dashboard.snapshot();
+		const cell = firstFreeCell(occupiedIconCells(snap?.icons ?? {}));
 		await window.brainstorm.dashboard.upsertIcon(pinId, {
-			x: 0,
-			y: 0,
+			x: cell.col,
+			y: cell.row,
 			kind: "shell-surface",
 			target: ShellSurfaceId.Bin,
 			label: t("shell.bin.title"),

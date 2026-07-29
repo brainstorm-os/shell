@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/t";
 import { useShortcut } from "../shortcuts/use-shortcut";
 import { AppIcon } from "./app-icon";
+import { resolveAppIconSrc } from "./app-icon-cache";
 
 export type WindowSwitcherProps = {
 	open: boolean;
@@ -172,7 +173,7 @@ export function WindowSwitcher({
 										<AppIcon
 											name={entry.appName}
 											seed={entry.appId}
-											src={`brainstorm://app-icon/${encodeURIComponent(entry.appId)}`}
+											src={resolveAppIconSrc(entry.appId)}
 											size={40}
 										/>
 										<span className="window-switcher__row-body">

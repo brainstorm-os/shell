@@ -28,6 +28,7 @@ import { launchApp } from "../analytics/track-app-launch";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { AppIcon } from "./app-icon";
+import { resolveAppIconSrc } from "./app-icon-cache";
 import {
 	GRID_OUTER_MARGIN,
 	type GridCell,
@@ -849,14 +850,11 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 					    request racing the installer's uninstall→install window 404s,
 					    AppIcon falls back to initials, and a constant src pins that
 					    fallback for the whole session (the same F-380 edge the
-					    iframe entry and titles already re-resolve for). */}
-					<AppIcon
-						name={title}
-						seed={appId}
-						src={`brainstorm://app-icon/${encodeURIComponent(appId)}?e=${appsEpoch}`}
-						size={18}
-						glyph
-					/>
+					    iframe entry and titles already re-resolve for). The shared
+				    resolver answers `null` for an app that ships no icon, so an
+				    icon-less app's widget draws initials with no request at all
+				    (POLISH-LAY-8). */}
+					<AppIcon name={title} seed={appId} src={resolveAppIconSrc(appId, appsEpoch)} size={18} glyph />
 					<span className="dashboard-widgets__title">{title}</span>
 				</div>
 				<button

@@ -26,6 +26,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
 import { AppIcon } from "./app-icon";
+import { resolveAppIconSrc } from "./app-icon-cache";
 import { IconBadge, badgeAriaLabel, useAppBadges } from "./icon-badge";
 
 export type WindowStripProps = {
@@ -225,7 +226,7 @@ function WindowStripInner(props: WindowStripProps) {
 							<AppIcon
 								name={entry.appName}
 								seed={entry.appId}
-								src={`brainstorm://app-icon/${encodeURIComponent(entry.appId)}`}
+								src={resolveAppIconSrc(entry.appId)}
 								size={18}
 								glyph
 							/>

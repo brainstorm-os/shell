@@ -1,33 +1,37 @@
 /**
  * Dashboard grid placement — the single source of "where does a new
- * pinned tile land". Extracted so the entity-pin path (dashboard-service)
- * and the shell-surface-pin path (Bin overlay) compute the first free
- * cell identically (DRY — previously inlined only in dashboard-service).
+ * pinned tile land" on the MAIN side. Every install path (marketplace,
+ * sideload, vault-source install, dev seeder) and every pin path
+ * (dashboard-service entity pin, Bin overlay) computes its cell here.
  *
- * Pure: same icon map → same cell. `GRID_COLS` mirrors the renderer's
- * fixed-width grid (`dashboard/grid.ts`).
+ * The geometry itself is NOT defined here: it lives in
+ * `shared/dashboard-icon-grid`, which the renderer's `dashboard/grid.ts`
+ * also builds on. This module is only the main-side adapter from a stored
+ * icon map to that placer.
+ *
+ * That indirection is the POLISH-LAY-6 fix. Main used to scan a fictional
+ * 12-column grid of 1×1 cells while the renderer stores 8px grid units and
+ * paints an 11×14-cell footprint per icon — so with Notes at `0,0` the cell
+ * `1,0` looked free and a freshly installed app's tile landed on top of it.
+ *
+ * Pure: same icon map → same cell.
  */
 
-export const GRID_COLS = 12;
+import {
+	type IconGridCell,
+	firstFreeIconCell,
+	occupiedIconCells,
+} from "../../shared/dashboard-icon-grid";
 
-/** Integer-cell coordinates already occupied by an icon. Legacy pixel
- *  records (non-integer x/y, rare, renderer-migrated) occupy no cell —
- *  the renderer's collision layer handles any residual display overlap. */
-export function occupiedCells(icons: Record<string, { x: number; y: number }>): Set<string> {
-	const taken = new Set<string>();
-	for (const icon of Object.values(icons)) {
-		if (Number.isInteger(icon.x) && Number.isInteger(icon.y)) {
-			taken.add(`${icon.x}:${icon.y}`);
-		}
-	}
-	return taken;
+export type { IconGridCell };
+
+/** Footprint origins already occupied by an icon, in 8px grid units. */
+export function occupiedCells(icons: Record<string, { x: number; y: number }>): IconGridCell[] {
+	return occupiedIconCells(icons);
 }
 
-/** First free `{col, row}` scanning row-major over the fixed-width grid. */
-export function firstFreeCell(taken: ReadonlySet<string>): { col: number; row: number } {
-	for (let row = 0; ; row++) {
-		for (let col = 0; col < GRID_COLS; col++) {
-			if (!taken.has(`${col}:${row}`)) return { col, row };
-		}
-	}
+/** First install slot (row-major, footprint-stepped) whose icon box clears
+ *  every existing icon's box. */
+export function firstFreeCell(occupied: readonly IconGridCell[]): IconGridCell {
+	return firstFreeIconCell(occupied);
 }

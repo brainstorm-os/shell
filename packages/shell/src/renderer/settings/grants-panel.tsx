@@ -186,11 +186,19 @@ export function GrantsPanel() {
 					<ul className="grants-panel__list">
 						{openEntry.grants.map((grant) => (
 							<li key={grant.id} className="grants-panel__row">
-								<span className="grants-panel__capability">
-									{formatGrant(grant.capability, grant.scope)}
-								</span>
-								<span className="grants-panel__source">
-									{t(`shell.settings.security.grantedVia.${grant.grantedVia}`)}
+								{/* Capability over source, stacked — mirrors the app row's
+								    name-over-count block above. The scope is the only part
+								    of a grant that carries meaning ("what can this app
+								    read?"), so it gets the full row width and WRAPS; the
+								    three-column layout ellipsised it away
+								    (`entities.read:brainstorm/Pro…`, POLISH-LAY-7). */}
+								<span className="grants-panel__row-text">
+									<span className="grants-panel__capability">
+										{formatGrant(grant.capability, grant.scope)}
+									</span>
+									<span className="grants-panel__source">
+										{t(`shell.settings.security.grantedVia.${grant.grantedVia}`)}
+									</span>
 								</span>
 								<Button
 									variant={ButtonVariant.Destructive}
