@@ -34,27 +34,29 @@ export type EventChipMode = "compact" | "block" | "row";
  *  content that FITS the chip's inline height — the CSS hides the rest so
  *  meta lines never flex-shrink into mid-glyph clipping (dark-sweep
  *  2026-07-29: a 1h chip squeezed its time line to ascender tips because
- *  guests/tz lines were never gated). Bands are picked from the event's
- *  duration in `week-view.tsx`. */
+ *  guests/tz lines were never gated and the ⋯ button sat in column flow).
+ *  Bands are picked from the event's duration in `week-view.tsx`. */
 export enum ChipDensity {
-	/** <35min — title only. */
+	/** <44min — title only. */
 	Tight = "tight",
-	/** 35–55min — title + time. */
+	/** 44–72min — title + time. */
 	Compact = "compact",
-	/** 55–80min — title + time + location. */
+	/** 72–100min — title + time + location. */
 	Roomy = "roomy",
-	/** ≥80min — full content (adds guests + timezone). */
+	/** ≥100min — full content (adds guests + timezone). */
 	Spacious = "spacious",
 }
 
 /** Pick the band for a block chip of `durationMins`. Bands must match the
- *  pixel budget (64px/h ≈ 1.07px/min): every band's content has to FIT its
+ *  pixel budget: 64px/h ≈ 1.07px/min against 18px line boxes + 2px gaps +
+ *  8px block padding (916b probe numbers) — title 26px, +time 46px,
+ *  +location 66px, +guests/tz 106px. Every band's content has to FIT its
  *  minimum chip height, or the flex column squeezes the meta lines into
  *  mid-glyph clipping. */
 export function densityForDuration(durationMins: number): ChipDensity {
-	if (durationMins < 35) return ChipDensity.Tight;
-	if (durationMins < 55) return ChipDensity.Compact;
-	if (durationMins < 80) return ChipDensity.Roomy;
+	if (durationMins < 44) return ChipDensity.Tight;
+	if (durationMins < 72) return ChipDensity.Compact;
+	if (durationMins < 100) return ChipDensity.Roomy;
 	return ChipDensity.Spacious;
 }
 

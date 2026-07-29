@@ -43,26 +43,42 @@ import { createPortal } from "react-dom";
 
 export const CODE_HIGHLIGHT_ROOT_CLASS = "notes--code-highlighted";
 
-/** `@lexical/code` language id → Shiki grammar id. Identity for most; the
- *  one rename is `bash → shellscript` (Shiki's id for shell). Languages not
- *  shipped by the SDK tokenizer map to `null` → plain (uncoloured) paint. */
+/** `@lexical/code` language id → Shiki grammar id. Identity for most, plus
+ *  the fence aliases people actually type (```ts / ```js / ```py / ```sh —
+ *  a fenced block stores its info string verbatim, and an unmapped alias
+ *  silently painted plain). Languages not shipped by the SDK tokenizer map
+ *  to `null` → plain (uncoloured) paint. */
 const SHIKI_ID: Readonly<Record<string, string>> = Object.freeze({
 	javascript: "javascript",
+	js: "javascript",
+	mjs: "javascript",
+	cjs: "javascript",
 	typescript: "typescript",
+	ts: "typescript",
 	jsx: "jsx",
 	tsx: "tsx",
 	python: "python",
+	py: "python",
 	json: "json",
+	jsonc: "jsonc",
 	html: "html",
 	css: "css",
 	markdown: "markdown",
+	md: "markdown",
 	bash: "shellscript",
+	sh: "shellscript",
+	shell: "shellscript",
+	zsh: "shellscript",
+	shellscript: "shellscript",
 	sql: "sql",
 	go: "go",
 	rust: "rust",
+	rs: "rust",
 	java: "java",
 	cpp: "cpp",
 	yaml: "yaml",
+	yml: "yaml",
+	toml: "toml",
 });
 
 function shikiIdFor(language: string | null | undefined): string | null {

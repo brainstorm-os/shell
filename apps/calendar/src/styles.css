@@ -691,10 +691,10 @@ body.is-resizing .calendar-resize {
  * flex column shrink EVERY meta line into mid-glyph clipping. Every
  * `.cal-chip__meta` variant (time, location, guests, tz) must appear in
  * these bands. `data-density` is set by week-view.tsx (ChipDensity):
- *   - tight (<35min): title only
- *   - compact (<55min): title + time
- *   - roomy (<80min): title + time + location
- *   - spacious (≥80min): full content (adds guests + timezone)
+ *   - tight (<44min): title only
+ *   - compact (<72min): title + time
+ *   - roomy (<100min): title + time + location
+ *   - spacious (≥100min): full content (adds guests + timezone)
  */
 .cal-chip--block[data-density="tight"] .cal-chip__meta,
 .cal-chip--block[data-density="compact"] .cal-chip__meta--location,
@@ -1141,6 +1141,16 @@ body.is-resizing .calendar-resize {
 	opacity: 0;
 	flex: 0 0 auto;
 	transition: opacity 80ms ease;
+}
+
+/* In the column-flex block chip the ⋯ must NOT be a flow child: even at
+ * opacity 0 its 28px box stacks under the title and flex-shrinks the meta
+ * lines into mid-glyph clips (916b probe: a 64px chip's time line measured
+ * 6px tall). Overlay it top-right instead — the chip is position:relative. */
+.cal-chip--block .cal-chip__more {
+	position: absolute;
+	top: var(--space-0_5);
+	inset-inline-end: var(--space-0_5);
 }
 
 .cal-chip:hover .cal-chip__more,
