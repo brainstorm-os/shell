@@ -13,6 +13,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import type { ProposedArtifact } from "./propose-artifacts";
+import { CodeFileRejectReason, PROPOSE_CODE_FILE_VERB } from "./propose-code-file";
 import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";
 import { makeDispatchTool } from "./turn";
@@ -180,5 +181,48 @@ describe("makeDispatchTool — a proposed new database (Agent-11e)", () => {
 		expect(staged).toHaveLength(0);
 		expect(ack.staged).toBe(false);
 		expect(ack.reason).toBe("missing-name");
+	});
+});
+
+describe("makeDispatchTool — a proposed code file (AppForge-3)", () => {
+	const proposeCodeFile = { verb: PROPOSE_CODE_FILE_VERB, label: "Propose a code file" };
+
+	it("stages the file and NEVER calls intents.dispatch", async () => {
+		const intents = fakeIntents();
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(intents, [proposeCodeFile], (a) => staged.push(a));
+
+		const ack = (await dispatch({
+			tool: PROPOSE_CODE_FILE_VERB,
+			args: { path: "hello-app/manifest.json", content: '{"id":"io.brainstorm.hello"}' },
+		})) as Record<string, unknown>;
+
+		expect(intents.dispatch).not.toHaveBeenCalled();
+		expect(staged).toHaveLength(1);
+		expect(staged[0]?.entityType).toBe("brainstorm/CodeFile/v1");
+		expect(staged[0]?.codeFile?.language).toBe("json");
+		expect(staged[0]?.id).toMatch(/^proposal-/);
+		expect(ack.staged).toBe(true);
+		expect(ack.status).toBe("pending-approval");
+	});
+
+	it("refuses a pathless file (stages nothing, acks the reason)", async () => {
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(fakeIntents(), [proposeCodeFile], (a) => staged.push(a));
+		const ack = (await dispatch({
+			tool: PROPOSE_CODE_FILE_VERB,
+			args: { content: "x" },
+		})) as Record<string, unknown>;
+		expect(staged).toHaveLength(0);
+		expect(ack).toEqual({ staged: false, reason: CodeFileRejectReason.MissingPath });
+	});
+
+	it("fails closed when the tool is not offered — the verb never reaches staging", async () => {
+		const staged: ProposedArtifact[] = [];
+		const dispatch = makeDispatchTool(fakeIntents(), [openTool], (a) => staged.push(a));
+		await expect(
+			dispatch({ tool: PROPOSE_CODE_FILE_VERB, args: { path: "a.ts", content: "" } }),
+		).rejects.toThrow(/unknown tool/);
+		expect(staged).toHaveLength(0);
 	});
 });

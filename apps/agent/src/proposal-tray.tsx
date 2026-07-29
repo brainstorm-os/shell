@@ -14,8 +14,10 @@
  * laid out as the row it will become — label column, value column.
  */
 
+import type { ThemedToken } from "@brainstorm-os/sdk/code-highlight";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
-import type { ReactElement } from "react";
+import { languageDisplayLabel, shikiIdForLanguage } from "@brainstorm-os/sdk/language-detect";
+import { type ReactElement, useEffect, useState } from "react";
 import type { AgentI18nKey } from "./i18n";
 import { t } from "./i18n";
 import {
@@ -34,6 +36,7 @@ const KIND_LABEL_KEY: Record<ProposeKind, AgentI18nKey> = {
 	[ProposeKind.Contact]: "propose.kind.contact",
 	[ProposeKind.Row]: "propose.kind.row",
 	[ProposeKind.Database]: "propose.kind.database",
+	[ProposeKind.CodeFile]: "propose.kind.codeFile",
 };
 
 const KIND_ICON: Record<ProposeKind, IconName> = {
@@ -44,6 +47,9 @@ const KIND_ICON: Record<ProposeKind, IconName> = {
 	[ProposeKind.Contact]: IconName.AddressBook,
 	[ProposeKind.Row]: IconName.Entity,
 	[ProposeKind.Database]: IconName.KindDictionary,
+	// No dedicated code glyph in the shared IconName set yet — KindText reads
+	// as "text content" and stays distinct from the Note card's KindFile.
+	[ProposeKind.CodeFile]: IconName.KindText,
 };
 
 const descriptorFor = (artifact: ProposedArtifact) =>
@@ -57,6 +63,14 @@ type CardField = { key: string; label: string; multiline: boolean };
 function cardFields(
 	artifact: ProposedArtifact,
 ): { fields: CardField[]; primaryField: string } | null {
+	if (artifact.codeFile) {
+		// The content edits nowhere — the card previews it read-only (below);
+		// only the filename is an editable line.
+		return {
+			fields: [{ key: "path", label: t("propose.field.path"), multiline: false }],
+			primaryField: "path",
+		};
+	}
 	if (artifact.database) {
 		return {
 			fields: [{ key: "name", label: t("propose.database.name"), multiline: false }],
@@ -134,6 +148,84 @@ function SeedRows({
 	);
 }
 
+/** Skip Shiki above this many code units — a huge draft previews as plain
+ *  text instead of stalling the tray on tokenization. */
+const PREVIEW_HIGHLIGHT_MAX = 20_000;
+
+/**
+ * AppForge-3 — the read-only, scroll-capped code preview on a proposed code
+ * file. SECURITY: the content is untrusted model output and renders ONLY as
+ * React text nodes (never markup), so injection-shaped content stays inert.
+ * Highlighting is progressive enhancement: the Shiki tokenizer is
+ * dynamic-imported (keeps shiki out of the agent's initial chunk) and any
+ * failure — or an unhighlightable language — degrades to the same plain text.
+ */
+function CodeFilePreview({ artifact }: { artifact: ProposedArtifact }): ReactElement | null {
+	const language = artifact.codeFile?.language;
+	const content = artifact.fields.content ?? "";
+	const [tokens, setTokens] = useState<ThemedToken[][] | null>(null);
+
+	useEffect(() => {
+		if (!language || content.length === 0 || content.length > PREVIEW_HIGHLIGHT_MAX) {
+			setTokens(null);
+			return;
+		}
+		const shikiId = shikiIdForLanguage(language);
+		if (!shikiId) {
+			setTokens(null);
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const shiki = await import("@brainstorm-os/sdk/code-highlight");
+				const dark =
+					shiki.shellAppearanceDark() ??
+					(typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches);
+				const theme = dark ? shiki.HighlightTheme.Dark : shiki.HighlightTheme.Light;
+				const result = await shiki.tokenizeShiki(content, shikiId, theme);
+				if (!cancelled) setTokens(result);
+			} catch {
+				// Plain-text fallback — the preview never blocks on the highlighter.
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [content, language]);
+
+	if (!artifact.codeFile) return null;
+	return (
+		<pre
+			className="agent-proposal__code"
+			// biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll-capped region must be keyboard-focusable to scroll (WCAG scrollable-region-focusable); role="region" + aria-label name it.
+			tabIndex={0}
+			role="region"
+			aria-label={t("propose.codeFile.preview", { path: artifact.fields.path ?? "" })}
+			data-testid="agent-proposal-code"
+		>
+			{tokens ? (
+				<code>
+					{tokens.map((line, i) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: lines are positional and the list fully re-renders on content change.
+						<span key={i}>
+							{line.map((token, j) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: same — tokens are positional within their line.
+								<span key={j} style={token.color ? { color: token.color } : undefined}>
+									{token.content}
+								</span>
+							))}
+							{"\n"}
+						</span>
+					))}
+				</code>
+			) : (
+				<code>{content}</code>
+			)}
+		</pre>
+	);
+}
+
 export type ProposalTrayProps = {
 	proposals: readonly ProposedArtifact[];
 	/** Ids currently being persisted (approve in flight) — disables the card. */
@@ -177,6 +269,11 @@ function ProposalCard({
 				{artifact.row ? (
 					<span className="agent-proposal__target" data-testid="agent-proposal-database">
 						{t("propose.row.into", { database: artifact.row.databaseName })}
+					</span>
+				) : null}
+				{artifact.codeFile ? (
+					<span className="agent-proposal__language" data-testid="agent-proposal-language">
+						{languageDisplayLabel(artifact.codeFile.language)}
 					</span>
 				) : null}
 			</div>
@@ -230,6 +327,7 @@ function ProposalCard({
 					onEditField={onEditField}
 				/>
 			) : null}
+			{artifact.codeFile ? <CodeFilePreview artifact={artifact} /> : null}
 			<div className="agent-proposal__actions">
 				<button
 					type="button"

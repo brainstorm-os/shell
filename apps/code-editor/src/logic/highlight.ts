@@ -16,42 +16,19 @@ import {
 	setHighlighterFactory,
 	tokenizeShiki,
 } from "@brainstorm-os/sdk/code-highlight";
-import { LanguageKey } from "../types/code-file";
+import { shikiIdForLanguage } from "@brainstorm-os/sdk/language-detect";
+import type { LanguageKey } from "../types/code-file";
 
 export { HighlightTheme, resetHighlighter, setHighlighterFactory };
 export type { ThemedToken };
 
-/**
- * Shiki's bundled language id for each known {@link LanguageKey}. `null`
- * means we deliberately don't highlight (`PlainText`, `Unknown`) — the
- * overlay falls back to a single un-styled span per line. The right side is
- * the lookup key into the SDK's grammar chunk table.
- */
-const SHIKI_LANGUAGE: Readonly<Record<LanguageKey, string | null>> = Object.freeze({
-	[LanguageKey.TypeScript]: "typescript",
-	[LanguageKey.JavaScript]: "javascript",
-	[LanguageKey.TSX]: "tsx",
-	[LanguageKey.JSX]: "jsx",
-	[LanguageKey.JSON]: "json",
-	[LanguageKey.JSONC]: "jsonc",
-	[LanguageKey.HTML]: "html",
-	[LanguageKey.CSS]: "css",
-	[LanguageKey.Markdown]: "markdown",
-	[LanguageKey.Python]: "python",
-	[LanguageKey.Rust]: "rust",
-	[LanguageKey.Go]: "go",
-	[LanguageKey.Java]: "java",
-	[LanguageKey.Shell]: "shellscript",
-	[LanguageKey.YAML]: "yaml",
-	[LanguageKey.TOML]: "toml",
-	[LanguageKey.SQL]: "sql",
-	[LanguageKey.Dockerfile]: "docker",
-	[LanguageKey.PlainText]: null,
-	[LanguageKey.Unknown]: null,
-});
-
+/** Shiki's bundled language id for each known {@link LanguageKey}. `null`
+ *  means we deliberately don't highlight (`PlainText`, `Unknown`) — the
+ *  overlay falls back to a single un-styled span per line. The map itself
+ *  lives in `@brainstorm-os/sdk/language-detect` (extracted at copy two —
+ *  the Agent's propose-code-file preview is the second consumer). */
 export function shikiLanguageId(key: LanguageKey): string | null {
-	return SHIKI_LANGUAGE[key] ?? null;
+	return shikiIdForLanguage(key);
 }
 
 /** Ensure the Shiki grammar for {@link key} is loaded — `true` when ready,

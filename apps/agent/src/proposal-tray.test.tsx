@@ -10,6 +10,7 @@ import { GENERIC_OBJECT_TYPE, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProposeKind, type ProposedArtifact, buildProposal } from "./logic/propose-artifacts";
+import { PROPOSE_CODE_FILE_VERB, buildCodeFileProposal } from "./logic/propose-code-file";
 import { PROPOSE_DATABASE_VERB, buildDatabaseProposal, rowCellKey } from "./logic/propose-database";
 import { PROPOSE_ROW_VERB, buildRowProposal } from "./logic/propose-row";
 import { ProposalTray } from "./proposal-tray";
@@ -325,5 +326,72 @@ describe("ProposalTray — a proposed new database (Agent-11e)", () => {
 			/>,
 		);
 		expect(handle.container.querySelector("[data-testid='agent-proposal-seed-rows']")).toBeNull();
+	});
+});
+
+describe("ProposalTray — code-file cards (AppForge-3)", () => {
+	function stageCode(args: Record<string, unknown>, id = "c1"): ProposedArtifact {
+		const r = buildCodeFileProposal({ verb: PROPOSE_CODE_FILE_VERB, args, id });
+		if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
+		return r.artifact;
+	}
+
+	async function renderCode(artifact: ProposedArtifact, onEditField = noop) {
+		return renderInto(
+			<ProposalTray
+				proposals={[artifact]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={onEditField}
+			/>,
+		);
+	}
+
+	it("renders filename input, language chip, and the read-only preview", async () => {
+		handle = await renderCode(
+			stageCode({ path: "hello-app/index.html", language: "html", content: "<h1>hi</h1>" }),
+		);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		expect(card?.getAttribute("data-kind")).toBe(ProposeKind.CodeFile);
+		const pathInput = card?.querySelector<HTMLInputElement>("input");
+		expect(pathInput?.value).toBe("hello-app/index.html");
+		expect(card?.querySelector("[data-testid='agent-proposal-language']")?.textContent).toBe("HTML");
+		const pre = card?.querySelector("[data-testid='agent-proposal-code']");
+		expect(pre?.textContent).toBe("<h1>hi</h1>");
+	});
+
+	it("SECURITY: injection-shaped content renders as inert text, never as markup", async () => {
+		const payload = '<img src=x onerror="window.__pwned=true"><script>window.__pwned=true</script>';
+		handle = await renderCode(stageCode({ path: "x.html", content: payload }));
+		const pre = handle.container.querySelector("[data-testid='agent-proposal-code']");
+		// The characters are there as TEXT…
+		expect(pre?.textContent).toBe(payload);
+		// …but no element was ever created from them, in the pre or anywhere.
+		expect(pre?.querySelector("img, script")).toBeNull();
+		expect(handle.container.querySelector("img, script")).toBeNull();
+		expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined();
+	});
+
+	it("editing the filename fires onEditField('path'); the content has no editor", async () => {
+		const onEditField = vi.fn();
+		handle = await renderCode(stageCode({ path: "a.ts", content: "x" }), onEditField);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		const input = card?.querySelector<HTMLInputElement>("input");
+		const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+		await act(async () => {
+			setter?.call(input, "b.ts");
+			input?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		expect(onEditField).toHaveBeenCalledWith("c1", "path", "b.ts");
+		// Exactly one editable line (the filename) — the code itself is preview-only.
+		expect(card?.querySelectorAll("input, textarea")).toHaveLength(1);
+	});
+
+	it("the preview region is keyboard-reachable (focusable scroll container)", async () => {
+		handle = await renderCode(stageCode({ path: "a.ts", content: "x".repeat(2000) }));
+		const pre = handle.container.querySelector<HTMLElement>("[data-testid='agent-proposal-code']");
+		expect(pre?.tabIndex).toBe(0);
+		expect(pre?.getAttribute("aria-label")).toContain("a.ts");
 	});
 });

@@ -892,6 +892,34 @@ body {
 	width: 100%;
 }
 
+/* AppForge-3: a proposed code file — the language chip in the card head and
+   the read-only, scroll-capped code preview. The preview is text-only content
+   (untrusted model output rendered inert); both scroll inside their own box
+   so the tray never scrolls horizontally. */
+.agent-proposal__language {
+	flex-shrink: 0;
+	padding: 0 var(--space-1);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+}
+
+.agent-proposal__code {
+	margin: 0;
+	max-height: 240px;
+	overflow: auto;
+	padding: var(--space-2);
+	background: var(--code-bg);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	font-family: var(--text-family-code, ui-monospace, monospace);
+	font-size: var(--text-size-xs);
+	line-height: var(--text-line-height-normal);
+	white-space: pre;
+	tab-size: 2;
+}
+
 /* A proposed NEW database (Agent-11e): the inferred schema, then its seed rows
    as the grid they will become — one editable input per cell. */
 .agent-proposal__schema {

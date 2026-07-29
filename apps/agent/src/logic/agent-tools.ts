@@ -39,6 +39,7 @@ import {
 	capabilityImplies,
 } from "@brainstorm-os/sdk-types";
 import { proposeTools } from "./propose-artifacts";
+import { PROPOSE_CODE_FILE_VERB } from "./propose-code-file";
 import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";
 
@@ -60,10 +61,15 @@ export type AgentToolVerb = (typeof AGENT_TOOL_VERB)[keyof typeof AGENT_TOOL_VER
  *
  *  `hasDatabases` (Agent-11d) gates the row tool: with no Collection in the
  *  vault every row proposal would refuse, so the tool isn't offered at all —
- *  the model is never shown an affordance it cannot use. */
+ *  the model is never shown an affordance it cannot use.
+ *
+ *  `canWriteCodeFiles` (AppForge-3) gates the code-file tool the same
+ *  fail-closed way: offered only when the conversation's frozen capability
+ *  set can actually write a `CodeFile/v1` (`canProposeCodeFiles`), so an
+ *  approval is never doomed to a denial. */
 export function curatedAgentTools(
 	translate: (key: string) => string,
-	options: { hasDatabases?: boolean } = {},
+	options: { hasDatabases?: boolean; canWriteCodeFiles?: boolean } = {},
 ): AgentTool[] {
 	return [
 		{ verb: AGENT_TOOL_VERB.Open, label: translate("tool.open.label") },
@@ -72,6 +78,9 @@ export function curatedAgentTools(
 			? [{ verb: PROPOSE_ROW_VERB, label: translate("propose.row.label") }]
 			: []),
 		{ verb: PROPOSE_DATABASE_VERB, label: translate("propose.database.label") },
+		...(options.canWriteCodeFiles
+			? [{ verb: PROPOSE_CODE_FILE_VERB, label: translate("propose.codeFile.label") }]
+			: []),
 	];
 }
 
@@ -80,7 +89,7 @@ export function curatedAgentTools(
  *  offered; the manifest test asserts the declared caps cover them. */
 export function curatedToolCapabilities(): string[] {
 	const caps = new Set<string>();
-	for (const tool of curatedAgentTools(() => "", { hasDatabases: true })) {
+	for (const tool of curatedAgentTools(() => "", { hasDatabases: true, canWriteCodeFiles: true })) {
 		for (const cap of agentToolCapabilities(tool)) caps.add(cap);
 	}
 	return [...caps].sort();

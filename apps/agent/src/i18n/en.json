@@ -161,5 +161,9 @@
   "propose.database.label": "Propose a brand-new database for the user. args: {\"name\": \"<database name>\", \"columns\": [{\"name\": \"<column>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<column>\": \"<value>\"}]}",
   "propose.kind.database": "New database",
   "propose.database.name": "Database name",
-  "propose.database.schema": "Columns: {columns}"
+  "propose.database.schema": "Columns: {columns}",
+  "propose.codeFile.label": "Propose a new code file (a script/snippet saved in the user's vault, opened by the Code editor). args: {\"path\": \"<filename, e.g. scripts/build.ts>\", \"language\": \"<optional language id, e.g. typescript>\", \"content\": \"<the full source code>\"}",
+  "propose.kind.codeFile": "Code file",
+  "propose.field.path": "Filename",
+  "propose.codeFile.preview": "Code preview for {path}"
 }

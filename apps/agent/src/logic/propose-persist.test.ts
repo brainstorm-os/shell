@@ -1,6 +1,7 @@
 import { GENERIC_OBJECT_TYPE, MEMBERS_HARD_CAP, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { ProposeKind, type ProposedArtifact, buildProposal } from "./propose-artifacts";
+import { buildCodeFileProposal } from "./propose-code-file";
 import {
 	memberPinPatch,
 	persistApprovedProposal,
@@ -111,7 +112,10 @@ describe("proposalToEntityProperties — schema-aware coercion", () => {
 		// A Row's type is the target database's, not a build-time constant — it is
 		// covered by the database-row cases below.
 		const byKind: Record<
-			Exclude<ProposeKind, typeof ProposeKind.Row | typeof ProposeKind.Database>,
+			Exclude<
+				ProposeKind,
+				typeof ProposeKind.Row | typeof ProposeKind.Database | typeof ProposeKind.CodeFile
+			>,
 			string
 		> = {
 			[ProposeKind.Note]: "io.brainstorm.notes/Note/v1",
@@ -131,7 +135,10 @@ describe("proposalToEntityProperties — schema-aware coercion", () => {
 			const plan = proposalToEntityProperties(artifact, NOW);
 			expect(plan.entityType).toBe(
 				byKind[
-					artifact.kind as Exclude<ProposeKind, typeof ProposeKind.Row | typeof ProposeKind.Database>
+					artifact.kind as Exclude<
+						ProposeKind,
+						typeof ProposeKind.Row | typeof ProposeKind.Database | typeof ProposeKind.CodeFile
+					>
 				],
 			);
 		}
@@ -306,6 +313,64 @@ describe("persistApprovedProposal (the approve gesture's write path)", () => {
 			undefined,
 			undefined,
 		);
+	});
+});
+
+describe("proposalToEntityProperties — code files (AppForge-3)", () => {
+	const codeArtifact = (content: string): ProposedArtifact => {
+		const r = buildCodeFileProposal({
+			verb: "propose-code-file",
+			args: { path: "hello-app/index.html", language: "html", content },
+			id: "p-code",
+		});
+		if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
+		return r.artifact;
+	};
+
+	it("mirrors the Code editor's own new-file shape: path + content + language", () => {
+		const plan = proposalToEntityProperties(codeArtifact("<h1>hi</h1>\n"), NOW);
+		expect(plan.entityType).toBe("brainstorm/CodeFile/v1");
+		expect(plan.properties).toEqual({
+			path: "hello-app/index.html",
+			content: "<h1>hi</h1>\n",
+			language: "html",
+			sizeBytes: 12,
+			lineCount: 2,
+			createdAt: NOW,
+			updatedAt: NOW,
+		});
+	});
+
+	it("derives byte-accurate sizeBytes for multi-byte content; empty = 0 lines", () => {
+		const plan = proposalToEntityProperties(codeArtifact("é"), NOW);
+		expect(plan.properties.sizeBytes).toBe(2);
+		expect(plan.properties.lineCount).toBe(1);
+		const empty = proposalToEntityProperties(codeArtifact(""), NOW);
+		expect(empty.properties.sizeBytes).toBe(0);
+		expect(empty.properties.lineCount).toBe(0);
+	});
+
+	it("approve = EXACTLY ONE entities.create, provenance-stamped, no membership patch", async () => {
+		const create = vi.fn(async () => ({ id: "ent_code" }));
+		const update = vi.fn(async () => undefined);
+		await persistApprovedProposal({ create, update }, codeArtifact("body {}"), {
+			conversationId: "conv_1",
+			now: NOW,
+		});
+		expect(create).toHaveBeenCalledTimes(1);
+		expect(create).toHaveBeenCalledWith(
+			"brainstorm/CodeFile/v1",
+			expect.objectContaining({ path: "hello-app/index.html", content: "body {}" }),
+			undefined,
+			{ conversationId: "conv_1" },
+		);
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it("injection-shaped content persists as plain data, untouched", async () => {
+		const payload = "<script>alert(1)</script><img src=x onerror=x>";
+		const plan = proposalToEntityProperties(codeArtifact(payload), NOW);
+		expect(plan.properties.content).toBe(payload);
 	});
 });
 

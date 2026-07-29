@@ -16,6 +16,7 @@ import {
 	effectiveAgentCapabilities,
 	toolCallToIntent,
 } from "../src/logic/agent-tools";
+import { PROPOSE_CODE_FILE_VERB } from "../src/logic/propose-code-file";
 import { PROPOSE_DATABASE_VERB } from "../src/logic/propose-database";
 import { PROPOSE_ROW_VERB } from "../src/logic/propose-row";
 
@@ -61,6 +62,7 @@ describe("curated agent tools", () => {
 		expect(curatedToolCapabilities()).toEqual([
 			"intents.dispatch:open",
 			"intents.dispatch:propose-bookmark",
+			"intents.dispatch:propose-code-file",
 			"intents.dispatch:propose-contact",
 			"intents.dispatch:propose-database",
 			"intents.dispatch:propose-event",
@@ -80,6 +82,29 @@ describe("curated agent tools", () => {
 		expect(verbs()).not.toContain(PROPOSE_ROW_VERB);
 		expect(verbs({ hasDatabases: false })).not.toContain(PROPOSE_ROW_VERB);
 		expect(verbs({ hasDatabases: true })).toContain(PROPOSE_ROW_VERB);
+	});
+
+	it("offers the code-file tool ONLY behind the write-cap gate (AppForge-3)", () => {
+		const verbs = (options?: { canWriteCodeFiles: boolean }) =>
+			curatedAgentTools(id, options).map((tool) => tool.verb);
+		// Absent / false → the model is never shown the affordance.
+		expect(verbs()).not.toContain(PROPOSE_CODE_FILE_VERB);
+		expect(verbs({ canWriteCodeFiles: false })).not.toContain(PROPOSE_CODE_FILE_VERB);
+		expect(verbs({ canWriteCodeFiles: true })).toContain(PROPOSE_CODE_FILE_VERB);
+		// Like every propose tool: no entityType, so its only cap is its verb.
+		const tool = curatedAgentTools(id, { canWriteCodeFiles: true }).find(
+			(t) => t.verb === PROPOSE_CODE_FILE_VERB,
+		);
+		expect(tool?.entityType).toBeUndefined();
+	});
+
+	it("even when offered by mistake, a conversation without the dispatch cap drops it", () => {
+		// Defence in depth: the loop's intersection still gates the tool on
+		// intents.dispatch:propose-code-file — a frozen set without it never
+		// offers the tool to the model.
+		const tools = curatedAgentTools(id, { canWriteCodeFiles: true });
+		const offered = intersectAgentTools(tools, ["intents.dispatch:open"]);
+		expect(offered.map((t) => t.verb)).toEqual(["open"]);
 	});
 });
 

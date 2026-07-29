@@ -21,6 +21,7 @@
  */
 
 import type { AgentTool, ValueType } from "@brainstorm-os/sdk-types";
+import type { ProposedCodeFile } from "./propose-code-file";
 import type { ProposedDatabase } from "./propose-database";
 
 /** The artifact kinds the agent can propose (Agent-11a/b: simple entities;
@@ -46,6 +47,10 @@ export const ProposeKind = {
 	 *  Its schema rides the `database` payload; its seed-row cells ride
 	 *  `fields` under `rowCellKey(i, column)`. */
 	Database: "database",
+	/** A source-code file (`brainstorm/CodeFile/v1` — AppForge-3). Its path +
+	 *  content ride `fields`; the resolved language rides the `codeFile`
+	 *  payload. Approval creates the file the Code editor opens. */
+	CodeFile: "code-file",
 } as const;
 export type ProposeKind = (typeof ProposeKind)[keyof typeof ProposeKind];
 
@@ -187,6 +192,9 @@ export type ProposedArtifact = {
 	/** Set only for {@link ProposeKind.Database} — the proposed schema + how
 	 *  many seed rows the `fields` cell keys describe (Agent-11e). */
 	database?: ProposedDatabase;
+	/** Set only for {@link ProposeKind.CodeFile} — the resolved language
+	 *  (AppForge-3). */
+	codeFile?: ProposedCodeFile;
 };
 
 /** Why a propose call could not be staged (fed back to the model so it can
@@ -310,7 +318,9 @@ export function proposalReducer(state: ProposalState, action: ProposalAction): P
 						? (p.row.columns[0]?.key ?? "")
 						: p.database
 							? "name"
-							: (PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind)?.primaryField ?? "");
+							: p.codeFile
+								? "path"
+								: (PROPOSE_DESCRIPTORS.find((d) => d.kind === p.kind)?.primaryField ?? "");
 					const summary = primaryField ? (fields[primaryField] ?? p.summary) : p.summary;
 					return { ...p, fields, summary };
 				}),

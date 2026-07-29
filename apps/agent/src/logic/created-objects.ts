@@ -33,7 +33,9 @@ type SnapshotEntity = {
 };
 
 function titleOf(properties: Record<string, unknown>): string {
-	const raw = properties.title ?? properties.name;
+	// `path` is the CodeFile/v1 naming property (AppForge-3) — the chip for an
+	// approved code file would otherwise render untitled.
+	const raw = properties.title ?? properties.name ?? properties.path;
 	return typeof raw === "string" ? raw.trim() : "";
 }
 
