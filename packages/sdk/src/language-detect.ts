@@ -168,6 +168,38 @@ export function languageDisplayLabel(lang: CodeLanguage): string {
 	return DISPLAY_LABEL[lang];
 }
 
+/** Shiki's bundled grammar id per {@link CodeLanguage} — the lookup key into
+ *  `@brainstorm-os/sdk/code-highlight`'s chunk table. `null` = deliberately
+ *  unhighlighted (`PlainText`, `Unknown`); consumers paint plain text.
+ *  Extracted from the code-editor's `LanguageKey` adapter at copy two (the
+ *  Agent's propose-code-file preview is the second consumer). */
+const SHIKI_LANGUAGE_ID: Readonly<Record<CodeLanguage, string | null>> = Object.freeze({
+	[CodeLanguage.TypeScript]: "typescript",
+	[CodeLanguage.JavaScript]: "javascript",
+	[CodeLanguage.TSX]: "tsx",
+	[CodeLanguage.JSX]: "jsx",
+	[CodeLanguage.JSON]: "json",
+	[CodeLanguage.JSONC]: "jsonc",
+	[CodeLanguage.HTML]: "html",
+	[CodeLanguage.CSS]: "css",
+	[CodeLanguage.Markdown]: "markdown",
+	[CodeLanguage.Python]: "python",
+	[CodeLanguage.Rust]: "rust",
+	[CodeLanguage.Go]: "go",
+	[CodeLanguage.Java]: "java",
+	[CodeLanguage.Shell]: "shellscript",
+	[CodeLanguage.YAML]: "yaml",
+	[CodeLanguage.TOML]: "toml",
+	[CodeLanguage.SQL]: "sql",
+	[CodeLanguage.Dockerfile]: "docker",
+	[CodeLanguage.PlainText]: null,
+	[CodeLanguage.Unknown]: null,
+});
+
+export function shikiIdForLanguage(lang: CodeLanguage): string | null {
+	return SHIKI_LANGUAGE_ID[lang] ?? null;
+}
+
 function baseNameOf(path: string): string {
 	const normalized = path.replace(/\\/g, "/");
 	const lastSlash = normalized.lastIndexOf("/");

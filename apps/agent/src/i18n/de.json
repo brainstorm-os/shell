@@ -129,5 +129,9 @@
   "propose.database.label": "Schlage eine ganz neue Datenbank vor. args: {\"name\": \"<Name>\", \"columns\": [{\"name\": \"<Spalte>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<Spalte>\": \"<Wert>\"}]}",
   "propose.kind.database": "Neue Datenbank",
   "propose.database.name": "Datenbankname",
-  "propose.database.schema": "Spalten: {columns}"
+  "propose.database.schema": "Spalten: {columns}",
+  "propose.codeFile.label": "Schlage eine neue Code-Datei vor (ein Skript/Schnipsel im Tresor des Nutzers, geöffnet vom Code-Editor). args: {\"path\": \"<Dateiname, z. B. scripts/build.ts>\", \"language\": \"<optionale Sprach-Id, z. B. typescript>\", \"content\": \"<der vollständige Quellcode>\"}",
+  "propose.kind.codeFile": "Code-Datei",
+  "propose.field.path": "Dateiname",
+  "propose.codeFile.preview": "Code-Vorschau für {path}"
 }

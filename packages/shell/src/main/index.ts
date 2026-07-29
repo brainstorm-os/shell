@@ -3802,7 +3802,11 @@ void app.whenReady().then(async () => {
 	// registered as the default so a demo-vault agent turn (no pinned provider)
 	// routes here and drives the real agent loop with scripted proposals.
 	if (process.env.BRAINSTORM_DEMO_AGENT) {
-		aiProviders.register(createDemoAgentProvider(), { default: true });
+		// The env VALUE selects the script ("appforge" = the propose-code-file
+		// build-an-app act; anything else = the follow-up reel).
+		aiProviders.register(createDemoAgentProvider(process.env.BRAINSTORM_DEMO_AGENT), {
+			default: true,
+		});
 	}
 	// 11.6 — BYO cloud provider (Anthropic Claude). Reached over the same
 	// network broker as Ollama but WITHOUT `allowPrivate` (the Claude API is a

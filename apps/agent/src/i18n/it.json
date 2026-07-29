@@ -129,5 +129,9 @@
   "propose.database.label": "Proponi un database completamente nuovo. args: {\"name\": \"<nome>\", \"columns\": [{\"name\": \"<colonna>\", \"type\": \"text|number|boolean|date\"}], \"rows\": [{\"<colonna>\": \"<valore>\"}]}",
   "propose.kind.database": "Nuovo database",
   "propose.database.name": "Nome del database",
-  "propose.database.schema": "Colonne: {columns}"
+  "propose.database.schema": "Colonne: {columns}",
+  "propose.codeFile.label": "Proponi un nuovo file di codice (uno script o frammento salvato nel vault dell'utente, aperto dall'editor di codice). args: {\"path\": \"<nome file, ad es. scripts/build.ts>\", \"language\": \"<id di linguaggio opzionale, ad es. typescript>\", \"content\": \"<il codice sorgente completo>\"}",
+  "propose.kind.codeFile": "File di codice",
+  "propose.field.path": "Nome file",
+  "propose.codeFile.preview": "Anteprima del codice di {path}"
 }

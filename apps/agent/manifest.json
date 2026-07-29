@@ -45,6 +45,8 @@
     "entities.write:brainstorm/List/v1",
     "intents.dispatch:propose-database",
     "entities.write:brainstorm/ListView/v1",
+    "intents.dispatch:propose-code-file",
+    "entities.write:brainstorm/CodeFile/v1",
     "ui.badge"
   ],
   "registrations": {

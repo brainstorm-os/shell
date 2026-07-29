@@ -20,6 +20,7 @@ import {
 	type MemberOverrides,
 	coerceScalarValue,
 } from "@brainstorm-os/sdk-types";
+import { CodeLanguage } from "@brainstorm-os/sdk/language-detect";
 import { ProposeKind, type ProposedArtifact } from "./propose-artifacts";
 
 /** A ready-to-persist plan: the canonical owner-app type + the full property bag
@@ -128,6 +129,26 @@ export function proposalToEntityProperties(
 					...opt("bio", f.notes),
 				},
 			};
+		case ProposeKind.CodeFile: {
+			// AppForge-3 — mirrors the Code editor's own new-file create
+			// (`{path, content, language}`): the source text lives in the
+			// `content` property, which the editor seeds its Y.Doc buffer from
+			// on first open. `sizeBytes`/`lineCount` are the manifest schema's
+			// optional metadata, derived from the same content.
+			const content = f.content ?? "";
+			return {
+				entityType: type,
+				properties: {
+					path: f.path ?? "",
+					content,
+					language: artifact.codeFile?.language ?? CodeLanguage.PlainText,
+					sizeBytes: new TextEncoder().encode(content).length,
+					lineCount: content.length === 0 ? 0 : content.split("\n").length,
+					createdAt: now,
+					updatedAt: now,
+				},
+			};
+		}
 		case ProposeKind.Database:
 			// A new database is a MULTI-entity create (Collection + its view + one
 			// entity per seed row), so there is no single property bag to map:

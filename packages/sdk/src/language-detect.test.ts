@@ -7,6 +7,7 @@ import {
 	languageForExtension,
 	languageForMime,
 	languageForShebang,
+	shikiIdForLanguage,
 } from "./language-detect";
 
 describe("languageForExtension", () => {
@@ -116,5 +117,21 @@ describe("languageDisplayLabel + isCodeLanguage", () => {
 		expect(isCodeLanguage("typescript")).toBe(true);
 		expect(isCodeLanguage("nope")).toBe(false);
 		expect(isCodeLanguage(42)).toBe(false);
+	});
+});
+
+describe("shikiIdForLanguage", () => {
+	it("maps every language to a grammar id, except the two deliberate nulls", () => {
+		for (const lang of Object.values(CodeLanguage)) {
+			const id = shikiIdForLanguage(lang);
+			if (lang === CodeLanguage.PlainText || lang === CodeLanguage.Unknown) {
+				expect(id).toBeNull();
+			} else {
+				expect(typeof id).toBe("string");
+			}
+		}
+		// The two renames Shiki insists on.
+		expect(shikiIdForLanguage(CodeLanguage.Shell)).toBe("shellscript");
+		expect(shikiIdForLanguage(CodeLanguage.Dockerfile)).toBe("docker");
 	});
 });

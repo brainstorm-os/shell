@@ -31,6 +31,11 @@ import {
 	proposeDescriptorForVerb,
 } from "./propose-artifacts";
 import {
+	PROPOSE_CODE_FILE_VERB,
+	buildCodeFileProposal,
+	buildCodeFileProposalAck,
+} from "./propose-code-file";
+import {
 	PROPOSE_DATABASE_VERB,
 	buildDatabaseProposal,
 	buildDatabaseProposalAck,
@@ -104,6 +109,17 @@ export function makeDispatchTool(
 			});
 			if (result.ok) onPropose?.(result.artifact);
 			return buildDatabaseProposalAck(result);
+		}
+		// AppForge-3 — a code file: path + language + bounded content, staged
+		// like every other draft. Same propose-not-persist rule.
+		if (tool.verb === PROPOSE_CODE_FILE_VERB) {
+			const result = buildCodeFileProposal({
+				verb: tool.verb,
+				args: call.args,
+				id: mintProposalId(),
+			});
+			if (result.ok) onPropose?.(result.artifact);
+			return buildCodeFileProposalAck(result);
 		}
 		// Propose-not-persist: stage a draft, never touch the vault.
 		if (proposeDescriptorForVerb(tool.verb)) {

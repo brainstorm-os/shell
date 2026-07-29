@@ -108,6 +108,7 @@ import {
 	emptyProposalState,
 	proposalReducer,
 } from "./logic/propose-artifacts";
+import { canProposeCodeFiles } from "./logic/propose-code-file";
 import { persistProposedDatabase } from "./logic/propose-database-persist";
 import { persistApprovedProposal } from "./logic/propose-persist";
 import {
@@ -496,6 +497,9 @@ export function AgentApp(): ReactElement {
 			intersectAgentTools(
 				curatedAgentTools((k) => t(k as AgentI18nKey), {
 					hasDatabases: databaseSchemas.length > 0,
+					// AppForge-3 — offered only when the frozen set can actually
+					// write a CodeFile/v1 (fail-closed at offer time).
+					canWriteCodeFiles: canProposeCodeFiles(frozenCapabilities),
 				}),
 				frozenCapabilities,
 			),
