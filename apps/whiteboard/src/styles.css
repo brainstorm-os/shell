@@ -1245,6 +1245,103 @@ button {
 	transform: translateY(-50%);
 }
 
+/* ── Resize handles (9.17.23) ────────────────────────────────────────── */
+
+/* Grips exist on every node but only materialise in the resizable state
+ * (single selection, unlocked node, board not read-only — the engine toggles
+ * `whiteboard__node--resizable`). Corners are visible accent squares; the
+ * edges are invisible hit strips spanning the border (the cursor is the
+ * affordance), sitting BELOW the midpoint connector dots so connecting from
+ * a selected node still works. */
+.whiteboard__resize-handle {
+	position: absolute;
+	display: none;
+	pointer-events: none;
+	z-index: 2;
+}
+
+.whiteboard__node--resizable .whiteboard__resize-handle {
+	display: block;
+	pointer-events: auto;
+}
+
+/* The connector dots outrank the edge strips where they overlap (the edge
+ * midpoints), so both gestures stay reachable on a selected node. */
+.whiteboard__node--resizable .whiteboard__handle {
+	z-index: 3;
+}
+
+/* PHYSICAL-AXIS INTENTIONAL: resize grips straddle the node's geometric
+ * corners/edges and pair with physical-direction cursors (nwse/nesw/ew/ns).
+ * Locale-invariant by design. */
+.whiteboard__resize-handle--nw,
+.whiteboard__resize-handle--ne,
+.whiteboard__resize-handle--se,
+.whiteboard__resize-handle--sw {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-xs);
+	background: var(--bg, #191919);
+	border: 1.5px solid var(--accent, #6b73f0);
+	z-index: 4;
+}
+
+.whiteboard__resize-handle--nw {
+	top: -6px;
+	left: -6px;
+	cursor: nwse-resize;
+}
+
+.whiteboard__resize-handle--se {
+	bottom: -6px;
+	right: -6px;
+	cursor: nwse-resize;
+}
+
+.whiteboard__resize-handle--ne {
+	top: -6px;
+	right: -6px;
+	cursor: nesw-resize;
+}
+
+.whiteboard__resize-handle--sw {
+	bottom: -6px;
+	left: -6px;
+	cursor: nesw-resize;
+}
+
+.whiteboard__resize-handle--n,
+.whiteboard__resize-handle--s {
+	left: 10px;
+	right: 10px;
+	height: 8px;
+	cursor: ns-resize;
+}
+
+.whiteboard__resize-handle--n {
+	top: -4px;
+}
+
+.whiteboard__resize-handle--s {
+	bottom: -4px;
+}
+
+.whiteboard__resize-handle--e,
+.whiteboard__resize-handle--w {
+	top: 10px;
+	bottom: 10px;
+	width: 8px;
+	cursor: ew-resize;
+}
+
+.whiteboard__resize-handle--e {
+	right: -4px;
+}
+
+.whiteboard__resize-handle--w {
+	left: -4px;
+}
+
 /* ── Hint footer ─────────────────────────────────────────────────────── */
 
 .whiteboard__hint {

@@ -28,6 +28,10 @@ export const ActionId = {
 	CommitEdit: "io.brainstorm.whiteboard/commit-edit",
 	CancelEdit: "io.brainstorm.whiteboard/cancel-edit",
 	CommitRename: "io.brainstorm.whiteboard/commit-rename",
+	ResizeWiden: "io.brainstorm.whiteboard/resize-widen",
+	ResizeNarrow: "io.brainstorm.whiteboard/resize-narrow",
+	ResizeTaller: "io.brainstorm.whiteboard/resize-taller",
+	ResizeShorter: "io.brainstorm.whiteboard/resize-shorter",
 	NudgeUp: "io.brainstorm.whiteboard/nudge-up",
 	NudgeDown: "io.brainstorm.whiteboard/nudge-down",
 	NudgeLeft: "io.brainstorm.whiteboard/nudge-left",
@@ -58,6 +62,13 @@ const DEFAULT_CHORDS: Record<ActionId, readonly string[]> = {
 	// Single-line rename input only (input-scoped binding): plain Enter
 	// commits — unlike the multi-line node editor where Enter is a newline.
 	[ActionId.CommitRename]: ["Enter"],
+	// Keyboard resize (bottom-right-anchored — the top-left corner stays):
+	// Alt+Arrows grow/shrink the single selected node, mirroring the plain
+	// Arrow nudges' directional model.
+	[ActionId.ResizeWiden]: ["Alt+ArrowRight"],
+	[ActionId.ResizeNarrow]: ["Alt+ArrowLeft"],
+	[ActionId.ResizeTaller]: ["Alt+ArrowDown"],
+	[ActionId.ResizeShorter]: ["Alt+ArrowUp"],
 	[ActionId.NudgeUp]: ["ArrowUp"],
 	[ActionId.NudgeDown]: ["ArrowDown"],
 	[ActionId.NudgeLeft]: ["ArrowLeft"],

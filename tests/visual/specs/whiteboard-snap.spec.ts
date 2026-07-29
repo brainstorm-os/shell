@@ -28,6 +28,7 @@ const SCREENSHOT_DIR = join(REPO_ROOT, ".screenshots", "whiteboard-snap");
 
 interface WbDev {
 	nodeIds: () => string[];
+	seedGrid: (count: number, opts?: { cols?: number; cell?: number }) => string[];
 	dragNodeBy: (id: string, dx: number, dy: number) => { x: number; y: number; guides: number };
 	endDrag: () => void;
 }
@@ -56,11 +57,14 @@ test("whiteboard drag snaps to a neighbour + draws an alignment guide", async ()
 		await wb.waitForLoadState("load", { timeout: 30_000 });
 		await wb.waitForSelector(".whiteboard__canvas", { state: "visible", timeout: 30_000 });
 
-		// Two stickies — both land at the viewport centre, so they overlap.
-		for (let i = 0; i < 2; i++) {
-			await wb.locator(".whiteboard__add-trigger").click();
-			await wb.locator(".fm-menu .fm-row", { hasText: "Sticky note" }).click();
-		}
+		// Two stickies at a known separation. (The old flow clicked the header
+		// Add menu via `.whiteboard__add-trigger`, a selector the React-chrome
+		// migration retired — dev seeding is deterministic and chrome-free.)
+		await wb.evaluate(() => {
+			(
+				window as unknown as { __brainstormWhiteboardDev: WbDev }
+			).__brainstormWhiteboardDev.seedGrid(2, { cols: 2, cell: 240 });
+		});
 		await expect(wb.locator(".whiteboard__node")).toHaveCount(2, { timeout: 10_000 });
 
 		// Drag the first node right 200px and *almost* aligned vertically (4px
