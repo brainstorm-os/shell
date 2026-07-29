@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LanguageKey } from "../types/code-file";
 import {
+	languageAfterRename,
 	languageForExtension,
 	languageForMime,
 	languageForShebang,
@@ -133,5 +134,56 @@ describe("resolveLanguage", () => {
 
 	it("returns Unknown when every signal is empty", () => {
 		expect(resolveLanguage({})).toBe(LanguageKey.Unknown);
+	});
+});
+
+describe("languageAfterRename (POLISH-FN-2)", () => {
+	it("re-derives across an extension change", () => {
+		expect(languageAfterRename(LanguageKey.TypeScript, "foo.md")).toBe(LanguageKey.Markdown);
+		expect(languageAfterRename(LanguageKey.TypeScript, "client-pulse/manifest.json")).toBe(
+			LanguageKey.JSON,
+		);
+		expect(languageAfterRename(LanguageKey.TypeScript, "client-pulse/index.html")).toBe(
+			LanguageKey.HTML,
+		);
+		expect(languageAfterRename(LanguageKey.JSON, "styles.css")).toBe(LanguageKey.CSS);
+	});
+
+	it("keeps the language when the new name only moves the file", () => {
+		expect(languageAfterRename(LanguageKey.TypeScript, "src/deep/foo.ts")).toBe(
+			LanguageKey.TypeScript,
+		);
+	});
+
+	it("degrades sanely on an unknown extension — keeps the valid language", () => {
+		expect(languageAfterRename(LanguageKey.TypeScript, "foo.wat")).toBe(LanguageKey.TypeScript);
+		expect(languageAfterRename(LanguageKey.Markdown, "notes.qqq")).toBe(LanguageKey.Markdown);
+	});
+
+	it("a no-extension rename never wipes a valid language", () => {
+		expect(languageAfterRename(LanguageKey.TypeScript, "README")).toBe(LanguageKey.TypeScript);
+		expect(languageAfterRename(LanguageKey.Shell, ".env")).toBe(LanguageKey.Shell);
+		expect(languageAfterRename(LanguageKey.CSS, "")).toBe(LanguageKey.CSS);
+	});
+
+	it("never writes Unknown back over a stored language", () => {
+		for (const name of ["README", "foo.wat", "", "Untitled"]) {
+			expect(languageAfterRename(LanguageKey.Python, name)).not.toBe(LanguageKey.Unknown);
+		}
+	});
+
+	it("falls back to the buffer's shebang when the new name carries no extension", () => {
+		expect(languageAfterRename(LanguageKey.TypeScript, "deploy", "#!/usr/bin/env bash")).toBe(
+			LanguageKey.Shell,
+		);
+		// The extension still outranks the shebang.
+		expect(languageAfterRename(LanguageKey.TypeScript, "deploy.py", "#!/bin/bash")).toBe(
+			LanguageKey.Python,
+		);
+	});
+
+	it("promotes a special filename (Dockerfile / tsconfig.json)", () => {
+		expect(languageAfterRename(LanguageKey.PlainText, "Dockerfile")).toBe(LanguageKey.Dockerfile);
+		expect(languageAfterRename(LanguageKey.JSON, "tsconfig.json")).toBe(LanguageKey.JSONC);
 	});
 });

@@ -54,6 +54,7 @@ import { type CodeFileRow, isCodeFileEditable, projectCodeFiles } from "./logic/
 import { fileName, languageLabel } from "./logic/code-view";
 import type { EditorCommand } from "./logic/command-palette";
 import { lintCode } from "./logic/diagnostics";
+import { languageAfterRename } from "./logic/language-detect";
 import { RenameError, nextUntitledPath, validateRenamePath } from "./logic/new-file";
 import { SyntaxThemePreference, parseSyntaxThemePreference } from "./logic/syntax-theme";
 import {
@@ -480,9 +481,20 @@ export function CodeEditorApp(): ReactElement {
 	const applyRename = useCallback(async (row: CodeFileRow, path: string): Promise<void> => {
 		const update = getCodeEditorRuntime()?.services?.entities?.update;
 		if (!update) return;
+		// A rename that changes the extension changes what the file IS — re-derive
+		// and PERSIST the language so highlighting, the header chip and the
+		// diagnostics rail all follow the new name (POLISH-FN-2). The stored
+		// property is the source of truth every reader (Preview, the agent's code
+		// preview, the projector) trusts, so a stale value has to be corrected at
+		// the write, not papered over per reader.
+		const language = languageAfterRename(
+			row.language,
+			path,
+			editsRef.current.get(row.id)?.split("\n", 1)[0] ?? row.content.split("\n", 1)[0] ?? "",
+		);
 		try {
-			await update(row.id, { path });
-			setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, path } : r)));
+			await update(row.id, language === row.language ? { path } : { path, language });
+			setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, path, language } : r)));
 		} catch (err) {
 			console.warn("[code-editor] rename failed:", err);
 		}
