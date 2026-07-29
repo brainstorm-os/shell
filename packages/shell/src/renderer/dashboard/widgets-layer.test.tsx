@@ -86,6 +86,26 @@ describe("DashboardWidgetsLayer — apps:changed refresh (F-380)", () => {
 		expect(host.querySelector(".dashboard-widgets__title")?.textContent).toBe("Recent Notes");
 	});
 
+	it("re-requests the header glyph after apps:changed — a 404 during the reinstall window heals", async () => {
+		// The header AppIcon's src must carry the apps epoch: an icon request
+		// racing the installer's uninstall→install window 404s, AppIcon falls
+		// back to initials, and a CONSTANT src would pin that fallback for the
+		// session (the dashboard "RN" glyph, dark-sweep 2026-07-29).
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_1: WIDGET }} />);
+		});
+		await flush();
+		const glyphSrc = () =>
+			host.querySelector<HTMLImageElement>(".app-icon-glyph__image")?.getAttribute("src");
+		expect(glyphSrc()).toBe(`brainstorm://app-icon/${encodeURIComponent(NOTES)}?e=0`);
+
+		await act(async () => {
+			for (const fire of appsChangedListeners) fire();
+		});
+		await flush();
+		expect(glyphSrc()).toBe(`brainstorm://app-icon/${encodeURIComponent(NOTES)}?e=1`);
+	});
+
 	it("renders a record stranded off-surface back inside the viewport (F-379)", async () => {
 		// The pre-7.3b migration bug baked ×10 positions into stored records
 		// (session 375: left 336px / top 4016px on an 800px screen). PR #92

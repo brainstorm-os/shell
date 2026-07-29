@@ -22,12 +22,19 @@
  *
  * Every block gets an overlay even when its language is unknown / still
  * loading (a plain, uncoloured paint) so the transparent block text is always
- * backed by something readable. Theme follows the app's resolved `color-scheme`
- * (set on the document root from the active theme's background luminance), not
- * the OS — so light tokens never land on a dark code background.
+ * backed by something readable. Theme follows the SHELL-painted appearance —
+ * `<body>`'s computed `color-scheme` via `shellAppearanceDark` — not the OS
+ * and not `<html>` (whose computed value is the app's own constant
+ * "light dark") — so light tokens never land on a dark code background and
+ * dark tokens never land on a light one.
  */
 
-import { HighlightTheme, type ThemedToken, tokenizeShiki } from "@brainstorm-os/sdk/code-highlight";
+import {
+	HighlightTheme,
+	type ThemedToken,
+	shellAppearanceDark,
+	tokenizeShiki,
+} from "@brainstorm-os/sdk/code-highlight";
 import { CodeNode } from "@lexical/code";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, type LexicalEditor } from "lexical";
@@ -64,6 +71,14 @@ function shikiIdFor(language: string | null | undefined): string | null {
 }
 
 function resolvedTheme(): HighlightTheme {
+	// The shell-painted `<body>` appearance is the source of truth
+	// (`shellAppearanceDark` — reading `<html>` here returned the constant
+	// "light dark" from the host app's own `:root` rule, which the old
+	// `includes("dark")` read as permanently dark: github-dark tokens on
+	// light-theme Notes). The `<html>` read survives only as the no-shell
+	// fallback.
+	const painted = shellAppearanceDark();
+	if (painted !== null) return painted ? HighlightTheme.Dark : HighlightTheme.Light;
 	if (typeof document === "undefined") return HighlightTheme.Light;
 	const scheme = getComputedStyle(document.documentElement).colorScheme || "";
 	return scheme.includes("dark") ? HighlightTheme.Dark : HighlightTheme.Light;

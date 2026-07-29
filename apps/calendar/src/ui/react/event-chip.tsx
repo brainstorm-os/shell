@@ -30,6 +30,34 @@ const RECURRENCE_LABELS = recurrenceLabels();
 
 export type EventChipMode = "compact" | "block" | "row";
 
+/** Block-chip content gating band (`data-density`). Each band names the
+ *  content that FITS the chip's inline height — the CSS hides the rest so
+ *  meta lines never flex-shrink into mid-glyph clipping (dark-sweep
+ *  2026-07-29: a 1h chip squeezed its time line to ascender tips because
+ *  guests/tz lines were never gated). Bands are picked from the event's
+ *  duration in `week-view.tsx`. */
+export enum ChipDensity {
+	/** <35min — title only. */
+	Tight = "tight",
+	/** 35–55min — title + time. */
+	Compact = "compact",
+	/** 55–80min — title + time + location. */
+	Roomy = "roomy",
+	/** ≥80min — full content (adds guests + timezone). */
+	Spacious = "spacious",
+}
+
+/** Pick the band for a block chip of `durationMins`. Bands must match the
+ *  pixel budget (64px/h ≈ 1.07px/min): every band's content has to FIT its
+ *  minimum chip height, or the flex column squeezes the meta lines into
+ *  mid-glyph clipping. */
+export function densityForDuration(durationMins: number): ChipDensity {
+	if (durationMins < 35) return ChipDensity.Tight;
+	if (durationMins < 55) return ChipDensity.Compact;
+	if (durationMins < 80) return ChipDensity.Roomy;
+	return ChipDensity.Spacious;
+}
+
 export type EventChipProps = {
 	item: ScheduledItem;
 	mode: EventChipMode;
@@ -38,7 +66,7 @@ export type EventChipProps = {
 	/** Inline style (block-mode positioning + density). */
 	style?: CSSProperties;
 	/** Density hint (block mode) → `data-density`. */
-	density?: string;
+	density?: ChipDensity;
 	/** Forwarded to the chip button (drag wiring in week/month views). */
 	buttonRef?: Ref<HTMLButtonElement>;
 };

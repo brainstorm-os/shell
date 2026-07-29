@@ -844,11 +844,16 @@ const WidgetCard = memo(function WidgetCardImpl(props: WidgetCardProps) {
 				>
 					{/* The owning app's brand glyph — the `glyph` variant drops the
 					    squircle tile + glass, so the header reads as a bare mark (the
-					    full tile was visual noise at this size). */}
+					    full tile was visual noise at this size). `appsEpoch` in the
+					    URL makes a failed load retry after every (re)install: a
+					    request racing the installer's uninstall→install window 404s,
+					    AppIcon falls back to initials, and a constant src pins that
+					    fallback for the whole session (the same F-380 edge the
+					    iframe entry and titles already re-resolve for). */}
 					<AppIcon
 						name={title}
 						seed={appId}
-						src={`brainstorm://app-icon/${encodeURIComponent(appId)}`}
+						src={`brainstorm://app-icon/${encodeURIComponent(appId)}?e=${appsEpoch}`}
 						size={18}
 						glyph
 					/>

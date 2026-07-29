@@ -61,9 +61,10 @@ test("whiteboard drag snaps to a neighbour + draws an alignment guide", async ()
 		// Add menu via `.whiteboard__add-trigger`, a selector the React-chrome
 		// migration retired — dev seeding is deterministic and chrome-free.)
 		await wb.evaluate(() => {
-			(
-				window as unknown as { __brainstormWhiteboardDev: WbDev }
-			).__brainstormWhiteboardDev.seedGrid(2, { cols: 2, cell: 240 });
+			(window as unknown as { __brainstormWhiteboardDev: WbDev }).__brainstormWhiteboardDev.seedGrid(
+				2,
+				{ cols: 2, cell: 240 },
+			);
 		});
 		await expect(wb.locator(".whiteboard__node")).toHaveCount(2, { timeout: 10_000 });
 

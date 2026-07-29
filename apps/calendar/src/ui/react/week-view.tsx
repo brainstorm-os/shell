@@ -12,7 +12,7 @@ import { useEffect, useRef } from "react";
 import { t } from "../../i18n/t";
 import type { CompiledDayView, CompiledWeekView, WeekDayBucket } from "../../logic/compile-view";
 import type { ScheduledItem } from "../../logic/scheduled-item";
-import { EventChip } from "./event-chip";
+import { EventChip, densityForDuration } from "./event-chip";
 import { beginBlockDrag } from "./use-chip-drag";
 import type { ViewCallbacks } from "./view-callbacks";
 
@@ -243,7 +243,7 @@ function TimedBlock({
 		item.end === null ? startMins + 30 : minutesIntoDayFromEpoch(item.end, dayStart),
 	);
 	const heightMins = Math.max(20, endMins - startMins);
-	const density = heightMins < 35 ? "tight" : heightMins < 55 ? "compact" : "roomy";
+	const density = densityForDuration(heightMins);
 	const pxPerMin = HOUR_HEIGHT_PX / 60;
 
 	const draggable = !item.isRecurringInstance && !item.readonly;
