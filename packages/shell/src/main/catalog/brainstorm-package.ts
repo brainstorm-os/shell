@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { ed25519Sign, ed25519Verify } from "@brainstorm-os/native";
-import { packBundle, unpackBundle } from "../bundle/bundle-archive";
+import { type UnpackBundleOptions, packBundle, unpackBundle } from "../bundle/bundle-archive";
 import { BundleCompression } from "../bundle/bundle-format";
 
 /** The `ed25519:` prefix on a wire publisher key (`ed25519:<base64url 32-byte>`). */
@@ -37,9 +37,14 @@ export function packBrainstormBundle(files: ReadonlyMap<string, Uint8Array>): Ui
 }
 
 /** Unpack a `.brainstorm` archive to a path → bytes map. Throws on bad magic /
- *  version / compression (the codec) or an unsafe path (the tar zip-slip guard). */
-export function unpackBrainstormBundle(bytes: Uint8Array): Map<string, Uint8Array> {
-	return unpackBundle(bytes);
+ *  version / compression (the codec), an unsafe path (the tar zip-slip guard),
+ *  or content exceeding `options.maxOutputBytes` (decompression-bomb bound —
+ *  untrusted-input callers must set it). */
+export function unpackBrainstormBundle(
+	bytes: Uint8Array,
+	options: UnpackBundleOptions = {},
+): Map<string, Uint8Array> {
+	return unpackBundle(bytes, options);
 }
 
 /**
@@ -51,9 +56,10 @@ export function unpackBrainstormBundle(bytes: Uint8Array): Map<string, Uint8Arra
 export async function unpackBrainstormBundleToDir(
 	bytes: Uint8Array,
 	destDir: string,
+	options: UnpackBundleOptions = {},
 ): Promise<string> {
 	const root = resolve(destDir);
-	const files = unpackBrainstormBundle(bytes);
+	const files = unpackBrainstormBundle(bytes, options);
 	for (const [path, data] of files) {
 		const target = resolve(root, path);
 		if (target !== root && !target.startsWith(root + sep)) {

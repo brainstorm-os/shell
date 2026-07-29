@@ -252,6 +252,14 @@ function sharedSourceRoots(appsDir: string): readonly string[] {
 
 export type ReinstallResult = { ok: true } | { ok: false; reason: string };
 
+export type ReinstallOptions = {
+	/** Packaged-shell mode: install the already-built bundle at
+	 *  `<appsDir>/<dir>` as-is (`bootstrap-cache` provenance) and NEVER spawn
+	 *  `vite build` — a packaged build has no sources, no bun on PATH, and a
+	 *  read-only resources tree, so a spawn there could only fail confusingly. */
+	prebuiltOnly?: boolean;
+};
+
 /**
  * Reinstall a single first-party app by manifest id — the marketplace's
  * "Install" affordance for a built-in app the user previously uninstalled.
@@ -261,6 +269,7 @@ export type ReinstallResult = { ok: true } | { ok: false; reason: string };
 export async function reinstallFirstPartyApp(
 	appId: string,
 	appsDir: string,
+	options: ReinstallOptions = {},
 ): Promise<ReinstallResult> {
 	const app = firstPartyAppById(appId);
 	if (!app) return { ok: false, reason: `${appId} is not a first-party app` };
@@ -283,12 +292,21 @@ export async function reinstallFirstPartyApp(
 	// they previously removed the icon from the dashboard.
 	dashboard.clearAppIconDismissed(app.expectedAppId);
 
-	const outcome = await buildInstallPin(app, appsDir, {
-		installer,
-		appsRepo,
-		dashboard,
-		provenance: DEV_INSTALL_PROVENANCE,
-	});
+	// Prebuilt mode omits `provenance` so the installer stamps its default
+	// (`bootstrap-cache`) — the same row the packaged bootstrap installer
+	// writes, so the update engine reconciles it against the catalog.
+	const outcome = options.prebuiltOnly
+		? await installPrebuiltBundle(app, join(appsDir, app.dir), {
+				installer,
+				appsRepo,
+				dashboard,
+			})
+		: await buildInstallPin(app, appsDir, {
+				installer,
+				appsRepo,
+				dashboard,
+				provenance: DEV_INSTALL_PROVENANCE,
+			});
 	return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
 }
 

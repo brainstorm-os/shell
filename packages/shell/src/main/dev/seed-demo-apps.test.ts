@@ -3,15 +3,34 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const spawnSpy = vi.fn(() => {
+	throw new Error("spawn must not be called in prebuiltOnly mode");
+});
+vi.mock("node:child_process", () => ({
+	spawn: (...args: unknown[]) => spawnSpy(...(args as [])),
+}));
+
+let activeSession: unknown;
+vi.mock("../vault/session", () => ({
+	getActiveVaultSession: () => activeSession,
+}));
+
 import type { FirstPartyApp } from "../apps/first-party";
+import { InstallOrigin } from "../apps/install-provenance";
 import { AppInstaller } from "../apps/installer";
 import type { AppManifest } from "../apps/manifest";
 import { validateManifest } from "../apps/manifest";
 import type { DashboardStore } from "../dashboard/dashboard-store";
 import { DataStores } from "../storage/data-stores";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
-import { FIRST_PARTY_APPS, installPrebuiltBundle, summarizeBuildStderr } from "./seed-demo-apps";
+import {
+	FIRST_PARTY_APPS,
+	installPrebuiltBundle,
+	reinstallFirstPartyApp,
+	summarizeBuildStderr,
+} from "./seed-demo-apps";
 
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..", "..");
 
@@ -89,6 +108,7 @@ function makeFakeDashboard(): DashboardStore {
 			icons[id] = record;
 		},
 		isAppIconDismissed: () => false,
+		clearAppIconDismissed: () => {},
 	};
 	return shim as unknown as DashboardStore;
 }
@@ -187,6 +207,73 @@ describe("installPrebuiltBundle", () => {
 			dashboard: env.dashboard,
 		});
 		expect(result.ok).toBe(false);
+	});
+});
+
+/**
+ * AppForge-1 packaged-path fix — `reinstallFirstPartyApp` in a packaged shell
+ * (`prebuiltOnly`) installs the extraResources bundle as-is with
+ * `bootstrap-cache` provenance and NEVER spawns `vite build`: a packaged
+ * build has no sources, no bun on PATH, and a read-only resources tree.
+ * The spawn spy at the top of this file throws if any code path reaches it.
+ */
+describe("reinstallFirstPartyApp — prebuiltOnly (packaged shell)", () => {
+	const NOTES_ID = "io.brainstorm.notes";
+	let vaultDir: string;
+	let appsDir: string;
+	let stores: DataStores;
+
+	beforeEach(async () => {
+		spawnSpy.mockClear();
+		vaultDir = await mkdtemp(join(tmpdir(), "bs-reinstall-vault-"));
+		appsDir = await mkdtemp(join(tmpdir(), "bs-reinstall-apps-"));
+		stores = new DataStores(vaultDir);
+		activeSession = {
+			vaultPath: vaultDir,
+			dataStores: stores,
+			capabilityLedger: async () => new CapabilityLedger(await stores.open("ledger")),
+			dashboardStore: async () => makeFakeDashboard(),
+		};
+		// A prebuilt "notes" bundle, the shape extraResources ships.
+		const bundleDir = join(appsDir, "notes");
+		await mkdir(join(bundleDir, "dist"), { recursive: true });
+		await writeFile(
+			join(bundleDir, "manifest.json"),
+			JSON.stringify({
+				id: NOTES_ID,
+				name: "Notes",
+				version: "1.0.0",
+				sdk: "1",
+				entry: "dist/index.html",
+				capabilities: [],
+			}),
+			"utf8",
+		);
+		await writeFile(join(bundleDir, "dist", "index.html"), "<!doctype html>", "utf8");
+	});
+
+	afterEach(async () => {
+		activeSession = null;
+		stores.close();
+		await rm(vaultDir, { recursive: true, force: true });
+		await rm(appsDir, { recursive: true, force: true });
+	});
+
+	it("installs the prebuilt bundle with bootstrap-cache provenance and never spawns a build", async () => {
+		const result = await reinstallFirstPartyApp(NOTES_ID, appsDir, { prebuiltOnly: true });
+		expect(result).toEqual({ ok: true });
+		expect(spawnSpy).not.toHaveBeenCalled();
+		const repo = new AppsRepository(await stores.open("registry"));
+		expect(repo.getActive(NOTES_ID)?.origin).toBe(InstallOrigin.BootstrapCache);
+	});
+
+	it("fails with a clear reason (still no spawn) when the prebuilt bundle is missing", async () => {
+		await rm(join(appsDir, "notes"), { recursive: true, force: true });
+		const result = await reinstallFirstPartyApp(NOTES_ID, appsDir, { prebuiltOnly: true });
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.reason.length).toBeGreaterThan(0);
+		expect(spawnSpy).not.toHaveBeenCalled();
 	});
 });
 

@@ -485,6 +485,13 @@
 	color: var(--color-text-secondary);
 }
 
+/* Unsigned-install advisory (AppForge-1) — warning tint, not an error: v1
+   signature policy is advisory and the chip says so honestly. */
+.marketplace__detail-chip--unsigned {
+	color: var(--color-state-warning);
+	border-color: var(--color-state-warning);
+}
+
 .marketplace__detail-summary {
 	margin: 0;
 	font-size: var(--text-size-sm);

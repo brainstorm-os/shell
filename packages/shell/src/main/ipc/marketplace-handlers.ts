@@ -19,7 +19,7 @@ import { effectiveSlotFor } from "@brainstorm-os/protocol/appearance";
 import { UpdateChannel } from "@brainstorm-os/protocol/update-wire-types";
 import { type ThemeName, isThemeName } from "@brainstorm-os/tokens";
 import { app, ipcMain, nativeTheme } from "electron";
-import { firstPartyAppsDir, readFirstPartyCatalog } from "../apps/first-party";
+import { readFirstPartyCatalog, resolveFirstPartyAppsDir } from "../apps/first-party";
 import { AppInstaller } from "../apps/installer";
 import {
 	ensureCatalogRefreshed,
@@ -74,7 +74,12 @@ export type MarketplaceHandlersOptions = {
 };
 
 export function registerMarketplaceHandlers(options: MarketplaceHandlersOptions): void {
-	const appsDir = firstPartyAppsDir(options.mainDir);
+	// Packaged builds must read the extraResources tree — the dev relative walk
+	// from `__dirname` points inside the asar there and does not exist.
+	const appsDir = resolveFirstPartyAppsDir(options.mainDir, {
+		isPackaged: app.isPackaged,
+		resourcesPath: process.resourcesPath,
+	});
 
 	ipcMain.handle(MARKETPLACE_LISTINGS_CHANNEL, async (): Promise<MarketplaceListing[]> => {
 		const service = await buildService(appsDir);
@@ -173,7 +178,9 @@ async function installFromCatalogOrReinstall(
 	const client = getCatalogClient(app.getPath("userData"));
 	await ensureCatalogRefreshed(client);
 	const listing = client.listing(appId);
-	if (!listing) return reinstallFirstPartyApp(appId, appsDir);
+	// Packaged fallback installs the prebuilt extraResources bundle; only the
+	// dev shell may spawn a source build.
+	if (!listing) return reinstallFirstPartyApp(appId, appsDir, { prebuiltOnly: app.isPackaged });
 
 	const registry = await session.dataStores.open("registry");
 	const ledger = await session.capabilityLedger();
@@ -281,6 +288,8 @@ async function buildService(appsDir: string): Promise<MarketplaceService | null>
 						id: record.id,
 						name: meta.name,
 						version: record.version,
+						origin: record.origin,
+						signatureStatus: record.signatureStatus,
 						...(meta.description !== undefined ? { description: meta.description } : {}),
 					};
 				}),

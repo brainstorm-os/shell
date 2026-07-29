@@ -38,7 +38,7 @@ const CODE_COMPRESSION: Record<number, BundleCompression> = {
 
 type ZstdCapableZlib = typeof zlib & {
 	zstdCompressSync: (buf: Buffer) => Buffer;
-	zstdDecompressSync: (buf: Buffer) => Buffer;
+	zstdDecompressSync: (buf: Buffer, options?: { maxOutputLength?: number }) => Buffer;
 };
 
 function zstdCapable(): ZstdCapableZlib | null {
@@ -69,16 +69,25 @@ function compress(algo: BundleCompression, bytes: Buffer): Buffer {
 	}
 }
 
-function decompress(algo: BundleCompression, bytes: Buffer): Buffer {
+function decompress(algo: BundleCompression, bytes: Buffer, maxOutputBytes?: number): Buffer {
 	switch (algo) {
 		case BundleCompression.None:
+			if (maxOutputBytes !== undefined && bytes.length > maxOutputBytes) {
+				throw new Error(`bundle: content exceeds the ${maxOutputBytes}-byte unpack limit`);
+			}
 			return bytes;
 		case BundleCompression.Gzip:
-			return zlib.gunzipSync(bytes);
+			return zlib.gunzipSync(
+				bytes,
+				maxOutputBytes !== undefined ? { maxOutputLength: maxOutputBytes } : {},
+			);
 		case BundleCompression.Zstd: {
 			const z = zstdCapable();
 			if (!z) throw new Error("bundle: zstd bundle cannot be read in this runtime");
-			return z.zstdDecompressSync(bytes);
+			return z.zstdDecompressSync(
+				bytes,
+				maxOutputBytes !== undefined ? { maxOutputLength: maxOutputBytes } : {},
+			);
 		}
 	}
 }
@@ -101,9 +110,21 @@ export function packBundle(
 	return Buffer.concat([head, payload]);
 }
 
+export type UnpackBundleOptions = {
+	/** Cap on the decompressed tar size. A hostile archive can compress a huge
+	 *  payload into a tiny file (decompression bomb) — untrusted-input callers
+	 *  (the sideload install path) MUST bound the expansion. Throws when the
+	 *  content would exceed the cap. */
+	maxOutputBytes?: number;
+};
+
 /** Unpack a `.bsbundle` byte buffer into a path→bytes map. Throws on a bad
- *  magic / unknown container version / unknown compression code. */
-export function unpackBundle(bundle: Uint8Array): Map<string, Uint8Array> {
+ *  magic / unknown container version / unknown compression code, or when the
+ *  decompressed content exceeds `maxOutputBytes`. */
+export function unpackBundle(
+	bundle: Uint8Array,
+	options: UnpackBundleOptions = {},
+): Map<string, Uint8Array> {
 	const buf = Buffer.from(bundle);
 	if (
 		buf.length < MAGIC_BYTES.length + 2 ||
@@ -120,7 +141,7 @@ export function unpackBundle(bundle: Uint8Array): Map<string, Uint8Array> {
 	if (algo === undefined) {
 		throw new Error(`bundle: unknown compression code ${code}`);
 	}
-	const tar = decompress(algo, buf.subarray(MAGIC_BYTES.length + 2));
+	const tar = decompress(algo, buf.subarray(MAGIC_BYTES.length + 2), options.maxOutputBytes);
 	const out = new Map<string, Uint8Array>();
 	for (const entry of unpackTar(tar)) out.set(entry.path, entry.data);
 	return out;
