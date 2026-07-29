@@ -1688,49 +1688,15 @@ body:not([data-inspector="open"]) .inspector {
 
 /* ── Footer / status bar (28px) ──────────────────────────────────────── */
 
-/* The view-mode picker is the shared `<SelectMenu>` (`.bs-select` trigger +
- * fancy-menus popup, 9.8.10); `.view-switch` only constrains the trigger
- * height to the toolbar's compact controls. The chrome comes from
- * `@brainstorm-os/sdk/select-menu.css`. */
-.view-switch.bs-select {
-	height: var(--control-height-sm);
-}
-
-/* Sort menu trigger + popover items */
-
-.toolbar__sort {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	height: var(--control-height-sm);
-	padding: 0 var(--space-2);
-	border-radius: var(--radius-sm);
-	border: var(--border-width) solid transparent;
-	color: var(--text-dim);
-	font-size: var(--text-size-xs);
-	cursor: pointer;
-}
-
-.toolbar__sort:hover {
-	background: var(--hover);
-	color: var(--text);
-}
-
-.toolbar__sort[aria-expanded="true"] {
-	background: var(--hover);
-	color: var(--text);
-}
+/* Toolbar trigger faces (POLISH-DSN-4): the sort trigger and the view-mode
+ * picker are the SAME `.bs-select--sm` face (one boxed trigger face per
+ * toolbar; chrome from `@brainstorm-os/sdk/select-menu.css`). The sort button
+ * keeps its own popover (direction + group-by + layout controls, not a plain
+ * option list) — only its face is the shared one; its caret shows the current
+ * sort direction instead of the dropdown caret. */
 
 .toolbar__sort-label {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	max-width: 220px;
-}
-
-.toolbar__sort-arrow {
-	color: var(--text-faint);
-	font-variant-numeric: tabular-nums;
 }
 
 .sort-menu__items {

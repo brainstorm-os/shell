@@ -722,25 +722,24 @@ export function FilesApp() {
 						<div className="toolbar__group toolbar__group--end">
 							<button
 								type="button"
-								className="toolbar__sort"
+								className="bs-select bs-select--sm toolbar__sort"
 								data-testid="toolbar-sort"
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
 								title={t("brainstorm.files.sort.label")}
 								onClick={() => setSortMenuOpen((open) => !open)}
 							>
-								<span className="toolbar__sort-label">
+								<span className="bs-select__value toolbar__sort-label">
 									{t("brainstorm.files.sort.label")}: {sortLabel(store.sortKey)}
 								</span>
-								<span aria-hidden="true" className="toolbar__sort-arrow">
-									<Icon
-										name={store.sortDirection === SortDirection.Asc ? IconName.CaretUp : IconName.CaretDown}
-										size={12}
-									/>
-								</span>
+								<Icon
+									name={store.sortDirection === SortDirection.Asc ? IconName.CaretUp : IconName.CaretDown}
+									size={12}
+									className="bs-select__caret"
+								/>
 							</button>
 							<SelectMenu<ViewMode>
-								className="view-switch"
+								className="bs-select--sm view-switch"
 								data-testid="view-switch"
 								ariaLabel={t("brainstorm.files.view.label")}
 								value={store.viewMode}

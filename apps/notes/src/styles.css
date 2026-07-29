@@ -702,6 +702,9 @@ body.is-resizing .notes__props-resize {
 	min-width: 0;
 }
 
+/* Icon-gutter rule (POLISH-DSN-5): rendered for EVERY row whenever any row
+ * in the list carries an icon — an icon-less row keeps the empty 18px slot
+ * so titles share a left edge. Icon-free lists render no slot at all. */
 .notes__sidebar-icon {
 	display: inline-flex;
 	align-items: center;
@@ -709,10 +712,6 @@ body.is-resizing .notes__props-resize {
 	width: 18px;
 	height: 18px;
 	flex: none;
-}
-
-.notes__sidebar-icon:empty {
-	display: none;
 }
 
 .notes__sidebar-icon img {

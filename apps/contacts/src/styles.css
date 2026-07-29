@@ -215,30 +215,12 @@ body.is-resizing .contacts__resize {
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
-/* Light borderless toggles, matching the Tasks app's Group/Sort controls
-   (was heavy bordered chips). */
-.contacts-list__control {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-1);
-	border: var(--border-width) solid transparent;
-	border-radius: var(--radius-sm);
-	background: transparent;
-	color: var(--text-dim);
-	font-size: var(--text-size-xs);
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-.contacts-list__control svg {
+/* Group/Sort triggers share the `.bs-select--sm` face (POLISH-DSN-4);
+ * chrome comes from `@brainstorm-os/sdk/select-menu.css`. Only the leading
+ * axis glyph is styled locally. */
+.contacts-list__control > svg:first-child {
 	flex: 0 0 auto;
 	color: var(--text-dim);
-}
-
-.contacts-list__control:hover {
-	background: var(--hover);
-	color: var(--text);
 }
 
 .contacts-list__banner {

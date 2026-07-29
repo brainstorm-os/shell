@@ -241,6 +241,13 @@ body {
 	list-style: none;
 }
 
+/* The empty-list row fills the pane so the shared <EmptyState> centres,
+ * matching the reading pane's empty beside it (POLISH-LAY-2). */
+.mb-list__empty-row {
+	display: flex;
+	height: 100%;
+}
+
 
 .mb-row {
 	display: flex;
@@ -435,29 +442,6 @@ body {
 .mb-reading--empty {
 	align-items: center;
 	justify-content: center;
-}
-
-.mb-reading__placeholder {
-	text-align: center;
-	color: var(--text-dim, var(--text));
-}
-
-.mb-reading__placeholder-icon {
-	width: 40px;
-	height: 40px;
-	margin-bottom: var(--space-2);
-	opacity: 0.4;
-}
-
-.mb-reading__placeholder-title {
-	margin: 0 0 var(--space-1);
-	font-weight: var(--text-weight-medium);
-}
-
-.mb-reading__placeholder-blurb {
-	margin: 0;
-	font-size: var(--text-size-sm);
-	opacity: 0.75;
 }
 
 .mb-iconbtn {
