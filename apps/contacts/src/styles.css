@@ -216,8 +216,14 @@ body.is-resizing .contacts__resize {
 }
 
 /* Group/Sort triggers share the `.bs-select--sm` face (POLISH-DSN-4);
- * chrome comes from `@brainstorm-os/sdk/select-menu.css`. Only the leading
- * axis glyph is styled locally. */
+ * chrome comes from `@brainstorm-os/sdk/select-menu.css`. Full-width rows —
+ * the boxed face doesn't fit two-up in the narrow sidebar, and a stacked
+ * pair reads like the form controls above (search) rather than a ragged
+ * wrap. Only the leading axis glyph is styled locally. */
+.contacts-list__control {
+	flex: 1 1 100%;
+}
+
 .contacts-list__control > svg:first-child {
 	flex: 0 0 auto;
 	color: var(--text-dim);
