@@ -3,6 +3,138 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.11.1",
+      "date": "2026-07-29",
+      "icon": "📐",
+      "title": "Resize anything on the whiteboard",
+      "summary": "The most-asked-for whiteboard feature: grab a corner and resize sticky notes, shapes, images — anything. Plus a round of polish across Database, Files, Mailbox, Contacts, and Notes.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Whiteboard"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Resize anything",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — select a note, shape, or image and drag any corner or edge. Edges "
+            },
+            {
+              "text": "snap",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " to neighbours like drag does, "
+            },
+            {
+              "text": "Shift",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " locks the aspect ratio (images lock by default), and one "
+            },
+            {
+              "text": "Undo",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " restores the old size. "
+            },
+            {
+              "text": "Alt+Arrows",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " resizes from the keyboard."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — number columns right-align top to bottom: header, cells, editors, and the footer "
+            },
+            {
+              "text": "SUM",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " finally agree."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files & Contacts",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — sort and group pickers wear the same face as every other field."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Mailbox",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — both panes' empty states share one centered design."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Notes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — sidebar titles line up on one left edge, icons or not."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.11.0",
       "date": "2026-07-28",
       "icon": "📎",
