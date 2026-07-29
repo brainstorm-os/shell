@@ -35,13 +35,12 @@ import { FIRST_PARTY_APPS, type FirstPartyApp, firstPartyAppById } from "../apps
 import { DEV_INSTALL_PROVENANCE, type InstallProvenance } from "../apps/install-provenance";
 import { AppInstaller } from "../apps/installer";
 import type { DashboardStore } from "../dashboard/dashboard-store";
+import { firstFreeCell, occupiedCells } from "../dashboard/grid-placement";
 import { pruneOrphanAppIcons } from "../dashboard/prune-orphan-app-icons";
 import { getActiveShortcutRegistry } from "../shortcuts/active-registry";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { getActiveVaultSession } from "../vault/session";
 import { isBundleBuildStale } from "./bundle-staleness";
-
-const GRID_COLS = 12;
 
 // Re-exported so existing import sites (`./seed-demo-apps`) keep working;
 // the canonical catalog now lives in `../apps/first-party`.
@@ -310,14 +309,15 @@ export async function reinstallFirstPartyApp(
 	return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
 }
 
-/** Place a dashboard icon at the next free grid cell. Returns false when
+/** Place a dashboard icon at the next free install slot. Returns false when
  *  an icon already targets this app (no-op for re-seeds).
  *
- *  Wire format is cell-index `{x: col, y: row}` (small integers) — matches
- *  the renderer's grid in `packages/shell/src/renderer/dashboard/grid.ts`.
- *  Storing pixel coordinates here would put `col=0` (`x=16`) below the
- *  legacy-detection threshold and strand it as `col=16` on the rendered
- *  grid (clamped off-screen). */
+ *  Wire format is 8px grid units `{x: col, y: row}` — the same units the
+ *  renderer paints with. The free slot comes from the SHARED placer
+ *  (`shared/dashboard-icon-grid` via `dashboard/grid-placement`), which knows
+ *  an icon's box spans `ICON_FOOTPRINT_W × ICON_FOOTPRINT_H` units: a
+ *  local "next free 1×1 cell" scan dropped a new app straight on top of
+ *  Notes (POLISH-LAY-6). */
 export function placeDashboardIcon(
 	dashboard: DashboardStore,
 	appId: string,
@@ -325,30 +325,18 @@ export function placeDashboardIcon(
 ): boolean {
 	// The user removed this app's icon on purpose — don't resurrect it.
 	if (dashboard.isAppIconDismissed(appId)) return false;
-	const existingIcons = Object.entries(dashboard.snapshot().icons);
-	if (existingIcons.some(([, icon]) => icon.target === appId)) return false;
+	const existingIcons = dashboard.snapshot().icons;
+	if (Object.values(existingIcons).some((icon) => icon.target === appId)) return false;
 
-	const occupied = new Set(existingIcons.map(([, icon]) => keyFor(icon.x, icon.y)));
-	let cursor = 0;
-	while (true) {
-		const col = cursor % GRID_COLS;
-		const row = Math.floor(cursor / GRID_COLS);
-		if (!occupied.has(keyFor(col, row))) {
-			dashboard.upsertIcon(`icon_${appId}_demo`, {
-				x: col,
-				y: row,
-				kind: "app",
-				target: appId,
-				label,
-			});
-			return true;
-		}
-		cursor += 1;
-	}
-}
-
-function keyFor(x: number, y: number): string {
-	return `${x}:${y}`;
+	const cell = firstFreeCell(occupiedCells(existingIcons));
+	dashboard.upsertIcon(`icon_${appId}_demo`, {
+		x: cell.col,
+		y: cell.row,
+		kind: "app",
+		target: appId,
+		label,
+	});
+	return true;
 }
 
 async function pathExists(path: string): Promise<boolean> {

@@ -608,18 +608,30 @@
 
 .grants-panel__row {
 	display: grid;
-	grid-template-columns: 1fr auto auto;
+	grid-template-columns: 1fr auto;
 	column-gap: var(--space-3);
 	align-items: center;
 	font-size: var(--text-size-md);
 }
 
+/* Capability over "granted via", stacked in one text column — the same
+ * shape as `.grants-panel__app-text` in the list behind this popover. */
+.grants-panel__row-text {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+	min-width: 0;
+}
+
+/* The scope is the payload of a grant, so it must stay readable in full: it
+ * wraps (and breaks inside the long `vendor/Type/v1` token when it has to)
+ * instead of ellipsising. Truncating it made the panel that answers "what
+ * can this app read?" unable to answer (POLISH-LAY-7). */
 .grants-panel__capability {
 	font-family: var(--text-family-code);
 	color: var(--color-text-primary);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
 .grants-panel__source {

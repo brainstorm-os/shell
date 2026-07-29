@@ -44,6 +44,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
+import { appIconUrl } from "../shared/app-icon-url";
 
 export type { AppearanceMode, AppearancePair, AppearanceSlot, AppearanceState };
 export type { ReleaseInfo, UpdateCheckResult, UpdatePrefs };
@@ -1097,10 +1098,7 @@ const apps = {
 	 *  app-derived caches (widget titles + entries, icon cache) on this edge
 	 *  instead of racing the installer once at mount (F-380). */
 	onChanged: (listener: () => void): (() => void) => subscribe<void>("apps:changed", listener),
-	iconUrl: (appId: string, version?: string): string => {
-		const base = `brainstorm://app-icon/${encodeURIComponent(appId)}`;
-		return version ? `${base}?v=${encodeURIComponent(version)}` : base;
-	},
+	iconUrl: (appId: string, version?: string): string => appIconUrl(appId, version),
 	launch: (appId: string): Promise<void> => ipcRenderer.invoke("apps:launch", appId),
 	uninstall: (appId: string): Promise<UninstallSummary> =>
 		ipcRenderer.invoke("apps:uninstall", appId),

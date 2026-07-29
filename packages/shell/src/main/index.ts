@@ -55,6 +55,13 @@ import { createGeminiProvider } from "./ai/gemini-provider";
 import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
 import { ProviderRegistry } from "./ai/provider-registry";
+import {
+	AppIconMiss,
+	type AppIconResolution,
+	appIconMissStatus,
+	isAppIconHit,
+	resolveAppIconInBundle,
+} from "./apps/app-icon-resolver";
 import { maskAppWindowsForLock } from "./apps/app-window-lock";
 import { setAppsChangedTarget } from "./apps/apps-changed";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
@@ -556,8 +563,11 @@ function registerBrainstormProtocol(): void {
 		}
 		// brainstorm://app-icon/<appId>  — manifest-declared icon asset.
 		// The handler reads the installed bundle's manifest, validates the
-		// icon path stays inside the bundle, and streams it. Apps without a
-		// declared icon get 404 — the renderer falls back to initials.
+		// icon path stays inside the bundle, and streams it. An app that
+		// declares NO icon answers 204 (no content, not an error) so the
+		// caller's initials fallback runs without a console 404 per surface
+		// per boot (POLISH-LAY-8); an id that resolves to no installed app
+		// still 404s, because that IS worth surfacing.
 		if (url.host === "app-icon") {
 			const session = getActiveVaultSession();
 			if (!session) return new Response(null, { status: 404 });
@@ -565,9 +575,11 @@ function registerBrainstormProtocol(): void {
 			if (!appId || appId.includes("..") || appId.includes("/")) {
 				return new Response(null, { status: 400 });
 			}
-			const target = await resolveAppIconPath(appId);
-			if (!target) return new Response(null, { status: 404 });
-			const response = await net.fetch(pathToFileURL(target).toString());
+			const resolved = await resolveAppIconPath(appId);
+			if (!isAppIconHit(resolved)) {
+				return new Response(null, { status: appIconMissStatus(resolved.miss) });
+			}
+			const response = await net.fetch(pathToFileURL(resolved.path).toString());
 			const headers = new Headers(response.headers);
 			// A `?v=<version>` request is immutable: the renderer cache-busts on
 			// app update, so the bytes for a given version never change. Caching
@@ -1175,27 +1187,15 @@ async function drainAssetUploads(): Promise<void> {
 	}
 }
 
-async function resolveAppIconPath(appId: string): Promise<string | null> {
+/** Locate the active bundle for an app id, then resolve its declared icon
+ *  inside it. The resolution rules (and why a no-icon app is NOT a 404) live
+ *  in `apps/app-icon-resolver`. */
+async function resolveAppIconPath(appId: string): Promise<AppIconResolution> {
 	const session = getActiveVaultSession();
-	if (!session) return null;
+	if (!session) return { miss: AppIconMiss.Unresolved };
 	const registry = await session.dataStores.open("registry");
 	const repo = new AppsRepository(registry);
-	const record = repo.getActive(appId);
-	if (!record) return null;
-	let manifest: { icon?: unknown };
-	try {
-		const raw = await readFile(join(record.bundleDir, "manifest.json"), "utf8");
-		manifest = JSON.parse(raw) as { icon?: unknown };
-	} catch {
-		return null;
-	}
-	if (typeof manifest.icon !== "string" || manifest.icon.length === 0) return null;
-	if (manifest.icon.includes("..")) return null;
-	const target = normalize(join(record.bundleDir, manifest.icon));
-	if (!target.startsWith(record.bundleDir + sep) && target !== record.bundleDir) {
-		return null;
-	}
-	return target;
+	return resolveAppIconInBundle(repo.getActive(appId)?.bundleDir ?? null);
 }
 
 function resolveIconPath(): string {

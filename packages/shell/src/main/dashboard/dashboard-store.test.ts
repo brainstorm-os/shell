@@ -12,6 +12,11 @@ import {
 import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+	ICON_FOOTPRINT_H,
+	ICON_FOOTPRINT_W,
+	footprintsOverlap,
+} from "../../shared/dashboard-icon-grid";
 import { placeDashboardIcon } from "../dev/seed-demo-apps";
 import { YDocStore } from "../storage/ydoc-store";
 import { DASHBOARD_DOC_ID, DashboardStore, applyLegacyMigration } from "./dashboard-store";
@@ -662,6 +667,87 @@ describe("DashboardStore — shell prefs (locale / regional / chrome / notificat
 		store.clearNotificationHistory();
 		await store.flush();
 		expect(store.snapshot().notificationHistory).toEqual([]);
+		await store.close();
+	});
+
+	// POLISH-LAY-6 — the install path, end to end over the real store. Main
+	// used to place onto a fictional 12-column grid of 1×1 cells while the
+	// renderer stores 8px units and paints an ICON_FOOTPRINT_W × _H box per
+	// icon, so a newly installed app landed ON TOP of Notes.
+	it("places an installed app's icon clear of every existing icon's footprint", async () => {
+		const store = await DashboardStore.open(yStore);
+		// The seeded fleet as captured on the real dashboard.
+		const seeded = [
+			{ id: "io.brainstorm.notes", x: 0, y: 0 },
+			{ id: "io.brainstorm.files", x: 11, y: 0 },
+			{ id: "io.brainstorm.database", x: 22, y: 0 },
+			{ id: "io.brainstorm.books", x: 0, y: 14 },
+		];
+		for (const app of seeded) {
+			store.upsertIcon(`icon_${app.id}_demo`, {
+				x: app.x,
+				y: app.y,
+				kind: "app",
+				target: app.id,
+				label: app.id,
+			});
+		}
+
+		expect(placeDashboardIcon(store, "studio.northbound.client-pulse", "Client Pulse")).toBe(true);
+		const placed = store.snapshot().icons["icon_studio.northbound.client-pulse_demo"];
+		expect(placed).toBeDefined();
+		if (!placed) throw new Error("unreachable");
+		for (const app of seeded) {
+			expect(footprintsOverlap({ col: placed.x, row: placed.y }, { col: app.x, row: app.y })).toBe(
+				false,
+			);
+		}
+
+		// A second install stacks on neither the fleet nor the first newcomer.
+		expect(placeDashboardIcon(store, "io.brainstorm.hello", "Hello")).toBe(true);
+		const second = store.snapshot().icons["icon_io.brainstorm.hello_demo"];
+		if (!second) throw new Error("unreachable");
+		for (const other of [...seeded.map((a) => ({ x: a.x, y: a.y })), placed]) {
+			expect(footprintsOverlap({ col: second.x, row: second.y }, { col: other.x, row: other.y })).toBe(
+				false,
+			);
+		}
+		await store.close();
+	});
+
+	it("wraps an install onto the next footprint row once the first row is full", async () => {
+		const store = await DashboardStore.open(yStore);
+		// Fill the first footprint row wall to wall for a 1440px-wide surface
+		// (≈ 16 slots at ICON_FOOTPRINT_W); the placer keeps stepping across
+		// (the grid is unbounded) but never overlaps.
+		for (let i = 0; i < 16; i++) {
+			store.upsertIcon(`icon_seed${i}_demo`, {
+				x: i * ICON_FOOTPRINT_W,
+				y: 0,
+				kind: "app",
+				target: `seed${i}`,
+				label: `Seed ${i}`,
+			});
+		}
+		// One icon parked on the second footprint row's origin: the newcomer
+		// must clear that too.
+		store.upsertIcon("icon_seedRow2_demo", {
+			x: 0,
+			y: ICON_FOOTPRINT_H,
+			kind: "app",
+			target: "seedRow2",
+			label: "Row 2",
+		});
+
+		expect(placeDashboardIcon(store, "io.brainstorm.newcomer", "Newcomer")).toBe(true);
+		const placed = store.snapshot().icons["icon_io.brainstorm.newcomer_demo"];
+		if (!placed) throw new Error("unreachable");
+		for (const icon of Object.values(store.snapshot().icons)) {
+			if (icon.target === "io.brainstorm.newcomer") continue;
+			expect(footprintsOverlap({ col: placed.x, row: placed.y }, { col: icon.x, row: icon.y })).toBe(
+				false,
+			);
+		}
 		await store.close();
 	});
 

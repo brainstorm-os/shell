@@ -17,7 +17,27 @@
  * `layoutIcons`.
  */
 
-export const GRID_UNIT = 8;
+import {
+	GRID_UNIT,
+	ICON_BUTTON_H,
+	ICON_BUTTON_W,
+	ICON_FOOTPRINT_H,
+	ICON_FOOTPRINT_W,
+	firstFreeIconCell,
+} from "../../shared/dashboard-icon-grid";
+
+/** The placement geometry lives in `shared/dashboard-icon-grid` so the main
+ *  process places a newly installed tile with the SAME units and the SAME
+ *  occupancy test the renderer paints with (POLISH-LAY-6). Re-exported here so
+ *  every existing renderer call site keeps importing from `./grid`. */
+export {
+	GRID_UNIT,
+	ICON_BUTTON_W,
+	ICON_BUTTON_H,
+	ICON_FOOTPRINT_W,
+	ICON_FOOTPRINT_H,
+} from "../../shared/dashboard-icon-grid";
+
 export const GRID_OUTER_MARGIN = 16;
 
 /** A layout whose every icon sits within this many cells of the origin is a
@@ -41,16 +61,11 @@ export function getCellSize(_viewport?: GridPoint): GridSize {
  *  `cell` argument is ignored, kept for call-site compatibility. */
 export type IconSize = { w: number; h: number; tile: number };
 
-/** Fixed icon-button box (tile + two label lines) and inner tile. Keep in
- *  lockstep with `--grid-icon-w/-h` + the tile size in `icons-layer.css`. */
-export const ICON_BUTTON_W = 80;
-export const ICON_BUTTON_H = 104;
+/** Inner tile of the icon button. The button box itself (`ICON_BUTTON_W/H`) and
+ *  its footprint come from the shared placement module re-exported above; keep
+ *  all three in lockstep with `--grid-icon-w/-h` + the tile size in
+ *  `icons-layer.css`. */
 export const ICON_TILE = 56;
-/** Footprint of one icon, in `GRID_UNIT` cells (button box + a 1-cell gutter) —
- *  the slot spacing the install placer (`firstFreeCell`) steps by, and the box it
- *  checks for overlap. Free drags ignore this; only new installs avoid piling. */
-export const ICON_FOOTPRINT_W = Math.ceil(ICON_BUTTON_W / GRID_UNIT) + 1;
-export const ICON_FOOTPRINT_H = Math.ceil(ICON_BUTTON_H / GRID_UNIT) + 1;
 
 /**
  * Vertical slot reserved *below the tile, above the label* by every icon
@@ -109,29 +124,10 @@ export function clampCell(cell: GridCell): GridCell {
 	return { col: Math.max(0, Math.floor(cell.col)), row: Math.max(0, Math.floor(cell.row)) };
 }
 
-/** Do two icon footprints (top-left cells `a`, `b`, each `ICON_FOOTPRINT_W` ×
- *  `ICON_FOOTPRINT_H`) overlap? Used only to place a NEW icon clear of existing
- *  ones — user drags are free and never overlap-checked. */
-function footprintsOverlap(a: GridCell, b: GridCell): boolean {
-	return (
-		a.col < b.col + ICON_FOOTPRINT_W &&
-		b.col < a.col + ICON_FOOTPRINT_W &&
-		a.row < b.row + ICON_FOOTPRINT_H &&
-		b.row < a.row + ICON_FOOTPRINT_H
-	);
-}
-
-/** First free install slot: scan footprint-stepped slots (row-major) for one
- *  whose footprint clears every occupied icon. New installs land in a tidy grid;
- *  the user can then freely drag them anywhere on the 8px grid. */
+/** First free install slot — the shared placer, under the name the renderer's
+ *  existing call sites already use. */
 export function firstFreeCell(occupied: readonly GridCell[]): GridCell {
-	for (let r = 0; r < 1024; r++) {
-		for (let c = 0; c < 1024; c++) {
-			const slot = { col: c * ICON_FOOTPRINT_W, row: r * ICON_FOOTPRINT_H };
-			if (!occupied.some((o) => footprintsOverlap(slot, o))) return slot;
-		}
-	}
-	return { col: 0, row: 1024 * ICON_FOOTPRINT_H };
+	return firstFreeIconCell(occupied);
 }
 
 // --- Widget grid (Stage 7.3 / 7.3b) ---

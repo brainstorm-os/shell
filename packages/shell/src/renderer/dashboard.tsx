@@ -26,6 +26,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
+import { occupiedIconCells } from "../shared/dashboard-icon-grid";
 import { onSystemPreferenceChange, systemPrefersDark } from "./dashboard/appearance-watcher";
 import "./dashboard.css";
 import { AppGrid } from "./dashboard/app-grid";
@@ -520,11 +521,7 @@ export function Dashboard() {
 	const onPinApp = useCallback(
 		(app: InstalledApp) => {
 			const id = `icon_${app.id}_${Date.now()}`;
-			const occupied = Object.values(snapshot?.icons ?? {}).map(({ x, y }) => ({
-				col: Math.max(0, Math.floor(x)),
-				row: Math.max(0, Math.floor(y)),
-			}));
-			const cell = firstFreeCell(occupied);
+			const cell = firstFreeCell(occupiedIconCells(snapshot?.icons ?? {}));
 			void window.brainstorm.dashboard.upsertIcon(id, {
 				x: cell.col,
 				y: cell.row,
