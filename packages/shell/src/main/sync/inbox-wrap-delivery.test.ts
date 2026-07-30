@@ -238,7 +238,7 @@ describe("F-466 — inbox WrapBootstrap delivery over the production transport s
 		await bridgeMira.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
 		await bridgeMarcus.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
 
-		const invite = bridgeMarcus.createInvite("Marcus");
+		const invite = await bridgeMarcus.createInvite("Marcus");
 		await bridgeMira.share({
 			entityId: ENTITY_ID,
 			type: ENTITY_TYPE,

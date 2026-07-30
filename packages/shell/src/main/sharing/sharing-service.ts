@@ -93,8 +93,16 @@ function toSharedMember(view: CollabAccessView): SharedMember {
 }
 
 /** Encode a verified `ShareInvite` as a compact, copy-pasteable token. The
- *  invite is all-base64 strings, so plain JSON → base64url is stable + safe
- *  (only public keys + a signature; nothing secret). */
+ *  invite is all-base64 strings plus one number, so plain JSON → base64url is
+ *  stable.
+ *
+ *  Collab-C5-invite-anchor: this token is a BEARER credential — it carries the
+ *  single-use anchor secret the owner must echo back, which is the whole point
+ *  (the receiver's bootstrap gate trusts nothing else). It is not vault key
+ *  material: the sovereign Ed25519 and device X25519 secrets never leave the
+ *  session, and the token buys exactly one entity, once, before it expires.
+ *  Treat it like an invite link — hand it to the intended collaborator and no
+ *  one else. */
 function encodeInviteToken(invite: ShareInvite): ShareInviteToken {
 	return Buffer.from(JSON.stringify(invite), "utf8").toString("base64url");
 }
@@ -233,7 +241,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 	async function handleCreateInvite(envelope: Envelope): Promise<ShareInviteToken> {
 		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
 		const label = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
-		return encodeInviteToken(engineFor().createInvite(label));
+		return encodeInviteToken(await engineFor().createInvite(label));
 	}
 
 	async function handleShare(envelope: Envelope): Promise<SharedMember[]> {

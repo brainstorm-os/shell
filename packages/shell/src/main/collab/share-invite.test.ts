@@ -13,6 +13,7 @@ import {
 import { LoopbackRelayPort } from "../sync/relay-port";
 import { randomBytes } from "../test-support/crypto-test-helpers";
 import { AccessRole, activeMembers, isActiveMember, roleOf } from "./access-record";
+import { INVITE_SECRET_BYTES } from "./invite-anchor";
 import {
 	SHARE_INVITE_VERSION,
 	createShareInvite,
@@ -48,10 +49,16 @@ describe("share-invite — the ShareInvite primitive", () => {
 	it("createShareInviteSigned (closure form) matches the raw-secret form", () => {
 		const user = generateIdentity();
 		const wrapping = generateDeviceX25519();
+		// Pin the anchor secret + clock: a production mint draws fresh randomness
+		// and stamps a fresh expiry, so only a pinned pair can be byte-compared.
+		const anchorSecret = randomBytes(INVITE_SECRET_BYTES);
+		const now = 1_700_000_000_000;
 		const fromSecret = createShareInvite({
 			userSecret: user.secretKey,
 			x25519Pub: wrapping.publicKey,
 			label: "Marcus",
+			secret: anchorSecret,
+			now,
 		});
 		// A session signs without exposing its secret — same Ed25519 key + payload
 		// is deterministic (RFC 8032), so the two invites are byte-identical.
@@ -59,6 +66,8 @@ describe("share-invite — the ShareInvite primitive", () => {
 			userPub: user.publicKey,
 			x25519Pub: wrapping.publicKey,
 			label: "Marcus",
+			secret: anchorSecret,
+			now,
 			sign: (payload) => signPayload(user.secretKey, payload),
 		});
 		expect(fromClosure).toEqual(fromSecret);
@@ -89,7 +98,7 @@ describe("share-invite — the ShareInvite primitive", () => {
 		const { invite } = makeCollaborator("Mira");
 		expect(verifyShareInvite(null)).toBe(false);
 		expect(verifyShareInvite({})).toBe(false);
-		expect(verifyShareInvite({ ...invite, v: 2 })).toBe(false);
+		expect(verifyShareInvite({ ...invite, v: 1 })).toBe(false);
 		expect(verifyShareInvite({ ...invite, sig: "not base64 %%%" })).toBe(false);
 	});
 });

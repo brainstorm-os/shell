@@ -137,9 +137,10 @@ export class CollabDevBridge {
 		return this.#engine.whoami();
 	}
 
-	/** Collaborator-side: mint a self-signed `ShareInvite`. */
-	createInvite(label: string): ShareInvite {
-		return this.#engine.createInvite(label);
+	/** Collaborator-side: mint a self-signed `ShareInvite` (and persist its
+	 *  single-use anchor secret in this vault — Collab-C5-invite-anchor). */
+	async createInvite(label: string): Promise<ShareInvite> {
+		return await this.#engine.createInvite(label);
 	}
 
 	/** Owner-side: create the entity row + DEK + the owner's Owner grant.

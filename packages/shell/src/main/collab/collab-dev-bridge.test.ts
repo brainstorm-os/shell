@@ -105,7 +105,7 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 		await bridgeMarcus.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
 		await bridgeMira.installShareReceiver(ENTITY_ID, ENTITY_TYPE);
 
-		const invite = bridgeMarcus.createInvite("Marcus — designer");
+		const invite = await bridgeMarcus.createInvite("Marcus — designer");
 		const membersAfterShare = await bridgeMira.share({
 			entityId: ENTITY_ID,
 			type: ENTITY_TYPE,
@@ -176,13 +176,13 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 		await bridgeMira.share({
 			entityId: A,
 			type: ENTITY_TYPE,
-			invite: bridgeMarcus.createInvite("Marcus"),
+			invite: await bridgeMarcus.createInvite("Marcus"),
 			role: AccessRole.Editor,
 		});
 		await bridgeMira.share({
 			entityId: B,
 			type: ENTITY_TYPE,
-			invite: bridgeMarcus.createInvite("Marcus"),
+			invite: await bridgeMarcus.createInvite("Marcus"),
 			role: AccessRole.Editor,
 		});
 
@@ -206,7 +206,7 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 		await bridgeMira.share({
 			entityId: ENTITY_ID,
 			type: ENTITY_TYPE,
-			invite: bridgeMarcus.createInvite("Marcus"),
+			invite: await bridgeMarcus.createInvite("Marcus"),
 			role: AccessRole.Editor,
 		});
 		expect(await bridgeMira.revoke(ENTITY_ID, marcusB64)).toBe(true);
@@ -219,7 +219,7 @@ describe("Collab-C4-live — persisted relay-driven share + co-edit + revoke", (
 		const reView = await bridgeMira.share({
 			entityId: ENTITY_ID,
 			type: ENTITY_TYPE,
-			invite: bridgeMarcus.createInvite("Marcus"),
+			invite: await bridgeMarcus.createInvite("Marcus"),
 			role: AccessRole.Editor,
 		});
 		const marcusRows = reView.filter((m) => m.member === marcusB64);
