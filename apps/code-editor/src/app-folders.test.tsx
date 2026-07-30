@@ -12,6 +12,7 @@
  * mode against an in-memory entity store whose `onChange` drives the real
  * vault-list store (250ms coalesce — hence the waitFor polling).
  */
+import { ENTITY_DRAG_MIME } from "@brainstorm-os/sdk/entity-drag";
 import { type ContextMenuItem, openContextMenu } from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -362,6 +363,29 @@ describe("folder tree — move", () => {
 		fire(target, "drop");
 	}
 
+	/** Drop a ready-made multi-item object payload straight onto a target — the
+	 *  cross-app shape, which this app's own rows never produce. */
+	function dropPayloadOn(
+		target: HTMLElement,
+		items: { entityId: string; entityType: string; label: string }[],
+	): void {
+		const wire = JSON.stringify({ v: 1, sourceApp: "", items });
+		const dataTransfer = {
+			types: [ENTITY_DRAG_MIME],
+			setData: () => undefined,
+			getData: (type: string) => (type === ENTITY_DRAG_MIME ? wire : ""),
+			dropEffect: "none",
+			effectAllowed: "all",
+		};
+		for (const type of ["dragover", "drop"]) {
+			const event = new Event(type, { bubbles: true, cancelable: true });
+			Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+			act(() => {
+				target.dispatchEvent(event);
+			});
+		}
+	}
+
 	const rowFor = (path: string) =>
 		[...document.querySelectorAll<HTMLElement>(".editor__file[data-file-id]")].find(
 			(el) => el.querySelector(".editor__file-open")?.getAttribute("title") === path,
@@ -378,6 +402,33 @@ describe("folder tree — move", () => {
 
 		await vi.waitFor(() => expect(update).toHaveBeenCalledWith("code-1", { path: "lib/one.ts" }));
 		await vi.waitFor(() => expect(filePaths()).toContain("lib/one.ts"));
+		// Exactly once: the list body is ALSO a drop zone (it is the root
+		// folder), so a row drop that bubbled would move the file straight back
+		// out again.
+		expect(update).toHaveBeenCalledTimes(1);
+	});
+
+	it("a multi-item drop never lands two same-named files on one path", async () => {
+		const { runtime, update } = makeFakeRuntime([
+			{ path: "a/one.ts" },
+			{ path: "b/one.ts" },
+			{ path: "dest/keep.ts" },
+		]);
+		await mount(runtime);
+
+		// A cross-app payload can carry several objects at once — the app plans
+		// each against the paths the previous moves already left behind.
+		const target = folderRow("dest");
+		if (!target) throw new Error("no dest folder");
+		dropPayloadOn(target, [
+			{ entityId: "code-1", entityType: CODE_FILE_ENTITY_TYPE, label: "one.ts" },
+			{ entityId: "code-2", entityType: CODE_FILE_ENTITY_TYPE, label: "one.ts" },
+		]);
+
+		await vi.waitFor(() => expect(update).toHaveBeenCalledWith("code-1", { path: "dest/one.ts" }));
+		// The second one has nowhere free to land, so it stays put.
+		expect(update).toHaveBeenCalledTimes(1);
+		await vi.waitFor(() => expect(filePaths()).toContain("b/one.ts"));
 	});
 
 	it("a locked file is not draggable and never moves", async () => {

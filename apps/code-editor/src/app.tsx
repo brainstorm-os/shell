@@ -568,12 +568,18 @@ export function CodeEditorApp(): ReactElement {
 	// The plan is computed first (collisions / locks / cycles), then applied —
 	// so one user action either lands whole or is refused whole.
 
-	/** The files as the planners see them: id + path + lock. */
+	/** The files as the planners see them: id + path + rewritable-or-not. EVERY
+	 *  row is included so the collision set is complete; a row that must not be
+	 *  rewritten — read-only-locked, or an adapted StylePack whose path is
+	 *  synthesized from its name rather than stored — is marked `locked`, which
+	 *  is exactly the flag the planners refuse on. */
 	const planFiles = useCallback(
 		(): FolderPlanFile[] =>
-			rowsRef.current
-				.filter((row) => isCodeFileEditable(row) || row.locked)
-				.map((row) => ({ id: row.id, path: row.path, locked: row.locked })),
+			rowsRef.current.map((row) => ({
+				id: row.id,
+				path: row.path,
+				locked: !isCodeFileEditable(row),
+			})),
 		[],
 	);
 
@@ -599,13 +605,11 @@ export function CodeEditorApp(): ReactElement {
 	/** Carry the pending (file-less) folders through a prefix rewrite, and drop
 	 *  the ones a file now occupies — a folder that exists in the paths needs no
 	 *  UI-only stand-in. */
-	const reconcilePendingFolders = useCallback((from: string | null, to: string | null): void => {
+	const reconcilePendingFolders = useCallback((from: string, to: string): void => {
 		setPendingFolders((prev) => {
-			const rewritten = prev.map((folder) => {
-				if (from === null || to === null) return folder;
-				if (folder.toLowerCase() === from.toLowerCase()) return to;
-				return rewritePathPrefix(folder, from, to);
-			});
+			const rewritten = prev.map((folder) =>
+				folder.toLowerCase() === from.toLowerCase() ? to : rewritePathPrefix(folder, from, to),
+			);
 			return [...new Set(rewritten)].slice(0, MAX_PERSISTED_FOLDERS);
 		});
 	}, []);
@@ -681,12 +685,17 @@ export function CodeEditorApp(): ReactElement {
 	const moveFiles = useCallback(
 		(entityIds: readonly string[], folder: string): void => {
 			const moves: PathMove[] = [];
-			const files = planFiles();
+			// Each plan is judged against the paths as the PREVIOUS moves in this
+			// drop already left them, so two same-named files dropped together
+			// can't both claim the destination path.
+			let files = planFiles();
 			for (const id of entityIds) {
 				const file = files.find((f) => f.id === id);
 				if (!file) continue;
 				const plan = planFileMove(file, folder, files);
-				if (plan?.ok) moves.push(...plan.moves);
+				if (!plan?.ok) continue;
+				moves.push(...plan.moves);
+				files = files.map((f) => (f.id === file.id ? { ...f, path: plan.path } : f));
 			}
 			void applyMoves(moves);
 		},

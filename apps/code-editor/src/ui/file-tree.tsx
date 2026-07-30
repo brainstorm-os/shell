@@ -24,7 +24,7 @@ import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm-os/s
 import { ObjectMenuMoreButton, openObjectMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
-import type { CodeFileRow } from "../logic/code-projection";
+import { type CodeFileRow, isCodeFileEditable } from "../logic/code-projection";
 import { fileName } from "../logic/code-view";
 import { PathNodeKind, type PathTreeNode, buildPathTree, dirOf } from "../logic/path-tree";
 import { CODE_FILE_ENTITY_TYPE } from "../runtime";
@@ -231,6 +231,7 @@ type FolderDropHandle = {
  *  MIME for folder-into-folder moves. */
 function useFolderDrop(tree: FileTreeProps, folderPath: string): FolderDropHandle {
 	const { onMoveFiles, onMoveFolder } = tree;
+	const isRoot = folderPath.length === 0;
 	const [folderOver, setFolderOver] = useState(false);
 	const object = useDropTarget({
 		// Native hover can't read the payload types (blanked for security), so
@@ -253,10 +254,13 @@ function useFolderDrop(tree: FileTreeProps, folderPath: string): FolderDropHandl
 		dropRef: object.dropRef,
 		dropProps: {
 			...object.dropProps,
+			// A row's drop must NOT also reach the list body: both are drop zones
+			// (the body IS the root folder), so letting the event bubble would run
+			// the move twice — once into the folder and once back out to the root.
 			onDragOver: (event) => {
+				if (!isRoot) event.stopPropagation();
 				if (carriesFolder(event)) {
 					event.preventDefault();
-					event.stopPropagation();
 					event.dataTransfer.dropEffect = "move";
 					setFolderOver(true);
 					return;
@@ -269,9 +273,9 @@ function useFolderDrop(tree: FileTreeProps, folderPath: string): FolderDropHandl
 			},
 			onDrop: (event) => {
 				setFolderOver(false);
+				if (!isRoot) event.stopPropagation();
 				if (carriesFolder(event)) {
 					event.preventDefault();
-					event.stopPropagation();
 					const source = event.dataTransfer.getData(FOLDER_DRAG_MIME);
 					if (source.length > 0) onMoveFolder(source, folderPath);
 					return;
@@ -445,8 +449,10 @@ function FileRow({
 			className="editor__file bs-object-menu__host bs-object-menu__host--row"
 			aria-current={row.id === selectedId ? "true" : "false"}
 			data-file-id={row.id}
-			// A locked file is read-only: it can't be moved, so it can't be dragged.
-			draggable={!row.locked}
+			// A row that can't be rewritten — read-only-locked, or an adapted
+			// StylePack whose path is synthesized — can't be moved, so it can't be
+			// dragged either.
+			draggable={isCodeFileEditable(row)}
 			onDragStart={(event) => {
 				setObjectDragData(event.dataTransfer, {
 					v: 1,
