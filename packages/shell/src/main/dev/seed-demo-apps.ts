@@ -29,13 +29,13 @@ import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
+import { UNPLACED_ICON_POSITION } from "../../shared/dashboard-icon-grid";
 import { hashBundleDirectory } from "../apps/app-bundle-hash";
 import { shouldCopyBundleEntry } from "../apps/bundle-filter";
 import { FIRST_PARTY_APPS, type FirstPartyApp, firstPartyAppById } from "../apps/first-party";
 import { DEV_INSTALL_PROVENANCE, type InstallProvenance } from "../apps/install-provenance";
 import { AppInstaller } from "../apps/installer";
 import type { DashboardStore } from "../dashboard/dashboard-store";
-import { firstFreeCell, occupiedCells } from "../dashboard/grid-placement";
 import { pruneOrphanAppIcons } from "../dashboard/prune-orphan-app-icons";
 import { getActiveShortcutRegistry } from "../shortcuts/active-registry";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
@@ -309,15 +309,16 @@ export async function reinstallFirstPartyApp(
 	return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
 }
 
-/** Place a dashboard icon at the next free install slot. Returns false when
- *  an icon already targets this app (no-op for re-seeds).
+/** Add this app's dashboard icon WITHOUT a position. Returns false when an icon
+ *  already targets this app (no-op for re-seeds).
  *
- *  Wire format is 8px grid units `{x: col, y: row}` — the same units the
- *  renderer paints with. The free slot comes from the SHARED placer
- *  (`shared/dashboard-icon-grid` via `dashboard/grid-placement`), which knows
- *  an icon's box spans `ICON_FOOTPRINT_W × ICON_FOOTPRINT_H` units: a
- *  local "next free 1×1 cell" scan dropped a new app straight on top of
- *  Notes (POLISH-LAY-6). */
+ *  Main deliberately doesn't choose the cell (POLISH-LAY-9): the install slot
+ *  has to wrap at a column bound derived from the icon surface's width, and
+ *  only the renderer knows that width. It writes `UNPLACED_ICON_POSITION` and
+ *  the dashboard's icons layer resolves + persists a real, on-screen cell on
+ *  the very next snapshot — so the live no-restart reveal still holds. Main's
+ *  own unbounded scan is what marched the 20th install out to `220,0`
+ *  (1760px on a 1440px stage), where nothing can scroll to it. */
 export function placeDashboardIcon(
 	dashboard: DashboardStore,
 	appId: string,
@@ -328,10 +329,8 @@ export function placeDashboardIcon(
 	const existingIcons = dashboard.snapshot().icons;
 	if (Object.values(existingIcons).some((icon) => icon.target === appId)) return false;
 
-	const cell = firstFreeCell(occupiedCells(existingIcons));
 	dashboard.upsertIcon(`icon_${appId}_demo`, {
-		x: cell.col,
-		y: cell.row,
+		...UNPLACED_ICON_POSITION,
 		kind: "app",
 		target: appId,
 		label,

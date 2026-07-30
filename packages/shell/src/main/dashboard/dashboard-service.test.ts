@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
+import { isUnplacedIcon, resolveIconPlacements } from "../../shared/dashboard-icon-grid";
 import type { EntitiesRepository } from "../storage/entities-repo";
 import { YDocStore } from "../storage/ydoc-store";
 import { makeDashboardServiceHandler } from "./dashboard-service";
@@ -78,11 +79,19 @@ describe("dashboard service handler", () => {
 		expect(await h(env("unpin", [{ entityId: "ent-1" }]))).toBe(false);
 	});
 
-	it("pin lays subsequent pins into distinct free cells", async () => {
+	// POLISH-LAY-9 — main pins WITHOUT a cell (it can't see the icon surface's
+	// width, and its unbounded scan walked new icons off the right edge). The
+	// renderer resolves the sentinels into distinct on-screen slots.
+	it("pins with no position, and the renderer's resolver lays them into distinct free cells", async () => {
 		const h = handler();
 		await h(env("pin", [{ entityId: "a" }]));
 		await h(env("pin", [{ entityId: "b" }]));
-		const cells = Object.values(store.snapshot().icons).map((i) => `${i.x}:${i.y}`);
+		const icons = store.snapshot().icons;
+		expect(Object.values(icons).every(isUnplacedIcon)).toBe(true);
+
+		const changes = resolveIconPlacements(icons, 1440);
+		expect(changes).toHaveLength(2);
+		const cells = changes.map((c) => `${c.col}:${c.row}`);
 		expect(new Set(cells).size).toBe(2);
 	});
 

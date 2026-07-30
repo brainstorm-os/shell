@@ -14,7 +14,6 @@ import {
 	clampWidgetOrigin,
 	clampWidgetSize,
 	clampWidgetSizeToSurface,
-	firstFreeCell,
 	getCellSize,
 	isLegacyIconLayout,
 	layoutIcons,
@@ -75,22 +74,6 @@ describe("clampCell", () => {
 		expect(clampCell({ col: -5, row: -5 })).toEqual({ col: 0, row: 0 });
 		expect(clampCell({ col: 999, row: 999 })).toEqual({ col: 999, row: 999 });
 		expect(clampCell({ col: 3.7, row: 2.2 })).toEqual({ col: 3, row: 2 });
-	});
-});
-
-describe("firstFreeCell (install placement)", () => {
-	it("starts at the origin when nothing is placed", () => {
-		expect(firstFreeCell([])).toEqual({ col: 0, row: 0 });
-	});
-
-	it("steps by the icon footprint so a new install clears existing ones", () => {
-		expect(firstFreeCell([{ col: 0, row: 0 }])).toEqual({ col: ICON_FOOTPRINT_W, row: 0 });
-		expect(
-			firstFreeCell([
-				{ col: 0, row: 0 },
-				{ col: ICON_FOOTPRINT_W, row: 0 },
-			]),
-		).toEqual({ col: 2 * ICON_FOOTPRINT_W, row: 0 });
 	});
 });
 

@@ -35,9 +35,7 @@ describe("grants popover row layout", () => {
 	});
 
 	it("gives the text column the row's free width next to the Revoke button", () => {
-		expect(ruleBlock(".grants-panel__row {")).toMatch(
-			/grid-template-columns\s*:\s*1fr\s+auto\s*;/,
-		);
+		expect(ruleBlock(".grants-panel__row {")).toMatch(/grid-template-columns\s*:\s*1fr\s+auto\s*;/);
 	});
 
 	it("stacks capability over source in one shrinkable text column", () => {

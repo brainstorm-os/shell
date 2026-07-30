@@ -1,10 +1,20 @@
 /**
- * DashboardIconsLayer — renders the icons placed on the dashboard. The wire
- * format stays `{x, y}` pixels (legacy DashboardStore shape), but display
- * positions come from `layoutIcons`: it clamps stored intents to the
- * currently visible grid (so resizing the window doesn't leave icons
- * stranded off-screen) and resolves collisions deterministically (so two
- * icons can never occupy the same cell with one hidden under the other).
+ * DashboardIconsLayer — renders the icons on the dashboard, and OWNS their
+ * placement (POLISH-LAY-9).
+ *
+ * Stored `{x, y}` are 8px grid cells and placement is free: an icon paints
+ * exactly where it's stored. The two exceptions both need the surface's width,
+ * which is why they live here and not in main:
+ *
+ *   - an icon main installed/pinned with NO position (`UNPLACED_ICON_POSITION`)
+ *     is given the first free slot that fits the current viewport, and that
+ *     cell is persisted — the live, no-restart install reveal;
+ *   - an icon stored past the right edge is re-flowed in the VIEW MODEL only,
+ *     so a fleet laid out on a wider window stays reachable without quietly
+ *     rewriting the arrangement the user made.
+ *
+ * Both come from `resolveIconPlacements` in the shared grid module, so the
+ * footprint / overlap / scan model has exactly one implementation.
  */
 
 import { Orientation, SelectionAttribute, useCompositeKeyboard } from "@brainstorm-os/sdk/a11y";
@@ -31,21 +41,22 @@ import { IconBadge, badgeAriaLabel, useAppBadges } from "./icon-badge";
 import "./app-icon.css";
 import { Icon } from "../ui/icon";
 import {
-	GRID_OUTER_MARGIN,
-	GRID_UNIT,
 	type GridCell,
 	type GridPoint,
 	type GridSize,
-	ICON_FOOTPRINT_W,
 	ICON_PIN_GLYPH_RATIO,
+	IconPlacementReason,
 	type IconSize,
 	cellToPoint,
 	getCellSize,
 	getIconSize,
+	iconGridColumns,
 	isLegacyIconLayout,
+	isUnplacedIcon,
 	layoutIcons,
 	pointToCell,
 	repackIcons,
+	resolveIconPlacements,
 } from "./grid";
 import { SHELL_SURFACES, type ShellSurfaceId, isShellSurfaceId } from "./shell-surfaces";
 import { SQUIRCLE_RADIUS_PERCENT } from "./squircle";
@@ -126,6 +137,11 @@ function DashboardIconsLayerInner({
 		x: window.innerWidth,
 		y: window.innerHeight,
 	}));
+	// Flips true once the surface has actually been measured. Placement writes
+	// wait for it: the initial `window` guess is close enough to paint against,
+	// but not to PERSIST a cell from — a pre-layout width would bake a wrapped
+	// position that the measured width immediately disagrees with.
+	const [measured, setMeasured] = useState(false);
 
 	useEffect(() => {
 		const el = surfaceRef.current;
@@ -141,9 +157,16 @@ function DashboardIconsLayerInner({
 		const apply = () => {
 			raf = 0;
 			const rect = el.getBoundingClientRect();
-			setViewport((prev) =>
-				prev.x === rect.width && prev.y === rect.height ? prev : { x: rect.width, y: rect.height },
-			);
+			// A zero layout box (hidden / pre-layout / jsdom) falls back to the
+			// window box rather than reporting a 0-wide surface — placement is
+			// derived from this width, and a 0 would mean "one column" (mirrors
+			// the widgets layer's rescue clamp).
+			const next = {
+				x: rect.width || window.innerWidth,
+				y: rect.height || window.innerHeight,
+			};
+			setViewport((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
+			setMeasured(true);
 		};
 		const schedule = () => {
 			if (raf !== 0) return;
@@ -211,13 +234,26 @@ function DashboardIconsLayerInner({
 	// doesn't accidentally launch the app.
 	const suppressNextClickRef = useRef(false);
 
+	// POLISH-LAY-9 — the renderer owns placement, because the column bound the
+	// install slot wraps at comes from the icon surface's width and nothing else
+	// knows it. `resolveIconPlacements` answers for the two icons that can't just
+	// paint at their stored cell: one main installed/pinned with NO position
+	// (`Unplaced` — we persist the cell we pick, below) and one stored past the
+	// right edge (`Offscreen` — view-model only, never persisted; see the effect).
+	// Keyed on the derived column count rather than the raw viewport so a live
+	// window resize re-runs it ~once per 88px, not once per frame.
+	const surfaceWidth = viewport.x;
+	const resolved = useMemo(() => resolveIconPlacements(icons, surfaceWidth), [icons, surfaceWidth]);
+
 	// Cell-coord placements (`{col, row}`) — pixel positions are computed
-	// at paint time in CSS from container-query units (see `icons-layer.css`),
-	// so this memo no longer needs to re-run on viewport changes.
+	// at paint time in CSS from container-query units (see `icons-layer.css`).
 	const placements = useMemo(() => {
+		const resolvedById = new Map(resolved.map((r) => [r.id, r]));
 		const intents = Object.entries(icons).map(([id, icon]) => {
 			const override = pending[id];
 			if (override) return { id, col: override.col, row: override.row };
+			const placed = resolvedById.get(id);
+			if (placed) return { id, col: placed.col, row: placed.row };
 			const cell = storedIconCell(icon);
 			return { id, col: cell.col, row: cell.row };
 		});
@@ -226,7 +262,33 @@ function DashboardIconsLayerInner({
 			map.set(p.id, { col: p.col, row: p.row });
 		}
 		return map;
-	}, [icons, pending]);
+	}, [icons, pending, resolved]);
+
+	// Persist the cells we chose for icons that arrived WITHOUT one. This is the
+	// live install reveal: `apps:changed` → snapshot with an unplaced record →
+	// painted in a free on-screen slot this frame → written back so it's stable
+	// across restarts and devices. `Offscreen` rescues are deliberately NOT
+	// persisted (a narrow window must not rewrite the layout the user arranged in
+	// a wide one — widening restores it; dragging a rescued icon commits it).
+	// The ref keeps us from re-issuing the same write on every re-render while
+	// the store round-trips.
+	const persistedPlacementsRef = useRef<Map<string, string>>(new Map());
+	useEffect(() => {
+		if (!measured) return;
+		const persisted = persistedPlacementsRef.current;
+		const live = new Set<string>();
+		for (const change of resolved) {
+			if (change.reason !== IconPlacementReason.Unplaced) continue;
+			live.add(change.id);
+			const key = `${change.col},${change.row}`;
+			if (persisted.get(change.id) === key) continue;
+			persisted.set(change.id, key);
+			onMoveIcon(change.id, change.col, change.row);
+		}
+		for (const id of persisted.keys()) {
+			if (!live.has(id)) persisted.delete(id);
+		}
+	}, [resolved, onMoveIcon, measured]);
 
 	// Element whose `style.transform` was imperatively set by the last
 	// pointer-move. Cleared in a layout effect after the drag-end commit
@@ -448,22 +510,18 @@ function DashboardIconsLayerInner({
 	const migratedThisSessionRef = useRef(false);
 	useEffect(() => {
 		if (gridMigrated || migratedThisSessionRef.current) return;
-		const entries = Object.entries(icons);
-		// Wait for icons to load before marking migrated, so an empty first frame
-		// doesn't burn the one-shot before the real layout arrives.
+		// Icons still awaiting placement say nothing about the stored format —
+		// judging a fleet of sentinels would read every one as cell 0,0 and so as
+		// "legacy". Wait for real cells (also the guard against burning the
+		// one-shot on an empty first frame).
+		const entries = Object.entries(icons).filter(([, icon]) => !isUnplacedIcon(icon));
 		if (entries.length === 0) return;
 		migratedThisSessionRef.current = true;
-		const cells = entries.map(([, icon]) => ({
-			col: Math.max(0, Math.floor(icon.x)),
-			row: Math.max(0, Math.floor(icon.y)),
-		}));
+		const cells = entries.map(([, icon]) => storedIconCell(icon));
 		if (isLegacyIconLayout(cells)) {
-			const columns = Math.floor(
-				(viewport.x - 2 * GRID_OUTER_MARGIN) / (ICON_FOOTPRINT_W * GRID_UNIT),
-			);
 			for (const placed of repackIcons(
 				entries.map(([id]) => id),
-				columns,
+				iconGridColumns(viewport.x),
 			)) {
 				onMoveIcon(placed.id, placed.col, placed.row);
 			}

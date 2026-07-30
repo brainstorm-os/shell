@@ -13,32 +13,41 @@
  * past that bound immediately (install slots step by `ICON_FOOTPRINT_W`).
  *
  * Bounds: columns/rows are clamped to ≥ 0 only (a drop is clamped to keep the
- * icon on-screen via `pointToCell`). There is NO collision resolution — see
- * `layoutIcons`.
+ * icon on-screen via `pointToCell`, which shares its right-edge bound with the
+ * placer through `maxIconCol`). There is NO collision resolution — see
+ * `layoutIcons`. Where a NEW icon lands, and who decides, is
+ * `resolveIconPlacements` + the icons-layer (POLISH-LAY-9).
  */
 
 import {
+	GRID_OUTER_MARGIN,
 	GRID_UNIT,
 	ICON_BUTTON_H,
 	ICON_BUTTON_W,
 	ICON_FOOTPRINT_H,
 	ICON_FOOTPRINT_W,
-	firstFreeIconCell,
+	maxIconCol,
 } from "../../shared/dashboard-icon-grid";
 
-/** The placement geometry lives in `shared/dashboard-icon-grid` so the main
- *  process places a newly installed tile with the SAME units and the SAME
- *  occupancy test the renderer paints with (POLISH-LAY-6). Re-exported here so
- *  every existing renderer call site keeps importing from `./grid`. */
+/** The placement geometry lives in `shared/dashboard-icon-grid` — one
+ *  footprint/overlap/scan model (POLISH-LAY-6), now called with a viewport-
+ *  derived column bound by the renderer alone (POLISH-LAY-9). Re-exported here
+ *  so every existing renderer call site keeps importing from `./grid`. */
 export {
+	GRID_OUTER_MARGIN,
 	GRID_UNIT,
 	ICON_BUTTON_W,
 	ICON_BUTTON_H,
 	ICON_FOOTPRINT_W,
 	ICON_FOOTPRINT_H,
+	IconPlacementReason,
+	type IconPlacementChange,
+	iconGridColumns,
+	isUnplacedIcon,
+	maxIconCol,
+	resolveIconPlacements,
+	UNPLACED_ICON_POSITION,
 } from "../../shared/dashboard-icon-grid";
-
-export const GRID_OUTER_MARGIN = 16;
 
 /** A layout whose every icon sits within this many cells of the origin is a
  *  pre-8px (coarse 14-col) layout to re-pack once. New 8px layouts spread past
@@ -106,10 +115,7 @@ export function cellToPoint(cell: GridCell, _viewport?: GridPoint): GridPoint {
 export function pointToCell(point: GridPoint, viewport: GridPoint): GridCell {
 	const col = Math.round((point.x - GRID_OUTER_MARGIN) / GRID_UNIT);
 	const row = Math.round((point.y - GRID_OUTER_MARGIN) / GRID_UNIT);
-	const maxCol = Math.max(
-		0,
-		Math.floor((viewport.x - GRID_OUTER_MARGIN - ICON_BUTTON_W) / GRID_UNIT),
-	);
+	const maxCol = maxIconCol(viewport.x);
 	const maxRow = Math.max(
 		0,
 		Math.floor((viewport.y - GRID_OUTER_MARGIN - ICON_BUTTON_H) / GRID_UNIT),
@@ -122,12 +128,6 @@ export function pointToCell(point: GridPoint, viewport: GridPoint): GridCell {
 
 export function clampCell(cell: GridCell): GridCell {
 	return { col: Math.max(0, Math.floor(cell.col)), row: Math.max(0, Math.floor(cell.row)) };
-}
-
-/** First free install slot — the shared placer, under the name the renderer's
- *  existing call sites already use. */
-export function firstFreeCell(occupied: readonly GridCell[]): GridCell {
-	return firstFreeIconCell(occupied);
 }
 
 // --- Widget grid (Stage 7.3 / 7.3b) ---

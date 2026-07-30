@@ -26,11 +26,10 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
-import { occupiedIconCells } from "../shared/dashboard-icon-grid";
+import { UNPLACED_ICON_POSITION } from "../shared/dashboard-icon-grid";
 import { onSystemPreferenceChange, systemPrefersDark } from "./dashboard/appearance-watcher";
 import "./dashboard.css";
 import { AppGrid } from "./dashboard/app-grid";
-import { firstFreeCell } from "./dashboard/grid";
 import { DashboardIconsLayer } from "./dashboard/icons-layer";
 import { openAddWidgetMenu } from "./dashboard/widget-add-menu";
 import { DashboardWidgetsLayer } from "./dashboard/widgets-layer";
@@ -518,20 +517,18 @@ export function Dashboard() {
 		[snapshot, activateAppIcon],
 	);
 
-	const onPinApp = useCallback(
-		(app: InstalledApp) => {
-			const id = `icon_${app.id}_${Date.now()}`;
-			const cell = firstFreeCell(occupiedIconCells(snapshot?.icons ?? {}));
-			void window.brainstorm.dashboard.upsertIcon(id, {
-				x: cell.col,
-				y: cell.row,
-				kind: "app",
-				target: app.id,
-				label: app.name,
-			});
-		},
-		[snapshot],
-	);
+	const onPinApp = useCallback((app: InstalledApp) => {
+		const id = `icon_${app.id}_${Date.now()}`;
+		// No position — the icons layer places it against the live surface width
+		// and persists the cell (POLISH-LAY-9). Nothing outside that layer knows
+		// how many columns fit, so nothing outside it picks a slot.
+		void window.brainstorm.dashboard.upsertIcon(id, {
+			...UNPLACED_ICON_POSITION,
+			kind: "app",
+			target: app.id,
+			label: app.name,
+		});
+	}, []);
 
 	const onUnpinApp = useCallback(
 		(appId: string) => {
