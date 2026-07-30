@@ -55,10 +55,12 @@ import {
 import { type AccessRole, grantAccess, roleOf } from "./access-record";
 import {
 	INVITE_DEFAULT_TTL_MS,
+	INVITE_NONCE_BYTES,
 	INVITE_SECRET_BYTES,
 	computeInviteAnchor,
-	inviteIdForSecret,
-	mintInviteSecret,
+	deriveInviteSecret,
+	inviteIdForNonce,
+	mintInviteNonce,
 } from "./invite-anchor";
 
 /** Bump only on a wire-incompatible change to the invite shape or its signed
@@ -92,8 +94,10 @@ export type ShareInvite = {
 	/** Human label for the invite (person / device name). Included in the
 	 *  signed payload so it can't be swapped after signing. */
 	label: string;
-	/** Public handle for the anchor secret, `SHA-256(domain‖secret)[0..16]`
-	 *  base64url. Signed, and the invitee's `share_invites` row is keyed by it. */
+	/** Public handle for the anchor: a 16-byte nonce, base64url. Signed, and the
+	 *  invitee's `share_invites` row is keyed by it. The invitee re-derives the
+	 *  secret from it under their sovereign key, so no local row is needed to
+	 *  VERIFY an anchor — only to enforce single use. */
 	inviteId: string;
 	/** base64 of the 32-byte single-use anchor secret (Collab-C5-invite-anchor).
 	 *  The owner echoes a MAC under this key inside the grant, which is the ONLY
@@ -172,17 +176,23 @@ export function createShareInviteSigned(opts: {
 	now?: number;
 	/** Redemption window. Defaults to {@link INVITE_DEFAULT_TTL_MS}. */
 	ttlMs?: number;
-	/** Injected anchor secret — tests only; production draws a fresh one. */
-	secret?: Uint8Array;
+	/** Injected anchor nonce — tests only; production draws a fresh one. */
+	nonce?: Uint8Array;
 }): ShareInvite {
 	const userPubB64 = publicKeyToBase64(opts.userPub);
 	const x25519PubB64 = bytesToBase64(opts.x25519Pub);
 	const label = opts.label.slice(0, MAX_INVITE_LABEL_LENGTH);
-	const secret = opts.secret ?? mintInviteSecret();
-	if (secret.length !== INVITE_SECRET_BYTES) {
-		throw new Error(`share-invite: secret must be ${INVITE_SECRET_BYTES} bytes`);
+	const nonce = opts.nonce ?? mintInviteNonce();
+	if (nonce.length !== INVITE_NONCE_BYTES) {
+		throw new Error(`share-invite: nonce must be ${INVITE_NONCE_BYTES} bytes`);
 	}
-	const inviteId = inviteIdForSecret(secret);
+	const inviteId = inviteIdForNonce(nonce);
+	// Derived, never drawn: the invitee must be able to re-derive this secret from
+	// the public nonce after a vault wipe, and on any paired device.
+	const secret = deriveInviteSecret(opts.sign, nonce);
+	if (secret.length !== INVITE_SECRET_BYTES) {
+		throw new Error(`share-invite: derived secret must be ${INVITE_SECRET_BYTES} bytes`);
+	}
 	const expiresAt = (opts.now ?? Date.now()) + (opts.ttlMs ?? INVITE_DEFAULT_TTL_MS);
 	const sig = opts.sign(invitePayload(userPubB64, x25519PubB64, inviteId, expiresAt, label));
 	return {
@@ -210,7 +220,7 @@ export function createShareInvite(opts: {
 	label: string;
 	now?: number;
 	ttlMs?: number;
-	secret?: Uint8Array;
+	nonce?: Uint8Array;
 }): ShareInvite {
 	return createShareInviteSigned({
 		userPub: publicKeyFromSecret(opts.userSecret),
@@ -219,7 +229,7 @@ export function createShareInvite(opts: {
 		sign: (payload) => signPayload(opts.userSecret, payload),
 		...(opts.now === undefined ? {} : { now: opts.now }),
 		...(opts.ttlMs === undefined ? {} : { ttlMs: opts.ttlMs }),
-		...(opts.secret === undefined ? {} : { secret: opts.secret }),
+		...(opts.nonce === undefined ? {} : { nonce: opts.nonce }),
 	});
 }
 
@@ -232,12 +242,13 @@ export function createShareInvite(opts: {
 export function verifyShareInvite(invite: unknown): invite is ShareInvite {
 	if (!isShareInvite(invite)) return false;
 	try {
-		// The id is the secret's hash, so re-deriving it proves the token's secret
-		// really is the one the signature commits to — a swapped secret is refused
-		// before any anchor is ever computed from it.
-		const secret = base64ToBytes(invite.secret);
-		if (secret.length !== INVITE_SECRET_BYTES) return false;
-		if (inviteIdForSecret(secret) !== invite.inviteId) return false;
+		// The secret is derived from the signed nonce under the invitee's sovereign
+		// key, so the OWNER cannot check the two against each other (they hold
+		// neither key). What the signature does guarantee is that the nonce, the
+		// expiry, both public keys and the label are the invitee's own. A tampered
+		// `secret` therefore only lets a token-holder make their OWN share
+		// unredeemable, which they could equally achieve by not sharing.
+		if (base64ToBytes(invite.secret).length !== INVITE_SECRET_BYTES) return false;
 		return verifySignature(
 			base64ToBytes(invite.userPubB64),
 			invitePayload(

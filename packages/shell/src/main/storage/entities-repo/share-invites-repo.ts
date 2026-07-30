@@ -16,7 +16,7 @@
  */
 
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
-import type { ShareInviteRecord } from "../../collab/invite-anchor";
+import type { PinShareInviteInput, ShareInviteRecord } from "../../collab/invite-anchor";
 
 type ShareInviteRow = {
 	invite_id: string;
@@ -78,17 +78,37 @@ export class ShareInvitesRepository {
 		return row ? toRecord(row) : null;
 	}
 
-	/** Pin an invite to the one entity + granter it authorizes. The `IS NULL`
-	 *  guard makes the first writer win even if two frames race: a second, losing
-	 *  pin changes nothing and the caller's re-read refuses the mismatched pair. */
-	pin(inviteId: string, entityId: string, ownerPubB64: string, now: number): void {
+	/** Pin an invite to the one entity + granter it authorizes, CREATING the row
+	 *  when this device has no record of the invite. A missing row is the normal
+	 *  state on a cold-restored vault or a paired sibling, and the anchor's secret
+	 *  is re-derived from the sovereign key rather than read from here, so the row
+	 *  is a replay ledger rather than the trust root. The `IS NULL` guard makes the
+	 *  first writer win even if two frames race: a second, losing pin changes
+	 *  nothing and the caller's re-read refuses the mismatched pair. */
+	pin(input: PinShareInviteInput): void {
 		this.db
 			.prepare(
-				`UPDATE share_invites
-				SET redeemed_at = ?, redeemed_entity_id = ?, redeemed_by = ?
-				WHERE invite_id = ? AND redeemed_entity_id IS NULL AND redeemed_by IS NULL`,
+				`INSERT INTO share_invites
+					(invite_id, secret, member_pub, created_at, expires_at,
+					 redeemed_at, redeemed_entity_id, redeemed_by)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(invite_id) DO UPDATE SET
+					redeemed_at = excluded.redeemed_at,
+					redeemed_entity_id = excluded.redeemed_entity_id,
+					redeemed_by = excluded.redeemed_by
+				WHERE share_invites.redeemed_entity_id IS NULL
+					AND share_invites.redeemed_by IS NULL`,
 			)
-			.run(now, entityId, ownerPubB64, inviteId);
+			.run(
+				input.inviteId,
+				input.secretB64,
+				input.memberPubB64,
+				input.now,
+				input.now,
+				input.now,
+				input.entityId,
+				input.ownerPubB64,
+			);
 	}
 
 	/** Withdraw an invite that has not been redeemed yet (and stop a spent one

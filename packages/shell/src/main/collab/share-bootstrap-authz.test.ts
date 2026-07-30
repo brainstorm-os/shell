@@ -50,6 +50,7 @@ import {
 	resolveMembers,
 } from "./access-record";
 import { COLLAB_TEXT_KEY, CollabDevBridge } from "./collab-dev-bridge";
+import { deriveInviteSecret } from "./invite-anchor";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./share-bootstrap-authz";
 import { type CollabRelayLike, SharingEngine } from "./sharing-engine";
 
@@ -119,6 +120,8 @@ class ReceivingShell {
 				incomingState: plaintext,
 				now: Date.now(),
 				invites: this.invites,
+				deriveInviteSecret: (nonce) =>
+					deriveInviteSecret((bytes) => this.session.signPayload(bytes), nonce),
 				loadDoc: async (id) => (await this.session.ydocStore.load(id)).doc,
 				typeOf: (id) => this.repo.get(id)?.type ?? null,
 			});

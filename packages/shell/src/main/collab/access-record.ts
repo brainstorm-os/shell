@@ -106,6 +106,12 @@ export type ResolvedMember = {
 
 const encoder = new TextEncoder();
 
+/** A tagged grant segment must carry no `|`, or the segments stop being
+ *  separable — see {@link grantPayload}. Empty and absent are the same thing. */
+function separable(value: string | null | undefined): value is string {
+	return typeof value === "string" && value.length > 0 && !value.includes("|");
+}
+
 /** Deterministic signed bytes for a grant. Binds scheme version + entity so a
  *  grant can't be replayed into another entity or read as another version. */
 function grantPayload(
@@ -127,8 +133,16 @@ function grantPayload(
 	// Same rule for the Collab-C5-invite-anchor fields: tagged, terminal, and
 	// omitted when absent, so every grant minted before them still verifies. They
 	// go last so the older payload is a strict prefix of the newer one.
-	const a = anchor ? `|a=${anchor}` : "";
-	const v = via ? `|v=${via}` : "";
+	//
+	// `separable` is what keeps the two tags unambiguous. Without it an
+	// `anchor` containing the literal `|v=` would make ONE byte string readable as
+	// both `(anchor = "Z|v=Y", via = null)` and `(anchor = "Z", via = "Y")`, so a
+	// single signature would cover two different grants. Neither field can
+	// legitimately contain a pipe (an anchor is base64url + `:` + base64; a
+	// container id is an entity id), so a value that does is not a value - it is
+	// refused into the null form and the grant simply fails to validate.
+	const a = separable(anchor) ? `|a=${anchor}` : "";
+	const v = separable(via) ? `|v=${via}` : "";
 	return encoder.encode(
 		`brainstorm/access/v${ACCESS_RECORD_VERSION}/grant|${entityId}|${member}|${x}${role}|${addedBy}|${addedAt}${a}${v}`,
 	);
@@ -212,6 +226,11 @@ export function grantAccess(
 	const arr = getAccessArray(doc);
 	if (findActiveEntry(arr, opts.member) !== null) return;
 	const x25519 = opts.x25519 ?? null;
+	// Refused rather than stored: a pipe would make the signed segments ambiguous
+	// (see `grantPayload`), and every legitimate value is pipe-free by
+	// construction, so this can only be a caller bug or a hostile input.
+	if (opts.anchor?.includes("|")) throw new Error("grantAccess: anchor must not contain '|'");
+	if (opts.via?.includes("|")) throw new Error("grantAccess: via must not contain '|'");
 	const anchor = opts.anchor ?? null;
 	const via = opts.via ?? null;
 	const addedBy = publicKeyToBase64(publicKeyFromSecret(opts.signerSecret));
@@ -289,8 +308,13 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 		if (member === null || addedBy === null || addedAt === null || !isAccessRole(roleRaw)) continue;
 		const role = roleRaw;
 		const x25519 = readString(m, "x25519");
-		const anchor = readString(m, "anchor");
-		const via = readString(m, "via");
+		// A stored value carrying a pipe cannot have been signed in the tagged form
+		// (see `grantPayload`), so read it as absent — the reconstructed payload then
+		// mismatches and `grantValid` is false, which is the fail-closed answer.
+		const anchorRaw = readString(m, "anchor");
+		const viaRaw = readString(m, "via");
+		const anchor = separable(anchorRaw) ? anchorRaw : null;
+		const via = separable(viaRaw) ? viaRaw : null;
 		const revokedAt = readNumber(m, "revokedAt");
 		const revokedBy = readString(m, "revokedBy");
 		const grantValid = safeVerify(

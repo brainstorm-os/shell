@@ -13,7 +13,7 @@ import {
 import { LoopbackRelayPort } from "../sync/relay-port";
 import { randomBytes } from "../test-support/crypto-test-helpers";
 import { AccessRole, activeMembers, isActiveMember, roleOf } from "./access-record";
-import { INVITE_SECRET_BYTES } from "./invite-anchor";
+import { INVITE_NONCE_BYTES } from "./invite-anchor";
 import {
 	SHARE_INVITE_VERSION,
 	createShareInvite,
@@ -51,13 +51,13 @@ describe("share-invite — the ShareInvite primitive", () => {
 		const wrapping = generateDeviceX25519();
 		// Pin the anchor secret + clock: a production mint draws fresh randomness
 		// and stamps a fresh expiry, so only a pinned pair can be byte-compared.
-		const anchorSecret = randomBytes(INVITE_SECRET_BYTES);
+		const anchorNonce = randomBytes(INVITE_NONCE_BYTES);
 		const now = 1_700_000_000_000;
 		const fromSecret = createShareInvite({
 			userSecret: user.secretKey,
 			x25519Pub: wrapping.publicKey,
 			label: "Marcus",
-			secret: anchorSecret,
+			nonce: anchorNonce,
 			now,
 		});
 		// A session signs without exposing its secret — same Ed25519 key + payload
@@ -66,7 +66,7 @@ describe("share-invite — the ShareInvite primitive", () => {
 			userPub: user.publicKey,
 			x25519Pub: wrapping.publicKey,
 			label: "Marcus",
-			secret: anchorSecret,
+			nonce: anchorNonce,
 			now,
 			sign: (payload) => signPayload(user.secretKey, payload),
 		});

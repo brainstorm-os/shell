@@ -37,7 +37,7 @@ import { DataStores } from "../storage/data-stores";
 import { ShareInvitesRepository } from "../storage/entities-repo";
 import { VaultSession } from "../vault/session";
 import { AccessRole, authorizesAsShareBootstrap, grantAccess, revokeAccess } from "./access-record";
-import { computeInviteAnchor } from "./invite-anchor";
+import { computeInviteAnchor, deriveInviteSecret } from "./invite-anchor";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./share-bootstrap-authz";
 import type { ShareInvite } from "./share-invite";
 import { SharingEngine } from "./sharing-engine";
@@ -134,6 +134,7 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 				incomingState: state,
 				now,
 				invites: aliceInvites,
+				deriveInviteSecret: (n) => deriveInviteSecret((b) => alice.signPayload(b), n),
 				loadDoc: async (id) => (await alice.ydocStore.load(id)).doc,
 				typeOf: (id) => types[id] ?? null,
 			});
@@ -146,6 +147,8 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 	 *  minted — the exact value `shareEntityWithInvite` writes into the grant. */
 	function anchorOf(invite: ShareInvite, entityId: string): string {
 		const anchor = computeInviteAnchor({
+			// Straight off the token the owner was handed - the same bytes
+			// `shareEntityWithInvite` keys its HMAC with.
 			secret: new Uint8Array(Buffer.from(invite.secret, "base64")),
 			inviteId: invite.inviteId,
 			entityId,
@@ -232,9 +235,9 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 		expect(await aliceGate(INJECTED, forged)).toBe(ShareBootstrapVerdict.DenyInviteMismatch);
 	});
 
-	it("a fabricated anchor for an invite Alice never minted is unknown", async () => {
+	it("a fabricated anchor for an invite Alice never minted never verifies", async () => {
 		const forged = forgeState(INJECTED, { anchor: "AAAAAAAAAAAAAAAAAAAAAA:aGVsbG8=" });
-		expect(await aliceGate(INJECTED, forged)).toBe(ShareBootstrapVerdict.DenyInviteUnknown);
+		expect(await aliceGate(INJECTED, forged)).toBe(ShareBootstrapVerdict.DenyInviteMismatch);
 	});
 
 	it("a garbage anchor is refused as malformed, never crashes the receive path", async () => {
@@ -242,6 +245,53 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 			const forged = forgeState(INJECTED, { anchor });
 			const verdict = await aliceGate(INJECTED, forged);
 			expect(verdict).not.toBe(ShareBootstrapVerdict.Allow);
+		}
+	});
+
+	it("a PIPE-carrying anchor cannot make one signature cover two grants", async () => {
+		// `|a=` and `|v=` are tagged segments of the grant's signed payload, so an
+		// anchor containing the literal `|v=` would make one byte string readable as
+		// both `(anchor = "Z|v=Y", via = null)` and `(anchor = "Z", via = "Y")`.
+		// The minting side refuses it outright...
+		const invite = await aliceEngine.createInvite("Alice");
+		expect(() =>
+			grantAccess(new Y.Doc(), {
+				entityId: INJECTED,
+				member: alice.identity.publicKeyBase64,
+				role: AccessRole.Editor,
+				signerSecret: mallory.exposeIdentityForPairing().secretKey,
+				now: Date.now(),
+				anchor: `${anchorOf(invite, INJECTED)}|v=${SHARED}`,
+			}),
+		).toThrow(/must not contain/);
+
+		// ...and a value smuggled straight into the stored map reads as ABSENT, so
+		// the reconstructed payload mismatches and the grant does not validate.
+		const doc = new Y.Doc();
+		try {
+			const exposed = mallory.exposeIdentityForPairing();
+			grantAccess(doc, {
+				entityId: INJECTED,
+				member: mallory.identity.publicKeyBase64,
+				role: AccessRole.Owner,
+				signerSecret: exposed.secretKey,
+				now: Date.now(),
+			});
+			grantAccess(doc, {
+				entityId: INJECTED,
+				member: alice.identity.publicKeyBase64,
+				role: AccessRole.Editor,
+				signerSecret: exposed.secretKey,
+				now: Date.now(),
+				anchor: anchorOf(invite, INJECTED),
+			});
+			const entries = doc.getMap("brainstorm.meta").get("access") as Y.Array<Y.Map<unknown>>;
+			entries.get(1).set("anchor", `${anchorOf(invite, INJECTED)}|v=${SHARED}`);
+			expect(await aliceGate(INJECTED, Y.encodeStateAsUpdate(doc))).toBe(
+				ShareBootstrapVerdict.DenyNoSelfGrant,
+			);
+		} finally {
+			doc.destroy();
 		}
 	});
 

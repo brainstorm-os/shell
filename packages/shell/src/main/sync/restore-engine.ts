@@ -83,6 +83,7 @@ export class RestoreEngine {
 	readonly #delay: (ms: number) => Promise<void>;
 	readonly #now: () => number;
 	#running = false;
+	#inFlight: ReadonlySet<string> = new Set();
 
 	constructor(ctx: RestoreEngineContext) {
 		this.#ctx = ctx;
@@ -106,6 +107,12 @@ export class RestoreEngine {
 			// 10.10 — batch-track the whole catalog: one pass, chunked bundle:true
 			// subscribes, so a durable node streams the backfill as bundled frames
 			// (an old node falls back to the per-frame stream transparently).
+			// Collab-C5-invite-anchor: the catalog is the node's answer to a question
+			// only this identity could ask (it is keyed on this device's own wire
+			// sender), so while the pass runs these ids are a trust anchor the share
+			// bootstrap gate may accept a backfill against - see
+			// `isRestoringEntity`.
+			this.#inFlight = new Set(entries.map((entry) => entry.entityId));
 			this.#ctx.engine.trackForRestoreBatch(entries.map((entry) => entry.entityId));
 			await this.#awaitBackfill(entries);
 			// Settle the apply chain once more so the snapshot/tail behind the
@@ -122,7 +129,15 @@ export class RestoreEngine {
 			};
 		} finally {
 			this.#running = false;
+			this.#inFlight = new Set();
 		}
+	}
+
+	/** Is `entityId` in the catalog of a restore pass running RIGHT NOW? The set is
+	 *  populated when the catalog lands and cleared when the pass ends, so the
+	 *  window is exactly one explicit, user-initiated restore. */
+	isRestoringEntity(entityId: string): boolean {
+		return this.#running && this.#inFlight.has(entityId);
 	}
 
 	/** Block until every entry is recovered, the stream quiesces, or the

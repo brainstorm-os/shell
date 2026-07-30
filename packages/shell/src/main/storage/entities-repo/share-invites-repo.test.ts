@@ -27,6 +27,16 @@ describe("ShareInvitesRepository", () => {
 	let vaultDir = "";
 	let env: Awaited<ReturnType<typeof openAt>>;
 
+	const pin = (inviteId: string, entityId: string, ownerPubB64: string, now: number) =>
+		env.invites.pin({
+			inviteId,
+			secretB64: "c2VjcmV0",
+			memberPubB64: "bWVtYmVy",
+			entityId,
+			ownerPubB64,
+			now,
+		});
+
 	const mint = (inviteId: string, over: { expiresAt?: number } = {}) =>
 		env.invites.mint({
 			inviteId,
@@ -58,8 +68,8 @@ describe("ShareInvitesRepository", () => {
 
 	it("pin records the one entity + granter, and the first pin wins", () => {
 		mint("inv_a");
-		env.invites.pin("inv_a", "ent_1", "owner_1", NOW);
-		env.invites.pin("inv_a", "ent_2", "owner_2", NOW + 1);
+		pin("inv_a", "ent_1", "owner_1", NOW);
+		pin("inv_a", "ent_2", "owner_2", NOW + 1);
 		const row = env.invites.get("inv_a");
 		expect(row?.redeemedEntityId).toBe("ent_1");
 		expect(row?.redeemedBy).toBe("owner_1");
@@ -78,7 +88,7 @@ describe("ShareInvitesRepository", () => {
 		mint("inv_spent");
 		mint("inv_revoked");
 		mint("inv_expired", { expiresAt: NOW - 1 });
-		env.invites.pin("inv_spent", "ent_1", "owner_1", NOW);
+		pin("inv_spent", "ent_1", "owner_1", NOW);
 		env.invites.revoke("inv_revoked", NOW);
 		expect(env.invites.listOutstanding(NOW).map((r) => r.inviteId)).toEqual(["inv_live"]);
 	});
@@ -87,7 +97,7 @@ describe("ShareInvitesRepository", () => {
 		mint("inv_old", { expiresAt: NOW - 30 * DAY });
 		mint("inv_recent", { expiresAt: NOW - 1 });
 		mint("inv_spent_old", { expiresAt: NOW - 30 * DAY });
-		env.invites.pin("inv_spent_old", "ent_1", "owner_1", NOW);
+		pin("inv_spent_old", "ent_1", "owner_1", NOW);
 		expect(env.invites.purgeExpired(NOW, 7 * DAY)).toBe(1);
 		expect(env.invites.get("inv_old")).toBeNull();
 		expect(env.invites.get("inv_recent")).not.toBeNull();
@@ -99,7 +109,7 @@ describe("ShareInvitesRepository", () => {
 
 	it("RESTART: a spent invite is still spent after the store is reopened", async () => {
 		mint("inv_a");
-		env.invites.pin("inv_a", "ent_1", "owner_1", NOW);
+		pin("inv_a", "ent_1", "owner_1", NOW);
 		env.stores.close();
 
 		env = await openAt(vaultDir);

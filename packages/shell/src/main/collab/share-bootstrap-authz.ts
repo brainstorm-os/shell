@@ -29,6 +29,12 @@
  *     container's membership") reduced to what local state can verify — a
  *     channel co-member can introduce a Message and nothing else.
  *
+ *  3. **Restore catalog** (a cold restore). The device asked the durable node,
+ *     under its own sovereign key, for the entities this account previously
+ *     synced, and is applying that backfill right now. The id set is the answer
+ *     to a question only this identity could ask, and the window is the length of
+ *     one explicit, user-initiated restore pass.
+ *
  * Fail-closed at every step. An unreadable doc, an oversized or undecodable
  * state, an absent self-grant, an unknown/expired/spent/revoked invite, an
  * unknown container, or a child type that does not match its container's rule
@@ -48,7 +54,12 @@ import {
 	roleAtLeast,
 } from "./access-record";
 import { containmentRuleForParent } from "./containment-registry";
-import { InviteRedemption, type ShareInviteStoreLike, redeemInviteAnchor } from "./invite-anchor";
+import {
+	type DeriveInviteSecretFn,
+	InviteRedemption,
+	type ShareInviteStoreLike,
+	redeemInviteAnchor,
+} from "./invite-anchor";
 
 /** The outcome of the gate. `Allow` is the only accepting value; every other
  *  member names the precise reason so a refusal is diagnosable in a log line
@@ -62,7 +73,6 @@ export enum ShareBootstrapVerdict {
 	DenyNoAnchor = "deny-no-anchor",
 	DenyGranterNotOwner = "deny-granter-not-owner",
 	DenyInviteMalformed = "deny-invite-malformed",
-	DenyInviteUnknown = "deny-invite-unknown",
 	DenyInviteExpired = "deny-invite-expired",
 	DenyInviteRevoked = "deny-invite-revoked",
 	DenyInviteWrongMember = "deny-invite-wrong-member",
@@ -79,7 +89,6 @@ export enum ShareBootstrapVerdict {
 const REDEMPTION_VERDICT: Readonly<Record<InviteRedemption, ShareBootstrapVerdict>> = {
 	[InviteRedemption.Ok]: ShareBootstrapVerdict.Allow,
 	[InviteRedemption.Malformed]: ShareBootstrapVerdict.DenyInviteMalformed,
-	[InviteRedemption.Unknown]: ShareBootstrapVerdict.DenyInviteUnknown,
 	[InviteRedemption.Revoked]: ShareBootstrapVerdict.DenyInviteRevoked,
 	[InviteRedemption.WrongMember]: ShareBootstrapVerdict.DenyInviteWrongMember,
 	[InviteRedemption.Mismatch]: ShareBootstrapVerdict.DenyInviteMismatch,
@@ -100,8 +109,16 @@ export type ShareBootstrapAuthzInput = {
 	/** The decrypted Yjs update the frame carries. */
 	incomingState: Uint8Array;
 	now: number;
-	/** This vault's outstanding invites (`share_invites`). */
+	/** This vault's outstanding invites (`share_invites`) — the replay ledger. */
 	invites: ShareInviteStoreLike;
+	/** Re-derive an invite's anchor secret from its nonce under this vault's
+	 *  sovereign key. The trust root: it works with no local row at all. */
+	deriveInviteSecret: DeriveInviteSecretFn;
+	/** Stage 10.14 — is `entityId` in the catalog of a restore pass this device is
+	 *  running right now? The catalog is keyed on this identity's own wire sender,
+	 *  so a listed id is one this vault previously synced; a bootstrap for it is
+	 *  the backfill, not an injection. Absent ⇒ never restoring. */
+	isRestoring?: (entityId: string) => boolean;
 	/** Load a persisted doc by entity id. The gate destroys what it loads. */
 	loadDoc: (entityId: string) => Promise<Y.Doc>;
 	/** The locally materialized reverse-DNS type of an entity, or null. */
@@ -145,7 +162,9 @@ async function authorizeContainerDescent(
 	}
 	try {
 		if (!isActiveMember(container, containerId, input.selfPubB64)) {
-			return ShareBootstrapVerdict.DenyContainerNotMember;
+			return input.isRestoring?.(input.entityId) === true
+				? ShareBootstrapVerdict.Allow
+				: ShareBootstrapVerdict.DenyContainerNotMember;
 		}
 		if (!granterMayCascade(container, containerId, granterPubB64)) {
 			return ShareBootstrapVerdict.DenyContainerGranterNotMember;
@@ -216,12 +235,17 @@ export async function authorizeShareBootstrap(
 				memberPubB64: input.selfPubB64,
 				ownerPubB64: selfGrant.addedBy,
 				now: input.now,
+				deriveSecret: input.deriveInviteSecret,
 			});
 			return REDEMPTION_VERDICT[redemption];
 		}
 		if (selfGrant.via !== null) {
 			return await authorizeContainerDescent(input, selfGrant.via, selfGrant.addedBy);
 		}
+		// Anchor 3 - an explicit, user-initiated restore of THIS account's own
+		// catalog. Covers the backfill frames of a shared entity whose cascade grant
+		// arrives before its container, which no local record could yet judge.
+		if (input.isRestoring?.(input.entityId) === true) return ShareBootstrapVerdict.Allow;
 		return ShareBootstrapVerdict.DenyNoAnchor;
 	} catch {
 		return ShareBootstrapVerdict.DenyUnreadable;

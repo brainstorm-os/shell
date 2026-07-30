@@ -64,11 +64,13 @@
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-/** Bytes of entropy in an invite secret. */
+const encoder = new TextEncoder();
+
+/** Bytes of the derived invite secret (a SHA-256 digest). */
 export const INVITE_SECRET_BYTES = 32;
 
-/** Bytes of the public invite handle derived from the secret. */
-export const INVITE_ID_BYTES = 16;
+/** Bytes of entropy in the public invite handle. */
+export const INVITE_NONCE_BYTES = 16;
 
 /** Default lifetime of a freshly minted invite: seven days. Long enough for a
  *  human hand-off across a weekend, short enough that an unredeemed code stops
@@ -85,14 +87,14 @@ export const MAX_ANCHOR_LENGTH = 256;
 export const MAX_ANCHOR_FIELD_LENGTH = 512;
 
 const ANCHOR_SEPARATOR = ":";
-const ID_DOMAIN = "brainstorm/share-invite/v2/id";
+const NONCE_DOMAIN = "brainstorm/share-invite/v2/nonce";
+const SECRET_DOMAIN = "brainstorm/share-invite/v2/secret";
 const MAC_DOMAIN = "brainstorm/share-anchor/v1";
 
 /** Why a redemption attempt was refused. `Ok` is the only accepting value. */
 export enum InviteRedemption {
 	Ok = "ok",
 	Malformed = "malformed",
-	Unknown = "unknown-invite",
 	Revoked = "invite-revoked",
 	WrongMember = "wrong-member",
 	Mismatch = "anchor-mismatch",
@@ -118,13 +120,27 @@ export type ShareInviteRecord = {
 	revokedAt: number | null;
 };
 
+/** Pinning an invite to the one `(entity, granter)` pair it authorizes. Creates
+ *  the row when this device has no record of the invite — see
+ *  {@link redeemInviteAnchor} on why a missing row is "unspent", not "unknown". */
+export type PinShareInviteInput = {
+	inviteId: string;
+	secretB64: string;
+	memberPubB64: string;
+	entityId: string;
+	ownerPubB64: string;
+	now: number;
+};
+
 /** The persistence surface {@link redeemInviteAnchor} needs — satisfied by
  *  `ShareInvitesRepository`, and by a map in unit tests. */
 export type ShareInviteStoreLike = {
 	get(inviteId: string): ShareInviteRecord | null;
-	/** Pin an outstanding invite to its one entity + granter. */
-	pin(inviteId: string, entityId: string, ownerPubB64: string, now: number): void;
+	pin(input: PinShareInviteInput): void;
 };
+
+/** Re-derive the anchor secret for a nonce under this vault's sovereign key. */
+export type DeriveInviteSecretFn = (nonce: Uint8Array) => Uint8Array;
 
 /** The parts an anchor string carries. */
 export type ParsedAnchor = {
@@ -139,21 +155,50 @@ function withinBounds(value: string): boolean {
 	return value.length > 0 && value.length <= MAX_ANCHOR_FIELD_LENGTH;
 }
 
-/** Derive the public invite handle from the secret. Preimage-resistant, so
- *  publishing the id inside a grant reveals nothing about the secret. */
-export function inviteIdForSecret(secret: Uint8Array): string {
-	return createHash("sha256")
-		.update(ID_DOMAIN, "utf8")
-		.update("|")
-		.update(secret)
-		.digest()
-		.subarray(0, INVITE_ID_BYTES)
-		.toString("base64url");
+/** Draw a fresh invite nonce — the invite's PUBLIC handle. */
+export function mintInviteNonce(): Uint8Array {
+	return new Uint8Array(randomBytes(INVITE_NONCE_BYTES));
 }
 
-/** Draw a fresh invite secret. */
-export function mintInviteSecret(): Uint8Array {
-	return new Uint8Array(randomBytes(INVITE_SECRET_BYTES));
+/** The public handle an anchor names: the nonce, base64url. */
+export function inviteIdForNonce(nonce: Uint8Array): string {
+	return Buffer.from(nonce).toString("base64url");
+}
+
+/** The nonce an anchor's handle names, or null when it is not one. */
+export function nonceForInviteId(inviteId: string): Uint8Array | null {
+	if (!BASE64URL_ID.test(inviteId)) return null;
+	const bytes = new Uint8Array(Buffer.from(inviteId, "base64url"));
+	return bytes.length === INVITE_NONCE_BYTES ? bytes : null;
+}
+
+/**
+ * Derive an invite's anchor secret from the nonce and the invitee's OWN sovereign
+ * key: `SHA-256(domain‖Ed25519_sign(sk, domain‖nonce))`.
+ *
+ * Deriving rather than drawing at random is what makes the anchor survive a vault
+ * WIPE. Ed25519 is deterministic (RFC 8032), so any device holding this identity
+ * re-derives the same secret from the public nonce, forever — a cold restore has
+ * no `share_invites` table left, yet must still admit the owner's backfill of an
+ * entity it was legitimately shared. It also lets a PAIRED device redeem an invite
+ * its sibling minted, which a per-device random secret could not.
+ *
+ * `sign` is `VaultSession.signPayload`: the sovereign secret never leaves the
+ * session, and nothing derived here crosses IPC except inside the invite token
+ * the user deliberately hands over.
+ */
+export function deriveInviteSecret(
+	sign: (payload: Uint8Array) => Uint8Array,
+	nonce: Uint8Array,
+): Uint8Array {
+	const bound = new Uint8Array(encoder.encode(`${NONCE_DOMAIN}|`).length + nonce.length);
+	const prefix = encoder.encode(`${NONCE_DOMAIN}|`);
+	bound.set(prefix, 0);
+	bound.set(nonce, prefix.length);
+	const signature = sign(bound);
+	return new Uint8Array(
+		createHash("sha256").update(SECRET_DOMAIN, "utf8").update("|").update(signature).digest(),
+	);
 }
 
 /**
@@ -210,6 +255,15 @@ function macEquals(a: string, b: string): boolean {
 /**
  * Verify an anchor carried by a grant and, if it holds, spend the invite.
  *
+ * Verification is PURELY cryptographic: the secret is re-derived from the anchor's
+ * nonce under this vault's own sovereign key, so a forgery fails whatever the
+ * local table says, and a legitimate anchor still verifies on a device that has
+ * no record of the invite (a cold restore, or a paired sibling). The table is a
+ * REPLAY LEDGER, not the trust root — which is why a missing row reads as
+ * "unspent" and is created on the spot rather than refused. Expiry is enforced
+ * only where a row exists; a wiped vault trades that one property for being
+ * restorable at all, and every other property still holds.
+ *
  * The MAC is checked BEFORE any state changes, so a forged anchor can never burn
  * a real invite. On success the invite is pinned to `(entityId, ownerPubB64)`;
  * a repeat of that same pair returns `Ok` again (retry-safe), while any other
@@ -223,6 +277,7 @@ export function redeemInviteAnchor(
 		memberPubB64: string;
 		ownerPubB64: string;
 		now: number;
+		deriveSecret: DeriveInviteSecretFn;
 	},
 ): InviteRedemption {
 	const parsed = parseInviteAnchor(input.anchor);
@@ -230,40 +285,52 @@ export function redeemInviteAnchor(
 	if (!withinBounds(input.entityId)) return InviteRedemption.Malformed;
 	if (!withinBounds(input.memberPubB64)) return InviteRedemption.Malformed;
 	if (!withinBounds(input.ownerPubB64)) return InviteRedemption.Malformed;
+	const nonce = nonceForInviteId(parsed.inviteId);
+	if (!nonce) return InviteRedemption.Malformed;
 
 	const record = store.get(parsed.inviteId);
-	if (!record) return InviteRedemption.Unknown;
-	if (record.revokedAt !== null) return InviteRedemption.Revoked;
-	if (record.memberPubB64 !== input.memberPubB64) return InviteRedemption.WrongMember;
+	if (record?.revokedAt != null) return InviteRedemption.Revoked;
+	if (record && record.memberPubB64 !== input.memberPubB64) return InviteRedemption.WrongMember;
 
 	let secret: Uint8Array;
 	try {
-		secret = new Uint8Array(Buffer.from(record.secretB64, "base64"));
+		secret = input.deriveSecret(nonce);
 	} catch {
 		return InviteRedemption.Malformed;
 	}
-	const expected = computeInviteAnchor({
-		secret,
-		inviteId: parsed.inviteId,
-		entityId: input.entityId,
-		memberPubB64: input.memberPubB64,
-		ownerPubB64: input.ownerPubB64,
-	});
-	secret.fill(0);
-	if (expected === null) return InviteRedemption.Malformed;
-	const expectedMac = parseInviteAnchor(expected);
-	if (!expectedMac || !macEquals(expectedMac.macB64, parsed.macB64)) {
-		return InviteRedemption.Mismatch;
-	}
+	let expected: string | null;
+	try {
+		expected = computeInviteAnchor({
+			secret,
+			inviteId: parsed.inviteId,
+			entityId: input.entityId,
+			memberPubB64: input.memberPubB64,
+			ownerPubB64: input.ownerPubB64,
+		});
+		if (expected === null) return InviteRedemption.Malformed;
+		const expectedMac = parseInviteAnchor(expected);
+		if (!expectedMac || !macEquals(expectedMac.macB64, parsed.macB64)) {
+			return InviteRedemption.Mismatch;
+		}
 
-	// Already spent: the ONLY thing it may still authorize is the pair it was
-	// spent on (a re-sent opening frame). Anything else is a replay.
-	if (record.redeemedEntityId !== null || record.redeemedBy !== null) {
-		const samePair =
-			record.redeemedEntityId === input.entityId && record.redeemedBy === input.ownerPubB64;
-		return samePair ? InviteRedemption.Ok : InviteRedemption.AlreadyRedeemed;
+		// Already spent: the ONLY thing it may still authorize is the pair it was
+		// spent on (a re-sent opening frame). Anything else is a replay.
+		if (record && (record.redeemedEntityId !== null || record.redeemedBy !== null)) {
+			const samePair =
+				record.redeemedEntityId === input.entityId && record.redeemedBy === input.ownerPubB64;
+			return samePair ? InviteRedemption.Ok : InviteRedemption.AlreadyRedeemed;
+		}
+		if (record && input.now > record.expiresAt) return InviteRedemption.Expired;
+		store.pin({
+			inviteId: parsed.inviteId,
+			secretB64: Buffer.from(secret).toString("base64"),
+			memberPubB64: input.memberPubB64,
+			entityId: input.entityId,
+			ownerPubB64: input.ownerPubB64,
+			now: input.now,
+		});
+		return InviteRedemption.Ok;
+	} finally {
+		secret.fill(0);
 	}
-	if (input.now > record.expiresAt) return InviteRedemption.Expired;
-	store.pin(parsed.inviteId, input.entityId, input.ownerPubB64, input.now);
-	return InviteRedemption.Ok;
 }

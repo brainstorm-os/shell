@@ -115,6 +115,7 @@ import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
+import { deriveInviteSecret } from "./collab/invite-anchor";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
 import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
@@ -3330,8 +3331,11 @@ void app.whenReady().then(async () => {
 								incomingState: plaintext,
 								now: Date.now(),
 								invites: shareInvites,
+								deriveInviteSecret: (nonce) =>
+									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce),
 								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
 								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+								isRestoring: (id) => getRestoreEngine()?.isRestoringEntity(id) === true,
 							});
 							if (verdict !== ShareBootstrapVerdict.Allow) {
 								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
