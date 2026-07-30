@@ -94,6 +94,7 @@ describe("file sidebar keyboard (KBN-A-code-editor)", () => {
 		const path = folder?.dataset.folderPath ?? "";
 		expect(path).not.toBe("");
 		const before = list()?.querySelectorAll(".editor__file").length ?? 0;
+		expect(before).toBeGreaterThan(0);
 
 		key("ArrowLeft");
 		expect(

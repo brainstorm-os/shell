@@ -374,7 +374,7 @@ function FolderRow({
 			{...itemProps}
 			{...drop.dropProps}
 			ref={drop.dropRef}
-			className="editor__file editor__folder bs-object-menu__host bs-object-menu__host--row"
+			className="editor__row editor__folder bs-object-menu__host bs-object-menu__host--row"
 			data-drop-over={drop.isOver ? "true" : undefined}
 			data-folder-path={node.path}
 			draggable
@@ -456,7 +456,7 @@ function FileRow({
 	return (
 		<div
 			{...itemProps}
-			className="editor__file bs-object-menu__host bs-object-menu__host--row"
+			className="editor__row editor__file bs-object-menu__host bs-object-menu__host--row"
 			aria-current={row.id === selectedId ? "true" : "false"}
 			data-file-id={row.id}
 			// A row that can't be rewritten — read-only-locked, or an adapted

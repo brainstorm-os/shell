@@ -126,7 +126,10 @@ button {
 	outline-offset: -2px;
 }
 
-.editor__file {
+/* Shared TREE-ROW face — folder rows and file rows both wear it. The kind
+   classes (`.editor__folder` / `.editor__file`) stay meaningful on their own,
+   so a selector for "a file row" never accidentally counts folders. */
+.editor__row {
 	display: flex;
 	align-items: center;
 	width: 100%;
@@ -135,21 +138,21 @@ button {
 }
 
 /* An accepted drag hovering a folder row (or the root list). */
-.editor__file[data-drop-over="true"] {
+.editor__row[data-drop-over="true"] {
 	background: var(--color-accent-subtle, var(--hover));
 	box-shadow: inset 0 0 0 var(--border-width) var(--accent);
 }
 
-.editor__file:focus-visible {
+.editor__row:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -2px;
 }
 
-.editor__file:hover {
+.editor__row:hover {
 	background: var(--hover, rgba(127, 127, 127, 0.1));
 }
 
-.editor__file[aria-current="true"] {
+.editor__row[aria-current="true"] {
 	background: var(--accent-soft, rgba(127, 127, 127, 0.18));
 	color: var(--text);
 }
@@ -986,7 +989,10 @@ button {
 }
 
 .editor__diagnostics-head {
-	padding-inline: var(--panel-inset);
+	/* The diagnostics list is a generic DOM module — it inherits the host
+	   panel's column, with a sane floor if ever mounted somewhere that has
+	   none. */
+	padding-inline: var(--panel-inset, var(--space-2));
 	font-size: var(--text-size-xs);
 	color: var(--text-dim);
 	margin-bottom: var(--space-1);
@@ -1012,7 +1018,7 @@ button {
 	text-align: left;
 	/* Full-bleed row: the inset lives on the row so its hover highlight spans
 	   the panel while the text stays on the content column. */
-	padding: var(--space-1) var(--panel-inset);
+	padding: var(--space-1) var(--panel-inset, var(--space-2));
 	cursor: pointer;
 }
 
