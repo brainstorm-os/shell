@@ -435,7 +435,7 @@ let lanHostRuntime: {
 		knownPeers(): readonly { instance: string; urls: readonly string[]; source: string }[];
 	};
 	discovery: { apply(): Promise<void> };
-	parsePeerAddress(raw: string): string | null;
+	parsePeerAddress(raw: string, opts?: { allowLoopback?: boolean }): string | null;
 } | null = null;
 
 /**
@@ -2384,7 +2384,10 @@ void app.whenReady().then(async () => {
 		onPairedPeerUrl: (url) => {
 			const rt = lanHostRuntime;
 			if (!rt) return;
-			const normalised = rt.parsePeerAddress(url);
+			// `allowLoopback: false`: the payload slot holds the RELAY address whenever
+			// one is configured, and the two-shell dogfood run caught exactly that —
+			// the joining device adopted the durable node on 127.0.0.1 as a LAN peer.
+			const normalised = rt.parsePeerAddress(url, { allowLoopback: false });
 			if (!normalised) return;
 			rt.dial.offerPairedPeer(normalised);
 		},

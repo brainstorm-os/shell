@@ -216,3 +216,37 @@ describe("LanDialCoordinator", () => {
 		expect(onTargetChanged).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("paired-peer adoption", () => {
+	// Caught by the two-shell dogfood run, not by a unit test: the pairing
+	// payload's single URL slot holds the RELAY address whenever one is
+	// configured, so the joining device adopted the durable node on 127.0.0.1 as
+	// a LAN peer and put it on the channel-bound transport it never answers.
+	// That is the F-466 failure mode reached from provenance instead of the
+	// address, which is exactly the mistake provenance was supposed to avoid.
+	it("refuses a loopback address from a pairing payload", () => {
+		expect(parseLanPeerAddress("127.0.0.1:9000", { allowLoopback: false })).toBeNull();
+		expect(parseLanPeerAddress("ws://127.0.0.1:9000", { allowLoopback: false })).toBeNull();
+	});
+
+	it("still accepts loopback from a TYPED address, where it is legitimate", () => {
+		expect(parseLanPeerAddress("127.0.0.1:9000")).toBe("ws://127.0.0.1:9000");
+	});
+
+	it("accepts a private address from a pairing payload", () => {
+		expect(parseLanPeerAddress("192.168.1.20:51820", { allowLoopback: false })).toBe(
+			"ws://192.168.1.20:51820",
+		);
+	});
+
+	it("stores a paired peer under a stable instance so a re-pair replaces it", () => {
+		const seen: (LanDialTarget | null)[] = [];
+		const c = new LanDialCoordinator({ onTargetChanged: (t) => seen.push(t), now: () => 1_000 });
+		c.setMode(LanDialMode.Auto);
+		c.offerPairedPeer("ws://192.168.1.20:51820");
+		c.offerPairedPeer("ws://192.168.1.20:51820");
+		expect(c.knownPeers()).toHaveLength(1);
+		expect(c.target()?.source).toBe(LanDialSource.Pairing);
+		expect(seen).toHaveLength(1);
+	});
+});

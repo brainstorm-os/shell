@@ -125,7 +125,10 @@ export function parseLanDialMode(raw: unknown): LanDialMode {
  * driven by typed input, and a routable address would mean dialling the
  * internet from a control labelled "local network".
  */
-export function parseLanPeerAddress(raw: string): string | null {
+export function parseLanPeerAddress(
+	raw: string,
+	opts: { allowLoopback?: boolean } = {},
+): string | null {
 	const trimmed = raw.trim();
 	if (trimmed.length === 0 || trimmed.length > 64) return null;
 	const withScheme = /^wss?:\/\//i.test(trimmed) ? trimmed : `ws://${trimmed}`;
@@ -145,6 +148,13 @@ export function parseLanPeerAddress(raw: string): string | null {
 	if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return null;
 	const host = url.hostname;
 	if (!isBindableAddress(host)) return null;
+	// Loopback is a legitimate TYPED address (local testing, a second shell on
+	// one machine) but never a legitimate PAIRED one: a peer device is not on
+	// your loopback, and a pairing payload's slot holds the relay's address
+	// whenever a relay is configured. Adopting that would put the durable node
+	// on the LAN transport with the channel-bound handshake it never answers —
+	// the F-466 failure mode, arrived at from provenance instead of the address.
+	if (opts.allowLoopback === false && /^127\./.test(host)) return null;
 	return `ws://${host}:${port}`;
 }
 
