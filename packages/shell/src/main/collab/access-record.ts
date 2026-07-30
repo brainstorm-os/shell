@@ -380,12 +380,24 @@ export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint
  * entity DEK and to have produced a valid signature over the frame, so this
  * opens no key-free surface.
  */
+/** Ceiling on the state a share BOOTSTRAP may carry (see below). Deliberately
+ *  generous against a real opening snapshot and still far under anything that
+ *  could stall the main process. */
+const MAX_BOOTSTRAP_STATE_BYTES = 4 * 1024 * 1024;
+
 export function authorizesAsShareBootstrap(
 	localDoc: Y.Doc,
 	entityId: string,
 	senderKey: Uint8Array,
 	incomingState: Uint8Array,
 ): boolean {
+	// The real apply of a remote update is delegated to the ydoc WORKER; this
+	// probe decodes the same attacker-supplied bytes on the main process, so it
+	// gets an explicit ceiling that the worker path does not need. A share's
+	// opening state is a fresh doc plus an access record, orders of magnitude
+	// under this; anything larger is not a bootstrap and is refused rather than
+	// handed to a length-prefixed decoder on the UI thread.
+	if (incomingState.byteLength > MAX_BOOTSTRAP_STATE_BYTES) return false;
 	if (resolveMembers(localDoc, entityId).length > 0) return false;
 	const probe = new Y.Doc();
 	try {

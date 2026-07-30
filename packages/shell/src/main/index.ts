@@ -133,7 +133,7 @@ import {
 	writeBillingCredential,
 } from "./credentials/billing-refresh-credential";
 import { base64ToBytes, bytesToBase64 } from "./credentials/crypto";
-import { verifySignature } from "./credentials/identity";
+import { ED25519_PUBLIC_BYTES, verifySignature } from "./credentials/identity";
 import { wrapDekForRecipient, wrapDekVersionOf } from "./credentials/member-wraps";
 import { makeDashboardServiceHandler } from "./dashboard/dashboard-service";
 import {
@@ -3236,12 +3236,10 @@ void app.whenReady().then(async () => {
 					entityId: string,
 					senderPubB64: string,
 				): Promise<boolean> => {
-					let senderKey: Uint8Array;
-					try {
-						senderKey = base64UrlToBytes(senderPubB64);
-					} catch {
-						return false;
-					}
+					// See the note on the writer predicate: base64url decoding is
+					// lossy, not throwing, so length-check the key outright.
+					const senderKey = base64UrlToBytes(senderPubB64);
+					if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
 					try {
 						const existing = dekStore.open(entityId);
 						const holdsDek = existing !== null;
@@ -3304,12 +3302,12 @@ void app.whenReady().then(async () => {
 					//      `authorizesAsShareBootstrap`, which only fires on a doc with
 					//      no record and still demands a signature-verified Editor+).
 					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
-						let senderKey: Uint8Array;
-						try {
-							senderKey = base64UrlToBytes(senderPubB64);
-						} catch {
-							return false;
-						}
+						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
+						// invalid characters and returns a short buffer - so state the
+						// invariant explicitly rather than relying on a catch that can
+						// never fire.
+						const senderKey = base64UrlToBytes(senderPubB64);
+						if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
 						if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
 						const { doc } = await session.ydocStore.load(entityId);
 						try {

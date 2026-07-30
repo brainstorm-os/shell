@@ -123,6 +123,19 @@ describe("authorizesWrapInstall - who may install / rotate a per-entity DEK", ()
 		}
 	});
 
+	it("ALLOWS when this device holds a DEK but has no access record at all", () => {
+		// Reachable without an attacker: the wrap and the state that carries the
+		// record are two independent best-effort frames, so a drop between them
+		// leaves exactly this. Denying would be a permanent, unrepairable
+		// lock-out (the security review's HIGH-2).
+		const doc = new Y.Doc();
+		try {
+			expect(check(doc, owner.publicKey, me.publicKey, true)).toBe(true);
+		} finally {
+			doc.destroy();
+		}
+	});
+
 	it("fail-closed: an undecodable member key is skipped, never treated as a match", () => {
 		const doc = sharedDoc();
 		try {

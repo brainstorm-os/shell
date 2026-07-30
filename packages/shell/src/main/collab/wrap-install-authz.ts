@@ -48,7 +48,20 @@ export type WrapInstallAuthzInput = {
 export function authorizesWrapInstall(input: WrapInstallAuthzInput): boolean {
 	if (keyBytesEqual(input.senderKey, input.selfPub)) return true;
 	if (!input.holdsDek) return true;
-	for (const member of resolveCurrentMembers(input.localDoc, input.entityId)) {
+	const members = resolveCurrentMembers(input.localDoc, input.entityId);
+	// Un-judgeable, so allow: this device holds a DEK but no access record at
+	// all. That state is reachable WITHOUT an attacker, because the wrap and the
+	// state that carries the record are two independent best-effort frames
+	// (`SharingEngine.#shareOne`) and sync is online-only, so a drop between them
+	// leaves exactly this. Denying here would be permanent: the owner's next
+	// rotation wrap is refused, their re-sent state is sealed under a DEK we
+	// refused, and nothing can ever repair it. That is the ROT-3a lock-out shape
+	// on the receive path, and it is worse than the hole it would close, since a
+	// device with no record cannot tell an Owner from anyone else anyway. The
+	// Viewer-rotation attack this rule exists for needs a record to be a Viewer
+	// IN, so it is unaffected.
+	if (members.length === 0) return true;
+	for (const member of members) {
 		if (!member.active) continue;
 		if (!roleAtLeast(member.role, AccessRole.Owner)) continue;
 		let memberKey: Uint8Array;

@@ -306,6 +306,48 @@ describe("F-288 writer authorization on the receiver's production path", () => {
 		}
 	});
 
+	it("a DELTA first frame does not authorize a bootstrap (only a full state can)", async () => {
+		// The legit flow works because `SharingEngine.#emitFullState` sends
+		// `Y.encodeStateAsUpdate(doc)`, so the probe resolves the whole record. If
+		// some future path ever emits a DELTA as the opening frame, the access
+		// entries stay in the probe's pending structs and the bootstrap must deny
+		// rather than half-resolve. Pinning that here so the dependency is a test,
+		// not a comment.
+		await shareWith(AccessRole.Editor);
+		const { doc } = await owner.ydocStore.load(ENTITY);
+		try {
+			const ahead = new Y.Doc();
+			// A state vector from a doc that has never seen anything yields a full
+			// state; ask instead for the diff against the doc ITSELF, which is empty.
+			const delta = Y.encodeStateAsUpdate(doc, Y.encodeStateVector(doc));
+			const local = new Y.Doc();
+			try {
+				expect(authorizesAsShareBootstrap(local, ENTITY, owner.identity.publicKey, delta)).toBe(false);
+			} finally {
+				local.destroy();
+				ahead.destroy();
+			}
+		} finally {
+			doc.destroy();
+		}
+	});
+
+	it("an oversized incoming state is refused before it reaches the decoder", () => {
+		const local = new Y.Doc();
+		try {
+			expect(
+				authorizesAsShareBootstrap(
+					local,
+					ENTITY,
+					owner.identity.publicKey,
+					new Uint8Array(4 * 1024 * 1024 + 1),
+				),
+			).toBe(false);
+		} finally {
+			local.destroy();
+		}
+	});
+
 	it("VIEWER: the gate still drops a Viewer's write after bootstrap (F-288 holds)", async () => {
 		await shareWith(AccessRole.Viewer);
 		await drain();
