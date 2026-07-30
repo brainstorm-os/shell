@@ -212,7 +212,10 @@ describe("folder tree — create", () => {
 		const { runtime, create } = makeFakeRuntime([{ path: "lib/one.ts" }, { path: "root.ts" }]);
 		await mount(runtime);
 
-		act(() => folderRow("lib")?.dispatchEvent(new FocusEvent("focus", { bubbles: true })));
+		// Click, not a synthetic FocusEvent: React's `onFocus` rides delegated
+		// `focusin`, which jsdom delivers unreliably — the row's click handler
+		// sets the active row directly, which is what a real click does anyway.
+		act(() => folderRow("lib")?.click());
 		const newBtn = document.querySelector<HTMLButtonElement>(".editor__file-new");
 		expect(newBtn).not.toBeNull();
 		act(() => newBtn?.click());

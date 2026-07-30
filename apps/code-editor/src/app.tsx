@@ -635,12 +635,14 @@ export function CodeEditorApp(): ReactElement {
 	);
 
 	const createFolder = useCallback((parent: string): void => {
+		// Computed outside the state updater: an updater must stay pure (React
+		// may invoke it twice), and arming the rename is a side effect.
 		const existing = foldersOf(rowsRef.current.map((r) => r.path));
-		setPendingFolders((prev) => {
-			const path = nextFolderPath([...existing, ...prev], parent);
-			pendingFolderRenameRef.current = path;
-			return [...prev, path].slice(0, MAX_PERSISTED_FOLDERS);
-		});
+		const path = nextFolderPath([...existing, ...pendingFoldersRef.current], parent);
+		pendingFolderRenameRef.current = path;
+		setPendingFolders((prev) =>
+			prev.includes(path) ? prev : [...prev, path].slice(0, MAX_PERSISTED_FOLDERS),
+		);
 	}, []);
 
 	const removeFolder = useCallback((path: string): void => {
