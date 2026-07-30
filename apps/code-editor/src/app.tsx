@@ -19,7 +19,7 @@
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
 import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
-import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
 import { LockButton } from "@brainstorm-os/sdk/lock-button";
@@ -1329,45 +1329,49 @@ function ReferencesPanel({
 		<aside className="editor__refs glass--strong" tabIndex={-1} aria-label={t("referencesRegion")}>
 			<DiagnosticsList content={content} language={row.language} onReveal={onReveal} />
 			<div className="editor__refs-head">{t("referencesHeading")}</div>
+			{refs.length === 0 ? (
+				<EmptyState
+					className="editor__refs-empty"
+					tone={EmptyStateTone.Compact}
+					icon={IconName.KindLink}
+					title={t("referencesEmpty")}
+				/>
+			) : null}
 			<div className="editor__refs-list">
-				{refs.length === 0 ? (
-					<div className="editor__refs-empty">{t("referencesEmpty")}</div>
-				) : (
-					refs.map((ref) => {
-						const { entry } = ref;
-						return (
-							<button
-								key={`${entry.entityId}:${ref.firstLine}`}
-								type="button"
-								className="editor__ref"
-								title={t("referenceOpen", { code: entry.code, title: entry.title })}
-								onClick={() => {
-									void openEntity(getCodeEditorRuntime(), {
-										entityId: entry.entityId,
-										entityType: entry.entityType,
-									});
-								}}
-							>
-								<div className="editor__ref-top">
-									<span className="editor__ref-code">{entry.code}</span>
-									<span className="editor__ref-status" data-status={entry.status}>
-										{entry.status || KIND_LABEL[entry.kind]()}
+				{refs.map((ref) => {
+					const { entry } = ref;
+					return (
+						<button
+							key={`${entry.entityId}:${ref.firstLine}`}
+							type="button"
+							className="editor__ref"
+							title={t("referenceOpen", { code: entry.code, title: entry.title })}
+							onClick={() => {
+								void openEntity(getCodeEditorRuntime(), {
+									entityId: entry.entityId,
+									entityType: entry.entityType,
+								});
+							}}
+						>
+							<div className="editor__ref-top">
+								<span className="editor__ref-code">{entry.code}</span>
+								<span className="editor__ref-status" data-status={entry.status}>
+									{entry.status || KIND_LABEL[entry.kind]()}
+								</span>
+								{ref.count > 1 ? (
+									<span
+										className="editor__ref-count"
+										title={t("referenceOccurrences", { count: ref.count, line: ref.firstLine })}
+									>
+										{t("referenceCount", { count: ref.count })}
 									</span>
-									{ref.count > 1 ? (
-										<span
-											className="editor__ref-count"
-											title={t("referenceOccurrences", { count: ref.count, line: ref.firstLine })}
-										>
-											{t("referenceCount", { count: ref.count })}
-										</span>
-									) : null}
-								</div>
-								<div className="editor__ref-title">{entry.title}</div>
-								{entry.summary ? <div className="editor__ref-summary">{entry.summary}</div> : null}
-							</button>
-						);
-					})
-				)}
+								) : null}
+							</div>
+							<div className="editor__ref-title">{entry.title}</div>
+							{entry.summary ? <div className="editor__ref-summary">{entry.summary}</div> : null}
+						</button>
+					);
+				})}
 			</div>
 		</aside>
 	);

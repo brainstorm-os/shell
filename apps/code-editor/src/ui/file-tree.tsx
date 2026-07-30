@@ -34,12 +34,17 @@ import type { codeFileObjectMenuContext } from "./object-menu-context";
 /** Indent per tree level — wide enough that a nested row reads as nested,
  *  narrow enough that a 3-deep path still fits the 248px panel. */
 const INDENT_PX = 14;
-/** Inline-start inset of a level-0 row (the caret column's left edge). */
-const BASE_INSET_PX = 6;
+/** Inline-start inset of a level-0 row — the panel's content column
+ *  (`--panel-inset` = `--space-2` on `.editor__files`), so the FILES heading
+ *  and every row's disclosure caret start on the same offset. */
+const BASE_INSET_PX = 8;
 
 /** Intra-app folder drags ride their own MIME: a folder is not an entity, so
  *  it can't travel on the shared object payload. */
 const FOLDER_DRAG_MIME = "application/x-brainstorm-code-folder";
+
+/** The FILES heading, which names the tree below it. */
+const HEADING_ID = "code-files-heading";
 
 export interface FileTreeProps {
 	rows: CodeFileRow[];
@@ -158,7 +163,9 @@ export function FileTree(props: FileTreeProps): ReactElement {
 	return (
 		<nav className="editor__files" aria-label={t("filesRegion")}>
 			<div className="editor__files-head">
-				<span className="editor__files-heading">{t("filesHeading")}</span>
+				<span className="editor__files-heading" id={HEADING_ID}>
+					{t("filesHeading")}
+				</span>
 				{canCreate ? (
 					<div className="editor__files-actions">
 						<button
@@ -186,7 +193,10 @@ export function FileTree(props: FileTreeProps): ReactElement {
 				{...root.dropProps}
 				ref={setListRef}
 				className="editor__file-list"
-				aria-label={t("filesRegion")}
+				// The <nav> already carries the region name; labelling the tree by
+				// the panel's own FILES heading stops a screen reader announcing the
+				// same string twice on entry.
+				aria-labelledby={HEADING_ID}
 				data-drop-over={root.isOver ? "true" : undefined}
 			>
 				{nodes.map((node) =>

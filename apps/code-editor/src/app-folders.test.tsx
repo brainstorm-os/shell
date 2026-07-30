@@ -138,7 +138,14 @@ async function mount(runtime: CodeEditorRuntime): Promise<void> {
 		root.render(<CodeEditorApp />);
 	});
 	await vi.waitFor(
-		() => expect(document.querySelectorAll(".editor__file[data-file-id]").length).toBeGreaterThan(0),
+		() => {
+			expect(document.querySelectorAll(".editor__file[data-file-id]").length).toBeGreaterThan(0);
+			// Wait for the tree's roving focus to SETTLE on the auto-selected file
+			// too: the app picks a selection one effect after the rows land, and
+			// the tree follows it — a test that acts before that lands races the
+			// pending `setActiveId` and has its own focus move overwritten.
+			expect(document.querySelector('.editor__file[aria-selected="true"]')).not.toBeNull();
+		},
 		{ timeout: 3000 },
 	);
 }
