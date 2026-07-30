@@ -91,5 +91,16 @@
   "diff.stats": "{added} ajoutées · {removed} supprimées",
   "diff.noChanges": "Aucune modification depuis le dernier enregistrement.",
   "diff.baseColumn": "Enregistré",
-  "diff.nextColumn": "Actuel"
+  "diff.nextColumn": "Actuel",
+  "newFolder": "Nouveau dossier",
+  "newFolderHint": "Créer un dossier",
+  "newFileHere": "Nouveau fichier ici",
+  "folderMenuLabel": "Actions du dossier {name}",
+  "folderRename": "Renommer le dossier…",
+  "folderRemove": "Supprimer le dossier",
+  "folderRenameTitle": "Renommer {name}",
+  "folderRenameLabel": "Chemin du dossier",
+  "folderErrorLocked": "Ce dossier contient un fichier verrouillé. Déverrouillez-le d’abord.",
+  "folderErrorCycle": "Un dossier ne peut pas être déplacé dans lui-même.",
+  "languageSelect": "Langage"
 }

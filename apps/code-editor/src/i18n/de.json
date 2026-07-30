@@ -91,5 +91,16 @@
   "diff.stats": "{added} hinzugefügt · {removed} entfernt",
   "diff.noChanges": "Keine Änderungen seit dem letzten Speichern.",
   "diff.baseColumn": "Gespeichert",
-  "diff.nextColumn": "Aktuell"
+  "diff.nextColumn": "Aktuell",
+  "newFolder": "Neuer Ordner",
+  "newFolderHint": "Neuen Ordner erstellen",
+  "newFileHere": "Neue Datei hier",
+  "folderMenuLabel": "Ordneraktionen für {name}",
+  "folderRename": "Ordner umbenennen…",
+  "folderRemove": "Ordner entfernen",
+  "folderRenameTitle": "{name} umbenennen",
+  "folderRenameLabel": "Ordnerpfad",
+  "folderErrorLocked": "Dieser Ordner enthält eine gesperrte Datei. Entsperre sie zuerst.",
+  "folderErrorCycle": "Ein Ordner kann nicht in sich selbst verschoben werden.",
+  "languageSelect": "Sprache"
 }

@@ -91,5 +91,16 @@
   "diff.stats": "{added} aggiunte · {removed} rimosse",
   "diff.noChanges": "Nessuna modifica dall'ultimo salvataggio.",
   "diff.baseColumn": "Salvato",
-  "diff.nextColumn": "Attuale"
+  "diff.nextColumn": "Attuale",
+  "newFolder": "Nuova cartella",
+  "newFolderHint": "Crea una nuova cartella",
+  "newFileHere": "Nuovo file qui",
+  "folderMenuLabel": "Azioni cartella per {name}",
+  "folderRename": "Rinomina cartella…",
+  "folderRemove": "Rimuovi cartella",
+  "folderRenameTitle": "Rinomina {name}",
+  "folderRenameLabel": "Percorso della cartella",
+  "folderErrorLocked": "Questa cartella contiene un file bloccato. Sbloccalo prima.",
+  "folderErrorCycle": "Una cartella non può essere spostata dentro sé stessa.",
+  "languageSelect": "Linguaggio"
 }

@@ -1,5 +1,5 @@
 /**
- * Syntax-theme preference for the code-editor's Shiki highlight (9.7.9).
+ * Syntax-theme preference for the code-editor's Shiki highlight (9.7.12).
  *
  * The shared tokenizer (`@brainstorm-os/sdk/code-highlight`) bundles exactly two
  * Shiki themes — GitHub Light + GitHub Dark — loaded once at startup. This

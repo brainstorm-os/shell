@@ -91,5 +91,16 @@
   "diff.stats": "{added} added · {removed} removed",
   "diff.noChanges": "No changes since the last save.",
   "diff.baseColumn": "Saved",
-  "diff.nextColumn": "Current"
+  "diff.nextColumn": "Current",
+  "newFolder": "New folder",
+  "newFolderHint": "Create a new folder",
+  "newFileHere": "New file here",
+  "folderMenuLabel": "Folder actions for {name}",
+  "folderRename": "Rename folder…",
+  "folderRemove": "Remove folder",
+  "folderRenameTitle": "Rename {name}",
+  "folderRenameLabel": "Folder path",
+  "folderErrorLocked": "This folder holds a locked file. Unlock it first.",
+  "folderErrorCycle": "A folder cannot be moved inside itself.",
+  "languageSelect": "Language"
 }

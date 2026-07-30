@@ -19,16 +19,7 @@
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
 import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
-import {
-	type CompositeItemProps,
-	Orientation,
-	useCompositeKeyboard,
-} from "@brainstorm-os/sdk/a11y";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
-import {
-	type Icon as EntityIconValue,
-	createEntityIconElement,
-} from "@brainstorm-os/sdk/entity-icon";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
 import { LockButton } from "@brainstorm-os/sdk/lock-button";
@@ -42,6 +33,7 @@ import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -55,7 +47,19 @@ import { fileName, languageLabel } from "./logic/code-view";
 import type { EditorCommand } from "./logic/command-palette";
 import { lintCode } from "./logic/diagnostics";
 import { languageAfterRename } from "./logic/language-detect";
-import { RenameError, nextUntitledPath, validateRenamePath } from "./logic/new-file";
+import {
+	type FolderPlan,
+	type FolderPlanFile,
+	type PathMove,
+	RenameError,
+	nextFolderPath,
+	nextUntitledPath,
+	planFileMove,
+	planFolderMove,
+	planFolderRename,
+	validateRenamePath,
+} from "./logic/new-file";
+import { baseOf, dirOf, foldersOf, isUnder, rewritePathPrefix } from "./logic/path-tree";
 import { SyntaxThemePreference, parseSyntaxThemePreference } from "./logic/syntax-theme";
 import {
 	CODE_FILE_ENTITY_TYPE,
@@ -65,13 +69,16 @@ import {
 } from "./runtime";
 import { CODE_EDITOR_CHORDS, CodeEditorAction } from "./shortcuts";
 import { getYDocResolverApi } from "./store/ydoc-resolver";
-import { LanguageKey } from "./types/code-file";
+import { LANGUAGES, LanguageKey } from "./types/code-file";
 import { CodePaneHost, type CodePaneHostHandle } from "./ui/code-pane-host";
 import { type CommandPaletteController, openCommandPalette } from "./ui/command-palette";
 import { renderDiagnosticsList } from "./ui/diagnostics-list";
 import { type DiffViewController, DiffViewMode, openDiffView } from "./ui/diff-view";
+import { EntityIcon } from "./ui/entity-icon";
+import { FileTree } from "./ui/file-tree";
 import { codeFileObjectMenuContext } from "./ui/object-menu-context";
 import { type QuickOpenController, openQuickOpen } from "./ui/quick-open";
+import { openRenamePopover } from "./ui/rename-popover";
 
 const EMPTY_CITATION_INDEX: CitationIndex = new Map();
 
@@ -89,6 +96,34 @@ const WRAP_KEY = "code-editor:wrap";
 const FORMAT_ON_SAVE_KEY = "code-editor:format-on-save";
 const SYNTAX_THEME_KEY = "code-editor:syntax-theme";
 const DIFF_MODE_KEY = "code-editor:diff-mode";
+/** Collapsed folder prefixes + the UI-only folders that hold no file yet
+ *  (9.7.12). Both are device-local view state on a device-local surface, so
+ *  they ride the same `localStorage` idiom as the panel prefs above rather
+ *  than minting vault entities — a folder here IS a path prefix, and an empty
+ *  one has no path to live in until a file lands in it. */
+const COLLAPSED_FOLDERS_KEY = "code-editor:collapsed-folders";
+const PENDING_FOLDERS_KEY = "code-editor:pending-folders";
+/** Bound on the persisted path lists so a pathological vault (or a wedged
+ *  create loop) can't grow `localStorage` without limit. */
+const MAX_PERSISTED_FOLDERS = 500;
+
+function readFolderList(key: string): string[] {
+	try {
+		const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter((v): v is string => typeof v === "string").slice(0, MAX_PERSISTED_FOLDERS);
+	} catch {
+		return [];
+	}
+}
+
+function writeFolderList(key: string, paths: readonly string[]): void {
+	try {
+		localStorage.setItem(key, JSON.stringify(paths.slice(0, MAX_PERSISTED_FOLDERS)));
+	} catch {
+		/* private mode / quota — ok */
+	}
+}
 
 function readPanelPref(key: string, fallback: boolean): boolean {
 	try {
@@ -156,6 +191,30 @@ function diffModeLabelKey(mode: DiffViewMode): CodeEditorMessageKey {
 	return mode === DiffViewMode.Unified ? "diff.modeUnified" : "diff.modeSideBySide";
 }
 
+/** The header language control's options. The label is the human name from
+ *  `languageLabel`; the value IS the persisted `LanguageKey`. Built once —
+ *  the set is frozen at module scope. */
+const LANGUAGE_OPTIONS = LANGUAGES.map((language) => ({
+	value: language,
+	label: languageLabel(language),
+}));
+
+/** The inline message a refused folder operation shows in the rename
+ *  popover. Module-scope so it isn't re-minted per render (and so the mapping
+ *  lives beside the enum it switches on). */
+function folderErrorMessage(reason: RenameError): string {
+	switch (reason) {
+		case RenameError.Empty:
+			return t("renameErrorEmpty");
+		case RenameError.Locked:
+			return t("folderErrorLocked");
+		case RenameError.Cycle:
+			return t("folderErrorCycle");
+		default:
+			return t("renameErrorDuplicate");
+	}
+}
+
 const KIND_LABEL: Readonly<Record<CitationKind, () => string>> = {
 	[CitationKind.Iteration]: () => t("kindIteration"),
 	[CitationKind.OpenQuestion]: () => t("kindOpenQuestion"),
@@ -170,21 +229,6 @@ function contentOf(row: CodeFileRow, edits: ReadonlyMap<string, string>): string
 function isDirty(row: CodeFileRow, edits: ReadonlyMap<string, string>): boolean {
 	const edited = edits.get(row.id);
 	return edited !== undefined && edited !== row.content;
-}
-
-/** The object's own universal icon, rendered through the shared imperative
- *  primitive (the SDK has no React entity-icon outside `@brainstorm-os/editor`,
- *  which this app deliberately does not depend on). */
-function EntityIcon({ icon, size }: { icon: EntityIconValue | null; size: number }): ReactElement {
-	const ref = useRef<HTMLSpanElement>(null);
-	useEffect(() => {
-		const host = ref.current;
-		if (!host) return;
-		host.replaceChildren();
-		const el = createEntityIconElement(icon, { size });
-		if (el) host.appendChild(el);
-	}, [icon, size]);
-	return <span className="editor__file-icon" ref={ref} aria-hidden="true" />;
 }
 
 /** The diagnostics problem list (imperative builder) mounted via ref so the
@@ -227,6 +271,21 @@ export function CodeEditorApp(): ReactElement {
 
 	const [navOpen, setNavOpen] = useState(() => readPanelPref(NAV_OPEN_KEY, true));
 	const [refsOpen, setRefsOpen] = useState(() => readPanelOpen(REFS_OPEN_KEY, true));
+
+	// ── Folder tree view state (9.7.12) ───────────────────────────────────────
+	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+		() => new Set(readFolderList(COLLAPSED_FOLDERS_KEY)),
+	);
+	const [pendingFolders, setPendingFolders] = useState<string[]>(() =>
+		readFolderList(PENDING_FOLDERS_KEY),
+	);
+	// The folder a create lands in — published by the tree from its focused row
+	// so the header "+" and the sidebar buttons agree on the target.
+	const [focusFolder, setFocusFolder] = useState("");
+	const focusFolderRef = useRef(focusFolder);
+	focusFolderRef.current = focusFolder;
+	const pendingFoldersRef = useRef(pendingFolders);
+	pendingFoldersRef.current = pendingFolders;
 
 	// Cross-app handoff target (theme-editor → "Edit in Code Editor"). The
 	// StylePack id surfaces an adapted CSS row; `pendingOpenId` auto-selects
@@ -455,10 +514,14 @@ export function CodeEditorApp(): ReactElement {
 		}
 	}, []);
 
-	const createNewFile = useCallback(async (): Promise<void> => {
+	const createNewFile = useCallback(async (folder?: string): Promise<void> => {
 		const create = getCodeEditorRuntime()?.services?.entities?.create;
 		if (!create) return;
-		const path = nextUntitledPath(rowsRef.current.map((r) => r.path));
+		const target = folder ?? focusFolderRef.current;
+		const path = nextUntitledPath(
+			rowsRef.current.map((r) => r.path),
+			target,
+		);
 		try {
 			const created = await create(CODE_FILE_ENTITY_TYPE, {
 				path,
@@ -500,6 +563,144 @@ export function CodeEditorApp(): ReactElement {
 		}
 	}, []);
 
+	// ── Folder operations (9.7.12) ────────────────────────────────────────────
+	// A folder IS a path prefix, so every folder write is N file-path writes.
+	// The plan is computed first (collisions / locks / cycles), then applied —
+	// so one user action either lands whole or is refused whole.
+
+	/** The files as the planners see them: id + path + lock. */
+	const planFiles = useCallback(
+		(): FolderPlanFile[] =>
+			rowsRef.current
+				.filter((row) => isCodeFileEditable(row) || row.locked)
+				.map((row) => ({ id: row.id, path: row.path, locked: row.locked })),
+		[],
+	);
+
+	const applyMoves = useCallback(async (moves: readonly PathMove[]): Promise<void> => {
+		const update = getCodeEditorRuntime()?.services?.entities?.update;
+		if (!update || moves.length === 0) return;
+		const landed: PathMove[] = [];
+		for (const move of moves) {
+			try {
+				await update(move.id, { path: move.to });
+				landed.push(move);
+			} catch (err) {
+				console.warn("[code-editor] move failed:", err);
+			}
+		}
+		if (landed.length === 0) return;
+		const byId = new Map(landed.map((move) => [move.id, move.to]));
+		setRows((prev) =>
+			prev.map((r) => (byId.has(r.id) ? { ...r, path: byId.get(r.id) ?? r.path } : r)),
+		);
+	}, []);
+
+	/** Carry the pending (file-less) folders through a prefix rewrite, and drop
+	 *  the ones a file now occupies — a folder that exists in the paths needs no
+	 *  UI-only stand-in. */
+	const reconcilePendingFolders = useCallback((from: string | null, to: string | null): void => {
+		setPendingFolders((prev) => {
+			const rewritten = prev.map((folder) => {
+				if (from === null || to === null) return folder;
+				if (folder.toLowerCase() === from.toLowerCase()) return to;
+				return rewritePathPrefix(folder, from, to);
+			});
+			return [...new Set(rewritten)].slice(0, MAX_PERSISTED_FOLDERS);
+		});
+	}, []);
+
+	const runFolderPlan = useCallback(
+		async (plan: FolderPlan, from: string): Promise<void> => {
+			if (!plan.ok) return;
+			reconcilePendingFolders(from, plan.path);
+			setCollapsed((prev) => {
+				const next = new Set<string>();
+				for (const folder of prev) {
+					next.add(
+						folder.toLowerCase() === from.toLowerCase()
+							? plan.path
+							: rewritePathPrefix(folder, from, plan.path),
+					);
+				}
+				return next;
+			});
+			await applyMoves(plan.moves);
+		},
+		[applyMoves, reconcilePendingFolders],
+	);
+
+	const createFolder = useCallback((parent: string): void => {
+		const existing = foldersOf(rowsRef.current.map((r) => r.path));
+		setPendingFolders((prev) => {
+			const path = nextFolderPath([...existing, ...prev], parent);
+			pendingFolderRenameRef.current = path;
+			return [...prev, path].slice(0, MAX_PERSISTED_FOLDERS);
+		});
+	}, []);
+
+	const removeFolder = useCallback((path: string): void => {
+		// Only ever reachable for a folder with no file beneath it (the tree
+		// gates the affordance), so this is pure local view state — no writes.
+		setPendingFolders((prev) => prev.filter((folder) => folder !== path && !isUnder(folder, path)));
+	}, []);
+
+	const toggleFolder = useCallback((path: string): void => {
+		setCollapsed((prev) => {
+			const next = new Set(prev);
+			if (!next.delete(path)) next.add(path);
+			return next;
+		});
+	}, []);
+
+	const pendingFolderRenameRef = useRef<string | null>(null);
+	const renameFolderRef = useRef<((path: string) => void) | null>(null);
+
+	const renameFolder = useCallback(
+		(path: string): void => {
+			if (!getCodeEditorRuntime()?.services?.entities?.update) return;
+			openRenamePopover({
+				title: t("folderRenameTitle", { name: baseOf(path) }),
+				value: path,
+				inputLabel: t("folderRenameLabel"),
+				cancelLabel: t("renameCancel"),
+				saveLabel: t("renameSave"),
+				testId: "code-folder-rename",
+				submit: (typed) => {
+					const plan = planFolderRename(typed, path, planFiles(), pendingFoldersRef.current);
+					if (!plan.ok) return folderErrorMessage(plan.reason);
+					void runFolderPlan(plan, path);
+					return null;
+				},
+			});
+		},
+		[planFiles, runFolderPlan],
+	);
+	renameFolderRef.current = renameFolder;
+
+	const moveFiles = useCallback(
+		(entityIds: readonly string[], folder: string): void => {
+			const moves: PathMove[] = [];
+			const files = planFiles();
+			for (const id of entityIds) {
+				const file = files.find((f) => f.id === id);
+				if (!file) continue;
+				const plan = planFileMove(file, folder, files);
+				if (plan?.ok) moves.push(...plan.moves);
+			}
+			void applyMoves(moves);
+		},
+		[planFiles, applyMoves],
+	);
+
+	const moveFolder = useCallback(
+		(path: string, dest: string): void => {
+			const plan = planFolderMove(path, dest, planFiles(), pendingFoldersRef.current);
+			if (plan.ok) void runFolderPlan(plan, path);
+		},
+		[planFiles, runFolderPlan],
+	);
+
 	const toggleFileLock = useCallback((): void => {
 		const row = selectedRow;
 		if (!row) return;
@@ -508,6 +709,28 @@ export function CodeEditorApp(): ReactElement {
 		void update(row.id, { locked: !row.locked });
 	}, [selectedRow]);
 
+	/** Override the detected language from the header select. Persisted, because
+	 *  the stored property is what every reader (Preview, the agent's code
+	 *  preview, the projector) trusts. Refused on a locked / adapted row — the
+	 *  control is disabled there too, this is the write-path half of the gate. */
+	const setFileLanguage = useCallback(
+		(language: LanguageKey): void => {
+			const row = selectedRow;
+			if (!row || !isCodeFileEditable(row) || language === row.language) return;
+			const update = getCodeEditorRuntime()?.services?.entities?.update;
+			if (!update) return;
+			void (async () => {
+				try {
+					await update(row.id, { language });
+					setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, language } : r)));
+				} catch (err) {
+					console.warn("[code-editor] language change failed:", err);
+				}
+			})();
+		},
+		[selectedRow],
+	);
+
 	const pendingRenameIdRef = useRef<string | null>(null);
 	const renameFileRef = useRef<((row: CodeFileRow) => void) | null>(null);
 
@@ -515,71 +738,30 @@ export function CodeEditorApp(): ReactElement {
 		(row: CodeFileRow): void => {
 			if (row.locked) return;
 			if (!getCodeEditorRuntime()?.services?.entities?.update) return;
-
-			const field = document.createElement("form");
-			field.className = "editor__rename-field";
-			const input = document.createElement("input");
-			input.type = "text";
-			input.className = "editor__rename-input";
-			input.value = row.path;
-			input.setAttribute("aria-label", t("renameLabel"));
-			const error = document.createElement("div");
-			error.className = "editor__rename-error";
-			error.id = "code-rename-error";
-			error.setAttribute("role", "alert");
-			error.hidden = true;
-			input.setAttribute("aria-describedby", error.id);
-			field.append(input, error);
-
-			const actions = document.createElement("div");
-			actions.className = "editor__rename-actions";
-			const cancelBtn = document.createElement("button");
-			cancelBtn.type = "button";
-			cancelBtn.className = "bs-btn bs-btn--ghost";
-			cancelBtn.textContent = t("renameCancel");
-			const saveBtn = document.createElement("button");
-			saveBtn.type = "button";
-			saveBtn.className = "bs-btn";
-			saveBtn.dataset.bsPrimary = "";
-			saveBtn.textContent = t("renameSave");
-			actions.append(cancelBtn, saveBtn);
-
-			const handle = createPopoverElement({
-				title: t("renameTitle", { name: fileName(row.path) }),
-				body: field,
-				footer: actions,
-				size: PopoverSize.Small,
-				testId: "code-rename",
-				onClose: () => handle.close(),
-			});
-
-			const submit = (): void => {
-				const result = validateRenamePath(
-					input.value,
-					row.path,
-					rowsRef.current.map((r) => r.path),
-				);
-				if (!result.ok) {
-					error.textContent =
-						result.reason === RenameError.Empty ? t("renameErrorEmpty") : t("renameErrorDuplicate");
-					error.hidden = false;
-					input.setAttribute("aria-invalid", "true");
-					input.focus();
-					input.select();
-					return;
-				}
-				handle.close();
-				void applyRename(row, result.path);
-			};
-			cancelBtn.addEventListener("click", () => handle.close());
-			saveBtn.addEventListener("click", submit);
-			field.addEventListener("submit", (event) => {
-				event.preventDefault();
-				submit();
-			});
-			input.focus();
 			const dot = row.path.lastIndexOf(".");
-			input.setSelectionRange(0, dot > 0 ? dot : row.path.length);
+			openRenamePopover({
+				title: t("renameTitle", { name: fileName(row.path) }),
+				value: row.path,
+				inputLabel: t("renameLabel"),
+				cancelLabel: t("renameCancel"),
+				saveLabel: t("renameSave"),
+				testId: "code-rename",
+				selectTo: dot > 0 ? dot : row.path.length,
+				submit: (typed) => {
+					const result = validateRenamePath(
+						typed,
+						row.path,
+						rowsRef.current.map((r) => r.path),
+					);
+					if (!result.ok) {
+						return result.reason === RenameError.Empty
+							? t("renameErrorEmpty")
+							: t("renameErrorDuplicate");
+					}
+					void applyRename(row, result.path);
+					return null;
+				},
+			});
 		},
 		[applyRename],
 	);
@@ -846,9 +1028,31 @@ export function CodeEditorApp(): ReactElement {
 		[],
 	);
 
-	// ── Persist panel prefs ──────────────────────────────────────────────────
+	// ── Persist panel prefs + folder view state ──────────────────────────────
 	useEffect(() => writePanelPref(NAV_OPEN_KEY, navOpen), [navOpen]);
 	useEffect(() => writePanelOpen(REFS_OPEN_KEY, refsOpen), [refsOpen]);
+	useEffect(() => writeFolderList(COLLAPSED_FOLDERS_KEY, [...collapsed]), [collapsed]);
+	useEffect(() => writeFolderList(PENDING_FOLDERS_KEY, pendingFolders), [pendingFolders]);
+
+	// A pending folder is a stand-in for a folder no path implies yet; once a
+	// file lands in it the prefix is real and the stand-in retires. Keeping
+	// both would leave a duplicate claim on the same row.
+	useEffect(() => {
+		const real = new Set(foldersOf(rows.map((r) => r.path)).map((f) => f.toLowerCase()));
+		setPendingFolders((prev) => {
+			const next = prev.filter((folder) => !real.has(folder.toLowerCase()));
+			return next.length === prev.length ? prev : next;
+		});
+	}, [rows]);
+
+	// A freshly created folder invites a name — arm the rename the moment its
+	// row exists, mirroring what a new FILE does (F-451).
+	useEffect(() => {
+		const target = pendingFolderRenameRef.current;
+		if (target === null || !pendingFolders.includes(target)) return;
+		pendingFolderRenameRef.current = null;
+		requestAnimationFrame(() => renameFolderRef.current?.(target));
+	}, [pendingFolders]);
 
 	// ── Window-level chords routed through the shared shortcut registry. ─────
 	useEffect(() => {
@@ -881,7 +1085,11 @@ export function CodeEditorApp(): ReactElement {
 
 	const selectedContent = selectedRow ? contentOf(selectedRow, edits) : "";
 	const totalFiles = rows.length;
-	const dirtyCount = useMemo(() => rows.filter((r) => isDirty(r, edits)).length, [rows, edits]);
+	const dirtyIds = useMemo(
+		() => new Set(rows.filter((r) => isDirty(r, edits)).map((r) => r.id)),
+		[rows, edits],
+	);
+	const dirtyCount = dirtyIds.size;
 
 	const metaText =
 		totalFiles === 0
@@ -932,17 +1140,25 @@ export function CodeEditorApp(): ReactElement {
 						{metaText}
 					</div>
 					{selectedRow ? (
-						<span className="editor__lang">{languageLabel(selectedRow.language)}</span>
+						<SelectMenu
+							className="bs-select--sm editor__lang"
+							value={selectedRow.language}
+							options={LANGUAGE_OPTIONS}
+							onChange={setFileLanguage}
+							ariaLabel={t("languageSelect")}
+							disabled={!isCodeFileEditable(selectedRow)}
+							data-testid="code-language"
+						/>
 					) : null}
 					{canCreateFile ? (
 						<button
 							type="button"
-							className="editor__header-new"
+							className="bs-btn bs-btn--sm bs-btn--icon editor__header-new"
 							data-bs-tooltip={t("newFileHint")}
 							aria-label={t("newFileHint")}
 							onClick={() => void createNewFile()}
 						>
-							<Icon name={IconName.Plus} size={16} />
+							<Icon name={IconName.Plus} size={15} />
 						</button>
 					) : null}
 					<PanelToggleButton
@@ -1005,13 +1221,22 @@ export function CodeEditorApp(): ReactElement {
 					/>
 				) : (
 					<>
-						<FileList
+						<FileTree
 							rows={rows}
 							selectedId={selectedId}
-							edits={edits}
+							dirtyIds={dirtyIds}
+							collapsed={collapsed}
+							pendingFolders={pendingFolders}
 							canCreate={canCreateFile}
+							onToggleFolder={toggleFolder}
+							onFocusFolderChange={setFocusFolder}
 							onOpen={openRow}
-							onCreate={createNewFile}
+							onCreateFile={createNewFile}
+							onCreateFolder={createFolder}
+							onRenameFolder={renameFolder}
+							onRemoveFolder={removeFolder}
+							onMoveFiles={moveFiles}
+							onMoveFolder={moveFolder}
 							menuContext={fileMenuContext}
 						/>
 						{selectedRow ? (
@@ -1073,134 +1298,6 @@ export function CodeEditorApp(): ReactElement {
 				)}
 			</main>
 		</>
-	);
-}
-
-// ── File sidebar ────────────────────────────────────────────────────────────
-
-function FileList({
-	rows,
-	selectedId,
-	edits,
-	canCreate,
-	onOpen,
-	onCreate,
-	menuContext,
-}: {
-	rows: CodeFileRow[];
-	selectedId: string | null;
-	edits: ReadonlyMap<string, string>;
-	canCreate: boolean;
-	onOpen: (row: CodeFileRow, mode: NavigationMode) => void;
-	onCreate: () => void | Promise<void>;
-	menuContext: (row: CodeFileRow) => ReturnType<typeof codeFileObjectMenuContext>;
-}): ReactElement {
-	// Listbox keyboard model via the shared a11y reducer (no raw `e.key`) —
-	// same posture as the Preview file sidebar. Selection follows the active
-	// item (select === open), so ArrowUp/Down rove + load and Enter/Space opens.
-	const activeIndex = useMemo(() => rows.findIndex((r) => r.id === selectedId), [rows, selectedId]);
-	const openAt = useCallback(
-		(index: number): void => {
-			const target = rows[index];
-			if (target) onOpen(target, NavigationMode.Replace);
-		},
-		[rows, onOpen],
-	);
-	const { containerProps, getItemProps } = useCompositeKeyboard({
-		orientation: Orientation.Vertical,
-		count: rows.length,
-		activeIndex,
-		onActiveIndexChange: openAt,
-		onActivate: openAt,
-		useAriaActiveDescendant: true,
-	});
-
-	return (
-		<nav className="editor__files" aria-label={t("filesRegion")}>
-			<div className="editor__files-head">
-				<span className="editor__files-heading">{t("filesHeading")}</span>
-				{canCreate ? (
-					<button
-						type="button"
-						className="editor__file-new"
-						title={t("newFileHint")}
-						onClick={() => void onCreate()}
-					>
-						{t("newFile")}
-					</button>
-				) : null}
-			</div>
-			<div {...containerProps} className="editor__file-list" aria-label={t("filesRegion")}>
-				{rows.map((row, index) => (
-					<FileRow
-						key={row.id}
-						row={row}
-						current={row.id === selectedId}
-						dirty={isDirty(row, edits)}
-						itemProps={getItemProps(index)}
-						onOpen={onOpen}
-						menuContext={menuContext}
-					/>
-				))}
-			</div>
-		</nav>
-	);
-}
-
-/** A single file-list row. Mirrors the imperative `attachObjectMenuTrigger`
- *  row: the `.editor__file` element is itself the object-menu host (carrying
- *  `aria-current` for the selected-row style + the row keyboard semantics),
- *  with a right-click opener and the trailing ⋯ `ObjectMenuMoreButton`. */
-function FileRow({
-	row,
-	current,
-	dirty,
-	itemProps,
-	onOpen,
-	menuContext,
-}: {
-	row: CodeFileRow;
-	current: boolean;
-	dirty: boolean;
-	itemProps: CompositeItemProps;
-	onOpen: (row: CodeFileRow, mode: NavigationMode) => void;
-	menuContext: (row: CodeFileRow) => ReturnType<typeof codeFileObjectMenuContext>;
-}): ReactElement {
-	const moreActionsLabel = t("menuMoreActions", { name: fileName(row.path) });
-	const context = useCallback(() => menuContext(row), [menuContext, row]);
-	const onContextMenu = useCallback(
-		(event: React.MouseEvent) => {
-			const ctx = context();
-			if (!ctx) return;
-			event.preventDefault();
-			void openObjectMenu({ x: event.clientX, y: event.clientY }, ctx);
-		},
-		[context],
-	);
-	return (
-		<div
-			{...itemProps}
-			className="editor__file bs-object-menu__host bs-object-menu__host--row"
-			aria-current={current ? "true" : "false"}
-			data-file-id={row.id}
-			onContextMenu={onContextMenu}
-		>
-			<button
-				type="button"
-				className="editor__file-open"
-				title={row.path}
-				tabIndex={-1}
-				onClick={(event) => onOpen(row, navModeFromEvent(event.nativeEvent))}
-				onAuxClick={(event) => {
-					if (event.button === 1) onOpen(row, navModeFromEvent(event.nativeEvent));
-				}}
-			>
-				<EntityIcon icon={row.icon} size={15} />
-				<span className="editor__file-name">{fileName(row.path)}</span>
-				{dirty ? <span className="editor__file-dirty" aria-label={t("fileUnsaved")} /> : null}
-			</button>
-			<ObjectMenuMoreButton context={context} moreActionsLabel={moreActionsLabel} />
-		</div>
 	);
 }
 
