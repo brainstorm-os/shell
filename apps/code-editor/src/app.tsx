@@ -46,7 +46,7 @@ import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortc
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildCodeDemo, buildDemoCitationIndex } from "./demo/dataset";
-import { type CodeEditorMessageKey, t } from "./i18n";
+import { type CodeEditorMessageKey, plural as appPlural, t } from "./i18n";
 import { useCodeEditorPlural, useCodeEditorT } from "./i18n-hooks";
 import { type CitationIndex, CitationKind, buildCitationIndex } from "./logic/citation-index";
 import { type CitationReference, collectReferences } from "./logic/citation-scan";
@@ -79,6 +79,16 @@ const EMPTY_CITATION_INDEX: CitationIndex = new Map();
  *  string` translator; the app's `t` has a narrower literal-key domain. */
 const translateMsg = (key: string, params?: Record<string, string>): string =>
 	t(key as CodeEditorMessageKey, params);
+
+/** Same widening for the catalog-bound `plural` helper, so the diagnostics
+ *  builder can pluralise without knowing the app's key union. */
+const pluralMsg = (
+	count: number,
+	oneKey: string,
+	otherKey: string,
+	params?: Record<string, string>,
+): string =>
+	appPlural(count, oneKey as CodeEditorMessageKey, otherKey as CodeEditorMessageKey, params);
 
 // ── Panel + editor preferences (device-local; same localStorage path as
 // every other first-party app). The right-hand refs panel is the exception:
@@ -206,6 +216,7 @@ function DiagnosticsList({
 			renderDiagnosticsList({
 				diagnostics: lintCode(content, language),
 				t: translateMsg,
+				plural: pluralMsg,
 				onReveal,
 			}),
 		);

@@ -14,6 +14,11 @@
  *   - Backdrop = `var(--color-dimmer)` so dashboard content shows through.
  *   - Panel is a glass surface — applies `.glass` from styles.css (default
  *     density) so wallpaper / background read through with a tinted blur.
+ *   - A popover opened from INSIDE another popover (a confirm fired from a
+ *     picker dialog) is *stacked*: it drops the glass for an opaque panel,
+ *     blurs its own backdrop, lifts its z-index, and renders the popover
+ *     beneath it `inert`. See `./popover-stack` for why. A lone popover is
+ *     untouched — glass stays glass.
  *   - Focus / Escape / Tab-wrap routes through `useFocusTrap` (KBN-1b on top
  *     of KBN-2's shared escape stack). The opener is captured via a
  *     `useState` lazy initializer at the FIRST render, before any effect, so
@@ -27,11 +32,18 @@
 
 import { InitialFocusMode, useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { motion } from "framer-motion";
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../i18n/t";
 import { IconName } from "./icon";
 import { IconButton } from "./icon-button";
+import {
+	MAX_STACKED_POPOVER_LIFT,
+	getPopoverStackIds,
+	registerPopover,
+	stackDepthOf,
+	subscribePopoverStack,
+} from "./popover-stack";
 import { PopoverBodyPadding, type PopoverProps, PopoverSize } from "./popover-types";
 import "./popover.css";
 
@@ -49,6 +61,27 @@ export function Popover({
 	testId,
 }: PopoverProps) {
 	const titleId = useId();
+	const stackId = useId();
+	const rootRef = useRef<HTMLDivElement | null>(null);
+	// Depth is read from the same module state the mount effect below pushes
+	// onto: before registration it resolves to the depth this popover is about
+	// to land on, so the stacked styling is right on the FIRST paint (no
+	// un-stacked flash), and it un-stacks again if the dialog underneath
+	// closes first. See ./popover-stack.
+	const stackIds = useSyncExternalStore(
+		subscribePopoverStack,
+		getPopoverStackIds,
+		getPopoverStackIds,
+	);
+	const depth = stackDepthOf(stackIds, stackId);
+	const stacked = depth > 0;
+
+	useLayoutEffect(() => {
+		const element = rootRef.current;
+		if (element === null) return;
+		return registerPopover(stackId, element);
+	}, [stackId]);
+
 	// Capture the opener at first render — lazy init runs ONCE, synchronously,
 	// before useFocusTrap's effect moves focus into the panel. Without an
 	// explicit `restoreFocusTo` the hook's default capture would still work,
@@ -71,6 +104,11 @@ export function Popover({
 	const sizeClass = `popover__panel--${size}`;
 	const fitClass = fitContent ? " popover__panel--fit" : "";
 	const bodyClass = `popover__body popover__body--${bodyPadding}`;
+	// A stacked panel swaps `.glass` for an opaque surface: glass samples the
+	// dialog beneath it, and two dialogs' worth of body text composited into one
+	// layer is unreadable. Lone popovers keep the glass look untouched.
+	const surfaceClass = stacked ? "popover__panel--solid" : "glass";
+	const lift = Math.min(depth, MAX_STACKED_POPOVER_LIFT);
 
 	const node = (
 		// Animation strategy, pragmatic to Chromium's behaviour:
@@ -86,8 +124,11 @@ export function Popover({
 		// - Panel exit *does* animate — the GPU compositor layer is already
 		//   warm from the open, so the blur fades cleanly with the panel.
 		<div
-			className="popover"
+			ref={rootRef}
+			className={`popover${stacked ? " popover--stacked" : ""}`}
 			data-bs-region="popover"
+			data-popover-depth={depth}
+			{...(lift > 0 ? { style: { zIndex: `calc(var(--z-popover) + ${lift})` } } : {})}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={titleId}
@@ -99,14 +140,19 @@ export function Popover({
 				onClick={onClose}
 				aria-label={t("shell.actions.close")}
 				tabIndex={-1}
-				initial={{ opacity: 0 }}
+				// Stacked backdrops carry a `backdrop-filter` so the dialog beneath
+				// reads as a soft wash rather than competing text. Chromium defers
+				// the blur while a freshly-mounted blurred surface animates opacity
+				// (the same glitch the panel dodges below), so a stacked backdrop
+				// mounts straight at its target state; exit still animates.
+				initial={stacked ? false : { opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
 				transition={{ type: "spring", stiffness: 700, damping: 50, mass: 0.5 }}
 			/>
 			<motion.div
 				{...containerProps}
-				className={`popover__panel glass ${sizeClass}${fitClass}`}
+				className={`popover__panel ${surfaceClass} ${sizeClass}${fitClass}`}
 				data-bs-region="popover-panel"
 				data-testid={testId}
 				initial={false}

@@ -32,6 +32,25 @@
 	overflow: hidden;
 }
 
+/* ── Stacked popovers ──────────────────────────────────────────────────────
+ * A dialog opened from inside another dialog (the marketplace "Install from
+ * vault" picker firing a consent confirm) cannot stay glass: `backdrop-filter`
+ * samples the dialog beneath, so both panels' body text and both footers'
+ * buttons composite into one unreadable layer. The stacked case therefore
+ * (a) drops the glass for an opaque surface so nothing reads through the panel
+ * and (b) blurs its own scrim so the dialog below is unmistakably background.
+ * A lone popover never matches these rules — the single-dialog glass look is
+ * unchanged. z-index lift comes from the component (inline `calc()` on
+ * `--z-popover`) because it is per-instance depth, not a fixed layer. */
+.popover--stacked .popover__backdrop {
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.popover__panel--solid {
+	background: var(--color-background-elevated);
+}
+
 .popover__panel--small {
 	width: 320px;
 	min-height: 220px;
