@@ -789,7 +789,16 @@ body {
 	flex-shrink: 0;
 }
 
-/* Agent-11b — the propose-confirm tray above the composer. */
+/* Agent-11b — the propose-confirm tray above the composer.
+ *
+ * The tray is a flex item in the column that also holds the transcript and the
+ * composer, and a flex item's default `min-height: auto` refuses to shrink
+ * below its content. Two code-file proposals (each a 240px-capped preview plus
+ * head and actions) therefore pushed the SECOND card's Approve/Discard row —
+ * and the composer under it — clean off the bottom of the window, with nothing
+ * scrollable to reach them. Capping the tray and letting it scroll internally
+ * keeps the composer parked where it belongs however many artifacts are
+ * staged. */
 .agent-proposal-tray {
 	display: flex;
 	flex-direction: column;
@@ -799,6 +808,10 @@ body {
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 	background: var(--bg-elev);
+	min-height: 0;
+	max-height: 52vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
 }
 
 .agent-proposal-tray__head {
