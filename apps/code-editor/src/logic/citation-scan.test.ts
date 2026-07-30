@@ -89,3 +89,24 @@ describe("lineAtOffset", () => {
 		expect(lineAtOffset("", 999)).toBe(1);
 	});
 });
+
+describe("compiled-pattern cache", () => {
+	it("repeated scans of the same index agree with a scan through a fresh index", () => {
+		const codes: Array<[string]> = [["SH-14"], ["9.14.1.5"], ["OQ-GR-1"]];
+		const cached = index(codes);
+		const text = "SH-14 then 9.14.1.5 then OQ-GR-1 then SH-14";
+		const first = scanCitations(text, cached).map((s) => [s.start, s.code]);
+		// A second (and third) pass reuses the compiled alternation — the shared
+		// regexp's `lastIndex` must not have advanced past the first match.
+		expect(scanCitations(text, cached).map((s) => [s.start, s.code])).toEqual(first);
+		expect(scanCitations(text, cached).map((s) => [s.start, s.code])).toEqual(first);
+		expect(scanCitations(text, index(codes)).map((s) => [s.start, s.code])).toEqual(first);
+	});
+
+	it("a rebuilt index compiles its own pattern", () => {
+		const before = index([["SH-14"]]);
+		const after = index([["SH-14"], ["9.7.2"]]);
+		expect(scanCitations("SH-14 and 9.7.2", before).map((s) => s.code)).toEqual(["SH-14"]);
+		expect(scanCitations("SH-14 and 9.7.2", after).map((s) => s.code)).toEqual(["SH-14", "9.7.2"]);
+	});
+});
