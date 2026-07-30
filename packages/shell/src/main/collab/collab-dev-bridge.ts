@@ -45,7 +45,7 @@ export type { CollabAccessView, CollabIdentity, CollabRelayLike } from "./sharin
 /** Yjs text type the dogfood co-edit writes into. The real editor uses its own
  *  Lexical-bound types; this is a plain scratch surface for the harness so a
  *  collab session can prove convergence without booting the full editor. */
-const COLLAB_TEXT_KEY = "collab-text";
+export const COLLAB_TEXT_KEY = "collab-text";
 
 /** App id the asset-bind verb writes entities as. The bridge grants it
  *  `entities.read/write:*` in the vault ledger at bind time so the REAL
