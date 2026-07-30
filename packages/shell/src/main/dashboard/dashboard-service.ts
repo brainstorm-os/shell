@@ -25,10 +25,10 @@
 
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import { UNPLACED_ICON_POSITION } from "../../shared/dashboard-icon-grid";
 import { deriveEntityTitle } from "../entities/derive-title";
 import type { EntitiesRepository } from "../storage/entities-repo";
 import type { DashboardStore } from "./dashboard-store";
-import { firstFreeCell, occupiedCells } from "./grid-placement";
 
 export type DashboardServiceOptions = {
 	/** Active vault's dashboard store, or null when no session is open
@@ -88,10 +88,11 @@ export function makeDashboardServiceHandler(options: DashboardServiceOptions): S
 				} catch {
 					label = "";
 				}
-				const cell = firstFreeCell(occupiedCells(store.snapshot().icons));
+				// No position: the renderer places it against its real viewport
+				// (POLISH-LAY-9) — main has no idea how wide the icon surface is,
+				// and guessing produced slots off the right edge.
 				store.upsertIcon(id, {
-					x: cell.col,
-					y: cell.row,
+					...UNPLACED_ICON_POSITION,
 					kind: "entity",
 					target: entityId,
 					label,

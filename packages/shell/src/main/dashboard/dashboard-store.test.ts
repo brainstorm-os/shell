@@ -13,12 +13,18 @@ import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import { ThemeName } from "@brainstorm-os/tokens";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	GRID_OUTER_MARGIN,
+	GRID_UNIT,
+	ICON_BUTTON_W,
 	ICON_FOOTPRINT_H,
-	ICON_FOOTPRINT_W,
-	footprintsOverlap,
+	IconPlacementReason,
+	UNPLACED_ICON_POSITION,
+	isUnplacedIcon,
+	resolveIconPlacements,
 } from "../../shared/dashboard-icon-grid";
 import { placeDashboardIcon } from "../dev/seed-demo-apps";
 import { YDocStore } from "../storage/ydoc-store";
+import { makeDashboardServiceHandler } from "./dashboard-service";
 import { DASHBOARD_DOC_ID, DashboardStore, applyLegacyMigration } from "./dashboard-store";
 
 describe("DashboardStore", () => {
@@ -670,11 +676,12 @@ describe("DashboardStore — shell prefs (locale / regional / chrome / notificat
 		await store.close();
 	});
 
-	// POLISH-LAY-6 — the install path, end to end over the real store. Main
-	// used to place onto a fictional 12-column grid of 1×1 cells while the
-	// renderer stores 8px units and paints an ICON_FOOTPRINT_W × _H box per
-	// icon, so a newly installed app landed ON TOP of Notes.
-	it("places an installed app's icon clear of every existing icon's footprint", async () => {
+	// POLISH-LAY-9 — the install path, end to end over the real store. Main
+	// does NOT choose the cell any more: the slot has to wrap at a column bound
+	// derived from the icon surface's width, and main can't see that width. Its
+	// unbounded scan is what marched the 20th install out to `220,0` (1760px on
+	// a 1440px stage), where nothing can scroll to it.
+	it("installs an app icon with no position — the renderer places it", async () => {
 		const store = await DashboardStore.open(yStore);
 		// The seeded fleet as captured on the real dashboard.
 		const seeded = [
@@ -697,57 +704,58 @@ describe("DashboardStore — shell prefs (locale / regional / chrome / notificat
 		const placed = store.snapshot().icons["icon_studio.northbound.client-pulse_demo"];
 		expect(placed).toBeDefined();
 		if (!placed) throw new Error("unreachable");
+		expect(isUnplacedIcon(placed)).toBe(true);
+		expect({ x: placed.x, y: placed.y }).toEqual(UNPLACED_ICON_POSITION);
+		// Never a `0,0` seed — that would read as a deliberate top-left placement
+		// and paint on top of Notes.
+		expect(placed.x).not.toBe(0);
+		// The existing fleet is untouched.
 		for (const app of seeded) {
-			expect(footprintsOverlap({ col: placed.x, row: placed.y }, { col: app.x, row: app.y })).toBe(
-				false,
-			);
-		}
-
-		// A second install stacks on neither the fleet nor the first newcomer.
-		expect(placeDashboardIcon(store, "io.brainstorm.hello", "Hello")).toBe(true);
-		const second = store.snapshot().icons["icon_io.brainstorm.hello_demo"];
-		if (!second) throw new Error("unreachable");
-		for (const other of [...seeded.map((a) => ({ x: a.x, y: a.y })), placed]) {
-			expect(footprintsOverlap({ col: second.x, row: second.y }, { col: other.x, row: other.y })).toBe(
-				false,
-			);
+			const icon = store.snapshot().icons[`icon_${app.id}_demo`];
+			expect(icon && { x: icon.x, y: icon.y }).toEqual({ x: app.x, y: app.y });
 		}
 		await store.close();
 	});
 
-	it("wraps an install onto the next footprint row once the first row is full", async () => {
+	it("resolves a seeded fleet of unplaced icons into a wrapped, on-screen grid", async () => {
 		const store = await DashboardStore.open(yStore);
-		// Fill the first footprint row wall to wall for a 1440px-wide surface
-		// (≈ 16 slots at ICON_FOOTPRINT_W); the placer keeps stepping across
-		// (the grid is unbounded) but never overlaps.
-		for (let i = 0; i < 16; i++) {
-			store.upsertIcon(`icon_seed${i}_demo`, {
-				x: i * ICON_FOOTPRINT_W,
-				y: 0,
-				kind: "app",
-				target: `seed${i}`,
-				label: `Seed ${i}`,
-			});
+		// The 20-app seed, exactly as the capture had it — every one unplaced now.
+		for (let i = 0; i < 20; i++) {
+			expect(placeDashboardIcon(store, `io.brainstorm.app${i}`, `App ${i}`)).toBe(true);
 		}
-		// One icon parked on the second footprint row's origin: the newcomer
-		// must clear that too.
-		store.upsertIcon("icon_seedRow2_demo", {
-			x: 0,
-			y: ICON_FOOTPRINT_H,
-			kind: "app",
-			target: "seedRow2",
-			label: "Row 2",
-		});
+		const icons = store.snapshot().icons;
+		expect(Object.values(icons).every(isUnplacedIcon)).toBe(true);
 
-		expect(placeDashboardIcon(store, "io.brainstorm.newcomer", "Newcomer")).toBe(true);
-		const placed = store.snapshot().icons["icon_io.brainstorm.newcomer_demo"];
-		if (!placed) throw new Error("unreachable");
-		for (const icon of Object.values(store.snapshot().icons)) {
-			if (icon.target === "io.brainstorm.newcomer") continue;
-			expect(footprintsOverlap({ col: placed.x, row: placed.y }, { col: icon.x, row: icon.y })).toBe(
-				false,
-			);
+		// What the renderer does with them on a 1440px stage: 16 across, wrap.
+		const changes = resolveIconPlacements(icons, 1440);
+		expect(changes).toHaveLength(20);
+		for (const change of changes) {
+			expect(change.reason).toBe(IconPlacementReason.Unplaced);
+			expect(GRID_OUTER_MARGIN + change.col * GRID_UNIT + ICON_BUTTON_W).toBeLessThanOrEqual(1440);
 		}
+		expect(changes[16]).toMatchObject({ col: 0, row: ICON_FOOTPRINT_H });
+		await store.close();
+	});
+
+	it("pins an entity icon with no position too (dashboard.pin)", async () => {
+		const store = await DashboardStore.open(yStore);
+		const handler = makeDashboardServiceHandler({
+			getStore: async () => store,
+			getEntitiesRepo: async () => null,
+		});
+		const pinned = await handler({
+			v: 1,
+			msg: "m1",
+			app: "io.brainstorm.notes",
+			service: "dashboard",
+			method: "pin",
+			args: [{ entityId: "ent_1" }],
+			caps: [],
+		} as unknown as Parameters<typeof handler>[0]);
+		expect(pinned).toBe(true);
+		const icon = Object.values(store.snapshot().icons)[0];
+		if (!icon) throw new Error("unreachable");
+		expect(isUnplacedIcon(icon)).toBe(true);
 		await store.close();
 	});
 
