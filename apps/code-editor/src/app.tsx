@@ -60,6 +60,7 @@ import {
 	validateRenamePath,
 } from "./logic/new-file";
 import { baseOf, dirOf, foldersOf, isUnder, rewritePathPrefix } from "./logic/path-tree";
+import { EDIT_SETTLE_MS } from "./logic/settle";
 import { SyntaxThemePreference, parseSyntaxThemePreference } from "./logic/syntax-theme";
 import {
 	CODE_FILE_ENTITY_TYPE,
@@ -72,13 +73,14 @@ import { getYDocResolverApi } from "./store/ydoc-resolver";
 import { LANGUAGES, LanguageKey } from "./types/code-file";
 import { CodePaneHost, type CodePaneHostHandle } from "./ui/code-pane-host";
 import { type CommandPaletteController, openCommandPalette } from "./ui/command-palette";
-import { renderDiagnosticsList } from "./ui/diagnostics-list";
+import { type DiagnosticsListHandle, createDiagnosticsList } from "./ui/diagnostics-list";
 import { type DiffViewController, DiffViewMode, openDiffView } from "./ui/diff-view";
 import { EntityIcon } from "./ui/entity-icon";
 import { FileTree } from "./ui/file-tree";
 import { codeFileObjectMenuContext } from "./ui/object-menu-context";
 import { type QuickOpenController, openQuickOpen } from "./ui/quick-open";
 import { openRenamePopover } from "./ui/rename-popover";
+import { useSettledValue } from "./use-settled-value";
 
 const EMPTY_CITATION_INDEX: CitationIndex = new Map();
 
@@ -242,7 +244,11 @@ function isDirty(row: CodeFileRow, edits: ReadonlyMap<string, string>): boolean 
 }
 
 /** The diagnostics problem list (imperative builder) mounted via ref so the
- *  pure DOM module is reused unchanged inside the React inspector. */
+ *  pure DOM module is reused unchanged inside the React inspector. The handle
+ *  is created once and reconciles in place — mounting a freshly built subtree
+ *  per update is what made the panel blink. `content` arrives already
+ *  quiet-period-coalesced, so `update` runs once per typing pause, not per
+ *  keystroke. */
 function DiagnosticsList({
 	content,
 	language,
@@ -253,18 +259,26 @@ function DiagnosticsList({
 	onReveal: (line: number) => void;
 }): ReactElement {
 	const ref = useRef<HTMLDivElement>(null);
+	const listRef = useRef<DiagnosticsListHandle | null>(null);
+	// The reveal hook is read through a ref so a new callback identity can
+	// never force the list to be rebuilt — the whole point of the handle.
+	const onRevealRef = useRef(onReveal);
+	onRevealRef.current = onReveal;
 	useEffect(() => {
 		const host = ref.current;
 		if (!host) return;
-		host.replaceChildren(
-			renderDiagnosticsList({
-				diagnostics: lintCode(content, language),
+		let list = listRef.current;
+		if (!list) {
+			list = createDiagnosticsList({
 				t: translateMsg,
 				plural: pluralMsg,
-				onReveal,
-			}),
-		);
-	}, [content, language, onReveal]);
+				onReveal: (line) => onRevealRef.current(line),
+			});
+			listRef.current = list;
+			host.replaceChildren(list.element);
+		}
+		list.update(lintCode(content, language));
+	}, [content, language]);
 	return <div ref={ref} />;
 }
 
@@ -1100,12 +1114,21 @@ export function CodeEditorApp(): ReactElement {
 		};
 	}, [persistSelected, moveSelection, focusReferences, showQuickOpen, showCommandPalette]);
 
+	const selectedContent = selectedRow ? contentOf(selectedRow, edits) : "";
+	// `edits` changes on every keystroke, so deriving the inspector straight off
+	// it re-scanned the whole buffer per character and rebuilt the panel with
+	// it. The inspector reads a quiet-period-coalesced copy instead: during a
+	// burst the previously derived content stays on screen (no mid-typing flash
+	// to the empty state), and it catches up the moment typing pauses. A file
+	// switch flushes immediately — the other file's references aren't "late",
+	// they're wrong.
+	const settledContent = useSettledValue(selectedContent, EDIT_SETTLE_MS, selectedRow?.id ?? null);
+
 	const refs = useMemo(
-		() => (selectedRow ? collectReferences(contentOf(selectedRow, edits), citationIndex) : []),
-		[selectedRow, edits, citationIndex],
+		() => collectReferences(settledContent, citationIndex),
+		[settledContent, citationIndex],
 	);
 
-	const selectedContent = selectedRow ? contentOf(selectedRow, edits) : "";
 	const totalFiles = rows.length;
 	const dirtyIds = useMemo(
 		() => new Set(rows.filter((r) => isDirty(r, edits)).map((r) => r.id)),
@@ -1311,7 +1334,7 @@ export function CodeEditorApp(): ReactElement {
 						{selectedRow ? (
 							<ReferencesPanel
 								row={selectedRow}
-								content={selectedContent}
+								content={settledContent}
 								refs={refs}
 								onReveal={revealLine}
 							/>
@@ -1353,7 +1376,9 @@ function ReferencesPanel({
 					const { entry } = ref;
 					return (
 						<button
-							key={`${entry.entityId}:${ref.firstLine}`}
+							// Keyed on the cited entry alone — folding the first line into the
+							// key remounted every row whenever a line was added above it.
+							key={entry.key}
 							type="button"
 							className="editor__ref"
 							title={t("referenceOpen", { code: entry.code, title: entry.title })}

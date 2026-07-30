@@ -45,7 +45,22 @@ function escapeRegExp(literal: string): string {
  *  not flanked by word chars, dots, hyphens, or path separators. */
 const BOUNDARY = "[\\w.\\-/]";
 
+/** Compiled patterns, keyed on the index they were built from. The
+ *  alternation spans every citable code in the vault, so rebuilding it per
+ *  scan dominated the cost of a scan — and the overlay scans on every
+ *  keystroke. The index is rebuilt (never mutated) by `buildCitationIndex`,
+ *  so identity is a sound cache key. */
+const PATTERN_CACHE = new WeakMap<object, RegExp | null>();
+
 function buildPattern(index: CitationIndex): RegExp | null {
+	const cached = PATTERN_CACHE.get(index);
+	if (cached !== undefined) return cached;
+	const pattern = compilePattern(index);
+	PATTERN_CACHE.set(index, pattern);
+	return pattern;
+}
+
+function compilePattern(index: CitationIndex): RegExp | null {
 	if (index.size === 0) return null;
 	const keys = [...index.keys()].sort((a, b) => b.length - a.length);
 	const alternation = keys.map(escapeRegExp).join("|");
@@ -58,6 +73,8 @@ function buildPattern(index: CitationIndex): RegExp | null {
  * is always the canonical one even when the buffer used a different case.
  */
 export function scanCitations(text: string, index: CitationIndex): CitationSpan[] {
+	// Safe against the cache: `matchAll` iterates a clone of the regexp, so the
+	// shared instance's `lastIndex` never advances between scans.
 	const pattern = buildPattern(index);
 	if (!pattern || text.length === 0) return [];
 	const spans: CitationSpan[] = [];

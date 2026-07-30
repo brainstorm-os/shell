@@ -80,6 +80,7 @@ import {
 	applyMultiCursorEdit,
 	selectNextOccurrence,
 } from "../logic/multi-cursor";
+import { EDIT_SETTLE_MS, createTrailingCoalescer } from "../logic/settle";
 import {
 	SYNTAX_THEME_OPTIONS,
 	SyntaxThemePreference,
@@ -565,6 +566,19 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 		overlay.setDiagnostics(diagnosticRanges(content, lintCode(content, language)));
 	}
 
+	/** Squiggles follow the same quiet period as the inspector's problem list
+	 *  (`logic/settle.ts`), so the two never disagree about the buffer: the
+	 *  list used to recompute per keystroke while the overlay only repainted
+	 *  on rebind, leaving the underlines stale for the whole edit. */
+	const diagnosticsSettle = createTrailingCoalescer(EDIT_SETTLE_MS);
+
+	function scheduleDiagnostics(): void {
+		diagnosticsSettle.schedule(() => {
+			if (state.disposed || state.foldView) return;
+			repaintDiagnostics(textarea.value, state.row.language);
+		});
+	}
+
 	/** Highlight the bracket pair adjacent to the caret (9.7.3). Only a
 	 *  collapsed selection matches — a range selection clears the highlight.
 	 *  Reads the live textarea so it tracks the caret on move + edit. */
@@ -616,6 +630,9 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 	}
 
 	function applyContent(content: string, language: LanguageKey): void {
+		// An authoritative content swap (bind / refresh / unfold) supersedes any
+		// pending settle — it paints the diagnostics for `content` right here.
+		diagnosticsSettle.cancel();
 		// While folded the textarea shows VIEW text — repaint against that
 		// instead of the doc text the callers pass (citation refreshes).
 		if (state.foldView) {
@@ -700,6 +717,7 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 				repaintCitations(content);
 				repaintGuides(content);
 				repaintBracket();
+				scheduleDiagnostics();
 				void tokenizeAndPaint(content, state.row.language);
 				opts.onContentChange(state.row.id, content);
 			},
@@ -878,8 +896,10 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 		repaintCitations(viewText);
 		repaintGuides(viewText);
 		// Doc-absolute squiggle offsets don't map onto folded view text; clear
-		// them while folded (they repaint on unfold via applyContent).
-		overlay.setDiagnostics([]);
+		// them while folded. Unfolded, the view text IS the doc text, so the
+		// squiggles repaint here rather than waiting for the next rebind.
+		if (state.foldView) overlay.setDiagnostics([]);
+		else repaintDiagnostics(viewText, state.row.language);
 		repaintBracket();
 		void tokenizeAndPaint(viewText, state.row.language);
 	}
@@ -1233,6 +1253,7 @@ export function createCodePane(opts: CodePaneOptions): CodePaneController {
 		dispose() {
 			if (state.disposed) return;
 			state.disposed = true;
+			diagnosticsSettle.cancel();
 			unsubscribeFind();
 			find.close();
 			detachFindBar();
