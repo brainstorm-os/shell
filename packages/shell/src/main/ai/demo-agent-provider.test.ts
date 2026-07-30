@@ -2,6 +2,10 @@ import { type AiChatMessage, MessageRole } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { validateManifest } from "../apps/manifest";
 import {
+	DEMO_AGENT_APPFORGE_APP_ID,
+	DEMO_AGENT_APPFORGE_APP_NAME,
+	DEMO_AGENT_APPFORGE_INDEX_PATH,
+	DEMO_AGENT_APPFORGE_MANIFEST_PATH,
 	DEMO_AGENT_APPFORGE_MODE,
 	DEMO_AGENT_APPFORGE_SCRIPT,
 	DEMO_AGENT_PROVIDER_ID,
@@ -75,10 +79,10 @@ describe("demo-agent-provider — the AppForge propose-code-file script", () => 
 	it("proposes manifest.json, then index.html, then finalizes without claiming a save", () => {
 		const first = JSON.parse(nextDemoReply([sys, user], DEMO_AGENT_APPFORGE_SCRIPT));
 		expect(first.tool).toBe("propose-code-file");
-		expect(first.args.path).toBe("hello-app/manifest.json");
+		expect(first.args.path).toBe(DEMO_AGENT_APPFORGE_MANIFEST_PATH);
 		const second = JSON.parse(nextDemoReply(transcriptWithAcks(1), DEMO_AGENT_APPFORGE_SCRIPT));
 		expect(second.tool).toBe("propose-code-file");
-		expect(second.args.path).toBe("hello-app/index.html");
+		expect(second.args.path).toBe(DEMO_AGENT_APPFORGE_INDEX_PATH);
 		const final = JSON.parse(nextDemoReply(transcriptWithAcks(2), DEMO_AGENT_APPFORGE_SCRIPT));
 		expect(typeof final.final).toBe("string");
 		expect(final.final).toMatch(/approve/i);
@@ -104,16 +108,43 @@ describe("demo-agent-provider — the AppForge propose-code-file script", () => 
 		const line = DEMO_AGENT_APPFORGE_SCRIPT[0];
 		expect(line).toBeDefined();
 		const call = JSON.parse(line as string);
-		expect(call.args.path).toBe("hello-app/manifest.json");
-		const result = validateManifest(JSON.parse(call.args.content));
+		expect(call.args.path).toBe(DEMO_AGENT_APPFORGE_MANIFEST_PATH);
+		const manifest = JSON.parse(call.args.content);
+		expect(manifest.id).toBe(DEMO_AGENT_APPFORGE_APP_ID);
+		expect(manifest.name).toBe(DEMO_AGENT_APPFORGE_APP_NAME);
+		expect(manifest.sdk).toBe("1");
+		const result = validateManifest(manifest);
 		expect(result.ok ? "" : `${result.reason} @ ${result.path ?? "?"}`).toBe("");
 		expect(result.ok).toBe(true);
+	});
+
+	it("the drafted app asks for ONE scoped capability — an app that asks for nothing proves nothing", () => {
+		// The episode's claim is that agent-authored code is held by the same
+		// broker as everything else. That is only demonstrable if the drafted
+		// manifest actually requests something, and requests it narrowly.
+		const line = DEMO_AGENT_APPFORGE_SCRIPT[0] as string;
+		const manifest = JSON.parse(JSON.parse(line).args.content);
+		expect(manifest.capabilities).toEqual(["entities.read:brainstorm/Project/v1"]);
+	});
+
+	it("the drafted page is a real app — it queries the granted type through window.brainstorm", () => {
+		// A hello-world contradicts the narration ("it drafts the files"). Pin the
+		// two things that make it an app rather than a placeholder: it reads the
+		// vault through the host API, and it reads the type its manifest scoped.
+		const line = DEMO_AGENT_APPFORGE_SCRIPT[1] as string;
+		const html = JSON.parse(line).args.content as string;
+		expect(html).toContain("window.brainstorm");
+		expect(html).toContain("api.services.entities");
+		expect(html).toContain('type: "brainstorm/Project/v1"');
+		expect(html).toContain("milestoneAt");
+		// A classic <script> — ES modules are blocked over `file://`.
+		expect(html).not.toContain('type="module"');
 	});
 
 	it("the provider in appforge mode walks the code-file script and clamps at the final", async () => {
 		const p = createDemoAgentProvider(DEMO_AGENT_APPFORGE_MODE);
 		const res = await p.generate({ messages: [sys, user] });
-		expect(JSON.parse(res.content).args.path).toBe("hello-app/manifest.json");
+		expect(JSON.parse(res.content).args.path).toBe(DEMO_AGENT_APPFORGE_MANIFEST_PATH);
 		const done = await p.generate({ messages: transcriptWithAcks(99) });
 		expect(JSON.parse(done.content).final).toBeTruthy();
 	});
