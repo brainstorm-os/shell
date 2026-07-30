@@ -75,6 +75,11 @@ button {
 /* ── File list (left = navigation, per project convention) ─────────── */
 
 .editor__files {
+	/* ONE content column for the whole panel: the head's label, every tree
+	   row's disclosure caret, and anything else added later start on the same
+	   inline offset. Per-element padding is what let the head and the rows
+	   drift apart. */
+	--panel-inset: var(--space-2);
 	border-inline-end: var(--border-width) solid var(--border);
 	background: var(--bg);
 	overflow-y: auto;
@@ -86,8 +91,12 @@ button {
 .editor__files-head {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	/* The shared 44px panel-header baseline — the FILES head, the refs head and
+	   the app header all sit on it. */
 	height: 44px;
-	padding: 0 var(--space-4);
+	padding: 0 var(--panel-inset);
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-medium);
@@ -102,9 +111,25 @@ button {
 .editor__file-list {
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 auto;
+	padding-block: var(--space-1);
 }
 
-.editor__file {
+/* The list body is the tree's root drop zone — dropping on empty space below
+   the rows moves a file back to the top level. */
+.editor__file-list[data-drop-over="true"] {
+	background: var(--color-accent-subtle, var(--hover));
+}
+
+.editor__file-list:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -2px;
+}
+
+/* Shared TREE-ROW face — folder rows and file rows both wear it. The kind
+   classes (`.editor__folder` / `.editor__file`) stay meaningful on their own,
+   so a selector for "a file row" never accidentally counts folders. */
+.editor__row {
 	display: flex;
 	align-items: center;
 	width: 100%;
@@ -112,16 +137,22 @@ button {
 	font-size: var(--text-size-md);
 }
 
-.editor__file:focus-visible {
+/* An accepted drag hovering a folder row (or the root list). */
+.editor__row[data-drop-over="true"] {
+	background: var(--color-accent-subtle, var(--hover));
+	box-shadow: inset 0 0 0 var(--border-width) var(--accent);
+}
+
+.editor__row:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
 	outline-offset: -2px;
 }
 
-.editor__file:hover {
+.editor__row:hover {
 	background: var(--hover, rgba(127, 127, 127, 0.1));
 }
 
-.editor__file[aria-current="true"] {
+.editor__row[aria-current="true"] {
 	background: var(--accent-soft, rgba(127, 127, 127, 0.18));
 	color: var(--text);
 }
@@ -129,10 +160,18 @@ button {
 .editor__file-open {
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
+	/* Tight gap between the caret / glyph / name so a nested row still has
+	   room for its name in the 248px panel. */
+	gap: var(--space-1);
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: 7px;
+	/* The inline-start inset is the tree indent (set per row from the node's
+	   level); only the block padding + trailing inset live here, so every row
+	   keeps one rhythm whatever its depth. */
+	/* 8px block padding → a 32px row, the same control-height step the
+	   buttons beside it use. */
+	padding-block: var(--space-2);
+	padding-inline-end: var(--space-2);
 	border: 0;
 	background: transparent;
 	color: inherit;
@@ -146,14 +185,42 @@ button {
 	outline-offset: -2px;
 }
 
-.editor__file-icon {
+/* Disclosure column. Folder rows draw a caret in it; file rows reserve the
+   same width with an empty span so names align across kinds. */
+.editor__folder-caret {
 	flex: 0 0 auto;
+	width: 12px;
+	height: 12px;
+	color: var(--text-faint);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.editor__folder-face {
+	cursor: pointer;
+	text-align: start;
+}
+
+.editor__folder .editor__file-icon {
+	color: var(--text-dim);
+}
+
+/* Fixed box so every row's name starts on the same inline offset for its
+   level, whether the file carries its own icon or the type fallback. */
+.editor__file-icon {
+	flex: 0 0 15px;
+	width: 15px;
+	height: 15px;
 	color: var(--text-dim);
 	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .editor__file-name {
 	flex: 1 1 auto;
+	padding-inline-start: var(--space-1);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -182,15 +249,14 @@ button {
 	position: relative;
 }
 
-/* Language chip — lives in the `.app-header` right group beside the file
-   meta now that the pane has no header of its own. */
+/* Language control — the SHARED `.bs-select` trigger (`<SelectMenu>`), which
+   also makes the detected language user-overridable. Sized `--sm` so it sits
+   on the same 24px control line as the header's icon buttons and panel
+   toggles; the app supplies only the width clamp so a long language name
+   can't push the header group around. */
 .editor__lang {
 	flex: 0 0 auto;
-	font-size: var(--text-size-xs);
-	color: var(--text-dim);
-	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--border);
-	border-radius: var(--radius-full);
+	max-width: 128px;
 }
 
 .editor__code {
@@ -609,7 +675,9 @@ button {
 .editor__citation-tooltip__status {
 	font-size: var(--text-size-xs);
 	color: var(--text-dim);
-	padding: var(--space-0_5);
+	/* A bordered pill needs horizontal room: uniform `--space-0_5` put the
+	   label flush against the curve. Same face as `.editor__ref-status`. */
+	padding: var(--space-0_5) var(--space-2);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-full);
 	align-self: flex-start;
@@ -676,6 +744,10 @@ button {
  * background + blur); floats above the editor without reflowing it,
  * matching Notes/Database. */
 .editor__refs {
+	/* Same rule as the file panel: ONE inline inset the diagnostics summary,
+	   the REFERENCES heading, the empty state and the reference cards all key
+	   off, so the panel reads as one column instead of three fragments. */
+	--panel-inset: var(--space-4);
 	position: absolute;
 	top: 0;
 	bottom: 0;
@@ -703,7 +775,7 @@ button {
 	display: flex;
 	align-items: center;
 	height: 44px;
-	padding: 0 var(--space-4);
+	padding: 0 var(--panel-inset);
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-medium);
@@ -720,15 +792,19 @@ button {
 .editor__refs-list {
 	display: flex;
 	flex-direction: column;
-	padding: var(--space-2);
+	padding: var(--space-2) var(--panel-inset);
 	gap: var(--space-2);
 }
 
+/* The shared compact `<EmptyState>` (in-panel tone: small dim glyph, no
+   chip). It OWNS the rest of the REFERENCES section and centres in it — the
+   primitive's own convention, adopted rather than re-tuned. Centring is also
+   why it can't drift off the panel's content column: it has no left inset to
+   disagree about. */
 .editor__refs-empty {
-	padding: var(--space-3);
-	font-size: var(--text-size-sm);
-	color: var(--text-dim);
-	line-height: var(--code-line-height);
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: var(--space-3) var(--panel-inset);
 }
 
 .editor__ref {
@@ -774,7 +850,7 @@ button {
 	font-size: var(--text-size-xs);
 	text-transform: capitalize;
 	color: var(--text-dim);
-	padding: var(--space-0_5);
+	padding: var(--space-0_5) var(--space-2);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-full);
 }
@@ -888,68 +964,35 @@ button {
 	font-size: var(--text-size-sm);
 }
 
-/* ── New-file button (9.7.5) ─────────────────────────────────────── */
+/* ── FILES head actions (9.7.5, 9.7.12) ──────────────────────────────
+   The "New" affordances are the SHARED button faces (`.bs-btn--sm`,
+   `.bs-btn--sm.bs-btn--icon`) — height, padding, radius, hover and focus
+   ring all come from `@brainstorm-os/sdk/app-theme.css`. The app supplies
+   only the layout delta. */
 
-.editor__files-head {
-	justify-content: space-between;
-}
-
-.editor__file-new {
-	border: var(--border-width) solid var(--border-subtle, var(--border));
-	border-radius: var(--radius-sm);
-	background: transparent;
-	color: var(--text-dim);
-	font: inherit;
-	letter-spacing: normal;
-	text-transform: none;
-	padding: var(--space-0_5);
-	cursor: pointer;
-}
-
-.editor__file-new:hover {
-	background: var(--color-accent-subtle, var(--hover));
-	color: var(--color-accent-on-surface, var(--text));
-}
-
-.editor__file-new:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-}
-
-/* Header "+" New-file (F-205) — borderless icon chip matching the
-   panel-toggles it sits beside, so the header right group reads as one row. */
-.editor__header-new {
-	display: inline-flex;
+.editor__files-actions {
+	display: flex;
 	align-items: center;
-	justify-content: center;
-	width: var(--control-height-sm, 24px);
-	height: var(--control-height-sm, 24px);
-	padding: 0;
-	border: var(--border-width) solid transparent;
-	border-radius: var(--radius-sm);
-	background: transparent;
-	color: var(--text-dim);
-	cursor: pointer;
+	gap: var(--space-1);
+	flex: 0 0 auto;
 }
 
-.editor__header-new:hover {
-	background: var(--color-accent-subtle, var(--hover));
-	color: var(--color-accent-default, var(--text));
-}
-
-.editor__header-new:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-}
+/* The panel's own heading + the header "+" carry no deltas beyond what the
+   shared faces give them; the rules that used to re-declare their box are
+   deliberately gone. */
 
 /* ── Diagnostics problem list (9.7.6) ────────────────────────────── */
 
 .editor__diagnostics {
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
-	padding: var(--space-2);
+	padding-block: var(--space-2);
 }
 
 .editor__diagnostics-head {
+	/* The diagnostics list is a generic DOM module — it inherits the host
+	   panel's column, with a sane floor if ever mounted somewhere that has
+	   none. */
+	padding-inline: var(--panel-inset, var(--space-2));
 	font-size: var(--text-size-xs);
 	color: var(--text-dim);
 	margin-bottom: var(--space-1);
@@ -973,8 +1016,9 @@ button {
 	color: var(--text);
 	font: inherit;
 	text-align: left;
-	padding: var(--space-0_5);
-	border-radius: var(--radius-sm);
+	/* Full-bleed row: the inset lives on the row so its hover highlight spans
+	   the panel while the text stays on the content column. */
+	padding: var(--space-1) var(--panel-inset, var(--space-2));
 	cursor: pointer;
 }
 
@@ -1178,17 +1222,11 @@ button {
 	gap: var(--space-1);
 }
 
+/* The field face is the shared `.bs-input` (height / padding / radius /
+   border / surface); the app supplies nothing but the monospace face a path
+   deserves. */
 .editor__rename-input {
-	width: 100%;
-	background: var(--bg);
-	border: var(--border-width) solid var(--accent);
-	border-radius: var(--radius-sm);
-	padding: var(--space-1);
-	font: inherit;
-	font-size: var(--text-size-md);
-	color: var(--text);
-	outline-offset: -1px;
-	outline: 1px solid var(--color-focus-ring);
+	font-family: var(--text-family-code, ui-monospace, monospace);
 }
 
 .editor__rename-error {

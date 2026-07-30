@@ -95,5 +95,16 @@
   "diff.stats": "{added} añadidos · {removed} eliminados",
   "diff.noChanges": "Sin cambios desde el último guardado.",
   "diff.baseColumn": "Guardado",
-  "diff.nextColumn": "Actual"
+  "diff.nextColumn": "Actual",
+  "newFolder": "Nueva carpeta",
+  "newFolderHint": "Crear una carpeta nueva",
+  "newFileHere": "Nuevo archivo aquí",
+  "folderMenuLabel": "Acciones de carpeta para {name}",
+  "folderRename": "Cambiar nombre de la carpeta…",
+  "folderRemove": "Eliminar carpeta",
+  "folderRenameTitle": "Cambiar nombre de {name}",
+  "folderRenameLabel": "Ruta de la carpeta",
+  "folderErrorLocked": "Esta carpeta contiene un archivo bloqueado. Desbloquéalo primero.",
+  "folderErrorCycle": "Una carpeta no se puede mover dentro de sí misma.",
+  "languageSelect": "Lenguaje"
 }

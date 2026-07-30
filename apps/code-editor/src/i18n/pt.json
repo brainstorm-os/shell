@@ -95,5 +95,16 @@
   "diff.stats": "{added} adicionadas · {removed} removidas",
   "diff.noChanges": "Nenhuma alteração desde o último salvamento.",
   "diff.baseColumn": "Salvo",
-  "diff.nextColumn": "Atual"
+  "diff.nextColumn": "Atual",
+  "newFolder": "Nova pasta",
+  "newFolderHint": "Criar uma nova pasta",
+  "newFileHere": "Novo ficheiro aqui",
+  "folderMenuLabel": "Ações da pasta {name}",
+  "folderRename": "Mudar o nome da pasta…",
+  "folderRemove": "Remover pasta",
+  "folderRenameTitle": "Mudar o nome de {name}",
+  "folderRenameLabel": "Caminho da pasta",
+  "folderErrorLocked": "Esta pasta contém um ficheiro bloqueado. Desbloqueie-o primeiro.",
+  "folderErrorCycle": "Uma pasta não pode ser movida para dentro de si mesma.",
+  "languageSelect": "Linguagem"
 }
