@@ -112,9 +112,15 @@ import {
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import { isAuthorizedWriter, resolveMembers } from "./collab/access-record";
+import {
+	authorizesAsShareBootstrap,
+	isAuthorizedWriter,
+	keyBytesEqual,
+	resolveMembers,
+} from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
+import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
 import { buildConnectorsServiceDeps } from "./connectors/wiring";
@@ -126,8 +132,8 @@ import {
 	readBillingCredential,
 	writeBillingCredential,
 } from "./credentials/billing-refresh-credential";
-import { bytesToBase64 } from "./credentials/crypto";
-import { verifySignature } from "./credentials/identity";
+import { base64ToBytes, bytesToBase64 } from "./credentials/crypto";
+import { ED25519_PUBLIC_BYTES, verifySignature } from "./credentials/identity";
 import { wrapDekForRecipient, wrapDekVersionOf } from "./credentials/member-wraps";
 import { makeDashboardServiceHandler } from "./dashboard/dashboard-service";
 import {
@@ -3223,6 +3229,39 @@ void app.whenReady().then(async () => {
 		void (async () => {
 			try {
 				const dekStore = await session.entityDekStore();
+				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
+				// from an Owner (or ourselves), or any member could re-key an entity
+				// out from under its owner. Fail-closed on any read error.
+				const authorizeWrapInstall = async (
+					entityId: string,
+					senderPubB64: string,
+				): Promise<boolean> => {
+					// See the note on the writer predicate: base64url decoding is
+					// lossy, not throwing, so length-check the key outright.
+					const senderKey = base64UrlToBytes(senderPubB64);
+					if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
+					try {
+						const existing = dekStore.open(entityId);
+						const holdsDek = existing !== null;
+						if (existing) dekStore.close(existing.dek);
+						if (!holdsDek) return true; // bootstrap: no key to substitute
+						const { doc } = await session.ydocStore.load(entityId);
+						try {
+							return authorizesWrapInstall({
+								entityId,
+								senderKey,
+								selfPub: session.identity.publicKey,
+								holdsDek,
+								localDoc: doc,
+								decodeMemberKey: base64ToBytes,
+							});
+						} finally {
+							doc.destroy();
+						}
+					} catch {
+						return false;
+					}
+				};
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
 					dekStore,
@@ -3251,16 +3290,29 @@ void app.whenReady().then(async () => {
 					// a Viewer's signed edit drops here. Reads the same persisted
 					// access record `isShared` does. Fail-closed on any error (a
 					// doc we can't read the record from doesn't get written to).
-					authorizeWriter: async (senderPubB64, entityId) => {
-						let senderKey: Uint8Array;
-						try {
-							senderKey = base64UrlToBytes(senderPubB64);
-						} catch {
-							return false;
-						}
+					//
+					// Two branches exist above the persisted-record check because a
+					// record is not always LOCAL yet, and denying those cases is a
+					// deadlock rather than a safe refusal:
+					//   1. our OWN sovereign key - a paired device and the cold-restore
+					//      backfill both re-deliver this identity's own data, and a
+					//      never-shared entity has no access record at all to check;
+					//   2. the share BOOTSTRAP - the first frame of a new share carries
+					//      the signed record that authorizes it (see
+					//      `authorizesAsShareBootstrap`, which only fires on a doc with
+					//      no record and still demands a signature-verified Editor+).
+					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
+						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
+						// invalid characters and returns a short buffer - so state the
+						// invariant explicitly rather than relying on a catch that can
+						// never fire.
+						const senderKey = base64UrlToBytes(senderPubB64);
+						if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
+						if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
 						const { doc } = await session.ydocStore.load(entityId);
 						try {
-							return isAuthorizedWriter(doc, entityId, senderKey);
+							if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
+							return authorizesAsShareBootstrap(doc, entityId, senderKey, plaintext);
 						} catch {
 							return false;
 						} finally {
@@ -3287,7 +3339,23 @@ void app.whenReady().then(async () => {
 					// row's createdBy/ownerApp is a best-effort derivation from the
 					// type prefix (the real creator app isn't on the wire); a full
 					// search rebuild after restore re-derives the rest.
-					installWrap: async (wrap, entityId) => {
+					installWrap: async (wrap, entityId, senderPubB64) => {
+						// Collab-C5 - a wrap that ROTATES a DEK this device already holds
+						// is a key-substitution surface, not a bootstrap: the inbox
+						// channel is `inbox:<pubkey>` and every member's X25519 wrapping
+						// key is published in the access record, so any member could
+						// otherwise seal a DEK of their choosing at a higher ordinal and
+						// re-key an entity out from under its owner (the victim then
+						// can't read real traffic, and emits under a key the attacker
+						// knows). Rotation is an Owner operation (ROT-3a), so require the
+						// authenticated sender to be an Owner of the entity - or this
+						// identity itself (a paired device / restore). A FIRST install
+						// stays open: it can only create an entity we didn't have, and a
+						// cold device has no record to check against.
+						if (!(await authorizeWrapInstall(entityId, senderPubB64))) {
+							console.warn(`[live-sync] refused a DEK rotation for ${entityId} from a non-Owner sender`);
+							return null;
+						}
 						const { dek, type } = session.unwrapMemberWrapWithType(wrap, entityId);
 						try {
 							const repo = await getEntitiesRepoForActiveSession();

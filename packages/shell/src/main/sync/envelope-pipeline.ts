@@ -101,12 +101,20 @@ export type PipelineContext = {
 	 * makes a Viewer read-only at the DATA layer — a Viewer holds the DEK
 	 * (they can read) and can sign, so nothing else stops their write.
 	 * `senderPubB64` is the header sender (base64url); `resolvedEntityId`
-	 * is the real entity id (post routing-token resolution). Optional +
+	 * is the real entity id (post routing-token resolution); `plaintext` is
+	 * the decrypted Yjs update this frame carries, so a receiver holding no
+	 * record yet can authorize the share BOOTSTRAP off the signed access
+	 * entries the frame itself delivers (see `authorizesAsShareBootstrap` -
+	 * without it the first frame of a new share deadlocks). Optional +
 	 * fail-open when absent (back-compat: loopback/dev/soak paths that
 	 * carry no access record skip it); production wires it to the entity's
 	 * signed access record (role ≥ Editor).
 	 */
-	authorizeWriter?: (senderPubB64: string, resolvedEntityId: string) => boolean | Promise<boolean>;
+	authorizeWriter?: (
+		senderPubB64: string,
+		resolvedEntityId: string,
+		plaintext: Uint8Array,
+	) => boolean | Promise<boolean>;
 	/**
 	 * Stage 10.7 — traffic-tick hooks for the sync-status surface. Fired
 	 * AFTER a successful `relay.send(frame)` / `applyUpdate(...)` /
@@ -251,7 +259,10 @@ export async function receiveAndApply(
 		// Collab-C5 (F-288) — authenticated, now authorize: a Viewer holds
 		// the DEK and a valid signature, so only the signed access record
 		// stops their write. Checked here, after verify, before apply.
-		if (ctx.authorizeWriter && !(await ctx.authorizeWriter(decoded.header.sender, resolved.id))) {
+		if (
+			ctx.authorizeWriter &&
+			!(await ctx.authorizeWriter(decoded.header.sender, resolved.id, plaintext))
+		) {
 			throw named(
 				"Unauthorized",
 				`envelope-pipeline: sender ${decoded.header.sender} is not an authorized writer of ${resolved.id}`,
@@ -315,13 +326,22 @@ export async function emitWrapBootstrap(
  * The callback shape mirrors `receiveAndApply`: the wire path itself
  * does NOT call `VaultSession.unwrapMemberWrap` — that lives in the
  * session because the X25519 secret never leaves it. The callback
- * receives the parsed wrap and the resolved entity id; the session-
- * aware orchestrator does the HPKE unseal and the install of the
+ * receives the parsed wrap, the resolved entity id and the AUTHENTICATED
+ * sender (base64url, its signature over the frame already verified); the
+ * session-aware orchestrator does the HPKE unseal and the install of the
  * decrypted DEK into `EntityDekStore`.
+ *
+ * The sender is passed because a wrap is not uniformly safe to install. A
+ * FIRST wrap for an unknown entity can only create one, but a wrap at a HIGHER
+ * DEK ordinal ROTATES a key the device already holds - and the inbox channel
+ * plus every member's X25519 are public to the entity's members, so without an
+ * authorization check any member could re-key an entity out from under its
+ * owner. The install side applies that rule (`main/index.ts`).
  */
 export type WrapBootstrapAcceptedFn = (
 	wrap: MemberWrapPayload,
 	entityId: string,
+	senderPubB64: string,
 ) => void | Promise<void>;
 
 export async function receiveWrapBootstrap(
@@ -353,7 +373,7 @@ export async function receiveWrapBootstrap(
 		verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
 		...routedBinding(decoded.header.entityId, resolved.id, ctx),
 	});
-	await onWrapAccepted(wrap, resolved.id);
+	await onWrapAccepted(wrap, resolved.id, decoded.header.sender);
 	ctx.onReceived?.(frame.byteLength);
 }
 

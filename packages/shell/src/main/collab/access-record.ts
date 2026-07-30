@@ -332,7 +332,7 @@ export function activeMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
  * remote writer resolves to nothing → denied. That is correct — a remote
  * update can only arrive for a shared entity, and a shared entity always
  * carries the owner's self-grant (see `SharingEngine.provisionEntity`), so a
- * genuine owner/editor always resolves. `keyMatches` is byte-exact.
+ * genuine owner/editor always resolves. `keyBytesEqual` is byte-exact.
  */
 export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint8Array): boolean {
 	for (const m of resolveCurrentMembers(doc, entityId)) {
@@ -344,12 +344,76 @@ export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint
 		} catch {
 			continue;
 		}
-		if (keyEquals(memberKey, senderKey)) return true;
+		if (keyBytesEqual(memberKey, senderKey)) return true;
 	}
 	return false;
 }
 
-function keyEquals(a: Uint8Array, b: Uint8Array): boolean {
+/**
+ * Collab-C5 (F-288 bootstrap) - may `senderKey` write to `entityId` on the
+ * strength of the state they are sending, when this device holds no record yet?
+ *
+ * The FIRST state frame of a new share carries the access record that
+ * authorizes it. A receiver whose local doc is still empty therefore has
+ * nothing to check {@link isAuthorizedWriter} against and drops the very frame
+ * that would make them a member - and every frame after it, on the same empty
+ * doc. That is a permanent deadlock, not a conservative denial: dogfood collab
+ * `009` reproduced it as `sender <owner> is not an authorized writer` on a
+ * brand-new share.
+ *
+ * Authority here comes from SIGNATURES, not from locality. Every grant is
+ * individually Ed25519-signed over `(version, entityId, member, x25519, role,
+ * addedBy, addedAt)` and {@link resolveMembers} verifies each one, so checking
+ * the record carried INSIDE the frame is exactly as strong as checking a
+ * persisted copy of the same signed entries. The relaxation is scoped as
+ * tightly as it can be and stays fail-closed:
+ *
+ *   - it applies ONLY when the local doc carries NO access entries at all - a
+ *     doc that already resolved a record is authoritative, so a later frame can
+ *     never re-bootstrap around a revoke;
+ *   - the incoming state is merged into a THROWAWAY doc, never the real one, so
+ *     a rejected bootstrap leaves nothing behind;
+ *   - the sender must resolve to an ACTIVE Editor-or-Owner member in that
+ *     state; anything else (including a malformed update) denies.
+ *
+ * Reaching this predicate at all already required the sender to hold the
+ * entity DEK and to have produced a valid signature over the frame, so this
+ * opens no key-free surface.
+ */
+/** Ceiling on the state a share BOOTSTRAP may carry (see below). Deliberately
+ *  generous against a real opening snapshot and still far under anything that
+ *  could stall the main process. */
+const MAX_BOOTSTRAP_STATE_BYTES = 4 * 1024 * 1024;
+
+export function authorizesAsShareBootstrap(
+	localDoc: Y.Doc,
+	entityId: string,
+	senderKey: Uint8Array,
+	incomingState: Uint8Array,
+): boolean {
+	// The real apply of a remote update is delegated to the ydoc WORKER; this
+	// probe decodes the same attacker-supplied bytes on the main process, so it
+	// gets an explicit ceiling that the worker path does not need. A share's
+	// opening state is a fresh doc plus an access record, orders of magnitude
+	// under this; anything larger is not a bootstrap and is refused rather than
+	// handed to a length-prefixed decoder on the UI thread.
+	if (incomingState.byteLength > MAX_BOOTSTRAP_STATE_BYTES) return false;
+	if (resolveMembers(localDoc, entityId).length > 0) return false;
+	const probe = new Y.Doc();
+	try {
+		Y.applyUpdate(probe, incomingState);
+		return isAuthorizedWriter(probe, entityId, senderKey);
+	} catch {
+		return false;
+	} finally {
+		probe.destroy();
+	}
+}
+
+/** Byte-exact public-key comparison. Keys are stored base64 in the access
+ *  record and arrive base64**url** off the wire header, so string equality
+ *  silently mismatches a legitimate member - always compare decoded bytes. */
+export function keyBytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.length !== b.length) return false;
 	for (let i = 0; i < a.length; i++) {
 		if (a[i] !== b[i]) return false;
