@@ -91,6 +91,30 @@ export type PipelineContext = {
 	 * compatibility with existing call sites; absent ⇒ revocation
 	 * enforcement is off (back-compat default; production wires the
 	 * predicate from `DevicesStore.isRevoked`).
+	 *
+	 * **P2P-1 finding: this predicate has zero non-test producers, and wiring
+	 * it to `DevicesStore.isRevoked` today would be WORSE than leaving it
+	 * dormant.** The `P2P-0` spike flagged it as unwired defence in depth that
+	 * "costs almost nothing to wire". Reading the producer says otherwise. The
+	 * only production `PipelineContext` is `SharingEngine.makeCtx`, and it sets
+	 * `devicePub: session.identity.publicKey` — the **sovereign user key**, not
+	 * a device key. `senderPub` here is `header.sender`, so on the relay path it
+	 * is an account identifier, while `DevicesStore` is a roster of per-device
+	 * Ed25519 keys. `isRevoked(userKey)` therefore returns `false` for every
+	 * frame that will ever arrive: it would compile, add a hot-path lookup, and
+	 * read in review as enforcement while enforcing nothing. A vacuous check
+	 * that looks like a real one is a worse security posture than a visibly
+	 * absent one, because the next reviewer stops looking.
+	 *
+	 * Device-level revocation on the relay path needs the envelope to carry the
+	 * signing DEVICE key, or a signed device→member binding the receiver can
+	 * check — a wire-format change, and `LAN-2b(d)`'s live half together with
+	 * `ROT-3a` rotate-on-revoke. `P2P-1` neither creates nor closes that gap: on
+	 * the LAN path revocation IS enforced, at admission, against device keys,
+	 * with the roster rebuilt from `listActive()` per access, which is the
+	 * strictest enforcement anywhere in the product. The predicate stays
+	 * declared because the LAN/pairing contexts (which DO carry device keys, see
+	 * `pairing-live-e2e.test.ts`) are where it becomes meaningful.
 	 */
 	isDeviceRevoked?: (senderPub: Uint8Array) => boolean;
 	/**

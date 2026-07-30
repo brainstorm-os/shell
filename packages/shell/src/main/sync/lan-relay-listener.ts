@@ -30,10 +30,17 @@ import { type IncomingMessage, type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { networkInterfaces } from "node:os";
 import { WebSocketServer } from "ws";
+import { type LanInterface, isBindableAddress, isPrivateIpv4 } from "./lan-address";
 import type { LanRelayHost } from "./lan-relay-host";
 
-/** A bindable local address: private IPv4 (RFC1918) or link-local. */
-export type LanInterface = { name: string; address: string };
+// The address predicates live in `lan-address.ts` so discovery and the dial
+// coordinator can ask the same question without pulling in `ws`. Re-exported
+// here because every existing caller imports them from this module.
+export {
+	type LanInterface,
+	isBindableAddress,
+	rankLanInterfaces,
+} from "./lan-address";
 
 /**
  * Addresses this machine may bind a LAN listener to. Deliberately excludes
@@ -62,36 +69,6 @@ export function lanInterfaces(): LanInterface[] {
 export function normalizeSourceAddress(raw: string): string {
 	const lower = raw.trim().toLowerCase();
 	return lower.startsWith("::ffff:") ? lower.slice("::ffff:".length) : lower;
-}
-
-/**
- * May we bind here? Private or loopback IPv4 literals only.
- *
- * Loopback is allowed so tests can bind without touching a real interface;
- * everything else must satisfy `isPrivateIpv4`. Anything that is not a
- * four-octet literal — a hostname, `0`, `0x0`, `::0`, a trailing dot — is
- * refused, because those are exactly the forms that resolved to a wildcard.
- */
-export function isBindableAddress(address: string): boolean {
-	const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address.trim());
-	if (!m) return false;
-	const octets = m.slice(1, 5).map(Number);
-	if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
-	if (octets[0] === 127) return true; // loopback — test/local host client
-	return isPrivateIpv4(address.trim());
-}
-
-function isPrivateIpv4(address: string): boolean {
-	const parts = address.split(".").map(Number);
-	if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
-		return false;
-	}
-	const [a, b] = parts as [number, number, number, number];
-	if (a === 10) return true;
-	if (a === 192 && b === 168) return true;
-	if (a === 172 && b >= 16 && b <= 31) return true;
-	if (a === 169 && b === 254) return true; // link-local
-	return false;
 }
 
 /** How many connections one source address may open within the window. The

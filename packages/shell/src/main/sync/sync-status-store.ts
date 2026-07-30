@@ -320,6 +320,11 @@ export class SyncStatusStore {
 			transportState === WebSocketRelayState.Reconnecting ||
 			transportState === WebSocketRelayState.Closed ||
 			transportState === WebSocketRelayState.Idle ||
+			// P2P-1 — a degraded LAN link stops claiming a live connection. The
+			// socket is still open and may recover, but the peer has missed its
+			// heartbeat deadline, so nothing is getting through and saying
+			// "syncing" would be the false half of a privacy claim.
+			transportState === WebSocketRelayState.Degraded ||
 			transportState === null
 		) {
 			return SyncState.Offline;

@@ -32,8 +32,12 @@ export type BuiltLanListener = {
 
 export type LanListenerFactoryDeps = {
 	access: LanSessionAccess;
-	/** Candidate bind addresses, newest-first. Injected for tests; production
-	 *  passes `lanInterfaces().map((i) => i.address)`. */
+	/** Candidate bind addresses in PREFERENCE order — the first reachable one
+	 *  wins. Injected for tests; production passes
+	 *  `rankLanInterfaces(lanInterfaces()).map((i) => i.address)`, which puts
+	 *  physical adapters ahead of Docker bridges, VPN `utun`s and VM host
+	 *  adapters. Taking `[0]` off an unranked OS enumeration is how a listener
+	 *  silently binds an address no peer can reach (see `rankLanInterfaces`). */
 	addresses: () => readonly string[];
 	/** Post-listen socket errors — routed to the shell's error log. */
 	onError?: (error: Error) => void;

@@ -234,7 +234,7 @@ import { registerSearchHandlers } from "./ipc/search-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
-import { registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
+import { type LanPeeringSnapshot, registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
 import { registerAutoUpdateHandlers, registerUpdateHandlers } from "./ipc/update-handlers";
 import { registerVaultHandlers } from "./ipc/vault-handlers";
 import { registerVaultLockHandlers } from "./ipc/vault-lock-handlers";
@@ -403,9 +403,14 @@ const WALLPAPER_THUMB_SUFFIX = ".thumb.jpg";
 // soak attempt either succeeds or reveals the exact stalled milestone.
 const BOOT_START = Date.now();
 import {
+	LanDialMode as LanDialModeEnum,
+	type LanDialMode as LanDialModeValue,
+} from "./sync/lan-dial-coordinator";
+import {
 	LanHostMode as LanHostModeEnum,
 	type LanHostMode as LanHostModeValue,
 } from "./sync/lan-host-policy";
+import type { LanPeerPrefs as LanPeerPrefsValue } from "./sync/lan-peer-prefs-store";
 
 let lanHostRuntime: {
 	prefs: {
@@ -413,8 +418,74 @@ let lanHostRuntime: {
 		load(): Promise<{ mode: LanHostModeValue }>;
 		setMode(mode: LanHostModeValue): Promise<{ mode: LanHostModeValue }>;
 	};
-	controller: { apply(): Promise<void> };
+	controller: { apply(): Promise<void>; readonly url: string | null };
+	/** P2P-1 — the dial half, declared structurally so this module-level slot
+	 *  does not force an eager import of the LAN tree at boot. */
+	peerPrefs: {
+		cached: LanPeerPrefsValue | null;
+		load(): Promise<LanPeerPrefsValue>;
+		setMode(mode: LanDialModeValue): Promise<LanPeerPrefsValue>;
+		setManualAddress(raw: string | null): Promise<LanPeerPrefsValue | null>;
+	};
+	dial: {
+		setMode(mode: LanDialModeValue): void;
+		setManualUrl(url: string | null): void;
+		offerPairedPeer(url: string): void;
+		target(): { url: string; source: string; instance?: string } | null;
+		knownPeers(): readonly { instance: string; urls: readonly string[]; source: string }[];
+	};
+	discovery: { apply(): Promise<void> };
+	parsePeerAddress(raw: string): string | null;
 } | null = null;
+
+/**
+ * P2P-1 — split `ws://host:port` back into the parts an mDNS advert needs.
+ *
+ * The listener's URL is the canonical thing a peer dials, so the advert is
+ * derived FROM it rather than rebuilt from the interface list: a rebuild could
+ * disagree with what is actually bound, and the tag commits to the advertised
+ * address, so a disagreement would fail verification on the far side with no
+ * clue why. Returns `null` for anything that is not a well-formed `ws://` URL
+ * with an explicit port.
+ */
+/**
+ * P2P-1 — everything Settings → Sync renders for the local network, read in one
+ * pass so the panel can never show a dial mode from one moment beside a peer
+ * list from another.
+ *
+ * Absent runtime (boot order, no relay block) reads as "off, nothing found"
+ * rather than throwing: the panel then shows the feature as off, which is
+ * true.
+ */
+function lanPeeringSnapshot(prefs: LanPeerPrefsValue | null | undefined): LanPeeringSnapshot {
+	const rt = lanHostRuntime;
+	const target = rt?.dial.target() ?? null;
+	return {
+		dialMode: prefs?.mode ?? LanDialModeEnum.Off,
+		manualUrl: prefs?.manualUrl ?? null,
+		activeUrl: target?.url ?? null,
+		listenerUrl: rt?.controller.url ?? null,
+		peers: (rt?.dial.knownPeers() ?? []).map((peer) => ({
+			instance: peer.instance,
+			urls: peer.urls,
+		})),
+	};
+}
+
+function parseLanListenerUrl(
+	url: string | null,
+): { addresses: readonly string[]; port: number } | null {
+	if (!url) return null;
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== "ws:" || !parsed.port) return null;
+		const port = Number(parsed.port);
+		if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return null;
+		return { addresses: [parsed.hostname], port };
+	} catch {
+		return null;
+	}
+}
 
 function bootStage(stage: string): void {
 	console.log(`[brainstorm/boot] ${stage} ${Date.now() - BOOT_START}`);
@@ -2023,7 +2094,7 @@ void app.whenReady().then(async () => {
 	// configured, loopback otherwise).
 	{
 		const { ActiveRelayOrchestrator, installActiveRelay } = await import("./sync/active-relay");
-		const { WebSocketRelayPort } = await import("./sync/websocket-relay-port");
+		const { WebSocketRelayPort, WebSocketRelayState } = await import("./sync/websocket-relay-port");
 		const { createLanSessionAccess, makeLanClientHandshakeForSession } = await import(
 			"./sync/lan-sync-wiring"
 		);
@@ -2088,10 +2159,59 @@ void app.whenReady().then(async () => {
 		const { LanHostController } = await import("./sync/lan-host-controller");
 		const { createLanListener } = await import("./sync/lan-host-factory");
 		const { DEFAULT_LAN_HOST_MODE } = await import("./sync/lan-host-policy");
-		const { lanInterfaces } = await import("./sync/lan-relay-listener");
+		const { lanInterfaces, rankLanInterfaces } = await import("./sync/lan-relay-listener");
 		const lanHostPrefs = new LanHostPrefsStore({
 			path: lanHostPrefsPath(app.getPath("userData")),
 		});
+		// P2P-1 — the DIAL half. Everything above this line is the host half; the
+		// client half read `syncRelay.lan` out of vault.json and nothing ever
+		// wrote it, so a device could listen and no device would ever dial. These
+		// are the pieces that let a user reach LAN sync from Settings.
+		const { LanPeerPrefsStore, lanPeerPrefsPath } = await import("./sync/lan-peer-prefs-store");
+		const {
+			LAN_CONNECT_TIMEOUT_MS,
+			LAN_HEARTBEAT_INTERVAL_MS,
+			LAN_HEARTBEAT_TIMEOUT_MS,
+			LanDialCoordinator,
+			LanDialMode,
+			LanDialSource,
+			parseLanPeerAddress,
+		} = await import("./sync/lan-dial-coordinator");
+		const { LanDiscoveryService } = await import("./sync/lan-discovery-service");
+		const { createLanMdnsBackend } = await import("./sync/lan-mdns-backend");
+		const lanPeerPrefs = new LanPeerPrefsStore({
+			path: lanPeerPrefsPath(app.getPath("userData")),
+		});
+		const lanDial = new LanDialCoordinator({
+			onTargetChanged: (target) => {
+				console.info(
+					`[lan-dial] ${target ? `target ${target.url} (${target.source})` : "no peer — relay"}`,
+				);
+				// Rebuild the transport in this turn so a discovered peer is dialled
+				// now rather than at the next vault change.
+				const relay = getActiveRelay();
+				if (relay) void relay.reconfigure();
+			},
+		});
+		// The discovery secret is derived per access from the sovereign user key
+		// rather than cached: a vault close must stop us advertising and stop us
+		// verifying, and a cached copy would outlive the session that authorised
+		// it. Derivation is one HKDF call, so per-access is free.
+		const lanDiscoverySecret = (): Uint8Array | null => {
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			try {
+				return session.lanDiscoverySecret();
+			} catch {
+				// A session disposed between the null-check and the call throws
+				// `assertOpen`; refusing is the correct read of that race.
+				return null;
+			}
+		};
+		// The listener's bound address + port, parsed back out of the URL the
+		// controller reports. That URL is the canonical thing a peer dials, so
+		// advertising anything derived separately could disagree with it.
+		let lanListenerEndpoint: { addresses: readonly string[]; port: number } | null = null;
 		const lanHost = new LanHostController({
 			readState: () => ({
 				// Prefs not loaded yet ⇒ the Off default, so a slow disk read cannot
@@ -2106,16 +2226,57 @@ void app.whenReady().then(async () => {
 			createListener: () =>
 				createLanListener({
 					access: lanAccess,
-					addresses: () => lanInterfaces().map((iface) => iface.address),
+					// P2P-1 — ranked, not raw: physical adapters ahead of Docker
+					// bridges, VPN `utun`s and VM host adapters, so the listener does
+					// not silently bind an address no peer can reach.
+					addresses: () => rankLanInterfaces(lanInterfaces()).map((iface) => iface.address),
 					onError: (error) => console.warn("[lan-host] listener error", error),
 				}),
 			onError: (error) => console.warn("[lan-host] could not bind", error),
-			onUrlChanged: (url) => console.info(`[lan-host] ${url ? `listening on ${url}` : "stopped"}`),
+			onUrlChanged: (url) => {
+				console.info(`[lan-host] ${url ? `listening on ${url}` : "stopped"}`);
+				// LAN-3's PRODUCING half. The listener has always minted exactly the
+				// URL the pairing payload wants, and the payload validator has always
+				// accepted it — nothing connected the two, so the only consumer of
+				// this callback was a log line. Now the bound URL reaches both the
+				// pairing payload (below) and the discovery advert.
+				lanListenerEndpoint = parseLanListenerUrl(url);
+				void lanDiscovery.apply();
+			},
 		});
-		lanHostRuntime = { prefs: lanHostPrefs, controller: lanHost };
+		// P2P-1 — advertise this device while it is hosting, and browse whenever
+		// the user asked us to find peers automatically. The two are independent:
+		// a laptop that dials the desktop need not accept anything itself.
+		const lanDiscovery = new LanDiscoveryService({
+			readState: () => ({
+				advertise: lanHost.listening,
+				browse: (lanPeerPrefs.cached?.mode ?? LanDialMode.Off) === LanDialMode.Auto,
+				listener: lanListenerEndpoint,
+			}),
+			discoverySecret: lanDiscoverySecret,
+			backend: await createLanMdnsBackend({
+				onError: (error) => console.warn("[lan-discovery] responder", error),
+			}),
+			onCandidate: (candidate) => lanDial.offerCandidate(candidate, LanDialSource.Discovery),
+			onError: (error) => console.warn("[lan-discovery]", error),
+		});
+		lanHostRuntime = {
+			prefs: lanHostPrefs,
+			controller: lanHost,
+			peerPrefs: lanPeerPrefs,
+			dial: lanDial,
+			discovery: lanDiscovery,
+			parsePeerAddress: parseLanPeerAddress,
+		};
 		void lanHostPrefs.load().then(() => lanHost.apply());
+		void lanPeerPrefs.load().then((prefs) => {
+			lanDial.setMode(prefs.mode);
+			lanDial.setManualUrl(prefs.manualUrl);
+			return lanDiscovery.apply();
+		});
 		app.on("before-quit", () => {
 			void lanHost.dispose();
+			void lanDiscovery.dispose();
 		});
 
 		// Re-prime on every vault change, and once now for a session that opened
@@ -2124,10 +2285,22 @@ void app.whenReady().then(async () => {
 		onActiveVaultSessionChanged(() => {
 			primeLanDevices();
 			void lanHost.apply();
+			// A new identity must not inherit the previous one's peers: the tags
+			// that verified them were derived from a key this session does not
+			// have, so every stored candidate is unverifiable now.
+			lanDial.reset();
+			void lanDiscovery.apply();
 		});
 		primeLanDevices();
 		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
+				// P2P-1 — LAN preferred, exclusively. A live peer target replaces the
+				// relay outright; when the dial fails or the link degrades the
+				// coordinator drops the target and the relay carries sync again.
+				resolveLanTarget: () => {
+					const target = lanDial.target();
+					return target ? { url: target.url, lan: true } : null;
+				},
 				makeRelayPort: (url, target) => {
 					// A LAN peer authenticates with the channel-bound device handshake;
 					// a cloud relay uses the SYNC-4b entitlement challenge. The two are
@@ -2141,8 +2314,40 @@ void app.whenReady().then(async () => {
 								url,
 								requireAdmission: true,
 								lanHandshake: makeLanClientHandshakeForSession(lanAccess),
+								// P2P-1 — measured, not guessed. A dial to a sleeping peer
+								// costs 75,010 ms on the OS default and 3,003 ms with this
+								// deadline; without it, exclusive LAN selection turns every
+								// sleeping-peer case into a 75-second sync outage. The
+								// heartbeat is the other half: the transport never noticed a
+								// frozen peer at all, and a 5 s answer deadline noticed in
+								// 5,047 ms. Both are LAN-only — the cloud path has a hosted
+								// node on the other end and is a separate question.
+								connectTimeoutMs: LAN_CONNECT_TIMEOUT_MS,
+								heartbeatIntervalMs: LAN_HEARTBEAT_INTERVAL_MS,
+								heartbeatTimeoutMs: LAN_HEARTBEAT_TIMEOUT_MS,
+								onDegraded: (degraded) => {
+									if (degraded) lanDial.noteDialUnusable(url);
+									else lanDial.noteDialOpen(url);
+								},
 							})
 						: new WebSocketRelayPort({ url, onChallenge });
+					if (target.lan) {
+						// The dial outcome drives selection: an admitted link clears the
+						// cooldown, anything else cools the address off and hands sync
+						// back to the relay. `Reconnecting` after a deadline is the
+						// signal that the address is not answering.
+						port.on("state", (state) => {
+							if (state === WebSocketRelayState.Open) lanDial.noteDialOpen(url);
+							// Only `Reconnecting`, never `Closed`: `close()` is also how the
+							// orchestrator retires a port when WE moved on, and cooling an
+							// address off for that would punish a peer that was healthy.
+							// `Reconnecting` is reached solely from an unexpected drop or
+							// an expired connect deadline.
+							else if (state === WebSocketRelayState.Reconnecting) {
+								lanDial.noteDialUnusable(url);
+							}
+						});
+					}
 					port.connect();
 					return port;
 				},
@@ -2166,7 +2371,24 @@ void app.whenReady().then(async () => {
 			}
 		}
 	}
-	registerPairingHandlers({ getDashboard: () => dashboardWindow });
+	registerPairingHandlers({
+		getDashboard: () => dashboardWindow,
+		// LAN-3's producing half: while this device hosts on the local network,
+		// the payload it hands the joining device carries its own private
+		// address, so the pair itself happens with no server in the middle.
+		getLanListenerUrl: () => lanHostRuntime?.controller.url ?? null,
+		// The just-paired device adopts its peer's address, so it can sync
+		// directly without waiting for an mDNS record to turn up. Filtered by the
+		// same predicate a typed address goes through: a payload that named a
+		// public host is not a LAN peer.
+		onPairedPeerUrl: (url) => {
+			const rt = lanHostRuntime;
+			if (!rt) return;
+			const normalised = rt.parsePeerAddress(url);
+			if (!normalised) return;
+			rt.dial.offerPairedPeer(normalised);
+		},
+	});
 	// Collab-C6 — privileged Settings → Identity profile get/set (the dashboard
 	// surface; apps use the capability-gated `roster` service instead).
 	registerProfileHandlers();
@@ -2220,6 +2442,33 @@ void app.whenReady().then(async () => {
 					// the next restart.
 					await rt.controller.apply();
 					return saved.mode;
+				},
+				// P2P-1 — the dial half. Everything above is "accept connections";
+				// these are "go and find the other machine", which is what was
+				// missing: nothing outside tests ever set the LAN trust model, so a
+				// device could listen and no device would ever dial.
+				getLanPeering: async () => lanPeeringSnapshot(await lanHostRuntime?.peerPrefs.load()),
+				setLanDialMode: async (mode) => {
+					const rt = lanHostRuntime;
+					if (!rt) return lanPeeringSnapshot(null);
+					const saved = await rt.peerPrefs.setMode(mode as LanDialModeValue);
+					rt.dial.setMode(saved.mode);
+					// Browsing follows the mode, so start/stop the responder in this
+					// turn rather than at the next restart.
+					await rt.discovery.apply();
+					return lanPeeringSnapshot(saved);
+				},
+				setLanPeerAddress: async (raw) => {
+					const rt = lanHostRuntime;
+					if (!rt) return null;
+					const input = raw === null ? null : typeof raw === "string" ? raw : "";
+					const saved = await rt.peerPrefs.setManualAddress(input);
+					// `null` ⇒ the address did not validate. Refuse rather than store
+					// it: a stored bad address looks exactly like the bug this rung
+					// exists to fix — the dialer silently never dials.
+					if (!saved) return null;
+					rt.dial.setManualUrl(saved.manualUrl);
+					return lanPeeringSnapshot(saved);
 				},
 				// 10.14 — offer cold restore when this keystore-intact device has
 				// an empty entities.db AND the active transport has a durable node.

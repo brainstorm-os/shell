@@ -101,6 +101,7 @@ import {
 } from "../storage/entities-repo";
 import { YDocStore } from "../storage/ydoc-store";
 import { openLanChallenge } from "../sync/lan-admission";
+import { deriveLanDiscoverySecret } from "../sync/lan-discovery-tag";
 import { appLockCooldownMs, isAppLockCapped } from "./app-lock-policy";
 import { readAppLockSettings, writeAppLockSettings } from "./app-lock-settings";
 import {
@@ -778,6 +779,29 @@ export class VaultSession {
 	signPayload(payload: Uint8Array): Uint8Array {
 		this.assertOpen();
 		return ed25519Sign(this.identitySecret, payload);
+	}
+
+	/**
+	 * P2P-1 — the identity's LAN discovery secret.
+	 *
+	 * A verb rather than the key, for the same reason `openLanSealedChallenge`
+	 * is a verb: the sovereign secret stays inside the session and the caller
+	 * gets only what it needs. What it needs is a value every device of THIS
+	 * identity can compute and no one else can, so that an mDNS advert can
+	 * carry a rotating tag proving "this is one of your machines" before the
+	 * dialer discloses its device key. See `sync/lan-discovery-tag.ts`.
+	 *
+	 * Derived from the sovereign SECRET, never the public key: the public key
+	 * appears in share invites and in every wire routing header, so a tag keyed
+	 * on it would be forgeable by anyone the user has ever shared with.
+	 *
+	 * A fresh buffer each call, owned by the caller. Cheap (one HKDF), so it is
+	 * derived per access rather than cached — a cached copy would outlive the
+	 * session that authorised it.
+	 */
+	lanDiscoverySecret(): Uint8Array {
+		this.assertOpen();
+		return deriveLanDiscoverySecret(this.identitySecret);
 	}
 
 	/** Sign `payload` with the per-device Ed25519 secret (Stage 10.5a).
