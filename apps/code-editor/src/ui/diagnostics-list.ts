@@ -29,25 +29,41 @@ function diagnosticMessage(
 	return t(MESSAGE_KEY[d.code], d.params);
 }
 
+/** The app's `plural` helper, widened to the generic key domain this pure
+ *  builder speaks. Count selection lives in `@brainstorm-os/sdk/i18n` — never
+ *  here, and never as a `count === 1` branch in component code. */
+export type DiagnosticsPlural = (
+	count: number,
+	oneKey: string,
+	otherKey: string,
+	params?: Record<string, string>,
+) => string;
+
 export type DiagnosticsListOptions = {
 	diagnostics: readonly Diagnostic[];
 	t: (key: string, params?: Record<string, string>) => string;
+	plural: DiagnosticsPlural;
 	/** Reveal a 1-based line in the editor (best-effort host hook). */
 	onReveal(line: number): void;
 };
 
 export function renderDiagnosticsList(opts: DiagnosticsListOptions): HTMLElement {
-	const { diagnostics, t, onReveal } = opts;
+	const { diagnostics, t, plural, onReveal } = opts;
 	const section = document.createElement("div");
 	section.className = "editor__diagnostics";
 
 	const head = document.createElement("div");
 	head.className = "editor__diagnostics-head";
 	const { errors, warnings } = countBySeverity(diagnostics);
+	// Each half is pluralised on its own count ("1 error · 2 warnings"); the
+	// separator stays in the catalog so a locale can move or replace it.
 	head.textContent =
 		diagnostics.length === 0
 			? t("diagnostics.clean")
-			: t("diagnostics.summary", { errors: String(errors), warnings: String(warnings) });
+			: t("diagnostics.summary", {
+					errors: plural(errors, "diagnostics.errors.one", "diagnostics.errors.other"),
+					warnings: plural(warnings, "diagnostics.warnings.one", "diagnostics.warnings.other"),
+				});
 	section.appendChild(head);
 
 	if (diagnostics.length === 0) return section;

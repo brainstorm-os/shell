@@ -6,6 +6,11 @@ import { renderDiagnosticsList } from "./diagnostics-list";
 const t = (key: string, params?: Record<string, string>) =>
 	params ? `${key}:${Object.values(params).join(",")}` : key;
 
+// Mirrors `@brainstorm-os/sdk/i18n`'s `plural`: the count === 1 selection lives
+// in the shared helper, never in the builder under test.
+const plural = (count: number, oneKey: string, otherKey: string) =>
+	t(count === 1 ? oneKey : otherKey, { count: String(count) });
+
 function diag(over: Partial<Diagnostic> = {}): Diagnostic {
 	return {
 		severity: DiagnosticSeverity.Warning,
@@ -17,7 +22,7 @@ function diag(over: Partial<Diagnostic> = {}): Diagnostic {
 
 describe("renderDiagnosticsList", () => {
 	it("shows a clean state with no diagnostics", () => {
-		const el = renderDiagnosticsList({ diagnostics: [], t, onReveal: vi.fn() });
+		const el = renderDiagnosticsList({ diagnostics: [], t, plural, onReveal: vi.fn() });
 		expect(el.querySelector(".editor__diagnostics-head")?.textContent).toBe("diagnostics.clean");
 		expect(el.querySelector(".editor__diagnostics-list")).toBeNull();
 	});
@@ -34,6 +39,7 @@ describe("renderDiagnosticsList", () => {
 				diag(),
 			],
 			t,
+			plural,
 			onReveal: vi.fn(),
 		});
 		expect(el.querySelector(".editor__diagnostic--error")).not.toBeNull();
@@ -48,6 +54,7 @@ describe("renderDiagnosticsList", () => {
 				diag({ code: DiagnosticCode.TrailingWhitespace }),
 			],
 			t,
+			plural,
 			onReveal: vi.fn(),
 		});
 		const msgs = [...el.querySelectorAll(".editor__diagnostic-msg")].map((n) => n.textContent);
@@ -55,9 +62,37 @@ describe("renderDiagnosticsList", () => {
 		expect(msgs).toContain("diagnostics.msg.trailingWhitespace");
 	});
 
+	it("pluralises each half of the summary on its own count (never “1 errors”)", () => {
+		const el = renderDiagnosticsList({
+			diagnostics: [
+				diag({ severity: DiagnosticSeverity.Error }),
+				diag({ severity: DiagnosticSeverity.Warning }),
+				diag({ severity: DiagnosticSeverity.Warning }),
+			],
+			t,
+			plural,
+			onReveal: vi.fn(),
+		});
+		expect(el.querySelector(".editor__diagnostics-head")?.textContent).toBe(
+			"diagnostics.summary:diagnostics.errors.one:1,diagnostics.warnings.other:2",
+		);
+	});
+
+	it("uses the plural branch for a zero count", () => {
+		const el = renderDiagnosticsList({
+			diagnostics: [diag({ severity: DiagnosticSeverity.Warning })],
+			t,
+			plural,
+			onReveal: vi.fn(),
+		});
+		expect(el.querySelector(".editor__diagnostics-head")?.textContent).toBe(
+			"diagnostics.summary:diagnostics.errors.other:0,diagnostics.warnings.one:1",
+		);
+	});
+
 	it("reveals the line on click", () => {
 		const onReveal = vi.fn();
-		const el = renderDiagnosticsList({ diagnostics: [diag({ line: 7 })], t, onReveal });
+		const el = renderDiagnosticsList({ diagnostics: [diag({ line: 7 })], t, plural, onReveal });
 		el.querySelector<HTMLButtonElement>(".editor__diagnostic")?.click();
 		expect(onReveal).toHaveBeenCalledWith(7);
 	});

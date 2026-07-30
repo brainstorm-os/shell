@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CODE_EDITOR_MESSAGES, t } from "./i18n";
+import { CODE_EDITOR_MESSAGES, plural, t } from "./i18n";
 
 describe("code-editor i18n", () => {
 	it("returns the English default for a known key", () => {
@@ -20,6 +20,17 @@ describe("code-editor i18n", () => {
 			const closes = (template.match(/\}/g) ?? []).length;
 			expect(opens, `${key} placeholder braces must balance`).toBe(closes);
 		}
+	});
+
+	it("reads the diagnostics summary singular/plural from real catalog keys", () => {
+		const summary = (errors: number, warnings: number) =>
+			t("diagnostics.summary", {
+				errors: plural(errors, "diagnostics.errors.one", "diagnostics.errors.other"),
+				warnings: plural(warnings, "diagnostics.warnings.one", "diagnostics.warnings.other"),
+			});
+		expect(summary(1, 1)).toBe("1 error · 1 warning");
+		expect(summary(0, 2)).toBe("0 errors · 2 warnings");
+		expect(summary(3, 0)).toBe("3 errors · 0 warnings");
 	});
 
 	it("provides a localised Open label distinct from the app title", () => {
