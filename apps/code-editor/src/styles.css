@@ -94,8 +94,11 @@ button {
 	justify-content: space-between;
 	gap: var(--space-2);
 	/* The shared 44px panel-header baseline — the FILES head, the refs head and
-	   the app header all sit on it. */
+	   the app header all sit on it. `flex-shrink: 0` is what keeps 44px a
+	   HEIGHT rather than a ceiling once the tree below it is long enough to
+	   compete for the column. */
 	height: 44px;
+	flex-shrink: 0;
 	padding: 0 var(--panel-inset);
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	font-size: var(--text-size-xs);
@@ -775,6 +778,11 @@ button {
 	display: flex;
 	align-items: center;
 	height: 44px;
+	/* The panel is a column flex container whose empty state is `flex: 1 1 auto`
+	   — without this the head is a shrinkable flex item and the 44px is only a
+	   ceiling: it rendered 19px tall next to the FILES head's 44px, breaking the
+	   project-wide panel-header baseline. */
+	flex-shrink: 0;
 	padding: 0 var(--panel-inset);
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	font-size: var(--text-size-xs);
@@ -986,6 +994,9 @@ button {
 .editor__diagnostics {
 	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	padding-block: var(--space-2);
+	/* Same reason as `.editor__refs-head`: a column-flex sibling of a `flex: 1`
+	   empty state must not be squeezed. */
+	flex-shrink: 0;
 }
 
 .editor__diagnostics-head {
