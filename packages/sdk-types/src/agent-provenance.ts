@@ -35,6 +35,16 @@ export type AgentProvenance = {
 	conversationId: string;
 	/** When the entity was created (epoch ms). */
 	createdAt: number;
+	/** Agent-Teams-3 — DUAL PROVENANCE, present when the object came from a
+	 *  team agent's proposal in a shared channel rather than the Agent app's own
+	 *  loop: which AGENT member proposed it (its `ed25519:<hex>` fingerprint).
+	 *  Server-authoritative like `agent` — main reads it from the proposal
+	 *  message's host-written `created_by`, never from the approving app. */
+	proposedBy?: string;
+	/** Agent-Teams-3 — the sovereign pubkey of the human who approved it. Also
+	 *  server-side: main uses the active session's own identity, so an app
+	 *  cannot attribute an approval to someone else. */
+	approvedBy?: string;
 };
 
 /** The client-supplied half of a create-time provenance request: the caller
@@ -67,8 +77,15 @@ export function buildAgentProvenance(
 	agent: string,
 	conversationId: string,
 	createdAt: number,
+	dual?: { proposedBy?: string; approvedBy?: string },
 ): AgentProvenance {
-	return { agent, conversationId, createdAt };
+	return {
+		agent,
+		conversationId,
+		createdAt,
+		...(dual?.proposedBy ? { proposedBy: dual.proposedBy } : {}),
+		...(dual?.approvedBy ? { approvedBy: dual.approvedBy } : {}),
+	};
 }
 
 /** Safely read a provenance stamp back out of an entity's properties, or null
@@ -84,7 +101,14 @@ export function readAgentProvenance(
 	if (typeof agent !== "string" || agent === "") return null;
 	if (typeof conversationId !== "string" || conversationId === "") return null;
 	if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) return null;
-	return { agent, conversationId, createdAt };
+	const { proposedBy, approvedBy } = raw as Record<string, unknown>;
+	return {
+		agent,
+		conversationId,
+		createdAt,
+		...(typeof proposedBy === "string" && proposedBy !== "" ? { proposedBy } : {}),
+		...(typeof approvedBy === "string" && approvedBy !== "" ? { approvedBy } : {}),
+	};
 }
 
 /** Remove any caller-supplied provenance key from a property bag. The service

@@ -27,10 +27,9 @@
  * Pure + framework-free, exhaustively unit-tested without a runtime.
  */
 
-import { capabilityImplies } from "@brainstorm-os/sdk-types";
+import { ProposeKind, type ProposedArtifact, capabilityImplies } from "@brainstorm-os/sdk-types";
 import { CodeLanguage, detectLanguage, isCodeLanguage } from "@brainstorm-os/sdk/language-detect";
 import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
-import { ProposeKind, type ProposedArtifact } from "./propose-artifacts";
 
 /** The tool verb the model calls to stage a code file. */
 export const PROPOSE_CODE_FILE_VERB = "propose-code-file";
@@ -49,13 +48,6 @@ export const CODE_FILE_CONTENT_MAX = 256 * 1024;
 
 /** Same clamp the Code editor's rename path applies (`MAX_RENAME_LENGTH`). */
 export const CODE_FILE_PATH_MAX = 200;
-
-/** The code-file payload a {@link ProposeKind.CodeFile} artifact carries:
- *  the resolved language (model-supplied when valid, else inferred from the
- *  path/first line, mirroring the Code editor's own detection fallback). */
-export type ProposedCodeFile = {
-	language: CodeLanguage;
-};
 
 export enum CodeFileRejectReason {
 	/** No usable `path` (empty, or nothing survives sanitization). */

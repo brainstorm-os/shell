@@ -20,13 +20,13 @@
  */
 
 import { humanizeKey, uniqueName } from "@brainstorm-os/sdk";
-import { ValueType } from "@brainstorm-os/sdk-types";
 import {
 	PROPOSE_SHORT_MAX,
 	ProposeKind,
 	type ProposedArtifact,
 	type RowColumn,
-} from "./propose-artifacts";
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import { ROW_PRIMARY_KEY } from "./propose-row";
 
 /** The tool verb the model calls to stage a new database. */
@@ -73,15 +73,6 @@ export enum DatabaseRejectReason {
 	/** The proposal carried no usable database name. */
 	MissingName = "missing-name",
 }
-
-/** The staged schema + row count a {@link ProposeKind.Database} artifact
- *  carries. The row CELLS live in the artifact's `fields` under
- *  {@link rowCellKey} so the existing edit reducer + card inputs work
- *  unchanged; `rowCount` says how many rows those keys describe. */
-export type ProposedDatabase = {
-	columns: readonly RowColumn[];
-	rowCount: number;
-};
 
 export type BuildDatabaseResult =
 	| { ok: true; artifact: ProposedArtifact }

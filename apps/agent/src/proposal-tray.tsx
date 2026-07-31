@@ -14,6 +14,12 @@
  * laid out as the row it will become — label column, value column.
  */
 
+import {
+	PROPOSE_DESCRIPTORS,
+	ProposeKind,
+	type ProposedArtifact,
+	type RowColumn,
+} from "@brainstorm-os/sdk-types";
 import type { ThemedToken } from "@brainstorm-os/sdk/code-highlight";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { languageDisplayLabel, shikiIdForLanguage } from "@brainstorm-os/sdk/language-detect";
@@ -26,12 +32,6 @@ import {
 	findCodeFilePathConflict,
 	nextFreeCodeFilePath,
 } from "./logic/code-file-conflict";
-import {
-	PROPOSE_DESCRIPTORS,
-	ProposeKind,
-	type ProposedArtifact,
-	type RowColumn,
-} from "./logic/propose-artifacts";
 import { rowCellKey } from "./logic/propose-database";
 
 const KIND_LABEL_KEY: Record<ProposeKind, AgentI18nKey> = {

@@ -1,6 +1,5 @@
-import { ValueType } from "@brainstorm-os/sdk-types";
+import { ProposeKind, ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
-import { ProposeKind } from "./propose-artifacts";
 import {
 	DATABASE_MAX_COLUMNS,
 	DATABASE_MAX_ROWS,

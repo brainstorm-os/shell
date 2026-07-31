@@ -2714,6 +2714,46 @@ export type {
 	AgentToolCall,
 } from "./agent-loop";
 
+// ─── Propose / approve (Agent-11) ───────────────────────────────────────────
+//
+// The agent PROPOSES vault artifacts and never persists them: the staging
+// catalogue, the fail-closed field mapping, the pending-buffer reducer and the
+// approval-side property mapper are all pure, so the main process, the Agent
+// app and the Chat app share one implementation. Per `./propose` /
+// `./propose-persist`.
+
+export { CodeLanguage } from "./code-language";
+export {
+	PROPOSE_DESCRIPTORS,
+	PROPOSE_LONG_MAX,
+	PROPOSE_SHORT_MAX,
+	PROPOSE_TOOL_GUIDANCE,
+	ProposalActionKind,
+	ProposalRejectReason,
+	ProposeKind,
+	buildProposal,
+	buildProposalAck,
+	emptyProposalState,
+	proposalReducer,
+	proposeDescriptorForVerb,
+	proposeEntityWriteCapabilities,
+	proposeToolCapabilities,
+	proposeTools,
+} from "./propose";
+export type {
+	BuildProposalResult,
+	ProposalAction,
+	ProposalState,
+	ProposeDescriptor,
+	ProposedArtifact,
+	ProposedCodeFile,
+	ProposedDatabase,
+	ProposedRow,
+	RowColumn,
+} from "./propose";
+export { proposalToEntityProperties } from "./propose-persist";
+export type { ProposalPersistPlan } from "./propose-persist";
+
 // ─── MCP integrations (doc 64 — MCP client) ─────────────────────────────────
 export {
 	HTTP_MCP_TRANSPORTS,

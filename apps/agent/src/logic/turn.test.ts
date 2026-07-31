@@ -9,10 +9,10 @@ import {
 	type AgentToolCall,
 	GENERIC_OBJECT_TYPE,
 	type IntentsService,
+	type ProposedArtifact,
 	ValueType,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
-import type { ProposedArtifact } from "./propose-artifacts";
 import { CodeFileRejectReason, PROPOSE_CODE_FILE_VERB } from "./propose-code-file";
 import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";

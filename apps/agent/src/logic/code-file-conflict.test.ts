@@ -5,6 +5,7 @@
  * contents, which is the property that actually broke.
  */
 
+import { type ProposedArtifact, buildProposal } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import {
 	CodeFileConflictChoice,
@@ -17,7 +18,6 @@ import {
 	nextFreeCodeFilePath,
 	releaseCodeFilePath,
 } from "./code-file-conflict";
-import { type ProposedArtifact, buildProposal } from "./propose-artifacts";
 import { CODE_FILE_ENTITY_TYPE, buildCodeFileProposal } from "./propose-code-file";
 import { CodeFilePathConflictError, persistApprovedProposal } from "./propose-persist";
 

@@ -6,11 +6,16 @@
  * disabled once the required primary field is cleared (never a blank write).
  */
 
-import { GENERIC_OBJECT_TYPE, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	GENERIC_OBJECT_TYPE,
+	ProposeKind,
+	type ProposedArtifact,
+	ValueType,
+	buildProposal,
+} from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFileConflictChoice, type CodeFilePathRow } from "./logic/code-file-conflict";
-import { ProposeKind, type ProposedArtifact, buildProposal } from "./logic/propose-artifacts";
 import { PROPOSE_CODE_FILE_VERB, buildCodeFileProposal } from "./logic/propose-code-file";
 import { PROPOSE_DATABASE_VERB, buildDatabaseProposal, rowCellKey } from "./logic/propose-database";
 import { PROPOSE_ROW_VERB, buildRowProposal } from "./logic/propose-row";
