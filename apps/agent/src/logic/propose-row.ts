@@ -29,16 +29,14 @@ import {
 	type ColumnSpec,
 	type ListSource,
 	ListSourceKind,
-	ValueType,
-	capabilityImplies,
-	decideRowCreate,
-} from "@brainstorm-os/sdk-types";
-import {
 	PROPOSE_SHORT_MAX,
 	ProposeKind,
 	type ProposedArtifact,
 	type RowColumn,
-} from "./propose-artifacts";
+	ValueType,
+	capabilityImplies,
+	decideRowCreate,
+} from "@brainstorm-os/sdk-types";
 
 /** The tool verb the model calls to stage a row. */
 export const PROPOSE_ROW_VERB = "propose-row";

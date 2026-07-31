@@ -17,12 +17,13 @@
  * `dispatchTool`, which routes a propose verb here instead of to the vault.
  *
  * Pure + framework-free so the catalogue, the fail-closed field mapping, and the
- * pending-buffer reducer are all unit-tested without a runtime.
+ * pending-buffer reducer are all unit-tested without a runtime — and so the main
+ * process, the Agent app and the Chat app share ONE implementation.
  */
 
-import type { AgentTool, ValueType } from "@brainstorm-os/sdk-types";
-import type { ProposedCodeFile } from "./propose-code-file";
-import type { ProposedDatabase } from "./propose-database";
+import type { AgentTool } from "./automations";
+import type { CodeLanguage } from "./code-language";
+import type { ValueType } from "./properties";
 
 /** The artifact kinds the agent can propose (Agent-11a/b: simple entities;
  *  database rows / new databases are Agent-11d/11e). Each kind is its OWN tool
@@ -176,6 +177,22 @@ export type ProposedRow = {
 	databaseName: string;
 	addToMembers: boolean;
 	columns: readonly RowColumn[];
+};
+
+/** The staged schema + row count a {@link ProposeKind.Database} artifact
+ *  carries. The row CELLS live in the artifact's `fields` under `rowCellKey`
+ *  so the existing edit reducer + card inputs work unchanged; `rowCount` says
+ *  how many rows those keys describe (Agent-11e). */
+export type ProposedDatabase = {
+	columns: readonly RowColumn[];
+	rowCount: number;
+};
+
+/** The code-file payload a {@link ProposeKind.CodeFile} artifact carries:
+ *  the resolved language (model-supplied when valid, else inferred from the
+ *  path/first line, mirroring the Code editor's own detection fallback). */
+export type ProposedCodeFile = {
+	language: CodeLanguage;
 };
 
 /** A staged draft awaiting the user's approval. `id` is host-minted when the

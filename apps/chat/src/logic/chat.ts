@@ -21,6 +21,7 @@ import {
 	SenderKind,
 } from "@brainstorm-os/sdk-types";
 import { parseAttachments } from "@brainstorm-os/sdk/composer-context";
+import { type ChannelProposal, readChannelProposal } from "./proposal";
 
 /** The Chat-owned channel type (a channel is NOT an AI `Conversation/v1`, so
  *  it never collides with the Agent app's primary opener). */
@@ -59,6 +60,10 @@ export type ChatMessage = {
 	/** Context the author attached to the message (documents / people / media) —
 	 *  rendered as chips; the persona-agent reading the channel grounds on them. */
 	attachments: MessageAttachment[];
+	/** Agent-Teams-3 — an agent's staged draft riding on this message, when the
+	 *  row carries a well-formed one. Absent for every ordinary message AND for
+	 *  a malformed proposal (fail-closed: it renders as an ordinary message). */
+	proposal?: ChannelProposal;
 };
 
 /** One run of consecutive messages from the same author on the same day, within
@@ -133,6 +138,7 @@ function readAuthor(
 export function toMessage(entity: EntityLike): ChatMessage {
 	const author = readAuthor(entity.properties, entity.id);
 	const richBody = str(entity.properties.richBody);
+	const proposal = readChannelProposal(entity.properties);
 	return {
 		id: entity.id,
 		channelId: str(entity.properties.conversation),
@@ -143,6 +149,7 @@ export function toMessage(entity: EntityLike): ChatMessage {
 		createdAt: str(entity.properties.createdAt),
 		seq: num(entity.properties.seq) ?? 0,
 		attachments: parseAttachments(entity.properties.attachments),
+		...(proposal ? { proposal } : {}),
 	};
 }
 

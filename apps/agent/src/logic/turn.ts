@@ -20,16 +20,14 @@ import {
 	type AiService,
 	type Intent,
 	type IntentsService,
-	runAgentLoop,
-} from "@brainstorm-os/sdk-types";
-import { toolCallToIntent } from "./agent-tools";
-import {
 	PROPOSE_TOOL_GUIDANCE,
 	type ProposedArtifact,
 	buildProposal,
 	buildProposalAck,
 	proposeDescriptorForVerb,
-} from "./propose-artifacts";
+	runAgentLoop,
+} from "@brainstorm-os/sdk-types";
+import { toolCallToIntent } from "./agent-tools";
 import {
 	PROPOSE_CODE_FILE_VERB,
 	buildCodeFileProposal,

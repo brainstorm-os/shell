@@ -29,10 +29,15 @@ import {
 	MessageRole,
 	OLLAMA_PROVIDER_ID,
 	type PlatformCatalog,
+	ProposalActionKind,
+	ProposeKind,
+	type ProposedArtifact,
 	SenderKind,
 	ToolRefusalReason,
 	capabilityImplies,
+	emptyProposalState,
 	intersectAgentTools,
+	proposalReducer,
 } from "@brainstorm-os/sdk-types";
 import {
 	AttachContextButton,
@@ -110,13 +115,6 @@ import {
 	memoriesFromEntities,
 } from "./logic/memory";
 import { seedFromProcessIntent } from "./logic/process-intent";
-import {
-	ProposalActionKind,
-	ProposeKind,
-	type ProposedArtifact,
-	emptyProposalState,
-	proposalReducer,
-} from "./logic/propose-artifacts";
 import { canProposeCodeFiles } from "./logic/propose-code-file";
 import { persistProposedDatabase } from "./logic/propose-database-persist";
 import { CodeFilePathConflictError, persistApprovedProposal } from "./logic/propose-persist";

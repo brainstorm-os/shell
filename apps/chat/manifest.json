@@ -16,6 +16,7 @@
     "roster.read",
     "roster.write",
     "agents.mention",
+    "agents.approve",
     "sharing.read",
     "sharing.share",
     "ui.badge"

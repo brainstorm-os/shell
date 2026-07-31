@@ -26,6 +26,35 @@
  *  create/update and only re-stamps it server-side. */
 export const AGENT_PROVENANCE_PROPERTY_KEY = "agentProvenance";
 
+/** Agent-Teams-3 — the staged proposal card on a chat message. RESERVED for
+ *  the same reason as provenance, and learned the same way: while it was an
+ *  ordinary property, any app holding `entities.write:brainstorm/Message/v1`
+ *  could paste a card onto an agent-authored message and have the privileged
+ *  approve path mint an entity of ANY type under that agent's name. The
+ *  entities service strips it from every create/update, so only the host can
+ *  author a card or settle one. */
+export const AGENT_PROPOSAL_PROPERTY_KEY = "agentProposal";
+
+/** Property keys an app may never write. The service strips each on create and
+ *  update; the host writes them through the repo directly. */
+export const RESERVED_PROPERTY_KEYS: readonly string[] = [
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	AGENT_PROPOSAL_PROPERTY_KEY,
+];
+
+/** Drop every reserved key from a caller-supplied bag. Returns the same
+ *  reference when none are present (the common path allocates nothing). */
+export function stripReservedProperties(
+	properties: Record<string, unknown>,
+): Record<string, unknown> {
+	if (!RESERVED_PROPERTY_KEYS.some((key) => key in properties)) return properties;
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(properties)) {
+		if (!RESERVED_PROPERTY_KEYS.includes(key)) out[key] = value;
+	}
+	return out;
+}
+
 /** The provenance stamp carried in an agent-created entity's properties. */
 export type AgentProvenance = {
 	/** Broker-verified app id of the proposing agent. Server-authoritative —
@@ -35,6 +64,16 @@ export type AgentProvenance = {
 	conversationId: string;
 	/** When the entity was created (epoch ms). */
 	createdAt: number;
+	/** Agent-Teams-3 — DUAL PROVENANCE, present when the object came from a
+	 *  team agent's proposal in a shared channel rather than the Agent app's own
+	 *  loop: which AGENT member proposed it (its `ed25519:<hex>` fingerprint).
+	 *  Server-authoritative like `agent` — main reads it from the proposal
+	 *  message's host-written `created_by`, never from the approving app. */
+	proposedBy?: string;
+	/** Agent-Teams-3 — the sovereign pubkey of the human who approved it. Also
+	 *  server-side: main uses the active session's own identity, so an app
+	 *  cannot attribute an approval to someone else. */
+	approvedBy?: string;
 };
 
 /** The client-supplied half of a create-time provenance request: the caller
@@ -67,8 +106,15 @@ export function buildAgentProvenance(
 	agent: string,
 	conversationId: string,
 	createdAt: number,
+	dual?: { proposedBy?: string; approvedBy?: string },
 ): AgentProvenance {
-	return { agent, conversationId, createdAt };
+	return {
+		agent,
+		conversationId,
+		createdAt,
+		...(dual?.proposedBy ? { proposedBy: dual.proposedBy } : {}),
+		...(dual?.approvedBy ? { approvedBy: dual.approvedBy } : {}),
+	};
 }
 
 /** Safely read a provenance stamp back out of an entity's properties, or null
@@ -84,7 +130,14 @@ export function readAgentProvenance(
 	if (typeof agent !== "string" || agent === "") return null;
 	if (typeof conversationId !== "string" || conversationId === "") return null;
 	if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) return null;
-	return { agent, conversationId, createdAt };
+	const { proposedBy, approvedBy } = raw as Record<string, unknown>;
+	return {
+		agent,
+		conversationId,
+		createdAt,
+		...(typeof proposedBy === "string" && proposedBy !== "" ? { proposedBy } : {}),
+		...(typeof approvedBy === "string" && approvedBy !== "" ? { approvedBy } : {}),
+	};
 }
 
 /** Remove any caller-supplied provenance key from a property bag. The service
