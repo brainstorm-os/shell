@@ -464,3 +464,31 @@
 	font-family: var(--text-family-code);
 	word-break: break-all;
 }
+
+/* Blocked links (Privacy). Only rendered when at least one link is blocked,
+   so it never occupies space in the common case. */
+.network-egress__blocked-links {
+	list-style: none;
+	margin: var(--space-2) 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.network-egress__blocked-link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-raised);
+}
+
+.network-egress__blocked-link code {
+	font-family: var(--text-family-code);
+	color: var(--color-text-secondary);
+	overflow-wrap: anywhere;
+}

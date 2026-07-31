@@ -38,6 +38,7 @@ import {
 	type OpenWithCandidate,
 	type OpenWithDecision,
 	OpenWithDecisionKind,
+	type OsHandoffConsent,
 	OsHandoffPromptDecision,
 	type PinResolution,
 	type PropertyDef,
@@ -351,6 +352,10 @@ export type RegisteredWidget = {
 };
 export type { PinResolution };
 export type DashboardSnapshot = {
+	/** Remembered "open outside the vault" decisions, keyed by signature
+	 *  (`scheme:https` / `ext:pdf`). A `Denied` entry is what the Privacy
+	 *  panel's Blocked-links control clears. */
+	osHandoffConsent?: Record<string, OsHandoffConsent>;
 	/** Active pair's wallpaper, decided by `appearance.mode` + the OS
 	 *  prefers-color-scheme (resolved main-side via `nativeTheme`). */
 	wallpaper: DashboardWallpaper;
@@ -1331,6 +1336,11 @@ const dashboard = {
 	/** Record that the one-shot pre-8px → 8px icon-grid re-pack has run, so the
 	 *  icons layer never re-packs (resets) the layout again on this vault. */
 	markIconGridMigrated: (): Promise<void> => ipcRenderer.invoke("dashboard:mark-icon-grid-migrated"),
+	/** Forget a remembered "open outside the vault" decision, or all of them
+	 *  when no signature is given. A Deny is otherwise permanent, which left
+	 *  a blocked link with no way back. */
+	clearOsHandoffConsent: (signature?: string): Promise<void> =>
+		ipcRenderer.invoke("dashboard:clear-os-handoff-consent", signature),
 	/** Apply a wallpaper. Without `slot`, the wallpaper lands in the
 	 *  currently-active slot (Settings → Appearance's primary path). With
 	 *  `slot`, the wallpaper lands in the named slot regardless of which
