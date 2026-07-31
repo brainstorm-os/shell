@@ -23,7 +23,14 @@ export type AuditEventKind =
 	| "vault.activate"
 	| "capability.grant"
 	| "capability.revoke"
-	| "ipc.denied";
+	| "ipc.denied"
+	// Agent-Teams-1 — agent-member lifecycle + per-agent authority changes,
+	// keyed on the agent fingerprint so "what happened to this agent" is a
+	// filter over one log.
+	| "agent.create"
+	| "agent.delete"
+	| "agent.grant"
+	| "agent.revoke";
 
 export type AuditEventInput = {
 	kind: AuditEventKind;

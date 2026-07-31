@@ -10,18 +10,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
-import { RosterRole } from "@brainstorm-os/sdk-types";
+import {
+	AGENT_TYPE,
+	AgentAutonomy,
+	AgentMemoryScope,
+	AgentRouting,
+	RosterMemberKind,
+	RosterRole,
+	agentDefToEntityProperties,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION } from "../../ipc/envelope";
 import { AccessRole, grantAccess } from "../collab/access-record";
 import {
+	fingerprintPublicKey,
 	generateIdentity,
 	publicKeyToBase64,
 	signPayload as signWith,
 } from "../credentials/identity";
 import { DataStores } from "../storage/data-stores";
+import { EntitiesRepository } from "../storage/entities-repo";
 import { YDocStore } from "../storage/ydoc-store";
 import type { VaultSession } from "../vault/session";
 import {
@@ -181,5 +191,89 @@ describe("roster service (Collab-C6)", () => {
 	it("rejects an unknown method", async () => {
 		const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
 		await expect(handler(envelope("nope", [], []))).rejects.toMatchObject({ name: "Invalid" });
+	});
+
+	describe("agent members (Agent-Teams-1)", () => {
+		async function seedAgentRow(displayName: string): Promise<{ pubkey: string; fp: string }> {
+			const kp = generateIdentity();
+			const pubkey = publicKeyToBase64(kp.publicKey);
+			const fp = fingerprintPublicKey(kp.publicKey);
+			const repo = new EntitiesRepository(await env.stores.open("entities"));
+			repo.create({
+				id: `agt_${displayName.toLowerCase()}`,
+				type: AGENT_TYPE,
+				createdBy: "shell",
+				properties: agentDefToEntityProperties({
+					pubkey,
+					fingerprint: fp,
+					displayName,
+					avatarRef: null,
+					persona: "",
+					skills: [],
+					routing: AgentRouting.LocalOnly,
+					autonomy: AgentAutonomy.ConfirmOnWrite,
+					memoryScope: AgentMemoryScope.PerConversation,
+				}),
+				now: 1000,
+				dekId: null,
+			});
+			return { pubkey, fp };
+		}
+
+		it("does NOT include vault agents unless asked", async () => {
+			await seedAgentRow("Researcher");
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			expect(members).toHaveLength(1);
+		});
+
+		it("includeAgents appends agents as named Viewer-role Agent-kind members", async () => {
+			const { pubkey, fp } = await seedAgentRow("Researcher");
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL, { includeAgents: true }], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			expect(members).toHaveLength(2);
+			const agent = members.find((m) => m.pubkey === pubkey);
+			expect(agent).toMatchObject({
+				kind: RosterMemberKind.Agent,
+				role: RosterRole.Viewer,
+				displayName: "Researcher",
+				fingerprint: fp,
+				isSelf: false,
+			});
+		});
+
+		it("an access-record member that IS an agent resolves as Agent kind without the flag", async () => {
+			const { pubkey } = await seedAgentRow("Researcher");
+			await grantMemberOnDisk(env.ydocStore, env.selfKp.secretKey, pubkey, AccessRole.Viewer);
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			const agent = members.find((m) => m.pubkey === pubkey);
+			expect(agent?.kind).toBe(RosterMemberKind.Agent);
+			expect(agent?.displayName).toBe("Researcher");
+		});
+
+		it("drops an agent row whose identity is mangled (fail-closed)", async () => {
+			const repo = new EntitiesRepository(await env.stores.open("entities"));
+			repo.create({
+				id: "agt_bad",
+				type: AGENT_TYPE,
+				createdBy: "shell",
+				properties: { name: "Evil", pubkey: "not base64 !!", fingerprint: "nope" },
+				now: 1000,
+				dekId: null,
+			});
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL, { includeAgents: true }], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			expect(members).toHaveLength(1);
+			expect(members[0]?.isSelf).toBe(true);
+		});
 	});
 });

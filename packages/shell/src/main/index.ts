@@ -185,6 +185,7 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
+import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
 import { registerBillingSettingsHandlers } from "./ipc/billing-settings-handlers";
@@ -1551,6 +1552,8 @@ void app.whenReady().then(async () => {
 	registerLedgerHandlers({
 		onGrantsChanged: () => void automationsDeployment?.rehydrate().catch(() => {}),
 	});
+	// Agent-Teams-1 — the Team surface's directory + per-agent grant/revoke.
+	registerAgentHandlers();
 	registerBrainstormProtocol();
 	registerBlockFrameProtocol({
 		getBlocksRepo: async () => {
