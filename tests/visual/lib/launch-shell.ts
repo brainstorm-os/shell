@@ -7,6 +7,7 @@
  */
 
 export {
+	hiddenWindowEnv,
 	launchShell,
 	shellBuildExists,
 	type LaunchOptions,

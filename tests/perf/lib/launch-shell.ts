@@ -48,6 +48,21 @@ export function shellBuildExists(): boolean {
 	return existsSync(MAIN_ENTRY);
 }
 
+/**
+ * Harness runs are HIDDEN by default: `BRAINSTORM_HIDDEN_WINDOWS=1` stops the
+ * shell mapping any window onto a display (see
+ * `packages/shell/src/main/window/reveal-window.ts`), so an e2e / perf / soak
+ * / visual run never paints over whatever the developer is doing. The renderer
+ * keeps painting, so CDP screenshots and screencasts are unaffected.
+ *
+ * Opt out with `BRAINSTORM_TEST_VISIBLE=1` when a human genuinely wants to
+ * watch a run.
+ */
+export function hiddenWindowEnv(): Record<string, string> {
+	if (process.env.BRAINSTORM_TEST_VISIBLE === "1") return {};
+	return { BRAINSTORM_HIDDEN_WINDOWS: "1" };
+}
+
 export async function launchShell(options: LaunchOptions): Promise<LaunchResult> {
 	if (!shellBuildExists()) {
 		throw new Error(
@@ -67,6 +82,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchResult>
 			// launches don't rip OS focus away from the developer — Playwright
 			// drives the renderer over CDP, which never needs OS-level focus.
 			BRAINSTORM_NO_FOCUS: "1",
+			...hiddenWindowEnv(),
 			NODE_ENV: "production",
 			...(options.extraEnv ?? {}),
 		},

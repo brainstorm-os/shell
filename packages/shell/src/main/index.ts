@@ -369,7 +369,7 @@ import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
 import { brainstormChromeOptions } from "./window/chrome-options";
 import { DockActivation, resolveDockActivation } from "./window/dashboard-activation";
-import { focusStealingDisabled, revealWindow } from "./window/reveal-window";
+import { focusStealingDisabled, revealWindow, surfaceWindow } from "./window/reveal-window";
 import { type WorkersHandle, setWorkersHandle, startWorkers } from "./workers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1309,6 +1309,12 @@ function createDashboardWindow(): BrowserWindow {
 		// the bg follows.
 		backgroundColor: themes[DEFAULT_THEME].color.background.primary,
 		show: false,
+		// Load-bearing for `BRAINSTORM_HIDDEN_WINDOWS` (window/reveal-window.ts):
+		// a window that is never shown only keeps painting — and so only keeps
+		// answering CDP screenshot/screencast — while this is on. It is
+		// Electron's default; pinned so a default flip can't silently turn every
+		// harness capture black.
+		paintWhenInitiallyHidden: true,
 		autoHideMenuBar: true,
 		...brainstormChromeOptions(),
 		webPreferences: {
@@ -5365,9 +5371,7 @@ void app.whenReady().then(async () => {
 			openSearch: (query) => {
 				const dashboard = dashboardWindow;
 				if (!dashboard || dashboard.isDestroyed() || dashboard.webContents.isDestroyed()) return;
-				if (dashboard.isMinimized()) dashboard.restore();
-				dashboard.show();
-				dashboard.focus();
+				surfaceWindow(dashboard);
 				dashboard.webContents.send(SHELL_ACTION_CHANNEL, { action: "search", query });
 			},
 		}),
@@ -5973,8 +5977,7 @@ void app.whenReady().then(async () => {
 			shortcuts.attach(dashboardWindow.webContents);
 			wireDashboardLinkRouting(dashboardWindow.webContents);
 		} else if (dashboardWindow) {
-			dashboardWindow.show();
-			dashboardWindow.focus();
+			surfaceWindow(dashboardWindow);
 		}
 	});
 });

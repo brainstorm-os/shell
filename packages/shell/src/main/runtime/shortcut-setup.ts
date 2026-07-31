@@ -19,6 +19,7 @@
 
 import { BrowserWindow, type Input, type WebContents } from "electron";
 import { ShortcutRegistry } from "../shortcuts/shortcut-registry";
+import { surfaceWindow } from "../window/reveal-window";
 import { SHELL_ACTION_CHANNEL } from "./menu-setup";
 
 export type ShortcutSetupOptions = {
@@ -100,11 +101,7 @@ export function createShortcutSetup(options: ShortcutSetupOptions): ShortcutSetu
 			const surfaces = action?.surfacesOnDashboard !== false;
 			if (surfaces && dashboard.id !== webContents.id) {
 				const window = BrowserWindow.fromWebContents(dashboard);
-				if (window && !window.isDestroyed()) {
-					if (window.isMinimized()) window.restore();
-					window.show();
-					window.focus();
-				}
+				if (window) surfaceWindow(window);
 			}
 			dashboard.send(SHELL_ACTION_CHANNEL, { action: actionFor(id) });
 		});
