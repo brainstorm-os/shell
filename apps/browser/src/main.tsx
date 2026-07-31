@@ -1,4 +1,5 @@
 import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/sdk/empty-state.css";
 import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
 import { createRoot } from "react-dom/client";

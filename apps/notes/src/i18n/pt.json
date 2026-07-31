@@ -227,6 +227,7 @@
   "notes.link.searchPlaceholder": "Pesquisar notas para vincular…",
   "notes.link.options": "Notas vinculáveis",
   "notes.link.noResults": "Ainda não há notas para vincular",
+  "notes.link.noResultsOfType": "Ainda não há {types} para vincular",
   "notes.dict.region": "Editor de dicionário",
   "notes.dict.nameLabel": "Nome do dicionário",
   "notes.dict.count": "{n} valores",

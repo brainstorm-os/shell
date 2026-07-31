@@ -2,8 +2,10 @@
  * FormatChordsPlugin — keyboard chords for the editing actions Lexical ships no
  * default binding for, shared by every editor consumer (extracted from Notes).
  *
- *   - Strikethrough `Mod+Shift+S` and inline code `Mod+Shift+E` — the two marks
- *     with no native chord (Bold / Italic / Underline already have `Mod+B/I/U`).
+ *   - Strikethrough `Mod+Shift+S` and inline code `Mod+E` (with `Mod+Shift+E`
+ *     kept as an alias) — the two marks with no native chord (Bold / Italic /
+ *     Underline already have `Mod+B/I/U`). `Mod+E` is the convention users
+ *     arrive with (Notion et al.) — POLISH-ED-3 filed exactly this gap.
  *     Each toggles `FORMAT_TEXT_COMMAND`, the same command the inline toolbar's
  *     buttons dispatch, so chord and button stay in lockstep.
  *   - Turn-into `Mod+Alt+0…9` — paragraph / H1-3 / bullet / numbered / todo /
@@ -82,7 +84,7 @@ export function FormatChordsPlugin(): null {
 	);
 
 	useEditorShortcut(
-		["Mod+Shift+E"],
+		["Mod+E", "Mod+Shift+E"],
 		useCallback(
 			(event: KeyboardEvent) => {
 				event.preventDefault();

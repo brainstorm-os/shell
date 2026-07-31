@@ -188,6 +188,12 @@ export {
 export { ToggleCollapseStore } from "./plugins/toggle-collapse-store";
 export { TURN_INTO_COMMAND, TurnIntoPlugin } from "./plugins/turn-into-plugin";
 export {
+	type ListMarkdownMatch,
+	ListMarkdownShortcutsPlugin,
+	ListShortcutKind,
+	matchListMarkdownPrefix,
+} from "./plugins/list-markdown-shortcuts-plugin";
+export {
 	type StandardEditingPluginsProps,
 	StandardEditingPlugins,
 } from "./plugins/standard-editing-plugins";

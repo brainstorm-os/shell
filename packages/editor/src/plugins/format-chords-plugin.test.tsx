@@ -145,4 +145,28 @@ describe("FormatChordsPlugin (shared)", () => {
 		expect(marks).toContain("code");
 		unregister();
 	});
+
+	it("Mod+E (no Shift) dispatches the code mark — POLISH-ED-3", async () => {
+		const marks: TextFormatType[] = [];
+		const unregister = env.editor.registerCommand(
+			FORMAT_TEXT_COMMAND,
+			(payload: TextFormatType) => {
+				marks.push(payload);
+				return false;
+			},
+			COMMAND_PRIORITY_CRITICAL,
+		);
+		const isMac = /mac|iphone|ipad/i.test(navigator.platform ?? navigator.userAgent);
+		const mod = isMac ? { metaKey: true } : { ctrlKey: true };
+		await act(async () => {
+			press({ key: "e", code: "KeyE", ...mod });
+		});
+		expect(marks).toEqual(["code"]);
+		// A bare `e` (no modifier) must NOT format.
+		await act(async () => {
+			press({ key: "e", code: "KeyE" });
+		});
+		expect(marks).toEqual(["code"]);
+		unregister();
+	});
 });

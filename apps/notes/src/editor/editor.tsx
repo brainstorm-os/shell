@@ -72,6 +72,7 @@ import {
 	EmptyParagraphHintPlugin,
 	FindPlugin,
 	InitialFocusPlugin,
+	ListMarkdownShortcutsPlugin,
 	MarqueePlugin,
 	MentionTypeaheadPlugin,
 	SlashMenuPlugin,
@@ -267,6 +268,7 @@ export function Editor({
 								...UNICODE_SHORTCUT_TRANSFORMERS,
 							]}
 						/>
+						<ListMarkdownShortcutsPlugin />
 						<TabIndentationPlugin />
 						<TurnIntoPlugin />
 						<SlashMenuPlugin commands={BLOCK_COMMANDS} />

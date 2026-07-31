@@ -227,6 +227,7 @@
   "notes.link.searchPlaceholder": "Notizen zum Verknüpfen suchen…",
   "notes.link.options": "Verknüpfbare Notizen",
   "notes.link.noResults": "Noch keine Notizen zum Verknüpfen",
+  "notes.link.noResultsOfType": "Noch keine {types} zum Verknüpfen",
   "notes.dict.region": "Wörterbuch-Editor",
   "notes.dict.nameLabel": "Name des Wörterbuchs",
   "notes.dict.count": "{n} Werte",

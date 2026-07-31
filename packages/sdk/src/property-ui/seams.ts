@@ -112,6 +112,13 @@ export type PropertyUiLabels = {
 	linkSearchPlaceholder: string;
 	linkOptions: string;
 	linkNoResults: string;
+	/** Type-aware empty state for a typed relation (POLISH-PROP-3) —
+	 *  receives the pluralised human name(s) of the property's
+	 *  `allowedTypes` ("People", "Tasks"). Optional so existing label
+	 *  objects keep type-checking; a typed relation falls back to
+	 *  `linkNoResults` when absent. Untyped (note-scope) pickers always
+	 *  use `linkNoResults`. */
+	linkNoResultsOfType?: (types: string) => string;
 	/** Fallback shown for a linkable entity with no title/name yet, so the
 	 *  picker / chips never surface a raw `ent_…` id. Optional so existing
 	 *  label objects keep type-checking; falls back to "Untitled". */
@@ -196,6 +203,7 @@ export const DEFAULT_PROPERTY_UI_LABELS: PropertyUiLabels = {
 	linkSearchPlaceholder: "Search to link…",
 	linkOptions: "Linkable entities",
 	linkNoResults: "Nothing to link yet",
+	linkNoResultsOfType: (types) => `No ${types} to link yet`,
 	linkUntitled: "Untitled",
 
 	dictRegion: "Dictionary editor",

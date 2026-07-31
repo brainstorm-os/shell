@@ -227,6 +227,7 @@
   "notes.link.searchPlaceholder": "Buscar notas para enlazar…",
   "notes.link.options": "Notas enlazables",
   "notes.link.noResults": "Aún no hay notas para enlazar",
+  "notes.link.noResultsOfType": "Aún no hay {types} para enlazar",
   "notes.dict.region": "Editor de diccionario",
   "notes.dict.nameLabel": "Nombre del diccionario",
   "notes.dict.count": "{n} valores",

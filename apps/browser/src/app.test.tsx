@@ -119,6 +119,24 @@ describe("fresh session chrome", () => {
 		expect(container.querySelector(".browser__security")).toBeNull();
 	});
 
+	it("shows the start page on a blank tab, hides it after navigating (POLISH-DSN-3)", async () => {
+		await render(<BrowserApp />);
+		// Fresh vault, no history — the start page is its EmptyState form.
+		expect(container.querySelector(".browser-start")).not.toBeNull();
+		expect(container.querySelector(".browser-start--empty")).not.toBeNull();
+		const omnibox = container.querySelector<HTMLInputElement>(".browser__omnibox");
+		if (!omnibox) throw new Error("omnibox missing");
+		const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+		setter?.call(omnibox, "https://example.test");
+		await act(async () => {
+			omnibox.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		await act(async () => {
+			omnibox.closest("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+		});
+		expect(container.querySelector(".browser-start")).toBeNull();
+	});
+
 	it("shows a lock badge once a secure page loads", async () => {
 		await render(<BrowserApp />);
 		const omnibox = container.querySelector<HTMLInputElement>(".browser__omnibox");

@@ -298,4 +298,32 @@ describe("LinkInlineCell (stubbed note picker)", () => {
 		act(() => rows[0]?.click());
 		expect(onChange).toHaveBeenCalledWith("person_x");
 	});
+
+	it("empty state names the relation's target type, not 'notes' (POLISH-PROP-3)", async () => {
+		act(() => {
+			h.root.render(
+				withSeam(
+					createElement(LinkInlineCell, {
+						property: def({
+							valueType: ValueType.EntityRef,
+							count: { min: 0, max: 1 },
+							allowedTypes: ["brainstorm/Task/v1"],
+						}),
+						value: null,
+						onChange: vi.fn(),
+						noteId: "n_self",
+					}),
+				),
+			);
+		});
+		act(() => {
+			h.container.querySelector<HTMLButtonElement>(".bs-cell-link-trigger")?.click();
+		});
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+		const status = document.querySelector(".bs-cell-pop-status");
+		expect(status?.textContent).toBe("No Tasks to link yet");
+	});
 });
