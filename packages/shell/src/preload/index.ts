@@ -251,6 +251,13 @@ export type ShellAgentGrantResult =
 	| { granted: true; grant: { capability: string; scope: string | null } }
 	| { granted: false; reason: "unknown-agent" | "not-grantable" | "invalid" };
 
+/** One audit-log line about an agent (metadata-only, never content). */
+export type ShellAgentAuditEvent = {
+	ts: number;
+	kind: string;
+	[metadataKey: string]: unknown;
+};
+
 /** Agent-Teams-1 — the dashboard's (Team surface's) window onto agent members.
  *  The click driving grant/revoke here IS the consent gesture; policy (the
  *  agent-grantable vocabulary, fail-closed unknown agents) lives in main. */
@@ -267,6 +274,10 @@ const agents = {
 	delete: (id: string): Promise<boolean> => ipcRenderer.invoke("agents:delete", id),
 	grant: (fingerprint: string, capability: string): Promise<ShellAgentGrantResult> =>
 		ipcRenderer.invoke("agents:grant", fingerprint, capability),
+	/** Recent audit trail for one agent (newest first): lifecycle, grant/revoke,
+	 *  broker denials — "what this agent did" as a query. */
+	activity: (fingerprint: string): Promise<ShellAgentAuditEvent[]> =>
+		ipcRenderer.invoke("agents:activity", fingerprint),
 	revoke: (fingerprint: string, capability: string, scope: string | null): Promise<boolean> =>
 		ipcRenderer.invoke("agents:revoke", fingerprint, capability, scope),
 };

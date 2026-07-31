@@ -49,6 +49,10 @@ export enum SettingsSection {
 	 *  display name + avatar collaborators see, plus the sovereign fingerprint.
 	 *  Signed in main; edited through the privileged `profile.*` IPC. */
 	Identity = "identity",
+	/** Agent-Teams-2 — the agent-member directory + per-agent capability
+	 *  sheet (doc 69 §Management): create/configure/delete `Agent/v1`
+	 *  members, grant/revoke their scoped reads + propose verbs. */
+	Team = "team",
 	/** Stage 10.5b — paired-device list, add-device flow, join-vault flow.
 	 *  Surfaces the `pairing.*` privileged IPC introduced by 10.5a; the
 	 *  broker-side wire-up lands at 10.5c. */

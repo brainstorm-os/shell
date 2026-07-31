@@ -1,4 +1,4 @@
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 /**
@@ -50,6 +50,36 @@ export type AuditEventRecord = {
 
 export function auditLogPath(vaultPath: string): string {
 	return join(vaultPath, "logs", "audit.log");
+}
+
+/**
+ * Read the events whose `agent` metadata names `fingerprint` — the Team
+ * surface's "what happened to this agent" view (doc 69 §Management: legibility
+ * is a query, not a build). Newest first, capped at `limit`. Best-effort like
+ * the writer: a missing log or an unparseable line is skipped, never a throw.
+ */
+export async function readAgentAuditEvents(
+	vaultPath: string,
+	fingerprint: string,
+	limit = 50,
+): Promise<AuditEventRecord[]> {
+	let raw: string;
+	try {
+		raw = await readFile(auditLogPath(vaultPath), "utf8");
+	} catch {
+		return [];
+	}
+	const matches: AuditEventRecord[] = [];
+	for (const line of raw.split("\n")) {
+		if (!line) continue;
+		try {
+			const record = JSON.parse(line) as AuditEventRecord;
+			if (record.agent === fingerprint || record.app === fingerprint) matches.push(record);
+		} catch {
+			// Skip torn/corrupt lines — the log is best-effort by design.
+		}
+	}
+	return matches.slice(-limit).reverse();
 }
 
 /**

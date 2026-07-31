@@ -45,7 +45,12 @@ import { ulid } from "ulid";
 import { createAgentKey, removeAgentKey } from "../credentials/agent-keys";
 import type { CredentialStore } from "../credentials/store";
 import { EntitiesRepository } from "../storage/entities-repo";
-import { type AuditEventKind, appendAuditEvent } from "../vault/audit-log";
+import {
+	type AuditEventKind,
+	type AuditEventRecord,
+	appendAuditEvent,
+	readAgentAuditEvents,
+} from "../vault/audit-log";
 
 /** The slice of `VaultSession` this module needs — structural, so tests fake
  *  it without a full vault boot. */
@@ -114,6 +119,11 @@ function toRecord(row: {
 	return { id: row.id, def, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }
 
+// Serialized so consecutive gestures land in gesture order — two unawaited
+// appendFile calls have no ordering guarantee, and the activity view reads
+// the log as a timeline.
+let auditQueue: Promise<void> = Promise.resolve();
+
 function audit(
 	session: AgentDirectorySession,
 	kind: AuditEventKind,
@@ -121,11 +131,15 @@ function audit(
 ): void {
 	// Fail-soft: a full disk must not break the gesture; the ledger row is the
 	// authoritative state, the audit line is the narrative.
-	void appendAuditEvent(session.vaultPath, {
-		kind,
-		vaultId: session.vaultId,
-		...metadata,
-	}).catch(() => {});
+	auditQueue = auditQueue
+		.then(() =>
+			appendAuditEvent(session.vaultPath, {
+				kind,
+				vaultId: session.vaultId,
+				...metadata,
+			}),
+		)
+		.catch(() => {});
 }
 
 /** Create an agent: mint its own Ed25519 keypair (sealed in the credential
@@ -283,6 +297,17 @@ export async function grantAgentCapability(
 	});
 	audit(session, "agent.grant", { agent: fingerprint, capability: name, scope });
 	return { granted: true, grant };
+}
+
+/** The agent's recent audit trail — lifecycle + authority changes + broker
+ *  denials, newest first ("what this agent did" is a filter, doc 69). */
+export async function agentActivity(
+	session: AgentDirectorySession,
+	fingerprint: string,
+	limit = 50,
+): Promise<AuditEventRecord[]> {
+	if (!isAgentPrincipal(fingerprint)) return [];
+	return readAgentAuditEvents(session.vaultPath, fingerprint, limit);
 }
 
 /** Revoke one of an agent's grants. Returns false when no live grant matched. */

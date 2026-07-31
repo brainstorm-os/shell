@@ -1,0 +1,113 @@
+/* Settings → Team (Agent-Teams-2). Directory rows reuse the grants-panel row
+ * chrome; this sheet only adds the agent-specific pieces. */
+
+.team-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.team-section__intro {
+	margin: 0;
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-sm);
+}
+
+/* Monogram avatar — an agent has no manifest icon; a tinted circle with the
+ * initial keeps the row shape identical to the app-grants rows. */
+.team-section__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	flex-shrink: 0;
+	border-radius: var(--radius-full);
+	background: var(--color-accent-subtle);
+	color: var(--color-accent-on-surface);
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-semibold);
+}
+
+.grants-panel__dialog-title .team-section__avatar {
+	width: 24px;
+	height: 24px;
+	font-size: var(--text-size-xs);
+}
+
+.team-section__create,
+.team-section__grant-group {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.team-section__group-title {
+	margin: 0;
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-semibold);
+	color: var(--color-text-secondary);
+}
+
+.team-section__create-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.team-section__sheet {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.team-section__fingerprint {
+	margin: 0;
+	font-family: var(--text-family-code);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+	overflow-wrap: anywhere;
+}
+
+.team-section__note {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
+.team-section__activity {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.team-section__activity-row {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--space-3);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-primary);
+}
+
+.team-section__activity-detail {
+	font-family: var(--text-family-code);
+	color: var(--color-text-secondary);
+	overflow-wrap: anywhere;
+}
+
+.team-section__activity-time {
+	flex-shrink: 0;
+	color: var(--color-text-tertiary);
+	font-size: var(--text-size-xs);
+}
+
+.team-section__danger {
+	display: flex;
+	justify-content: flex-start;
+	border-top: var(--border-width) solid var(--color-border-subtle);
+	padding-top: var(--space-3);
+}

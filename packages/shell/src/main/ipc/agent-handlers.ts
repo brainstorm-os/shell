@@ -21,6 +21,7 @@ import { ipcMain } from "electron";
 import {
 	type AgentGrantResult,
 	type AgentRecord,
+	agentActivity,
 	createAgent,
 	deleteAgent,
 	grantAgentCapability,
@@ -130,6 +131,12 @@ export function registerAgentHandlers(): void {
 			return grantAgentCapability(session, fingerprint, capability);
 		},
 	);
+
+	ipcMain.handle("agents:activity", async (_e, fingerprint: unknown): Promise<unknown[]> => {
+		const session = getActiveVaultSession();
+		if (!session || typeof fingerprint !== "string") return [];
+		return agentActivity(session, fingerprint);
+	});
 
 	ipcMain.handle(
 		"agents:revoke",
