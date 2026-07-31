@@ -46,6 +46,11 @@ export type WindowTarget = {
 	baseWindow: BaseWindowHandle;
 	windowId: string;
 	bodyOrigin: () => { x: number; y: number };
+	/** Stack the app's chrome view above this window's page views (a floating
+	 *  chrome popup — menu / typeahead — is open and would otherwise be painted
+	 *  over by the native page view). Undone by bringing a page view back to
+	 *  the front ({@link ManagedWebView.bringToFront}). */
+	raiseChrome: () => void;
 };
 
 /** The subset of an Electron `WebContentsView` + its `webContents` the service
@@ -63,6 +68,10 @@ export interface ManagedWebView {
 	stopFind(): void;
 	setBounds(rect: WebViewRect): void;
 	setVisible(visible: boolean): void;
+	/** Re-stack this view above the app's chrome view (the normal order — the
+	 *  page paints over the chrome's content region). The counterpart of
+	 *  {@link WindowTarget.raiseChrome}. */
+	bringToFront(): void;
 	focus(): void;
 	/** Net-3 — the page's RENDERED DOM, read out of the live view (what the user
 	 *  can actually see, not what a second GET would return). `null` when the
@@ -320,6 +329,8 @@ export class WebViewService {
 				// SECURITY — same fail-closed gate as Capture (the read twin).
 				requireCaptureCap(declaredCaps);
 				return this.extractText(appId, req.tabId);
+			case WebViewMethod.SetChromeOnTop:
+				return this.setChromeOnTop(appId, req.tabId, req.on);
 		}
 	}
 
@@ -396,8 +407,27 @@ export class WebViewService {
 			if (other.window.windowId !== entry.window.windowId || other.view === null) continue;
 			other.view.setVisible(other.tabId === tabId);
 		}
+		// "Bring to the front of the window's content area" (the method's
+		// contract): also restores page-over-chrome stacking if a raised chrome
+		// was orphaned (its tab closed while a popup was open), so any tab
+		// interaction heals the order.
+		entry.view?.bringToFront();
 		entry.view?.focus();
 		this.enforceSuspensionCap();
+	}
+
+	/** A floating chrome popup opened (`on`) or the popup stack emptied
+	 *  (`!on`): flip whether the app's chrome view or the page view is on top.
+	 *  Tab-scoped so it inherits the per-app ownership of the tab registry —
+	 *  an app can only re-stack windows its own tabs live in. */
+	private setChromeOnTop(appId: string, tabId: string, on: boolean): void {
+		const entry = this.tabs.get(tabId);
+		if (!entry || entry.appId !== appId) return;
+		if (on) {
+			entry.window.raiseChrome();
+			return;
+		}
+		entry.view?.bringToFront();
 	}
 
 	private close(tabId: string): void {

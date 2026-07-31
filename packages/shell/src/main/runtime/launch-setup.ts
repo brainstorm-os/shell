@@ -409,7 +409,14 @@ const defaultTabViewFactory: TabViewFactory = (spec) => {
 			devTools: true,
 		},
 	});
-	view.setBackgroundColor(spec.backgroundColor);
+	// Transparent native background: the BaseWindow beneath carries the same
+	// themed `backgroundColor`, so first paint and resize-exposed pixels look
+	// identical — but a renderer may now punch a genuine alpha hole where a
+	// native view shows through when stacked below (the Browser's
+	// `.browser__region`, which must stay visible while its chrome is raised
+	// above the page view for a floating menu). An opaque view background
+	// would fill any DOM transparency with paint and kill that.
+	view.setBackgroundColor("#00000000");
 	// B11.16a — enable Chromium's spellchecker on the app renderer session
 	// (idempotent; app renderers share session.defaultSession). Only elements
 	// that opt in (spellcheck=true / contentEditable — B11.16b) are checked.

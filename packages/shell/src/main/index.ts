@@ -5263,6 +5263,7 @@ void app.whenReady().then(async () => {
 						const body = win.container.bodyBounds();
 						return { x: body.x, y: body.y };
 					},
+					raiseChrome: () => win.container.raiseActiveTabView(),
 				};
 			},
 			emitEvent: (appId, event) => {

@@ -24,6 +24,7 @@ import { PERSIST_DEBOUNCE_MS, sessionRecordToProperties } from "./logic/persiste
 import type { EntityRecord } from "./runtime";
 import type { BrowsingSessionRecord } from "./types/browsing-session";
 
+const popupStateListeners = vi.hoisted(() => [] as Array<(open: boolean) => void>);
 vi.mock("@brainstorm-os/sdk/menus", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@brainstorm-os/sdk/menus")>()),
 	mountMenuHost: vi.fn(() => () => {}),
@@ -33,6 +34,15 @@ vi.mock("@brainstorm-os/sdk/menus", async (importOriginal) => ({
 	// rendering + keyboard is covered in the SDK menus tests.
 	openTypeaheadMenu: vi.fn(() => true),
 	closeTypeaheadMenu: vi.fn(),
+	// Capture the chrome's popup-state subscription so tests can drive
+	// open/close transitions without a mounted menu host.
+	watchMenuOpenState: vi.fn((onChange: (open: boolean) => void) => {
+		popupStateListeners.push(onChange);
+		return () => {
+			const at = popupStateListeners.indexOf(onChange);
+			if (at >= 0) popupStateListeners.splice(at, 1);
+		};
+	}),
 }));
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 
@@ -53,6 +63,7 @@ type FakeWebView = WebViewClient & {
 	finds: Array<{ tabId: string; query: string; forward: boolean }>;
 	stopFinds: string[];
 	permissions: Array<{ tabId: string; origin: string; permission: string; allow: boolean }>;
+	chromeTop: Array<{ tabId: string; on: boolean }>;
 	emit: (event: WebViewEvent) => void;
 };
 
@@ -68,6 +79,7 @@ function fakeWebView(): FakeWebView {
 		finds: [],
 		stopFinds: [],
 		permissions: [],
+		chromeTop: [],
 		emit: (event) => {
 			for (const listener of listeners) listener(event);
 		},
@@ -93,6 +105,10 @@ function fakeWebView(): FakeWebView {
 		activate: noop,
 		setBounds: (tabId, rect) => {
 			view.bounds.push({ tabId, rect });
+			return Promise.resolve();
+		},
+		setChromeOnTop: (tabId, on) => {
+			view.chromeTop.push({ tabId, on });
 			return Promise.resolve();
 		},
 		findInPage: (tabId, query, forward) => {
@@ -203,6 +219,7 @@ function install(rows: EntityRecord[]): void {
 
 beforeEach(() => {
 	install([]);
+	popupStateListeners.length = 0;
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -223,6 +240,36 @@ async function render(node: ReactNode): Promise<void> {
 function tabTitles(): string[] {
 	return [...container.querySelectorAll(".browser__tab-title")].map((el) => el.textContent ?? "");
 }
+
+describe("chrome-on-top while a floating popup is open", () => {
+	it("raises the chrome when the popup stack opens and restores the page when it empties", async () => {
+		await render(<BrowserApp />);
+		const seedTab = webView.opened[0]?.tabId;
+		expect(seedTab).toBeTruthy();
+
+		await act(async () => {
+			for (const notify of popupStateListeners) notify(true);
+		});
+		expect(webView.chromeTop).toEqual([{ tabId: seedTab, on: true }]);
+
+		await act(async () => {
+			for (const notify of popupStateListeners) notify(false);
+		});
+		expect(webView.chromeTop).toEqual([
+			{ tabId: seedTab, on: true },
+			{ tabId: seedTab, on: false },
+		]);
+	});
+
+	it("a second open while already raised does not double-raise", async () => {
+		await render(<BrowserApp />);
+		await act(async () => {
+			for (const notify of popupStateListeners) notify(true);
+			for (const notify of popupStateListeners) notify(true);
+		});
+		expect(webView.chromeTop).toHaveLength(1);
+	});
+});
 
 describe("BrowsingSession/v1 restore", () => {
 	it("replaces the blank seed with the stored tabs and opens the restored active tab", async () => {

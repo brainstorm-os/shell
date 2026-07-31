@@ -135,6 +135,13 @@ export enum WebViewMethod {
 	 *  a round-trip through the vault. Needs `web.capture`; the raw DOM still
 	 *  never crosses — only the cleaned reader projection. */
 	ExtractText = "extract-text",
+	/** Stack the calling app's chrome view above the page `WebContentsView`s in
+	 *  `tabId`'s window (`on: true`) or restore the page on top (`on: false`).
+	 *  The chrome raises itself while a floating popup (menu / typeahead) is
+	 *  open — the page view otherwise paints over any DOM that drops into the
+	 *  content region — and lowers when the popup stack empties. While raised,
+	 *  the page receives no pointer input (popups are modal anyway). */
+	SetChromeOnTop = "set-chrome-on-top",
 }
 
 /** What {@link WebViewMethod.ExtractText} returns: the reader projection of the
@@ -191,7 +198,8 @@ export type WebViewRequest =
 	| { method: WebViewMethod.ClearBrowsingData }
 	| { method: WebViewMethod.SetSiteTrust; origin: string; trusted: boolean }
 	| { method: WebViewMethod.IsSiteTrusted; origin: string }
-	| { method: WebViewMethod.ExtractText; tabId: string };
+	| { method: WebViewMethod.ExtractText; tabId: string }
+	| { method: WebViewMethod.SetChromeOnTop; tabId: string; on: boolean };
 
 /** Metadata-only events the host pushes to the chrome. The page DOM, bytes,
  *  and live history never cross this boundary — only these projections. */
@@ -251,6 +259,10 @@ export interface WebViewClient {
 	/** Browser-8 — the reader projection of a tab's page (needs `web.capture`).
 	 *  `null` when there is nothing extractable. */
 	extractText(tabId: string): Promise<WebViewExtractedText | null>;
+	/** Raise the app's chrome above `tabId`'s window's page views while a
+	 *  floating popup is open (`on: true`); restore the page on top when the
+	 *  popup stack empties (`on: false`). See {@link WebViewMethod.SetChromeOnTop}. */
+	setChromeOnTop(tabId: string, on: boolean): Promise<void>;
 	setSitePermission(
 		tabId: string,
 		origin: string,

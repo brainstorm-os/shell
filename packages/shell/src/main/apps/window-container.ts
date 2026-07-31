@@ -231,6 +231,19 @@ export class WindowContainer {
 		return this.tabsList.find((t) => t.webContentsId === webContentsId) ?? null;
 	}
 
+	/** Re-stack the active app renderer's view on top of every other child
+	 *  view in this window (Electron re-parents an already-added child to the
+	 *  top). The WebView host calls this while the app's chrome has a floating
+	 *  popup open — a page `WebContentsView` otherwise paints over any DOM
+	 *  that drops into the content region. Page-on-top is restored by
+	 *  re-adding the page view, not by calling this again. */
+	raiseActiveTabView(): void {
+		if (this.disposed) return;
+		const active = this.activeTab();
+		if (!active) return;
+		this.baseWindow.contentView.addChildView(active.view);
+	}
+
 	activeTitle(): string {
 		return this.activeTab()?.title ?? this.appId;
 	}

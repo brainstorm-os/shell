@@ -273,6 +273,13 @@ export function createLockedWebView(
 			});
 		},
 		setVisible: (visible) => view.setVisible(visible),
+		bringToFront: () => {
+			// Electron re-parents an already-added child to the top of the
+			// stacking order — the page paints over the chrome again.
+			if (!spec.window.baseWindow.isDestroyed()) {
+				spec.window.baseWindow.contentView.addChildView(view as unknown as WebContentsViewHandle);
+			}
+		},
 		focus: () => {
 			if (!wc.isDestroyed()) wc.focus();
 		},
