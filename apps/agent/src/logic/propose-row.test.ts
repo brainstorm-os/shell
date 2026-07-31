@@ -1,6 +1,10 @@
-import { COLLECTION_TYPE_URL, GENERIC_OBJECT_TYPE, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	COLLECTION_TYPE_URL,
+	GENERIC_OBJECT_TYPE,
+	ProposeKind,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
-import { ProposeKind } from "./propose-artifacts";
 import {
 	PROPOSE_ROW_VERB,
 	ROW_PRIMARY_KEY,

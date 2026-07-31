@@ -12,28 +12,11 @@
  * `fallback` option.
  */
 
-export enum CodeLanguage {
-	TypeScript = "typescript",
-	JavaScript = "javascript",
-	TSX = "tsx",
-	JSX = "jsx",
-	JSON = "json",
-	JSONC = "jsonc",
-	HTML = "html",
-	CSS = "css",
-	Markdown = "markdown",
-	Python = "python",
-	Rust = "rust",
-	Go = "go",
-	Java = "java",
-	Shell = "shell",
-	YAML = "yaml",
-	TOML = "toml",
-	SQL = "sql",
-	Dockerfile = "dockerfile",
-	PlainText = "plaintext",
-	Unknown = "unknown",
-}
+// The enum itself lives in the dependency-free contract leaf (sdk-types) so
+// `ProposedCodeFile` can name it; this module stays its canonical import site.
+import { CodeLanguage } from "@brainstorm-os/sdk-types";
+
+export { CodeLanguage };
 
 export const CODE_LANGUAGES: readonly CodeLanguage[] = Object.freeze([
 	CodeLanguage.TypeScript,

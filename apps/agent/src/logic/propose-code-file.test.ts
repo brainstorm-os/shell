@@ -5,9 +5,14 @@
  * offer-time capability gate.
  */
 
+import {
+	ProposalActionKind,
+	ProposeKind,
+	emptyProposalState,
+	proposalReducer,
+} from "@brainstorm-os/sdk-types";
 import { CodeLanguage } from "@brainstorm-os/sdk/language-detect";
 import { describe, expect, it } from "vitest";
-import { ProposeKind } from "./propose-artifacts";
 import {
 	CODE_FILE_CONTENT_MAX,
 	CODE_FILE_ENTITY_TYPE,
@@ -144,5 +149,24 @@ describe("canProposeCodeFiles (offer-time gate)", () => {
 	it("true with the exact cap (or a wildcard that implies it)", () => {
 		expect(canProposeCodeFiles([CODE_FILE_WRITE_CAPABILITY])).toBe(true);
 		expect(canProposeCodeFiles(["entities.write:*"])).toBe(true);
+	});
+});
+
+describe("proposalReducer over a code-file card", () => {
+	it("a code-file card's summary follows its edited path (AppForge-3)", () => {
+		const code = buildCodeFileProposal({
+			verb: "propose-code-file",
+			args: { path: "a.ts", content: "x" },
+			id: "c",
+		});
+		if (!code.ok) throw new Error("expected ok");
+		let s = proposalReducer(emptyProposalState, {
+			kind: ProposalActionKind.Add,
+			artifact: code.artifact,
+		});
+		s = proposalReducer(s, { kind: ProposalActionKind.Edit, id: "c", fields: { path: "b.ts" } });
+		expect(s.pending[0]?.summary).toBe("b.ts");
+		// The content rode along untouched — editing the name never mutates code.
+		expect(s.pending[0]?.fields.content).toBe("x");
 	});
 });

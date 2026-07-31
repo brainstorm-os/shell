@@ -1,9 +1,6 @@
-import {
-	type AgentTool,
-	agentToolCapabilities,
-	intersectAgentTools,
-} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
+import { intersectAgentTools } from "./agent-loop";
+import { type AgentTool, agentToolCapabilities } from "./automations";
 import {
 	PROPOSE_DESCRIPTORS,
 	PROPOSE_LONG_MAX,
@@ -20,8 +17,7 @@ import {
 	proposeEntityWriteCapabilities,
 	proposeToolCapabilities,
 	proposeTools,
-} from "./propose-artifacts";
-import { buildCodeFileProposal } from "./propose-code-file";
+} from "./propose";
 
 const echo = (key: string) => key;
 
@@ -196,23 +192,6 @@ describe("proposalReducer — pending buffer", () => {
 		});
 		expect(s.pending[0]?.summary).toBe("A renamed");
 		expect(s.pending[0]?.fields).toEqual({ title: "A renamed", body: "extra" });
-	});
-
-	it("a code-file card's summary follows its edited path (AppForge-3)", () => {
-		const code = buildCodeFileProposal({
-			verb: "propose-code-file",
-			args: { path: "a.ts", content: "x" },
-			id: "c",
-		});
-		if (!code.ok) throw new Error("expected ok");
-		let s = proposalReducer(emptyProposalState, {
-			kind: ProposalActionKind.Add,
-			artifact: code.artifact,
-		});
-		s = proposalReducer(s, { kind: ProposalActionKind.Edit, id: "c", fields: { path: "b.ts" } });
-		expect(s.pending[0]?.summary).toBe("b.ts");
-		// The content rode along untouched — editing the name never mutates code.
-		expect(s.pending[0]?.fields.content).toBe("x");
 	});
 
 	it("discards one, removes a set, and clears all", () => {

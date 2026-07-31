@@ -10,6 +10,8 @@
  */
 
 import type {
+	AgentProposalDecision,
+	AgentProposalsService,
 	AiCostEstimate,
 	AiExtractRequest,
 	AiExtractResult,
@@ -281,6 +283,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			identity: identityProxy(bridge),
 			properties: propertiesProxy(bridge),
 			platform: platformProxy(bridge),
+			agentProposals: agentProposalsProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
 			presence: presenceProxy(bridge),
@@ -364,6 +367,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			identity: identityProxy(bridge),
 			properties: propertiesProxy(bridge),
 			platform: platformProxy(bridge),
+			agentProposals: agentProposalsProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
 			presence: presenceProxy(bridge),
@@ -1067,6 +1071,29 @@ function platformProxy(bridge: Bridge): PlatformService {
 		// doc 63 — read-only platform catalog. `platform.read` is scarce; the
 		// broker re-checks it against the ledger (fail-closed).
 		catalog: () => callService<PlatformCatalog>(bridge, "platform", "catalog", [], ["platform.read"]),
+	};
+}
+
+function agentProposalsProxy(bridge: Bridge): AgentProposalsService {
+	// Agent-Teams-3 — `agents.approve` is scarce (only an interactive chat
+	// surface declares it) and re-checked against the ledger server-side.
+	return {
+		approve: (input) =>
+			callService<AgentProposalDecision>(
+				bridge,
+				"agent-proposals",
+				"approve",
+				[input],
+				["agents.approve"],
+			),
+		discard: (input) =>
+			callService<AgentProposalDecision>(
+				bridge,
+				"agent-proposals",
+				"discard",
+				[input],
+				["agents.approve"],
+			),
 	};
 }
 

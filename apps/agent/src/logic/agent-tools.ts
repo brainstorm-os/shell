@@ -37,8 +37,8 @@ import {
 	type AgentToolCall,
 	agentToolCapabilities,
 	capabilityImplies,
+	proposeTools,
 } from "@brainstorm-os/sdk-types";
-import { proposeTools } from "./propose-artifacts";
 import { PROPOSE_CODE_FILE_VERB } from "./propose-code-file";
 import { PROPOSE_DATABASE_VERB } from "./propose-database";
 import { PROPOSE_ROW_VERB } from "./propose-row";
@@ -55,7 +55,7 @@ export type AgentToolVerb = (typeof AGENT_TOOL_VERB)[keyof typeof AGENT_TOOL_VER
 
 /** The curated tool catalogue offered to the model: the read-only `open`
  *  navigation verb plus the Agent-11 propose-* tools (each stages a draft the
- *  user approves — see `propose-artifacts.ts`). `translate` localises each
+ *  user approves — see sdk-types' `propose.ts`). `translate` localises each
  *  label; the model addresses a tool by its stable `verb`. The three-tier
  *  ceiling + the loop's fail-closed intersection still gate every one.
  *

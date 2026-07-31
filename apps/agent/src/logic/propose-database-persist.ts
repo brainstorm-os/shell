@@ -32,9 +32,9 @@ import {
 	type List,
 	type ListView,
 	ListViewKind,
+	type ProposedArtifact,
 	coerceScalarValue,
 } from "@brainstorm-os/sdk-types";
-import type { ProposedArtifact } from "./propose-artifacts";
 import { rowCellKey } from "./propose-database";
 import type { ProposalEntitiesService } from "./propose-persist";
 
