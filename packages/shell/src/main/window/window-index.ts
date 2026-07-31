@@ -24,6 +24,7 @@ import {
 } from "@brainstorm-os/protocol/window-types";
 import type { AppLauncher } from "../apps/launcher";
 import { type MonitorInfo, monitorIdFor } from "./monitor";
+import { surfaceWindow } from "./reveal-window";
 import { type TilePreset, projectOntoMonitor, tileBounds } from "./tile";
 
 export { WindowState };
@@ -142,10 +143,7 @@ export class WindowIndex {
 	focus(id: string): boolean {
 		const tracked = this.tracked.get(id);
 		if (!tracked || tracked.controller.isDestroyed()) return false;
-		const { controller } = tracked;
-		if (controller.isMinimized()) controller.restore();
-		controller.show();
-		controller.focus();
+		surfaceWindow(tracked.controller);
 		return true;
 	}
 
