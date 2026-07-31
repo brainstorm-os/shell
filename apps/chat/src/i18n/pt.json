@@ -28,6 +28,7 @@
   "composer.attach.remove": "Remover {label}",
   "members.title": "Membros",
   "members.you": "você",
+  "members.agent": "Agente de IA",
   "members.guest": "convidado",
   "members.unknown": "Membro desconhecido",
   "members.one": "{count} membro",

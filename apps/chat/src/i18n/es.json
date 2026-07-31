@@ -4,20 +4,16 @@
   "header.members.hide": "Ocultar miembros",
   "header.members.disabled": "Abre un canal para ver sus miembros",
   "header.moreActions": "Más acciones",
-
   "menu.editIdentity": "Cambiar nombre visible…",
-
   "sidebar.channels": "Canales",
   "sidebar.newChannel": "Nuevo canal",
   "sidebar.empty": "Aún no hay canales.",
   "sidebar.show": "Mostrar canales",
   "sidebar.hide": "Ocultar canales",
-
   "channel.empty.title": "Aún no hay mensajes",
   "channel.empty.blurb": "Saluda para iniciar la conversación en #{name}.",
   "channel.none.title": "Elige un canal",
   "channel.none.blurb": "Elige un canal a la izquierda o crea uno para empezar a chatear.",
-
   "composer.placeholder": "Mensaje en #{name}…",
   "composer.send": "Enviar",
   "composer.attach.button": "Añadir contexto",
@@ -30,14 +26,13 @@
   "composer.attach.search": "Mencionar a una persona",
   "composer.attach.empty": "No se encontraron personas",
   "composer.attach.remove": "Quitar {label}",
-
   "members.title": "Miembros",
   "members.you": "tú",
+  "members.agent": "Agente de IA",
   "members.guest": "invitado",
   "members.unknown": "Miembro desconocido",
   "members.one": "{count} miembro",
   "members.other": "{count} miembros",
-
   "newChannel.title": "Nuevo canal",
   "newChannel.name.label": "Nombre",
   "newChannel.name.placeholder": "p. ej. general",
@@ -45,16 +40,13 @@
   "newChannel.topic.placeholder": "¿De qué trata este canal?",
   "newChannel.cancel": "Cancelar",
   "newChannel.create": "Crear canal",
-
   "identity.title": "Tu nombre visible",
   "identity.label": "Nombre visible",
   "identity.placeholder": "Cómo te ven los demás",
   "identity.cancel": "Cancelar",
   "identity.save": "Guardar",
-
   "day.today": "Hoy",
   "day.yesterday": "Ayer",
-
   "menu.share": "Compartir canal…",
   "share.title": "Compartir canal",
   "share.membersHeading": "Personas con acceso",
@@ -78,7 +70,6 @@
   "share.revokeFailed": "No se pudo quitar a esa persona.",
   "share.loadFailed": "No se pudieron cargar los miembros.",
   "share.done": "Listo",
-
   "widget.label": "Chat",
   "widget.channels.one": "{count} canal",
   "widget.channels.other": "{count} canales",
