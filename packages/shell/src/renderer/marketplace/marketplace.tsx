@@ -321,7 +321,7 @@ export function Marketplace({ onClose, initialPanel = MarketplacePanel.Browse }:
 											))}
 										</div>
 										<Searchbar
-											className="marketplace__search"
+											className="marketplace__search bs-searchbar--field"
 											value={query}
 											onChange={setQuery}
 											placeholder={t("shell.marketplace.searchPlaceholder")}

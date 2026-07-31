@@ -91,6 +91,30 @@ export type PipelineContext = {
 	 * compatibility with existing call sites; absent ⇒ revocation
 	 * enforcement is off (back-compat default; production wires the
 	 * predicate from `DevicesStore.isRevoked`).
+	 *
+	 * **P2P-1 finding: this predicate has zero non-test producers, and wiring
+	 * it to `DevicesStore.isRevoked` today would be WORSE than leaving it
+	 * dormant.** The `P2P-0` spike flagged it as unwired defence in depth that
+	 * "costs almost nothing to wire". Reading the producer says otherwise. The
+	 * only production `PipelineContext` is `SharingEngine.makeCtx`, and it sets
+	 * `devicePub: session.identity.publicKey` — the **sovereign user key**, not
+	 * a device key. `senderPub` here is `header.sender`, so on the relay path it
+	 * is an account identifier, while `DevicesStore` is a roster of per-device
+	 * Ed25519 keys. `isRevoked(userKey)` therefore returns `false` for every
+	 * frame that will ever arrive: it would compile, add a hot-path lookup, and
+	 * read in review as enforcement while enforcing nothing. A vacuous check
+	 * that looks like a real one is a worse security posture than a visibly
+	 * absent one, because the next reviewer stops looking.
+	 *
+	 * Device-level revocation on the relay path needs the envelope to carry the
+	 * signing DEVICE key, or a signed device→member binding the receiver can
+	 * check — a wire-format change, and `LAN-2b(d)`'s live half together with
+	 * `ROT-3a` rotate-on-revoke. `P2P-1` neither creates nor closes that gap: on
+	 * the LAN path revocation IS enforced, at admission, against device keys,
+	 * with the roster rebuilt from `listActive()` per access, which is the
+	 * strictest enforcement anywhere in the product. The predicate stays
+	 * declared because the LAN/pairing contexts (which DO carry device keys, see
+	 * `pairing-live-e2e.test.ts`) are where it becomes meaningful.
 	 */
 	isDeviceRevoked?: (senderPub: Uint8Array) => boolean;
 	/**
@@ -101,12 +125,20 @@ export type PipelineContext = {
 	 * makes a Viewer read-only at the DATA layer — a Viewer holds the DEK
 	 * (they can read) and can sign, so nothing else stops their write.
 	 * `senderPubB64` is the header sender (base64url); `resolvedEntityId`
-	 * is the real entity id (post routing-token resolution). Optional +
+	 * is the real entity id (post routing-token resolution); `plaintext` is
+	 * the decrypted Yjs update this frame carries, so a receiver holding no
+	 * record yet can authorize the share BOOTSTRAP off the signed access
+	 * entries the frame itself delivers (see `authorizesAsShareBootstrap` -
+	 * without it the first frame of a new share deadlocks). Optional +
 	 * fail-open when absent (back-compat: loopback/dev/soak paths that
 	 * carry no access record skip it); production wires it to the entity's
 	 * signed access record (role ≥ Editor).
 	 */
-	authorizeWriter?: (senderPubB64: string, resolvedEntityId: string) => boolean | Promise<boolean>;
+	authorizeWriter?: (
+		senderPubB64: string,
+		resolvedEntityId: string,
+		plaintext: Uint8Array,
+	) => boolean | Promise<boolean>;
 	/**
 	 * Stage 10.7 — traffic-tick hooks for the sync-status surface. Fired
 	 * AFTER a successful `relay.send(frame)` / `applyUpdate(...)` /
@@ -259,7 +291,10 @@ export async function receiveAndApply(
 		// Collab-C5 (F-288) — authenticated, now authorize: a Viewer holds
 		// the DEK and a valid signature, so only the signed access record
 		// stops their write. Checked here, after verify, before apply.
-		if (ctx.authorizeWriter && !(await ctx.authorizeWriter(decoded.header.sender, resolved.id))) {
+		if (
+			ctx.authorizeWriter &&
+			!(await ctx.authorizeWriter(decoded.header.sender, resolved.id, plaintext))
+		) {
 			throw named(
 				"Unauthorized",
 				`envelope-pipeline: sender ${decoded.header.sender} is not an authorized writer of ${resolved.id}`,
@@ -323,13 +358,22 @@ export async function emitWrapBootstrap(
  * The callback shape mirrors `receiveAndApply`: the wire path itself
  * does NOT call `VaultSession.unwrapMemberWrap` — that lives in the
  * session because the X25519 secret never leaves it. The callback
- * receives the parsed wrap and the resolved entity id; the session-
- * aware orchestrator does the HPKE unseal and the install of the
+ * receives the parsed wrap, the resolved entity id and the AUTHENTICATED
+ * sender (base64url, its signature over the frame already verified); the
+ * session-aware orchestrator does the HPKE unseal and the install of the
  * decrypted DEK into `EntityDekStore`.
+ *
+ * The sender is passed because a wrap is not uniformly safe to install. A
+ * FIRST wrap for an unknown entity can only create one, but a wrap at a HIGHER
+ * DEK ordinal ROTATES a key the device already holds - and the inbox channel
+ * plus every member's X25519 are public to the entity's members, so without an
+ * authorization check any member could re-key an entity out from under its
+ * owner. The install side applies that rule (`main/index.ts`).
  */
 export type WrapBootstrapAcceptedFn = (
 	wrap: MemberWrapPayload,
 	entityId: string,
+	senderPubB64: string,
 ) => void | Promise<void>;
 
 export async function receiveWrapBootstrap(
@@ -361,7 +405,7 @@ export async function receiveWrapBootstrap(
 		verify: (sig, bytes) => ctx.deviceVerify(sig, bytes, senderPub),
 		...routedBinding(decoded.header.entityId, resolved.id, ctx),
 	});
-	await onWrapAccepted(wrap, resolved.id);
+	await onWrapAccepted(wrap, resolved.id, decoded.header.sender);
 	ctx.onReceived?.(frame.byteLength);
 }
 

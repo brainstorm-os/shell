@@ -110,6 +110,15 @@ body {
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
+	/* A grid item defaults to `min-width: auto`, so the `1fr` track refuses to
+	   shrink below its content's min-content width. A staged `propose-code-file`
+	   card carries a `<pre>` of unwrapped code, whose min-content width is the
+	   longest line — that pushed the whole grid 145px wider than the window,
+	   clipped by `.agent`'s `overflow: hidden`: the conversation sidebar slid
+	   26px off the left edge and the transcript's right edge (the card's
+	   language chip, the approve row) was cut off. Clamping the track lets the
+	   `<pre>`'s own `overflow-x: auto` do the scrolling, where it belongs. */
+	min-width: 0;
 }
 
 /* Transcript, error bar and composer share ONE centered content column —
@@ -953,10 +962,20 @@ body {
 	color: var(--color-text-secondary);
 }
 
+.agent-proposal__conflict {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-state-warning);
+}
+
 .agent-proposal__actions {
 	display: flex;
 	gap: var(--space-2);
 	margin-top: var(--space-1);
+	flex-wrap: wrap;
 }
 
 .agent-proposal__btn {

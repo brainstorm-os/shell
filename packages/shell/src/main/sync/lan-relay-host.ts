@@ -42,7 +42,7 @@ import {
 	createRelayCore,
 } from "../../../../relay-server/src/server";
 import type { LanHostHandshake } from "./lan-admission";
-import type { WebSocketCtor, WebSocketLike } from "./websocket-relay-port";
+import { type WebSocketCtor, type WebSocketLike, decodePingStamp } from "./websocket-relay-port";
 
 const CONTROL_CHANNEL_BYTE = 0x00;
 
@@ -323,6 +323,18 @@ export class LanRelayHost {
 			state.attempted = true;
 			void this.#tryAdmit(connId, state, auth, sendToClient, closeClient);
 			return;
+		}
+		// P2P-1 — answer the transport keepalive. Admitted-only, on purpose: a
+		// peer that has proven nothing gets no reply of any kind, so `ping` is
+		// not a pre-auth liveness oracle for scanning the LAN. The stamp is
+		// echoed verbatim and nothing else is read, so this carries no routing
+		// metadata and the host stays blind.
+		if (bytes.length >= 1 && bytes[0] === CONTROL_CHANNEL_BYTE) {
+			const stamp = decodePingStamp(bytes);
+			if (stamp !== null) {
+				sendToClient(encodeControl({ op: "pong", t: stamp }));
+				return;
+			}
 		}
 		// G6 — the LAN host does NOT serve `rotate`. `applyRotation` has no
 		// ownership check on `from`, so an admitted peer could migrate every

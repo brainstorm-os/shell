@@ -29,11 +29,11 @@ function listTables(db: Awaited<ReturnType<typeof fresh>>): TableInfo[] {
 }
 
 describe("entities.db schema", () => {
-	it("fresh install applies v1..v9 in order and ends at version 9", async () => {
+	it("fresh install applies v1..v10 in order and ends at version 10", async () => {
 		const db = await fresh();
 		try {
-			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(9);
-			expect(getSchemaVersion(db)).toBe(9);
+			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(10);
+			expect(getSchemaVersion(db)).toBe(10);
 			const names = listTables(db).map((t) => t.name);
 			expect(names).toContain("entities");
 			expect(names).toContain("links");
@@ -42,6 +42,7 @@ describe("entities.db schema", () => {
 			expect(names).toContain("assets");
 			expect(names).toContain("asset_deks");
 			expect(names).toContain("asset_refs");
+			expect(names).toContain("share_invites");
 		} finally {
 			db.close();
 		}
@@ -51,10 +52,10 @@ describe("entities.db schema", () => {
 		const db = await fresh();
 		try {
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(9);
+			expect(getSchemaVersion(db)).toBe(10);
 			// Second pass — nothing pending, version unchanged.
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(9);
+			expect(getSchemaVersion(db)).toBe(10);
 		} finally {
 			db.close();
 		}
@@ -78,7 +79,7 @@ describe("entities.db schema", () => {
 			insert.run("journal-ideas", NOTE, "{}", "io.brainstorm.notes", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(9);
+			expect(getSchemaVersion(db)).toBe(10);
 
 			const typeOf = (id: string) =>
 				(db.prepare("SELECT type, created_by FROM entities WHERE id = ?").get(id) as {
@@ -110,7 +111,7 @@ describe("entities.db schema", () => {
 			insert.run("p_kenji", PERSON, JSON.stringify({ name: "Kenji" }), "x", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(9);
+			expect(getSchemaVersion(db)).toBe(10);
 
 			// Two Company entities created, one per distinct name.
 			const companies = db

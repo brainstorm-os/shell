@@ -30,7 +30,11 @@ import {
 import type { EntityDekStore } from "../entities/entity-dek-store";
 import { installEntityDek } from "../entities/install-wrap";
 import { queryVaultListSource } from "../entities/vault-entities-service";
-import { EntitiesRepository, PendingRotationsRepository } from "../storage/entities-repo";
+import {
+	EntitiesRepository,
+	PendingRotationsRepository,
+	ShareInvitesRepository,
+} from "../storage/entities-repo";
 import { type PipelineContext, emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
 import type { VaultSession } from "../vault/session";
@@ -94,6 +98,7 @@ export class SharingEngine {
 	#dekStore: EntityDekStore | null = null;
 	#entitiesRepo: EntitiesRepository | null = null;
 	#pendingRepo: PendingRotationsRepository | null = null;
+	#invitesRepo: ShareInvitesRepository | null = null;
 	#draining = false;
 
 	constructor(session: VaultSession, getRelay: () => CollabRelayLike | null) {
@@ -109,22 +114,41 @@ export class SharingEngine {
 		};
 	}
 
-	/** Collaborator-side: mint a self-signed `ShareInvite` (the secret never
-	 *  leaves the session — `createShareInviteSigned` takes a signing closure).
+	/**
+	 * Collaborator-side: mint a self-signed `ShareInvite`. The sovereign signing
+	 * key never leaves the session (`createShareInviteSigned` takes a signing
+	 * closure).
 	 *
-	 *  Collab-C6-b: the invite carries this identity's signed display-profile
-	 *  snapshot, and an empty `label` falls back to that profile's display name.
-	 *  Every shipping call site passes `""`, which is why an auto-saved teammate
-	 *  used to land in the share dialog as a blank chip. */
+	 * Collab-C5-invite-anchor: the invite also carries a fresh single-use anchor
+	 * secret, and its record is PERSISTED here before the token is returned. That
+	 * row is the only thing that will later admit a first-share bootstrap into
+	 * this vault, so an invite that could not be recorded must not be handed out
+	 * (the store throw propagates — a token minted without its row would silently
+	 * fail to redeem, which is the deadlock shape this rung exists to avoid).
+	 *
+	 * Collab-C6-b: the invite also carries this identity's signed display-profile
+	 * snapshot, and an empty `label` falls back to that profile's display name.
+	 * Every shipping call site passes `""`, which is why an auto-saved teammate
+	 * used to land in the share dialog as a blank chip.
+	 */
 	async createInvite(label: string): Promise<ShareInvite> {
 		const profile = await readSelfProfileSnapshot(this.#session);
-		return createShareInviteSigned({
+		const invite = createShareInviteSigned({
 			userPub: this.#session.identity.publicKey,
 			x25519Pub: this.#session.deviceX25519.publicKey,
 			label: label || (profile?.displayName ?? ""),
 			sign: (payload) => this.#session.signPayload(payload),
 			profile,
 		});
+		const repo = await this.ensureShareInvitesRepo();
+		repo.mint({
+			inviteId: invite.inviteId,
+			secretB64: invite.secret,
+			memberPubB64: invite.userPubB64,
+			createdAt: Date.now(),
+			expiresAt: invite.expiresAt,
+		});
+		return invite;
 	}
 
 	/** Owner-side: create the entity row + a fresh DEK and bootstrap the owner's
@@ -215,7 +239,11 @@ export class SharingEngine {
 			);
 			if (result.ok) {
 				for (const childId of result.ids) {
-					await this.#shareOne(childId, rule.childType, opts.invite, opts.role);
+					// Collab-C5-invite-anchor: a child's grant is anchored on the
+					// CONTAINER the receiver already belongs to, not on the invite. The
+					// invite stays pinned to the container alone, so one code can open a
+					// collection of any size without becoming a multi-entity credential.
+					await this.#shareOne(childId, rule.childType, opts.invite, opts.role, opts.entityId);
 				}
 			}
 		}
@@ -297,6 +325,12 @@ export class SharingEngine {
 						signerSecret: exposed.secretKey,
 						now: Date.now(),
 						x25519,
+						// Collab-C5-invite-anchor: the receiver has no invite in play for
+						// a child created after the share, so the grant names the container
+						// they are already a member of. Their gate checks that locally —
+						// container membership + our right to cascade + the containment
+						// rule's child type — instead of trusting this signature alone.
+						via: containerId,
 					});
 					const existing = findWrapForRecipient(doc, recipientPub);
 					if (existing) return existing;
@@ -348,6 +382,7 @@ export class SharingEngine {
 		type: string,
 		invite: ShareInvite,
 		role: AccessRole,
+		via?: string,
 	): Promise<void> {
 		const dekStore = await this.ensureDekStore();
 		this.#types.set(entityId, type);
@@ -392,6 +427,7 @@ export class SharingEngine {
 					dekVersion: handle.version,
 					selfProfile,
 					selfPubkey: this.#session.identity.publicKeyBase64,
+					...(via === undefined ? {} : { via }),
 				});
 			});
 		} finally {
@@ -676,6 +712,14 @@ export class SharingEngine {
 			this.#pendingRepo = new PendingRotationsRepository(db);
 		}
 		return this.#pendingRepo;
+	}
+
+	async ensureShareInvitesRepo(): Promise<ShareInvitesRepository> {
+		if (!this.#invitesRepo) {
+			const db = await this.#session.dataStores.open("entities");
+			this.#invitesRepo = new ShareInvitesRepository(db);
+		}
+		return this.#invitesRepo;
 	}
 
 	// --- internals ------------------------------------------------------------

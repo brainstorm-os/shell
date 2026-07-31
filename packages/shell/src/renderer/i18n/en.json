@@ -1453,5 +1453,18 @@
   "shell.settings.sync.lanHost.summary": "Sync directly with your other devices over your local network, with no server in between. Turning this on opens a listening socket on this network; only devices already on your signed device list can connect.",
   "shell.settings.sync.lanHost.label": "Accept connections",
   "shell.settings.sync.lanHost.mode.off": "Off",
-  "shell.settings.sync.lanHost.mode.on": "While this vault is open"
+  "shell.settings.sync.lanHost.mode.on": "While this vault is open",
+  "shell.settings.sync.lan.live": "Syncing directly with {peer} on your local network. No server is involved.",
+  "shell.settings.sync.lan.thisDevice": "This device's address",
+  "shell.settings.sync.lan.dial.label": "Connect to devices",
+  "shell.settings.sync.lan.dial.off": "Off",
+  "shell.settings.sync.lan.dial.auto": "Find them automatically",
+  "shell.settings.sync.lan.dial.manual": "Use a specific address",
+  "shell.settings.sync.lan.peers.none": "No devices found yet. Both machines need to be on the same network, with this setting on and the other one accepting connections.",
+  "shell.settings.sync.lan.address.label": "Device address",
+  "shell.settings.sync.lan.address.placeholder": "192.168.1.20:51820",
+  "shell.settings.sync.lan.address.save": "Connect",
+  "shell.settings.sync.lan.address.clear": "Forget",
+  "shell.settings.sync.lan.address.invalid": "That is not a local network address. Use the address shown on your other device, including the port.",
+  "shell.settings.sync.lan.address.saved": "Saved. Connecting when the other device is reachable."
 }

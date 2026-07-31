@@ -543,5 +543,18 @@
   "shell.widgets.resize": "Button label in the dashboard widgets layer: “Resize widget”.",
   "shell.windowMenu.region": "Accessible label for the running-windows strip / window-switcher toolbar region in the dashboard footer. Very short.",
   "shell.windowStrip.scrollLeft": "Button label in the dashboard window strip (open-window switcher): “Scroll windows left”.",
-  "shell.windowStrip.scrollRight": "Button label in the dashboard window strip (open-window switcher): “Scroll windows right”."
+  "shell.windowStrip.scrollRight": "Button label in the dashboard window strip (open-window switcher): “Scroll windows right”.",
+  "shell.settings.sync.lan.live": "Shown in Settings > Sync when this device is syncing over the local network. {peer} is a ws:// address.",
+  "shell.settings.sync.lan.thisDevice": "Label for the address other devices type in to reach this one.",
+  "shell.settings.sync.lan.dial.label": "Label for the picker choosing how this device finds other devices on the local network.",
+  "shell.settings.sync.lan.dial.off": "Picker option: never look for devices on the local network.",
+  "shell.settings.sync.lan.dial.auto": "Picker option: discover devices automatically over mDNS.",
+  "shell.settings.sync.lan.dial.manual": "Picker option: connect only to a typed address.",
+  "shell.settings.sync.lan.peers.none": "Empty state for the discovered-devices list.",
+  "shell.settings.sync.lan.address.label": "Label for the typed local-network address field.",
+  "shell.settings.sync.lan.address.placeholder": "Example address. Keep the shape host:port; do not translate.",
+  "shell.settings.sync.lan.address.save": "Button that saves the typed address and starts connecting.",
+  "shell.settings.sync.lan.address.clear": "Button that clears the saved address.",
+  "shell.settings.sync.lan.address.invalid": "Error shown when the typed address is not a private-network address with a port.",
+  "shell.settings.sync.lan.address.saved": "Confirmation shown after a valid address is saved."
 }

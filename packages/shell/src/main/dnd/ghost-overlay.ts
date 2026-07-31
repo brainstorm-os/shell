@@ -19,6 +19,7 @@
 
 import { type DragGhostSpec, type DragPoint, DropEffect } from "@brainstorm-os/sdk-types";
 import { BrowserWindow } from "electron";
+import { hiddenWindowsRequested } from "../window/reveal-window";
 import type { GhostOverlay } from "./dnd-service";
 
 /** Offset (screen px) of the ghost's top-left from the cursor hot-spot, so the
@@ -228,6 +229,10 @@ export function createElectronGhostWindow(): GhostWindow {
 			else pending = { spec, effect };
 		},
 		showInactive: () => {
+			// The ghost is `focusable: false` + `skipTaskbar` so it never steals
+			// focus, but it is still an on-screen window — hidden harness runs
+			// must not paint it over the developer's desktop mid-drag.
+			if (hiddenWindowsRequested()) return;
 			if (!window.isDestroyed()) window.showInactive();
 		},
 		hide: () => {

@@ -370,6 +370,11 @@ function FolderRow({
 	);
 
 	return (
+		// The row's keyboard contract arrives through the `{...itemProps}` spread:
+		// `useTreeKeyboard` supplies role="treeitem" plus the roving tabIndex, and
+		// Enter / Space / ArrowLeft / ArrowRight reach this same toggle through the
+		// tree reducer's `onActivate` / `onToggle`. The guard reads literal
+		// attributes only, so it cannot see through the spread — kbn-onclick-exempt
 		<div
 			{...itemProps}
 			{...drop.dropProps}

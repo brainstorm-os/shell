@@ -114,14 +114,23 @@ export type LiveSyncEngineContext = {
 	 *  real type. Optional; absent ⇒ the engine ignores inbound wraps (live-only
 	 *  mode, no restore). The X25519 secret never crosses here — only the
 	 *  resulting install side-effect. */
-	installWrap?: (wrap: MemberWrapPayload, entityId: string) => Promise<string | null>;
+	installWrap?: (
+		wrap: MemberWrapPayload,
+		entityId: string,
+		senderPubB64: string,
+	) => Promise<string | null>;
 	/** Stage 10.5c revoke predicate — drops frames from a revoked device before
 	 *  any crypto. Optional; absent ⇒ enforcement off (back-compat). */
 	isDeviceRevoked?: (senderPub: Uint8Array) => boolean;
 	/** Collab-C5 (F-288) writer-role predicate — drops an inbound update whose
-	 *  authenticated sender isn't an Editor+ member of the entity. Optional;
-	 *  absent ⇒ enforcement off (back-compat). */
-	authorizeWriter?: (senderPubB64: string, resolvedEntityId: string) => boolean | Promise<boolean>;
+	 *  authenticated sender isn't an Editor+ member of the entity. Receives the
+	 *  decrypted update so a first-share receiver can authorize off the signed
+	 *  record the frame carries. Optional; absent ⇒ enforcement off (back-compat). */
+	authorizeWriter?: (
+		senderPubB64: string,
+		resolvedEntityId: string,
+		plaintext: Uint8Array,
+	) => boolean | Promise<boolean>;
 	nowMs?: () => number;
 	randomNonce?: () => Uint8Array;
 	/** Stage 10.7 traffic-tick hooks for the sync-status surface. */
@@ -463,9 +472,13 @@ export class LiveSyncEngine {
 		}
 		let installedType: string | null = null;
 		try {
-			await receiveWrapBootstrap(frame, this.#makeCtx(relay.currentPort()), async (wrap, id) => {
-				installedType = (await this.#ctx.installWrap?.(wrap, id)) ?? null;
-			});
+			await receiveWrapBootstrap(
+				frame,
+				this.#makeCtx(relay.currentPort()),
+				async (wrap, id, senderPubB64) => {
+					installedType = (await this.#ctx.installWrap?.(wrap, id, senderPubB64)) ?? null;
+				},
+			);
 		} catch (error) {
 			console.warn(`[live-sync] wrap install failed for ${entityId}: ${(error as Error).message}`);
 		}

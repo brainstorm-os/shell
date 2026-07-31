@@ -90,6 +90,15 @@
 	max-height: min(80vh, 760px);
 }
 
+/* Content-fit: drop the variant's `min-height` so a short body (a single
+ * rename field, a one-line confirmation) sizes the panel to its content
+ * instead of holding a fixed minimum that leaves a dead gap above the footer.
+ * The variant's `max-height` still caps it, so long bodies scroll unchanged.
+ * Mirrors `.popover__panel--fit` in the shell renderer. */
+.bs-popover__panel--fit {
+	min-height: 0;
+}
+
 /* Fixed 44px header + 1px subtle bottom border — the project-wide panel
  * header rule. Right padding optical-compensated for the close button. */
 .bs-popover__header {

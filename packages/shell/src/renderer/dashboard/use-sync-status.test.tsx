@@ -4,6 +4,7 @@
  * traffic-age combination renderer-side stale derivation needs.
  */
 
+import { SyncTransportKind } from "@brainstorm-os/protocol/sync-status-types";
 import { describe, expect, it } from "vitest";
 import { SyncTransportState } from "../../preload";
 import {
@@ -27,6 +28,7 @@ function snap(partial: Partial<SyncStatusSnapshot> = {}): SyncStatusSnapshot {
 		seqStateBytes: 0,
 		pairKeyCount: 0,
 		attachmentSyncPausedReason: null,
+		transportKind: SyncTransportKind.WebSocket,
 		...partial,
 	};
 }

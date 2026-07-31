@@ -79,7 +79,7 @@ import { EntityIcon } from "./ui/entity-icon";
 import { FileTree } from "./ui/file-tree";
 import { codeFileObjectMenuContext } from "./ui/object-menu-context";
 import { type QuickOpenController, openQuickOpen } from "./ui/quick-open";
-import { openRenamePopover } from "./ui/rename-popover";
+import { NameMode, openRenamePopover } from "./ui/rename-popover";
 import { useSettledValue } from "./use-settled-value";
 
 const EMPTY_CITATION_INDEX: CitationIndex = new Map();
@@ -453,7 +453,7 @@ export function CodeEditorApp(): ReactElement {
 				pendingRenameIdRef.current = null;
 				focusBufferOnOpenRef.current = false;
 				const row = rows.find((r) => r.id === pending);
-				if (row) requestAnimationFrame(() => renameFileRef.current?.(row));
+				if (row) requestAnimationFrame(() => renameFileRef.current?.(row, NameMode.Create));
 				return;
 			}
 			if (focusBufferOnOpenRef.current) {
@@ -685,17 +685,18 @@ export function CodeEditorApp(): ReactElement {
 	}, []);
 
 	const pendingFolderRenameRef = useRef<string | null>(null);
-	const renameFolderRef = useRef<((path: string) => void) | null>(null);
+	const renameFolderRef = useRef<((path: string, mode?: NameMode) => void) | null>(null);
 
 	const renameFolder = useCallback(
-		(path: string): void => {
+		(path: string, mode: NameMode = NameMode.Rename): void => {
 			if (!getCodeEditorRuntime()?.services?.entities?.update) return;
+			const creating = mode === NameMode.Create;
 			openRenamePopover({
-				title: t("folderRenameTitle", { name: baseOf(path) }),
+				title: creating ? t("newFolder") : t("folderRenameTitle", { name: baseOf(path) }),
 				value: path,
 				inputLabel: t("folderRenameLabel"),
 				cancelLabel: t("renameCancel"),
-				saveLabel: t("renameSave"),
+				saveLabel: creating ? t("renameCreate") : t("renameSave"),
 				testId: "code-folder-rename",
 				submit: (typed) => {
 					const plan = planFolderRename(typed, path, planFiles(), pendingFoldersRef.current);
@@ -768,19 +769,20 @@ export function CodeEditorApp(): ReactElement {
 	);
 
 	const pendingRenameIdRef = useRef<string | null>(null);
-	const renameFileRef = useRef<((row: CodeFileRow) => void) | null>(null);
+	const renameFileRef = useRef<((row: CodeFileRow, mode?: NameMode) => void) | null>(null);
 
 	const renameFile = useCallback(
-		(row: CodeFileRow): void => {
+		(row: CodeFileRow, mode: NameMode = NameMode.Rename): void => {
 			if (row.locked) return;
 			if (!getCodeEditorRuntime()?.services?.entities?.update) return;
 			const dot = row.path.lastIndexOf(".");
+			const creating = mode === NameMode.Create;
 			openRenamePopover({
-				title: t("renameTitle", { name: fileName(row.path) }),
+				title: creating ? t("command.newFile") : t("renameTitle", { name: fileName(row.path) }),
 				value: row.path,
 				inputLabel: t("renameLabel"),
 				cancelLabel: t("renameCancel"),
-				saveLabel: t("renameSave"),
+				saveLabel: creating ? t("renameCreate") : t("renameSave"),
 				testId: "code-rename",
 				selectTo: dot > 0 ? dot : row.path.length,
 				submit: (typed) => {
@@ -1087,7 +1089,7 @@ export function CodeEditorApp(): ReactElement {
 		const target = pendingFolderRenameRef.current;
 		if (target === null || !pendingFolders.includes(target)) return;
 		pendingFolderRenameRef.current = null;
-		requestAnimationFrame(() => renameFolderRef.current?.(target));
+		requestAnimationFrame(() => renameFolderRef.current?.(target, NameMode.Create));
 	}, [pendingFolders]);
 
 	// ── Window-level chords routed through the shared shortcut registry. ─────

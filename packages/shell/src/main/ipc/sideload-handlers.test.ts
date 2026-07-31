@@ -547,6 +547,35 @@ describe("apps:install-from-vault (AppForge-2)", () => {
 		});
 	});
 
+	it("a six-file app reports six files — the count is one row per path (POLISH-FN-4)", async () => {
+		// The downstream half of the agent-approval duplicate bug: `fileCount` is
+		// literally the number of CodeFile rows under the manifest's directory, so
+		// a second row at an existing path inflated a six-file app to "8 files".
+		// With the approval guard in place the vault only ever holds one row per
+		// path, and the count the installer reports is the app's real file count.
+		const paths = [
+			"milestones/manifest.json",
+			"milestones/index.html",
+			"milestones/app.js",
+			"milestones/styles.css",
+			"milestones/lib/format.js",
+			"milestones/icon.svg",
+		];
+		for (const path of paths) {
+			seedCodeFile(path, path.endsWith("manifest.json") ? JSON.stringify(baseManifest) : "x");
+		}
+		register();
+
+		const listed = await listSources();
+		expect(listed.ok).toBe(true);
+		if (!listed.ok) return;
+		const app = listed.sources.find((s) => s.rootDir === "milestones");
+		expect(app?.fileCount).toBe(6);
+		expect(app?.fileIds).toHaveLength(6);
+		expect(new Set(app?.fileIds)).toHaveLength(6);
+		expect(app?.problem).toBeNull();
+	});
+
 	it("lists vault app candidates with parsed manifests, and refuses a foreign sender", async () => {
 		seedCodeFile("my-app/manifest.json", JSON.stringify(baseManifest));
 		seedCodeFile("my-app/index.html", "<!doctype html>");

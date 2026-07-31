@@ -303,4 +303,39 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			);
 		},
 	},
+	{
+		version: 10,
+		description: "entities.db v10 — share_invites (Collab-C5-invite-anchor)",
+		up: (db) => {
+			// Collab-C5-invite-anchor — the invitee's own outstanding invites. Each
+			// row is the secret half of a `ShareInvite` this vault minted, and it is
+			// the ONLY thing that can authorize a first-share bootstrap into this
+			// vault: the owner echoes a MAC under `secret`, bound to the entity, the
+			// member key and the granter, inside the signed grant.
+			//
+			// Redemption PINS the row to one `(redeemed_entity_id, redeemed_by)`
+			// pair; the same pair may redeem again (a re-sent opening frame), any
+			// other pair is refused. Persisted rather than in-memory precisely so a
+			// restart cannot re-open a spent invite, and so an outstanding one
+			// survives the wait for a collaborator to act on it.
+			//
+			// No FK to `entities`: the entity being bootstrapped does not exist yet
+			// at mint time, and a pruned entity must not silently un-spend an invite.
+			// LOCAL state — it never syncs and never crosses the wire.
+			db.exec(`
+				CREATE TABLE share_invites (
+					invite_id          TEXT PRIMARY KEY,
+					secret             TEXT NOT NULL,
+					member_pub         TEXT NOT NULL,
+					created_at         INTEGER NOT NULL,
+					expires_at         INTEGER NOT NULL,
+					redeemed_at        INTEGER,
+					redeemed_entity_id TEXT,
+					redeemed_by        TEXT,
+					revoked_at         INTEGER
+				);
+				CREATE INDEX idx_share_invites_expires ON share_invites(expires_at);
+			`);
+		},
+	},
 ];

@@ -74,6 +74,14 @@ import {
 	toReference,
 } from "./logic/attachments-context";
 import {
+	type CodeFileConflictChoice,
+	type CodeFilePathRow,
+	claimCodeFilePath,
+	codeFilePathsFrom,
+	mergeCodeFilePaths,
+	releaseCodeFilePath,
+} from "./logic/code-file-conflict";
+import {
 	BudgetVerdict,
 	accrueSpend,
 	budgetCheck,
@@ -104,13 +112,14 @@ import {
 import { seedFromProcessIntent } from "./logic/process-intent";
 import {
 	ProposalActionKind,
+	ProposeKind,
 	type ProposedArtifact,
 	emptyProposalState,
 	proposalReducer,
 } from "./logic/propose-artifacts";
 import { canProposeCodeFiles } from "./logic/propose-code-file";
 import { persistProposedDatabase } from "./logic/propose-database-persist";
-import { persistApprovedProposal } from "./logic/propose-persist";
+import { CodeFilePathConflictError, persistApprovedProposal } from "./logic/propose-persist";
 import {
 	buildDatabaseContextBlock,
 	databaseSchemasFromEntities,
@@ -566,13 +575,36 @@ export function AgentApp(): ReactElement {
 		if (proposalNotice !== null) setProposalNotice(null);
 	}
 
+	// POLISH-FN-4 — `CodeFile/v1` has no uniqueness constraint on `path`, so the
+	// app is what keeps one file per path. Two sources feed the check: the live
+	// vault snapshot, and the files THIS session persisted (the snapshot has not
+	// round-tripped yet when a second card is approved seconds later, and
+	// without the session half that window mints a duplicate).
+	const vaultCodeFiles = useMemo(() => codeFilePathsFrom(all), [all]);
+	const [sessionCodeFiles, setSessionCodeFiles] = useState<readonly CodeFilePathRow[]>([]);
+	const knownCodeFiles = useMemo(
+		() => mergeCodeFilePaths(vaultCodeFiles, sessionCodeFiles),
+		[vaultCodeFiles, sessionCodeFiles],
+	);
+	// Paths with an approve in flight (`claimCodeFilePath`). A ref, not state:
+	// the claim has to be visible SYNCHRONOUSLY to a second card approved before
+	// the first create resolves — a render later is a render too late.
+	const inFlightCodeFilePaths = useRef<Set<string>>(new Set());
+
 	// Approve = the human gesture that persists a staged draft. THIS is the only
 	// place `entities.write:<type>` is exercised for a proposed artifact; the
 	// model never reaches it. Maps the draft to its owner-app schema, creates,
-	// then drops the card and confirms.
+	// then drops the card and confirms. `choice` is the user's answer to a
+	// code-file path conflict (POLISH-FN-4) — absent means there was none.
 	const approveProposal = useCallback(
-		async (artifact: ProposedArtifact) => {
+		async (artifact: ProposedArtifact, choice?: CodeFileConflictChoice) => {
 			if (!entitiesSvc || approvingIds.has(artifact.id)) return;
+			const codeFilePath =
+				artifact.kind === ProposeKind.CodeFile ? (artifact.fields.path ?? "") : null;
+			if (codeFilePath !== null && !claimCodeFilePath(inFlightCodeFilePaths.current, codeFilePath)) {
+				setError(t("propose.codeFile.conflictError", { path: codeFilePath }));
+				return;
+			}
 			setApprovingIds((prev) => new Set(prev).add(artifact.id));
 			setError(null);
 			try {
@@ -595,17 +627,34 @@ export function AgentApp(): ReactElement {
 					setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
 					return;
 				}
-				await persistApprovedProposal(entitiesSvc, artifact, {
+				const persisted = await persistApprovedProposal(entitiesSvc, artifact, {
 					conversationId: activeId,
 					collectionMembers: collection?.properties.members as MemberOverrides | undefined,
+					existingCodeFiles: knownCodeFiles,
+					codeFileChoice: choice,
 					now: Date.now(),
 				});
+				// Carry the path forward so the next card at it sees it as taken
+				// without waiting for the snapshot (POLISH-FN-4).
+				if (persisted?.codeFilePath) {
+					const landed: CodeFilePathRow = { id: persisted.id, path: persisted.codeFilePath };
+					setSessionCodeFiles((prev) => mergeCodeFilePaths(prev, [landed]));
+				}
 				dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
 				setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
 			} catch (err) {
-				console.error("[agent] approve proposal failed:", err);
-				setError(t("propose.card.approveFailed"));
+				if (err instanceof CodeFilePathConflictError) {
+					// Fail-closed: nothing was written. The card stays up and now shows
+					// the conflict, so the user picks update / save-a-copy / rename.
+					setError(t("propose.codeFile.conflictError", { path: err.path }));
+				} else {
+					console.error("[agent] approve proposal failed:", err);
+					setError(t("propose.card.approveFailed"));
+				}
 			} finally {
+				if (codeFilePath !== null) {
+					releaseCodeFilePath(inFlightCodeFilePaths.current, codeFilePath);
+				}
 				setApprovingIds((prev) => {
 					const next = new Set(prev);
 					next.delete(artifact.id);
@@ -613,7 +662,7 @@ export function AgentApp(): ReactElement {
 				});
 			}
 		},
-		[entitiesSvc, approvingIds, activeId, all],
+		[entitiesSvc, approvingIds, activeId, all, knownCodeFiles],
 	);
 	const discardProposal = useCallback((id: string) => {
 		dispatchProposal({ kind: ProposalActionKind.Discard, id });
@@ -1720,6 +1769,7 @@ export function AgentApp(): ReactElement {
 					<ProposalTray
 						proposals={proposalState.pending}
 						busyIds={approvingIds}
+						existingCodeFiles={knownCodeFiles}
 						onApprove={approveProposal}
 						onDiscard={discardProposal}
 						onEditField={editProposalField}
