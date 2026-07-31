@@ -47,6 +47,7 @@ import {
 	NetworkPrivacyMode,
 	NetworkProxyMode,
 } from "@brainstorm-os/protocol/network-wire-types";
+import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import { isPublicBeta } from "@brainstorm-os/sdk/analytics";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -667,6 +668,74 @@ function PrivacySection({
 					}}
 				/>
 			)}
+			<BlockedLinksGroup />
+		</div>
+	);
+}
+
+/**
+ * Links you told Brainstorm never to open outside the vault.
+ *
+ * A Deny on the open prompt is sticky per vault, which is the point: "never
+ * for this" has to mean never. But nothing could undo one, so a single Deny
+ * killed a link permanently while the refusal toast pointed here, at a control
+ * that did not exist. This is that control.
+ *
+ * Renders nothing at all when no link is blocked, so it stays out of the way
+ * until it has something to say.
+ */
+function BlockedLinksGroup() {
+	const [blocked, setBlocked] = useState<readonly string[]>([]);
+
+	const load = useCallback(async () => {
+		const snapshot = await window.brainstorm?.dashboard?.snapshot?.();
+		const consents = snapshot?.osHandoffConsent ?? {};
+		setBlocked(
+			Object.entries(consents)
+				.filter(([, decision]) => decision === OsHandoffConsent.Denied)
+				.map(([signature]) => signature)
+				.sort(),
+		);
+	}, []);
+
+	useEffect(() => {
+		void load();
+	}, [load]);
+
+	if (blocked.length === 0) return null;
+
+	const clear = async (signature?: string) => {
+		await window.brainstorm?.dashboard?.clearOsHandoffConsent?.(signature);
+		await load();
+	};
+
+	return (
+		<div className="network-egress__group" data-testid="network-egress-blocked-links">
+			<h4 className="network-egress__group-title">{t("shell.settings.privacy.blockedLinks.title")}</h4>
+			<p className="network-egress__group-hint">{t("shell.settings.privacy.blockedLinks.hint")}</p>
+			<ul className="network-egress__blocked-links">
+				{blocked.map((signature) => (
+					<li key={signature} className="network-egress__blocked-link">
+						<code>{signature}</code>
+						<Button
+							size={ButtonSize.Md}
+							variant={ButtonVariant.Ghost}
+							onClick={() => void clear(signature)}
+							data-testid={`blocked-link-clear-${signature}`}
+						>
+							{t("shell.settings.privacy.blockedLinks.clear")}
+						</Button>
+					</li>
+				))}
+			</ul>
+			<Button
+				size={ButtonSize.Md}
+				variant={ButtonVariant.Ghost}
+				onClick={() => void clear()}
+				data-testid="blocked-links-clear-all"
+			>
+				{t("shell.settings.privacy.blockedLinks.clearAll")}
+			</Button>
 		</div>
 	);
 }

@@ -328,6 +328,35 @@ export function registerDashboardHandlers(
 		await withStore((store) => store.setIconGridMigrated());
 	});
 
+	/**
+	 * Clear a remembered "open outside the vault" decision, or all of them.
+	 *
+	 * A Deny is sticky per vault, which is the point: "never for this" has to
+	 * mean never. But until now nothing could undo one, so a single Deny killed
+	 * a link permanently and the refusal toast pointed at a Settings control
+	 * that did not exist. Passing no signature clears every decision, which is
+	 * what the Privacy panel's reset does.
+	 */
+	ipcMain.handle(
+		"dashboard:clear-os-handoff-consent",
+		async (_event, signature?: string): Promise<void> => {
+			const session = getActiveVaultSession();
+			if (!session) {
+				console.warn("[brainstorm] dashboard:clear-os-handoff-consent: no active vault session");
+				return;
+			}
+			const store = await session.dashboardStore();
+			await ensureSubscribed(store, getDashboard);
+			if (typeof signature === "string" && signature.length > 0) {
+				store.setOsHandoffConsent(signature, null);
+				return;
+			}
+			for (const known of Object.keys(store.snapshot().osHandoffConsent)) {
+				store.setOsHandoffConsent(known, null);
+			}
+		},
+	);
+
 	ipcMain.handle(
 		"dashboard:set-wallpaper",
 		async (_event, wallpaper: Wallpaper, slot?: string): Promise<void> => {
