@@ -12,7 +12,7 @@
  * MCP) or manages other principals (sharing, roster.write).
  */
 
-import { parseCapability } from "./ledger";
+import { parseCapability } from "./capability-string";
 
 /** The propose-verb prefix — the only `intents.dispatch` scopes an agent may
  *  hold. A propose verb stages a draft; it can never persist bytes. */

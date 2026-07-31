@@ -42,6 +42,7 @@ import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekHandle, EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
 import { rewriteEntityRefs } from "./merge-refs";
+import { isShellOwnedEntityType } from "./shell-owned-types";
 
 /** Upper bound on losers per `entities.merge` call — a duplicate group is a
  *  handful of rows; a pathological request must not pin the main process in
@@ -407,6 +408,15 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		}
 
 		const can = (verb: EntityAccess, type: string): boolean => {
+			// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
+			// broad its grants. An `Agent/v1` record binds a ledger principal to a
+			// pubkey and a system-prompt persona: an app that could write one could
+			// hijack a granted agent's ceiling with its own persona, orphan a real
+			// agent's authority by mangling its identity, or trick a delete into
+			// destroying another agent's unrecoverable key. Only the privileged
+			// agent directory (which writes through the repo, not this service)
+			// may author them.
+			if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
 			try {
 				return ledger.has(app, `entities.${verb}:${type}`);
 			} catch (error) {
@@ -694,6 +704,11 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					for (const refId of referrerIds) {
 						const row = repo.get(refId);
 						if (!row) continue;
+						// The referrer scan is a raw substring match over every live row,
+						// so it can land on a SHELL-OWNED row the caller may not write.
+						// An id swap is narrow, but the fence says "no app writes this
+						// type" — honour it here too rather than carving an exception.
+						if (isShellOwnedEntityType(row.type)) continue;
 						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
 						if (!refPatch) continue;
 						const updated = await writePropsThroughDoc(repo, row, refPatch);

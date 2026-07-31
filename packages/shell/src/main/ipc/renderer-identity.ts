@@ -19,6 +19,7 @@
  */
 
 import { SHELL_IDENTITY } from "@brainstorm-os/capabilities/default-grants";
+import { isReservedAppId } from "../apps/manifest";
 
 export type RendererIdentitySource = {
 	/** WebContents.id (Electron). Stable for the lifetime of the renderer. */
@@ -29,7 +30,20 @@ export class RendererIdentityRegistry {
 	private readonly byWebContents = new Map<number, string>();
 
 	register(webContentsId: number, appId: string): void {
+		// Defence in depth behind manifest validation + the installer: a renderer
+		// registered under a platform-owned id would VERIFY as that principal and
+		// inherit its grants. Refuse rather than trust the caller.
+		if (isReservedAppId(appId)) {
+			throw new Error(`renderer-identity: "${appId}" is a reserved platform principal`);
+		}
 		this.byWebContents.set(webContentsId, appId);
+	}
+
+	/** The ONE sanctioned path to the platform principal: the privileged
+	 *  dashboard renderer, registered by the shell itself (never by an app
+	 *  manifest, which `register` refuses). */
+	registerPlatform(webContentsId: number, principal: typeof SHELL_IDENTITY): void {
+		this.byWebContents.set(webContentsId, principal);
 	}
 
 	unregister(webContentsId: number): void {
@@ -68,5 +82,5 @@ function parseSource(source: unknown): number | null {
 
 /** Convenience: register the dashboard renderer with the canonical shell id. */
 export function registerDashboard(registry: RendererIdentityRegistry, webContentsId: number): void {
-	registry.register(webContentsId, SHELL_IDENTITY);
+	registry.registerPlatform(webContentsId, SHELL_IDENTITY);
 }

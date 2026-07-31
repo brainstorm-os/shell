@@ -23,9 +23,10 @@
 
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
-import { AGENT_TYPE, RosterMemberKind, RosterRole, readAgentDef } from "@brainstorm-os/sdk-types";
+import { AGENT_TYPE, RosterMemberKind, RosterRole } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import { readTrustedAgentDef } from "../agents/agent-record";
 import { AccessRole, activeMembers } from "../collab/access-record";
 import { readDocProfiles } from "../collab/doc-profiles";
 import {
@@ -114,7 +115,10 @@ function readAgentMembers(
 		{ fingerprint: string; displayName: string; avatarRef: string | null }
 	>();
 	for (const row of repo.query({ type: AGENT_TYPE })) {
-		const def = readAgentDef(row.properties);
+		// The TRUSTED read: shell-authored + the fingerprint genuinely derives
+		// from the pubkey. An unbound or app-authored record is not an agent, so
+		// it never resolves as a member.
+		const def = readTrustedAgentDef(row);
 		if (!def) continue;
 		agents.set(def.pubkey, {
 			fingerprint: def.fingerprint,
@@ -167,10 +171,17 @@ async function handleMembers(
 
 	const resolve = (pubkey: string): ResolvedDisplay => {
 		const fingerprint = fingerprintOf(pubkey);
+		// Self always wins over anything else in the vault — nobody gets to rename
+		// you, or recast you as an agent, in your own member list. This ordering is
+		// load-bearing: it comes BEFORE the agent map so an `Agent/v1` record
+		// carrying a human's pubkey can never override that human's identity.
+		const profile =
+			pubkey === selfPubkey ? selfProfile : (docProfiles.get(pubkey) ?? readProfile(repo, pubkey));
 		// An Agent/v1 pubkey resolves through its agent record — kind + name come
 		// from the directory, not from a self-asserted profile (an agent has no
-		// sovereign profile; its record is privileged local vault data).
-		const agent = agents.get(pubkey);
+		// sovereign profile; its record is privileged local vault data). A pubkey
+		// that already has a VERIFIED human profile is that human, not an agent.
+		const agent = pubkey === selfPubkey || profile?.verified ? undefined : agents.get(pubkey);
 		if (agent) {
 			return {
 				fingerprint: agent.fingerprint,
@@ -179,10 +190,6 @@ async function handleMembers(
 				...(agent.avatarRef ? { avatarRef: agent.avatarRef } : {}),
 			};
 		}
-		// Self always wins over anything the doc claims about us — nobody else
-		// gets to rename you in your own member list.
-		const profile =
-			pubkey === selfPubkey ? selfProfile : (docProfiles.get(pubkey) ?? readProfile(repo, pubkey));
 		// A self-asserted name is only ever DISPLAYED when its signature verified;
 		// an unverified profile row degrades to the key fingerprint rather than
 		// letting an unauthenticated string stand in for an identity.

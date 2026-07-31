@@ -36,12 +36,23 @@ describe("RendererIdentityRegistry", () => {
 
 	it("verify rejects malformed source", () => {
 		const reg = new RendererIdentityRegistry();
-		reg.register(7, "shell");
+		registerDashboard(reg, 7);
 		expect(reg.verify("shell", "not-a-number")).toBe(false);
 		expect(reg.verify("shell", null)).toBe(false);
 		expect(reg.verify("shell", -1)).toBe(false);
 		expect(reg.verify("shell", 1.5)).toBe(false);
 		expect(reg.verify("shell", { somethingElse: 7 })).toBe(false);
+	});
+
+	it("refuses to register an APP under a reserved platform principal", () => {
+		// Pentest F1: `shell` is the principal `applyShellGrants` writes the full
+		// privileged capability set under. A renderer registered under it would
+		// VERIFY as the dashboard and inherit that set with no consent sheet.
+		const reg = new RendererIdentityRegistry();
+		for (const reserved of ["shell", "SHELL", "brainstorm"]) {
+			expect(() => reg.register(9, reserved)).toThrow(/reserved platform principal/);
+		}
+		expect(reg.get(9)).toBeUndefined();
 	});
 
 	it("registerDashboard tags the WebContents as the shell identity", () => {
@@ -54,7 +65,7 @@ describe("RendererIdentityRegistry", () => {
 	it("size() reports the number of registered renderers", () => {
 		const reg = new RendererIdentityRegistry();
 		expect(reg.size()).toBe(0);
-		reg.register(1, "shell");
+		registerDashboard(reg, 1);
 		reg.register(2, "io.example.app");
 		expect(reg.size()).toBe(2);
 		reg.unregister(1);
