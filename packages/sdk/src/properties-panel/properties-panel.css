@@ -155,8 +155,16 @@
 :root .bs-props__row-value > :first-child {
 	flex: 1 1 auto;
 	min-width: 0;
-	/* Long single-line values (emails, URLs) truncate cleanly instead of
-	   breaking mid-word across lines in a narrow inspector. */
+}
+
+/* Long single-line values (emails, URLs) truncate cleanly instead of
+   breaking mid-word across lines in a narrow inspector. The Multiline cell
+   and its editor are exempt: they wrap by design, and forcing the rest face
+   to one nowrap line made the row grow by N-1 lines the moment the
+   auto-grow textarea mounted — every row below jumped. */
+:root
+	.bs-props__row-value
+	> :first-child:not(.bs-cell-multiline):not(.bs-cell-multiline-input) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
