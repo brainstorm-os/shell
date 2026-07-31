@@ -6,6 +6,7 @@
  * IPC. SSR rendering matches the renderer's first paint shape.
  */
 
+import { SyncTransportKind } from "@brainstorm-os/protocol/sync-status-types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { IconName } from "../ui/icon";
@@ -25,6 +26,7 @@ function snap(partial: Partial<SyncStatusSnapshot>): SyncStatusSnapshot {
 		seqStateBytes: 0,
 		pairKeyCount: 0,
 		attachmentSyncPausedReason: null,
+		transportKind: SyncTransportKind.WebSocket,
 		...partial,
 	};
 }

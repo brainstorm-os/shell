@@ -9,6 +9,7 @@
 
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { LanDialMode } from "../sync/lan-dial-coordinator";
 import { LanHostMode } from "../sync/lan-host-policy";
 import type { SyncStatusSnapshot, SyncStatusStore } from "../sync/sync-status-store";
 
@@ -82,6 +83,24 @@ class FakeBrowserWindow {
 	}
 }
 
+/** P2P-1 — the dial-half options, which every registration now carries. Inert
+ *  stubs: these tests are about registration and the push channel, and the LAN
+ *  dial behaviour has its own suites. */
+function lanPeeringStubs() {
+	const snapshot = {
+		dialMode: LanDialMode.Off,
+		manualUrl: null,
+		activeUrl: null,
+		listenerUrl: null,
+		peers: [],
+	};
+	return {
+		getLanPeering: async () => snapshot,
+		setLanDialMode: async () => snapshot,
+		setLanPeerAddress: async () => snapshot,
+	};
+}
+
 describe("SYNC_STATUS_SNAPSHOT_CHANNEL", () => {
 	it("exposes the canonical channel id", () => {
 		expect(SYNC_STATUS_SNAPSHOT_CHANNEL).toBe("sync-status:snapshot");
@@ -108,6 +127,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		expect(store.isStarted()).toBe(true);
 	});
@@ -127,6 +147,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		store.emitChange({
 			state: "syncing",
@@ -162,6 +183,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		store.emitChange(null);
 		expect(win.webContents.send).not.toHaveBeenCalled();
@@ -181,6 +203,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		store.emitChange(null);
 		// No throw + no crash is the contract here.
@@ -203,6 +226,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		registerSyncStatusHandlers({
 			getDashboard: () => winB as unknown as Electron.BrowserWindow,
@@ -216,6 +240,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		store.emitChange(null);
 		// Only winB receives the push — the prior subscription was disposed.
@@ -241,6 +266,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		expect(() => store.emitChange(null)).not.toThrow();
 	});
@@ -260,6 +286,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		store.stop();
 		registerSyncStatusHandlers({
@@ -274,6 +301,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		expect(store.isStarted()).toBe(true);
 	});
@@ -300,6 +328,7 @@ describe("registerSyncStatusHandlers", () => {
 			runRestore: async () => ({ requested: 0, restored: 0, entityIds: [], complete: true }),
 			getLanHostMode: async () => LanHostMode.Off,
 			setLanHostMode: async () => LanHostMode.Off,
+			...lanPeeringStubs(),
 		});
 		const setHandler = handlers.get("sync-status:set-policy");
 		expect(setHandler).toBeTypeOf("function");

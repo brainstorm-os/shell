@@ -58,6 +58,35 @@ export type PairingHandlersOptions = {
 	/** The dashboard window — the only renderer that should receive the
 	 *  change signal. Same pattern `files-handles-handlers.ts` uses. */
 	getDashboard: () => BrowserWindow | null;
+	/**
+	 * LAN-3's PRODUCING half — the live LAN listener URL, or `null`.
+	 *
+	 * `LAN-3` shipped only the accepting half. `LanRelayListener` has always
+	 * minted exactly the URL the pairing payload wants (`LanListenerAddress.url`,
+	 * commented as such) and `pairing-payload.ts` has always validated and
+	 * accepted a `ws://` address behind the scheme allowlist — but nothing
+	 * connected the two, so `LanHostController.onUrlChanged`'s only production
+	 * consumer was a `console.info`. With this, the payload a hosting device
+	 * hands out carries its own private address, and the just-paired device
+	 * adopts it as a LAN peer with no discovery on the critical path.
+	 *
+	 * **The relay in `vault.json` still WINS when one is configured, and that
+	 * ordering is load-bearing.** The pairing exchange itself rides the local
+	 * transport, and the LAN transport's channel-bound admission refuses a
+	 * device that is not yet on the roster — which a device being paired is not,
+	 * by definition. So the LAN URL cannot carry the exchange; it is the address
+	 * to sync with AFTERWARDS. Preferring it would turn a working relay pairing
+	 * into one that hangs. It fills the slot only when there is no relay at all,
+	 * where the alternative is an empty payload.
+	 */
+	getLanListenerUrl?: () => string | null;
+	/**
+	 * LAN-3 — the source's address, as carried by a payload we just joined
+	 * with. The wiring offers it to the LAN dial coordinator so a just-paired
+	 * device can reach its peer directly without waiting for discovery. A
+	 * non-LAN address is filtered downstream.
+	 */
+	onPairedPeerUrl?: (url: string) => void;
 };
 
 type ActiveServiceHolder = {
@@ -87,7 +116,9 @@ async function readVaultSyncRelayUrl(vaultPath: string): Promise<string | null> 
 function buildSession(
 	session: VaultSession,
 	props: VaultPropertiesStore,
-	relayUrl: string | null,
+	/** Read per call, not captured: the LAN listener's port is ephemeral and the
+	 *  listener can start or stop between one pairing and the next. */
+	relayUrl: () => string | null,
 	notify: () => void,
 ): PairingServiceSession {
 	const devicesStore = props.devices();
@@ -105,7 +136,7 @@ function buildSession(
 		getDeviceX25519: () => ({
 			publicKey: identityProvider.deviceX25519Public,
 		}),
-		getRelayUrl: () => relayUrl,
+		getRelayUrl: relayUrl,
 		saveIdentitySecret: async (secret: Uint8Array): Promise<void> => {
 			// Stage 10.5c — install the unsealed user-identity secret into
 			// the keystore on the target side. The same keystore backend
@@ -408,7 +439,12 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 		if (active && active.session === session) return active;
 		await closeActive();
 		const props = await VaultPropertiesStoreClass.open(session.ydocStore);
-		const relayUrl = await readVaultSyncRelayUrl(session.vaultPath);
+		// LAN-3 — the listener URL wins when we are hosting. Read through a
+		// getter rather than captured, because the port is ephemeral and the
+		// listener can start or stop between one pairing and the next.
+		const vaultRelayUrl = await readVaultSyncRelayUrl(session.vaultPath);
+		// Relay first, LAN listener as the fallback — see `getLanListenerUrl`.
+		const relayUrl = (): string | null => vaultRelayUrl ?? options.getLanListenerUrl?.() ?? null;
 		const service = new PairingService({
 			getSession: async () => buildSession(session, props, relayUrl, notify),
 			transport: buildTransport(),
@@ -476,7 +512,17 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 					ownDeviceLabel: "",
 					expiresAt: payloadDecoded.expiresAt,
 				});
-				return await holder.service.scanPayload({ payload: args.payload, sealedIdentity });
+				const joined = await holder.service.scanPayload({
+					payload: args.payload,
+					sealedIdentity,
+				});
+				// LAN-3 — the payload's address is now OURS to sync with. Provenance,
+				// not address inference (F-466): this URL arrived inside a payload the
+				// user physically transferred and whose sealed identity we just
+				// opened, which is a stronger warrant than any discovery advert. The
+				// coordinator still refuses it unless the user has LAN dialling on.
+				options.onPairedPeerUrl?.(payloadDecoded.relayUrl);
+				return joined;
 			} catch (error) {
 				throw wrapError(error);
 			}
@@ -539,8 +585,16 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 	ipcMain.handle("pairing:has-relay", async (): Promise<boolean> => {
 		const session = getActiveVaultSession();
 		if (!session) return false;
+		// LAN-3 — a device hosting on the local network has a reachable address
+		// even with no relay configured, so "Add device" must not be disabled.
+		// Without this a LAN-only setup can never pair a second device, which is
+		// precisely the setup this rung exists to make usable.
 		const url = await readVaultSyncRelayUrl(session.vaultPath);
-		return url !== null;
+		if (url !== null) return true;
+		// A device hosting on the local network has a reachable address to put in
+		// the payload even with no relay configured, so "Add device" is not
+		// disabled outright.
+		return options.getLanListenerUrl?.() != null;
 	});
 
 	return () => {

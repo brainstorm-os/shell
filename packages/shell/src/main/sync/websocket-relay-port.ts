@@ -50,6 +50,16 @@ export enum WebSocketRelayState {
 	Reconnecting = "reconnecting",
 	Closed = "closed",
 	Error = "error",
+	/** P2P-1 — the socket is up but the peer has stopped answering heartbeats.
+	 *  DEGRADED, not closed, and the distinction is measured: the `P2P-0`
+	 *  prototype froze a peer with `SIGSTOP`, saw the transport never notice at
+	 *  all, saw a 5 s heartbeat deadline notice in 5,047 ms — and then found the
+	 *  socket STILL USABLE after the peer woke. So "heartbeat missed, tear it
+	 *  down" is the wrong reflex; it would destroy connections that recover.
+	 *  Degraded means: stop putting frames on the wire (they queue), stop
+	 *  claiming a live link in the status surface, arm the fallback, and give
+	 *  the socket a grace period to answer. */
+	Degraded = "degraded",
 }
 
 /** First-byte channel discriminator (see file header). */
@@ -94,13 +104,22 @@ export type AuthControl = { op: "auth"; token: string; account: string; sig: str
  *  window. Mirrors `brainstorm-sync`'s `RotateControl`. `account` feeds the
  *  node's catalog on an open node; a gated node uses the proven account. */
 export type RotateControl = { op: "rotate"; from: string; to: string; account?: string };
+/** P2P-1 — transport keepalive. Carries a client-minted stamp and nothing else:
+ *  no routing key, no account, no entity id, so it moves no metadata and the
+ *  relay-blind fence is untouched. Only sent on a transport configured with a
+ *  heartbeat (the LAN path); a peer that does not answer is degraded, not
+ *  closed. */
+export type PingControl = { op: "ping"; t: number };
+export type PongControl = { op: "pong"; t: number };
 export type RelayControlMessage =
 	| SubscribeControl
 	| UnsubscribeControl
 	| CatalogControl
 	| RotateControl
 	| HelloControl
-	| AuthControl;
+	| AuthControl
+	| PingControl
+	| PongControl;
 
 /** LAN-2b(b) — the first control on a channel-bound connection: it names the
  *  connecting device so the host can seal its challenge to that device's
@@ -168,6 +187,42 @@ export type WebSocketRelayPortOptions = {
 	rotateTimeoutMs?: number;
 	/** Asset-B4 — `requestAsset` (blob chunk) reply timeout (default 30 s). */
 	assetTimeoutMs?: number;
+	/**
+	 * P2P-1 — abort a connect attempt that has not opened within this many ms.
+	 *
+	 * Absent ⇒ the OS default, which the `P2P-0` prototype measured at
+	 * **75,010 ms** for a TCP connect to a silent LAN address — exactly what a
+	 * sleeping or powered-down machine looks like, since it sends no RST. With
+	 * a 3 s application deadline the same dial failed in 3,003 ms. Under the
+	 * exclusive LAN-preferred transport selection, no deadline turns every
+	 * sleeping-peer case into a seventy-five-second sync outage, so the LAN
+	 * path always sets one. Left absent for the cloud relay, where the far end
+	 * is a hosted node and the OS default is not a user-visible hazard.
+	 *
+	 * 3 s is ~13x the measured cross-machine mDNS discovery time and three
+	 * orders of magnitude above the measured 3 to 5 ms connect, so it will not
+	 * fire on a healthy link.
+	 */
+	connectTimeoutMs?: number;
+	/**
+	 * P2P-1 — send `{op:"ping"}` this often once the connection may speak.
+	 *
+	 * Absent ⇒ no keepalive, which is the shipped behaviour on every transport
+	 * and is why a frozen peer was never noticed at all. The LAN path sets 5 s.
+	 */
+	heartbeatIntervalMs?: number;
+	/**
+	 * P2P-1 — how long a ping may go unanswered before the port DEGRADES (see
+	 * {@link WebSocketRelayState.Degraded}). Default 5 s when a heartbeat
+	 * interval is configured, matching the 5,047 ms the prototype measured.
+	 */
+	heartbeatTimeoutMs?: number;
+	/**
+	 * P2P-1 — the port degraded or recovered. The LAN dial coordinator uses
+	 * this to arm the relay fallback without the transport having to know that
+	 * a fallback exists.
+	 */
+	onDegraded?: (degraded: boolean) => void;
 	/** SYNC-4b — respond to a gated node's `challenge`. Given the server nonce,
 	 *  return the `{token, account, sig}` to send back, or null to stay
 	 *  unauthenticated (an open node never challenges). This is the ONLY place
@@ -213,6 +268,10 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #catalogTimeoutMs: number;
 	readonly #rotateTimeoutMs: number;
 	readonly #assetTimeoutMs: number;
+	readonly #connectTimeoutMs: number | null;
+	readonly #heartbeatIntervalMs: number | null;
+	readonly #heartbeatTimeoutMs: number;
+	readonly #onDegraded: ((degraded: boolean) => void) | null;
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #requireAdmission: boolean;
 	readonly #lanHandshake: WebSocketRelayPortOptions["lanHandshake"] | null;
@@ -262,6 +321,9 @@ export class WebSocketRelayPort implements RelayPort {
 	#gatedAdmission = false;
 	#attempt = 0;
 	#reconnectHandle: unknown = null;
+	#connectDeadlineHandle: unknown = null;
+	#heartbeatHandle: unknown = null;
+	#heartbeatDeadlineHandle: unknown = null;
 	#openedAtMs: number | null = null;
 	#disposed = false;
 
@@ -279,6 +341,16 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#catalogTimeoutMs = opts.catalogTimeoutMs ?? 15_000;
 		this.#rotateTimeoutMs = opts.rotateTimeoutMs ?? 15_000;
 		this.#assetTimeoutMs = opts.assetTimeoutMs ?? 30_000;
+		this.#connectTimeoutMs =
+			typeof opts.connectTimeoutMs === "number" && opts.connectTimeoutMs > 0
+				? opts.connectTimeoutMs
+				: null;
+		this.#heartbeatIntervalMs =
+			typeof opts.heartbeatIntervalMs === "number" && opts.heartbeatIntervalMs > 0
+				? opts.heartbeatIntervalMs
+				: null;
+		this.#heartbeatTimeoutMs = opts.heartbeatTimeoutMs ?? 5_000;
+		this.#onDegraded = opts.onDegraded ?? null;
 		this.#onChallenge = opts.onChallenge ?? null;
 		this.#requireAdmission = opts.requireAdmission ?? false;
 		this.#lanHandshake = opts.lanHandshake ?? null;
@@ -652,6 +724,8 @@ export class WebSocketRelayPort implements RelayPort {
 		if (this.#disposed) return;
 		this.#disposed = true;
 		this.#clearReconnect();
+		this.#clearConnectDeadline();
+		this.#stopHeartbeat();
 		this.#rejectAllCatalog("WebSocketRelayPort: port closed");
 		this.#rejectAllRotate("WebSocketRelayPort: port closed");
 		this.#rejectPendingAsset("WebSocketRelayPort: port closed");
@@ -698,10 +772,49 @@ export class WebSocketRelayPort implements RelayPort {
 		ws.onclose = () => this.#onSocketClose();
 		ws.onerror = (event) => this.#onSocketError(event);
 		ws.onmessage = (event) => this.#onSocketMessage(event);
+		this.#armConnectDeadline(ws);
+	}
+
+	/**
+	 * P2P-1 — abort a connect that has not opened in time.
+	 *
+	 * The OS gives up on a silent LAN address after 75 s (measured). We close
+	 * the handle ourselves and go straight to the reconnect schedule, which is
+	 * what lets the LAN dial coordinator fall back to the relay in seconds
+	 * instead of a minute and a quarter. Closing the socket matters as much as
+	 * the timer: `awaitOpen` is only an observer and never aborted anything.
+	 */
+	#armConnectDeadline(ws: WebSocketLike): void {
+		const timeoutMs = this.#connectTimeoutMs;
+		if (timeoutMs === null) return;
+		this.#clearConnectDeadline();
+		this.#connectDeadlineHandle = this.#setTimer(() => {
+			this.#connectDeadlineHandle = null;
+			if (this.#disposed) return;
+			// A socket that opened between the timer firing and this callback is
+			// healthy — never tear down a live connection on a stale deadline.
+			if (this.#ws !== ws || this.#state === WebSocketRelayState.Open) return;
+			this.#ws = null;
+			try {
+				ws.close();
+			} catch {
+				// Already-closed handles are noisy on some impls.
+			}
+			this.#transition(WebSocketRelayState.Error);
+			this.#scheduleReconnect();
+		}, timeoutMs);
+	}
+
+	#clearConnectDeadline(): void {
+		if (this.#connectDeadlineHandle !== null) {
+			this.#clearTimer(this.#connectDeadlineHandle);
+			this.#connectDeadlineHandle = null;
+		}
 	}
 
 	#onSocketOpen(): void {
 		if (this.#disposed) return;
+		this.#clearConnectDeadline();
 		this.#openedAtMs = this.#now();
 		// A fresh socket is unauthenticated until the node's `auth-ok` lands.
 		this.#gatedAdmission = false;
@@ -732,10 +845,13 @@ export class WebSocketRelayPort implements RelayPort {
 		}
 		// Drain any frames queued while connecting / reconnecting.
 		this.#flushSendQueue();
+		this.#startHeartbeat();
 	}
 
 	#onSocketClose(): void {
 		if (this.#disposed) return;
+		this.#clearConnectDeadline();
+		this.#stopHeartbeat();
 		this.#ws = null;
 		// If the connection held Open for ≥ 30s, reset the attempt counter
 		// so a long-lived stable link doesn't punish a later reconnect.
@@ -810,6 +926,17 @@ export class WebSocketRelayPort implements RelayPort {
 				return;
 			}
 			const op = decodeControlOp(bytes);
+			if (op === "pong") {
+				this.#onHeartbeatAnswered();
+				return;
+			}
+			if (op === "ping") {
+				// Symmetry: answer a peer's keepalive so either end can be the one
+				// that notices. Costs one control message and moves no metadata.
+				const stamp = decodePingStamp(bytes);
+				if (stamp !== null) this.#sendControl({ op: "pong", t: stamp });
+				return;
+			}
 			if (op === "challenge") {
 				// Channel-bound (LAN): the nonce arrives SEALED to this device's
 				// X25519 key, so only we can answer it — the property a plaintext
@@ -967,6 +1094,98 @@ export class WebSocketRelayPort implements RelayPort {
 			this.#sendControl({ op: "subscribe", entityIds: [...this.#subscriptions], bundle: true });
 		}
 		this.#flushSendQueue();
+		// On a gated transport the heartbeat starts here, not at socket open: a
+		// peer that has proven nothing gets no traffic from us at all, keepalive
+		// included.
+		this.#startHeartbeat();
+	}
+
+	// --- P2P-1 heartbeat ----------------------------------------------------
+
+	/**
+	 * Begin pinging, if this transport is configured for it and may speak.
+	 *
+	 * Idempotent, so both the open path and the admitted path can call it
+	 * without coordinating.
+	 */
+	#startHeartbeat(): void {
+		if (this.#heartbeatIntervalMs === null) return;
+		if (this.#disposed || !this.#mayAnnounce()) return;
+		if (this.#heartbeatHandle !== null) return;
+		this.#scheduleHeartbeat();
+	}
+
+	#scheduleHeartbeat(): void {
+		const interval = this.#heartbeatIntervalMs;
+		if (interval === null || this.#disposed) return;
+		this.#heartbeatHandle = this.#setTimer(() => {
+			this.#heartbeatHandle = null;
+			this.#sendHeartbeat();
+		}, interval);
+	}
+
+	#sendHeartbeat(): void {
+		if (this.#disposed) return;
+		if (!this.#ws || this.#ws.readyState !== OPEN_READY_STATE) return;
+		this.#sendControl({ op: "ping", t: this.#now() });
+		// One deadline at a time: while degraded we keep pinging so a peer that
+		// wakes is noticed, but we do not stack timers.
+		if (this.#heartbeatDeadlineHandle === null) {
+			this.#heartbeatDeadlineHandle = this.#setTimer(() => {
+				this.#heartbeatDeadlineHandle = null;
+				this.#onHeartbeatLapsed();
+			}, this.#heartbeatTimeoutMs);
+		}
+		this.#scheduleHeartbeat();
+	}
+
+	/**
+	 * No answer inside the deadline. DEGRADE — do not close.
+	 *
+	 * The measurement behind this: a frozen peer's socket was still usable after
+	 * it woke. Closing here would destroy a connection that was about to
+	 * recover, and the reconnect would then race the wake. Instead we stop
+	 * putting frames on the wire (`#mayAnnounce` is false in Degraded, so
+	 * `send` queues them), tell the consumer so it can arm a fallback, and keep
+	 * pinging.
+	 */
+	#onHeartbeatLapsed(): void {
+		if (this.#disposed) return;
+		if (this.#state !== WebSocketRelayState.Open) return;
+		this.#transition(WebSocketRelayState.Degraded);
+		try {
+			this.#onDegraded?.(true);
+		} catch {
+			// A throwing consumer must not kill the timer callback.
+		}
+	}
+
+	/** A `pong` landed: clear the deadline, and un-degrade if we had. */
+	#onHeartbeatAnswered(): void {
+		if (this.#heartbeatDeadlineHandle !== null) {
+			this.#clearTimer(this.#heartbeatDeadlineHandle);
+			this.#heartbeatDeadlineHandle = null;
+		}
+		if (this.#state !== WebSocketRelayState.Degraded) return;
+		this.#transition(WebSocketRelayState.Open);
+		try {
+			this.#onDegraded?.(false);
+		} catch {
+			// Same posture as the lapse path.
+		}
+		// Frames queued while degraded go out now.
+		this.#flushSendQueue();
+	}
+
+	#stopHeartbeat(): void {
+		if (this.#heartbeatHandle !== null) {
+			this.#clearTimer(this.#heartbeatHandle);
+			this.#heartbeatHandle = null;
+		}
+		if (this.#heartbeatDeadlineHandle !== null) {
+			this.#clearTimer(this.#heartbeatDeadlineHandle);
+			this.#heartbeatDeadlineHandle = null;
+		}
 	}
 
 	#rejectAllCatalog(reason: string): void {
@@ -1115,6 +1334,9 @@ export function isControlMessage(value: unknown): value is RelayControlMessage {
 			v.sig.length > 0
 		);
 	}
+	if (v.op === "ping" || v.op === "pong") {
+		return Number.isFinite((v as { t?: unknown }).t);
+	}
 	if (v.op !== "subscribe" && v.op !== "unsubscribe") return false;
 	if (!Array.isArray(v.entityIds)) return false;
 	if (v.op === "subscribe" && "bundle" in v && (v as { bundle?: unknown }).bundle !== true) {
@@ -1183,6 +1405,23 @@ function decodeControlOp(wire: Uint8Array): string | null {
 		if (!parsed || typeof parsed !== "object") return null;
 		const op = (parsed as { op?: unknown }).op;
 		return typeof op === "string" ? op : null;
+	} catch {
+		return null;
+	}
+}
+
+/** P2P-1 — the stamp off an inbound `ping`, echoed verbatim in the `pong`.
+ *  Bounded: a non-finite or non-numeric stamp yields `null` and no answer, so a
+ *  malformed keepalive costs one dropped message rather than an echo of
+ *  whatever the peer put there. */
+export function decodePingStamp(wire: Uint8Array): number | null {
+	if (wire.length < 1 || wire[0] !== CONTROL_CHANNEL_BYTE) return null;
+	try {
+		const parsed = JSON.parse(new TextDecoder().decode(wire.subarray(1))) as unknown;
+		if (!parsed || typeof parsed !== "object") return null;
+		const { op, t } = parsed as { op?: unknown; t?: unknown };
+		if (op !== "ping") return null;
+		return typeof t === "number" && Number.isFinite(t) ? t : null;
 	} catch {
 		return null;
 	}

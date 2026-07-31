@@ -25,6 +25,13 @@ export const SYNC_POLICY_SET_CHANNEL = "sync-status:set-policy";
 /** LAN-4c — dashboard reads/writes the device's LAN host-listen mode. */
 export const SYNC_LAN_HOST_GET_CHANNEL = "sync-status:get-lan-host-mode";
 export const SYNC_LAN_HOST_SET_CHANNEL = "sync-status:set-lan-host-mode";
+/** P2P-1 — the DIAL half of LAN sync, which had no user-reachable surface at
+ *  all: the toggle above controls only whether this device ACCEPTS
+ *  connections. These are what let a user turn on going and finding the other
+ *  machine. */
+export const SYNC_LAN_PEERING_GET_CHANNEL = "sync-status:get-lan-peering";
+export const SYNC_LAN_DIAL_MODE_SET_CHANNEL = "sync-status:set-lan-dial-mode";
+export const SYNC_LAN_PEER_ADDRESS_SET_CHANNEL = "sync-status:set-lan-peer-address";
 export const SYNC_RESTORE_AVAILABLE_CHANNEL = "sync-status:restore-available";
 export const SYNC_RESTORE_CHANNEL = "sync-status:restore";
 
@@ -47,6 +54,34 @@ export type SyncStatusHandlersOptions = {
 	/** LAN-4c — persist the mode and re-apply the listener policy. Returns the
 	 *  mode actually stored (an unrecognised value normalises to `Off`). */
 	setLanHostMode: (mode: unknown) => Promise<LanHostMode>;
+	/** P2P-1 — everything the Settings LAN group renders in one read, so the
+	 *  panel cannot show a dial mode from one moment and a peer list from
+	 *  another. */
+	getLanPeering: () => Promise<LanPeeringSnapshot>;
+	/** P2P-1 — persist the dial mode and re-select a target. Returns the mode
+	 *  actually stored (anything unrecognised normalises to `Off`). */
+	setLanDialMode: (mode: unknown) => Promise<LanPeeringSnapshot>;
+	/** P2P-1 — set (or clear with `null`) the manual peer address. Returns
+	 *  `null` when the address does not validate, so the panel can say so
+	 *  rather than silently never dialling. */
+	setLanPeerAddress: (raw: unknown) => Promise<LanPeeringSnapshot | null>;
+};
+
+/** P2P-1 — what Settings → Sync needs to render the local-network group. */
+export type LanPeeringSnapshot = {
+	/** `off` | `auto` | `manual`. A plain string across IPC; main normalises. */
+	dialMode: string;
+	/** The stored manual address, or `null`. */
+	manualUrl: string | null;
+	/** The peer this device is currently dialling, or `null` for "using the
+	 *  relay". */
+	activeUrl: string | null;
+	/** This device's own listener URL when hosting — what the OTHER machine
+	 *  types in, and what a pairing payload now carries. */
+	listenerUrl: string | null;
+	/** Verified peers seen on the network, freshest first. Every entry proved a
+	 *  valid rotating discovery tag, so these are this identity's own devices. */
+	peers: readonly { instance: string; urls: readonly string[] }[];
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -91,6 +126,20 @@ export function registerSyncStatusHandlers(options: SyncStatusHandlersOptions): 
 			SYNC_LAN_HOST_SET_CHANNEL,
 			async (_event, mode: unknown): Promise<LanHostMode | null> =>
 				active ? active.setLanHostMode(mode) : null,
+		);
+		ipcMain.handle(
+			SYNC_LAN_PEERING_GET_CHANNEL,
+			async (): Promise<LanPeeringSnapshot | null> => (active ? active.getLanPeering() : null),
+		);
+		ipcMain.handle(
+			SYNC_LAN_DIAL_MODE_SET_CHANNEL,
+			async (_event, mode: unknown): Promise<LanPeeringSnapshot | null> =>
+				active ? active.setLanDialMode(mode) : null,
+		);
+		ipcMain.handle(
+			SYNC_LAN_PEER_ADDRESS_SET_CHANNEL,
+			async (_event, raw: unknown): Promise<LanPeeringSnapshot | null> =>
+				active ? active.setLanPeerAddress(raw) : null,
 		);
 		ipcMain.handle(
 			SYNC_RESTORE_AVAILABLE_CHANNEL,

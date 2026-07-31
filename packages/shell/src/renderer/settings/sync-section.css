@@ -102,3 +102,33 @@
 	margin: var(--space-1) 0 0;
 	line-height: 1.45;
 }
+
+/* P2P-1 — the local-network group. The live line is the honest "no server"
+   claim, so it gets the accent treatment the rest of the readouts do not. */
+.sync-section__lan-live {
+	margin: 0 0 var(--space-2);
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-raised);
+	border: var(--border-width) solid var(--color-border-subtle);
+	color: var(--color-text-primary);
+	font-size: var(--text-size-sm);
+}
+
+.sync-section__lan-peers {
+	display: flex;
+	flex-direction: column;
+}
+
+.sync-section__lan-address {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.sync-section__lan-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	padding-top: var(--space-1);
+}
