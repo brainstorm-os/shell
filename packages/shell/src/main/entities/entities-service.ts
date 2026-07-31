@@ -24,7 +24,6 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
-	AGENT_TYPE,
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
@@ -43,6 +42,7 @@ import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekHandle, EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
 import { rewriteEntityRefs } from "./merge-refs";
+import { isShellOwnedEntityType } from "./shell-owned-types";
 
 /** Upper bound on losers per `entities.merge` call — a duplicate group is a
  *  handful of rows; a pathological request must not pin the main process in
@@ -180,13 +180,6 @@ enum EntityAccess {
 	Read = "read",
 	Write = "write",
 }
-
-/** Entity types only the SHELL may author — an `entities.write:*` grant does
- *  NOT reach them. These carry security state rather than user content, so a
- *  forged or patched row is an authority bug, not a data bug (Agent-Teams-1:
- *  an `Agent/v1` binds a ledger principal to a pubkey + a system prompt).
- *  Reads stay ordinary capability-gated reads. */
-const SHELL_OWNED_ENTITY_TYPES: ReadonlySet<string> = new Set([AGENT_TYPE]);
 
 function named(name: string, message: string): Error {
 	const err = new Error(message);
@@ -423,7 +416,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			// destroying another agent's unrecoverable key. Only the privileged
 			// agent directory (which writes through the repo, not this service)
 			// may author them.
-			if (verb === EntityAccess.Write && SHELL_OWNED_ENTITY_TYPES.has(type)) return false;
+			if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
 			try {
 				return ledger.has(app, `entities.${verb}:${type}`);
 			} catch (error) {
@@ -711,6 +704,11 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					for (const refId of referrerIds) {
 						const row = repo.get(refId);
 						if (!row) continue;
+						// The referrer scan is a raw substring match over every live row,
+						// so it can land on a SHELL-OWNED row the caller may not write.
+						// An id swap is narrow, but the fence says "no app writes this
+						// type" — honour it here too rather than carving an exception.
+						if (isShellOwnedEntityType(row.type)) continue;
 						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
 						if (!refPatch) continue;
 						const updated = await writePropsThroughDoc(repo, row, refPatch);

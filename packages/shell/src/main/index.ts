@@ -46,7 +46,11 @@ import {
 } from "electron";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
-import { type MentionRunnerDeps, maybeRunMentionedAgents } from "./agents/mention-runner";
+import {
+	AGENTS_MENTION_CAPABILITY,
+	type MentionRunnerDeps,
+	maybeRunMentionedAgents,
+} from "./agents/mention-runner";
 import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
@@ -3840,6 +3844,18 @@ void app.whenReady().then(async () => {
 	const agentMentionDeps: MentionRunnerDeps = {
 		getSession: () => getActiveVaultSession(),
 		getSelfPubkey: () => getActiveVaultSession()?.identity.publicKeyBase64 ?? null,
+		// The broker-verified caller must hold the scarce `agents.mention` grant.
+		// Fail-closed: no vault / ledger error → nobody may actuate.
+		callerMayMention: (app) => {
+			try {
+				return (
+					workers?.context.checkCapability(app, "entities", "create", [AGENTS_MENTION_CAPABILITY]) ===
+					true
+				);
+			} catch {
+				return false;
+			}
+		},
 		getServiceHandler: (name) => workers?.broker.getServiceHandler(name),
 		onWrote: () => {
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
@@ -3875,7 +3891,7 @@ void app.whenReady().then(async () => {
 				notifyMentionsFromCreate(result);
 				// Agent-Teams-3 — fire-and-forget; a runner failure never breaks
 				// the create it piggybacks on (the runner swallows internally).
-				void maybeRunMentionedAgents(agentMentionDeps, result);
+				void maybeRunMentionedAgents(agentMentionDeps, result, envelope.app);
 			}
 		}
 		return result;

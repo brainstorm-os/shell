@@ -32,6 +32,7 @@
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { ValueType } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
+import { isShellOwnedEntityType } from "../entities/shell-owned-types";
 import type { VaultSession } from "../vault/session";
 import { inferMapping } from "./import-map";
 import { parseTable } from "./import-parse";
@@ -159,6 +160,13 @@ export function makeImportServiceHandler(deps: ImportServiceDeps): ServiceHandle
 		if (typeof a.text !== "string") throw named("Invalid", "import: { text } must be a string");
 		const text = a.text;
 		const userSource = typeof a.source === "string" && a.source.length > 0 ? a.source : format;
+
+		// Shell-owned types are unwritable by ANY app, however broad its grants —
+		// the same fence the entities service applies. An import path with its own
+		// capability check is exactly how the pentest walked around it.
+		if (isShellOwnedEntityType(targetType)) {
+			throw named("Denied", `import: ${targetType} may only be written by the shell`);
+		}
 
 		// Sole authority: the app must hold entities.write for the target type
 		// (`*` matches). A forged/absent envelope cap can't widen this.

@@ -45,6 +45,23 @@ import { compareDottedVersions } from "../util/schema-version";
 import { isBlockIdForApp, isValidBlockId } from "./block-id";
 
 const APP_ID_PATTERN = /^[a-z][a-z0-9._-]{1,127}$/i; // reverse-DNS-like
+
+/**
+ * App ids the PLATFORM owns — an installable app may never claim one.
+ *
+ * `shell` is the ledger principal `applyShellGrants` writes the full
+ * privileged capability set under on every vault open, and the identity the
+ * dashboard renderer registers as. An app installed under it would inherit
+ * that entire set with no consent sheet (read every other app's credentials,
+ * write every entity type including the shell-owned ones), so the id is
+ * refused at validation, at install, and at renderer registration.
+ */
+export const RESERVED_APP_IDS: ReadonlySet<string> = new Set(["shell", "brainstorm"]);
+
+/** True when `id` is a platform-owned principal an app may not claim. */
+export function isReservedAppId(id: string): boolean {
+	return RESERVED_APP_IDS.has(id.trim().toLowerCase());
+}
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$/;
 const SDK_VERSION_PATTERN = /^\d+$/;
 const CAPABILITY_PATTERN = /^[a-z][a-z0-9._-]*(?::[\S]+)?$/;
@@ -204,6 +221,9 @@ export function validateManifest(value: unknown): ValidationResult {
 
 	const idCheck = checkString(v.id, "id", APP_ID_PATTERN);
 	if (idCheck) return idCheck;
+	if (isReservedAppId(v.id as string)) {
+		return { ok: false, reason: `id "${v.id}" is reserved by the platform`, path: "$.id" };
+	}
 	const nameCheck = checkNonEmptyString(v.name, "name");
 	if (nameCheck) return nameCheck;
 	const versionCheck = checkString(v.version, "version", SEMVER_PATTERN);
