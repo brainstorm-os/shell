@@ -1,6 +1,7 @@
 import type { VaultActivateResult } from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { toVaultDbKind, toVaultRecovery } from "@brainstorm-os/protocol/vault-recovery-wire-types";
 import { BrowserWindow, dialog, ipcMain } from "electron";
+import { seedStarterAgents } from "../agents/starter-agents";
 import type { DataStoreKind } from "../storage/data-stores";
 import { VaultCorruptionError } from "../storage/recovery-plan";
 import { detectCloudSync } from "../vault/cloud-sync";
@@ -65,6 +66,16 @@ export function registerVaultHandlers(): void {
 	ipcMain.handle("vaults:create", async (_event, options: CreateVaultOptions) => {
 		const entry = await createVault(options);
 		await warmupBroker();
+		// Agent-Teams-4 — a NEW vault's team is alive on first look: three
+		// starter agents (Researcher / Builder / Reviewer), zero grants until
+		// the human scopes them on the Team surface. Fail-soft: a seed failure
+		// must never break vault creation.
+		const session = getActiveVaultSession();
+		if (session) {
+			await seedStarterAgents(session).catch((error) => {
+				console.warn("[brainstorm] starter-agent seed failed:", error);
+			});
+		}
 		return entry;
 	});
 

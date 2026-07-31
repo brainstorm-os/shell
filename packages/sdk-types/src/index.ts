@@ -1682,7 +1682,7 @@ export {
 	agentDefToEntityProperties,
 	readAgentDef,
 } from "./agent-def";
-export type { AgentDef, AgentSkillRef } from "./agent-def";
+export type { AgentDef, AgentSkillRef, AgentTemplate } from "./agent-def";
 
 /** A collaborator's self-signed share invite, serialized as a compact,
  *  copy-pasteable token (base64url JSON). It carries only the collaborator's

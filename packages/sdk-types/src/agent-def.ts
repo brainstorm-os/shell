@@ -75,6 +75,26 @@ export type AgentDef = {
 	memoryScope: AgentMemoryScope;
 };
 
+/** The portable half of an agent (doc 69 §Marketplace distribution) — what a
+ *  starter seed or a marketplace listing ships. Deliberately EXCLUDES the two
+ *  non-portable pieces: the keypair (generated locally at instantiation) and
+ *  grants (`requestedCapabilities` is a REQUEST manifest like an app's — a
+ *  grant only ever comes from the user's consent gesture, never as data). */
+export type AgentTemplate = {
+	displayName: string;
+	avatarRef: string | null;
+	persona: string;
+	skills: AgentSkillRef[];
+	traits: {
+		routing: AgentRouting;
+		autonomy: AgentAutonomy;
+		memoryScope: AgentMemoryScope;
+	};
+	/** `service.verb[:scope]` strings the template ASKS for — surfaced to the
+	 *  user at instantiation, never auto-granted. */
+	requestedCapabilities: string[];
+};
+
 /** Display-name length ceiling — same order as other entity titles. */
 export const AGENT_NAME_MAX_LENGTH = 200;
 
