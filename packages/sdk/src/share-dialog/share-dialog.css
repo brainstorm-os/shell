@@ -37,17 +37,36 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	height: var(--control-height-md, 32px);
+	min-height: var(--control-height-md, 32px);
+}
+
+/* A self-asserted name never stands alone: the key fingerprint sits under it, so
+   two members can always be told apart by something a name cannot forge. */
+.bs-share__member-id {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-width: 0;
+	justify-content: center;
 }
 
 .bs-share__member-name {
-	flex: 1 1 auto;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	font-size: var(--text-size-md);
 	color: var(--text);
+}
+
+.bs-share__member-key {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--text-family-code);
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
 }
 
 .bs-share__role {

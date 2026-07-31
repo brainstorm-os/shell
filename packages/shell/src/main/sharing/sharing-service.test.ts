@@ -247,6 +247,29 @@ describe("Collab-C5 — sharing broker service", () => {
 		expect(msgAccess.find((m) => m.pubkey === guestB64)?.active).toBe(true);
 	});
 
+	// Collab-C6-b. The name a contact ends up with decides what the roster chip
+	// reads, and the two inputs are not equally trusted: a petname is local and
+	// chosen by the owner, while a profile name is asserted by the peer about
+	// themselves. So the precedence runs one way only.
+	it("a typed contact name outranks the peer's self-asserted one; a blank one falls back", async () => {
+		const token = (await guestHandler(envelope("createInvite", ["Guest"]))) as ShareInviteToken;
+		const guestB64 = guestBridge.whoami().userPubB64;
+
+		// Blank name → fall back to what the invite asserts, rather than the empty
+		// string that used to render as a nameless chip.
+		const auto = (await ownerHandler(
+			envelope("saveContact", [{ invite: token, displayName: "" }]),
+		)) as SharedContact;
+		expect(auto).toEqual({ pubkey: guestB64, displayName: "Guest" });
+
+		// A typed name wins over the same asserted one, so a peer cannot rename
+		// themselves inside someone else's contact list.
+		const named = (await ownerHandler(
+			envelope("saveContact", [{ invite: token, displayName: "Marcus" }]),
+		)) as SharedContact;
+		expect(named).toEqual({ pubkey: guestB64, displayName: "Marcus" });
+	});
+
 	it("re-checks the scarce sharing.share capability server-side (fail-closed)", async () => {
 		const token = (await guestHandler(envelope("createInvite", ["Guest"]))) as ShareInviteToken;
 		await ownerBridge.provisionEntity(ENTITY_ID, ENTITY_TYPE);

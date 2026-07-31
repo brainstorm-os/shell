@@ -168,8 +168,14 @@ export async function encryptAndEmit(
 	entityId: string,
 	update: Uint8Array,
 	ctx: PipelineContext,
+	/** Collab-C5/F-471 — an optional relay routing-key override, exactly as on
+	 *  {@link emitWrapBootstrap}. Used to deliver a just-shared entity's full
+	 *  state to a NEW member's inbox channel, which they are already subscribed
+	 *  to, instead of the entity channel they cannot subscribe to until the wrap
+	 *  has resolved. `entityId` stays the AAD-bound real entity. */
+	route?: string,
 ): Promise<void> {
-	await sealAndSend(entityId, update, WireKind.Update, ctx);
+	await sealAndSend(entityId, update, WireKind.Update, ctx, route);
 }
 
 /**
@@ -199,6 +205,7 @@ async function sealAndSend(
 	payload: Uint8Array,
 	kind: WireKind.Update | WireKind.Snapshot,
 	ctx: PipelineContext,
+	route?: string,
 ): Promise<void> {
 	const handle = ctx.dekStore.open(entityId);
 	if (!handle) {
@@ -217,6 +224,7 @@ async function sealAndSend(
 			seq: ctx.nextSeq(entityId),
 			nonce: bytesToBase64(nonce),
 			ts: ctx.nowMs(),
+			...(route ? { route } : {}),
 		};
 		const frame = sealUpdateEnvelope({
 			dek: handle.dek,

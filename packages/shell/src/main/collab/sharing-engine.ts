@@ -47,7 +47,13 @@ import {
 } from "./access-record";
 import { childrenSourceFor, containmentRuleForParent } from "./containment-registry";
 import { inboxChannelFor } from "./inbox-channel";
-import { type ShareInvite, createShareInviteSigned, shareEntityWithInvite } from "./share-invite";
+import { cacheRemoteProfile, readSelfProfileSnapshot } from "./profile-store";
+import {
+	type ShareInvite,
+	createShareInviteSigned,
+	inviteProfile,
+	shareEntityWithInvite,
+} from "./share-invite";
 import { type SurvivorWrap, rewrapDekForSurvivors } from "./survivor-rewrap";
 
 function freshNonce(): Uint8Array {
@@ -119,13 +125,20 @@ export class SharingEngine {
 	 * this vault, so an invite that could not be recorded must not be handed out
 	 * (the store throw propagates — a token minted without its row would silently
 	 * fail to redeem, which is the deadlock shape this rung exists to avoid).
+	 *
+	 * Collab-C6-b: the invite also carries this identity's signed display-profile
+	 * snapshot, and an empty `label` falls back to that profile's display name.
+	 * Every shipping call site passes `""`, which is why an auto-saved teammate
+	 * used to land in the share dialog as a blank chip.
 	 */
 	async createInvite(label: string): Promise<ShareInvite> {
+		const profile = await readSelfProfileSnapshot(this.#session);
 		const invite = createShareInviteSigned({
 			userPub: this.#session.identity.publicKey,
 			x25519Pub: this.#session.deviceX25519.publicKey,
-			label,
+			label: label || (profile?.displayName ?? ""),
 			sign: (payload) => this.#session.signPayload(payload),
+			profile,
 		});
 		const repo = await this.ensureShareInvitesRepo();
 		repo.mint({
@@ -325,12 +338,12 @@ export class SharingEngine {
 					appendWrap(doc, w);
 					return w;
 				});
-				await emitWrapBootstrap(
-					childId,
-					wrap,
-					this.makeCtx(relay.currentPort()),
-					inboxChannelFor(m.member),
-				);
+				const inbox = inboxChannelFor(m.member);
+				await emitWrapBootstrap(childId, wrap, this.makeCtx(relay.currentPort()), inbox);
+				// F-471 — same subscribe race as `#shareOne`: this member has never
+				// seen `childId`, so the entity-channel state below can land before
+				// their subscribe does. Send it down the inbox they are already on.
+				await this.#emitFullState(childId, inbox);
 				shared++;
 			}
 			if (shared > 0) await this.#emitFullState(childId);
@@ -374,6 +387,12 @@ export class SharingEngine {
 		const dekStore = await this.ensureDekStore();
 		this.#types.set(entityId, type);
 		const exposed = this.#session.exposeIdentityForPairing();
+		// Collab-C6-b — remember the invitee's verified name locally, so THIS
+		// vault's roster resolves them on every entity from now on, not only the
+		// ones whose doc happens to carry the snapshot. Fail-closed inside
+		// `cacheRemoteProfile`: an unverifiable snapshot writes nothing.
+		await cacheRemoteProfile(this.#session, invite.userPubB64, inviteProfile(invite));
+		const selfProfile = await readSelfProfileSnapshot(this.#session);
 		const handle = dekStore.open(entityId);
 		if (!handle) {
 			throw new Error(`sharing-engine: owner has no DEK for ${entityId}`);
@@ -406,6 +425,8 @@ export class SharingEngine {
 					now: Date.now(),
 					type,
 					dekVersion: handle.version,
+					selfProfile,
+					selfPubkey: this.#session.identity.publicKeyBase64,
 					...(via === undefined ? {} : { via }),
 				});
 			});
@@ -416,9 +437,22 @@ export class SharingEngine {
 		const ctx = this.makeCtx(relay.currentPort());
 		// Deliver the wrap to the recipient's INBOX channel — they can't be on the
 		// entity channel yet (they don't know its id). On receipt their live-sync
-		// engine installs the DEK, subscribes to the entity channel, then the full
-		// state below converges. The entity stays the AAD-bound real entity.
-		await emitWrapBootstrap(entityId, wrap, ctx, inboxChannelFor(invite.userPubB64));
+		// engine installs the DEK and subscribes to the entity channel. The entity
+		// stays the AAD-bound real entity.
+		const inbox = inboxChannelFor(invite.userPubB64);
+		await emitWrapBootstrap(entityId, wrap, ctx, inbox);
+		// F-471 — the full state ALSO goes to that same inbox, not only to the
+		// entity channel. The recipient's subscribe to the entity channel is an
+		// async control message issued only once the wrap has resolved, so a
+		// forward-only relay drops anything sent to the entity channel in the
+		// window between the two — deterministically losing the very state the
+		// share was supposed to deliver. The inbox is a channel they subscribed to
+		// at engine start, so it has no window; frames are ordered on one socket,
+		// so the wrap is always installed before this arrives.
+		await this.#emitFullState(entityId, inbox);
+		// Existing members are on the entity channel and got the grant delta from
+		// the mutate above; this repairs any whose local state lagged. Yjs state is
+		// idempotent, so the recipient receiving both copies is a no-op.
 		await this.#emitFullState(entityId);
 	}
 
@@ -708,7 +742,7 @@ export class SharingEngine {
 		return result;
 	}
 
-	async #emitFullState(entityId: string): Promise<void> {
+	async #emitFullState(entityId: string, route?: string): Promise<void> {
 		const { doc } = await this.#session.ydocStore.load(entityId);
 		let state: Uint8Array;
 		try {
@@ -716,10 +750,10 @@ export class SharingEngine {
 		} finally {
 			doc.destroy();
 		}
-		await this.#emitUpdate(entityId, state);
+		await this.#emitUpdate(entityId, state, route);
 	}
 
-	async #emitUpdate(entityId: string, update: Uint8Array): Promise<void> {
+	async #emitUpdate(entityId: string, update: Uint8Array, route?: string): Promise<void> {
 		const relay = this.#getRelay();
 		if (!relay) return;
 		const dekStore = await this.ensureDekStore();
@@ -728,7 +762,7 @@ export class SharingEngine {
 		dekStore.close(handle.dek);
 		try {
 			const ctx = this.makeCtx(relay.currentPort());
-			await encryptAndEmit(entityId, update, ctx);
+			await encryptAndEmit(entityId, update, ctx, route);
 		} catch (error) {
 			console.warn(`[sharing] wire-emit failed for ${entityId}: ${(error as Error).message}`);
 		}

@@ -131,8 +131,8 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 
 	/** A guest-side invite (created through the guest's own engine, as the real
 	 *  invite flow does — the secret never leaves that session). */
-	function inviteFrom(guest: VaultSession, label: string) {
-		return new SharingEngine(guest, () => null).createInvite(label);
+	async function inviteFrom(guest: VaultSession, label: string) {
+		return await new SharingEngine(guest, () => null).createInvite(label);
 	}
 
 	it("mints a new DEK, re-wraps it for the survivor, and never for the revoked member", async () => {
