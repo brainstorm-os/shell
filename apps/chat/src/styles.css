@@ -376,6 +376,115 @@ body {
 	color: var(--accent);
 }
 
+/* ── agent proposal card (Agent-Teams-3) ──────────────────────────
+   An agent's staged draft, inline in the transcript. Framed rather than
+   free-flowing so it never reads as an ordinary message: it is an approval
+   affordance over a privileged write. A settled card drops the accent tint so
+   the live decisions stand out from the history. */
+.chat__proposal {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	max-width: 34rem;
+	margin: var(--space-1) 0 var(--space-2);
+	padding: var(--space-3);
+	border: 1px solid var(--accent);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.chat__proposal[data-status="approved"],
+.chat__proposal[data-status="discarded"] {
+	border-color: var(--border-subtle);
+	background: var(--bg-subtle);
+}
+
+.chat__proposal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.chat__proposal-eyebrow,
+.chat__proposal-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-dim);
+}
+
+.chat__proposal-summary {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--text);
+	overflow-wrap: anywhere;
+}
+
+/* Label column / value column, so a proposed Task reads as the row it will
+   become. `display: contents` promotes each pair's dt + dd into the grid. */
+.chat__proposal-fields {
+	display: grid;
+	grid-template-columns: minmax(72px, 30%) 1fr;
+	align-items: baseline;
+	gap: var(--space-1) var(--space-2);
+	margin: 0;
+}
+
+.chat__proposal-field {
+	display: contents;
+}
+
+.chat__proposal-field-label {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
+.chat__proposal-field-value {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--text);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.chat__proposal-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.chat__proposal-outcome {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: 13px;
+	color: var(--text-dim);
+}
+
+.chat__proposal[data-status="approved"] .chat__proposal-outcome {
+	color: var(--ok);
+}
+
+.chat__proposal-hint {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
+.chat__proposal-error {
+	margin: 0;
+	font-size: 13px;
+	color: var(--danger);
+}
+
 /* ── composer ─────────────────────────────────────────────────── */
 .chat__composer-wrap {
 	flex-shrink: 0;

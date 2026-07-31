@@ -1645,6 +1645,21 @@ export type RosterProfileInput = {
 	avatarRef?: string;
 };
 
+/** Agent-Teams-3 — deciding an agent's proposal card in a chat channel. The
+ *  WRITE happens in main, not here: dual provenance (which agent proposed,
+ *  which human approved) must be attested from sources an app cannot set, so
+ *  the app only names the card. Requires the scarce `agents.approve`. */
+export type AgentProposalDecision =
+	| { ok: true; status: string; createdEntityId?: string }
+	| { ok: false; reason: string };
+
+export type AgentProposalsService = {
+	/** Approve the proposal on `messageId` — creates the entity in main. */
+	approve(input: { messageId: string }): Promise<AgentProposalDecision>;
+	/** Discard it — settles the card, writes nothing to the vault. */
+	discard(input: { messageId: string }): Promise<AgentProposalDecision>;
+};
+
 export type RosterService = {
 	/** Members of `entityId` (a channel / shared entity) — always includes self,
 	 *  including silent members granted access but who have never posted. With
@@ -2147,6 +2162,8 @@ export type AppRuntime = {
 		readonly properties: PropertiesService;
 		readonly platform: PlatformService;
 		readonly roster: RosterService;
+		/** Agent-Teams-3 — decide an agent's proposal card (scarce `agents.approve`). */
+		readonly agentProposals: AgentProposalsService;
 		readonly sharing: SharingService;
 		readonly presence: PresenceService;
 		readonly ui: UiService;

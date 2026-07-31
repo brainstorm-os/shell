@@ -46,7 +46,10 @@ import {
 } from "electron";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
-import { makeAgentProposalServiceHandler } from "./agents/agent-proposal-service";
+import {
+	AGENT_PROPOSALS_SERVICE,
+	makeAgentProposalServiceHandler,
+} from "./agents/agent-proposal-service";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
@@ -4103,7 +4106,7 @@ void app.whenReady().then(async () => {
 	// agent comes from the card's host-written author, the approver from the
 	// session's own identity. `agents.approve` is scarce and re-checked there.
 	workers.broker.registerService(
-		"agentProposals",
+		AGENT_PROPOSALS_SERVICE,
 		makeAgentProposalServiceHandler({
 			getSession: () => getActiveVaultSession(),
 			getSelfPubkey: () => getActiveVaultSession()?.identity.publicKeyBase64 ?? null,

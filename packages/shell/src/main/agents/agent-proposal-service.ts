@@ -1,5 +1,5 @@
 /**
- * The `agentProposals` broker service (Agent-Teams-3) — the app-facing half of
+ * The `agent-proposals` broker service (Agent-Teams-3) — the app-facing half of
  * the channel propose→approve flow: a member presses approve or discard on an
  * agent's card, and this decides it.
  *
@@ -40,6 +40,13 @@ import {
 	settledProposalProperty,
 } from "./channel-proposals";
 
+/** The broker service name. Lowercase-with-dashes because `SERVICE_PATTERN`
+ *  says so and `validateEnvelope` runs BEFORE the handler lookup — a camelCase
+ *  name fails at the wire on every call, with a handler that looks perfectly
+ *  correct and is simply never reached. Exported so the registration and the
+ *  tests name it once. */
+export const AGENT_PROPOSALS_SERVICE = "agent-proposals";
+
 /** Scarce capability: deciding an agent's proposal on behalf of the human. */
 export const AGENTS_APPROVE_CAPABILITY = "agents.approve";
 
@@ -77,24 +84,24 @@ async function requireCapability(
 		ledger = await options.getLedger();
 	} catch (error) {
 		if (error instanceof LedgerUnavailableError) {
-			throw makeError("Unavailable", "agentProposals: capability ledger unavailable");
+			throw makeError("Unavailable", "agent-proposals: capability ledger unavailable");
 		}
 		throw error;
 	}
-	if (!ledger) throw makeError("Unavailable", "agentProposals: no active vault session");
+	if (!ledger) throw makeError("Unavailable", "agent-proposals: no active vault session");
 	let held: boolean;
 	try {
 		held = ledger.has(envelope.app, AGENTS_APPROVE_CAPABILITY);
 	} catch (error) {
 		if (error instanceof LedgerUnavailableError) {
-			throw makeError("Unavailable", "agentProposals: capability ledger unavailable");
+			throw makeError("Unavailable", "agent-proposals: capability ledger unavailable");
 		}
 		throw error;
 	}
 	if (!held) {
 		throw makeError(
 			"Denied",
-			`agentProposals.${envelope.method}: ${envelope.app} lacks ${AGENTS_APPROVE_CAPABILITY}`,
+			`agent-proposals.${envelope.method}: ${envelope.app} lacks ${AGENTS_APPROVE_CAPABILITY}`,
 		);
 	}
 }
@@ -110,7 +117,7 @@ export async function decideChannelProposal(
 	decision: ChannelProposalStatus.Approved | ChannelProposalStatus.Discarded,
 ): Promise<DecideProposalResult> {
 	const session = options.getSession();
-	if (!session) throw makeError("Unavailable", "agentProposals: no active vault session");
+	if (!session) throw makeError("Unavailable", "agent-proposals: no active vault session");
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 
 	const row = repo.get(messageId);
@@ -181,14 +188,14 @@ export function makeAgentProposalServiceHandler(
 		await requireCapability(envelope, options);
 		const arg = (envelope.args[0] ?? {}) as { messageId?: unknown };
 		const messageId = typeof arg.messageId === "string" ? arg.messageId : "";
-		if (!messageId) throw makeError("Invalid", "agentProposals: messageId required");
+		if (!messageId) throw makeError("Invalid", "agent-proposals: messageId required");
 		switch (envelope.method) {
 			case "approve":
 				return await decideChannelProposal(options, messageId, ChannelProposalStatus.Approved);
 			case "discard":
 				return await decideChannelProposal(options, messageId, ChannelProposalStatus.Discarded);
 			default:
-				throw makeError("Invalid", `unknown agentProposals method: ${envelope.method}`);
+				throw makeError("Invalid", `unknown agent-proposals method: ${envelope.method}`);
 		}
 	};
 }

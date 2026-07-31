@@ -9,6 +9,7 @@ import {
 	renderEditorState,
 } from "@brainstorm-os/editor";
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { openEntity } from "@brainstorm-os/sdk";
 import {
 	AttachmentKind,
 	IconKind,
@@ -65,6 +66,12 @@ import {
 } from "./logic/chat";
 import { type LocalIdentity, mintPersonRef } from "./logic/identity";
 import {
+	ProposalDecision,
+	ProposalDecisionFailure,
+	type ProposalDecisionResult,
+	readDecisionResult,
+} from "./logic/proposal";
+import {
 	type ReadWatermarks,
 	ackChannels,
 	channelMaxSeqs,
@@ -72,6 +79,7 @@ import {
 	saveWatermarks,
 	unreadTotal,
 } from "./logic/unread";
+import { ProposalCard, type ProposalHost } from "./proposal-card";
 import { getBrainstorm } from "./runtime";
 import "./styles.css";
 
@@ -435,6 +443,47 @@ export function ChatApp(): ReactElement {
 		return map;
 	}, [members, identity.personRef, identity.avatarRef]);
 
+	// Agent-Teams-3 — the approve/discard surface for an agent's proposal card.
+	// The decision is a PRIVILEGED main-side write (`agents.approve`): the app
+	// only asks for it, and never asserts either half of the provenance. Failure
+	// is normalised — the card must always be able to say something truthful, so
+	// a throw or an absent service becomes `Unavailable` rather than a silence.
+	const proposalsSvc = services?.agentProposals ?? null;
+	const intentsSvc = services?.intents ?? null;
+	const proposalHost = useMemo<ProposalHost>(
+		() => ({
+			canDecide: !!proposalsSvc,
+			decide: async (messageId, decision): Promise<ProposalDecisionResult> => {
+				if (!proposalsSvc) return { ok: false, reason: ProposalDecisionFailure.Unavailable };
+				try {
+					const reply =
+						decision === ProposalDecision.Approve
+							? await proposalsSvc.approve({ messageId })
+							: await proposalsSvc.discard({ messageId });
+					return readDecisionResult(reply);
+				} catch (err) {
+					console.warn("[chat] proposal decision failed:", err);
+					return { ok: false, reason: ProposalDecisionFailure.Unavailable };
+				}
+			},
+			open: (entityId, entityType) => {
+				if (!intentsSvc || !entityId) return;
+				void openEntity(
+					{
+						services: {
+							intents: {
+								dispatch: (intent) =>
+									intentsSvc.dispatch(intent as Parameters<typeof intentsSvc.dispatch>[0]),
+							},
+						},
+					},
+					{ entityId, entityType },
+				);
+			},
+		}),
+		[proposalsSvc, intentsSvc],
+	);
+
 	const createChannel = useCallback(
 		async (name: string, topic: string) => {
 			if (!entitiesSvc) return;
@@ -630,6 +679,7 @@ export function ChatApp(): ReactElement {
 								groups={groups}
 								avatarByAuthor={avatarByAuthor}
 								emptyName={activeChannel.name}
+								proposalHost={proposalHost}
 							/>
 							<Composer
 								channelName={activeChannel.name}
@@ -789,11 +839,13 @@ function MessageView({
 	groups,
 	avatarByAuthor,
 	emptyName,
+	proposalHost,
 }: {
 	channel: ChatChannel;
 	groups: ReturnType<typeof groupMessages>;
 	avatarByAuthor: ReadonlyMap<string, string>;
 	emptyName: string;
+	proposalHost: ProposalHost;
 }): ReactElement {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const count = groups.reduce((n, g) => n + g.messages.length, 0);
@@ -849,6 +901,9 @@ function MessageView({
 												</div>
 											) : m.body ? (
 												<p className="chat__line">{m.body}</p>
+											) : null}
+											{m.proposal ? (
+												<ProposalCard messageId={m.id} proposal={m.proposal} host={proposalHost} />
 											) : null}
 											{chips.length > 0 ? (
 												<div className="chat__attachments" data-testid="message-attachments">

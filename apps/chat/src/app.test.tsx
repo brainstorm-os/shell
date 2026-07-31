@@ -34,13 +34,26 @@ type StorageStub = {
 /** 7.14 — records the app-icon badge mirror (`services.ui.badge`). */
 const badgeSet = vi.fn(() => Promise.resolve());
 
+/** Agent-Teams-3 — the host's proposal-decision surface + the `open` intent the
+ *  approved card's back-link dispatches. */
+const approveProposal = vi.fn(() =>
+	Promise.resolve({ ok: true, status: "approved", createdEntityId: "ent_42" }),
+);
+const discardProposal = vi.fn(() => Promise.resolve({ ok: true, status: "discarded" }));
+const dispatchIntent = vi.fn(() => Promise.resolve({ ok: true }));
+
 function installShell(entities: StubEntity[], storageOverride?: StorageStub): void {
 	created.length = 0;
 	badgeSet.mockClear();
+	approveProposal.mockClear();
+	discardProposal.mockClear();
+	dispatchIntent.mockClear();
 	const kv = new Map<string, unknown>();
 	(window as { brainstorm?: unknown }).brainstorm = {
 		services: {
 			ui: { badge: { set: badgeSet, clear: vi.fn(() => Promise.resolve()) } },
+			agentProposals: { approve: approveProposal, discard: discardProposal },
+			intents: { dispatch: dispatchIntent },
 			vaultEntities: {
 				list: () => Promise.resolve({ entities, links: [] }),
 				onChange: () => ({ unsubscribe: () => {} }),
@@ -242,6 +255,108 @@ describe("ChatApp", () => {
 		});
 		const ch = created.find((c) => c.type === CHANNEL_TYPE);
 		expect(ch?.properties.name).toBe("announcements");
+	});
+});
+
+describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
+	function proposalMessage(id: string, channelId: string, agentProposal: unknown): StubEntity {
+		return {
+			id,
+			type: MESSAGE_TYPE,
+			properties: {
+				conversation: channelId,
+				body: "Proposed task: Ship the release notes — approve it to save it.",
+				createdAt: "2026-06-20T10:00:00.000Z",
+				seq: 1,
+				sender: { kind: "participant", personRef: "pk-researcher", displayName: "Researcher" },
+				agentProposal,
+			},
+		};
+	}
+
+	const pendingTask = {
+		artifact: {
+			id: "prop-1",
+			kind: "task",
+			entityType: "brainstorm/Task/v1",
+			fields: { title: "Ship the release notes" },
+			summary: "Ship the release notes",
+		},
+		status: "pending",
+	};
+
+	it("renders a card for a pending proposal and approves through the host service", async () => {
+		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		expect(container.querySelector('[data-testid="chat-proposal"]')).not.toBeNull();
+		const approve = container.querySelector(
+			'[data-testid="chat-proposal-approve"]',
+		) as HTMLButtonElement;
+		await act(async () => {
+			approve.click();
+		});
+		expect(approveProposal).toHaveBeenCalledWith({ messageId: "m1" });
+	});
+
+	it("discards through the host service", async () => {
+		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		const discard = container.querySelector(
+			'[data-testid="chat-proposal-discard"]',
+		) as HTMLButtonElement;
+		await act(async () => {
+			discard.click();
+		});
+		expect(discardProposal).toHaveBeenCalledWith({ messageId: "m1" });
+	});
+
+	it("opens what an approval created through the shared open intent", async () => {
+		await mount([
+			channel("c1", "general"),
+			proposalMessage("m1", "c1", {
+				...pendingTask,
+				status: "approved",
+				createdEntityId: "ent_42",
+			}),
+		]);
+		const open = container.querySelector('[data-testid="chat-proposal-open"]') as HTMLButtonElement;
+		await act(async () => {
+			open.click();
+		});
+		expect(dispatchIntent).toHaveBeenCalledWith({
+			verb: "open",
+			payload: { entityId: "ent_42", entityType: "brainstorm/Task/v1" },
+		});
+	});
+
+	it("renders a MALFORMED proposal as an ordinary message — never an approvable card", async () => {
+		await mount([
+			channel("c1", "general"),
+			// A kind the channel path cannot honour: main would refuse the approval.
+			proposalMessage("m1", "c1", {
+				...pendingTask,
+				artifact: { ...pendingTask.artifact, kind: "database" },
+			}),
+		]);
+		expect(container.querySelector('[data-testid="chat-proposal"]')).toBeNull();
+		expect(container.querySelector(".chat__line")?.textContent).toContain(
+			"Proposed task: Ship the release notes",
+		);
+	});
+
+	it("surfaces a rejected decision in the card", async () => {
+		approveProposal.mockResolvedValueOnce({
+			ok: false,
+			reason: "already-decided",
+		} as unknown as { ok: true; status: string; createdEntityId: string });
+		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		const approve = container.querySelector(
+			'[data-testid="chat-proposal-approve"]',
+		) as HTMLButtonElement;
+		await act(async () => {
+			approve.click();
+		});
+		expect(container.querySelector('[data-testid="chat-proposal-error"]')?.textContent).toBe(
+			"Someone already decided this one.",
+		);
 	});
 });
 

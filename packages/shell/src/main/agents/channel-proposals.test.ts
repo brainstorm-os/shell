@@ -17,7 +17,7 @@ import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { ProposeKind, readAgentProvenance } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
-import { ENVELOPE_PROTOCOL_VERSION } from "../../ipc/envelope";
+import { ENVELOPE_PROTOCOL_VERSION, validateEnvelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { CredentialStore } from "../credentials/store";
 import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
@@ -26,6 +26,7 @@ import { EntitiesRepository } from "../storage/entities-repo";
 import { type AgentDirectorySession, type AgentRecord, createAgent } from "./agent-directory";
 import {
 	AGENTS_APPROVE_CAPABILITY,
+	AGENT_PROPOSALS_SERVICE,
 	makeAgentProposalServiceHandler,
 } from "./agent-proposal-service";
 import {
@@ -48,7 +49,7 @@ function envelope(method: string, args: unknown[], app = CHAT_APP): Envelope {
 		v: ENVELOPE_PROTOCOL_VERSION,
 		msg: "m1",
 		app,
-		service: "agentProposals",
+		service: AGENT_PROPOSALS_SERVICE,
 		method,
 		args,
 		caps: [AGENTS_APPROVE_CAPABILITY],
@@ -120,6 +121,14 @@ describe("channel proposals (Agent-Teams-3)", () => {
 		});
 		return id;
 	}
+
+	it("registers under a wire-VALID service name", () => {
+		// `SERVICE_PATTERN` is lowercase-and-dashes; `validateEnvelope` runs BEFORE
+		// the handler lookup, so a camelCase registration would fail at the wire on
+		// every call — the handler would look correct and never be reached.
+		expect(AGENT_PROPOSALS_SERVICE).toMatch(/^[a-z][a-z0-9-]{0,63}$/);
+		expect(validateEnvelope(envelope("approve", [{ messageId: "m" }])).ok).toBe(true);
+	});
 
 	it("only offers the propose verbs the channel path can actually honour", () => {
 		expect(isChannelProposeVerb("propose-task")).toBe(true);
