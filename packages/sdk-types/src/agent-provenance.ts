@@ -26,6 +26,35 @@
  *  create/update and only re-stamps it server-side. */
 export const AGENT_PROVENANCE_PROPERTY_KEY = "agentProvenance";
 
+/** Agent-Teams-3 — the staged proposal card on a chat message. RESERVED for
+ *  the same reason as provenance, and learned the same way: while it was an
+ *  ordinary property, any app holding `entities.write:brainstorm/Message/v1`
+ *  could paste a card onto an agent-authored message and have the privileged
+ *  approve path mint an entity of ANY type under that agent's name. The
+ *  entities service strips it from every create/update, so only the host can
+ *  author a card or settle one. */
+export const AGENT_PROPOSAL_PROPERTY_KEY = "agentProposal";
+
+/** Property keys an app may never write. The service strips each on create and
+ *  update; the host writes them through the repo directly. */
+export const RESERVED_PROPERTY_KEYS: readonly string[] = [
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	AGENT_PROPOSAL_PROPERTY_KEY,
+];
+
+/** Drop every reserved key from a caller-supplied bag. Returns the same
+ *  reference when none are present (the common path allocates nothing). */
+export function stripReservedProperties(
+	properties: Record<string, unknown>,
+): Record<string, unknown> {
+	if (!RESERVED_PROPERTY_KEYS.some((key) => key in properties)) return properties;
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(properties)) {
+		if (!RESERVED_PROPERTY_KEYS.includes(key)) out[key] = value;
+	}
+	return out;
+}
+
 /** The provenance stamp carried in an agent-created entity's properties. */
 export type AgentProvenance = {
 	/** Broker-verified app id of the proposing agent. Server-authoritative —

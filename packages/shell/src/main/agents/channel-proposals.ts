@@ -28,6 +28,10 @@
  */
 
 import {
+	PROPOSE_DESCRIPTORS,
+	PROPOSE_LONG_MAX,
+	PROPOSE_SHORT_MAX,
+	type ProposeDescriptor,
 	ProposeKind,
 	type ProposedArtifact,
 	proposalToEntityProperties,
@@ -72,6 +76,12 @@ export const CHANNEL_PROPOSAL_KINDS: readonly ProposeKind[] = [
 	ProposeKind.Contact,
 ];
 
+/** The build-time descriptor for a channel kind — the authority on what an
+ *  approval writes. */
+export function descriptorForKind(kind: ProposeKind): ProposeDescriptor | null {
+	return PROPOSE_DESCRIPTORS.find((d) => d.kind === kind) ?? null;
+}
+
 /** True when `verb` is a propose verb this channel path can actually honour. */
 export function isChannelProposeVerb(verb: string): boolean {
 	const descriptor = proposeDescriptorForVerb(verb);
@@ -109,17 +119,30 @@ export function readChannelProposal(properties: Record<string, unknown>): Channe
 	const kind = artifact.kind;
 	if (!CHANNEL_PROPOSAL_KINDS.includes(kind as ProposeKind)) return null;
 	const id = artifact.id;
-	const entityType = artifact.entityType;
 	const summary = artifact.summary;
 	if (typeof id !== "string" || !id) return null;
-	if (typeof entityType !== "string" || !entityType) return null;
 	if (typeof summary !== "string" || !summary) return null;
+
+	// The entity type and the field allowlist are RE-DERIVED from the build-time
+	// descriptor for this kind — never read from the row. A stored card is just
+	// data, so trusting its `entityType` would let whoever can write that row
+	// choose what an approval creates; trusting its `fields` would let them
+	// bypass the staging clamps. Both were exactly that before review.
+	const descriptor = descriptorForKind(kind as ProposeKind);
+	if (!descriptor) return null;
+	const entityType = descriptor.entityType;
 
 	const rawFields = asRecord(artifact.fields) ?? {};
 	const fields: Record<string, string> = {};
-	for (const [key, value] of Object.entries(rawFields)) {
-		if (typeof value === "string") fields[key] = value;
+	for (const key of descriptor.fields) {
+		const value = rawFields[key];
+		if (typeof value !== "string" || value === "") continue;
+		const max = descriptor.longFields.includes(key) ? PROPOSE_LONG_MAX : PROPOSE_SHORT_MAX;
+		fields[key] = value.length > max ? value.slice(0, max) : value;
 	}
+	// The primary field is what the card summarises and the entity titles on —
+	// a card without it is not approvable.
+	if (!fields[descriptor.primaryField]) return null;
 
 	const decidedBy = typeof raw.decidedBy === "string" ? raw.decidedBy : undefined;
 	const createdEntityId = typeof raw.createdEntityId === "string" ? raw.createdEntityId : undefined;
@@ -178,6 +201,12 @@ export function settledProposalProperty(
 export function proposalEntityProperties(
 	artifact: ProposedArtifact,
 	now: number,
-): { entityType: string; properties: Record<string, unknown> } {
-	return proposalToEntityProperties(artifact, now);
+): { entityType: string; properties: Record<string, unknown> } | null {
+	// Belt and braces with the re-derivation in `readChannelProposal`: the type
+	// handed to the privileged write is the DESCRIPTOR's, whatever the artifact
+	// carries, and a kind with no descriptor produces nothing at all.
+	const descriptor = descriptorForKind(artifact.kind);
+	if (!descriptor) return null;
+	const plan = proposalToEntityProperties({ ...artifact, entityType: descriptor.entityType }, now);
+	return { entityType: descriptor.entityType, properties: plan.properties };
 }

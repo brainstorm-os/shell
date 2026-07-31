@@ -14,7 +14,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { ProposeKind, readAgentProvenance } from "@brainstorm-os/sdk-types";
+import {
+	ProposeKind,
+	RESERVED_PROPERTY_KEYS,
+	readAgentProvenance,
+	stripReservedProperties,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION, validateEnvelope } from "../../ipc/envelope";
@@ -229,6 +234,88 @@ describe("channel proposals (Agent-Teams-3)", () => {
 			ok: false,
 			reason: "not-found",
 		});
+	});
+
+	it("REVIEW B1: the approved entity type comes from the DESCRIPTOR, never the stored card", async () => {
+		// The card is data. Before review, `entityType` was read straight off the
+		// row and handed to a privileged repo.create — so anyone who could write
+		// that row chose what an approval minted (a shell-owned `Agent/v1`, with
+		// a 50 KB body, under the agent's name). Now it is re-derived.
+		repo.create({
+			id: "msg_typed",
+			type: MESSAGE_TYPE_URL,
+			createdBy: agent.def.fingerprint,
+			properties: {
+				conversation: CHANNEL,
+				seq: 2,
+				[CHANNEL_PROPOSAL_PROPERTY_KEY]: {
+					status: ChannelProposalStatus.Pending,
+					artifact: {
+						id: "prp_x",
+						kind: ProposeKind.Task,
+						entityType: "brainstorm/Agent/v1",
+						summary: "Ship it",
+						fields: { title: "Ship it", notes: "x".repeat(50_000), pubkey: "AAAA" },
+					},
+				},
+			},
+			now: 1000,
+			dekId: null,
+		});
+		// Only the agent's own record exists before the approval.
+		const agentRowsBefore = repo.query({ type: "brainstorm/Agent/v1" }).length;
+		const result = (await handler()(envelope("approve", [{ messageId: "msg_typed" }]))) as {
+			ok: boolean;
+			createdEntityId?: string;
+		};
+		expect(result.ok).toBe(true);
+		// The forged type was never created; the descriptor's type was.
+		expect(repo.query({ type: "brainstorm/Agent/v1" })).toHaveLength(agentRowsBefore);
+		const created = repo.query({ type: "brainstorm/Task/v1" });
+		expect(created).toHaveLength(1);
+		// An off-allowlist field is dropped, and a long field is re-clamped on
+		// READ — the staging clamp cannot be relied on for a stored card.
+		expect(created[0]?.properties.pubkey).toBeUndefined();
+		expect(String(created[0]?.properties.notes ?? "").length).toBeLessThanOrEqual(8000);
+	});
+
+	it("REVIEW B1: the card property is reserved — an app cannot write or settle one", async () => {
+		// The structural fix: `agentProposal` is stripped from every app create
+		// and update, exactly like `agentProvenance`, so only the host authors a
+		// card. Without this, an app could paste one onto an agent's message.
+		const stripped = stripReservedProperties({
+			body: "hi",
+			[CHANNEL_PROPOSAL_PROPERTY_KEY]: { status: "pending", artifact: {} },
+			agentProvenance: { agent: "x" },
+		});
+		expect(stripped).toEqual({ body: "hi" });
+		expect(RESERVED_PROPERTY_KEYS).toContain(CHANNEL_PROPOSAL_PROPERTY_KEY);
+	});
+
+	it("REVIEW 2: concurrent approves mint exactly one entity", async () => {
+		stageCard();
+		const results = await Promise.all([
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+		]);
+		expect(results.filter((r) => (r as { ok: boolean }).ok)).toHaveLength(1);
+		expect(repo.query({ type: "brainstorm/Task/v1" })).toHaveLength(1);
+	});
+
+	it("REVIEW 4: no session identity means no approval, not an unattributed write", async () => {
+		stageCard();
+		const noIdentity = makeAgentProposalServiceHandler({
+			getSession: () => session,
+			getSelfPubkey: () => null,
+			getLedger: async () => ledgerGranting(new Set([AGENTS_APPROVE_CAPABILITY])),
+			newId: () => "ent_x",
+			now: () => 5000,
+		});
+		await expect(noIdentity(envelope("approve", [{ messageId: "msg_card" }]))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+		expect(repo.query({ type: "brainstorm/Task/v1" })).toHaveLength(0);
 	});
 
 	it("readChannelProposal fails closed on a malformed card", () => {

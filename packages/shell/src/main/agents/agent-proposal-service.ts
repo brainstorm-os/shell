@@ -28,6 +28,7 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import { AGENT_PROVENANCE_PROPERTY_KEY, buildAgentProvenance } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import { isShellOwnedEntityType } from "../entities/shell-owned-types";
 import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { findAgentByFingerprint } from "./agent-directory";
@@ -137,46 +138,74 @@ export async function decideChannelProposal(
 	if (!proposingAgent) return { ok: false, reason: "untrusted-agent" };
 
 	const now = options.now ? options.now() : Date.now();
+	// Fail closed: with no session identity there is no approver to attest, so
+	// there is no approval — never a write with the attribution silently missing.
 	const approver = options.getSelfPubkey() ?? "";
+	if (!approver) throw makeError("Unavailable", "agent-proposals: no session identity");
 	const channelId =
 		typeof row.properties.conversation === "string" ? row.properties.conversation : "";
 
-	let createdEntityId: string | undefined;
+	const plan =
+		decision === ChannelProposalStatus.Approved
+			? proposalEntityProperties(proposal.artifact, now)
+			: null;
 	if (decision === ChannelProposalStatus.Approved) {
-		const plan = proposalEntityProperties(proposal.artifact, now);
-		const entityId = options.newId();
-		repo.create({
-			id: entityId,
-			type: plan.entityType,
-			createdBy: proposingAgent.def.fingerprint,
-			properties: {
-				...plan.properties,
-				[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(
-					proposingAgent.def.fingerprint,
-					channelId,
+		if (!plan) return { ok: false, reason: "not-a-proposal" };
+		// Defence in depth, per shell-owned-types' own instruction: EVERY path
+		// that writes on behalf of an app checks the fence before it writes.
+		if (isShellOwnedEntityType(plan.entityType)) {
+			return { ok: false, reason: "not-a-proposal" };
+		}
+	}
+
+	// One transaction: re-read, re-check Pending, write, settle. Without this the
+	// Pending check and the create straddle an await, and the broker does not
+	// serialize an app's calls — two concurrent approves on one card each saw
+	// Pending and each minted an entity.
+	let createdEntityId: string | undefined;
+	const decided = repo.transaction(() => {
+		const fresh = repo.get(messageId);
+		if (!fresh) return false;
+		const current = readChannelProposal(fresh.properties);
+		if (!current || current.status !== ChannelProposalStatus.Pending) return false;
+
+		if (plan) {
+			const entityId = options.newId();
+			repo.create({
+				id: entityId,
+				type: plan.entityType,
+				createdBy: proposingAgent.def.fingerprint,
+				properties: {
+					...plan.properties,
+					[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(
+						proposingAgent.def.fingerprint,
+						channelId,
+						now,
+						{ proposedBy: proposingAgent.def.fingerprint, approvedBy: approver },
+					),
+				},
+				now,
+				dekId: null,
+			});
+			createdEntityId = entityId;
+		}
+
+		repo.update(
+			messageId,
+			{
+				[CHANNEL_PROPOSAL_PROPERTY_KEY]: settledProposalProperty(
+					current,
+					decision,
+					approver,
 					now,
-					{ proposedBy: proposingAgent.def.fingerprint, approvedBy: approver },
+					createdEntityId,
 				),
 			},
 			now,
-			dekId: null,
-		});
-		createdEntityId = entityId;
-	}
-
-	repo.update(
-		messageId,
-		{
-			[CHANNEL_PROPOSAL_PROPERTY_KEY]: settledProposalProperty(
-				proposal,
-				decision,
-				approver,
-				now,
-				createdEntityId,
-			),
-		},
-		now,
-	);
+		);
+		return true;
+	});
+	if (!decided) return { ok: false, reason: "already-decided" };
 	options.onWrote?.();
 	return { ok: true, status: decision, ...(createdEntityId ? { createdEntityId } : {}) };
 }

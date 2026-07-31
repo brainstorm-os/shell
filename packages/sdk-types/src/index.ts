@@ -2704,11 +2704,14 @@ export type {
 
 // ─── Agent provenance + back-links (Agent-11c) ──────────────────────────────
 export {
+	AGENT_PROPOSAL_PROPERTY_KEY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	RESERVED_PROPERTY_KEYS,
 	buildAgentProvenance,
 	parseProvenanceRequest,
 	readAgentProvenance,
 	stripAgentProvenance,
+	stripReservedProperties,
 } from "./agent-provenance";
 export type { AgentProvenance, AgentProvenanceRequest } from "./agent-provenance";
 

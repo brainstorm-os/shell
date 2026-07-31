@@ -31,7 +31,7 @@ import {
 	type EntityQuery,
 	buildAgentProvenance,
 	parseProvenanceRequest,
-	stripAgentProvenance,
+	stripReservedProperties,
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
@@ -475,10 +475,10 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const provReq = parseProvenanceRequest(a.provenance);
 				const properties: Record<string, unknown> = provReq
 					? {
-							...stripAgentProvenance(rawProperties),
+							...stripReservedProperties(rawProperties),
 							[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(app, provReq.conversationId, clock()),
 						}
-					: stripAgentProvenance(rawProperties);
+					: stripReservedProperties(rawProperties);
 				// Optional caller-supplied id (9.3.5.3): entity ids are local
 				// opaque strings (05-data-and-blocks-protocol §Decision), so an
 				// app migrating off its kv silo may preserve its stable ids
@@ -595,7 +595,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				// Agent-11c — provenance is create-time + immutable; strip the
 				// reserved key from an update patch so an app can neither inject it
 				// after the fact nor overwrite an existing server stamp.
-				const patch = stripAgentProvenance(
+				const patch = stripReservedProperties(
 					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {},
 				);
 				const updated = await writePropsThroughDoc(repo, existing, patch);
