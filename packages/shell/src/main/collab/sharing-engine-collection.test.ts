@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
 import { AccessRole, resolveCurrentMembers } from "./access-record";
@@ -106,6 +107,44 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		expect(await activeMemberKeys("msg_2")).toContain(guestPub);
 		// A message in a different channel is untouched.
 		expect(await activeMemberKeys("msg_other")).not.toContain(guestPub);
+	});
+
+	// The owner enumerates children from the SQLite index, but the receiver's
+	// container-descent gate reads the child's parent property back out of the DOC
+	// it is sent. A row whose properties were never written through the Y.Doc
+	// (legacy, seeded, or provisioned) leaves those two disagreeing, and the
+	// receiver drops the child with `deny-container-not-a-child` and only a console
+	// warning. Sharing must therefore leave the parent property ON the doc.
+	it("leaves each cascaded child's parent property on its doc, so the receiver can verify descent", async () => {
+		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
+		await engine.provisionEntity("msg_1", MESSAGE_TYPE_URL, { conversation: CHANNEL, body: "hi" });
+
+		const docBefore = await owner.ydocStore.load("msg_1");
+		try {
+			expect(
+				readEntityDocProjection(docBefore.doc).properties ?? {},
+				"provisioning alone leaves the doc's property map empty — the shape this guards",
+			).toEqual({});
+		} finally {
+			docBefore.doc.destroy();
+		}
+
+		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
+		await engine.shareCollection({
+			entityId: CHANNEL,
+			type: CHANNEL_TYPE,
+			invite: await guestEngine.createInvite("Guest"),
+			role: AccessRole.Editor,
+		});
+
+		const docAfter = await owner.ydocStore.load("msg_1");
+		try {
+			const properties = readEntityDocProjection(docAfter.doc).properties ?? {};
+			expect(properties.conversation, "the child names its container on the doc").toBe(CHANNEL);
+			expect(properties.body, "and the rest of the row came along").toBe("hi");
+		} finally {
+			docAfter.doc.destroy();
+		}
 	});
 
 	it("records the invitee's X25519 in each cascaded grant (so a later child cascade can wrap to them)", async () => {
