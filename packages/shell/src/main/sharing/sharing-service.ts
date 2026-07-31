@@ -35,7 +35,8 @@ import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { AccessRole } from "../collab/access-record";
 import type { ContactsStore } from "../collab/contacts-store";
-import { type ShareInvite, verifyShareInvite } from "../collab/share-invite";
+import { cacheRemoteProfile } from "../collab/profile-store";
+import { type ShareInvite, inviteProfile, verifyShareInvite } from "../collab/share-invite";
 import type { CollabAccessView, CollabRelayLike } from "../collab/sharing-engine";
 import { SharingEngine } from "../collab/sharing-engine";
 import type { VaultSession } from "../vault/session";
@@ -215,7 +216,17 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		const invite = decodeInviteToken(input.invite);
 		const displayName = typeof input.displayName === "string" ? input.displayName : "";
 		const store = await requireContactsStore();
-		const contact = await store.add(displayName || invite.label, invite);
+		// Collab-C6-b — a name the OWNER typed always wins; only when they gave none
+		// (every shipping call site passes `""`, which is why an auto-saved teammate
+		// used to render as a blank chip) do we fall back to what the peer asserts
+		// about themselves. A petname is trusted because it is local; a signed
+		// profile name is self-asserted, so it must never overwrite one.
+		const claimed = inviteProfile(invite)?.displayName ?? invite.label;
+		const contact = await store.add(displayName || claimed, invite);
+		// Remember the verified profile vault-wide, not just in the contacts file,
+		// so the roster resolves this pubkey on entities we have not shared yet.
+		const session = options.getSession();
+		if (session) await cacheRemoteProfile(session, invite.userPubB64, inviteProfile(invite));
 		return { pubkey: contact.invite.userPubB64, displayName: contact.displayName };
 	}
 
@@ -233,7 +244,7 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 	async function handleCreateInvite(envelope: Envelope): Promise<ShareInviteToken> {
 		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
 		const label = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
-		return encodeInviteToken(engineFor().createInvite(label));
+		return encodeInviteToken(await engineFor().createInvite(label));
 	}
 
 	async function handleShare(envelope: Envelope): Promise<SharedMember[]> {

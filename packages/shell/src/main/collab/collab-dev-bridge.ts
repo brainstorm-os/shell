@@ -138,8 +138,8 @@ export class CollabDevBridge {
 	}
 
 	/** Collaborator-side: mint a self-signed `ShareInvite`. */
-	createInvite(label: string): ShareInvite {
-		return this.#engine.createInvite(label);
+	async createInvite(label: string): Promise<ShareInvite> {
+		return await this.#engine.createInvite(label);
 	}
 
 	/** Owner-side: create the entity row + DEK + the owner's Owner grant.

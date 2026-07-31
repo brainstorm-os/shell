@@ -20,48 +20,34 @@
  */
 
 import { sha256 } from "@brainstorm-os/native";
-import { base64ToBytes, bytesToBase64 } from "../credentials/crypto";
-import {
-	fingerprintPublicKey,
-	publicKeyFromBase64,
-	verifySignature,
-} from "../credentials/identity";
+import { bytesToBase64 } from "../credentials/crypto";
+import { fingerprintPublicKey, publicKeyFromBase64 } from "../credentials/identity";
 import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
+import {
+	type ProfileSnapshot,
+	type ResolvedProfile,
+	isProfileSnapshot,
+	profilePayload,
+	resolveProfileProperties,
+	sanitizeDisplayName,
+	verifyProfileSnapshot,
+} from "./profile-snapshot";
+
+export {
+	DISPLAY_NAME_MAX,
+	type ProfileSnapshot,
+	type ResolvedProfile,
+	resolveProfileProperties,
+	sanitizeDisplayName,
+	verifyProfileSnapshot,
+} from "./profile-snapshot";
 
 /** The shell-owned display-profile entity type. */
 export const PROFILE_TYPE = "brainstorm/Profile/v1";
 
 /** `created_by` stamp for the shell-provisioned profile entity (not any app). */
 const PROFILE_ACTOR = "brainstorm.shell";
-
-/** Bump only on a wire-incompatible change to the signed payload construction. */
-const PROFILE_SIG_VERSION = 1 as const;
-
-const encoder = new TextEncoder();
-
-/** The resolved, signature-checked profile for one pubkey. */
-export type ResolvedProfile = {
-	pubkey: string;
-	displayName: string;
-	avatarRef: string | null;
-	/** The self-asserted name+avatar signature verified under `pubkey`. */
-	verified: boolean;
-};
-
-export const DISPLAY_NAME_MAX = 60;
-
-/** Trim, collapse inner whitespace, strip C0/C1/DEL control chars, clamp. Mirrors
- *  the chat-side sanitiser; the codepoint filter keeps biome's
- *  `noControlCharactersInRegex` happy without a suppression. */
-export function sanitizeDisplayName(raw: string): string {
-	let out = "";
-	for (const ch of raw) {
-		const code = ch.codePointAt(0) ?? 0;
-		out += code <= 0x1f || (code >= 0x7f && code <= 0x9f) ? " " : ch;
-	}
-	return out.replace(/\s+/g, " ").trim().slice(0, DISPLAY_NAME_MAX);
-}
 
 /** Deterministic, opaque singleton id for an identity's profile — a hash of the
  *  pubkey so every device of that identity writes the same entity (idempotent,
@@ -73,45 +59,6 @@ export function profileEntityId(pubkeyBase64: string): string {
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join("");
 	return `brainstorm/profile/${hex}`;
-}
-
-/** Deterministic signed bytes for a profile. Binds scheme version + pubkey so the
- *  name+avatar can't be lifted onto another identity. */
-function profilePayload(pubkey: string, displayName: string, avatarRef: string): Uint8Array {
-	return encoder.encode(
-		`brainstorm/profile/v${PROFILE_SIG_VERSION}|${pubkey}|${displayName}|${avatarRef}`,
-	);
-}
-
-function str(value: unknown): string {
-	return typeof value === "string" ? value : "";
-}
-
-/** Verify + shape a raw profile-entity properties blob for `pubkey`. A tampered
- *  name/avatar (or a missing signature) resolves `verified: false` but still
- *  returns the stored fields — the consumer decides how much to trust an
- *  unverified self-asserted name. */
-export function resolveProfileProperties(
-	pubkey: string,
-	properties: Record<string, unknown>,
-): ResolvedProfile {
-	const displayName = sanitizeDisplayName(str(properties.displayName));
-	const avatarRefRaw = str(properties.avatarRef);
-	const avatarRef = avatarRefRaw.length > 0 ? avatarRefRaw : null;
-	const sig = str(properties.sig);
-	let verified = false;
-	if (sig.length > 0) {
-		try {
-			verified = verifySignature(
-				publicKeyFromBase64(pubkey),
-				profilePayload(pubkey, displayName, avatarRef ?? ""),
-				base64ToBytes(sig),
-			);
-		} catch {
-			verified = false;
-		}
-	}
-	return { pubkey, displayName, avatarRef, verified };
 }
 
 /** Read the live, signature-checked profile for one pubkey from `entities.db`,
@@ -166,6 +113,74 @@ export async function writeSelfProfile(
 		repo.create({ id, type: PROFILE_TYPE, properties, createdBy: PROFILE_ACTOR, now, dekId: null });
 	}
 	return { pubkey, displayName, avatarRef, verified: true };
+}
+
+/**
+ * The local user's OWN profile as a portable {@link ProfileSnapshot}, or `null`
+ * when they have not set a display name yet (Collab-C6-b).
+ *
+ * The stored `sig` is reused verbatim rather than re-minted, so what rides an
+ * invite is byte-identical to what the profile entity holds — a recipient that
+ * later receives the same identity's profile through another channel sees one
+ * consistent, verifiable assertion.
+ */
+export async function readSelfProfileSnapshot(
+	session: VaultSession,
+): Promise<ProfileSnapshot | null> {
+	const db = await session.dataStores.open("entities");
+	const repo = new EntitiesRepository(db);
+	const pubkey = session.identity.publicKeyBase64;
+	const row = repo.get(profileEntityId(pubkey));
+	if (!row || row.type !== PROFILE_TYPE) return null;
+	const props = row.properties;
+	const snapshot = {
+		displayName: typeof props.displayName === "string" ? props.displayName : "",
+		...(typeof props.avatarRef === "string" && props.avatarRef.length > 0
+			? { avatarRef: props.avatarRef }
+			: {}),
+		sig: typeof props.sig === "string" ? props.sig : "",
+	};
+	if (!isProfileSnapshot(snapshot)) return null;
+	// Round-trip through the same verifier a peer will run: never distribute a
+	// snapshot our own consumers would reject.
+	return verifyProfileSnapshot(pubkey, snapshot) ? snapshot : null;
+}
+
+/**
+ * Cache a REMOTE identity's verified profile snapshot into `entities.db`, so
+ * `readProfile` resolves it forever after (Collab-C6-b). Returns the resolved
+ * profile, or `null` when the snapshot does not verify under `pubkey`.
+ *
+ * SECURITY: fail-closed on verification, and it refuses to touch the LOCAL
+ * user's own profile row — the only writer of self is `writeSelfProfile`, so a
+ * replayed or stale snapshot of yourself can never clobber what you set in
+ * Settings.
+ */
+export async function cacheRemoteProfile(
+	session: VaultSession,
+	pubkey: string,
+	snapshot: unknown,
+	now: number = Date.now(),
+): Promise<ResolvedProfile | null> {
+	if (pubkey === session.identity.publicKeyBase64) return null;
+	const resolved = verifyProfileSnapshot(pubkey, snapshot);
+	if (!resolved) return null;
+	const properties: Record<string, unknown> = {
+		pubkey,
+		displayName: resolved.displayName,
+		sig: (snapshot as ProfileSnapshot).sig,
+		updatedAt: now,
+		...(resolved.avatarRef ? { avatarRef: resolved.avatarRef } : {}),
+	};
+	const db = await session.dataStores.open("entities");
+	const repo = new EntitiesRepository(db);
+	const id = profileEntityId(pubkey);
+	if (repo.get(id)) {
+		repo.update(id, { ...properties, avatarRef: resolved.avatarRef ?? null }, now);
+	} else {
+		repo.create({ id, type: PROFILE_TYPE, properties, createdBy: PROFILE_ACTOR, now, dekId: null });
+	}
+	return resolved;
 }
 
 /** The `ed25519:<hex>` short fingerprint for a base64 pubkey. */

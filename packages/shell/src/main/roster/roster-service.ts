@@ -27,6 +27,7 @@ import { RosterRole } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { AccessRole, activeMembers } from "../collab/access-record";
+import { readDocProfiles } from "../collab/doc-profiles";
 import {
 	fingerprintOf,
 	readProfile,
@@ -116,6 +117,14 @@ async function handleMembers(
 		role: ACCESS_TO_ROSTER_ROLE[m.role],
 	}));
 
+	// Collab-C6-b — the entity's own signed profile cache. This is what makes a
+	// REMOTE member render as a name: `readProfile` reads `entities.db`, whose
+	// only local writers are this user's own profile and the invites this vault
+	// has processed, so on its own it resolves nobody else on the receiving side.
+	// Every entry here is signature-checked against the pubkey it is filed under
+	// (`readDocProfiles`), so an unverifiable claim is dropped, not displayed.
+	const docProfiles = readDocProfiles(doc);
+
 	const db = await session.dataStores.open("entities");
 	const repo = new EntitiesRepository(db);
 	const selfPubkey = session.identity.publicKeyBase64;
@@ -123,12 +132,18 @@ async function handleMembers(
 
 	const resolve = (pubkey: string): ResolvedDisplay => {
 		const fingerprint = fingerprintOf(pubkey);
-		const profile = pubkey === selfPubkey ? selfProfile : readProfile(repo, pubkey);
-		const displayName = profile?.displayName ?? "";
+		// Self always wins over anything the doc claims about us — nobody else
+		// gets to rename you in your own member list.
+		const profile =
+			pubkey === selfPubkey ? selfProfile : (docProfiles.get(pubkey) ?? readProfile(repo, pubkey));
+		// A self-asserted name is only ever DISPLAYED when its signature verified;
+		// an unverified profile row degrades to the key fingerprint rather than
+		// letting an unauthenticated string stand in for an identity.
+		const displayName = profile?.verified ? profile.displayName : "";
 		return {
 			fingerprint,
 			...(displayName ? { displayName } : {}),
-			...(profile?.avatarRef ? { avatarRef: profile.avatarRef } : {}),
+			...(displayName && profile?.avatarRef ? { avatarRef: profile.avatarRef } : {}),
 		};
 	};
 

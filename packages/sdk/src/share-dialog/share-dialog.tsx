@@ -75,9 +75,24 @@ const EDITOR = RosterRole.Editor;
 const VIEWER = RosterRole.Viewer;
 const OWNER = RosterRole.Owner;
 
+/**
+ * The primary line for a member. A resolved `displayName` is SELF-ASSERTED (the
+ * holder of that key says they are called this) — it is signature-checked before
+ * it ever reaches here, but it proves possession of a key, not who anybody is.
+ * So the key fingerprint is rendered on its own line beside it rather than only
+ * as a tooltip: a display name must never be the ONLY thing distinguishing two
+ * members, otherwise a member could pick a name (or another member's
+ * fingerprint string) and pass for someone else.
+ */
 function memberName(m: RosterMember, youLabel: string): string {
 	if (m.isSelf) return m.displayName ? `${m.displayName} (${youLabel})` : youLabel;
 	return m.displayName || m.fingerprint;
+}
+
+/** The key line, shown only when a name is occupying the primary line — with no
+ *  name the fingerprint IS the primary line and repeating it is noise. */
+function memberKeyLine(m: RosterMember): string | null {
+	return m.displayName ? m.fingerprint : null;
 }
 
 export function ShareDialog(props: ShareDialogProps): ReactElement {
@@ -214,8 +229,13 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 					<ul className="bs-share__members">
 						{members.map((m) => (
 							<li key={m.pubkey} className="bs-share__member">
-								<span className="bs-share__member-name" title={m.fingerprint}>
-									{memberName(m, labels.you)}
+								<span className="bs-share__member-id">
+									<span className="bs-share__member-name" title={m.fingerprint}>
+										{memberName(m, labels.you)}
+									</span>
+									{memberKeyLine(m) ? (
+										<span className="bs-share__member-key">{memberKeyLine(m)}</span>
+									) : null}
 								</span>
 								<span className="bs-share__role">{roleLabel(m.role)}</span>
 								{canManage && !m.isSelf && m.role !== OWNER ? (

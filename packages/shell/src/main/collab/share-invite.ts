@@ -53,6 +53,8 @@ import {
 	wrapDekForRecipient,
 } from "../credentials/member-wraps";
 import { type AccessRole, grantAccess, roleOf } from "./access-record";
+import { publishDocProfile } from "./doc-profiles";
+import { type ProfileSnapshot, isProfileSnapshot, verifyProfileSnapshot } from "./profile-snapshot";
 
 /** Bump only on a wire-incompatible change to the invite shape or its signed
  *  payload construction. Pinned into the signed payload so a future codec can
@@ -78,6 +80,20 @@ export type ShareInvite = {
 	label: string;
 	/** base64 Ed25519 signature by `userPubB64` over the canonical payload. */
 	sig: string;
+	/**
+	 * OPTIONAL self-asserted display profile snapshot (Collab-C6-b) — how the
+	 * owner learns the invitee's NAME instead of rendering their key.
+	 *
+	 * Deliberately OUTSIDE {@link invitePayload}: it carries its own Ed25519
+	 * signature bound to `userPubB64` ({@link verifyProfileSnapshot}), so it is
+	 * self-authenticating and adding it does not change the v1 signed bytes —
+	 * a v1 invite minted before this field still verifies, and a v1 verifier
+	 * still accepts an invite that has it. The two attacks the split allows are
+	 * both benign: STRIPPING it degrades the owner's view to a fingerprint, and
+	 * SUBSTITUTING it can only substitute another snapshot signed by the SAME
+	 * identity — i.e. still that person's own self-assertion.
+	 */
+	profile?: ProfileSnapshot;
 };
 
 const encoder = new TextEncoder();
@@ -104,8 +120,17 @@ export function isShareInvite(value: unknown): value is ShareInvite {
 		typeof i.userPubB64 === "string" &&
 		typeof i.x25519PubB64 === "string" &&
 		typeof i.label === "string" &&
-		typeof i.sig === "string"
+		typeof i.sig === "string" &&
+		(i.profile === undefined || isProfileSnapshot(i.profile))
 	);
+}
+
+/** The invitee's display profile, but ONLY if its own signature verifies under
+ *  the invite's identity key (Collab-C6-b). Never throws; a missing, malformed
+ *  or badly-signed snapshot resolves `null` and the owner renders a fingerprint. */
+export function inviteProfile(invite: ShareInvite): ProfileSnapshot | null {
+	if (!invite.profile) return null;
+	return verifyProfileSnapshot(invite.userPubB64, invite.profile) ? invite.profile : null;
 }
 
 /**
@@ -120,6 +145,10 @@ export function createShareInviteSigned(opts: {
 	x25519Pub: Uint8Array;
 	label: string;
 	sign: (payload: Uint8Array) => Uint8Array;
+	/** Collab-C6-b — this identity's signed display-profile snapshot, so the
+	 *  owner can render a NAME rather than a key fingerprint. Already signed
+	 *  (see {@link ShareInvite.profile}); attached verbatim. */
+	profile?: ProfileSnapshot | null;
 }): ShareInvite {
 	const userPubB64 = publicKeyToBase64(opts.userPub);
 	const x25519PubB64 = bytesToBase64(opts.x25519Pub);
@@ -130,6 +159,7 @@ export function createShareInviteSigned(opts: {
 		x25519PubB64,
 		label: opts.label,
 		sig: bytesToBase64(sig),
+		...(opts.profile ? { profile: opts.profile } : {}),
 	};
 }
 
@@ -210,6 +240,14 @@ export function shareEntityWithInvite(
 		 *  into the wrap so the invitee's install path can order it against a
 		 *  later rotation. Omitted ⇒ a v1 (ordinal-1) wrap. */
 		dekVersion?: number;
+		/** Collab-C6-b — the OWNER's own signed profile snapshot, cached into the
+		 *  doc so the invitee can render the owner's name. The invite only ever
+		 *  carries the invitee's profile, so without this the naming would be
+		 *  one-directional. Omitted ⇒ the owner has set no display name. */
+		selfProfile?: ProfileSnapshot | null;
+		/** The owner's own pubkey — the key `selfProfile` is filed under. Required
+		 *  whenever `selfProfile` is given. */
+		selfPubkey?: string;
 	},
 ): MemberWrapPayload {
 	// Validate everything that can fail BEFORE any mutation, so a rejected
@@ -233,6 +271,16 @@ export function shareEntityWithInvite(
 			`shareEntityWithInvite: ${opts.invite.userPubB64} is already a member at role "${currentRole}"; change a role via revokeAccess then re-share`,
 		);
 	}
+	// Collab-C6-b — cache both parties' signed display profiles in the doc that
+	// already syncs to exactly this member set, so names arrive with membership.
+	// Runs before the idempotent early-return below: a re-share is where a
+	// teammate who has SINCE set a display name gets it distributed, and
+	// `publishDocProfile` is itself a no-op when nothing changed.
+	if (opts.selfPubkey && opts.selfProfile) {
+		publishDocProfile(doc, opts.selfPubkey, opts.selfProfile);
+	}
+	publishDocProfile(doc, opts.invite.userPubB64, inviteProfile(opts.invite));
+
 	const existingWrap = findWrapForRecipient(doc, recipientPub);
 	if (currentRole !== null && existingWrap !== null) return existingWrap;
 
