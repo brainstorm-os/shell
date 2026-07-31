@@ -82,6 +82,11 @@ export type RetroWrapOptions = {
  * the surrounding boot orchestration (`onVaultOpened`). Returns the
  * per-pass tally — a boot log surfaces it.
  */
+/** The rotation ordinal a retro-wrapped placeholder DEK is minted at. Below
+ *  every genuine wrap (which start at 1), so an owner's first share always
+ *  outranks it. See the note at the `persist` call. */
+export const RETRO_WRAP_PLACEHOLDER_VERSION = 0;
+
 export async function retroWrapNullDeks(opts: RetroWrapOptions): Promise<RetroWrapResult> {
 	const { repo, dekStore, installEntityWrap } = opts;
 	const result: RetroWrapResult = { wrapped: 0, skipped: 0 };
@@ -126,7 +131,20 @@ export async function retroWrapNullDeks(opts: RetroWrapOptions): Promise<RetroWr
 					// neither wrapped nor skipped (a concurrent success).
 					throw new RetroWrapStampSkipped();
 				}
-				const handle = dekStore.persist(id, dekId);
+				// F-472 — ordinal 0, deliberately BELOW every real wrap.
+				//
+				// This DEK is a placeholder: it exists so the wire path never sees a
+				// null-DEK row, not because anyone agreed on it. `persist` would
+				// otherwise mint ordinal 1, which is exactly what an owner's first
+				// share carries, and `installEntityDek` accepts only a STRICTLY
+				// newer ordinal — so the owner's wrap was rejected as a replay and
+				// the receiver kept a key no one else held. The symptom was a row
+				// that looked shared and could not decrypt a single frame from it
+				// (`xchacha20poly1305: open failed`), permanently.
+				//
+				// Anti-rollback is untouched: real wraps still start at 1 and still
+				// have to climb. Nothing can install ordinal 0 remotely.
+				const handle = dekStore.persist(id, dekId, RETRO_WRAP_PLACEHOLDER_VERSION);
 				stampedHandle = { dekBytes: handle.dek };
 			});
 			if (stampedHandle) {

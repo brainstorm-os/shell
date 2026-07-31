@@ -7,7 +7,8 @@ import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
 import { removeTestDir } from "../test-support/remove-test-dir";
 import { EntityDekStore } from "./entity-dek-store";
-import { retroWrapNullDeks } from "./retro-wrap-deks";
+import { installEntityDek } from "./install-wrap";
+import { RETRO_WRAP_PLACEHOLDER_VERSION, retroWrapNullDeks } from "./retro-wrap-deks";
 
 async function setup() {
 	const vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-retro-wrap-"));
@@ -327,5 +328,68 @@ describe("retroWrapNullDeks", () => {
 		} finally {
 			console.warn = originalWarn;
 		}
+	});
+});
+
+describe("retro-wrap placeholder ranks below every real wrap (F-472)", () => {
+	let env: Awaited<ReturnType<typeof setup>>;
+
+	beforeEach(async () => {
+		env = await setup();
+	});
+
+	afterEach(async () => {
+		env.stores.close();
+		await removeTestDir(env.vaultDir);
+	});
+
+	// A row awaiting an owner's wrap used to be given a placeholder DEK at the
+	// SAME ordinal that owner's first share carries. `installEntityDek` takes
+	// only a strictly-newer ordinal, so the real wrap was discarded as a replay
+	// and the receiver was left holding a key nobody else had — the row looked
+	// shared and could not decrypt one frame from it, permanently.
+	it("an owner's first wrap still installs over a retro-wrapped placeholder", async () => {
+		seedLegacy(env, "ent_awaiting_wrap");
+		const wrapped = await retroWrapNullDeks({ repo: env.repo, dekStore: env.dekStore });
+		expect(wrapped.wrapped).toBe(1);
+
+		const placeholder = env.dekStore.open("ent_awaiting_wrap");
+		expect(placeholder, "the row now carries a DEK, so the wire path is safe").not.toBeNull();
+		expect(placeholder?.version, "and it ranks below a real wrap").toBe(
+			RETRO_WRAP_PLACEHOLDER_VERSION,
+		);
+		if (placeholder) env.dekStore.close(placeholder.dek);
+
+		// The owner's first share arrives at ordinal 1.
+		const ownerDek = generateSymmetricKey();
+		const installed = installEntityDek("ent_awaiting_wrap", ownerDek, 1, env.dekStore, env.repo);
+		expect(installed, "the owner's wrap wins over the placeholder").toBe(true);
+
+		const live = env.dekStore.open("ent_awaiting_wrap");
+		expect(live?.version).toBe(1);
+		expect(live && Buffer.compare(live.dek, ownerDek), "and it is the owner's key").toBe(0);
+		if (live) env.dekStore.close(live.dek);
+	});
+
+	// Anti-rollback still holds where it matters: nothing may install the
+	// placeholder ordinal remotely, and a stale wrap cannot displace a live one.
+	it("a replayed or older wrap is still refused", async () => {
+		seedLegacy(env, "ent_rollback");
+		await retroWrapNullDeks({ repo: env.repo, dekStore: env.dekStore });
+		const v1 = generateSymmetricKey();
+		expect(installEntityDek("ent_rollback", v1, 1, env.dekStore, env.repo)).toBe(true);
+		const v2 = generateSymmetricKey();
+		expect(installEntityDek("ent_rollback", v2, 2, env.dekStore, env.repo)).toBe(true);
+		// Re-delivery of v2, and a rollback to v1, are both no-ops.
+		expect(installEntityDek("ent_rollback", generateSymmetricKey(), 2, env.dekStore, env.repo)).toBe(
+			false,
+		);
+		expect(installEntityDek("ent_rollback", generateSymmetricKey(), 1, env.dekStore, env.repo)).toBe(
+			false,
+		);
+		const live = env.dekStore.open("ent_rollback");
+		expect(live?.version).toBe(2);
+		expect(live && Buffer.compare(live.dek, v2)).toBe(0);
+		if (live) env.dekStore.close(live.dek);
 	});
 });
