@@ -9,7 +9,8 @@
  *
  * Methods:
  *   - `createInvite(label)` → {@link ShareInviteToken}. Mint THIS user's
- *     self-signed invite (public keys only). Requires `sharing.read`.
+ *     self-signed invite. Requires `sharing.share` — the token carries the
+ *     single-use anchor secret, so minting one is credential issuance, not a read.
  *   - `share({entityId, type, invite, role})` → {@link SharedMember}[]. Owner
  *     grants + delivers the DEK. Requires `sharing.share`.
  *   - `revoke({entityId, type, member})` → {@link SharedMember}[]. Owner
@@ -239,7 +240,11 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 	}
 
 	async function handleCreateInvite(envelope: Envelope): Promise<ShareInviteToken> {
-		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		// SCARCE, not read-tier (Collab-C5-invite-anchor). The token used to be
+		// public keys + a signature; it now carries the single-use anchor secret,
+		// and anything holding it can bootstrap an entity into this vault. An app
+		// with only `sharing.read` must not be able to mint one and post it out.
+		await requireCapability(envelope, options, SHARING_SHARE_CAPABILITY);
 		const label = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
 		return encodeInviteToken(await engineFor().createInvite(label));
 	}

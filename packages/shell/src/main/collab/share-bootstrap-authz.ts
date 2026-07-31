@@ -29,11 +29,13 @@
  *     container's membership") reduced to what local state can verify — a
  *     channel co-member can introduce a Message and nothing else.
  *
- *  3. **Restore catalog** (a cold restore). The device asked the durable node,
- *     under its own sovereign key, for the entities this account previously
- *     synced, and is applying that backfill right now. The id set is the answer
- *     to a question only this identity could ask, and the window is the length of
- *     one explicit, user-initiated restore pass.
+ * A COLD RESTORE needs no third anchor: the invite secret is derived from the
+ * sovereign key, so a wiped vault re-derives it and the owner's backfill redeems
+ * normally. An earlier cut DID add a restore-catalog anchor and it was removed on
+ * review - it authorized an entity ID rather than a SENDER, so inside the window
+ * any co-member (a Viewer included) could have their self-signed record accepted
+ * onto an entity the empty local doc could not yet judge, and the id set came from
+ * the untrusted relay's catalog answer.
  *
  * Fail-closed at every step. An unreadable doc, an oversized or undecodable
  * state, an absent self-grant, an unknown/expired/spent/revoked invite, an
@@ -43,6 +45,8 @@
  */
 
 import * as Y from "yjs";
+import { ENTITY_META_TOP } from "../credentials/member-wraps";
+import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import {
 	AccessRole,
 	MAX_BOOTSTRAP_STATE_BYTES,
@@ -83,6 +87,8 @@ export enum ShareBootstrapVerdict {
 	DenyContainerGranterNotMember = "deny-container-granter-not-member",
 	DenyContainerNoRule = "deny-container-no-rule",
 	DenyContainerChildType = "deny-container-child-type",
+	DenyContainerNotAChild = "deny-container-not-a-child",
+	DenyLocalContent = "deny-local-content",
 	DenyUnreadable = "deny-unreadable",
 }
 
@@ -114,16 +120,20 @@ export type ShareBootstrapAuthzInput = {
 	/** Re-derive an invite's anchor secret from its nonce under this vault's
 	 *  sovereign key. The trust root: it works with no local row at all. */
 	deriveInviteSecret: DeriveInviteSecretFn;
-	/** Stage 10.14 — is `entityId` in the catalog of a restore pass this device is
-	 *  running right now? The catalog is keyed on this identity's own wire sender,
-	 *  so a listed id is one this vault previously synced; a bootstrap for it is
-	 *  the backfill, not an injection. Absent ⇒ never restoring. */
-	isRestoring?: (entityId: string) => boolean;
 	/** Load a persisted doc by entity id. The gate destroys what it loads. */
 	loadDoc: (entityId: string) => Promise<Y.Doc>;
 	/** The locally materialized reverse-DNS type of an entity, or null. */
 	typeOf: (entityId: string) => string | null;
 };
+
+/** Does this doc already carry entity CONTENT, as opposed to the meta map that
+ *  membership bookkeeping creates on any doc it touches? */
+function hasContentRoots(doc: Y.Doc): boolean {
+	for (const name of doc.share.keys()) {
+		if (name !== ENTITY_META_TOP) return true;
+	}
+	return false;
+}
 
 /** The current, signature-valid, active grant naming `selfPubB64`, or undefined. */
 function selfGrantIn(
@@ -151,6 +161,7 @@ function granterMayCascade(container: Y.Doc, containerId: string, granterPubB64:
 
 async function authorizeContainerDescent(
 	input: ShareBootstrapAuthzInput,
+	probe: Y.Doc,
 	containerId: string,
 	granterPubB64: string,
 ): Promise<ShareBootstrapVerdict> {
@@ -162,18 +173,28 @@ async function authorizeContainerDescent(
 	}
 	try {
 		if (!isActiveMember(container, containerId, input.selfPubB64)) {
-			return input.isRestoring?.(input.entityId) === true
-				? ShareBootstrapVerdict.Allow
-				: ShareBootstrapVerdict.DenyContainerNotMember;
+			return ShareBootstrapVerdict.DenyContainerNotMember;
 		}
 		if (!granterMayCascade(container, containerId, granterPubB64)) {
 			return ShareBootstrapVerdict.DenyContainerGranterNotMember;
 		}
+		// The container's type is LOCAL - we are a member, so we hold its row.
 		const containerType = input.typeOf(containerId);
 		const rule = containerType ? containmentRuleForParent(containerType) : null;
 		if (!rule) return ShareBootstrapVerdict.DenyContainerNoRule;
+		// The child's type, by contrast, is whatever the sender declared in the wrap
+		// that materialized its row, so on its own it constrains nothing. What makes
+		// the pair meaningful is the SECOND check: the incoming doc must actually
+		// name this container under the containment rule's parent property, which is
+		// the same key `childrenSourceFor` enumerates by. Without it a co-member of
+		// ONE container could declare any entity a "Message" and inject unbounded
+		// arbitrary content - the original attack, wearing a different hat.
 		if (input.typeOf(input.entityId) !== rule.childType) {
 			return ShareBootstrapVerdict.DenyContainerChildType;
+		}
+		const properties = readEntityDocProjection(probe).properties ?? {};
+		if (properties[rule.childParentProp] !== containerId) {
+			return ShareBootstrapVerdict.DenyContainerNotAChild;
 		}
 		return ShareBootstrapVerdict.Allow;
 	} catch {
@@ -200,6 +221,19 @@ export async function authorizeShareBootstrap(
 	}
 	let probe: Y.Doc;
 	try {
+		// A bootstrap may only CREATE. An entity we already hold CONTENT for is not a
+		// bootstrap target, and admitting one would let a forged record be merged
+		// into a private doc we authored - taking ownership of an existing entity
+		// rather than injecting a new one, which only needs the attacker to learn an
+		// entity id (ids travel in links, backlinks and attachments).
+		//
+		// "Content" is any root type other than the entity META map, because the
+		// meta map is not evidence: `resolveMembers` / `isAuthorizedWriter`
+		// get-or-create the access array on whatever doc they are handed, and the
+		// caller runs those BEFORE this gate - so a state-vector or update-size probe
+		// reports every doc as non-empty. The real content roots (Lexical's `root`,
+		// the props map, the links array) are only ever written by an apply.
+		if (hasContentRoots(input.localDoc)) return ShareBootstrapVerdict.DenyLocalContent;
 		// A doc that already resolved a record is authoritative, so no later frame
 		// can re-bootstrap around a revoke.
 		if (resolveMembers(input.localDoc, input.entityId).length > 0) {
@@ -240,12 +274,8 @@ export async function authorizeShareBootstrap(
 			return REDEMPTION_VERDICT[redemption];
 		}
 		if (selfGrant.via !== null) {
-			return await authorizeContainerDescent(input, selfGrant.via, selfGrant.addedBy);
+			return await authorizeContainerDescent(input, probe, selfGrant.via, selfGrant.addedBy);
 		}
-		// Anchor 3 - an explicit, user-initiated restore of THIS account's own
-		// catalog. Covers the backfill frames of a shared entity whose cascade grant
-		// arrives before its container, which no local record could yet judge.
-		if (input.isRestoring?.(input.entityId) === true) return ShareBootstrapVerdict.Allow;
 		return ShareBootstrapVerdict.DenyNoAnchor;
 	} catch {
 		return ShareBootstrapVerdict.DenyUnreadable;

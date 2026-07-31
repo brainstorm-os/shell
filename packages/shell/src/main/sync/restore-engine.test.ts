@@ -142,34 +142,4 @@ describe("RestoreEngine (10.14)", () => {
 		release();
 		await first;
 	});
-
-	it("Collab-C5-invite-anchor: the catalog ids are a bootstrap anchor only WHILE the pass runs", async () => {
-		const engine = new FakeEngine();
-		const entries: CatalogEntry[] = [
-			{ entityId: "ent_a", version: 1 },
-			{ entityId: "ent_b", version: 1 },
-		];
-		let duringPass: boolean[] = [];
-		const restore = new RestoreEngine(
-			makeCtx(engine, entries, {
-				engine: {
-					trackForRestoreBatch: (ids) => {
-						engine.trackForRestoreBatch(ids);
-						duringPass = [
-							restore.isRestoringEntity("ent_a"),
-							restore.isRestoringEntity("ent_b"),
-							restore.isRestoringEntity("ent_never_synced"),
-						];
-						for (const id of ids) engine.land(id, "brainstorm/Note/v1");
-					},
-					restoredType: (id) => engine.restoredType(id),
-					whenIdle: () => engine.whenIdle(),
-				},
-			}),
-		);
-		expect(restore.isRestoringEntity("ent_a"), "no window before the pass").toBe(false);
-		await restore.restore();
-		expect(duringPass, "catalog ids anchor, an unlisted id never does").toEqual([true, true, false]);
-		expect(restore.isRestoringEntity("ent_a"), "the window closes with the pass").toBe(false);
-	});
 });

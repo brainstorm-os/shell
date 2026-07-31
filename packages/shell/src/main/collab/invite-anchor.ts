@@ -48,14 +48,30 @@
  *
  * ## Single use, retries, and expiry
  *
- * Redemption PINS the invite to the first `(entityId, ownerPub)` pair that
- * successfully redeems it. A later redemption of the same pair is idempotent, so
- * a re-sent or duplicated opening frame still applies; any OTHER pair is refused
- * outright. A hard burn-on-first-use was rejected deliberately: authorization
- * runs before the update is applied, so burning the invite there would leave a
- * dropped apply permanently unrecoverable — the exact deadlock class this rung
- * exists to close. Expiry gates the FIRST redemption only; once an invite has
- * done its job for an entity, retries for that entity keep working.
+ * Redemption PINS the invite to the FIRST GRANTER that redeems it, and to nobody
+ * else. One code, one collaborator: a second party who gets hold of the token - a
+ * forwarded message, a shoulder-surfed screen - is refused, because the person it
+ * was meant for has already claimed it. Retries by that granter are idempotent, so
+ * a re-sent or duplicated opening frame still applies.
+ *
+ * It does NOT pin to one entity, and that is deliberate rather than a weakening.
+ * `ContactsStore` exists so a teammate you have accepted once becomes a
+ * click-to-share chip, and `sharing.share({contact})` re-presents that same stored
+ * invite for every later share. Pinning to one entity would therefore refuse the
+ * SECOND thing you ever share with a saved teammate, on their side, silently -
+ * which is the same class of break as the deadlock this rung exists to close. The
+ * first entity is recorded for audit; the granter is what is enforced.
+ *
+ * A hard burn-on-first-use was rejected for the same reason: authorization runs
+ * before the update is applied, so burning the invite there would leave a dropped
+ * apply permanently unrecoverable.
+ *
+ * Expiry gates the FIRST claim only, and is carried IN THE ANCHOR with the secret
+ * derived over it - so a holder can neither strip it nor extend it, and a device
+ * with no ledger row enforces it exactly like one that has the row. An UNCLAIMED
+ * code stops being a key into the vault after its window; that is the code sitting
+ * unused in a chat log, and the one that actually matters. Once claimed, the invite
+ * is that collaborator's standing credential and `revoke` is how you withdraw it.
  *
  * Fail-closed everywhere: a missing, malformed, oversized, unknown, expired,
  * revoked or already-spent anchor refuses. Nothing here ever throws into the
@@ -87,6 +103,7 @@ export const MAX_ANCHOR_LENGTH = 256;
 export const MAX_ANCHOR_FIELD_LENGTH = 512;
 
 const ANCHOR_SEPARATOR = ":";
+const ANCHOR_FIELD_SEPARATOR = ".";
 const NONCE_DOMAIN = "brainstorm/share-invite/v2/nonce";
 const SECRET_DOMAIN = "brainstorm/share-invite/v2/secret";
 const MAC_DOMAIN = "brainstorm/share-anchor/v1";
@@ -113,22 +130,27 @@ export type ShareInviteRecord = {
 	createdAt: number;
 	expiresAt: number;
 	redeemedAt: number | null;
-	/** The single entity this invite has been pinned to, once redeemed. */
+	/** The FIRST entity this invite opened. Audit only - the granter is what is
+	 *  enforced, so a saved contact can share a second thing. */
 	redeemedEntityId: string | null;
-	/** base64 sovereign key of the granter that redeemed it. */
+	/** base64 sovereign key of the granter that CLAIMED it. Enforced: nobody else
+	 *  may ever redeem this invite. */
 	redeemedBy: string | null;
 	revokedAt: number | null;
 };
 
-/** Pinning an invite to the one `(entity, granter)` pair it authorizes. Creates
- *  the row when this device has no record of the invite — see
- *  {@link redeemInviteAnchor} on why a missing row is "unspent", not "unknown". */
+/** Claiming an invite for the one granter it authorizes. Creates the row when this
+ *  device has no record of the invite — see {@link redeemInviteAnchor} on why a
+ *  missing row is "unclaimed", not "unknown". */
 export type PinShareInviteInput = {
 	inviteId: string;
 	secretB64: string;
 	memberPubB64: string;
 	entityId: string;
 	ownerPubB64: string;
+	/** The MAC-bound expiry from the anchor, recorded so a later `listOutstanding`
+	 *  and `purgeExpired` agree with what the anchor itself says. */
+	expiresAt: number;
 	now: number;
 };
 
@@ -140,19 +162,28 @@ export type ShareInviteStoreLike = {
 };
 
 /** Re-derive the anchor secret for a nonce under this vault's sovereign key. */
-export type DeriveInviteSecretFn = (nonce: Uint8Array) => Uint8Array;
+export type DeriveInviteSecretFn = (nonce: Uint8Array, expiresAt: number) => Uint8Array;
 
 /** The parts an anchor string carries. */
 export type ParsedAnchor = {
 	inviteId: string;
+	/** Epoch ms after which an UNCLAIMED invite stops being redeemable. Carried in
+	 *  the anchor and bound into the SECRET, so a holder cannot strip or extend it
+	 *  and a device with no ledger row can still enforce it. */
+	expiresAt: number;
 	macB64: string;
 };
 
 const BASE64URL_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const BASE64_MAC = /^[A-Za-z0-9+/]{1,128}={0,2}$/;
+const DECIMAL = /^[0-9]{1,15}$/;
 
+/** A MAC input field must be non-empty, bounded, and free of the `|` separator.
+ *  `entityId` and `ownerPubB64` are the only variable-length fields in the MAC
+ *  string; with a pipe allowed in either, two distinct tuples could in principle
+ *  serialise to the same bytes. Neither can legitimately contain one. */
 function withinBounds(value: string): boolean {
-	return value.length > 0 && value.length <= MAX_ANCHOR_FIELD_LENGTH;
+	return value.length > 0 && value.length <= MAX_ANCHOR_FIELD_LENGTH && !value.includes("|");
 }
 
 /** Draw a fresh invite nonce — the invite's PUBLIC handle. */
@@ -165,11 +196,24 @@ export function inviteIdForNonce(nonce: Uint8Array): string {
 	return Buffer.from(nonce).toString("base64url");
 }
 
-/** The nonce an anchor's handle names, or null when it is not one. */
+/**
+ * The nonce an anchor's handle names, or null when it is not one.
+ *
+ * The encoding must be CANONICAL. `Buffer.from(s, "base64url")` is lenient: a
+ * 16-byte nonce is 22 base64url characters, whose last character carries 4
+ * surplus bits that decoding simply drops - so SIXTEEN distinct strings decode to
+ * the same nonce. The secret is derived from the NONCE but the replay ledger is
+ * keyed on the STRING, so without this round-trip a holder of a claimed invite
+ * could re-spell its handle, land on a fresh unclaimed row, and redeem again -
+ * past a revoke and past expiry. A pentest broke the first cut of this exactly
+ * that way. Re-encoding and demanding equality collapses every spelling onto one
+ * key.
+ */
 export function nonceForInviteId(inviteId: string): Uint8Array | null {
 	if (!BASE64URL_ID.test(inviteId)) return null;
 	const bytes = new Uint8Array(Buffer.from(inviteId, "base64url"));
-	return bytes.length === INVITE_NONCE_BYTES ? bytes : null;
+	if (bytes.length !== INVITE_NONCE_BYTES) return null;
+	return inviteIdForNonce(bytes) === inviteId ? bytes : null;
 }
 
 /**
@@ -190,11 +234,19 @@ export function nonceForInviteId(inviteId: string): Uint8Array | null {
 export function deriveInviteSecret(
 	sign: (payload: Uint8Array) => Uint8Array,
 	nonce: Uint8Array,
+	expiresAt: number,
 ): Uint8Array {
-	const bound = new Uint8Array(encoder.encode(`${NONCE_DOMAIN}|`).length + nonce.length);
+	// `expiresAt` is inside the SIGNED message, so it is part of the secret's
+	// identity: change it and you derive a different secret and the MAC stops
+	// verifying. That is what makes expiry enforceable on a device that holds no
+	// ledger row at all - a cold restore, a paired sibling - rather than a
+	// property a token holder can strip by redeeming somewhere the row is missing.
 	const prefix = encoder.encode(`${NONCE_DOMAIN}|`);
+	const suffix = encoder.encode(`|${expiresAt}`);
+	const bound = new Uint8Array(prefix.length + nonce.length + suffix.length);
 	bound.set(prefix, 0);
 	bound.set(nonce, prefix.length);
+	bound.set(suffix, prefix.length + nonce.length);
 	const signature = sign(bound);
 	return new Uint8Array(
 		createHash("sha256").update(SECRET_DOMAIN, "utf8").update("|").update(signature).digest(),
@@ -210,23 +262,25 @@ export function deriveInviteSecret(
 export function computeInviteAnchor(input: {
 	secret: Uint8Array;
 	inviteId: string;
+	expiresAt: number;
 	entityId: string;
 	memberPubB64: string;
 	ownerPubB64: string;
 }): string | null {
 	if (input.secret.length !== INVITE_SECRET_BYTES) return null;
 	if (!BASE64URL_ID.test(input.inviteId)) return null;
+	if (!Number.isSafeInteger(input.expiresAt) || input.expiresAt < 0) return null;
 	for (const field of [input.entityId, input.memberPubB64, input.ownerPubB64]) {
 		if (!withinBounds(field)) return null;
 	}
 	const mac = createHmac("sha256", input.secret)
 		.update(
-			`${MAC_DOMAIN}|${input.inviteId}|${input.entityId}|${input.memberPubB64}|${input.ownerPubB64}`,
+			`${MAC_DOMAIN}|${input.inviteId}|${input.expiresAt}|${input.entityId}|${input.memberPubB64}|${input.ownerPubB64}`,
 			"utf8",
 		)
 		.digest()
 		.toString("base64");
-	return `${input.inviteId}${ANCHOR_SEPARATOR}${mac}`;
+	return `${input.inviteId}${ANCHOR_FIELD_SEPARATOR}${input.expiresAt}${ANCHOR_SEPARATOR}${mac}`;
 }
 
 /** Split an untrusted anchor into its parts, or null when it is not one. Both
@@ -236,11 +290,20 @@ export function parseInviteAnchor(anchor: unknown): ParsedAnchor | null {
 	if (anchor.length === 0 || anchor.length > MAX_ANCHOR_LENGTH) return null;
 	const cut = anchor.indexOf(ANCHOR_SEPARATOR);
 	if (cut <= 0 || cut === anchor.length - 1) return null;
-	const inviteId = anchor.slice(0, cut);
 	const macB64 = anchor.slice(cut + 1);
+	const head = anchor.slice(0, cut);
+	const dot = head.indexOf(ANCHOR_FIELD_SEPARATOR);
+	if (dot <= 0 || dot === head.length - 1) return null;
+	const inviteId = head.slice(0, dot);
+	const expiresRaw = head.slice(dot + 1);
 	if (!BASE64URL_ID.test(inviteId)) return null;
+	if (!DECIMAL.test(expiresRaw)) return null;
+	const expiresAt = Number(expiresRaw);
+	// Round-trip the number too: a leading zero or an unsafe magnitude would give
+	// two spellings of one expiry, and everything here is keyed on exact strings.
+	if (!Number.isSafeInteger(expiresAt) || String(expiresAt) !== expiresRaw) return null;
 	if (!BASE64_MAC.test(macB64)) return null;
-	return { inviteId, macB64 };
+	return { inviteId, expiresAt, macB64 };
 }
 
 /** Constant-time comparison of two base64 MACs. A length difference answers
@@ -265,9 +328,9 @@ function macEquals(a: string, b: string): boolean {
  * restorable at all, and every other property still holds.
  *
  * The MAC is checked BEFORE any state changes, so a forged anchor can never burn
- * a real invite. On success the invite is pinned to `(entityId, ownerPubB64)`;
- * a repeat of that same pair returns `Ok` again (retry-safe), while any other
- * pair returns {@link InviteRedemption.AlreadyRedeemed}.
+ * a real invite. On success the invite is claimed by `ownerPubB64`; that granter
+ * may redeem it again for this or any other entity they share with us, while any
+ * other granter returns {@link InviteRedemption.AlreadyRedeemed}.
  */
 export function redeemInviteAnchor(
 	store: ShareInviteStoreLike,
@@ -294,15 +357,15 @@ export function redeemInviteAnchor(
 
 	let secret: Uint8Array;
 	try {
-		secret = input.deriveSecret(nonce);
+		secret = input.deriveSecret(nonce, parsed.expiresAt);
 	} catch {
 		return InviteRedemption.Malformed;
 	}
-	let expected: string | null;
 	try {
-		expected = computeInviteAnchor({
+		const expected = computeInviteAnchor({
 			secret,
 			inviteId: parsed.inviteId,
+			expiresAt: parsed.expiresAt,
 			entityId: input.entityId,
 			memberPubB64: input.memberPubB64,
 			ownerPubB64: input.ownerPubB64,
@@ -313,13 +376,18 @@ export function redeemInviteAnchor(
 			return InviteRedemption.Mismatch;
 		}
 
-		// Already spent: the ONLY thing it may still authorize is the pair it was
-		// spent on (a re-sent opening frame). Anything else is a replay.
-		if (record && (record.redeemedEntityId !== null || record.redeemedBy !== null)) {
-			const samePair =
-				record.redeemedEntityId === input.entityId && record.redeemedBy === input.ownerPubB64;
-			return samePair ? InviteRedemption.Ok : InviteRedemption.AlreadyRedeemed;
+		// Already claimed: only the granter who claimed it may still redeem, for any
+		// entity they share with us (see the header on why the entity is recorded
+		// but not enforced). Anyone else is a replay.
+		if (record?.redeemedBy != null) {
+			return record.redeemedBy === input.ownerPubB64
+				? InviteRedemption.Ok
+				: InviteRedemption.AlreadyRedeemed;
 		}
+		// Expiry gates the FIRST claim, and is read off the ANCHOR, not the ledger:
+		// the secret is derived over it, so a holder cannot strip or extend it, and a
+		// device with no row (cold restore, paired sibling) enforces it identically.
+		if (input.now > parsed.expiresAt) return InviteRedemption.Expired;
 		if (record && input.now > record.expiresAt) return InviteRedemption.Expired;
 		store.pin({
 			inviteId: parsed.inviteId,
@@ -327,6 +395,7 @@ export function redeemInviteAnchor(
 			memberPubB64: input.memberPubB64,
 			entityId: input.entityId,
 			ownerPubB64: input.ownerPubB64,
+			expiresAt: parsed.expiresAt,
 			now: input.now,
 		});
 		return InviteRedemption.Ok;
