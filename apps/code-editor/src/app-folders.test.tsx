@@ -265,6 +265,43 @@ describe("folder tree — create", () => {
 		);
 	});
 
+	it("asks the CREATE question, not the rename one, when the naming sheet is armed by a create", async () => {
+		const { runtime } = makeFakeRuntime([{ path: "lib/one.ts" }]);
+		await mount(runtime);
+
+		const folderSheet = () =>
+			document.querySelector<HTMLElement>('[data-testid="code-folder-rename"]');
+		runFolderMenuItem("lib", "New folder");
+		await vi.waitFor(() => expect(folderSheet()).not.toBeNull());
+		const panel = folderSheet();
+		expect(panel?.querySelector<HTMLInputElement>(".editor__rename-input")?.value).toBe(
+			"lib/new-folder",
+		);
+		expect(panel?.querySelector(".bs-popover__title")?.textContent).toBe("New folder");
+		expect(
+			Array.from(panel?.querySelectorAll(".bs-popover__footer button") ?? []).map((b) =>
+				b.textContent?.trim(),
+			),
+		).toEqual(["Cancel", "Create"]);
+		// A short body sizes to its content instead of the variant's min-height.
+		expect(panel?.classList.contains("bs-popover__panel--fit")).toBe(true);
+		act(() => panel?.querySelector<HTMLButtonElement>(".bs-popover__close")?.click());
+
+		// The same sheet reached by RENAMING keeps the rename copy.
+		runFolderMenuItem("lib", "Rename folder…");
+		await vi.waitFor(() => expect(folderSheet()).not.toBeNull());
+		const renamePanel = folderSheet();
+		expect(renamePanel?.querySelector<HTMLInputElement>(".editor__rename-input")?.value).toBe(
+			"lib",
+		);
+		expect(renamePanel?.querySelector(".bs-popover__title")?.textContent).toBe("Rename lib");
+		expect(
+			Array.from(renamePanel?.querySelectorAll(".bs-popover__footer button") ?? []).map((b) =>
+				b.textContent?.trim(),
+			),
+		).toEqual(["Cancel", "Rename"]);
+	});
+
 	it("dismisses an empty folder from its own menu, with no vault write", async () => {
 		const { runtime, create, update } = makeFakeRuntime([{ path: "lib/one.ts" }]);
 		await mount(runtime);

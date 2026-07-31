@@ -143,6 +143,25 @@ describe("createPopoverElement", () => {
 		expect(document.body.contains(h.element)).toBe(false);
 	});
 
+	it("adds the content-fit modifier only when asked", () => {
+		const bare = createPopoverElement({ title: "t", body: "b", onClose: () => undefined });
+		expect(
+			bare.element.querySelector(".bs-popover__panel")?.classList.contains("bs-popover__panel--fit"),
+		).toBe(false);
+		bare.close();
+		const fit = createPopoverElement({
+			title: "t",
+			body: "b",
+			onClose: () => undefined,
+			fitContent: true,
+		});
+		const panel = fit.element.querySelector(".bs-popover__panel");
+		expect(panel?.classList.contains("bs-popover__panel--fit")).toBe(true);
+		// The size variant is still applied — fit drops the min-height, nothing else.
+		expect(panel?.classList.contains("bs-popover__panel--medium")).toBe(true);
+		fit.close();
+	});
+
 	it("honours a custom escape matcher", () => {
 		const onClose = vi.fn();
 		createPopoverElement({

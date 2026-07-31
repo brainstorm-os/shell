@@ -169,7 +169,11 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	padding: var(--space-1);
+	/* One row, one control height: the chips, the search field and the
+	   "Install from…" button all sit on the md step so the toolbar reads as a
+	   single band instead of three sizes stacked on one line. */
+	height: var(--control-height-md);
+	padding: 0 var(--space-2);
 	border-radius: var(--radius-md);
 	border: var(--border-width) solid var(--color-border-subtle);
 	background: transparent;
@@ -201,13 +205,12 @@
 
 /* The bar chrome itself is `.bs-searchbar` (loaded by
  * `packages/shell/src/renderer/main.tsx` via
- * `@brainstorm-os/sdk/searchbar/searchbar.css`); this rule stretches it within
- * the toolbar row and applies the marketplace-only tinted surround. */
+ * `@brainstorm-os/sdk/searchbar/searchbar.css`); the field FACE comes from the
+ * shared `.bs-searchbar--field` toolbar variant, so this rule only sets how
+ * the bar flexes inside the row. */
 .marketplace__search {
 	min-width: 220px;
 	flex: 0 1 280px;
-	background: rgba(0, 0, 0, 0.18);
-	border: var(--border-width) solid var(--color-border-subtle);
 }
 
 .marketplace__grid {

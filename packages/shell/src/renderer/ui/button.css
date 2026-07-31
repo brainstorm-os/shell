@@ -37,23 +37,39 @@
 	opacity: 0.55;
 }
 
-/* Filled faces keep their mid-luminance gradient at FULL opacity and
- * desaturate instead. 55% opacity over a light panel washed the face out
- * to near-background while the label stayed `--color-accent-text` (white
- * on most themes) — a disabled Save/Upgrade read as blank chrome on the
- * light themes (F-410). Greying the face preserves the label↔face
- * contrast; the dropped OUTER shadow keeps it reading inert. The shine
- * layers stay — DIMMED, not deleted: zeroing them collapsed the glossy
- * face to a flat single-colour slab in disabled/loading states (owner
- * report 2026-07-18); the muted speculars keep the material identity
- * while the desaturation still says "inactive". */
+/* Filled faces keep a REAL face when disabled — never 55% opacity, which
+ * washed them out to near-background while the label stayed
+ * `--color-accent-text`, so a disabled Save/Upgrade read as blank chrome on
+ * the light themes (F-410).
+ *
+ * `filter: saturate(0.25)` was the first answer, and it swapped one wrong
+ * reading for another: desaturating keeps the face's LUMINANCE, so on the dark
+ * themes a disabled primary rendered as a light-grey slab that pulled MORE
+ * attention than the enabled accent button beside it (the vault-install
+ * picker's greyed-out candidate out-shouted the installable one). A disabled
+ * control that reads as the loudest thing on the row is a defect.
+ *
+ * So: keep the gradient machinery (the gloss stops are what the speculars ride
+ * on) but point BOTH stops at the raised SURFACE token and the ink at
+ * `--color-text-tertiary`. Every theme defines that surface as an alpha tint,
+ * so the face tracks whatever it sits on and can never out-glow the enabled
+ * button beside it — in either appearance — while the tertiary ink keeps the
+ * label readable and the subtle inset hairline keeps the box legible. The
+ * shine layers stay, dimmed by the rule below: zeroing them collapsed the face
+ * to a flat slab (owner report 2026-07-18). */
 .button--glass:disabled,
 .button--primary:disabled,
 .button--neutral:disabled,
 .button--destructive:disabled {
-	opacity: 0.9;
-	filter: saturate(0.25);
-	box-shadow: none;
+	--gloss-top: var(--color-surface-raised);
+	--gloss-bottom: var(--color-surface-raised);
+	color: var(--color-text-tertiary);
+	text-shadow: none;
+	/* Full opacity — the base `.button:disabled` 55% is what F-410 was about:
+	   it multiplies through the face AND the ink, taking the tertiary label to
+	   an alpha of 0.34. The face itself already says "inactive". */
+	opacity: 1;
+	box-shadow: inset 0 0 0 var(--border-width) var(--color-border-subtle);
 }
 
 .button--glass:disabled::before,

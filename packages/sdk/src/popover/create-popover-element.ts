@@ -30,6 +30,12 @@ export type CreatePopoverOptions = {
 	footer?: Node;
 	onClose: () => void;
 	size?: PopoverSize;
+	/** Drop the size variant's `min-height` so a SHORT body (one field, one
+	 *  sentence) sizes the panel to its content instead of holding a fixed
+	 *  minimum that leaves a dead gap above the footer. Parity with the shell
+	 *  renderer's React `<Popover fitContent>`; the variant's `max-height`
+	 *  still caps a long body, which scrolls unchanged. */
+	fitContent?: boolean;
 	bodyPadding?: PopoverBodyPadding;
 	/** Escape predicate, or `null` to leave Escape to the consumer.
 	 *  Default: bare-Escape via the shared matcher seam. */
@@ -66,7 +72,9 @@ export function createPopoverElement(options: CreatePopoverOptions): PopoverHand
 	backdrop.tabIndex = -1;
 
 	const panel = document.createElement("div");
-	panel.className = `bs-popover__panel bs-popover__panel--${size}`;
+	panel.className = `bs-popover__panel bs-popover__panel--${size}${
+		options.fitContent ? " bs-popover__panel--fit" : ""
+	}`;
 	if (options.testId) panel.dataset.testid = options.testId;
 
 	const header = document.createElement("header");

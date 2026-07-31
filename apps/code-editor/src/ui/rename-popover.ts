@@ -9,6 +9,15 @@
 
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 
+/** Which question the dialog asks. Renaming something that already exists, or
+ *  naming something that was just created — the flow and the validation are
+ *  identical, only the title and the confirm label differ. A create arriving
+ *  under a "Rename new-folder" title is the bug this replaces. */
+export enum NameMode {
+	Rename = "rename",
+	Create = "create",
+}
+
 export interface RenamePopoverParams {
 	title: string;
 	/** Pre-filled path. */
@@ -58,6 +67,9 @@ export function openRenamePopover(params: RenamePopoverParams): void {
 		body: field,
 		footer: actions,
 		size: PopoverSize.Small,
+		// One field + one error line: without this the Small variant's 220px
+		// floor left ~120px of dead panel between the input and the footer.
+		fitContent: true,
 		testId: params.testId,
 		onClose: () => handle.close(),
 	});
