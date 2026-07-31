@@ -36,6 +36,7 @@ function fakeView() {
 		stopFind: vi.fn(),
 		setBounds: vi.fn(),
 		setVisible: vi.fn(),
+		bringToFront: vi.fn(),
 		focus: vi.fn(),
 		captureHtml: vi.fn(async () => "<html><body><p>page</p></body></html>" as string | null),
 		destroy: vi.fn(),
@@ -43,10 +44,12 @@ function fakeView() {
 }
 
 const APP = "brainstorm.browser";
+const raiseChrome = vi.fn();
 const WINDOW: WindowTarget = {
 	baseWindow: {} as BaseWindowHandle,
 	windowId: "main",
 	bodyOrigin: () => ({ x: 0, y: 0 }),
+	raiseChrome,
 };
 
 function setup(overrides: Partial<WebViewServiceOptions> = {}) {
@@ -388,6 +391,7 @@ describe("WebViewService", () => {
 			baseWindow: {} as BaseWindowHandle,
 			windowId: "second",
 			bodyOrigin: () => ({ x: 0, y: 0 }),
+			raiseChrome: vi.fn(),
 		};
 		let target = windowB;
 		const created = new Map<string, ReturnType<typeof fakeView>>();
@@ -417,6 +421,40 @@ describe("WebViewService", () => {
 		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" });
 		h.service.dispose();
 		expect(h.service.liveCount()).toBe(0);
+	});
+});
+
+describe("WebViewService — chrome-on-top (floating popup over the page view)", () => {
+	let h: ReturnType<typeof setup>;
+	beforeEach(() => {
+		raiseChrome.mockClear();
+		h = setup();
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t1", url: "https://a.com" });
+	});
+
+	it("on=true raises the window's chrome view", () => {
+		h.service.handle(APP, { method: WebViewMethod.SetChromeOnTop, tabId: "t1", on: true });
+		expect(raiseChrome).toHaveBeenCalledOnce();
+		expect(h.created.get("t1")?.bringToFront).not.toHaveBeenCalled();
+	});
+
+	it("on=false re-stacks the tab's page view on top", () => {
+		h.service.handle(APP, { method: WebViewMethod.SetChromeOnTop, tabId: "t1", on: true });
+		h.service.handle(APP, { method: WebViewMethod.SetChromeOnTop, tabId: "t1", on: false });
+		expect(h.created.get("t1")?.bringToFront).toHaveBeenCalledOnce();
+	});
+
+	it("an unknown tab and a foreign app's tab are both no-ops (fail-soft, no throw)", () => {
+		h.service.handle(APP, { method: WebViewMethod.SetChromeOnTop, tabId: "ghost", on: true });
+		h.service.handle("other.app", { method: WebViewMethod.SetChromeOnTop, tabId: "t1", on: true });
+		expect(raiseChrome).not.toHaveBeenCalled();
+	});
+
+	it("activate() re-stacks the page view on top (heals an orphaned raise)", () => {
+		h.service.handle(APP, { method: WebViewMethod.Open, tabId: "t2", url: "https://b.com" });
+		h.service.handle(APP, { method: WebViewMethod.SetChromeOnTop, tabId: "t1", on: true });
+		h.service.handle(APP, { method: WebViewMethod.Activate, tabId: "t2" });
+		expect(h.created.get("t2")?.bringToFront).toHaveBeenCalledOnce();
 	});
 });
 

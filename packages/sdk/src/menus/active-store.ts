@@ -14,9 +14,11 @@
 import type { MenuStore } from "@react-fancy-menus/core/runtime";
 
 let active: MenuStore | null = null;
+const storeWatchers = new Set<(store: MenuStore | null) => void>();
 
 export function setActiveMenuStore(store: MenuStore | null): void {
 	active = store;
+	for (const watcher of storeWatchers) watcher(store);
 }
 
 /**
@@ -26,4 +28,45 @@ export function setActiveMenuStore(store: MenuStore | null): void {
  */
 export function getActiveMenuStore(): MenuStore | null {
 	return active;
+}
+
+/**
+ * Observe whether ANY floating popup in this renderer's menu stack is up —
+ * menus, typeaheads, search pickers all run through the one store. `onChange`
+ * fires on every open⇄closed transition (a menu in its close animation still
+ * counts as open, so a quick re-open never flickers the closed state).
+ *
+ * Host-mount safe: the provider publishes the store asynchronously after
+ * `mountMenuHost()`, so this attaches to whatever store is (or later becomes)
+ * active rather than requiring one at call time. The consumer that needs this
+ * is chrome hosting native-overlaid content (the Browser raises its chrome
+ * view above the page `WebContentsView` while a popup is open — DOM that
+ * drops into the page region is otherwise painted over natively).
+ */
+export function watchMenuOpenState(onChange: (open: boolean) => void): () => void {
+	let unsubscribe: (() => void) | null = null;
+	let last = false;
+	const emit = (open: boolean): void => {
+		if (open === last) return;
+		last = open;
+		onChange(open);
+	};
+	const attach = (store: MenuStore | null): void => {
+		unsubscribe?.();
+		unsubscribe = null;
+		if (!store) {
+			emit(false);
+			return;
+		}
+		const read = (): void => emit(store.getAll().length > 0);
+		unsubscribe = store.subscribe(read);
+		read();
+	};
+	storeWatchers.add(attach);
+	attach(active);
+	return () => {
+		storeWatchers.delete(attach);
+		unsubscribe?.();
+		unsubscribe = null;
+	};
 }

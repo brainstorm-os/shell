@@ -14,8 +14,15 @@ body,
 	margin: 0;
 }
 
+/* The body is a genuine ALPHA HOLE, not themed paint: the app's native view
+ * is created with a transparent background, and while the chrome is raised
+ * above the page `WebContentsView` (a floating menu / typeahead is open) the
+ * page must stay visible through `.browser__region`. Every chrome band
+ * (toolbar, findbar, banners, panels, reader) paints its own opaque
+ * background; where nothing paints, the themed BaseWindow shows through —
+ * the same color the body used to paint. */
 body {
-	background: var(--color-background-primary, #fff);
+	background: transparent;
 	color: var(--color-text-primary, #111);
 	font-family: var(--text-family-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
 }
@@ -290,12 +297,14 @@ body {
 	white-space: nowrap;
 }
 
-/* The shell's WebContentsView floats over this; it must paint nothing of its
- * own (the page is behind/above it natively). */
+/* The shell's WebContentsView floats over this; it must paint NOTHING of its
+ * own — transparent, so the page still shows through when the chrome view is
+ * raised above the page view (floating popup open). The themed window paints
+ * the empty-tab state behind it. */
 .browser__region {
 	flex: 1;
 	min-height: 0;
-	background: var(--color-background-primary, #fff);
+	background: transparent;
 }
 
 /* ── Find-in-page bar ─────────────────────────────────────────────────── */

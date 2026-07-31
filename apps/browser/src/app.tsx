@@ -27,6 +27,7 @@ import {
 	closeTypeaheadMenu,
 	mountMenuHost,
 	openTypeaheadMenu,
+	watchMenuOpenState,
 } from "@brainstorm-os/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { attachShortcut, useShortcut } from "@brainstorm-os/sdk/shortcut";
@@ -339,6 +340,38 @@ export function BrowserApp(): ReactElement {
 	// Stand up the fancy-menus runtime once so the recently-closed anchored menu
 	// renders through the shared menu host (theme + keyboard + glass chrome).
 	useEffect(() => mountMenuHost(), []);
+
+	// The page is a native WebContentsView stacked ABOVE this chrome, so any
+	// floating popup (the ⋯ menu, history menu, shield menu, omnibox
+	// typeahead) that drops into the page region would be painted over —
+	// "clicking ⋯ does nothing" with a page loaded. While any popup is up,
+	// raise the chrome view above the page (`.browser__region` is a real
+	// alpha hole, so the page stays visible); when the stack empties, put the
+	// page back on top so it gets pointer input again. Track which tab we
+	// raised on: the lower call must name the same tab even if the active
+	// tab changed while the popup was open.
+	const raisedForTabRef = useRef<string | null>(null);
+	const activeIdRef = useRef<string | null>(null);
+	activeIdRef.current = active?.id ?? null;
+	useEffect(() => {
+		if (!webView) return;
+		return watchMenuOpenState((open) => {
+			if (open) {
+				const tabId = activeIdRef.current;
+				if (tabId === null || raisedForTabRef.current !== null) return;
+				raisedForTabRef.current = tabId;
+				void webView.setChromeOnTop(tabId, true);
+				return;
+			}
+			const raised = raisedForTabRef.current;
+			raisedForTabRef.current = null;
+			// Restore via the CURRENT active tab when there is one — that's the
+			// view that must end up on top — falling back to the raised tab
+			// (e.g. it was closed from the menu itself and nothing is active).
+			const restore = activeIdRef.current ?? raised;
+			if (raised !== null && restore !== null) void webView.setChromeOnTop(restore, false);
+		});
+	}, [webView]);
 
 	// Open the initial tab's view in the shell once (mount only — deps
 	// intentionally empty so a later tab/url change doesn't re-open the first tab).

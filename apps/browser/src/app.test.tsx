@@ -16,6 +16,7 @@ import { BrowserApp } from "./app";
 vi.mock("@brainstorm-os/sdk/menus", () => ({
 	mountMenuHost: vi.fn(() => () => {}),
 	closeTypeaheadMenu: vi.fn(),
+	watchMenuOpenState: vi.fn(() => () => {}),
 }));
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({ openAnchoredMenu: vi.fn() }));
 
@@ -55,6 +56,7 @@ function fakeWebView(): FakeWebView {
 		},
 		activate: noop,
 		setBounds: noop,
+		setChromeOnTop: noop,
 		findInPage: noop,
 		stopFind: noop,
 		capture: () => Promise.resolve(null),

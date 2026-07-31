@@ -673,6 +673,14 @@ function webViewProxy(bridge: Bridge): WebViewClient {
 				[{ method: WebViewMethod.Capture, tabId, selectionOnly }],
 				[WEB_CAPTURE_CAP],
 			),
+		setChromeOnTop: (tabId, on) =>
+			callService<void>(
+				bridge,
+				WEBVIEW_SERVICE,
+				WebViewMethod.SetChromeOnTop,
+				[{ method: WebViewMethod.SetChromeOnTop, tabId, on }],
+				browse,
+			),
 		setSitePermission: (tabId, origin, permission, allow) =>
 			callService<void>(
 				bridge,

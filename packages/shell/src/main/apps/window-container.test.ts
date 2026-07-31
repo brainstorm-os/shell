@@ -171,6 +171,23 @@ describe("WindowContainer", () => {
 		expect(t.reveal).toHaveBeenCalled();
 	});
 
+	it("raiseActiveTabView re-adds the active tab's view (Electron stacks it on top)", () => {
+		const t = makeContainer();
+		const tab = t.container.addTab(t.spec(null));
+		const addChildView = t.baseWindow.contentView.addChildView as ReturnType<typeof vi.fn>;
+		addChildView.mockClear();
+		t.container.raiseActiveTabView();
+		expect(addChildView).toHaveBeenCalledOnce();
+		expect(addChildView).toHaveBeenCalledWith(tab.view);
+	});
+
+	it("raiseActiveTabView with no active tab is a no-op", () => {
+		const t = makeContainer();
+		const addChildView = t.baseWindow.contentView.addChildView as ReturnType<typeof vi.fn>;
+		t.container.raiseActiveTabView();
+		expect(addChildView).not.toHaveBeenCalled();
+	});
+
 	it("publishes the object title to the OS window when the active tab reports it", () => {
 		const t = makeContainer();
 		t.container.addTab(t.spec(null));
