@@ -7,7 +7,9 @@ Thanks for your interest in Brainstorm. The project is in public beta and moving
 - **Report a bug.** Use the [bug report template](https://github.com/brainstorm-os/shell/issues/new?template=bug_report.yml). Include your Brainstorm version (Settings → What's new) and platform. Please describe the behavior, not your data — never paste vault content into an issue.
 - **Propose an idea.** Use the [idea template](https://github.com/brainstorm-os/shell/issues/new?template=idea.yml). Brainstorm has strong opinions (local-first, capability-gated, one vault of typed objects), so a short "why" goes further than a feature list.
 - **Improve the code.** Bug fixes, accessibility improvements, localization, performance work, and test coverage are all welcome. For anything larger than a focused fix, **open an issue first** so we can agree on the approach before you invest time — the architecture has hard boundaries (see below) and a PR that crosses them can't be merged, however good the code is.
-- **Report a security issue privately.** Please do not open a public issue for anything security-sensitive. Email [founder@getbrainstorm.online](mailto:founder@getbrainstorm.online) and we'll respond as quickly as we can.
+- **Report a security issue privately.** Please do not open a public issue for anything security-sensitive — use [GitHub's private vulnerability reporting](https://github.com/brainstorm-os/shell/security/advisories/new) or email [founder@getbrainstorm.online](mailto:founder@getbrainstorm.online). Details in the [security policy](SECURITY.md).
+
+Participation in the project is covered by our [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Getting set up
 
