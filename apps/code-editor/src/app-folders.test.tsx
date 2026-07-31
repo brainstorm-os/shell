@@ -291,9 +291,7 @@ describe("folder tree — create", () => {
 		runFolderMenuItem("lib", "Rename folder…");
 		await vi.waitFor(() => expect(folderSheet()).not.toBeNull());
 		const renamePanel = folderSheet();
-		expect(renamePanel?.querySelector<HTMLInputElement>(".editor__rename-input")?.value).toBe(
-			"lib",
-		);
+		expect(renamePanel?.querySelector<HTMLInputElement>(".editor__rename-input")?.value).toBe("lib");
 		expect(renamePanel?.querySelector(".bs-popover__title")?.textContent).toBe("Rename lib");
 		expect(
 			Array.from(renamePanel?.querySelectorAll(".bs-popover__footer button") ?? []).map((b) =>
