@@ -112,14 +112,11 @@ import {
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import {
-	authorizesAsShareBootstrap,
-	isAuthorizedWriter,
-	keyBytesEqual,
-	resolveMembers,
-} from "./collab/access-record";
+import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
+import { deriveInviteSecret } from "./collab/invite-anchor";
+import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
 import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
@@ -303,7 +300,12 @@ import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcut
 import type { ShortcutRegistry } from "./shortcuts/shortcut-registry";
 import { makeShortcutsServiceHandler } from "./shortcuts/shortcuts-service";
 import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
-import { AssetRefsRepository, AssetsRepository, EntitiesRepository } from "./storage/entities-repo";
+import {
+	AssetRefsRepository,
+	AssetsRepository,
+	EntitiesRepository,
+	ShareInvitesRepository,
+} from "./storage/entities-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
 import { ConnectorWebhooksRepository } from "./storage/registry-repo/connector-webhooks-repo";
@@ -3481,6 +3483,12 @@ void app.whenReady().then(async () => {
 		void (async () => {
 			try {
 				const dekStore = await session.entityDekStore();
+				// Collab-C5-invite-anchor - the receiver's bootstrap gate reads this
+				// vault's OWN outstanding invites and the local type of an entity + its
+				// container. Opened once per session alongside the DEK store.
+				const entitiesDb = await session.dataStores.open("entities");
+				const entitiesRepo = new EntitiesRepository(entitiesDb);
+				const shareInvites = new ShareInvitesRepository(entitiesDb);
 				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
 				// from an Owner (or ourselves), or any member could re-key an entity
 				// out from under its owner. Fail-closed on any read error.
@@ -3550,9 +3558,12 @@ void app.whenReady().then(async () => {
 					//      backfill both re-deliver this identity's own data, and a
 					//      never-shared entity has no access record at all to check;
 					//   2. the share BOOTSTRAP - the first frame of a new share carries
-					//      the signed record that authorizes it (see
-					//      `authorizesAsShareBootstrap`, which only fires on a doc with
-					//      no record and still demands a signature-verified Editor+).
+					//      the signed record that authorizes it. Signatures alone cannot
+					//      root that (an attacker signs their own grants), so
+					//      `authorizeShareBootstrap` additionally demands an out-of-band
+					//      anchor: the granter's echo of the single-use secret from an
+					//      invite THIS vault minted, or - for a collection cascade - a
+					//      container this vault is already a member of.
 					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
 						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
 						// invalid characters and returns a short buffer - so state the
@@ -3564,7 +3575,24 @@ void app.whenReady().then(async () => {
 						const { doc } = await session.ydocStore.load(entityId);
 						try {
 							if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
-							return authorizesAsShareBootstrap(doc, entityId, senderKey, plaintext);
+							const verdict = await authorizeShareBootstrap({
+								localDoc: doc,
+								entityId,
+								senderKey,
+								selfPubB64: session.identity.publicKeyBase64,
+								incomingState: plaintext,
+								now: Date.now(),
+								invites: shareInvites,
+								deriveInviteSecret: (nonce) =>
+									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce),
+								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
+								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+								isRestoring: (id) => getRestoreEngine()?.isRestoringEntity(id) === true,
+							});
+							if (verdict !== ShareBootstrapVerdict.Allow) {
+								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
+							}
+							return verdict === ShareBootstrapVerdict.Allow;
 						} catch {
 							return false;
 						} finally {

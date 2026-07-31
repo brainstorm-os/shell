@@ -11,6 +11,8 @@ function member(over: Partial<ResolvedMember> & { device?: DeviceX25519Keypair }
 	return {
 		member: rest.member ?? "m",
 		x25519: device ? bytesToBase64(device.publicKey) : null,
+		anchor: null,
+		via: null,
 		role: AccessRole.Editor,
 		addedBy: "owner",
 		addedAt: 1000,

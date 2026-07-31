@@ -33,7 +33,7 @@ import { verifySignature } from "../credentials/identity";
 import { wrapDekVersionOf } from "../credentials/member-wraps";
 import { installEntityDek } from "../entities/install-wrap";
 import { base64UrlToBytes } from "../pairing/pairing-channel";
-import type { EntitiesRepository } from "../storage/entities-repo";
+import type { EntitiesRepository, ShareInvitesRepository } from "../storage/entities-repo";
 import { decodeFrame } from "../sync/envelope-codec";
 import {
 	type PipelineContext,
@@ -50,6 +50,8 @@ import {
 	resolveMembers,
 } from "./access-record";
 import { COLLAB_TEXT_KEY, CollabDevBridge } from "./collab-dev-bridge";
+import { deriveInviteSecret } from "./invite-anchor";
+import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./share-bootstrap-authz";
 import { type CollabRelayLike, SharingEngine } from "./sharing-engine";
 
 const ENTITY = "ent_shared_brief";
@@ -79,6 +81,7 @@ class ReceivingShell {
 		readonly engine: SharingEngine,
 		readonly repo: EntitiesRepository,
 		readonly dekStore: Awaited<ReturnType<VaultSession["entityDekStore"]>>,
+		readonly invites: ShareInvitesRepository,
 		readonly port: LoopbackRelayPort,
 	) {}
 
@@ -86,10 +89,15 @@ class ReceivingShell {
 		const engine = new SharingEngine(session, () => relayAdapter(port));
 		const repo = await engine.ensureEntitiesRepo();
 		const dekStore = await engine.ensureDekStore();
-		return new ReceivingShell(session, engine, repo, dekStore, port);
+		const invites = await engine.ensureShareInvitesRepo();
+		return new ReceivingShell(session, engine, repo, dekStore, invites, port);
 	}
 
-	/** The production `main/index.ts` closure, verbatim in shape. */
+	/** The production `main/index.ts` closure, verbatim in shape — including the
+	 *  Collab-C5-invite-anchor gate, so the LEGITIMATE first share is proven to
+	 *  survive it and not just the signature half. */
+	readonly refusals: ShareBootstrapVerdict[] = [];
+
 	#authorizeWriter = async (
 		senderPubB64: string,
 		entityId: string,
@@ -104,7 +112,21 @@ class ReceivingShell {
 		const { doc } = await this.session.ydocStore.load(entityId);
 		try {
 			if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
-			return authorizesAsShareBootstrap(doc, entityId, senderKey, plaintext);
+			const verdict = await authorizeShareBootstrap({
+				localDoc: doc,
+				entityId,
+				senderKey,
+				selfPubB64: this.session.identity.publicKeyBase64,
+				incomingState: plaintext,
+				now: Date.now(),
+				invites: this.invites,
+				deriveInviteSecret: (nonce) =>
+					deriveInviteSecret((bytes) => this.session.signPayload(bytes), nonce),
+				loadDoc: async (id) => (await this.session.ydocStore.load(id)).doc,
+				typeOf: (id) => this.repo.get(id)?.type ?? null,
+			});
+			if (verdict !== ShareBootstrapVerdict.Allow) this.refusals.push(verdict);
+			return verdict === ShareBootstrapVerdict.Allow;
 		} catch {
 			return false;
 		} finally {
@@ -245,7 +267,7 @@ describe("F-288 writer authorization on the receiver's production path", () => {
 	async function shareWith(role: AccessRole): Promise<void> {
 		await bridge.provisionEntity(ENTITY, ENTITY_TYPE);
 		await bridge.editText(ENTITY, BODY);
-		const invite = new SharingEngine(guest, () => null).createInvite("Guest");
+		const invite = await new SharingEngine(guest, () => null).createInvite("Guest");
 		await bridge.share({ entityId: ENTITY, type: ENTITY_TYPE, invite, role });
 	}
 
@@ -254,8 +276,13 @@ describe("F-288 writer authorization on the receiver's production path", () => {
 		await drain();
 
 		expect(received.unauthorized(), "the opening state must not be dropped").toEqual([]);
+		expect(received.refusals, "the invite anchor must ADMIT the legitimate share").toEqual([]);
 		expect(await received.text()).toContain("Q3 brief");
 		expect(await received.activeMembers()).toContain(guest.identity.publicKeyBase64);
+		// Single-use is pinned to a pair, not burnt on first sight: the invite must
+		// still name this entity + this owner so a re-sent opening frame applies.
+		const invites = await received.engine.ensureShareInvitesRepo();
+		expect(invites.listOutstanding(Date.now()), "the invite is spent").toEqual([]);
 	});
 
 	it("a doc that already carries a record is authoritative - no re-bootstrap around it", async () => {

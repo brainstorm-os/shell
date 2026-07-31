@@ -140,13 +140,13 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		await engine.share({
 			entityId: ENTITY,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestA, "A"),
+			invite: await inviteFrom(guestA, "A"),
 			role: AccessRole.Editor,
 		});
 		await engine.share({
 			entityId: ENTITY,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestB, "B"),
+			invite: await inviteFrom(guestB, "B"),
 			role: AccessRole.Editor,
 		});
 
@@ -191,13 +191,13 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		await engine.share({
 			entityId: ENTITY,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestA, "A"),
+			invite: await inviteFrom(guestA, "A"),
 			role: AccessRole.Editor,
 		});
 		await engine.share({
 			entityId: ENTITY,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestB, "B"),
+			invite: await inviteFrom(guestB, "B"),
 			role: AccessRole.Editor,
 		});
 
@@ -276,13 +276,13 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		await flappy.share({
 			entityId: ENT,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestA, "A"),
+			invite: await inviteFrom(guestA, "A"),
 			role: AccessRole.Editor,
 		});
 		await flappy.share({
 			entityId: ENT,
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestB, "B"),
+			invite: await inviteFrom(guestB, "B"),
 			role: AccessRole.Editor,
 		});
 		const dekBefore = await currentDek(ENT);
@@ -320,13 +320,13 @@ describe("SharingEngine.revoke — ROT-3a rotates the DEK for forward secrecy", 
 		await engine.share({
 			entityId: "ent_online",
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestA, "A"),
+			invite: await inviteFrom(guestA, "A"),
 			role: AccessRole.Editor,
 		});
 		await engine.share({
 			entityId: "ent_online",
 			type: ENTITY_TYPE,
-			invite: inviteFrom(guestB, "B"),
+			invite: await inviteFrom(guestB, "B"),
 			role: AccessRole.Editor,
 		});
 		expect(await engine.revoke("ent_online", guestA.identity.publicKeyBase64)).toBe(true);

@@ -53,11 +53,29 @@ import {
 	wrapDekForRecipient,
 } from "../credentials/member-wraps";
 import { type AccessRole, grantAccess, roleOf } from "./access-record";
+import {
+	INVITE_DEFAULT_TTL_MS,
+	INVITE_NONCE_BYTES,
+	INVITE_SECRET_BYTES,
+	computeInviteAnchor,
+	deriveInviteSecret,
+	inviteIdForNonce,
+	mintInviteNonce,
+} from "./invite-anchor";
 
 /** Bump only on a wire-incompatible change to the invite shape or its signed
  *  payload construction. Pinned into the signed payload so a future codec can
- *  detect (and refuse) an invite minted under a different scheme. */
-export const SHARE_INVITE_VERSION = 1 as const;
+ *  detect (and refuse) an invite minted under a different scheme.
+ *
+ *  - `1` — public keys + label only. **No longer accepted**: a v1 invite carries
+ *    no anchor secret, so a share made from one could not be bootstrap-verified
+ *    by the receiver (Collab-C5-invite-anchor). Fail-closed by construction.
+ *  - `2` — adds `inviteId`, the single-use `secret` and `expiresAt`. */
+export const SHARE_INVITE_VERSION = 2 as const;
+
+/** Ceiling on the human label. It is user input that reaches a signed payload
+ *  and a persisted contacts file, so it is bounded rather than trusted. */
+export const MAX_INVITE_LABEL_LENGTH = 200;
 
 /**
  * A collaborator's self-signed invitation to be added to an entity. Produced
@@ -76,6 +94,20 @@ export type ShareInvite = {
 	/** Human label for the invite (person / device name). Included in the
 	 *  signed payload so it can't be swapped after signing. */
 	label: string;
+	/** Public handle for the anchor: a 16-byte nonce, base64url. Signed, and the
+	 *  invitee's `share_invites` row is keyed by it. The invitee re-derives the
+	 *  secret from it under their sovereign key, so no local row is needed to
+	 *  VERIFY an anchor — only to enforce single use. */
+	inviteId: string;
+	/** base64 of the 32-byte single-use anchor secret (Collab-C5-invite-anchor).
+	 *  The owner echoes a MAC under this key inside the grant, which is the ONLY
+	 *  thing that lets the invitee's shell accept a first-share bootstrap. It is a
+	 *  bearer credential the human hands over deliberately; it is not vault key
+	 *  material (the sovereign Ed25519 and device X25519 secrets never leave the
+	 *  session) and it authorizes exactly one entity, once, before `expiresAt`. */
+	secret: string;
+	/** Epoch ms after which an UNREDEEMED invite stops being redeemable. */
+	expiresAt: number;
 	/** base64 Ed25519 signature by `userPubB64` over the canonical payload. */
 	sig: string;
 };
@@ -83,15 +115,22 @@ export type ShareInvite = {
 const encoder = new TextEncoder();
 
 /** Deterministic signed bytes for an invite. Binds scheme version, the user
- *  identity, the wrapping key, and the label — so none can be altered without
- *  invalidating the signature. Field separation is unambiguous because the two
- *  key fields are base64 of fixed 32-byte keys (the standard alphabet has no
- *  `|`) and the free-form `label` is terminal — so no two distinct
- *  `(user, x25519, label)` tuples can collide onto the same payload bytes. Keep
- *  `label` last if this ever changes. */
-function invitePayload(userPubB64: string, x25519PubB64: string, label: string): Uint8Array {
+ *  identity, the wrapping key, the anchor handle, the expiry, and the label — so
+ *  none can be altered without invalidating the signature. `inviteId` commits to
+ *  the secret (it is its hash), so signing the id signs the secret too. Field
+ *  separation is unambiguous because every field but `label` is base64/base64url
+ *  or a decimal number (no `|` in any of those alphabets) and the free-form
+ *  `label` is terminal — so no two distinct tuples collide onto the same payload
+ *  bytes. Keep `label` last if this ever changes. */
+function invitePayload(
+	userPubB64: string,
+	x25519PubB64: string,
+	inviteId: string,
+	expiresAt: number,
+	label: string,
+): Uint8Array {
 	return encoder.encode(
-		`brainstorm/share-invite/v${SHARE_INVITE_VERSION}|${userPubB64}|${x25519PubB64}|${label}`,
+		`brainstorm/share-invite/v${SHARE_INVITE_VERSION}|${userPubB64}|${x25519PubB64}|${inviteId}|${expiresAt}|${label}`,
 	);
 }
 
@@ -104,8 +143,21 @@ export function isShareInvite(value: unknown): value is ShareInvite {
 		typeof i.userPubB64 === "string" &&
 		typeof i.x25519PubB64 === "string" &&
 		typeof i.label === "string" &&
+		i.label.length <= MAX_INVITE_LABEL_LENGTH &&
+		typeof i.inviteId === "string" &&
+		typeof i.secret === "string" &&
+		typeof i.expiresAt === "number" &&
+		Number.isFinite(i.expiresAt) &&
 		typeof i.sig === "string"
 	);
+}
+
+/** An invite whose redemption window has closed. Checked where it matters (the
+ *  owner's share, and the receiver's first redemption), never in
+ *  {@link verifyShareInvite} — verification is purely cryptographic so a stored
+ *  contact does not evaporate the moment its original invite ages out. */
+export function isShareInviteExpired(invite: ShareInvite, now: number): boolean {
+	return now > invite.expiresAt;
 }
 
 /**
@@ -120,15 +172,37 @@ export function createShareInviteSigned(opts: {
 	x25519Pub: Uint8Array;
 	label: string;
 	sign: (payload: Uint8Array) => Uint8Array;
+	/** Epoch ms the expiry is measured from. Defaults to `Date.now()`. */
+	now?: number;
+	/** Redemption window. Defaults to {@link INVITE_DEFAULT_TTL_MS}. */
+	ttlMs?: number;
+	/** Injected anchor nonce — tests only; production draws a fresh one. */
+	nonce?: Uint8Array;
 }): ShareInvite {
 	const userPubB64 = publicKeyToBase64(opts.userPub);
 	const x25519PubB64 = bytesToBase64(opts.x25519Pub);
-	const sig = opts.sign(invitePayload(userPubB64, x25519PubB64, opts.label));
+	const label = opts.label.slice(0, MAX_INVITE_LABEL_LENGTH);
+	const nonce = opts.nonce ?? mintInviteNonce();
+	if (nonce.length !== INVITE_NONCE_BYTES) {
+		throw new Error(`share-invite: nonce must be ${INVITE_NONCE_BYTES} bytes`);
+	}
+	const inviteId = inviteIdForNonce(nonce);
+	// Derived, never drawn: the invitee must be able to re-derive this secret from
+	// the public nonce after a vault wipe, and on any paired device.
+	const secret = deriveInviteSecret(opts.sign, nonce);
+	if (secret.length !== INVITE_SECRET_BYTES) {
+		throw new Error(`share-invite: derived secret must be ${INVITE_SECRET_BYTES} bytes`);
+	}
+	const expiresAt = (opts.now ?? Date.now()) + (opts.ttlMs ?? INVITE_DEFAULT_TTL_MS);
+	const sig = opts.sign(invitePayload(userPubB64, x25519PubB64, inviteId, expiresAt, label));
 	return {
 		v: SHARE_INVITE_VERSION,
 		userPubB64,
 		x25519PubB64,
-		label: opts.label,
+		label,
+		inviteId,
+		secret: bytesToBase64(secret),
+		expiresAt,
 		sig: bytesToBase64(sig),
 	};
 }
@@ -144,12 +218,18 @@ export function createShareInvite(opts: {
 	userSecret: Uint8Array;
 	x25519Pub: Uint8Array;
 	label: string;
+	now?: number;
+	ttlMs?: number;
+	nonce?: Uint8Array;
 }): ShareInvite {
 	return createShareInviteSigned({
 		userPub: publicKeyFromSecret(opts.userSecret),
 		x25519Pub: opts.x25519Pub,
 		label: opts.label,
 		sign: (payload) => signPayload(opts.userSecret, payload),
+		...(opts.now === undefined ? {} : { now: opts.now }),
+		...(opts.ttlMs === undefined ? {} : { ttlMs: opts.ttlMs }),
+		...(opts.nonce === undefined ? {} : { nonce: opts.nonce }),
 	});
 }
 
@@ -162,9 +242,22 @@ export function createShareInvite(opts: {
 export function verifyShareInvite(invite: unknown): invite is ShareInvite {
 	if (!isShareInvite(invite)) return false;
 	try {
+		// The secret is derived from the signed nonce under the invitee's sovereign
+		// key, so the OWNER cannot check the two against each other (they hold
+		// neither key). What the signature does guarantee is that the nonce, the
+		// expiry, both public keys and the label are the invitee's own. A tampered
+		// `secret` therefore only lets a token-holder make their OWN share
+		// unredeemable, which they could equally achieve by not sharing.
+		if (base64ToBytes(invite.secret).length !== INVITE_SECRET_BYTES) return false;
 		return verifySignature(
 			base64ToBytes(invite.userPubB64),
-			invitePayload(invite.userPubB64, invite.x25519PubB64, invite.label),
+			invitePayload(
+				invite.userPubB64,
+				invite.x25519PubB64,
+				invite.inviteId,
+				invite.expiresAt,
+				invite.label,
+			),
 			base64ToBytes(invite.sig),
 		);
 	} catch {
@@ -210,6 +303,12 @@ export function shareEntityWithInvite(
 		 *  into the wrap so the invitee's install path can order it against a
 		 *  later rotation. Omitted ⇒ a v1 (ordinal-1) wrap. */
 		dekVersion?: number;
+		/** Collab-C5-invite-anchor — the container this entity descends from, when
+		 *  the share is a COLLECTION cascade rather than a direct one. A child's
+		 *  grant carries the container id instead of an invite anchor: the receiver
+		 *  is already a member of that container locally, so the container IS the
+		 *  anchor and the invite stays pinned to the container alone. */
+		via?: string;
 	},
 ): MemberWrapPayload {
 	// Validate everything that can fail BEFORE any mutation, so a rejected
@@ -222,7 +321,34 @@ export function shareEntityWithInvite(
 	if (!verifyShareInvite(opts.invite)) {
 		throw new Error("shareEntityWithInvite: invite failed verification");
 	}
+	const via = opts.via ?? null;
+	// A DIRECT share must echo the invite's anchor, so refuse an invite whose
+	// redemption window has closed rather than mint a grant the receiver will
+	// (correctly) refuse. A CASCADE child carries no anchor, so it is unaffected —
+	// the container it descends from was anchored when it was shared.
+	if (via === null && isShareInviteExpired(opts.invite, opts.now)) {
+		throw new Error("shareEntityWithInvite: invite has expired");
+	}
 	const recipientPub = base64ToBytes(opts.invite.x25519PubB64);
+	const ownerPubB64 = publicKeyToBase64(publicKeyFromSecret(opts.signerSecret));
+	let anchor: string | null = null;
+	if (via === null) {
+		const secret = base64ToBytes(opts.invite.secret);
+		try {
+			anchor = computeInviteAnchor({
+				secret,
+				inviteId: opts.invite.inviteId,
+				entityId: opts.entityId,
+				memberPubB64: opts.invite.userPubB64,
+				ownerPubB64,
+			});
+		} finally {
+			secret.fill(0);
+		}
+		if (anchor === null) {
+			throw new Error("shareEntityWithInvite: could not compute the invite anchor");
+		}
+	}
 
 	// Grants are append-only and `grantAccess` no-ops on a live grant, so a
 	// re-share at a *different* role would silently fail to change anything.
@@ -247,6 +373,11 @@ export function shareEntityWithInvite(
 		// from the access record to wrap the child DEK to this member, with the
 		// key authenticated by the same signature that authorizes the member.
 		x25519: opts.invite.x25519PubB64,
+		// Collab-C5-invite-anchor — the bootstrap trust root travels with the
+		// grant and is covered by its signature, so it cannot be re-pointed at
+		// another entity/member without invalidating the grant AND the MAC.
+		anchor,
+		via,
 	});
 
 	if (existingWrap !== null) return existingWrap;

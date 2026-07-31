@@ -82,6 +82,15 @@ export type ResolvedMember = {
 	 *  signature). `null` for a pre-collection-sharing grant that signed no key. */
 	x25519: string | null;
 	role: AccessRole;
+	/** Collab-C5-invite-anchor — `"<inviteId>:<mac>"`, the granter's echo of the
+	 *  single-use secret this member's invite carried. Covered by the grant
+	 *  signature. `null` for a self-grant, a cascade child (see `via`), or any
+	 *  pre-anchor grant. */
+	anchor: string | null;
+	/** Collab-C5-invite-anchor — the container id this entity descends from, for
+	 *  a collection-cascade grant. Covered by the grant signature. `null` for a
+	 *  direct share. */
+	via: string | null;
 	/** base64 user-Ed25519 public key of the granter. */
 	addedBy: string;
 	addedAt: number;
@@ -97,6 +106,12 @@ export type ResolvedMember = {
 
 const encoder = new TextEncoder();
 
+/** A tagged grant segment must carry no `|`, or the segments stop being
+ *  separable — see {@link grantPayload}. Empty and absent are the same thing. */
+function separable(value: string | null | undefined): value is string {
+	return typeof value === "string" && value.length > 0 && !value.includes("|");
+}
+
 /** Deterministic signed bytes for a grant. Binds scheme version + entity so a
  *  grant can't be replayed into another entity or read as another version. */
 function grantPayload(
@@ -106,6 +121,8 @@ function grantPayload(
 	addedBy: string,
 	addedAt: number,
 	x25519?: string | null,
+	anchor?: string | null,
+	via?: string | null,
 ): Uint8Array {
 	// The X25519 segment is included ONLY when the grant carries a member
 	// wrapping key (collection-sharing, design 71). Omitting it reproduces the
@@ -113,8 +130,21 @@ function grantPayload(
 	// still verify — the presence of the stored `x25519` field on the entry tells
 	// `resolveMembers` which form to reconstruct.
 	const x = x25519 ? `${x25519}|` : "";
+	// Same rule for the Collab-C5-invite-anchor fields: tagged, terminal, and
+	// omitted when absent, so every grant minted before them still verifies. They
+	// go last so the older payload is a strict prefix of the newer one.
+	//
+	// `separable` is what keeps the two tags unambiguous. Without it an
+	// `anchor` containing the literal `|v=` would make ONE byte string readable as
+	// both `(anchor = "Z|v=Y", via = null)` and `(anchor = "Z", via = "Y")`, so a
+	// single signature would cover two different grants. Neither field can
+	// legitimately contain a pipe (an anchor is base64url + `:` + base64; a
+	// container id is an entity id), so a value that does is not a value - it is
+	// refused into the null form and the grant simply fails to validate.
+	const a = separable(anchor) ? `|a=${anchor}` : "";
+	const v = separable(via) ? `|v=${via}` : "";
 	return encoder.encode(
-		`brainstorm/access/v${ACCESS_RECORD_VERSION}/grant|${entityId}|${member}|${x}${role}|${addedBy}|${addedAt}`,
+		`brainstorm/access/v${ACCESS_RECORD_VERSION}/grant|${entityId}|${member}|${x}${role}|${addedBy}|${addedAt}${a}${v}`,
 	);
 }
 
@@ -185,21 +215,36 @@ export function grantAccess(
 		/** base64 device X25519 wrapping key for `member`, signed into the grant
 		 *  (collection-sharing, design 71). Omit for a key-less grant. */
 		x25519?: string | null;
+		/** Collab-C5-invite-anchor — the granter's echo of the member's single-use
+		 *  invite secret, `"<inviteId>:<mac>"`. Signed into the grant. */
+		anchor?: string | null;
+		/** Collab-C5-invite-anchor — the container this entity descends from, for a
+		 *  cascade grant. Signed into the grant. */
+		via?: string | null;
 	},
 ): void {
 	const arr = getAccessArray(doc);
 	if (findActiveEntry(arr, opts.member) !== null) return;
 	const x25519 = opts.x25519 ?? null;
+	// Refused rather than stored: a pipe would make the signed segments ambiguous
+	// (see `grantPayload`), and every legitimate value is pipe-free by
+	// construction, so this can only be a caller bug or a hostile input.
+	if (opts.anchor?.includes("|")) throw new Error("grantAccess: anchor must not contain '|'");
+	if (opts.via?.includes("|")) throw new Error("grantAccess: via must not contain '|'");
+	const anchor = opts.anchor ?? null;
+	const via = opts.via ?? null;
 	const addedBy = publicKeyToBase64(publicKeyFromSecret(opts.signerSecret));
 	const sig = signPayload(
 		opts.signerSecret,
-		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now, x25519),
+		grantPayload(opts.entityId, opts.member, opts.role, addedBy, opts.now, x25519, anchor, via),
 	);
 	doc.transact(() => {
 		const entry = new Y.Map<unknown>();
 		entry.set("v", ACCESS_RECORD_VERSION);
 		entry.set("member", opts.member);
 		entry.set("x25519", x25519);
+		entry.set("anchor", anchor);
+		entry.set("via", via);
 		entry.set("role", opts.role);
 		entry.set("addedBy", addedBy);
 		entry.set("addedAt", opts.now);
@@ -263,11 +308,18 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 		if (member === null || addedBy === null || addedAt === null || !isAccessRole(roleRaw)) continue;
 		const role = roleRaw;
 		const x25519 = readString(m, "x25519");
+		// A stored value carrying a pipe cannot have been signed in the tagged form
+		// (see `grantPayload`), so read it as absent — the reconstructed payload then
+		// mismatches and `grantValid` is false, which is the fail-closed answer.
+		const anchorRaw = readString(m, "anchor");
+		const viaRaw = readString(m, "via");
+		const anchor = separable(anchorRaw) ? anchorRaw : null;
+		const via = separable(viaRaw) ? viaRaw : null;
 		const revokedAt = readNumber(m, "revokedAt");
 		const revokedBy = readString(m, "revokedBy");
 		const grantValid = safeVerify(
 			addedBy,
-			grantPayload(entityId, member, role, addedBy, addedAt, x25519),
+			grantPayload(entityId, member, role, addedBy, addedAt, x25519, anchor, via),
 			readString(m, "grantSig"),
 		);
 		const revokeValid =
@@ -281,6 +333,8 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 		out.push({
 			member,
 			x25519,
+			anchor,
+			via,
 			role,
 			addedBy,
 			addedAt,
@@ -350,7 +404,17 @@ export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint
 }
 
 /**
- * Collab-C5 (F-288 bootstrap) - may `senderKey` write to `entityId` on the
+ * Collab-C5 (F-288 bootstrap) - the SIGNATURE half of the share-bootstrap gate.
+ *
+ * ⚠️ NOT SUFFICIENT ON ITS OWN, and never call it as the whole gate: an attacker
+ * signs their own grants, so a self-signed record passes this predicate. It is
+ * exported and kept as a discrete step because `authorizeShareBootstrap`
+ * (`share-bootstrap-authz.ts`) layers the out-of-band invite anchor on top of it,
+ * and because the adversarial regression test needs to demonstrate exactly what
+ * this half does and does not decide. Production must go through
+ * `authorizeShareBootstrap`.
+ *
+ * May `senderKey` write to `entityId` on the
  * strength of the state they are sending, when this device holds no record yet?
  *
  * The FIRST state frame of a new share carries the access record that
@@ -383,7 +447,7 @@ export function isAuthorizedWriter(doc: Y.Doc, entityId: string, senderKey: Uint
 /** Ceiling on the state a share BOOTSTRAP may carry (see below). Deliberately
  *  generous against a real opening snapshot and still far under anything that
  *  could stall the main process. */
-const MAX_BOOTSTRAP_STATE_BYTES = 4 * 1024 * 1024;
+export const MAX_BOOTSTRAP_STATE_BYTES = 4 * 1024 * 1024;
 
 export function authorizesAsShareBootstrap(
 	localDoc: Y.Doc,
