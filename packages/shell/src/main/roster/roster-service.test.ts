@@ -258,6 +258,97 @@ describe("roster service (Collab-C6)", () => {
 			expect(agent?.displayName).toBe("Researcher");
 		});
 
+		it("an Agent/v1 carrying the LOCAL USER's pubkey never overrides their identity", async () => {
+			// The B2 attack shape: a planted agent record claiming a human's pubkey
+			// would otherwise recast that human as an agent with an attacker-chosen
+			// name, bypassing the signed-profile requirement.
+			const repo = new EntitiesRepository(await env.stores.open("entities"));
+			repo.create({
+				id: "agt_impostor",
+				type: AGENT_TYPE,
+				createdBy: "shell",
+				properties: agentDefToEntityProperties({
+					pubkey: env.selfPub,
+					fingerprint: fingerprintPublicKey(env.selfKp.publicKey),
+					displayName: "Ada Lovelace (verified)",
+					avatarRef: null,
+					persona: "",
+					skills: [],
+					routing: AgentRouting.LocalOnly,
+					autonomy: AgentAutonomy.ConfirmOnWrite,
+					memoryScope: AgentMemoryScope.PerConversation,
+				}),
+				now: 1000,
+				dekId: null,
+			});
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL, { includeAgents: true }], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			const self = members.find((m) => m.pubkey === env.selfPub);
+			expect(self?.isSelf).toBe(true);
+			expect(self?.kind).toBe(RosterMemberKind.Human);
+			expect(self?.displayName).not.toBe("Ada Lovelace (verified)");
+		});
+
+		it("drops an agent row whose fingerprint does not bind to its pubkey", async () => {
+			const a = generateIdentity();
+			const b = generateIdentity();
+			const repo = new EntitiesRepository(await env.stores.open("entities"));
+			repo.create({
+				id: "agt_unbound",
+				type: AGENT_TYPE,
+				createdBy: "shell",
+				properties: agentDefToEntityProperties({
+					pubkey: publicKeyToBase64(a.publicKey),
+					fingerprint: fingerprintPublicKey(b.publicKey),
+					displayName: "Impostor",
+					avatarRef: null,
+					persona: "",
+					skills: [],
+					routing: AgentRouting.LocalOnly,
+					autonomy: AgentAutonomy.ConfirmOnWrite,
+					memoryScope: AgentMemoryScope.PerConversation,
+				}),
+				now: 1000,
+				dekId: null,
+			});
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL, { includeAgents: true }], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			expect(members).toHaveLength(1);
+			expect(members[0]?.isSelf).toBe(true);
+		});
+
+		it("drops an app-authored agent row", async () => {
+			const kp = generateIdentity();
+			const repo = new EntitiesRepository(await env.stores.open("entities"));
+			repo.create({
+				id: "agt_app",
+				type: AGENT_TYPE,
+				createdBy: "io.evil.app",
+				properties: agentDefToEntityProperties({
+					pubkey: publicKeyToBase64(kp.publicKey),
+					fingerprint: fingerprintPublicKey(kp.publicKey),
+					displayName: "Impostor",
+					avatarRef: null,
+					persona: "",
+					skills: [],
+					routing: AgentRouting.LocalOnly,
+					autonomy: AgentAutonomy.ConfirmOnWrite,
+					memoryScope: AgentMemoryScope.PerConversation,
+				}),
+				now: 1000,
+				dekId: null,
+			});
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const members = (await handler(
+				envelope("members", [CHANNEL, { includeAgents: true }], [ROSTER_READ_CAPABILITY]),
+			)) as RosterMember[];
+			expect(members).toHaveLength(1);
+		});
+
 		it("drops an agent row whose identity is mangled (fail-closed)", async () => {
 			const repo = new EntitiesRepository(await env.stores.open("entities"));
 			repo.create({

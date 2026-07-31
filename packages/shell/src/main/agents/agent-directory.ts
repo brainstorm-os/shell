@@ -51,6 +51,7 @@ import {
 	appendAuditEvent,
 	readAgentAuditEvents,
 } from "../vault/audit-log";
+import { SHELL_PRINCIPAL, rawFingerprintOf, readTrustedAgentDef } from "./agent-record";
 
 /** The slice of `VaultSession` this module needs — structural, so tests fake
  *  it without a full vault boot. */
@@ -110,11 +111,12 @@ async function repoFor(session: AgentDirectorySession): Promise<EntitiesReposito
 
 function toRecord(row: {
 	id: string;
+	createdBy: string;
 	properties: Record<string, unknown>;
 	createdAt: number;
 	updatedAt: number;
 }): AgentRecord | null {
-	const def = readAgentDef(row.properties);
+	const def = readTrustedAgentDef(row);
 	if (!def) return null;
 	return { id: row.id, def, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }
@@ -172,7 +174,7 @@ export async function createAgent(
 		const row = repo.create({
 			id,
 			type: AGENT_TYPE,
-			createdBy: "shell",
+			createdBy: SHELL_PRINCIPAL,
 			properties: agentDefToEntityProperties(def),
 			now,
 			dekId: null,
@@ -222,7 +224,7 @@ export async function updateAgent(
 	const repo = await repoFor(session);
 	const row = repo.get(id);
 	if (!row || row.type !== AGENT_TYPE) return null;
-	const current = readAgentDef(row.properties);
+	const current = readTrustedAgentDef(row);
 	if (!current) return null;
 	const next: AgentDef = {
 		...current,
@@ -250,14 +252,26 @@ export async function deleteAgent(session: AgentDirectorySession, id: string): P
 	const repo = await repoFor(session);
 	const row = repo.get(id);
 	if (!row || row.type !== AGENT_TYPE) return false;
-	const def = readAgentDef(row.properties);
+	// Revoke from the row's RAW fingerprint when the parsed def is unavailable: a
+	// shell-authored record whose identity no longer parses must still be able to
+	// shed its authority and its key, or live grants would strand with nothing
+	// able to reach them. Only ever from a SHELL-authored row — a row anything
+	// else wrote is not an agent, and must never be able to name (and destroy)
+	// another agent's unrecoverable, device-local key.
+	const trusted = readTrustedAgentDef(row);
+	const fingerprint =
+		trusted?.fingerprint ??
+		(row.createdBy === SHELL_PRINCIPAL ? rawFingerprintOf(row.properties) : null);
+	const owned = fingerprint !== null && isAgentPrincipal(fingerprint);
 	const ledger = await session.capabilityLedger();
 	let revoked = 0;
-	if (def) revoked = ledger.revokeAllFor(def.fingerprint);
-	if (def) await removeAgentKey(session.credentials, def.fingerprint).catch(() => {});
+	if (owned && fingerprint) {
+		revoked = ledger.revokeAllFor(fingerprint);
+		await removeAgentKey(session.credentials, fingerprint).catch(() => {});
+	}
 	const deleted = repo.softDelete(id, Date.now());
-	if (def) {
-		audit(session, "agent.delete", { agent: def.fingerprint, entityId: id, revokedGrants: revoked });
+	if (owned && fingerprint) {
+		audit(session, "agent.delete", { agent: fingerprint, entityId: id, revokedGrants: revoked });
 	}
 	return deleted;
 }

@@ -19,6 +19,11 @@
 
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { ulid } from "ulid";
+import { isAgentGrantableCapability } from "./agent-grants";
+import { parseCapability } from "./capability-string";
+import { isAgentPrincipal } from "./principals";
+
+export { parseCapability } from "./capability-string";
 
 /** How a capability grant was created. String values are persisted in the
  *  `granted_via` column (and its CHECK constraint) — keep them stable. */
@@ -43,6 +48,17 @@ export type GrantInput = {
 	grantedVia: GrantedVia;
 };
 
+/** Thrown when a grant would give an AGENT principal a capability outside the
+ *  agent-grantable vocabulary (writes, network, MCP, sharing, non-propose
+ *  dispatch). Loud by design: this is a policy violation in the caller, never
+ *  a condition to handle. */
+export class AgentCapabilityRefusedError extends Error {
+	constructor(principal: string, capability: string) {
+		super(`Capability "${capability}" may never be granted to an agent (${principal}).`);
+		this.name = "AgentCapabilityRefused";
+	}
+}
+
 export class LedgerUnavailableError extends Error {
 	constructor(cause: unknown) {
 		super(
@@ -61,6 +77,20 @@ export class CapabilityLedger {
 	 * capability inserts a fresh row (the old row stays for audit).
 	 */
 	grant(input: GrantInput): CapabilityGrant {
+		// Agent-Teams-1 — the agent-grantable vocabulary is enforced HERE, at the
+		// one choke point every grant path funnels through, not only at the Team
+		// surface's call site. Otherwise a sibling grant path (the egress/ingress
+		// consent prompts take a caller-supplied principal string) could hand an
+		// agent a capability the policy exists to forbid.
+		if (isAgentPrincipal(input.appId)) {
+			const required =
+				input.scope === null || input.scope === undefined
+					? input.capability
+					: `${input.capability}:${input.scope}`;
+			if (!isAgentGrantableCapability(required)) {
+				throw new AgentCapabilityRefusedError(input.appId, required);
+			}
+		}
 		const existing = this.findActive(input.appId, input.capability, input.scope ?? null);
 		if (existing) return existing;
 		const row: CapabilityGrant = {
@@ -182,19 +212,6 @@ export class CapabilityLedger {
 	private all<T>(sql: string, params: unknown[]): T[] {
 		return this.db.prepare(sql).all(...params) as T[];
 	}
-}
-
-/**
- * Parse "service.verb:scope" into its parts. Scope is optional.
- * Wildcard requests (`entities.read:*`) round-trip as scope === "*".
- */
-export function parseCapability(required: string): { capability: string; scope: string | null } {
-	const colon = required.indexOf(":");
-	if (colon < 0) return { capability: required, scope: null };
-	return {
-		capability: required.slice(0, colon),
-		scope: required.slice(colon + 1),
-	};
 }
 
 type DbRow = {
