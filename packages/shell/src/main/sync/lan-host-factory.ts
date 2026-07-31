@@ -23,11 +23,24 @@ import {
 	deviceAccountId,
 	makeLanHostHandshakeForSession,
 } from "./lan-sync-wiring";
+import type { WebSocketCtor } from "./websocket-relay-port";
 
 /** A bound LAN listener, narrowed to what `LanHostController` drives. */
 export type BuiltLanListener = {
 	start(): Promise<{ url: string }>;
 	stop(): Promise<void>;
+	/**
+	 * F-474 — an in-process WebSocket onto THIS host's own admission + routing
+	 * core, for the hosting device's own client.
+	 *
+	 * A host is a peer like any other: it has to join the session it is serving
+	 * or its edits reach nobody. Dialling its own listener over a real socket
+	 * was tried and stalls between accepted and authenticated, and it buys
+	 * nothing when both ends are the same process. This is the seam
+	 * `LanRelayHost` was built with (`webSocketCtor()`, used until now only by
+	 * tests): same handshake, same roster check, same router, no network.
+	 */
+	webSocketCtor(): WebSocketCtor;
 };
 
 export type LanListenerFactoryDeps = {
@@ -60,11 +73,16 @@ function defaultBuild(opts: {
 		handshake: opts.handshake,
 		hostAccount: opts.hostAccount,
 	});
-	return new LanRelayListener({
+	const listener = new LanRelayListener({
 		host,
 		address: opts.address,
 		...(opts.onError ? { onError: opts.onError } : {}),
 	});
+	return {
+		start: () => listener.start(),
+		stop: () => listener.stop(),
+		webSocketCtor: () => host.webSocketCtor(),
+	};
 }
 
 /**

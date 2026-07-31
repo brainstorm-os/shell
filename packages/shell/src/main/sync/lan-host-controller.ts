@@ -29,6 +29,9 @@ import { type LanHostState, shouldListenOnLan } from "./lan-host-policy";
 export type LanListenerLike = {
 	start(): Promise<{ url: string }>;
 	stop(): Promise<void>;
+	/** F-474 — in-process WebSocket onto this listener's own core, for the
+	 *  hosting device's own client. Optional so a test double need not stub it. */
+	webSocketCtor?: () => unknown;
 };
 
 export type LanHostControllerOptions = {
@@ -86,6 +89,15 @@ export class LanHostController {
 		if (want === this.listening) return;
 		if (want) await this.#start();
 		else await this.#stop();
+	}
+
+	/** F-474 — an in-process WebSocket onto the live listener's own core, or
+	 *  `null` when not listening. The hosting device's own client uses this
+	 *  instead of dialling its own address over a real socket. */
+	localWebSocketCtor(): (() => unknown) | null {
+		const listener = this.#listener;
+		const ctor = listener?.webSocketCtor;
+		return ctor ? () => ctor.call(listener) : null;
 	}
 
 	async #start(): Promise<void> {

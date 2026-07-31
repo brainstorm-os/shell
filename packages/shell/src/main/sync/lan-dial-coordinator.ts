@@ -54,6 +54,10 @@ export enum LanDialSource {
 	/** Learned from a pairing payload, which the user physically transferred.
 	 *  Trusted for the same reason the payload's keys are. */
 	Pairing = "pairing",
+	/** This device's OWN listener. A host is a peer like any other: it has to
+	 *  join the session it is serving or its edits reach nobody. Ranked last,
+	 *  so a real peer always wins over talking to ourselves. */
+	SelfHost = "self-host",
 }
 
 export type LanDialTarget = {
@@ -169,6 +173,7 @@ export class LanDialCoordinator {
 	readonly #cooldown = new Map<string, number>();
 	#mode: LanDialMode = DEFAULT_LAN_DIAL_MODE;
 	#manualUrl: string | null = null;
+	#selfHostUrl: string | null = null;
 	#target: LanDialTarget | null = null;
 
 	constructor(options: LanDialCoordinatorOptions) {
@@ -204,6 +209,12 @@ export class LanDialCoordinator {
 		const next = parseLanDialMode(mode);
 		if (this.#mode === next) return;
 		this.#mode = next;
+		this.#reselect();
+	}
+
+	/** This device's own listener URL while hosting, or `null`. */
+	setSelfHostUrl(url: string | null): void {
+		this.#selfHostUrl = url;
 		this.#reselect();
 	}
 
@@ -300,13 +311,18 @@ export class LanDialCoordinator {
 	}
 
 	#select(): LanDialTarget | null {
-		if (this.#mode === LanDialMode.Off) return null;
 		const now = this.#now();
+		// `Off` means "do not go looking for peers", not "do not serve the ones I
+		// invited": hosting is its own opt-in, and a host that will not join its
+		// own session publishes nothing.
+		if (this.#mode === LanDialMode.Off) return this.#selfHostTarget(now);
 
 		if (this.#mode === LanDialMode.Manual) {
 			const url = this.#manualUrl;
-			if (!url || this.#isCoolingDown(url, now)) return null;
-			return { url, source: LanDialSource.Manual };
+			if (url && !this.#isCoolingDown(url, now)) {
+				return { url, source: LanDialSource.Manual };
+			}
+			return this.#selfHostTarget(now);
 		}
 
 		// Auto. Prefer the address we are already on, so a healthy link is not
@@ -321,10 +337,17 @@ export class LanDialCoordinator {
 			if (entry.candidate.urls.every((url) => this.#isCoolingDown(url, now))) continue;
 			if (!best || entry.seenAtMs > best.seenAtMs) best = entry;
 		}
-		if (!best) return null;
+		if (!best) return this.#selfHostTarget(now);
 		const url = best.candidate.urls.find((u) => !this.#isCoolingDown(u, now));
-		if (!url) return null;
+		if (!url) return this.#selfHostTarget(now);
 		return { url, source: best.source, instance: best.candidate.instance };
+	}
+
+	/** Our own listener, when hosting and no real peer is selectable. */
+	#selfHostTarget(now: number): LanDialTarget | null {
+		const url = this.#selfHostUrl;
+		if (!url || this.#isCoolingDown(url, now)) return null;
+		return { url, source: LanDialSource.SelfHost };
 	}
 
 	#isCoolingDown(url: string, now: number): boolean {

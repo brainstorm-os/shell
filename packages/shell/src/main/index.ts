@@ -426,7 +426,14 @@ let lanHostRuntime: {
 		load(): Promise<{ mode: LanHostModeValue }>;
 		setMode(mode: LanHostModeValue): Promise<{ mode: LanHostModeValue }>;
 	};
-	controller: { apply(): Promise<void>; readonly url: string | null };
+	controller: {
+		apply(): Promise<void>;
+		readonly url: string | null;
+		/** F-474 — in-process socket onto our own listener's core, or null when
+		 *  not listening. Declared structurally so this module-level slot does
+		 *  not force an eager import of the LAN tree at boot. */
+		localWebSocketCtor?: () => (() => unknown) | null;
+	};
 	/** Replace the devices roster the LAN handshake authenticates against.
 	 *  Pairing pushes its own live rows here, because a second
 	 *  `VaultPropertiesStore.open()` gets a separate Y.Doc handle that cannot
@@ -2231,6 +2238,9 @@ void app.whenReady().then(async () => {
 		// controller reports. That URL is the canonical thing a peer dials, so
 		// advertising anything derived separately could disagree with it.
 		let lanListenerEndpoint: { addresses: readonly string[]; port: number } | null = null;
+		/** F-474 — the URL of OUR OWN listener while hosting. A target equal to
+		 *  this is served by an in-process socket rather than the network. */
+		let selfHostUrl: string | null = null;
 		const lanHost = new LanHostController({
 			readState: () => ({
 				// Prefs not loaded yet ⇒ the Off default, so a slow disk read cannot
@@ -2260,6 +2270,12 @@ void app.whenReady().then(async () => {
 				// this callback was a log line. Now the bound URL reaches both the
 				// pairing payload (below) and the discovery advert.
 				lanListenerEndpoint = parseLanListenerUrl(url);
+				// F-474 — join the session we are hosting. Deferred out of the
+				// controller's start/stop critical section: selecting a target
+				// rebuilds the relay synchronously, and doing that mid-bind re-enters
+				// the reconcile that is still binding the socket.
+				selfHostUrl = url;
+				queueMicrotask(() => lanDial.setSelfHostUrl(url));
 				void lanDiscovery.apply();
 			},
 		});
@@ -2331,10 +2347,18 @@ void app.whenReady().then(async () => {
 					// on loopback or a private address, and the admission gate against
 					// a host that never admits silently swallows every pre-open
 					// subscription (F-466 — the inbox WrapBootstrap channel).
+					// F-474 — dialling our OWN listener goes through the host's
+					// in-process socket, not the network. Same handshake, same roster
+					// check, same router; it simply skips a TCP round trip to
+					// ourselves, which stalls between accepted and authenticated and
+					// buys nothing when both ends are one process.
+					const selfCtor =
+						target.lan && url === selfHostUrl ? lanHostRuntime?.controller.localWebSocketCtor?.() : null;
 					const port = target.lan
 						? new WebSocketRelayPort({
 								url,
 								requireAdmission: true,
+								...(selfCtor ? { wsImpl: selfCtor() as never } : {}),
 								lanHandshake: makeLanClientHandshakeForSession(lanAccess),
 								// P2P-1 — measured, not guessed. A dial to a sleeping peer
 								// costs 75,010 ms on the OS default and 3,003 ms with this
