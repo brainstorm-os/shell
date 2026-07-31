@@ -117,12 +117,21 @@ jobs:
           # Headless runner has no Secret Service / unlocked keyring; the
           # suite tests app flows, the keystore has its own unit suites.
           BRAINSTORM_DEV_INSECURE_CREDENTIALS: "1"
+          # Harness runs are hidden by default so an agent-driven shell never
+          # paints over a developer's desktop mid-call. Under xvfb there is no
+          # desktop and nobody to disturb, and an unmapped X11 window does not
+          # behave like an unmapped macOS one: these specs went red the moment
+          # hidden mode landed, while passing hidden on macOS. So CI opts back
+          # into visible windows, which is also exactly what it did before.
+          BRAINSTORM_TEST_VISIBLE: "1"
         run: xvfb-run --auto-servernum -- npx playwright test --config=playwright.e2e.config.ts
 
       - name: KBN keyboard specs (xvfb)
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
           BRAINSTORM_DEV_INSECURE_CREDENTIALS: "1"
+          # Keyboard specs need a focused window, which an unmapped one is not.
+          BRAINSTORM_TEST_VISIBLE: "1"
         run: xvfb-run --auto-servernum -- npx playwright test --config=playwright.config.ts kbn-
 
       - name: Upload failure artefacts

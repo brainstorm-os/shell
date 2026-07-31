@@ -21,18 +21,14 @@
             },
             {
               "text": "manifest.json",
-              "marks": [
-                "highlight"
-              ]
+              "marks": ["highlight"]
             },
             {
               "text": " and an "
             },
             {
               "text": "index.html",
-              "marks": [
-                "highlight"
-              ]
+              "marks": ["highlight"]
             },
             {
               "text": ". That is the whole format, with no build step anywhere. Write those in the Code editor and Brainstorm will install them for you, straight out of your vault."
@@ -44,9 +40,7 @@
           "text": [
             {
               "text": "Install from your vault",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " Select the code files that make up an app and choose Install as app. It lands on your dashboard right away, with no restart."
@@ -58,18 +52,14 @@
           "text": [
             {
               "text": "Install from a folder or a file",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " Point Brainstorm at a folder on disk, or at a "
             },
             {
               "text": ".brainstorm",
-              "marks": [
-                "highlight"
-              ]
+              "marks": ["highlight"]
             },
             {
               "text": " bundle someone sent you."
@@ -81,9 +71,7 @@
           "text": [
             {
               "text": "The agent can write the code",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " Ask it for an app and it drafts the files as cards you read and approve. Nothing reaches your vault until you say so, the same as everything else it proposes."
@@ -108,18 +96,14 @@
           "text": [
             {
               "text": "Names on shared objects",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " Everyone on a shared object now appears by name instead of a long "
             },
             {
               "text": "ed25519:",
-              "marks": [
-                "highlight"
-              ]
+              "marks": ["highlight"]
             },
             {
               "text": " string. Names travel with the object itself, so there is no directory anywhere and the relay learns nothing new."
@@ -131,9 +115,7 @@
           "text": [
             {
               "text": "The key is still shown",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " A name is only what someone calls themselves, so the key fingerprint sits beside it. Two people can never be told apart by a name alone."
@@ -149,9 +131,7 @@
           "text": [
             {
               "text": "Sharing a channel now brings every message",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " Some messages silently never arrived on the other side. They do now."
@@ -163,9 +143,7 @@
           "text": [
             {
               "text": "Invites are single use",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " An invite code opens exactly one thing, once, and it expires. Revoking someone takes effect immediately."
@@ -177,9 +155,7 @@
           "text": [
             {
               "text": "A proposed file at a path you already have asks first",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " It used to quietly make a second copy."
@@ -191,9 +167,7 @@
           "text": [
             {
               "text": "The Code editor keeps still while you type",
-              "marks": [
-                "bold"
-              ]
+              "marks": ["bold"]
             },
             {
               "text": " The right panel no longer blinks on every keystroke, and the file tree has folders."
