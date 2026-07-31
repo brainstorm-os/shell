@@ -843,6 +843,10 @@ export class WebSocketRelayPort implements RelayPort {
 			// `auth-ok` carries a proof we accept.
 			const account = this.#lanHandshake?.helloAccount() ?? null;
 			if (account) this.#sendControl({ op: "hello", account });
+			// Sending nothing leaves the host waiting for a `hello` that never
+			// comes, so the connection dies on a deadline with no reason logged on
+			// either side — the hardest shape of this failure to diagnose.
+			else this.#onAdmissionFailed?.("no device account to announce");
 			return;
 		}
 		// Re-emit every active subscription so the relay's routing table

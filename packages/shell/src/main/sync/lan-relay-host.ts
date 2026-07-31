@@ -238,6 +238,7 @@ export class LanRelayHost {
 			return null;
 		}
 		const connId = this.#core.handlers.onOpen(serverWs);
+		console.info(`[lan-host] connection accepted (${this.#core.connections.size} live)`);
 		if (this.#handshake || this.#admit) {
 			const nonce = this.#mintNonce();
 			const state: AdmissionState = {
@@ -296,7 +297,10 @@ export class LanRelayHost {
 			// so the challenge can be SEALED to its roster X25519 key.
 			if (this.#handshake && state.clientAccount === null) {
 				const hello = decodeHello(control);
-				if (!hello) return;
+				if (!hello) {
+					console.warn("[lan-host] pre-auth message was not a usable hello — ignoring");
+					return;
+				}
 				const nonceBytes = this.#mintNonceBytes();
 				const sealed = this.#handshake.sealFor(hello.account, nonceBytes);
 				// Unknown, revoked, or no usable X25519 key ⇒ close. There is NO
