@@ -98,10 +98,10 @@ export class EntityDekStore {
 	 * 10.1 writes exactly one row per entity at create. Rotation (10.2)
 	 * and the encrypted-update wire path (10.3) build on this primitive.
 	 */
-	persist(entityId: string, dekId: string): EntityDekHandle {
+	persist(entityId: string, dekId: string, versionOverride?: number): EntityDekHandle {
 		assertNonEmptyEntityId(entityId);
 		const dek = generateSymmetricKey();
-		const version = this.#deks.maxVersionForEntity(entityId) + 1;
+		const version = versionOverride ?? this.#deks.maxVersionForEntity(entityId) + 1;
 		try {
 			const sealed = sealSecret(this.#masterKey, dek, entityIdAad(entityId));
 			this.#deks.create({ dekId, entityId, version, sealedDek: sealed, now: this.#clock() });
