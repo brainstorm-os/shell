@@ -3815,6 +3815,7 @@ void app.whenReady().then(async () => {
 	// next unrelated write.
 	const agentMentionDeps: MentionRunnerDeps = {
 		getSession: () => getActiveVaultSession(),
+		getSelfPubkey: () => getActiveVaultSession()?.identity.publicKeyBase64 ?? null,
 		getServiceHandler: (name) => workers?.broker.getServiceHandler(name),
 		onWrote: () => {
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);

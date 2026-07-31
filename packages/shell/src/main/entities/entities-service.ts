@@ -24,6 +24,7 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	AGENT_TYPE,
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
@@ -179,6 +180,13 @@ enum EntityAccess {
 	Read = "read",
 	Write = "write",
 }
+
+/** Entity types only the SHELL may author — an `entities.write:*` grant does
+ *  NOT reach them. These carry security state rather than user content, so a
+ *  forged or patched row is an authority bug, not a data bug (Agent-Teams-1:
+ *  an `Agent/v1` binds a ledger principal to a pubkey + a system prompt).
+ *  Reads stay ordinary capability-gated reads. */
+const SHELL_OWNED_ENTITY_TYPES: ReadonlySet<string> = new Set([AGENT_TYPE]);
 
 function named(name: string, message: string): Error {
 	const err = new Error(message);
@@ -407,6 +415,15 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		}
 
 		const can = (verb: EntityAccess, type: string): boolean => {
+			// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
+			// broad its grants. An `Agent/v1` record binds a ledger principal to a
+			// pubkey and a system-prompt persona: an app that could write one could
+			// hijack a granted agent's ceiling with its own persona, orphan a real
+			// agent's authority by mangling its identity, or trick a delete into
+			// destroying another agent's unrecoverable key. Only the privileged
+			// agent directory (which writes through the repo, not this service)
+			// may author them.
+			if (verb === EntityAccess.Write && SHELL_OWNED_ENTITY_TYPES.has(type)) return false;
 			try {
 				return ledger.has(app, `entities.${verb}:${type}`);
 			} catch (error) {

@@ -65,3 +65,55 @@ describe("isAgentGrantableCapability", () => {
 		}
 	});
 });
+
+describe("ledger-level enforcement (the choke point)", () => {
+	it("refuses a non-grantable capability for an agent principal at grant time", async () => {
+		const { CapabilityLedger, GrantedVia, AgentCapabilityRefusedError } = await import("./ledger");
+		const { DataStores } = await import("../../shell/src/main/storage/data-stores");
+		const { mkdtemp, rm } = await import("node:fs/promises");
+		const { tmpdir } = await import("node:os");
+		const { join } = await import("node:path");
+
+		const dir = await mkdtemp(join(tmpdir(), "brainstorm-cap-agent-"));
+		const stores = new DataStores(dir);
+		try {
+			const ledger = new CapabilityLedger(await stores.open("ledger"));
+			const agent = "ed25519:0123456789abcdef";
+			// Every alternate grant path funnels through here, so the policy holds
+			// even for callers that never consult the vocabulary themselves.
+			expect(() =>
+				ledger.grant({
+					appId: agent,
+					capability: "network.egress",
+					scope: "https://evil.example",
+					grantedVia: GrantedVia.Runtime,
+				}),
+			).toThrow(AgentCapabilityRefusedError);
+			expect(() =>
+				ledger.grant({
+					appId: agent,
+					capability: "entities.write",
+					scope: "*",
+					grantedVia: GrantedVia.Runtime,
+				}),
+			).toThrow(AgentCapabilityRefusedError);
+			expect(ledger.listActive(agent)).toHaveLength(0);
+
+			// A grantable one still lands, and app principals are unaffected.
+			expect(
+				ledger.grant({ appId: agent, capability: "ai.use", grantedVia: GrantedVia.Runtime }).appId,
+			).toBe(agent);
+			expect(
+				ledger.grant({
+					appId: "io.brainstorm.notes",
+					capability: "network.egress",
+					scope: "https://ok.example",
+					grantedVia: GrantedVia.Runtime,
+				}).appId,
+			).toBe("io.brainstorm.notes");
+		} finally {
+			stores.close();
+			await rm(dir, { recursive: true, force: true });
+		}
+	});
+});
