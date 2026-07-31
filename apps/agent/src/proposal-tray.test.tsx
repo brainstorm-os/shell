@@ -9,11 +9,12 @@
 import { GENERIC_OBJECT_TYPE, ValueType } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CodeFileConflictChoice, type CodeFilePathRow } from "./logic/code-file-conflict";
 import { ProposeKind, type ProposedArtifact, buildProposal } from "./logic/propose-artifacts";
 import { PROPOSE_CODE_FILE_VERB, buildCodeFileProposal } from "./logic/propose-code-file";
 import { PROPOSE_DATABASE_VERB, buildDatabaseProposal, rowCellKey } from "./logic/propose-database";
 import { PROPOSE_ROW_VERB, buildRowProposal } from "./logic/propose-row";
-import { ProposalTray } from "./proposal-tray";
+import { ProposalTray, type ProposalTrayProps } from "./proposal-tray";
 import { type RenderHandle, renderInto } from "./test/render";
 
 function stage(verb: string, args: Record<string, unknown>, id: string): ProposedArtifact {
@@ -393,5 +394,111 @@ describe("ProposalTray — code-file cards (AppForge-3)", () => {
 		const pre = handle.container.querySelector<HTMLElement>("[data-testid='agent-proposal-code']");
 		expect(pre?.tabIndex).toBe(0);
 		expect(pre?.getAttribute("aria-label")).toContain("a.ts");
+	});
+});
+
+describe("ProposalTray — a code-file path that is already taken (POLISH-FN-4)", () => {
+	function stageCode(args: Record<string, unknown>, id = "c1"): ProposedArtifact {
+		const r = buildCodeFileProposal({ verb: PROPOSE_CODE_FILE_VERB, args, id });
+		if (!r.ok) throw new Error(`expected ok, got ${r.reason}`);
+		return r.artifact;
+	}
+
+	async function renderWithVault(
+		artifact: ProposedArtifact,
+		existingCodeFiles: CodeFilePathRow[],
+		onApprove: ProposalTrayProps["onApprove"] = noop,
+	) {
+		return renderInto(
+			<ProposalTray
+				proposals={[artifact]}
+				busyIds={new Set()}
+				existingCodeFiles={existingCodeFiles}
+				onApprove={onApprove}
+				onDiscard={noop}
+				onEditField={noop}
+			/>,
+		);
+	}
+
+	const existing: CodeFilePathRow[] = [{ id: "ent_old", path: "hello-app/manifest.json" }];
+
+	it("says so BEFORE approval, naming the conflicting path", async () => {
+		handle = await renderWithVault(
+			stageCode({ path: "hello-app/manifest.json", content: "{}" }),
+			existing,
+		);
+		const notice = handle.container.querySelector("[data-testid='agent-proposal-conflict']");
+		expect(notice?.textContent).toContain("hello-app/manifest.json");
+		expect(notice?.getAttribute("role")).toBe("status");
+	});
+
+	it("replaces the one Add button with the two named outcomes", async () => {
+		handle = await renderWithVault(
+			stageCode({ path: "hello-app/manifest.json", content: "{}" }),
+			existing,
+		);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		// The button that used to create a duplicate is simply not there.
+		expect(card?.querySelector("[data-testid='agent-proposal-approve']")).toBeNull();
+		expect(card?.querySelector("[data-testid='agent-proposal-update']")).not.toBeNull();
+		// The rename target is named, so "save a copy" is never a silent rename.
+		expect(card?.querySelector("[data-testid='agent-proposal-save-copy']")?.textContent).toContain(
+			"hello-app/manifest-2.json",
+		);
+	});
+
+	it("each button reports the choice the user made", async () => {
+		const onApprove = vi.fn();
+		const artifact = stageCode({ path: "hello-app/manifest.json", content: "{}" });
+		handle = await renderWithVault(artifact, existing, onApprove);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		await act(async () => {
+			card?.querySelector<HTMLButtonElement>("[data-testid='agent-proposal-update']")?.click();
+		});
+		expect(onApprove).toHaveBeenLastCalledWith(artifact, CodeFileConflictChoice.Update);
+		await act(async () => {
+			card?.querySelector<HTMLButtonElement>("[data-testid='agent-proposal-save-copy']")?.click();
+		});
+		expect(onApprove).toHaveBeenLastCalledWith(artifact, CodeFileConflictChoice.SaveCopy);
+	});
+
+	it("a case-only collision is a conflict too", async () => {
+		handle = await renderWithVault(stageCode({ path: "hello-app/MANIFEST.JSON", content: "{}" }), [
+			{ id: "ent_old", path: "hello-app/manifest.json" },
+		]);
+		expect(handle.container.querySelector("[data-testid='agent-proposal-conflict']")).not.toBeNull();
+	});
+
+	it("a free path keeps the plain Add button and no notice", async () => {
+		handle = await renderWithVault(
+			stageCode({ path: "hello-app/index.html", content: "<p>" }),
+			existing,
+		);
+		const card = handle.container.querySelector("[data-testid='agent-proposal']");
+		expect(card?.querySelector("[data-testid='agent-proposal-conflict']")).toBeNull();
+		expect(card?.querySelector("[data-testid='agent-proposal-approve']")).not.toBeNull();
+		expect(card?.querySelector("[data-testid='agent-proposal-update']")).toBeNull();
+	});
+
+	it("a NOTE whose title matches a code-file path is not a conflict", async () => {
+		handle = await renderWithVault(stage("propose-note", { title: "hello-app/manifest.json" }, "n"), [
+			{ id: "ent_old", path: "hello-app/manifest.json" },
+		]);
+		expect(handle.container.querySelector("[data-testid='agent-proposal-conflict']")).toBeNull();
+		expect(handle.container.querySelector("[data-testid='agent-proposal-approve']")).not.toBeNull();
+	});
+
+	it("no vault context at all (prop omitted) behaves as an empty vault", async () => {
+		handle = await renderInto(
+			<ProposalTray
+				proposals={[stageCode({ path: "hello-app/manifest.json", content: "{}" })]}
+				busyIds={new Set()}
+				onApprove={noop}
+				onDiscard={noop}
+				onEditField={noop}
+			/>,
+		);
+		expect(handle.container.querySelector("[data-testid='agent-proposal-conflict']")).toBeNull();
 	});
 });

@@ -165,5 +165,9 @@
   "propose.codeFile.label": "Propose a new code file (a script/snippet saved in the user's vault, opened by the Code editor). args: {\"path\": \"<filename, e.g. scripts/build.ts>\", \"language\": \"<optional language id, e.g. typescript>\", \"content\": \"<the full source code>\"}",
   "propose.kind.codeFile": "Code file",
   "propose.field.path": "Filename",
-  "propose.codeFile.preview": "Code preview for {path}"
+  "propose.codeFile.preview": "Code preview for {path}",
+  "propose.codeFile.conflict": "A code file already exists at {path}. Rename this draft, or choose what to do with the one that's there.",
+  "propose.codeFile.update": "Update the existing file",
+  "propose.codeFile.saveCopy": "Save as {path}",
+  "propose.codeFile.conflictError": "Nothing was saved — a code file already exists at {path}. Update it or save a copy."
 }
