@@ -15,6 +15,7 @@
     "intents.dispatch:open",
     "roster.read",
     "roster.write",
+    "agents.mention",
     "sharing.read",
     "sharing.share",
     "ui.badge"

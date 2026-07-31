@@ -53,9 +53,12 @@ type ServiceHandlerGetter = (
 
 export type MentionRunnerDeps = {
 	getSession: () => AgentDirectorySession | null;
-	/** The local human's sovereign pubkey — the ONLY author whose message
-	 *  actuates an agent run (see `maybeRunMentionedAgents`). */
+	/** The local human's sovereign pubkey — the author a message must carry
+	 *  before it can actuate a run (see `maybeRunMentionedAgents`). */
 	getSelfPubkey: () => string | null;
+	/** Does the broker-VERIFIED principal that wrote the message hold the scarce
+	 *  `agents.mention` grant? The authenticated half of the actuation gate. */
+	callerMayMention: (app: string) => boolean;
 	getServiceHandler: ServiceHandlerGetter;
 	/** Fired after the runner writes a reply row directly (bypassing the
 	 *  entities service), so the host re-broadcasts staleness / reindexes —
@@ -70,6 +73,19 @@ export const MENTION_TRANSCRIPT_LIMIT = 24;
 
 /** At most this many agents run per message, however many are mentioned. */
 export const MENTION_RUN_CAP = 3;
+
+/** The scarce capability an app must hold for its writes to invite an agent
+ *  into a thread. Not a default grant — only the interactive chat surface. */
+export const AGENTS_MENTION_CAPABILITY = "agents.mention";
+
+/** Minimum spacing between runs in one channel. The per-message cap bounds
+ *  fan-out within a single create; this bounds a caller looping creates. */
+export const MENTION_CHANNEL_COOLDOWN_MS = 3_000;
+
+/** Highest `seq` an agent reply will ever be stamped with. A message carrying
+ *  a hostile `seq` (MAX_SAFE_INTEGER) would otherwise pin a channel's ordering
+ *  forever, since every later reply saturates at the same value. */
+export const MENTION_MAX_SEQ = 1_000_000_000;
 
 /** Per-message and whole-transcript character ceilings — a bounded COUNT is not
  *  a bounded prompt; one huge message would otherwise be unbounded context. */
@@ -93,8 +109,11 @@ export function projectTranscript(
 		senderKind: string;
 		personRef: string;
 		displayName: string;
+		/** The row's `created_by` — HOST-written and not settable by the app that
+		 *  posted the message, unlike everything else here. */
+		createdBy: string;
 	}>,
-	agentPubkey: string,
+	agent: { pubkey: string; fingerprint: string },
 ): AiChatMessage[] {
 	const out: AiChatMessage[] = [];
 	let budget = MENTION_TRANSCRIPT_CHARS_MAX;
@@ -104,13 +123,25 @@ export function projectTranscript(
 		const m = messages[i];
 		if (!m || m.body.trim().length === 0) continue;
 		const body = m.body.slice(0, MENTION_MESSAGE_CHARS_MAX);
-		const isAgentTurn = m.personRef === agentPubkey;
-		const content = isAgentTurn ? body : `${m.displayName.trim() || "Someone"}: ${body}`;
+		// A turn counts as THIS AGENT's only when the host wrote it as the agent.
+		// Keying on the app-supplied `personRef` let an app forge a prior
+		// "assistant" turn and put words in the agent's own mouth.
+		const isAgentTurn = m.createdBy === agent.fingerprint;
+		const content = isAgentTurn ? body : `${speakerLabel(m.displayName)}: ${body}`;
 		if (content.length > budget) break;
 		budget -= content.length;
 		out.push({ role: isAgentTurn ? MessageRole.Assistant : MessageRole.User, content });
 	}
 	return out.reverse();
+}
+
+/** A speaker label safe to interpolate into the `Name: ` turn delimiter —
+ *  interior newlines would otherwise let a display name forge turn boundaries
+ *  ("Ada\n\nSYSTEM: ..."), which is a free prompt-injection primitive for
+ *  anyone who can set a display name. */
+export function speakerLabel(displayName: string): string {
+	const flattened = displayName.replace(/[\r\n\t]+/g, " ").trim();
+	return flattened.slice(0, 64) || "Someone";
 }
 
 /** The persona-bearing instruction block for a channel run. */
@@ -124,6 +155,12 @@ export function buildChannelInstructions(agentName: string, persona: string): st
 	return lines.join("\n");
 }
 
+/** Channels with a run in flight, and when each last ran — the F8 rate limit.
+ *  Bounded by clearing wholesale; this is a throttle, not an audit record. */
+const inFlightChannels = new Set<string>();
+const lastRunAt = new Map<string, number>();
+const CHANNEL_CLOCK_MAX = 512;
+
 type ChannelMessage = {
 	id: string;
 	body: string;
@@ -132,6 +169,7 @@ type ChannelMessage = {
 	displayName: string;
 	seq: number;
 	createdAt: string;
+	createdBy: string;
 };
 
 function str(value: unknown): string {
@@ -160,6 +198,7 @@ function readChannelMessages(repo: EntitiesRepository, channelId: string): Chann
 			displayName: str(sender.displayName),
 			seq: typeof row.properties.seq === "number" ? row.properties.seq : 0,
 			createdAt: str(row.properties.createdAt),
+			createdBy: row.createdBy,
 		});
 	}
 	return messages.sort(
@@ -222,10 +261,16 @@ async function runOneAgent(
 ): Promise<void> {
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 	const messages = readChannelMessages(repo, channelId);
-	const nextSeq = (messages[messages.length - 1]?.seq ?? 0) + 1;
+	const lastSeq = messages[messages.length - 1]?.seq ?? 0;
+	const nextSeq = Math.min(Math.max(lastSeq, 0) + 1, MENTION_MAX_SEQ);
 
 	const ledger = await session.capabilityLedger();
 	const caps = ledger.listActive(agent.def.fingerprint).map(grantString);
+	// Grounding on a channel's history is a READ of other people's messages, so
+	// it rides the agent's own `entities.read` grant. Without it the agent still
+	// answers — from the turn that summoned it alone — rather than being handed
+	// a transcript nobody authorized it to see.
+	const mayReadThread = ledger.has(agent.def.fingerprint, `entities.read:${MESSAGE_TYPE_URL}`);
 	// The ledger's own matcher, not a string compare over the projection: a
 	// wildcard/scoped grant must resolve exactly as the broker resolves it.
 	if (!ledger.has(agent.def.fingerprint, "ai.use")) {
@@ -275,7 +320,13 @@ async function runOneAgent(
 			tools: [],
 			frozenCapabilities: caps,
 			maxIterations: 1,
-			transcript: projectTranscript(messages.slice(-MENTION_TRANSCRIPT_LIMIT), agent.def.pubkey),
+			transcript: projectTranscript(
+				(mayReadThread ? messages : messages.slice(-1)).slice(-MENTION_TRANSCRIPT_LIMIT),
+				{
+					pubkey: agent.def.pubkey,
+					fingerprint: agent.def.fingerprint,
+				},
+			),
 		},
 	);
 
@@ -295,8 +346,18 @@ async function runOneAgent(
 export async function maybeRunMentionedAgents(
 	deps: MentionRunnerDeps,
 	created: unknown,
+	callerApp: string,
 ): Promise<void> {
 	try {
+		// AUTHENTICATED actuation. The message's `sender.kind` / `personRef` are
+		// self-assertions of whatever app wrote the row, and the local user's
+		// pubkey is a PUBLIC value (roster.self is a default grant, and it sits on
+		// every message they ever sent) — so neither is a gate, only a knowledge
+		// check the pentest walked through. The real gate is the broker-verified
+		// principal that made the create: only an interactive chat surface, which
+		// holds the scarce `agents.mention` grant, can invite an agent into a
+		// thread.
+		if (!deps.callerMayMention(callerApp)) return;
 		const entity = created as { type?: unknown; properties?: unknown } | null;
 		if (!entity || entity.type !== MESSAGE_TYPE_URL || !entity.properties) return;
 		const properties = entity.properties as Record<string, unknown>;
@@ -307,21 +368,38 @@ export async function maybeRunMentionedAgents(
 
 		const session = deps.getSession();
 		if (!session) return;
-		// Human-in-the-loop (OQ-AT-2), enforced against the SOVEREIGN IDENTITY —
-		// not against the message's self-asserted `sender.kind`, which the writing
-		// app chooses. Only a turn authored by THIS device's human actuates a run,
-		// so neither an agent's own reply nor an LLM-driven app writing a
-		// participant-shaped message can start one.
+
+		// Human-in-the-loop (OQ-AT-2): on top of the authenticated caller above,
+		// the turn must be authored by THIS device's own identity, so an agent's
+		// own reply (an Assistant sender → null author) never actuates.
 		if (targets.author !== deps.getSelfPubkey()) return;
+
 		const agents = await listAgents(session);
 		const byPubkey = new Map(agents.map((a) => [a.def.pubkey, a]));
 		const mentioned = targets.mentioned
 			.map((pubkey) => byPubkey.get(pubkey))
 			.filter((a): a is AgentRecord => a !== undefined)
 			.slice(0, MENTION_RUN_CAP);
+		if (mentioned.length === 0) return;
 
-		for (const agent of mentioned) {
-			await runOneAgent(deps, session, agent, channelId);
+		// Rate limit per channel: one run per cooldown, never two at once. This
+		// sits AFTER every gate and is immediately followed by the try/finally —
+		// an early return between the `add` and the `finally` would leave the
+		// channel marked in-flight forever, so no agent could be summoned in it
+		// again for the life of the process.
+		const now = deps.now ? deps.now() : Date.now();
+		if (inFlightChannels.has(channelId)) return;
+		const last = lastRunAt.get(channelId) ?? 0;
+		if (now - last < MENTION_CHANNEL_COOLDOWN_MS) return;
+		lastRunAt.set(channelId, now);
+		if (lastRunAt.size > CHANNEL_CLOCK_MAX) lastRunAt.clear();
+		inFlightChannels.add(channelId);
+		try {
+			for (const agent of mentioned) {
+				await runOneAgent(deps, session, agent, channelId);
+			}
+		} finally {
+			inFlightChannels.delete(channelId);
 		}
 	} catch (error) {
 		console.warn("[brainstorm] agent mention run failed:", error);
