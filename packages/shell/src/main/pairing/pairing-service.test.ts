@@ -99,7 +99,19 @@ describe("PairingService — IPC layer", () => {
 		const confirmed = await targetSvc.confirmSas({ requestId: scanned.requestId });
 		expect(confirmed.addedRecord.deviceEd25519Pub.length).toBeGreaterThan(0);
 		expect(confirmed.addedRecord.sig.length).toBeGreaterThan(0);
-		expect(targetSession.devicesList().length).toBe(1);
+		// P2P-1 — the joiner records BOTH ends: itself, and the device it just
+		// paired with. It used to record only itself, which left it unable to
+		// recognise the source as a rostered host, so LAN admission could never
+		// succeed and every dial fell back to the relay.
+		const rostered = targetSession.devicesList();
+		expect(rostered.length).toBe(2);
+		expect(rostered.map((d) => d.deviceEd25519Pub)).toContain(confirmed.addedRecord.deviceEd25519Pub);
+		// Only the source's Ed25519 travels in the QR payload, so its row carries
+		// an empty X25519: a member we can verify, but cannot yet seal to.
+		const sourceRow = rostered.find(
+			(d) => d.deviceEd25519Pub !== confirmed.addedRecord.deviceEd25519Pub,
+		);
+		expect(sourceRow?.deviceX25519Pub).toBe("");
 
 		const stored = (targetSession as unknown as { _stored: () => Uint8Array | null })._stored();
 		expect(stored).not.toBeNull();

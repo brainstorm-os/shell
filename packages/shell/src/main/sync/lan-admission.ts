@@ -419,8 +419,19 @@ export function makeLanHostHandshake(deps: {
 		sealFor: (clientAccount, nonce) => {
 			try {
 				const host = deps.hostAccount();
-				const entry = deps.activeDevices().get(clientAccount);
-				if (!host || !entry?.x25519Pub) return null;
+				const roster = deps.activeDevices();
+				const entry = roster.get(clientAccount);
+				if (!host || !entry?.x25519Pub) {
+					// Say WHICH of the three it was. Refusing silently is what made a
+					// failed LAN dial impossible to diagnose from either side.
+					const why = !host
+						? "this host has no device account"
+						: !entry
+							? `not in the roster (${roster.size} active device(s) known)`
+							: "roster row has no usable X25519 key";
+					console.warn(`[lan-admission] cannot seal for ${clientAccount.slice(0, 12)}…: ${why}`);
+					return null;
+				}
 				return sealLanChallenge({
 					clientX25519Pub: entry.x25519Pub,
 					hostAccount: host,

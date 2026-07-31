@@ -256,6 +256,12 @@ export type WebSocketRelayPortOptions = {
 		) => AuthResponse | null;
 		verifyHostProof: (proof: string) => boolean;
 	};
+	/** Why an admission attempt gave up. The handshake refuses by closing the
+	 *  socket, which is right — a peer that cannot prove itself gets nothing —
+	 *  but silently, so a failed LAN dial used to surface as nothing but a
+	 *  fallback to the relay with no reason anywhere. The reason is a fixed
+	 *  string, never peer-supplied text, so logging it leaks nothing. */
+	onAdmissionFailed?: (reason: string) => void;
 };
 
 export class WebSocketRelayPort implements RelayPort {
@@ -275,6 +281,7 @@ export class WebSocketRelayPort implements RelayPort {
 	readonly #onChallenge: ((nonce: string) => Promise<AuthResponse | null>) | null;
 	readonly #requireAdmission: boolean;
 	readonly #lanHandshake: WebSocketRelayPortOptions["lanHandshake"] | null;
+	readonly #onAdmissionFailed: ((reason: string) => void) | null;
 	readonly #onResync: ((routingKey: string, sinceStateVectorB64?: string) => void) | null;
 	readonly #emitter = new EventEmitter();
 	readonly #subscriptions = new Set<string>();
@@ -354,6 +361,7 @@ export class WebSocketRelayPort implements RelayPort {
 		this.#onChallenge = opts.onChallenge ?? null;
 		this.#requireAdmission = opts.requireAdmission ?? false;
 		this.#lanHandshake = opts.lanHandshake ?? null;
+		this.#onAdmissionFailed = opts.onAdmissionFailed ?? null;
 		this.#onResync = opts.onResync ?? null;
 	}
 
@@ -950,6 +958,7 @@ export class WebSocketRelayPort implements RelayPort {
 					// Refused (not rostered / can't open / no session): stay
 					// unauthenticated and let the host's deadline close us.
 					if (reply) this.#sendControl({ op: "auth", ...reply });
+					else this.#onAdmissionFailed?.("could not answer the host's sealed challenge");
 					return;
 				}
 				const nonce = decodeChallengeNonce(bytes);
@@ -976,7 +985,13 @@ export class WebSocketRelayPort implements RelayPort {
 				// something any rogue peer can say (gate finding G2).
 				if (this.#lanHandshake) {
 					const proof = decodeAuthOkProof(bytes);
-					if (!proof || !this.#lanHandshake.verifyHostProof(proof)) {
+					if (!proof) {
+						this.#onAdmissionFailed?.("host sent auth-ok with no proof");
+						this.#closeSocketOnly();
+						return;
+					}
+					if (!this.#lanHandshake.verifyHostProof(proof)) {
+						this.#onAdmissionFailed?.("host proof did not verify");
 						this.#closeSocketOnly();
 						return;
 					}

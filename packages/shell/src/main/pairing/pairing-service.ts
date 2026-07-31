@@ -306,6 +306,27 @@ export class PairingService {
 			identity.secretKey,
 		);
 		session.devicesAdd(record);
+		// P2P-1 — record OUR OWN device too. Neither side used to do this, so a
+		// freshly-paired source knew the joiner but not itself, and a device that
+		// is not in its own roster cannot be admitted by its own LAN listener —
+		// which is how the hosting device joins the session it is hosting.
+		try {
+			const deviceX = session.getDeviceX25519();
+			session.devicesAdd(
+				signAddDeviceRecord(
+					{
+						deviceEd25519Pub: bytesToBase64(deviceEd.publicKey),
+						deviceX25519Pub: bytesToBase64(deviceX.publicKey),
+						deviceLabel: "",
+						addedAt: (this.options.now ?? Date.now)(),
+						addedBy: bytesToBase64(identity.publicKey),
+					},
+					identity.secretKey,
+				),
+			);
+		} catch (error) {
+			console.warn("[pairing] could not record this device:", error);
+		}
 		if (stillPending.machine.state === PairingState.HandshakeInFlight) {
 			stillPending.machine.paired();
 		}
@@ -384,6 +405,38 @@ export class PairingService {
 			identity.secretKey,
 		);
 		const stored = session.devicesAdd(record);
+		// P2P-1 — also record the device we just paired WITH. Without this the
+		// pair is asymmetric: the source records the joiner, the joiner records
+		// only itself, and nothing ever teaches the joiner who the source is.
+		// The LAN client refuses a host that is not in its own roster, so two
+		// paired machines could never admit each other and every dial fell back
+		// to the relay. Idempotent by `deviceEd25519Pub`, like every other add.
+		//
+		// Only the source's Ed25519 travels in the QR payload, which is all a
+		// CLIENT needs (it verifies the host's proof under that key). Sealing a
+		// challenge additionally needs the peer's X25519, so this device cannot
+		// yet act as HOST for the source; that direction wants the source's
+		// X25519 on the wire and is its own rung.
+		try {
+			session.devicesAdd(
+				signAddDeviceRecord(
+					{
+						deviceEd25519Pub: bytesToBase64(pending.join.sourceDeviceEd25519Pub),
+						// Only the source's Ed25519 travels in the QR payload; see the
+						// note in `DevicesStore.add` on why empty is legitimate here.
+						deviceX25519Pub: "",
+						deviceLabel: "",
+						addedAt: (this.options.now ?? Date.now)(),
+						addedBy: bytesToBase64(identity.publicKey),
+					},
+					identity.secretKey,
+				),
+			);
+		} catch (error) {
+			// A failure here must not undo a completed pairing — the user is
+			// paired either way; only LAN admission is degraded.
+			console.warn("[pairing] could not record the source device:", error);
+		}
 		pending.machine.paired();
 		return { requestId: args.requestId, addedRecord: stored };
 	}

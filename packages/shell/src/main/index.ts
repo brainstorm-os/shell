@@ -427,6 +427,11 @@ let lanHostRuntime: {
 		setMode(mode: LanHostModeValue): Promise<{ mode: LanHostModeValue }>;
 	};
 	controller: { apply(): Promise<void>; readonly url: string | null };
+	/** Replace the devices roster the LAN handshake authenticates against.
+	 *  Pairing pushes its own live rows here, because a second
+	 *  `VaultPropertiesStore.open()` gets a separate Y.Doc handle that cannot
+	 *  see a write made through the first one. */
+	setDevices(records: readonly { deviceEd25519Pub: string; deviceX25519Pub?: string }[]): void;
 	/** P2P-1 — the dial half, declared structurally so this module-level slot
 	 *  does not force an eager import of the LAN tree at boot. */
 	peerPrefs: {
@@ -2277,6 +2282,9 @@ void app.whenReady().then(async () => {
 		lanHostRuntime = {
 			prefs: lanHostPrefs,
 			controller: lanHost,
+			setDevices: (records) => {
+				lanDevices = { listActive: () => records };
+			},
 			peerPrefs: lanPeerPrefs,
 			dial: lanDial,
 			discovery: lanDiscovery,
@@ -2340,8 +2348,18 @@ void app.whenReady().then(async () => {
 								heartbeatIntervalMs: LAN_HEARTBEAT_INTERVAL_MS,
 								heartbeatTimeoutMs: LAN_HEARTBEAT_TIMEOUT_MS,
 								onDegraded: (degraded) => {
-									if (degraded) lanDial.noteDialUnusable(url);
-									else lanDial.noteDialOpen(url);
+									if (degraded) {
+										console.warn(`[lan-dial] ${url} went quiet past its heartbeat`);
+										lanDial.noteDialUnusable(url);
+									} else lanDial.noteDialOpen(url);
+								},
+								// A peer that cannot prove itself gets nothing, which is
+								// right, but it used to get nothing SILENTLY: the whole
+								// failure surfaced as a fallback to the relay with no
+								// reason anywhere. The reason is a fixed string, never
+								// peer-supplied text.
+								onAdmissionFailed: (reason) => {
+									console.warn(`[lan-dial] ${url} refused admission: ${reason}`);
 								},
 							})
 						: new WebSocketRelayPort({ url, onChallenge });
@@ -2358,6 +2376,9 @@ void app.whenReady().then(async () => {
 							// `Reconnecting` is reached solely from an unexpected drop or
 							// an expired connect deadline.
 							else if (state === WebSocketRelayState.Reconnecting) {
+								console.warn(
+									`[lan-dial] ${url} did not answer within ${LAN_CONNECT_TIMEOUT_MS}ms — falling back to the relay`,
+								);
 								lanDial.noteDialUnusable(url);
 							}
 						});
@@ -2387,6 +2408,16 @@ void app.whenReady().then(async () => {
 	}
 	registerPairingHandlers({
 		getDashboard: () => dashboardWindow,
+		// P2P-1 — a device joined (or was revoked), so re-read the roster the LAN
+		// handshake authenticates against. It is otherwise only read on a vault
+		// change, and pairing happens while the vault is already open, so the
+		// host kept its empty pre-pairing roster and refused to seal a challenge
+		// for the machine that had just paired. Re-apply the host too: a first
+		// device makes hosting meaningful where before it could admit nobody.
+		onDevicesChanged: (activeRecords) => {
+			lanHostRuntime?.setDevices(activeRecords);
+			void lanHostRuntime?.controller.apply();
+		},
 		// LAN-3's producing half: while this device hosts on the local network,
 		// the payload it hands the joining device carries its own private
 		// address, so the pair itself happens with no server in the middle.

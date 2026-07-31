@@ -255,8 +255,16 @@ function validateRecordShape(record: SignedAddDeviceRecord): void {
 	if (typeof record.deviceEd25519Pub !== "string" || record.deviceEd25519Pub.length === 0) {
 		throw new Error("DevicesStore.add: deviceEd25519Pub must be a non-empty string");
 	}
-	if (typeof record.deviceX25519Pub !== "string" || record.deviceX25519Pub.length === 0) {
-		throw new Error("DevicesStore.add: deviceX25519Pub must be a non-empty string");
+	// P2P-1 — present but EMPTY is allowed. The field stays in the signed
+	// payload either way, so the signature shape is unchanged; an empty value
+	// simply means "we know this device is ours but not its HPKE recipient
+	// key". `lanRosterDirectory` already models exactly that: such a row is a
+	// member (the Ed25519 half admits it and verifies its proofs) but cannot be
+	// sealed TO, so it can be a LAN client and not a LAN host. The joining
+	// device records the source this way, because only the source's Ed25519
+	// travels in the QR payload.
+	if (typeof record.deviceX25519Pub !== "string") {
+		throw new Error("DevicesStore.add: deviceX25519Pub must be a string");
 	}
 	if (typeof record.deviceLabel !== "string") {
 		throw new Error("DevicesStore.add: deviceLabel must be a string");

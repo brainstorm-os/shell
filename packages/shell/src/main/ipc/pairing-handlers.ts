@@ -59,6 +59,19 @@ export type PairingHandlersOptions = {
 	 *  change signal. Same pattern `files-handles-handlers.ts` uses. */
 	getDashboard: () => BrowserWindow | null;
 	/**
+	 * P2P-1 — the devices roster changed (a device was paired in, or revoked).
+	 *
+	 * The LAN handshake authenticates against a roster the main process reads
+	 * ONCE per vault change, but pairing happens while the vault is already
+	 * open. Without this the host kept the empty pre-pairing roster and refused
+	 * to seal a challenge for the device that had just joined, so two paired
+	 * machines could never admit each other and every LAN dial fell back to the
+	 * relay. Revocation needs the same signal, in the other direction.
+	 */
+	onDevicesChanged?: (
+		activeRecords: readonly { deviceEd25519Pub: string; deviceX25519Pub?: string }[],
+	) => void;
+	/**
 	 * LAN-3's PRODUCING half — the live LAN listener URL, or `null`.
 	 *
 	 * `LAN-3` shipped only the accepting half. `LanRelayListener` has always
@@ -414,6 +427,16 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 	let active: ActiveServiceHolder = null;
 
 	const notify = (): void => {
+		try {
+			// Hand over THIS store's live rows rather than letting the listener
+			// re-open its own `VaultPropertiesStore`: a second `open()` loads a
+			// separate Y.Doc handle for the same id, so it cannot see a write that
+			// has only happened in this one. That is precisely why re-reading the
+			// roster after pairing still reported zero devices.
+			options.onDevicesChanged?.(active?.props.devices().listActive() ?? []);
+		} catch (error) {
+			console.warn("[brainstorm] pairing-devices main-process hook failed:", error);
+		}
 		const dashboard = options.getDashboard();
 		if (!dashboard || dashboard.isDestroyed()) return;
 		try {
