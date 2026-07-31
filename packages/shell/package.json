@@ -205,6 +205,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.9.0",
     "better-sqlite3-multiple-ciphers": "12.9.0",
+    "bonjour-service": "1.4.4",
     "electron-updater": "^6.3.0",
     "framer-motion": "^12.38.0",
     "imapflow": "^1.4.6",

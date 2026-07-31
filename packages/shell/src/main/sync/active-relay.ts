@@ -116,6 +116,24 @@ export type ActiveRelayOptions = {
 	makeLoopback?: MakeLoopbackPort;
 	/** Pluggable for tests. Defaults to reading `<vaultPath>/vault.json`. */
 	readSyncRelayUrl?: (vaultPath: string) => Promise<string | SyncRelayTarget | null>;
+	/**
+	 * P2P-1 — the LAN peer this device has decided to dial, or `null`.
+	 *
+	 * Consulted BEFORE `vault.json`, which is the whole of "exclusive
+	 * selection, LAN preferred": a live LAN target replaces the relay rather
+	 * than running beside it. Running both, or racing them, would hand the
+	 * relay exactly the timing and volume metadata that LAN mode exists to
+	 * avoid, and would make the sync surface's "no server" line untrue.
+	 *
+	 * Separate from `vault.json` on purpose. A discovered peer's address is
+	 * device-local and ephemeral — the port changes every boot — so writing it
+	 * into the vault's durable relay slot would destroy the user's configured
+	 * relay and leave nothing to fall back to. The explicit `lan` flag still
+	 * comes from provenance, never from the address (F-466): a target only
+	 * appears here after a verified discovery tag, a typed address, or a
+	 * pairing payload.
+	 */
+	resolveLanTarget?: () => SyncRelayTarget | null;
 };
 
 const STATE_EVENT = "state";
@@ -162,6 +180,7 @@ export class ActiveRelayOrchestrator {
 	readonly #makeRelayPort: MakeRelayPort;
 	readonly #makeLoopback: MakeLoopbackPort;
 	readonly #readSyncRelayUrl: (vaultPath: string) => Promise<string | SyncRelayTarget | null>;
+	readonly #resolveLanTarget: (() => SyncRelayTarget | null) | null;
 	readonly #frameListeners = new Set<(frame: Uint8Array) => void>();
 	readonly #subscribed = new Set<string>();
 	#current: ActiveRelayState;
@@ -173,6 +192,7 @@ export class ActiveRelayOrchestrator {
 		this.#makeRelayPort = opts.makeRelayPort ?? makeDefaultWebSocketPort;
 		this.#makeLoopback = opts.makeLoopback ?? makeDefaultLoopback;
 		this.#readSyncRelayUrl = opts.readSyncRelayUrl ?? readVaultSyncRelayUrl;
+		this.#resolveLanTarget = opts.resolveLanTarget ?? null;
 		this.#current = this.#mintLoopbackState();
 	}
 
@@ -376,6 +396,25 @@ export class ActiveRelayOrchestrator {
 		return { kind: ActiveRelayKind.Loopback, port: this.#makeLoopback() };
 	}
 
+	/**
+	 * The LAN peer to prefer, if any. Fail-closed: a resolver that throws is
+	 * read as "no LAN peer" and sync falls to the relay, never the other way
+	 * round — a thrown key check or a half-built coordinator must not put an
+	 * unverified address on the transport.
+	 */
+	#readLanTarget(): SyncRelayTarget | null {
+		if (!this.#resolveLanTarget) return null;
+		try {
+			const target = this.#resolveLanTarget();
+			if (!target || typeof target.url !== "string" || target.url.length === 0) return null;
+			// The flag is not negotiable here: anything this resolver produces is a
+			// peer device, so it gets the channel-bound admission handshake.
+			return { url: target.url, lan: true };
+		} catch {
+			return null;
+		}
+	}
+
 	async #rebuild(): Promise<void> {
 		// Serialize concurrent rebuilds so two rapid session changes don't
 		// race on the close/open sequence and leave a stale port behind.
@@ -406,8 +445,13 @@ export class ActiveRelayOrchestrator {
 		// path) and would happen every reconfigure call, even no-op ones,
 		// if we built unconditionally.
 		const desiredKind = !session ? ActiveRelayKind.Loopback : null;
+		// P2P-1 — LAN preferred, exclusively. A live LAN target short-circuits
+		// the vault.json read entirely, so the relay is not merely deprioritised
+		// but absent from the path while a peer is carrying sync.
+		const lanTarget = session && desiredKind === null ? this.#readLanTarget() : null;
 		const rawTarget =
-			session && desiredKind === null ? await this.#readSyncRelayUrl(session.vaultPath) : null;
+			lanTarget ??
+			(session && desiredKind === null ? await this.#readSyncRelayUrl(session.vaultPath) : null);
 		// A bare-string reader (tests, back-compat) means "relay" — the LAN
 		// trust model is only ever selected by the explicit flag (F-466).
 		const target: SyncRelayTarget | null =

@@ -28,6 +28,25 @@
 		background-color var(--motion-duration-fast, 120ms) ease,
 		border-color var(--motion-duration-fast, 120ms) ease;
 }
+/* Toolbar variant — a searchbar that sits in a CONTROL ROW (beside buttons,
+   selects or filter chips) wears the shared field face at the md control
+   height, so the row lines up on one baseline and the field reads as a field
+   at rest. The chromeless default stays right for a search that OWNS its own
+   header band (Notes / Contacts / Books sidebars). Face + height are the
+   `.bs-input` values verbatim — one field face, declared once.
+
+   The marketplace toolbar previously tried to paint this locally and lost the
+   specificity fight with `:root .bs-searchbar` above, so the field rendered
+   with no border and no fill at 24px next to a 32px button. */
+:root .bs-searchbar--field {
+	height: var(--control-height-md, 32px);
+	border-color: var(--color-border-default);
+	border-radius: var(--radius-sm);
+	background: var(--color-background-elevated);
+}
+:root .bs-searchbar--field:hover:not(:focus-within) {
+	border-color: var(--color-border-strong);
+}
 /* On focus, show the standard purple focus ring the rest of the design system
    uses — not a filled surface + border, which reads as the field abruptly
    changing shape when you click into it. */

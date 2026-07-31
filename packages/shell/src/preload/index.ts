@@ -840,10 +840,24 @@ const SYNC_POLICY_GET_CHANNEL = "sync-status:get-policy";
 const SYNC_LAN_HOST_GET_CHANNEL = "sync-status:get-lan-host-mode";
 const SYNC_LAN_HOST_SET_CHANNEL = "sync-status:set-lan-host-mode";
 const SYNC_POLICY_SET_CHANNEL = "sync-status:set-policy";
+const SYNC_LAN_PEERING_GET_CHANNEL = "sync-status:get-lan-peering";
+const SYNC_LAN_DIAL_MODE_SET_CHANNEL = "sync-status:set-lan-dial-mode";
+const SYNC_LAN_PEER_ADDRESS_SET_CHANNEL = "sync-status:set-lan-peer-address";
 const SYNC_RESTORE_AVAILABLE_CHANNEL = "sync-status:restore-available";
 const SYNC_RESTORE_CHANNEL = "sync-status:restore";
 
 type SyncStatusListener = (snap: SyncStatusSnapshot | null) => void;
+
+/** P2P-1 — everything Settings → Sync renders for the local network. Mirrors
+ *  `main/ipc/sync-status-handlers.ts`; declared here rather than imported so
+ *  the preload keeps its no-main-imports rule. */
+export type LanPeeringSnapshot = {
+	dialMode: string;
+	manualUrl: string | null;
+	activeUrl: string | null;
+	listenerUrl: string | null;
+	peers: readonly { instance: string; urls: readonly string[] }[];
+};
 
 /** Stage 10.14 — the result of a cold restore-from-zero pass. */
 export type RestoreSummary = {
@@ -880,6 +894,18 @@ const syncStatus = {
 	getLanHostMode: (): Promise<string | null> => ipcRenderer.invoke(SYNC_LAN_HOST_GET_CHANNEL),
 	setLanHostMode: (mode: string): Promise<string | null> =>
 		ipcRenderer.invoke(SYNC_LAN_HOST_SET_CHANNEL, mode),
+	/** P2P-1 — the DIAL half. `getLanPeering` returns the whole local-network
+	 *  picture in one read (mode, typed address, live peer, this device's own
+	 *  address, and the verified peers discovery has seen), so the panel cannot
+	 *  render two moments at once. `setLanPeerAddress` resolves `null` when the
+	 *  address does not validate — that is a refusal to store, not a silent
+	 *  no-op. */
+	getLanPeering: (): Promise<LanPeeringSnapshot | null> =>
+		ipcRenderer.invoke(SYNC_LAN_PEERING_GET_CHANNEL),
+	setLanDialMode: (mode: string): Promise<LanPeeringSnapshot | null> =>
+		ipcRenderer.invoke(SYNC_LAN_DIAL_MODE_SET_CHANNEL, mode),
+	setLanPeerAddress: (raw: string | null): Promise<LanPeeringSnapshot | null> =>
+		ipcRenderer.invoke(SYNC_LAN_PEER_ADDRESS_SET_CHANNEL, raw),
 	setPolicy: (policy: SelectiveSyncPolicy): Promise<SelectiveSyncPolicy | null> =>
 		ipcRenderer.invoke(SYNC_POLICY_SET_CHANNEL, policy),
 	// Stage 10.14 — cold restore-from-zero (keystore-intact device). `available`

@@ -112,9 +112,12 @@ import {
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
-import { isAuthorizedWriter, resolveMembers } from "./collab/access-record";
+import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
+import { deriveInviteSecret } from "./collab/invite-anchor";
+import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
+import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
 import { makeNetworkEgress } from "./connectors/egress";
 import { buildConnectorsServiceDeps } from "./connectors/wiring";
@@ -126,8 +129,8 @@ import {
 	readBillingCredential,
 	writeBillingCredential,
 } from "./credentials/billing-refresh-credential";
-import { bytesToBase64 } from "./credentials/crypto";
-import { verifySignature } from "./credentials/identity";
+import { base64ToBytes, bytesToBase64 } from "./credentials/crypto";
+import { ED25519_PUBLIC_BYTES, verifySignature } from "./credentials/identity";
 import { wrapDekForRecipient, wrapDekVersionOf } from "./credentials/member-wraps";
 import { makeDashboardServiceHandler } from "./dashboard/dashboard-service";
 import {
@@ -234,7 +237,7 @@ import { registerSearchHandlers } from "./ipc/search-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
-import { registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
+import { type LanPeeringSnapshot, registerSyncStatusHandlers } from "./ipc/sync-status-handlers";
 import { registerAutoUpdateHandlers, registerUpdateHandlers } from "./ipc/update-handlers";
 import { registerVaultHandlers } from "./ipc/vault-handlers";
 import { registerVaultLockHandlers } from "./ipc/vault-lock-handlers";
@@ -297,7 +300,12 @@ import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcut
 import type { ShortcutRegistry } from "./shortcuts/shortcut-registry";
 import { makeShortcutsServiceHandler } from "./shortcuts/shortcuts-service";
 import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
-import { AssetRefsRepository, AssetsRepository, EntitiesRepository } from "./storage/entities-repo";
+import {
+	AssetRefsRepository,
+	AssetsRepository,
+	EntitiesRepository,
+	ShareInvitesRepository,
+} from "./storage/entities-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
 import { ConnectorWebhooksRepository } from "./storage/registry-repo/connector-webhooks-repo";
@@ -403,9 +411,14 @@ const WALLPAPER_THUMB_SUFFIX = ".thumb.jpg";
 // soak attempt either succeeds or reveals the exact stalled milestone.
 const BOOT_START = Date.now();
 import {
+	LanDialMode as LanDialModeEnum,
+	type LanDialMode as LanDialModeValue,
+} from "./sync/lan-dial-coordinator";
+import {
 	LanHostMode as LanHostModeEnum,
 	type LanHostMode as LanHostModeValue,
 } from "./sync/lan-host-policy";
+import type { LanPeerPrefs as LanPeerPrefsValue } from "./sync/lan-peer-prefs-store";
 
 let lanHostRuntime: {
 	prefs: {
@@ -413,8 +426,74 @@ let lanHostRuntime: {
 		load(): Promise<{ mode: LanHostModeValue }>;
 		setMode(mode: LanHostModeValue): Promise<{ mode: LanHostModeValue }>;
 	};
-	controller: { apply(): Promise<void> };
+	controller: { apply(): Promise<void>; readonly url: string | null };
+	/** P2P-1 — the dial half, declared structurally so this module-level slot
+	 *  does not force an eager import of the LAN tree at boot. */
+	peerPrefs: {
+		cached: LanPeerPrefsValue | null;
+		load(): Promise<LanPeerPrefsValue>;
+		setMode(mode: LanDialModeValue): Promise<LanPeerPrefsValue>;
+		setManualAddress(raw: string | null): Promise<LanPeerPrefsValue | null>;
+	};
+	dial: {
+		setMode(mode: LanDialModeValue): void;
+		setManualUrl(url: string | null): void;
+		offerPairedPeer(url: string): void;
+		target(): { url: string; source: string; instance?: string } | null;
+		knownPeers(): readonly { instance: string; urls: readonly string[]; source: string }[];
+	};
+	discovery: { apply(): Promise<void> };
+	parsePeerAddress(raw: string, opts?: { allowLoopback?: boolean }): string | null;
 } | null = null;
+
+/**
+ * P2P-1 — split `ws://host:port` back into the parts an mDNS advert needs.
+ *
+ * The listener's URL is the canonical thing a peer dials, so the advert is
+ * derived FROM it rather than rebuilt from the interface list: a rebuild could
+ * disagree with what is actually bound, and the tag commits to the advertised
+ * address, so a disagreement would fail verification on the far side with no
+ * clue why. Returns `null` for anything that is not a well-formed `ws://` URL
+ * with an explicit port.
+ */
+/**
+ * P2P-1 — everything Settings → Sync renders for the local network, read in one
+ * pass so the panel can never show a dial mode from one moment beside a peer
+ * list from another.
+ *
+ * Absent runtime (boot order, no relay block) reads as "off, nothing found"
+ * rather than throwing: the panel then shows the feature as off, which is
+ * true.
+ */
+function lanPeeringSnapshot(prefs: LanPeerPrefsValue | null | undefined): LanPeeringSnapshot {
+	const rt = lanHostRuntime;
+	const target = rt?.dial.target() ?? null;
+	return {
+		dialMode: prefs?.mode ?? LanDialModeEnum.Off,
+		manualUrl: prefs?.manualUrl ?? null,
+		activeUrl: target?.url ?? null,
+		listenerUrl: rt?.controller.url ?? null,
+		peers: (rt?.dial.knownPeers() ?? []).map((peer) => ({
+			instance: peer.instance,
+			urls: peer.urls,
+		})),
+	};
+}
+
+function parseLanListenerUrl(
+	url: string | null,
+): { addresses: readonly string[]; port: number } | null {
+	if (!url) return null;
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== "ws:" || !parsed.port) return null;
+		const port = Number(parsed.port);
+		if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return null;
+		return { addresses: [parsed.hostname], port };
+	} catch {
+		return null;
+	}
+}
 
 function bootStage(stage: string): void {
 	console.log(`[brainstorm/boot] ${stage} ${Date.now() - BOOT_START}`);
@@ -2023,7 +2102,7 @@ void app.whenReady().then(async () => {
 	// configured, loopback otherwise).
 	{
 		const { ActiveRelayOrchestrator, installActiveRelay } = await import("./sync/active-relay");
-		const { WebSocketRelayPort } = await import("./sync/websocket-relay-port");
+		const { WebSocketRelayPort, WebSocketRelayState } = await import("./sync/websocket-relay-port");
 		const { createLanSessionAccess, makeLanClientHandshakeForSession } = await import(
 			"./sync/lan-sync-wiring"
 		);
@@ -2088,10 +2167,59 @@ void app.whenReady().then(async () => {
 		const { LanHostController } = await import("./sync/lan-host-controller");
 		const { createLanListener } = await import("./sync/lan-host-factory");
 		const { DEFAULT_LAN_HOST_MODE } = await import("./sync/lan-host-policy");
-		const { lanInterfaces } = await import("./sync/lan-relay-listener");
+		const { lanInterfaces, rankLanInterfaces } = await import("./sync/lan-relay-listener");
 		const lanHostPrefs = new LanHostPrefsStore({
 			path: lanHostPrefsPath(app.getPath("userData")),
 		});
+		// P2P-1 — the DIAL half. Everything above this line is the host half; the
+		// client half read `syncRelay.lan` out of vault.json and nothing ever
+		// wrote it, so a device could listen and no device would ever dial. These
+		// are the pieces that let a user reach LAN sync from Settings.
+		const { LanPeerPrefsStore, lanPeerPrefsPath } = await import("./sync/lan-peer-prefs-store");
+		const {
+			LAN_CONNECT_TIMEOUT_MS,
+			LAN_HEARTBEAT_INTERVAL_MS,
+			LAN_HEARTBEAT_TIMEOUT_MS,
+			LanDialCoordinator,
+			LanDialMode,
+			LanDialSource,
+			parseLanPeerAddress,
+		} = await import("./sync/lan-dial-coordinator");
+		const { LanDiscoveryService } = await import("./sync/lan-discovery-service");
+		const { createLanMdnsBackend } = await import("./sync/lan-mdns-backend");
+		const lanPeerPrefs = new LanPeerPrefsStore({
+			path: lanPeerPrefsPath(app.getPath("userData")),
+		});
+		const lanDial = new LanDialCoordinator({
+			onTargetChanged: (target) => {
+				console.info(
+					`[lan-dial] ${target ? `target ${target.url} (${target.source})` : "no peer — relay"}`,
+				);
+				// Rebuild the transport in this turn so a discovered peer is dialled
+				// now rather than at the next vault change.
+				const relay = getActiveRelay();
+				if (relay) void relay.reconfigure();
+			},
+		});
+		// The discovery secret is derived per access from the sovereign user key
+		// rather than cached: a vault close must stop us advertising and stop us
+		// verifying, and a cached copy would outlive the session that authorised
+		// it. Derivation is one HKDF call, so per-access is free.
+		const lanDiscoverySecret = (): Uint8Array | null => {
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			try {
+				return session.lanDiscoverySecret();
+			} catch {
+				// A session disposed between the null-check and the call throws
+				// `assertOpen`; refusing is the correct read of that race.
+				return null;
+			}
+		};
+		// The listener's bound address + port, parsed back out of the URL the
+		// controller reports. That URL is the canonical thing a peer dials, so
+		// advertising anything derived separately could disagree with it.
+		let lanListenerEndpoint: { addresses: readonly string[]; port: number } | null = null;
 		const lanHost = new LanHostController({
 			readState: () => ({
 				// Prefs not loaded yet ⇒ the Off default, so a slow disk read cannot
@@ -2106,16 +2234,57 @@ void app.whenReady().then(async () => {
 			createListener: () =>
 				createLanListener({
 					access: lanAccess,
-					addresses: () => lanInterfaces().map((iface) => iface.address),
+					// P2P-1 — ranked, not raw: physical adapters ahead of Docker
+					// bridges, VPN `utun`s and VM host adapters, so the listener does
+					// not silently bind an address no peer can reach.
+					addresses: () => rankLanInterfaces(lanInterfaces()).map((iface) => iface.address),
 					onError: (error) => console.warn("[lan-host] listener error", error),
 				}),
 			onError: (error) => console.warn("[lan-host] could not bind", error),
-			onUrlChanged: (url) => console.info(`[lan-host] ${url ? `listening on ${url}` : "stopped"}`),
+			onUrlChanged: (url) => {
+				console.info(`[lan-host] ${url ? `listening on ${url}` : "stopped"}`);
+				// LAN-3's PRODUCING half. The listener has always minted exactly the
+				// URL the pairing payload wants, and the payload validator has always
+				// accepted it — nothing connected the two, so the only consumer of
+				// this callback was a log line. Now the bound URL reaches both the
+				// pairing payload (below) and the discovery advert.
+				lanListenerEndpoint = parseLanListenerUrl(url);
+				void lanDiscovery.apply();
+			},
 		});
-		lanHostRuntime = { prefs: lanHostPrefs, controller: lanHost };
+		// P2P-1 — advertise this device while it is hosting, and browse whenever
+		// the user asked us to find peers automatically. The two are independent:
+		// a laptop that dials the desktop need not accept anything itself.
+		const lanDiscovery = new LanDiscoveryService({
+			readState: () => ({
+				advertise: lanHost.listening,
+				browse: (lanPeerPrefs.cached?.mode ?? LanDialMode.Off) === LanDialMode.Auto,
+				listener: lanListenerEndpoint,
+			}),
+			discoverySecret: lanDiscoverySecret,
+			backend: await createLanMdnsBackend({
+				onError: (error) => console.warn("[lan-discovery] responder", error),
+			}),
+			onCandidate: (candidate) => lanDial.offerCandidate(candidate, LanDialSource.Discovery),
+			onError: (error) => console.warn("[lan-discovery]", error),
+		});
+		lanHostRuntime = {
+			prefs: lanHostPrefs,
+			controller: lanHost,
+			peerPrefs: lanPeerPrefs,
+			dial: lanDial,
+			discovery: lanDiscovery,
+			parsePeerAddress: parseLanPeerAddress,
+		};
 		void lanHostPrefs.load().then(() => lanHost.apply());
+		void lanPeerPrefs.load().then((prefs) => {
+			lanDial.setMode(prefs.mode);
+			lanDial.setManualUrl(prefs.manualUrl);
+			return lanDiscovery.apply();
+		});
 		app.on("before-quit", () => {
 			void lanHost.dispose();
+			void lanDiscovery.dispose();
 		});
 
 		// Re-prime on every vault change, and once now for a session that opened
@@ -2124,10 +2293,22 @@ void app.whenReady().then(async () => {
 		onActiveVaultSessionChanged(() => {
 			primeLanDevices();
 			void lanHost.apply();
+			// A new identity must not inherit the previous one's peers: the tags
+			// that verified them were derived from a key this session does not
+			// have, so every stored candidate is unverifiable now.
+			lanDial.reset();
+			void lanDiscovery.apply();
 		});
 		primeLanDevices();
 		const installedRelay = installActiveRelay(
 			new ActiveRelayOrchestrator({
+				// P2P-1 — LAN preferred, exclusively. A live peer target replaces the
+				// relay outright; when the dial fails or the link degrades the
+				// coordinator drops the target and the relay carries sync again.
+				resolveLanTarget: () => {
+					const target = lanDial.target();
+					return target ? { url: target.url, lan: true } : null;
+				},
 				makeRelayPort: (url, target) => {
 					// A LAN peer authenticates with the channel-bound device handshake;
 					// a cloud relay uses the SYNC-4b entitlement challenge. The two are
@@ -2141,8 +2322,40 @@ void app.whenReady().then(async () => {
 								url,
 								requireAdmission: true,
 								lanHandshake: makeLanClientHandshakeForSession(lanAccess),
+								// P2P-1 — measured, not guessed. A dial to a sleeping peer
+								// costs 75,010 ms on the OS default and 3,003 ms with this
+								// deadline; without it, exclusive LAN selection turns every
+								// sleeping-peer case into a 75-second sync outage. The
+								// heartbeat is the other half: the transport never noticed a
+								// frozen peer at all, and a 5 s answer deadline noticed in
+								// 5,047 ms. Both are LAN-only — the cloud path has a hosted
+								// node on the other end and is a separate question.
+								connectTimeoutMs: LAN_CONNECT_TIMEOUT_MS,
+								heartbeatIntervalMs: LAN_HEARTBEAT_INTERVAL_MS,
+								heartbeatTimeoutMs: LAN_HEARTBEAT_TIMEOUT_MS,
+								onDegraded: (degraded) => {
+									if (degraded) lanDial.noteDialUnusable(url);
+									else lanDial.noteDialOpen(url);
+								},
 							})
 						: new WebSocketRelayPort({ url, onChallenge });
+					if (target.lan) {
+						// The dial outcome drives selection: an admitted link clears the
+						// cooldown, anything else cools the address off and hands sync
+						// back to the relay. `Reconnecting` after a deadline is the
+						// signal that the address is not answering.
+						port.on("state", (state) => {
+							if (state === WebSocketRelayState.Open) lanDial.noteDialOpen(url);
+							// Only `Reconnecting`, never `Closed`: `close()` is also how the
+							// orchestrator retires a port when WE moved on, and cooling an
+							// address off for that would punish a peer that was healthy.
+							// `Reconnecting` is reached solely from an unexpected drop or
+							// an expired connect deadline.
+							else if (state === WebSocketRelayState.Reconnecting) {
+								lanDial.noteDialUnusable(url);
+							}
+						});
+					}
 					port.connect();
 					return port;
 				},
@@ -2166,7 +2379,27 @@ void app.whenReady().then(async () => {
 			}
 		}
 	}
-	registerPairingHandlers({ getDashboard: () => dashboardWindow });
+	registerPairingHandlers({
+		getDashboard: () => dashboardWindow,
+		// LAN-3's producing half: while this device hosts on the local network,
+		// the payload it hands the joining device carries its own private
+		// address, so the pair itself happens with no server in the middle.
+		getLanListenerUrl: () => lanHostRuntime?.controller.url ?? null,
+		// The just-paired device adopts its peer's address, so it can sync
+		// directly without waiting for an mDNS record to turn up. Filtered by the
+		// same predicate a typed address goes through: a payload that named a
+		// public host is not a LAN peer.
+		onPairedPeerUrl: (url) => {
+			const rt = lanHostRuntime;
+			if (!rt) return;
+			// `allowLoopback: false`: the payload slot holds the RELAY address whenever
+			// one is configured, and the two-shell dogfood run caught exactly that —
+			// the joining device adopted the durable node on 127.0.0.1 as a LAN peer.
+			const normalised = rt.parsePeerAddress(url, { allowLoopback: false });
+			if (!normalised) return;
+			rt.dial.offerPairedPeer(normalised);
+		},
+	});
 	// Collab-C6 — privileged Settings → Identity profile get/set (the dashboard
 	// surface; apps use the capability-gated `roster` service instead).
 	registerProfileHandlers();
@@ -2220,6 +2453,33 @@ void app.whenReady().then(async () => {
 					// the next restart.
 					await rt.controller.apply();
 					return saved.mode;
+				},
+				// P2P-1 — the dial half. Everything above is "accept connections";
+				// these are "go and find the other machine", which is what was
+				// missing: nothing outside tests ever set the LAN trust model, so a
+				// device could listen and no device would ever dial.
+				getLanPeering: async () => lanPeeringSnapshot(await lanHostRuntime?.peerPrefs.load()),
+				setLanDialMode: async (mode) => {
+					const rt = lanHostRuntime;
+					if (!rt) return lanPeeringSnapshot(null);
+					const saved = await rt.peerPrefs.setMode(mode as LanDialModeValue);
+					rt.dial.setMode(saved.mode);
+					// Browsing follows the mode, so start/stop the responder in this
+					// turn rather than at the next restart.
+					await rt.discovery.apply();
+					return lanPeeringSnapshot(saved);
+				},
+				setLanPeerAddress: async (raw) => {
+					const rt = lanHostRuntime;
+					if (!rt) return null;
+					const input = raw === null ? null : typeof raw === "string" ? raw : "";
+					const saved = await rt.peerPrefs.setManualAddress(input);
+					// `null` ⇒ the address did not validate. Refuse rather than store
+					// it: a stored bad address looks exactly like the bug this rung
+					// exists to fix — the dialer silently never dials.
+					if (!saved) return null;
+					rt.dial.setManualUrl(saved.manualUrl);
+					return lanPeeringSnapshot(saved);
 				},
 				// 10.14 — offer cold restore when this keystore-intact device has
 				// an empty entities.db AND the active transport has a durable node.
@@ -3223,6 +3483,45 @@ void app.whenReady().then(async () => {
 		void (async () => {
 			try {
 				const dekStore = await session.entityDekStore();
+				// Collab-C5-invite-anchor - the receiver's bootstrap gate reads this
+				// vault's OWN outstanding invites and the local type of an entity + its
+				// container. Opened once per session alongside the DEK store.
+				const entitiesDb = await session.dataStores.open("entities");
+				const entitiesRepo = new EntitiesRepository(entitiesDb);
+				const shareInvites = new ShareInvitesRepository(entitiesDb);
+				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
+				// from an Owner (or ourselves), or any member could re-key an entity
+				// out from under its owner. Fail-closed on any read error.
+				const authorizeWrapInstall = async (
+					entityId: string,
+					senderPubB64: string,
+				): Promise<boolean> => {
+					// See the note on the writer predicate: base64url decoding is
+					// lossy, not throwing, so length-check the key outright.
+					const senderKey = base64UrlToBytes(senderPubB64);
+					if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
+					try {
+						const existing = dekStore.open(entityId);
+						const holdsDek = existing !== null;
+						if (existing) dekStore.close(existing.dek);
+						if (!holdsDek) return true; // bootstrap: no key to substitute
+						const { doc } = await session.ydocStore.load(entityId);
+						try {
+							return authorizesWrapInstall({
+								entityId,
+								senderKey,
+								selfPub: session.identity.publicKey,
+								holdsDek,
+								localDoc: doc,
+								decodeMemberKey: base64ToBytes,
+							});
+						} finally {
+							doc.destroy();
+						}
+					} catch {
+						return false;
+					}
+				};
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
 					dekStore,
@@ -3251,16 +3550,48 @@ void app.whenReady().then(async () => {
 					// a Viewer's signed edit drops here. Reads the same persisted
 					// access record `isShared` does. Fail-closed on any error (a
 					// doc we can't read the record from doesn't get written to).
-					authorizeWriter: async (senderPubB64, entityId) => {
-						let senderKey: Uint8Array;
-						try {
-							senderKey = base64UrlToBytes(senderPubB64);
-						} catch {
-							return false;
-						}
+					//
+					// Two branches exist above the persisted-record check because a
+					// record is not always LOCAL yet, and denying those cases is a
+					// deadlock rather than a safe refusal:
+					//   1. our OWN sovereign key - a paired device and the cold-restore
+					//      backfill both re-deliver this identity's own data, and a
+					//      never-shared entity has no access record at all to check;
+					//   2. the share BOOTSTRAP - the first frame of a new share carries
+					//      the signed record that authorizes it. Signatures alone cannot
+					//      root that (an attacker signs their own grants), so
+					//      `authorizeShareBootstrap` additionally demands an out-of-band
+					//      anchor: the granter's echo of the single-use secret from an
+					//      invite THIS vault minted, or - for a collection cascade - a
+					//      container this vault is already a member of.
+					authorizeWriter: async (senderPubB64, entityId, plaintext) => {
+						// `Buffer.from(s, "base64url")` does NOT throw on junk - it drops
+						// invalid characters and returns a short buffer - so state the
+						// invariant explicitly rather than relying on a catch that can
+						// never fire.
+						const senderKey = base64UrlToBytes(senderPubB64);
+						if (senderKey.length !== ED25519_PUBLIC_BYTES) return false;
+						if (keyBytesEqual(senderKey, session.identity.publicKey)) return true;
 						const { doc } = await session.ydocStore.load(entityId);
 						try {
-							return isAuthorizedWriter(doc, entityId, senderKey);
+							if (isAuthorizedWriter(doc, entityId, senderKey)) return true;
+							const verdict = await authorizeShareBootstrap({
+								localDoc: doc,
+								entityId,
+								senderKey,
+								selfPubB64: session.identity.publicKeyBase64,
+								incomingState: plaintext,
+								now: Date.now(),
+								invites: shareInvites,
+								deriveInviteSecret: (nonce, expiresAt) =>
+									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce, expiresAt),
+								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
+								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
+							});
+							if (verdict !== ShareBootstrapVerdict.Allow) {
+								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);
+							}
+							return verdict === ShareBootstrapVerdict.Allow;
 						} catch {
 							return false;
 						} finally {
@@ -3287,7 +3618,23 @@ void app.whenReady().then(async () => {
 					// row's createdBy/ownerApp is a best-effort derivation from the
 					// type prefix (the real creator app isn't on the wire); a full
 					// search rebuild after restore re-derives the rest.
-					installWrap: async (wrap, entityId) => {
+					installWrap: async (wrap, entityId, senderPubB64) => {
+						// Collab-C5 - a wrap that ROTATES a DEK this device already holds
+						// is a key-substitution surface, not a bootstrap: the inbox
+						// channel is `inbox:<pubkey>` and every member's X25519 wrapping
+						// key is published in the access record, so any member could
+						// otherwise seal a DEK of their choosing at a higher ordinal and
+						// re-key an entity out from under its owner (the victim then
+						// can't read real traffic, and emits under a key the attacker
+						// knows). Rotation is an Owner operation (ROT-3a), so require the
+						// authenticated sender to be an Owner of the entity - or this
+						// identity itself (a paired device / restore). A FIRST install
+						// stays open: it can only create an entity we didn't have, and a
+						// cold device has no record to check against.
+						if (!(await authorizeWrapInstall(entityId, senderPubB64))) {
+							console.warn(`[live-sync] refused a DEK rotation for ${entityId} from a non-Owner sender`);
+							return null;
+						}
 						const { dek, type } = session.unwrapMemberWrapWithType(wrap, entityId);
 						try {
 							const repo = await getEntitiesRepoForActiveSession();

@@ -90,7 +90,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		await engine.provisionEntity("msg_other", MESSAGE_TYPE_URL, { conversation: OTHER_CHANNEL });
 
 		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
-		const invite = guestEngine.createInvite("Guest");
+		const invite = await guestEngine.createInvite("Guest");
 		const guestPub = guest.identity.publicKeyBase64;
 
 		await engine.shareCollection({
@@ -113,7 +113,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		await engine.provisionEntity("msg_1", MESSAGE_TYPE_URL, { conversation: CHANNEL });
 
 		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
-		const invite = guestEngine.createInvite("Guest");
+		const invite = await guestEngine.createInvite("Guest");
 		const guestPub = guest.identity.publicKeyBase64;
 
 		await engine.shareCollection({
@@ -138,7 +138,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		// Share an EMPTY channel with the guest first.
 		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
 		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
-		const invite = guestEngine.createInvite("Guest");
+		const invite = await guestEngine.createInvite("Guest");
 		const guestPub = guest.identity.publicKeyBase64;
 		await engine.shareCollection({
 			entityId: CHANNEL,
@@ -169,7 +169,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 		await engine.provisionEntity(CHANNEL, CHANNEL_TYPE, { name: "general" });
 		await engine.provisionEntity("msg_1", MESSAGE_TYPE_URL, { conversation: CHANNEL });
 		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
-		const invite = guestEngine.createInvite("Guest");
+		const invite = await guestEngine.createInvite("Guest");
 		const guestPub = guest.identity.publicKeyBase64;
 		await engine.shareCollection({
 			entityId: CHANNEL,
@@ -210,7 +210,7 @@ describe("SharingEngine.shareCollection — cascade onto a channel's messages", 
 	it("a single-entity collection (no containment rule) shares only itself", async () => {
 		await engine.provisionEntity("ent_note", "brainstorm/Note/v1", { name: "Solo" });
 		const guestEngine = new SharingEngine(guest, () => relayAdapter(ports[1] as LoopbackRelayPort));
-		const invite = guestEngine.createInvite("Guest");
+		const invite = await guestEngine.createInvite("Guest");
 		// No throw, shares the note itself; nothing to cascade.
 		const view = await engine.shareCollection({
 			entityId: "ent_note",

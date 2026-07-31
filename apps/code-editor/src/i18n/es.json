@@ -43,6 +43,7 @@
   "renameTitle": "Renombrar {name}",
   "renameLabel": "Nombre del archivo",
   "renameSave": "Renombrar",
+  "renameCreate": "Crear",
   "renameCancel": "Cancelar",
   "renameErrorEmpty": "Escribe un nombre de archivo.",
   "renameErrorDuplicate": "Ya existe un archivo con ese nombre.",

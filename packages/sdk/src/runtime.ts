@@ -1081,7 +1081,9 @@ function sharingProxy(bridge: Bridge): SharingService {
 	// `sharing.share` (grant/revoke) is scarce and re-checked server-side.
 	return {
 		createInvite: (label) =>
-			callService<ShareInviteToken>(bridge, "sharing", "createInvite", [label], ["sharing.read"]),
+			// `sharing.share`, not `.read`: the token carries the single-use anchor
+			// secret that admits a share into this vault (Collab-C5-invite-anchor).
+			callService<ShareInviteToken>(bridge, "sharing", "createInvite", [label], ["sharing.share"]),
 		share: (input) =>
 			callService<SharedMember[]>(bridge, "sharing", "share", [input], ["sharing.share"]),
 		shareCollection: (input) =>

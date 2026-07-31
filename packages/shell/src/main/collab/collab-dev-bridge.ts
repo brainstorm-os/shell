@@ -45,7 +45,7 @@ export type { CollabAccessView, CollabIdentity, CollabRelayLike } from "./sharin
 /** Yjs text type the dogfood co-edit writes into. The real editor uses its own
  *  Lexical-bound types; this is a plain scratch surface for the harness so a
  *  collab session can prove convergence without booting the full editor. */
-const COLLAB_TEXT_KEY = "collab-text";
+export const COLLAB_TEXT_KEY = "collab-text";
 
 /** App id the asset-bind verb writes entities as. The bridge grants it
  *  `entities.read/write:*` in the vault ledger at bind time so the REAL
@@ -137,9 +137,10 @@ export class CollabDevBridge {
 		return this.#engine.whoami();
 	}
 
-	/** Collaborator-side: mint a self-signed `ShareInvite`. */
-	createInvite(label: string): ShareInvite {
-		return this.#engine.createInvite(label);
+	/** Collaborator-side: mint a self-signed `ShareInvite` (and persist its
+	 *  single-use anchor secret in this vault — Collab-C5-invite-anchor). */
+	async createInvite(label: string): Promise<ShareInvite> {
+		return await this.#engine.createInvite(label);
 	}
 
 	/** Owner-side: create the entity row + DEK + the owner's Owner grant.

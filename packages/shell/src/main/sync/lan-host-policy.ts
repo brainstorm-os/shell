@@ -1,3 +1,5 @@
+import { LanHostMode } from "@brainstorm-os/protocol/sync-status-types";
+
 /**
  * When should this device listen for LAN peers?
  *
@@ -25,14 +27,10 @@
  * default change plus a call site, not a rewrite.
  */
 
-export enum LanHostMode {
-	/** Never listen. The default. */
-	Off = "off",
-	/** Listen whenever a vault is open. */
-	WhenVaultOpen = "when-vault-open",
-	/** Listen only while a shared entity is open (T8). */
-	WhenShared = "when-shared",
-}
+// The enum itself lives in `@brainstorm-os/protocol` so the Settings control
+// and this predicate share ONE declaration; the reasoning for the three modes
+// stays here, with the policy that reads them.
+export { LanHostMode } from "@brainstorm-os/protocol/sync-status-types";
 
 export const DEFAULT_LAN_HOST_MODE = LanHostMode.Off;
 
