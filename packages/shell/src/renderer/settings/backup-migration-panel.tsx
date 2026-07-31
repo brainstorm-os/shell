@@ -73,14 +73,11 @@ export function BackupMigrationPanel() {
 	);
 }
 
-/** Icon-led card header shared by every flow: an accent icon chip beside the
- *  title + one-line description. */
-/** One flow's header. `action` is the flow's primary control, pinned to the
- *  right of the title row rather than stacked under the description: with six
- *  flows on this panel, a button under each paragraph scatters the actions down
- *  the page and makes the section read like documentation instead of a control
- *  surface. Actions in a column are scannable, and each flow collapses from a
- *  tall card to one row. */
+/** One flow's header: accent icon chip + title + the flow's primary control on
+ *  one baseline, description spanning the full width below. The action sits in
+ *  the title row (not under the paragraph) so six flows read as a scannable
+ *  column of controls; the description gets the whole card width so a long
+ *  action label never squeezes it into a narrow ragged column. */
 function SectionHead({
 	icon,
 	title,
@@ -97,11 +94,9 @@ function SectionHead({
 			<span className="backup-migration__group-icon" aria-hidden="true">
 				<Icon name={icon} size={18} />
 			</span>
-			<div className="backup-migration__group-text">
-				<h4 className="backup-migration__group-title">{title}</h4>
-				<p className="settings__hint">{hint}</p>
-			</div>
+			<h4 className="backup-migration__group-title">{title}</h4>
 			{action ? <div className="backup-migration__group-action">{action}</div> : null}
+			<p className="settings__hint backup-migration__group-hint">{hint}</p>
 		</div>
 	);
 }
@@ -1013,13 +1008,15 @@ function NotionApiSection() {
 
 			{connected === false && (
 				<div className="backup-migration__row">
-					<input
+					<TextField
 						type="password"
-						className="bs-input"
+						size={TextFieldSize.Md}
 						value={token}
+						onChange={setToken}
 						placeholder={t("shell.settings.backupMigration.notionApi.tokenPlaceholder")}
 						aria-label={t("shell.settings.backupMigration.notionApi.tokenLabel")}
-						onChange={(e) => setToken(e.target.value)}
+						autoComplete="off"
+						spellCheck={false}
 						data-testid="backup-migration-notion-api-token"
 					/>
 					<Button

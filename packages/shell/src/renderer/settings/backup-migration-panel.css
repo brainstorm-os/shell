@@ -25,33 +25,36 @@
 	box-shadow: var(--shadow-md);
 }
 
-/* Header row: an accent-tinted icon chip anchors the section, with the title
- * and one-line description stacked beside it. */
-/* The flow's one row: icon chip, the title + description column, and the
-   flow's primary action pinned right. Actions line up in a column down the
-   panel instead of sitting under each paragraph, so the section scans as a
-   set of controls rather than as documentation. Wraps on a narrow pane so the
-   action drops below the text instead of crushing it. */
+/* The flow's header grid: icon chip | title | action on one centered baseline,
+   description on the second row spanning from the title's left edge to the
+   card's right edge. The action lives in the title row so the six flows scan
+   as a column of right-aligned controls — and because the description is a
+   separate grid row, a wide action never steals width from the copy (the old
+   flex row squeezed the paragraph into a narrow ragged column for the whole
+   card height). */
 .backup-migration__group-head {
-	display: flex;
-	align-items: flex-start;
-	flex-wrap: wrap;
-	gap: var(--space-3);
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	column-gap: var(--space-3);
+	row-gap: var(--space-1);
 }
 
 .backup-migration__group-action {
+	grid-row: 1;
+	grid-column: 3;
 	display: flex;
 	align-items: center;
+	justify-self: end;
 	gap: var(--space-2);
-	flex: 0 0 auto;
-	margin-inline-start: auto;
 }
 
 .backup-migration__group-icon {
+	grid-row: 1;
+	grid-column: 1;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	flex-shrink: 0;
 	width: 32px;
 	height: 32px;
 	border-radius: var(--radius-md);
@@ -59,33 +62,32 @@
 	color: var(--color-accent-strong);
 }
 
-.backup-migration__group-text {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-0_5);
-	flex: 1 1 16rem;
-	min-width: 0;
-}
-
 .backup-migration__group-title {
+	grid-row: 1;
+	grid-column: 2;
 	margin: 0;
 	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-semibold);
 	color: var(--color-text-primary);
 }
 
-/* The section hint reads as supporting copy under the title — bump it from the
- * xs settings default to sm and a touch more line-height for legibility. */
-.backup-migration__group-text .settings__hint {
+/* Supporting copy under the title row — sm (not the xs settings default) with
+ * a touch more line-height, capped at a readable measure. */
+.backup-migration__group-head .backup-migration__group-hint {
+	grid-row: 2;
+	grid-column: 2 / -1;
+	margin: 0;
+	max-width: 64ch;
 	font-size: var(--text-size-sm);
 	line-height: 1.45;
 	color: var(--color-text-secondary);
 }
 
-/* Single idle action sits content-width, left-aligned, rather than stretching
- * the full card (the default flex-column stretch). */
-.backup-migration__group > .button {
-	align-self: flex-start;
+/* Everything that unfolds under the header (token row, progress, the done
+ * report, errors) hangs at the title's left edge — aligned with the copy, not
+ * the icon chip — so the card reads as one indented block per flow. */
+.backup-migration__group > :not(.backup-migration__group-head) {
+	margin-inline-start: calc(32px + var(--space-3));
 }
 
 .backup-migration__stack {
@@ -94,7 +96,7 @@
 	gap: var(--space-2);
 }
 
-/* Connect/act row — a token field or a pair of buttons on one line (IE-7's
+/* Connect/act row — the token field beside its button on one line (IE-7's
    Notion API section). Wraps so a narrow Settings pane keeps both reachable. */
 .backup-migration__row {
 	display: flex;
@@ -103,9 +105,10 @@
 	gap: var(--space-2);
 }
 
-.backup-migration__row .bs-input {
+.backup-migration__row .text-field {
 	flex: 1 1 16rem;
 	min-width: 0;
+	max-width: 30rem;
 }
 
 /* Target-type picker — labelled select of friendly type names (Note, Task),
