@@ -3,6 +3,180 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.12.0",
+      "date": "2026-07-31",
+      "icon": "🧱",
+      "title": "Build an app inside Brainstorm, then install it",
+      "summary": "Write an app in the Code editor and install it into your own vault, with no build step and no terminal. Shared objects now show the people on them by name. Plus a security pass over sharing, and a fix for messages that went missing when you shared a channel.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Apps you make yourself"
+        },
+        {
+          "kind": "p",
+          "text": [
+            {
+              "text": "An app here is two files: a "
+            },
+            {
+              "text": "manifest.json",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and an "
+            },
+            {
+              "text": "index.html",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". That is the whole format, with no build step anywhere. Write those in the Code editor and Brainstorm will install them for you, straight out of your vault."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Install from your vault",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Select the code files that make up an app and choose Install as app. It lands on your dashboard right away, with no restart."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Install from a folder or a file",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Point Brainstorm at a folder on disk, or at a "
+            },
+            {
+              "text": ".brainstorm",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " bundle someone sent you."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The agent can write the code",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Ask it for an app and it drafts the files as cards you read and approve. Nothing reaches your vault until you say so, the same as everything else it proposes."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔒",
+          "text": [
+            {
+              "text": "An app installed this way is unsigned, so it is marked as such and its actions are held to the sideloaded trust tier. It gets the capabilities you grant it and nothing more."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Sharing shows people, not keys"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Names on shared objects",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Everyone on a shared object now appears by name instead of a long "
+            },
+            {
+              "text": "ed25519:",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " string. Names travel with the object itself, so there is no directory anywhere and the relay learns nothing new."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The key is still shown",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A name is only what someone calls themselves, so the key fingerprint sits beside it. Two people can never be told apart by a name alone."
+            }
+          ]
+        },
+        {
+          "kind": "h3",
+          "text": "Fixes worth naming"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sharing a channel now brings every message",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Some messages silently never arrived on the other side. They do now."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Invites are single use",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An invite code opens exactly one thing, once, and it expires. Revoking someone takes effect immediately."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A proposed file at a path you already have asks first",
+              "marks": ["bold"]
+            },
+            {
+              "text": " It used to quietly make a second copy."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "The Code editor keeps still while you type",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The right panel no longer blinks on every keystroke, and the file tree has folders."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.11.1",
       "date": "2026-07-29",
       "icon": "📐",
