@@ -17,6 +17,7 @@
  * except through the same `envelope-pipeline` DEK path the rest of sync uses.
  */
 
+import { ENTITY_PROPS_MAP_NAME } from "@brainstorm-os/sdk-types";
 import * as Y from "yjs";
 import { XCHACHA_NONCE_BYTES, base64ToBytes } from "../credentials/crypto";
 import { verifySignature } from "../credentials/identity";
@@ -28,6 +29,7 @@ import {
 	wrapDekVersionOf,
 } from "../credentials/member-wraps";
 import type { EntityDekStore } from "../entities/entity-dek-store";
+import { writeEntityProps } from "../entities/entity-doc-codec";
 import { installEntityDek } from "../entities/install-wrap";
 import { queryVaultListSource } from "../entities/vault-entities-service";
 import {
@@ -397,9 +399,24 @@ export class SharingEngine {
 		if (!handle) {
 			throw new Error(`sharing-engine: owner has no DEK for ${entityId}`);
 		}
+		// Collab-C5 — the owner enumerates a container's children from the SQLite
+		// index, but the receiver's container-descent gate reads the child's parent
+		// property back out of the DOC it is sent. An entity whose properties were
+		// never written through the Y.Doc (a legacy or seeded row) has an empty
+		// property map, so the two disagree: the owner grants and emits, and the
+		// receiver refuses with `deny-container-not-a-child` and drops the child on
+		// the floor with only a console warning. Seed the doc from the row first,
+		// the same lazy hydration the ydoc worker performs on write. A doc that
+		// already carries properties is left alone — the doc stays the source of
+		// truth, this only backfills one that was never populated.
+		const propsRow = (await this.ensureEntitiesRepo()).get(entityId);
+		const seedProps = propsRow?.properties ?? null;
 		let wrap: MemberWrapPayload;
 		try {
 			wrap = await this.#mutateAndEmitReturning(entityId, (doc) => {
+				if (seedProps && doc.getMap(ENTITY_PROPS_MAP_NAME).size === 0) {
+					writeEntityProps(doc, seedProps);
+				}
 				// Bootstrap the OWNER's own grant (idempotent — `grantAccess`
 				// no-ops on a live grant) BEFORE granting the invitee. A normal
 				// entity (entities.create) carries no access record until its
