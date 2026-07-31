@@ -303,6 +303,12 @@ export class LanRelayHost {
 				// fallback to a plaintext challenge: that would be a downgrade an
 				// attacker could force by presenting an old-shaped roster row.
 				if (!sealed) {
+					// Refusing is right; refusing SILENTLY is what made a failed LAN
+					// dial undiagnosable — the peer just saw its connect deadline
+					// expire. Only a key prefix is logged, never the whole account.
+					console.warn(
+						`[lan-host] no sealed challenge for ${hello.account.slice(0, 12)}… — not in this device's roster, revoked, or no usable X25519 key`,
+					);
 					closeClient();
 					return;
 				}
@@ -451,6 +457,11 @@ export class LanRelayHost {
 		// injectable, so a wiring supplying non-unique ids would otherwise let a
 		// stale continuation mark a *new* connection authenticated.
 		if (this.#closed || this.#admission.get(connId) !== state) return;
+		if (!ok) {
+			console.warn(
+				`[lan-host] refused ${(state.clientAccount ?? "unknown").slice(0, 12)}… — the challenge answer did not verify`,
+			);
+		}
 		if (ok) {
 			// The host proves ITSELF back before the client sends anything —
 			// without this the client has no way to tell a rostered host from a
