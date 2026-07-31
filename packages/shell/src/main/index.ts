@@ -46,6 +46,7 @@ import {
 } from "electron";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
+import { type MentionRunnerDeps, maybeRunMentionedAgents } from "./agents/mention-runner";
 import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
@@ -185,6 +186,7 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
+import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
 import { registerBillingSettingsHandlers } from "./ipc/billing-settings-handlers";
@@ -1558,6 +1560,8 @@ void app.whenReady().then(async () => {
 	registerLedgerHandlers({
 		onGrantsChanged: () => void automationsDeployment?.rehydrate().catch(() => {}),
 	});
+	// Agent-Teams-1 — the Team surface's directory + per-agent grant/revoke.
+	registerAgentHandlers();
 	registerBrainstormProtocol();
 	registerBlockFrameProtocol({
 		getBlocksRepo: async () => {
@@ -3829,6 +3833,18 @@ void app.whenReady().then(async () => {
 			body: who ? `${who} mentioned you` : "Someone mentioned you",
 		});
 	};
+	// Agent-Teams-3 — @-mentioning an agent in Chat runs its loop in main under
+	// the agent's own ledger ceiling; the reply is a direct repo write, so
+	// onWrote re-broadcasts staleness or the reply would not paint until the
+	// next unrelated write.
+	const agentMentionDeps: MentionRunnerDeps = {
+		getSession: () => getActiveVaultSession(),
+		getServiceHandler: (name) => workers?.broker.getServiceHandler(name),
+		onWrote: () => {
+			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
+			scheduleSearchReindex();
+		},
+	};
 	workers.broker.registerService("entities", async (envelope) => {
 		const result = await entitiesHandler(envelope);
 		if (
@@ -3854,7 +3870,12 @@ void app.whenReady().then(async () => {
 			// user; notify them (self-authored mentions self-suppress). Fires for
 			// agent/other-authored mentions now; collaborator mentions light up
 			// once channels/comments sync cross-vault (Collab-C5).
-			if (envelope.method === "create") notifyMentionsFromCreate(result);
+			if (envelope.method === "create") {
+				notifyMentionsFromCreate(result);
+				// Agent-Teams-3 — fire-and-forget; a runner failure never breaks
+				// the create it piggybacks on (the runner swallows internally).
+				void maybeRunMentionedAgents(agentMentionDeps, result);
+			}
 		}
 		return result;
 	});

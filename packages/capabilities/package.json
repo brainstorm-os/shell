@@ -9,7 +9,9 @@
   "exports": {
     ".": "./src/ledger.ts",
     "./ledger": "./src/ledger.ts",
-    "./default-grants": "./src/default-grants.ts"
+    "./default-grants": "./src/default-grants.ts",
+    "./principals": "./src/principals.ts",
+    "./agent-grants": "./src/agent-grants.ts"
   },
   "publishConfig": {
     "access": "public"

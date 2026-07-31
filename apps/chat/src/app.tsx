@@ -14,6 +14,7 @@ import {
 	IconKind,
 	type MessageAttachment,
 	type RosterMember,
+	RosterMemberKind,
 } from "@brainstorm-os/sdk-types";
 import {
 	AttachContextButton,
@@ -147,15 +148,19 @@ export function ChatApp(): ReactElement {
 				// a recipient who hasn't cached the profile still sees a name.
 				if (!roster || !activeId) return matches;
 				try {
-					const people = await roster.members(activeId);
+					// Agent-Teams-3 — the vault's agent members ride the same list
+					// (kind-tagged), so "@Researcher" works exactly like "@Ada":
+					// mentioning an agent invites its loop into the channel.
+					const people = await roster.members(activeId, { includeAgents: true });
 					for (const m of people) {
 						const name = m.displayName || m.fingerprint;
 						if (q && !name.toLowerCase().includes(q)) continue;
+						const isAgent = m.kind === RosterMemberKind.Agent;
 						matches.push({
 							id: m.pubkey,
 							kind: AttachmentKind.Person,
 							label: name,
-							description: m.isSelf ? t("members.you") : m.fingerprint,
+							description: m.isSelf ? t("members.you") : isAgent ? t("members.agent") : m.fingerprint,
 						});
 						if (matches.length >= 8) break;
 					}

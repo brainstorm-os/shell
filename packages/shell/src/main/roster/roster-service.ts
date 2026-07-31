@@ -23,7 +23,7 @@
 
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { RosterMember, RosterSelf } from "@brainstorm-os/sdk-types";
-import { RosterRole } from "@brainstorm-os/sdk-types";
+import { AGENT_TYPE, RosterMemberKind, RosterRole, readAgentDef } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { AccessRole, activeMembers } from "../collab/access-record";
@@ -102,6 +102,29 @@ function requireSession(options: RosterServiceOptions): VaultSession {
 	return session;
 }
 
+/** Agent-Teams-1 — the vault's live `Agent/v1` members, keyed by pubkey, so
+ *  the roster resolves an agent to its name + Agent kind. Records the codec
+ *  rejects (mangled identity) are dropped — fail-closed, never a guessed
+ *  member. Local vault data written only by the privileged agent directory. */
+function readAgentMembers(
+	repo: EntitiesRepository,
+): Map<string, { fingerprint: string; displayName: string; avatarRef: string | null }> {
+	const agents = new Map<
+		string,
+		{ fingerprint: string; displayName: string; avatarRef: string | null }
+	>();
+	for (const row of repo.query({ type: AGENT_TYPE })) {
+		const def = readAgentDef(row.properties);
+		if (!def) continue;
+		agents.set(def.pubkey, {
+			fingerprint: def.fingerprint,
+			displayName: def.displayName,
+			avatarRef: def.avatarRef,
+		});
+	}
+	return agents;
+}
+
 async function handleMembers(
 	envelope: Envelope,
 	options: RosterServiceOptions,
@@ -110,6 +133,8 @@ async function handleMembers(
 	const session = requireSession(options);
 	const entityId = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
 	if (!entityId) throw makeError("Invalid", "roster.members: entityId required");
+	const opts = (envelope.args[1] ?? {}) as { includeAgents?: unknown };
+	const includeAgents = opts.includeAgents === true;
 
 	const { doc } = await session.ydocStore.load(entityId);
 	const active: ActiveMemberRef[] = activeMembers(doc, entityId).map((m) => ({
@@ -129,9 +154,31 @@ async function handleMembers(
 	const repo = new EntitiesRepository(db);
 	const selfPubkey = session.identity.publicKeyBase64;
 	const selfProfile = readProfile(repo, selfPubkey);
+	const agents = readAgentMembers(repo);
+
+	// Agent members join the roster as Viewers: an agent never writes directly
+	// (propose→approve is its only road to persisted bytes), so any higher role
+	// would overstate its authority. An access-record grant can still raise it.
+	if (includeAgents) {
+		for (const pubkey of agents.keys()) {
+			active.push({ pubkey, role: RosterRole.Viewer });
+		}
+	}
 
 	const resolve = (pubkey: string): ResolvedDisplay => {
 		const fingerprint = fingerprintOf(pubkey);
+		// An Agent/v1 pubkey resolves through its agent record — kind + name come
+		// from the directory, not from a self-asserted profile (an agent has no
+		// sovereign profile; its record is privileged local vault data).
+		const agent = agents.get(pubkey);
+		if (agent) {
+			return {
+				fingerprint: agent.fingerprint,
+				kind: RosterMemberKind.Agent,
+				...(agent.displayName ? { displayName: agent.displayName } : {}),
+				...(agent.avatarRef ? { avatarRef: agent.avatarRef } : {}),
+			};
+		}
 		// Self always wins over anything the doc claims about us — nobody else
 		// gets to rename you in your own member list.
 		const profile =

@@ -57,6 +57,8 @@ const DevicesSection = lazy(() =>
 const IdentitySection = lazy(() =>
 	import("./identity-section").then((m) => ({ default: m.IdentitySection })),
 );
+// Agent-Teams-2 — only reachable from Settings; keeps the entry chunk lean.
+const TeamSection = lazy(() => import("./team-section").then((m) => ({ default: m.TeamSection })));
 import { AppLockPanel } from "./app-lock-panel";
 import { FileHandlesPanel } from "./file-handles-panel";
 import { GrantsPanel } from "./grants-panel";
@@ -155,6 +157,11 @@ export const SECTIONS: ReadonlyArray<{ id: SettingsSection; labelKey: string; ic
 		id: SettingsSection.Identity,
 		labelKey: "shell.settings.section.identity",
 		icon: IconName.ShieldCheck,
+	},
+	{
+		id: SettingsSection.Team,
+		labelKey: "shell.settings.section.team",
+		icon: IconName.Buildings,
 	},
 	{
 		id: SettingsSection.Devices,
@@ -444,6 +451,12 @@ function renderBody(
 			return (
 				<Suspense fallback={null}>
 					<IdentitySection />
+				</Suspense>
+			);
+		case SettingsSection.Team:
+			return (
+				<Suspense fallback={null}>
+					<TeamSection />
 				</Suspense>
 			);
 		case SettingsSection.Devices:

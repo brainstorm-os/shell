@@ -229,6 +229,59 @@ const ledger = {
 		ipcRenderer.invoke("files:revoke-watch-grant", watchId),
 };
 
+/** Agent-Teams-1 — one agent member as the Team surface renders it: the
+ *  `Agent/v1` record plus its live capability grants. */
+export type ShellAgent = {
+	id: string;
+	pubkey: string;
+	fingerprint: string;
+	displayName: string;
+	avatarRef: string | null;
+	persona: string;
+	skills: Array<{ kind: string; ref: string }>;
+	routing: string;
+	autonomy: string;
+	memoryScope: string;
+	createdAt: number;
+	updatedAt: number;
+	grants: Array<{ capability: string; scope: string | null; grantedAt: number }>;
+};
+
+export type ShellAgentGrantResult =
+	| { granted: true; grant: { capability: string; scope: string | null } }
+	| { granted: false; reason: "unknown-agent" | "not-grantable" | "invalid" };
+
+/** One audit-log line about an agent (metadata-only, never content). */
+export type ShellAgentAuditEvent = {
+	ts: number;
+	kind: string;
+	[metadataKey: string]: unknown;
+};
+
+/** Agent-Teams-1 — the dashboard's (Team surface's) window onto agent members.
+ *  The click driving grant/revoke here IS the consent gesture; policy (the
+ *  agent-grantable vocabulary, fail-closed unknown agents) lives in main. */
+const agents = {
+	list: (): Promise<ShellAgent[]> => ipcRenderer.invoke("agents:list"),
+	create: (input: { displayName: string; persona?: string }): Promise<ShellAgent | null> =>
+		ipcRenderer.invoke("agents:create", input),
+	update: (
+		id: string,
+		patch: Partial<
+			Pick<ShellAgent, "displayName" | "persona" | "routing" | "autonomy" | "memoryScope">
+		>,
+	): Promise<ShellAgent | null> => ipcRenderer.invoke("agents:update", id, patch),
+	delete: (id: string): Promise<boolean> => ipcRenderer.invoke("agents:delete", id),
+	grant: (fingerprint: string, capability: string): Promise<ShellAgentGrantResult> =>
+		ipcRenderer.invoke("agents:grant", fingerprint, capability),
+	/** Recent audit trail for one agent (newest first): lifecycle, grant/revoke,
+	 *  broker denials — "what this agent did" as a query. */
+	activity: (fingerprint: string): Promise<ShellAgentAuditEvent[]> =>
+		ipcRenderer.invoke("agents:activity", fingerprint),
+	revoke: (fingerprint: string, capability: string, scope: string | null): Promise<boolean> =>
+		ipcRenderer.invoke("agents:revoke", fingerprint, capability, scope),
+};
+
 /** Shell-action channel (main → dashboard). Used by the application menu. */
 const SHELL_ACTION_CHANNEL = "shell:action";
 type ShellAction = { action: string; topicId?: string; query?: string };
@@ -1922,6 +1975,7 @@ const brainstorm = {
 	welcome,
 	credentials,
 	ledger,
+	agents,
 	apps,
 	windows,
 	dashboard,

@@ -28,6 +28,7 @@
   "composer.attach.remove": "{label} entfernen",
   "members.title": "Mitglieder",
   "members.you": "du",
+  "members.agent": "KI-Agent",
   "members.guest": "Gast",
   "members.unknown": "Unbekanntes Mitglied",
   "members.one": "{count} Mitglied",
