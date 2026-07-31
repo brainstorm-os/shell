@@ -116,6 +116,8 @@ Other scripts: `bun run build`, `bun run test`, `bun run typecheck`, `bun run li
 
 The repo is a Bun-workspaces monorepo: `packages/shell` is the Electron shell (main, preload, dashboard renderer, workers); `packages/{tokens,sdk,sdk-types,react-yjs,editor,cli}` are the libraries apps build on; `apps/` holds the twenty first-party apps, each an independently built sandboxed bundle. Design docs and the implementation plan are maintained privately in the project's `harness` repository.
 
+Want to report a bug, propose an idea, or open a PR? Start with the [contributing guide](CONTRIBUTING.md).
+
 ## Why this exists
 
 Brainstorm is a deliberate second attempt. A previous effort in this space became hard to evolve because everything was interconnected — data, UI, sync, schema, and product surface fused into a single mass. You can't bolt a permission system onto a monolith after the fact: adding AI to something like that means giving it everything or nothing.
