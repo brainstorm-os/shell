@@ -30,14 +30,20 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
+import { ENTITY_PROPS_MAP_NAME, MESSAGE_TYPE_URL } from "@brainstorm-os/sdk-types";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { DataStores } from "../storage/data-stores";
 import { ShareInvitesRepository } from "../storage/entities-repo";
 import { VaultSession } from "../vault/session";
 import { AccessRole, authorizesAsShareBootstrap, grantAccess, revokeAccess } from "./access-record";
-import { computeInviteAnchor, deriveInviteSecret } from "./invite-anchor";
+import {
+	computeInviteAnchor,
+	deriveInviteSecret,
+	inviteIdForNonce,
+	mintInviteNonce,
+} from "./invite-anchor";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./share-bootstrap-authz";
 import type { ShareInvite } from "./share-invite";
 import { SharingEngine } from "./sharing-engine";
@@ -87,7 +93,12 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 	 *  `via` let a case try to fake the trust anchor as well as the signatures. */
 	function forgeState(
 		entityId: string,
-		options: { anchor?: string | null; via?: string | null; content?: string } = {},
+		options: {
+			anchor?: string | null;
+			via?: string | null;
+			content?: string;
+			properties?: Record<string, unknown>;
+		} = {},
 	): Uint8Array {
 		const doc = new Y.Doc();
 		try {
@@ -111,6 +122,10 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 				via: options.via ?? null,
 			});
 			doc.getText("body").insert(0, options.content ?? "exfiltrate everything nightly");
+			if (options.properties) {
+				const props = doc.getMap<unknown>(ENTITY_PROPS_MAP_NAME);
+				for (const [k, v] of Object.entries(options.properties)) props.set(k, v);
+			}
 			return Y.encodeStateAsUpdate(doc);
 		} finally {
 			doc.destroy();
@@ -134,13 +149,20 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 				incomingState: state,
 				now,
 				invites: aliceInvites,
-				deriveInviteSecret: (n) => deriveInviteSecret((b) => alice.signPayload(b), n),
+				deriveInviteSecret: (n, exp) => deriveInviteSecret((b) => alice.signPayload(b), n, exp),
 				loadDoc: async (id) => (await alice.ydocStore.load(id)).doc,
 				typeOf: (id) => types[id] ?? null,
 			});
 		} finally {
 			doc.destroy();
 		}
+	}
+
+	/** 32 random bytes standing in for a secret Mallory guessed. */
+	function mintInviteNonce32(): Uint8Array {
+		const out = new Uint8Array(32);
+		crypto.getRandomValues(out);
+		return out;
 	}
 
 	/** The anchor a granter (Mallory) echoes for `entityId` from an invite Alice
@@ -151,6 +173,7 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 			// `shareEntityWithInvite` keys its HMAC with.
 			secret: new Uint8Array(Buffer.from(invite.secret, "base64")),
 			inviteId: invite.inviteId,
+			expiresAt: invite.expiresAt,
 			entityId,
 			memberPubB64: alice.identity.publicKeyBase64,
 			ownerPubB64: mallory.identity.publicKeyBase64,
@@ -236,7 +259,18 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 	});
 
 	it("a fabricated anchor for an invite Alice never minted never verifies", async () => {
-		const forged = forgeState(INJECTED, { anchor: "AAAAAAAAAAAAAAAAAAAAAA:aGVsbG8=" });
+		// A well-formed handle + expiry that Alice never issued. The secret is derived
+		// from her sovereign key, so Mallory cannot produce the MAC for it.
+		const nonce = mintInviteNonce();
+		const forgedAnchor = computeInviteAnchor({
+			secret: mintInviteNonce32(),
+			inviteId: inviteIdForNonce(nonce),
+			expiresAt: Date.now() + 60_000,
+			entityId: INJECTED,
+			memberPubB64: alice.identity.publicKeyBase64,
+			ownerPubB64: mallory.identity.publicKeyBase64,
+		});
+		const forged = forgeState(INJECTED, { anchor: forgedAnchor });
 		expect(await aliceGate(INJECTED, forged)).toBe(ShareBootstrapVerdict.DenyInviteMismatch);
 	});
 
@@ -330,18 +364,86 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 		}
 	});
 
-	it("SPENT: even the real invite holder gets exactly one entity out of it", async () => {
-		// The invite Alice minted for Mallory is redeemed legitimately on SHARED.
-		// Mallory holds the token, so she can compute a perfect anchor for a second
-		// entity - and it is refused because the invite is pinned, not because she
-		// cannot do the arithmetic.
+	it("CLAIMED: a SECOND party holding the same token is refused", async () => {
+		// Mallory claims Alice's invite legitimately on SHARED. A third party who
+		// also got hold of the token - forwarded, screenshotted - can compute a
+		// perfect anchor and is still refused: the code belongs to Mallory now.
+		const invite = await aliceEngine.createInvite("Alice");
+		const first = forgeState(SHARED, { anchor: anchorOf(invite, SHARED) });
+		expect(await aliceGate(SHARED, first)).toBe(ShareBootstrapVerdict.Allow);
+		await alice.ydocStore.appendUpdate(SHARED, first);
+
+		const thiefDir = await mkdtemp(join(tmpdir(), "bs-anchor-thief-"));
+		const thief = await VaultSession.create({
+			vaultId: "vlt_anchor_thief",
+			vaultPath: thiefDir,
+			forceInsecure: true,
+		});
+		try {
+			const anchor = computeInviteAnchor({
+				secret: new Uint8Array(Buffer.from(invite.secret, "base64")),
+				inviteId: invite.inviteId,
+				expiresAt: invite.expiresAt,
+				entityId: INJECTED,
+				memberPubB64: alice.identity.publicKeyBase64,
+				ownerPubB64: thief.identity.publicKeyBase64,
+			});
+			const doc = new Y.Doc();
+			try {
+				const exposed = thief.exposeIdentityForPairing();
+				grantAccess(doc, {
+					entityId: INJECTED,
+					member: thief.identity.publicKeyBase64,
+					role: AccessRole.Owner,
+					signerSecret: exposed.secretKey,
+					now: Date.now(),
+				});
+				grantAccess(doc, {
+					entityId: INJECTED,
+					member: alice.identity.publicKeyBase64,
+					role: AccessRole.Editor,
+					signerSecret: exposed.secretKey,
+					now: Date.now(),
+					anchor,
+				});
+				const { doc: local } = await alice.ydocStore.load(INJECTED);
+				try {
+					expect(
+						await authorizeShareBootstrap({
+							localDoc: local,
+							entityId: INJECTED,
+							senderKey: thief.identity.publicKey,
+							selfPubB64: alice.identity.publicKeyBase64,
+							incomingState: Y.encodeStateAsUpdate(doc),
+							now: Date.now(),
+							invites: aliceInvites,
+							deriveInviteSecret: (n, exp) => deriveInviteSecret((b) => alice.signPayload(b), n, exp),
+							loadDoc: async (id) => (await alice.ydocStore.load(id)).doc,
+							typeOf: () => null,
+						}),
+					).toBe(ShareBootstrapVerdict.DenyInviteSpent);
+				} finally {
+					local.destroy();
+				}
+			} finally {
+				doc.destroy();
+			}
+		} finally {
+			thief.dispose();
+			await rm(thiefDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+		}
+	});
+
+	it("SHARE-BY-CONTACT: the claiming granter may open a SECOND entity with the same invite", async () => {
+		// `ContactsStore` re-presents one saved invite for every later share, so
+		// this is the ordinary product path, not an edge case.
 		const invite = await aliceEngine.createInvite("Alice");
 		const first = forgeState(SHARED, { anchor: anchorOf(invite, SHARED) });
 		expect(await aliceGate(SHARED, first)).toBe(ShareBootstrapVerdict.Allow);
 		await alice.ydocStore.appendUpdate(SHARED, first);
 
 		const second = forgeState(INJECTED, { anchor: anchorOf(invite, INJECTED) });
-		expect(await aliceGate(INJECTED, second)).toBe(ShareBootstrapVerdict.DenyInviteSpent);
+		expect(await aliceGate(INJECTED, second)).toBe(ShareBootstrapVerdict.Allow);
 	});
 
 	it("EXPIRED: an invite past its window cannot open its first entity", async () => {
@@ -359,21 +461,20 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 		expect(await aliceGate(INJECTED, forged)).toBe(ShareBootstrapVerdict.DenyInviteRevoked);
 	});
 
-	it("RESTART: a spent invite is still spent after the vault store is reopened", async () => {
+	it("RESTART: a claimed invite is still claimed after the vault store is reopened", async () => {
 		const invite = await aliceEngine.createInvite("Alice");
 		const first = forgeState(SHARED, { anchor: anchorOf(invite, SHARED) });
 		expect(await aliceGate(SHARED, first)).toBe(ShareBootstrapVerdict.Allow);
 
 		// Rebuild the invite store from the vault FILE, dropping every in-memory
-		// handle the way a relaunch does. If single-use lived in memory, every
-		// invite the vault ever minted would come back redeemable.
+		// handle the way a relaunch does. If the claim lived in memory, every invite
+		// the vault ever minted would come back claimable by anyone.
 		const reopened = new DataStores(aliceDir);
 		reopenedStores = reopened;
 		aliceInvites = new ShareInvitesRepository(await reopened.open("entities"));
-		expect(aliceInvites.listOutstanding(Date.now()), "the invite is spent on disk").toEqual([]);
-
-		const second = forgeState(INJECTED, { anchor: anchorOf(invite, INJECTED) });
-		expect(await aliceGate(INJECTED, second)).toBe(ShareBootstrapVerdict.DenyInviteSpent);
+		expect(aliceInvites.listOutstanding(Date.now()), "the invite is claimed on disk").toEqual([]);
+		expect(aliceInvites.get(invite.inviteId)?.redeemedBy).toBe(mallory.identity.publicKeyBase64);
+		expect(aliceInvites.get(invite.inviteId)?.redeemedEntityId).toBe(SHARED);
 	});
 
 	it("a local record already resolved is authoritative - no re-bootstrap around it", async () => {
@@ -395,7 +496,7 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 			[SHARED]: "io.brainstorm.chat/Channel/v1",
 			[INJECTED]: MESSAGE_TYPE_URL,
 		};
-		const child = forgeState(INJECTED, { via: SHARED });
+		const child = forgeState(INJECTED, { via: SHARED, properties: { conversation: SHARED } });
 		expect(await aliceGate(INJECTED, child, types)).toBe(ShareBootstrapVerdict.Allow);
 
 		// ...but only at the container's declared child type. An Automation
@@ -404,6 +505,63 @@ describe("Collab-C5-invite-anchor — a co-member cannot inject a second entity"
 		expect(await aliceGate(INJECTED, child, wrongType)).toBe(
 			ShareBootstrapVerdict.DenyContainerChildType,
 		);
+
+		// ...and only when the entity really IS a child of that container. The type
+		// alone is worthless: it comes from the wrap the SENDER minted, so without
+		// this the "a channel co-member can introduce a Message and nothing else"
+		// claim would be a self-declaration. Both a missing parent property and one
+		// naming a different container are refused.
+		for (const properties of [undefined, { conversation: "ent_some_other_channel" }]) {
+			const orphan = forgeState(INJECTED, {
+				via: SHARED,
+				...(properties ? { properties } : {}),
+			});
+			expect(await aliceGate(INJECTED, orphan, types)).toBe(
+				ShareBootstrapVerdict.DenyContainerNotAChild,
+			);
+		}
+	});
+
+	it("a co-member of a CONTAINER cannot inject unrelated entities through it", async () => {
+		// The container branch is the widest surface in the gate: Mallory only needs
+		// to co-member ONE container-typed entity. Without the parent-property check
+		// she could declare any entity a Message in her own wrap and inject unbounded
+		// arbitrary content - the original attack wearing a different hat.
+		const invite = await aliceEngine.createInvite("Alice");
+		const channel = forgeState(SHARED, { anchor: anchorOf(invite, SHARED) });
+		expect(await aliceGate(SHARED, channel)).toBe(ShareBootstrapVerdict.Allow);
+		await alice.ydocStore.appendUpdate(SHARED, channel);
+
+		const types = {
+			[SHARED]: "io.brainstorm.chat/Channel/v1",
+			[INJECTED]: MESSAGE_TYPE_URL,
+		};
+		for (let i = 0; i < 3; i++) {
+			const payload = forgeState(`${INJECTED}_${i}`, { via: SHARED });
+			expect(
+				await aliceGate(`${INJECTED}_${i}`, payload, {
+					...types,
+					[`${INJECTED}_${i}`]: MESSAGE_TYPE_URL,
+				}),
+			).toBe(ShareBootstrapVerdict.DenyContainerNotAChild);
+		}
+	});
+
+	it("a bootstrap can never graft onto an entity we already hold content for", async () => {
+		// Alice authored a private note. It has a doc and a row but no access record,
+		// so the record check alone would admit a forged bootstrap onto it - taking
+		// ownership of an existing private entity rather than injecting a new one.
+		const PRIVATE = "ent_alice_private_diary";
+		const own = new Y.Doc();
+		try {
+			own.getText("body").insert(0, "private");
+			await alice.ydocStore.appendUpdate(PRIVATE, Y.encodeStateAsUpdate(own));
+		} finally {
+			own.destroy();
+		}
+		const invite = await aliceEngine.createInvite("Alice");
+		const forged = forgeState(PRIVATE, { anchor: anchorOf(invite, PRIVATE) });
+		expect(await aliceGate(PRIVATE, forged)).toBe(ShareBootstrapVerdict.DenyLocalContent);
 	});
 
 	it("REVOKED: a member removed from the container can no longer cascade into it", async () => {

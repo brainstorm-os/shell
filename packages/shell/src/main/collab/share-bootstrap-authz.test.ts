@@ -120,8 +120,8 @@ class ReceivingShell {
 				incomingState: plaintext,
 				now: Date.now(),
 				invites: this.invites,
-				deriveInviteSecret: (nonce) =>
-					deriveInviteSecret((bytes) => this.session.signPayload(bytes), nonce),
+				deriveInviteSecret: (nonce, expiresAt) =>
+					deriveInviteSecret((bytes) => this.session.signPayload(bytes), nonce, expiresAt),
 				loadDoc: async (id) => (await this.session.ydocStore.load(id)).doc,
 				typeOf: (id) => this.repo.get(id)?.type ?? null,
 			});

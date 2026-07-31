@@ -78,13 +78,13 @@ export class ShareInvitesRepository {
 		return row ? toRecord(row) : null;
 	}
 
-	/** Pin an invite to the one entity + granter it authorizes, CREATING the row
+	/** Claim an invite for the one granter it authorizes, CREATING the row
 	 *  when this device has no record of the invite. A missing row is the normal
 	 *  state on a cold-restored vault or a paired sibling, and the anchor's secret
 	 *  is re-derived from the sovereign key rather than read from here, so the row
 	 *  is a replay ledger rather than the trust root. The `IS NULL` guard makes the
 	 *  first writer win even if two frames race: a second, losing pin changes
-	 *  nothing and the caller's re-read refuses the mismatched pair. */
+	 *  nothing and the caller's re-read refuses a mismatched granter. */
 	pin(input: PinShareInviteInput): void {
 		this.db
 			.prepare(
@@ -96,15 +96,14 @@ export class ShareInvitesRepository {
 					redeemed_at = excluded.redeemed_at,
 					redeemed_entity_id = excluded.redeemed_entity_id,
 					redeemed_by = excluded.redeemed_by
-				WHERE share_invites.redeemed_entity_id IS NULL
-					AND share_invites.redeemed_by IS NULL`,
+				WHERE share_invites.redeemed_by IS NULL`,
 			)
 			.run(
 				input.inviteId,
 				input.secretB64,
 				input.memberPubB64,
 				input.now,
-				input.now,
+				input.expiresAt,
 				input.now,
 				input.entityId,
 				input.ownerPubB64,
@@ -133,8 +132,8 @@ export class ShareInvitesRepository {
 	}
 
 	/** Drop invites that expired without ever being redeemed, once they are
-	 *  `graceMs` past expiry. A SPENT row is never purged — it is the record that
-	 *  stops the invite being replayed at some other entity. */
+	 *  `graceMs` past expiry. A CLAIMED row is never purged — it is the record that
+	 *  stops the invite being claimed by anyone else. */
 	purgeExpired(now: number, graceMs: number): number {
 		const result = this.db
 			.prepare("DELETE FROM share_invites WHERE redeemed_at IS NULL AND expires_at < ?")

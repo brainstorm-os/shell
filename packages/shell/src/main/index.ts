@@ -3583,11 +3583,10 @@ void app.whenReady().then(async () => {
 								incomingState: plaintext,
 								now: Date.now(),
 								invites: shareInvites,
-								deriveInviteSecret: (nonce) =>
-									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce),
+								deriveInviteSecret: (nonce, expiresAt) =>
+									deriveInviteSecret((bytes) => session.signPayload(bytes), nonce, expiresAt),
 								loadDoc: async (id) => (await session.ydocStore.load(id)).doc,
 								typeOf: (id) => entitiesRepo.get(id)?.type ?? null,
-								isRestoring: (id) => getRestoreEngine()?.isRestoringEntity(id) === true,
 							});
 							if (verdict !== ShareBootstrapVerdict.Allow) {
 								console.warn(`[collab] share bootstrap refused for ${entityId}: ${verdict}`);

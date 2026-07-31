@@ -187,13 +187,15 @@ export function createShareInviteSigned(opts: {
 		throw new Error(`share-invite: nonce must be ${INVITE_NONCE_BYTES} bytes`);
 	}
 	const inviteId = inviteIdForNonce(nonce);
+	const expiresAt = (opts.now ?? Date.now()) + (opts.ttlMs ?? INVITE_DEFAULT_TTL_MS);
 	// Derived, never drawn: the invitee must be able to re-derive this secret from
-	// the public nonce after a vault wipe, and on any paired device.
-	const secret = deriveInviteSecret(opts.sign, nonce);
+	// the public nonce after a vault wipe, and on any paired device. The expiry is
+	// inside the derivation, so it cannot be stripped by redeeming somewhere the
+	// ledger row is missing.
+	const secret = deriveInviteSecret(opts.sign, nonce, expiresAt);
 	if (secret.length !== INVITE_SECRET_BYTES) {
 		throw new Error(`share-invite: derived secret must be ${INVITE_SECRET_BYTES} bytes`);
 	}
-	const expiresAt = (opts.now ?? Date.now()) + (opts.ttlMs ?? INVITE_DEFAULT_TTL_MS);
 	const sig = opts.sign(invitePayload(userPubB64, x25519PubB64, inviteId, expiresAt, label));
 	return {
 		v: SHARE_INVITE_VERSION,
@@ -338,6 +340,7 @@ export function shareEntityWithInvite(
 			anchor = computeInviteAnchor({
 				secret,
 				inviteId: opts.invite.inviteId,
+				expiresAt: opts.invite.expiresAt,
 				entityId: opts.entityId,
 				memberPubB64: opts.invite.userPubB64,
 				ownerPubB64,

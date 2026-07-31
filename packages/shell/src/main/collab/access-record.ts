@@ -129,7 +129,7 @@ function grantPayload(
 	// exact bytes of every pre-collection-sharing grant, so their signatures
 	// still verify — the presence of the stored `x25519` field on the entry tells
 	// `resolveMembers` which form to reconstruct.
-	const x = x25519 ? `${x25519}|` : "";
+	const x = separable(x25519) ? `${x25519}|` : "";
 	// Same rule for the Collab-C5-invite-anchor fields: tagged, terminal, and
 	// omitted when absent, so every grant minted before them still verifies. They
 	// go last so the older payload is a strict prefix of the newer one.
@@ -229,8 +229,19 @@ export function grantAccess(
 	// Refused rather than stored: a pipe would make the signed segments ambiguous
 	// (see `grantPayload`), and every legitimate value is pipe-free by
 	// construction, so this can only be a caller bug or a hostile input.
-	if (opts.anchor?.includes("|")) throw new Error("grantAccess: anchor must not contain '|'");
-	if (opts.via?.includes("|")) throw new Error("grantAccess: via must not contain '|'");
+	// Every field concatenated into the signed payload must be pipe-free, or the
+	// segments stop being separable (see `grantPayload`). All of them are base64,
+	// base64url or an entity id by construction, so a pipe is a caller bug or a
+	// hostile input, never a value.
+	for (const [name, value] of [
+		["anchor", opts.anchor],
+		["via", opts.via],
+		["x25519", opts.x25519],
+		["entityId", opts.entityId],
+		["member", opts.member],
+	] as const) {
+		if (value?.includes("|")) throw new Error(`grantAccess: ${name} must not contain '|'`);
+	}
 	const anchor = opts.anchor ?? null;
 	const via = opts.via ?? null;
 	const addedBy = publicKeyToBase64(publicKeyFromSecret(opts.signerSecret));
@@ -307,7 +318,8 @@ export function resolveMembers(doc: Y.Doc, entityId: string): ResolvedMember[] {
 		const addedAt = readNumber(m, "addedAt");
 		if (member === null || addedBy === null || addedAt === null || !isAccessRole(roleRaw)) continue;
 		const role = roleRaw;
-		const x25519 = readString(m, "x25519");
+		const x25519raw = readString(m, "x25519");
+		const x25519 = separable(x25519raw) ? x25519raw : null;
 		// A stored value carrying a pipe cannot have been signed in the tagged form
 		// (see `grantPayload`), so read it as absent — the reconstructed payload then
 		// mismatches and `grantValid` is false, which is the fail-closed answer.

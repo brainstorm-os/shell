@@ -34,6 +34,7 @@ describe("ShareInvitesRepository", () => {
 			memberPubB64: "bWVtYmVy",
 			entityId,
 			ownerPubB64,
+			expiresAt: now + 7 * DAY,
 			now,
 		});
 
@@ -66,7 +67,7 @@ describe("ShareInvitesRepository", () => {
 		expect(env.invites.listOutstanding(NOW)).toHaveLength(1);
 	});
 
-	it("pin records the one entity + granter, and the first pin wins", () => {
+	it("pin records the claiming granter, and the first pin wins", () => {
 		mint("inv_a");
 		pin("inv_a", "ent_1", "owner_1", NOW);
 		pin("inv_a", "ent_2", "owner_2", NOW + 1);
@@ -83,7 +84,7 @@ describe("ShareInvitesRepository", () => {
 		expect(env.invites.get("inv_a")?.revokedAt).toBe(NOW);
 	});
 
-	it("listOutstanding hides spent, revoked and expired invites", () => {
+	it("listOutstanding hides claimed, revoked and expired invites", () => {
 		mint("inv_live");
 		mint("inv_spent");
 		mint("inv_revoked");
@@ -103,11 +104,11 @@ describe("ShareInvitesRepository", () => {
 		expect(env.invites.get("inv_recent")).not.toBeNull();
 		expect(
 			env.invites.get("inv_spent_old"),
-			"a SPENT row is what stops a replay - never purge it",
+			"a CLAIMED row is what stops another granter claiming it - never purge it",
 		).not.toBeNull();
 	});
 
-	it("RESTART: a spent invite is still spent after the store is reopened", async () => {
+	it("RESTART: a claimed invite is still claimed after the store is reopened", async () => {
 		mint("inv_a");
 		pin("inv_a", "ent_1", "owner_1", NOW);
 		env.stores.close();
