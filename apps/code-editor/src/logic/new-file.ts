@@ -4,6 +4,7 @@
  * one. Pure (no DOM / no service); the app wires the create call.
  */
 
+import { firstFreeName } from "@brainstorm-os/sdk/path-names";
 import { sanitizeInlineText } from "@brainstorm-os/sdk/sanitize-text";
 import {
 	type PathTreeEntry,
@@ -26,19 +27,21 @@ const FOLDER_BASE = "new-folder";
  *  before it reaches that chrome — `sanitizeInlineText` does both. */
 const MAX_RENAME_LENGTH = 200;
 
-/** First `<folder>/<base>[-N]<suffix>` not already taken (case-insensitive). */
+/** First `<folder>/<base>[-N]<suffix>` not already taken (case-insensitive).
+ *  The `-N` walk itself is the shared `firstFreeName` (the agent's "Save a
+ *  copy" on a conflicting code-file path walks the same one, so both surfaces
+ *  name collisions identically); the folder join stays here because it is this
+ *  app's path semantics. */
 function firstFreePath(
 	base: string,
 	suffix: string,
 	folder: string,
 	taken: ReadonlySet<string>,
 ): string {
-	for (let n = 1; n < 10_000; n++) {
-		const candidate = joinPath(folder, n === 1 ? `${base}${suffix}` : `${base}-${n}${suffix}`);
-		if (!taken.has(candidate.toLowerCase())) return candidate;
-	}
-	// Pathological fallback — effectively unreachable.
-	return joinPath(folder, `${base}-${taken.size + 1}${suffix}`);
+	return joinPath(
+		folder,
+		firstFreeName(base, suffix, (name) => taken.has(joinPath(folder, name).toLowerCase())),
+	);
 }
 
 /** A path not already taken: `untitled.ts`, then `untitled-2.ts`, … `folder`

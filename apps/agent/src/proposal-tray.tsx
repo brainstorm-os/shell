@@ -21,6 +21,12 @@ import { type ReactElement, useEffect, useState } from "react";
 import type { AgentI18nKey } from "./i18n";
 import { t } from "./i18n";
 import {
+	CodeFileConflictChoice,
+	type CodeFilePathRow,
+	findCodeFilePathConflict,
+	nextFreeCodeFilePath,
+} from "./logic/code-file-conflict";
+import {
 	PROPOSE_DESCRIPTORS,
 	ProposeKind,
 	type ProposedArtifact,
@@ -230,7 +236,13 @@ export type ProposalTrayProps = {
 	proposals: readonly ProposedArtifact[];
 	/** Ids currently being persisted (approve in flight) — disables the card. */
 	busyIds: ReadonlySet<string>;
-	onApprove: (artifact: ProposedArtifact) => void;
+	/** POLISH-FN-4 — every code file the app can see (vault snapshot + anything
+	 *  persisted this session). A code-file card whose path is already taken
+	 *  says so BEFORE approval and offers the two named outcomes instead of the
+	 *  plain Add button, because a silent overwrite and a silent rename are both
+	 *  surprises and the tray exists precisely so the user decides. */
+	existingCodeFiles?: readonly CodeFilePathRow[];
+	onApprove: (artifact: ProposedArtifact, choice?: CodeFileConflictChoice) => void;
 	onDiscard: (id: string) => void;
 	onEditField: (id: string, field: string, value: string) => void;
 };
@@ -238,13 +250,15 @@ export type ProposalTrayProps = {
 function ProposalCard({
 	artifact,
 	busy,
+	existingCodeFiles,
 	onApprove,
 	onDiscard,
 	onEditField,
 }: {
 	artifact: ProposedArtifact;
 	busy: boolean;
-	onApprove: (artifact: ProposedArtifact) => void;
+	existingCodeFiles: readonly CodeFilePathRow[];
+	onApprove: (artifact: ProposedArtifact, choice?: CodeFileConflictChoice) => void;
 	onDiscard: (id: string) => void;
 	onEditField: (id: string, field: string, value: string) => void;
 }): ReactElement | null {
@@ -252,6 +266,11 @@ function ProposalCard({
 	if (!layout) return null;
 	const kindLabel = t(KIND_LABEL_KEY[artifact.kind]);
 	const primaryEmpty = !(artifact.fields[layout.primaryField] ?? "").trim();
+	// Recomputed on every keystroke in the path field, so renaming the draft is
+	// the third way out of the conflict and the card clears the moment it is.
+	const draftPath = artifact.fields.path ?? "";
+	const conflict = artifact.codeFile ? findCodeFilePathConflict(existingCodeFiles, draftPath) : null;
+	const copyPath = conflict ? nextFreeCodeFilePath(existingCodeFiles, draftPath) : "";
 
 	return (
 		<div
@@ -328,17 +347,47 @@ function ProposalCard({
 				/>
 			) : null}
 			{artifact.codeFile ? <CodeFilePreview artifact={artifact} /> : null}
+			{conflict ? (
+				<p className="agent-proposal__conflict" role="status" data-testid="agent-proposal-conflict">
+					<Icon name={IconName.Warning} size={13} />
+					{t("propose.codeFile.conflict", { path: conflict.path })}
+				</p>
+			) : null}
 			<div className="agent-proposal__actions">
-				<button
-					type="button"
-					className="agent-proposal__btn agent-proposal__btn--approve"
-					disabled={busy || primaryEmpty}
-					onClick={() => onApprove(artifact)}
-					data-testid="agent-proposal-approve"
-				>
-					<Icon name={IconName.Check} size={13} />
-					{t("propose.card.approve")}
-				</button>
+				{conflict ? (
+					<>
+						<button
+							type="button"
+							className="agent-proposal__btn agent-proposal__btn--approve"
+							disabled={busy}
+							onClick={() => onApprove(artifact, CodeFileConflictChoice.Update)}
+							data-testid="agent-proposal-update"
+						>
+							<Icon name={IconName.Check} size={13} />
+							{t("propose.codeFile.update")}
+						</button>
+						<button
+							type="button"
+							className="agent-proposal__btn"
+							disabled={busy}
+							onClick={() => onApprove(artifact, CodeFileConflictChoice.SaveCopy)}
+							data-testid="agent-proposal-save-copy"
+						>
+							{t("propose.codeFile.saveCopy", { path: copyPath })}
+						</button>
+					</>
+				) : (
+					<button
+						type="button"
+						className="agent-proposal__btn agent-proposal__btn--approve"
+						disabled={busy || primaryEmpty}
+						onClick={() => onApprove(artifact)}
+						data-testid="agent-proposal-approve"
+					>
+						<Icon name={IconName.Check} size={13} />
+						{t("propose.card.approve")}
+					</button>
+				)}
 				<button
 					type="button"
 					className="agent-proposal__btn"
@@ -356,6 +405,7 @@ function ProposalCard({
 export function ProposalTray({
 	proposals,
 	busyIds,
+	existingCodeFiles = [],
 	onApprove,
 	onDiscard,
 	onEditField,
@@ -375,6 +425,7 @@ export function ProposalTray({
 					key={artifact.id}
 					artifact={artifact}
 					busy={busyIds.has(artifact.id)}
+					existingCodeFiles={existingCodeFiles}
 					onApprove={onApprove}
 					onDiscard={onDiscard}
 					onEditField={onEditField}
