@@ -6,12 +6,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { LanHostHandshake } from "./lan-admission";
-import { createLanListener } from "./lan-host-factory";
+import { type BuiltLanListener, createLanListener } from "./lan-host-factory";
 import type { LanSessionAccess } from "./lan-sync-wiring";
 
-const stub = (): { start: () => Promise<{ url: string }>; stop: () => Promise<void> } => ({
+const stub = (): BuiltLanListener => ({
 	start: async () => ({ url: "ws://192.168.1.5:5000" }),
 	stop: async () => undefined,
+	webSocketCtor: () => class {} as never,
 });
 
 const accessWith = (over: Partial<LanSessionAccess> = {}): LanSessionAccess => ({

@@ -250,3 +250,47 @@ describe("paired-peer adoption", () => {
 		expect(seen).toHaveLength(1);
 	});
 });
+
+describe("LanDialCoordinator — the host joins its own session (F-474)", () => {
+	// A host is a peer like any other. Until this existed the hosting device sat
+	// on the loopback transport while serving guests, so a two-device LAN session
+	// synced in one direction only: the guest's dial succeeded and nothing the
+	// host wrote ever moved.
+	const SELF = "ws://192.168.1.5:5000";
+	const PEER = "ws://192.168.1.9:5000";
+
+	it("selects our own listener when hosting and no real peer is available", () => {
+		const seen: (LanDialTarget | null)[] = [];
+		const c = new LanDialCoordinator({ onTargetChanged: (t) => seen.push(t) });
+		c.setSelfHostUrl(SELF);
+		expect(c.target()).toEqual({ url: SELF, source: LanDialSource.SelfHost });
+		expect(seen.at(-1)?.source).toBe(LanDialSource.SelfHost);
+	});
+
+	it("still selects self-host with dialling Off, because hosting is its own opt-in", () => {
+		const c = new LanDialCoordinator({ onTargetChanged: () => undefined });
+		c.setMode(LanDialMode.Off);
+		c.setSelfHostUrl(SELF);
+		expect(c.target()?.source).toBe(LanDialSource.SelfHost);
+	});
+
+	it("a real peer outranks talking to ourselves", () => {
+		const c = new LanDialCoordinator({ onTargetChanged: () => undefined });
+		c.setSelfHostUrl(SELF);
+		c.setMode(LanDialMode.Manual);
+		c.setManualUrl(PEER);
+		expect(c.target()).toEqual({ url: PEER, source: LanDialSource.Manual });
+		// ...and when that peer goes away we fall back to our own listener rather
+		// than to the relay, so hosting keeps working.
+		c.setManualUrl(null);
+		expect(c.target()?.source).toBe(LanDialSource.SelfHost);
+	});
+
+	it("clears the self target when we stop hosting", () => {
+		const c = new LanDialCoordinator({ onTargetChanged: () => undefined });
+		c.setSelfHostUrl(SELF);
+		expect(c.target()).not.toBeNull();
+		c.setSelfHostUrl(null);
+		expect(c.target()).toBeNull();
+	});
+});
