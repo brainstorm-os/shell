@@ -564,7 +564,7 @@ body.is-resizing .journal__props-resize {
 	justify-content: center;
 	width: 32px;
 	height: 32px;
-	font-size: 18px;
+	font-size: var(--text-size-xl);
 	line-height: 1;
 	border: var(--border-width) solid transparent;
 	border-radius: var(--radius-md);
@@ -622,7 +622,7 @@ body.is-resizing .journal__props-resize {
 }
 
 .journal__habit-glyph {
-	font-size: 13px;
+	font-size: var(--text-size-sm);
 	line-height: 1;
 	filter: grayscale(0.5);
 }
@@ -682,7 +682,7 @@ body.is-resizing .journal__props-resize {
 }
 
 .journal__streak-flame {
-	font-size: 13px;
+	font-size: var(--text-size-sm);
 	line-height: 1;
 }
 

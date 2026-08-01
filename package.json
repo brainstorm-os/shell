@@ -28,7 +28,7 @@
     "test:watch": "bun --bun vitest",
     "test:coverage": "bun --bun vitest run --coverage",
     "lint": "biome check . && bun run lint:apps",
-    "lint:apps": "node tools/check-app-reactivity.mjs && node tools/check-control-faces.mjs && bun tools/check-css-tokens.mjs && bun tools/check-hardcoded-radius.mjs && node tools/check-app-i18n.mjs && node tools/check-bespoke-empty-cta.mjs && node tools/check-panel-toggles.mjs && node tools/check-template-i18n.mjs && node tools/check-native-select.mjs",
+    "lint:apps": "node tools/check-app-reactivity.mjs && node tools/check-control-faces.mjs && bun tools/check-css-tokens.mjs && bun tools/check-hardcoded-radius.mjs && node tools/check-app-i18n.mjs && node tools/check-bespoke-empty-cta.mjs && node tools/check-panel-toggles.mjs && node tools/check-template-i18n.mjs && node tools/check-native-select.mjs && node tools/check-design-drift.mjs",
     "new-app": "bun tools/new-app.ts",
     "release": "bun tools/release.mjs",
     "format": "biome format --write .",
