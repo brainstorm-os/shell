@@ -37,6 +37,7 @@ import { cp, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { applyDefaultAppGrants } from "@brainstorm-os/capabilities/default-grants";
 import { type CapabilityLedger, GrantedVia } from "@brainstorm-os/capabilities/ledger";
+import { appToolId, normalizeAppTool } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import { type ShortcutRegistry, shellChordSet } from "../shortcuts/shortcut-registry";
 import { OpenerTargetKind, RegistryRepositories } from "../storage/registry-repo";
@@ -549,6 +550,18 @@ export class AppInstaller {
 			})),
 		);
 
+		// Tool-2 — declared tools. Ids are minted here (`app.<appId>.<name>`) so
+		// the registry is the single authority on a tool's address; the manifest
+		// only names it.
+		this.repos.appTools.insertMany(
+			(regs.tools ?? []).map((t) => ({
+				...normalizeAppTool(t),
+				id: appToolId(manifest.id, t.name),
+				appId: manifest.id,
+				registeredAt: now,
+			})),
+		);
+
 		this.repos.intents.insertMany(
 			(regs.intents ?? []).map((it) => ({
 				appId: manifest.id,
@@ -578,6 +591,7 @@ export class AppInstaller {
 		this.repos.blocks.deleteForApp(appId);
 		this.repos.widgets.deleteForApp(appId);
 		this.repos.intents.deleteForApp(appId);
+		this.repos.appTools.deleteForApp(appId);
 	}
 }
 

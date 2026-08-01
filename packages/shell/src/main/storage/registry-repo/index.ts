@@ -1,3 +1,4 @@
+export { AppToolsRepository } from "./app-tools-repo";
 /**
  * Composite of all `registry.db` repositories. Constructed once per vault
  * session and threaded through `AppInstaller`, the future app-launcher, the
@@ -8,6 +9,7 @@
  */
 
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
+import { AppToolsRepository } from "./app-tools-repo";
 import { AppsRepository } from "./apps-repo";
 import { BlocksRepository } from "./blocks-repo";
 import { ConnectorWebhooksRepository } from "./connector-webhooks-repo";
@@ -46,6 +48,7 @@ export class RegistryRepositories {
 	readonly blocks: BlocksRepository;
 	readonly entityTypes: EntityTypesRepository;
 	readonly widgets: WidgetsRepository;
+	readonly appTools: AppToolsRepository;
 	readonly intents: IntentsRepository;
 	readonly schedulerFires: SchedulerFiresRepository;
 	readonly fileWatchGrants: FileWatchGrantsRepository;
@@ -57,6 +60,7 @@ export class RegistryRepositories {
 		this.blocks = new BlocksRepository(db);
 		this.entityTypes = new EntityTypesRepository(db);
 		this.widgets = new WidgetsRepository(db);
+		this.appTools = new AppToolsRepository(db);
 		this.intents = new IntentsRepository(db);
 		this.schedulerFires = new SchedulerFiresRepository(db);
 		this.fileWatchGrants = new FileWatchGrantsRepository(db);

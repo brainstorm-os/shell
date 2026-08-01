@@ -329,6 +329,7 @@ import {
 	EntitiesRepository,
 	ShareInvitesRepository,
 } from "./storage/entities-repo";
+import { AppToolsRepository } from "./storage/registry-repo/app-tools-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
 import { ConnectorWebhooksRepository } from "./storage/registry-repo/connector-webhooks-repo";
@@ -353,6 +354,7 @@ import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
 import { AppCallHost } from "./tools/app-call-host";
+import { makeToolsServiceHandler } from "./tools/tools-service";
 import { wireAppCallIpc } from "./tools/wire-app-call";
 import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
@@ -4168,6 +4170,25 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				if (!session) return null;
 				return await session.dataStores.open("registry");
+			},
+			getLedger: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return await session.capabilityLedger();
+			},
+		}),
+	);
+
+	// Tool-2 — the `tools` service: the app-tool catalogue (registry read only;
+	// applicability matches declared types, never content). `tools.call` is
+	// Tool-4 — this rung lists.
+	workers.broker.registerService(
+		"tools",
+		makeToolsServiceHandler({
+			getRepo: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return new AppToolsRepository(await session.dataStores.open("registry"));
 			},
 			getLedger: async () => {
 				const session = getActiveVaultSession();

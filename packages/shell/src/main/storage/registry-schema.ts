@@ -300,4 +300,31 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			db.exec("CREATE INDEX idx_connector_webhooks_account ON connector_webhooks (account_id);");
 		},
 	},
+	{
+		version: 13,
+		description: "registry.db v13 — app_tools (Tool-2: apps as typed tool providers)",
+		up: (db) => {
+			// Tool-2 — an installed app's declared tools (doc 78). Replaced
+			// wholesale per app on install/update, like widgets/openers/blocks:
+			// the set is a function of the manifest, so a re-install is a
+			// delete + insert, never a merge. `applies_to` / `surfaces` are JSON
+			// arrays (the openers precedent for multi-valued columns). LOCAL —
+			// a registry row never syncs.
+			db.exec(`
+				CREATE TABLE app_tools (
+					id            TEXT PRIMARY KEY,
+					app_id        TEXT NOT NULL,
+					name          TEXT NOT NULL,
+					title         TEXT NOT NULL,
+					description   TEXT NOT NULL,
+					effect        TEXT NOT NULL,
+					applies_to    TEXT NOT NULL,
+					surfaces      TEXT NOT NULL,
+					registered_at INTEGER NOT NULL
+				);
+			`);
+			db.exec("CREATE INDEX idx_app_tools_app ON app_tools (app_id);");
+			db.exec("CREATE UNIQUE INDEX idx_app_tools_app_name ON app_tools (app_id, name);");
+		},
+	},
 ];
