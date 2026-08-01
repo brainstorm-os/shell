@@ -150,9 +150,12 @@ export type AgentTraceService = {
 	beginTurn(input?: { conversationId?: string }): Promise<{ runId: string | null }>;
 	/** Close a run this app opened (no-op on a foreign/unknown id). */
 	endTurn(input: { runId: string }): Promise<{ ended: boolean }>;
-	/** This app's own runs, newest first, bounded + cursor-paged. */
+	/** This app's own runs, newest first, bounded + cursor-paged. The
+	 *  `workflowRunId` filter is 12c's drill-in join: the persisted
+	 *  `WorkflowRun/v1` entity id back-linked on an automation trace run. */
 	listRuns(input?: {
 		conversationId?: string;
+		workflowRunId?: string;
 		beforeStartedAt?: number;
 		limit?: number;
 	}): Promise<{ runs: readonly AgentRunSummary[] }>;
@@ -192,6 +195,41 @@ function draft(
 function boundedDuration(value: number | undefined): number {
 	if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return 0;
 	return Math.min(Math.floor(value), 86_400_000);
+}
+
+/** The `WorkflowRun/v1.error` prefix a capability-refused automation run is
+ *  persisted with (`capability-denied:<cap>,<cap>`). A wire contract: the
+ *  shell host writes it, the Automations app's run detail parses it back into
+ *  named capabilities (Agent-12c — a failed run shows the denying capability,
+ *  never a bare error string). */
+export const WORKFLOW_RUN_DENIED_ERROR_PREFIX = "capability-denied:";
+
+/** Parse a `WorkflowRun/v1.error` into the denied capability list, or null
+ *  when the error is not a capability refusal. Defensive: bounds + sanitizes
+ *  each name (the row is vault data — treat it as untrusted on read). */
+export function workflowRunDeniedCapabilities(error: unknown): string[] | null {
+	if (typeof error !== "string" || !error.startsWith(WORKFLOW_RUN_DENIED_ERROR_PREFIX)) return null;
+	const out: string[] = [];
+	for (const part of error.slice(WORKFLOW_RUN_DENIED_ERROR_PREFIX.length).split(",")) {
+		const capability = sanitizeTraceText(part, AGENT_TRACE_CAPABILITY_MAX);
+		if (capability && !out.includes(capability)) out.push(capability);
+	}
+	return out;
+}
+
+/** The unique missing capabilities a run's `tool-denied` events name — the
+ *  ONE denial shaping both read surfaces render (the Automations drill-in,
+ *  12c, and the Settings → AI activity view, 12d). First-seen order. */
+export function deniedTraceCapabilities(
+	events: ReadonlyArray<Pick<AgentTraceEventRecord, "kind" | "capability">>,
+): string[] {
+	const out: string[] = [];
+	for (const event of events) {
+		if (event.kind !== AgentEventKind.ToolDenied) continue;
+		if (!event.capability || out.includes(event.capability)) continue;
+		out.push(event.capability);
+	}
+	return out;
 }
 
 /** The offered-tool context a codec caller passes so a capability-denied

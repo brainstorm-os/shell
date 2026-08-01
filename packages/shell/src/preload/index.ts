@@ -636,6 +636,65 @@ const aiSettings = {
 		ipcRenderer.invoke("ai-settings:set-app-budget", appId, budget),
 };
 
+/** Agent-12d — Settings → AI → Agent activity (privileged; OQ-AO-2
+ *  shell-surfaces-only, so this bridge is the ONLY road to vault-wide trace
+ *  reads — no app capability exists). Replies are bounded, metadata-only
+ *  projections; page sizes are clamped main-side regardless of what is
+ *  passed here. */
+const agentActivity = {
+	runs: (query: AgentActivityRunsQueryView): Promise<AgentActivityRunsResultView> =>
+		ipcRenderer.invoke("agent-activity:runs", query),
+	events: (runId: string, afterSeq?: number): Promise<AgentActivityEventsResultView> =>
+		ipcRenderer.invoke("agent-activity:events", runId, afterSeq ?? null),
+	entityHistory: (entityId: string): Promise<AgentActivityEventsResultView> =>
+		ipcRenderer.invoke("agent-activity:entity-history", entityId),
+	agents: (): Promise<{ agents: readonly string[] }> => ipcRenderer.invoke("agent-activity:agents"),
+};
+
+/** Mirrors the main-side `AgentActivityRunsQuery` (agent-activity-handlers).
+ *  Every field is optional and re-validated main-side. */
+export type AgentActivityRunsQueryView = {
+	surface?: string;
+	agent?: string;
+	outcome?: string;
+	sinceTs?: number;
+	untilTs?: number;
+	denialsOnly?: boolean;
+	beforeStartedAt?: number;
+	limit?: number;
+};
+
+/** Mirrors `AgentRunSummary` (sdk-types agent-trace) — the bounded run
+ *  projection, never a raw DB row. */
+export type AgentActivityRunView = {
+	id: string;
+	surface: string;
+	conversationId: string | null;
+	workflowRunId: string | null;
+	agent: string;
+	startedAt: number;
+	endedAt: number | null;
+	outcome: string | null;
+	denialCount: number;
+};
+
+/** Mirrors `AgentTraceEventRecord` (sdk-types agent-trace). */
+export type AgentActivityEventView = {
+	runId: string;
+	seq: number;
+	ts: number;
+	kind: string;
+	tool: string;
+	targetEntityId: string | null;
+	capability: string | null;
+	outcome: string;
+	detail: string | null;
+	durationMs: number;
+};
+
+export type AgentActivityRunsResultView = { runs: readonly AgentActivityRunView[] };
+export type AgentActivityEventsResultView = { events: readonly AgentActivityEventView[] };
+
 /** A per-app budget over the rolling 30-day window (14.8). Either unit may be
  *  set; an empty object clears the budget. Mirrors main-side `AppAiBudget`. */
 export type AiAppBudgetView = {
@@ -1989,6 +2048,7 @@ const brainstorm = {
 	importExport,
 	spellcheck,
 	aiSettings,
+	agentActivity,
 	billing,
 	mcpSettings,
 	filesHandles,

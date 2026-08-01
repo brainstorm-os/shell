@@ -10,6 +10,7 @@
  */
 
 import type {
+	AgentTraceService,
 	AutomationsService,
 	IntentsService,
 	StorageService,
@@ -92,6 +93,9 @@ export type AutomationsBrainstorm = {
 		 *  icon (cap `ui.badge`). Only `badge` is used; typed as the full
 		 *  service so the proxy shape stays honest. */
 		ui?: UiService;
+		/** Agent-12c — own-runs trace reads (no capability, OQ-AO-2): the runs
+		 *  drill-in joins its `WorkflowRun/v1` rows to the shell-written trace. */
+		agentTrace?: AgentTraceService;
 	} | null;
 	on?(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
 };

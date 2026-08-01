@@ -150,6 +150,23 @@ describe("AgentTraceRepository", () => {
 		expect(repo.getRun("r1")?.workflowRunId).toBe("ent_wfr");
 	});
 
+	it("listRuns filters by workflowRunId (the 12c drill-in join)", () => {
+		repo.insertRun(run({ id: "r1", surface: AgentRunSurface.Automation, conversationId: null }));
+		repo.insertRun(run({ id: "r2", surface: AgentRunSurface.Automation, conversationId: null }));
+		repo.setWorkflowRunId("r1", "ent_wfr_1");
+		repo.setWorkflowRunId("r2", "ent_wfr_2");
+		expect(repo.listRuns({ workflowRunId: "ent_wfr_2" }).map((r) => r.id)).toEqual(["r2"]);
+		expect(repo.listRuns({ workflowRunId: "nope" })).toHaveLength(0);
+	});
+
+	it("listAgents returns distinct principals, bounded (the 12d app filter)", () => {
+		repo.insertRun(run({ id: "r1", agent: "io.a" }));
+		repo.insertRun(run({ id: "r2", agent: "io.b" }));
+		repo.insertRun(run({ id: "r3", agent: "io.a" }));
+		expect(repo.listAgents()).toEqual(["io.a", "io.b"]);
+		expect(repo.listAgents(1)).toEqual(["io.a"]);
+	});
+
 	it("eventsForEntity returns the per-entity agent history, bounded", () => {
 		repo.insertRun(run({ id: "r1" }));
 		repo.insertEvent(event("r1", { targetEntityId: "ent_x", ts: 1 }));

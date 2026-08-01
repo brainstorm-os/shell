@@ -24,6 +24,7 @@ import {
 	AgentRunOutcome,
 	AgentRunSurface,
 	type EntityEventVerb,
+	WORKFLOW_RUN_DENIED_ERROR_PREFIX,
 	type WorkflowRunDef,
 	WorkflowRunStatus,
 	type WorkflowStep,
@@ -586,7 +587,7 @@ export class AutomationsHost {
 			triggeredBy,
 			triggeredAt: new Date(this.ports.clock()).toISOString(),
 			status: WorkflowRunStatus.Failed,
-			error: `capability-denied:${[...new Set(denied)].sort().join(",")}`,
+			error: `${WORKFLOW_RUN_DENIED_ERROR_PREFIX}${[...new Set(denied)].sort().join(",")}`,
 		});
 	}
 

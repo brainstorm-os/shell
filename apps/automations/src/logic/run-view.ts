@@ -8,7 +8,11 @@
  * degrades to safe defaults and never throws.
  */
 
-import { type WorkflowRunStatus, isWorkflowRunStatus } from "@brainstorm-os/sdk-types";
+import {
+	type WorkflowRunStatus,
+	isWorkflowRunStatus,
+	workflowRunDeniedCapabilities,
+} from "@brainstorm-os/sdk-types";
 import type { EntityRecord } from "../storage/runtime";
 
 /** A decoded `stepLog` entry. The runner writes a flat, depth-tagged list;
@@ -31,6 +35,9 @@ export type RunView = {
 	triggeredAtMs: number;
 	triggeredBy: string;
 	error?: string;
+	/** Agent-12c — the capabilities a `capability-denied:` refusal named,
+	 *  parsed from `error` so the surface renders THEM, never the raw string. */
+	deniedCapabilities?: string[];
 	costCents?: number;
 	steps: RunStep[];
 };
@@ -92,7 +99,11 @@ export function toRunView(
 		steps: decodeStepLog(p.stepLog),
 	};
 	const error = asString(p.error, "");
-	if (error !== "") view.error = error;
+	if (error !== "") {
+		const denied = workflowRunDeniedCapabilities(error);
+		if (denied && denied.length > 0) view.deniedCapabilities = denied;
+		else view.error = error;
+	}
 	const cost = asFiniteNumber(p.costCents);
 	if (cost !== undefined) view.costCents = cost;
 	return view;

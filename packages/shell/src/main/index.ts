@@ -206,6 +206,7 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
+import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
@@ -1829,6 +1830,10 @@ void app.whenReady().then(async () => {
 	registerAiSettingsHandlers({
 		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
 	});
+	// Agent-12d — Settings → AI → Agent activity (dashboard-privileged, not
+	// broker; OQ-AO-2 shell-surfaces-only). Bounded projections over the
+	// active vault's agent trace; resolves the session per call.
+	registerAgentActivityHandlers();
 	// 14.6 — Settings → Billing (dashboard-privileged, not broker). The
 	// refresh credential lives in the vault's Tier-2 CredentialStore; the
 	// account link + entitlement cache live in account.db; billing-edge is

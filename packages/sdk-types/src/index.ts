@@ -2751,8 +2751,10 @@ export {
 	AgentEventOutcome,
 	AgentRunOutcome,
 	AgentRunSurface,
+	WORKFLOW_RUN_DENIED_ERROR_PREFIX,
 	WorkflowTraceStepStatus,
 	collectWorkflowAgentTools,
+	deniedTraceCapabilities,
 	firstMissingToolCapability,
 	isAgentEventKind,
 	isAgentEventOutcome,
@@ -2760,6 +2762,7 @@ export {
 	isAgentRunSurface,
 	loopStepEvents,
 	sanitizeTraceText,
+	workflowRunDeniedCapabilities,
 	workflowStepEvents,
 } from "./agent-trace";
 export type {
