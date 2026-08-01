@@ -68,11 +68,6 @@ body {
 	gap: var(--space-0_5);
 }
 
-.agent__sidebar-empty {
-	color: var(--color-text-tertiary);
-	font-size: var(--text-size-sm);
-	padding: var(--space-2);
-}
 
 .agent__conv {
 	appearance: none;
@@ -978,44 +973,8 @@ body {
 	flex-wrap: wrap;
 }
 
-.agent-proposal__btn {
-	appearance: none;
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	height: var(--control-height-sm, 24px);
-	padding: 0 var(--space-3);
-	border-radius: var(--radius-md);
-	border: var(--border-width) solid var(--color-border-subtle);
-	background: transparent;
-	color: var(--color-text-secondary);
-	font: inherit;
-	font-size: var(--text-size-xs);
-	cursor: pointer;
-}
 
-.agent-proposal__btn:hover:not(:disabled) {
-	background: var(--hover);
-	color: var(--color-text-primary);
-}
 
-.agent-proposal__btn:focus-visible {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: 2px;
-}
 
-.agent-proposal__btn:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
 
-.agent-proposal__btn--approve {
-	border-color: transparent;
-	background: var(--accent);
-	color: var(--accent-fg);
-}
 
-.agent-proposal__btn--approve:hover:not(:disabled) {
-	background: var(--accent-strong);
-	color: var(--accent-fg);
-}
