@@ -38,6 +38,7 @@ import { ColumnsPlugin } from "./columns-plugin";
 import { FormatChordsPlugin } from "./format-chords-plugin";
 import { InitialFocusPlugin } from "./initial-focus-plugin";
 import { InlineToolbarPlugin } from "./inline-toolbar-plugin";
+import { ListMarkdownShortcutsPlugin } from "./list-markdown-shortcuts-plugin";
 import { SlashMenuPlugin } from "./slash-menu-plugin";
 import { TablesPlugin } from "./table-plugin";
 import { TogglePlugin } from "./toggle-plugin";
@@ -95,6 +96,7 @@ export function StandardEditingPlugins({
 			<CheckListPlugin />
 			<HorizontalRulePlugin />
 			<MarkdownShortcutPlugin transformers={[...BLOCK_MARKDOWN_TRANSFORMERS, ...TRANSFORMERS]} />
+			<ListMarkdownShortcutsPlugin />
 			<TabIndentationPlugin />
 			<TurnIntoPlugin />
 			<SlashMenuPlugin commands={commands} />

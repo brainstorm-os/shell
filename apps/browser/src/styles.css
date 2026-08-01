@@ -573,3 +573,86 @@ body {
 	color: var(--color-accent-default);
 	background: var(--color-accent-subtle);
 }
+
+/* ── Start page (POLISH-DSN-3) ────────────────────────────────────────────
+ * Rendered in `.browser__region` while the active tab is blank (the shell
+ * view is parked at zero bounds meanwhile, same as the reader sheet), so
+ * unlike the transparent resting region this surface paints itself. */
+
+.browser-start {
+	height: 100%;
+	overflow-y: auto;
+	padding: var(--space-6);
+	background: var(--color-background-primary);
+}
+
+.browser-start--empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.browser-start__heading {
+	max-width: 640px;
+	margin: 0 auto var(--space-3);
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--color-text-secondary);
+}
+
+.browser-start__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: var(--space-2);
+	max-width: 640px;
+	margin: 0 auto;
+}
+
+.browser-start__tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-3) var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+	color: var(--text);
+	cursor: pointer;
+	text-align: center;
+	min-width: 0;
+}
+
+.browser-start__tile:hover {
+	background: var(--hover);
+}
+
+.browser-start__monogram {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-full);
+	background: var(--color-accent-subtle);
+	color: var(--color-accent-default);
+	font-size: var(--text-size-md);
+	font-weight: 600;
+}
+
+.browser-start__tile-title {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-size-sm);
+}
+
+.browser-start__tile-host {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-size-sm);
+	color: var(--color-text-tertiary);
+}

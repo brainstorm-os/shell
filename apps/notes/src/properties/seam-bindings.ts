@@ -63,6 +63,7 @@ export const notesPropertyUiLabels: PropertyUiLabels = {
 	linkSearchPlaceholder: t("notes.link.searchPlaceholder"),
 	linkOptions: t("notes.link.options"),
 	linkNoResults: t("notes.link.noResults"),
+	linkNoResultsOfType: (types) => t("notes.link.noResultsOfType", { types }),
 
 	dictRegion: t("notes.dict.region"),
 	dictNameLabel: t("notes.dict.nameLabel"),

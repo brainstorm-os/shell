@@ -227,6 +227,7 @@
   "notes.link.searchPlaceholder": "Rechercher des notes à lier…",
   "notes.link.options": "Notes pouvant être liées",
   "notes.link.noResults": "Pas encore de notes à lier",
+  "notes.link.noResultsOfType": "Pas encore de {types} à lier",
   "notes.dict.region": "Éditeur de dictionnaire",
   "notes.dict.nameLabel": "Nom du dictionnaire",
   "notes.dict.count": "{n} valeurs",

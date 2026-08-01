@@ -111,6 +111,7 @@ import {
 	getWebView,
 	onIntent,
 } from "./runtime";
+import { StartPage } from "./start-page";
 import { SummaryPanel } from "./summary-panel";
 import {
 	BROWSING_SESSION_ENTITY_TYPE,
@@ -621,13 +622,17 @@ export function BrowserApp(): ReactElement {
 	// the summary panel living in the top chrome flow). Closing the reader
 	// re-runs this effect and restores the measured rect.
 	const readerParked = activeReader !== null;
+	// POLISH-DSN-3 — a blank (new-tab) page parks the view the same way, so
+	// the in-chrome start page underneath is visible and clickable. The first
+	// navigation flips `active.url` and this effect restores the real bounds.
+	const startPageShown = active !== undefined && active.url === NEW_TAB_URL;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on tab switch, not every meta change
 	useLayoutEffect(() => {
 		if (!webView || !active) return;
 		const el = regionRef.current;
 		if (!el) return;
 		const push = () => {
-			if (readerParked) {
+			if (readerParked || startPageShown) {
 				void webView.setBounds(active.id, { x: 0, y: 0, width: 0, height: 0 });
 			} else {
 				pushBoundsFor(active.id);
@@ -641,7 +646,7 @@ export function BrowserApp(): ReactElement {
 			ro.disconnect();
 			window.removeEventListener("resize", push);
 		};
-	}, [webView, active?.id, pushBoundsFor, readerParked]);
+	}, [webView, active?.id, pushBoundsFor, readerParked, startPageShown]);
 
 	const closeSuggestions = useCallback(() => {
 		setSuggestOpen(false);
@@ -1500,6 +1505,9 @@ export function BrowserApp(): ReactElement {
 			<DownloadTray notices={downloadNotices} onDismiss={dismissNotice} />
 			<div ref={regionRef} className="browser__region">
 				{activeReader && <ReaderView state={activeReader} onClose={closeReader} />}
+				{!activeReader && startPageShown && (
+					<StartPage visits={visits} isPrivate={active?.private === true} onOpen={navigateTo} />
+				)}
 			</div>
 		</div>
 	);

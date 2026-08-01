@@ -227,6 +227,7 @@
   "notes.link.searchPlaceholder": "Search notes to link…",
   "notes.link.options": "Linkable notes",
   "notes.link.noResults": "No notes to link yet",
+  "notes.link.noResultsOfType": "No {types} to link yet",
   "notes.dict.region": "Dictionary editor",
   "notes.dict.nameLabel": "Dictionary name",
   "notes.dict.count": "{n} values",

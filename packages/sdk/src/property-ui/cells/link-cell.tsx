@@ -18,6 +18,7 @@ import {
 import type { JSX } from "react";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { coerceValue } from "../../properties-validate";
+import { friendlyTypeName } from "../../system-entities";
 import { CheckIcon } from "../icons";
 import { usePropertyUiSeams } from "../use-properties";
 import { CellPopover } from "./cell-popover";
@@ -202,7 +203,11 @@ function LinkPicker({
 				aria-label={labels.linkOptions}
 			>
 				{results.length === 0 ? (
-					<div className="bs-cell-pop-status">{labels.linkNoResults}</div>
+					<div className="bs-cell-pop-status">
+						{allowedTypes && allowedTypes.length > 0 && labels.linkNoResultsOfType
+							? labels.linkNoResultsOfType(allowedTypes.map(friendlyTypeName).join(", "))
+							: labels.linkNoResults}
+					</div>
 				) : (
 					results.map((e, index) => {
 						const selected = selectedIds.includes(e.id);
