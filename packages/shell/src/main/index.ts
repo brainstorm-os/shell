@@ -12,6 +12,7 @@ import {
 } from "@brainstorm-os/protocol/selective-sync-types";
 import { UPDATE_STATE_EVENT } from "@brainstorm-os/protocol/update-wire-types";
 import {
+	AGENT_TRACE_SERVICE,
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
@@ -58,11 +59,14 @@ import {
 	maybeRunAssignedAgent,
 	recordAssignmentRun,
 } from "./agents/assignment-runner";
+import { ChannelProposalStatus } from "./agents/channel-proposals";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
 	maybeRunMentionedAgents,
 } from "./agents/mention-runner";
+import { AgentTraceRecorder, makeBrokerTraceObserver } from "./agents/trace/agent-trace-recorder";
+import { makeAgentTraceServiceHandler } from "./agents/trace/agent-trace-service";
 import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
@@ -3449,12 +3453,64 @@ void app.whenReady().then(async () => {
 	// same `app:vault-entities-changed` staleness signal + trigger a
 	// search reindex, exactly like the storage-write wrap above, so
 	// subscribers repaint without polling.
+	// Agent-12a — the agent run/event trace substrate (doc 77). The recorder
+	// is the ONE writer: shell-hosted loops (mention runner, automations)
+	// call it directly, the broker dispatch observer feeds the chat surface,
+	// and the propose/approve gestures land via the entities / agent-proposals
+	// service callbacks below. All writes fail-soft; active runs are scoped
+	// to the vault they began under.
+	const agentTraceRecorder = new AgentTraceRecorder({
+		getRepo: async () => {
+			const session = getActiveVaultSession();
+			return session ? await session.agentTraceRepo() : null;
+		},
+		getVaultKey: () => getActiveVaultSession()?.vaultId ?? null,
+	});
+	workers.broker.registerService(
+		AGENT_TRACE_SERVICE,
+		makeAgentTraceServiceHandler({
+			recorder: agentTraceRecorder,
+			getRepo: async () => {
+				const session = getActiveVaultSession();
+				return session ? await session.agentTraceRepo() : null;
+			},
+		}),
+	);
+	// The chat-surface chokepoint: every identity-verified envelope an app
+	// dispatches while it has an open run maps to a timeline event; denials
+	// name the missing capability (resolved against the live ledger).
+	workers.broker.setDispatchObserver(
+		makeBrokerTraceObserver(agentTraceRecorder, {
+			findMissingCapability: async (app, declaredCaps) => {
+				const session = getActiveVaultSession();
+				if (!session || declaredCaps.length === 0) return null;
+				const ledger = await session.capabilityLedger();
+				return declaredCaps.find((cap) => !ledger.has(app, cap)) ?? null;
+			},
+		}),
+	);
+	// A vault switch/close orphans any in-memory active runs (their rows are
+	// closed by the repo's stale sweep) — drop them so nothing correlates
+	// across vaults. Belt to the recorder's per-run vault-key braces.
+	onActiveVaultSessionChanged(() => agentTraceRecorder.reset());
+
 	// 10.12 — the entities service hands its system-only remote-apply closure
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
 	const entitiesHandler = makeEntitiesServiceHandler({
 		onEntityChange: (change) => automationsChangeEmitter.emit(change),
+		// Agent-12a — a provenance-carrying create IS the approve gesture:
+		// record `proposal-approved` on the caller's latest run in that
+		// conversation (identifiers only; broker-verified app).
+		onAgentProvenanceCreate: ({ app, conversationId, entityId }) => {
+			void agentTraceRecorder.recordProposalDecision({
+				agent: app,
+				conversationId,
+				approved: true,
+				entityId,
+			});
+		},
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
 		getAssetKind: getAssetKindForActiveSession,
@@ -3873,6 +3929,9 @@ void app.whenReady().then(async () => {
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 			scheduleSearchReindex();
 		},
+		// Agent-12a — the runner is a shell-hosted loop seam; it writes the
+		// run + events for every channel mention turn.
+		trace: agentTraceRecorder,
 	};
 	workers.broker.registerService("entities", async (envelope) => {
 		const result = await entitiesHandler(envelope);
@@ -4137,6 +4196,16 @@ void app.whenReady().then(async () => {
 				broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 				scheduleSearchReindex();
 			},
+			// Agent-12a — the channel approve/discard gesture: attach the
+			// decision to the proposing agent's latest run in that channel.
+			onDecided: ({ agentFingerprint, channelId, decision, createdEntityId }) => {
+				void agentTraceRecorder.recordProposalDecision({
+					agent: agentFingerprint,
+					conversationId: channelId,
+					approved: decision === ChannelProposalStatus.Approved,
+					entityId: createdEntityId ?? null,
+				});
+			},
 		}),
 	);
 
@@ -4274,6 +4343,8 @@ void app.whenReady().then(async () => {
 						label: (key) => key,
 						newProposalId: (agent, entityId, index) =>
 							`prp_${agent.def.fingerprint}_${entityId}_${index}`,
+						// Agent-12a — an unattended assignment run leaves its own trace.
+						trace: agentTraceRecorder,
 					},
 					change,
 				);
@@ -4520,6 +4591,11 @@ void app.whenReady().then(async () => {
 			return (await session.billingService()).hasFeature(FeatureFlag.BundledAiCredits);
 		},
 		isPlatformBilled: () => false,
+		// Agent-12a (OQ-AO-5) — stamp each accounting row with the caller's
+		// open agent run, so the trace timeline derives model-call steps from
+		// `ai_usage` instead of duplicating them. Keyed on the record's own
+		// broker-verified appId — never another principal's run.
+		getActiveRunId: (appId) => agentTraceRecorder.activeRunIdFor(appId),
 	});
 	workers.broker.registerService(
 		"ai",
@@ -4991,6 +5067,9 @@ void app.whenReady().then(async () => {
 			const deployment = buildAutomationsDeployment({
 				callEntities: (method, arg) => connectorsCallEntities(AUTOMATIONS_APP_ID, method, arg),
 				getServiceHandler: (name) => workersRef.broker.getServiceHandler(name),
+				// Agent-12a — automation runs emit the one trace shape under the
+				// automations app principal (surface `automation`).
+				trace: agentTraceRecorder,
 				getLedger: connectorsGetLedger,
 				schedulerStore: new RegistrySchedulerStore(new SchedulerFiresRepository(registryDb)),
 				fileWatch: fileWatchPort,

@@ -31,6 +31,15 @@
  * credits, with a `synced` flag so a future control-plane reporter can
  * replay unsynced debits to `/v1/usage/ingest`). Metadata only — never a
  * prompt or completion.
+ *
+ * v3 (Agent-12a, doc 77) adds the agent-observability trace: `agent_runs`
+ * (one row per chat turn / automation run) + `agent_events` (ordered events
+ * within a run — tool calls, denials with the missing capability, proposal
+ * gestures), and a nullable `run_id` on `ai_usage` so the timeline derives
+ * model-call steps from the accounting substrate instead of duplicating it
+ * (OQ-AO-5). Same metadata-only posture: never prompt/completion/argument
+ * bytes. Retention is tiered + count-capped (OQ-AO-1) — see
+ * `agents/trace/agent-trace-repo.ts` for the prune contract.
  */
 
 import type { SqliteMigration } from "./migrations";
@@ -94,6 +103,45 @@ export const ACCOUNT_MIGRATIONS: SqliteMigration[] = [
 					remote_ref     TEXT
 				);
 				CREATE INDEX ai_credit_ledger_synced ON ai_credit_ledger (synced, id);
+			`);
+		},
+	},
+	{
+		version: 3,
+		description: "account.db v3 — agent run/event trace substrate + ai_usage.run_id (Agent-12a)",
+		up: (db) => {
+			db.exec(`
+				CREATE TABLE agent_runs (
+					id               TEXT PRIMARY KEY,
+					surface          TEXT NOT NULL,
+					conversation_id  TEXT,
+					workflow_run_id  TEXT,
+					agent            TEXT NOT NULL,
+					started_at       INTEGER NOT NULL,
+					ended_at         INTEGER,
+					outcome          TEXT,
+					denial_count     INTEGER NOT NULL DEFAULT 0
+				);
+				CREATE INDEX agent_runs_started ON agent_runs (started_at);
+				CREATE INDEX agent_runs_agent ON agent_runs (agent, started_at);
+				CREATE INDEX agent_runs_conversation ON agent_runs (conversation_id, started_at);
+				CREATE TABLE agent_events (
+					run_id           TEXT NOT NULL,
+					seq              INTEGER NOT NULL,
+					ts               INTEGER NOT NULL,
+					kind             TEXT NOT NULL,
+					tool             TEXT NOT NULL DEFAULT '',
+					target_entity_id TEXT,
+					capability       TEXT,
+					outcome          TEXT NOT NULL,
+					detail           TEXT,
+					duration_ms      INTEGER NOT NULL DEFAULT 0,
+					PRIMARY KEY (run_id, seq)
+				);
+				CREATE INDEX agent_events_ts ON agent_events (ts);
+				CREATE INDEX agent_events_target ON agent_events (target_entity_id)
+					WHERE target_entity_id IS NOT NULL;
+				ALTER TABLE ai_usage ADD COLUMN run_id TEXT;
 			`);
 		},
 	},

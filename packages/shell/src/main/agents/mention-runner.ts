@@ -32,7 +32,11 @@
 import {
 	AGENT_DELEGATED_BY_PROPERTY_KEY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	AgentEventKind,
+	AgentEventOutcome,
 	AgentRouting,
+	AgentRunOutcome,
+	AgentRunSurface,
 	AgentStopReason,
 	type AiChatMessage,
 	MessageRole,
@@ -63,6 +67,7 @@ import {
 	delegationToolResult,
 	runDelegatedChild,
 } from "./delegation";
+import type { AgentTraceRecorder } from "./trace/agent-trace-recorder";
 
 /** Mirrors `broker.getServiceHandler` — name → handler. */
 type ServiceHandlerGetter = (
@@ -82,6 +87,11 @@ export type MentionRunnerDeps = {
 	 *  entities service), so the host re-broadcasts staleness / reindexes —
 	 *  without it the reply would not paint until the next unrelated write. */
 	onWrote: () => void;
+	/** Agent-12a — the trace recorder. The runner is a shell-hosted
+	 *  `runAgentLoop` seam, so IT writes the run/events (never the model);
+	 *  absent in minimal test harnesses (emission still covered by the
+	 *  mention-runner trace tests). */
+	trace?: AgentTraceRecorder;
 	now?: () => number;
 	newId?: () => string;
 };
@@ -369,6 +379,16 @@ async function runOneAgent(
 
 	const ledger = await session.capabilityLedger();
 	const caps = ledger.listActive(agent.def.fingerprint).map(grantString);
+	// Agent-12a — the runner is a shell-hosted loop seam, so the SHELL opens
+	// the run (agent = the fingerprint principal, surface = chat) and records
+	// every event below. Fail-soft: a null run id disables tracing, never the
+	// turn.
+	const traceRunId =
+		(await deps.trace?.beginRun({
+			surface: AgentRunSurface.Chat,
+			agent: agent.def.fingerprint,
+			conversationId: channelId,
+		})) ?? null;
 	// Grounding on a channel's history is a READ of other people's messages, so
 	// it rides the agent's own `entities.read` grant. Without it the agent still
 	// answers — from the turn that summoned it alone — rather than being handed
@@ -378,12 +398,31 @@ async function runOneAgent(
 	// wildcard/scoped grant must resolve exactly as the broker resolves it.
 	if (!ledger.has(agent.def.fingerprint, "ai.use")) {
 		writeAgentReply(deps, repo, channelId, agent, NO_PERMISSION_REPLY, nextSeq);
+		// The denial the whole track exists for: the row NAMES the missing cap.
+		if (traceRunId && deps.trace) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.ToolDenied,
+				tool: "ai.generate",
+				capability: "ai.use",
+				outcome: AgentEventOutcome.Denied,
+			});
+			await deps.trace.endRun(traceRunId, AgentRunOutcome.Refused);
+		}
 		return;
 	}
 
 	const aiHandler = deps.getServiceHandler("ai");
 	if (!aiHandler) {
 		writeAgentReply(deps, repo, channelId, agent, GENERATE_FAILED_REPLY, nextSeq);
+		if (traceRunId && deps.trace) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.Error,
+				tool: "ai.generate",
+				outcome: AgentEventOutcome.Error,
+				detail: "service-unavailable",
+			});
+			await deps.trace.endRun(traceRunId, AgentRunOutcome.Error);
+		}
 		return;
 	}
 
@@ -446,6 +485,7 @@ async function runOneAgent(
 	/** Children spawned by THIS run — each reports back, replies in its own
 	 *  name, and may leave its own cards. */
 	const delegations: DelegationOutcome[] = [];
+	const dispatchDurationsMs: number[] = [];
 
 	const result = await runAgentLoop(
 		{
@@ -454,40 +494,47 @@ async function runOneAgent(
 			// dispatched, so no model output — prompt injection included — reaches
 			// the vault. The id is minted host-side, never taken from the model.
 			dispatchTool: async (call) => {
-				const target = delegateTargetFromVerb(call.tool);
-				if (target) {
-					const outcome = await runDelegatedChild(
-						{
-							grantsFor: (fingerprint) => ledger.listActive(fingerprint).map(grantString),
-							ledger,
-							agents,
-							generate: (childAgent, effective, chat) => generateAs(childAgent, effective, chat),
-							label: (key) => PROPOSE_TOOL_LABELS[key] ?? key,
-							newProposalId: (childAgent, index) =>
-								`prp_${childAgent.def.fingerprint}_${nextSeq}_d${delegations.length}_${index}`,
-						},
-						{
-							delegator: agent,
-							targetFingerprint: target,
-							subtask: typeof call.args.subtask === "string" ? call.args.subtask : "",
-							spawnedSoFar: delegations.filter((d) => d.ok).length,
-						},
-					);
-					delegations.push(outcome);
-					return delegationToolResult(outcome);
+				const dispatchedAt = deps.now ? deps.now() : Date.now();
+				try {
+					const target = delegateTargetFromVerb(call.tool);
+					if (target) {
+						const outcome = await runDelegatedChild(
+							{
+								grantsFor: (fingerprint) => ledger.listActive(fingerprint).map(grantString),
+								ledger,
+								agents,
+								generate: (childAgent, effective, chat) => generateAs(childAgent, effective, chat),
+								label: (key) => PROPOSE_TOOL_LABELS[key] ?? key,
+								newProposalId: (childAgent, index) =>
+									`prp_${childAgent.def.fingerprint}_${nextSeq}_d${delegations.length}_${index}`,
+								...(deps.trace ? { trace: deps.trace } : {}),
+							},
+							{
+								delegator: agent,
+								targetFingerprint: target,
+								subtask: typeof call.args.subtask === "string" ? call.args.subtask : "",
+								spawnedSoFar: delegations.filter((d) => d.ok).length,
+							},
+						);
+						delegations.push(outcome);
+						return delegationToolResult(outcome);
+					}
+					if (!isChannelProposeVerb(call.tool)) return null;
+					if (staged.length >= MENTION_PROPOSALS_MAX) {
+						return { staged: false, reason: "too-many-proposals" };
+					}
+					proposalSeq += 1;
+					const built = buildProposal({
+						verb: call.tool,
+						args: call.args,
+						id: `prp_${agent.def.fingerprint}_${nextSeq}_${proposalSeq}`,
+					});
+					if (built.ok) staged.push(built.artifact);
+					return buildProposalAck(built);
+				} finally {
+					// Agent-12a — per-dispatch timing for the trace (metadata only).
+					dispatchDurationsMs.push((deps.now ? deps.now() : Date.now()) - dispatchedAt);
 				}
-				if (!isChannelProposeVerb(call.tool)) return null;
-				if (staged.length >= MENTION_PROPOSALS_MAX) {
-					return { staged: false, reason: "too-many-proposals" };
-				}
-				proposalSeq += 1;
-				const built = buildProposal({
-					verb: call.tool,
-					args: call.args,
-					id: `prp_${agent.def.fingerprint}_${nextSeq}_${proposalSeq}`,
-				});
-				if (built.ok) staged.push(built.artifact);
-				return buildProposalAck(built);
 			},
 		},
 		{
@@ -514,6 +561,33 @@ async function runOneAgent(
 			? GENERATE_FAILED_REPLY
 			: result.finalAnswer.trim() || GENERATE_FAILED_REPLY;
 	writeAgentReply(deps, repo, channelId, agent, body, nextSeq);
+
+	// Agent-12a — persist the run's durable account: the loop transcript
+	// through the metadata-only codec (delegation tool-calls included, since a
+	// delegate verb returns a tool-result step), one `proposal-staged` row per
+	// draft, then close with the honest outcome. Model-call rows live in
+	// `ai_usage` (stamped with this run's id via the quota sink). The delegated
+	// CHILD runs record their own trace inside `runDelegatedChild`.
+	if (traceRunId && deps.trace) {
+		await deps.trace.recordLoopResult(traceRunId, result.steps, {
+			tools: offeredTools,
+			frozenCapabilities: caps,
+			dispatchDurationsMs,
+		});
+		for (const artifact of staged) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.ProposalStaged,
+				tool: artifact.kind,
+				outcome: AgentEventOutcome.Ok,
+			});
+		}
+		await deps.trace.endRun(
+			traceRunId,
+			result.stopReason === AgentStopReason.GenerateFailed
+				? AgentRunOutcome.Error
+				: AgentRunOutcome.Ok,
+		);
+	}
 
 	// Agent-Teams-5 — a delegated child speaks IN ITS OWN NAME. Its reply row is
 	// authored by the CHILD's fingerprint and provenance-stamped as the child,

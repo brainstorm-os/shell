@@ -21,7 +21,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isAgentGrantableCapability } from "@brainstorm-os/capabilities/agent-grants";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { type AiChatMessage, intersectAgentTools } from "@brainstorm-os/sdk-types";
+import {
+	AgentRunOutcome,
+	AgentRunSurface,
+	type AiChatMessage,
+	intersectAgentTools,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { CredentialStore } from "../credentials/store";
@@ -47,6 +52,8 @@ import {
 	effectiveChildCapabilities,
 	runDelegatedChild,
 } from "./delegation";
+import { AgentTraceRecorder } from "./trace/agent-trace-recorder";
+import { AgentTraceRepository } from "./trace/agent-trace-repo";
 
 describe("delegation (Agent-Teams-5)", () => {
 	let vaultDir: string;
@@ -106,14 +113,20 @@ describe("delegation (Agent-Teams-5)", () => {
 		};
 	}
 
-	const run = (over: Partial<Parameters<typeof runDelegatedChild>[1]> = {}) =>
-		runDelegatedChild(deps(), {
-			delegator: manager,
-			targetFingerprint: worker.def.fingerprint,
-			subtask: "Summarise the Q3 numbers",
-			spawnedSoFar: 0,
-			...over,
-		});
+	const run = (
+		over: Partial<Parameters<typeof runDelegatedChild>[1]> = {},
+		trace?: AgentTraceRecorder,
+	) =>
+		runDelegatedChild(
+			{ ...deps(), ...(trace ? { trace } : {}) },
+			{
+				delegator: manager,
+				targetFingerprint: worker.def.fingerprint,
+				subtask: "Summarise the Q3 numbers",
+				spawnedSoFar: 0,
+				...over,
+			},
+		);
 
 	// ── the keystone ──────────────────────────────────────────────────────
 
@@ -424,5 +437,39 @@ describe("delegation (Agent-Teams-5)", () => {
 		// human approves. `runDelegatedChild` touches no repo at all.
 		expect(outcome.staged).toHaveLength(1);
 		expect(outcome.staged[0]?.summary).toBe("Ship the report");
+	});
+
+	it("Agent-12a: the delegated CHILD run leaves its OWN trace under the child's fingerprint", async () => {
+		await grantAgentCapability(session, manager.def.fingerprint, "ai.use");
+		await grantAgentCapability(session, worker.def.fingerprint, "ai.use");
+		await grantAgentCapability(session, worker.def.fingerprint, "intents.dispatch:propose-task");
+		await grantAgentCapability(session, manager.def.fingerprint, "intents.dispatch:propose-task");
+		await grantAgentCapability(
+			session,
+			manager.def.fingerprint,
+			delegateCapabilityFor(worker.def.fingerprint),
+		);
+		const traceRepo = new AgentTraceRepository(await stores.open("account"));
+		const recorder = new AgentTraceRecorder({
+			getRepo: async () => traceRepo,
+			getVaultKey: () => session.vaultId,
+		});
+		script = ['{"tool": "propose-task", "args": {"title": "Do it"}}', '{"final": "Subtask done."}'];
+		const outcome = await run({}, recorder);
+		expect(outcome.ok).toBe(true);
+
+		// The run is attributed to the WORKER (the child principal), not the manager.
+		const runs = traceRepo.listRuns({ agent: worker.def.fingerprint });
+		expect(runs).toHaveLength(1);
+		expect(runs[0]).toMatchObject({
+			surface: AgentRunSurface.Chat,
+			agent: worker.def.fingerprint,
+			outcome: AgentRunOutcome.Ok,
+		});
+		expect(traceRepo.listRuns({ agent: manager.def.fingerprint })).toHaveLength(0);
+		// The staged draft shows as a proposal-staged event; no arg bytes leak.
+		const events = traceRepo.listEvents(runs[0]?.id as string);
+		expect(events.some((e) => e.kind === "proposal-staged")).toBe(true);
+		expect(JSON.stringify(events).includes("Do it")).toBe(false);
 	});
 });

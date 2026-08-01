@@ -37,12 +37,24 @@ describe("AiUsageRepository", () => {
 		await rm(vaultDir, { recursive: true, force: true });
 	});
 
-	it("account.db migrates to v2 (ai_usage + ai_credit_ledger land)", async () => {
+	it("account.db migrates to v3 (ai_usage + ai_credit_ledger + agent trace land)", async () => {
 		const db = await stores.open("account");
-		expect(getSchemaVersion(db)).toBe(2);
-		// Both tables exist and are queryable.
+		expect(getSchemaVersion(db)).toBe(3);
+		// All tables exist and are queryable.
 		expect(db.prepare("SELECT COUNT(*) AS n FROM ai_usage").get()).toEqual({ n: 0 });
 		expect(db.prepare("SELECT COUNT(*) AS n FROM ai_credit_ledger").get()).toEqual({ n: 0 });
+		expect(db.prepare("SELECT COUNT(*) AS n FROM agent_runs").get()).toEqual({ n: 0 });
+		expect(db.prepare("SELECT COUNT(*) AS n FROM agent_events").get()).toEqual({ n: 0 });
+	});
+
+	it("stamps and reads back run_id (Agent-12a — the OQ-AO-5 join)", () => {
+		repo.insert(row({ ts: 10, runId: "run_1" }));
+		repo.insert(row({ ts: 20, runId: "run_1" }));
+		repo.insert(row({ ts: 30 })); // outside any run → NULL
+		const calls = repo.callsForRun("run_1");
+		expect(calls.map((c) => c.ts)).toEqual([10, 20]);
+		expect(calls.every((c) => c.runId === "run_1")).toBe(true);
+		expect(repo.callsForRun("run_none")).toEqual([]);
 	});
 
 	it("insert + totalsForApp aggregates one app since a timestamp", () => {

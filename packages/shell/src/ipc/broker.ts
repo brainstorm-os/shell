@@ -66,6 +66,25 @@ export type DenialEvent = {
 	reason: string;
 };
 
+/** Post-dispatch outcome handed to the observer (Agent-12a trace hook). */
+export type DispatchOutcome = {
+	ok: boolean;
+	/** The reply's error kind when `ok` is false (`CapabilityDenied`, a
+	 *  handler's thrown `error.name`, …). Never the error message — an
+	 *  observer that wants no payload bytes gets none. */
+	errorKind?: string;
+	durationMs: number;
+};
+
+/**
+ * Fired once per dispatched envelope AFTER identity verification succeeded
+ * (an unverifiable claimant must not be able to attribute activity to the
+ * app id it claimed). Receives the validated envelope itself — observers are
+ * main-process shell code (the agent-trace hook); nothing here crosses IPC.
+ * A throwing observer is contained and never affects the reply.
+ */
+export type DispatchObserver = (envelope: Envelope, outcome: DispatchOutcome) => void;
+
 export type BrokerOptions = {
 	services: ServiceRegistry;
 	verifyAppIdentity?: AppIdentityVerifier;
@@ -77,6 +96,8 @@ export type BrokerOptions = {
 	maxPendingPerApp?: number;
 	/** Called on every denial (Invalid, CapabilityDenied, Unavailable, Error). */
 	onDenied?: (event: DenialEvent) => void;
+	/** Called after every identity-verified dispatch (see `DispatchObserver`). */
+	onDispatched?: DispatchObserver;
 };
 
 const DEFAULT_MAX_PENDING = 256;
@@ -93,6 +114,7 @@ export class Broker {
 	private readonly checkCapability: CapabilityChecker;
 	private readonly maxPendingPerApp: number;
 	private readonly onDenied?: (event: DenialEvent) => void;
+	private onDispatched: DispatchObserver | undefined;
 	private readonly pendingByApp = new Map<string, Pending[]>();
 
 	constructor(options: BrokerOptions) {
@@ -101,6 +123,22 @@ export class Broker {
 		this.checkCapability = options.checkCapability ?? ALWAYS_TRUE;
 		this.maxPendingPerApp = options.maxPendingPerApp ?? DEFAULT_MAX_PENDING;
 		if (options.onDenied !== undefined) this.onDenied = options.onDenied;
+		if (options.onDispatched !== undefined) this.onDispatched = options.onDispatched;
+	}
+
+	/** Late-bind the dispatch observer (the broker is constructed in
+	 *  `startWorkers` before the vault-dependent trace recorder exists). */
+	setDispatchObserver(observer: DispatchObserver | undefined): void {
+		this.onDispatched = observer;
+	}
+
+	private observe(envelope: Envelope, outcome: DispatchOutcome): void {
+		if (!this.onDispatched) return;
+		try {
+			this.onDispatched(envelope, outcome);
+		} catch {
+			// An observer failure must never affect the reply (fail-soft).
+		}
 	}
 
 	registerService(name: string, handler: ServiceHandler): void {
@@ -146,6 +184,7 @@ export class Broker {
 			return reply;
 		}
 
+		const dispatchStart = Date.now();
 		let capOk: boolean;
 		try {
 			capOk = this.checkCapability(envelope.app, envelope.service, envelope.method, envelope.caps);
@@ -158,6 +197,7 @@ export class Broker {
 				method: envelope.method,
 			});
 			this.emit("Unavailable", reply, envelope.app, envelope.service, envelope.method);
+			this.observe(envelope, { ok: false, errorKind: "Unavailable", durationMs: 0 });
 			return reply;
 		}
 		if (!capOk) {
@@ -168,6 +208,7 @@ export class Broker {
 				method: envelope.method,
 			});
 			this.emit("CapabilityDenied", reply, envelope.app, envelope.service, envelope.method);
+			this.observe(envelope, { ok: false, errorKind: "CapabilityDenied", durationMs: 0 });
 			return reply;
 		}
 
@@ -204,11 +245,17 @@ export class Broker {
 				this.emit("Unavailable", reply, envelope.app, envelope.service, envelope.method);
 				return reply;
 			}
+			this.observe(envelope, { ok: true, durationMs: Date.now() - dispatchStart });
 			return makeOkReply(envelope.msg, value);
 		} catch (error) {
 			const payload = errorPayload(error);
 			const reply = makeErrorReply(envelope.msg, payload);
 			this.emit(payload.kind, reply, envelope.app, envelope.service, envelope.method);
+			this.observe(envelope, {
+				ok: false,
+				errorKind: payload.kind,
+				durationMs: Date.now() - dispatchStart,
+			});
 			return reply;
 		} finally {
 			this.retire(envelope.app, slot);

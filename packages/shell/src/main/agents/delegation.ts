@@ -45,6 +45,10 @@ import {
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { isAgentPrincipal } from "@brainstorm-os/capabilities/principals";
 import {
+	AgentEventKind,
+	AgentEventOutcome,
+	AgentRunOutcome,
+	AgentRunSurface,
 	AgentStopReason,
 	type AgentTool,
 	type AiChatMessage,
@@ -58,6 +62,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { AgentRecord } from "./agent-directory";
 import { isChannelProposeVerb } from "./channel-proposals";
+import type { AgentTraceRecorder } from "./trace/agent-trace-recorder";
 
 /** The verb prefix a delegate tool carries. One tool per DELEGATABLE TARGET,
  *  rather than one generic `delegate(agentId, …)`, so the target is part of the
@@ -192,6 +197,10 @@ export type DelegationDeps = {
 	/** Model-facing labels (main has no renderer `t()`). */
 	readonly label: (key: string) => string;
 	readonly newProposalId: (child: AgentRecord, index: number) => string;
+	/** Agent-12a — the trace recorder. A delegated CHILD run is a run by the
+	 *  child principal and must leave its own trace (the "who did this is a
+	 *  query" answer stays the child). Optional (absent in unit tests). */
+	readonly trace?: AgentTraceRecorder;
 };
 
 /**
@@ -301,6 +310,13 @@ export async function runDelegatedChild(
 
 	const tools = childToolsFor(deps.label);
 	const staged: ProposedArtifact[] = [];
+	// Agent-12a — the child run is a run by the CHILD principal; trace it under
+	// the child's fingerprint. Fail-soft: a null id disables tracing.
+	const traceRunId =
+		(await deps.trace?.beginRun({
+			surface: AgentRunSurface.Chat,
+			agent: child.def.fingerprint,
+		})) ?? null;
 	const result = await runAgentLoop(
 		{
 			generate: (messages) => deps.generate(child, effective, messages),
@@ -332,7 +348,28 @@ export async function runDelegatedChild(
 	);
 
 	if (result.stopReason === AgentStopReason.GenerateFailed) {
+		if (traceRunId && deps.trace) {
+			await deps.trace.recordLoopResult(traceRunId, result.steps, {
+				tools,
+				frozenCapabilities: effective,
+			});
+			await deps.trace.endRun(traceRunId, AgentRunOutcome.Error);
+		}
 		return { ok: false, reason: DelegationRefusal.GenerateFailed };
+	}
+	if (traceRunId && deps.trace) {
+		await deps.trace.recordLoopResult(traceRunId, result.steps, {
+			tools,
+			frozenCapabilities: effective,
+		});
+		for (const artifact of staged) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.ProposalStaged,
+				tool: artifact.kind,
+				outcome: AgentEventOutcome.Ok,
+			});
+		}
+		await deps.trace.endRun(traceRunId, AgentRunOutcome.Ok);
 	}
 	return {
 		ok: true,

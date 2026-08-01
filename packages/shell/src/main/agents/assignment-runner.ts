@@ -35,6 +35,10 @@ import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { isAgentPrincipal } from "@brainstorm-os/capabilities/principals";
 import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	AgentEventKind,
+	AgentEventOutcome,
+	AgentRunOutcome,
+	AgentRunSurface,
 	AgentStopReason,
 	type AiChatMessage,
 	type EntityEventVerb,
@@ -53,6 +57,7 @@ import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
 import type { AgentRecord } from "./agent-directory";
 import { CHANNEL_PROPOSAL_PROPERTY_KEY, buildProposalProperty } from "./channel-proposals";
 import { childToolsFor } from "./delegation";
+import type { AgentTraceRecorder } from "./trace/agent-trace-recorder";
 
 /** The `Trigger/v1` config key naming the agent an assignment run belongs to.
  *  The value is the agent's ledger principal (`ed25519:<hex>`), so the trigger
@@ -237,6 +242,11 @@ export type AssignmentRunnerDeps = {
 	readonly label: (key: string) => string;
 	readonly now?: () => number;
 	readonly newProposalId: (agent: AgentRecord, entityId: string, index: number) => string;
+	/** Agent-12a — the trace recorder. An assignment run is an unattended agent
+	 *  run driven by an entity change: it MUST leave a trace like any other, or
+	 *  it is exactly the silence this track ends. Optional (absent in minimal
+	 *  test harnesses). */
+	readonly trace?: AgentTraceRecorder;
 };
 
 /** Per-entity throttle. Bounded by clearing wholesale — a rate limiter, not an
@@ -294,12 +304,30 @@ export async function maybeRunAssignedAgent(
 	lastRunAt.set(throttleKey, now);
 	if (lastRunAt.size > ASSIGNMENT_CLOCK_MAX) lastRunAt.clear();
 
+	// Agent-12a — open the run (unattended surface) BEFORE the ai.use gate so a
+	// denial is itself traced. Fail-soft: a null id disables tracing.
+	const traceRunId =
+		(await deps.trace?.beginRun({
+			surface: AgentRunSurface.Automation,
+			agent: agent.def.fingerprint,
+			conversationId: change.entityId,
+		})) ?? null;
+
 	// The ceiling, RE-READ live. Not from the trigger, not from an envelope.
 	const ledger = await deps.ledger();
 	const caps = ledger
 		.listActive(agent.def.fingerprint)
 		.map((g) => (g.scope === null ? g.capability : `${g.capability}:${g.scope}`));
 	if (!ledger.has(agent.def.fingerprint, "ai.use")) {
+		if (traceRunId && deps.trace) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.ToolDenied,
+				tool: "ai.generate",
+				capability: "ai.use",
+				outcome: AgentEventOutcome.Denied,
+			});
+			await deps.trace.endRun(traceRunId, AgentRunOutcome.Refused);
+		}
 		return { ran: false, reason: AssignmentSkip.NoAiGrant };
 	}
 
@@ -340,10 +368,25 @@ export async function maybeRunAssignedAgent(
 	);
 
 	if (result.stopReason === AgentStopReason.GenerateFailed) {
+		if (traceRunId && deps.trace) {
+			await deps.trace.recordLoopResult(traceRunId, result.steps, { tools, frozenCapabilities: caps });
+			await deps.trace.endRun(traceRunId, AgentRunOutcome.Error);
+		}
 		return { ran: false, reason: AssignmentSkip.GenerateFailed };
 	}
 	const answer = result.finalAnswer.trim();
 	deps.record(agent, change.entityId, answer, staged);
+	if (traceRunId && deps.trace) {
+		await deps.trace.recordLoopResult(traceRunId, result.steps, { tools, frozenCapabilities: caps });
+		for (const artifact of staged) {
+			await deps.trace.event(traceRunId, {
+				kind: AgentEventKind.ProposalStaged,
+				tool: artifact.kind,
+				outcome: AgentEventOutcome.Ok,
+			});
+		}
+		await deps.trace.endRun(traceRunId, AgentRunOutcome.Ok);
+	}
 	return { ran: true, answer, staged };
 }
 

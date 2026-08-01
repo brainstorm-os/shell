@@ -19,12 +19,18 @@
  */
 
 import {
+	AgentEventKind,
+	AgentEventOutcome,
+	AgentRunOutcome,
+	AgentRunSurface,
 	type EntityEventVerb,
 	type WorkflowRunDef,
 	WorkflowRunStatus,
 	type WorkflowStep,
 	aggregateWorkflowCapabilities,
+	collectWorkflowAgentTools,
 	missingCapabilities,
+	workflowStepEvents,
 } from "@brainstorm-os/sdk-types";
 import type { UiNotification } from "../ui/notify-host";
 import type { ItemAlertRegistration } from "./item-alerts";
@@ -36,6 +42,34 @@ import { type WorkflowRunResult, WorkflowRunner, toWorkflowRunDef } from "./work
 
 /** A workflow ready to run: its steps + the frozen caps it executes under. */
 export type LoadedWorkflow = { steps: WorkflowStep[]; capabilities: string[] };
+
+/** Agent-12a — the structural slice of `AgentTraceRecorder` the host drives
+ *  (injected so the fire→run→persist orchestration stays fake-testable). */
+export type AutomationsTracePort = {
+	beginRun(input: {
+		surface: AgentRunSurface;
+		agent: string;
+		conversationId?: string | null;
+		workflowRunId?: string | null;
+	}): Promise<string | null>;
+	event(
+		runId: string,
+		input: {
+			kind: AgentEventKind;
+			tool?: string;
+			capability?: string | null;
+			outcome?: AgentEventOutcome;
+			detail?: string | null;
+			durationMs?: number;
+		},
+	): Promise<void>;
+	events(
+		runId: string,
+		drafts: ReadonlyArray<ReturnType<typeof workflowStepEvents>[number]>,
+	): Promise<void>;
+	endRun(runId: string, outcome?: AgentRunOutcome): Promise<void>;
+	attachWorkflowRunId(runId: string, workflowRunId: string): Promise<void>;
+};
 
 /** An entity create/update/delete, as seen by `EntityEvent` triggers. */
 export type EntityChange = {
@@ -231,8 +265,18 @@ export type AutomationsHostPorts = {
 	loadWorkflow(workflowId: string): Promise<LoadedWorkflow | null>;
 	/** Build interpreter ports scoped to a workflow's caps (three-tier). */
 	makeInterpreterPorts(caps: readonly string[]): InterpreterPorts;
-	/** Persist a finished run (entities.create `WorkflowRun/v1`). */
-	persistRun(run: WorkflowRunDef): Promise<void>;
+	/** Persist a finished run (entities.create `WorkflowRun/v1`). Returning
+	 *  the created entity's id lets the Agent-12a trace back-link it; a void
+	 *  return (older wirings/tests) simply skips the back-link. */
+	persistRun(run: WorkflowRunDef): Promise<string | null> | Promise<void>;
+	/** Agent-12a — the trace recorder port. The host opens one trace run per
+	 *  workflow invocation (surface `automation`, agent = `traceAgent`),
+	 *  before the runner starts so live `ai_usage` rows join it, and maps the
+	 *  step log through the metadata-only codec on completion. Absent =
+	 *  untraced (minimal test wirings). */
+	trace?: AutomationsTracePort;
+	/** The principal automation runs act as (the automations app id). */
+	traceAgent?: string;
 	/** The automations app's granted capability set — the outer ceiling of
 	 *  the three-tier model (doc 39 §Capabilities). A workflow's declared
 	 *  caps must be a subset of these; enforced at run time, fail-closed.
@@ -456,9 +500,15 @@ export class AutomationsHost {
 		// full automations-app grant set.
 		const denied = await this.capabilityViolations(loaded);
 		if (denied.length > 0) {
-			await this.persistDeniedRun(workflowId, triggeredBy, denied);
+			const runEntityId = await this.persistDeniedRun(workflowId, triggeredBy, denied);
+			await this.traceDeniedRun(denied, runEntityId);
 			return null;
 		}
+
+		// Agent-12a — the trace run opens BEFORE the runner so the AI broker's
+		// accounting rows stamp this run's id live (OQ-AO-5). Fail-soft: a null
+		// id disables tracing, never the run.
+		const traceRunId = await this.beginTraceRun();
 
 		const interpreterPorts = this.ports.makeInterpreterPorts(loaded.capabilities);
 		const runner = new WorkflowRunner(createCoreInterpreters(interpreterPorts), {
@@ -470,8 +520,47 @@ export class AutomationsHost {
 			steps: loaded.steps,
 			triggerPayload,
 		});
-		await this.ports.persistRun(toWorkflowRunDef(result));
+		const runEntityId = await this.ports.persistRun(toWorkflowRunDef(result));
+		if (traceRunId && this.ports.trace) {
+			if (typeof runEntityId === "string" && runEntityId) {
+				await this.ports.trace.attachWorkflowRunId(traceRunId, runEntityId);
+			}
+			await this.ports.trace.events(
+				traceRunId,
+				workflowStepEvents(result.stepLog, {
+					tools: collectWorkflowAgentTools(loaded.steps),
+					frozenCapabilities: loaded.capabilities,
+				}),
+			);
+			await this.ports.trace.endRun(traceRunId, traceOutcomeForRun(result.status));
+		}
 		return result;
+	}
+
+	private async beginTraceRun(): Promise<string | null> {
+		if (!this.ports.trace || !this.ports.traceAgent) return null;
+		return await this.ports.trace.beginRun({
+			surface: AgentRunSurface.Automation,
+			agent: this.ports.traceAgent,
+		});
+	}
+
+	/** A refused run is the denial-visibility case the track exists for: one
+	 *  `tool-denied` row PER missing capability, run outcome `refused`. */
+	private async traceDeniedRun(denied: readonly string[], runEntityId: unknown): Promise<void> {
+		const traceRunId = await this.beginTraceRun();
+		if (!traceRunId || !this.ports.trace) return;
+		if (typeof runEntityId === "string" && runEntityId) {
+			await this.ports.trace.attachWorkflowRunId(traceRunId, runEntityId);
+		}
+		for (const capability of [...new Set(denied)].sort()) {
+			await this.ports.trace.event(traceRunId, {
+				kind: AgentEventKind.ToolDenied,
+				capability,
+				outcome: AgentEventOutcome.Denied,
+			});
+		}
+		await this.ports.trace.endRun(traceRunId, AgentRunOutcome.Refused);
 	}
 
 	/** The capabilities a workflow would exercise beyond what it is allowed:
@@ -491,8 +580,8 @@ export class AutomationsHost {
 		workflowId: string,
 		triggeredBy: string,
 		denied: readonly string[],
-	): Promise<void> {
-		await this.ports.persistRun({
+	): Promise<unknown> {
+		return await this.ports.persistRun({
 			workflow: workflowId,
 			triggeredBy,
 			triggeredAt: new Date(this.ports.clock()).toISOString(),
@@ -615,5 +704,17 @@ export class AutomationsHost {
 	private fail(context: string, error: unknown): void {
 		if (this.ports.onError) this.ports.onError(context, error);
 		else console.error(`[automations] ${context} failed:`, error);
+	}
+}
+
+/** Run status → trace outcome (cancel/timeout both read as `aborted`). */
+function traceOutcomeForRun(status: WorkflowRunStatus): AgentRunOutcome {
+	switch (status) {
+		case WorkflowRunStatus.Succeeded:
+			return AgentRunOutcome.Ok;
+		case WorkflowRunStatus.Failed:
+			return AgentRunOutcome.Error;
+		default:
+			return AgentRunOutcome.Aborted;
 	}
 }
