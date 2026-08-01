@@ -4195,6 +4195,15 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return await session.capabilityLedger();
 			},
+			// AS-4 — the user's disabled-contributor set (same store the intents
+			// bus and the action surface read). A disabled provider's tools are
+			// invisible, not merely unclickable.
+			resolveDisabledContributors: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return new Set<string>();
+				const dashboard = await session.dashboardStore();
+				return new Set(dashboard.snapshot().disabledContributors);
+			},
 		}),
 	);
 

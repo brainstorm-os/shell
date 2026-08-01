@@ -2253,6 +2253,7 @@ export {
 	APP_TOOL_TITLE_MAX,
 	AppToolEffect,
 	AppToolSurface,
+	CURATED_INTENT_VERBS,
 	RESERVED_APP_TOOL_NAMES,
 	appToolApplies,
 	appToolId,

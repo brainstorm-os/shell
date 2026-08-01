@@ -50,10 +50,12 @@ function toRecord(r: Row): AppToolRecord {
 		name: r.name,
 		title: r.title,
 		description: r.description,
-		// A row whose effect somehow isn't in the vocabulary reads as the most
-		// restrictive class rather than the most permissive — friction defaults
-		// to the safe side, exactly like MCP's missing `readOnlyHint`.
-		effect: (isAppToolEffect(r.effect) ? r.effect : "proposes-write") as AppToolEffect,
+		// A row whose effect isn't in the vocabulary keeps its RAW value: the
+		// service's capability filter has no requirement entry for it and so
+		// refuses to offer it at all. (Mapping it onto a real class would be
+		// fail-OPEN — `proposes-write` requires nothing, so a mangled byte
+		// would have skipped the provider-capability check entirely.)
+		effect: (isAppToolEffect(r.effect) ? r.effect : r.effect) as AppToolEffect,
 		appliesTo: parseList(r.applies_to),
 		surfaces: parseList(r.surfaces).filter((s): s is AppToolSurface => isAppToolSurface(s)),
 		registeredAt: r.registered_at,

@@ -52,8 +52,15 @@ export const TOOLS_READ_CAPABILITY = "tools.read";
  *  lowers friction, the ledger decides authority (doc 78). */
 const EFFECT_REQUIREMENTS: Readonly<Record<AppToolEffect, readonly string[]>> = {
 	[AppToolEffect.Pure]: [],
-	[AppToolEffect.ReadsVault]: ["entities.read:*"],
-	[AppToolEffect.External]: ["network.egress:*"],
+	// Matched by capability NAME, any live scope: the consent path only ever
+	// grants scoped capabilities (`network.egress:<origin>`,
+	// `entities.read:<type>`), so requiring a literal `*` scope would make the
+	// filter unsatisfiable — a control that can never pass is a control nobody
+	// notices regressing.
+	[AppToolEffect.ReadsVault]: ["entities.read"],
+	[AppToolEffect.External]: ["network.egress"],
+	// A proposal is inert until a human approves it, so the tool itself needs
+	// nothing; the approving write is gated where it happens.
 	[AppToolEffect.ProposesWrite]: [],
 };
 
@@ -61,8 +68,9 @@ export type ToolsServiceOptions = {
 	/** The registry repo, or null when no vault is open. */
 	getRepo: () => Promise<AppToolsRepository | null> | AppToolsRepository | null;
 	getLedger?: () => Promise<CapabilityLedger | null>;
-	/** AS-4 — per-app disable list (app ids the user switched off). */
-	isAppDisabled?: (appId: string) => boolean;
+	/** AS-4 — the user's disabled-contributor set, resolved per call (the store
+	 *  is async; a sync predicate is what left this filter unwired at first). */
+	resolveDisabledContributors?: () => Promise<ReadonlySet<string>>;
 };
 
 async function requireCapability(envelope: Envelope, options: ToolsServiceOptions): Promise<void> {
@@ -97,11 +105,19 @@ async function requireCapability(envelope: Envelope, options: ToolsServiceOption
 /** Does the provider still hold what its declared effect implies? Any ledger
  *  trouble drops the tool (fail-closed) rather than offering it. */
 function providerSatisfiesEffect(ledger: CapabilityLedger | null, tool: AppToolRecord): boolean {
-	const required = EFFECT_REQUIREMENTS[tool.effect] ?? [];
+	const required = EFFECT_REQUIREMENTS[tool.effect];
+	// An effect outside the vocabulary never satisfies anything — the row is
+	// corrupt, and "unknown" must not read as "needs nothing" (that would make
+	// a mangled byte bypass the whole filter).
+	if (required === undefined) return false;
 	if (required.length === 0) return true;
 	if (!ledger) return false;
 	try {
-		return required.every((cap) => ledger.has(tool.appId, cap));
+		return required.some(
+			(capability) =>
+				ledger.listActive(tool.appId).some((grant) => grant.capability === capability) ||
+				ledger.has(tool.appId, capability),
+		);
 	} catch {
 		return false;
 	}
@@ -124,16 +140,28 @@ export async function handleToolsList(
 
 	const raw = (envelope.args[0] ?? {}) as Record<string, unknown>;
 	const appliesTo = typeof raw.appliesTo === "string" && raw.appliesTo ? raw.appliesTo : null;
+	if (raw.surface !== undefined && !isAppToolSurface(raw.surface)) {
+		throw makeError("Invalid", "tools.list: surface must be menu | agent | automation");
+	}
 	const surface = isAppToolSurface(raw.surface) ? raw.surface : null;
 
 	const ledger = options.getLedger ? await options.getLedger().catch(() => null) : null;
-	const isDisabled = options.isAppDisabled ?? (() => false);
+	// Fail CLOSED on a disable-store read error: an unreadable disable set must
+	// not silently re-enable every contributor the user switched off.
+	const disabled = options.resolveDisabledContributors
+		? await options.resolveDisabledContributors().catch(() => null)
+		: new Set<string>();
+	if (disabled === null)
+		throw makeError("Unavailable", "tools: disabled-contributor set unreadable");
 
 	return repo.listAll().filter((tool) => {
 		// A tool never offers itself back to its own provider's menu — the app
 		// already has the function; the catalogue is for OTHER callers.
 		if (tool.appId === envelope.app) return false;
-		if (isDisabled(tool.appId)) return false;
+		if (disabled.has(tool.appId)) return false;
+		// "Registered but never presented" must hold on the UNFILTERED listing
+		// too, or a naive menu consumer renders agent-only tools.
+		if (tool.surfaces.length === 0) return false;
 		if (surface !== null && !tool.surfaces.includes(surface)) return false;
 		if (appliesTo !== null && !appToolApplies(tool, appliesTo)) return false;
 		return providerSatisfiesEffect(ledger, tool);

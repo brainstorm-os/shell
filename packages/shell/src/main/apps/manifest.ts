@@ -38,6 +38,7 @@ import {
 	APP_TOOLS_PER_APP_MAX,
 	type AppLayoutManifestEntry,
 	type AppToolRegistration,
+	CURATED_INTENT_VERBS,
 	type LayoutContext,
 	isHardBlockedScheme,
 	validateAppLayouts,
@@ -111,21 +112,9 @@ export type WidgetRegistration = {
  * Curated intent-verb namespace per.
  * Apps cannot invent new verbs at runtime; the shell ships the namespace.
  */
-export const INTENT_VERBS = [
-	"open",
-	"insert",
-	"share",
-	"convert",
-	"export",
-	"import",
-	"process",
-	"compose",
-	"quick-look",
-	"move",
-	"send",
-	"reply",
-	"forward",
-] as const;
+/** The curated verb namespace. Single source of truth lives in sdk-types so
+ *  the app-tools reserved-name set can never drift from it (Tool-2). */
+export const INTENT_VERBS = CURATED_INTENT_VERBS;
 
 export type IntentVerb = (typeof INTENT_VERBS)[number];
 

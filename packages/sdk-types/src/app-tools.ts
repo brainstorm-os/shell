@@ -80,25 +80,39 @@ export function appToolId(appId: string, name: string): string {
 /** Names an app tool may never claim — the curated intent verbs. A tool must
  *  not impersonate the routing layer (intents route: "somebody handle this";
  *  tools call: "this app compute this"). */
-export const RESERVED_APP_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const CURATED_INTENT_VERBS = [
 	"open",
-	"share",
 	"insert",
+	"share",
+	"convert",
 	"export",
-	"process",
 	"import",
+	"process",
 	"compose",
+	"quick-look",
+	"move",
 	"send",
 	"reply",
 	"forward",
-]);
+] as const;
 
-/** Control characters are REFUSED, never silently stripped: a descriptor
- *  carrying them is malformed, and a partial strip could still smuggle prompt
- *  structure past a reviewer's eye. Covers C0, DEL, and the bidi/zero-width
- *  overrides that render invisibly. */
+export const RESERVED_APP_TOOL_NAMES: ReadonlySet<string> = new Set(CURATED_INTENT_VERBS);
+
+/** Invisible text is REFUSED, never silently stripped: a descriptor carrying
+ *  it is malformed, and a partial strip could still smuggle prompt structure
+ *  past a reviewer's eye. Covers C0/C1, DEL, soft hyphen, the bidi controls
+ *  and isolates, zero-width and word-joiner ranges, BOM/interlinear marks,
+ *  variation selectors, and the Unicode **Tags** block (U+E0000–E007F) — the
+ *  standard channel for smuggling arbitrary ASCII invisibly into a model
+ *  prompt. Blank-rendering-but-not-whitespace characters (Hangul fillers,
+ *  Braille blank) are refused separately, since `.trim()` keeps them. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: refusing control characters is the point
-const CONTROL_CHARS = /[\u0000-\u001f\u007f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
+const INVISIBLE_TEXT =
+	/[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufff9-\ufffb\ufe00-\ufe0f]|[\u{e0000}-\u{e007f}]|[\u{e0100}-\u{e01ef}]/u;
+
+/** Characters that RENDER as nothing but survive `.trim()` — a title made of
+ *  these is a clickable menu row with no label. */
+const BLANK_RENDERING = /^[\s\u115f\u1160\u2800\u3164\uffa0]*$/u;
 
 export type AppToolValidation = { ok: true } | { ok: false; reason: string; field: string };
 
@@ -126,20 +140,28 @@ export function validateAppTool(value: unknown): AppToolValidation {
 	if (typeof t.title !== "string" || t.title.trim().length === 0) {
 		return { ok: false, reason: "tool.title required", field: "title" };
 	}
-	if (t.title.length > APP_TOOL_TITLE_MAX || CONTROL_CHARS.test(t.title)) {
+	if (
+		t.title.length > APP_TOOL_TITLE_MAX ||
+		INVISIBLE_TEXT.test(t.title) ||
+		BLANK_RENDERING.test(t.title)
+	) {
 		return {
 			ok: false,
-			reason: `tool.title must be <= ${APP_TOOL_TITLE_MAX} chars with no control characters`,
+			reason: `tool.title must be <= ${APP_TOOL_TITLE_MAX} visible chars with no invisible/control characters`,
 			field: "title",
 		};
 	}
 	if (typeof t.description !== "string" || t.description.trim().length === 0) {
 		return { ok: false, reason: "tool.description required", field: "description" };
 	}
-	if (t.description.length > APP_TOOL_DESCRIPTION_MAX || CONTROL_CHARS.test(t.description)) {
+	if (
+		t.description.length > APP_TOOL_DESCRIPTION_MAX ||
+		INVISIBLE_TEXT.test(t.description) ||
+		BLANK_RENDERING.test(t.description)
+	) {
 		return {
 			ok: false,
-			reason: `tool.description must be <= ${APP_TOOL_DESCRIPTION_MAX} chars with no control characters`,
+			reason: `tool.description must be <= ${APP_TOOL_DESCRIPTION_MAX} visible chars with no invisible/control characters`,
 			field: "description",
 		};
 	}

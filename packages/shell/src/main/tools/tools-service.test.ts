@@ -36,7 +36,22 @@ function envelope(method: string, args: unknown[]): Envelope {
 
 function ledgerGranting(pairs: ReadonlyArray<[string, string]>): CapabilityLedger {
 	const held = new Set(pairs.map(([app, cap]) => `${app}::${cap}`));
-	return { has: (app: string, cap: string) => held.has(`${app}::${cap}`) } as CapabilityLedger;
+	// Mirrors the real ledger's two read shapes: exact `has` (capability[:scope])
+	// and `listActive` (every live grant for a principal), which is how the
+	// effect filter matches a SCOPED grant against a capability name.
+	return {
+		has: (app: string, cap: string) => held.has(`${app}::${cap}`),
+		listActive: (app: string) =>
+			pairs
+				.filter(([a]) => a === app)
+				.map(([, cap]) => {
+					const colon = cap.indexOf(":");
+					return {
+						capability: colon < 0 ? cap : cap.slice(0, colon),
+						scope: colon < 0 ? null : cap.slice(colon + 1),
+					};
+				}),
+	} as unknown as CapabilityLedger;
 }
 
 function tool(partial: Partial<AppToolRecord> & { appId: string; name: string }): AppToolRecord {
@@ -129,7 +144,7 @@ describe("tools.list (Tool-2)", () => {
 			getLedger: async () =>
 				ledgerGranting([
 					[CALLER, TOOLS_READ_CAPABILITY],
-					["io.example.reader", "entities.read:*"],
+					["io.example.reader", "entities.read:brainstorm/Note/v1"],
 				]),
 		});
 		const rows2 = (await withGrant(envelope("list", [{}]))) as AppToolRecord[];
@@ -138,9 +153,9 @@ describe("tools.list (Tool-2)", () => {
 
 	it("hides a disabled provider entirely (AS-4)", async () => {
 		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
-		const rows = (await handler({ isAppDisabled: (id) => id === "io.example.a" })(
-			envelope("list", [{}]),
-		)) as AppToolRecord[];
+		const rows = (await handler({
+			resolveDisabledContributors: async () => new Set(["io.example.a"]),
+		})(envelope("list", [{}]))) as AppToolRecord[];
 		expect(rows).toEqual([]);
 	});
 
@@ -167,6 +182,40 @@ describe("tools.list (Tool-2)", () => {
 		await expect(noVault(envelope("list", [{}]))).rejects.toMatchObject({ name: "Unavailable" });
 	});
 
+	it("fails CLOSED when the disable set cannot be read", async () => {
+		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
+		await expect(
+			handler({
+				resolveDisabledContributors: async () => {
+					throw new Error("dashboard store down");
+				},
+			})(envelope("list", [{}])),
+		).rejects.toMatchObject({ name: "Unavailable" });
+	});
+
+	it("rejects an unknown surface instead of silently dropping the filter", async () => {
+		await expect(handler()(envelope("list", [{ surface: "everywhere" }]))).rejects.toMatchObject({
+			name: "Invalid",
+		});
+	});
+
+	it("never presents a tool that declares no surfaces, even unfiltered", async () => {
+		repo.insertMany([tool({ appId: "io.example.a", name: "hidden", surfaces: [] })]);
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows).toEqual([]);
+	});
+
+	it("a corrupt effect is never offered (the fallback must not be fail-open)", async () => {
+		const db = await stores.open("registry");
+		db
+			.prepare(
+				"INSERT INTO app_tools (id, app_id, name, title, description, effect, applies_to, surfaces, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			)
+			.run("app.io.example.x.bad", "io.example.x", "bad", "Bad", "d", "nonsense", "[]", '["menu"]', 1);
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows).toEqual([]);
+	});
+
 	it("rejects an unknown method", async () => {
 		await expect(handler()(envelope("call", [{}]))).rejects.toMatchObject({ name: "Invalid" });
 	});
@@ -179,7 +228,7 @@ describe("tools.list (Tool-2)", () => {
 			)
 			.run("app.io.example.x.bad", "io.example.x", "bad", "Bad", "d", "nonsense", "[", "[", 1);
 		const row = repo.get("app.io.example.x.bad");
-		expect(row?.effect).toBe(AppToolEffect.ProposesWrite);
+		expect(row?.effect).toBe("nonsense");
 		expect(row?.appliesTo).toEqual([]);
 		expect(row?.surfaces).toEqual([]);
 	});
