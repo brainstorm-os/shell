@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { createHeadlessEditor } from "@lexical/headless";
+import { $createQuoteNode, QuoteNode } from "@lexical/rich-text";
 import {
 	$createParagraphNode,
 	$createTextNode,
@@ -10,7 +11,6 @@ import {
 	TextNode,
 } from "lexical";
 import { describe, expect, it } from "vitest";
-import { $createQuoteNode, QuoteNode } from "@lexical/rich-text";
 import { InlineTransclusionNode } from "../nodes/inline-transclusion-node";
 import { TransclusionNode } from "../nodes/transclusion-node";
 import {
@@ -172,8 +172,9 @@ describe("applyTransclusionInsertion", () => {
 		expect(collectTransclusions(state)).toHaveLength(1);
 		// The transclusion must be a TOP-LEVEL child of root, never nested
 		// inside the quote — nesting is what death-coupled the two on delete.
-		const rootChildren = (state.root as unknown as { children: { type: string; children?: unknown[] }[] })
-			.children;
+		const rootChildren = (
+			state.root as unknown as { children: { type: string; children?: unknown[] }[] }
+		).children;
 		const topLevelTypes = rootChildren.map((c) => c.type);
 		expect(topLevelTypes).toContain("transclusion");
 		for (const child of rootChildren) {
