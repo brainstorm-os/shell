@@ -129,7 +129,7 @@ body {
 	bottom: 0;
 	inset-inline-end: 0;
 	width: var(--db-inspector-width, 320px);
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 }
 
 /* Drag handle on the inspector's LEFT edge. Inspector slides via
@@ -186,7 +186,7 @@ body {
 .db-inspector__resize:focus-visible,
 body.is-resizing .db-sidebar-resize,
 body.is-resizing .db-inspector__resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 
@@ -749,7 +749,7 @@ body.is-resizing .db-inspector__resize {
 	padding: var(--space-2);
 	border: var(--border-width) solid var(--color-glass-border);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl, 0 12px 28px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 }
 
 .db-value-prompt__title {
@@ -1976,7 +1976,7 @@ body.is-resizing .db-inspector__resize {
 .dbv-tl__labels-resize:hover,
 .dbv-tl__labels-resize:focus-visible,
 body.is-resizing .dbv-tl__labels-resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 
@@ -2189,7 +2189,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	border-radius: var(--radius-full);
 	font-weight: var(--text-weight-semibold);
 	letter-spacing: 0.02em;
-	box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-sm);
 }
 
 /* ── Inspector ────────────────────────────────────────────────────────── */
@@ -2710,7 +2710,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	overflow-y: auto;
 	border: var(--border-width) solid var(--color-glass-border);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl, 0 12px 28px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	display: flex;
 	flex-direction: column;
 }
@@ -3622,8 +3622,8 @@ body.is-resizing .dbv-tl__labels-resize {
 	padding: var(--space-4);
 	min-width: 360px;
 	max-width: 480px;
-	box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.2)),
-		var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.08));
+	box-shadow: var(--shadow-lg),
+		var(--shadow-sm);
 	font-family: inherit;
 }
 
@@ -3633,7 +3633,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-import-modal::backdrop {
-	background: rgba(0, 0, 0, 0.32);
+	background: var(--color-dimmer);
 	backdrop-filter: blur(2px);
 }
 
