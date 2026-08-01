@@ -28,6 +28,7 @@
 
 import { openEntity } from "@brainstorm-os/sdk";
 import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
+import { EmptyStateTone, createEmptyState } from "@brainstorm-os/sdk/empty-state";
 import {
 	SaveDispositionKind,
 	requestSaveBytes,
@@ -2539,12 +2540,21 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		navListKeyboard = null;
 		if (boards.length === 0) {
 			list.replaceChildren();
-			const empty = document.createElement("div");
-			empty.className = "whiteboard__nav-empty";
-			empty.textContent =
+			const empty =
 				q === ""
-					? t("whiteboard.nav.empty")
-					: t("whiteboard.nav.emptySearch", { query: state.navQuery.trim() });
+					? createEmptyState({
+							icon: IconName.Palette,
+							title: t("whiteboard.nav.empty"),
+							hint: t("whiteboard.nav.emptyHint"),
+							tone: EmptyStateTone.Compact,
+							className: "whiteboard__nav-empty",
+						})
+					: createEmptyState({
+							icon: IconName.Search,
+							title: t("whiteboard.nav.emptySearch", { query: state.navQuery.trim() }),
+							tone: EmptyStateTone.Compact,
+							className: "whiteboard__nav-empty",
+						});
 			list.appendChild(empty);
 			return;
 		}
@@ -2561,6 +2571,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	function changeBoardIcon(): void {
+		if (state.readonly) return;
 		void import("@brainstorm-os/sdk/picker-host").then(({ openIconPicker }) => {
 			openIconPicker({
 				value: state.whiteboard.icon ?? null,
@@ -2575,6 +2586,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	function renameBoard(next: string): void {
+		if (state.readonly) return;
 		const board = state.whiteboard;
 		if (!board.id) return;
 		if (next === board.name) return;

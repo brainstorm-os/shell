@@ -124,7 +124,7 @@ function BoardTitle({
 	return (
 		<span
 			className="app-header__title whiteboard__board-name"
-			title={t("whiteboard.board.rename.hint")}
+			title={canRename ? t("whiteboard.board.rename.hint") : t("whiteboard.board.lockedHint")}
 			onDoubleClick={(e) => {
 				e.preventDefault();
 				e.stopPropagation();
@@ -141,9 +141,11 @@ function BoardTitle({
  *  into a ref host. */
 function BoardIconButton({
 	icon,
+	locked,
 	onPick,
 }: {
 	icon: ChromeSnapshot["boardIcon"];
+	locked: boolean;
 	onPick: () => void;
 }): ReactElement | null {
 	const hostRef = useRef<HTMLSpanElement>(null);
@@ -160,13 +162,16 @@ function BoardIconButton({
 
 	if (!icon) return null;
 
+	const label = locked ? t("whiteboard.board.lockedHint") : t("whiteboard.board.icon.change");
 	return (
 		<button
 			type="button"
 			className="whiteboard__board-icon-btn"
-			data-bs-tooltip={t("whiteboard.board.icon.change")}
-			aria-label={t("whiteboard.board.icon.change")}
-			onClick={onPick}
+			data-bs-tooltip={label}
+			aria-label={label}
+			aria-disabled={locked ? "true" : undefined}
+			title={locked ? label : undefined}
+			onClick={locked ? undefined : onPick}
 		>
 			<span ref={hostRef} />
 		</button>
@@ -548,10 +553,14 @@ export function WhiteboardApp(): ReactElement {
 						className="whiteboard__board-name-row"
 						noMoreButton
 					>
-						<BoardIconButton icon={snap?.boardIcon ?? null} onPick={() => eng()?.changeBoardIcon()} />
+						<BoardIconButton
+							icon={snap?.boardIcon ?? null}
+							locked={boardLocked}
+							onPick={() => eng()?.changeBoardIcon()}
+						/>
 						<BoardTitle
 							name={snap?.boardName ?? ""}
-							canRename={Boolean(snap?.boardId)}
+							canRename={Boolean(snap?.boardId) && !boardLocked}
 							onCommit={(next) => eng()?.renameBoard(next)}
 						/>
 					</ObjectMenuTrigger>

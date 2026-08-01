@@ -51,9 +51,5 @@
   "apps/tasks/src/styles.css": {
     "colors": 10,
     "fontPx": 0
-  },
-  "apps/whiteboard/src/styles.css": {
-    "colors": 53,
-    "fontPx": 0
   }
 }
