@@ -132,6 +132,6 @@
   "propose.database.schema": "Columnas: {columns}",
   "propose.codeFile.label": "Propón un nuevo archivo de código (un script o fragmento guardado en el baúl del usuario, abierto por el editor de código). args: {\"path\": \"<nombre de archivo, p. ej. scripts/build.ts>\", \"language\": \"<id de lenguaje opcional, p. ej. typescript>\", \"content\": \"<el código fuente completo>\"}",
   "propose.kind.codeFile": "Archivo de código",
-  "propose.field.path": "Nombre de archivo",
+  "propose.field.path": "Ruta",
   "propose.codeFile.preview": "Vista previa del código de {path}"
 }

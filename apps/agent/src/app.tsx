@@ -52,7 +52,7 @@ import {
 	visibleAttachments,
 	withMentionAttachments,
 } from "@brainstorm-os/sdk/composer-context";
-import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { Markdown } from "@brainstorm-os/sdk/markdown";
 import {
@@ -1590,7 +1590,7 @@ export function AgentApp(): ReactElement {
 				<aside className="agent__sidebar" id="agent-sidebar">
 					<nav className="agent__convs">
 						{conversations.length === 0 ? (
-							<p className="agent__sidebar-empty">{t("sidebar.empty")}</p>
+							<EmptyState icon={IconName.Chat} title={t("sidebar.empty")} tone={EmptyStateTone.Compact} />
 						) : (
 							conversations.map((c) => (
 								<button

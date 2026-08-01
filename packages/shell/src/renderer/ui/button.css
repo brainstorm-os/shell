@@ -191,13 +191,23 @@
 	--gloss-bottom: var(--color-gloss-bottom);
 }
 
-/* Neutral face rides the inverse surface (dark on light themes, light on
- * dark) with a short top-to-bottom lift so the same specular stack reads
- * as polished rather than a flat chip. Ink is always the inverse text. */
+/* Neutral face — the quiet filled secondary (dialog Cancel, toolbar
+ * "Install from…"). POLISH-DSN-10: the original face rode the inverse
+ * surface at full strength, which on light themes is a near-black slab —
+ * the heaviest element on the surface, out-weighing the accent primary it
+ * sits beside. It now rides the theme surface with a light inverse TINT
+ * (stronger at the bottom so the specular stack still has travel), and
+ * the ink is the theme's own text — quiet next to a glossy accent
+ * primary in both appearances. */
 .button--neutral {
-	--gloss-top: color-mix(in srgb, var(--color-background-inverse) 78%, white);
-	--gloss-bottom: var(--color-background-inverse);
-	color: var(--color-text-inverse);
+	--gloss-top: color-mix(in srgb, var(--color-background-inverse) 8%, var(--color-surface-default));
+	--gloss-bottom: color-mix(
+		in srgb,
+		var(--color-background-inverse) 16%,
+		var(--color-surface-default)
+	);
+	color: var(--color-text-primary);
+	text-shadow: none;
 }
 
 /* Destructive face derives from the error token (top lifted toward

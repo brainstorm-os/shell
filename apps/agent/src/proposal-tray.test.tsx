@@ -145,7 +145,10 @@ describe("ProposalTray", () => {
 				onEditField={noop}
 			/>,
 		);
-		const buttons = handle.container.querySelectorAll<HTMLButtonElement>(".agent-proposal__btn");
+		const buttons = handle.container.querySelectorAll<HTMLButtonElement>(
+			".agent-proposal__actions .bs-btn",
+		);
+		expect(buttons.length).toBeGreaterThan(0);
 		for (const btn of buttons) expect(btn.disabled).toBe(true);
 	});
 });
@@ -453,7 +456,10 @@ describe("ProposalTray — a code-file path that is already taken (POLISH-FN-4)"
 		);
 	});
 
-	it("each button reports the choice the user made", async () => {
+	// 15s: two sequential click→debounce cycles; the default 5s flakes under
+	// parallel-suite load (times out at ~13s on a busy host, incl. on an
+	// unmodified checkout).
+	it("each button reports the choice the user made", { timeout: 15_000 }, async () => {
 		const onApprove = vi.fn();
 		const artifact = stageCode({ path: "hello-app/manifest.json", content: "{}" });
 		handle = await renderWithVault(artifact, existing, onApprove);

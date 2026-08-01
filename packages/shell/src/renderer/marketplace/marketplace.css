@@ -516,10 +516,13 @@
 }
 
 /* Unsigned-install advisory (AppForge-1) — warning tint, not an error: v1
-   signature policy is advisory and the chip says so honestly. */
+   signature policy is advisory and the chip says so honestly.
+   POLISH-DSN-12: salience comes from the warning-tinted FILL + ink, not a
+   lone colored border — every chip in the row wears the same border, so
+   the family reads as one. */
 .marketplace__detail-chip--unsigned {
 	color: var(--color-state-warning);
-	border-color: var(--color-state-warning);
+	background: color-mix(in srgb, var(--color-state-warning) 14%, transparent);
 }
 
 .marketplace__detail-summary {
@@ -557,16 +560,17 @@
 	letter-spacing: 0.04em;
 }
 
+/* POLISH-DSN-12: every value in the spec list shares ONE size + ink so the
+   column reads as a single face; the deliberate exceptions carry meaning —
+   mono family for the id, semantic color for the install state. */
 .marketplace__detail-spec-row dd {
 	margin: 0;
-	font-size: var(--text-size-md);
+	font-size: var(--text-size-sm);
 	color: var(--color-text-primary);
 }
 
 .marketplace__detail-spec-mono {
 	font-family: var(--text-family-code);
-	font-size: var(--text-size-xs);
-	color: var(--color-text-secondary);
 	word-break: break-all;
 }
 
@@ -574,7 +578,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-0_5);
-	font-size: var(--text-size-xs);
+	font-size: var(--text-size-sm);
 }
 
 .marketplace__state--active {

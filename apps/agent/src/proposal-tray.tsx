@@ -358,7 +358,8 @@ function ProposalCard({
 					<>
 						<button
 							type="button"
-							className="agent-proposal__btn agent-proposal__btn--approve"
+							className="bs-btn"
+							data-bs-primary=""
 							disabled={busy}
 							onClick={() => onApprove(artifact, CodeFileConflictChoice.Update)}
 							data-testid="agent-proposal-update"
@@ -368,7 +369,7 @@ function ProposalCard({
 						</button>
 						<button
 							type="button"
-							className="agent-proposal__btn"
+							className="bs-btn"
 							disabled={busy}
 							onClick={() => onApprove(artifact, CodeFileConflictChoice.SaveCopy)}
 							data-testid="agent-proposal-save-copy"
@@ -379,7 +380,8 @@ function ProposalCard({
 				) : (
 					<button
 						type="button"
-						className="agent-proposal__btn agent-proposal__btn--approve"
+						className="bs-btn"
+						data-bs-primary=""
 						disabled={busy || primaryEmpty}
 						onClick={() => onApprove(artifact)}
 						data-testid="agent-proposal-approve"
@@ -390,7 +392,7 @@ function ProposalCard({
 				)}
 				<button
 					type="button"
-					className="agent-proposal__btn"
+					className="bs-btn"
 					disabled={busy}
 					onClick={() => onDiscard(artifact.id)}
 					data-testid="agent-proposal-discard"
