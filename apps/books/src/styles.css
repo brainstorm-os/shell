@@ -434,7 +434,7 @@ body {
 	background: var(--reader-bg, var(--bg));
 	color: var(--reader-text, var(--text));
 	--reader-font-family: var(--text-family-body, var(--text-family-ui));
-	--reader-font-size: 18px;
+	--reader-font-size: 18px; /* design-ok: reader CONTENT typography default, user-adjustable at runtime — not chrome */
 	--reader-leading: 1.6;
 	--reader-measure: 65ch;
 	--reader-border: var(--color-border-subtle);

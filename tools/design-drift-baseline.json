@@ -1,0 +1,59 @@
+{
+  "_doc": "Per-file counts of literal colors + px font-sizes in app CSS, shrink-only. Drained by the POLISH-APP-* rungs; regenerate with `node tools/check-design-drift.mjs --update`.",
+  "apps/bookmarks/src/styles.css": {
+    "colors": 1,
+    "fontPx": 0
+  },
+  "apps/books/src/styles.css": {
+    "colors": 38,
+    "fontPx": 0
+  },
+  "apps/browser/src/styles.css": {
+    "colors": 17,
+    "fontPx": 0
+  },
+  "apps/calendar/src/styles.css": {
+    "colors": 8,
+    "fontPx": 0
+  },
+  "apps/code-editor/src/styles.css": {
+    "colors": 14,
+    "fontPx": 0
+  },
+  "apps/database/src/styles.css": {
+    "colors": 9,
+    "fontPx": 0
+  },
+  "apps/files/src/styles.css": {
+    "colors": 10,
+    "fontPx": 0
+  },
+  "apps/form-designer/src/styles.css": {
+    "colors": 4,
+    "fontPx": 0
+  },
+  "apps/graph/src/styles.css": {
+    "colors": 13,
+    "fontPx": 0
+  },
+  "apps/journal/src/styles.css": {
+    "colors": 6,
+    "fontPx": 0
+  },
+  "apps/notes/src/styles.css": {
+    "colors": 5,
+    "fontPx": 0
+  },
+  "apps/preview/src/styles.css": {
+    "colors": 6,
+    "fontPx": 0
+  },
+  "apps/tasks/src/styles.css": {
+    "colors": 10,
+    "fontPx": 0
+  },
+  "apps/whiteboard/src/styles.css": {
+    "colors": 53,
+    "fontPx": 0
+  }
+}
