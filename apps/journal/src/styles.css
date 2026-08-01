@@ -125,7 +125,7 @@ button {
 	inset-inline-end: 0;
 	width: var(--journal-props-width, 320px);
 	border-inline-start: var(--border-width) solid var(--color-glass-border, var(--border));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	z-index: 100;
 	transition: transform var(--motion-duration-normal, 180ms) ease;
@@ -578,7 +578,7 @@ body.is-resizing .journal__props-resize {
 .journal__mood-btn:hover {
 	filter: grayscale(0);
 	opacity: 1;
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 }
 
 .journal__mood-btn[aria-pressed="true"] {
@@ -607,7 +607,7 @@ body.is-resizing .journal__props-resize {
 }
 
 .journal__habit-btn:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 }
 
 .journal__habit-btn[aria-pressed="true"] {
@@ -656,7 +656,7 @@ body.is-resizing .journal__props-resize {
 /* Streak-break warning (9.16.11) — today's entry is unwritten but a streak
  * is still savable. */
 .journal__streak[data-risk="true"] {
-	background: var(--warn-bg, rgba(224, 169, 59, 0.16));
+	background: var(--warn-bg);
 	color: var(--warn, var(--text));
 }
 
@@ -716,7 +716,7 @@ body.is-resizing .journal__props-resize {
 }
 
 .journal__rollup-btn:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 	color: var(--text);
 }
 
@@ -824,7 +824,7 @@ body.is-resizing .journal__props-resize {
 }
 
 .journal__overview-btn:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 }
 
 .journal__overview-btn:focus-visible {
