@@ -14,6 +14,8 @@
  * rendering are jsdom-tested without booting the canvas app.
  */
 
+import { EmptyStateTone, createEmptyState } from "@brainstorm-os/sdk/empty-state";
+import { IconName } from "@brainstorm-os/sdk/icon";
 import type { TranslationParams, WhiteboardMessageKey } from "../i18n/t";
 import type { LayerRow } from "../logic/layer-list";
 import { WhiteboardIcon, createIcon } from "./icons";
@@ -89,7 +91,13 @@ export function createLayersPanel(options: LayersPanelOptions): LayersPanelHandl
 		if (rows.length === 0) {
 			const empty = document.createElement("li");
 			empty.className = "whiteboard__layers-empty";
-			empty.textContent = t("whiteboard.layers.empty");
+			empty.appendChild(
+				createEmptyState({
+					icon: IconName.Entity,
+					title: t("whiteboard.layers.empty"),
+					tone: EmptyStateTone.Compact,
+				}),
+			);
 			list.replaceChildren(empty);
 			return;
 		}

@@ -36,7 +36,7 @@
  */
 
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -113,7 +113,9 @@ function scan() {
 		for (const file of cssFiles(appDir)) {
 			const { colors, fontPx } = countOffenders(readFileSync(file, "utf8"));
 			if (colors > 0 || fontPx > 0) {
-				found[relative(ROOT, file)] = { colors, fontPx };
+				// Baseline keys are posix-style so the file is identical across
+				// platforms (Windows `relative()` yields backslashes).
+				found[relative(ROOT, file).split(sep).join("/")] = { colors, fontPx };
 			}
 		}
 	}

@@ -139,8 +139,10 @@ button {
 	background: var(--hover);
 }
 
+/* Accent-soft selection fill — the cross-app selected-row treatment
+ * (Notes/Files sidebars), never the neutral interactive grey. */
 .whiteboard__nav-row--active {
-	background: var(--active, var(--hover));
+	background: var(--accent-soft);
 }
 
 .whiteboard__nav-row:focus-visible {
@@ -161,10 +163,10 @@ button {
 	white-space: nowrap;
 }
 
+/* Hosts the shared compact `.bs-empty-state`; the face comes from
+ * `@brainstorm-os/sdk/empty-state.css`, this only positions it. */
 .whiteboard__nav-empty {
-	padding: var(--space-2);
-	color: var(--text-faint);
-	font-size: var(--text-size-sm);
+	padding: var(--space-4) var(--space-2);
 }
 
 /* Drag handle on the column boundary; hidden when the panel is closed. */
@@ -210,6 +212,16 @@ button {
 
 .whiteboard__board-icon-btn:hover {
 	background: var(--hover);
+}
+
+/* Locked board — the picker no-ops; mirror the hdr-btn disabled face. */
+.whiteboard__board-icon-btn[aria-disabled="true"] {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.whiteboard__board-icon-btn[aria-disabled="true"]:hover {
+	background: transparent;
 }
 
 .whiteboard__board-icon-btn:focus-visible {
@@ -294,7 +306,7 @@ button {
 }
 
 .whiteboard__hdr-btn.is-error {
-	color: var(--danger, #e5484d);
+	color: var(--danger);
 }
 
 /* Group divider between content actions and the trailing toggles + ⋯. */
@@ -327,7 +339,7 @@ button {
 	-webkit-backdrop-filter: blur(var(--glass-blur, 8px)) saturate(var(--glass-saturate, 180%));
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-sm);
 }
 
 .whiteboard__zoom-btn,
@@ -407,7 +419,7 @@ button {
 	-webkit-backdrop-filter: blur(var(--glass-blur, 8px)) saturate(var(--glass-saturate, 180%));
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-sm);
 }
 
 .whiteboard__tool {
@@ -569,8 +581,8 @@ button {
 
 .whiteboard__guide {
 	position: absolute;
-	background: var(--accent, #6b73f0);
-	box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent, #6b73f0) 40%, transparent);
+	background: var(--accent);
+	box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* ── Nodes ───────────────────────────────────────────────────────────── */
@@ -590,22 +602,22 @@ button {
 .whiteboard__node {
 	position: absolute;
 	pointer-events: auto;
-	border: var(--border-width, 1px) solid var(--border-strong, #424242);
-	background: var(--bg-elev, #232323);
+	border: var(--border-width, 1px) solid var(--border-strong, #424242); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	background: var(--bg-elev, #232323); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	border-radius: var(--radius-md);
 	display: flex;
 	flex-direction: column;
 	padding: var(--space-2, var(--space-2)) var(--space-3, var(--space-3));
-	color: var(--text, #f7f7f7);
+	color: var(--text, #f7f7f7); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	font-size: var(--text-size-md);
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	box-shadow: var(--shadow-sm);
 	user-select: none;
 	cursor: grab;
 	transition: box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .whiteboard__node:hover {
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+	box-shadow: var(--shadow-md);
 }
 
 .whiteboard__node:active {
@@ -613,8 +625,8 @@ button {
 }
 
 .whiteboard__node--selected {
-	border-color: var(--accent, #6b73f0);
-	box-shadow: 0 0 0 1px var(--accent, #6b73f0);
+	border-color: var(--accent, #6b73f0); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* KBN-A-whiteboard: a node is a Tab stop; show a keyboard focus ring so the
@@ -643,7 +655,7 @@ button {
 	flex-direction: column;
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-md);
-	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--shadow-lg);
 	overflow: hidden;
 }
 
@@ -722,7 +734,7 @@ button {
 }
 
 .whiteboard__layer[data-selected="true"] {
-	background: var(--color-accent-subtle, color-mix(in srgb, var(--accent, #6b73f0) 14%, transparent));
+	background: var(--color-accent-subtle);
 }
 
 .whiteboard__layer[data-hidden="true"] .whiteboard__layer-label {
@@ -772,14 +784,12 @@ button {
 }
 
 .whiteboard__layer-label[data-locked="true"] {
-	color: var(--text-dim, var(--text-dim, #888));
+	color: var(--text-dim);
 }
 
+/* Hosts the shared compact `.bs-empty-state` (see nav-empty). */
 .whiteboard__layers-empty {
-	padding: var(--space-2, var(--space-2));
-	color: var(--text-dim, var(--text-dim, #888));
-	font-size: var(--text-size-sm);
-	font-style: italic;
+	padding: var(--space-4) var(--space-2);
 }
 
 /* Primitive shapes (9.17.10) — the node chrome steps aside; the fill div is the
@@ -798,8 +808,8 @@ button {
 .whiteboard__shape-fill {
 	width: 100%;
 	height: 100%;
-	background: var(--node-tint, var(--accent, #6b73f0));
-	border: var(--border-width) solid color-mix(in srgb, var(--node-tint, #6b73f0) 70%, #000);
+	background: var(--node-tint, var(--accent));
+	border: var(--border-width) solid color-mix(in srgb, var(--node-tint, var(--accent)) 70%, #000); /* design-ok: theme-independent darkening of the data tint */
 	box-sizing: border-box;
 }
 
@@ -817,19 +827,19 @@ button {
 }
 
 .whiteboard__shape-svg--fill polygon {
-	fill: var(--node-tint, var(--accent, #6b73f0));
-	stroke: color-mix(in srgb, var(--node-tint, #6b73f0) 70%, #000);
+	fill: var(--node-tint, var(--accent));
+	stroke: color-mix(in srgb, var(--node-tint, var(--accent)) 70%, #000); /* design-ok: theme-independent darkening of the data tint */
 	stroke-width: 1;
 }
 
 .whiteboard__shape-svg--stroke line {
-	stroke: var(--node-tint, var(--accent, #6b73f0));
+	stroke: var(--node-tint, var(--accent));
 	stroke-width: 2;
 	stroke-linecap: round;
 }
 
 .whiteboard__shape-svg-head {
-	fill: var(--node-tint, var(--accent, #6b73f0));
+	fill: var(--node-tint, var(--accent));
 }
 
 /* Freehand ink (9.17.9): the node chrome steps aside; a stroked polyline is
@@ -849,7 +859,7 @@ button {
 
 .whiteboard__ink-svg polyline {
 	fill: none;
-	stroke: var(--node-tint, var(--accent, #6b73f0));
+	stroke: var(--node-tint, var(--accent));
 	stroke-width: 2;
 	stroke-linecap: round;
 	stroke-linejoin: round;
@@ -861,12 +871,12 @@ button {
 }
 
 .whiteboard__node--locked.whiteboard__node--selected {
-	box-shadow: 0 0 0 1px var(--accent, #6b73f0);
+	box-shadow: 0 0 0 1px var(--accent);
 	border-style: dashed;
 }
 
 .whiteboard__node:focus-visible {
-	outline: 2px solid var(--accent, #6b73f0);
+	outline: 2px solid var(--accent);
 	outline-offset: -2px;
 }
 
@@ -886,7 +896,7 @@ button {
 }
 
 .whiteboard__node-body--placeholder {
-	color: var(--text-faint, #7a7a7a);
+	color: var(--text-faint, #7a7a7a); /* design-ok: node-chrome floor — pinned by node-dom.test */
 }
 
 .whiteboard__node-body--editing {
@@ -919,7 +929,7 @@ button {
 	-webkit-backdrop-filter: blur(var(--glass-blur, 8px)) saturate(var(--glass-saturate, 180%));
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-sm);
 }
 
 .whiteboard__format-btn {
@@ -1024,14 +1034,14 @@ button {
 	width: 16px;
 	height: 16px;
 	flex-shrink: 0;
-	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+	filter: drop-shadow(0 1px 1px var(--color-shadow-default));
 }
 
 .whiteboard__presence-name {
 	margin-top: var(--space-3);
 	padding: var(--space-0_5);
 	border-radius: var(--radius-md);
-	color: #ffffff;
+	color: #ffffff; /* design-ok: white label on the saturated peer presence color (data, both themes) */
 	font-size: var(--text-size-xs);
 	line-height: 1.5;
 	white-space: nowrap;
@@ -1054,18 +1064,18 @@ button {
 }
 
 .whiteboard__node--text-quote {
-	border-inline-start: 3px solid var(--accent, #6b73f0);
+	border-inline-start: 3px solid var(--accent);
 }
 
 .whiteboard__node--text-quote .whiteboard__node-body {
 	font-style: italic;
-	color: var(--text-dim, #a3a3a3);
+	color: var(--text-dim, #a3a3a3); /* design-ok: node-chrome floor — pinned by node-dom.test */
 }
 
 .whiteboard__node--sticky {
-	background: var(--node-tint, #f6cd6b);
-	color: rgba(0, 0, 0, 0.85);
-	border-color: rgba(0, 0, 0, 0.08);
+	background: var(--node-tint, #f6cd6b); /* design-ok: sticky tint is board data; fallback = default sticky */
+	color: rgba(0, 0, 0, 0.85); /* design-ok: dark ink on the light sticky tint — theme-independent */
+	border-color: rgba(0, 0, 0, 0.08); /* design-ok: theme-independent hairline on the data tint */
 }
 
 /* The global placeholder color (`--text-faint`, a light grey tuned for dark
@@ -1074,16 +1084,16 @@ button {
  * grey so it reads against the tint while staying clearly secondary to the
  * 0.85 real text. */
 .whiteboard__node--sticky .whiteboard__node-body--placeholder {
-	color: rgba(0, 0, 0, 0.45);
+	color: rgba(0, 0, 0, 0.45); /* design-ok: muted dark ink on the light sticky tint (F-044) */
 }
 
 .whiteboard__node--text {
-	background: var(--bg-elev, #232323);
-	color: var(--text, #f7f7f7);
+	background: var(--bg-elev, #232323); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	color: var(--text, #f7f7f7); /* design-ok: node-chrome floor — pinned by node-dom.test */
 }
 
 .whiteboard__node--image {
-	background: var(--bg, #161616);
+	background: var(--bg, #161616); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	padding: 0;
 	overflow: hidden;
 }
@@ -1113,9 +1123,9 @@ button {
 	padding: var(--space-2);
 	box-sizing: border-box;
 	text-align: center;
-	color: var(--text-dim, #a3a3a3);
+	color: var(--text-dim, #a3a3a3); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	font-size: var(--text-size-sm);
-	background: var(--bg-subtle, #1c1c1c);
+	background: var(--bg-subtle, #1c1c1c); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
@@ -1126,7 +1136,7 @@ button {
  * header baseline + 1px subtle border per the project chrome rule. */
 .whiteboard__node--frame {
 	background: transparent;
-	border: var(--border-width, 1px) solid var(--border-subtle, var(--border, #333));
+	border: var(--border-width, 1px) solid var(--border-subtle, var(--border, #333)); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	padding: 0;
 	box-shadow: none;
 	pointer-events: none;
@@ -1147,13 +1157,13 @@ button {
 	align-items: center;
 	height: 44px;
 	padding: 0 var(--space-3, var(--space-3));
-	background: var(--node-tint, var(--bg-elev, #232323));
-	color: var(--text, #f7f7f7);
+	background: var(--node-tint, var(--bg-elev, #232323)); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	color: var(--text, #f7f7f7); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-semibold, 600);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	border-bottom: var(--border-width) solid var(--border-subtle, var(--border, #333));
+	border-bottom: var(--border-width) solid var(--border-subtle, var(--border));
 	border-radius: var(--radius-md) var(--radius-md) 0 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1165,18 +1175,18 @@ button {
 }
 
 .whiteboard__node--group {
-	background: color-mix(in srgb, var(--accent, #6b73f0) 6%, transparent);
-	border: var(--border-width, 1px) dashed var(--accent, #6b73f0);
+	background: color-mix(in srgb, var(--accent, #6b73f0) 6%, transparent); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	border: var(--border-width, 1px) dashed var(--accent, #6b73f0); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	pointer-events: none;
 }
 
 .whiteboard__node--group.whiteboard__node--selected {
-	background: color-mix(in srgb, var(--accent, #6b73f0) 12%, transparent);
+	background: color-mix(in srgb, var(--accent, #6b73f0) 12%, transparent); /* design-ok: node-chrome floor — pinned by node-dom.test */
 }
 
 .whiteboard__node--embedded {
-	background: var(--bg-elev, #232323);
-	border-color: var(--accent, #6b73f0);
+	background: var(--bg-elev, #232323); /* design-ok: node-chrome floor — pinned by node-dom.test */
+	border-color: var(--accent, #6b73f0); /* design-ok: node-chrome floor — pinned by node-dom.test */
 	overflow: hidden;
 }
 
@@ -1281,8 +1291,8 @@ button {
 	width: 10px;
 	height: 10px;
 	border-radius: var(--radius-xs);
-	background: var(--bg, #191919);
-	border: 1.5px solid var(--accent, #6b73f0);
+	background: var(--bg);
+	border: 1.5px solid var(--accent);
 	z-index: 4;
 }
 
