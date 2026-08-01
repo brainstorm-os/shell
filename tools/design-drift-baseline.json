@@ -20,10 +20,6 @@
     "colors": 4,
     "fontPx": 0
   },
-  "apps/graph/src/styles.css": {
-    "colors": 13,
-    "fontPx": 0
-  },
   "apps/journal/src/styles.css": {
     "colors": 6,
     "fontPx": 0
