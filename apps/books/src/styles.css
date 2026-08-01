@@ -442,28 +442,42 @@ body {
 	--reader-hover: var(--hover);
 }
 
+/* Reader page palettes — the White / Sepia / Night READING surfaces the user
+ * picks in the type panel. Deliberately independent of the app theme (a sepia
+ * page stays sepia in a dark app). Each mode declares only its two anchors
+ * (page surface + page ink) — the border/dim/hover tints derive from the ink
+ * via color-mix, and the type-panel swatches consume the same anchors. */
+.books {
+	--books-page-light-bg: #ffffff; /* design-ok: reader page surface — user reading mode, not app chrome */
+	--books-page-light-text: #1a1a1a; /* design-ok: reader page ink — user reading mode */
+	--books-page-sepia-bg: #f4ecd8; /* design-ok: reader page surface — user reading mode */
+	--books-page-sepia-text: #5b4636; /* design-ok: reader page ink — user reading mode */
+	--books-page-dark-bg: #1a1a1a; /* design-ok: reader page surface — user reading mode */
+	--books-page-dark-text: #d8d8d8; /* design-ok: reader page ink — user reading mode */
+}
+
 .books--theme-light {
-	--reader-bg: #ffffff;
-	--reader-text: #1a1a1a;
-	--reader-border: rgba(26, 26, 26, 0.12);
-	--reader-dim: rgba(26, 26, 26, 0.55);
-	--reader-hover: rgba(26, 26, 26, 0.06);
+	--reader-bg: var(--books-page-light-bg);
+	--reader-text: var(--books-page-light-text);
+	--reader-border: color-mix(in srgb, var(--books-page-light-text) 12%, transparent);
+	--reader-dim: color-mix(in srgb, var(--books-page-light-text) 55%, transparent);
+	--reader-hover: color-mix(in srgb, var(--books-page-light-text) 6%, transparent);
 }
 
 .books--theme-sepia {
-	--reader-bg: #f4ecd8;
-	--reader-text: #5b4636;
-	--reader-border: rgba(91, 70, 54, 0.18);
-	--reader-dim: rgba(91, 70, 54, 0.62);
-	--reader-hover: rgba(91, 70, 54, 0.08);
+	--reader-bg: var(--books-page-sepia-bg);
+	--reader-text: var(--books-page-sepia-text);
+	--reader-border: color-mix(in srgb, var(--books-page-sepia-text) 18%, transparent);
+	--reader-dim: color-mix(in srgb, var(--books-page-sepia-text) 62%, transparent);
+	--reader-hover: color-mix(in srgb, var(--books-page-sepia-text) 8%, transparent);
 }
 
 .books--theme-dark {
-	--reader-bg: #1a1a1a;
-	--reader-text: #d8d8d8;
-	--reader-border: rgba(216, 216, 216, 0.14);
-	--reader-dim: rgba(216, 216, 216, 0.55);
-	--reader-hover: rgba(216, 216, 216, 0.08);
+	--reader-bg: var(--books-page-dark-bg);
+	--reader-text: var(--books-page-dark-text);
+	--reader-border: color-mix(in srgb, var(--books-page-dark-text) 14%, transparent);
+	--reader-dim: color-mix(in srgb, var(--books-page-dark-text) 55%, transparent);
+	--reader-hover: color-mix(in srgb, var(--books-page-dark-text) 8%, transparent);
 }
 
 .books__preview-badge {
@@ -578,8 +592,8 @@ body {
 	max-height: 100%;
 	border: var(--border-width) solid var(--reader-border);
 	border-radius: var(--radius-sm);
-	background: #ffffff;
-	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+	background: #ffffff; /* design-ok: PDF pages composite on white — page content, not chrome */
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18); /* design-ok: page-lift scrim over the mode-colored reader surface, not app-themed */
 	transition: filter var(--motion-duration-fast, 120ms) ease;
 }
 
@@ -865,18 +879,18 @@ body {
 }
 
 .books__type-swatch--light .books__type-swatch-fill {
-	background: #ffffff;
-	color: #1a1a1a;
+	background: var(--books-page-light-bg);
+	color: var(--books-page-light-text);
 }
 
 .books__type-swatch--sepia .books__type-swatch-fill {
-	background: #f4ecd8;
-	color: #5b4636;
+	background: var(--books-page-sepia-bg);
+	color: var(--books-page-sepia-text);
 }
 
 .books__type-swatch--dark .books__type-swatch-fill {
-	background: #1a1a1a;
-	color: #d8d8d8;
+	background: var(--books-page-dark-bg);
+	color: var(--books-page-dark-text);
 }
 
 .books__type-swatch:hover .books__type-swatch-fill {
@@ -899,26 +913,10 @@ body {
 }
 
 /* Highlight authoring (9.21.4). The five colours read against any reading
-   theme — translucent tints over the page text. */
-.books {
-	--books-hl-yellow: rgba(250, 204, 21, 0.4);
-	--books-hl-green: rgba(74, 222, 128, 0.4);
-	--books-hl-blue: rgba(96, 165, 250, 0.4);
-	--books-hl-pink: rgba(244, 114, 182, 0.4);
-	--books-hl-purple: rgba(167, 139, 250, 0.4);
-}
-
-/* The highlight popovers mount outside `.books`, so the palette is also
- * declared on the popover bodies themselves. */
-.books__hl-menu,
-.books__hl-panel {
-	--books-hl-yellow: rgba(250, 204, 21, 0.4);
-	--books-hl-green: rgba(74, 222, 128, 0.4);
-	--books-hl-blue: rgba(96, 165, 250, 0.4);
-	--books-hl-pink: rgba(244, 114, 182, 0.4);
-	--books-hl-purple: rgba(167, 139, 250, 0.4);
-}
-
+ * theme — translucent tints over the page text. The palette itself is
+ * declared ONCE, on `:root` (further down, the F-201 fix): the highlight
+ * dialog/panel mount into `document.body` outside `.books`, and `:root`
+ * reaches both them and the reader. */
 .books__mark {
 	border-radius: var(--radius-sm);
 	padding: 0.05em 0;
@@ -956,17 +954,15 @@ body {
 /* Declared on :root, NOT .books — the highlight dialog/panel mount into
  * `document.body` via the shared popover, outside `.books`. Scoping these
  * to `.books` left every swatch background unresolved there, which is what
- * rendered the create-Highlight dialog completely empty (F-201). */
+ * rendered the create-Highlight dialog completely empty (F-201). This is
+ * the palette's ONLY declaration — a highlighter tint is annotation data,
+ * the same in every app theme. */
 :root {
-	--books-hl-yellow: rgba(250, 204, 21, 0.4);
-	--books-hl-green: rgba(74, 222, 128, 0.4);
-	--books-hl-blue: rgba(96, 165, 250, 0.4);
-	--books-hl-pink: rgba(244, 114, 182, 0.4);
-	--books-hl-purple: rgba(167, 139, 250, 0.4);
-}
-
-.books__mark {
-	background: var(--books-hl, var(--books-hl-yellow));
+	--books-hl-yellow: rgba(250, 204, 21, 0.4); /* design-ok: highlight tint — annotation data, theme-independent */
+	--books-hl-green: rgba(74, 222, 128, 0.4); /* design-ok: highlight tint — annotation data, theme-independent */
+	--books-hl-blue: rgba(96, 165, 250, 0.4); /* design-ok: highlight tint — annotation data, theme-independent */
+	--books-hl-pink: rgba(244, 114, 182, 0.4); /* design-ok: highlight tint — annotation data, theme-independent */
+	--books-hl-purple: rgba(167, 139, 250, 0.4); /* design-ok: highlight tint — annotation data, theme-independent */
 }
 
 .books__hl-menu {
