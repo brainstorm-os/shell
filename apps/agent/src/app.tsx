@@ -143,13 +143,15 @@ import {
 	linkifyEntityRefs,
 	sortMessages,
 } from "./logic/transcript";
-import { runAgentTurn, usedToolNames } from "./logic/turn";
+import { runAgentTurn } from "./logic/turn";
+import { type TurnTimelineItem, turnTimeline } from "./logic/turn-timeline";
 import { buildVaultDataContextBlock } from "./logic/vault-data-context";
 import { buildWorkspaceContextBlock, joinContextBlocks } from "./logic/workspace-context";
 import { MemoryPopover } from "./memory-popover";
 import { ProposalTray } from "./proposal-tray";
 import { getBrainstorm } from "./runtime";
 import { SaveAsAutomationPopover } from "./save-as-automation-popover";
+import { TurnTimeline } from "./turn-timeline";
 
 type VaultEntity = { id: string; type: string; properties: Record<string, unknown> };
 
@@ -160,9 +162,10 @@ type UiMessage = {
 	createdAt: string;
 	seq?: number;
 	model?: string;
-	/** Tool verbs this assistant turn ran (Agent-3) — surfaced as a compact
-	 *  "used tool X" affordance. */
-	tools?: string[];
+	/** Agent-12b — the ordered "what I did" timeline for this turn (calls,
+	 *  errors, denials) derived from the persisted `toolCalls`. Replaces the
+	 *  transient "used tool X" chips with a durable, expandable account. */
+	timeline?: TurnTimelineItem[];
 	/** Cited vault-object links (Agent-4) — clickable, labelled by title,
 	 *  opened via the cap-checked `open` intent. Resolved from the turn's
 	 *  retrieval hits at send time; rehydrated (id-as-label) on reload. */
@@ -247,25 +250,6 @@ function storedGrants(properties: Record<string, unknown>): string[] | null {
 	return grants.length === raw.length && grants.length > 0 ? grants : null;
 }
 
-/** Pull the dispatched tool verbs out of a persisted `toolCalls` (the loop's
- *  `AgentLoopStep[]`) for the "used tool X" affordance. Tolerant of the
- *  untyped persisted shape. */
-function toolNamesFromSteps(raw: unknown): string[] {
-	if (!Array.isArray(raw)) return [];
-	const names: string[] = [];
-	for (const step of raw) {
-		if (
-			step &&
-			typeof step === "object" &&
-			(step as { kind?: unknown }).kind === "tool-result" &&
-			typeof (step as { tool?: unknown }).tool === "string"
-		) {
-			names.push((step as { tool: string }).tool);
-		}
-	}
-	return names;
-}
-
 /** Coerce a persisted `toolCalls` (the loop's `AgentLoopStep[]`) back to typed
  *  steps for the save-as-automation generalizer. Keeps only well-formed members
  *  (a string `kind`); tolerant of the untyped persisted shape. */
@@ -316,17 +300,6 @@ function citationsFromProperty(raw: unknown): CitationLink[] {
 	);
 }
 
-/** Stable per-occurrence keys for the tool chips — a verb may appear more than
- *  once in a turn, so key by `verb#<occurrence>` rather than the array index. */
-function toolChips(tools: readonly string[]): { key: string; tool: string }[] {
-	const counts = new Map<string, number>();
-	return tools.map((tool) => {
-		const n = counts.get(tool) ?? 0;
-		counts.set(tool, n + 1);
-		return { key: `${tool}#${n}`, tool };
-	});
-}
-
 /** The Agent's own bookkeeping types — excluded from the vault-data tally so
  *  the agent reports the user's content, not its own transcript (doc 63). */
 const AGENT_OWN_TYPES: ReadonlySet<string> = new Set([
@@ -374,6 +347,7 @@ export function AgentApp(): ReactElement {
 	const aiSvc = rt?.services?.ai ?? null;
 	const intentsSvc = rt?.services?.intents ?? null;
 	const searchSvc = rt?.services?.search ?? null;
+	const agentTraceSvc = rt?.services?.agentTrace ?? null;
 	const storageSvc = rt?.services?.storage ?? null;
 	const platformSvc = rt?.services?.platform ?? null;
 	const appCaps = rt?.capabilities ?? null;
@@ -798,7 +772,7 @@ export function AgentApp(): ReactElement {
 			.map((e) => {
 				const seq = e.properties.seq;
 				const model = (e.properties.aiProvenance as AiProvenance | undefined)?.model;
-				const tools = toolNamesFromSteps(e.properties.toolCalls);
+				const timeline = turnTimeline(e.properties.toolCalls);
 				const citations = citationsFromProperty(e.properties.citations);
 				const attachments = parseAttachments(e.properties.attachments);
 				const richBody = str(e.properties.richBody);
@@ -810,7 +784,7 @@ export function AgentApp(): ReactElement {
 					createdAt: str(e.properties.createdAt),
 					...(typeof seq === "number" ? { seq } : {}),
 					...(model ? { model } : {}),
-					...(tools.length > 0 ? { tools } : {}),
+					...(timeline.length > 0 ? { timeline } : {}),
 					...(citations.length > 0 ? { citations } : {}),
 					...(attachments.length > 0 ? { attachments } : {}),
 				};
@@ -1287,52 +1261,74 @@ export function AgentApp(): ReactElement {
 			let provider: string;
 			let model: string;
 			let loopSteps: AgentLoopResult["steps"] | null = null;
-			let usedTools: string[] = [];
 			let citationIds: string[] = [];
 
-			if (toolsEnabled && intentsSvc) {
-				const loop = await runAgentTurn(
-					{ ai: aiSvc, intents: intentsSvc },
-					{
-						tools: offeredTools,
-						frozenCapabilities,
-						transcript: visionTranscript.filter((m) => m.role !== MessageRole.System),
-						...(retrievalContext ? { retrievalContext } : {}),
+			// Agent-12b/12a — bracket the turn so the shell's own chokepoints
+			// (model calls via `ai_usage.run_id`, broker cap-denials) correlate to
+			// ONE run. The renderer's timeline reads the persisted `toolCalls`; this
+			// bracket is what makes the vault-level activity + live-chip surfaces see
+			// the chat turn. Fail-soft: a null run id just means no correlation.
+			let traceRunId: string | null = null;
+			try {
+				traceRunId = (await agentTraceSvc?.beginTurn({ conversationId: convId }))?.runId ?? null;
+			} catch {
+				traceRunId = null;
+			}
+
+			try {
+				if (toolsEnabled && intentsSvc) {
+					const loop = await runAgentTurn(
+						{ ai: aiSvc, intents: intentsSvc },
+						{
+							tools: offeredTools,
+							frozenCapabilities,
+							transcript: visionTranscript.filter((m) => m.role !== MessageRole.System),
+							...(retrievalContext ? { retrievalContext } : {}),
+							...(conversationProvider ? { provider: conversationProvider } : {}),
+							...(conversationModel ? { model: conversationModel } : {}),
+							onPropose: (artifact) => dispatchProposal({ kind: ProposalActionKind.Add, artifact }),
+							rowSchemas: databaseSchemas,
+							existingDatabases,
+						},
+					);
+					if (loop.stopReason === AgentStopReason.GenerateFailed) {
+						throw Object.assign(new Error(loop.error ?? "generate-failed"), { kind: "Unavailable" });
+					}
+					body = loop.finalAnswer;
+					provider = loop.provenance?.provider ?? "";
+					model = loop.provenance?.model ?? "";
+					loopSteps = loop.steps;
+					citationIds = loop.citations;
+				} else {
+					// Plain-chat fallback: still ground on retrieval (the system region
+					// gains the context block) so the model answers from the vault. The
+					// non-tool path has no citation protocol, so no links render.
+					const messagesWithContext = retrievalContext
+						? visionTranscript.map((m) =>
+								m.role === MessageRole.System && typeof m.content === "string"
+									? { ...m, content: `${m.content}\n\n${retrievalContext}` }
+									: m,
+							)
+						: visionTranscript;
+					const result = await aiSvc.generate({
+						messages: messagesWithContext,
 						...(conversationProvider ? { provider: conversationProvider } : {}),
 						...(conversationModel ? { model: conversationModel } : {}),
-						onPropose: (artifact) => dispatchProposal({ kind: ProposalActionKind.Add, artifact }),
-						rowSchemas: databaseSchemas,
-						existingDatabases,
-					},
-				);
-				if (loop.stopReason === AgentStopReason.GenerateFailed) {
-					throw Object.assign(new Error(loop.error ?? "generate-failed"), { kind: "Unavailable" });
+					});
+					body = result.content;
+					provider = result.provider;
+					model = result.model;
 				}
-				body = loop.finalAnswer;
-				provider = loop.provenance?.provider ?? "";
-				model = loop.provenance?.model ?? "";
-				loopSteps = loop.steps;
-				usedTools = usedToolNames(loop);
-				citationIds = loop.citations;
-			} else {
-				// Plain-chat fallback: still ground on retrieval (the system region
-				// gains the context block) so the model answers from the vault. The
-				// non-tool path has no citation protocol, so no links render.
-				const messagesWithContext = retrievalContext
-					? visionTranscript.map((m) =>
-							m.role === MessageRole.System && typeof m.content === "string"
-								? { ...m, content: `${m.content}\n\n${retrievalContext}` }
-								: m,
-						)
-					: visionTranscript;
-				const result = await aiSvc.generate({
-					messages: messagesWithContext,
-					...(conversationProvider ? { provider: conversationProvider } : {}),
-					...(conversationModel ? { model: conversationModel } : {}),
-				});
-				body = result.content;
-				provider = result.provider;
-				model = result.model;
+			} finally {
+				// Close the run whether generation succeeded or threw — the shell
+				// derives the outcome from what it observed. Fail-soft.
+				if (traceRunId) {
+					try {
+						await agentTraceSvc?.endTurn({ runId: traceRunId });
+					} catch {
+						// no-op — a trace close failure never affects the turn
+					}
+				}
 			}
 
 			// Resolve the cited ids to clickable link descriptors via this turn's
@@ -1354,7 +1350,7 @@ export function AgentApp(): ReactElement {
 						createdAt: repliedAt,
 						seq: userSeq + 1,
 						...(model ? { model } : {}),
-						...(usedTools.length > 0 ? { tools: usedTools } : {}),
+						...(loopSteps ? { timeline: turnTimeline(loopSteps) } : {}),
 						...(citationLinks.length > 0 ? { citations: citationLinks } : {}),
 					},
 				},
@@ -1411,6 +1407,7 @@ export function AgentApp(): ReactElement {
 		aiSvc,
 		intentsSvc,
 		searchSvc,
+		agentTraceSvc,
 		toolsEnabled,
 		offeredTools,
 		frozenCapabilities,
@@ -1631,15 +1628,8 @@ export function AgentApp(): ReactElement {
 												<span className="agent__msg-model"> · {t("provenance.via", { model: m.model })}</span>
 											) : null}
 										</div>
-										{m.tools && m.tools.length > 0 ? (
-											<div className="agent__msg-tools" data-testid="agent-msg-tools">
-												{toolChips(m.tools).map(({ key, tool }) => (
-													<span key={key} className="agent__tool-chip">
-														<Icon name={IconName.Sparkle} size={12} />
-														{t("tool.used", { tool })}
-													</span>
-												))}
-											</div>
+										{m.timeline && m.timeline.length > 0 ? (
+											<TurnTimeline items={m.timeline} onEscalate={allowEscalation} />
 										) : null}
 										<div className="agent__msg-body">
 											{m.role === MessageRole.Assistant ? (

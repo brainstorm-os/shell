@@ -15,6 +15,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */ // declarations only
 
 import type { AgentProvenanceRequest } from "./agent-provenance";
+import type { AgentTraceService } from "./agent-trace";
 import type { ExportTextFormat } from "./automations";
 import type { CalDavService } from "./caldav";
 import type {
@@ -2164,6 +2165,8 @@ export type AppRuntime = {
 		readonly roster: RosterService;
 		/** Agent-Teams-3 — decide an agent's proposal card (scarce `agents.approve`). */
 		readonly agentProposals: AgentProposalsService;
+		/** Agent-12a/12b — own-run trace demarcation + reads (no capability). */
+		readonly agentTrace: AgentTraceService;
 		readonly sharing: SharingService;
 		readonly presence: PresenceService;
 		readonly ui: UiService;
@@ -2748,8 +2751,10 @@ export {
 	AgentEventOutcome,
 	AgentRunOutcome,
 	AgentRunSurface,
+	WORKFLOW_RUN_DENIED_ERROR_PREFIX,
 	WorkflowTraceStepStatus,
 	collectWorkflowAgentTools,
+	deniedTraceCapabilities,
 	firstMissingToolCapability,
 	isAgentEventKind,
 	isAgentEventOutcome,
@@ -2757,12 +2762,14 @@ export {
 	isAgentRunSurface,
 	loopStepEvents,
 	sanitizeTraceText,
+	workflowRunDeniedCapabilities,
 	workflowStepEvents,
 } from "./agent-trace";
 export type {
 	AgentRunSummary,
 	AgentTraceEventDraft,
 	AgentTraceEventRecord,
+	AgentTraceService,
 	LoopTraceContext,
 	WorkflowTraceStep,
 } from "./agent-trace";

@@ -80,6 +80,9 @@ export type AgentRunFilter = {
 	surface?: AgentRunSurface;
 	agent?: string;
 	conversationId?: string;
+	/** The persisted `WorkflowRun/v1` entity id back-linked on an automation
+	 *  run — 12c's drill-in join. */
+	workflowRunId?: string;
 	sinceTs?: number;
 	untilTs?: number;
 	outcome?: AgentRunOutcome;
@@ -235,6 +238,10 @@ export class AgentTraceRepository {
 			where.push("conversation_id = ?");
 			params.push(filter.conversationId);
 		}
+		if (filter.workflowRunId !== undefined) {
+			where.push("workflow_run_id = ?");
+			params.push(filter.workflowRunId);
+		}
 		if (filter.sinceTs !== undefined) {
 			where.push("started_at >= ?");
 			params.push(filter.sinceTs);
@@ -292,6 +299,15 @@ export class AgentTraceRepository {
 			"SELECT * FROM agent_events WHERE target_entity_id = ? ORDER BY ts DESC LIMIT ?",
 		).all(entityId, clampLimit(limit, AGENT_EVENTS_PAGE_MAX, 50)) as EventRow[];
 		return rows.map(composeEvent).filter((e): e is AgentTraceEventRecord => e !== null);
+	}
+
+	/** The distinct acting principals with runs in the window — the 12d app
+	 *  filter's option list. Bounded like every projection. */
+	listAgents(limit?: number): readonly string[] {
+		const rows = this.stmt("SELECT DISTINCT agent FROM agent_runs ORDER BY agent ASC LIMIT ?").all(
+			clampLimit(limit, AGENT_RUNS_PAGE_MAX, AGENT_RUNS_PAGE_MAX),
+		) as Array<{ agent: string }>;
+		return rows.map((r) => r.agent);
 	}
 
 	countRuns(): number {

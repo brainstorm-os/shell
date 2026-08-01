@@ -1,0 +1,246 @@
+/* Settings → AI → Agent activity (Agent-12d) — vault-wide run list with
+ * filters + denial-forward styling. Generic field chrome (.settings__field*)
+ * comes from the shared settings.css; this file holds only the activity
+ * surfaces. Everything reads theme tokens — no literal colors. */
+
+.settings__activity-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	margin: var(--space-2) 0 var(--space-3);
+}
+
+/* The first-class denials toggle: a pressed-state filter pill on the shared
+ * control-height scale so it lines up with the selects beside it. */
+.settings__activity-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	height: var(--control-height-md);
+	padding: 0 var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-full);
+	background: var(--color-surface-raised);
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-sm);
+	cursor: pointer;
+	transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.settings__activity-toggle:hover {
+	border-color: var(--color-border-strong);
+}
+
+.settings__activity-toggle:focus-visible {
+	outline: var(--focus-ring-outline);
+	outline-offset: var(--focus-ring-offset-inset);
+}
+
+.settings__activity-toggle[aria-pressed="true"] {
+	color: var(--color-state-error);
+	border-color: color-mix(in srgb, var(--color-state-error) 48%, transparent);
+	background: color-mix(in srgb, var(--color-state-error) 12%, transparent);
+}
+
+.settings__activity-runs {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.settings__activity-run {
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+}
+
+.settings__activity-run[data-denied] {
+	border-color: color-mix(in srgb, var(--color-state-error) 32%, transparent);
+}
+
+.settings__activity-run-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	width: 100%;
+	padding: var(--space-2) var(--space-3);
+	border: none;
+	background: transparent;
+	color: var(--color-text-primary);
+	font-size: var(--text-size-sm);
+	text-align: left;
+	cursor: pointer;
+}
+
+.settings__activity-run-head:hover {
+	background: var(--color-surface-overlay);
+}
+
+.settings__activity-run-head:focus-visible {
+	outline: var(--focus-ring-outline);
+	outline-offset: var(--focus-ring-offset-inset);
+}
+
+.settings__activity-run-agent {
+	font-weight: var(--text-weight-medium);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings__activity-run-surface {
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-xs);
+}
+
+.settings__activity-run-outcome {
+	flex: 0 0 auto;
+	padding: 0 var(--space-2);
+	border-radius: var(--radius-full);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.settings__activity-run-outcome[data-outcome="ok"] {
+	color: var(--color-state-success);
+}
+
+.settings__activity-run-outcome[data-outcome="error"],
+.settings__activity-run-outcome[data-outcome="refused"] {
+	color: var(--color-state-error);
+}
+
+.settings__activity-run-outcome[data-outcome="running"] {
+	color: var(--color-accent-text);
+}
+
+.settings__activity-denial-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	flex: 0 0 auto;
+	padding: 0 var(--space-2);
+	border-radius: var(--radius-full);
+	font-size: var(--text-size-xs);
+	color: var(--color-state-error);
+	background: color-mix(in srgb, var(--color-state-error) 16%, transparent);
+}
+
+.settings__activity-run-time {
+	margin-left: auto;
+	flex: 0 0 auto;
+	color: var(--color-text-tertiary);
+	font-size: var(--text-size-xs);
+}
+
+.settings__activity-run-detail {
+	padding: var(--space-2) var(--space-3) var(--space-3);
+	border-top: var(--border-width) solid var(--color-border-subtle);
+	background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+.settings__activity-events {
+	list-style: none;
+	margin: 0 0 var(--space-2);
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.settings__activity-event {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+	font-size: var(--text-size-sm);
+}
+
+.settings__activity-event--denied {
+	color: var(--color-state-error);
+}
+
+.settings__activity-event-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	flex: 0 0 auto;
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-xs);
+}
+
+.settings__activity-event--denied .settings__activity-event-kind {
+	color: var(--color-state-error);
+}
+
+.settings__activity-event-tool {
+	font-family: var(--text-family-code, monospace);
+	font-size: var(--text-size-xs);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings__activity-event-capability {
+	color: var(--color-state-error);
+	font-size: var(--text-size-xs);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings__activity-entity {
+	flex: 0 0 auto;
+	max-width: 12rem;
+	padding: 0 var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-full);
+	background: transparent;
+	color: var(--color-accent-text);
+	font-size: var(--text-size-xs);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.settings__activity-entity:hover {
+	border-color: var(--color-border-strong);
+}
+
+.settings__activity-entity:focus-visible {
+	outline: var(--focus-ring-outline);
+	outline-offset: var(--focus-ring-offset-inset);
+}
+
+.settings__activity-event-duration {
+	margin-left: auto;
+	flex: 0 0 auto;
+	color: var(--color-text-tertiary);
+	font-size: var(--text-size-xs);
+}
+
+.settings__activity-run-actions {
+	display: flex;
+	gap: var(--space-2);
+}
+
+.settings__activity-entity-history-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin-bottom: var(--space-2);
+}
+
+.settings__activity-entity-history-title {
+	font-weight: var(--text-weight-medium);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -21,6 +21,7 @@ import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Popover } from "../ui/popover";
 import { PopoverBodyPadding, PopoverSize } from "../ui/popover-types";
 import { TextField } from "../ui/text-field";
+import { AgentActivitySection } from "./agent-activity-section";
 import { budgetConsumedFraction, formatCredits, isBudgetExhausted } from "./ai-budget-view";
 import { McpServersSection } from "./mcp-panel";
 import { SettingRow, SettingSelect } from "./settings-controls";
@@ -580,6 +581,9 @@ export function AiPanel() {
 			<RoutingSection settings={settings} onChange={setDefaultProvider} />
 			<McpServersSection />
 			<UsageAndBudgetsSection usage={usage} settings={settings} onSetBudget={setBudget} />
+			{/* Agent-12d — the vault-wide agent activity view rides beside the
+			    usage panel (doc 77 §Surfaces #3). */}
+			<AgentActivitySection />
 		</section>
 	);
 }

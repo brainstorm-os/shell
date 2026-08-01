@@ -206,6 +206,7 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
+import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
@@ -1829,6 +1830,10 @@ void app.whenReady().then(async () => {
 	registerAiSettingsHandlers({
 		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
 	});
+	// Agent-12d — Settings → AI → Agent activity (dashboard-privileged, not
+	// broker; OQ-AO-2 shell-surfaces-only). Bounded projections over the
+	// active vault's agent trace; resolves the session per call.
+	registerAgentActivityHandlers();
 	// 14.6 — Settings → Billing (dashboard-privileged, not broker). The
 	// refresh credential lives in the vault's Tier-2 CredentialStore; the
 	// account link + entitlement cache live in account.db; billing-edge is
@@ -3465,6 +3470,19 @@ void app.whenReady().then(async () => {
 			return session ? await session.agentTraceRepo() : null;
 		},
 		getVaultKey: () => getActiveVaultSession()?.vaultId ?? null,
+		// Agent-12e — surface in-flight runs on the dashboard chip like indexing
+		// or sync (named, cleared on completion). One op id per run.
+		activity: {
+			set: (runId) =>
+				activityStore.set({
+					id: `agent-run:${runId}`,
+					kind: ActivityKind.AgentRun,
+					phase: ActivityPhase.Running,
+					percent: null,
+					detail: null,
+				}),
+			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
+		},
 	});
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,

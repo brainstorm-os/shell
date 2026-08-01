@@ -113,9 +113,13 @@ export function makeAgentTraceServiceHandler(options: AgentTraceServiceOptions):
 				const a = arg(envelope);
 				const repo = await requireRepo();
 				const conversationId = sanitizeTraceText(a.conversationId, AGENT_TRACE_ID_MAX);
+				// 12c — the WorkflowRun/v1 drill-in join. Still scoped to the
+				// caller's own runs: the agent predicate below is non-negotiable.
+				const workflowRunId = sanitizeTraceText(a.workflowRunId, AGENT_TRACE_ID_MAX);
 				const runs = repo.listRuns({
 					agent: envelope.app,
 					...(conversationId ? { conversationId } : {}),
+					...(workflowRunId ? { workflowRunId } : {}),
 					...(optionalNumber(a.beforeStartedAt) !== undefined
 						? { beforeStartedAt: optionalNumber(a.beforeStartedAt) as number }
 						: {}),

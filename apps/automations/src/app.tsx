@@ -20,6 +20,9 @@
 
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import type {
+	AgentRunSummary,
+	AgentTraceEventRecord,
+	AgentTraceService,
 	AutomationsHostStatus,
 	AutomationsService,
 	ReminderDef,
@@ -106,6 +109,10 @@ function filesService(): FilesService | null {
 
 function automationsService(): AutomationsService | null {
 	return getBrainstorm()?.services?.automations ?? null;
+}
+
+function agentTraceService(): AgentTraceService | null {
+	return getBrainstorm()?.services?.agentTrace ?? null;
 }
 
 function now(): number {
@@ -206,6 +213,49 @@ export function AutomationsApp(): ReactElement {
 		if (!badge) return;
 		void badge.set({ count: unseenFailures }).catch(() => undefined);
 	}, [unseenFailures]);
+
+	// ── Agent-12c — join the runs list to the shell-written trace (own-runs
+	// read, no capability). One bounded page of trace summaries keyed by the
+	// back-linked `WorkflowRun/v1` id feeds the passive per-row denial badge;
+	// the drill-in fetches its events on expand.
+	const [traceByRunId, setTraceByRunId] = useState<ReadonlyMap<string, AgentRunSummary>>(
+		() => new Map(),
+	);
+	useEffect(() => {
+		// `runs` is a real dependency: a new WorkflowRun arriving via the live
+		// snapshot re-joins the badge map; no runs, nothing to join.
+		if (!ready || view !== View.Runs || runs.length === 0) return undefined;
+		const trace = agentTraceService();
+		if (!trace) return undefined;
+		let live = true;
+		trace
+			.listRuns({ limit: 100 })
+			.then(({ runs: traceRuns }) => {
+				if (!live) return;
+				const next = new Map<string, AgentRunSummary>();
+				for (const run of traceRuns) {
+					if (run.workflowRunId && !next.has(run.workflowRunId)) next.set(run.workflowRunId, run);
+				}
+				setTraceByRunId(next);
+			})
+			.catch(() => undefined);
+		return () => {
+			live = false;
+		};
+	}, [ready, view, runs]);
+
+	const loadTraceEvents = useCallback(
+		async (workflowRunId: string): Promise<readonly AgentTraceEventRecord[] | null> => {
+			const trace = agentTraceService();
+			if (!trace) return null;
+			const { runs: matches } = await trace.listRuns({ workflowRunId, limit: 1 });
+			const match = matches[0];
+			if (!match) return null;
+			const { events } = await trace.listEvents({ runId: match.id });
+			return events;
+		},
+		[],
+	);
 
 	// ── Boot: the runtime hands services over after first paint, so gate the
 	// live binding on the lifecycle `ready` handshake (fall through immediately
@@ -448,7 +498,14 @@ export function AutomationsApp(): ReactElement {
 					/>
 				);
 			case View.Runs:
-				return <RunsView runs={runs} now={now} />;
+				return (
+					<RunsView
+						runs={runs}
+						now={now}
+						traceByRunId={traceByRunId}
+						loadTraceEvents={loadTraceEvents}
+					/>
+				);
 			default:
 				return (
 					<WorkflowsView

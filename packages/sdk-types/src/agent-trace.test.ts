@@ -8,12 +8,15 @@ import {
 	AgentEventKind,
 	AgentEventOutcome,
 	type AgentTraceEventDraft,
+	WORKFLOW_RUN_DENIED_ERROR_PREFIX,
 	type WorkflowTraceStep,
 	WorkflowTraceStepStatus,
 	collectWorkflowAgentTools,
+	deniedTraceCapabilities,
 	firstMissingToolCapability,
 	loopStepEvents,
 	sanitizeTraceText,
+	workflowRunDeniedCapabilities,
 	workflowStepEvents,
 } from "./agent-trace";
 import type { AgentTool, WorkflowStep } from "./automations";
@@ -288,5 +291,42 @@ describe("collectWorkflowAgentTools", () => {
 			},
 		] as unknown as WorkflowStep[];
 		expect(collectWorkflowAgentTools(steps).map((t) => t.verb)).toEqual(["open", "propose.note"]);
+	});
+});
+
+describe("workflowRunDeniedCapabilities (12c — the denied-run error contract)", () => {
+	it("parses the prefix into named capabilities, deduped + sanitized", () => {
+		expect(
+			workflowRunDeniedCapabilities(
+				`${WORKFLOW_RUN_DENIED_ERROR_PREFIX}entities.write:io.example/Note/v1,ai.use,ai.use`,
+			),
+		).toEqual(["entities.write:io.example/Note/v1", "ai.use"]);
+	});
+
+	it("returns null for anything that is not a capability refusal", () => {
+		expect(workflowRunDeniedCapabilities("boom")).toBeNull();
+		expect(workflowRunDeniedCapabilities(undefined)).toBeNull();
+		expect(workflowRunDeniedCapabilities(42)).toBeNull();
+	});
+
+	it("strips controls and bounds each name (vault data is untrusted on read)", () => {
+		const parsed = workflowRunDeniedCapabilities(
+			`${WORKFLOW_RUN_DENIED_ERROR_PREFIX}a‮b,${"x".repeat(600)}`,
+		);
+		expect(parsed?.[0]).toBe("a b");
+		expect((parsed?.[1] ?? "").length).toBeLessThanOrEqual(AGENT_TRACE_CAPABILITY_MAX);
+	});
+});
+
+describe("deniedTraceCapabilities (the ONE denial shaping both surfaces use)", () => {
+	it("collects unique tool-denied capabilities in first-seen order", () => {
+		const events = [
+			{ kind: AgentEventKind.ToolCall, capability: "entities.read:*" },
+			{ kind: AgentEventKind.ToolDenied, capability: "intents.dispatch:open" },
+			{ kind: AgentEventKind.ToolDenied, capability: null },
+			{ kind: AgentEventKind.ToolDenied, capability: "ai.use" },
+			{ kind: AgentEventKind.ToolDenied, capability: "intents.dispatch:open" },
+		];
+		expect(deniedTraceCapabilities(events)).toEqual(["intents.dispatch:open", "ai.use"]);
 	});
 });

@@ -10,6 +10,7 @@
  */
 
 import type {
+	AgentTraceService,
 	AiService,
 	EntitiesService,
 	Intent,
@@ -41,6 +42,9 @@ export type AgentRuntime = {
 		ai?: AiService;
 		intents?: IntentsService;
 		search?: SearchService;
+		/** Agent-12a/12b — own-run trace demarcation (beginTurn/endTurn) + reads;
+		 *  no capability (the shell scopes to this app). */
+		agentTrace?: AgentTraceService;
 		/** doc 63 — the read-only platform catalog the Agent reads to learn what
 		 *  apps exist, the object types they produce, and their action vocabulary
 		 *  (its capabilities/tools context). Gated by `platform.read`. */
