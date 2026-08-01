@@ -191,6 +191,39 @@ describe("channel proposals (Agent-Teams-3)", () => {
 		expect(settled?.decidedBy).toBe(selfPubkey);
 	});
 
+	it("Agent-12a: a decision fires onDecided with HOST-WRITTEN identifiers, contained on throw", async () => {
+		stageCard();
+		const decisions: unknown[] = [];
+		const traced = makeAgentProposalServiceHandler({
+			getSession: () => session,
+			getSelfPubkey: () => selfPubkey,
+			getLedger: async () => ledgerGranting(new Set([AGENTS_APPROVE_CAPABILITY])),
+			getDekStore: async () => dekStore,
+			installEntityWrap: async (entityId, dek) => {
+				wrapped.push({ entityId, dekIsLive: dek.some((b) => b !== 0) });
+			},
+			newId: () => `ent_new_${++idSeq}`,
+			now: () => 5000,
+			onDecided: (info) => {
+				decisions.push(info);
+				throw new Error("trace disk full"); // must be contained
+			},
+		});
+		const result = (await traced(envelope("approve", [{ messageId: "msg_card" }]))) as {
+			ok: boolean;
+			createdEntityId?: string;
+		};
+		expect(result.ok).toBe(true);
+		expect(decisions).toEqual([
+			{
+				agentFingerprint: agent.def.fingerprint,
+				channelId: CHANNEL,
+				decision: ChannelProposalStatus.Approved,
+				createdEntityId: result.createdEntityId,
+			},
+		]);
+	});
+
 	it("discard settles the card and writes nothing to the vault", async () => {
 		stageCard();
 		const result = (await handler()(envelope("discard", [{ messageId: "msg_card" }]))) as {

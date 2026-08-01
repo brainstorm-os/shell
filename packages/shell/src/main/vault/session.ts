@@ -32,6 +32,7 @@ import { join } from "node:path";
 import { applyShellGrants } from "@brainstorm-os/capabilities/default-grants";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import type { UnlockResult } from "@brainstorm-os/protocol/app-lock-wire-types";
+import { AgentTraceRepository } from "../agents/trace/agent-trace-repo";
 import { AiUsageRepository } from "../ai/ai-usage-repo";
 import { AssetDekStore } from "../assets/asset-dek-store";
 import { AssetStore } from "../assets/asset-store";
@@ -210,6 +211,7 @@ export class VaultSession {
 		entitlements: EntitlementRepository;
 	} | null = null;
 	private cachedAiUsage: AiUsageRepository | null = null;
+	private cachedAgentTrace: AgentTraceRepository | null = null;
 	private cachedCreditLedger: CreditLedgerRepository | null = null;
 	private cachedDashboard: DashboardStore | null = null;
 	private dashboardOpening: Promise<DashboardStore> | null = null;
@@ -305,6 +307,17 @@ export class VaultSession {
 		const db = await this.dataStores.open("account");
 		const repo = new AiUsageRepository(db);
 		this.cachedAiUsage = repo;
+		return repo;
+	}
+
+	/** Lazily open `account.db` and return the agent run/event trace repo
+	 *  (Agent-12a). Cached — the trace recorder touches it per event. */
+	async agentTraceRepo(): Promise<AgentTraceRepository> {
+		this.assertOpen();
+		if (this.cachedAgentTrace) return this.cachedAgentTrace;
+		const db = await this.dataStores.open("account");
+		const repo = new AgentTraceRepository(db);
+		this.cachedAgentTrace = repo;
 		return repo;
 	}
 

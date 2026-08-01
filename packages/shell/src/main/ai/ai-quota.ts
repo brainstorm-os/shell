@@ -104,6 +104,11 @@ export type AiQuotaDeps = {
 	isPlatformBilled?: (providerId: string) => boolean;
 	/** Injected pricer, defaulting to the static rate table. */
 	priceCall?: typeof creditsMicroForUsage;
+	/** Agent-12a (OQ-AO-5): the open agent run for a principal, if any — the
+	 *  trace recorder's `activeRunIdFor`. The id is resolved from the RECORD's
+	 *  own (broker-verified) `appId`, so a call can only ever stamp its own
+	 *  principal's run — never another app's. Absent = no stamping. */
+	getActiveRunId?: (appId: string) => string | null;
 	now?: () => number;
 	windowMs?: number;
 };
@@ -202,6 +207,7 @@ export class AiQuotaService {
 				creditsMicro,
 				outcome: record.outcome,
 				durationMs: record.durationMs,
+				runId: this.deps.getActiveRunId?.(record.appId) ?? null,
 			});
 			await this.debitBundledCredits(record, creditsMicro);
 			this.pruneOpportunistically(repo);

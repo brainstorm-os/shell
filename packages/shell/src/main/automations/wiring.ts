@@ -47,6 +47,7 @@ import {
 } from "./automation-host-designation";
 import {
 	AutomationsHost,
+	type AutomationsTracePort,
 	type ConnectorSyncPort,
 	type ConnectorWebhookRegistration,
 	type EntityChangeSource,
@@ -132,6 +133,10 @@ export type AutomationsWiringDeps = {
 	 *  (shell-internal, hash-only digests). Each is gated per connector app
 	 *  on `network.ingress` at hydrate — fail-closed. */
 	listConnectorWebhooks?: () => Promise<readonly ConnectorWebhookRegistration[]>;
+	/** Agent-12a — the trace recorder port; automation runs emit the one
+	 *  run/event shape under the automations app principal. Optional so
+	 *  existing wirings/tests stay valid; absent = untraced. */
+	trace?: AutomationsTracePort;
 	clock?: () => number;
 	intervalMs?: number;
 	intervals?: IntervalFactory;
@@ -233,8 +238,15 @@ export function buildAutomationsDeployment(deps: AutomationsWiringDeps): Automat
 				...(deps.egress ? { egress: deps.egress } : {}),
 			}),
 		persistRun: async (run) => {
-			await deps.callEntities("create", { type: WORKFLOW_RUN_TYPE_URL, properties: run });
+			const created = (await deps.callEntities("create", {
+				type: WORKFLOW_RUN_TYPE_URL,
+				properties: run,
+			})) as { id?: unknown } | null;
+			// Agent-12a — hand the created run entity's id back so the trace row
+			// can back-link `workflow_run_id` (12c's drill-in join).
+			return typeof created?.id === "string" ? created.id : null;
 		},
+		...(deps.trace ? { trace: deps.trace, traceAgent: AUTOMATIONS_APP_ID } : {}),
 		appCapabilities: () => appGrantCeiling(deps.getLedger),
 		clock,
 		entityChanges: deps.entityChanges,

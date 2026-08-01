@@ -27,6 +27,10 @@ export type AiUsageRow = {
 	creditsMicro: number;
 	outcome: AiUsageOutcome;
 	durationMs: number;
+	/** Agent-12a (OQ-AO-5): the `agent_runs.id` this call executed under, or
+	 *  null outside an agent run. Lets the trace timeline derive model-call
+	 *  steps from THIS table instead of duplicating rows. */
+	runId?: string | null;
 };
 
 /** Window totals for one app — what the budget check compares against. */
@@ -74,8 +78,8 @@ export class AiUsageRepository {
 	/** Record one call. Returns the inserted rowid. */
 	insert(row: AiUsageRow): number {
 		const result = this.stmt(
-			"INSERT INTO ai_usage (ts, app_id, verb, provider, model, prompt_tokens, completion_tokens, total_tokens, credits_micro, outcome, duration_ms) " +
-				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO ai_usage (ts, app_id, verb, provider, model, prompt_tokens, completion_tokens, total_tokens, credits_micro, outcome, duration_ms, run_id) " +
+				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		).run(
 			row.ts,
 			row.appId,
@@ -88,8 +92,47 @@ export class AiUsageRepository {
 			row.creditsMicro,
 			row.outcome,
 			row.durationMs,
+			row.runId ?? null,
 		);
 		return Number(result.lastInsertRowid);
+	}
+
+	/** The model-call slice of one agent run's timeline (Agent-12a): the
+	 *  `ai_usage` rows stamped with `run_id`, oldest first, bounded. */
+	callsForRun(runId: string, limit = 50): readonly (AiUsageRow & { id: number })[] {
+		const rows = this.stmt(
+			"SELECT id, ts, app_id, verb, provider, model, prompt_tokens, completion_tokens, total_tokens, credits_micro, outcome, duration_ms, run_id " +
+				"FROM ai_usage WHERE run_id = ? ORDER BY ts ASC, id ASC LIMIT ?",
+		).all(runId, Math.min(Math.max(1, Math.floor(limit)), 200)) as Array<{
+			id: number;
+			ts: number;
+			app_id: string;
+			verb: string;
+			provider: string;
+			model: string;
+			prompt_tokens: number;
+			completion_tokens: number;
+			total_tokens: number;
+			credits_micro: number;
+			outcome: string;
+			duration_ms: number;
+			run_id: string | null;
+		}>;
+		return rows.map((r) => ({
+			id: Number(r.id),
+			ts: Number(r.ts),
+			appId: r.app_id,
+			verb: r.verb,
+			provider: r.provider,
+			model: r.model,
+			promptTokens: Number(r.prompt_tokens),
+			completionTokens: Number(r.completion_tokens),
+			totalTokens: Number(r.total_tokens),
+			creditsMicro: Number(r.credits_micro),
+			outcome: r.outcome as AiUsageOutcome,
+			durationMs: Number(r.duration_ms),
+			runId: r.run_id,
+		}));
 	}
 
 	/** One app's totals since `sinceTs` (inclusive) — the budget-check read. */

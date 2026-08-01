@@ -141,6 +141,19 @@ describe("AiQuotaService", () => {
 	});
 
 	describe("recordUsage", () => {
+		it("Agent-12a: stamps run_id from the caller's OWN open run, never another principal's", async () => {
+			const runsByApp: Record<string, string> = { [APP]: "run_mine" };
+			const quota = service({
+				getActiveRunId: (appId) => runsByApp[appId] ?? null,
+			});
+			await quota.recordUsage(record());
+			await quota.recordUsage(record({ appId: "io.example.other" }));
+			expect(repo.callsForRun("run_mine").map((r) => r.appId)).toEqual([APP]);
+			// The other app had no open run → NULL, and nothing attributed
+			// io.example.other's call to APP's run.
+			expect(repo.callsForRun("run_mine")).toHaveLength(1);
+		});
+
 		it("writes one priced accounting row per call", async () => {
 			await service().recordUsage(
 				record({ promptTokens: 1_000_000, completionTokens: 0, totalTokens: 1_000_000 }),

@@ -13,6 +13,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
+	AgentEventKind,
+	AgentRunOutcome,
+	AgentRunSurface,
 	MessageRole,
 	ProposeKind,
 	SenderKind,
@@ -47,6 +50,8 @@ import {
 	projectTranscript,
 	speakerLabel,
 } from "./mention-runner";
+import { AgentTraceRecorder } from "./trace/agent-trace-recorder";
+import { AgentTraceRepository } from "./trace/agent-trace-repo";
 
 const CHAT_APP = "io.brainstorm.chat";
 
@@ -164,6 +169,68 @@ describe("mention-runner (Agent-Teams-3)", () => {
 		const replies = channelReplies();
 		expect(replies).toHaveLength(1);
 		expect(replies[0]?.body).toBe(NO_PERMISSION_REPLY);
+	});
+
+	it("Agent-12a: a mention turn emits the ONE trace shape (run + events, chat surface)", async () => {
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		const traceRepo = new AgentTraceRepository(await stores.open("account"));
+		const recorder = new AgentTraceRecorder({
+			getRepo: async () => traceRepo,
+			getVaultKey: () => session.vaultId,
+		});
+		deps.trace = recorder;
+		const created = humanMessage("@Researcher what do we know?", [agent.def.pubkey]);
+		await maybeRunMentionedAgents(deps, created, CHAT_APP);
+
+		const runs = traceRepo.listRuns({ agent: agent.def.fingerprint });
+		expect(runs).toHaveLength(1);
+		expect(runs[0]).toMatchObject({
+			surface: AgentRunSurface.Chat,
+			conversationId: CHANNEL,
+			agent: agent.def.fingerprint,
+			outcome: AgentRunOutcome.Ok,
+			denialCount: 0,
+		});
+		expect(runs[0]?.endedAt).not.toBeNull();
+	});
+
+	it("Agent-12a: without ai.use the trace records the DENIAL naming the missing cap", async () => {
+		const traceRepo = new AgentTraceRepository(await stores.open("account"));
+		const recorder = new AgentTraceRecorder({
+			getRepo: async () => traceRepo,
+			getVaultKey: () => session.vaultId,
+		});
+		deps.trace = recorder;
+		const created = humanMessage("@Researcher hello", [agent.def.pubkey]);
+		await maybeRunMentionedAgents(deps, created, CHAT_APP);
+
+		const runs = traceRepo.listRuns({ agent: agent.def.fingerprint, denialsOnly: true });
+		expect(runs).toHaveLength(1);
+		expect(runs[0]).toMatchObject({ outcome: AgentRunOutcome.Refused, denialCount: 1 });
+		const events = traceRepo.listEvents(runs[0]?.id as string);
+		expect(events.map((e) => [e.kind, e.capability])).toEqual([
+			[AgentEventKind.ToolDenied, "ai.use"],
+		]);
+	});
+
+	it("Agent-12a: a generate failure closes the run as error, and NO prompt bytes land in rows", async () => {
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		const traceRepo = new AgentTraceRepository(await stores.open("account"));
+		const recorder = new AgentTraceRecorder({
+			getRepo: async () => traceRepo,
+			getVaultKey: () => session.vaultId,
+		});
+		deps.trace = recorder;
+		aiReply = async () => {
+			throw new Error("no provider configured");
+		};
+		const created = humanMessage("@Researcher SECRET_CHANNEL_BYTES", [agent.def.pubkey]);
+		await maybeRunMentionedAgents(deps, created, CHAT_APP);
+
+		const runs = traceRepo.listRuns({ agent: agent.def.fingerprint });
+		expect(runs[0]?.outcome).toBe(AgentRunOutcome.Error);
+		const events = traceRepo.listEvents(runs[0]?.id as string);
+		expect(JSON.stringify(events).includes("SECRET_CHANNEL_BYTES")).toBe(false);
 	});
 
 	it("an agent-authored message never actuates another agent (human-in-the-loop)", async () => {

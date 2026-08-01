@@ -73,6 +73,17 @@ export type AgentProposalServiceOptions = {
 	/** Fired after a decision writes rows directly through the repo, so the
 	 *  host re-broadcasts staleness / reindexes. */
 	readonly onWrote?: () => void;
+	/** Agent-12a — the approve/discard gesture chokepoint. Fired post-commit
+	 *  with identifiers only: the PROPOSING agent's fingerprint (host-written,
+	 *  never the caller's claim), the channel, the decision, and the created
+	 *  entity id when approved. Contained — a trace failure never fails the
+	 *  decision. */
+	readonly onDecided?: (info: {
+		agentFingerprint: string;
+		channelId: string;
+		decision: ChannelProposalStatus.Approved | ChannelProposalStatus.Discarded;
+		createdEntityId?: string;
+	}) => void;
 };
 
 export type DecideProposalResult =
@@ -266,6 +277,16 @@ export async function decideChannelProposal(
 	}
 	if (!decided) return { ok: false, reason: "already-decided" };
 	options.onWrote?.();
+	try {
+		options.onDecided?.({
+			agentFingerprint: proposingAgent.def.fingerprint,
+			channelId,
+			decision,
+			...(createdEntityId ? { createdEntityId } : {}),
+		});
+	} catch {
+		// Contained: the trace hook never fails a decided proposal.
+	}
 	return { ok: true, status: decision, ...(createdEntityId ? { createdEntityId } : {}) };
 }
 

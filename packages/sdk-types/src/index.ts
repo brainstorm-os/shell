@@ -2737,6 +2737,36 @@ export type {
 	AgentToolCall,
 } from "./agent-loop";
 
+// ─── Agent trace (Agent-12a — doc 77 agent observability) ───────────────────
+export {
+	AGENT_TRACE_CAPABILITY_MAX,
+	AGENT_TRACE_DETAIL_MAX,
+	AGENT_TRACE_ID_MAX,
+	AGENT_TRACE_SERVICE,
+	AGENT_TRACE_TOOL_MAX,
+	AgentEventKind,
+	AgentEventOutcome,
+	AgentRunOutcome,
+	AgentRunSurface,
+	WorkflowTraceStepStatus,
+	collectWorkflowAgentTools,
+	firstMissingToolCapability,
+	isAgentEventKind,
+	isAgentEventOutcome,
+	isAgentRunOutcome,
+	isAgentRunSurface,
+	loopStepEvents,
+	sanitizeTraceText,
+	workflowStepEvents,
+} from "./agent-trace";
+export type {
+	AgentRunSummary,
+	AgentTraceEventDraft,
+	AgentTraceEventRecord,
+	LoopTraceContext,
+	WorkflowTraceStep,
+} from "./agent-trace";
+
 // ─── Propose / approve (Agent-11) ───────────────────────────────────────────
 //
 // The agent PROPOSES vault artifacts and never persists them: the staging

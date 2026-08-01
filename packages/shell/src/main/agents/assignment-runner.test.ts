@@ -20,6 +20,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
+	AgentRunOutcome,
+	AgentRunSurface,
 	type AiChatMessage,
 	EntityEventVerb,
 	TRIGGER_TYPE_URL,
@@ -51,6 +53,8 @@ import {
 	recordAssignmentRun,
 } from "./assignment-runner";
 import { CHANNEL_PROPOSAL_PROPERTY_KEY } from "./channel-proposals";
+import { AgentTraceRecorder } from "./trace/agent-trace-recorder";
+import { AgentTraceRepository } from "./trace/agent-trace-repo";
 
 const TASK_TYPE = "brainstorm/Task/v1";
 
@@ -189,6 +193,48 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 		expect(recorded).toEqual([
 			{ agent: agent.def.fingerprint, entityId: id, answer: "I looked at it.", staged: 0 },
 		]);
+	});
+
+	it("Agent-12a: an assignment run leaves an automation-surface trace (and traces a denial)", async () => {
+		const traceRepo = new AgentTraceRepository(await stores.open("account"));
+		const recorder = new AgentTraceRecorder({
+			getRepo: async () => traceRepo,
+			getVaultKey: () => session.vaultId,
+		});
+		trigger({
+			entityType: TASK_TYPE,
+			verb: EntityEventVerb.Update,
+			[ASSIGNEE_TRIGGER_CONFIG_KEY]: agent.def.fingerprint,
+		});
+		const id = task(agent.def.fingerprint);
+
+		// No ai.use yet → the run is refused, and the refusal is itself traced.
+		await maybeRunAssignedAgent(
+			{ ...deps(100_000), trace: recorder },
+			{ entityId: id, type: TASK_TYPE, verb: EntityEventVerb.Update },
+		);
+		const refused = traceRepo.listRuns({ agent: agent.def.fingerprint });
+		expect(refused).toHaveLength(1);
+		expect(refused[0]).toMatchObject({
+			surface: AgentRunSurface.Automation,
+			outcome: AgentRunOutcome.Refused,
+			denialCount: 1,
+		});
+		expect(traceRepo.listEvents(refused[0]?.id as string)[0]).toMatchObject({
+			kind: "tool-denied",
+			capability: "ai.use",
+		});
+
+		// Grant it, fire again (past the cooldown) → a clean ok run is traced.
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		await maybeRunAssignedAgent(
+			{ ...deps(100_000 + 60_000), trace: recorder },
+			{ entityId: id, type: TASK_TYPE, verb: EntityEventVerb.Update },
+		);
+		const okRun = traceRepo
+			.listRuns({ agent: agent.def.fingerprint })
+			.find((r) => r.outcome === AgentRunOutcome.Ok);
+		expect(okRun).toBeDefined();
 	});
 
 	it("an entity assigned to SOMEONE ELSE never runs this agent", async () => {

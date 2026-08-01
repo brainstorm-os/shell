@@ -119,6 +119,18 @@ export type EntitiesServiceOptions = {
 	 *  per-keystroke rich-text path) deliberately does NOT emit — only the
 	 *  property-level create/update/delete verbs do. */
 	onEntityChange?: (change: EntityChange) => void;
+	/** Agent-12a — the approve gesture chokepoint: a create carrying a
+	 *  provenance request IS a user approving an agent-proposed artifact
+	 *  (the Agent app's propose→approve path). Fired post-commit with
+	 *  identifiers only (app = the broker-verified caller, the conversation
+	 *  the provenance names, the created entity id) so the trace records a
+	 *  `proposal-approved` event no app can forge for another. Contained
+	 *  like `onEntityChange`. */
+	onAgentProvenanceCreate?: (info: {
+		app: string;
+		conversationId: string;
+		entityId: string;
+	}) => void;
 	/** Asset-B4 — resolve a LOCALLY-stored asset's `kind` (favicon/cover/upload)
 	 *  for the implicit asset-ref bind writer, or null when the asset isn't
 	 *  stored in this vault. Two jobs: it gates whether a `brainstorm://asset/`
@@ -541,6 +553,19 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 						}
 					}
 					emitChange(EntityEventVerb.Create, entityId, type);
+					// Agent-12a — record the approve gesture (contained;
+					// identifiers only — see the option's doc).
+					if (provReq && options.onAgentProvenanceCreate) {
+						try {
+							options.onAgentProvenanceCreate({
+								app,
+								conversationId: provReq.conversationId,
+								entityId,
+							});
+						} catch {
+							// Contained: a trace failure never fails the create.
+						}
+					}
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);

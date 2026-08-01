@@ -1,4 +1,7 @@
 import {
+	AgentEventKind,
+	AgentRunOutcome,
+	AgentRunSurface,
 	type AiChatMessage,
 	EntityEventVerb,
 	StepKind,
@@ -10,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	AutomationsHost,
 	type AutomationsHostPorts,
+	type AutomationsTracePort,
 	type EntityChange,
 	type IntervalFactory,
 	type LoadedWorkflow,
@@ -467,5 +471,103 @@ describe("AutomationsHost — Startup triggers (11b.10)", () => {
 		await new Promise((r) => setTimeout(r, 5));
 		expect(persisted).toHaveLength(1);
 		host.stop();
+	});
+});
+
+describe("AutomationsHost — Agent-12a trace emission", () => {
+	type TraceCall =
+		| { op: "begin"; input: Record<string, unknown> }
+		| { op: "event"; runId: string; input: Record<string, unknown> }
+		| { op: "events"; runId: string; drafts: readonly Record<string, unknown>[] }
+		| { op: "end"; runId: string; outcome?: string }
+		| { op: "attach"; runId: string; workflowRunId: string };
+
+	function fakeTrace() {
+		const calls: TraceCall[] = [];
+		const port: AutomationsTracePort = {
+			beginRun: async (input) => {
+				calls.push({ op: "begin", input: input as unknown as Record<string, unknown> });
+				return "trace_run_1";
+			},
+			event: async (runId, input) => {
+				calls.push({ op: "event", runId, input: input as unknown as Record<string, unknown> });
+			},
+			events: async (runId, drafts) => {
+				calls.push({
+					op: "events",
+					runId,
+					drafts: drafts as unknown as readonly Record<string, unknown>[],
+				});
+			},
+			endRun: async (runId, outcome) => {
+				calls.push({ op: "end", runId, ...(outcome !== undefined ? { outcome } : {}) });
+			},
+			attachWorkflowRunId: async (runId, workflowRunId) => {
+				calls.push({ op: "attach", runId, workflowRunId });
+			},
+		};
+		return { port, calls };
+	}
+
+	it("emits ONE automation-surface run with step events, back-linked to the WorkflowRun entity", async () => {
+		const loaded: LoadedWorkflow = {
+			steps: [notifyStep("n")],
+			capabilities: ["notifications.post"],
+		};
+		const { port, calls } = fakeTrace();
+		const { host } = hostWith({
+			loadWorkflow: vi.fn(async () => loaded),
+			persistRun: vi.fn(async () => "ent_wfr_1"),
+			trace: port,
+			traceAgent: "io.brainstorm.automations",
+		});
+		await host.runWorkflow("wf1", "trig1", null);
+
+		expect(calls[0]).toMatchObject({
+			op: "begin",
+			input: { surface: AgentRunSurface.Automation, agent: "io.brainstorm.automations" },
+		});
+		expect(calls).toContainEqual({
+			op: "attach",
+			runId: "trace_run_1",
+			workflowRunId: "ent_wfr_1",
+		});
+		const eventsCall = calls.find((c) => c.op === "events") as
+			| { drafts: readonly Record<string, unknown>[] }
+			| undefined;
+		expect(eventsCall?.drafts.map((d) => d.tool)).toEqual(["notify:n"]);
+		expect(calls[calls.length - 1]).toMatchObject({ op: "end", outcome: AgentRunOutcome.Ok });
+	});
+
+	it("a capability-refused run emits tool-denied rows NAMING each missing cap, outcome refused", async () => {
+		const loaded: LoadedWorkflow = { steps: [notifyStep("n")], capabilities: [] };
+		const { port, calls } = fakeTrace();
+		const { host } = hostWith({
+			loadWorkflow: vi.fn(async () => loaded),
+			trace: port,
+			traceAgent: "io.brainstorm.automations",
+		});
+		const result = await host.runWorkflow("sneaky", "trig", null);
+		expect(result).toBeNull();
+		const denials = calls.filter((c) => c.op === "event") as Array<{
+			input: Record<string, unknown>;
+		}>;
+		expect(denials.map((d) => d.input.capability)).toEqual(["notifications.post"]);
+		expect(denials[0]?.input.kind).toBe(AgentEventKind.ToolDenied);
+		expect(calls[calls.length - 1]).toMatchObject({
+			op: "end",
+			outcome: AgentRunOutcome.Refused,
+		});
+	});
+
+	it("without a trace port nothing changes (fail-soft optionality)", async () => {
+		const loaded: LoadedWorkflow = {
+			steps: [notifyStep("n")],
+			capabilities: ["notifications.post"],
+		};
+		const { host, persisted } = hostWith({ loadWorkflow: vi.fn(async () => loaded) });
+		const result = await host.runWorkflow("wf1", "trig1", null);
+		expect(result?.status).toBe(WorkflowRunStatus.Succeeded);
+		expect(persisted).toHaveLength(1);
 	});
 });
