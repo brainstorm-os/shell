@@ -28,6 +28,7 @@ import {
 	type AppToolRecord,
 	type AppToolSurface,
 	appToolApplies,
+	isAppToolEffect,
 	isAppToolSurface,
 } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
@@ -105,10 +106,13 @@ async function requireCapability(envelope: Envelope, options: ToolsServiceOption
 /** Does the provider still hold what its declared effect implies? Any ledger
  *  trouble drops the tool (fail-closed) rather than offering it. */
 function providerSatisfiesEffect(ledger: CapabilityLedger | null, tool: AppToolRecord): boolean {
+	// Validate BEFORE indexing: a plain object literal inherits `toString`,
+	// `valueOf`, … so a corrupt row whose effect is an Object.prototype key
+	// would resolve to a FUNCTION whose `.length === 0` — read as "requires
+	// nothing" and skip this filter entirely, defeating the very guard the
+	// repo's raw-effect passthrough exists to feed.
+	if (!isAppToolEffect(tool.effect)) return false;
 	const required = EFFECT_REQUIREMENTS[tool.effect];
-	// An effect outside the vocabulary never satisfies anything — the row is
-	// corrupt, and "unknown" must not read as "needs nothing" (that would make
-	// a mangled byte bypass the whole filter).
 	if (required === undefined) return false;
 	if (required.length === 0) return true;
 	if (!ledger) return false;

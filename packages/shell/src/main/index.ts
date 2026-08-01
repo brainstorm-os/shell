@@ -4361,6 +4361,8 @@ void app.whenReady().then(async () => {
 							assignmentTriggersCache ??= deriveAssignmentTriggers(
 								repo.query({ type: TRIGGER_TYPE_URL }).map((r) => ({
 									id: r.id,
+									// Host-written author — the assignment author gate reads it.
+									createdBy: r.createdBy,
 									properties: r.properties,
 								})),
 							);

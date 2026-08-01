@@ -688,15 +688,29 @@ function TriggerSection({
 						{/* Agent-Teams-5 assignment: the run fires the named agent's loop
 						    (under its own re-checked ceiling) instead of the workflow's
 						    steps. Empty = a plain workflow trigger. */}
+						{/* A saved assignment whose agent is missing from the roster (deleted,
+						    or the roster read was denied) must still SHOW as assigned —
+						    `assigneeAgent` survives an untouched save either way, so a blank
+						    control would misreport live state. Synthesize a row for the
+						    unknown principal rather than dropping it. */}
 						<SelectMenu
 							value={trigger.assigneeAgent}
 							ariaLabel={t("builder.trigger.assignee")}
+							placeholder={t("builder.trigger.assignee.none")}
 							options={[
 								{ value: "", label: t("builder.trigger.assignee.none") },
 								...agents.map((a) => ({
 									value: a.fingerprint,
 									label: a.displayName || a.fingerprint,
 								})),
+								...(trigger.assigneeAgent && !agents.some((a) => a.fingerprint === trigger.assigneeAgent)
+									? [
+											{
+												value: trigger.assigneeAgent,
+												label: t("builder.trigger.assignee.unknown"),
+											},
+										]
+									: []),
 							]}
 							onChange={(assigneeAgent) => onChange({ ...trigger, assigneeAgent })}
 						/>

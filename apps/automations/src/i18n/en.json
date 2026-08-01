@@ -136,6 +136,7 @@
   "builder.trigger.verb": "When",
   "builder.trigger.assignee": "Assign to agent",
   "builder.trigger.assignee.none": "No assignment — run the steps",
+  "builder.trigger.assignee.unknown": "Assigned agent (no longer in your team)",
   "trigger.kind.time": "A schedule",
   "trigger.kind.entity-event": "An entity change",
   "trigger.kind.manual": "Run on demand",

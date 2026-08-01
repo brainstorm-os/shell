@@ -216,6 +216,19 @@ describe("tools.list (Tool-2)", () => {
 		expect(rows).toEqual([]);
 	});
 
+	it("an Object.prototype key as effect is never offered (no inherited-key bypass)", async () => {
+		const db = await stores.open("registry");
+		for (const [i, evil] of ["toString", "valueOf", "constructor"].entries()) {
+			db
+				.prepare(
+					"INSERT INTO app_tools (id, app_id, name, title, description, effect, applies_to, surfaces, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				)
+				.run(`app.io.example.p.t${i}`, "io.example.p", `t${i}`, "T", "d", evil, "[]", '["menu"]', 1);
+		}
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows).toEqual([]);
+	});
+
 	it("rejects an unknown method", async () => {
 		await expect(handler()(envelope("call", [{}]))).rejects.toMatchObject({ name: "Invalid" });
 	});

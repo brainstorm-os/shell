@@ -35,10 +35,12 @@ import {
 	$createTextNode,
 	$getNodeByKey,
 	$getSelection,
+	$isElementNode,
 	$isParagraphNode,
 	$isRangeSelection,
 	$isTextNode,
 	COMMAND_PRIORITY_HIGH,
+	type ElementNode,
 	KEY_ARROW_DOWN_COMMAND,
 	KEY_ARROW_UP_COMMAND,
 	KEY_ENTER_COMMAND,
@@ -330,6 +332,22 @@ export type TransclusionInsertion = {
 	label: string;
 };
 
+/** Is the `!@` host disposable after the hoist (F-478)?
+ *
+ *  ONLY a leaf text container qualifies — a quote or heading that held the
+ *  trigger and nothing else. A host with ELEMENT children is user structure:
+ *  `getTopLevelElement()` of a `!@` in a bullet is the whole LIST, and its
+ *  other items are the user's, empty or not. Anything that is not a text node
+ *  (decorator, line break) is content too. Recursing into children would
+ *  delete a list of empty bullets — the data-loss shape this guards. */
+function isDisposableHost(node: ElementNode): boolean {
+	for (const child of node.getChildren()) {
+		if (!$isTextNode(child)) return false;
+		if (child.getTextContent().trim() !== "") return false;
+	}
+	return true;
+}
+
 /** Replace `!@<query>` in the anchor TextNode with a `TransclusionNode`
  *  and ensure a clean follow-paragraph for the caret to land in. Wraps
  *  its own `editor.update()` so tests can call it directly. Block-level
@@ -370,9 +388,14 @@ export function applyTransclusionInsertion(
 			// sibling after the host; the host keeps any remaining text and is
 			// removed only when the trigger was its entire content.
 			const host = transclusion.getTopLevelElement();
-			if (host && host !== transclusion && !$isParagraphNode(host)) {
+			if (host && $isElementNode(host) && !$isParagraphNode(host)) {
 				host.insertAfter(transclusion);
-				if (host.getTextContent().trim() === "") host.remove();
+				// Remove the host ONLY when it is now structurally empty. Text
+				// emptiness is the wrong test: `getTopLevelElement()` of a `!@` in
+				// a list item is the whole LIST, so an all-empty-bullets list would
+				// be deleted with the user's other items — and a quote holding only
+				// an image reports "" while still holding content.
+				if (isDisposableHost(host)) host.remove();
 			}
 			const parent = transclusion.getParent();
 			if (parent && $isParagraphNode(parent) && parent.getChildrenSize() === 1) {

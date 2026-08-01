@@ -123,6 +123,7 @@
   "builder.trigger.verb": "Wann",
   "builder.trigger.assignee": "Agent zuweisen",
   "builder.trigger.assignee.none": "Keine Zuweisung – Schritte ausführen",
+  "builder.trigger.assignee.unknown": "Zugewiesener Agent (nicht mehr im Team)",
   "trigger.kind.time": "Ein Zeitplan",
   "trigger.kind.entity-event": "Eine Entitätsänderung",
   "trigger.kind.manual": "Auf Abruf ausführen",

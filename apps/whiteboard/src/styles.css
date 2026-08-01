@@ -135,7 +135,13 @@ button {
 	cursor: pointer;
 }
 
-.whiteboard__nav-row:hover {
+/* `:not(--active)` is load-bearing: `:hover` is (0,2,0) and the selected
+ * class is (0,1,0), so WITHOUT the guard hover outranks selection no matter
+ * which is declared last — hovering the open board would swap its accent-soft
+ * fill back to neutral grey, the exact bug POLISH-APP-1 set out to kill. (The
+ * layers list below gets away with source order only because its attribute
+ * selector ties hover's specificity.) */
+.whiteboard__nav-row:hover:not(.whiteboard__nav-row--active) {
 	background: var(--hover);
 }
 

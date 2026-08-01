@@ -123,6 +123,7 @@
   "builder.trigger.verb": "Quand",
   "builder.trigger.assignee": "Assigner à un agent",
   "builder.trigger.assignee.none": "Aucune assignation – exécuter les étapes",
+  "builder.trigger.assignee.unknown": "Agent assigné (ne fait plus partie de l'équipe)",
   "trigger.kind.time": "Une planification",
   "trigger.kind.entity-event": "Un changement d'entité",
   "trigger.kind.manual": "Exécuter à la demande",
