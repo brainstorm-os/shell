@@ -121,6 +121,8 @@
   "builder.trigger.repeat": "Wiederholen",
   "builder.trigger.entityType": "Entitätstyp",
   "builder.trigger.verb": "Wann",
+  "builder.trigger.assignee": "Agent zuweisen",
+  "builder.trigger.assignee.none": "Keine Zuweisung – Schritte ausführen",
   "trigger.kind.time": "Ein Zeitplan",
   "trigger.kind.entity-event": "Eine Entitätsänderung",
   "trigger.kind.manual": "Auf Abruf ausführen",

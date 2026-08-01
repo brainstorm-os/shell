@@ -246,6 +246,26 @@ describe("roster service (Collab-C6)", () => {
 			});
 		});
 
+		it("agents() lists the directory for pickers — principal + display only (Agent-Teams-5)", async () => {
+			const { fp } = await seedAgentRow("Researcher");
+			const handler = makeRosterServiceHandler(options([ROSTER_READ_CAPABILITY]));
+			const agents = (await handler(envelope("agents", [], [ROSTER_READ_CAPABILITY]))) as Array<
+				Record<string, unknown>
+			>;
+			expect(agents).toHaveLength(1);
+			expect(agents[0]).toMatchObject({ fingerprint: fp, displayName: "Researcher" });
+			// Narrow projection: never keys, grants, or persona.
+			expect(Object.keys(agents[0] ?? {}).sort()).toEqual(["displayName", "fingerprint"]);
+		});
+
+		it("agents() fails closed (Denied) without roster.read", async () => {
+			await seedAgentRow("Researcher");
+			const handler = makeRosterServiceHandler(options([]));
+			await expect(handler(envelope("agents", [], []))).rejects.toMatchObject({
+				name: "Denied",
+			});
+		});
+
 		it("an access-record member that IS an agent resolves as Agent kind without the flag", async () => {
 			const { pubkey } = await seedAgentRow("Researcher");
 			await grantMemberOnDisk(env.ydocStore, env.selfKp.secretKey, pubkey, AccessRole.Viewer);

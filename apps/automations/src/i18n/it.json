@@ -121,6 +121,8 @@
   "builder.trigger.repeat": "Ripeti",
   "builder.trigger.entityType": "Tipo di entità",
   "builder.trigger.verb": "Quando",
+  "builder.trigger.assignee": "Assegna a un agente",
+  "builder.trigger.assignee.none": "Nessuna assegnazione: esegui i passaggi",
   "trigger.kind.time": "Una pianificazione",
   "trigger.kind.entity-event": "Una modifica di entità",
   "trigger.kind.manual": "Esegui su richiesta",

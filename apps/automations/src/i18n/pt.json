@@ -121,6 +121,8 @@
   "builder.trigger.repeat": "Repetir",
   "builder.trigger.entityType": "Tipo de entidade",
   "builder.trigger.verb": "Quando",
+  "builder.trigger.assignee": "Atribuir a um agente",
+  "builder.trigger.assignee.none": "Sem atribuição — executar as etapas",
   "trigger.kind.time": "Um agendamento",
   "trigger.kind.entity-event": "Uma alteração de entidade",
   "trigger.kind.manual": "Executar sob demanda",

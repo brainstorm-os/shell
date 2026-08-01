@@ -24,7 +24,8 @@
     "files.read",
     "files.write",
     "automations.run",
-    "ui.badge"
+    "ui.badge",
+    "roster.read"
   ],
   "registrations": {
     "entityTypes": [

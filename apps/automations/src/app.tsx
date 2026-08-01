@@ -147,6 +147,29 @@ export function AutomationsApp(): ReactElement {
 	const canTransferFiles = Boolean(getBrainstorm()?.services?.files);
 	const appCapabilities = getBrainstorm()?.capabilities ?? [];
 
+	// Agent-Teams-5 — the assignee picker's agent directory. Fail-soft: a
+	// vault with no roster grant (or an older shell) just shows "No
+	// assignment"; the picker never blocks the builder.
+	const [vaultAgents, setVaultAgents] = useState<
+		readonly { fingerprint: string; displayName: string }[]
+	>([]);
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const roster = getBrainstorm()?.services?.roster;
+				if (!roster) return;
+				const rows = await roster.agents();
+				if (!cancelled) setVaultAgents(rows);
+			} catch {
+				// capability denied / older shell — leave the picker empty
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	// ── Reactivity: the three lists read off the live whole-vault snapshot
 	// through the ONE shared stack — `useVaultEntities` owns the subscription +
 	// coalescing. A save here, or a write from another device, re-derives the
@@ -571,6 +594,7 @@ export function AutomationsApp(): ReactElement {
 				<WorkflowBuilder
 					appCapabilities={appCapabilities}
 					knownTriggerTypes={knownTriggerTypes}
+					agents={vaultAgents}
 					{...(builder.mode === "edit"
 						? { initialState: builder.state, initialTrigger: builder.trigger }
 						: {})}

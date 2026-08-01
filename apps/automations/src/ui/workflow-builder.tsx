@@ -87,6 +87,9 @@ export type WorkflowBuilderProps = {
 	 *  curated + vault-present, from `triggerTypeSuggestions`. Optional so
 	 *  tests/hosts without a vault snapshot still render. */
 	knownTriggerTypes?: readonly string[];
+	/** The vault's agents for the EntityEvent assignee picker (Agent-Teams-5).
+	 *  Empty/omitted renders the picker with only "No assignment". */
+	agents?: readonly { fingerprint: string; displayName: string }[];
 	onClose: () => void;
 	onSave: (result: BuilderResult) => void;
 };
@@ -614,10 +617,12 @@ function TriggerSection({
 	trigger,
 	onChange,
 	knownTypes,
+	agents,
 }: {
 	trigger: BuilderTrigger;
 	onChange: (next: BuilderTrigger) => void;
 	knownTypes: readonly string[];
+	agents: readonly { fingerprint: string; displayName: string }[];
 }): ReactElement {
 	return (
 		<section className="au-builder__section">
@@ -676,6 +681,24 @@ function TriggerSection({
 								label: t(`entity.verb.${v}` as AutomationsI18nKey),
 							}))}
 							onChange={(verb) => onChange({ ...trigger, verb })}
+						/>
+					</div>
+					<div className="au-field">
+						<span className="au-field__label">{t("builder.trigger.assignee")}</span>
+						{/* Agent-Teams-5 assignment: the run fires the named agent's loop
+						    (under its own re-checked ceiling) instead of the workflow's
+						    steps. Empty = a plain workflow trigger. */}
+						<SelectMenu
+							value={trigger.assigneeAgent}
+							ariaLabel={t("builder.trigger.assignee")}
+							options={[
+								{ value: "", label: t("builder.trigger.assignee.none") },
+								...agents.map((a) => ({
+									value: a.fingerprint,
+									label: a.displayName || a.fingerprint,
+								})),
+							]}
+							onChange={(assigneeAgent) => onChange({ ...trigger, assigneeAgent })}
 						/>
 					</div>
 				</>
@@ -969,6 +992,7 @@ export function WorkflowBuilder(props: WorkflowBuilderProps): ReactElement {
 					trigger={trigger}
 					onChange={setTrigger}
 					knownTypes={props.knownTriggerTypes ?? SUGGESTED_TRIGGER_TYPES}
+					agents={props.agents ?? []}
 				/>
 
 				<section className="au-builder__section">

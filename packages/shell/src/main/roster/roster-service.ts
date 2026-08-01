@@ -235,11 +235,36 @@ async function handleSetSelf(
 	};
 }
 
+/** The vault's Agent/v1 directory, projected for pickers (Agent-Teams-5
+ *  assignment UI). Deliberately narrow: principal + display fields only —
+ *  no pubkeys, no grants, no persona. Same capability as `members`, which
+ *  already exposes the same rows channel-scoped with `includeAgents`. */
+async function handleAgents(
+	envelope: Envelope,
+	options: RosterServiceOptions,
+): Promise<Array<{ fingerprint: string; displayName: string; avatarRef?: string }>> {
+	await requireCapability(envelope, options, ROSTER_READ_CAPABILITY);
+	const session = requireSession(options);
+	const db = await session.dataStores.open("entities");
+	const repo = new EntitiesRepository(db);
+	const out: Array<{ fingerprint: string; displayName: string; avatarRef?: string }> = [];
+	for (const agent of readAgentMembers(repo).values()) {
+		out.push({
+			fingerprint: agent.fingerprint,
+			displayName: agent.displayName ?? "",
+			...(agent.avatarRef ? { avatarRef: agent.avatarRef } : {}),
+		});
+	}
+	return out;
+}
+
 export function makeRosterServiceHandler(options: RosterServiceOptions): ServiceHandler {
 	return async (envelope: Envelope): Promise<unknown> => {
 		switch (envelope.method) {
 			case "members":
 				return await handleMembers(envelope, options);
+			case "agents":
+				return await handleAgents(envelope, options);
 			case "self":
 				return await handleSelf(envelope, options);
 			case "setSelf":
