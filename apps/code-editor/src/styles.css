@@ -152,11 +152,11 @@ button {
 }
 
 .editor__row:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 }
 
 .editor__row[aria-current="true"] {
-	background: var(--accent-soft, rgba(127, 127, 127, 0.18));
+	background: var(--accent-soft);
 	color: var(--text);
 }
 
@@ -419,7 +419,7 @@ button {
 	height: 1.5em;
 	width: 1ch;
 	border-radius: var(--radius-xs);
-	background: var(--accent-soft, rgba(127, 127, 127, 0.32));
+	background: var(--accent-soft);
 	box-shadow: inset 0 0 0 1px var(--accent);
 	pointer-events: none;
 }
@@ -432,7 +432,7 @@ button {
 	top: 0;
 	height: 1.5em;
 	border-radius: var(--radius-xs);
-	background: var(--accent-soft, rgba(127, 127, 127, 0.24));
+	background: var(--accent-soft);
 	pointer-events: none;
 }
 
@@ -457,7 +457,7 @@ button {
 	position: absolute;
 	top: 0;
 	height: 1.5em;
-	background: var(--accent-soft, rgba(127, 127, 127, 0.24));
+	background: var(--accent-soft);
 	pointer-events: none;
 }
 
@@ -610,7 +610,7 @@ button {
 }
 
 .editor__buffer::selection {
-	background: var(--accent-soft, rgba(127, 127, 127, 0.32));
+	background: var(--accent-soft);
 }
 
 .editor__buffer:focus-visible {
@@ -646,7 +646,7 @@ button {
 	color: var(--text);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-popover, 0 10px 30px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-popover);
 	font-size: var(--text-size-sm);
 	display: flex;
 	flex-direction: column;
@@ -725,7 +725,7 @@ button {
 }
 
 .editor__citation-tooltip__action:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 }
 
 /* ── Empty state ──────────────────────────────────────────────────── */
@@ -757,7 +757,7 @@ button {
 	inset-inline-end: 0;
 	width: 280px;
 	border-inline-start: var(--border-width) solid var(--color-glass-border, var(--border));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
@@ -830,7 +830,7 @@ button {
 }
 
 .editor__ref:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.1));
+	background: var(--hover);
 	border-color: var(--border);
 }
 
@@ -906,7 +906,7 @@ button {
 	justify-content: center;
 	align-items: flex-start;
 	padding-top: 12vh;
-	background: var(--color-dimmer, rgba(0, 0, 0, 0.32));
+	background: var(--color-dimmer);
 }
 
 .editor__quickopen {
@@ -916,7 +916,7 @@ button {
 	flex-direction: column;
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 }
 
@@ -1072,7 +1072,7 @@ button {
 	justify-content: center;
 	align-items: flex-start;
 	padding-top: 8vh;
-	background: var(--color-dimmer, rgba(0, 0, 0, 0.32));
+	background: var(--color-dimmer);
 }
 
 .editor__diff {
@@ -1082,7 +1082,7 @@ button {
 	flex-direction: column;
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 }
 
