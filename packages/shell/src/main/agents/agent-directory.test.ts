@@ -110,6 +110,20 @@ describe("agent-directory (Agent-Teams-1)", () => {
 		expect(grants[0]).toMatchObject({ capability: "entities.read", scope: "brainstorm/Task/v1" });
 	});
 
+	it("a delegation grant (colon-bearing scope) round-trips grant -> ledger -> list (pins the Team-dialog checklist read)", async () => {
+		const alpha = await createAgent(session, { displayName: "Probe Alpha" });
+		const beta = await createAgent(session, { displayName: "Probe Beta" });
+		const grantString = `agents.delegate:${beta.def.fingerprint}`;
+		const result = await grantAgentCapability(session, alpha.def.fingerprint, grantString);
+		expect(result.granted).toBe(true);
+		// The exact check the delegation runner makes:
+		expect(ledger.has(alpha.def.fingerprint, grantString)).toBe(true);
+		// And the exact read the Team dialog's checklist state makes:
+		const grants = await listAgentGrants(session, alpha.def.fingerprint);
+		const delegate = grants.find((g) => g.capability === "agents.delegate");
+		expect(delegate?.scope).toBe(beta.def.fingerprint);
+	});
+
 	it("fail-closes granting to a fingerprint no live agent owns", async () => {
 		const result = await grantAgentCapability(session, "ed25519:00000000deadbeef", "entities.read:*");
 		expect(result).toEqual({ granted: false, reason: "unknown-agent" });
