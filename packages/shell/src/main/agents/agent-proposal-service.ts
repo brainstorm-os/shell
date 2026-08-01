@@ -28,6 +28,8 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import { AGENT_PROVENANCE_PROPERTY_KEY, buildAgentProvenance } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
+import { DekWrapFailurePolicy, createEntityWithDek } from "../entities/create-with-dek";
+import type { EntityDekStore } from "../entities/entity-dek-store";
 import { isShellOwnedEntityType } from "../entities/shell-owned-types";
 import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
 import { EntitiesRepository } from "../storage/entities-repo";
@@ -35,6 +37,7 @@ import { findAgentByFingerprint } from "./agent-directory";
 import type { AgentDirectorySession } from "./agent-directory";
 import {
 	CHANNEL_PROPOSAL_PROPERTY_KEY,
+	type ChannelProposal,
 	ChannelProposalStatus,
 	proposalEntityProperties,
 	readChannelProposal,
@@ -58,6 +61,13 @@ export type AgentProposalServiceOptions = {
 	readonly getSelfPubkey: () => string | null;
 	/** SECURITY — re-checked server-side. Absent → gate skipped (unit tests). */
 	readonly getLedger?: () => Promise<CapabilityLedger | null>;
+	/** The active vault's per-entity DEK store. An approval mints a real DEK for
+	 *  the object it creates, exactly like `entities.create` — without one there
+	 *  is no approval (fail-closed), never a second-class un-shareable row. */
+	readonly getDekStore?: () => Promise<EntityDekStore | null>;
+	/** Stage 10.3a — install this device's member wrap on the approved entity's
+	 *  Y.Doc. Absent in legacy/test contexts. */
+	readonly installEntityWrap?: (entityId: string, dek: Uint8Array, type?: string) => Promise<void>;
 	readonly newId: () => string;
 	readonly now?: () => number;
 	/** Fired after a decision writes rows directly through the repo, so the
@@ -162,34 +172,11 @@ export async function decideChannelProposal(
 	// Pending check and the create straddle an await, and the broker does not
 	// serialize an app's calls — two concurrent approves on one card each saw
 	// Pending and each minted an entity.
-	let createdEntityId: string | undefined;
-	const decided = repo.transaction(() => {
-		const fresh = repo.get(messageId);
-		if (!fresh) return false;
-		const current = readChannelProposal(fresh.properties);
-		if (!current || current.status !== ChannelProposalStatus.Pending) return false;
-
-		if (plan) {
-			const entityId = options.newId();
-			repo.create({
-				id: entityId,
-				type: plan.entityType,
-				createdBy: proposingAgent.def.fingerprint,
-				properties: {
-					...plan.properties,
-					[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(
-						proposingAgent.def.fingerprint,
-						channelId,
-						now,
-						{ proposedBy: proposingAgent.def.fingerprint, approvedBy: approver },
-					),
-				},
-				now,
-				dekId: null,
-			});
-			createdEntityId = entityId;
-		}
-
+	//
+	// The settle is what makes the decision terminal, so it MUST be atomic with
+	// the create — hence the guard + alsoWrite hooks rather than a bare create
+	// followed by an update.
+	const settle = (current: ChannelProposal, createdEntityId?: string): void => {
 		repo.update(
 			messageId,
 			{
@@ -203,8 +190,80 @@ export async function decideChannelProposal(
 			},
 			now,
 		);
-		return true;
-	});
+	};
+	/** Re-read + re-check Pending. Returns the fresh proposal, or null when
+	 *  another call already decided this card. */
+	const stillPending = (): ChannelProposal | null => {
+		const fresh = repo.get(messageId);
+		if (!fresh) return null;
+		const current = readChannelProposal(fresh.properties);
+		return current && current.status === ChannelProposalStatus.Pending ? current : null;
+	};
+
+	let createdEntityId: string | undefined;
+	let decided: boolean;
+	if (plan) {
+		const entityId = options.newId();
+		// Agent-Teams-3 closure (a) — a channel-approved object is a FIRST-CLASS
+		// entity: it is born with its own sealed DEK and this device's member
+		// wrap, through the same seam `entities.create` uses. It used to be
+		// written with `dekId: null`, so it could not be wrapped for sharing until
+		// the next vault open's retro-wrap pass.
+		let pending: ChannelProposal | null = null;
+		const dekStore = await options.getDekStore?.();
+		if (!dekStore) throw makeError("Unavailable", "agent-proposals: no entity DEK store");
+		const created = await createEntityWithDek(
+			{
+				repo,
+				dekStore,
+				...(options.installEntityWrap ? { installEntityWrap: options.installEntityWrap } : {}),
+			},
+			{
+				id: entityId,
+				type: plan.entityType,
+				createdBy: proposingAgent.def.fingerprint,
+				properties: {
+					...plan.properties,
+					[AGENT_PROVENANCE_PROPERTY_KEY]: buildAgentProvenance(
+						proposingAgent.def.fingerprint,
+						channelId,
+						now,
+						{ proposedBy: proposingAgent.def.fingerprint, approvedBy: approver },
+					),
+				},
+				now,
+			},
+			// The user has already been told the object exists — deleting it
+			// because a Y.Doc wrap round-trip failed would be a worse lie than a
+			// missing wrap, and the row still carries a real DEK (so the sync wire
+			// path never sees an ambiguous null-DEK row). Same posture the
+			// retro-wrap pass takes for the identical case.
+			DekWrapFailurePolicy.KeepRow,
+			{
+				guard: () => {
+					pending = stillPending();
+					return pending !== null;
+				},
+				alsoWrite: () => {
+					createdEntityId = entityId;
+					if (pending) settle(pending, entityId);
+				},
+				onWrapFailed: (error) => {
+					console.warn(
+						`[agent-proposals] approved ${entityId} but its member wrap failed: ${error.message}`,
+					);
+				},
+			},
+		);
+		decided = created.ok;
+	} else {
+		decided = repo.transaction(() => {
+			const current = stillPending();
+			if (!current) return false;
+			settle(current);
+			return true;
+		});
+	}
 	if (!decided) return { ok: false, reason: "already-decided" };
 	options.onWrote?.();
 	return { ok: true, status: decision, ...(createdEntityId ? { createdEntityId } : {}) };

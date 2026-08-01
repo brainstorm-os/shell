@@ -12,6 +12,7 @@
  */
 
 import {
+	AGENT_TYPE,
 	MESSAGE_TYPE_URL,
 	type MessageAttachment,
 	type MessageDef,
@@ -29,12 +30,21 @@ export const CHANNEL_TYPE = "io.brainstorm.chat/Channel/v1";
 /** Re-exported for the app + tests so the shared substrate id has one name. */
 export const MESSAGE_TYPE = MESSAGE_TYPE_URL;
 
+/** The `created_by` the shell stamps on rows it authors itself. Host-written —
+ *  no app can set it — which is what makes it a usable trust signal here.
+ *  Mirrors `SHELL_PRINCIPAL` in the main process's `agents/agent-record.ts`. */
+export const SHELL_PRINCIPAL = "shell";
+
 /** The minimal entity shape this module reads — a structural subset of the
  *  SDK `VaultEntity`, so helpers test against plain objects. */
 export type EntityLike = {
 	id: string;
 	type: string;
 	properties: Record<string, unknown>;
+	/** The row's HOST-written `created_by` (the snapshot's `ownerAppId`). An app
+	 *  cannot set it, so it is the only author claim on a message worth trusting
+	 *  — `sender.personRef` is a self-assertion of whichever app wrote the row. */
+	ownerAppId?: string;
 };
 
 export type ChatChannel = {
@@ -135,10 +145,53 @@ function readAuthor(
 	return { authorRef: `anon:${fallbackId}`, authorName: "Someone" };
 }
 
-export function toMessage(entity: EntityLike): ChatMessage {
+/**
+ * The fingerprints of this vault's own agent members — the set a proposal card
+ * must be authored by before it renders as an approvable card.
+ *
+ * The app-side mirror of main's `readTrustedAgentDef` notion, minus the crypto
+ * half (an app has no key primitives; main re-checks the pubkey↔fingerprint
+ * binding on every approve, and refuses otherwise). What this CAN check is the
+ * half that decides honesty: the `Agent/v1` record must be SHELL-authored, so
+ * an app-planted or synced-in record can never vouch for a card.
+ */
+export function trustedAgentAuthors(entities: readonly EntityLike[]): ReadonlySet<string> {
+	const out = new Set<string>();
+	for (const e of entities) {
+		if (e.type !== AGENT_TYPE || e.ownerAppId !== SHELL_PRINCIPAL) continue;
+		const fingerprint = str(e.properties.fingerprint);
+		if (fingerprint) out.add(fingerprint);
+	}
+	return out;
+}
+
+/** Per-call context for {@link toMessage}. An options BAG rather than a
+ *  positional set on purpose: `entities.map(toMessage)` hands the callback an
+ *  index, and a bag degrades that to the fail-closed default instead of
+ *  throwing (or, worse, treating an index as a trust set). */
+export type ToMessageContext = {
+	/** {@link trustedAgentAuthors} — the vault's own agent members. */
+	trustedAgents?: ReadonlySet<string>;
+};
+
+/**
+ * Project a message row. A proposal is attached ONLY when the row's
+ * host-written author is one of `context.trustedAgents`.
+ *
+ * FAIL-CLOSED BY DEFAULT (Agent-Teams-3 closure b): omit the set and no card is
+ * ever produced. A card is an approve button over a privileged main-side write,
+ * and a card that arrived from ANOTHER vault can only ever fail there (inbound
+ * rows never carry a local agent's fingerprint as `created_by`) — rendering the
+ * button anyway is both a UX lie and a phishing surface. The parse itself stays
+ * fail-closed too: a malformed card renders as an ordinary message, whose plain
+ * body already reads honestly on its own.
+ */
+export function toMessage(entity: EntityLike, context?: ToMessageContext): ChatMessage {
 	const author = readAuthor(entity.properties, entity.id);
 	const richBody = str(entity.properties.richBody);
-	const proposal = readChannelProposal(entity.properties);
+	const trusted = context?.trustedAgents;
+	const proposal =
+		trusted?.has(entity.ownerAppId ?? "") === true ? readChannelProposal(entity.properties) : null;
 	return {
 		id: entity.id,
 		channelId: str(entity.properties.conversation),
@@ -161,12 +214,15 @@ export function sortMessages(messages: readonly ChatMessage[]): ChatMessage[] {
 	);
 }
 
-/** The ordered messages of one channel from the live snapshot. */
+/** The ordered messages of one channel from the live snapshot. Resolves the
+ *  trusted-agent author set from the same snapshot, so a proposal card only
+ *  renders for a local agent's own message (see {@link toMessage}). */
 export function channelMessages(entities: readonly EntityLike[], channelId: string): ChatMessage[] {
 	if (!channelId) return [];
+	const trustedAgents = trustedAgentAuthors(entities);
 	const rows = entities
 		.filter((e) => e.type === MESSAGE_TYPE && str(e.properties.conversation) === channelId)
-		.map(toMessage);
+		.map((e) => toMessage(e, { trustedAgents }));
 	return sortMessages(rows);
 }
 

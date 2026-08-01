@@ -74,7 +74,9 @@ export function shapeRecentMessages(
 
 	const messages = entities
 		.filter((e) => e.type === MESSAGE_TYPE && e.deletedAt === null)
-		.map(toMessage)
+		// No trusted-agent context: the widget shows message snippets, never an
+		// approvable card, so it takes `toMessage`'s fail-closed default.
+		.map((e) => toMessage(e))
 		.filter((m) => channelNames.has(m.channelId));
 
 	const rows = sortMessages(messages)

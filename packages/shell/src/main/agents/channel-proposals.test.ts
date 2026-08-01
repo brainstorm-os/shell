@@ -25,9 +25,10 @@ import type { Envelope } from "../../ipc/envelope";
 import { ENVELOPE_PROTOCOL_VERSION, validateEnvelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { CredentialStore } from "../credentials/store";
+import { EntityDekStore } from "../entities/entity-dek-store";
 import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
 import { DataStores } from "../storage/data-stores";
-import { EntitiesRepository } from "../storage/entities-repo";
+import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
 import { type AgentDirectorySession, type AgentRecord, createAgent } from "./agent-directory";
 import {
 	AGENTS_APPROVE_CAPABILITY,
@@ -69,6 +70,8 @@ describe("channel proposals (Agent-Teams-3)", () => {
 	let agent: AgentRecord;
 	let selfPubkey: string;
 	let idSeq: number;
+	let dekStore: EntityDekStore;
+	let wrapped: Array<{ entityId: string; dekIsLive: boolean }>;
 
 	beforeEach(async () => {
 		vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-proposals-"));
@@ -82,6 +85,11 @@ describe("channel proposals (Agent-Teams-3)", () => {
 			capabilityLedger: async () => ledger,
 		};
 		repo = new EntitiesRepository(await stores.open("entities"));
+		dekStore = new EntityDekStore(
+			new EntityDeksRepository(await stores.open("entities")),
+			generateSymmetricKey(),
+		);
+		wrapped = [];
 		agent = await createAgent(session, { displayName: "Researcher" });
 		selfPubkey = "self-pubkey-base64";
 		idSeq = 0;
@@ -97,6 +105,12 @@ describe("channel proposals (Agent-Teams-3)", () => {
 			getSession: () => session,
 			getSelfPubkey: () => selfPubkey,
 			getLedger: async () => ledgerGranting(new Set(held)),
+			getDekStore: async () => dekStore,
+			installEntityWrap: async (entityId, dek) => {
+				// The real installer round-trips to the ydoc worker; here we only
+				// record that the wrap was minted from a LIVE (non-zeroed) DEK.
+				wrapped.push({ entityId, dekIsLive: dek.some((b) => b !== 0) });
+			},
 			newId: () => `ent_new_${++idSeq}`,
 			now: () => 5000,
 		});
@@ -316,6 +330,76 @@ describe("channel proposals (Agent-Teams-3)", () => {
 			name: "Unavailable",
 		});
 		expect(repo.query({ type: "brainstorm/Task/v1" })).toHaveLength(0);
+	});
+
+	it("CLOSURE (a): approve mints + seals a per-entity DEK exactly like an entities-service create", async () => {
+		// The slice-2 review left this OPEN: the approve write passed `dekId: null`,
+		// so a channel-approved object could not be wrapped for sharing until the
+		// retro-wrap pass at the next vault open — fail-closed but second-class.
+		stageCard();
+		const result = (await handler()(envelope("approve", [{ messageId: "msg_card" }]))) as {
+			ok: boolean;
+			createdEntityId?: string;
+		};
+		expect(result.ok).toBe(true);
+		const deks = new EntityDeksRepository(await stores.open("entities"));
+		const wrap = deks.getByEntityId(result.createdEntityId ?? "");
+		expect(wrap).not.toBeNull();
+		// Ordinal 1, like any genuine first wrap — NOT the retro-wrap pass's
+		// placeholder 0, which an owner's first share would then have to outrank.
+		expect(wrap?.version).toBe(1);
+		// The member wrap was minted for exactly this entity, from a LIVE DEK.
+		expect(wrapped).toEqual([{ entityId: result.createdEntityId, dekIsLive: true }]);
+		// The DEK unwraps under the vault master key with the entity-bound AAD —
+		// i.e. this is a real key, not a stamped id.
+		const handle = dekStore.open(result.createdEntityId ?? "");
+		expect(handle?.dek).toHaveLength(32);
+		if (handle) dekStore.close(handle.dek);
+	});
+
+	it("CLOSURE (a): a discard mints NO key — only an approval creates an object", async () => {
+		stageCard();
+		await handler()(envelope("discard", [{ messageId: "msg_card" }]));
+		expect(wrapped).toEqual([]);
+	});
+
+	it("CLOSURE (a): a losing concurrent approve leaves no orphan DEK row", async () => {
+		// The guard runs INSIDE the transaction, so a create that loses the
+		// Pending race writes neither the entity row nor its `entity_deks` row.
+		stageCard();
+		const results = await Promise.all([
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+			handler()(envelope("approve", [{ messageId: "msg_card" }])),
+		]);
+		expect(results.filter((r) => (r as { ok: boolean }).ok)).toHaveLength(1);
+		expect(wrapped).toHaveLength(1);
+		const deks = new EntityDeksRepository(await stores.open("entities"));
+		for (let i = 1; i <= idSeq; i++) {
+			const created = repo.get(`ent_new_${i}`);
+			// Every minted id either has a row AND a DEK, or neither.
+			expect(!!deks.getByEntityId(`ent_new_${i}`)).toBe(!!created);
+		}
+	});
+
+	it("CLOSURE (a): no DEK store means no approval — never an unwrappable row", async () => {
+		stageCard();
+		const noDeks = makeAgentProposalServiceHandler({
+			getSession: () => session,
+			getSelfPubkey: () => selfPubkey,
+			getLedger: async () => ledgerGranting(new Set([AGENTS_APPROVE_CAPABILITY])),
+			getDekStore: async () => null,
+			newId: () => "ent_nodek",
+			now: () => 5000,
+		});
+		await expect(noDeks(envelope("approve", [{ messageId: "msg_card" }]))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+		expect(repo.query({ type: "brainstorm/Task/v1" })).toHaveLength(0);
+		// The card is untouched, so a later approval with a live store still works.
+		expect(readChannelProposal(repo.get("msg_card")?.properties ?? {})?.status).toBe(
+			ChannelProposalStatus.Pending,
+		);
 	});
 
 	it("readChannelProposal fails closed on a malformed card", () => {
