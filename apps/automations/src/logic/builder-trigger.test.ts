@@ -31,6 +31,24 @@ describe("builder trigger", () => {
 		expect(BUILDER_TRIGGER_KINDS).toContain(TriggerKind.Webhook);
 	});
 
+	it("carries assigneeAgent through an EntityEvent def round-trip, omitting it when empty (Agent-Teams-5)", () => {
+		const base = emptyBuilderTrigger();
+		base.kind = TriggerKind.EntityEvent;
+		base.entityType = "brainstorm/Task/v1";
+		const principal = `ed25519:${"ab".repeat(32)}`;
+
+		const plain = builderTriggerToDef(base);
+		expect("assigneeAgent" in (plain.config ?? {})).toBe(false);
+
+		base.assigneeAgent = principal;
+		const assigned = builderTriggerToDef(base);
+		expect(assigned.config?.assigneeAgent).toBe(principal);
+
+		const back = builderTriggerFromDef(assigned);
+		expect(back.assigneeAgent).toBe(principal);
+		expect(builderTriggerFromDef(plain).assigneeAgent).toBe("");
+	});
+
 	it("mints a route id + secret when a Webhook trigger is first saved", () => {
 		const def = builderTriggerToDef({ ...emptyBuilderTrigger(), kind: TriggerKind.Webhook });
 		expect(def.kind).toBe(TriggerKind.Webhook);

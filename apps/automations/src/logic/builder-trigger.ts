@@ -96,6 +96,12 @@ export type BuilderTrigger = {
 	/** `EntityEvent`: the watched type + lifecycle verb. */
 	entityType: string;
 	verb: EntityEventVerb;
+	/** `EntityEvent`: optional agent assignment (Agent-Teams-5) — the ledger
+	 *  principal (`ed25519:<hex>`) whose loop runs when the event fires on an
+	 *  entity assigned to it. Empty = a plain workflow trigger. Main re-checks
+	 *  the principal fail-closed (`deriveAssignmentTriggers`); this field only
+	 *  AUTHORS the config key. */
+	assigneeAgent: string;
 	/** `Webhook`: the endpoint's stable route id + rotating secret. Minted on
 	 *  first save; carried across edits so the URL the user pasted stays valid
 	 *  (the secret rotates only on an explicit "rotate"). */
@@ -112,6 +118,7 @@ export function emptyBuilderTrigger(): BuilderTrigger {
 		timePreset: TimePreset.Daily,
 		entityType: "",
 		verb: EntityEventVerb.Create,
+		assigneeAgent: "",
 	};
 }
 
@@ -148,7 +155,11 @@ export function builderTriggerToDef(trigger: BuilderTrigger): TriggerDef {
 		case TriggerKind.EntityEvent:
 			return {
 				kind: TriggerKind.EntityEvent,
-				config: { entityType: trigger.entityType.trim(), verb: trigger.verb },
+				config: {
+					entityType: trigger.entityType.trim(),
+					verb: trigger.verb,
+					...(trigger.assigneeAgent ? { assigneeAgent: trigger.assigneeAgent } : {}),
+				},
 				enabled: true,
 			};
 		case TriggerKind.Webhook: {
@@ -185,6 +196,7 @@ export function builderTriggerFromDef(def: TriggerDef): BuilderTrigger {
 	if (def.kind === TriggerKind.EntityEvent) {
 		if (typeof config.entityType === "string") base.entityType = config.entityType;
 		if (isEntityEventVerb(config.verb)) base.verb = config.verb;
+		if (typeof config.assigneeAgent === "string") base.assigneeAgent = config.assigneeAgent;
 	}
 	if (def.kind === TriggerKind.Time) {
 		const recurrence = config.recurrence as Recurrence | undefined;

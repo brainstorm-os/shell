@@ -1675,6 +1675,19 @@ export type RosterService = {
 	 *  key — an app can only ever write its own vault's profile). Requires
 	 *  `roster.write`. */
 	setSelf(input: RosterProfileInput): Promise<RosterSelf>;
+	/** The vault's `Agent/v1` directory, projected for pickers (Agent-Teams-5
+	 *  assignment UI): ledger principal + display name only — no keys, no
+	 *  grants. Requires `roster.read`. */
+	agents(): Promise<RosterAgent[]>;
+};
+
+/** One vault agent, as pickers see it. `fingerprint` is the canonical ledger
+ *  principal (`ed25519:<hex>`) — the exact string an `assigneeAgent` trigger
+ *  config or an `agents.delegate:` scope stores. */
+export type RosterAgent = {
+	fingerprint: string;
+	displayName: string;
+	avatarRef?: string;
 };
 
 // ─── Agent teams (agents as first-class vault members) ───────────────────────

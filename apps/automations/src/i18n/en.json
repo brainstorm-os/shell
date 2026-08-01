@@ -134,6 +134,8 @@
   "builder.trigger.repeat": "Repeat",
   "builder.trigger.entityType": "Entity type",
   "builder.trigger.verb": "When",
+  "builder.trigger.assignee": "Assign to agent",
+  "builder.trigger.assignee.none": "No assignment — run the steps",
   "trigger.kind.time": "A schedule",
   "trigger.kind.entity-event": "An entity change",
   "trigger.kind.manual": "Run on demand",

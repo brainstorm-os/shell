@@ -111,3 +111,10 @@
 	border-top: var(--border-width) solid var(--color-border-subtle);
 	padding-top: var(--space-3);
 }
+
+/* Secondary explainer line inside a grant group (delegation). */
+.team-section__group-hint {
+	margin: 0 0 var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--color-text-tertiary);
+}

@@ -16,6 +16,7 @@ import {
 	TEAM_READ_GRANTS,
 	TEAM_RUN_GRANTS,
 	agentInitial,
+	delegateGrantFor,
 	heldGrantSet,
 	splitGrant,
 } from "./team-section";
@@ -50,6 +51,17 @@ describe("team-section grant catalog", () => {
 	it("has no duplicate grants across groups", () => {
 		const all = ALL_OPTIONS.map((o) => o.grant);
 		expect(new Set(all).size).toBe(all.length);
+	});
+
+	it("the dynamic delegation grant form passes the same policy for a canonical fingerprint", () => {
+		// The delegation group generates per-target grants rather than reading a
+		// static catalog; the generated form must sit inside the vocabulary too.
+		const canonical = `ed25519:${"ab".repeat(32)}`;
+		expect(isAgentGrantableCapability(delegateGrantFor(canonical))).toBe(true);
+		// The shapes the policy must keep refusing: wildcard and non-canonical.
+		expect(isAgentGrantableCapability("agents.delegate:*")).toBe(false);
+		expect(isAgentGrantableCapability(delegateGrantFor("Named Agent"))).toBe(false);
+		expect(isAgentGrantableCapability(delegateGrantFor(`ED25519:${"AB".repeat(32)}`))).toBe(false);
 	});
 
 	it("labels every option from the en catalog", () => {

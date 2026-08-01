@@ -65,6 +65,14 @@ export const TEAM_RUN_GRANTS: readonly TeamGrantOption[] = [
 	{ grant: "roster.read", labelKey: "shell.settings.team.run.rosterRead" },
 ];
 
+/** The per-target delegation grant string — `agents.delegate:<fingerprint>`.
+ *  Options are DYNAMIC (one per other agent in the directory), unlike the
+ *  static catalogs above; the subset-pinning test validates the generated
+ *  form against the same main-process vocabulary. */
+export function delegateGrantFor(fingerprint: string): string {
+	return `agents.delegate:${fingerprint}`;
+}
+
 /** Split a `service.verb[:scope]` string for the revoke IPC (which takes the
  *  halves the ledger stores). */
 export function splitGrant(grant: string): { capability: string; scope: string | null } {
@@ -154,6 +162,48 @@ function GrantGroup({
 					ariaLabel={t("shell.settings.team.grantToggleAria", { grant: t(option.labelKey) })}
 				/>
 			))}
+		</section>
+	);
+}
+
+/** Per-target delegation toggles — one row per OTHER agent in the directory
+ *  (`agents.delegate:<fingerprint>`; self excluded, wildcard never offered).
+ *  The grant names who this agent may ASK; the child's authority stays
+ *  child∩delegator at spawn, enforced in main — the hint says so. */
+function DelegationGroup({
+	agents,
+	openAgent,
+	held,
+	onToggle,
+}: {
+	agents: readonly ShellAgent[];
+	openAgent: ShellAgent;
+	held: Set<string>;
+	onToggle: (grant: string, next: boolean) => void;
+}) {
+	const targets = agents.filter((a) => a.fingerprint !== openAgent.fingerprint);
+	return (
+		<section className="team-section__grant-group">
+			<h4 className="team-section__group-title">{t("shell.settings.team.group.delegate")}</h4>
+			<p className="team-section__group-hint">{t("shell.settings.team.delegate.hint")}</p>
+			{targets.length === 0 ? (
+				<p className="team-section__group-hint">{t("shell.settings.team.delegate.none")}</p>
+			) : (
+				targets.map((target) => {
+					const grant = delegateGrantFor(target.fingerprint);
+					return (
+						<ToggleRow
+							key={target.fingerprint}
+							title={target.displayName}
+							checked={held.has(grant)}
+							onChange={(next) => onToggle(grant, next)}
+							ariaLabel={t("shell.settings.team.delegate.toggleAria", {
+								name: target.displayName,
+							})}
+						/>
+					);
+				})
+			)}
 		</section>
 	);
 }
@@ -407,6 +457,12 @@ export function TeamSection() {
 						<GrantGroup
 							titleKey="shell.settings.team.group.run"
 							options={TEAM_RUN_GRANTS}
+							held={held}
+							onToggle={(grant, next) => void onToggleGrant(openAgent, grant, next)}
+						/>
+						<DelegationGroup
+							agents={agents}
+							openAgent={openAgent}
 							held={held}
 							onToggle={(grant, next) => void onToggleGrant(openAgent, grant, next)}
 						/>

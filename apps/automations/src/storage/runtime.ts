@@ -13,6 +13,7 @@ import type {
 	AgentTraceService,
 	AutomationsService,
 	IntentsService,
+	RosterService,
 	StorageService,
 	UiService,
 	VaultEntitiesService,
@@ -96,6 +97,9 @@ export type AutomationsBrainstorm = {
 		/** Agent-12c — own-runs trace reads (no capability, OQ-AO-2): the runs
 		 *  drill-in joins its `WorkflowRun/v1` rows to the shell-written trace. */
 		agentTrace?: AgentTraceService;
+		/** Agent-Teams-5 — the vault agent directory for the trigger builder's
+		 *  assignee picker (cap `roster.read`). */
+		roster?: RosterService;
 	} | null;
 	on?(event: LifecycleEvent["type"], handler: LifecycleHandler): { unsubscribe(): void };
 };

@@ -612,5 +612,9 @@
   "shell.settings.privacy.blockedLinks.title": "Heading in Settings → Privacy for the list of links the user chose never to open outside the vault.",
   "shell.settings.privacy.blockedLinks.hint": "Helper text under the blocked-links list explaining that clearing one makes the app ask again.",
   "shell.settings.privacy.blockedLinks.clear": "Button clearing a single blocked-link entry.",
-  "shell.settings.privacy.blockedLinks.clearAll": "Button clearing every blocked-link entry."
+  "shell.settings.privacy.blockedLinks.clearAll": "Button clearing every blocked-link entry.",
+  "shell.settings.team.group.delegate": "Heading for the per-target delegation permission group (who this agent may hand sub-tasks to).",
+  "shell.settings.team.delegate.hint": "Explainer under the Delegation heading: a delegate child runs with the intersection of both agents' grants, never more.",
+  "shell.settings.team.delegate.none": "Placeholder inside the Delegation group when the directory has no other agents.",
+  "shell.settings.team.delegate.toggleAria": "Screen-reader label for one delegation toggle; {name} is the target agent's display name."
 }

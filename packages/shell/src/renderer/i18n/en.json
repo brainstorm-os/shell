@@ -1571,5 +1571,9 @@
   "shell.settings.privacy.blockedLinks.title": "Blocked links",
   "shell.settings.privacy.blockedLinks.hint": "You chose never to open these outside the vault. Clear one to be asked again next time.",
   "shell.settings.privacy.blockedLinks.clear": "Clear",
-  "shell.settings.privacy.blockedLinks.clearAll": "Clear all"
+  "shell.settings.privacy.blockedLinks.clearAll": "Clear all",
+  "shell.settings.team.group.delegate": "Delegation",
+  "shell.settings.team.delegate.hint": "Who this agent may hand a sub-task to. A delegate never gains more authority than both agents already hold.",
+  "shell.settings.team.delegate.none": "No other agents to delegate to yet.",
+  "shell.settings.team.delegate.toggleAria": "Allow delegating to {name}"
 }

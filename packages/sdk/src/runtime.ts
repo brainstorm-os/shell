@@ -98,6 +98,7 @@ import type {
 	PropertiesService,
 	PropertiesSnapshot,
 	PropertyDef,
+	RosterAgent,
 	RosterMember,
 	RosterProfileInput,
 	RosterSelf,
@@ -1134,11 +1135,20 @@ function rosterProxy(bridge: Bridge): RosterService {
 		// Collab-C6 — vault membership joined to self-asserted display profiles.
 		// `roster.read` / `roster.write` are scarce; the broker re-checks them
 		// against the ledger (fail-closed).
-		members: (entityId) =>
-			callService<RosterMember[]>(bridge, "roster", "members", [entityId], ["roster.read"]),
+		// The opts bag must ride along — dropping it silently disabled
+		// `includeAgents` for every caller (the chat typeahead's agent rows).
+		members: (entityId, opts) =>
+			callService<RosterMember[]>(
+				bridge,
+				"roster",
+				"members",
+				opts === undefined ? [entityId] : [entityId, opts],
+				["roster.read"],
+			),
 		self: () => callService<RosterSelf>(bridge, "roster", "self", [], ["roster.read"]),
 		setSelf: (input: RosterProfileInput) =>
 			callService<RosterSelf>(bridge, "roster", "setSelf", [input], ["roster.write"]),
+		agents: () => callService<RosterAgent[]>(bridge, "roster", "agents", [], ["roster.read"]),
 	};
 }
 
