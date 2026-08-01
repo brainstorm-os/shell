@@ -272,7 +272,7 @@ body.is-resizing .tasks-resize {
 }
 
 .task-row__subtasks[data-complete="true"] {
-	color: var(--ok, #5fa87d);
+	color: var(--ok);
 }
 
 /* Blocked / dependencies (9.14.8). The BLOCKED BY section carries the same
@@ -293,8 +293,8 @@ body.is-resizing .tasks-resize {
 	border-radius: var(--radius-sm);
 	font-size: var(--text-size-sm);
 	font-weight: var(--text-weight-medium, 500);
-	color: var(--danger, #dd6058);
-	background: color-mix(in srgb, var(--danger, #dd6058) 14%, transparent);
+	color: var(--danger);
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
 	white-space: nowrap;
 }
 
@@ -310,8 +310,8 @@ body.is-resizing .tasks-resize {
 }
 
 .tasks-detail__dep-remove:hover {
-	color: var(--danger, #dd6058);
-	background: color-mix(in srgb, var(--danger, #dd6058) 12%, transparent);
+	color: var(--danger);
+	background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .tasks-detail__dep-add {
@@ -615,14 +615,14 @@ body.is-resizing .tasks-resize {
 	font-weight: var(--text-weight-medium, 500);
 	text-align: left;
 	cursor: pointer;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--shadow-sm);
 	transition: filter 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 
 .tasks-timeline__bar:hover {
 	filter: brightness(1.06);
 	transform: translateY(-1px);
-	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.24);
+	box-shadow: var(--shadow-md);
 }
 
 .tasks-timeline__bar[data-state="done"] {
@@ -773,7 +773,7 @@ body.is-resizing .tasks-resize {
 
 .tasks-detail__comment-remove:hover {
 	opacity: 1;
-	color: var(--danger, #dd6058);
+	color: var(--danger);
 }
 
 .tasks-detail__comment-body {
@@ -898,8 +898,8 @@ body.is-resizing .tasks-resize {
 }
 
 .task-row__time[data-over="true"] {
-	color: var(--danger, #dd6058);
-	background: color-mix(in srgb, var(--danger, #dd6058) 12%, transparent);
+	color: var(--danger);
+	background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 /* Repeat / recurrence section (9.14.12). */

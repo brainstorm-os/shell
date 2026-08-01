@@ -284,20 +284,26 @@ const GROUP_AXIS_ICON: Record<UpcomingGrouping, IconName> = {
 	[UpcomingGrouping.Tags]: IconName.Tag,
 };
 
-/** The "Group by ▾" header control — a button that opens the shared anchored
- *  menu listing every grouping axis, the active one checked. Replaces the old
- *  hardcoded Date↔Assignee toggle: every axis is a one-click choice. */
+/** The "Group by ▾" header control — wears the shared `.bs-select` face
+ *  (the POLISH-DSN-4 owner call: one menu-trigger face per toolbar; Files +
+ *  Contacts already converted) and opens the shared anchored menu listing
+ *  every grouping axis, the active one checked. */
 function renderGroupByPicker(
 	active: UpcomingGrouping,
 	onSet: (grouping: UpcomingGrouping) => void,
 ): HTMLElement {
 	const button = document.createElement("button");
 	button.type = "button";
-	button.className = "tasks-surface__toggle tasks-surface__toggle--icon";
+	button.className = "bs-select bs-select--sm tasks-surface__picker";
+	button.setAttribute("aria-haspopup", "menu");
 	button.appendChild(createIconElement(GROUP_AXIS_ICON[active], { size: 14 }));
 	const label = document.createElement("span");
+	label.className = "bs-select__value";
 	label.textContent = t("tasks.header.groupBy", { axis: t(GROUP_LABEL_KEY[active]) });
 	button.appendChild(label);
+	const caret = createIconElement(IconName.CaretDown, { size: 12 });
+	caret.classList.add("bs-select__caret");
+	button.appendChild(caret);
 	button.addEventListener("click", () => {
 		const rect = button.getBoundingClientRect();
 		openAnchoredMenu(
@@ -334,16 +340,21 @@ const SORT_ICON: Record<TaskSort, IconName> = {
 };
 
 /** The "Sort ▾" header control — present on every list surface. Mirrors the
- *  group-by picker: a leading glyph + label trigger opening the shared
- *  anchored menu, each sort key one click, the active one marked. */
+ *  group-by picker: the shared `.bs-select` face (POLISH-DSN-4), a leading
+ *  glyph, and the shared anchored menu with the active key marked. */
 function renderSortPicker(active: TaskSort, onSet: (sort: TaskSort) => void): HTMLElement {
 	const button = document.createElement("button");
 	button.type = "button";
-	button.className = "tasks-surface__toggle tasks-surface__toggle--icon";
+	button.className = "bs-select bs-select--sm tasks-surface__picker";
+	button.setAttribute("aria-haspopup", "menu");
 	button.appendChild(createIconElement(SORT_ICON[active], { size: 14 }));
 	const label = document.createElement("span");
+	label.className = "bs-select__value";
 	label.textContent = t("tasks.header.sortBy", { key: t(SORT_LABEL_KEY[active]) });
 	button.appendChild(label);
+	const caret = createIconElement(IconName.CaretDown, { size: 12 });
+	caret.classList.add("bs-select__caret");
+	button.appendChild(caret);
 	button.addEventListener("click", () => {
 		const rect = button.getBoundingClientRect();
 		openAnchoredMenu(
