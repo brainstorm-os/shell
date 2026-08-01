@@ -419,7 +419,7 @@ body.is-resizing .fd-resize {
 
 .invoices__export {
 	background: var(--accent);
-	color: #fff;
+	color: var(--accent-fg);
 	border-color: transparent;
 }
 
@@ -681,10 +681,10 @@ body.is-resizing .fd-resize {
 	overflow-y: auto;
 	margin: var(--space-4);
 	padding: 40px;
-	background: #fff;
-	color: #111;
+	background: #fff; /* design-ok: the form-preview PAPER sheet — printable page, white in both themes */
+	color: #111; /* design-ok: ink on the paper sheet — theme-independent */
 	border-radius: var(--radius-sm);
-	box-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
+	box-shadow: var(--shadow-md);
 }
 
 /* Section + page-element cards (8.10.3). They share `.fd-field-card`'s box

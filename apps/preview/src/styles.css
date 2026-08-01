@@ -341,7 +341,7 @@ button {
 	bottom: 0;
 	width: 320px;
 	border-inline-start: var(--border-width) solid var(--color-glass-border, var(--border));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
@@ -544,11 +544,11 @@ button {
 }
 
 .preview-image-hud__btn:hover {
-	background: var(--hover, rgba(127, 127, 127, 0.16));
+	background: var(--hover);
 }
 
 .preview-image-hud__btn:focus-visible {
-	outline: 2px solid var(--accent, #6c8cff);
+	outline: 2px solid var(--accent);
 	outline-offset: -2px;
 }
 
@@ -600,7 +600,7 @@ button {
 .preview-pdf-canvas {
 	display: block;
 	border-radius: var(--radius-xs);
-	background: #fff;
+	background: #fff; /* design-ok: PDF pages composite on white — page content, not chrome */
 	box-shadow: var(--shadow-popover);
 }
 
@@ -829,7 +829,7 @@ button {
 	align-items: flex-end;
 	padding: var(--space-4) var(--space-2);
 	background: var(--bg-elev);
-	border-inline-end: var(--border-width) solid var(--color-border-subtle, rgba(127, 127, 127, 0.2));
+	border-inline-end: var(--border-width) solid var(--color-border-subtle);
 	color: var(--text-dim);
 	user-select: none;
 	text-align: end;
@@ -1056,7 +1056,7 @@ button {
 	justify-content: center;
 	border-radius: 50%;
 	color: var(--accent);
-	background: var(--accent-soft, rgba(127, 127, 127, 0.14));
+	background: var(--accent-soft);
 }
 
 .preview-audio__name {
