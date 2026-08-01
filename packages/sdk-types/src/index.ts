@@ -2246,6 +2246,23 @@ export { TAB_ICON_NONE, emojiFaviconUrl, tabFaviconUrl } from "./tab-identity";
  * . Renderer + curated gradient set +
  * id-seeded fallback live in `@brainstorm-os/sdk/entity-cover`.
  */
+export {
+	APP_TOOLS_PER_APP_MAX,
+	APP_TOOL_DESCRIPTION_MAX,
+	APP_TOOL_NAME_RE,
+	APP_TOOL_TITLE_MAX,
+	AppToolEffect,
+	AppToolSurface,
+	CURATED_INTENT_VERBS,
+	RESERVED_APP_TOOL_NAMES,
+	appToolApplies,
+	appToolId,
+	isAppToolEffect,
+	isAppToolSurface,
+	normalizeAppTool,
+	validateAppTool,
+} from "./app-tools";
+export type { AppToolRecord, AppToolRegistration, AppToolValidation } from "./app-tools";
 export { CoverKind } from "./cover";
 export type { Cover, CoverFocal } from "./cover";
 

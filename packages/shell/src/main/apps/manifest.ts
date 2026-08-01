@@ -35,10 +35,14 @@
  */
 
 import {
+	APP_TOOLS_PER_APP_MAX,
 	type AppLayoutManifestEntry,
+	type AppToolRegistration,
+	CURATED_INTENT_VERBS,
 	type LayoutContext,
 	isHardBlockedScheme,
 	validateAppLayouts,
+	validateAppTool,
 } from "@brainstorm-os/sdk-types";
 import { normalizeChord } from "../shortcuts/chord";
 import { compareDottedVersions } from "../util/schema-version";
@@ -108,21 +112,9 @@ export type WidgetRegistration = {
  * Curated intent-verb namespace per.
  * Apps cannot invent new verbs at runtime; the shell ships the namespace.
  */
-export const INTENT_VERBS = [
-	"open",
-	"insert",
-	"share",
-	"convert",
-	"export",
-	"import",
-	"process",
-	"compose",
-	"quick-look",
-	"move",
-	"send",
-	"reply",
-	"forward",
-] as const;
+/** The curated verb namespace. Single source of truth lives in sdk-types so
+ *  the app-tools reserved-name set can never drift from it (Tool-2). */
+export const INTENT_VERBS = CURATED_INTENT_VERBS;
 
 export type IntentVerb = (typeof INTENT_VERBS)[number];
 
@@ -194,6 +186,9 @@ export type AppManifest = {
 		entityTypes?: EntityTypeRegistration[];
 		widgets?: WidgetRegistration[];
 		intents?: IntentRegistration[];
+		/** Tool-2 — typed tools this app provides to other apps / the agent /
+		 *  automations (doc 78). */
+		tools?: AppToolRegistration[];
 	};
 	shortcuts?: ShortcutRegistration[];
 	menus?: MenuRegistration[];
@@ -368,6 +363,38 @@ function validateRegistrations(
 		for (const [i, w] of regs.widgets.entries()) {
 			const r = validateWidget(w, i);
 			if (r) return r;
+		}
+	}
+	if (regs.tools !== undefined) {
+		if (!Array.isArray(regs.tools)) {
+			return { ok: false, reason: "tools must be an array", path: "$.registrations.tools" };
+		}
+		if (regs.tools.length > APP_TOOLS_PER_APP_MAX) {
+			return {
+				ok: false,
+				reason: `at most ${APP_TOOLS_PER_APP_MAX} tools per app`,
+				path: "$.registrations.tools",
+			};
+		}
+		const seenToolNames = new Set<string>();
+		for (const [i, t] of regs.tools.entries()) {
+			const result = validateAppTool(t);
+			if (!result.ok) {
+				return {
+					ok: false,
+					reason: result.reason,
+					path: `$.registrations.tools[${i}]${result.field ? `.${result.field}` : ""}`,
+				};
+			}
+			const name = (t as { name: string }).name;
+			if (seenToolNames.has(name)) {
+				return {
+					ok: false,
+					reason: `duplicate tool.name "${name}"`,
+					path: `$.registrations.tools[${i}].name`,
+				};
+			}
+			seenToolNames.add(name);
 		}
 	}
 	if (regs.intents !== undefined) {
