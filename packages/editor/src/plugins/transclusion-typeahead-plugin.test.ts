@@ -10,6 +10,7 @@ import {
 	TextNode,
 } from "lexical";
 import { describe, expect, it } from "vitest";
+import { $createQuoteNode, QuoteNode } from "@lexical/rich-text";
 import { InlineTransclusionNode } from "../nodes/inline-transclusion-node";
 import { TransclusionNode } from "../nodes/transclusion-node";
 import {
@@ -20,7 +21,7 @@ import {
 function editor(): LexicalEditor {
 	return createHeadlessEditor({
 		namespace: "tr-tt",
-		nodes: [ParagraphNode, TextNode, TransclusionNode, InlineTransclusionNode],
+		nodes: [ParagraphNode, TextNode, QuoteNode, TransclusionNode, InlineTransclusionNode],
 		onError: (e) => {
 			throw e;
 		},
@@ -35,6 +36,21 @@ function seedParagraph(e: LexicalEditor, text: string): string {
 			const t = $createTextNode(text);
 			p.append(t);
 			$getRoot().append(p);
+			key = t.getKey();
+		},
+		{ discrete: true },
+	);
+	return key;
+}
+
+function seedQuote(e: LexicalEditor, text: string): string {
+	let key = "";
+	e.update(
+		() => {
+			const q = $createQuoteNode();
+			const t = $createTextNode(text);
+			q.append(t);
+			$getRoot().append(q);
 			key = t.getKey();
 		},
 		{ discrete: true },
@@ -141,6 +157,32 @@ describe("applyTransclusionInsertion", () => {
 		expect(text.includes("suffix")).toBe(true);
 		expect(text.includes("!@target")).toBe(false);
 		expect(collectTransclusions(state)).toHaveLength(1);
+	});
+
+	it("hoists the block node out of a quote host so deleting the quote cannot take it (F-478)", () => {
+		const e = editor();
+		const textKey = seedQuote(e, "!@target");
+		applyTransclusionInsertion(
+			e,
+			textKey,
+			{ triggerOffset: 0, query: "target" },
+			{ entityId: "n_target", entityType: "T/v1", label: "Target" },
+		);
+		const state = readSerialized(e);
+		expect(collectTransclusions(state)).toHaveLength(1);
+		// The transclusion must be a TOP-LEVEL child of root, never nested
+		// inside the quote — nesting is what death-coupled the two on delete.
+		const rootChildren = (state.root as unknown as { children: { type: string; children?: unknown[] }[] })
+			.children;
+		const topLevelTypes = rootChildren.map((c) => c.type);
+		expect(topLevelTypes).toContain("transclusion");
+		for (const child of rootChildren) {
+			if (child.type !== "quote") continue;
+			const nested = JSON.stringify(child.children ?? []);
+			expect(nested.includes('"transclusion"')).toBe(false);
+		}
+		// The fully-consumed quote host must not linger as an empty block.
+		expect(topLevelTypes).not.toContain("quote");
 	});
 });
 

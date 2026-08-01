@@ -363,6 +363,17 @@ export function applyTransclusionInsertion(
 			// so the user can keep typing without their cursor stranded
 			// inside the (block-level, decorator) transclusion.
 			middle.replace(transclusion);
+			// A `!@` committed inside a quote / heading / list item would
+			// otherwise nest the BLOCK card inside that element — the host
+			// renders as a stray empty block beside the card and deleting it
+			// deletes the card with it (F-478). Hoist the card to a top-level
+			// sibling after the host; the host keeps any remaining text and is
+			// removed only when the trigger was its entire content.
+			const host = transclusion.getTopLevelElement();
+			if (host && host !== transclusion && !$isParagraphNode(host)) {
+				host.insertAfter(transclusion);
+				if (host.getTextContent().trim() === "") host.remove();
+			}
 			const parent = transclusion.getParent();
 			if (parent && $isParagraphNode(parent) && parent.getChildrenSize() === 1) {
 				// The transclusion is the only child of its enclosing paragraph;
