@@ -35,9 +35,5 @@
   "apps/preview/src/styles.css": {
     "colors": 6,
     "fontPx": 0
-  },
-  "apps/tasks/src/styles.css": {
-    "colors": 10,
-    "fontPx": 0
   }
 }
