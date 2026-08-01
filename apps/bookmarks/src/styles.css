@@ -143,7 +143,7 @@ button {
 .bookmarks__resize:hover,
 .bookmarks__resize:focus-visible,
 body.is-resizing .bookmarks__resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 

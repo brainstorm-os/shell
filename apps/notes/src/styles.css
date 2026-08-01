@@ -78,9 +78,9 @@ textarea {
 	 * data, not chrome — never tokenise". This is the `color-scheme`-only
 	 * convention plus three named constants, NOT a reintroduced :root
 	 * theme-alias block. */
-	--notes-media-scrim: rgba(0, 0, 0, 0.6);
-	--notes-media-on-scrim: #fff;
-	--notes-media-matte: #000;
+	--notes-media-scrim: rgba(0, 0, 0, 0.6); /* design-ok: media overlay scrim — user-content surface, never tokenised (see block comment) */
+	--notes-media-on-scrim: #fff; /* design-ok: ink on the media scrim — theme-independent */
+	--notes-media-matte: #000; /* design-ok: media letterbox matte — theme-independent */
 }
 
 /* The grid-template-columns transition above is the TOGGLE-button
@@ -588,7 +588,7 @@ textarea {
 	inset-inline-end: 0;
 	width: var(--notes-props-width, 320px);
 	border-inline-start: var(--border-width) solid var(--color-glass-border, var(--border));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	z-index: 100;
 	transition: transform var(--motion-duration-normal) ease;
@@ -638,7 +638,7 @@ textarea {
 .notes__props-resize:focus-visible,
 body.is-resizing .notes__nav-resize,
 body.is-resizing .notes__props-resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 
