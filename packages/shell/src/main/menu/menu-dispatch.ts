@@ -10,7 +10,8 @@
  *     4. The app's menu handler executes the action.
  *
  * The "internal-intent" lives on a dedicated ipcMain → renderer channel
- * (`menu:invoke`) instead of going through the broker — it's a trusted
+ * (`menu:invoke` — subscribed by the app preload's Tool-1 handler registry
+ * as `menu:<action>` handlers) instead of going through the broker — it's a trusted
  * shell→app message, doesn't need capability checking, and the renderer
  * preload re-exposes it as a `brainstorm.on("menu", ...)` lifecycle-style
  * event in Stage 5b alongside the rest of the lifecycle wiring.

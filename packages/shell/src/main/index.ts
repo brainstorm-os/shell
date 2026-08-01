@@ -352,6 +352,8 @@ import { RestoreEngine } from "./sync/restore-engine";
 import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
+import { AppCallHost } from "./tools/app-call-host";
+import { wireAppCallIpc } from "./tools/wire-app-call";
 import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
 import { getOsBadgeAggregator } from "./ui/os-badge";
@@ -1623,9 +1625,15 @@ void app.whenReady().then(async () => {
 	// bridge), so the bus reads through this ref per dispatch. Fail closed
 	// until it is assigned.
 	let mailServiceApi: MailServiceApi | null = null;
+	// Tool-1 — the shell→app reverse channel. One host per boot; the launcher
+	// mirrors tab attach/detach into it, and the reply channel verifies every
+	// sender through the same identity registry the broker trusts.
+	const appCallHost = new AppCallHost();
+	wireAppCallIpc(appCallHost, workers.context.identities);
 	const launchSetup = createLaunchSetup({
 		mainDir: __dirname,
 		identities: workers.context.identities,
+		appCallHost,
 		// Closing the last visible app window hands focus back to the
 		// dashboard — without this, a fullscreen/Spaces session is left on an
 		// empty black Space after the app window hides.

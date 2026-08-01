@@ -126,6 +126,17 @@ export type AppLauncherOptions = {
 	mainDir: string;
 	appsRepo: AppsRepository;
 	identities: RendererIdentityRegistry;
+	/** Tool-1 seam: mirror tab attach/detach into the `AppCallHost` so the
+	 *  reverse channel always targets a live renderer. Optional — tests and
+	 *  Stage-1 setups run without it. */
+	appCalls?: {
+		attach(
+			appId: string,
+			webContentsId: number,
+			sender: { send(channel: string, payload: never): void },
+		): void;
+		detach(appId: string, webContentsId: number): void;
+	};
 	containerFactory: ContainerFactory;
 	tabViewFactory: TabViewFactory;
 	/** Builds the shell tab strip. Omit to run strip-less (tests / Stage 1). */
@@ -406,10 +417,12 @@ export class AppLauncher {
 			reveal: (w) => revealWindow(w),
 			onTabCreated: (_c, tab) => {
 				this.options.identities.register(tab.webContentsId, appId);
+				this.options.appCalls?.attach(appId, tab.webContentsId, tab.view.webContents);
 				this.tabIndex.set(tab.webContentsId, { record, tabId: tab.tabId });
 			},
 			onTabClosed: (_c, tab) => {
 				this.options.identities.unregister(tab.webContentsId);
+				this.options.appCalls?.detach(appId, tab.webContentsId);
 				this.tabIndex.delete(tab.webContentsId);
 			},
 			onChanged: () => this.notifyWindowsChanged(),
@@ -438,6 +451,7 @@ export class AppLauncher {
 		const onClosed = () => {
 			for (const tab of record.container.tabs()) {
 				this.options.identities.unregister(tab.webContentsId);
+				this.options.appCalls?.detach(appId, tab.webContentsId);
 				this.tabIndex.delete(tab.webContentsId);
 			}
 			if (record.chromeWcId !== null) this.chromeIndex.delete(record.chromeWcId);

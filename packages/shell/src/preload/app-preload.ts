@@ -455,6 +455,52 @@ function resolveAnalyticsDeviceId(): string {
 	}
 }
 
+// ── Tool-1: the reverse channel's app side (doc 78) ─────────────────────────
+// The shell calls INTO this renderer on `tools:call`; the app registers a
+// handler per tool name and the reply rides `tools:result` with the same
+// correlation id. Fail-closed: no handler → an error reply (the shell-side
+// host maps it to a Provider failure); a throwing handler replies with a
+// clamped message, never a stack. The SHELL owns the deadline — this side
+// never times anything out.
+type AppToolHandler = (args: unknown) => unknown | Promise<unknown>;
+const toolHandlers = new Map<string, AppToolHandler>();
+
+ipcRenderer.on(
+	"tools:call",
+	(_event, request: { callId?: unknown; tool?: unknown; args?: unknown }) => {
+		const callId = typeof request?.callId === "string" ? request.callId : null;
+		if (callId === null) return;
+		const tool = typeof request?.tool === "string" ? request.tool : "";
+		const handler = toolHandlers.get(tool);
+		if (!handler) {
+			ipcRenderer.send("tools:result", { callId, ok: false, error: `no handler for tool: ${tool}` });
+			return;
+		}
+		void (async () => {
+			try {
+				const value = await handler(request.args);
+				ipcRenderer.send("tools:result", { callId, ok: true, value });
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				ipcRenderer.send("tools:result", { callId, ok: false, error: message.slice(0, 500) });
+			}
+		})();
+	},
+);
+
+// `menu:invoke` — the once-dead trusted shell→app dispatch (designed in the
+// menu router, never subscribed until Tool-1). A menu action `X` dispatches
+// the handler registered as `menu:X` in the same tool registry.
+// Fire-and-forget BY DESIGN: a menu click is a command, not a call — no
+// reply rides back and the shell owns nothing pending.
+ipcRenderer.on("menu:invoke", (_event, payload: { action?: unknown }) => {
+	const action = typeof payload?.action === "string" ? payload.action : "";
+	if (!action) return;
+	const handler = toolHandlers.get(`menu:${action}`);
+	if (!handler) return;
+	void Promise.resolve(handler(undefined)).catch(() => undefined);
+});
+
 const augmentedRuntime = {
 	...runtime,
 	/** Shell version (not app version) — analytics beta gate + shell_version prop. */
@@ -463,6 +509,20 @@ const augmentedRuntime = {
 	analyticsDeviceId: resolveAnalyticsDeviceId(),
 	/** OS platform string for anonymous product analytics (shell preload exposes this too). */
 	platform: process.platform,
+	/** Tool-1 — register this app as the provider for a named tool. One
+	 *  handler per name (a re-register replaces); returns an unsubscribe.
+	 *  Discovery/typing/capabilities are later rungs (Tool-2..4) — this is
+	 *  only the wire. */
+	tools: {
+		handle: (name: string, handler: AppToolHandler): { unsubscribe(): void } => {
+			toolHandlers.set(name, handler);
+			return {
+				unsubscribe: () => {
+					if (toolHandlers.get(name) === handler) toolHandlers.delete(name);
+				},
+			};
+		},
+	},
 	// getSystemVersion isn't guaranteed in the sandboxed `process` subset —
 	// guard so a missing method can't throw and tear down the whole bridge.
 	osVersion: typeof process.getSystemVersion === "function" ? process.getSystemVersion() : "",
