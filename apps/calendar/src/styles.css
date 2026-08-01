@@ -122,7 +122,7 @@ button:focus-visible {
 .calendar-resize:hover,
 .calendar-resize:focus-visible,
 body.is-resizing .calendar-resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 
@@ -420,7 +420,7 @@ body.is-resizing .calendar-resize {
 }
 .cal-year__day[data-density="3"] {
 	background: color-mix(in srgb, var(--accent) 62%, transparent);
-	color: var(--accent-fg, #fff);
+	color: var(--accent-fg);
 }
 
 .cal-year__day[data-today="true"] {
@@ -546,7 +546,7 @@ body.is-resizing .calendar-resize {
 	color: var(--text);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.2));
+	box-shadow: var(--shadow-md);
 }
 
 .cal-month__overflow-popover-header {
@@ -1446,7 +1446,7 @@ body.is-resizing .calendar-resize {
 
 .cal-detail__reminder[data-selected="true"] {
 	background: var(--accent);
-	color: var(--accent-fg, #fff);
+	color: var(--accent-fg);
 	border-color: transparent;
 	font-weight: var(--text-weight-semibold);
 }
@@ -1572,8 +1572,8 @@ body.is-resizing .calendar-resize {
 		135deg,
 		transparent 0,
 		transparent 5px,
-		rgb(0 0 0 / 0.06) 5px,
-		rgb(0 0 0 / 0.06) 7px
+		rgb(0 0 0 / 0.06) 5px, /* design-ok: hatch over the event tint — theme-independent darkening */
+		rgb(0 0 0 / 0.06) 7px /* design-ok: hatch over the event tint — theme-independent darkening */
 	);
 }
 
@@ -1614,7 +1614,7 @@ body.is-resizing .calendar-resize {
 	gap: var(--space-3);
 	padding: var(--space-2) var(--space-2);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.25));
+	box-shadow: var(--shadow-lg);
 }
 
 .cal-selection-bar__count {
@@ -1626,7 +1626,7 @@ body.is-resizing .calendar-resize {
 	appearance: none;
 	border: none;
 	background: var(--accent);
-	color: var(--accent-fg, #fff);
+	color: var(--accent-fg);
 	font: inherit;
 	padding: var(--space-1);
 	border-radius: var(--radius-sm);
