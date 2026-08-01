@@ -4123,6 +4123,14 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return await session.capabilityLedger();
 			},
+			// An approved proposal is a first-class entity: same DEK mint + member
+			// wrap as `entities.create` (Agent-Teams-3 closure).
+			getDekStore: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return await session.entityDekStore();
+			},
+			installEntityWrap,
 			newId: () => `ent_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
 			now: () => Date.now(),
 			onWrote: () => {

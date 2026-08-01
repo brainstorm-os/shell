@@ -22,7 +22,13 @@ vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-type StubEntity = { id: string; type: string; properties: Record<string, unknown> };
+type StubEntity = {
+	id: string;
+	type: string;
+	properties: Record<string, unknown>;
+	/** The row's host-written `created_by` — the snapshot's `ownerAppId`. */
+	ownerAppId?: string;
+};
 
 const created: { type: string; properties: Record<string, unknown> }[] = [];
 
@@ -259,10 +265,31 @@ describe("ChatApp", () => {
 });
 
 describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
-	function proposalMessage(id: string, channelId: string, agentProposal: unknown): StubEntity {
+	const AGENT_FINGERPRINT = "ed25519:beef";
+
+	/** The vault's own agent member — SHELL-authored, so it can vouch for a card
+	 *  (Agent-Teams-3 closure b). */
+	const localAgent: StubEntity = {
+		id: "agt_1",
+		type: "brainstorm/Agent/v1",
+		ownerAppId: "shell",
+		properties: {
+			fingerprint: AGENT_FINGERPRINT,
+			pubkey: "pk-researcher",
+			displayName: "Researcher",
+		},
+	};
+
+	function proposalMessage(
+		id: string,
+		channelId: string,
+		agentProposal: unknown,
+		ownerAppId = AGENT_FINGERPRINT,
+	): StubEntity {
 		return {
 			id,
 			type: MESSAGE_TYPE,
+			ownerAppId,
 			properties: {
 				conversation: channelId,
 				body: "Proposed task: Ship the release notes — approve it to save it.",
@@ -286,7 +313,7 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 	};
 
 	it("renders a card for a pending proposal and approves through the host service", async () => {
-		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		await mount([localAgent, channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
 		expect(container.querySelector('[data-testid="chat-proposal"]')).not.toBeNull();
 		const approve = container.querySelector(
 			'[data-testid="chat-proposal-approve"]',
@@ -298,7 +325,7 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 	});
 
 	it("discards through the host service", async () => {
-		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		await mount([localAgent, channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
 		const discard = container.querySelector(
 			'[data-testid="chat-proposal-discard"]',
 		) as HTMLButtonElement;
@@ -310,6 +337,7 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 
 	it("opens what an approval created through the shared open intent", async () => {
 		await mount([
+			localAgent,
 			channel("c1", "general"),
 			proposalMessage("m1", "c1", {
 				...pendingTask,
@@ -329,6 +357,7 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 
 	it("renders a MALFORMED proposal as an ordinary message — never an approvable card", async () => {
 		await mount([
+			localAgent,
 			channel("c1", "general"),
 			// A kind the channel path cannot honour: main would refuse the approval.
 			proposalMessage("m1", "c1", {
@@ -347,7 +376,7 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 			ok: false,
 			reason: "already-decided",
 		} as unknown as { ok: true; status: string; createdEntityId: string });
-		await mount([channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
+		await mount([localAgent, channel("c1", "general"), proposalMessage("m1", "c1", pendingTask)]);
 		const approve = container.querySelector(
 			'[data-testid="chat-proposal-approve"]',
 		) as HTMLButtonElement;
@@ -357,6 +386,39 @@ describe("ChatApp — agent proposal cards (Agent-Teams-3)", () => {
 		expect(container.querySelector('[data-testid="chat-proposal-error"]')?.textContent).toBe(
 			"Someone already decided this one.",
 		);
+	});
+
+	it("CLOSURE (b): a card whose author is NOT a local agent renders as an ordinary message", async () => {
+		// The phishing surface slice 2 left open: a card synced in from another
+		// vault (or pasted by an app) showed an Approve button that main could
+		// only ever refuse. Now the message's HOST-written author must resolve to
+		// a shell-authored `Agent/v1` record before a card renders at all.
+		for (const foreignAuthor of ["brainstorm", `${AGENT_FINGERPRINT} (received)`, "io.evil.app"]) {
+			await mount([
+				localAgent,
+				channel("c1", "general"),
+				proposalMessage("m1", "c1", pendingTask, foreignAuthor),
+			]);
+			expect(container.querySelector('[data-testid="chat-proposal"]')).toBeNull();
+			expect(container.querySelector('[data-testid="chat-proposal-approve"]')).toBeNull();
+			// The body still reads honestly on its own — no silent drop.
+			expect(container.querySelector(".chat__line")?.textContent).toContain(
+				"Proposed task: Ship the release notes",
+			);
+			act(() => root.unmount());
+			container.remove();
+		}
+		// Re-mount so the shared afterEach has a live root to tear down.
+		await mount([channel("c1", "general")]);
+	});
+
+	it("CLOSURE (b): an Agent/v1 record NOT authored by the shell cannot vouch for a card", async () => {
+		await mount([
+			{ ...localAgent, ownerAppId: "io.evil.app" },
+			channel("c1", "general"),
+			proposalMessage("m1", "c1", pendingTask),
+		]);
+		expect(container.querySelector('[data-testid="chat-proposal"]')).toBeNull();
 	});
 });
 

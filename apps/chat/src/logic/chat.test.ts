@@ -381,6 +381,121 @@ describe("buildMessageProperties", () => {
 	});
 });
 
+describe("proposal cards gate on a TRUSTED LOCAL AGENT author (Agent-Teams-3 closure b)", () => {
+	// The slice-2 review left this OPEN: Chat rendered an approve/discard card
+	// from ANY message carrying the `agentProposal` property, so a card synced in
+	// from another vault showed an Approve button that could only ever fail
+	// (main refuses it — inbound rows never carry a local agent fingerprint) —
+	// a UX lie and a phishing surface. The gate: the message's HOST-written
+	// author (`ownerAppId` = the row's `created_by`) must resolve to a
+	// shell-authored `Agent/v1` record, the renderer-side mirror of main's
+	// `readTrustedAgentDef` notion.
+	const AGENT_FP = "ed25519:00ff";
+	const pendingProposal = {
+		artifact: {
+			id: "prp_1",
+			kind: "task",
+			entityType: "brainstorm/Task/v1",
+			fields: { title: "Ship it" },
+			summary: "Ship it",
+		},
+		status: "pending",
+	};
+
+	function agentRow(ownerAppId: string, fingerprint = AGENT_FP): EntityLike {
+		return {
+			id: `agt_${fingerprint}`,
+			type: "brainstorm/Agent/v1",
+			ownerAppId,
+			properties: { fingerprint, pubkey: "pk", displayName: "Researcher" },
+		};
+	}
+
+	function cardMessage(ownerAppId: string): EntityLike {
+		return {
+			id: "m_card",
+			type: MESSAGE_TYPE,
+			ownerAppId,
+			properties: {
+				conversation: "c1",
+				body: "Proposed task: Ship it — approve it to save it.",
+				createdAt: "2026-08-01T10:00:00.000Z",
+				seq: 1,
+				sender: { kind: SenderKind.Assistant, personRef: "pk", displayName: "Researcher" },
+				agentProposal: pendingProposal,
+			},
+		};
+	}
+
+	it("attaches the proposal when the author is a shell-authored local agent", () => {
+		const rows = channelMessages([agentRow("shell"), cardMessage(AGENT_FP)], "c1");
+		expect(rows[0]?.proposal?.status).toBe("pending");
+	});
+
+	it("a synced-in card (foreign created_by) renders as an ordinary message, never a card", () => {
+		// The production receive path stamps `created_by` from the type prefix
+		// ("brainstorm"), and the dev bridge stamps "<pubkey> (received)" — neither
+		// can ever equal a local agent fingerprint.
+		for (const foreign of ["brainstorm", `${AGENT_FP} (received)`, "io.brainstorm.chat"]) {
+			const rows = channelMessages([agentRow("shell"), cardMessage(foreign)], "c1");
+			expect(rows[0]?.proposal).toBeUndefined();
+			expect(rows[0]?.body).toContain("Proposed task");
+		}
+	});
+
+	it("an Agent/v1 row NOT authored by the shell never vouches for a card", () => {
+		for (const forger of ["io.evil.app", "brainstorm", `${AGENT_FP} (received)`]) {
+			const rows = channelMessages([agentRow(forger), cardMessage(AGENT_FP)], "c1");
+			expect(rows[0]?.proposal).toBeUndefined();
+		}
+	});
+
+	it("a NON-CANONICAL spelling of a trusted fingerprint never matches", () => {
+		// The class that broke an earlier fix on this track: an attacker reaches
+		// for a second spelling of the same value. The comparison is exact, and
+		// the shell writes fingerprints in canonical lowercase hex, so every
+		// variant fails CLOSED (no card) rather than open.
+		for (const variant of [
+			AGENT_FP.toUpperCase(),
+			`${AGENT_FP} `,
+			` ${AGENT_FP}`,
+			`${AGENT_FP} `,
+			AGENT_FP.replace("ed25519:", "ED25519:"),
+			AGENT_FP.replace("ed25519:", "ed25519::"),
+			// A homoglyph — Cyrillic 'е' in "ed25519".
+			AGENT_FP.replace("e", "е"),
+		]) {
+			expect(
+				channelMessages([agentRow("shell"), cardMessage(variant)], "c1")[0]?.proposal,
+			).toBeUndefined();
+			// ...and the mirror: a variant on the AGENT ROW cannot vouch either.
+			expect(
+				channelMessages([agentRow("shell", variant), cardMessage(AGENT_FP)], "c1")[0]?.proposal,
+			).toBeUndefined();
+		}
+	});
+
+	it("a non-canonical status / kind spelling is not an approvable card", () => {
+		for (const bad of [
+			{ ...pendingProposal, status: "Pending" },
+			{ ...pendingProposal, status: "pending " },
+			{ ...pendingProposal, artifact: { ...pendingProposal.artifact, kind: "Task" } },
+			{ ...pendingProposal, artifact: { ...pendingProposal.artifact, kind: "task " } },
+		]) {
+			const row = { ...cardMessage(AGENT_FP) };
+			row.properties = { ...row.properties, agentProposal: bad };
+			expect(channelMessages([agentRow("shell"), row], "c1")[0]?.proposal).toBeUndefined();
+		}
+	});
+
+	it("no Agent/v1 record at all → no card (fail-closed default)", () => {
+		expect(channelMessages([cardMessage(AGENT_FP)], "c1")[0]?.proposal).toBeUndefined();
+		// And a bare toMessage (no trusted set supplied) stays fail-closed too —
+		// the unread/widget projections must never resurrect a card.
+		expect(toMessage(cardMessage(AGENT_FP)).proposal).toBeUndefined();
+	});
+});
+
 describe("buildChannelProperties", () => {
 	it("trims the name and drops an empty topic", () => {
 		expect(buildChannelProperties({ name: "  general ", createdAt: "t" })).toEqual({

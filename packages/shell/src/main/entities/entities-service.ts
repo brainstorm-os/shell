@@ -37,9 +37,10 @@ import type { ServiceHandler } from "../../ipc/broker";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
+import { DekWrapFailurePolicy, createEntityWithDek } from "./create-with-dek";
 import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
 import type { EntityChange } from "./entity-change-emitter";
-import type { EntityDekHandle, EntityDekStore } from "./entity-dek-store";
+import type { EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
 import { rewriteEntityRefs } from "./merge-refs";
 import { isShellOwnedEntityType } from "./shell-owned-types";
@@ -498,59 +499,24 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					throw named("Invalid", `entities.create: ${explicitId} already exists`);
 				}
 				const entityId = explicitId ?? options.newId();
-				// Stage 10.1 — forward-allocate the dekId so the entity row
-				// can stamp `dek_id` in its very first INSERT (no UPDATE),
-				// then write the entity row and the DEK wrap row inside one
-				// SQLite transaction. The FK on `entity_deks.entity_id`
-				// requires the parent to exist first, so the order inside
-				// the txn matters; either write throwing rolls back both,
-				// so a failed wrap never leaves an entity row with a
-				// dangling `dek_id`. The plaintext DEK is zeroed in the
-				// `finally` whether the txn commits or aborts.
-				const dekId = dekStore.nextDekId();
-				let dekHandle: EntityDekHandle | null = null;
-				try {
-					const row = repo.transaction(() => {
-						const created = repo.create({
-							id: entityId,
-							type,
-							properties,
-							createdBy: app,
-							now: clock(),
-							dekId,
-						});
-						dekHandle = dekStore.persist(entityId, dekId);
-						return created;
-					});
-					// Stage 10.3a — install the per-device member wrap on the
-					// entity's Y.Doc *after* the row + DEK are committed, but
-					// while the DEK is still live (zeroed in the finally
-					// below). The wrap is what the wire-path open side reads
-					// to recover the DEK on a paired device; without it a
-					// fresh row would be un-decryptable by any device, even
-					// the one that created it. A throw here rolls the entity
-					// row + DEK row back via `hardDelete` so a half-created
-					// row can't strand. No installer wired = legacy test
-					// context; production binds it at boot.
-					if (options.installEntityWrap && dekHandle) {
-						try {
-							await options.installEntityWrap(entityId, (dekHandle as EntityDekHandle).dek, type);
-						} catch (error) {
-							// Rollback the freshly-committed row + DEK by
-							// soft-then-hard delete (hardDelete is guarded by
-							// `deleted_at IS NOT NULL`). FK cascade also drops
-							// the `entity_deks` row.
-							try {
-								repo.softDelete(entityId, clock());
-								repo.hardDelete(entityId);
-							} catch {
-								// Best-effort: a rollback failure is logged
-								// but does not mask the original wrap-install
-								// error which is what the caller needs to see.
-							}
-							throw error;
-						}
-					}
+				// Stage 10.1 + 10.3a — the row is born with its sealed per-entity
+				// DEK and this device's member wrap, through the ONE shared seam
+				// the channel-approve path also uses (`create-with-dek.ts`). A
+				// wrap-install failure un-creates the row: nobody has seen it yet,
+				// and the throw below is what the caller needs.
+				{
+					const created = await createEntityWithDek(
+						{
+							repo,
+							dekStore,
+							...(options.installEntityWrap ? { installEntityWrap: options.installEntityWrap } : {}),
+						},
+						{ id: entityId, type, properties, createdBy: app, now: clock() },
+						DekWrapFailurePolicy.RollbackRow,
+					);
+					// No guard is passed, so the create always happens.
+					if (!created.ok) throw named("Unavailable", `entities.create: ${entityId} not created`);
+					const row = created.row;
 					// Y.Doc-first (Phase 2): seed the entity's Y.Doc with its
 					// properties so the doc — not the row — is the source of
 					// truth from birth (the row already holds the same set as
@@ -579,8 +545,6 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
 					return compose(row);
-				} finally {
-					if (dekHandle) dekStore.close((dekHandle as EntityDekHandle).dek);
 				}
 			}
 

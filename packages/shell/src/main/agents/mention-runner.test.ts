@@ -12,7 +12,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { MessageRole, SenderKind, readAgentProvenance } from "@brainstorm-os/sdk-types";
+import {
+	MessageRole,
+	ProposeKind,
+	SenderKind,
+	readAgentProvenance,
+} from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
@@ -27,6 +32,7 @@ import {
 	createAgent,
 	grantAgentCapability,
 } from "./agent-directory";
+import { CHANNEL_PROPOSAL_PROPERTY_KEY } from "./channel-proposals";
 import {
 	CHANNEL_UNTRUSTED_CONTENT_GUIDANCE,
 	DELEGATED_BY_PROPERTY_KEY,
@@ -342,6 +348,53 @@ describe("mention-runner (Agent-Teams-3)", () => {
 		expect(
 			repo.query({ type: MESSAGE_TYPE_URL }).some((r) => r.createdBy === worker.def.fingerprint),
 		).toBe(false);
+	});
+
+	it("CLOSURE (c): the scoped-out propose verbs are STRUCTURALLY unreachable from a channel", async () => {
+		// Slice 2 scoped row / database / code-file proposals out by "never
+		// offering the tool". This probe pins that it is structural, not a UI
+		// omission: the agent holds EVERY grantable propose dispatch (including
+		// `propose-row`, which the starter agents really are granted), and the
+		// model asks for each scoped-out verb by name before settling on a task.
+		// Only the task can stage — the others are refused by the loop's offered-set
+		// re-check, and `dispatchTool` would return null for them anyway.
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		for (const verb of [
+			"propose-task",
+			"propose-note",
+			"propose-row",
+			"propose-database",
+			"propose-code-file",
+		]) {
+			await grantAgentCapability(session, agent.def.fingerprint, `intents.dispatch:${verb}`);
+		}
+		const script = [
+			'{"tool": "propose-row", "args": {"title": "Row"}}',
+			'{"tool": "propose-database", "args": {"name": "DB"}}',
+			'{"tool": "propose-code-file", "args": {"path": "a.ts", "content": "x"}}',
+			'{"tool": "propose-task", "args": {"title": "Ship it"}}',
+		];
+		let turn = 0;
+		aiReply = async () => ({ content: script[turn++] ?? '{"final": "done"}' });
+		const created = humanMessage("@Researcher make me a database", [agent.def.pubkey]);
+		await maybeRunMentionedAgents(deps, created, CHAT_APP);
+
+		// Not one of the scoped-out verbs was ever offered to the model.
+		const systemPrompt = JSON.stringify(
+			(aiEnvelopes[0]?.args[0] as { messages: Array<{ content: string }> }).messages[0]?.content,
+		);
+		expect(systemPrompt).toContain("propose-task");
+		expect(systemPrompt).not.toContain("propose-row");
+		expect(systemPrompt).not.toContain("propose-database");
+		expect(systemPrompt).not.toContain("propose-code-file");
+
+		// And no card of a scoped-out kind exists — the run's ONLY card is the task.
+		const cards = repo
+			.query({ type: MESSAGE_TYPE_URL })
+			.map((r) => r.properties[CHANNEL_PROPOSAL_PROPERTY_KEY])
+			.filter((p): p is Record<string, unknown> => !!p && typeof p === "object");
+		expect(cards).toHaveLength(1);
+		expect((cards[0]?.artifact as { kind: string }).kind).toBe(ProposeKind.Task);
 	});
 
 	it("throttles a caller looping creates into one channel", async () => {
