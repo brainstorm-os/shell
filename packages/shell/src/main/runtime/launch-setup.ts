@@ -36,6 +36,7 @@ import { EntitiesRepository } from "../storage/entities-repo";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { IntentsRepository } from "../storage/registry-repo/intents-repo";
 import { OpenersRepository } from "../storage/registry-repo/openers-repo";
+import type { AppCallHost } from "../tools/app-call-host";
 import { getActiveVaultSession } from "../vault/session";
 import { readSpellcheckDictionary } from "../vault/vault-spellcheck-dictionary-store";
 import {
@@ -67,6 +68,9 @@ export type LaunchSetup = {
 export function createLaunchSetup(args: {
 	mainDir: string;
 	identities: RendererIdentityRegistry;
+	/** Tool-1 — the shell→app reverse-channel host; the launcher mirrors tab
+	 *  attach/detach into it. */
+	appCallHost: AppCallHost;
 	containerFactory?: ContainerFactory;
 	tabViewFactory?: TabViewFactory;
 	chromeViewFactory?: ChromeViewFactory;
@@ -153,6 +157,11 @@ export function createLaunchSetup(args: {
 			mainDir: args.mainDir,
 			appsRepo,
 			identities: args.identities,
+			appCalls: {
+				attach: (appId, webContentsId, sender) =>
+					args.appCallHost.attachApp(appId, webContentsId, sender),
+				detach: (appId, webContentsId) => args.appCallHost.detachApp(appId, webContentsId),
+			},
 			containerFactory,
 			tabViewFactory,
 			chromeViewFactory,
