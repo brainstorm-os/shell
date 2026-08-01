@@ -25,6 +25,7 @@
  */
 
 import { ulid } from "ulid";
+import { isReservedAppId } from "../apps/manifest";
 
 export const TOOLS_CALL_CHANNEL = "tools:call" as const;
 export const TOOLS_RESULT_CHANNEL = "tools:result" as const;
@@ -116,6 +117,10 @@ export class AppCallHost {
 	 *  calls to an older tab settle by timeout, and a same-app reply from
 	 *  any of the app's tabs still verifies (identity is per APP). */
 	attachApp(appId: string, webContentsId: number, sender: AppCallSender): void {
+		// Defence in depth: today the launcher registers identity (which already
+		// refuses reserved ids) before attaching, but a future attach seam must
+		// not be able to make a platform principal callable.
+		if (isReservedAppId(appId)) return;
 		let tabs = this.senders.get(appId);
 		if (!tabs) {
 			tabs = new Map();
@@ -174,7 +179,20 @@ export class AppCallHost {
 			this.pending.set(callId, entry);
 			this.bumpPending(appId, 1);
 		});
-		sender.send(TOOLS_CALL_CHANNEL, { callId, tool, args });
+		try {
+			sender.send(TOOLS_CALL_CHANNEL, { callId, tool, args });
+		} catch {
+			// A renderer destroyed between attach and send (teardown races the
+			// call): settle the structured failure this class promises rather
+			// than throwing a raw TypeError at the caller and holding the slot
+			// for the full deadline.
+			const entry = this.pending.get(callId);
+			if (entry) {
+				this.pending.delete(callId);
+				this.bumpPending(appId, -1);
+				this.settle(entry, { ok: false, reason: AppCallFailure.Unavailable });
+			}
+		}
 		return await promise;
 	}
 

@@ -161,6 +161,27 @@ describe("AppCallHost (Tool-1)", () => {
 		}
 	});
 
+	it("a renderer destroyed mid-call settles Unavailable, not a raw throw", async () => {
+		host.attachApp("io.example.a", 1, {
+			send() {
+				throw new TypeError("Object has been destroyed");
+			},
+		});
+		await expect(host.call("io.example.a", "t", {})).resolves.toEqual({
+			ok: false,
+			reason: AppCallFailure.Unavailable,
+		});
+		expect(host.pendingFor("io.example.a")).toBe(0);
+	});
+
+	it("refuses to make a reserved platform principal callable", async () => {
+		host.attachApp("shell", 1, sender());
+		await expect(host.call("shell", "t", {})).resolves.toEqual({
+			ok: false,
+			reason: AppCallFailure.Unavailable,
+		});
+	});
+
 	it("dispose settles everything Unavailable", async () => {
 		const s = sender();
 		host.attachApp("io.example.a", 1, s);
