@@ -29,6 +29,7 @@ import {
 } from "./agent-directory";
 import {
 	CHANNEL_UNTRUSTED_CONTENT_GUIDANCE,
+	DELEGATED_BY_PROPERTY_KEY,
 	GENERATE_FAILED_REPLY,
 	MENTION_MAX_SEQ,
 	MENTION_MESSAGE_CHARS_MAX,
@@ -262,6 +263,85 @@ describe("mention-runner (Agent-Teams-3)", () => {
 		await maybeRunMentionedAgents(deps, created, "io.evil.app");
 		expect(aiEnvelopes).toHaveLength(0);
 		expect(channelReplies()).toHaveLength(0);
+	});
+
+	it("Agent-Teams-5: a mentioned manager delegates, and the child speaks in its OWN name", async () => {
+		const worker = await createAgent(session, {
+			displayName: "Specialist",
+			persona: "You specialise.",
+		});
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		await grantAgentCapability(session, worker.def.fingerprint, "ai.use");
+		await grantAgentCapability(
+			session,
+			agent.def.fingerprint,
+			`agents.delegate:${worker.def.fingerprint}`,
+		);
+		const script = [
+			// The manager delegates...
+			`{"tool": "delegate-to-${worker.def.fingerprint}", "args": {"subtask": "Summarise Q3"}}`,
+			// ...the CHILD answers (its own run)...
+			'{"final": "Q3 was up 12%."}',
+			// ...and the manager wraps up.
+			'{"final": "Specialist says Q3 was up 12%."}',
+		];
+		let turn = 0;
+		aiReply = async () => ({ content: script[turn++] ?? '{"final": "done"}' });
+		await maybeRunMentionedAgents(
+			deps,
+			humanMessage("@Researcher ask the specialist about Q3", [agent.def.pubkey]),
+			CHAT_APP,
+		);
+
+		// The child's model call rode the CHILD's principal, not the manager's.
+		expect(aiEnvelopes.map((e) => e.app)).toEqual([
+			agent.def.fingerprint,
+			worker.def.fingerprint,
+			agent.def.fingerprint,
+		]);
+
+		// Two replies, each authored by the agent that produced it — the child's
+		// work is attributable to the child, never blurred into the delegator.
+		const rows = repo
+			.query({ type: MESSAGE_TYPE_URL })
+			.filter((r) => (r.properties.role as string) === MessageRole.Assistant);
+		const byAuthor = new Map(rows.map((r) => [r.createdBy, r]));
+		expect(byAuthor.get(agent.def.fingerprint)?.properties.body).toBe(
+			"Specialist says Q3 was up 12%.",
+		);
+		const childRow = byAuthor.get(worker.def.fingerprint);
+		expect(childRow?.properties.body).toBe("Q3 was up 12%.");
+		expect(readAgentProvenance(childRow?.properties)?.agent).toBe(worker.def.fingerprint);
+		// ...with the delegator recorded, so "who asked" is legible too.
+		expect(childRow?.properties[DELEGATED_BY_PROPERTY_KEY]).toBe(agent.def.fingerprint);
+	});
+
+	it("Agent-Teams-5: an ungranted delegate target is never offered and never runs", async () => {
+		const worker = await createAgent(session, { displayName: "Specialist" });
+		await grantAgentCapability(session, agent.def.fingerprint, "ai.use");
+		await grantAgentCapability(session, worker.def.fingerprint, "ai.use");
+		// NO `agents.delegate:<worker>` grant for the manager.
+		const script = [
+			`{"tool": "delegate-to-${worker.def.fingerprint}", "args": {"subtask": "do my job"}}`,
+			'{"final": "I could not delegate."}',
+		];
+		let turn = 0;
+		aiReply = async () => ({ content: script[turn++] ?? '{"final": "done"}' });
+		await maybeRunMentionedAgents(
+			deps,
+			humanMessage("@Researcher delegate everything", [agent.def.pubkey]),
+			CHAT_APP,
+		);
+
+		// The manifest never named the tool, and the child never ran.
+		const systemPrompt = String(
+			(aiEnvelopes[0]?.args[0] as { messages: Array<{ content: string }> }).messages[0]?.content,
+		);
+		expect(systemPrompt).not.toContain("delegate-to-");
+		expect(aiEnvelopes.every((e) => e.app === agent.def.fingerprint)).toBe(true);
+		expect(
+			repo.query({ type: MESSAGE_TYPE_URL }).some((r) => r.createdBy === worker.def.fingerprint),
+		).toBe(false);
 	});
 
 	it("throttles a caller looping creates into one channel", async () => {

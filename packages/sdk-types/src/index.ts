@@ -2523,6 +2523,7 @@ export {
 	TRIGGER_KINDS,
 	TRIGGER_TYPE_URL,
 	TriggerKind,
+	UNSATISFIABLE_CAPABILITY,
 	WORKFLOW_RUN_STATUSES,
 	WORKFLOW_RUN_TYPE_URL,
 	WORKFLOW_TYPE_URL,
@@ -2530,6 +2531,7 @@ export {
 	aggregateWorkflowCapabilities,
 	agentToolCapabilities,
 	capabilityImplies,
+	intersectCapabilities,
 	isCapabilitySubset,
 	isConcurrencyPolicy,
 	isEntityEventVerb,
@@ -2705,6 +2707,7 @@ export type {
 // ─── Agent provenance + back-links (Agent-11c) ──────────────────────────────
 export {
 	AGENT_PROPOSAL_PROPERTY_KEY,
+	AGENT_DELEGATED_BY_PROPERTY_KEY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	RESERVED_PROPERTY_KEYS,
 	buildAgentProvenance,

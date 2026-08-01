@@ -15,12 +15,14 @@ import {
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
+	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
 	StoredAssetKind,
+	TRIGGER_TYPE_URL,
 	TabCommandKind,
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
@@ -46,10 +48,16 @@ import {
 } from "electron";
 import { BackgroundActivityStore } from "./activity/background-activity-store";
 import { SEMANTIC_MODEL_OP_ID, operationFromSemanticStatus } from "./activity/semantic-activity";
+import { listAgents } from "./agents/agent-directory";
 import {
 	AGENT_PROPOSALS_SERVICE,
 	makeAgentProposalServiceHandler,
 } from "./agents/agent-proposal-service";
+import {
+	deriveAssignmentTriggers,
+	maybeRunAssignedAgent,
+	recordAssignmentRun,
+} from "./agents/assignment-runner";
 import {
 	AGENTS_MENTION_CAPABILITY,
 	type MentionRunnerDeps,
@@ -4192,6 +4200,79 @@ void app.whenReady().then(async () => {
 			const repo = await getEntitiesRepoForActiveSession();
 			return repo?.get(entityId)?.properties ?? null;
 		},
+	});
+
+	// Agent-Teams-5 (doc 69 §O.2) — assignment-driven agent runs. An entity
+	// assigned to an agent, with a matching `Trigger/v1`, runs that agent's loop
+	// on it. Deliberately NO coordination ledger and NO lease (OQ-AT-1): the
+	// signal is `assignee` + `status`, and CRDT merge handles convergence.
+	// The ceiling is re-read from the live ledger at fire time — the trigger row
+	// is app-writable data and only ever SELECTS an agent.
+	// Derived once and reused: an entity change is a HOT path, and re-deriving
+	// would put a `Trigger/v1` scan on every write in the vault. Triggers only
+	// change when a `Trigger/v1` row does, so that is the exact invalidation.
+	let assignmentTriggersCache: ReturnType<typeof deriveAssignmentTriggers> | null = null;
+	automationsChangeEmitter.subscribe((change) => {
+		if (change.type === TRIGGER_TYPE_URL) assignmentTriggersCache = null;
+		void (async () => {
+			try {
+				const session = getActiveVaultSession();
+				const repo = await getEntitiesRepoForActiveSession();
+				if (!session || !repo) return;
+				const aiHandler = workersRef.broker.getServiceHandler("ai");
+				if (!aiHandler) return;
+				let generateSeq = 0;
+				await maybeRunAssignedAgent(
+					{
+						triggers: () => {
+							assignmentTriggersCache ??= deriveAssignmentTriggers(
+								repo.query({ type: TRIGGER_TYPE_URL }).map((r) => ({
+									id: r.id,
+									properties: r.properties,
+								})),
+							);
+							return assignmentTriggersCache;
+						},
+						agents: () => listAgents(session),
+						ledger: () => session.capabilityLedger(),
+						getEntity: (entityId) => {
+							const row = repo.get(entityId);
+							return row ? { id: row.id, type: row.type, properties: row.properties } : null;
+						},
+						// The agent IS the principal, exactly as in the mention path.
+						generate: async (agent, caps, messages) => {
+							generateSeq += 1;
+							const reply = (await aiHandler({
+								v: 1,
+								msg: `agent-assign-${agent.def.fingerprint}-${generateSeq}`,
+								app: agent.def.fingerprint,
+								service: "ai",
+								method: "generate",
+								args: [
+									{
+										messages: [...messages],
+										...(agent.def.routing === AgentRouting.LocalOnly ? { provider: OLLAMA_PROVIDER_ID } : {}),
+									},
+								],
+								caps: [...caps],
+							})) as { content?: unknown } | null;
+							return { content: typeof reply?.content === "string" ? reply.content : "" };
+						},
+						record: (agent, entityId, answer, staged) => {
+							recordAssignmentRun(repo, agent, entityId, answer, staged);
+							broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
+							scheduleSearchReindex();
+						},
+						label: (key) => key,
+						newProposalId: (agent, entityId, index) =>
+							`prp_${agent.def.fingerprint}_${entityId}_${index}`,
+					},
+					change,
+				);
+			} catch (error) {
+				console.warn("[brainstorm] assignment run failed:", (error as Error).message);
+			}
+		})();
 	});
 
 	// ROT-3a-ii (design 73, F-ROT-4) — finish any rotate-on-revoke wire delivery

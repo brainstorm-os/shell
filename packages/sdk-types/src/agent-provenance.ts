@@ -35,11 +35,20 @@ export const AGENT_PROVENANCE_PROPERTY_KEY = "agentProvenance";
  *  author a card or settle one. */
 export const AGENT_PROPOSAL_PROPERTY_KEY = "agentProposal";
 
+/** Agent-Teams-5 — the delegator recorded on a delegated child's row. RESERVED
+ *  for the same reason as the two above: it is a PROVENANCE CLAIM ("this agent
+ *  asked for this"), and an app holding `entities.write:brainstorm/Message/v1`
+ *  could otherwise stamp its own message as delegated work of an agent the user
+ *  trusts. Nothing authorizes off it today, which is exactly when to close it —
+ *  the two keys above were both learned the expensive way. */
+export const AGENT_DELEGATED_BY_PROPERTY_KEY = "agentDelegatedBy";
+
 /** Property keys an app may never write. The service strips each on create and
  *  update; the host writes them through the repo directly. */
 export const RESERVED_PROPERTY_KEYS: readonly string[] = [
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AGENT_PROPOSAL_PROPERTY_KEY,
+	AGENT_DELEGATED_BY_PROPERTY_KEY,
 ];
 
 /** Drop every reserved key from a caller-supplied bag. Returns the same

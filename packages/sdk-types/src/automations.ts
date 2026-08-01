@@ -294,6 +294,19 @@ export type AgentTool = {
 	format?: string;
 	label: string;
 	outputSchema?: unknown;
+	/** The EXACT capability footprint this tool requires, when it is not the
+	 *  default `intents.dispatch:<verb>` (+ the entity read a declared
+	 *  `entityType` implies).
+	 *
+	 *  Agent-Teams-5 — a `delegate-to-<agent>` tool is gated on
+	 *  `agents.delegate:<fingerprint>`, not on an intent dispatch, so without
+	 *  this the loop's fail-closed intersection could not see its real
+	 *  requirement and delegation scoping would need a SECOND mechanism beside
+	 *  `intersectAgentTools`. Declaring the footprint keeps ONE gate.
+	 *
+	 *  An empty array is NOT "no requirement" — it is refused as unsatisfiable
+	 *  by {@link agentToolCapabilities}, so a malformed tool is never offered. */
+	capabilities?: readonly string[];
 };
 
 type StepBase<K extends StepKind> = { id: StepId; kind: K };
@@ -509,6 +522,24 @@ export function isCapabilitySubset(requested: readonly string[], held: readonly 
 	return requested.every((req) => held.some((grant) => capabilityImplies(grant, req)));
 }
 
+/**
+ * The fail-closed capability intersection: the subset of `requested` that
+ * `held` actually implies. Narrowing only — nothing in the result is absent
+ * from `requested`, and nothing survives that `held` does not cover.
+ *
+ * The one primitive behind two ceilings that must behave identically: the
+ * Agent app's per-conversation grant (`conversationGrants ∩ appCaps`) and
+ * Agent-Teams-5's delegated child (`childGrants ∩ delegatorGrants` — a manager
+ * can never hand out authority it does not itself hold). Pure + deterministic
+ * so both are property-testable against the same function.
+ */
+export function intersectCapabilities(
+	requested: readonly string[],
+	held: readonly string[],
+): string[] {
+	return requested.filter((req) => held.some((grant) => capabilityImplies(grant, req)));
+}
+
 /** The subset of `requested` caps NOT implied by any cap in `held`. */
 export function missingCapabilities(
 	requested: readonly string[],
@@ -564,13 +595,28 @@ export function stepCapabilities(step: WorkflowStep): string[] {
 	}
 }
 
-/** The capabilities an agent tool requires to be dispatched (it is an
- *  intent, so `intents.dispatch:<verb>` + the entity read it implies). */
+/** The capabilities an agent tool requires to be dispatched. By default it is
+ *  an intent, so `intents.dispatch:<verb>` + the entity read it implies; a tool
+ *  that declares an explicit {@link AgentTool.capabilities} footprint uses that
+ *  instead (Agent-Teams-5's `delegate-to-<agent>`).
+ *
+ *  FAIL-CLOSED: a declared-but-EMPTY footprint would make the tool trivially
+ *  satisfiable by `intersectAgentTools` (every element of ∅ is implied), i.e. an
+ *  ungated tool. It resolves to an unsatisfiable sentinel instead, so such a
+ *  tool is silently never offered rather than silently always offered. */
 export function agentToolCapabilities(tool: AgentTool): string[] {
+	if (tool.capabilities) {
+		return tool.capabilities.length > 0 ? [...tool.capabilities] : [UNSATISFIABLE_CAPABILITY];
+	}
 	const caps = [`intents.dispatch:${tool.verb}`];
 	if (tool.entityType) caps.push(`entities.read:${tool.entityType}`);
 	return caps;
 }
+
+/** A capability no principal can ever hold — the fail-closed stand-in for a
+ *  tool whose declared footprint is empty. Its scope cannot be produced by
+ *  `parseCapability` from any grantable string, so no `*` grant implies it. */
+export const UNSATISFIABLE_CAPABILITY = "brainstorm.unsatisfiable:never";
 
 /** Recursively collect a step's own caps and those of its children. */
 function collectStepCapabilities(step: WorkflowStep, into: Set<string>): void {

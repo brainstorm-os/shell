@@ -30,6 +30,7 @@
  */
 
 import {
+	AGENT_DELEGATED_BY_PROPERTY_KEY,
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AgentRouting,
 	AgentStopReason,
@@ -55,6 +56,13 @@ import {
 	buildProposalProperty,
 	isChannelProposeVerb,
 } from "./channel-proposals";
+import {
+	type DelegationOutcome,
+	delegateTargetFromVerb,
+	delegateTools,
+	delegationToolResult,
+	runDelegatedChild,
+} from "./delegation";
 
 /** Mirrors `broker.getServiceHandler` — name → handler. */
 type ServiceHandlerGetter = (
@@ -104,6 +112,20 @@ export const MENTION_MAX_ITERATIONS = 4;
 /** Drafts one mention may stage. A card per draft lands in a shared room, so
  *  an unbounded run would be a spam vector as much as a cost one. */
 export const MENTION_PROPOSALS_MAX = 3;
+
+/** Agent-Teams-5 — the property a delegated child's row carries, naming the
+ *  agent that asked. A RESERVED key (stripped from every app write), because it
+ *  is a provenance CLAIM: an app could otherwise stamp its own message as an
+ *  agent's delegated work. Purely a record even so — authorship (`created_by`)
+ *  and the provenance stamp still name the CHILD, so the audit answer to "who
+ *  did this" never shifts to the manager. */
+export const DELEGATED_BY_PROPERTY_KEY = AGENT_DELEGATED_BY_PROPERTY_KEY;
+
+/** Agent-Teams-5 — the label a delegate tool carries into the model's manifest.
+ *  Model-facing prompt text, like the propose labels below. */
+export function delegateToolLabel(name: string): string {
+	return `Hand one specific subtask to ${name} and get their report back`;
+}
 
 /** Tool labels for the channel propose set. The shell renderer's `t()` never
  *  reaches main, and these are model-facing prompt text rather than chrome. */
@@ -335,6 +357,10 @@ async function runOneAgent(
 	session: AgentDirectorySession,
 	agent: AgentRecord,
 	channelId: string,
+	/** Every live, trusted agent in the vault — the delegation candidate pool.
+	 *  Passed in rather than re-listed so the whole message's fan-out sees one
+	 *  consistent directory snapshot. */
+	agents: readonly AgentRecord[],
 ): Promise<void> {
 	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
 	const messages = readChannelMessages(repo, channelId);
@@ -362,15 +388,27 @@ async function runOneAgent(
 	}
 
 	let seq = 0;
-	const generate = async (chat: readonly AiChatMessage[]) => {
+	/** One model call AS `who`, under `withCaps`.
+	 *
+	 *  Shared by the summoned agent and any delegated child (Agent-Teams-5), so a
+	 *  child's generate is identical in every respect except WHOSE principal and
+	 *  WHICH caps it carries — a child never rides the delegator's identity, and
+	 *  `withCaps` is the already-intersected effective set, never the raw grants.
+	 *  Its own routing decides local-vs-cloud: a LocalOnly specialist must not be
+	 *  shipped off-device because the manager that asked it happened to be cloud. */
+	const generateAs = async (
+		who: AgentRecord,
+		withCaps: readonly string[],
+		chat: readonly AiChatMessage[],
+	) => {
 		seq += 1;
 		// The agent IS the principal: its fingerprint as `app`, its live grants
 		// as `caps` — the ai service's own fail-closed check runs against the
 		// agent's ledger rows (Agent-Teams-1).
 		const result = (await aiHandler({
 			v: ENVELOPE_PROTOCOL_VERSION,
-			msg: `agent-mention-${agent.def.fingerprint}-${seq}`,
-			app: agent.def.fingerprint,
+			msg: `agent-mention-${who.def.fingerprint}-${seq}`,
+			app: who.def.fingerprint,
 			service: "ai",
 			method: "generate",
 			// AgentRouting.LocalOnly must MEAN local: without an explicit provider
@@ -380,22 +418,34 @@ async function runOneAgent(
 			args: [
 				{
 					messages: [...chat],
-					...(agent.def.routing === AgentRouting.LocalOnly ? { provider: OLLAMA_PROVIDER_ID } : {}),
+					...(who.def.routing === AgentRouting.LocalOnly ? { provider: OLLAMA_PROVIDER_ID } : {}),
 				},
 			],
-			caps,
+			caps: [...withCaps],
 		})) as { content?: unknown } | null;
 		return { content: typeof result?.content === "string" ? result.content : "" };
 	};
+	const generate = (chat: readonly AiChatMessage[]) => generateAs(agent, caps, chat);
 
 	// The propose tools this agent may actually use: the curated channel kinds,
 	// intersected against its own ledger grants by the loop. Staged drafts only
 	// — see `dispatchTool` below, which never reaches the vault.
-	const offeredTools = proposeTools((key) => PROPOSE_TOOL_LABELS[key] ?? key).filter((tool) =>
-		isChannelProposeVerb(tool.verb),
-	);
+	//
+	// Agent-Teams-5 — plus one `delegate-to-<agent>` tool per OTHER live agent.
+	// These are only DECLARED: each carries `agents.delegate:<target>` as its
+	// footprint, so the loop's own fail-closed intersection drops every target
+	// this agent holds no grant for before the model sees the manifest.
+	const offeredTools = [
+		...proposeTools((key) => PROPOSE_TOOL_LABELS[key] ?? key).filter((tool) =>
+			isChannelProposeVerb(tool.verb),
+		),
+		...delegateTools(agent, agents, delegateToolLabel),
+	];
 	const staged: ProposedArtifact[] = [];
 	let proposalSeq = 0;
+	/** Children spawned by THIS run — each reports back, replies in its own
+	 *  name, and may leave its own cards. */
+	const delegations: DelegationOutcome[] = [];
 
 	const result = await runAgentLoop(
 		{
@@ -404,6 +454,28 @@ async function runOneAgent(
 			// dispatched, so no model output — prompt injection included — reaches
 			// the vault. The id is minted host-side, never taken from the model.
 			dispatchTool: async (call) => {
+				const target = delegateTargetFromVerb(call.tool);
+				if (target) {
+					const outcome = await runDelegatedChild(
+						{
+							grantsFor: (fingerprint) => ledger.listActive(fingerprint).map(grantString),
+							ledger,
+							agents,
+							generate: (childAgent, effective, chat) => generateAs(childAgent, effective, chat),
+							label: (key) => PROPOSE_TOOL_LABELS[key] ?? key,
+							newProposalId: (childAgent, index) =>
+								`prp_${childAgent.def.fingerprint}_${nextSeq}_d${delegations.length}_${index}`,
+						},
+						{
+							delegator: agent,
+							targetFingerprint: target,
+							subtask: typeof call.args.subtask === "string" ? call.args.subtask : "",
+							spawnedSoFar: delegations.filter((d) => d.ok).length,
+						},
+					);
+					delegations.push(outcome);
+					return delegationToolResult(outcome);
+				}
 				if (!isChannelProposeVerb(call.tool)) return null;
 				if (staged.length >= MENTION_PROPOSALS_MAX) {
 					return { staged: false, reason: "too-many-proposals" };
@@ -442,20 +514,42 @@ async function runOneAgent(
 			? GENERATE_FAILED_REPLY
 			: result.finalAnswer.trim() || GENERATE_FAILED_REPLY;
 	writeAgentReply(deps, repo, channelId, agent, body, nextSeq);
-	// Each staged draft becomes its own card message, so any member of the
-	// channel can approve or discard it. Nothing here is persisted as vault
-	// data — a card is a message carrying a PENDING proposal.
-	staged.forEach((artifact, index) => {
+
+	// Agent-Teams-5 — a delegated child speaks IN ITS OWN NAME. Its reply row is
+	// authored by the CHILD's fingerprint and provenance-stamped as the child,
+	// with `delegatedBy` recording who asked: the audit answer to "who did this"
+	// stays the child, and the manager's turn is not credited with its work.
+	let rowSeq = nextSeq;
+	for (const outcome of delegations) {
+		if (!outcome.ok) continue;
+		rowSeq = Math.min(rowSeq + 1, MENTION_MAX_SEQ);
 		writeAgentReply(
 			deps,
 			repo,
 			channelId,
-			agent,
-			proposalMessageBody(artifact),
-			Math.min(nextSeq + 1 + index, MENTION_MAX_SEQ),
-			{ [CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact) },
+			outcome.child,
+			outcome.answer || GENERATE_FAILED_REPLY,
+			rowSeq,
+			{ [DELEGATED_BY_PROPERTY_KEY]: agent.def.fingerprint },
 		);
-	});
+		for (const artifact of outcome.staged) {
+			rowSeq = Math.min(rowSeq + 1, MENTION_MAX_SEQ);
+			writeAgentReply(deps, repo, channelId, outcome.child, proposalMessageBody(artifact), rowSeq, {
+				[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact),
+				[DELEGATED_BY_PROPERTY_KEY]: agent.def.fingerprint,
+			});
+		}
+	}
+
+	// Each staged draft becomes its own card message, so any member of the
+	// channel can approve or discard it. Nothing here is persisted as vault
+	// data — a card is a message carrying a PENDING proposal.
+	for (const artifact of staged) {
+		rowSeq = Math.min(rowSeq + 1, MENTION_MAX_SEQ);
+		writeAgentReply(deps, repo, channelId, agent, proposalMessageBody(artifact), rowSeq, {
+			[CHANNEL_PROPOSAL_PROPERTY_KEY]: buildProposalProperty(artifact),
+		});
+	}
 }
 
 /** The card's plain-text body — what a surface that does not render the card
@@ -524,7 +618,7 @@ export async function maybeRunMentionedAgents(
 		inFlightChannels.add(channelId);
 		try {
 			for (const agent of mentioned) {
-				await runOneAgent(deps, session, agent, channelId);
+				await runOneAgent(deps, session, agent, channelId, agents);
 			}
 		} finally {
 			inFlightChannels.delete(channelId);
