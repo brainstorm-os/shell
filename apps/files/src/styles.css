@@ -216,7 +216,7 @@ body:not([data-inspector="open"]) .window-resize--inspector {
 .window-resize:hover,
 .window-resize:focus-visible,
 body.is-resizing .window-resize {
-	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.1));
+	background: var(--color-accent-subtle);
 	outline: none;
 }
 
@@ -496,8 +496,8 @@ body[data-nav-open="false"] .sidebar {
 	padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 	border: var(--border-width) solid var(--color-glass-border, var(--border));
 	border-radius: var(--radius-full);
-	background: var(--color-glass-background-strong, var(--bg-elev, rgba(28, 28, 30, 0.92)));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.45));
+	background: var(--color-glass-background-strong);
+	box-shadow: var(--shadow-xl);
 	backdrop-filter: blur(12px);
 }
 
@@ -541,7 +541,7 @@ body[data-nav-open="false"] .sidebar {
 
 .files-bulkbar__action--danger,
 .files-bulkbar__action--danger svg {
-	color: var(--danger, #ef4444);
+	color: var(--danger);
 }
 
 .files-bulkbar__clear {
@@ -1036,7 +1036,7 @@ body[data-view-mode="gallery"]
 	background: var(--bg-elev);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-md);
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+	box-shadow: var(--shadow-sm);
 }
 
 /* Tile modes render the row as a vertical card, so the list-mode grips — pinned
@@ -1052,7 +1052,7 @@ body[data-view-mode="gallery"] .content-row__export-grip {
 	background: var(--bg-elev);
 	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-md);
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+	box-shadow: var(--shadow-sm);
 }
 
 body[data-view-mode="grid"] .content-row__drag-grip,
@@ -1228,7 +1228,7 @@ body[data-view-mode="gallery"] .content-row {
 body[data-view-mode="gallery"] .content-row:hover {
 	background: var(--bg-elev);
 	transform: translateY(-1px);
-	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+	box-shadow: var(--shadow-md);
 }
 
 body[data-view-mode="gallery"] .content-row[data-selected="true"] {
@@ -1334,7 +1334,7 @@ body[data-view-mode="icon-list"] .content-row__size {
 	bottom: 0;
 	width: var(--files-inspector-width, 320px);
 	border-inline-start: var(--border-width) solid var(--color-glass-border, var(--border));
-	box-shadow: var(--shadow-xl, 0 12px 32px -8px rgba(0, 0, 0, 0.4));
+	box-shadow: var(--shadow-xl);
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
@@ -1789,7 +1789,7 @@ body:not([data-inspector="open"]) .inspector {
 	background: var(--color-glass-background-strong, var(--bg-elev));
 	backdrop-filter: blur(var(--glass-blur, 5px)) saturate(var(--glass-saturate, 180%));
 	-webkit-backdrop-filter: blur(var(--glass-blur, 5px)) saturate(var(--glass-saturate, 180%));
-	box-shadow: var(--shadow-md, 0 6px 20px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--shadow-md);
 	color: var(--text);
 	white-space: nowrap;
 	overflow: hidden;
@@ -1814,11 +1814,10 @@ body:not([data-inspector="open"]) .inspector {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	/* Modal scrim — intentionally dark across themes. The convention for
-	 * a modal backdrop is a dark wash that pulls focus to the dialog;
-	 * a theme-aware tint would invert in light mode and stop reading as
-	 * "the rest of the UI is dimmed". */
-	background: rgba(0, 0, 0, 0.32);
+	/* Modal scrim — the shared dimmer token: a dark wash in EVERY theme
+	 * (tuned per theme, never inverting), which is exactly the modal
+	 * backdrop convention. */
+	background: var(--color-dimmer);
 	padding: var(--space-5);
 }
 
