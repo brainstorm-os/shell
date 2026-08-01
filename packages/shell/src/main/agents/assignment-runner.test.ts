@@ -134,7 +134,9 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 		return {
 			triggers: () =>
 				deriveAssignmentTriggers(
-					repo.query({ type: TRIGGER_TYPE_URL }).map((r) => ({ id: r.id, properties: r.properties })),
+					repo
+						.query({ type: TRIGGER_TYPE_URL })
+						.map((r) => ({ id: r.id, createdBy: r.createdBy, properties: r.properties })),
 				),
 			agents: () => listAgents(session),
 			ledger: async () => ledger,
@@ -338,6 +340,7 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 			// entityType + verb must both be present and valid
 			{
 				id: "d",
+				createdBy: "shell",
 				properties: {
 					kind: "entity-event",
 					enabled: true,
@@ -346,6 +349,7 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 			},
 			{
 				id: "e",
+				createdBy: "shell",
 				properties: {
 					kind: "entity-event",
 					enabled: true,
@@ -364,6 +368,7 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 			deriveAssignmentTriggers([
 				{
 					id: "ok",
+					createdBy: "shell",
 					properties: {
 						kind: "entity-event",
 						enabled: true,
@@ -383,6 +388,42 @@ describe("assignment-driven runs (Agent-Teams-5)", () => {
 				verb: EntityEventVerb.Update,
 			},
 		]);
+	});
+
+	it("refuses a trigger authored by an APP — only the shell or the automations host may assign an agent", () => {
+		const config = {
+			entityType: TASK_TYPE,
+			verb: EntityEventVerb.Create,
+			[ASSIGNEE_TRIGGER_CONFIG_KEY]: `ed25519:${"ab".repeat(32)}`,
+		};
+		// The attack: any app holding entities.write:Trigger/v1 writes a row that
+		// aims a VICTIM agent's loop at content the attacker controls. The run's
+		// replies persist as trusted, agent-authored proposal cards — attribution
+		// laundering, plus unmetered spend of that agent's ai.use budget.
+		const hostile = [
+			{
+				id: "t1",
+				createdBy: "io.evil.sideloaded",
+				properties: { kind: "entity-event", enabled: true, config },
+			},
+		];
+		expect(deriveAssignmentTriggers(hostile)).toEqual([]);
+
+		// The legitimate authors still derive (a gate that blocks everything is
+		// just a broken feature).
+		for (const author of ["shell", "io.brainstorm.automations"]) {
+			const ok = deriveAssignmentTriggers([
+				{ id: "t2", createdBy: author, properties: { kind: "entity-event", enabled: true, config } },
+			]);
+			expect(ok, author).toHaveLength(1);
+		}
+
+		// A row with no author at all fails closed.
+		expect(
+			deriveAssignmentTriggers([
+				{ id: "t3", properties: { kind: "entity-event", enabled: true, config } },
+			]),
+		).toEqual([]);
 	});
 
 	it("assignee matching is EXACT — fingerprint or pubkey, never a variant", () => {

@@ -53,8 +53,10 @@ import {
 	proposeTools,
 	runAgentLoop,
 } from "@brainstorm-os/sdk-types";
+import { AUTOMATIONS_APP_ID } from "../automations/wiring";
 import { MESSAGE_TYPE_URL } from "../roster/mention-notifier";
 import type { AgentRecord } from "./agent-directory";
+import { SHELL_PRINCIPAL } from "./agent-record";
 import { CHANNEL_PROPOSAL_PROPERTY_KEY, buildProposalProperty } from "./channel-proposals";
 import { childToolsFor } from "./delegation";
 import type { AgentTraceRecorder } from "./trace/agent-trace-recorder";
@@ -94,8 +96,28 @@ export type AssignmentTrigger = {
 	verb: EntityEventVerb;
 };
 
-/** A persisted `Trigger/v1` row, as the repo returns it. */
-export type TriggerRow = { id: string; properties: Record<string, unknown> };
+/** A persisted `Trigger/v1` row, as the repo returns it. `createdBy` is the
+ *  HOST-written author (an app can never set it), which is what makes the
+ *  author gate below trustworthy. */
+export type TriggerRow = { id: string; createdBy?: string; properties: Record<string, unknown> };
+
+/** Who may aim an agent's loop at an entity. An assignment trigger is a
+ *  standing authorization to run a named agent unattended, so — exactly like
+ *  the Agent-Teams-3 proposal-card author gate — it is honored only from a
+ *  trusted author: the shell itself, or the Automations app whose builder UI
+ *  is the consented way to create one.
+ *
+ *  WHY: without this, any app holding `entities.write:brainstorm/Trigger/v1`
+ *  could point a VICTIM agent at content it controls. The child's authority is
+ *  still bounded (propose-only tools, live-ledger ceiling), but the run's
+ *  replies persist as host-stamped, agent-authored proposal cards — attacker-
+ *  steered text wearing a trusted agent's name, one human click from being
+ *  saved — and it spends that agent's `ai.use` budget unmetered. Fail closed
+ *  on an absent author: a row with no provenance is not a permission. */
+export const ASSIGNMENT_TRUSTED_AUTHORS: ReadonlySet<string> = new Set([
+	SHELL_PRINCIPAL,
+	AUTOMATIONS_APP_ID,
+]);
 
 function str(value: unknown): string {
 	return typeof value === "string" ? value : "";
@@ -114,6 +136,10 @@ function str(value: unknown): string {
 export function deriveAssignmentTriggers(rows: readonly TriggerRow[]): AssignmentTrigger[] {
 	const out: AssignmentTrigger[] = [];
 	for (const row of rows) {
+		// The author gate comes FIRST: everything below reads attacker-supplied
+		// config, and no amount of field validation makes an untrusted standing
+		// authorization safe.
+		if (!ASSIGNMENT_TRUSTED_AUTHORS.has(str(row.createdBy))) continue;
 		const props = row.properties ?? {};
 		if (props.enabled !== true) continue;
 		if (props.kind !== "entity-event") continue;

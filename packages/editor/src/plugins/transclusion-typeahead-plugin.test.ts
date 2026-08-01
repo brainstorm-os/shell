@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { createHeadlessEditor } from "@lexical/headless";
+import { $createListItemNode, $createListNode, ListItemNode, ListNode } from "@lexical/list";
 import { $createQuoteNode, QuoteNode } from "@lexical/rich-text";
 import {
 	$createParagraphNode,
@@ -21,7 +22,15 @@ import {
 function editor(): LexicalEditor {
 	return createHeadlessEditor({
 		namespace: "tr-tt",
-		nodes: [ParagraphNode, TextNode, QuoteNode, TransclusionNode, InlineTransclusionNode],
+		nodes: [
+			ParagraphNode,
+			TextNode,
+			QuoteNode,
+			ListNode,
+			ListItemNode,
+			TransclusionNode,
+			InlineTransclusionNode,
+		],
 		onError: (e) => {
 			throw e;
 		},
@@ -157,6 +166,57 @@ describe("applyTransclusionInsertion", () => {
 		expect(text.includes("suffix")).toBe(true);
 		expect(text.includes("!@target")).toBe(false);
 		expect(collectTransclusions(state)).toHaveLength(1);
+	});
+
+	function seedListItem(e: LexicalEditor, texts: readonly string[]): string {
+		let key = "";
+		e.update(
+			() => {
+				const list = $createListNode("bullet");
+				texts.forEach((t, i) => {
+					const li = $createListItemNode();
+					const node = $createTextNode(t);
+					li.append(node);
+					list.append(li);
+					if (i === 0) key = node.getKey();
+				});
+				$getRoot().append(list);
+			},
+			{ discrete: true },
+		);
+		return key;
+	}
+
+	it("does NOT destroy the surrounding list when the trigger is in a list item", () => {
+		const e = editor();
+		// A list whose OTHER items are empty: the host's text content is "" once
+		// the trigger is consumed, so an emptiness check on the top-level element
+		// would delete the whole list — losing the user's other bullets.
+		const textKey = seedListItem(e, ["!@target", "", ""]);
+		applyTransclusionInsertion(
+			e,
+			textKey,
+			{ triggerOffset: 0, query: "target" },
+			{ entityId: "n_target", entityType: "T/v1", label: "Target" },
+		);
+		const state = readSerialized(e);
+		expect(collectTransclusions(state)).toHaveLength(1);
+		const rootChildren = (state.root as unknown as { children: { type: string }[] }).children;
+		expect(rootChildren.map((c) => c.type)).toContain("list");
+	});
+
+	it("keeps a host that still has content, removing only a fully-consumed one", () => {
+		const e = editor();
+		const textKey = seedQuote(e, "keep me !@target");
+		applyTransclusionInsertion(
+			e,
+			textKey,
+			{ triggerOffset: 8, query: "target" },
+			{ entityId: "n_target", entityType: "T/v1", label: "Target" },
+		);
+		const state = readSerialized(e);
+		expect(collectTransclusions(state)).toHaveLength(1);
+		expect(plainText(state)).toContain("keep me");
 	});
 
 	it("hoists the block node out of a quote host so deleting the quote cannot take it (F-478)", () => {
