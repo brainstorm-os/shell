@@ -58,12 +58,23 @@ export const AGENT_TRACE_MAX_ACTIVE_PER_AGENT = 4;
 /** How often the opportunistic prune may run (mirrors `AiQuotaService`). */
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
+/** Agent-12e — the live-activity port: an in-flight run registers with the
+ *  dashboard's `BackgroundActivityStore` (named, cleared on completion) like
+ *  indexing or sync. Injected + optional so the recorder stays testable and
+ *  inert without a dashboard. */
+export type AgentActivityPort = {
+	set(runId: string): void;
+	clear(runId: string): void;
+};
+
 export type AgentTraceRecorderDeps = {
 	/** The active vault's trace repo, or null when no vault is open. */
 	getRepo: () => Promise<AgentTraceRepository | null>;
 	/** Identity of the active vault (its id) — active runs are scoped to it.
 	 *  Null when no vault is open. */
 	getVaultKey: () => string | null;
+	/** Agent-12e — live in-flight-run surface (dashboard chip). Optional. */
+	activity?: AgentActivityPort;
 	now?: () => number;
 	newRunId?: () => string;
 };
@@ -129,6 +140,12 @@ export class AgentTraceRecorder {
 			});
 			this.track({ id, agent, vaultKey, sawError: false, sawBudget: false });
 			this.pruneOpportunistically(repo);
+			// Agent-12e — surface the in-flight run on the dashboard chip.
+			try {
+				this.deps.activity?.set(id);
+			} catch {
+				// A dashboard push failure never affects the turn.
+			}
 			return id;
 		} catch (error) {
 			warn("begin", error);
@@ -193,6 +210,11 @@ export class AgentTraceRecorder {
 	async endRun(runId: string, explicit?: AgentRunOutcome): Promise<void> {
 		const run = this.active.get(runId);
 		this.untrack(runId);
+		try {
+			this.deps.activity?.clear(runId);
+		} catch {
+			// A dashboard push failure never affects the turn.
+		}
 		try {
 			const repo = await this.deps.getRepo();
 			if (!repo) return;
@@ -275,6 +297,13 @@ export class AgentTraceRecorder {
 	/** Drop all in-memory active-run state (vault close/switch). Rows already
 	 *  written stay; the repo's stale sweep closes any left open. */
 	reset(): void {
+		for (const id of this.active.keys()) {
+			try {
+				this.deps.activity?.clear(id);
+			} catch {
+				// ignore
+			}
+		}
 		this.active.clear();
 		this.activeByAgent.clear();
 	}
@@ -306,6 +335,11 @@ export class AgentTraceRecorder {
 			const oldest = list[0];
 			if (oldest === undefined) break;
 			this.untrack(oldest);
+			try {
+				this.deps.activity?.clear(oldest);
+			} catch {
+				// ignore
+			}
 			repo.finishRun(oldest, this.now(), AgentRunOutcome.Aborted);
 		}
 	}

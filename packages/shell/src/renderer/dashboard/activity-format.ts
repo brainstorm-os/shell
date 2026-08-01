@@ -20,6 +20,8 @@ export function iconForActivityKind(kind: ActivityKind): IconName {
 			return IconName.Download;
 		case ActivityKind.Export:
 			return IconName.Update;
+		case ActivityKind.AgentRun:
+			return IconName.Sparkle;
 	}
 }
 
