@@ -3465,6 +3465,19 @@ void app.whenReady().then(async () => {
 			return session ? await session.agentTraceRepo() : null;
 		},
 		getVaultKey: () => getActiveVaultSession()?.vaultId ?? null,
+		// Agent-12e — surface in-flight runs on the dashboard chip like indexing
+		// or sync (named, cleared on completion). One op id per run.
+		activity: {
+			set: (runId) =>
+				activityStore.set({
+					id: `agent-run:${runId}`,
+					kind: ActivityKind.AgentRun,
+					phase: ActivityPhase.Running,
+					percent: null,
+					detail: null,
+				}),
+			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
+		},
 	});
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,

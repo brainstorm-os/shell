@@ -25,6 +25,8 @@ export enum ActivityKind {
 	Import = "import",
 	/** Vault export / backup. */
 	Export = "export",
+	/** An in-flight agent run — a chat turn or automation run (Agent-12e). */
+	AgentRun = "agent-run",
 }
 
 /** An operation is shown while `Running`; `Error` keeps it visible (with its

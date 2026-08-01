@@ -12,6 +12,9 @@
 import type {
 	AgentProposalDecision,
 	AgentProposalsService,
+	AgentRunSummary,
+	AgentTraceEventRecord,
+	AgentTraceService,
 	AiCostEstimate,
 	AiExtractRequest,
 	AiExtractResult,
@@ -284,6 +287,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			properties: propertiesProxy(bridge),
 			platform: platformProxy(bridge),
 			agentProposals: agentProposalsProxy(bridge),
+			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
 			presence: presenceProxy(bridge),
@@ -368,6 +372,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			properties: propertiesProxy(bridge),
 			platform: platformProxy(bridge),
 			agentProposals: agentProposalsProxy(bridge),
+			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
 			presence: presenceProxy(bridge),
@@ -1093,6 +1098,33 @@ function agentProposalsProxy(bridge: Bridge): AgentProposalsService {
 				"discard",
 				[input],
 				["agents.approve"],
+			),
+	};
+}
+
+function agentTraceProxy(bridge: Bridge): AgentTraceService {
+	// Agent-12a/12b — own-runs demarcation + reads. No capability: the shell
+	// scopes every call to the broker-verified `envelope.app` (OQ-AO-2).
+	return {
+		beginTurn: (input) =>
+			callService<{ runId: string | null }>(bridge, "agent-trace", "beginTurn", [input ?? {}], []),
+		endTurn: (input) =>
+			callService<{ ended: boolean }>(bridge, "agent-trace", "endTurn", [input], []),
+		listRuns: (input) =>
+			callService<{ runs: readonly AgentRunSummary[] }>(
+				bridge,
+				"agent-trace",
+				"listRuns",
+				[input ?? {}],
+				[],
+			),
+		listEvents: (input) =>
+			callService<{ events: readonly AgentTraceEventRecord[] }>(
+				bridge,
+				"agent-trace",
+				"listEvents",
+				[input],
+				[],
 			),
 	};
 }

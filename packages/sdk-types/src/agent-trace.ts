@@ -138,6 +138,32 @@ export type AgentTraceEventRecord = AgentTraceEventDraft & {
 	ts: number;
 };
 
+/**
+ * The app-facing `agent-trace` surface (Agent-12a / 12b). An app brackets its
+ * OWN chat turn and reads its OWN runs — no new capability (OQ-AO-2). The
+ * shell scopes every call to the broker-verified `envelope.app`; a caller
+ * cannot name another principal, and a foreign run id reads as empty.
+ */
+export type AgentTraceService = {
+	/** Open a chat-surface run for this turn; returns its id (or null when the
+	 *  shell could not record it — the caller proceeds regardless). */
+	beginTurn(input?: { conversationId?: string }): Promise<{ runId: string | null }>;
+	/** Close a run this app opened (no-op on a foreign/unknown id). */
+	endTurn(input: { runId: string }): Promise<{ ended: boolean }>;
+	/** This app's own runs, newest first, bounded + cursor-paged. */
+	listRuns(input?: {
+		conversationId?: string;
+		beforeStartedAt?: number;
+		limit?: number;
+	}): Promise<{ runs: readonly AgentRunSummary[] }>;
+	/** One own-run's ordered events, bounded + cursor-paged. */
+	listEvents(input: {
+		runId: string;
+		afterSeq?: number;
+		limit?: number;
+	}): Promise<{ events: readonly AgentTraceEventRecord[] }>;
+};
+
 function draft(
 	kind: AgentEventKind,
 	outcome: AgentEventOutcome,

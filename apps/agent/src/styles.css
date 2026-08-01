@@ -176,6 +176,90 @@ body {
 	padding: 2px;
 }
 
+/* ── Per-turn "what I did" timeline (Agent-12b) ── */
+.agent__timeline {
+	margin-bottom: var(--space-1);
+}
+
+.agent__timeline-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+	background: none;
+	border: none;
+	padding: 2px 0;
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+}
+
+.agent__timeline-toggle:hover {
+	color: var(--color-text-secondary);
+}
+
+.agent__timeline-toggle:focus-visible {
+	outline: 2px solid var(--color-border-focus);
+	outline-offset: 2px;
+}
+
+.agent__timeline-summary {
+	font-weight: var(--text-weight-medium, 500);
+}
+
+.agent__timeline-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: var(--text-size-xs);
+	color: var(--color-state-warning);
+	background: var(--color-surface-raised);
+	border-radius: var(--radius-sm);
+	padding: 0 var(--space-1);
+}
+
+.agent__timeline-list {
+	list-style: none;
+	margin: var(--space-1) 0 0;
+	padding: 0 0 0 var(--space-3);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.agent__timeline-item {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.agent__timeline-item--denied {
+	color: var(--color-state-warning);
+}
+
+.agent__timeline-label {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.agent__timeline-grant {
+	flex: 0 0 auto;
+	font-size: var(--text-size-xs);
+	color: var(--color-accent);
+	background: none;
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	padding: 0 var(--space-1);
+	cursor: pointer;
+}
+
+.agent__timeline-grant:focus-visible {
+	outline: 2px solid var(--color-border-focus);
+	outline-offset: 2px;
+}
+
 /* ── Cited sources (Agent-4) ── */
 .agent__citations {
 	display: flex;

@@ -1227,6 +1227,7 @@
   "shell.dashboard.activity.kind.sync": "Syncing",
   "shell.dashboard.activity.kind.import": "Importing",
   "shell.dashboard.activity.kind.export": "Exporting",
+  "shell.dashboard.activity.kind.agent-run": "Agent working",
   "shell.dashboard.syncStatus.chipLabel": "Sync status",
   "shell.dashboard.syncStatus.state.local-only": "Local only",
   "shell.dashboard.syncStatus.state.syncing": "Syncing",
