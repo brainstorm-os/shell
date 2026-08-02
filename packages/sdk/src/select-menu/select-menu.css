@@ -20,10 +20,12 @@
 	 * Designer) or side by side (Theme Editor's theme picker next to the name
 	 * input). A grey surface-default select beside an elevated bordered input
 	 * read as two different design systems — one face, defined once here and
-	 * once in `.bs-input`, both bound to the same tokens. */
-	border: var(--border-width) solid var(--color-border-strong);
-	border-radius: var(--radius-sm);
-	background: var(--color-background-elevated);
+	 * once in `.bs-input`, both bound to the same `field` tokens (a flat theme
+	 * swaps the elevated bordered box for a borderless tinted chip). Radius
+	 * rides the control-radius token so flat themes render pill triggers. */
+	border: var(--border-width) solid var(--color-field-border);
+	border-radius: var(--control-radius-md, 4px);
+	background: var(--color-field-background);
 	color: var(--color-text-primary);
 	font: inherit;
 	font-size: var(--text-size-md);
@@ -34,9 +36,15 @@
 		background var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
+/* Hover/open tint LAYERS over the field face (gradient trick — two color
+ * stops of the same colour) instead of replacing it: a replacement reads
+ * backwards on a flat theme whose field chip is already darker than the
+ * hover alpha. */
 .bs-select:hover:not(:disabled) {
-	border-color: var(--color-border-strong);
-	background: var(--color-interactive-hover);
+	border-color: var(--color-field-border);
+	background:
+		linear-gradient(var(--color-interactive-hover), var(--color-interactive-hover)),
+		var(--color-field-background);
 }
 
 .bs-select:focus-visible {
@@ -48,7 +56,9 @@
    trigger for as long as its menu is up. */
 .bs-select[aria-expanded="true"] {
 	border-color: var(--color-accent-default);
-	background: var(--color-interactive-hover);
+	background:
+		linear-gradient(var(--color-interactive-hover), var(--color-interactive-hover)),
+		var(--color-field-background);
 }
 
 .bs-select:disabled {
