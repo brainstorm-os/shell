@@ -293,6 +293,17 @@ export type AgentTool = {
 	entityType?: string;
 	format?: string;
 	label: string;
+	/** Declared shape of the tool's result.
+	 *
+	 * ⚠️ NOTHING VALIDATES THIS (`Tool-9`, filed honestly rather than assumed).
+	 * doc 39 promises an `output-schema-violation` outcome; grep the repo and
+	 * there is no such implementation and no validator consumes this field — it
+	 * is typed `unknown` and read by nobody. A workflow author reading the type
+	 * would reasonably assume a result is checked against it. It is not, so a
+	 * step must treat a tool result as untrusted data exactly as it would
+	 * without the field. Enforcing it needs the same decision `OQ-TOOL-1` made
+	 * for inputs (a validator we actually have), which is why it is not quietly
+	 * bolted on here. */
 	outputSchema?: unknown;
 	/** The EXACT capability footprint this tool requires, when it is not the
 	 *  default `intents.dispatch:<verb>` (+ the entity read a declared
