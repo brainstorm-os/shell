@@ -162,12 +162,15 @@ export type PropertyUiLabels = {
  *  subpath + its tests + any non-Notes consumer render correctly with
  *  just these (no `t()` manifest required). */
 export const DEFAULT_PROPERTY_UI_LABELS: PropertyUiLabels = {
-	// Empty cells render blank (no "Empty" placeholder word) — like Notion /
-	// Airtable. The cell stays hover/click-editable; it just isn't labelled.
-	cellEmpty: "",
+	// Empty cells read "Empty" in faint text — matching Notes' own labels, so
+	// every host renders the same affordance. A blank default made a page of
+	// unset properties look like dead labels (nothing marked the value column
+	// as clickable). Rating keeps a blank fallback: its outline stars are the
+	// affordance. `selectEmpty` is omitted so Tag/Select cells fall back to
+	// `cellEmpty`, exactly as Notes' own label set does.
+	cellEmpty: "Empty",
 	cellEditValueFor: (name) => `Edit value for ${name}`,
 	cellToggleValueFor: (name) => `Toggle ${name}`,
-	selectEmpty: "",
 	ratingEmpty: "",
 	cellRateValueFor: (name, star, max) => `Rate ${name} ${star} of ${max}`,
 

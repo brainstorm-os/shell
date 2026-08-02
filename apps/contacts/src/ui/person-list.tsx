@@ -116,7 +116,10 @@ type AxisPickerProps<T extends string> = {
 
 // Group/Sort triggers on the shared `.bs-select` face (POLISH-DSN-4): one
 // boxed trigger face for every "pick one of N" toolbar control, matching the
-// Files toolbar. A leading glyph tells the two axes apart.
+// Files toolbar. A leading glyph tells the two axes apart; the visible
+// caption is just the active axis value so both triggers fit two-up on one
+// sidebar row — the "Group by / Sort by" phrasing carries in the tooltip,
+// the aria-label and the menu label.
 function AxisPicker<T extends string>({
 	axes,
 	active,
@@ -127,12 +130,15 @@ function AxisPicker<T extends string>({
 	onSet,
 }: AxisPickerProps<T>): React.ReactElement {
 	const buttonRef = useRef<HTMLButtonElement>(null);
+	const fullCaption = t(captionKey, { axis: t(labelKeyOf(active)) });
 	return (
 		<button
 			ref={buttonRef}
 			type="button"
 			className="bs-select bs-select--sm contacts-list__control"
 			aria-haspopup="menu"
+			aria-label={fullCaption}
+			data-bs-tooltip={fullCaption}
 			onClick={() => {
 				const button = buttonRef.current;
 				if (!button) return;
@@ -149,7 +155,7 @@ function AxisPicker<T extends string>({
 			}}
 		>
 			<Icon name={leadingIcon} size={14} />
-			<span className="bs-select__value">{t(captionKey, { axis: t(labelKeyOf(active)) })}</span>
+			<span className="bs-select__value">{t(labelKeyOf(active))}</span>
 			<Icon name={IconName.CaretDown} size={12} className="bs-select__caret" />
 		</button>
 	);

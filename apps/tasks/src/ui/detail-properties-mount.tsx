@@ -72,6 +72,7 @@ export function mountTaskDetailProperties(
 					rows={bridgedTaskRows(next, deps.makeHandlers(next.id), INLINE_FIELDS)}
 					entityId={next.id}
 					hideHeader
+					inline
 				/>
 			</PropertiesProvider>,
 		);

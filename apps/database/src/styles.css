@@ -2354,17 +2354,9 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 /* The editable property list is the shared `<PropertiesPanel>` content
- * (`.bs-props`), mounted inline inside the inspector's own scrolling body —
- * so neutralize the panel's full-height flex + nested scroll + outer padding;
- * the `.bs-props__list` rows keep their shared label/value grid + hover. */
-.db-inspector .bs-props__inner {
-	height: auto;
-}
-
-.db-inspector .bs-props__body {
-	overflow: visible;
-	padding: 0;
-}
+ * rendered with its `inline` prop (`.bs-props__inner--inline`) — the
+ * full-height flex / nested scroll / outer padding neutralization lives in
+ * the SDK sheet now. */
 
 /* Two-column property grid — label left, value right, baseline-aligned.
  * Used by the System metadata block (created / updated / id). */

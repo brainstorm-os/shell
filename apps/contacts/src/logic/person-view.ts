@@ -5,6 +5,8 @@
  * unit-tested in isolation.
  */
 
+import { parseCover } from "@brainstorm-os/sdk/entity-cover";
+import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { PERSON_TYPE, type Person, type VaultEntityLike } from "../types/person";
 
 /** Normalise a stored multi-value text property (email / phone) into a
@@ -77,6 +79,8 @@ export function entityToPerson(entity: VaultEntityLike): Person {
 		anniversary: num(p.anniversary),
 		linkIds: refsToIds(p.links),
 		bio: str(p.bio),
+		icon: parseIcon(p.icon),
+		cover: parseCover(p.cover),
 	};
 }
 

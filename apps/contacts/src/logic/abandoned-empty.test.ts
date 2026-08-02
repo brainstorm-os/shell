@@ -14,6 +14,8 @@ function person(overrides: Partial<Person> = {}): Person {
 		anniversary: null,
 		linkIds: [],
 		bio: "",
+		icon: null,
+		cover: null,
 		...overrides,
 	};
 }

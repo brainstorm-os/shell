@@ -208,7 +208,6 @@ body.is-resizing .contacts__resize {
 .contacts-list__controls {
 	display: flex;
 	flex: 0 0 auto;
-	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2);
 	padding: var(--space-2);
@@ -216,12 +215,14 @@ body.is-resizing .contacts__resize {
 }
 
 /* Group/Sort triggers share the `.bs-select--sm` face (POLISH-DSN-4);
- * chrome comes from `@brainstorm-os/sdk/select-menu.css`. Full-width rows —
- * the boxed face doesn't fit two-up in the narrow sidebar, and a stacked
- * pair reads like the form controls above (search) rather than a ragged
- * wrap. Only the leading axis glyph is styled locally. */
+ * chrome comes from `@brainstorm-os/sdk/select-menu.css`. Two-up on ONE row:
+ * the trigger caption is just the active axis value ("First letter", "Name")
+ * — the "Group by / Sort by" phrasing lives in the tooltip, the aria-label
+ * and the menu label — so both fit the narrow sidebar without stacking a
+ * form-like column of full-width controls above the list. */
 .contacts-list__control {
-	flex: 1 1 100%;
+	flex: 1 1 0;
+	min-width: 0;
 }
 
 .contacts-list__control > svg:first-child {
@@ -408,14 +409,26 @@ body.is-resizing .contacts__resize {
 }
 
 /* Inline property block — the shared cells at the top of the page (the
- * Tasks-detail convention), separated from the body by a subtle rule. */
+ * Tasks-detail convention), separated from the body by a subtle rule. The
+ * panel renders with its `inline` prop (no padding of its own); the list's
+ * negative inline margin swallows the rows' own horizontal padding so the
+ * label text sits flush with the editor column and the hover pill bleeds
+ * into the gutter — same trick the cells' own negative margins use. */
 .contacts-detail__properties {
 	margin-bottom: var(--space-4);
 	padding-bottom: var(--space-2);
 	border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
+.contacts-detail__properties .bs-props__list {
+	margin-inline: calc(-1 * var(--space-2));
+}
+
 .contacts-detail__body {
+	/* The Lexical placeholder (`.bs-editor__placeholder`) is absolutely
+	 * positioned and anchors to the nearest positioned ancestor — without this
+	 * it escaped to `.contacts__content` and painted at the top of the pane. */
+	position: relative;
 	flex: 1 1 auto;
 	min-height: 0;
 	font-size: var(--text-size-md);
@@ -434,17 +447,44 @@ body.is-resizing .contacts__resize {
 	pointer-events: none;
 }
 
+/* Full-bleed cover band above the hero (shown only when the person HAS a
+ * cover — parity with Notes / Bookmarks); clicking it re-opens the picker. */
+.contacts-detail__cover {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+/* The avatar is the icon-picker affordance: the person's own universal icon
+ * when set, initials otherwise; a hover ring hints the click. */
 .contacts-detail__avatar {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	width: 72px;
 	height: 72px;
+	padding: 0;
+	border: 0;
 	border-radius: var(--radius-full);
 	background: var(--accent-soft);
 	color: var(--accent);
 	font-size: var(--text-size-2xl);
 	font-weight: var(--text-weight-semibold);
+	cursor: pointer;
+}
+
+.contacts-detail__avatar:hover {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.contacts-detail__avatar-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .contacts-detail__subtitle {

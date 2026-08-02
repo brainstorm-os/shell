@@ -76,5 +76,5 @@ export function InspectorProperties({
 			),
 		});
 	}
-	return <PropertiesPanel title="" hideHeader rows={rows} entityId={entity.id} />;
+	return <PropertiesPanel title="" hideHeader inline rows={rows} entityId={entity.id} />;
 }

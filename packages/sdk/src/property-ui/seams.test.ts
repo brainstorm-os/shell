@@ -18,7 +18,12 @@ import {
 describe("default labels", () => {
 	it("matches the English strings Notes shipped pre-VP-7", () => {
 		const l = DEFAULT_PROPERTY_UI_LABELS;
-		expect(l.cellEmpty).toBe("");
+		// "Empty" (not blank) — the unset-value affordance every host shows,
+		// matching Notes' own `notes.cell.empty` label.
+		expect(l.cellEmpty).toBe("Empty");
+		// Tag/Select cells must FALL BACK to `cellEmpty` (an explicit "" here
+		// would block the `??` fallback and render blank tag cells).
+		expect(l.selectEmpty).toBeUndefined();
 		expect(l.cellEditValueFor("Status")).toBe("Edit value for Status");
 		expect(l.cellToggleValueFor("Done")).toBe("Toggle Done");
 		expect(l.tagRemove("Doing")).toBe("Remove Doing");

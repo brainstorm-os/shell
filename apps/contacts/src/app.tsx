@@ -223,6 +223,9 @@ export function ContactsApp(): ReactElement {
 	const [composeOpen, setComposeOpen] = useState(false);
 	const [duplicatesOpen, setDuplicatesOpen] = useState(false);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+	// Owned here (not in PersonDetail) so the object ⋯ menu's Add/Change-cover
+	// item can open the picker too — the Notes arrangement.
+	const [coverPickerOpen, setCoverPickerOpen] = useState(false);
 	// When the shell launches Contacts to open a Company (a company link from
 	// any app routes here, since Contacts owns the `Company/v1` opener), we land
 	// on that company's people rather than the bare list.
@@ -591,6 +594,10 @@ export function ContactsApp(): ReactElement {
 		[location, persons],
 	);
 
+	// A picker left open for one contact must not greet the next.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: location.id IS the reset trigger
+	useEffect(() => setCoverPickerOpen(false), [location.id]);
+
 	// Label the tab + OS window with the open object's name (the shared
 	// tab-identity contract every app follows).
 	useEffect(() => {
@@ -620,14 +627,31 @@ export function ContactsApp(): ReactElement {
 	}, [canImportExport, persons.length, importVCard, exportVCard]);
 
 	const menuContextFor = useCallback(
-		(person: Person) =>
-			contactObjectMenuContext({
+		(person: Person) => {
+			// The cover affordance rides the ⋯ of the OPEN contact only (its own
+			// always-visible button would make the coverless hero noisy) — label
+			// flips Add / Change on whether one is set, exactly like Notes.
+			const extras: ObjectMenuExtraItem[] = [
+				...(activePerson && person.id === activePerson.id
+					? [
+							{
+								id: "cover",
+								label: person.cover ? t("detail.cover.edit") : t("detail.cover.add"),
+								icon: IconName.Palette,
+								run: () => setCoverPickerOpen(true),
+							},
+						]
+					: []),
+				...vcardItems,
+			];
+			return contactObjectMenuContext({
 				person,
 				runtime: rt,
 				onRemove: () => setConfirmDeleteId(person.id),
-				...(vcardItems.length > 0 ? { extraItems: vcardItems } : {}),
-			}),
-		[rt, vcardItems],
+				...(extras.length > 0 ? { extraItems: extras } : {}),
+			});
+		},
+		[rt, vcardItems, activePerson],
 	);
 
 	const moreRef = useRef<HTMLButtonElement>(null);
@@ -759,6 +783,8 @@ export function ContactsApp(): ReactElement {
 								entityTitleSource={titleSource}
 								showProperties={showProperties}
 								onToggleProperties={() => setShowProperties((v) => !v)}
+								coverPickerOpen={coverPickerOpen}
+								onCoverPickerOpenChange={setCoverPickerOpen}
 								onRenamePerson={(name) => void patchPerson(activePerson.id, { name })}
 								onPatch={(patch) => void patchPerson(activePerson.id, patch)}
 								onCreateCompany={(name) => void createCompanyFor(activePerson.id, name)}
