@@ -2249,6 +2249,10 @@ export { TAB_ICON_NONE, emojiFaviconUrl, tabFaviconUrl } from "./tab-identity";
 export {
 	APP_TOOLS_PER_APP_MAX,
 	APP_TOOL_DESCRIPTION_MAX,
+	APP_TOOL_INPUTS_MAX,
+	APP_TOOL_INPUT_CHOICES_MAX,
+	APP_TOOL_INPUT_DESCRIPTION_MAX,
+	APP_TOOL_INPUT_NAME_RE,
 	APP_TOOL_NAME_RE,
 	APP_TOOL_TITLE_MAX,
 	AppToolEffect,
@@ -2260,9 +2264,16 @@ export {
 	isAppToolEffect,
 	isAppToolSurface,
 	normalizeAppTool,
+	normalizeAppToolInput,
 	validateAppTool,
+	validateAppToolInput,
 } from "./app-tools";
-export type { AppToolRecord, AppToolRegistration, AppToolValidation } from "./app-tools";
+export type {
+	AppToolInput,
+	AppToolRecord,
+	AppToolRegistration,
+	AppToolValidation,
+} from "./app-tools";
 export { CoverKind } from "./cover";
 export type { Cover, CoverFocal } from "./cover";
 

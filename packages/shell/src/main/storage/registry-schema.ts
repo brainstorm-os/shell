@@ -327,4 +327,15 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			db.exec("CREATE UNIQUE INDEX idx_app_tools_app_name ON app_tools (app_id, name);");
 		},
 	},
+	{
+		version: 14,
+		description: "registry.db v14 — app_tools.input (Tool-3: typed arguments)",
+		up: (db) => {
+			// Tool-3 — the tool's declared arguments, a JSON array of
+			// `AppToolInput` (OQ-TOOL-1: PropertyDef-shaped, not JSON Schema).
+			// Defaulted to `[]` so a v13 row reads back as "takes no arguments",
+			// which is what it in fact declared.
+			db.exec("ALTER TABLE app_tools ADD COLUMN input TEXT NOT NULL DEFAULT '[]';");
+		},
+	},
 ];

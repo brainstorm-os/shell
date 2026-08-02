@@ -101,6 +101,7 @@ export default defineConfig({
 			// Subpath exports — must precede the bare `@brainstorm-os/sdk` entry
 			// so the longer prefix wins (alias matching is order-sensitive),
 			// else `@brainstorm-os/sdk/resizable` rewrites to `…/index.ts/resizable`.
+			"@brainstorm-os/sdk/app-tool-args": resolve(__dirname, "packages/sdk/src/app-tool-args.ts"),
 			"@brainstorm-os/sdk/property-ui/pure": resolve(
 				__dirname,
 				"packages/sdk/src/property-ui-pure.ts",

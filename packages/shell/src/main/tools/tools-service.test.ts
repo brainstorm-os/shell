@@ -11,6 +11,7 @@ import {
 	AppToolEffect,
 	type AppToolRecord,
 	AppToolSurface,
+	ValueType,
 	appToolId,
 } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -64,6 +65,8 @@ function tool(partial: Partial<AppToolRecord> & { appId: string; name: string })
 		effect: partial.effect ?? AppToolEffect.Pure,
 		appliesTo: partial.appliesTo ?? [],
 		surfaces: partial.surfaces ?? [AppToolSurface.Menu, AppToolSurface.Agent],
+		input: partial.input ?? [],
+		...(partial.declarationInvalid ? { declarationInvalid: true as const } : {}),
 		registeredAt: 1000,
 	};
 }
@@ -231,6 +234,90 @@ describe("tools.list (Tool-2)", () => {
 
 	it("rejects an unknown method", async () => {
 		await expect(handler()(envelope("call", [{}]))).rejects.toMatchObject({ name: "Invalid" });
+	});
+
+	it("round-trips a declared argument through the registry (Tool-3)", async () => {
+		repo.insertMany([
+			tool({
+				appId: "io.example.a",
+				name: "search",
+				input: [
+					{
+						name: "query",
+						description: "what to look for",
+						required: true,
+						valueType: ValueType.Text,
+						pattern: "[a-z ]+",
+					},
+				],
+			}),
+		]);
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows).toHaveLength(1);
+		expect(rows[0]?.input).toEqual([
+			{
+				name: "query",
+				description: "what to look for",
+				required: true,
+				valueType: ValueType.Text,
+				pattern: "[a-z ]+",
+			},
+		]);
+	});
+
+	it("never offers a tool whose stored declaration fails to re-validate", async () => {
+		// Losing a constraint silently would leave a tool that LOOKS constrained
+		// and validates nothing — so a bad declaration poisons the whole tool.
+		const db = await stores.open("registry");
+		for (const [i, badInput] of [
+			"not json",
+			'{"not":"an array"}',
+			'[{"name":"query"}]',
+			'[{"name":"q","description":"d","required":true,"valueType":"richText"}]',
+			'[{"name":"q","description":"d","required":true,"valueType":"text","pattern":"[unclosed"}]',
+		].entries()) {
+			db
+				.prepare(
+					"INSERT INTO app_tools (id, app_id, name, title, description, effect, applies_to, surfaces, input, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				)
+				.run(
+					`app.io.example.bad.t${i}`,
+					"io.example.bad",
+					`t${i}`,
+					"T",
+					"d",
+					AppToolEffect.Pure,
+					"[]",
+					'["menu"]',
+					badInput,
+					1,
+				);
+			expect(repo.get(`app.io.example.bad.t${i}`)?.declarationInvalid, badInput).toBe(true);
+		}
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows).toEqual([]);
+	});
+
+	it("reads a pre-Tool-3 row as declaring no arguments", async () => {
+		const db = await stores.open("registry");
+		db
+			.prepare(
+				"INSERT INTO app_tools (id, app_id, name, title, description, effect, applies_to, surfaces, registered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			)
+			.run(
+				"app.io.example.v13.old",
+				"io.example.v13",
+				"old",
+				"Old",
+				"d",
+				AppToolEffect.Pure,
+				"[]",
+				'["menu"]',
+				1,
+			);
+		const row = repo.get("app.io.example.v13.old");
+		expect(row?.input).toEqual([]);
+		expect(row?.declarationInvalid).toBeUndefined();
 	});
 
 	it("degrades a corrupt row to the most restrictive effect, never the most permissive", async () => {
