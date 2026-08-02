@@ -15,10 +15,13 @@
 
 import {
 	type AppToolEffect,
+	type AppToolInput,
 	type AppToolRecord,
 	type AppToolSurface,
 	isAppToolEffect,
 	isAppToolSurface,
+	normalizeAppToolInput,
+	validateAppToolInput,
 } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
@@ -31,6 +34,7 @@ type Row = {
 	effect: string;
 	applies_to: string;
 	surfaces: string;
+	input: string;
 	registered_at: number;
 };
 
@@ -43,8 +47,35 @@ function parseList(json: string): string[] {
 	}
 }
 
+/** Re-validate the stored argument declaration on READ (Tool-3).
+ *
+ * The installer validates before writing, so a row that fails here is corrupt
+ * or hand-edited. Degrading the way the list columns do — dropping the bad
+ * entries and keeping the rest — would be fail-OPEN in the one place it must
+ * not be: silently losing a `pattern` or a `range` leaves a tool that looks
+ * constrained and validates nothing. So a bad declaration poisons the whole
+ * tool instead. */
+function parseInput(json: string): { input: AppToolInput[]; invalid: boolean } {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(json);
+	} catch {
+		return { input: [], invalid: true };
+	}
+	if (!Array.isArray(parsed)) return { input: [], invalid: true };
+	const input: AppToolInput[] = [];
+	for (const [i, entry] of parsed.entries()) {
+		if (!validateAppToolInput(entry, i).ok) return { input: [], invalid: true };
+		input.push(normalizeAppToolInput(entry as AppToolInput));
+	}
+	return { input, invalid: false };
+}
+
 function toRecord(r: Row): AppToolRecord {
+	const { input, invalid } = parseInput(r.input);
 	return {
+		...(invalid ? { declarationInvalid: true as const } : {}),
+		input,
 		id: r.id,
 		appId: r.app_id,
 		name: r.name,
@@ -62,14 +93,15 @@ function toRecord(r: Row): AppToolRecord {
 	};
 }
 
-const COLUMNS = "id, app_id, name, title, description, effect, applies_to, surfaces, registered_at";
+const COLUMNS =
+	"id, app_id, name, title, description, effect, applies_to, surfaces, input, registered_at";
 
 export class AppToolsRepository {
 	constructor(private readonly db: SqliteDatabase) {}
 
 	insertMany(tools: readonly AppToolRecord[]): void {
 		const stmt = this.db.prepare(
-			`INSERT INTO app_tools (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO app_tools (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		);
 		for (const t of tools) {
 			stmt.run(
@@ -81,6 +113,7 @@ export class AppToolsRepository {
 				t.effect,
 				JSON.stringify(t.appliesTo),
 				JSON.stringify(t.surfaces),
+				JSON.stringify(t.input ?? []),
 				t.registeredAt,
 			);
 		}

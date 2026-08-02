@@ -159,6 +159,10 @@ export async function handleToolsList(
 		throw makeError("Unavailable", "tools: disabled-contributor set unreadable");
 
 	return repo.listAll().filter((tool) => {
+		// Tool-3 — a persisted declaration that failed to re-validate on read is
+		// never offered. Checked first: everything below reasons about a tool
+		// whose contract is intact.
+		if (tool.declarationInvalid) return false;
 		// A tool never offers itself back to its own provider's menu — the app
 		// already has the function; the catalogue is for OTHER callers.
 		if (tool.appId === envelope.app) return false;
