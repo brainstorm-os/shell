@@ -4207,6 +4207,15 @@ void app.whenReady().then(async () => {
 		makeToolsServiceHandler({
 			getCallHost: () => appCallHost,
 			getApprovalHost: () => toolApprovalHost,
+			// Tool-8 — the read-only lock is a synced entity property, and it has to
+			// hold on EVERY write path or it is decoration (the lesson the read-only
+			// lock fleet already taught). Unreadable ⇒ treated as locked.
+			resolveEntityLocked: async (entityId: string) => {
+				const repo = await getEntitiesRepoForActiveSession();
+				const row = repo?.get(entityId);
+				if (!row) return true;
+				return (row.properties as Record<string, unknown> | undefined)?.locked === true;
+			},
 			// Tool-5 — the user's per-tool approvals, so an app UPDATE that
 			// rewrites a tool re-prompts instead of inheriting the friction its
 			// old description earned.

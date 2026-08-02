@@ -429,6 +429,67 @@ describe("tools.call (Tool-4)", () => {
 		).rejects.toMatchObject({ name: "Denied" });
 	});
 
+	it("refuses a proposes-write tool aimed at a LOCKED object", async () => {
+		// A locked object is read-only, and the lock has to hold on every write
+		// path or it is decoration. A proposes-write tool takes an object and
+		// returns a change to it — refused before the provider sees the id.
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to rewrite",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.ProposesWrite, input: [target] })]);
+		await expect(
+			handler({ resolveEntityLocked: async () => true })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).rejects.toMatchObject({ name: "Denied" });
+		expect(host.call).not.toHaveBeenCalled();
+		await expect(
+			handler({ resolveEntityLocked: async () => false })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).resolves.toEqual({ value: "done" });
+	});
+
+	it("treats an unresolvable lock as LOCKED", async () => {
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to rewrite",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.ProposesWrite, input: [target] })]);
+		for (const resolver of [
+			undefined,
+			async () => {
+				throw new Error("entities down");
+			},
+		]) {
+			await expect(
+				handler(resolver ? { resolveEntityLocked: resolver } : {})(
+					envelope([{ tool: TOOL, args: { target: "e1" } }]),
+				),
+			).rejects.toMatchObject({ name: "Denied" });
+		}
+	});
+
+	it("does not consult the lock for a tool that only reads", async () => {
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to read",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.Pure, input: [target] })]);
+		await expect(
+			handler({ resolveEntityLocked: async () => true })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).resolves.toEqual({ value: "done" });
+	});
+
 	// ── Friction ─────────────────────────────────────────────────────────────
 
 	it("does not read an OMITTED argument off Object.prototype", async () => {

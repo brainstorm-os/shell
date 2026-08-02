@@ -42,6 +42,7 @@ import { isAgentPrincipal } from "@brainstorm-os/capabilities/principals";
 import {
 	APP_TOOL_NAME_RE,
 	AppToolApprovalState,
+	AppToolEffect,
 	type AppToolInput,
 	type AppToolRecord,
 	ToolCallInitiator,
@@ -139,6 +140,9 @@ export type ToolsCallOptions = {
 	 *  declaring `allowedTypes` may be called; the caller's claim about a
 	 *  referenced object's type is never trusted. */
 	resolveEntityType?: (entityId: string) => Promise<string | null>;
+	/** Is this object read-only? Required before a `proposes-write` tool may
+	 *  touch it; absent ⇒ treated as locked (fail closed). */
+	resolveEntityLocked?: (entityId: string) => Promise<boolean>;
 	/** The shell-owned approval prompt (Tool-8). Absent = nothing can be
 	 *  approved, so a call needing approval refuses rather than proceeding. */
 	getApprovalHost?: () => ToolApprovalHost | null;
@@ -288,6 +292,34 @@ async function enforceAllowedTypes(
 	return null;
 }
 
+/** The first entityRef argument naming a LOCKED object, or null.
+ *
+ * Fails closed: if the lock cannot be resolved we treat the object as locked,
+ * because "we could not tell" and "it is editable" are not the same answer. */
+async function lockedTarget(
+	inputs: readonly AppToolInput[],
+	args: Readonly<Record<string, unknown>>,
+	options: ToolsCallOptions,
+): Promise<string | null> {
+	const refs = inputs.filter((i) => i.valueType === ValueType.EntityRef);
+	if (refs.length === 0) return null;
+	for (const input of refs) {
+		if (!Object.hasOwn(args, input.name)) continue;
+		const supplied = args[input.name];
+		const ids = isMultiValued(input.count) ? (supplied as unknown[]) : [supplied];
+		for (const id of ids) {
+			if (typeof id !== "string") continue;
+			if (!options.resolveEntityLocked) return input.name;
+			try {
+				if (await options.resolveEntityLocked(id)) return input.name;
+			} catch {
+				return input.name;
+			}
+		}
+	}
+	return null;
+}
+
 export async function handleToolsCall(
 	envelope: Envelope,
 	options: ToolsCallOptions,
@@ -409,6 +441,21 @@ export async function handleToolsCall(
 	if (typeError) {
 		record("refused", "entity-type", argKeys);
 		throw makeError("Denied", `tools.call: ${typeError}`);
+	}
+
+	// Tool-8 — a locked object is read-only, and the lock has to hold on EVERY
+	// write path or it is decoration (the lesson the read-only-lock fleet
+	// already taught: inspector, cover, icon, drag, rename, delete and menu all
+	// had to gate on it, not just the editor). A `proposes-write` tool takes an
+	// object and comes back with a change to it, so it is a write path — the
+	// proposal would be built against something the user froze. Refused BEFORE
+	// the provider sees the id, so a locked object is not even readable this way.
+	if (tool.effect === AppToolEffect.ProposesWrite) {
+		const locked = await lockedTarget(tool.input, args, options);
+		if (locked) {
+			record("refused", "locked-object", argKeys);
+			throw makeError("Denied", `tools.call: ${locked} is locked`);
+		}
 	}
 
 	// ── 5. Friction ──────────────────────────────────────────────────────────
