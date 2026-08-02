@@ -17,7 +17,9 @@
 	justify-content: center;
 	gap: var(--space-2);
 	border: var(--border-width) solid transparent;
-	border-radius: var(--radius-md);
+	/* Control-radius token, not the generic scale: a flat theme can render
+	 * pill buttons without rounding cards/menus with them. */
+	border-radius: var(--control-radius-lg);
 	color: var(--color-text-primary);
 	font-family: inherit;
 	font-weight: var(--text-weight-medium);
@@ -200,22 +202,19 @@
  * the ink is the theme's own text — quiet next to a glossy accent
  * primary in both appearances. */
 .button--neutral {
-	--gloss-top: color-mix(in srgb, var(--color-background-inverse) 8%, var(--color-surface-default));
-	--gloss-bottom: color-mix(
-		in srgb,
-		var(--color-background-inverse) 16%,
-		var(--color-surface-default)
-	);
+	--gloss-top: var(--color-gloss-neutral-top);
+	--gloss-bottom: var(--color-gloss-neutral-bottom);
 	color: var(--color-text-primary);
 	text-shadow: none;
 }
 
-/* Destructive face derives from the error token (top lifted toward
- * white, bottom dropped toward black) so the gloss has somewhere to
- * travel; reuses the shared speculars. */
+/* Destructive face — theme-owned stops (the glossy themes derive them
+ * from `state.error`, top lifted toward white / bottom dropped toward
+ * black so the gloss has somewhere to travel; flat themes collapse both
+ * to the error colour); reuses the shared speculars. */
 .button--destructive {
-	--gloss-top: color-mix(in srgb, var(--color-state-error) 82%, white);
-	--gloss-bottom: color-mix(in srgb, var(--color-state-error) 84%, black);
+	--gloss-top: var(--color-gloss-destructive-top);
+	--gloss-bottom: var(--color-gloss-destructive-bottom);
 	color: var(--color-text-inverse);
 }
 
