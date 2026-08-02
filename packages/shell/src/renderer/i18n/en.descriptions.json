@@ -676,5 +676,6 @@
   "tools.approval.body": "Body of the approval prompt; {caller} is the requesting app's name, {tool} the tool's title, {provider} the app that provides it. Keep the curly quotes around the tool title.",
   "tools.approval.changed.body": "Body of the re-approval prompt; {tool} and {provider} as above. Tells the user to review what the tool does before allowing it again.",
   "tools.approval.approve": "Confirm button of the tool-approval prompt — lets the call proceed. Verb, imperative.",
-  "tools.approval.decline": "Cancel button of the tool-approval prompt — refuses the call. Verb, imperative."
+  "tools.approval.decline": "Cancel button of the tool-approval prompt — refuses the call. Verb, imperative.",
+  "shell.settings.data.properties.usagePillNotUsed": "Pill on a property or dictionary-item row that nothing uses yet. Renders in place of the usage count so \"used by zero objects\" is visibly different from \"not counted\", rather than both being blank."
 }
