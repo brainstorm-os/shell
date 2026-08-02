@@ -3,7 +3,13 @@ import {
 	type AppearanceState,
 	effectiveSlotFor,
 } from "@brainstorm-os/protocol/appearance";
-import { DEFAULT_THEME, ThemeName, flattenTokens, themes } from "@brainstorm-os/tokens";
+import {
+	DEFAULT_THEME,
+	ThemeName,
+	flattenTokens,
+	isThemeName,
+	themes,
+} from "@brainstorm-os/tokens";
 import { type ReactNode, useEffect, useState } from "react";
 import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
@@ -30,15 +36,27 @@ const FLATTENED: Record<ThemeName, Record<string, string>> = Object.fromEntries(
  * is preserved), while `--typography-scale` and any role a theme omits fall to
  * the contract default.
  */
-export function applyThemeVars(theme: ThemeName): void {
+export function applyThemeVars(theme: ThemeName | string): void {
+	// The name comes from persisted vault state (or a main-process push), so it
+	// can belong to a theme this renderer doesn't ship — a newer install wrote
+	// the slot, or the dev renderer pre-bundled tokens before a theme merged.
+	// Resolve-or-fallback like every other surface (tab-strip, app-preload,
+	// widgets layer); throwing here kills the repaint and the light/dark
+	// toggle plays dead (F-480).
+	const resolved = isThemeName(theme) ? theme : DEFAULT_THEME;
+	if (resolved !== theme) {
+		console.warn(
+			`[brainstorm] applyThemeVars: unknown theme ${JSON.stringify(theme)} — falling back to ${resolved} (renderer build older than the vault's theme?)`,
+		);
+	}
 	const root = document.documentElement;
 	for (const [key, value] of Object.entries(TYPOGRAPHY_BASE)) {
 		root.style.setProperty(key, value);
 	}
-	for (const [key, value] of Object.entries(FLATTENED[theme])) {
+	for (const [key, value] of Object.entries(FLATTENED[resolved])) {
 		root.style.setProperty(key, value);
 	}
-	root.dataset.theme = theme;
+	root.dataset.theme = resolved;
 }
 
 /**
