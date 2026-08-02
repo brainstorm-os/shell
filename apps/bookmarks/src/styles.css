@@ -703,12 +703,22 @@ body.is-resizing .bookmarks__resize {
 	margin-top: var(--space-1);
 }
 
+/* A bookmark's tags ARE a tag property, so they wear the shared property face
+ * (`.bs-cell-tag`) rather than a local approximation. The old rule was a
+ * lookalike with tighter padding, no border and no weight — visibly a
+ * different kind of chip from the same data everywhere else. */
 .bookmarks__card-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	max-width: 18em;
+	padding: 0 var(--space-2);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-full);
 	font-size: var(--text-size-xs);
+	font-weight: var(--text-weight-medium);
 	color: var(--text-dim);
 	background: var(--bg-elev);
-	padding: 0 var(--space-1);
-	border-radius: var(--radius-full);
 }
 
 /* The card's only trailing affordance is the ⋯ object menu (every action
@@ -1129,6 +1139,12 @@ textarea.bookmarks__form-input {
 }
 
 .bm-detail__body {
+	/* The Lexical placeholder (`.bs-editor__placeholder`) is absolutely
+	 * positioned and anchors to the nearest POSITIONED ancestor — without this
+	 * it escaped the pane entirely and painted over the window chrome. Contacts
+	 * hit the identical bug (`.contacts-detail__body`); this is the third app,
+	 * so the editor owning a positioned host is filed as the real fix. */
+	position: relative;
 	font-size: var(--text-size-md);
 	line-height: 1.65;
 	color: var(--text);
