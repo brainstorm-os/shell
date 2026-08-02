@@ -57,17 +57,24 @@ export type Tokens = {
 			 *  `accent.default` for decorative fills that carry no text. */
 			onFill: string;
 		};
-		/** Glossy-button anatomy — the `Button` Glass/Primary/Destructive
-		 *  variants render a saturated theme-driven 2-colour face gradient
+		/** Glossy-button anatomy — the `Button` Glass/Primary/Neutral/
+		 *  Destructive variants render a theme-driven 2-colour face gradient
 		 *  (`top` → `bottom`, NO white wash on the top edge) plus subtle
-		 *  glass speculars. `top` / `bottom` are the face stops (Glass +
-		 *  Primary share them; Destructive derives its own from
-		 *  `state.error`). `shineTop` is the soft blurred top reflection;
+		 *  glass speculars. `top` / `bottom` are the accent face stops
+		 *  (Glass + Primary share them); `neutralTop/Bottom` and
+		 *  `destructiveTop/Bottom` are the Neutral / Destructive face stops
+		 *  (values may be `color-mix()`/`var()` strings — they resolve at
+		 *  use). A flat theme collapses each pair to one colour and zeroes
+		 *  the speculars. `shineTop` is the soft blurred top reflection;
 		 *  `shineBottom` the bottom reflected glow + contact line;
 		 *  `innerTop` / `innerBottom` are the 1px inset edge glints. */
 		gloss: {
 			top: string;
 			bottom: string;
+			neutralTop: string;
+			neutralBottom: string;
+			destructiveTop: string;
+			destructiveBottom: string;
 			shineTop: string;
 			shineBottom: string;
 			innerTop: string;
@@ -190,6 +197,14 @@ export type Tokens = {
 	control: {
 		height: {
 			sm: string;
+			md: string;
+			lg: string;
+		};
+		/** Corner rounding for buttons (md = default button, lg = the shell
+		 *  Button / large app button). Split from the generic `radius` scale
+		 *  so a theme can render pill buttons (9999px) without rounding
+		 *  cards, menus and inputs with them. */
+		radius: {
 			md: string;
 			lg: string;
 		};

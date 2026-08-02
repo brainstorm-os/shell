@@ -458,6 +458,8 @@
   "shell.settings.themes.aurora.label": "Display name of the 'Aurora' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.forest.description": "Description of the 'Forest' theme (deep evergreen surfaces, emerald accent) in the theme picker.",
   "shell.settings.themes.forest.label": "Display name of the 'Forest' theme. Very short; a proper noun, may stay untranslated.",
+  "shell.settings.themes.graphite.description": "Description of the 'Graphite' theme (flat charcoal surfaces, clear blue accent; dark counterpart of Porcelain) in the theme picker.",
+  "shell.settings.themes.graphite.label": "Display name of the 'Graphite' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.mint.description": "Description of the 'Mint' theme (light green-tinted surfaces, teal accent) in the theme picker.",
   "shell.settings.themes.mint.label": "Display name of the 'Mint' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.nord.description": "Description of the 'Nord' theme (arctic blue-grey surfaces, frost-blue accent) in the theme picker.",

@@ -8,6 +8,7 @@ import {
 	defaultDark,
 	defaultLight,
 	forest,
+	graphite,
 	highContrast,
 	isThemeName,
 	midnight,
@@ -74,6 +75,7 @@ describe("themes catalog", () => {
 			rose,
 			slate,
 			porcelain,
+			graphite,
 		]) {
 			const keys = Object.keys(flattenTokens(tokens)).sort();
 			expect(keys).toEqual(baseKeys);

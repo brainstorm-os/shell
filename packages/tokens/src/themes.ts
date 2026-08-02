@@ -119,6 +119,43 @@ const control = {
 		md: "32px",
 		lg: "40px",
 	},
+	// Matches the generic radius scale (sm 4 / md 8) so every existing theme
+	// renders unchanged; flat themes override to 9999px for pill buttons.
+	radius: {
+		md: "4px",
+		lg: "8px",
+	},
+} as const;
+
+// Neutral / Destructive button-face stops shared by every glossy theme —
+// the exact `color-mix()` derivations the Button CSS used to hardcode
+// (they reference other tokens, so each theme still renders its own
+// colours). Flat themes replace these with single-colour pairs.
+const glossVariantStops = {
+	neutralTop: "color-mix(in srgb, var(--color-background-inverse) 8%, var(--color-surface-default))",
+	neutralBottom:
+		"color-mix(in srgb, var(--color-background-inverse) 16%, var(--color-surface-default))",
+	destructiveTop: "color-mix(in srgb, var(--color-state-error) 82%, white)",
+	destructiveBottom: "color-mix(in srgb, var(--color-state-error) 84%, black)",
+} as const;
+
+// Flat-theme variant stops — no travel: one colour per face.
+const flatVariantStops = {
+	neutralTop:
+		"color-mix(in srgb, var(--color-background-inverse) 12%, var(--color-surface-default))",
+	neutralBottom:
+		"color-mix(in srgb, var(--color-background-inverse) 12%, var(--color-surface-default))",
+	destructiveTop: "var(--color-state-error)",
+	destructiveBottom: "var(--color-state-error)",
+} as const;
+
+// Pill-button control scale for the flat themes (Porcelain / Graphite).
+const pillControl = {
+	...control,
+	radius: {
+		md: "9999px",
+		lg: "9999px",
+	},
 } as const;
 
 const radius = {
@@ -412,6 +449,24 @@ const graphPorcelain = {
 	},
 } as const;
 
+const graphGraphite = {
+	subject: {
+		"1": "#699bff", // blue
+		"2": "#c870e8", // purple
+		"3": "#20c8b8", // teal
+		"4": "#ecd91a", // yellow
+		"5": "#f25040", // red
+		"6": "#40b8f5", // ice
+		"7": "#f040a0", // pink
+		"8": "#4ecc4e", // lime
+	},
+	unmatched: "rgba(200, 200, 200, 0.4)",
+	edge: {
+		matched: "rgba(55, 122, 255, 0.7)",
+		unmatched: "rgba(200, 200, 200, 0.28)",
+	},
+} as const;
+
 const sharedScalars = {
 	space,
 	text: {
@@ -469,6 +524,7 @@ export const defaultDark: Tokens = {
 			onFill: palette.blue["400"],
 		},
 		gloss: {
+			...glossVariantStops,
 			// A real TWO-colour face: vivid violet at the top rotating to a
 			// clear blue at the bottom (the hue travels ~40°, like the
 			// reference purple→blue — NOT a single-hue lightness ramp). No
@@ -569,6 +625,7 @@ export const defaultLight: Tokens = {
 			onFill: palette.blue["600"],
 		},
 		gloss: {
+			...glossVariantStops,
 			// Violet→blue, same hue travel as dark but a touch deeper for
 			// contrast on the light surfaces.
 			top: "#7c5cf6",
@@ -667,6 +724,7 @@ export const midnight: Tokens = {
 			onFill: "#38bdf8",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Bright cyan→blue — Midnight's cooler two-colour face.
 			top: "#5cc6f8",
 			bottom: "#2f7be0",
@@ -758,6 +816,7 @@ export const sepia: Tokens = {
 			onFill: "#b04a18",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Warm orange→brick two-colour face; warm (cream/amber)
 			// speculars rather than the cool ones of the dark themes so the
 			// gloss stays inside Sepia's paper palette.
@@ -858,6 +917,7 @@ export const highContrast: Tokens = {
 			onFill: "#ffd400",
 		},
 		gloss: {
+			...glossVariantStops,
 			// High Contrast deliberately suppresses the soft-glass look
 			// (blur 0, opaque surfaces): a tight near-flat yellow gradient
 			// and plain-white glints so the button reads as a crisp solid.
@@ -955,6 +1015,7 @@ export const solar: Tokens = {
 			onFill: "#c2410c",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Warm orange→amber two-colour face — matches Solar's accent.
 			top: "#fb923c",
 			bottom: "#c2410c",
@@ -1049,6 +1110,7 @@ export const forest: Tokens = {
 			onFill: "#34d399",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Bright leaf-green → deep forest green two-colour face.
 			top: "#5be39b",
 			bottom: "#0f9d6e",
@@ -1140,6 +1202,7 @@ export const nord: Tokens = {
 			onFill: "#88c0d0",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Frost teal → deep frost blue two-colour face.
 			top: "#8fbcbb",
 			bottom: "#5e81ac",
@@ -1231,6 +1294,7 @@ export const aurora: Tokens = {
 			onFill: "#d946ef",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Orchid → magenta two-colour face — the aurora's brightest band.
 			top: "#e066f5",
 			bottom: "#a21caf",
@@ -1322,6 +1386,7 @@ export const mint: Tokens = {
 			onFill: "#0f766e",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Bright teal → deep teal two-colour face.
 			top: "#2dd4bf",
 			bottom: "#0f766e",
@@ -1413,6 +1478,7 @@ export const rose: Tokens = {
 			onFill: "#e11d48",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Bright rose → deep crimson two-colour face.
 			top: "#fb7185",
 			bottom: "#be123c",
@@ -1504,6 +1570,7 @@ export const slate: Tokens = {
 			onFill: "#4f46e5",
 		},
 		gloss: {
+			...glossVariantStops,
 			// Indigo → deep indigo two-colour face.
 			top: "#6366f1",
 			bottom: "#4338ca",
@@ -1596,13 +1663,16 @@ export const porcelain: Tokens = {
 			onFill: "#2563eb",
 		},
 		gloss: {
-			// Soft cornflower → clear blue two-colour face — matches the accent.
-			top: "#6d95f6",
-			bottom: "#2f5fe0",
-			shineTop: "rgba(219, 229, 255, 0.65)",
-			shineBottom: "rgba(200, 220, 255, 0.7)",
-			innerTop: "rgba(255, 255, 255, 0.45)",
-			innerBottom: "rgba(60, 110, 230, 0.20)",
+			...flatVariantStops,
+			// Flat face — both stops the text-grade accent (white label stays
+			// AA) and every specular/glint fully transparent: Porcelain's
+			// buttons are plain pills, no glossy effect.
+			top: "#2563eb",
+			bottom: "#2563eb",
+			shineTop: "rgba(255, 255, 255, 0)",
+			shineBottom: "rgba(255, 255, 255, 0)",
+			innerTop: "rgba(255, 255, 255, 0)",
+			innerBottom: "rgba(255, 255, 255, 0)",
 		},
 		state: {
 			success: palette.green["600"],
@@ -1640,12 +1710,115 @@ export const porcelain: Tokens = {
 		graph: graphPorcelain,
 	},
 	...sharedScalars,
+	// Pill buttons — Porcelain's controls are fully rounded (the generic
+	// radius scale is untouched: cards / menus / inputs keep their corners).
+	control: pillControl,
 	shadow: {
 		none: "none",
 		sm: "0 1px 2px rgba(23, 23, 23, 0.06)",
 		md: "0 2px 8px rgba(23, 23, 23, 0.08)",
 		lg: "0 8px 24px rgba(23, 23, 23, 0.12)",
 		xl: "0 16px 48px rgba(23, 23, 23, 0.18)",
+	},
+	glass: {
+		blur: "10px",
+		saturate: "180%",
+	},
+};
+
+// Graphite — Porcelain's dark counterpart. Flat, truly neutral charcoal
+// surfaces (no navy/violet undertone), soft off-white text and the same
+// clear-blue accent family; the quietest of the dark set, for people who
+// want the UI to disappear behind the content. Dark variant.
+export const graphite: Tokens = {
+	color: {
+		background: {
+			primary: "#171717",
+			elevated: "#232323",
+			subtle: "#292929",
+			inverse: "#e1e1e1",
+		},
+		surface: {
+			default: "rgba(255, 255, 255, 0.05)",
+			overlay: "rgba(255, 255, 255, 0.11)",
+			raised: "rgba(255, 255, 255, 0.11)",
+		},
+		border: {
+			subtle: "rgba(255, 255, 255, 0.08)",
+			default: "rgba(255, 255, 255, 0.13)",
+			strong: "rgba(255, 255, 255, 0.26)",
+		},
+		text: {
+			primary: "#e1e1e1",
+			secondary: "#e1e1e1",
+			tertiary: "rgba(225, 225, 225, 0.6)",
+			inverse: "#171717",
+			link: "#699bff",
+		},
+		accent: {
+			subtle: "rgba(55, 122, 255, 0.15)",
+			default: "#377aff",
+			strong: "#105aef",
+			text: "#ffffff",
+			onSurface: "#699bff",
+			onFill: "#105aef",
+		},
+		gloss: {
+			...flatVariantStops,
+			// Flat face — both stops the deep text-grade accent (white label
+			// stays AA) and every specular/glint fully transparent: Graphite's
+			// buttons are plain pills, no glossy effect.
+			top: "#105aef",
+			bottom: "#105aef",
+			shineTop: "rgba(255, 255, 255, 0)",
+			shineBottom: "rgba(255, 255, 255, 0)",
+			innerTop: "rgba(255, 255, 255, 0)",
+			innerBottom: "rgba(255, 255, 255, 0)",
+		},
+		state: {
+			success: palette.green["400"],
+			warning: palette.amber["400"],
+			error: palette.red["400"],
+			info: palette.cyan["400"],
+		},
+		chrome: {
+			background: "#171717",
+			text: "#e1e1e1",
+		},
+		shadow: {
+			subtle: "rgba(0, 0, 0, 0.14)",
+			default: "rgba(0, 0, 0, 0.2)",
+			strong: "rgba(0, 0, 0, 0.38)",
+		},
+		focus: {
+			ring: "#377aff",
+		},
+		interactive: {
+			hover: "rgba(255, 255, 255, 0.05)",
+			active: "rgba(255, 255, 255, 0.11)",
+		},
+		glass: {
+			// Denser charcoal veil than Default Dark — panels sit closer to
+			// opaque flat surfaces while the wallpaper still breathes through
+			// the blur. Mirrors Porcelain's flatter-than-siblings register.
+			backgroundSubtle: "rgba(28, 28, 28, 0.5)",
+			background: "rgba(28, 28, 28, 0.62)",
+			backgroundStrong: "rgba(28, 28, 28, 0.75)",
+			border: "rgba(255, 255, 255, 0.10)",
+		},
+		dimmer: "rgba(0, 0, 0, 0.3)",
+		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.45)",
+		graph: graphGraphite,
+	},
+	...sharedScalars,
+	// Pill buttons — mirrors Porcelain (see the comment there).
+	control: pillControl,
+	shadow: {
+		none: "none",
+		sm: "0 1px 2px rgba(0, 0, 0, 0.18)",
+		md: "0 4px 16px rgba(0, 0, 0, 0.2)",
+		lg: "0 8px 24px rgba(0, 0, 0, 0.35)",
+		xl: "0 16px 48px rgba(0, 0, 0, 0.5)",
 	},
 	glass: {
 		blur: "10px",
@@ -1667,6 +1840,7 @@ export enum ThemeName {
 	Rose = "rose",
 	Slate = "slate",
 	Porcelain = "porcelain",
+	Graphite = "graphite",
 }
 
 export const themes: Record<ThemeName, Tokens> = {
@@ -1683,6 +1857,7 @@ export const themes: Record<ThemeName, Tokens> = {
 	[ThemeName.Rose]: rose,
 	[ThemeName.Slate]: slate,
 	[ThemeName.Porcelain]: porcelain,
+	[ThemeName.Graphite]: graphite,
 };
 
 export function isThemeName(value: unknown): value is ThemeName {
@@ -1813,6 +1988,13 @@ export const themeCatalog: readonly ThemeCatalogEntry[] = [
 		descriptionKey: "shell.settings.themes.porcelain.description",
 		appearance: ThemeAppearance.Light,
 		preview: previewOf(porcelain),
+	},
+	{
+		id: ThemeName.Graphite,
+		labelKey: "shell.settings.themes.graphite.label",
+		descriptionKey: "shell.settings.themes.graphite.description",
+		appearance: ThemeAppearance.Dark,
+		preview: previewOf(graphite),
 	},
 ];
 
