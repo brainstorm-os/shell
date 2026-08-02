@@ -224,5 +224,6 @@
   "template.triage-new-email.trigger": "Lorsqu'un e-mail arrive",
   "template.email-follow-up-nudge.name": "Rappel de relance d'e-mails",
   "template.email-follow-up-nudge.desc": "Un rappel quotidien pour relancer les fils d'e-mails toujours sans réponse.",
-  "template.email-follow-up-nudge.trigger": "Chaque jour ouvré à 16h00"
+  "template.email-follow-up-nudge.trigger": "Chaque jour ouvré à 16h00",
+  "menu.more": "Plus d'actions"
 }

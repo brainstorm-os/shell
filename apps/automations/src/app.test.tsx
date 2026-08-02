@@ -17,6 +17,7 @@ vi.mock("@brainstorm-os/sdk/menus", () => ({
 }));
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
+	closeAnchoredMenu: vi.fn(),
 }));
 
 afterEach(() => {
@@ -143,7 +144,11 @@ function workflow(id: string, name: string, enabled: boolean): SnapshotEntity {
 }
 
 describe("AutomationsApp", () => {
-	it("renders the app-header with NO trailing object ⋯ (no header object to act on)", async () => {
+	// F-488 — the 329 screenshot audit caught this header as the only one of
+	// the 20 apps with an EMPTY right group. The ⋯ is the catch-all overflow,
+	// not an object-only affordance: with no header object it carries the
+	// view-level actions (Books' F-249 / Graph's view-actions pattern).
+	it("ends the header right group with a live view-actions ⋯", async () => {
 		const { container, unmount } = await renderInto(<AutomationsApp />);
 		await flush();
 		const header = container.querySelector('[data-testid="app-header"]');
@@ -151,10 +156,18 @@ describe("AutomationsApp", () => {
 		expect(container.querySelector(".app-header__title")?.textContent).toBe("Automations");
 		const right = container.querySelector<HTMLElement>(".app-header__right");
 		expect(right).toBeTruthy();
-		// A permanently-disabled ⋯ reads as broken, so the header right group
-		// has no object menu at all rather than a dead button.
-		expect(right?.querySelector(".bs-object-menu__more")).toBeNull();
-		expect(right?.children.length).toBe(0);
+		const more = right?.querySelector<HTMLButtonElement>(".bs-object-menu__more");
+		expect(more).toBeTruthy();
+		// …and it is the LAST element of the right group, per the standing rule.
+		expect(right?.lastElementChild).toBe(more);
+
+		await act(async () => {
+			more?.click();
+		});
+		expect(openAnchoredMenu).toHaveBeenCalled();
+		const items = vi.mocked(openAnchoredMenu).mock.calls[0]?.[1] ?? [];
+		expect(items.map((i) => i.label)).toContain("New workflow");
+		expect(items.map((i) => i.label)).toContain("New from template");
 		await unmount();
 	});
 

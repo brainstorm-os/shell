@@ -5,7 +5,7 @@
  *  UI — `deriveThreadKey` / OQ-MB-3 shipped in Mailbox-1). */
 
 import { CountBadge, CountBadgeTone } from "@brainstorm-os/sdk/count-badge";
-import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
@@ -224,17 +224,18 @@ export function MessageList({
 				</button>
 			</div>
 			<ul className="mb-list__items" aria-label={t("list.aria")}>
+				{/* Hero tone (the default), NOT Compact: this empty sits beside the
+				    reading pane's empty in the SAME window, and the two faces read as
+				    two different designs — a bare small glyph next to a large tinted
+				    icon tile (329 audit). Compact is for a narrow nav panel (Agent's
+				    session sidebar, Whiteboard's layers); the message list is a
+				    primary full-height content column. */}
 				{empty ? (
 					<li className="mb-list__empty-row">
 						{query.trim().length > 0 ? (
-							<EmptyState
-								tone={EmptyStateTone.Compact}
-								icon={IconName.Search}
-								title={t("list.noResults", { query })}
-							/>
+							<EmptyState icon={IconName.Search} title={t("list.noResults", { query })} />
 						) : (
 							<EmptyState
-								tone={EmptyStateTone.Compact}
 								icon={syncFailed ? IconName.Warning : IconName.Inbox}
 								title={t("list.empty.title")}
 								hint={syncFailed ? t("list.empty.errorBlurb") : t("list.empty.blurb")}

@@ -110,6 +110,27 @@ body {
 	height: 14px;
 	object-fit: contain;
 	color: var(--color-text-secondary);
+	border-radius: var(--radius-xs);
+}
+
+/* A favicon is an arbitrary third-party image, and a monochrome DARK mark
+ * (GitHub's octocat is the common one) all but disappears against the dark
+ * tab strip — the 329 audit caught a row of faint grey rings where light
+ * theme showed crisp marks. Give it a neutral backing chip in dark only;
+ * `box-shadow` paints the chip OUTSIDE the 14px box, so nothing in the strip
+ * moves. Inverting or filtering the image itself is not an option — that
+ * would wreck every coloured logo. `light-dark()` resolves against the
+ * `color-scheme` the app preload sets from the active theme (same mechanism
+ * the editor's highlight swatches use). */
+/* Scoped to `img` on purpose: the fallback glyph (`<Icon KindUrl>`) paints in
+ * `currentColor` and is already legible in both themes — a chip behind it
+ * would be noise. */
+img.browser__tab-favicon {
+	/* design-ok: the chip must stay a theme-independent neutral white — it backs a
+	   third-party image, so a theme token would repaint it and lose the contrast. */
+	--browser-favicon-chip: rgba(255, 255, 255, 0.86); /* design-ok: theme-independent neutral chip behind a third-party image */
+	background: light-dark(transparent, var(--browser-favicon-chip));
+	box-shadow: light-dark(none, 0 0 0 1.5px var(--browser-favicon-chip));
 }
 
 .browser__tab-spin {

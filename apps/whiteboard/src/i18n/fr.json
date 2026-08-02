@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Créez-en un avec le bouton + ci-dessus",
   "whiteboard.nav.emptySearch": "Aucun tableau ne correspond à « {query} »",
   "whiteboard.untitled": "Tableau blanc sans titre",
+  "whiteboard.board.rename.menu": "Renommer",
   "whiteboard.board.rename.aria": "Renommer le tableau",
   "whiteboard.board.rename.hint": "Double-cliquez pour renommer",
   "whiteboard.board.lock": "Verrouiller le tableau (lecture seule)",

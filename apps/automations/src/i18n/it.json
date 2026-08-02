@@ -224,5 +224,6 @@
   "template.triage-new-email.trigger": "Quando arriva un'email",
   "template.email-follow-up-nudge.name": "Spinta al follow-up delle email",
   "template.email-follow-up-nudge.desc": "Un promemoria quotidiano per sollecitare i thread email ancora in attesa di risposta.",
-  "template.email-follow-up-nudge.trigger": "Ogni giorno feriale alle 16:00"
+  "template.email-follow-up-nudge.trigger": "Ogni giorno feriale alle 16:00",
+  "menu.more": "Altre azioni"
 }

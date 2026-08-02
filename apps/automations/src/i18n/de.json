@@ -224,5 +224,6 @@
   "template.triage-new-email.trigger": "Wenn eine E-Mail eintrifft",
   "template.email-follow-up-nudge.name": "Anstoß für E-Mail-Nachfassen",
   "template.email-follow-up-nudge.desc": "Eine tägliche Erinnerung, E-Mail-Verläufe nachzufassen, die noch auf Antwort warten.",
-  "template.email-follow-up-nudge.trigger": "Jeden Werktag um 16:00 Uhr"
+  "template.email-follow-up-nudge.trigger": "Jeden Werktag um 16:00 Uhr",
+  "menu.more": "Weitere Aktionen"
 }

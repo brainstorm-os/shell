@@ -224,5 +224,6 @@
   "template.triage-new-email.trigger": "Quando um e-mail chega",
   "template.email-follow-up-nudge.name": "Lembrete de acompanhamento de e-mails",
   "template.email-follow-up-nudge.desc": "Um lembrete diário para cobrar as conversas de e-mail que ainda aguardam resposta.",
-  "template.email-follow-up-nudge.trigger": "Todo dia útil às 16:00"
+  "template.email-follow-up-nudge.trigger": "Todo dia útil às 16:00",
+  "menu.more": "Mais ações"
 }
