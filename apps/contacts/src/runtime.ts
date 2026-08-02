@@ -7,8 +7,10 @@
  */
 
 import type {
+	CoversService,
 	DashboardService,
 	EntitiesService,
+	IconsService,
 	IntentsService,
 	PropertiesService,
 	SettingsService,
@@ -89,6 +91,12 @@ export type ContactsRuntime = {
 		/** Per-device, per-vault settings — backs "reopen the last contact I was
 		 *  viewing" via `@brainstorm-os/sdk/last-viewed`. */
 		settings?: SettingsService;
+		/** Vault-shared cover library (default-granted `covers.read`/`covers.write`)
+		 *  — backs the contact page's cover picker. Absent on older shells. */
+		covers?: CoversService;
+		/** Vault image-icon store (default-granted `icons.read`/`icons.write`) —
+		 *  the avatar icon picker's Upload / Library tabs. Absent on older shells. */
+		icons?: IconsService;
 	} | null;
 	/** Inbound Y.Doc update bridge — feeds the renderer-side resolver behind
 	 *  `useYDoc(person.id)` so a body edit from another renderer / sync source

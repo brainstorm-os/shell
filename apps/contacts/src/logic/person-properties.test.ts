@@ -20,6 +20,8 @@ function makePerson(over: Partial<Person> = {}): Person {
 		anniversary: null,
 		linkIds: [],
 		bio: "hi",
+		icon: null,
+		cover: null,
 		...over,
 	};
 }

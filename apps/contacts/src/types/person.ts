@@ -6,6 +6,8 @@
  * graph-link-reasons work); Contacts only reads it.
  */
 
+import type { Cover, Icon } from "@brainstorm-os/sdk-types";
+
 export const PERSON_TYPE = "brainstorm/Person/v1";
 export const COMPANY_TYPE = "brainstorm/Company/v1";
 export const PROJECT_TYPE = "brainstorm/Project/v1";
@@ -31,4 +33,9 @@ export type Person = {
 	anniversary: number | null;
 	linkIds: string[];
 	bio: string;
+	/** The person's OWN universal icon (`properties.icon`) — never a
+	 *  synthesized default; `null` is genuinely unset (initials render). */
+	icon: Icon | null;
+	/** The person's OWN cover (`properties.cover`); `null` → no band. */
+	cover: Cover | null;
 };

@@ -1527,18 +1527,9 @@ body:not([data-inspector="open"]) .inspector {
 	text-align: center;
 }
 
-/* The Properties tab is the shared `<PropertiesPanel>` content (`.bs-props`),
- * mounted inline inside the inspector's own scrolling tab body — so neutralize
- * the panel's full-height flex + nested scroll + outer padding; the
- * `.bs-props__list` rows keep their shared label/value grid + hover. */
-.inspector .bs-props__inner {
-	height: auto;
-}
-
-.inspector .bs-props__body {
-	overflow: visible;
-	padding: 0;
-}
+/* The Properties tab is the shared `<PropertiesPanel>` content rendered
+ * with its `inline` prop (`.bs-props__inner--inline`) — the neutralization
+ * rules live in the SDK sheet now. */
 
 /* ── Inspector links panel ─────────────────────────────────────────────
  * Realises B6.4: per-entity "Linked from / Links to" surface, fed by

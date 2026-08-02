@@ -105,6 +105,20 @@
 	gap: var(--space-2, var(--space-2));
 }
 
+/* In-flow variant (`inline` prop): the panel content sits inside a host that
+ * already scrolls — an inspector tab body (Database / Files) or the inline
+ * block at the top of a detail page (Contacts / Tasks) — so the full-height
+ * flex, the nested scroller, and the outer padding are neutralized. Rows keep
+ * the shared label/value grid + hover chrome. */
+:root .bs-props__inner--inline {
+	height: auto;
+}
+
+:root .bs-props__inner--inline .bs-props__body {
+	overflow: visible;
+	padding: 0;
+}
+
 :root .bs-props__status {
 	margin: var(--space-1) 0;
 	color: var(--text-dim);

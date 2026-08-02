@@ -33,6 +33,8 @@ function person(): Person {
 		anniversary: null,
 		linkIds: [],
 		bio: "",
+		icon: null,
+		cover: null,
 	};
 }
 

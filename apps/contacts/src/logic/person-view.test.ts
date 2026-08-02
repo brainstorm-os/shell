@@ -1,3 +1,4 @@
+import { CoverKind, IconKind } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { VaultEntityLike } from "../types/person";
 import {
@@ -91,7 +92,24 @@ describe("entityToPerson", () => {
 			anniversary: 456,
 			linkIds: ["ent_2", "ent_3"],
 			bio: "hi",
+			icon: null,
+			cover: null,
 		});
+	});
+	it("projects a valid icon + cover and rejects malformed ones", () => {
+		const good = entityToPerson(
+			person("ent_i", "Ada", {
+				icon: { kind: IconKind.Emoji, value: "🦊" },
+				cover: { kind: CoverKind.Color, value: "#aabbcc" },
+			}),
+		);
+		expect(good.icon).toEqual({ kind: IconKind.Emoji, value: "🦊" });
+		expect(good.cover).toEqual({ kind: CoverKind.Color, value: "#aabbcc" });
+		const bad = entityToPerson(
+			person("ent_j", "Ada", { icon: { kind: "nope" }, cover: "not-a-cover" }),
+		);
+		expect(bad.icon).toBeNull();
+		expect(bad.cover).toBeNull();
 	});
 	it("defaults missing fields", () => {
 		const p = entityToPerson(person("ent_x", ""));

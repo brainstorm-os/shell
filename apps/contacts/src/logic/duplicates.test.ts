@@ -23,6 +23,8 @@ function person(id: string, over: Partial<Person> = {}): Person {
 		anniversary: null,
 		linkIds: [],
 		bio: "",
+		icon: null,
+		cover: null,
 		...over,
 	};
 }

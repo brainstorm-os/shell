@@ -73,6 +73,13 @@ export type PropertiesPanelProps = {
 	/** Rendered after the rows (before `meta`) — extra panel sections the
 	 *  host owns (e.g. Books' table of contents). Scrolls with the body. */
 	children?: ReactNode;
+	/** Render as an IN-FLOW block inside a host that already scrolls (an
+	 *  inspector tab body, the inline block at the top of a detail page)
+	 *  instead of a full-height panel: neutralizes the inner flex height, the
+	 *  body's own scroller, and the outer padding. The row grid/hover chrome
+	 *  is unchanged. Replaces the per-app `.bs-props__body { padding: 0 … }`
+	 *  override Database / Files used to copy. */
+	inline?: boolean;
 };
 
 export function PropertiesPanel({
@@ -90,13 +97,14 @@ export function PropertiesPanel({
 	meta,
 	lead,
 	children,
+	inline,
 }: PropertiesPanelProps): ReactNode {
 	// The whole entity's values, keyed by property key — passed to each cell so a
 	// computed cell (formula) can resolve references to sibling properties.
 	const siblingValues: Record<string, unknown> = {};
 	for (const row of rows) siblingValues[row.def.key] = row.value;
 	return (
-		<div className="bs-props__inner">
+		<div className={inline ? "bs-props__inner bs-props__inner--inline" : "bs-props__inner"}>
 			{hideHeader ? null : (
 				<header className="bs-props__head">
 					<h2 className="bs-props__title">{title}</h2>

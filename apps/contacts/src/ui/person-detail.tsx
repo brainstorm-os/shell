@@ -14,9 +14,15 @@
  */
 
 import type { PropertiesService } from "@brainstorm-os/sdk-types";
+import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
+import { IconPicker, type IconUploadService } from "@brainstorm-os/sdk/icon-picker";
 import { PropertiesPanel } from "@brainstorm-os/sdk/properties-panel";
-import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
+import {
+	DEFAULT_PROPERTY_UI_LABELS,
+	type EntityTitleSource,
+	PropertiesProvider,
+} from "@brainstorm-os/sdk/property-ui";
 import { useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import {
@@ -26,9 +32,18 @@ import {
 	nextBirthday,
 } from "../logic/birthday";
 import { personInitials } from "../logic/person-view";
+import { getBrainstorm } from "../runtime";
 import type { Person } from "../types/person";
+import { EntityCover, EntityIcon } from "./entity-visuals";
 import { PersonBodyEditor } from "./person-body-editor";
 import { PersonPropertiesPanel, personPropertyRows } from "./person-properties-panel";
+
+/** Older shells don't expose the vault cover store — the picker's gradient /
+ *  colour tabs still work; Image upload rejects (the Bookmarks arrangement). */
+const COVERS_UNAVAILABLE: CoverPickerService = {
+	uploadBytes: () => Promise.reject(new Error("covers service unavailable")),
+	list: () => Promise.resolve([]),
+};
 
 // The no-selection state is `{ id: null }`, NOT bare `null`: the shared
 // NavButtons / NavHistory contract reserves JS `null` as the "nothing to
@@ -45,6 +60,10 @@ export type PersonDetailProps = {
 	entityTitleSource: EntityTitleSource;
 	showProperties: boolean;
 	onToggleProperties: () => void;
+	/** Cover-picker visibility is owned by the app shell so the object ⋯ menu's
+	 *  Add/Change-cover item can open it too (the Notes arrangement). */
+	coverPickerOpen: boolean;
+	onCoverPickerOpenChange: (open: boolean) => void;
 	onRenamePerson: (name: string) => void;
 	onPatch: (patch: Record<string, unknown>) => void;
 	/** Mint a new Company and link it to this person (the picker can only pick
@@ -85,6 +104,8 @@ export function PersonDetail({
 	entityTitleSource,
 	showProperties,
 	onToggleProperties,
+	coverPickerOpen,
+	onCoverPickerOpenChange,
 	onRenamePerson,
 	onPatch,
 	onCreateCompany,
@@ -131,16 +152,70 @@ export function PersonDetail({
 		[properties],
 	);
 
+	const [iconPickerOpen, setIconPickerOpen] = useState(false);
+
+	// Universal icon / cover backing services (default-granted caps); absent on
+	// older shells — the pickers' upload tabs degrade, everything else works.
+	const coversService = useMemo<CoverPickerService>(
+		() => getBrainstorm()?.services?.covers ?? COVERS_UNAVAILABLE,
+		[],
+	);
+	const iconUpload = useMemo<IconUploadService | undefined>(() => {
+		const icons = getBrainstorm()?.services?.icons;
+		if (!icons) return undefined;
+		return {
+			upload: (filename, bytes) => icons.uploadBytes(filename, bytes),
+			list: async () => (await icons.list()).map((e) => ({ url: e.url, thumbUrl: e.thumbUrl })),
+		};
+	}, []);
+
+	// Stable cover subject — the band re-renders off the explicit `cover` prop.
+	const coverSubject = useMemo(() => ({ id: person.id }), [person.id]);
+
 	const inlineRows = personPropertyRows(person, onPatch);
+
+	// Localised "Empty" for unset cells; identity-stable so the provider's
+	// context memo doesn't churn (dep is the resolved string, which changes
+	// exactly when the locale pack swaps).
+	const cellEmptyLabel = t("prop.empty");
+	const propertyUiLabels = useMemo(
+		() => ({ ...DEFAULT_PROPERTY_UI_LABELS, cellEmpty: cellEmptyLabel }),
+		[cellEmptyLabel],
+	);
 
 	const content = (
 		<div className="contacts-detail">
 			<div className="contacts-detail__scroll">
+				{person.cover ? (
+					<button
+						type="button"
+						className="contacts-detail__cover"
+						aria-label={t("detail.cover.edit")}
+						aria-haspopup="dialog"
+						aria-expanded={coverPickerOpen}
+						onClick={() => onCoverPickerOpenChange(!coverPickerOpen)}
+					>
+						{/* Slim banner aspect shared with Notes / Bookmarks (16 / 3.5). */}
+						<EntityCover subject={coverSubject} cover={person.cover} aspect={16 / 3.5} />
+					</button>
+				) : null}
 				<div className="contacts-detail__page">
 					<div className="contacts-detail__card">
-						<div className="contacts-detail__avatar" aria-hidden="true">
-							{initials || <Icon name={IconName.Entity} size={28} />}
-						</div>
+						<button
+							type="button"
+							className="contacts-detail__avatar"
+							aria-label={t("detail.icon.edit")}
+							aria-haspopup="dialog"
+							aria-expanded={iconPickerOpen}
+							data-bs-tooltip={t("detail.icon.edit")}
+							onClick={() => setIconPickerOpen((open) => !open)}
+						>
+							{person.icon ? (
+								<EntityIcon icon={person.icon} size={40} className="contacts-detail__avatar-icon" />
+							) : (
+								initials || <Icon name={IconName.Entity} size={28} />
+							)}
+						</button>
 						<input
 							className="contacts-detail__name-input bs-input bs-input--lg"
 							value={nameDraft}
@@ -227,6 +302,7 @@ export function PersonDetail({
 								rows={inlineRows}
 								entityId={person.id}
 								hideHeader
+								inline
 							/>
 						</div>
 					) : null}
@@ -249,13 +325,38 @@ export function PersonDetail({
 					onClose={onToggleProperties}
 				/>
 			) : null}
+
+			{iconPickerOpen ? (
+				<IconPicker
+					value={person.icon}
+					onChange={(icon) => onPatch({ icon })}
+					onClose={() => setIconPickerOpen(false)}
+					{...(iconUpload ? { iconUpload } : {})}
+				/>
+			) : null}
+
+			{coverPickerOpen ? (
+				<CoverPicker
+					value={person.cover}
+					covers={coversService}
+					onChange={(cover) => {
+						onPatch({ cover });
+						onCoverPickerOpenChange(false);
+					}}
+					onClose={() => onCoverPickerOpenChange(false)}
+				/>
+			) : null}
 		</div>
 	);
 
 	// ONE provider for both property surfaces (the inline page block + the
 	// slide-over inspector) — one store, one catalog `list()` IPC, not two.
 	return propertiesRuntime ? (
-		<PropertiesProvider runtime={propertiesRuntime} entityTitleSource={entityTitleSource}>
+		<PropertiesProvider
+			runtime={propertiesRuntime}
+			entityTitleSource={entityTitleSource}
+			labels={propertyUiLabels}
+		>
 			{content}
 		</PropertiesProvider>
 	) : (

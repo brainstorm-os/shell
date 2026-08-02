@@ -297,7 +297,7 @@ function PropertiesTab({ entity, store }: { entity: Entity; store: FilesStore })
 		},
 	];
 
-	return <PropertiesPanel title="" hideHeader rows={rows} meta={meta} entityId={entity.id} />;
+	return <PropertiesPanel title="" hideHeader inline rows={rows} meta={meta} entityId={entity.id} />;
 }
 
 /** The Comments tab — the same shared comments thread every entity app shows,
