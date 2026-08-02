@@ -4,6 +4,7 @@ import "@brainstorm-os/sdk/app-theme.css";
 import "@brainstorm-os/sdk/composer-context.css";
 import "@brainstorm-os/sdk/empty-state.css";
 import "@brainstorm-os/sdk/markdown.css";
+import "@brainstorm-os/sdk/proposal-tray.css";
 import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";

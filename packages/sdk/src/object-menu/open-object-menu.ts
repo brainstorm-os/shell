@@ -36,6 +36,7 @@ import {
 import { IconName } from "../icon/icon-registry";
 import { MenuAlign } from "../menus";
 import { OPEN_VERB } from "../open-entity";
+import { canPromptForTool } from "../tool-arg-prompt/arg-prompt-logic";
 import { type AnchoredMenuItem, closeAnchoredMenu, openAnchoredMenu } from "./anchored-menu";
 import {
 	COLLECTIONS_WRITE_CAPABILITY,
@@ -75,6 +76,12 @@ export type OpenObjectMenuOptions = Omit<BuildObjectMenuOptions, "pinned" | "lab
 	 *  that renders tool rows SHOULD supply one; without it a refusal surfaces
 	 *  as an unhandled rejection rather than silence. */
 	onToolResult?: ObjectMenuToolReporter;
+	/** Collect a tool's declared arguments from the user (Tool-8b). With this
+	 *  seam supplied, tools with REQUIRED inputs become menu rows that prompt
+	 *  on activation (`useToolArgumentPrompt` is the drop-in host); without
+	 *  it they stay hidden, exactly as under Tool-7. Resolve `null` for a
+	 *  cancel — the menu then makes no call and reports nothing. */
+	onToolArguments?: ObjectMenuToolArgumentPrompt;
 	/** The ⋯ / trigger element the menu drops from. When given, the menu
 	 *  anchors to its live rect, right-aligns to its edge, and the element
 	 *  shows its open state. Omit for cursor-anchored (right-click) opens. */
@@ -224,9 +231,11 @@ function actionGroupLabel(group: ActionGroup, chrome: ObjectMenuChromeLabels): s
  * Hiding beats a row that refuses on every click. */
 /** Can THIS menu run the tool with only a click to go on?
  *
- * Only one class is excluded now: a tool with a REQUIRED input, because a click
- * carries no arguments and `tools.call` would refuse it `Invalid` every time.
- * (An argument prompt is the other half of `Tool-8`.)
+ * A tool with a REQUIRED input is offered only when the host supplies an
+ * argument prompt (`onToolArguments`, Tool-8b) that can actually render every
+ * required input — a click alone carries no arguments and `tools.call` would
+ * refuse it `Invalid` every time. Without the seam such tools stay hidden,
+ * exactly as under Tool-7: hiding beats a row that refuses on every click.
  *
  * Approval is no longer the menu's problem. `Tool-8` moved the question to the
  * SHELL, which prompts in the dashboard and records the answer itself — so a
@@ -235,23 +244,26 @@ function actionGroupLabel(group: ActionGroup, chrome: ObjectMenuChromeLabels): s
  * row on a host-supplied confirm seam, as the previous cut did, meant a host
  * without one silently lost every such tool.
  */
-function menuCanInvoke(tool: AppToolRecord): boolean {
-	return !tool.input.some((i) => i.required);
+function menuCanInvoke(tool: AppToolRecord, canPrompt: boolean): boolean {
+	if (!tool.input.some((i) => i.required)) return true;
+	return canPrompt && canPromptForTool(tool.input);
 }
 
 /** Menu-surfaced tools that apply to this object. Declared-type match only —
  *  `tools.list` never reads content — filtered server-side to what this caller
- *  may CALL, then filtered here to what a click alone can actually invoke. */
+ *  may CALL, then filtered here to what a click alone (plus the host's
+ *  argument prompt, when it has one) can actually invoke. */
 async function suggestAppTools(
 	runtime: ObjectMenuRuntime,
 	target: ObjectMenuTarget,
+	canPrompt: boolean,
 ): Promise<AppToolRecord[]> {
 	const list = runtime?.services?.appTools?.list;
 	if (!list) return [];
 	try {
 		const input: { appliesTo?: string; surface?: string } = { surface: APP_TOOL_MENU_SURFACE };
 		if (target.entityType) input.appliesTo = target.entityType;
-		return [...(await list(input))].filter(menuCanInvoke);
+		return [...(await list(input))].filter((tool) => menuCanInvoke(tool, canPrompt));
 	} catch {
 		return [];
 	}
@@ -302,11 +314,13 @@ function appToolRow(
 	action: ContributedAction,
 	tool: AppToolRecord,
 	runtime: ObjectMenuRuntime,
+	target: ObjectMenuTarget,
 	report: ObjectMenuToolReporter | undefined,
+	promptForArgs: ObjectMenuToolArgumentPrompt | undefined,
 ): AnchoredMenuItem {
 	return {
 		label: `${action.label} — ${action.appLabel}`,
-		onSelect: () => runAppTool(runtime, tool, report),
+		onSelect: () => runAppTool(runtime, tool, target, report, promptForArgs),
 	};
 }
 
@@ -349,18 +363,31 @@ function contributedActionRow(
 function runAppTool(
 	runtime: ObjectMenuRuntime,
 	tool: AppToolRecord,
+	target: ObjectMenuTarget,
 	report: ObjectMenuToolReporter | undefined,
+	promptForArgs: ObjectMenuToolArgumentPrompt | undefined,
 ): void {
 	const call = runtime?.services?.appTools?.call;
 	if (!call) return;
 	void (async () => {
 		try {
+			// Tool-8b — a tool with a required input collects its arguments first.
+			// Such a tool is only a row at all when the host supplied the prompt
+			// seam (see `menuCanInvoke`); a cancelled prompt is a user backing out
+			// of the menu, so it makes no call and reports nothing.
+			let args: Readonly<Record<string, unknown>> | undefined;
+			if (tool.input.some((i) => i.required)) {
+				if (!promptForArgs) return;
+				const collected = await promptForArgs(tool, target);
+				if (collected === null) return;
+				args = collected;
+			}
 			// No confirm plumbing here: the SHELL prompts and records the answer
 			// itself (Tool-8), so a declined approval comes back as `NeedsConfirm`
 			// and the reporter renders it like any other named refusal. The
 			// previous cut asked through a host-supplied seam, which meant a host
 			// without one silently lost every tool that needed asking.
-			const result = await call({ tool: tool.id });
+			const result = await call({ tool: tool.id, ...(args !== undefined ? { args } : {}) });
 			report?.({ tool, ok: true, value: result.value });
 		} catch (error: unknown) {
 			const kind = error instanceof Error && error.name ? error.name : "Error";
@@ -372,6 +399,16 @@ function runAppTool(
 		}
 	})();
 }
+
+/** How a host collects a tool's declared arguments (Tool-8b). The drop-in
+ *  implementation is `useToolArgumentPrompt`'s `promptForToolArgs`, wired as
+ *  `(tool, target) => promptForToolArgs(tool, { target })`. Resolving `null`
+ *  cancels: no call, no report. The resolved bag must be
+ *  `validateAppToolArgs`' own output — the broker revalidates regardless. */
+export type ObjectMenuToolArgumentPrompt = (
+	tool: AppToolRecord,
+	target: ObjectMenuTarget,
+) => Promise<Readonly<Record<string, unknown>> | null>;
 
 /** How a host reports the outcome of a tool run started from an object menu.
  *  A toast, an inline chip — the menu does not care, but it must not be
@@ -389,6 +426,7 @@ function buildContributedRows(
 	chrome: ObjectMenuChromeLabels,
 	toolsById: ReadonlyMap<string, AppToolRecord>,
 	report?: ObjectMenuToolReporter,
+	promptForArgs?: ObjectMenuToolArgumentPrompt,
 ): AnchoredMenuItem[] {
 	const groups: ContributedActionGroup[] = groupContributedActions(actions);
 	if (groups.length === 0) return [];
@@ -398,7 +436,7 @@ function buildContributedRows(
 		const row = (action: ContributedAction): AnchoredMenuItem => {
 			const tool = toolsById.get(action.id);
 			return tool
-				? appToolRow(action, tool, runtime, report)
+				? appToolRow(action, tool, runtime, target, report, promptForArgs)
 				: contributedActionRow(action, runtime, target);
 		};
 		if (group.inline.length > 0) {
@@ -467,7 +505,7 @@ export async function openObjectMenu(
 		// quietest possible way — and today no caller passes the seam, so this
 		// is not hypothetical.
 		options.onToolResult
-			? suggestAppTools(options.runtime, options.target)
+			? suggestAppTools(options.runtime, options.target, options.onToolArguments !== undefined)
 			: Promise.resolve<AppToolRecord[]>([]),
 	]);
 
@@ -506,6 +544,7 @@ export async function openObjectMenu(
 			chrome,
 			new Map(appTools.map((tool) => [tool.id, tool])),
 			options.onToolResult,
+			options.onToolArguments,
 		),
 	);
 	if (options.onRemove) {

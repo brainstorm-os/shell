@@ -879,89 +879,14 @@ body {
 
 /* Agent-11b — the propose-confirm tray above the composer.
  *
- * The tray is a flex item in the column that also holds the transcript and the
- * composer, and a flex item's default `min-height: auto` refuses to shrink
- * below its content. Two code-file proposals (each a 240px-capped preview plus
- * head and actions) therefore pushed the SECOND card's Approve/Discard row —
- * and the composer under it — clean off the bottom of the window, with nothing
- * scrollable to reach them. Capping the tray and letting it scroll internally
- * keeps the composer parked where it belongs however many artifacts are
- * staged. */
-.agent-proposal-tray {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
+ * The tray/card chrome is the shared `@brainstorm-os/sdk/proposal-tray.css`
+ * (`.bs-proposal-tray` / `.bs-proposal` and their parts) — extracted there at
+ * copy two, when the `proposes-write` tool tray became the second proposal
+ * surface. Only the agent-specific delta stays here: the tray's placement
+ * margin in the transcript column, and the card bodies the agent alone has
+ * (code preview, seed-row grid, database-row layout, conflict line). */
+.agent .bs-proposal-tray {
 	margin: 0 var(--space-3) var(--space-2);
-	padding: var(--space-3);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	background: var(--bg-elev);
-	min-height: 0;
-	max-height: 52vh;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-}
-
-.agent-proposal-tray__head {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-0_5);
-}
-
-.agent-proposal-tray__title {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	font-size: var(--text-size-sm);
-	font-weight: 600;
-	color: var(--color-text-primary);
-}
-
-.agent-proposal-tray__subtitle {
-	font-size: var(--text-size-xs);
-	color: var(--color-text-secondary);
-}
-
-.agent-proposal {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
-	padding: var(--space-3);
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-}
-
-.agent-proposal__kind {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	font-size: var(--text-size-xs);
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--color-text-secondary);
-}
-
-.agent-proposal__head {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: var(--space-2);
-}
-
-.agent-proposal__target {
-	min-width: 0;
-	overflow: hidden;
-	font-size: var(--text-size-xs);
-	color: var(--color-text-secondary);
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.agent-proposal__fields {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
 }
 
 /* A proposed database row reads as the row it will become: a label column and
@@ -974,23 +899,8 @@ body {
 	gap: var(--space-1) var(--space-2);
 }
 
-.agent-proposal__fields--row .agent-proposal__field {
+.agent-proposal__fields--row .bs-proposal__field {
 	display: contents;
-}
-
-.agent-proposal__field {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-0_5);
-}
-
-.agent-proposal__field-label {
-	font-size: var(--text-size-xs);
-	color: var(--color-text-secondary);
-}
-
-.agent-proposal__input {
-	width: 100%;
 }
 
 /* AppForge-3: a proposed code file — the language chip in the card head and
@@ -1048,13 +958,6 @@ body {
 	margin: 0;
 	font-size: var(--text-size-xs);
 	color: var(--color-state-warning);
-}
-
-.agent-proposal__actions {
-	display: flex;
-	gap: var(--space-2);
-	margin-top: var(--space-1);
-	flex-wrap: wrap;
 }
 
 

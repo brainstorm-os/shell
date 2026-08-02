@@ -62,7 +62,7 @@ vi.mock("./anchored-menu", async (importOriginal) => {
 
 async function rowsFor(
 	tools: readonly AppToolRecord[],
-	extra: Record<string, never> = {},
+	extra: Partial<import("./open-object-menu").OpenObjectMenuOptions> = {},
 ): Promise<{
 	labels: string[];
 	call: ReturnType<typeof vi.fn>;
@@ -116,11 +116,64 @@ describe("object menu — app tool rows", () => {
 		expect(labels.some((l) => l.includes("Slugify") && l.includes("Provider"))).toBe(true);
 	});
 
-	it("does NOT offer a tool with a required argument", async () => {
+	it("does NOT offer a tool with a required argument when the host has no prompt", async () => {
 		// A menu click supplies no args, so `tools.call` would refuse `Invalid`
-		// every time. An argument prompt is the other half of Tool-8.
+		// every time. Only an argument prompt (Tool-8b) makes such a row live.
 		const { labels } = await rowsFor([tool("rewrite", { title: "Rewrite", input: [requiredInput] })]);
 		expect(labels.some((l) => l.includes("Rewrite"))).toBe(false);
+	});
+
+	it("OFFERS a required-argument tool when the host supplies an argument prompt", async () => {
+		const { labels } = await rowsFor(
+			[tool("rewrite", { title: "Rewrite", input: [requiredInput] })],
+			{
+				onToolArguments: async () => ({ text: "hi" }),
+			},
+		);
+		expect(labels.some((l) => l.includes("Rewrite"))).toBe(true);
+	});
+
+	it("still hides a required input the prompt cannot collect (free-form multi)", async () => {
+		const multi: AppToolInput = {
+			name: "items",
+			description: "several things",
+			required: true,
+			valueType: ValueType.Text,
+			count: { min: 1, max: 5 },
+		};
+		const { labels } = await rowsFor([tool("bulk", { title: "Bulk", input: [multi] })], {
+			onToolArguments: async () => ({}),
+		});
+		expect(labels.some((l) => l.includes("Bulk"))).toBe(false);
+	});
+
+	it("collects the arguments through the prompt and forwards them on the call", async () => {
+		const prompt = vi.fn(async (_tool: AppToolRecord, _target: { entityId: string }) => ({
+			text: "collected",
+		}));
+		const run = await rowsFor([tool("rewrite", { title: "Rewrite", input: [requiredInput] })], {
+			onToolArguments: prompt,
+		});
+		run.click("Rewrite");
+		await vi.waitFor(() => expect(run.call).toHaveBeenCalledTimes(1));
+		// The prompt receives the tool AND the menu's target, so it can prefill.
+		expect(prompt.mock.calls[0]?.[1]).toMatchObject({ entityId: "e1" });
+		expect(run.call.mock.calls[0]?.[0]).toEqual({
+			tool: expect.any(String),
+			args: { text: "collected" },
+		});
+	});
+
+	it("a cancelled prompt makes NO call and reports NOTHING", async () => {
+		const run = await rowsFor([tool("rewrite", { title: "Rewrite", input: [requiredInput] })], {
+			onToolArguments: async () => null,
+		});
+		run.click("Rewrite");
+		// Nothing to await on the happy path — flush the microtask queue and
+		// assert the world did not move.
+		await new Promise((r) => setTimeout(r, 0));
+		expect(run.call).not.toHaveBeenCalled();
+		expect(run.outcomes).toHaveLength(0);
 	});
 
 	it("OFFERS a tool that will need approval — the shell asks when clicked", async () => {

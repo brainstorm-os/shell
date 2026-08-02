@@ -1,0 +1,152 @@
+/**
+ * The shared proposal-tray chrome (Tool-8b). Imported once per app
+ * (`import "@brainstorm-os/sdk/proposal-tray.css"`). Extracted from the
+ * agent's preview-confirm tray at copy two; every custom property is a theme
+ * token or an app-theme alias `app-theme.css` already provides.
+ *
+ * The tray caps its own height and scrolls internally so however many cards
+ * are staged, the surface below it (a composer, an editor) stays reachable.
+ */
+
+.bs-proposal-tray {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+	min-height: 0;
+	max-height: 52vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.bs-proposal-tray__head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.bs-proposal-tray__title {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+	color: var(--color-text-primary);
+}
+
+.bs-proposal-tray__subtitle {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-proposal {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+}
+
+.bs-proposal__head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.bs-proposal__kind {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	font-size: var(--text-size-xs);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--color-text-secondary);
+}
+
+/* The muted, ellipsised meta line in a card head — provider attribution on a
+   tool-proposal card, the target database on an agent row card. */
+.bs-proposal__meta {
+	min-width: 0;
+	overflow: hidden;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bs-proposal__summary {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-proposal__fields {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.bs-proposal__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.bs-proposal__field-label {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-proposal__input {
+	width: 100%;
+}
+
+/* The tool-proposal diff: before struck + tinted toward danger, after tinted
+   toward success. Both are untrusted text rendered inert; both preserve the
+   provider's line structure and scroll inside their own box so the tray never
+   scrolls horizontally. */
+.bs-proposal__before,
+.bs-proposal__after {
+	display: block;
+	margin: 0;
+	padding: var(--space-1) var(--space-2);
+	max-height: 160px;
+	overflow: auto;
+	font-size: var(--text-size-sm);
+	line-height: var(--text-line-height-normal);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	border-radius: var(--radius-sm);
+	border: var(--border-width) solid var(--color-border-subtle);
+}
+
+.bs-proposal__before {
+	text-decoration: line-through;
+	color: var(--text-dim);
+	background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.bs-proposal__after {
+	text-decoration: none;
+	color: var(--text);
+	background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+
+.bs-proposal__error {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-state-error);
+}
+
+.bs-proposal__actions {
+	display: flex;
+	gap: var(--space-2);
+	margin-top: var(--space-1);
+	flex-wrap: wrap;
+}

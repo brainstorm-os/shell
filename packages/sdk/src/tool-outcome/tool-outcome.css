@@ -13,6 +13,10 @@
 	flex-direction: column;
 	gap: var(--space-2);
 	max-width: min(360px, 80vw);
+	/* Belt to the hook's retention cap: even a stack at the ceiling must not
+	 * bury the surface (or its own dismiss affordances) behind chips. */
+	max-height: 60vh;
+	overflow-y: auto;
 	pointer-events: none;
 }
 
@@ -29,8 +33,13 @@
 	pointer-events: auto;
 }
 
-/* A refusal is the outcome a user may need to act on, so it carries a
- * tinted edge rather than a colour-only cue. */
+/* A success wears the quiet confirmation tint; a refusal is the outcome a
+ * user may need to act on, so it carries a stronger edge rather than a
+ * colour-only cue. */
+.bs-tool-outcome--ok {
+	border-color: color-mix(in srgb, var(--ok) 45%, var(--color-border-subtle));
+}
+
 .bs-tool-outcome--refused {
 	border-color: var(--color-border-strong);
 }

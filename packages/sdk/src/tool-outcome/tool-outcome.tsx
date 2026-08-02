@@ -48,10 +48,28 @@ export const TOOL_REFUSAL_KEYS: Readonly<Record<string, string>> = {
 };
 
 export function refusalKeyFor(kind: string): string {
-	return TOOL_REFUSAL_KEYS[kind] ?? "tool.refused.generic";
+	// `Object.hasOwn`, not `?? fallback`: `kind` is derived from an error name a
+	// provider can influence, and on a prototype-bearing table a kind of
+	// "constructor" / "toString" would read back the inherited FUNCTION and
+	// hand it to `t()`.
+	return Object.hasOwn(TOOL_REFUSAL_KEYS, kind)
+		? (TOOL_REFUSAL_KEYS[kind] as string)
+		: "tool.refused.generic";
 }
 
 let seq = 0;
+
+/** Retention ceiling. A persistently failing auto-invoking surface must not
+ *  accumulate chips without bound — beyond this the OLDEST are dropped, and a
+ *  repeat of the same `(title, kind)` REPLACES its predecessor instead of
+ *  stacking (the user needs to know the tool is failing, not how many times). */
+export const TOOL_OUTCOMES_MAX = 5;
+
+function sameOutcome(a: ToolOutcomeInput, b: ToolOutcomeInput): boolean {
+	if (a.title !== b.title) return false;
+	if (a.ok || b.ok) return a.ok === b.ok;
+	return a.kind === b.kind;
+}
 
 /** Collect tool outcomes for rendering. The returned `report` is the exact
  *  shape every tool surface asks for, so an app wires it straight through. */
@@ -74,7 +92,20 @@ export function useToolOutcomes(): {
 		(outcome: ToolOutcomeInput) => {
 			seq += 1;
 			const id = `tool-outcome-${seq}`;
-			setOutcomes((prev) => [...prev, { ...outcome, id }]);
+			setOutcomes((prev) => {
+				// A repeat of the same (title, kind) replaces its predecessor; then
+				// the ceiling drops the oldest. Reap every replaced/evicted chip's
+				// pending timer so it does not fire against a chip already gone.
+				const next = [...prev.filter((o) => !sameOutcome(o, outcome)), { ...outcome, id }];
+				const kept = next.slice(Math.max(0, next.length - TOOL_OUTCOMES_MAX));
+				const keptIds = new Set(kept.map((o) => o.id));
+				for (const gone of prev.filter((o) => !keptIds.has(o.id))) {
+					const timer = timers.current.get(gone.id);
+					if (timer) clearTimeout(timer);
+					timers.current.delete(gone.id);
+				}
+				return kept;
+			});
 			// Successes retire themselves; a refusal waits to be dismissed, since
 			// it is the outcome a user may still need to act on.
 			if (outcome.ok) {
