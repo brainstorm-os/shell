@@ -786,6 +786,8 @@
   "shell.settings.themes.slate.description": "Cool neutral-grey surfaces with a crisp indigo accent. Businesslike and clean.",
   "shell.settings.themes.porcelain.label": "Porcelain",
   "shell.settings.themes.porcelain.description": "Flat paper-white surfaces with a cornflower-blue accent. Minimal and airy.",
+  "shell.settings.themes.graphite.label": "Graphite",
+  "shell.settings.themes.graphite.description": "Flat charcoal surfaces with a clear blue accent. Porcelain's quiet dark twin.",
   "shell.settings.themes.pick": "Apply {label}",
   "shell.settings.appearance.summary": "Pair a theme and wallpaper for Light and Dark. Pick how the active pair is chosen below — Auto follows your system.",
   "shell.settings.appearance.mode.label": "Appearance mode",

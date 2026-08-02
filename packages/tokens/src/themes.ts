@@ -412,6 +412,24 @@ const graphPorcelain = {
 	},
 } as const;
 
+const graphGraphite = {
+	subject: {
+		"1": "#699bff", // blue
+		"2": "#c870e8", // purple
+		"3": "#20c8b8", // teal
+		"4": "#ecd91a", // yellow
+		"5": "#f25040", // red
+		"6": "#40b8f5", // ice
+		"7": "#f040a0", // pink
+		"8": "#4ecc4e", // lime
+	},
+	unmatched: "rgba(200, 200, 200, 0.4)",
+	edge: {
+		matched: "rgba(55, 122, 255, 0.7)",
+		unmatched: "rgba(200, 200, 200, 0.28)",
+	},
+} as const;
+
 const sharedScalars = {
 	space,
 	text: {
@@ -1653,6 +1671,102 @@ export const porcelain: Tokens = {
 	},
 };
 
+// Graphite — Porcelain's dark counterpart. Flat, truly neutral charcoal
+// surfaces (no navy/violet undertone), soft off-white text and the same
+// clear-blue accent family; the quietest of the dark set, for people who
+// want the UI to disappear behind the content. Dark variant.
+export const graphite: Tokens = {
+	color: {
+		background: {
+			primary: "#171717",
+			elevated: "#232323",
+			subtle: "#292929",
+			inverse: "#e1e1e1",
+		},
+		surface: {
+			default: "rgba(255, 255, 255, 0.05)",
+			overlay: "rgba(255, 255, 255, 0.11)",
+			raised: "rgba(255, 255, 255, 0.11)",
+		},
+		border: {
+			subtle: "rgba(255, 255, 255, 0.08)",
+			default: "rgba(255, 255, 255, 0.13)",
+			strong: "rgba(255, 255, 255, 0.26)",
+		},
+		text: {
+			primary: "#e1e1e1",
+			secondary: "#e1e1e1",
+			tertiary: "rgba(225, 225, 225, 0.6)",
+			inverse: "#171717",
+			link: "#699bff",
+		},
+		accent: {
+			subtle: "rgba(55, 122, 255, 0.15)",
+			default: "#377aff",
+			strong: "#105aef",
+			text: "#ffffff",
+			onSurface: "#699bff",
+			onFill: "#105aef",
+		},
+		gloss: {
+			// Soft sky-blue → deep clear blue two-colour face — the same
+			// accent family as Porcelain, one register deeper for dark.
+			top: "#699bff",
+			bottom: "#105aef",
+			shineTop: "rgba(200, 220, 255, 0.6)",
+			shineBottom: "rgba(185, 214, 255, 0.7)",
+			innerTop: "rgba(255, 255, 255, 0.30)",
+			innerBottom: "rgba(40, 100, 230, 0.24)",
+		},
+		state: {
+			success: palette.green["400"],
+			warning: palette.amber["400"],
+			error: palette.red["400"],
+			info: palette.cyan["400"],
+		},
+		chrome: {
+			background: "#171717",
+			text: "#e1e1e1",
+		},
+		shadow: {
+			subtle: "rgba(0, 0, 0, 0.14)",
+			default: "rgba(0, 0, 0, 0.2)",
+			strong: "rgba(0, 0, 0, 0.38)",
+		},
+		focus: {
+			ring: "#377aff",
+		},
+		interactive: {
+			hover: "rgba(255, 255, 255, 0.05)",
+			active: "rgba(255, 255, 255, 0.11)",
+		},
+		glass: {
+			// Denser charcoal veil than Default Dark — panels sit closer to
+			// opaque flat surfaces while the wallpaper still breathes through
+			// the blur. Mirrors Porcelain's flatter-than-siblings register.
+			backgroundSubtle: "rgba(28, 28, 28, 0.5)",
+			background: "rgba(28, 28, 28, 0.62)",
+			backgroundStrong: "rgba(28, 28, 28, 0.75)",
+			border: "rgba(255, 255, 255, 0.10)",
+		},
+		dimmer: "rgba(0, 0, 0, 0.3)",
+		textShadowOnGlass: "0 1px 2px rgba(0, 0, 0, 0.45)",
+		graph: graphGraphite,
+	},
+	...sharedScalars,
+	shadow: {
+		none: "none",
+		sm: "0 1px 2px rgba(0, 0, 0, 0.18)",
+		md: "0 4px 16px rgba(0, 0, 0, 0.2)",
+		lg: "0 8px 24px rgba(0, 0, 0, 0.35)",
+		xl: "0 16px 48px rgba(0, 0, 0, 0.5)",
+	},
+	glass: {
+		blur: "10px",
+		saturate: "180%",
+	},
+};
+
 export enum ThemeName {
 	DefaultDark = "default-dark",
 	DefaultLight = "default-light",
@@ -1667,6 +1781,7 @@ export enum ThemeName {
 	Rose = "rose",
 	Slate = "slate",
 	Porcelain = "porcelain",
+	Graphite = "graphite",
 }
 
 export const themes: Record<ThemeName, Tokens> = {
@@ -1683,6 +1798,7 @@ export const themes: Record<ThemeName, Tokens> = {
 	[ThemeName.Rose]: rose,
 	[ThemeName.Slate]: slate,
 	[ThemeName.Porcelain]: porcelain,
+	[ThemeName.Graphite]: graphite,
 };
 
 export function isThemeName(value: unknown): value is ThemeName {
@@ -1813,6 +1929,13 @@ export const themeCatalog: readonly ThemeCatalogEntry[] = [
 		descriptionKey: "shell.settings.themes.porcelain.description",
 		appearance: ThemeAppearance.Light,
 		preview: previewOf(porcelain),
+	},
+	{
+		id: ThemeName.Graphite,
+		labelKey: "shell.settings.themes.graphite.label",
+		descriptionKey: "shell.settings.themes.graphite.description",
+		appearance: ThemeAppearance.Dark,
+		preview: previewOf(graphite),
 	},
 ];
 
