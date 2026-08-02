@@ -86,6 +86,55 @@ describe("parseToolProposal", () => {
 		).not.toBeNull(); // label likewise clamps
 	});
 
+	it("REJECTS a body carrying bidi overrides or C1 controls instead of stripping them", () => {
+		// A right-to-left override makes the RENDERED diff differ from the bytes
+		// the caller applies — the same divergence the length cap refuses.
+		const RLO = String.fromCharCode(0x202e);
+		const LRI = String.fromCharCode(0x2066);
+		const C1 = String.fromCharCode(0x85);
+		const NUL = String.fromCharCode(0x00);
+		expect(parseToolProposal({ changes: [change({ after: `transfer ${RLO}999` })] })).toBeNull();
+		expect(parseToolProposal({ changes: [change({ before: `old ${LRI}words` })] })).toBeNull();
+		expect(parseToolProposal({ changes: [change({ after: `new${C1}words` })] })).toBeNull();
+		expect(parseToolProposal({ changes: [change({ after: `new${NUL}words` })] })).toBeNull();
+	});
+
+	it("keeps newlines, tabs and emoji joiners — a body is multi-line text", () => {
+		const body = "para one\n\n\tindented\n👩‍👩‍👧";
+		expect(parseToolProposal({ changes: [change({ after: body })] })?.changes[0]?.after).toBe(body);
+	});
+
+	it("rejects a prototype-slot key", () => {
+		for (const key of ["__proto__", "constructor", "prototype"]) {
+			expect(parseToolProposal({ changes: [{ key, after: "owned" }] })).toBeNull();
+		}
+	});
+
+	it("snapshots the change list so an evil iterator cannot outrun the cap", () => {
+		// `length` reads as 1, but iterating yields far more than the cap allows.
+		const evil: unknown[] = [change()];
+		Object.defineProperty(evil, Symbol.iterator, {
+			value: function* () {
+				for (let i = 0; i < TOOL_PROPOSAL_CHANGES_MAX + 50; i += 1) yield change();
+			},
+		});
+		expect(parseToolProposal({ changes: evil })?.changes).toHaveLength(1);
+	});
+
+	it("reads the change list once — a re-reading getter cannot swap it after the cap check", () => {
+		let reads = 0;
+		const wire = {
+			get changes() {
+				reads += 1;
+				return reads === 1
+					? [change()]
+					: Array.from({ length: TOOL_PROPOSAL_CHANGES_MAX + 50 }, () => change());
+			},
+		};
+		expect(parseToolProposal(wire)?.changes).toHaveLength(1);
+		expect(reads).toBe(1);
+	});
+
 	it("ignores undeclared fields rather than ferrying them through", () => {
 		const parsed = parseToolProposal({
 			changes: [change({ html: "<script>x</script>" })],

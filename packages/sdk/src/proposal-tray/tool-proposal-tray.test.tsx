@@ -10,15 +10,24 @@
  *     (one `doc.transact` wrapping every change), which the consumer harness
  *     below does exactly as the docs prescribe;
  *   - a failed apply keeps the card with OUR failure line (never an error
- *     string); dismiss removes without applying.
+ *     string); dismiss removes without applying;
+ *   - a row is named by the key it applies to, never by the provider's label;
+ *   - staging is capped by REFUSING offers, so no card awaiting a decision is
+ *     ever evicted to make room.
  */
 
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type ToolProposalEntry, ToolProposalTray, useToolProposals } from "./tool-proposal-tray";
+import {
+	TOOL_PROPOSALS_MAX,
+	type ToolProposalEntry,
+	ToolProposalTray,
+	useToolProposals,
+} from "./tool-proposal-tray";
 
-const t = (key: string) => key;
+const t = (key: string, params?: Record<string, string | number>) =>
+	params ? `${key}:${Object.values(params).join(",")}` : key;
 
 const source = { id: "app.io.example.p.rewrite", title: "Rewrite", appId: "io.example.p" };
 const wire = {
@@ -54,8 +63,17 @@ afterEach(() => {
 	container.remove();
 });
 
+/** A provider naming the field something other than the key it writes. */
+const mislabelled = {
+	changes: [
+		{ key: "body", label: "Tags", after: "rewritten body" },
+		{ key: "startDate", label: "Start date", after: "2026-08-02" },
+	],
+};
+
 let currentDoc = new FakeDoc();
 let lastOfferRejected = false;
+let offerResults: boolean[] = [];
 
 function Harness({
 	onApply,
@@ -65,8 +83,15 @@ function Harness({
 	const { proposals, offer, dismiss } = useToolProposals();
 	return (
 		<>
-			<button type="button" id="offer-good" onClick={() => offer(source, wire)}>
+			<button type="button" id="offer-good" onClick={() => offerResults.push(offer(source, wire))}>
 				good
+			</button>
+			<button
+				type="button"
+				id="offer-mislabelled"
+				onClick={() => offerResults.push(offer(source, mislabelled))}
+			>
+				mislabelled
 			</button>
 			<button
 				type="button"
@@ -90,6 +115,7 @@ function Harness({
 function mount(onApply: (entry: ToolProposalEntry, doc: FakeDoc) => Promise<void> | void) {
 	currentDoc = new FakeDoc();
 	lastOfferRejected = false;
+	offerResults = [];
 	act(() => {
 		root.render(<Harness onApply={onApply} />);
 	});
@@ -162,6 +188,38 @@ describe("useToolProposals / ToolProposalTray", () => {
 		expect(
 			container.querySelector<HTMLButtonElement>("[data-testid='tool-proposal-apply']")?.disabled,
 		).toBe(false);
+	});
+
+	it("names every row by the key it applies to, not by the provider's label", () => {
+		mount(() => {});
+		click("#offer-mislabelled");
+		const rows = container.querySelectorAll("[data-testid='tool-proposal-change']");
+		// `{key: "body", label: "Tags"}` must not read as a change to Tags.
+		expect(rows[0]?.querySelector(".bs-proposal__field-label")?.textContent).toContain("Body");
+		expect(rows[0]?.querySelector("[data-testid='tool-proposal-provider-label']")?.textContent).toBe(
+			"tool.proposal.providerLabel:Tags",
+		);
+		// A label that merely humanizes the key differently is not a mismatch.
+		expect(rows[1]?.querySelector(".bs-proposal__field-label")?.textContent).toBe("Start date");
+		expect(rows[1]?.querySelector("[data-testid='tool-proposal-provider-label']")).toBeNull();
+	});
+
+	it("refuses further offers at the staging ceiling rather than dropping a staged card", () => {
+		mount(() => {});
+		for (let i = 0; i < TOOL_PROPOSALS_MAX + 2; i += 1) click("#offer-good");
+		expect(container.querySelectorAll("[data-testid='tool-proposal']")).toHaveLength(
+			TOOL_PROPOSALS_MAX,
+		);
+		// Every refusal is reported to the caller — never a silent drop.
+		expect(offerResults.filter(Boolean)).toHaveLength(TOOL_PROPOSALS_MAX);
+		expect(offerResults.slice(TOOL_PROPOSALS_MAX)).toEqual([false, false]);
+		// Dismissing one makes room again.
+		click("[data-testid='tool-proposal-dismiss']");
+		click("#offer-good");
+		expect(container.querySelectorAll("[data-testid='tool-proposal']")).toHaveLength(
+			TOOL_PROPOSALS_MAX,
+		);
+		expect(offerResults.at(-1)).toBe(true);
 	});
 
 	it("dismiss removes the card without applying", async () => {

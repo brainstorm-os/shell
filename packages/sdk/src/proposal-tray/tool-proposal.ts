@@ -10,14 +10,15 @@
  * Everything in a proposal is PROVIDER-AUTHORED, UNTRUSTED DATA. This parser
  * is the screen: it copies only the known fields into a fresh object (never
  * forwards the provider's object by reference), sanitizes every single-line
- * string, and REJECTS an over-cap body rather than truncating it — a human is
- * about to approve these exact bytes, and silently showing fewer of them than
- * will be applied is worse than refusing. A malformed proposal parses to
- * `null`; the caller reports that as a `ProviderError` refusal chip, never as
- * a half-rendered card.
+ * string, and REJECTS — rather than truncating or stripping — a body that is
+ * over cap or carries control/bidi-override characters. A human is about to
+ * approve these exact bytes, and rendering something other than what will be
+ * applied is worse than refusing. A malformed proposal parses to `null`; the
+ * caller reports that as a `ProviderError` refusal chip, never as a
+ * half-rendered card.
  */
 
-import { sanitizeInlineText } from "../sanitize-text";
+import { hasUnsafeBodyChars, sanitizeInlineText } from "../sanitize-text";
 
 /** Mirrors `APP_TOOL_INPUTS_MAX` — a proposal is a reviewable set of changes,
  *  not a bulk import. */
@@ -35,7 +36,9 @@ export const TOOL_PROPOSAL_SUMMARY_MAX = 500;
  *  recognise is a change it must not apply. */
 export type AppToolProposalChange = {
 	key: string;
-	/** Display label. Sanitized; falls back to the key at render time. */
+	/** Provider's suggested wording for the field. Sanitized, and never
+	 *  authoritative: the tray labels every row with the humanized `key` it will
+	 *  actually apply to, and shows this only as secondary text. */
 	label?: string;
 	/** The value as the provider saw it. Rendered struck-through so the user
 	 *  can spot a provider proposing against stale data. */
@@ -49,9 +52,19 @@ export type AppToolProposal = {
 	changes: readonly AppToolProposalChange[];
 };
 
+/** Keys that name a prototype slot rather than a field. A caller applying a
+ *  proposal writes `key` into an object of its own; `__proto__` reaching that
+ *  write is never something a human meant to approve. */
+const POISON_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
 function parseBody(value: unknown): string | null {
 	if (typeof value !== "string") return null;
 	if (value.length > TOOL_PROPOSAL_TEXT_MAX) return null;
+	// The same rule as the length cap, for the same reason: a body carrying a
+	// bidi override or a C1 control RENDERS as something other than the bytes
+	// the caller would write, so the whole proposal is refused rather than
+	// stripped — a human is about to approve these exact bytes.
+	if (hasUnsafeBodyChars(value)) return null;
 	return value;
 }
 
@@ -60,6 +73,7 @@ function parseChange(value: unknown): AppToolProposalChange | null {
 	const raw = value as Record<string, unknown>;
 	const key = sanitizeInlineText(raw.key, TOOL_PROPOSAL_KEY_MAX);
 	if (key.length === 0) return null;
+	if (POISON_KEYS.has(key)) return null;
 	const after = parseBody(raw.after);
 	if (after === null) return null;
 	const change: AppToolProposalChange = { key, after };
@@ -84,10 +98,16 @@ function parseChange(value: unknown): AppToolProposalChange | null {
 export function parseToolProposal(value: unknown): AppToolProposal | null {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
 	const raw = value as Record<string, unknown>;
-	if (!Array.isArray(raw.changes)) return null;
-	if (raw.changes.length === 0 || raw.changes.length > TOOL_PROPOSAL_CHANGES_MAX) return null;
+	// Materialize the list ONCE: a getter or an overridden `Symbol.iterator`
+	// makes the length check and the loop below disagree, so a payload passing
+	// the ≤16 cap could then yield unbounded entries. The agent is an in-process
+	// caller, so this is reachable — same fix as `app-tool-args`' `snapshot`.
+	const rawChanges: unknown = raw.changes;
+	const entries = Array.isArray(rawChanges) ? Array.prototype.slice.call(rawChanges) : null;
+	if (entries === null) return null;
+	if (entries.length === 0 || entries.length > TOOL_PROPOSAL_CHANGES_MAX) return null;
 	const changes: AppToolProposalChange[] = [];
-	for (const entry of raw.changes) {
+	for (const entry of entries) {
 		const change = parseChange(entry);
 		// One malformed change poisons the whole proposal: applying "the valid
 		// subset" of something a provider got wrong is a decision a human never
