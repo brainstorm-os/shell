@@ -12,6 +12,7 @@ export {
 export {
 	type ToolProposalEntry,
 	type ToolProposalSource,
+	TOOL_PROPOSALS_MAX,
 	ToolProposalTray,
 	type ToolProposalTrayProps,
 	useToolProposals,

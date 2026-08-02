@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeInlineText } from "./sanitize-text";
+import { hasUnsafeBodyChars, sanitizeInlineText } from "./sanitize-text";
 
 const ZWSP = String.fromCharCode(0x200b);
 const ZWNJ = String.fromCharCode(0x200c);
@@ -46,5 +46,35 @@ describe("sanitizeInlineText", () => {
 
 	it("keeps non-ASCII text and emoji intact", () => {
 		expect(sanitizeInlineText("título — 日本語 🚀", 100)).toBe("título — 日本語 🚀");
+	});
+});
+
+describe("hasUnsafeBodyChars", () => {
+	it("passes plain multi-line body text", () => {
+		expect(hasUnsafeBodyChars("line one\nline two\tindented\n\n日本語 🚀")).toBe(false);
+		expect(hasUnsafeBodyChars("")).toBe(false);
+	});
+
+	it("flags C0 controls other than newline and tab", () => {
+		expect(hasUnsafeBodyChars(`a${NUL}b`)).toBe(true);
+		expect(hasUnsafeBodyChars("a\rb")).toBe(true);
+		expect(hasUnsafeBodyChars(String.fromCharCode(0x1b))).toBe(true);
+	});
+
+	it("flags DEL and the C1 range", () => {
+		expect(hasUnsafeBodyChars(`a${DEL}b`)).toBe(true);
+		expect(hasUnsafeBodyChars(`a${String.fromCharCode(0x9f)}b`)).toBe(true);
+	});
+
+	it("flags bidi overrides and isolates", () => {
+		expect(hasUnsafeBodyChars(`a${RLO}b`)).toBe(true);
+		expect(hasUnsafeBodyChars(`a${LRE}b`)).toBe(true);
+		expect(hasUnsafeBodyChars(`a${LRI}b${PDI}`)).toBe(true);
+	});
+
+	it("leaves zero-width joiners alone — they are legitimate emoji sequences", () => {
+		expect(hasUnsafeBodyChars(`a${ZWJ}b`)).toBe(false);
+		expect(hasUnsafeBodyChars(`a${ZWSP}b${ZWNJ}c`)).toBe(false);
+		expect(hasUnsafeBodyChars("👩‍👩‍👧")).toBe(false);
 	});
 });

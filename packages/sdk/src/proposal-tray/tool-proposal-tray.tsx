@@ -19,12 +19,17 @@
  *     that does not parse, and the caller reports THAT as a refusal chip;
  *   - `before`/`after` render as React text nodes only — provider data stays
  *     inert however injection-shaped it is;
+ *   - each row is named by the humanized `key` the caller will apply to, never
+ *     by the provider's `label`, so what the user approves is what gets
+ *     written;
+ *   - staging is capped (`TOOL_PROPOSALS_MAX`) by REFUSING further offers, so
+ *     a looping caller cannot bury a card the user has yet to decide on;
  *   - a failed apply renders OUR message (`tool.proposal.applyFailed`), never
  *     an error string, mirroring the refusal chips' rule.
  */
 
 import { sanitizeAppLabel } from "@brainstorm-os/sdk-types";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { humanizeKey } from "../humanize-key";
 import { ProposalTraySection } from "./proposal-chrome";
 import {
@@ -53,9 +58,17 @@ export type ToolProposalEntry = {
 
 let seq = 0;
 
+/** Staging ceiling. A looping agent or automation must not stack proposal
+ *  cards without bound (each carries up to two 20k bodies per change). Unlike
+ *  `TOOL_OUTCOMES_MAX`, which drops the OLDEST chip, this ceiling REFUSES the
+ *  new offer: every staged card is awaiting a human decision, and evicting one
+ *  to make room would discard a choice the user has not made yet. The caller
+ *  reports the refusal on its existing `ProviderError` path. */
+export const TOOL_PROPOSALS_MAX = 5;
+
 /** Collect proposals for rendering. `offer` parses the raw tool result and
- *  returns whether it was a well-formed proposal — `false` means the caller
- *  should report a `ProviderError` refusal instead (a malformed proposal is a
+ *  returns whether it was staged — `false` means the caller should report a
+ *  `ProviderError` refusal instead (a malformed or refused proposal is a
  *  failed call, not a silently absent card). */
 export function useToolProposals(): {
 	proposals: readonly ToolProposalEntry[];
@@ -63,10 +76,17 @@ export function useToolProposals(): {
 	dismiss: (id: string) => void;
 } {
 	const [proposals, setProposals] = useState<readonly ToolProposalEntry[]>([]);
+	// `offer`'s verdict has to be synchronous — the caller reports a refusal on
+	// the spot — but state lags the event. This mirror counts staged cards
+	// across offers within one tick and resyncs to the committed list on render.
+	const staged = useRef(0);
+	staged.current = proposals.length;
 
 	const offer = useCallback((tool: ToolProposalSource, value: unknown): boolean => {
 		const proposal = parseToolProposal(value);
 		if (proposal === null) return false;
+		if (staged.current >= TOOL_PROPOSALS_MAX) return false;
+		staged.current += 1;
 		seq += 1;
 		setProposals((prev) => [
 			...prev,
@@ -105,6 +125,13 @@ export type ToolProposalTrayProps = {
 	t: (key: string, params?: Record<string, string | number>) => string;
 };
 
+/** Compare a provider label against the field name we render, ignoring case
+ *  and separators — "Start date" and "startDate" name the same field. */
+function sameField(label: string, name: string): boolean {
+	const fold = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+	return fold(label) === fold(name);
+}
+
 function ChangeRow({
 	change,
 	t,
@@ -112,9 +139,24 @@ function ChangeRow({
 	change: AppToolProposalChange;
 	t: ToolProposalTrayProps["t"];
 }) {
+	// The humanized KEY is the authoritative field name — it is what the caller
+	// will actually apply to. A provider label never replaces it: `{key: "body",
+	// label: "Tags"}` would otherwise have the user approving "Tags" while the
+	// body gets rewritten. A materially different label still renders, as
+	// clearly secondary text, so the mismatch is visible rather than hidden.
+	const name = humanizeKey(change.key);
+	const providerLabel =
+		change.label !== undefined && !sameField(change.label, name) ? change.label : null;
 	return (
 		<div className="bs-proposal__field" data-testid="tool-proposal-change">
-			<span className="bs-proposal__field-label">{change.label ?? humanizeKey(change.key)}</span>
+			<span className="bs-proposal__field-label">
+				{name}
+				{providerLabel !== null ? (
+					<span className="bs-proposal__field-note" data-testid="tool-proposal-provider-label">
+						{t("tool.proposal.providerLabel", { label: providerLabel })}
+					</span>
+				) : null}
+			</span>
 			{change.before !== undefined ? (
 				<del className="bs-proposal__before" aria-label={t("tool.proposal.before")}>
 					{change.before}

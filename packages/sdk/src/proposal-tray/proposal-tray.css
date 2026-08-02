@@ -103,6 +103,15 @@
 	color: var(--color-text-secondary);
 }
 
+/* A provider's own wording for a field, shown BESIDE the authoritative
+   humanized key it disagrees with — dimmer, so it reads as the provider's
+   claim rather than as the field being written. */
+.bs-proposal__field-note {
+	margin-left: var(--space-1);
+	color: var(--text-dim);
+	overflow-wrap: anywhere;
+}
+
 .bs-proposal__input {
 	width: 100%;
 }
