@@ -338,4 +338,28 @@ export const REGISTRY_MIGRATIONS: SqliteMigration[] = [
 			db.exec("ALTER TABLE app_tools ADD COLUMN input TEXT NOT NULL DEFAULT '[]';");
 		},
 	},
+	{
+		version: 15,
+		description: "registry.db v15 — app_tool_approvals (Tool-5: rug-pull re-prompt)",
+		up: (db) => {
+			// Tool-5 — the tool surface the USER approved, per tool. A row is
+			// written when a call is confirmed; `tools.call` compares the current
+			// declaration against it and re-prompts when an app UPDATE rewrote the
+			// tool. Deliberately NOT dropped with the app's tools on reinstall —
+			// see the repo's `deleteForApp` note; an approval survives a
+			// reinstall of the SAME declaration, and differs from it otherwise,
+			// which is exactly the signal.
+			db.exec(`
+				CREATE TABLE app_tool_approvals (
+					caller_app_id TEXT NOT NULL,
+					tool_id       TEXT NOT NULL,
+					app_id        TEXT NOT NULL,
+					fingerprint   TEXT NOT NULL,
+					approved_at   INTEGER NOT NULL,
+					PRIMARY KEY (caller_app_id, tool_id)
+				);
+			`);
+			db.exec("CREATE INDEX idx_app_tool_approvals_app ON app_tool_approvals (app_id);");
+		},
+	},
 ];

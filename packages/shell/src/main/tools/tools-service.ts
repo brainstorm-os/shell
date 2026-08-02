@@ -25,9 +25,11 @@ import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import { ActionTrustTier } from "@brainstorm-os/sdk-types";
 import {
+	AppToolApprovalState,
 	type AppToolRecord,
 	type AppToolSurface,
 	appToolApplies,
+	appToolApprovalState,
 	isAppToolSurface,
 	sanitizeAppLabel,
 } from "@brainstorm-os/sdk-types";
@@ -36,6 +38,7 @@ import type { AppToolsRepository } from "../storage/registry-repo/app-tools-repo
 import { providerSatisfiesEffect } from "./tool-effect-gate";
 import {
 	TOOLS_PROVIDE_CAPABILITY,
+	type ToolApprovals,
 	type ToolsCallOptions,
 	handleToolsCall,
 	holdsExactScope,
@@ -125,6 +128,9 @@ export async function handleToolsList(
 	// and is NOT used as a filter (the older behaviour), rather than silently
 	// hiding every tool.
 	const liveProviders = options.getCallHost?.()?.attachedApps() ?? null;
+	const approvals = options.getApprovals
+		? await options.getApprovals().catch(() => null)
+		: undefined;
 	// Fail CLOSED on a disable-store read error: an unreadable disable set must
 	// not silently re-enable every contributor the user switched off.
 	const disabled = options.resolveDisabledContributors
@@ -171,6 +177,10 @@ export async function handleToolsList(
 			// The provider's own manifest name — screened like any other text it
 			// authors, falling back to the registry-minted app id.
 			appLabel: sanitizeAppLabel(await options.resolveAppLabel?.(tool.appId)) ?? tool.appId,
+			// Tool-5 — so a caller knows to ask BEFORE clicking, rather than
+			// discovering the refusal by being refused. Unreadable ⇒ `New`, the
+			// state that asks.
+			approval: approvalState(approvals, envelope.app, tool),
 		}));
 	return await Promise.all(stamped);
 }
@@ -178,6 +188,22 @@ export async function handleToolsList(
 /** May this caller actually invoke the tool? Mirrors `tools.call`'s gate
  *  exactly (both scope forms, exact match only, no `*`), because a listing that
  *  disagreed with the call would put a row in a menu that refuses when clicked. */
+/** Never throws: a store that fails mid-read yields `New`, the state that ASKS.
+ *  A listing must not die because one row could not be checked. */
+function approvalState(
+	approvals: ToolApprovals | null | undefined,
+	callerAppId: string,
+	tool: AppToolRecord,
+): AppToolApprovalState {
+	if (approvals === undefined) return AppToolApprovalState.Approved;
+	if (approvals === null) return AppToolApprovalState.New;
+	try {
+		return appToolApprovalState(tool, approvals.get(callerAppId, tool.id));
+	} catch {
+		return AppToolApprovalState.New;
+	}
+}
+
 function callerMaySee(
 	ledger: CapabilityLedger | null,
 	callerAppId: string,

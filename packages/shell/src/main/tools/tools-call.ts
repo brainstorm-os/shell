@@ -41,11 +41,14 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import { isAgentPrincipal } from "@brainstorm-os/capabilities/principals";
 import {
 	APP_TOOL_NAME_RE,
+	AppToolApprovalState,
 	type AppToolInput,
 	type AppToolRecord,
 	ToolCallInitiator,
 	ToolFrictionDecision,
 	ValueType,
+	appToolApprovalState,
+	appToolFingerprint,
 	decideAppToolFriction,
 	isMultiValued,
 } from "@brainstorm-os/sdk-types";
@@ -135,8 +138,18 @@ export type ToolsCallOptions = {
 	 *  declaring `allowedTypes` may be called; the caller's claim about a
 	 *  referenced object's type is never trusted. */
 	resolveEntityType?: (entityId: string) => Promise<string | null>;
+	/** The user's per-tool approval record (Tool-5). Absent = no rug-pull check,
+	 *  which is the pre-Tool-5 behaviour and only used by callers that have no
+	 *  registry (tests). */
+	getApprovals?: () => Promise<ToolApprovals | null>;
 	onCall?: (record: ToolCallRecord) => void;
 	now?: () => number;
+};
+
+/** The slice of the approvals repo this path needs. */
+export type ToolApprovals = {
+	get(callerAppId: string, toolId: string): string | null;
+	approve(callerAppId: string, toolId: string, appId: string, fingerprint: string, at: number): void;
 };
 
 export type ToolsCallInput = {
@@ -392,7 +405,37 @@ export async function handleToolsCall(
 	}
 
 	// ── 5. Friction ──────────────────────────────────────────────────────────
-	const friction = decideAppToolFriction(tool.effect, initiator);
+	// Tool-5 — a declaration that CHANGED since the user approved it (or was
+	// never approved) needs a human answer regardless of what its `effect` would
+	// otherwise buy. `effect` is self-declared, so without this an app update
+	// could flip a tool from `pure` to something else, rewrite its description,
+	// and keep the auto-run the old wording earned.
+	// Fail CLOSED, exactly like the disable-set read above: an approvals store we
+	// cannot read is not a store that approved anything. Treating it as
+	// "approved" would silently restore pre-Tool-5 friction the moment the
+	// registry hiccups — the failure mode nobody would notice.
+	const approvals = options.getApprovals
+		? await options.getApprovals().catch(() => null)
+		: undefined;
+	if (approvals === null) {
+		record("refused", "approvals-unreadable", argKeys);
+		throw makeError("Unavailable", "tools.call: approval record unreadable");
+	}
+	let approval = AppToolApprovalState.Approved;
+	if (approvals) {
+		try {
+			approval = appToolApprovalState(tool, approvals.get(envelope.app, tool.id));
+		} catch {
+			// A store that throws mid-read is as unreadable as one that would not
+			// open. Refuse rather than let a raw driver error escape unaudited.
+			record("refused", "approvals-unreadable", argKeys);
+			throw makeError("Unavailable", "tools.call: approval record unreadable");
+		}
+	}
+	const friction =
+		approval === AppToolApprovalState.Approved
+			? decideAppToolFriction(tool.effect, initiator)
+			: ToolFrictionDecision.Confirm;
 	if (friction === ToolFrictionDecision.Confirm) {
 		// `confirmed` is a CALLER ASSERTION that a human already approved this.
 		// Sound for an app, where the assertion is backed by the gesture that
@@ -403,7 +446,14 @@ export async function handleToolsCall(
 		// trusting a boolean off the wire.
 		const agentSelfApproving = initiator === ToolCallInitiator.Agent;
 		if (agentSelfApproving || input.confirmed !== true) {
-			record("refused", agentSelfApproving ? "agent-needs-approval" : "needs-confirm", argKeys);
+			const reason = agentSelfApproving
+				? "agent-needs-approval"
+				: approval === AppToolApprovalState.Changed
+					? "declaration-changed"
+					: approval === AppToolApprovalState.New
+						? "never-approved"
+						: "needs-confirm";
+			record("refused", reason, argKeys);
 			throw makeError("NeedsConfirm", `tools.call: ${input.tool} needs confirmation before it runs`);
 		}
 	}
@@ -426,6 +476,20 @@ export async function handleToolsCall(
 	}
 
 	if (result.ok) {
+		// Re-baseline THIS tool, for THIS caller, only after the call actually
+		// worked — an approval recorded ahead of a failed dispatch would bless a
+		// surface the user never saw function. Blessing the whole app on one
+		// approval is the hole the MCP path documents.
+		if (approvals && friction === ToolFrictionDecision.Confirm) {
+			try {
+				approvals.approve(envelope.app, tool.id, tool.appId, appToolFingerprint(tool), now());
+			} catch {
+				// Losing the baseline costs another prompt next time; it must not
+				// cost the caller its result.
+				record("ok", "approval-not-recorded", argKeys);
+				return { value: result.value };
+			}
+		}
 		record("ok", undefined, argKeys);
 		return { value: result.value };
 	}

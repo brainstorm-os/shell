@@ -13,6 +13,8 @@ import {
 	APP_TOOL_INPUTS_MAX,
 	CURATED_INTENT_VERBS,
 	RESERVED_APP_TOOL_NAMES,
+	appToolFingerprint,
+	appToolId,
 	normalizeAppTool,
 	validateAppTool,
 } from "./app-tools";
@@ -223,5 +225,75 @@ describe("normalizeAppTool — inputs", () => {
 
 	it("defaults a tool with no declaration to no arguments", () => {
 		expect(normalizeAppTool(descriptor() as never).input).toEqual([]);
+	});
+});
+
+describe("tool ids cannot collide with the other addressing schemes (Tool-5)", () => {
+	it("never mints an id in the mcp namespace", () => {
+		// One addressing scheme covers both provider kinds, so the prefixes must
+		// stay disjoint: `app.<appId>.<name>` vs `mcp.<serverId>.<toolName>`.
+		expect(appToolId("io.example.p", "rewrite").startsWith("app.")).toBe(true);
+		// An app id cannot begin with a segment that would forge the mcp prefix,
+		// because the shell prepends `app.` itself — the manifest only names the
+		// tool.
+		expect(appToolId("mcp.evil", "rewrite")).toBe("app.mcp.evil.rewrite");
+	});
+
+	it("keeps every curated intent verb unclaimable as a tool name", () => {
+		// Verbs route ("somebody handle this"); tools call ("this app compute
+		// this"). A tool impersonating the routing layer is refused.
+		for (const verb of CURATED_INTENT_VERBS) {
+			expect(validateAppTool(descriptor({ name: verb })).ok, verb).toBe(false);
+		}
+	});
+});
+
+describe("appToolFingerprint (Tool-5)", () => {
+	const base = {
+		name: "rewrite",
+		title: "Rewrite",
+		description: "Rewrite the text.",
+		effect: "pure",
+		appliesTo: [],
+		surfaces: ["menu"],
+		input: [],
+	} as never;
+
+	it("changes when anything the user READ changes", () => {
+		const original = appToolFingerprint(base);
+		for (const changed of [
+			{ ...(base as object), title: "Rewrite everything" },
+			{ ...(base as object), description: "Send the text somewhere" },
+			{ ...(base as object), effect: "external" },
+			{
+				...(base as object),
+				input: [{ name: "t", description: "d", required: true, valueType: "text" }],
+			},
+		]) {
+			expect(appToolFingerprint(changed as never), JSON.stringify(changed)).not.toBe(original);
+		}
+	});
+
+	it("ignores applicability and registration time, which the user never read", () => {
+		const original = appToolFingerprint(base);
+		expect(
+			appToolFingerprint({ ...(base as object), appliesTo: ["x"], registeredAt: 999 } as never),
+		).toBe(original);
+	});
+
+	it("DOES change when a tool becomes agent-invocable", () => {
+		// `surfaces` is not merely where a tool appears: adding `agent` moves it
+		// from human-clicked to autonomous.
+		expect(
+			appToolFingerprint({ ...(base as object), surfaces: ["menu", "agent"] } as never),
+		).not.toBe(appToolFingerprint(base));
+		// Order is not a change.
+		expect(appToolFingerprint({ ...(base as object), surfaces: ["menu"] } as never)).toBe(
+			appToolFingerprint(base),
+		);
+	});
+
+	it("is stable across calls (a change-detector must not drift on its own)", () => {
+		expect(appToolFingerprint(base)).toBe(appToolFingerprint(base));
 	});
 });
