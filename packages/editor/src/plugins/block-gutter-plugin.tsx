@@ -207,7 +207,11 @@ export function BlockGutterPlugin({
 				onActivate: (command) => {
 					const s = selectionStore.getSnapshot();
 					const blockKeys = s.selectedKeys.size > 0 ? s.selectedKeys : new Set<NodeKey>([blockKey]);
-					command.run({ editor, blockKeys, ...(documentId ? { documentId } : {}) });
+					// A contributed command may be async and reports its own outcome;
+					// the surface only has to not drop the promise.
+					void Promise.resolve(
+						command.run({ editor, blockKeys, ...(documentId ? { documentId } : {}) }),
+					).catch(() => undefined);
 				},
 			});
 		},
