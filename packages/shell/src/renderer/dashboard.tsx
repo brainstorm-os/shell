@@ -774,7 +774,7 @@ export function Dashboard() {
 						onGridMigrated={markIconGridMigrated}
 					/>
 				)}
-				<DashboardWidgetsLayer widgets={widgets} />
+				<DashboardWidgetsLayer widgets={widgets} icons={icons} />
 			</section>
 
 			<footer

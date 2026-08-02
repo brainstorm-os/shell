@@ -24,9 +24,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *  dismissed — the one outcome a user may need to act on. */
 export const TOOL_OUTCOME_TTL_MS = 6_000;
 
-export type ToolOutcome =
-	| { id: string; ok: true; title: string }
-	| { id: string; ok: false; title: string; kind: string; message: string };
+/** What a caller reports. A DISCRIMINATED union — `Omit<ToolOutcome, "id">`
+ *  looks equivalent but is not: `Omit` over a union collapses it to the common
+ *  keys, so the failure variant's `kind`/`message` stop being assignable. */
+export type ToolOutcomeInput =
+	| { ok: true; title: string }
+	| { ok: false; title: string; kind: string; message: string };
+
+export type ToolOutcome = ToolOutcomeInput & { id: string };
 
 /** Every refusal `tools.call` can produce, mapped to the key a host
  *  translates. Exhaustive on purpose: an unmapped kind falls back to the
@@ -52,7 +57,7 @@ let seq = 0;
  *  shape every tool surface asks for, so an app wires it straight through. */
 export function useToolOutcomes(): {
 	outcomes: readonly ToolOutcome[];
-	report: (outcome: Omit<ToolOutcome, "id">) => void;
+	report: (outcome: ToolOutcomeInput) => void;
 	dismiss: (id: string) => void;
 } {
 	const [outcomes, setOutcomes] = useState<readonly ToolOutcome[]>([]);
@@ -66,10 +71,10 @@ export function useToolOutcomes(): {
 	}, []);
 
 	const report = useCallback(
-		(outcome: Omit<ToolOutcome, "id">) => {
+		(outcome: ToolOutcomeInput) => {
 			seq += 1;
 			const id = `tool-outcome-${seq}`;
-			setOutcomes((prev) => [...prev, { ...outcome, id } as ToolOutcome]);
+			setOutcomes((prev) => [...prev, { ...outcome, id }]);
 			// Successes retire themselves; a refusal waits to be dismissed, since
 			// it is the outcome a user may still need to act on.
 			if (outcome.ok) {

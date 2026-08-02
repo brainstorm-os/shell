@@ -26,6 +26,7 @@ import {
 	ICON_BUTTON_W,
 	ICON_FOOTPRINT_H,
 	ICON_FOOTPRINT_W,
+	isUnplacedIcon,
 	maxIconCol,
 } from "../../shared/dashboard-icon-grid";
 
@@ -242,6 +243,57 @@ export function clampWidgetOrigin<T extends { x: number; y: number; w?: number; 
 	const y = Math.max(0, Math.min(record.y, maxWidgetOriginCell(surface.y, spanH)));
 	if (x === record.x && y === record.y) return record;
 	return { ...record, x, y };
+}
+
+/** Does a widget record overlap any placed app icon?
+ *
+ * Widgets and icons share ONE coordinate system — both are
+ * `GRID_OUTER_MARGIN + cell * unit` from the same origin, and `WIDGET_UNIT`
+ * equals `GRID_UNIT` — so the comparison is a direct pixel-rect intersection.
+ * Nothing reconciled them before, which is how a widget came to render on top
+ * of the app icon row (found by the 327 screenshot audit). */
+export function widgetOverlapsIcons(
+	widget: { x: number; y: number; w?: number; h?: number },
+	icons: readonly { x: number; y: number }[],
+): boolean {
+	const wx = GRID_OUTER_MARGIN + widget.x * WIDGET_UNIT;
+	const wy = GRID_OUTER_MARGIN + widget.y * WIDGET_UNIT;
+	const ww = Math.max(WIDGET_MIN_W, widget.w ?? WIDGET_MIN_W) * WIDGET_UNIT;
+	const wh = Math.max(WIDGET_MIN_H, widget.h ?? WIDGET_MIN_H) * WIDGET_UNIT;
+	return icons.some((icon) => {
+		if (isUnplacedIcon(icon)) return false;
+		const ix = GRID_OUTER_MARGIN + icon.x * GRID_UNIT;
+		const iy = GRID_OUTER_MARGIN + icon.y * GRID_UNIT;
+		return (
+			wx < ix + ICON_FOOTPRINT_W * GRID_UNIT &&
+			wx + ww > ix &&
+			wy < iy + ICON_FOOTPRINT_H * GRID_UNIT &&
+			wy + wh > iy
+		);
+	});
+}
+
+/** Move a widget DOWN until it clears every icon, then re-clamp to the surface.
+ *
+ * Down rather than sideways because that is the dashboard's actual shape: icons
+ * band across the top, widgets live beneath them. A widget already clear is
+ * returned untouched (identity preserved, so the caller's `changed` check still
+ * works). If no clear row exists within the surface the record is returned as
+ * clamped — never dropped; an invisible widget is worse than an overlapping
+ * one. */
+export function rescueWidgetFromIcons<T extends { x: number; y: number; w?: number; h?: number }>(
+	record: T,
+	icons: readonly { x: number; y: number }[],
+	surface: GridPoint,
+): T {
+	if (icons.length === 0 || !widgetOverlapsIcons(record, icons)) return record;
+	const spanH = Math.max(WIDGET_MIN_H, record.h ?? WIDGET_MIN_H);
+	const maxRow = maxWidgetOriginCell(surface.y, spanH);
+	for (let row = record.y + 1; row <= maxRow; row += 1) {
+		const candidate = { ...record, y: row };
+		if (!widgetOverlapsIcons(candidate, icons)) return candidate;
+	}
+	return record;
 }
 
 /** Snap a window-content point to the nearest widget cell (origin-relative). */

@@ -39,6 +39,7 @@ import {
 	clampWidgetSizeToSurface,
 	matchedWidgetSize,
 	migrateWidgetRecord,
+	rescueWidgetFromIcons,
 	widgetFootprint,
 	widgetPointToCell,
 	widgetRectPx,
@@ -231,9 +232,13 @@ function useWidgetBridge(): {
 
 export type DashboardWidgetsLayerProps = {
 	widgets: Record<string, DashboardWidget>;
+	/** Placed app icons. The layer needs them because widgets and icons share
+	 *  ONE grid and nothing else reconciles them — without this a widget
+	 *  persisted over an icon renders on top of it forever (327 audit). */
+	icons?: Record<string, { x: number; y: number }>;
 };
 
-function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
+function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerProps) {
 	const surfaceRef = useRef<HTMLDivElement | null>(null);
 	const dragRef = useRef<DragState | null>(null);
 	const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -243,6 +248,8 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 	const [gesture, setGesture] = useState<GestureRect | null>(null);
 	const [titles, setTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
 	const bridge = useWidgetBridge();
+	// Stable identity so the view-model memo does not rebuild every render.
+	const iconCells = useMemo(() => Object.values(icons ?? {}), [icons]);
 
 	// Surface size in CSS pixels, for the stranded-record rescue clamp
 	// (`clampWidgetOrigin`, F-379). Initialised from the window (the surface is
@@ -331,12 +338,15 @@ function DashboardWidgetsLayerInner({ widgets }: DashboardWidgetsLayerProps) {
 		let changed = false;
 		const out: Record<string, DashboardWidget> = {};
 		for (const [id, w] of Object.entries(merged)) {
-			const clamped = clampWidgetOrigin(w, surface);
+			// Surface first, then icons: a record rescued onto the surface can
+			// still land on the icon band, and one pushed clear of the icons must
+			// stay on the surface.
+			const clamped = rescueWidgetFromIcons(clampWidgetOrigin(w, surface), iconCells, surface);
 			out[id] = clamped;
 			if (clamped !== w) changed = true;
 		}
 		return changed ? out : merged;
-	}, [migrated, pending, surface]);
+	}, [migrated, pending, surface, iconCells]);
 
 	const toggleCollapsed = useCallback(
 		(id: string) => {
