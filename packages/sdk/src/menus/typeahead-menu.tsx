@@ -42,6 +42,11 @@ export type TypeaheadMenuItem = {
 	/** Non-interactive row — for an empty-state / "no results" line that should
 	 *  show but never commit or take the active highlight (skipped in nav). */
 	disabled?: boolean;
+	/** Render as a non-interactive section heading (the `label` is the
+	 *  heading) — the fancy-menus `RowKind.Section` row. Never clickable,
+	 *  never highlighted; the host's `activeIndex` must count these rows
+	 *  when mapping its own highlight to a row index. */
+	section?: boolean;
 };
 
 type TypeaheadData = { items: readonly TypeaheadMenuItem[] };
@@ -62,6 +67,14 @@ export const typeaheadMenuConfig = defineMenu<TypeaheadData>({
 		kind: BodyKind.List,
 		source: { kind: SourceKind.Prop, getItems: (data) => [...data.items] },
 		rows: [
+			{
+				// Section headers group the browse view (e.g. the slash menu's
+				// block-type sections). Non-interactive by construction.
+				kind: RowKind.Section,
+				match: (item: TypeaheadMenuItem) => item.section === true,
+				name: (item: TypeaheadMenuItem): ReactNode => item.label,
+				className: "bs-typeahead-section",
+			},
 			{
 				// `Item` rows carry the runtime's active-row treatment (it paints the
 				// row at `activeIndex`) + click wiring + scroll-into-view — the whole

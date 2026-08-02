@@ -53,6 +53,14 @@ export type EditorI18nKey =
 	// Slash menu (SlashMenuPlugin).
 	| "editor.slashMenu.region"
 	| "editor.slashMenu.empty"
+	// Slash-menu section headers (B11.19 — browse view, bare `/`).
+	| "editor.slashMenu.section.basic"
+	| "editor.slashMenu.section.lists"
+	| "editor.slashMenu.section.media"
+	| "editor.slashMenu.section.embeds"
+	| "editor.slashMenu.section.layout"
+	| "editor.slashMenu.section.properties"
+	| "editor.slashMenu.section.advanced"
 	// Inline formatting toolbar (InlineToolbarPlugin).
 	| "editor.inline.toolbar.region"
 	| "editor.inline.bold"
@@ -321,6 +329,13 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.inline.colorName.red": "Red",
 	"editor.slashMenu.region": "Block menu",
 	"editor.slashMenu.empty": "No matches",
+	"editor.slashMenu.section.basic": "Basic blocks",
+	"editor.slashMenu.section.lists": "Lists",
+	"editor.slashMenu.section.media": "Media",
+	"editor.slashMenu.section.embeds": "Embeds",
+	"editor.slashMenu.section.layout": "Layout",
+	"editor.slashMenu.section.properties": "Properties",
+	"editor.slashMenu.section.advanced": "Advanced",
 	"editor.block.paragraph": "Text",
 	"editor.block.heading1": "Heading 1",
 	"editor.block.heading2": "Heading 2",

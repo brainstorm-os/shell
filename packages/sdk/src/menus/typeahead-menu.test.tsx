@@ -45,6 +45,16 @@ describe("typeahead-menu config", () => {
 		expect(typeaheadMenuConfig.keyboard?.navigation).toBe("none");
 		expect(typeaheadMenuConfig.chrome?.dimmer).toBe("none");
 	});
+
+	it("routes section items to the Section row and everything else to the Item row (first match wins)", () => {
+		const rows = (
+			typeaheadMenuConfig.body as { rows?: { kind: string; match?: (i: unknown) => boolean }[] }
+		).rows;
+		expect(rows?.map((r) => r.kind)).toEqual(["section", "item"]);
+		const sectionRow = rows?.[0];
+		expect(sectionRow?.match?.({ id: "s", label: "Basic blocks", section: true })).toBe(true);
+		expect(sectionRow?.match?.({ id: "h1", label: "Heading 1" })).toBe(false);
+	});
 });
 
 describe("openTypeaheadMenu (controlled-list)", () => {

@@ -123,9 +123,10 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 		icon: ReactNode,
 		keywords: readonly string[],
 		target: BlockType,
+		category: CommandCategory = CommandCategory.Basic,
 	): BlockCommand => ({
 		id,
-		category: CommandCategory.Basic,
+		category,
 		label: t(key),
 		description: t(`${key}.description` as Parameters<EditorT>[0]),
 		icon,
@@ -183,6 +184,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			<BulletListIcon />,
 			["bullet", "list", "unordered", "ul"],
 			BlockType.BulletList,
+			CommandCategory.Lists,
 		),
 		turnIntoCmd(
 			"block.numberedList",
@@ -190,6 +192,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			<NumberedListIcon />,
 			["numbered", "ordered", "list", "ol"],
 			BlockType.NumberedList,
+			CommandCategory.Lists,
 		),
 		turnIntoCmd(
 			"block.todoList",
@@ -197,6 +200,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			<TodoListIcon />,
 			["todo", "task", "checkbox", "check"],
 			BlockType.TodoList,
+			CommandCategory.Lists,
 		),
 		turnIntoCmd(
 			"block.quote",
@@ -221,7 +225,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 		),
 		{
 			id: "block.divider",
-			category: CommandCategory.Embed,
+			category: CommandCategory.Basic,
 			label: t("editor.block.divider"),
 			description: t("editor.block.divider.description"),
 			icon: <DividerIcon />,
@@ -257,7 +261,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 		),
 		{
 			id: "block.table",
-			category: CommandCategory.Embed,
+			category: CommandCategory.Layout,
 			label: t("editor.block.table"),
 			description: t("editor.block.table.description"),
 			icon: <TableIcon />,
@@ -269,7 +273,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 		},
 		{
 			id: "block.columns2",
-			category: CommandCategory.Embed,
+			category: CommandCategory.Layout,
 			label: t("editor.block.columns2"),
 			description: t("editor.block.columns2.description"),
 			icon: <ColumnsIcon />,
@@ -278,7 +282,7 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 		},
 		{
 			id: "block.columns3",
-			category: CommandCategory.Embed,
+			category: CommandCategory.Layout,
 			label: t("editor.block.columns3"),
 			description: t("editor.block.columns3.description"),
 			icon: <ColumnsIcon />,

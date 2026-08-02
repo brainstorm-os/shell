@@ -21,9 +21,13 @@ import type { ReactNode } from "react";
 
 export enum CommandCategory {
 	Basic = "basic",
+	Lists = "lists",
 	Media = "media",
 	Embed = "embed",
+	Layout = "layout",
 	Property = "property",
+	/** Rarely-reached power blocks (ToC, equation) — last slash section. */
+	Advanced = "advanced",
 	Action = "action",
 	Align = "align",
 	Indent = "indent",
