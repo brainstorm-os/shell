@@ -52,6 +52,7 @@ import {
 	missingCapabilities,
 	runAgentLoop,
 } from "@brainstorm-os/sdk-types";
+import { parseAppToolId } from "../tools/tools-call";
 import { type ExprScope, ExpressionError, evaluateExpression } from "./code-expression";
 import type {
 	ChildRunResult,
@@ -196,6 +197,17 @@ export type InterpreterPorts = {
 	exporter?: ExportPort;
 	/** 11b.7 — optional: present only when the host wires the AI broker. */
 	ai?: AiGeneratePort;
+	/** Tool-9 — optional: present only when the host wires app tools. Absent ⇒
+	 *  an app-tool call in a workflow fails closed rather than falling through
+	 *  to an intent dispatch. */
+	appTools?: AppToolsPort;
+};
+
+/** The one method a workflow needs. The broker re-checks every capability and
+ *  validates the arguments against the declaration, so this is a thin port, not
+ *  a second gate. */
+export type AppToolsPort = {
+	call(input: { tool: string; args?: Record<string, unknown> }): Promise<unknown>;
 };
 
 // ─────────────────────── condition / collection eval ───────────────────────
@@ -745,11 +757,35 @@ const aiAgentInterpreter =
  *  tool is in the offered (intersected) set; this maps the call to the intent
  *  bus, carrying the tool's declared `entityType` (NOT a model-supplied one) so
  *  the dispatch stays inside the tool's declared scope. */
+/**
+ * Route one tool call from an AI-agent step (Tool-9).
+ *
+ * NO new `StepKind`. That enum is deliberately closed — "an open extension
+ * surface would make workflow audits intractable" — so an app tool rides the
+ * existing `AgentTool` path, distinguished by the SHAPE OF ITS ID rather than
+ * by a new step type. `app.<appId>.<name>` parses; an intent verb does not.
+ *
+ * Before this, every tool call went to `intents.dispatch`, so an app tool's
+ * namespaced id would have been dispatched as a nonsense intent verb and
+ * silently gone nowhere.
+ */
 function dispatchAgentTool(
 	ports: InterpreterPorts,
 	call: AgentToolCall,
 	step: AIAgentStep,
 ): Promise<unknown> {
+	if (parseAppToolId(call.tool)) {
+		const callTool = ports.appTools?.call;
+		// Fail CLOSED: a workflow that cannot reach the tool must stop, not fall
+		// through to an intent dispatch that would do something else entirely.
+		if (!callTool) {
+			return Promise.reject(new Error(`app tools are unavailable: ${call.tool}`));
+		}
+		return callTool({
+			tool: call.tool,
+			args: (call.args ?? {}) as Record<string, unknown>,
+		});
+	}
 	const tool = step.tools.find((t) => t.verb === call.tool);
 	return ports.intents.dispatch(call.tool, tool?.entityType, call.args);
 }

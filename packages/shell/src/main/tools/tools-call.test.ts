@@ -121,6 +121,19 @@ describe("tools.call (Tool-4)", () => {
 	});
 
 	/** Fully-authorized by default; each test removes exactly what it probes. */
+	/** A shell-owned approval host that answers `answer`, recording what it was
+	 *  asked so a case can assert the REASON reached the prompt. */
+	const approver = (answer: boolean) => {
+		const asked: Array<{ reason: string; agentInitiated: boolean; callerAppId: string }> = [];
+		return {
+			request: async (i: { reason: string; agentInitiated: boolean; callerAppId: string }) => {
+				asked.push(i);
+				return answer;
+			},
+			asked,
+		};
+	};
+
 	/** In-memory approvals. `seed` pre-approves the given tools at their CURRENT
 	 *  declaration, so a case that is not about rug-pull behaves as before. */
 	const approvalsFor = (seed: readonly AppToolRecord[] = []) => {
@@ -147,6 +160,9 @@ describe("tools.call (Tool-4)", () => {
 			// Default: everything already approved, so existing cases are unchanged
 			// by Tool-5. Rug-pull cases override this.
 			getApprovals: async () => approvalsFor(repo.listAll()),
+			// Tool-8 — the shell asks. Default: a host that says yes, so cases
+			// about other gates are unaffected; approval cases override it.
+			getApprovalHost: () => ({ request: async () => true }) as never,
 			...opts,
 		});
 
@@ -322,12 +338,7 @@ describe("tools.call (Tool-4)", () => {
 	});
 
 	it("treats any non-app-shaped principal as an agent (7 prefix-test leaks)", async () => {
-		// `isAgentPrincipal` answers false for `ed25519:DEADBEEF…` (uppercase),
-		// which would promote a malformed agent id to the laxer UserGesture branch
-		// and let it self-approve. Classification errors must cost friction.
 		repo.insertMany([tool({ effect: AppToolEffect.External })]);
-		// Every one of these missed a prefix test and self-approved an
-		// always-confirm tool until the check asked "is this an APP?" instead.
 		for (const malformed of [
 			"ed25519:DEADBEEFCAFE1234",
 			"ED25519:deadbeefcafe1234",
@@ -337,14 +348,14 @@ describe("tools.call (Tool-4)", () => {
 			"ed25519:deadbeefcafe1234\n",
 			"ed25519\uff1adeadbeefcafe1234",
 		]) {
-			await expect(
-				handler({}, [
-					[malformed, toolsCallCapability(PROVIDER)],
-					[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
-					[PROVIDER, "network.egress:https://example.com"],
-				])(envelope([{ tool: TOOL, confirmed: true }], malformed)),
-				malformed,
-			).rejects.toMatchObject({ name: "NeedsConfirm" });
+			const asked = approver(true);
+			await handler({ getApprovalHost: () => asked as never }, [
+				[malformed, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "network.egress:https://example.com"],
+			])(envelope([{ tool: TOOL }], malformed)).catch(() => undefined);
+			// The prompt is told an agent is behind it, whatever shape the id took.
+			expect(asked.asked[0], malformed).toMatchObject({ agentInitiated: true });
 		}
 	});
 
@@ -418,6 +429,67 @@ describe("tools.call (Tool-4)", () => {
 		).rejects.toMatchObject({ name: "Denied" });
 	});
 
+	it("refuses a proposes-write tool aimed at a LOCKED object", async () => {
+		// A locked object is read-only, and the lock has to hold on every write
+		// path or it is decoration. A proposes-write tool takes an object and
+		// returns a change to it — refused before the provider sees the id.
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to rewrite",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.ProposesWrite, input: [target] })]);
+		await expect(
+			handler({ resolveEntityLocked: async () => true })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).rejects.toMatchObject({ name: "Denied" });
+		expect(host.call).not.toHaveBeenCalled();
+		await expect(
+			handler({ resolveEntityLocked: async () => false })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).resolves.toEqual({ value: "done" });
+	});
+
+	it("treats an unresolvable lock as LOCKED", async () => {
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to rewrite",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.ProposesWrite, input: [target] })]);
+		for (const resolver of [
+			undefined,
+			async () => {
+				throw new Error("entities down");
+			},
+		]) {
+			await expect(
+				handler(resolver ? { resolveEntityLocked: resolver } : {})(
+					envelope([{ tool: TOOL, args: { target: "e1" } }]),
+				),
+			).rejects.toMatchObject({ name: "Denied" });
+		}
+	});
+
+	it("does not consult the lock for a tool that only reads", async () => {
+		const target: AppToolInput = {
+			name: "target",
+			description: "what to read",
+			required: true,
+			valueType: ValueType.EntityRef,
+		};
+		repo.insertMany([tool({ effect: AppToolEffect.Pure, input: [target] })]);
+		await expect(
+			handler({ resolveEntityLocked: async () => true })(
+				envelope([{ tool: TOOL, args: { target: "e1" } }]),
+			),
+		).resolves.toEqual({ value: "done" });
+	});
+
 	// ── Friction ─────────────────────────────────────────────────────────────
 
 	it("does not read an OMITTED argument off Object.prototype", async () => {
@@ -444,21 +516,49 @@ describe("tools.call (Tool-4)", () => {
 		).resolves.toEqual({ value: "done" });
 	});
 
-	it("refuses an AGENT-initiated confirm instead of letting it self-approve", async () => {
-		// `confirmed` is a caller assertion. An app's assertion is backed by the
-		// gesture that reached its code; an agent asserting it is approving
-		// itself, so the flag must not open the gate.
+	it("lets an AGENT-initiated call be approved BY THE SHELL, not by itself", async () => {
+		// Tool-4 refused agents outright because `confirmed` would have been the
+		// agent approving itself. The shell asking removes that objection — and
+		// the prompt is told an agent is behind it, which is a materially
+		// different question from "you clicked".
 		const agent = "ed25519:deadbeefcafe1234";
 		repo.insertMany([tool({ effect: AppToolEffect.External })]);
+		const yes = approver(true);
 		const grants: ReadonlyArray<[string, string]> = [
 			[agent, toolsCallCapability(PROVIDER)],
 			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
 			[PROVIDER, "network.egress:https://example.com"],
 		];
 		await expect(
-			handler({}, grants)(envelope([{ tool: TOOL, confirmed: true }], agent)),
+			handler({ getApprovalHost: () => yes as never }, grants)(envelope([{ tool: TOOL }], agent)),
+		).resolves.toEqual({ value: "done" });
+		expect(yes.asked).toHaveLength(1);
+		expect(yes.asked[0]).toMatchObject({ agentInitiated: true, callerAppId: agent });
+	});
+
+	it("refuses when the human declines, whoever asked", async () => {
+		repo.insertMany([tool({ effect: AppToolEffect.External })]);
+		const no = approver(false);
+		await expect(
+			handler({ getApprovalHost: () => no as never }, [
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "network.egress:https://example.com"],
+			])(envelope([{ tool: TOOL }])),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
-		expect(records.at(-1)).toMatchObject({ reason: "agent-needs-approval" });
+		expect(host.call).not.toHaveBeenCalled();
+	});
+
+	it("refuses when there is no way to ask", async () => {
+		// No dashboard, no approval — never "assume yes".
+		repo.insertMany([tool({ effect: AppToolEffect.External })]);
+		await expect(
+			handler({ getApprovalHost: () => null }, [
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "network.egress:https://example.com"],
+			])(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
 	});
 
 	it("maps effect + initiator to friction", () => {
@@ -471,34 +571,34 @@ describe("tools.call (Tool-4)", () => {
 		expect(decideAppToolFriction(AppToolEffect.External, UserGesture)).toBe(Confirm);
 	});
 
-	it("confirms an external call and runs it once confirmed", async () => {
+	it("asks for an external call and runs it once approved", async () => {
 		repo.insertMany([tool({ effect: AppToolEffect.External })]);
 		const grants: ReadonlyArray<[string, string]> = [
 			[CALLER, toolsCallCapability(PROVIDER)],
 			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
 			[PROVIDER, "network.egress:https://example.com"],
 		];
-		await expect(handler({}, grants)(envelope([{ tool: TOOL }]))).rejects.toMatchObject({
-			name: "NeedsConfirm",
-		});
-		await expect(handler({}, grants)(envelope([{ tool: TOOL, confirmed: true }]))).resolves.toEqual({
-			value: "done",
-		});
+		await expect(
+			handler({ getApprovalHost: () => approver(false) as never }, grants)(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		await expect(
+			handler({ getApprovalHost: () => approver(true) as never }, grants)(envelope([{ tool: TOOL }])),
+		).resolves.toEqual({ value: "done" });
 	});
 
 	it("derives the initiator from the VERIFIED caller, so it cannot be claimed", async () => {
-		// An agent principal reading the vault must confirm even though the same
-		// call from an app auto-runs — and no field in the call can change that.
 		const agent = "ed25519:deadbeefcafe1234";
 		repo.insertMany([tool({ effect: AppToolEffect.ReadsVault })]);
-		const grants: ReadonlyArray<[string, string]> = [
-			[agent, toolsCallCapability(PROVIDER)],
-			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
-			[PROVIDER, "entities.read:brainstorm/Note/v1"],
-		];
+		const asked = approver(true);
 		await expect(
-			handler({}, grants)(envelope([{ tool: TOOL, initiator: "user-gesture" }], agent)),
-		).rejects.toMatchObject({ name: "NeedsConfirm" });
+			handler({ getApprovalHost: () => asked as never }, [
+				[agent, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+				[PROVIDER, "entities.read:brainstorm/Note/v1"],
+			])(envelope([{ tool: TOOL, initiator: "user-gesture" }], agent)),
+		).resolves.toEqual({ value: "done" });
+		// Claiming an initiator in the payload changes nothing.
+		expect(asked.asked[0]).toMatchObject({ agentInitiated: true });
 	});
 
 	// ── Tool-5: rug-pull re-prompt ───────────────────────────────────────────
@@ -509,20 +609,27 @@ describe("tools.call (Tool-4)", () => {
 		const original = tool({ description: "Slugify a title." });
 		repo.insertMany([original]);
 		const stale = approvalsFor([tool({ description: "SOMETHING ELSE ENTIRELY" })]);
+		const no = approver(false);
 		await expect(
-			handler({ getApprovals: async () => stale })(envelope([{ tool: TOOL }])),
+			handler({ getApprovals: async () => stale, getApprovalHost: () => no as never })(
+				envelope([{ tool: TOOL }]),
+			),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
-		expect(records.at(-1)).toMatchObject({ reason: "declaration-changed" });
+		// The rug-pull reason reaches the prompt — not a generic confirm.
+		expect(no.asked[0]).toMatchObject({ reason: "declaration-changed" });
 		expect(host.call).not.toHaveBeenCalled();
 	});
 
 	it("re-prompts on the FIRST call, before anything was approved", async () => {
 		repo.insertMany([tool()]);
 		const none = approvalsFor([]);
+		const no = approver(false);
 		await expect(
-			handler({ getApprovals: async () => none })(envelope([{ tool: TOOL }])),
+			handler({ getApprovals: async () => none, getApprovalHost: () => no as never })(
+				envelope([{ tool: TOOL }]),
+			),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
-		expect(records.at(-1)).toMatchObject({ reason: "never-approved" });
+		expect(no.asked[0]).toMatchObject({ reason: "first-use" });
 	});
 
 	it("re-baselines only the CONFIRMED tool, never the whole app", async () => {
@@ -532,17 +639,26 @@ describe("tools.call (Tool-4)", () => {
 		const b = tool({ name: "summarize" });
 		repo.insertMany([a, b]);
 		const none = approvalsFor([]);
-		const h = handler({ getApprovals: async () => none }, [
-			[CALLER, toolsCallCapability(PROVIDER)],
-			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
-		]);
-		await expect(h(envelope([{ tool: a.id, confirmed: true }]))).resolves.toEqual({
-			value: "done",
-		});
+		const h = handler(
+			{ getApprovals: async () => none, getApprovalHost: () => approver(true) as never },
+			[
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			],
+		);
+		await expect(h(envelope([{ tool: a.id }]))).resolves.toEqual({ value: "done" });
 		expect(none.map.has(a.id)).toBe(true);
 		expect(none.map.has(b.id)).toBe(false);
-		// The sibling still re-prompts.
-		await expect(h(envelope([{ tool: b.id }]))).rejects.toMatchObject({ name: "NeedsConfirm" });
+		// The sibling is still ASKED about (its approval was not written).
+		const noForSibling = approver(false);
+		const h2 = handler(
+			{ getApprovals: async () => none, getApprovalHost: () => noForSibling as never },
+			[
+				[CALLER, toolsCallCapability(PROVIDER)],
+				[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+			],
+		);
+		await expect(h2(envelope([{ tool: b.id }]))).rejects.toMatchObject({ name: "NeedsConfirm" });
 	});
 
 	it("runs without extra friction once the surface matches again", async () => {
@@ -569,7 +685,10 @@ describe("tools.call (Tool-4)", () => {
 		repo.insertMany([tool({ surfaces: [AppToolSurface.Menu, AppToolSurface.Agent] })]);
 		const approvedMenuOnly = approvalsFor([tool({ surfaces: [AppToolSurface.Menu] })]);
 		await expect(
-			handler({ getApprovals: async () => approvedMenuOnly })(envelope([{ tool: TOOL }])),
+			handler({
+				getApprovals: async () => approvedMenuOnly,
+				getApprovalHost: () => approver(false) as never,
+			})(envelope([{ tool: TOOL }])),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
 	});
 
@@ -604,9 +723,10 @@ describe("tools.call (Tool-4)", () => {
 			}),
 		]);
 		await expect(
-			handler({ getApprovals: async () => approvedNarrow })(
-				envelope([{ tool: TOOL, args: { text: "anything" } }]),
-			),
+			handler({
+				getApprovals: async () => approvedNarrow,
+				getApprovalHost: () => approver(false) as never,
+			})(envelope([{ tool: TOOL, args: { text: "anything" } }])),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
 	});
 

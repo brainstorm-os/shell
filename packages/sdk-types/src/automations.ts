@@ -293,6 +293,17 @@ export type AgentTool = {
 	entityType?: string;
 	format?: string;
 	label: string;
+	/** Declared shape of the tool's result.
+	 *
+	 * ⚠️ NOTHING VALIDATES THIS (`Tool-9`, filed honestly rather than assumed).
+	 * doc 39 promises an `output-schema-violation` outcome; grep the repo and
+	 * there is no such implementation and no validator consumes this field — it
+	 * is typed `unknown` and read by nobody. A workflow author reading the type
+	 * would reasonably assume a result is checked against it. It is not, so a
+	 * step must treat a tool result as untrusted data exactly as it would
+	 * without the field. Enforcing it needs the same decision `OQ-TOOL-1` made
+	 * for inputs (a validator we actually have), which is why it is not quietly
+	 * bolted on here. */
 	outputSchema?: unknown;
 	/** The EXACT capability footprint this tool requires, when it is not the
 	 *  default `intents.dispatch:<verb>` (+ the entity read a declared
@@ -307,6 +318,11 @@ export type AgentTool = {
 	 *  An empty array is NOT "no requirement" — it is refused as unsatisfiable
 	 *  by {@link agentToolCapabilities}, so a malformed tool is never offered. */
 	capabilities?: readonly string[];
+	/** JSON-Schema description of the tool's arguments (Tool-6). Present for
+	 *  APP tools, which declare typed inputs; absent for intent-derived tools,
+	 *  which have never had one — the model got a verb name and a prose label,
+	 *  and that gap is exactly what the app-tools track exists to close. */
+	inputSchema?: unknown;
 };
 
 type StepBase<K extends StepKind> = { id: StepId; kind: K };
@@ -604,7 +620,37 @@ export function stepCapabilities(step: WorkflowStep): string[] {
  *  satisfiable by `intersectAgentTools` (every element of ∅ is implied), i.e. an
  *  ungated tool. It resolves to an unsatisfiable sentinel instead, so such a
  *  tool is silently never offered rather than silently always offered. */
+/** Split an app-tool verb (`app.<appId>.<toolName>`) into its parts, or null.
+ *
+ * A local copy of the shell's `parseAppToolId` because `sdk-types` is
+ * dependency-free and this must be usable wherever `agentToolCapabilities` is —
+ * including the save-time capability sheet. The grammars it enforces are the
+ * ones that make the split unambiguous: an app id cannot contain `/` or `:`,
+ * and a tool name cannot contain a dot. */
+function parseAppToolVerb(verb: string): { appId: string; toolName: string } | null {
+	if (typeof verb !== "string" || !verb.startsWith("app.")) return null;
+	const rest = verb.slice(4);
+	const lastDot = rest.lastIndexOf(".");
+	if (lastDot <= 0 || lastDot === rest.length - 1) return null;
+	const appId = rest.slice(0, lastDot);
+	const toolName = rest.slice(lastDot + 1);
+	if (!/^[a-z][a-z0-9._-]{1,127}$/i.test(appId)) return null;
+	if (!/^[a-z][a-z0-9-]{0,63}$/.test(toolName)) return null;
+	return { appId, toolName };
+}
+
 export function agentToolCapabilities(tool: AgentTool): string[] {
+	// Tool-9 — an APP TOOL's footprint is derived from its id, never from what
+	// the step declared. Dispatch routes on the shape of the verb
+	// (`app.<appId>.<name>` → `tools.call`), so if the capability came from the
+	// declaration the two could disagree: a step could declare
+	// `{ verb: "app.io.x.rewrite" }` with no `capabilities` and put
+	// `intents.dispatch:app.io.x.rewrite` on the sheet the user approves, or
+	// name an already-held `intents.dispatch:open` as cover, and then invoke an
+	// arbitrary app tool the frozen ceiling never contained. The routing
+	// decision and the capability must be THE SAME FACT.
+	const appTool = parseAppToolVerb(tool.verb);
+	if (appTool) return [`tools.call:${appTool.appId}/${appTool.toolName}`];
 	if (tool.capabilities) {
 		return tool.capabilities.length > 0 ? [...tool.capabilities] : [UNSATISFIABLE_CAPABILITY];
 	}
