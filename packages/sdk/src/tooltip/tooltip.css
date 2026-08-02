@@ -1,13 +1,18 @@
-/* Tooltip chip — the app-side twin of the shell renderer's `.tooltip`
- * (packages/shell/src/renderer/ui/tooltip.css). A small, dark, deliberately
- * theme-independent chip with a fade-and-slide entrance, rendered by the
+/* Tooltip chip — the ONE tooltip surface, shared by every app and the shell
+ * renderer. A small chip with a fade-and-slide entrance, rendered by the
  * delegated `mountTooltipHost` controller into a fresh element each open so
  * the keyframe re-triggers every time. Positioned via inline `left/top` set
  * at the trigger's horizontal centre; `translate(-50%, …)` lines the chip's
  * centre up and the placement variant pulls it above or below the trigger.
  *
- * The chip is dark on every theme on purpose (it floats over arbitrary app
- * chrome and glass), so the surface is a fixed rgba rather than a token. */
+ * The chip is the INVERSE of the active theme — `background.inverse` /
+ * `text.inverse`, a pair the token contrast ratchet holds at WCAG AA in every
+ * built-in theme. A fixed dark rgba shipped instead, which read as a proper
+ * chip on the light themes and vanished on the dark ones: at rgba(20,20,20)
+ * over a #1c1c1c toolbar the surface WAS the backdrop, so "More actions" /
+ * "Graph actions" floated as bare white text with no chip at all (329 audit,
+ * Files + Graph). Inverting guarantees the chip separates from whatever chrome
+ * it floats over, in both schemes. */
 
 .bs-tooltip {
 	position: fixed;
@@ -18,8 +23,8 @@
 	max-width: min(420px, 92vw);
 	padding: var(--space-1);
 	border-radius: var(--radius-sm);
-	background: rgba(20, 20, 20, 0.94);
-	color: #ffffff;
+	background: var(--color-background-inverse);
+	color: var(--color-text-inverse);
 	font-size: var(--text-size-xs);
 	line-height: 1.3;
 	/* Tooltips are short action labels — keep them on one line so a label like
@@ -27,15 +32,16 @@
 	 * the safety cap for the rare long label. */
 	white-space: nowrap;
 	pointer-events: none;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	box-shadow: var(--shadow-md);
 	will-change: transform, opacity;
 }
 
 /* The chord segment — dimmed and tabular so a shortcut reads as secondary
- * metadata next to the action name. */
+ * metadata next to the action name. Dimmed against the INVERSE foreground, so
+ * it stays readable whichever way round the chip is. */
 .bs-tooltip__chord {
 	flex-shrink: 0;
-	color: rgba(255, 255, 255, 0.6);
+	color: color-mix(in srgb, var(--color-text-inverse) 70%, transparent);
 	font-variant-numeric: tabular-nums;
 }
 

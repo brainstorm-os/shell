@@ -7,6 +7,8 @@
  *     the source is removed when the provider unmounts.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -584,5 +586,31 @@ describe("icon gutter is consistent within a menu (F-461)", () => {
 			),
 		);
 		expect(iconOf("Rename")).toBe(blankMenuIcon);
+	});
+});
+
+/**
+ * The menu panel's legibility is pure CSS, asserted against the source
+ * bridge. A menu opens over arbitrary app content and `.fm-menu` amplifies
+ * its backdrop with `saturate(180%)`, so the panel fill must sit on an
+ * OPAQUE theme base: at the raw `--color-glass-background-strong` alphas
+ * (0.5–0.72) saturated content painted straight through the rows — a book
+ * cover turned the whole panel mint-green, an accent button bled a blue blob
+ * across a row label.
+ */
+describe("menu panel surface (stylesheet invariants)", () => {
+	const css = readFileSync(join(__dirname, "menus.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+	const surface = css.slice(css.indexOf("--fm-surface-bg:")).split(";")[0] ?? "";
+
+	it("mixes the glass tint over an opaque theme background", () => {
+		expect(surface).toContain("color-mix(");
+		expect(surface).toContain("var(--color-background-elevated)");
+		expect(surface).toContain("var(--color-glass-background-strong");
+	});
+
+	it("keeps the opaque base as the dominant stop", () => {
+		const percent = Number(/([0-9]+)%/.exec(surface)?.[1] ?? "0");
+		expect(percent).toBeGreaterThanOrEqual(90);
+		expect(percent).toBeLessThan(100);
 	});
 });

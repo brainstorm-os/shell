@@ -22,10 +22,23 @@
 :root {
 	/* ─── Surface ─────────────────────────────────────────────────────── */
 	/* Frosted glass to match every other Brainstorm overlay (Popover,
-	   launcher). The translucent fill + the backdrop-filter on `.fm-menu`
-	   below produce the aerial-glass look; a solid fill would read as a
-	   flat card fighting the wallpaper. */
-	--fm-surface-bg: var(--color-glass-background-strong, var(--color-surface-overlay));
+	   launcher) — but a MENU is dense text rows opened over ARBITRARY app
+	   content, so the glass tint rides on an OPAQUE base instead of being the
+	   whole fill. `--color-glass-background-strong` is 0.5–0.72 alpha in the
+	   built-in themes, and `.fm-menu`'s saturate(180%) backdrop-filter then
+	   AMPLIFIES whatever shows through: the 329 audit caught the Books cover
+	   band turning the ⋯ panel mint-green under red "Remove from library"
+	   text, Database's accent "+ New" button painting a blue blob across
+	   "Copy embed link", a Files card icon inside "Duplicate", Calendar's
+	   today-highlight under "Export to iCal…", and Graph's checkbox blue
+	   through the panel edge. Mixing the theme's opaque `background.elevated`
+	   under the glass keeps the frosted family look (~3% still bleeds, blurred)
+	   while guaranteeing row text keeps its contrast on every surface. */
+	--fm-surface-bg: color-mix(
+		in srgb,
+		var(--color-background-elevated) 92%,
+		var(--color-glass-background-strong, var(--color-surface-overlay))
+	);
 	--fm-surface-fg: var(--color-text-primary);
 	--fm-surface-border: var(--color-glass-border, var(--color-border-default));
 	--fm-surface-radius: var(--radius-lg);
