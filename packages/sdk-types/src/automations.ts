@@ -307,6 +307,11 @@ export type AgentTool = {
 	 *  An empty array is NOT "no requirement" — it is refused as unsatisfiable
 	 *  by {@link agentToolCapabilities}, so a malformed tool is never offered. */
 	capabilities?: readonly string[];
+	/** JSON-Schema description of the tool's arguments (Tool-6). Present for
+	 *  APP tools, which declare typed inputs; absent for intent-derived tools,
+	 *  which have never had one — the model got a verb name and a prose label,
+	 *  and that gap is exactly what the app-tools track exists to close. */
+	inputSchema?: unknown;
 };
 
 type StepBase<K extends StepKind> = { id: StepId; kind: K };

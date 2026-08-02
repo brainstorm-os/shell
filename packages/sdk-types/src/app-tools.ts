@@ -17,6 +17,7 @@
  * check is (doc 78, mirroring MCP's `readOnlyHint`).
  */
 
+import type { AgentTool } from "./automations";
 import {
 	ActionGroup,
 	ActionTrustTier,
@@ -30,6 +31,7 @@ import {
 	PropertyFormat,
 	type Range,
 	ValueType,
+	isMultiValued,
 } from "./properties";
 
 /** Declared side-effect class. Friction follows from it; authority does not. */
@@ -355,6 +357,83 @@ export function appToolApprovalState(
 	return approvedFingerprint === appToolFingerprint(tool)
 		? AppToolApprovalState.Approved
 		: AppToolApprovalState.Changed;
+}
+
+/** The capability an app tool declares as its footprint, so the loop's ONE
+ *  fail-closed intersection (`intersectAgentTools`) gates it with no second
+ *  mechanism — the same move `Agent-Teams-5`'s delegate tools made. */
+export function appToolCallCapability(appId: string, toolName: string): string {
+	return `tools.call:${appId}/${toolName}`;
+}
+
+/**
+ * Project registered app tools into the agent loop's tool surface (`Tool-6`).
+ *
+ * Two things this fixes about the shipped loop, which are the reason the track
+ * exists: a tool is addressed by its **namespaced id**, not by an intent verb
+ * (so two apps' tools no longer collide — the reason the Agent ships ONE
+ * curated `open` tool), and it carries a real **input schema** instead of a
+ * verb name and a prose label.
+ *
+ * OQ-TOOL-2 resolved — **coexist, with a division of labour.** This does not
+ * replace the intent-derived tools; verbs stay the ROUTING layer ("somebody
+ * handle this") and tools become the CALLING layer ("this app compute this").
+ * Both are unioned into the same offered set and both pass the same
+ * intersection.
+ *
+ * OQ-TOOL-4 applied — a **sideloaded** provider's tools are excluded from the
+ * model's list entirely. `AS-3` quarantines sideloaded contributions in menus
+ * under "More…", and a model has no "More…": a description is either in the
+ * prompt or it is not. So the menu quarantine's analogue here is exclusion
+ * until the provider is promoted (first-party or catalog-signed).
+ *
+ * Pure + deterministic. Every string that reaches the model has already been
+ * through `validateAppTool`'s screen.
+ */
+export function projectAppTools(tools: readonly AppToolRecord[]): AgentTool[] {
+	const out: AgentTool[] = [];
+	for (const tool of tools) {
+		if (tool.declarationInvalid) continue;
+		if (!tool.surfaces.includes(AppToolSurface.Agent)) continue;
+		// OQ-TOOL-4: unknown provenance never reaches the prompt.
+		if (tool.trustTier !== ActionTrustTier.Trusted) continue;
+		out.push({
+			// The namespaced id IS the address — this is the verb collision going
+			// away, not a workaround for it.
+			verb: tool.id,
+			label: `${tool.title} — ${tool.description}`,
+			capabilities: [appToolCallCapability(tool.appId, tool.name)],
+			inputSchema: appToolInputsJsonSchemaShape(tool.input),
+		});
+	}
+	return out;
+}
+
+/** The model-facing argument schema. Kept here as a light structural
+ *  projection so `sdk-types` stays dependency-free; the SDK's
+ *  `appToolInputsJsonSchema` is the richer one used at the broker. */
+function appToolInputsJsonSchemaShape(inputs: readonly AppToolInput[]): Record<string, unknown> {
+	const properties: Record<string, unknown> = {};
+	const required: string[] = [];
+	for (const input of inputs) {
+		properties[input.name] = { type: jsonTypeFor(input), description: input.description };
+		if (input.required) required.push(input.name);
+	}
+	return { type: "object", properties, required, additionalProperties: false };
+}
+
+function jsonTypeFor(input: AppToolInput): string {
+	if (isMultiValued(input.count)) return "array";
+	switch (input.valueType) {
+		case ValueType.Number:
+			return "number";
+		case ValueType.Boolean:
+			return "boolean";
+		case ValueType.Date:
+			return "object";
+		default:
+			return "string";
+	}
 }
 
 /** Build a tool's globally-unique id. */
