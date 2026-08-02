@@ -13,6 +13,7 @@ import {
 	midnight,
 	mint,
 	nord,
+	porcelain,
 	rose,
 	sepia,
 	slate,
@@ -72,6 +73,7 @@ describe("themes catalog", () => {
 			mint,
 			rose,
 			slate,
+			porcelain,
 		]) {
 			const keys = Object.keys(flattenTokens(tokens)).sort();
 			expect(keys).toEqual(baseKeys);

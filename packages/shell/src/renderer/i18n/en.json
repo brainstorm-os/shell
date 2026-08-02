@@ -784,6 +784,8 @@
   "shell.settings.themes.rose.description": "Soft blush-toned surfaces with a warm rose accent. Inviting and gentle.",
   "shell.settings.themes.slate.label": "Slate",
   "shell.settings.themes.slate.description": "Cool neutral-grey surfaces with a crisp indigo accent. Businesslike and clean.",
+  "shell.settings.themes.porcelain.label": "Porcelain",
+  "shell.settings.themes.porcelain.description": "Flat paper-white surfaces with a cornflower-blue accent. Minimal and airy.",
   "shell.settings.themes.pick": "Apply {label}",
   "shell.settings.appearance.summary": "Pair a theme and wallpaper for Light and Dark. Pick how the active pair is chosen below — Auto follows your system.",
   "shell.settings.appearance.mode.label": "Appearance mode",

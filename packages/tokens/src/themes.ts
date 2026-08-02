@@ -394,6 +394,24 @@ const graphSlate = {
 	},
 } as const;
 
+const graphPorcelain = {
+	subject: {
+		"1": "#2563eb", // blue
+		"2": "#7c3aed", // violet
+		"3": "#059669", // emerald
+		"4": "#d97706", // amber
+		"5": "#dc2626", // red
+		"6": "#0891b2", // cyan
+		"7": "#db2777", // pink
+		"8": "#65a30d", // lime
+	},
+	unmatched: "rgba(115, 115, 115, 0.45)",
+	edge: {
+		matched: "rgba(37, 99, 235, 0.65)",
+		unmatched: "rgba(115, 115, 115, 0.3)",
+	},
+} as const;
+
 const sharedScalars = {
 	space,
 	text: {
@@ -1540,6 +1558,101 @@ export const slate: Tokens = {
 	},
 };
 
+// Porcelain — a flat, paper-white light theme. Pure white surfaces, truly
+// neutral hairlines and a cornflower-blue accent; the calmest and least
+// decorated of the light set, for people who want the UI to disappear behind
+// the content. Light variant.
+export const porcelain: Tokens = {
+	color: {
+		background: {
+			primary: "#ffffff",
+			elevated: "#ffffff",
+			subtle: "#f2f2f2",
+			inverse: "#171717",
+		},
+		surface: {
+			default: "rgba(23, 23, 23, 0.04)",
+			overlay: "rgba(23, 23, 23, 0.08)",
+			raised: "rgba(23, 23, 23, 0.08)",
+		},
+		border: {
+			subtle: "rgba(23, 23, 23, 0.07)",
+			default: "rgba(23, 23, 23, 0.13)",
+			strong: "rgba(23, 23, 23, 0.26)",
+		},
+		text: {
+			primary: "#171717",
+			secondary: "#171717",
+			tertiary: "rgba(23, 23, 23, 0.6)",
+			inverse: "#ffffff",
+			link: "#2563eb",
+		},
+		accent: {
+			subtle: "rgba(77, 128, 240, 0.12)",
+			default: "#4d80f0",
+			strong: "#2563eb",
+			text: "#ffffff",
+			onSurface: "#2563eb",
+			onFill: "#2563eb",
+		},
+		gloss: {
+			// Soft cornflower → clear blue two-colour face — matches the accent.
+			top: "#6d95f6",
+			bottom: "#2f5fe0",
+			shineTop: "rgba(219, 229, 255, 0.65)",
+			shineBottom: "rgba(200, 220, 255, 0.7)",
+			innerTop: "rgba(255, 255, 255, 0.45)",
+			innerBottom: "rgba(60, 110, 230, 0.20)",
+		},
+		state: {
+			success: palette.green["600"],
+			warning: palette.amber["600"],
+			error: palette.red["600"],
+			info: palette.cyan["600"],
+		},
+		chrome: {
+			background: "#f7f7f7",
+			text: "#171717",
+		},
+		shadow: {
+			subtle: "rgba(23, 23, 23, 0.05)",
+			default: "rgba(23, 23, 23, 0.09)",
+			strong: "rgba(23, 23, 23, 0.16)",
+		},
+		focus: {
+			ring: "#4d80f0",
+		},
+		interactive: {
+			hover: "rgba(23, 23, 23, 0.05)",
+			active: "rgba(23, 23, 23, 0.10)",
+		},
+		glass: {
+			// Porcelain reads flatter than the other light themes — a denser
+			// white veil so panels sit closer to opaque paper while the
+			// wallpaper still breathes through the blur.
+			backgroundSubtle: "rgba(255, 255, 255, 0.4)",
+			background: "rgba(255, 255, 255, 0.55)",
+			backgroundStrong: "rgba(255, 255, 255, 0.72)",
+			border: "rgba(23, 23, 23, 0.09)",
+		},
+		dimmer: "rgba(0, 0, 0, 0.16)",
+		textShadowOnGlass: "0 1px 1px rgba(255, 255, 255, 0.6)",
+		graph: graphPorcelain,
+	},
+	...sharedScalars,
+	shadow: {
+		none: "none",
+		sm: "0 1px 2px rgba(23, 23, 23, 0.06)",
+		md: "0 2px 8px rgba(23, 23, 23, 0.08)",
+		lg: "0 8px 24px rgba(23, 23, 23, 0.12)",
+		xl: "0 16px 48px rgba(23, 23, 23, 0.18)",
+	},
+	glass: {
+		blur: "10px",
+		saturate: "180%",
+	},
+};
+
 export enum ThemeName {
 	DefaultDark = "default-dark",
 	DefaultLight = "default-light",
@@ -1553,6 +1666,7 @@ export enum ThemeName {
 	Mint = "mint",
 	Rose = "rose",
 	Slate = "slate",
+	Porcelain = "porcelain",
 }
 
 export const themes: Record<ThemeName, Tokens> = {
@@ -1568,6 +1682,7 @@ export const themes: Record<ThemeName, Tokens> = {
 	[ThemeName.Mint]: mint,
 	[ThemeName.Rose]: rose,
 	[ThemeName.Slate]: slate,
+	[ThemeName.Porcelain]: porcelain,
 };
 
 export function isThemeName(value: unknown): value is ThemeName {
@@ -1691,6 +1806,13 @@ export const themeCatalog: readonly ThemeCatalogEntry[] = [
 		descriptionKey: "shell.settings.themes.slate.description",
 		appearance: ThemeAppearance.Light,
 		preview: previewOf(slate),
+	},
+	{
+		id: ThemeName.Porcelain,
+		labelKey: "shell.settings.themes.porcelain.label",
+		descriptionKey: "shell.settings.themes.porcelain.description",
+		appearance: ThemeAppearance.Light,
+		preview: previewOf(porcelain),
 	},
 ];
 
