@@ -33,9 +33,16 @@ export type YDocTransport = {
 	/** Fetch the entity's canonical snapshot (Yjs update bytes), or null
 	 *  when the doc is empty / unavailable. */
 	load(entityId: string): Promise<Uint8Array | null>;
-	/** Ship a local update to the canonical side. Fire-and-forget — the
-	 *  replica is authoritative for the renderer per OQ-9. */
-	persist(entityId: string, update: Uint8Array): void;
+	/** Ship a local update to the canonical side. The replica is
+	 *  authoritative for the renderer per OQ-9, so the caller does not wait
+	 *  on the result — but a transport that CAN fail must return a promise
+	 *  and reject, never swallow. A Yjs update is an incremental diff: a
+	 *  dropped one is a permanent hole in the canonical doc that every later
+	 *  update depends on (its structs sit in `pendingStructs` forever and the
+	 *  body renders blank). The resolver answers a rejection by re-shipping
+	 *  the replica's FULL state, which heals the hole (Yjs apply is
+	 *  idempotent). */
+	persist(entityId: string, update: Uint8Array): unknown;
 	/** The last consumer for this entity unmounted — free the canonical
 	 *  handle (refcounted by the worker). Must be idempotent. */
 	release(entityId: string): void;
@@ -88,7 +95,19 @@ export type YDocResolverOptions = {
 	 *  logger (and, ideally, a UI affordance) so a doc that silently failed
 	 *  to load is distinguishable from a genuinely empty one. */
 	onError?(entityId: string, error: unknown): void;
+	/** Backoff schedule for the full-state resend that answers a rejected
+	 *  `transport.persist` (see `PERSIST_RETRY_DELAYS_MS`). One entry per
+	 *  attempt; when the last one fails the loss is reported through
+	 *  `onError`. Exposed for tests — production uses the default. */
+	persistRetryDelaysMs?: readonly number[];
 };
+
+/** Default backoff for the full-state resend. The dominant real cause of a
+ *  rejected persist is an entity whose row hasn't committed yet — the Journal
+ *  mounts the day editor and emits edits before its implicit `entities.create`
+ *  lands, and `entities.applyDoc` answers "not found" until it does. That
+ *  window is sub-second; the tail covers a slow disk / busy worker. */
+export const PERSIST_RETRY_DELAYS_MS: readonly number[] = [250, 500, 1000, 2000, 4000];
 
 /** Default zero-ref retention. Bounds memory (each retained replica holds a
  *  full Y.Doc) while comfortably covering navigate-away-and-back plus a
@@ -116,6 +135,15 @@ type Entry = {
 	 *  released before it ever hydrated and is still empty, so the canonical
 	 *  snapshot must be re-loaded from disk instead. */
 	hasApplied: () => boolean;
+	/** True while a persist has failed and its full-state resend hasn't
+	 *  succeeded yet — i.e. the canonical side is missing part of this
+	 *  replica. A revive must carry that debt across (the seed it hands the
+	 *  fresh replica is applied as REMOTE, so it would otherwise never ship). */
+	hasPendingPersist: () => boolean;
+	/** Ship state to the canonical side now — the replica's own full state by
+	 *  default, or explicit bytes (a revive ships the seed, because the fresh
+	 *  replica hasn't applied it yet: `applyPending` is lazy by design). */
+	resend: (state?: Uint8Array) => void;
 	detach: () => void;
 };
 
@@ -125,6 +153,10 @@ export function createYDocResolver(
 ): YDocResolverApi {
 	const retentionCap = options.retentionCap ?? DEFAULT_RETENTION_CAP;
 	const reportError = options.onError ?? (() => {});
+	const retryDelays =
+		options.persistRetryDelaysMs && options.persistRetryDelaysMs.length > 0
+			? options.persistRetryDelaysMs
+			: PERSIST_RETRY_DELAYS_MS;
 	const entries = new Map<string, Entry>();
 	// Zero-ref entries kept live for instant reopen, in least-recently-
 	// released order (insertion order = LRU; re-resolving deletes the key so
@@ -151,9 +183,51 @@ export function createYDocResolver(
 	function open(entityId: string, seedState?: Uint8Array): Entry {
 		const doc = new Y.Doc();
 
+		// Full-state resend after a rejected persist. A Yjs update is a diff,
+		// so a dropped one is NOT re-carried by the next update — the canonical
+		// doc keeps a permanent hole and every struct that depends on it sits in
+		// `pendingStructs` forever, which is exactly how a Journal day rendered
+		// an empty body while its denormalised snippet still read "5 words".
+		// `Y.encodeStateAsUpdate(doc)` carries everything and Yjs apply is
+		// idempotent, so one successful resend heals any number of drops.
+		let detached = false;
+		let retryTimer: ReturnType<typeof setTimeout> | null = null;
+		let retryAttempt = 0;
+		const scheduleResend = (): void => {
+			if (detached || retryTimer !== null) return;
+			if (retryAttempt >= retryDelays.length) {
+				reportError(
+					entityId,
+					new Error(
+						`ydoc: canonical side rejected ${retryDelays.length} persist attempts — local edits are not durable`,
+					),
+				);
+				return;
+			}
+			const delay = retryDelays[retryAttempt] ?? 0;
+			retryAttempt += 1;
+			retryTimer = setTimeout(() => {
+				retryTimer = null;
+				if (detached) return;
+				shipUpdate(Y.encodeStateAsUpdate(doc));
+			}, delay);
+		};
+		const shipUpdate = (update: Uint8Array): void => {
+			// `persist` is typed `unknown` so a fire-and-forget (void-returning)
+			// transport still satisfies it; only a thenable can report a failure.
+			const result = transport.persist(entityId, update);
+			if (!isThenable(result)) return;
+			void result.then(
+				() => {
+					retryAttempt = 0;
+				},
+				() => scheduleResend(),
+			);
+		};
+
 		const onUpdate = (update: Uint8Array, origin: unknown): void => {
 			if (origin === REMOTE_ORIGIN) return; // canonical-applied — don't echo
-			transport.persist(entityId, update);
+			shipUpdate(update);
 		};
 		doc.on("update", onUpdate);
 
@@ -226,7 +300,14 @@ export function createYDocResolver(
 			loaded,
 			applyPending,
 			hasApplied: () => applied,
+			hasPendingPersist: () => retryAttempt > 0,
+			resend: (state) => shipUpdate(state ?? Y.encodeStateAsUpdate(doc)),
 			detach: () => {
+				detached = true;
+				if (retryTimer !== null) {
+					clearTimeout(retryTimer);
+					retryTimer = null;
+				}
 				doc.off("update", onUpdate);
 				offRemote?.();
 				doc.destroy();
@@ -252,8 +333,14 @@ export function createYDocResolver(
 				// the canonical snapshot. In that case fall back to a normal open
 				// so `transport.load` runs.
 				const seed = kept.hasApplied() ? Y.encodeStateAsUpdate(kept.doc) : undefined;
+				// The seed is applied as REMOTE (never echoed back to the
+				// canonical side), so a replica that still owed the canonical
+				// side an update would silently lose that debt across the
+				// revive. Carry it over and re-ship from the fresh replica.
+				const owed = kept.hasPendingPersist();
 				kept.detach(); // destroy the old replica WITHOUT closing canonical
 				entry = open(entityId, seed);
+				if (owed && seed) entry.resend(seed);
 			} else {
 				entry = open(entityId);
 			}
@@ -307,4 +394,12 @@ export function createYDocResolver(
 			retained.clear();
 		},
 	};
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as PromiseLike<unknown>).then === "function"
+	);
 }

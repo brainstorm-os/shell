@@ -327,3 +327,102 @@ describe("createYDocResolver — load/apply failure recovery", () => {
 		expect(onError).not.toHaveBeenCalled();
 	});
 });
+
+/**
+ * F-486 — a rejected `transport.persist` used to be dropped on the floor.
+ * A Yjs update is a DIFF: the next update does not re-carry the lost one, so
+ * the canonical doc keeps a permanent hole and every struct that depends on
+ * it sits in `pendingStructs` forever. Real symptom, found by the 329 audit:
+ * a Journal day rendered a completely blank body while its denormalised
+ * snippet still read "5 words" — 7 of the dogfood vault's journal `.ydoc`
+ * files are in exactly that state, and every one of them is a Journal entry
+ * (the only app that mounts an editor BEFORE its entity row is created).
+ */
+describe("createYDocResolver — persist failure heals instead of losing the edit", () => {
+	/** Canonical side that rejects every write until the entity "exists" —
+	 *  the `entities.applyDoc: <id> not found` window the Journal's implicit
+	 *  create opens. */
+	function canonicalTransport() {
+		const canonical = new Y.Doc();
+		let exists = false;
+		const transport: YDocTransport = {
+			load: async () => null,
+			persist: async (_id, update) => {
+				if (!exists) throw new Error("entities.applyDoc: ent_1 not found");
+				Y.applyUpdate(canonical, update);
+			},
+			release: () => {},
+		};
+		return {
+			transport,
+			canonical,
+			create: () => {
+				exists = true;
+			},
+		};
+	}
+
+	async function waitFor(predicate: () => boolean, ms = 500): Promise<void> {
+		const deadline = Date.now() + ms;
+		while (!predicate() && Date.now() < deadline) {
+			await new Promise((res) => setTimeout(res, 5));
+		}
+	}
+
+	it("re-ships the full state after a rejected persist so the canonical doc has no hole", async () => {
+		const c = canonicalTransport();
+		const r = createYDocResolver(c.transport, { persistRetryDelaysMs: [5, 10, 20] });
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+
+		handle.doc.getText("t").insert(0, "hello"); // rejected — entity not created yet
+		await new Promise((res) => setTimeout(res, 20));
+		c.create();
+		handle.doc.getText("t").insert(5, " world"); // a diff that DEPENDS on the lost one
+
+		await waitFor(() => c.canonical.getText("t").toString() === "hello world");
+		expect(c.canonical.getText("t").toString()).toBe("hello world");
+		expect(c.canonical.store.pendingStructs).toBeNull();
+	});
+
+	it("reports the loss through onError once the retry budget is spent", async () => {
+		const c = canonicalTransport(); // never "created" — every attempt rejects
+		const onError = vi.fn();
+		const r = createYDocResolver(c.transport, { onError, persistRetryDelaysMs: [1, 1] });
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "hello");
+
+		await waitFor(() => onError.mock.calls.length > 0);
+		expect(onError).toHaveBeenCalledWith("ent_1", expect.anything());
+	});
+
+	it("carries an unshipped edit across a revive (the seed is applied as REMOTE and never echoed)", async () => {
+		const c = canonicalTransport();
+		const r = createYDocResolver(c.transport, { persistRetryDelaysMs: [10_000] });
+
+		const first = r.resolve("ent_1");
+		await first.applyPending?.();
+		first.doc.getText("t").insert(0, "hello"); // rejected, retry parked far out
+		await new Promise((res) => setTimeout(res, 10));
+		first.release(); // retained, not torn down
+
+		c.create();
+		const second = r.resolve("ent_1"); // revive: seed applied as REMOTE
+		await second.applyPending?.();
+
+		await waitFor(() => c.canonical.getText("t").toString() === "hello");
+		expect(c.canonical.getText("t").toString()).toBe("hello");
+	});
+
+	it("still accepts a void-returning transport (no promise, no retry machinery)", async () => {
+		const t = fakeTransport();
+		const r = createYDocResolver(t.transport);
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "x");
+		expect(t.persisted).toHaveLength(1);
+	});
+});
