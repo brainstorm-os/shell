@@ -1,6 +1,7 @@
 {
   "appTitle": "Código",
   "filesRegion": "Archivos de código",
+  "filesResize": "Redimensionar la lista de archivos",
   "filesHeading": "Archivos",
   "newFile": "Nuevo",
   "newFileHint": "Crear un archivo de código nuevo",
