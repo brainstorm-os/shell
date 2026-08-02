@@ -104,6 +104,18 @@ const SORT_ENTRY_ORDER: ReadonlyArray<SortKey> = [
 	SortKey.Size,
 ];
 
+/** The glyph for each sort key — the Tasks/Contacts convention: reuse the
+ *  existing property-kind / chrome icons rather than minting new ones, same
+ *  glyph for the same concept (manual → View, name → KindText, created →
+ *  History, dates → KindDate). */
+export const SORT_MENU_ICON: Record<SortKey, IconName> = {
+	[SortKey.Manual]: IconName.View,
+	[SortKey.Name]: IconName.KindText,
+	[SortKey.Modified]: IconName.KindDate,
+	[SortKey.Created]: IconName.History,
+	[SortKey.Size]: IconName.KindNumber,
+};
+
 function groupMenuLabel(key: GroupKey): string {
 	if (key === GroupKey.Type) return t("brainstorm.files.group.type");
 	if (key === GroupKey.FirstLetter) return t("brainstorm.files.group.letter");
@@ -117,6 +129,14 @@ const GROUP_ENTRY_ORDER: ReadonlyArray<GroupKey> = [
 	GroupKey.FirstLetter,
 	GroupKey.Month,
 ];
+
+/** Grouping-axis glyphs, mirroring the Tasks group-by menu's mapping. */
+export const GROUP_MENU_ICON: Record<GroupKey, IconName> = {
+	[GroupKey.None]: IconName.View,
+	[GroupKey.Type]: IconName.KindFile,
+	[GroupKey.FirstLetter]: IconName.KindText,
+	[GroupKey.Month]: IconName.KindDate,
+};
 
 function tileSizeLabel(size: TileSize): string {
 	if (size === TileSize.Small) return t("brainstorm.files.tileSize.small");
@@ -185,6 +205,9 @@ export function SortMenuPopover({
 							<span className="sort-menu__check" aria-hidden="true">
 								{active ? <Icon name={IconName.CheckCircle} size={14} /> : null}
 							</span>
+							<span className="sort-menu__glyph" aria-hidden="true">
+								<Icon name={SORT_MENU_ICON[key]} size={14} />
+							</span>
 							<span>{sortMenuLabel(key)}</span>
 						</button>
 					);
@@ -227,6 +250,9 @@ export function SortMenuPopover({
 						>
 							<span className="sort-menu__check" aria-hidden="true">
 								{active ? <Icon name={IconName.CheckCircle} size={14} /> : null}
+							</span>
+							<span className="sort-menu__glyph" aria-hidden="true">
+								<Icon name={GROUP_MENU_ICON[key]} size={14} />
 							</span>
 							<span>{groupMenuLabel(key)}</span>
 						</button>

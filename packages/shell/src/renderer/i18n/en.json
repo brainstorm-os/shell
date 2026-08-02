@@ -700,6 +700,7 @@
   "shell.settings.data.properties.deleteConfirm.usageNote": "Currently used by {count, plural, one {# object} other {# objects}} — those values will become orphan rows.",
   "shell.settings.data.properties.usagePill": "Used by {count, plural, one {# object} other {# objects}}",
   "shell.settings.data.properties.itemUsagePill": "{count, plural, one {# object uses this value} other {# objects use this value}}",
+  "shell.settings.data.properties.usagePillNotUsed": "Not used",
   "shell.settings.data.properties.kindBadge.text": "Text",
   "shell.settings.data.properties.kindBadge.number": "Number",
   "shell.settings.data.properties.kindBadge.date": "Date",
