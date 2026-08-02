@@ -25,6 +25,8 @@ import type {
 	AiTransformResult,
 	AppHandshake,
 	AppRuntime,
+	AppToolRecord,
+	AppToolsService,
 	AutomationsHostStatus,
 	AutomationsRunResult,
 	AutomationsService,
@@ -299,6 +301,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			webView: webViewProxy(bridge),
 			selection: selectionProxy(bridge),
 			dnd: dndProxy(bridge),
+			appTools: appToolsProxy(bridge),
 		},
 		on: <T extends LifecycleEvent["type"]>(event: T, handler: LifecycleHandler<T>) =>
 			lifecycle.on(event, handler),
@@ -384,6 +387,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			webView: webViewProxy(bridge),
 			selection: selectionProxy(bridge),
 			dnd: dndProxy(bridge),
+			appTools: appToolsProxy(bridge),
 		},
 		on: <T extends LifecycleEvent["type"]>(event: T, handler: LifecycleHandler<T>) =>
 			lifecycle.on(event, handler),
@@ -1185,6 +1189,20 @@ function presenceProxy(bridge: Bridge): PresenceService {
 		publish: (input) =>
 			callService<void>(bridge, "presence", "publish", [input], [`entities.read:${input.type}`]),
 		untrack: (input) => callService<void>(bridge, "presence", "untrack", [input], []),
+	};
+}
+
+function appToolsProxy(bridge: Bridge): AppToolsService {
+	// `list` declares only `tools.read` — the broker filters to what this caller
+	// may see (it cannot know that set ahead of the call). `call` cannot pin a
+	// scoped cap either, because the provider is only known once the tool id is
+	// parsed; the broker re-checks `tools.call:<appId>[/<name>]` against the
+	// ledger and refuses fail-closed, which is the authoritative gate regardless
+	// of what the envelope declares.
+	return {
+		list: (input) =>
+			callService<readonly AppToolRecord[]>(bridge, "tools", "list", [input ?? {}], ["tools.read"]),
+		call: (input) => callService<{ value: unknown }>(bridge, "tools", "call", [input], []),
 	};
 }
 

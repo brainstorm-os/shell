@@ -40,6 +40,60 @@ export enum AppToolEffect {
 	ProposesWrite = "proposes-write",
 }
 
+/** Who initiated a tool call. DERIVED from the verified caller principal at
+ *  the broker, never claimed in the call — a caller that could name its own
+ *  initiator would be choosing its own friction. */
+export enum ToolCallInitiator {
+	/** A human gesture in an app (a menu click, a toolbar press). The click is
+	 *  itself the confirmation. */
+	UserGesture = "user-gesture",
+	/** An agent's turn. No human is in the loop at the moment of the call. */
+	Agent = "agent",
+}
+
+/** Friction for one call. Deliberately the same two values as MCP's
+ *  `McpFrictionDecision`, so unifying them later is a rename rather than a
+ *  semantic change — they are NOT unified now because `decideToolFriction`
+ *  keys on MCP's `readOnlyHint`/`destructiveHint` booleans, which an app tool
+ *  does not have (it declares an `AppToolEffect` instead). */
+export enum ToolFrictionDecision {
+	AutoRun = "auto-run",
+	Confirm = "confirm",
+}
+
+/** Effect + initiator → friction (doc 78, OQ-TOOL-5).
+ *
+ * FRICTION IS NOT A SECURITY BOUNDARY. A provider declares its own `effect`
+ * and can lie about it, exactly as an MCP server can lie about `readOnlyHint`.
+ * What a call is *allowed* to do is decided by the capability ledger; this
+ * only decides whether a human is asked first.
+ *
+ *   - `pure` — no vault read, no side effects: auto-runs everywhere.
+ *   - `reads-vault` — auto-runs from a user gesture (the click IS the
+ *     confirmation) but confirms when an agent initiates, because there no
+ *     human chose this moment.
+ *   - `proposes-write` — returns a proposal that a human must approve before
+ *     anything persists, so the approval gesture exists by construction and
+ *     the call itself needs no second one.
+ *   - `external` — always confirms; leaving the machine is the one effect a
+ *     user cannot undo. */
+export function decideAppToolFriction(
+	effect: AppToolEffect,
+	initiator: ToolCallInitiator,
+): ToolFrictionDecision {
+	switch (effect) {
+		case AppToolEffect.Pure:
+		case AppToolEffect.ProposesWrite:
+			return ToolFrictionDecision.AutoRun;
+		case AppToolEffect.ReadsVault:
+			return initiator === ToolCallInitiator.UserGesture
+				? ToolFrictionDecision.AutoRun
+				: ToolFrictionDecision.Confirm;
+		case AppToolEffect.External:
+			return ToolFrictionDecision.Confirm;
+	}
+}
+
 /** Where a tool may be offered. A tool with no surfaces is registered but
  *  never presented — useful for agent-only tools. */
 export enum AppToolSurface {

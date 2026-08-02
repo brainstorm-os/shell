@@ -8,9 +8,11 @@
  * `appToolInputsJsonSchema`, projected from the same declaration, so the two
  * views cannot drift APART: anything the schema states, the broker enforces.
  * They are not identical, and the asymmetry only ever runs one way — the
- * broker is the stricter of the two. `format: phone` / `markdown` / `code` are
- * enforced here and unprojectable (JSON Schema has no name for them), so the
- * model is told less than is checked, never more.
+ * broker is the stricter of the two. `format: phone` is enforced here and
+ * unprojectable (JSON Schema has no name for it), so the model is told less
+ * than is checked, never more. `markdown` / `code` carry no syntactic rule at
+ * all beyond the blank + control-character screens — the shared formatter
+ * returns true for them — so they are a labelling convention, not a check.
  *
  * Two honest boundaries on what "validated" means:
  *
@@ -79,17 +81,75 @@ function matchesPattern(pattern: string, value: string): boolean {
 	}
 }
 
+/** Control + line characters, refused in any formatted argument. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: refusing control characters is the point
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u;
+
+/** Scheme allowlist for a `format: url` ARGUMENT.
+ *
+ * `isValidFormatted` is a DISPLAY validator — its job is to decide whether a
+ * property cell shows a red border, so it accepts anything `new URL()` parses.
+ * That is far too generous for a value the broker is telling a provider it
+ * checked: `javascript:`, `file:`, `data:` and `vbscript:` all parse. The
+ * model is told `format: "uri"`, so a caller sending `javascript://%0aalert(1)`
+ * would be handing the provider something neither party expects. (Found by
+ * this rung's pentest, dispatched end to end.) */
+const URL_SCHEMES: ReadonlySet<string> = new Set(["http:", "https:", "mailto:"]);
+
+function isSafeUrl(value: string): boolean {
+	try {
+		// No bare-host coercion here either: `isValidFormatted` prepends
+		// `https://` to a schemeless string, which would let the scheme check be
+		// skipped by a value that is not actually a URL.
+		return URL_SCHEMES.has(new URL(value).protocol);
+	} catch {
+		return false;
+	}
+}
+
+/** The canonical form of a url — what the provider will actually receive.
+ *
+ * EVERYTHING about a url argument is decided on this form: the scheme check,
+ * `choices`, `pattern`, and the `enum` the model is shown. Checking the raw
+ * string and forwarding the canonical one is a divergence, and a real one —
+ * `https://api.example.com/v1/../admin` satisfies a `pattern` pinned to
+ * `/v1/` and arrives at the provider as `/admin`. (Found by this rung's third
+ * pentest pass, in a fix the second one had asked for.) Returns null when the
+ * value is not a url at all; the scheme check then refuses it. */
+function canonicalUrl(value: string): string | null {
+	try {
+		return new URL(value).href;
+	} catch {
+		return null;
+	}
+}
+
+/** `choices` for a url argument compare canonically too, or a caller sending
+ *  exactly the declared choice would be refused for the trailing slash the URL
+ *  parser adds. */
+function choiceMatches(input: AppToolInput, text: string): boolean {
+	const choices = input.choices ?? [];
+	if (input.format !== PropertyFormat.Url) return choices.includes(text);
+	return choices.some((c) => canonicalUrl(c) === text || c === text);
+}
+
 /** The constraints the shared shape validator does not cover. */
 function checkConstraints(input: AppToolInput, value: unknown): string | null {
 	switch (input.valueType) {
 		case ValueType.Text: {
 			const text = value as string | null;
 			if (text === null) return null;
-			if (input.choices !== undefined && !input.choices.includes(text)) {
+			if (input.choices !== undefined && !choiceMatches(input, text)) {
 				return `${input.name}: must be one of ${input.choices.join(", ")}`;
 			}
 			if (input.pattern !== undefined && !matchesPattern(input.pattern, text)) {
 				return `${input.name}: does not match the declared pattern`;
+			}
+			// Control characters are refused for ANY formatted argument: a NUL or
+			// a newline passes `[^\s@]+`-style checks while turning the value into
+			// something else entirely wherever it lands.
+			if (input.format !== undefined && CONTROL_CHARS.test(text)) {
+				return `${input.name}: control characters are not allowed in a ${input.format}`;
 			}
 			if (input.format !== undefined) {
 				// `isValidFormatted` treats empty as valid — right for a stored
@@ -97,6 +157,9 @@ function checkConstraints(input: AppToolInput, value: unknown): string | null {
 				// where `{ to: "   " }` would satisfy a `format: email` argument the
 				// model was told is an email.
 				if (text.trim().length === 0) return `${input.name}: expected a ${input.format}, got blank`;
+				if (input.format === PropertyFormat.Url && !isSafeUrl(text)) {
+					return `${input.name}: only http(s) and mailto URLs are allowed`;
+				}
 				if (!isValidFormatted(input.format, text)) {
 					return `${input.name}: not a valid ${input.format}`;
 				}
@@ -141,6 +204,43 @@ function rebuild(input: AppToolInput, value: unknown): unknown {
 	return { at: d.at, granularity: d.granularity };
 }
 
+/** Snapshot a value to plain data BEFORE it is validated, so validation and
+ *  dispatch cannot read two different things.
+ *
+ * Everything below validates the snapshot and forwards the snapshot. Without
+ * this, a value whose fields are getters (or an array whose `Symbol.iterator`
+ * is overridden) is validated as one thing and dispatched as another — the
+ * validator reads it once, `rebuild`/`.map` reads it again, and the second read
+ * can answer differently. Freezing the OUTPUT bag does not help: the bypass is
+ * in the contents, not the container. Structured-clone IPC happens to flatten
+ * this today, so it is only reachable from an in-process caller — which is
+ * exactly what the agent will be. (Found by this rung's pentest.) */
+function snapshotScalar(input: AppToolInput, value: unknown): unknown {
+	if (
+		input.valueType === ValueType.Text &&
+		input.format === PropertyFormat.Url &&
+		typeof value === "string"
+	) {
+		// Canonicalise BEFORE validation so the checked bytes and the forwarded
+		// bytes are the same bytes — the same rule this whole helper exists for.
+		return canonicalUrl(value) ?? value;
+	}
+	if (input.valueType === ValueType.Date && value !== null && typeof value === "object") {
+		const d = value as DateValue;
+		return { at: d.at, granularity: d.granularity };
+	}
+	return value;
+}
+
+function snapshot(input: AppToolInput, value: unknown): unknown {
+	if (!isMultiValued(input.count)) return snapshotScalar(input, value);
+	if (!Array.isArray(value)) return value;
+	// Materialize the array AND each element: an overridden `Symbol.iterator`
+	// makes `for…of` and `.map` disagree, and a date element's getters would
+	// still be re-read by `rebuild`.
+	return Array.prototype.slice.call(value).map((e) => snapshotScalar(input, e));
+}
+
 /**
  * Validate a call's `args` against a tool's declared inputs.
  *
@@ -173,7 +273,9 @@ export function validateAppToolArgs(
 			if (input.required) errors.push(`missing required argument "${input.name}"`);
 			continue;
 		}
-		const value = supplied.get(input.name);
+		// Snapshot FIRST — every read below (shape, constraints, output) must see
+		// the same bytes.
+		const value = snapshot(input, supplied.get(input.name));
 		const def = defForInput(input);
 
 		// `PropertyDef`'s value types accept `null` as "no value" — right for a
@@ -237,7 +339,13 @@ export function validateAppToolArgs(
 	}
 
 	if (errors.length > 0) return { ok: false, errors };
-	return { ok: true, args: { ...out } };
+	// Returned with a NULL PROTOTYPE, not spread into a plain object. An
+	// argument may legally be named `valueOf` / `toString` / `constructor`
+	// (`APP_TOOL_INPUT_NAME_RE` admits them), so on a normal object a consumer
+	// asking `args[input.name]` for an OMITTED optional argument gets
+	// `Object.prototype.valueOf` — a function — instead of `undefined`, and any
+	// `=== undefined` guard downstream silently doesn't fire.
+	return { ok: true, args: Object.freeze(out) };
 }
 
 /** The scalar half of the projection. */
@@ -245,7 +353,12 @@ function scalarSchema(input: AppToolInput): JsonSchema {
 	switch (input.valueType) {
 		case ValueType.Text: {
 			const schema: JsonSchema = { type: "string" };
-			if (input.choices !== undefined) schema.enum = [...input.choices];
+			if (input.choices !== undefined) {
+				schema.enum =
+					input.format === PropertyFormat.Url
+						? input.choices.map((c) => canonicalUrl(c) ?? c)
+						: [...input.choices];
+			}
 			if (input.pattern !== undefined) schema.pattern = `^(?:${input.pattern})$`;
 			if (input.format === PropertyFormat.Email) schema.format = "email";
 			if (input.format === PropertyFormat.Url) schema.format = "uri";
