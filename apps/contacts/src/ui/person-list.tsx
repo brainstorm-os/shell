@@ -8,12 +8,9 @@
 
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
-import {
-	type ObjectMenuContext,
-	ObjectMenuTrigger,
-	openAnchoredMenu,
-} from "@brainstorm-os/sdk/object-menu";
+import { type ObjectMenuContext, ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
+import { openSelectMenu } from "@brainstorm-os/sdk/select-menu";
 import "@brainstorm-os/sdk/select-menu.css";
 import { useMemo, useRef } from "react";
 import { type ContactsI18nKey, plural, t } from "../i18n";
@@ -142,16 +139,19 @@ function AxisPicker<T extends string>({
 			onClick={() => {
 				const button = buttonRef.current;
 				if (!button) return;
-				const r = button.getBoundingClientRect();
-				openAnchoredMenu(
-					{ x: r.left, y: r.bottom + 4 },
-					axes.map((axis) => ({
-						label: t(labelKeyOf(axis)),
-						...(axis === active ? { icon: IconName.Check } : {}),
-						onSelect: () => onSet(axis),
-					})),
-					{ menuLabel: t(menuLabelKey), anchor: button },
-				);
+				// The SHARED select opener, not a hand-built anchored menu. Passing
+				// the check as the LEADING icon (what this did before) leaves every
+				// unselected row with an empty gutter, so nothing aligns and the
+				// popup collapses to the width of its longest label. `openSelectMenu`
+				// reserves the gutter on every row and gives the popup a readable
+				// floor — the same face every other "pick one of N" control wears.
+				openSelectMenu({
+					anchor: button,
+					menuLabel: t(menuLabelKey),
+					value: active,
+					options: axes.map((axis) => ({ value: axis, label: t(labelKeyOf(axis)) })),
+					onSelect: (next) => onSet(next),
+				});
 			}}
 		>
 			<Icon name={leadingIcon} size={14} />
