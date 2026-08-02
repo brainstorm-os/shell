@@ -504,8 +504,11 @@ select {
 	height: var(--control-height-md, 32px);
 	padding: 0 var(--space-2);
 	appearance: none;
-	background: var(--bg-elev);
-	border: var(--border-width) solid var(--border-strong);
+	/* Field-face tokens, shared with `.bs-select` (select-menu.css) — one
+	 * face for every field-like control; a flat theme swaps the elevated
+	 * bordered box for a borderless tinted chip. */
+	background: var(--color-field-background);
+	border: var(--border-width) solid var(--color-field-border);
 	border-radius: var(--radius-sm);
 	color: var(--text);
 	font-family: inherit;
@@ -518,9 +521,13 @@ select {
 :root .bs-input::placeholder {
 	color: var(--text-faint);
 }
+/* Hover tint layers over the field face (see `.bs-select`) — a replacement
+ * reads backwards on a flat theme whose chip is darker than the hover alpha. */
 :root .bs-input:hover:not(:disabled) {
-	border-color: var(--border-strong);
-	background: var(--hover);
+	border-color: var(--color-field-border);
+	background:
+		linear-gradient(var(--hover), var(--hover)),
+		var(--color-field-background);
 }
 /* Text inputs render focus whenever focused (you're typing); a trigger button
  * focuses on keyboard nav. `:focus-visible` covers both in modern Chromium. */

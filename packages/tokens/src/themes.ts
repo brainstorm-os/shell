@@ -139,6 +139,22 @@ const glossVariantStops = {
 	destructiveBottom: "color-mix(in srgb, var(--color-state-error) 84%, black)",
 } as const;
 
+// The field face (select trigger / text input) shared by every glossy
+// theme — the elevated bordered box `.bs-select`/`.bs-input` used to
+// hardcode. Values alias other tokens so each theme still renders its
+// own colours.
+const fieldFace = {
+	background: "var(--color-background-elevated)",
+	border: "var(--color-border-strong)",
+} as const;
+
+// Flat-theme field face — a borderless tinted chip instead of the
+// elevated bordered box.
+const flatFieldFace = {
+	background: "var(--color-surface-overlay)",
+	border: "transparent",
+} as const;
+
 // Flat-theme variant stops — no travel: one colour per face.
 const flatVariantStops = {
 	neutralTop:
@@ -504,6 +520,7 @@ export const defaultDark: Tokens = {
 			default: "rgba(231, 238, 249, 0.14)",
 			strong: "rgba(231, 238, 249, 0.28)",
 		},
+		field: fieldFace,
 		text: {
 			// White text on glass. `secondary` is identical to `primary` —
 			// the secondary grey was a visual hierarchy crutch that turned
@@ -605,6 +622,7 @@ export const defaultLight: Tokens = {
 			default: "rgba(17, 26, 46, 0.12)",
 			strong: "rgba(17, 26, 46, 0.25)",
 		},
+		field: fieldFace,
 		text: {
 			// Light theme mirrors dark — primary = secondary (no useless
 			// grey middle tier), tertiary a subtle alpha for hints. The alpha is
@@ -708,6 +726,7 @@ export const midnight: Tokens = {
 			default: "rgba(180, 200, 255, 0.16)",
 			strong: "rgba(180, 200, 255, 0.32)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#e7eef9",
 			secondary: "#e7eef9",
@@ -800,6 +819,7 @@ export const sepia: Tokens = {
 			default: "rgba(58, 46, 26, 0.18)",
 			strong: "rgba(58, 46, 26, 0.32)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#3a2e1a",
 			secondary: "#3a2e1a",
@@ -901,6 +921,7 @@ export const highContrast: Tokens = {
 			default: "rgba(255, 255, 255, 0.55)",
 			strong: "#ffffff",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#ffffff",
 			secondary: "#ffffff",
@@ -999,6 +1020,7 @@ export const solar: Tokens = {
 			default: "rgba(20, 30, 60, 0.14)",
 			strong: "rgba(20, 30, 60, 0.28)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#1f2937",
 			secondary: "#1f2937",
@@ -1094,6 +1116,7 @@ export const forest: Tokens = {
 			default: "rgba(190, 235, 205, 0.16)",
 			strong: "rgba(190, 235, 205, 0.30)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#e6f0e8",
 			secondary: "#e6f0e8",
@@ -1186,6 +1209,7 @@ export const nord: Tokens = {
 			default: "rgba(216, 222, 233, 0.18)",
 			strong: "rgba(216, 222, 233, 0.34)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#eceff4",
 			secondary: "#eceff4",
@@ -1278,6 +1302,7 @@ export const aurora: Tokens = {
 			default: "rgba(220, 190, 255, 0.18)",
 			strong: "rgba(220, 190, 255, 0.34)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#f0e9fb",
 			secondary: "#f0e9fb",
@@ -1370,6 +1395,7 @@ export const mint: Tokens = {
 			default: "rgba(15, 60, 50, 0.14)",
 			strong: "rgba(15, 60, 50, 0.28)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#143028",
 			secondary: "#143028",
@@ -1462,6 +1488,7 @@ export const rose: Tokens = {
 			default: "rgba(90, 25, 45, 0.14)",
 			strong: "rgba(90, 25, 45, 0.28)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#3a1f29",
 			secondary: "#3a1f29",
@@ -1554,6 +1581,7 @@ export const slate: Tokens = {
 			default: "rgba(30, 41, 59, 0.14)",
 			strong: "rgba(30, 41, 59, 0.28)",
 		},
+		field: fieldFace,
 		text: {
 			primary: "#1e293b",
 			secondary: "#1e293b",
@@ -1647,6 +1675,7 @@ export const porcelain: Tokens = {
 			default: "rgba(23, 23, 23, 0.13)",
 			strong: "rgba(23, 23, 23, 0.26)",
 		},
+		field: flatFieldFace,
 		text: {
 			primary: "#171717",
 			secondary: "#171717",
@@ -1748,6 +1777,7 @@ export const graphite: Tokens = {
 			default: "rgba(255, 255, 255, 0.13)",
 			strong: "rgba(255, 255, 255, 0.26)",
 		},
+		field: flatFieldFace,
 		text: {
 			primary: "#e1e1e1",
 			secondary: "#e1e1e1",

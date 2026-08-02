@@ -27,6 +27,14 @@ export type Tokens = {
 			default: string;
 			strong: string;
 		};
+		/** The field face — the shared select-trigger / text-input box
+		 *  (`.bs-select` / `.bs-input`). Values may be `var()` strings so a
+		 *  theme can alias existing tokens; a flat theme swaps the elevated
+		 *  bordered box for a borderless tinted chip. */
+		field: {
+			background: string;
+			border: string;
+		};
 		text: {
 			primary: string;
 			secondary: string;
