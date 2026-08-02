@@ -107,6 +107,22 @@ export default defineConfig({
 				"packages/sdk/src/tool-outcome/tool-outcome.css",
 			),
 			"@brainstorm-os/sdk/tool-outcome": resolve(__dirname, "packages/sdk/src/tool-outcome/index.ts"),
+			"@brainstorm-os/sdk/proposal-tray.css": resolve(
+				__dirname,
+				"packages/sdk/src/proposal-tray/proposal-tray.css",
+			),
+			"@brainstorm-os/sdk/proposal-tray": resolve(
+				__dirname,
+				"packages/sdk/src/proposal-tray/index.ts",
+			),
+			"@brainstorm-os/sdk/tool-arg-prompt.css": resolve(
+				__dirname,
+				"packages/sdk/src/tool-arg-prompt/tool-arg-prompt.css",
+			),
+			"@brainstorm-os/sdk/tool-arg-prompt": resolve(
+				__dirname,
+				"packages/sdk/src/tool-arg-prompt/index.ts",
+			),
 			"@brainstorm-os/sdk/app-tool-commands": resolve(
 				__dirname,
 				"packages/sdk/src/app-tool-commands.tsx",

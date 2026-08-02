@@ -1,0 +1,51 @@
+/**
+ * Tool argument prompt (Tool-8b). Imported once per app
+ * (`import "@brainstorm-os/sdk/tool-arg-prompt.css"`). The dialog chrome is
+ * the shared popover's; this styles only the form body. Every custom
+ * property is a theme token or an app-theme alias.
+ */
+
+.bs-tool-args {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.bs-tool-args__tool-description {
+	margin: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-tool-args__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+}
+
+.bs-tool-args__label {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-tool-args__description {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-tertiary);
+}
+
+.bs-tool-args__preview {
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.bs-tool-args__error {
+	font-size: var(--text-size-xs);
+	color: var(--color-state-error);
+}
+
+.bs-tool-args__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	width: 100%;
+}

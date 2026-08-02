@@ -47,7 +47,7 @@ describe("ProposalTray", () => {
 				onEditField={noop}
 			/>,
 		);
-		expect(handle.container.querySelector(".agent-proposal-tray")).toBeNull();
+		expect(handle.container.querySelector(".bs-proposal-tray")).toBeNull();
 	});
 
 	it("renders a card per staged proposal with the kind on the element", async () => {
@@ -146,7 +146,7 @@ describe("ProposalTray", () => {
 			/>,
 		);
 		const buttons = handle.container.querySelectorAll<HTMLButtonElement>(
-			".agent-proposal__actions .bs-btn",
+			".bs-proposal__actions .bs-btn",
 		);
 		expect(buttons.length).toBeGreaterThan(0);
 		for (const btn of buttons) expect(btn.disabled).toBe(true);
@@ -187,11 +187,11 @@ describe("ProposalTray — database rows (Agent-11d)", () => {
 		);
 		const card = handle.container.querySelector("[data-testid='agent-proposal']");
 		expect(card?.getAttribute("data-kind")).toBe(ProposeKind.Row);
-		const inputs = handle.container.querySelectorAll<HTMLInputElement>(".agent-proposal__input");
+		const inputs = handle.container.querySelectorAll<HTMLInputElement>(".bs-proposal__input");
 		expect(inputs).toHaveLength(2);
 		expect(inputs[0]?.value).toBe("Globex");
 		expect(inputs[1]?.value).toBe("5400");
-		expect(handle.container.querySelectorAll(".agent-proposal__field-label")[1]?.textContent).toBe(
+		expect(handle.container.querySelectorAll(".bs-proposal__field-label")[1]?.textContent).toBe(
 			"Amount",
 		);
 	});
@@ -222,7 +222,7 @@ describe("ProposalTray — database rows (Agent-11d)", () => {
 				onEditField={onEditField}
 			/>,
 		);
-		const amount = handle.container.querySelectorAll<HTMLInputElement>(".agent-proposal__input")[1];
+		const amount = handle.container.querySelectorAll<HTMLInputElement>(".bs-proposal__input")[1];
 		const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
 		await act(async () => {
 			setter?.call(amount, "6000");
@@ -281,7 +281,7 @@ describe("ProposalTray — a proposed new database (Agent-11e)", () => {
 		const schema = handle.container.querySelector("[data-testid='agent-proposal-schema']");
 		expect(schema?.textContent).toContain("Author");
 		expect(schema?.textContent).toContain("Pages");
-		const nameInput = handle.container.querySelector<HTMLInputElement>(".agent-proposal__input");
+		const nameInput = handle.container.querySelector<HTMLInputElement>(".bs-proposal__input");
 		expect(nameInput?.value).toBe("Reading list");
 	});
 

@@ -23,6 +23,7 @@ import {
 import type { ThemedToken } from "@brainstorm-os/sdk/code-highlight";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { languageDisplayLabel, shikiIdForLanguage } from "@brainstorm-os/sdk/language-detect";
+import { ProposalTraySection } from "@brainstorm-os/sdk/proposal-tray";
 import { type ReactElement, useEffect, useState } from "react";
 import type { AgentI18nKey } from "./i18n";
 import { t } from "./i18n";
@@ -141,7 +142,7 @@ function SeedRows({
 						<input
 							key={key}
 							type="text"
-							className="bs-input agent-proposal__input"
+							className="bs-input bs-proposal__input"
 							aria-label={`${column.label} ${index + 1}`}
 							value={artifact.fields[key] ?? ""}
 							disabled={busy}
@@ -274,19 +275,19 @@ function ProposalCard({
 
 	return (
 		<div
-			className="agent-proposal"
+			className="bs-proposal"
 			role="group"
 			aria-label={t("propose.card.aria", { kind: kindLabel, summary: artifact.summary })}
 			data-testid="agent-proposal"
 			data-kind={artifact.kind}
 		>
-			<div className="agent-proposal__head">
-				<span className="agent-proposal__kind">
+			<div className="bs-proposal__head">
+				<span className="bs-proposal__kind">
 					<Icon name={KIND_ICON[artifact.kind]} size={13} />
 					{kindLabel}
 				</span>
 				{artifact.row ? (
-					<span className="agent-proposal__target" data-testid="agent-proposal-database">
+					<span className="bs-proposal__meta" data-testid="agent-proposal-database">
 						{t("propose.row.into", { database: artifact.row.databaseName })}
 					</span>
 				) : null}
@@ -305,19 +306,19 @@ function ProposalCard({
 			) : null}
 			<div
 				className={
-					artifact.row ? "agent-proposal__fields agent-proposal__fields--row" : "agent-proposal__fields"
+					artifact.row ? "bs-proposal__fields agent-proposal__fields--row" : "bs-proposal__fields"
 				}
 			>
 				{layout.fields.map((field) => {
 					const value = artifact.fields[field.key] ?? "";
 					const inputId = `${artifact.id}-${field.key}`;
 					return (
-						<label key={field.key} className="agent-proposal__field" htmlFor={inputId}>
-							<span className="agent-proposal__field-label">{field.label}</span>
+						<label key={field.key} className="bs-proposal__field" htmlFor={inputId}>
+							<span className="bs-proposal__field-label">{field.label}</span>
 							{field.multiline ? (
 								<textarea
 									id={inputId}
-									className="bs-input bs-input--multiline agent-proposal__input"
+									className="bs-input bs-input--multiline bs-proposal__input"
 									value={value}
 									rows={3}
 									disabled={busy}
@@ -327,7 +328,7 @@ function ProposalCard({
 								<input
 									id={inputId}
 									type="text"
-									className="bs-input agent-proposal__input"
+									className="bs-input bs-proposal__input"
 									value={value}
 									disabled={busy}
 									onChange={(e) => onEditField(artifact.id, field.key, e.target.value)}
@@ -353,7 +354,7 @@ function ProposalCard({
 					{t("propose.codeFile.conflict", { path: conflict.path })}
 				</p>
 			) : null}
-			<div className="agent-proposal__actions">
+			<div className="bs-proposal__actions">
 				{conflict ? (
 					<>
 						<button
@@ -414,14 +415,11 @@ export function ProposalTray({
 }: ProposalTrayProps): ReactElement | null {
 	if (proposals.length === 0) return null;
 	return (
-		<section className="agent-proposal-tray" aria-label={t("propose.tray.title")}>
-			<header className="agent-proposal-tray__head">
-				<span className="agent-proposal-tray__title">
-					<Icon name={IconName.Sparkle} size={13} />
-					{t("propose.tray.title")}
-				</span>
-				<span className="agent-proposal-tray__subtitle">{t("propose.tray.subtitle")}</span>
-			</header>
+		<ProposalTraySection
+			icon={<Icon name={IconName.Sparkle} size={13} />}
+			title={t("propose.tray.title")}
+			subtitle={t("propose.tray.subtitle")}
+		>
 			{proposals.map((artifact) => (
 				<ProposalCard
 					key={artifact.id}
@@ -433,6 +431,6 @@ export function ProposalTray({
 					onEditField={onEditField}
 				/>
 			))}
-		</section>
+		</ProposalTraySection>
 	);
 }
