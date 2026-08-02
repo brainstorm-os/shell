@@ -21,6 +21,7 @@
 import {
 	ACTION_GROUP_ORDER,
 	ActionGroup,
+	AppToolApprovalState,
 	type AppToolRecord,
 	AppToolSurface,
 	type ContributedAction,
@@ -225,14 +226,21 @@ function actionGroupLabel(group: ActionGroup, chrome: ObjectMenuChromeLabels): s
  * then those tools ARE offered. The first needs an argument prompt, which is
  * `Tool-8`'s proposal tray; until then such tools are simply not menu rows.
  * Hiding beats a row that refuses on every click. */
+function needsHumanAnswer(tool: AppToolRecord): boolean {
+	// TWO independent reasons to ask, and both must be consulted. Deriving this
+	// from `effect` alone was a real regression: Tool-5 makes an UNAPPROVED tool
+	// refuse server-side, while the menu — seeing `pure` — sent no `confirmed`,
+	// so the approval was never recorded and the row failed on every click,
+	// forever.
+	if ((tool.approval ?? AppToolApprovalState.New) !== AppToolApprovalState.Approved) return true;
+	return (
+		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) === ToolFrictionDecision.Confirm
+	);
+}
+
 function menuCanInvoke(tool: AppToolRecord, canConfirm: boolean): boolean {
 	if (tool.input.some((i) => i.required)) return false;
-	if (
-		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) === ToolFrictionDecision.AutoRun
-	) {
-		return true;
-	}
-	return canConfirm;
+	return needsHumanAnswer(tool) ? canConfirm : true;
 }
 
 /** Menu-surfaced tools that apply to this object. Declared-type match only —
@@ -352,15 +360,17 @@ function runAppTool(
 ): void {
 	const call = runtime?.services?.appTools?.call;
 	if (!call) return;
-	const needsConfirm =
-		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) ===
-		ToolFrictionDecision.Confirm;
+	const needsConfirm = needsHumanAnswer(tool);
 	void (async () => {
 		try {
 			// A confirm-requiring tool is only OFFERED when the host can ask, so
 			// the approval is always a real human answer — never a flag this code
 			// invents on the caller's behalf.
-			if (needsConfirm && !(await confirm?.(tool))) return;
+			// The REASON is passed through, so a host can ask "this changed since
+			// you approved it" rather than showing the dialog it always shows —
+			// otherwise the rug-pull signal is computed and thrown away before it
+			// reaches a person.
+			if (needsConfirm && !(await confirm?.(tool, approvalReason(tool)))) return;
 			const result = await call({
 				tool: tool.id,
 				...(needsConfirm ? { confirmed: true } : {}),
@@ -380,7 +390,17 @@ function runAppTool(
 /** How a host reports the outcome of a tool run started from an object menu.
  *  A toast, an inline chip — the menu does not care, but it must not be
  *  nothing. */
-export type ObjectMenuToolConfirm = (tool: AppToolRecord) => Promise<boolean>;
+/** Why the host is being asked. `Changed` is the rug-pull case and deserves
+ *  different wording from a first-time approval. */
+export type ObjectMenuToolConfirm = (
+	tool: AppToolRecord,
+	reason: AppToolApprovalState | ToolFrictionDecision.Confirm,
+) => Promise<boolean>;
+
+function approvalReason(tool: AppToolRecord): AppToolApprovalState | ToolFrictionDecision.Confirm {
+	const state = tool.approval ?? AppToolApprovalState.New;
+	return state === AppToolApprovalState.Approved ? ToolFrictionDecision.Confirm : state;
+}
 
 export type ObjectMenuToolReporter = (
 	outcome:

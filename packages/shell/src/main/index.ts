@@ -332,6 +332,7 @@ import {
 	EntitiesRepository,
 	ShareInvitesRepository,
 } from "./storage/entities-repo";
+import { AppToolApprovalsRepository } from "./storage/registry-repo/app-tool-approvals-repo";
 import { AppToolsRepository } from "./storage/registry-repo/app-tools-repo";
 import { AppsRepository } from "./storage/registry-repo/apps-repo";
 import { BlocksRepository } from "./storage/registry-repo/blocks-repo";
@@ -4203,6 +4204,14 @@ void app.whenReady().then(async () => {
 		"tools",
 		makeToolsServiceHandler({
 			getCallHost: () => appCallHost,
+			// Tool-5 — the user's per-tool approvals, so an app UPDATE that
+			// rewrites a tool re-prompts instead of inheriting the friction its
+			// old description earned.
+			getApprovals: async () => {
+				const session = getActiveVaultSession();
+				if (!session) return null;
+				return new AppToolApprovalsRepository(await session.dataStores.open("registry"));
+			},
 			// Tool-7 / AS-4 — trust tier + display name come from the APPS
 			// REGISTRY, never the provider's manifest, so a sideloaded tool is
 			// quarantined under "More app actions" until the user promotes it and

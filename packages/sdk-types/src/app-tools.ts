@@ -215,6 +215,11 @@ export type AppToolRecord = AppToolRegistration & {
 	 *  cannot claim its own tier. Absent means the lister did not resolve one,
 	 *  which every consumer must read as `Sideloaded`. */
 	trustTier?: ActionTrustTier;
+	/** Whether the user has approved THIS surface (Tool-5). Stamped by
+	 *  `tools.list` so a caller can ask the right question — "approve this
+	 *  tool?" versus "this changed since you approved it" — instead of
+	 *  discovering the refusal by being refused. */
+	approval?: AppToolApprovalState;
 	/** The provider's display name, for "<title> — <app>" attribution in a menu.
 	 *  Resolved by `tools.list`; falls back to the app id. */
 	appLabel?: string;
@@ -276,6 +281,80 @@ export function sanitizeAppLabel(raw: string | undefined): string | null {
 		return null;
 	}
 	return trimmed;
+}
+
+/** A stable fingerprint of the surface a user approved when they granted
+ *  `tools.call` for this tool.
+ *
+ * The MCP rug-pull is a remote server swapping a benign description for a
+ * malicious one after approval. An app tool's descriptors are manifest-derived
+ * and installer-written, so the analogue is narrower but real: an **app
+ * update** rewrites a tool after the user approved it, and it keeps whatever
+ * friction the old description earned. `Tool-4` decides friction from `effect`
+ * alone, so a tool that changes from `pure` to `external` — or grows a
+ * `required` argument, or has its description rewritten — must be re-approved
+ * rather than inheriting the old answer.
+ *
+ * Covers everything a person would have READ or that changes what the tool
+ * does: title, description, effect, the full input declaration, and
+ * `surfaces` — the last because adding `agent` moves a tool from
+ * human-clicked to autonomously invocable, which is a change in what it does,
+ * not merely where it appears. Not `appliesTo` (a menu passes no arguments, so
+ * widening it exposes no object the user did not choose) and not
+ * `registeredAt` (which changes on every reinstall and would re-prompt for
+ * nothing, training the user to click through). Deterministic and JSON-stable;
+ * a change-detector, not a MAC — the threat is the provider changing its own
+ * data, not forging ours.
+ *
+ * Object-valued modifiers are flattened to positional tuples rather than
+ * stringified as parsed objects: `JSON.stringify` preserves key ORDER, so
+ * `{max, min}` and `{min, max}` would otherwise read as a change and re-prompt
+ * for nothing — the click-through training this whole mechanism is trying to
+ * avoid. It also only covers the DECLARATION: an update that keeps every
+ * descriptor byte-identical while changing the implementation inherits the
+ * approval, which is inherent to descriptor fingerprinting and is why the
+ * capability ledger, not this, is the boundary. */
+export function appToolFingerprint(tool: AppToolRegistration): string {
+	return JSON.stringify([
+		tool.title,
+		tool.description,
+		tool.effect,
+		[...(tool.surfaces ?? [])].sort(),
+		(tool.input ?? []).map((i) => [
+			i.name,
+			i.description,
+			i.required,
+			i.valueType,
+			i.count ? [i.count.min, i.count.max] : null,
+			i.format ?? null,
+			i.pattern ?? null,
+			i.range ? [i.range.min ?? null, i.range.max ?? null] : null,
+			i.granularity ?? null,
+			i.allowedTypes ?? null,
+			i.choices ?? null,
+		]),
+	]);
+}
+
+/** Why a tool needs re-approval before it may run again. */
+export enum AppToolApprovalState {
+	/** Fingerprint matches what was approved — no extra friction. */
+	Approved = "approved",
+	/** Approved before, but the declaration changed since (an app update). */
+	Changed = "changed",
+	/** Never approved — the first call after the grant. */
+	New = "new",
+}
+
+/** Compare a tool's current surface against what was approved. Pure. */
+export function appToolApprovalState(
+	tool: AppToolRegistration,
+	approvedFingerprint: string | null,
+): AppToolApprovalState {
+	if (approvedFingerprint === null) return AppToolApprovalState.New;
+	return approvedFingerprint === appToolFingerprint(tool)
+		? AppToolApprovalState.Approved
+		: AppToolApprovalState.Changed;
 }
 
 /** Build a tool's globally-unique id. */

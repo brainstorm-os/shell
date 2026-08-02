@@ -426,6 +426,10 @@ export class AppInstaller {
 		const orphanedTypes = this.repos.entityTypes.orphanForApp(appId);
 		this.registryDb.transaction(() => {
 			this.clearLookupRegistrations(appId);
+			// Tool-5 — approvals die with the APP, not with a reinstall. They are
+			// dropped here and nowhere else: an approval left behind would
+			// silently pre-approve a future app that reclaimed the same id.
+			this.repos.appToolApprovals.deleteForApp(appId);
 			this.repos.apps.markUninstalled(appId);
 		})();
 		const revokedCapabilities = this.ledger.revokeAllFor(appId);

@@ -9,6 +9,7 @@
  */
 
 import {
+	AppToolApprovalState,
 	AppToolEffect,
 	type AppToolInput,
 	type AppToolRecord,
@@ -40,6 +41,7 @@ function tool(name: string, over: Partial<AppToolRecord> = {}): AppToolRecord {
 		input: over.input ?? [],
 		registeredAt: 1,
 		appLabel: "Provider",
+		approval: AppToolApprovalState.Approved,
 		...over,
 	};
 }
@@ -60,7 +62,7 @@ vi.mock("./anchored-menu", async (importOriginal) => {
 
 async function rowsFor(
 	tools: readonly AppToolRecord[],
-	extra: { onToolConfirm?: () => Promise<boolean> } = {},
+	extra: { onToolConfirm?: (t: unknown, reason: unknown) => Promise<boolean> } = {},
 ): Promise<{
 	labels: string[];
 	call: ReturnType<typeof vi.fn>;
@@ -112,6 +114,50 @@ describe("object menu — app tool rows", () => {
 		// Attribution must be IN THE LABEL: the menu runtime drops `hint`, and
 		// two apps' same-titled tools are deliberately kept as two rows.
 		expect(labels.some((l) => l.includes("Slugify") && l.includes("Provider"))).toBe(true);
+	});
+
+	it("an UNAPPROVED pure tool asks once, then is callable — never permanently dead", async () => {
+		// The regression this pins: Tool-5 refuses an unapproved tool server-side,
+		// and the menu derived `confirmed` from `effect` alone — so a `pure` tool
+		// sent no confirmation, the approval was never recorded, and the row
+		// failed on every click forever.
+		const fresh = tool("slugify", { title: "Slugify", approval: AppToolApprovalState.New });
+		const asked: unknown[] = [];
+		const run = await rowsFor([fresh], {
+			onToolConfirm: async (_t: unknown, reason: unknown) => {
+				asked.push(reason);
+				return true;
+			},
+		});
+		expect(run.labels.some((l) => l.includes("Slugify"))).toBe(true);
+		run.click("Slugify");
+		await vi.waitFor(() => expect(run.call).toHaveBeenCalledTimes(1));
+		expect(run.call.mock.calls[0]?.[0]).toMatchObject({ confirmed: true });
+		expect(asked).toEqual([AppToolApprovalState.New]);
+	});
+
+	it("tells the host WHY it is asking, so a rug-pull reads differently", async () => {
+		const changed = tool("slugify", {
+			title: "Slugify",
+			approval: AppToolApprovalState.Changed,
+		});
+		const asked: unknown[] = [];
+		const run = await rowsFor([changed], {
+			onToolConfirm: async (_t: unknown, reason: unknown) => {
+				asked.push(reason);
+				return true;
+			},
+		});
+		run.click("Slugify");
+		await vi.waitFor(() => expect(run.call).toHaveBeenCalledTimes(1));
+		// Not a generic confirm — the Changed signal reaches the person.
+		expect(asked).toEqual([AppToolApprovalState.Changed]);
+	});
+
+	it("hides an unapproved tool when the host cannot ask", async () => {
+		const fresh = tool("slugify", { title: "Slugify", approval: AppToolApprovalState.New });
+		const { labels } = await rowsFor([fresh]);
+		expect(labels.some((l) => l.includes("Slugify"))).toBe(false);
 	});
 
 	it("does NOT offer a tool with a required argument", async () => {

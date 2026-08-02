@@ -18,6 +18,7 @@ import {
 	ToolCallInitiator,
 	ToolFrictionDecision,
 	ValueType,
+	appToolFingerprint,
 	appToolId,
 	decideAppToolFriction,
 } from "@brainstorm-os/sdk-types";
@@ -120,6 +121,17 @@ describe("tools.call (Tool-4)", () => {
 	});
 
 	/** Fully-authorized by default; each test removes exactly what it probes. */
+	/** In-memory approvals. `seed` pre-approves the given tools at their CURRENT
+	 *  declaration, so a case that is not about rug-pull behaves as before. */
+	const approvalsFor = (seed: readonly AppToolRecord[] = []) => {
+		const map = new Map<string, string>(seed.map((t) => [t.id, appToolFingerprint(t)]));
+		return {
+			get: (_caller: string, id: string) => map.get(id) ?? null,
+			approve: (_caller: string, id: string, _appId: string, fp: string) => void map.set(id, fp),
+			map,
+		};
+	};
+
 	const handler = (
 		opts: Partial<Parameters<typeof makeToolsServiceHandler>[0]> = {},
 		grants: ReadonlyArray<[string, string]> = [
@@ -132,6 +144,9 @@ describe("tools.call (Tool-4)", () => {
 			getLedger: async () => ledgerGranting(grants),
 			getCallHost: () => host as never,
 			onCall: (r) => records.push(r),
+			// Default: everything already approved, so existing cases are unchanged
+			// by Tool-5. Rug-pull cases override this.
+			getApprovals: async () => approvalsFor(repo.listAll()),
 			...opts,
 		});
 
@@ -483,6 +498,115 @@ describe("tools.call (Tool-4)", () => {
 		];
 		await expect(
 			handler({}, grants)(envelope([{ tool: TOOL, initiator: "user-gesture" }], agent)),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+	});
+
+	// ── Tool-5: rug-pull re-prompt ───────────────────────────────────────────
+
+	it("re-prompts when the declaration CHANGED since it was approved", async () => {
+		// An app update that rewrites a tool must not inherit the friction its
+		// old description earned. `pure` normally auto-runs.
+		const original = tool({ description: "Slugify a title." });
+		repo.insertMany([original]);
+		const stale = approvalsFor([tool({ description: "SOMETHING ELSE ENTIRELY" })]);
+		await expect(
+			handler({ getApprovals: async () => stale })(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(records.at(-1)).toMatchObject({ reason: "declaration-changed" });
+		expect(host.call).not.toHaveBeenCalled();
+	});
+
+	it("re-prompts on the FIRST call, before anything was approved", async () => {
+		repo.insertMany([tool()]);
+		const none = approvalsFor([]);
+		await expect(
+			handler({ getApprovals: async () => none })(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+		expect(records.at(-1)).toMatchObject({ reason: "never-approved" });
+	});
+
+	it("re-baselines only the CONFIRMED tool, never the whole app", async () => {
+		// Approving one changed tool must not silently bless every other tool
+		// that changed in the same update.
+		const a = tool({ name: "rewrite" });
+		const b = tool({ name: "summarize" });
+		repo.insertMany([a, b]);
+		const none = approvalsFor([]);
+		const h = handler({ getApprovals: async () => none }, [
+			[CALLER, toolsCallCapability(PROVIDER)],
+			[PROVIDER, TOOLS_PROVIDE_CAPABILITY],
+		]);
+		await expect(h(envelope([{ tool: a.id, confirmed: true }]))).resolves.toEqual({
+			value: "done",
+		});
+		expect(none.map.has(a.id)).toBe(true);
+		expect(none.map.has(b.id)).toBe(false);
+		// The sibling still re-prompts.
+		await expect(h(envelope([{ tool: b.id }]))).rejects.toMatchObject({ name: "NeedsConfirm" });
+	});
+
+	it("runs without extra friction once the surface matches again", async () => {
+		repo.insertMany([tool()]);
+		await expect(handler()(envelope([{ tool: TOOL }]))).resolves.toEqual({ value: "done" });
+	});
+
+	it("does not re-prompt for a field the user never read", async () => {
+		// `appliesTo` says WHERE a tool is offered and a menu passes no arguments,
+		// so widening it exposes no object the user did not choose;
+		// `registeredAt` changes on every reinstall. Re-prompting on those would
+		// train the user to click through.
+		const now = tool({ appliesTo: ["x"], registeredAt: 999 });
+		repo.insertMany([now]);
+		const approvedEarlier = approvalsFor([tool({ appliesTo: [], registeredAt: 1 })]);
+		await expect(
+			handler({ getApprovals: async () => approvedEarlier })(envelope([{ tool: TOOL }])),
+		).resolves.toEqual({ value: "done" });
+	});
+
+	it("DOES re-prompt when a tool becomes agent-invocable", async () => {
+		// Adding the `agent` surface moves a tool from human-clicked to
+		// autonomous — a change in what it does, not merely where it appears.
+		repo.insertMany([tool({ surfaces: [AppToolSurface.Menu, AppToolSurface.Agent] })]);
+		const approvedMenuOnly = approvalsFor([tool({ surfaces: [AppToolSurface.Menu] })]);
+		await expect(
+			handler({ getApprovals: async () => approvedMenuOnly })(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "NeedsConfirm" });
+	});
+
+	it("fails CLOSED when the approvals store cannot be read", async () => {
+		repo.insertMany([tool()]);
+		await expect(
+			handler({
+				getApprovals: async () => {
+					throw new Error("registry down");
+				},
+			})(envelope([{ tool: TOOL }])),
+		).rejects.toMatchObject({ name: "Unavailable" });
+		expect(host.call).not.toHaveBeenCalled();
+	});
+
+	it("re-prompts when an argument is added or widened", async () => {
+		const widened = tool({
+			input: [{ name: "text", description: "d", required: true, valueType: ValueType.Text }],
+		});
+		repo.insertMany([widened]);
+		const approvedNarrow = approvalsFor([
+			tool({
+				input: [
+					{
+						name: "text",
+						description: "d",
+						required: true,
+						valueType: ValueType.Text,
+						choices: ["a"],
+					},
+				],
+			}),
+		]);
+		await expect(
+			handler({ getApprovals: async () => approvedNarrow })(
+				envelope([{ tool: TOOL, args: { text: "anything" } }]),
+			),
 		).rejects.toMatchObject({ name: "NeedsConfirm" });
 	});
 
