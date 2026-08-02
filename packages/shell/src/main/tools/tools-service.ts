@@ -23,16 +23,24 @@
 
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
+import { ActionTrustTier } from "@brainstorm-os/sdk-types";
 import {
 	type AppToolRecord,
 	type AppToolSurface,
 	appToolApplies,
 	isAppToolSurface,
+	sanitizeAppLabel,
 } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import type { AppToolsRepository } from "../storage/registry-repo/app-tools-repo";
 import { providerSatisfiesEffect } from "./tool-effect-gate";
-import { type ToolsCallOptions, handleToolsCall } from "./tools-call";
+import {
+	TOOLS_PROVIDE_CAPABILITY,
+	type ToolsCallOptions,
+	handleToolsCall,
+	holdsExactScope,
+	toolsCallCapability,
+} from "./tools-call";
 
 /** Broker error shape — `name` is the machine-readable code the broker maps
  *  onto the envelope reply (same local helper the roster service uses). */
@@ -48,6 +56,11 @@ function makeError(name: string, message: string): Error {
 export const TOOLS_READ_CAPABILITY = "tools.read";
 
 export type ToolsServiceOptions = ToolsCallOptions & {
+	/** Resolve a provider's trust tier from the apps registry (AS-4). Absent =
+	 *  everything Sideloaded, i.e. quarantined. */
+	resolveTrustTier?: (appId: string) => ActionTrustTier | Promise<ActionTrustTier>;
+	/** Resolve a provider's display name for menu attribution. */
+	resolveAppLabel?: (appId: string) => string | undefined | Promise<string | undefined>;
 	/** The registry repo, or null when no vault is open. */
 	getRepo: () => Promise<AppToolsRepository | null> | AppToolsRepository | null;
 	getLedger?: () => Promise<CapabilityLedger | null>;
@@ -108,6 +121,10 @@ export async function handleToolsList(
 	const surface = isAppToolSurface(raw.surface) ? raw.surface : null;
 
 	const ledger = options.getLedger ? await options.getLedger().catch(() => null) : null;
+	// Null when the host wired no call channel at all — then liveness is unknown
+	// and is NOT used as a filter (the older behaviour), rather than silently
+	// hiding every tool.
+	const liveProviders = options.getCallHost?.()?.attachedApps() ?? null;
 	// Fail CLOSED on a disable-store read error: an unreadable disable set must
 	// not silently re-enable every contributor the user switched off.
 	const disabled = options.resolveDisabledContributors
@@ -116,22 +133,71 @@ export async function handleToolsList(
 	if (disabled === null)
 		throw makeError("Unavailable", "tools: disabled-contributor set unreadable");
 
-	return repo.listAll().filter((tool) => {
-		// Tool-3 — a persisted declaration that failed to re-validate on read is
-		// never offered. Checked first: everything below reasons about a tool
-		// whose contract is intact.
-		if (tool.declarationInvalid) return false;
-		// A tool never offers itself back to its own provider's menu — the app
-		// already has the function; the catalogue is for OTHER callers.
-		if (tool.appId === envelope.app) return false;
-		if (disabled.has(tool.appId)) return false;
-		// "Registered but never presented" must hold on the UNFILTERED listing
-		// too, or a naive menu consumer renders agent-only tools.
-		if (tool.surfaces.length === 0) return false;
-		if (surface !== null && !tool.surfaces.includes(surface)) return false;
-		if (appliesTo !== null && !appToolApplies(tool, appliesTo)) return false;
-		return providerSatisfiesEffect(ledger, tool);
-	});
+	const stamped = repo
+		.listAll()
+		.filter((tool) => {
+			// Tool-3 — a persisted declaration that failed to re-validate on read is
+			// never offered. Checked first: everything below reasons about a tool
+			// whose contract is intact.
+			if (tool.declarationInvalid) return false;
+			// A tool never offers itself back to its own provider's menu — the app
+			// already has the function; the catalogue is for OTHER callers.
+			if (tool.appId === envelope.app) return false;
+			if (disabled.has(tool.appId)) return false;
+			// "Registered but never presented" must hold on the UNFILTERED listing
+			// too, or a naive menu consumer renders agent-only tools.
+			if (tool.surfaces.length === 0) return false;
+			if (surface !== null && !tool.surfaces.includes(surface)) return false;
+			if (appliesTo !== null && !appToolApplies(tool, appliesTo)) return false;
+			if (!providerSatisfiesEffect(ledger, tool)) return false;
+			// Tool-7 — the provider must actually be RUNNING. `AppCallHost` answers
+			// `Unavailable` when no renderer is attached, so a tool from a closed
+			// app is a row that always fails. Launch-on-demand is `Tool-8`'s
+			// headless invocation (OQ-TOOL-3); until then, not listed.
+			if (liveProviders && !liveProviders.has(tool.appId)) return false;
+			// Tool-7 — a listed tool the caller could not CALL is a dead menu row,
+			// and "an enabled control that does nothing is rejected" is a standing
+			// rule. `tools.read` buys the catalogue; `tools.call:<appId>` buys the
+			// row. Checked with the same exact-scope rule `tools.call` uses, so
+			// listing and calling cannot disagree about who may do what.
+			return callerMaySee(ledger, envelope.app, tool);
+		})
+		.map(async (tool) => ({
+			...tool,
+			// Stamped from the APPS REGISTRY, never the provider's manifest.
+			// Absent resolver means every tool is Sideloaded — the safe default,
+			// matching the intents bus.
+			trustTier: (await options.resolveTrustTier?.(tool.appId)) ?? ActionTrustTier.Sideloaded,
+			// The provider's own manifest name — screened like any other text it
+			// authors, falling back to the registry-minted app id.
+			appLabel: sanitizeAppLabel(await options.resolveAppLabel?.(tool.appId)) ?? tool.appId,
+		}));
+	return await Promise.all(stamped);
+}
+
+/** May this caller actually invoke the tool? Mirrors `tools.call`'s gate
+ *  exactly (both scope forms, exact match only, no `*`), because a listing that
+ *  disagreed with the call would put a row in a menu that refuses when clicked. */
+function callerMaySee(
+	ledger: CapabilityLedger | null,
+	callerAppId: string,
+	tool: AppToolRecord,
+): boolean {
+	if (!ledger) return false;
+	// The PROVIDER's side of the gate too. `tools.call` refuses a provider
+	// without `tools.provide`, and revoking it is an advertised way to stop an
+	// app answering calls — so a listing that ignored it would keep offering
+	// rows that fail on every click, and would make `tool-effect-gate`'s "the
+	// rule lives in one place" untrue.
+	try {
+		if (!ledger.has(tool.appId, TOOLS_PROVIDE_CAPABILITY)) return false;
+	} catch {
+		return false;
+	}
+	return (
+		holdsExactScope(ledger, callerAppId, toolsCallCapability(tool.appId, tool.name)) ||
+		holdsExactScope(ledger, callerAppId, toolsCallCapability(tool.appId))
+	);
 }
 
 export function makeToolsServiceHandler(options: ToolsServiceOptions) {

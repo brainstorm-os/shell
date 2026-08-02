@@ -359,7 +359,7 @@ function resolveAppMeta(
  *  untrusted key, or a failed signature check — is quarantined (`Sideloaded`)
  *  under "More actions…" until the user promotes it (OQ-AS-3). Read from the
  *  registry row; the contributor's own manifest can never claim a higher tier. */
-function resolveActionTrustTier(appsRepo: AppsRepository, appId: string): ActionTrustTier {
+export function resolveActionTrustTier(appsRepo: AppsRepository, appId: string): ActionTrustTier {
 	if (firstPartyAppById(appId)) return ActionTrustTier.Trusted;
 	const record = appsRepo.getActive(appId);
 	if (record?.signatureStatus === AppSignatureStatus.Verified) return ActionTrustTier.Trusted;

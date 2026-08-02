@@ -2294,6 +2294,7 @@ export {
 	CURATED_INTENT_VERBS,
 	RESERVED_APP_TOOL_NAMES,
 	appToolApplies,
+	appToolToContributedAction,
 	appToolId,
 	isAppToolEffect,
 	isAppToolSurface,
@@ -2302,6 +2303,7 @@ export {
 	decideAppToolFriction,
 	normalizeAppTool,
 	normalizeAppToolInput,
+	sanitizeAppLabel,
 	validateAppTool,
 	validateAppToolInput,
 } from "./app-tools";

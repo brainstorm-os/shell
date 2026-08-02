@@ -248,6 +248,13 @@ export class AppCallHost {
 	}
 
 	/** Per-reason drop counters (tests / diagnostics). */
+	/** Which apps currently have at least one renderer attached — i.e. which
+	 *  providers could answer a call right now. `tools.list` uses it so a menu
+	 *  never offers a tool from an app that is not running. */
+	attachedApps(): ReadonlySet<string> {
+		return new Set(this.senders.keys());
+	}
+
 	dropCounters(): Readonly<AppCallDropCounters> {
 		return { ...this.drops };
 	}

@@ -5,6 +5,7 @@
  */
 
 import type {
+	AppToolRecord,
 	ContributedAction,
 	ContributedActionTarget,
 	ContributedVerb,
@@ -16,6 +17,14 @@ import type {
  *  degrades to "no contributed actions" rather than throwing. */
 export type ContributedActionsRuntime = {
 	services?: {
+		/** App tools (doc 78 / `Tool-7`). Absent ⇒ no tool contributions, exactly
+		 *  as an absent `suggestActions` means no intent contributions. */
+		appTools?: {
+			list?: (input?: {
+				appliesTo?: string;
+				surface?: string;
+			}) => Promise<readonly AppToolRecord[]>;
+		};
 		intents?: {
 			dispatch?: (i: { verb: string; payload: Record<string, unknown> }) => unknown;
 			suggestActions?: (input: {

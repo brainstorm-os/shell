@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
+	ActionTrustTier,
 	AppToolEffect,
 	type AppToolRecord,
 	AppToolSurface,
@@ -86,10 +87,44 @@ describe("tools.list (Tool-2)", () => {
 		await rm(dir, { recursive: true, force: true });
 	});
 
+	/** Tool-7 — listing now also requires the caller to be able to CALL, so the
+	 *  default ledger grants a blanket `tools.call:<provider>` for every app id
+	 *  these cases use. A test that probes the call gate overrides it. */
+	const PROVIDERS = [
+		"io.example.a",
+		"io.example.b",
+		"io.example.reader",
+		"io.example.pure",
+		"io.example.rewrite",
+		"io.example.x",
+		"io.example.p",
+		"io.example.bad",
+		"io.example.v13",
+		CALLER,
+	];
+	const CALLABLE: ReadonlyArray<[string, string]> = [
+		[CALLER, TOOLS_READ_CAPABILITY],
+		// Listing now also requires the PROVIDER to hold `tools.provide`, exactly
+		// as calling does — revoking it must remove the row, not leave one that
+		// fails on click.
+		...PROVIDERS.map((appId) => [appId, "tools.provide"] as [string, string]),
+		...[
+			"io.example.a",
+			"io.example.b",
+			"io.example.reader",
+			"io.example.pure",
+			"io.example.rewrite",
+			"io.example.x",
+			"io.example.p",
+			"io.example.bad",
+			"io.example.v13",
+			CALLER,
+		].map((appId) => [CALLER, `tools.call:${appId}`] as [string, string]),
+	];
 	const handler = (opts: Partial<Parameters<typeof makeToolsServiceHandler>[0]> = {}) =>
 		makeToolsServiceHandler({
 			getRepo: () => repo,
-			getLedger: async () => ledgerGranting([[CALLER, TOOLS_READ_CAPABILITY]]),
+			getLedger: async () => ledgerGranting(CALLABLE),
 			...opts,
 		});
 
@@ -145,10 +180,7 @@ describe("tools.list (Tool-2)", () => {
 		const withGrant = makeToolsServiceHandler({
 			getRepo: () => repo,
 			getLedger: async () =>
-				ledgerGranting([
-					[CALLER, TOOLS_READ_CAPABILITY],
-					["io.example.reader", "entities.read:brainstorm/Note/v1"],
-				]),
+				ledgerGranting([...CALLABLE, ["io.example.reader", "entities.read:brainstorm/Note/v1"]]),
 		});
 		const rows2 = (await withGrant(envelope("list", [{}]))) as AppToolRecord[];
 		expect(rows2.map((t) => t.name).sort()).toEqual(["slugify", "summarize"]);
@@ -230,6 +262,52 @@ describe("tools.list (Tool-2)", () => {
 		}
 		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
 		expect(rows).toEqual([]);
+	});
+
+	it("never lists a tool the caller could not CALL (no dead menu rows)", async () => {
+		// `tools.read` buys the catalogue; `tools.call:<appId>` buys the row. A
+		// listed-but-uncallable tool would render as a menu item that refuses
+		// when clicked — the standing "no enabled control that does nothing".
+		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
+		const readOnly = makeToolsServiceHandler({
+			getRepo: () => repo,
+			getLedger: async () => ledgerGranting([[CALLER, TOOLS_READ_CAPABILITY]]),
+		});
+		expect(await readOnly(envelope("list", [{}]))).toEqual([]);
+		// Granting the call capability makes the same tool appear.
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows.map((t) => t.name)).toEqual(["rewrite"]);
+	});
+
+	it("accepts the per-tool call grant for listing too", async () => {
+		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
+		const narrow = makeToolsServiceHandler({
+			getRepo: () => repo,
+			getLedger: async () =>
+				ledgerGranting([
+					[CALLER, TOOLS_READ_CAPABILITY],
+					["io.example.a", "tools.provide"],
+					[CALLER, "tools.call:io.example.a/rewrite"],
+				]),
+		});
+		const rows = (await narrow(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows.map((t) => t.name)).toEqual(["rewrite"]);
+	});
+
+	it("stamps trust tier + app label from the registry, never the manifest", async () => {
+		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
+		const rows = (await handler({
+			resolveTrustTier: () => ActionTrustTier.Trusted,
+			resolveAppLabel: () => "Rewriter",
+		})(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows[0]).toMatchObject({ trustTier: ActionTrustTier.Trusted, appLabel: "Rewriter" });
+	});
+
+	it("defaults to Sideloaded when no trust resolver is wired", async () => {
+		repo.insertMany([tool({ appId: "io.example.a", name: "rewrite" })]);
+		const rows = (await handler()(envelope("list", [{}]))) as AppToolRecord[];
+		expect(rows[0]?.trustTier).toBe(ActionTrustTier.Sideloaded);
+		expect(rows[0]?.appLabel).toBe("io.example.a");
 	});
 
 	it("rejects an unknown method", async () => {

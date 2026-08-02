@@ -203,7 +203,11 @@ function holds(ledger: CapabilityLedger, appId: string, capability: string): boo
  * including every app installed after the grant was made" — authority that
  * silently grows without another consent. A caller that should reach many
  * providers holds many rows. */
-function holdsExactScope(ledger: CapabilityLedger, appId: string, required: string): boolean {
+export function holdsExactScope(
+	ledger: CapabilityLedger,
+	appId: string,
+	required: string,
+): boolean {
 	const colon = required.indexOf(":");
 	const capability = required.slice(0, colon);
 	const scope = required.slice(colon + 1);

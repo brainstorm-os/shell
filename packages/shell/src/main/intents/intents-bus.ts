@@ -415,10 +415,15 @@ export class IntentsBus {
 			const trustTier = this.options.resolveTrustTier?.(row.appId) ?? ActionTrustTier.Sideloaded;
 			const appLabel = this.options.resolveAppLabel?.(row.appId) ?? row.appId;
 			const kind = row.kind ?? undefined;
-			// The label is shell-rendered with attribution (doc 63 §Security —
-			// "<label> — <app>") so a contribution can't impersonate a built-in.
 			// The contributor's declared label is sanitized to a bounded plain
 			// string; an absent label falls back to a verb+app description.
+			//
+			// NOTE (corrected 2026-08-02): attribution is only present on that
+			// FALLBACK. A supplied label renders bare, so the doc-63 claim that
+			// "<label> — <app>" stops a contribution impersonating a built-in is
+			// not delivered on this path. App-tool rows (Tool-7) do attribute
+			// every row; bringing intent rows in line is a behaviour change to a
+			// shipped surface and is not made here silently.
 			const label = sanitizeActionLabel(row.label) ?? `${row.verb} — ${appLabel}`;
 			out.push({
 				id: contributedActionId(row.verb, kind, row.appId),

@@ -79,6 +79,10 @@ export type ContributedAction = {
 	appId: string;
 	/** The contributing app's display name, for "<label> — <app>" attribution. */
 	appLabel: string;
+	/** Identity for deduping, when `(verb, kind)` is not it. Set by contributions
+	 *  that are individually addressable in their own right (app tools); absent
+	 *  for intent-derived ones. */
+	dedupeKey?: string;
 };
 
 /** The discriminators a contributed-action lookup matches against (doc 63
@@ -155,7 +159,14 @@ function rankAction(a: ContributedAction, b: ContributedAction): number {
 function dedupe(actions: readonly ContributedAction[]): ContributedAction[] {
 	const byKey = new Map<string, ContributedAction>();
 	for (const action of actions) {
-		const key = `${action.verb}:${action.kind ?? ""}`;
+		// `dedupeKey` overrides the `(verb, kind)` identity for contributions that
+		// are ALREADY individually addressable. An app tool is exactly that — its
+		// id is `app.<appId>.<name>` — and collapsing two apps' tools together is
+		// the verb collision the app-tools track exists to remove (doc 78: today
+		// the loop addresses a tool by its verb alone, so two tools collide).
+		// Intent-derived contributions keep the original key, where dedupe is the
+		// point: two apps registering `share` really are one labelled choice.
+		const key = action.dedupeKey ?? `${action.verb}:${action.kind ?? ""}`;
 		const existing = byKey.get(key);
 		if (!existing || rankAction(action, existing) < 0) byKey.set(key, action);
 	}
