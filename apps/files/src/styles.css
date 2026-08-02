@@ -886,6 +886,14 @@ body[data-nav-open="false"] .sidebar {
  * the row's trailing gutter (mirrors the leading cross-app grip), hover-revealed
  * for files only. */
 .content-row__export-grip {
+	/* It is a <button>, so without an explicit reset the UA paints its default
+	 * light `ButtonFace` and outset border — a white frame on every dark theme
+	 * the moment the row hover reveals it. The grid/gallery rules below set a
+	 * real chip face and so never showed it; LIST mode had no reset at all. */
+	appearance: none;
+	background: transparent;
+	border: none;
+	padding: 0;
 	position: absolute;
 	right: 30px;
 	top: 50%;
