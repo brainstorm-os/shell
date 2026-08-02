@@ -13,9 +13,16 @@ export {
 	type PopoverHandle,
 } from "./create-popover-element";
 export {
+	computeAnchoredPopoverPosition,
 	DEFAULT_POPOVER_ESCAPE_MATCHER,
+	POPOVER_ANCHOR_GUTTER,
+	POPOVER_VIEWPORT_MARGIN,
+	PopoverAlign,
+	type PopoverAnchorRect,
 	PopoverBodyPadding,
+	type PopoverBoxSize,
 	type PopoverEscapeMatcher,
+	type PopoverPosition,
 	PopoverSize,
 } from "./popover-shared";
 export {

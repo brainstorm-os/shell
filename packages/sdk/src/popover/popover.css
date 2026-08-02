@@ -29,6 +29,19 @@
 	animation: bs-popover-fade-in 140ms ease both;
 }
 
+/* Click-anchored variant: the panel hangs off its trigger (position + offsets
+ * are measured and applied inline by `<Popover>`), so the flex centring is
+ * inert and the backdrop is a click-catcher only — a menu must not dim the
+ * surface it is a menu OF. */
+.bs-popover--anchored .bs-popover__backdrop {
+	background: transparent;
+	animation: none;
+}
+
+.bs-popover--anchored .bs-popover__panel {
+	min-height: 0;
+}
+
 @keyframes bs-popover-fade-in {
 	from {
 		opacity: 0;

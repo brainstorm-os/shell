@@ -1722,6 +1722,17 @@ body:not([data-inspector="open"]) .inspector {
 	flex-shrink: 0;
 }
 
+/* The direction row's slot holds a caret, not a check: it reports which way
+ * the sort runs (same glyph as the toolbar trigger) rather than "selected". */
+.sort-menu__check--direction {
+	color: var(--text-dim);
+}
+
+.sort-menu__item[data-direction]:hover .sort-menu__check--direction,
+.sort-menu__item[data-direction]:focus-visible .sort-menu__check--direction {
+	color: var(--text);
+}
+
 /* Per-option concept glyph (the Tasks/Contacts sort-menu convention). */
 .sort-menu__glyph {
 	display: inline-flex;
