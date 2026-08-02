@@ -172,3 +172,103 @@ test("probe — a denied link can be un-blocked from Settings", async () => {
 		rmSync(userDataDir, { recursive: true, force: true });
 	}
 });
+
+test("probe — Report on GitHub with an in-vault https opener installed", async () => {
+	// F-468 third recurrence: with a vault open AND the Browser app claiming
+	// `https`, the bus raises the "Open with…" picker — which the active-vault
+	// dashboard tree never mounted, so the request timed out to Cancel and the
+	// button read dead. The fresh-vault probe above can't catch it (no opener
+	// installed → consent-prompt path). This leg seeds the prebuilt first-party
+	// apps first, then asserts the picker VISIBLY appears and that picking
+	// "Open with system default" really hands the URL to the OS.
+	test.setTimeout(300_000);
+	const userDataDir = mkdtempSync(join(tmpdir(), "bs-e2e-ghopener-"));
+	const { app } = await launchShell({ userDataDir });
+	const dashboard = await app.firstWindow();
+	try {
+		await dashboard.evaluate(
+			async ({ userDataDir }) => {
+				const bs = (
+					window as never as {
+						brainstorm: {
+							vaults: {
+								list: () => Promise<Array<{ id: string }>>;
+								create: (o: { name: string; path: string }) => Promise<unknown>;
+								activate: (id: string) => Promise<unknown>;
+								session: () => Promise<unknown>;
+							};
+							dev: { seedPrebuiltApps: () => Promise<unknown> };
+						};
+					}
+				).brainstorm;
+				const list = await bs.vaults.list();
+				if (list.length === 0) {
+					await bs.vaults.create({ name: "ghopener", path: `${userDataDir}/vault` });
+				} else if (list[0]) {
+					await bs.vaults.activate(list[0].id);
+				}
+				if (!(await bs.vaults.session())) throw new Error("no active vault");
+				await bs.dev.seedPrebuiltApps();
+			},
+			{ userDataDir },
+		);
+		// Wait until the Browser's https opener claim is queryable — the exact
+		// precondition for the picker path.
+		let claimed = false;
+		for (let i = 0; i < 45 && !claimed; i++) {
+			claimed = await dashboard.evaluate(async () => {
+				const bs = window as never as {
+					brainstorm: { dashboard: { defaultsCatalog: () => Promise<unknown> } };
+				};
+				const catalog = JSON.stringify(await bs.brainstorm.dashboard.defaultsCatalog());
+				return catalog.includes('"scheme":"https"');
+			});
+			if (!claimed) await dashboard.waitForTimeout(2000);
+		}
+		if (!claimed) throw new Error("Browser app never claimed the https opener");
+
+		for (let i = 0; i < 3; i++) {
+			if (
+				!(await dashboard
+					.locator(".popover")
+					.first()
+					.isVisible()
+					.catch(() => false))
+			)
+				break;
+			await dashboard.keyboard.press("Escape");
+			await dashboard.waitForTimeout(400);
+		}
+
+		await app.evaluate(({ shell }) => {
+			const g = globalThis as unknown as { __openedExternally?: string[] };
+			g.__openedExternally = [];
+			shell.openExternal = async (url: string) => {
+				g.__openedExternally?.push(url);
+			};
+		});
+
+		await dashboard.getByRole("button", { name: /help/i }).first().click();
+		await dashboard.waitForSelector('[data-testid="help-report-github"]', { timeout: 10000 });
+		await dashboard.click('[data-testid="help-report-github"]');
+
+		// The picker must VISIBLY appear — an unmounted host lets this click
+		// time out to Cancel with zero UI, which is the exact regression.
+		await dashboard.waitForSelector('[data-testid="open-with-prompt"]', { timeout: 10000 });
+		await dashboard.getByRole("radio", { name: /system default/i }).click();
+		await dashboard.getByRole("button", { name: "Open", exact: true }).click();
+		await dashboard.waitForTimeout(1500);
+		const opened = await app.evaluate(
+			() => (globalThis as unknown as { __openedExternally?: string[] }).__openedExternally ?? [],
+		);
+		console.log(`PROBE opener-installed opened=${JSON.stringify(opened)}`);
+		if (!opened.some((u) => u.includes("github.com/brainstorm-os/shell/issues"))) {
+			throw new Error(
+				`picked "system default" but the URL never reached the OS: ${JSON.stringify(opened)}`,
+			);
+		}
+	} finally {
+		await app.close().catch(() => {});
+		rmSync(userDataDir, { recursive: true, force: true });
+	}
+});
