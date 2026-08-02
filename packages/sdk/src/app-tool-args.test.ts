@@ -168,6 +168,110 @@ describe("validateAppToolArgs — constraints the shared shape validator does NO
 	});
 });
 
+describe("validateAppToolArgs — the pentest's argument exploits", () => {
+	it("refuses a javascript:/file:/data: URL for a format:url argument", () => {
+		// `isValidFormatted` is a DISPLAY validator and accepts anything `new URL`
+		// parses; these were dispatched to a provider end to end.
+		const inputs = [input({ name: "link", format: PropertyFormat.Url })];
+		for (const evil of [
+			"javascript://%0aalert(document.domain)",
+			"jAvAsCrIpT://%0afetch('https://evil.example')",
+			"file:///Users/admin/.ssh/id_ed25519",
+			"data:text/html,<script>alert(1)</script>",
+			"vbscript:msgbox(1)",
+		]) {
+			expect(validateAppToolArgs(inputs, { link: evil }).ok, evil).toBe(false);
+		}
+		for (const good of ["https://example.com/x", "http://example.com", "mailto:a@b.co"]) {
+			expect(validateAppToolArgs(inputs, { link: good }).ok, good).toBe(true);
+		}
+	});
+
+	it("checks and forwards the SAME url — constraints see the canonical form", () => {
+		// Checking the raw string and forwarding the canonical one let a value
+		// satisfy a constraint the provider then never saw honoured.
+		const choiceInput = [
+			input({ name: "t", format: PropertyFormat.Url, choices: ["https://example.com"] }),
+		];
+		const chosen = validateAppToolArgs(choiceInput, { t: "https://example.com" });
+		expect(chosen.ok).toBe(true);
+		// The declared choice and the forwarded value agree after canonicalising.
+		if (chosen.ok) expect(chosen.args.t).toBe("https://example.com/");
+
+		// `..` used to escape a path-pinned pattern: checked against the raw
+		// string, forwarded as the resolved path.
+		const pinned = [
+			input({
+				name: "t",
+				format: PropertyFormat.Url,
+				pattern: "https://api\\.example\\.com/v1/.*",
+			}),
+		];
+		expect(validateAppToolArgs(pinned, { t: "https://api.example.com/v1/../admin" }).ok).toBe(false);
+		expect(validateAppToolArgs(pinned, { t: "https://api.example.com/v1/ok" }).ok).toBe(true);
+	});
+
+	it("projects the canonical choices, so the model is shown what will match", () => {
+		const schema = appToolInputsJsonSchema([
+			input({ name: "t", format: PropertyFormat.Url, choices: ["https://example.com"] }),
+		]) as { properties: Record<string, { enum: string[] }> };
+		expect(schema.properties.t?.enum).toEqual(["https://example.com/"]);
+	});
+
+	it("forwards the PARSED url, so the provider sees what the broker checked", () => {
+		const inputs = [input({ name: "link", format: PropertyFormat.Url })];
+		const padded = validateAppToolArgs(inputs, { link: "   https://ok.example/   " });
+		expect(padded.ok).toBe(true);
+		if (padded.ok) expect(padded.args.link).toBe("https://ok.example/");
+		// `https:/\host` parses to the same origin — a provider doing
+		// `startsWith("https://")` on the raw string would disagree with us.
+		const slashes = validateAppToolArgs(inputs, { link: "https:/\\ok.example/" });
+		expect(slashes.ok).toBe(true);
+		if (slashes.ok) expect(slashes.args.link).toBe("https://ok.example/");
+	});
+
+	it("refuses control characters in a formatted argument", () => {
+		const inputs = [input({ name: "to", format: PropertyFormat.Email })];
+		expect(validateAppToolArgs(inputs, { to: "a@b.c\u0000" }).ok).toBe(false);
+		expect(validateAppToolArgs(inputs, { to: "a@b.c\n" }).ok).toBe(false);
+	});
+
+	it("validates and forwards the SAME bytes when an array lies about iteration", () => {
+		// `for…of` (validation) and `.map` (output) disagree when Symbol.iterator
+		// is overridden, so the validated value and the dispatched value differed.
+		const sneaky: string[] = ["safe"];
+		(sneaky as unknown as Record<symbol, unknown>)[Symbol.iterator] = function* () {
+			yield "safe";
+		};
+		sneaky[0] = "DESTRUCTIVE";
+		const inputs = [input({ name: "modes", count: { min: 1, max: 3 }, choices: ["safe"] })];
+		const result = validateAppToolArgs(inputs, { modes: sneaky });
+		// Either it refuses, or what it returns is what it checked — never a
+		// value it never saw.
+		if (result.ok) expect(result.args.modes).toEqual(["safe"]);
+		else expect(result.ok).toBe(false);
+	});
+
+	it("validates and forwards the SAME bytes when a date value uses getters", () => {
+		let reads = 0;
+		const shifty = {
+			at: 1,
+			get granularity() {
+				reads += 1;
+				return reads === 1 ? DateGranularity.Date : "EVIL";
+			},
+		};
+		const inputs = [
+			input({ name: "due", valueType: ValueType.Date, granularity: DateGranularity.Date }),
+		];
+		const result = validateAppToolArgs(inputs, { due: shifty });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.args.due).toEqual({ at: 1, granularity: DateGranularity.Date });
+		}
+	});
+});
+
 describe("validateAppToolArgs — multi-valued", () => {
 	const inputs = [input({ name: "ids", count: { min: 1, max: 3 } })];
 

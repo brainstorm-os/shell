@@ -4179,12 +4179,22 @@ void app.whenReady().then(async () => {
 		}),
 	);
 
-	// Tool-2 — the `tools` service: the app-tool catalogue (registry read only;
-	// applicability matches declared types, never content). `tools.call` is
-	// Tool-4 — this rung lists.
+	// Tool-2/3/4 — the `tools` service: the app-tool catalogue (registry read
+	// only; applicability matches declared types, never content) plus
+	// `tools.call`, which validates arguments against the declaration and
+	// dispatches into the provider's sandbox over the Tool-1 reverse channel.
 	workers.broker.registerService(
 		"tools",
 		makeToolsServiceHandler({
+			getCallHost: () => appCallHost,
+			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
+			// is checked against the entity's REAL type from entities.db, never
+			// the caller's claim about it (per-type read isolation; the same rule
+			// the presence service follows).
+			resolveEntityType: async (entityId) => {
+				const repo = await getEntitiesRepoForActiveSession();
+				return repo?.get(entityId)?.type ?? null;
+			},
 			getRepo: async () => {
 				const session = getActiveVaultSession();
 				if (!session) return null;

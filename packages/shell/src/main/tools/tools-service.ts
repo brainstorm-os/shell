@@ -24,15 +24,15 @@
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import {
-	AppToolEffect,
 	type AppToolRecord,
 	type AppToolSurface,
 	appToolApplies,
-	isAppToolEffect,
 	isAppToolSurface,
 } from "@brainstorm-os/sdk-types";
 import type { Envelope } from "../../ipc/envelope";
 import type { AppToolsRepository } from "../storage/registry-repo/app-tools-repo";
+import { providerSatisfiesEffect } from "./tool-effect-gate";
+import { type ToolsCallOptions, handleToolsCall } from "./tools-call";
 
 /** Broker error shape — `name` is the machine-readable code the broker maps
  *  onto the envelope reply (same local helper the roster service uses). */
@@ -47,25 +47,7 @@ function makeError(name: string, message: string): Error {
  *  (or a revoked app) can't enumerate the vault's provider surface. */
 export const TOOLS_READ_CAPABILITY = "tools.read";
 
-/** What each declared effect requires of the PROVIDER app. `pure` requires
- *  nothing; the rest ride the capability paths that already exist. A provider
- *  missing its own requirement is dropped from the listing — the declaration
- *  lowers friction, the ledger decides authority (doc 78). */
-const EFFECT_REQUIREMENTS: Readonly<Record<AppToolEffect, readonly string[]>> = {
-	[AppToolEffect.Pure]: [],
-	// Matched by capability NAME, any live scope: the consent path only ever
-	// grants scoped capabilities (`network.egress:<origin>`,
-	// `entities.read:<type>`), so requiring a literal `*` scope would make the
-	// filter unsatisfiable — a control that can never pass is a control nobody
-	// notices regressing.
-	[AppToolEffect.ReadsVault]: ["entities.read"],
-	[AppToolEffect.External]: ["network.egress"],
-	// A proposal is inert until a human approves it, so the tool itself needs
-	// nothing; the approving write is gated where it happens.
-	[AppToolEffect.ProposesWrite]: [],
-};
-
-export type ToolsServiceOptions = {
+export type ToolsServiceOptions = ToolsCallOptions & {
 	/** The registry repo, or null when no vault is open. */
 	getRepo: () => Promise<AppToolsRepository | null> | AppToolsRepository | null;
 	getLedger?: () => Promise<CapabilityLedger | null>;
@@ -100,30 +82,6 @@ async function requireCapability(envelope: Envelope, options: ToolsServiceOption
 			"Denied",
 			`tools.${envelope.method}: ${envelope.app} lacks ${TOOLS_READ_CAPABILITY}`,
 		);
-	}
-}
-
-/** Does the provider still hold what its declared effect implies? Any ledger
- *  trouble drops the tool (fail-closed) rather than offering it. */
-function providerSatisfiesEffect(ledger: CapabilityLedger | null, tool: AppToolRecord): boolean {
-	// Validate BEFORE indexing: a plain object literal inherits `toString`,
-	// `valueOf`, … so a corrupt row whose effect is an Object.prototype key
-	// would resolve to a FUNCTION whose `.length === 0` — read as "requires
-	// nothing" and skip this filter entirely, defeating the very guard the
-	// repo's raw-effect passthrough exists to feed.
-	if (!isAppToolEffect(tool.effect)) return false;
-	const required = EFFECT_REQUIREMENTS[tool.effect];
-	if (required === undefined) return false;
-	if (required.length === 0) return true;
-	if (!ledger) return false;
-	try {
-		return required.some(
-			(capability) =>
-				ledger.listActive(tool.appId).some((grant) => grant.capability === capability) ||
-				ledger.has(tool.appId, capability),
-		);
-	} catch {
-		return false;
 	}
 }
 
@@ -181,6 +139,8 @@ export function makeToolsServiceHandler(options: ToolsServiceOptions) {
 		switch (envelope.method) {
 			case "list":
 				return await handleToolsList(envelope, options);
+			case "call":
+				return await handleToolsCall(envelope, options);
 			default:
 				throw makeError("Invalid", `unknown tools method: ${envelope.method}`);
 		}

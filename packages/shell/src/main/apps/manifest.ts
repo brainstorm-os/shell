@@ -48,7 +48,7 @@ import { normalizeChord } from "../shortcuts/chord";
 import { compareDottedVersions } from "../util/schema-version";
 import { isBlockIdForApp, isValidBlockId } from "./block-id";
 
-const APP_ID_PATTERN = /^[a-z][a-z0-9._-]{1,127}$/i; // reverse-DNS-like
+export const APP_ID_PATTERN = /^[a-z][a-z0-9._-]{1,127}$/i; // reverse-DNS-like
 
 /**
  * App ids the PLATFORM owns — an installable app may never claim one.

@@ -145,8 +145,12 @@ export class CapabilityLedger {
 	 *     grant with the same capability + scope.
 	 *   - Wildcard grant: a grant with `scope = "*"` matches any specific
 	 *     scope request for the same capability.
-	 *   - Unscoped: a request without a scope is satisfied by a grant whose
-	 *     scope is null (or "*").
+	 *   - Unscoped: a request without a scope is satisfied ONLY by a grant whose
+	 *     scope is null. A `"*"` grant does NOT satisfy an unscoped request —
+	 *     the SQL below is `scope IS NULL`. (This docstring claimed otherwise
+	 *     until 2026-08-02; the behaviour is the fail-closed one, so callers
+	 *     relying on the text were getting less authority than promised, not
+	 *     more.)
 	 *
 	 * On any SQL failure (corrupt DB, locked file), this throws
 	 * `LedgerUnavailableError` so the broker can fail closed per

@@ -16,6 +16,7 @@
 
 import type { AgentProvenanceRequest } from "./agent-provenance";
 import type { AgentTraceService } from "./agent-trace";
+import type { AppToolRecord, AppToolSurface } from "./app-tools";
 import type { ExportTextFormat } from "./automations";
 import type { CalDavService } from "./caldav";
 import type {
@@ -2097,6 +2098,38 @@ export type McpService = {
 };
 
 /**
+ * App tools (doc 78, `Tool-2`/`Tool-3`/`Tool-4`) — installed apps as typed tool
+ * providers, the same shape a connected MCP server already has.
+ *
+ * `list` answers "what could act on this?" from the registry; `call` runs one
+ * in the providing app's own sandbox. The broker re-checks every capability
+ * against the ledger (fail-closed) and validates arguments against the
+ * provider's DECLARATION before they cross — the property MCP's opaque
+ * `inputSchema` cannot offer. Tool *results* are UNTRUSTED provider-authored
+ * data: render them, never treat them as instructions.
+ *
+ * The provider side of this is `brainstorm.tools.handle(name, handler)`,
+ * supplied by the app preload.
+ */
+export type AppToolsService = {
+	/** The tools this caller may see, filtered by declared applicability,
+	 *  surface, the provider's live capabilities, and the per-app disable. */
+	list(input?: {
+		appliesTo?: string;
+		surface?: AppToolSurface;
+	}): Promise<readonly AppToolRecord[]>;
+	/** Invoke one. Needs `tools.call:<appId>` (or the per-tool narrowing) on the
+	 *  ledger. A call whose declared effect asks for friction — an agent-initiated
+	 *  vault read, anything leaving the machine — is refused with `NeedsConfirm`
+	 *  until a human has approved it and the caller passes `confirmed: true`. */
+	call(input: {
+		tool: string;
+		args?: Record<string, unknown>;
+		confirmed?: boolean;
+	}): Promise<{ value: unknown }>;
+};
+
+/**
  * Automations host surface (11b.6 deploy) — the app-facing handle onto the
  * shell-side engine. `runNow` is the Manual trigger ("Run now"); the host
  * status/claim pair is the 11b.15 automation-host designation (which device
@@ -2188,6 +2221,7 @@ export type AppRuntime = {
 		readonly shortcuts: ShortcutsService;
 		readonly ai: AiService;
 		readonly mcp: McpService;
+		readonly appTools: AppToolsService;
 		readonly automations: AutomationsService;
 		readonly webView: WebViewClient;
 		readonly selection: SelectionService;
@@ -2263,6 +2297,9 @@ export {
 	appToolId,
 	isAppToolEffect,
 	isAppToolSurface,
+	ToolCallInitiator,
+	ToolFrictionDecision,
+	decideAppToolFriction,
 	normalizeAppTool,
 	normalizeAppToolInput,
 	validateAppTool,
