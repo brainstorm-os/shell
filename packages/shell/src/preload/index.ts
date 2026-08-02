@@ -310,6 +310,34 @@ const respondCapabilityPrompt = (requestId: string, accept: boolean): void => {
 	ipcRenderer.send(CAPABILITY_PROMPT_REPLY_CHANNEL, { requestId, accept });
 };
 
+/** Tool-approval prompt (Tool-8). Main asks the DASHBOARD to approve one tool
+ *  call; the reply channel is checked main-side against the dashboard's own
+ *  webContents id, so an app renderer cannot answer for the user. */
+const TOOL_APPROVAL_PROMPT_CHANNEL = "tools:approval-prompt";
+const TOOL_APPROVAL_REPLY_CHANNEL = "tools:approval-reply";
+
+export type ToolApprovalPromptRequest = {
+	requestId: string;
+	callerAppId: string;
+	toolId: string;
+	toolTitle: string;
+	toolDescription: string;
+	providerAppId: string;
+	providerLabel: string;
+	effect: string;
+	reason: "first-use" | "declaration-changed" | "effect-requires-confirm";
+	agentInitiated: boolean;
+};
+
+type ToolApprovalPromptListener = (request: ToolApprovalPromptRequest) => void;
+
+const onToolApprovalPrompt = (listener: ToolApprovalPromptListener): (() => void) =>
+	subscribe<ToolApprovalPromptRequest>(TOOL_APPROVAL_PROMPT_CHANNEL, listener);
+
+const respondToolApprovalPrompt = (requestId: string, accept: boolean): void => {
+	ipcRenderer.send(TOOL_APPROVAL_REPLY_CHANNEL, { requestId, accept });
+};
+
 /** OS-handoff first-use consent prompt (OpenRes-1c). Main posts the
  *  prompt on `os-handoff:prompt`; dashboard replies with the user's
  *  decision on `os-handoff:prompt-reply`. Allow / Deny are sticky (the
@@ -2063,6 +2091,7 @@ const brainstorm = {
 	shortcuts,
 	shellActions: { on: onShellAction },
 	capabilityPrompt: { on: onCapabilityPrompt, respond: respondCapabilityPrompt },
+	toolApprovalPrompt: { on: onToolApprovalPrompt, respond: respondToolApprovalPrompt },
 	osHandoffPrompt: { on: onOsHandoffPrompt, respond: respondOsHandoffPrompt },
 	openWithPrompt: { on: onOpenWithPrompt, respond: respondOpenWithPrompt },
 	mainErrors,

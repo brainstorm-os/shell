@@ -1579,5 +1579,12 @@
   "shell.settings.team.group.delegate": "Delegation",
   "shell.settings.team.delegate.hint": "Who this agent may hand a sub-task to. A delegate never gains more authority than both agents already hold.",
   "shell.settings.team.delegate.none": "No other agents to delegate to yet.",
-  "shell.settings.team.delegate.toggleAria": "Allow delegating to {name}"
+  "shell.settings.team.delegate.toggleAria": "Allow delegating to {name}",
+  "tools.approval.title": "Run this tool?",
+  "tools.approval.agent.title": "Your agent wants to run a tool",
+  "tools.approval.changed.title": "This tool changed since you approved it",
+  "tools.approval.body": "{caller} wants to run “{tool}” from {provider}.",
+  "tools.approval.changed.body": "“{tool}” from {provider} was updated. Review what it does before allowing it again.",
+  "tools.approval.approve": "Allow",
+  "tools.approval.decline": "Decline"
 }

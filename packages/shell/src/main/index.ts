@@ -5864,6 +5864,17 @@ void app.whenReady().then(async () => {
 	const toolApprovalHost = getToolApprovalHost();
 	wireToolApprovalIpc(toolApprovalHost, (id) => dashboardWebContentsId === id);
 
+	/** Bind (or clear) every dashboard-owned prompt host at once. Called from
+	 *  BOTH dashboard-creation paths and from `closed`, so a re-created window
+	 *  re-binds rather than leaving the hosts pointing at a dead renderer. */
+	const attachDashboardHosts = (sender: Electron.WebContents | null): void => {
+		promptHost.setDashboard(sender);
+		toolApprovalHost.setDashboard(sender);
+		osHandoffPromptHost.setDashboard(sender);
+		openWithPromptHost.setDashboard(sender);
+		dashboardWebContentsId = sender?.id ?? null;
+	};
+
 	// OpenRes-1c — first-use OS-handoff consent prompt. Mirrors the
 	// capability-prompt host: pure host posts the IPC, ipcMain wire
 	// dispatches the reply. The dashboard renderer mount lives next to
@@ -5995,20 +6006,17 @@ void app.whenReady().then(async () => {
 	registerAndTrack(dashboardWindow);
 	shortcuts.attach(dashboardWindow.webContents);
 	wireDashboardLinkRouting(dashboardWindow.webContents);
-	promptHost.setDashboard(dashboardWindow.webContents);
-	toolApprovalHost.setDashboard(dashboardWindow.webContents);
-	dashboardWebContentsId = dashboardWindow.webContents.id;
-	osHandoffPromptHost.setDashboard(dashboardWindow.webContents);
-	openWithPromptHost.setDashboard(dashboardWindow.webContents);
+	// ONE place binds every dashboard-owned prompt host. They were bound
+	// individually at creation and nulled on close, but the macOS dock-activate
+	// RE-creation path never re-bound them — so after a close/reopen every
+	// prompt silently refused and the reply sender-check compared against a null
+	// id. (Found by the Tool-8 review; pre-existing for the other three hosts.)
+	attachDashboardHosts(dashboardWindow.webContents);
 	dashboardWindow.once("ready-to-show", () => bootStage("dashboard-window-shown"));
 	dashboardWindow.webContents.once("dom-ready", () => bootStage("dashboard-renderer-domready"));
 	dashboardWindow.webContents.once("did-finish-load", () => bootStage("dashboard-renderer-paint"));
 	dashboardWindow.on("closed", () => {
-		promptHost.setDashboard(null);
-		toolApprovalHost.setDashboard(null);
-		dashboardWebContentsId = null;
-		osHandoffPromptHost.setDashboard(null);
-		openWithPromptHost.setDashboard(null);
+		attachDashboardHosts(null);
 	});
 
 	// 7.8 — render the pure tray model into a single OS `Tray`. The host
@@ -6394,6 +6402,11 @@ void app.whenReady().then(async () => {
 			dashboardWindow = createDashboardWindow();
 			registerAndTrack(dashboardWindow);
 			shortcuts.attach(dashboardWindow.webContents);
+			// Re-bind the prompt hosts. Without this a close/reopen left every
+			// dashboard-owned prompt pointing at a dead renderer: capability
+			// requests, OS-handoff consent, the open-with picker and tool
+			// approval all refused silently.
+			attachDashboardHosts(dashboardWindow.webContents);
 			wireDashboardLinkRouting(dashboardWindow.webContents);
 		} else if (dashboardWindow) {
 			surfaceWindow(dashboardWindow);

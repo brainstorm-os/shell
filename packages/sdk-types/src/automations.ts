@@ -620,7 +620,37 @@ export function stepCapabilities(step: WorkflowStep): string[] {
  *  satisfiable by `intersectAgentTools` (every element of ∅ is implied), i.e. an
  *  ungated tool. It resolves to an unsatisfiable sentinel instead, so such a
  *  tool is silently never offered rather than silently always offered. */
+/** Split an app-tool verb (`app.<appId>.<toolName>`) into its parts, or null.
+ *
+ * A local copy of the shell's `parseAppToolId` because `sdk-types` is
+ * dependency-free and this must be usable wherever `agentToolCapabilities` is —
+ * including the save-time capability sheet. The grammars it enforces are the
+ * ones that make the split unambiguous: an app id cannot contain `/` or `:`,
+ * and a tool name cannot contain a dot. */
+function parseAppToolVerb(verb: string): { appId: string; toolName: string } | null {
+	if (typeof verb !== "string" || !verb.startsWith("app.")) return null;
+	const rest = verb.slice(4);
+	const lastDot = rest.lastIndexOf(".");
+	if (lastDot <= 0 || lastDot === rest.length - 1) return null;
+	const appId = rest.slice(0, lastDot);
+	const toolName = rest.slice(lastDot + 1);
+	if (!/^[a-z][a-z0-9._-]{1,127}$/i.test(appId)) return null;
+	if (!/^[a-z][a-z0-9-]{0,63}$/.test(toolName)) return null;
+	return { appId, toolName };
+}
+
 export function agentToolCapabilities(tool: AgentTool): string[] {
+	// Tool-9 — an APP TOOL's footprint is derived from its id, never from what
+	// the step declared. Dispatch routes on the shape of the verb
+	// (`app.<appId>.<name>` → `tools.call`), so if the capability came from the
+	// declaration the two could disagree: a step could declare
+	// `{ verb: "app.io.x.rewrite" }` with no `capabilities` and put
+	// `intents.dispatch:app.io.x.rewrite` on the sheet the user approves, or
+	// name an already-held `intents.dispatch:open` as cover, and then invoke an
+	// arbitrary app tool the frozen ceiling never contained. The routing
+	// decision and the capability must be THE SAME FACT.
+	const appTool = parseAppToolVerb(tool.verb);
+	if (appTool) return [`tools.call:${appTool.appId}/${appTool.toolName}`];
 	if (tool.capabilities) {
 		return tool.capabilities.length > 0 ? [...tool.capabilities] : [UNSATISFIABLE_CAPABILITY];
 	}

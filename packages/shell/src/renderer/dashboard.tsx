@@ -77,6 +77,7 @@ import { formatOpenExplainer } from "./intents/open-explainer";
 const importMarketplace = () => import("./marketplace/marketplace");
 const Marketplace = lazy(() => importMarketplace().then((m) => ({ default: m.Marketplace })));
 import { CapabilityPromptHost } from "./settings/capability-prompt";
+import { ToolApprovalPromptHost } from "./settings/tool-approval-prompt";
 import "./settings/capability-prompt.css";
 const importWhatsNew = () => import("./dashboard/whats-new-popover");
 const WhatsNewPopover = lazy(() => importWhatsNew().then((m) => ({ default: m.WhatsNewPopover })));
@@ -567,6 +568,7 @@ export function Dashboard() {
 		return (
 			<>
 				<CapabilityPromptHost />
+				<ToolApprovalPromptHost />
 				<OsHandoffPromptHost />
 				<OpenWithPromptHost />
 			</>
@@ -930,6 +932,7 @@ export function Dashboard() {
 				onClose={closeSwitcher}
 			/>
 			<CapabilityPromptHost />
+			<ToolApprovalPromptHost />
 			<VaultRecoveryPromptHost />
 			<OsHandoffPromptHost />
 			{/* Open-with picker: MUST be mounted in the active-vault tree too, not

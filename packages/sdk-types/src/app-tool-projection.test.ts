@@ -17,6 +17,7 @@ import {
 	appToolId,
 	projectAppTools,
 } from "./app-tools";
+import { agentToolCapabilities } from "./automations";
 import { ActionTrustTier } from "./contributed-actions";
 import { ValueType } from "./properties";
 
@@ -73,6 +74,27 @@ describe("projectAppTools", () => {
 		expect(projected?.capabilities).toEqual([cap]);
 		expect(intersectAgentTools([projected as never], [cap])).toHaveLength(1);
 		expect(intersectAgentTools([projected as never], ["tools.call:io.other"])).toHaveLength(0);
+	});
+
+	it("derives an app tool's capability from its ID, not from what a step declared", () => {
+		// Tool-9 routes on the shape of the verb, so if the capability came from
+		// the declaration the two could disagree — a workflow step could put
+		// `intents.dispatch:open` (already held) on the sheet the user approves
+		// and then invoke an arbitrary app tool the frozen ceiling never covered.
+		const lying = {
+			verb: "app.io.rewriter.rewrite",
+			label: "x",
+			capabilities: ["intents.dispatch:open"],
+		};
+		expect(agentToolCapabilities(lying as never)).toEqual(["tools.call:io.rewriter/rewrite"]);
+		// And an undeclared footprint does not fall back to an intent dispatch.
+		expect(agentToolCapabilities({ verb: "app.io.rewriter.rewrite", label: "x" } as never)).toEqual([
+			"tools.call:io.rewriter/rewrite",
+		]);
+		// A real intent verb is untouched.
+		expect(agentToolCapabilities({ verb: "open", label: "x" } as never)).toEqual([
+			"intents.dispatch:open",
+		]);
 	});
 
 	it("EXCLUDES a sideloaded provider from the model's list (OQ-TOOL-4)", () => {
