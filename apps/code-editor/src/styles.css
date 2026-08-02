@@ -52,8 +52,36 @@ button {
 	position: relative;
 	height: calc(100vh - var(--app-header-height, 44px));
 	display: grid;
-	grid-template-columns: 248px 1fr;
+	grid-template-columns: var(--code-files-width, 248px) 1fr;
 	overflow: hidden;
+}
+
+/* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the file list's right
+   edge geometrically. Shared SDK resizable (drag + arrow keys), mirrors
+   Notes' nav handle. */
+.editor__files-resize {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--code-files-width, 248px);
+	width: 6px;
+	margin-left: -3px;
+	cursor: col-resize;
+	z-index: 95;
+	background: transparent;
+	transition: background 120ms ease;
+	touch-action: none;
+}
+
+.editor[data-nav-open="false"] .editor__files-resize {
+	display: none;
+}
+
+.editor__files-resize:hover,
+.editor__files-resize:focus-visible,
+body.is-resizing .editor__files-resize {
+	background: var(--color-accent-subtle);
+	outline: none;
 }
 
 /* Closed: collapse the file-list track + slide the panel out via GPU

@@ -33,6 +33,7 @@ import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
 import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { type ShortcutDisposer, attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
@@ -103,6 +104,20 @@ const pluralMsg = (
 // every other first-party app). The right-hand refs panel is the exception:
 // window-scoped via `@brainstorm-os/sdk/panel-state`. ──────────────────────
 const NAV_OPEN_KEY = "code-editor:nav-open";
+const FILES_WIDTH_KEY = "code-editor:files-width";
+const FILES_WIDTH_DEFAULT = 248;
+const FILES_WIDTH_MIN = 184;
+const FILES_WIDTH_MAX = 440;
+
+// CSS variable BEFORE first paint so the grid doesn't flash from default →
+// persisted width on every launch (the precaution Notes/Journal take).
+applyPersistedPanelWidth({
+	storageKey: FILES_WIDTH_KEY,
+	cssVar: "--code-files-width",
+	defaultWidth: FILES_WIDTH_DEFAULT,
+	min: FILES_WIDTH_MIN,
+	max: FILES_WIDTH_MAX,
+});
 const REFS_OPEN_KEY = "code-editor:refs-open";
 const WRAP_KEY = "code-editor:wrap";
 const FORMAT_ON_SAVE_KEY = "code-editor:format-on-save";
@@ -321,6 +336,7 @@ export function CodeEditorApp(): ReactElement {
 
 	const paneRef = useRef<CodePaneHostHandle | null>(null);
 	const rootRef = useRef<HTMLElement>(null);
+	const filesResizeRef = useRef<HTMLDivElement>(null);
 	const quickOpenRef = useRef<QuickOpenController | null>(null);
 	const commandPaletteRef = useRef<CommandPaletteController | null>(null);
 	const diffViewRef = useRef<DiffViewController | null>(null);
@@ -1068,6 +1084,28 @@ export function CodeEditorApp(): ReactElement {
 
 	// ── Persist panel prefs + folder view state ──────────────────────────────
 	useEffect(() => writePanelPref(NAV_OPEN_KEY, navOpen), [navOpen]);
+
+	// Files-panel resize — the shared SDK resizable (drag + arrow keys, width
+	// persisted), mirroring Notes' nav. Re-attach when the tree (re)mounts:
+	// the handle only renders once there are files.
+	const hasFiles = rows.length > 0;
+	// biome-ignore lint/correctness/useExhaustiveDependencies(hasFiles): the handle only mounts alongside the file tree — the effect must re-attach when it (re)appears
+	useEffect(() => {
+		const handle = filesResizeRef.current;
+		if (!handle) return;
+		const r = attachResizable({
+			handle,
+			side: "left",
+			defaultWidth: FILES_WIDTH_DEFAULT,
+			min: FILES_WIDTH_MIN,
+			max: FILES_WIDTH_MAX,
+			storageKey: FILES_WIDTH_KEY,
+			onWidth: (px) => {
+				document.body.style.setProperty("--code-files-width", `${px}px`);
+			},
+		});
+		return () => r.destroy();
+	}, [hasFiles]);
 	useEffect(() => writePanelOpen(REFS_OPEN_KEY, refsOpen), [refsOpen]);
 	useEffect(() => writeFolderList(COLLAPSED_FOLDERS_KEY, [...collapsed]), [collapsed]);
 	useEffect(() => writeFolderList(PENDING_FOLDERS_KEY, pendingFolders), [pendingFolders]);
@@ -1285,6 +1323,14 @@ export function CodeEditorApp(): ReactElement {
 							onMoveFiles={moveFiles}
 							onMoveFolder={moveFolder}
 							menuContext={fileMenuContext}
+						/>
+						<div
+							ref={filesResizeRef}
+							className="editor__files-resize"
+							role="separator"
+							aria-orientation="vertical"
+							aria-label={t("filesResize")}
+							tabIndex={0}
 						/>
 						{selectedRow ? (
 							<CodePaneHost
