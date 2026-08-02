@@ -5,6 +5,7 @@ import {
 	ICON_FOOTPRINT_H,
 	ICON_FOOTPRINT_W,
 	LEGACY_GRID_MAX,
+	UNPLACED_ICON_POSITION,
 	WIDGET_MIN_H,
 	WIDGET_MIN_W,
 	WIDGET_UNIT,
@@ -21,7 +22,9 @@ import {
 	migrateWidgetRecord,
 	pointToCell,
 	repackIcons,
+	rescueWidgetFromIcons,
 	widgetFootprint,
+	widgetOverlapsIcons,
 	widgetPointToCell,
 	widgetRectPx,
 } from "./grid";
@@ -323,42 +326,53 @@ describe("matchedWidgetSize (F-462)", () => {
  * These are SKIPPED, not failing: they specify the contract the fix must meet
  * rather than redefining today's behaviour as correct. Un-skip with the fix.
  */
-describe.skip("widget ↔ icon collision (327 audit)", () => {
-	it("does not leave a widget on top of an occupied icon cell", () => {
-		// An icon occupies the top-left footprint; a widget persisted at the same
-		// origin must be relocated, not rendered over it.
+describe("widget ↔ icon collision (327 audit)", () => {
+	const surface = { x: 1440, y: 900 };
+
+	it("moves a widget off an occupied icon cell", () => {
+		// The defect exactly as the audit saw it: a widget persisted at the
+		// icon-row origin rendered on top of the app icons forever.
 		const icons = [{ x: 0, y: 0 }];
-		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		const placed = clampWidgetOrigin(widget, { x: 1440, y: 900 });
-		// Today this returns the widget unchanged — that is the defect.
-		expect(overlapsAnyIcon(placed, icons)).toBe(false);
+		const placed = rescueWidgetFromIcons({ x: 0, y: 0, w: 40, h: 20 }, icons, surface);
+		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
+		// Pushed DOWN, not sideways — icons band across the top, widgets sit
+		// beneath them.
+		expect(placed.x).toBe(0);
+		expect(placed.y).toBeGreaterThan(0);
 	});
 
-	it("keeps a widget that was already clear of the icons where it is", () => {
+	it("leaves a widget that was already clear exactly where it is", () => {
 		const icons = [{ x: 0, y: 0 }];
 		const widget = { x: 0, y: 60, w: 40, h: 20 };
-		expect(clampWidgetOrigin(widget, { x: 1440, y: 900 })).toEqual(widget);
+		// Identity preserved, so the layer's `changed` check does not churn.
+		expect(rescueWidgetFromIcons(widget, icons, surface)).toBe(widget);
+	});
+
+	it("clears EVERY icon, not just the first", () => {
+		const icons = [
+			{ x: 0, y: 0 },
+			{ x: 0, y: 14 },
+			{ x: 0, y: 28 },
+		];
+		const placed = rescueWidgetFromIcons({ x: 0, y: 0, w: 40, h: 20 }, icons, surface);
+		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
+	});
+
+	it("ignores unplaced icons", () => {
+		// An unplaced icon has no position to collide with.
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		expect(rescueWidgetFromIcons(widget, [UNPLACED_ICON_POSITION], surface)).toBe(widget);
+	});
+
+	it("returns the record rather than dropping it when no clear row exists", () => {
+		// An invisible widget is worse than an overlapping one.
+		const icons = Array.from({ length: 200 }, (_, i) => ({ x: 0, y: i }));
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		expect(rescueWidgetFromIcons(widget, icons, { x: 400, y: 200 })).toBeTruthy();
+	});
+
+	it("does nothing when there are no icons at all", () => {
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		expect(rescueWidgetFromIcons(widget, [], surface)).toBe(widget);
 	});
 });
-
-/** Pixel-space overlap between a widget record and any icon footprint. Both
- *  live on the same origin and unit, so the comparison is direct. */
-function overlapsAnyIcon(
-	widget: { x: number; y: number; w?: number; h?: number },
-	icons: readonly { x: number; y: number }[],
-): boolean {
-	const wx = GRID_OUTER_MARGIN + widget.x * WIDGET_UNIT;
-	const wy = GRID_OUTER_MARGIN + widget.y * WIDGET_UNIT;
-	const ww = (widget.w ?? 0) * WIDGET_UNIT;
-	const wh = (widget.h ?? 0) * WIDGET_UNIT;
-	return icons.some((icon) => {
-		const ix = GRID_OUTER_MARGIN + icon.x * GRID_UNIT;
-		const iy = GRID_OUTER_MARGIN + icon.y * GRID_UNIT;
-		return (
-			wx < ix + ICON_FOOTPRINT_W * GRID_UNIT &&
-			wx + ww > ix &&
-			wy < iy + ICON_FOOTPRINT_H * GRID_UNIT &&
-			wy + wh > iy
-		);
-	});
-}
