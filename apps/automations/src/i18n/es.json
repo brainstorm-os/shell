@@ -211,5 +211,6 @@
   "template.triage-new-email.trigger": "Cuando llega un correo",
   "template.email-follow-up-nudge.name": "Aviso de seguimiento de correos",
   "template.email-follow-up-nudge.desc": "Un recordatorio diario para retomar los hilos de correo que siguen sin respuesta.",
-  "template.email-follow-up-nudge.trigger": "Cada día laborable a las 16:00"
+  "template.email-follow-up-nudge.trigger": "Cada día laborable a las 16:00",
+  "menu.more": "Más acciones"
 }

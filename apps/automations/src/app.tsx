@@ -27,6 +27,9 @@ import type {
 	AutomationsService,
 	ReminderDef,
 } from "@brainstorm-os/sdk-types";
+import { IconName } from "@brainstorm-os/sdk/icon";
+import { MenuAlign } from "@brainstorm-os/sdk/menus";
+import { closeAnchoredMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type AutomationsI18nKey, t } from "./i18n";
 import { useAutomationsT } from "./i18n-hooks";
@@ -552,17 +555,70 @@ export function AutomationsApp(): ReactElement {
 		}
 	})();
 
+	// View-level actions the trailing ⋯ always offers. Automations has no
+	// header object, so this IS the whole menu (Books' F-249 no-selection
+	// path). `canTransferFiles` gates Import exactly as the toolbar does — an
+	// action the host can't perform is omitted, never shown dead.
+	const headerMoreRef = useRef<HTMLButtonElement>(null);
+	useEffect(() => closeAnchoredMenu, []);
+	const openHeaderMenu = useCallback((): void => {
+		const el = headerMoreRef.current;
+		if (!el) return;
+		const rect = el.getBoundingClientRect();
+		const items = [
+			{
+				label: t("workflows.new"),
+				icon: IconName.Plus,
+				onSelect: () => onNewWorkflow(),
+			},
+			{
+				label: t("templates.open"),
+				icon: IconName.Sparkle,
+				onSelect: () => {
+					setView(View.Workflows);
+					setShowTemplates((v) => !v);
+				},
+			},
+			...(canTransferFiles
+				? [{ label: t("transfer.import"), icon: IconName.Download, onSelect: () => onImport() }]
+				: []),
+		];
+		openAnchoredMenu({ x: rect.left, y: rect.bottom + 4 }, items, {
+			menuLabel: t("menu.more"),
+			anchor: el,
+			align: MenuAlign.End,
+		});
+	}, [canTransferFiles, onImport, onNewWorkflow]);
+
 	return (
 		<>
 			<header className="app-header" data-testid="app-header">
 				<div className="app-header__left">
 					<h1 className="app-header__title">{t("app.title")}</h1>
 				</div>
-				{/* No Automations surface has a header object (workflow actions
-				    live on the rows; Import / New from template stay visible
-				    toolbar actions), so there is no trailing ⋯ — a permanently
-				    disabled one reads as broken. */}
-				<div className="app-header__right" />
+				{/* No Automations surface has a header OBJECT (workflow actions
+				    live on the rows), but the trailing ⋯ is not object-only —
+				    it is the catch-all overflow every app header ends with. It
+				    carries the view-level actions here, the same F-249 pattern
+				    Books / Graph use when nothing is selected; the toolbar keeps
+				    them visible too, so the ⋯ is a second door, not the only one.
+				    An empty right group was the odd one out across all 20 apps. */}
+				<div className="app-header__right">
+					<button
+						ref={headerMoreRef}
+						type="button"
+						className="bs-object-menu__more"
+						aria-haspopup="menu"
+						aria-label={t("menu.more")}
+						data-bs-tooltip={t("menu.more")}
+						data-testid="header-more"
+						onClick={openHeaderMenu}
+					>
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
+						<span className="bs-object-menu__more-dot" />
+					</button>
+				</div>
 			</header>
 			<main id="app-root">
 				{/* kbn-roles-exempt: tab keyboard handled by the app's hand-rolled Arrow-key onKeyDown (verified working). */}

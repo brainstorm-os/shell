@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Crea uno con el botón + de arriba",
   "whiteboard.nav.emptySearch": "Ningún tablero coincide con «{query}»",
   "whiteboard.untitled": "Pizarra sin título",
+  "whiteboard.board.rename.menu": "Renombrar",
   "whiteboard.board.rename.aria": "Renombrar tablero",
   "whiteboard.board.rename.hint": "Haga doble clic para renombrar",
   "whiteboard.board.lock": "Bloquear tablero (solo lectura)",

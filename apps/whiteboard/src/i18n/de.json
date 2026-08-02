@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Erstelle eines mit der +-Schaltfläche oben",
   "whiteboard.nav.emptySearch": "Keine Boards für „{query}“",
   "whiteboard.untitled": "Whiteboard ohne Titel",
+  "whiteboard.board.rename.menu": "Umbenennen",
   "whiteboard.board.rename.aria": "Board umbenennen",
   "whiteboard.board.rename.hint": "Zum Umbenennen doppelklicken",
   "whiteboard.board.lock": "Board sperren (schreibgeschützt)",

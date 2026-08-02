@@ -33,7 +33,7 @@ import {
 	type TypographyDef,
 	type TypographyScale,
 } from "@brainstorm-os/sdk-types";
-import { setActiveIconPack } from "@brainstorm-os/sdk/icon";
+import { IconName, setActiveIconPack } from "@brainstorm-os/sdk/icon";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
@@ -479,17 +479,27 @@ export function ThemeEditorApp(): ReactElement {
 		const anchor = moreButtonRef.current;
 		if (!anchor) return;
 		const rect = anchor.getBoundingClientRect();
-		const items: Array<{ label: string; hint?: string; disabled?: boolean; onSelect: () => void }> =
-			[];
+		// Every row carries a glyph — the ⋯ menus in Notes / Code Editor /
+		// Agent / Bookmarks all do, and a glyph-less list here read as a
+		// different, half-built menu (329 audit).
+		const items: Array<{
+			label: string;
+			hint?: string;
+			icon?: IconName;
+			disabled?: boolean;
+			onSelect: () => void;
+		}> = [];
 		if (getBrainstorm()?.services?.theme) {
 			items.push({
 				label: t("action.previewShell"),
 				hint: t("action.previewShellHint"),
+				icon: IconName.View,
 				onSelect: () => void previewAcrossShell(),
 			});
 		}
 		items.push({
 			label: t("stylePack.openInCodeEditor"),
+			icon: IconName.Pencil,
 			disabled: stylePackId === null,
 			...(stylePackId === null ? { hint: t("stylePack.openHintSaveFirst") } : {}),
 			onSelect: () => void openStylePackInCodeEditor(),

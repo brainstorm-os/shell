@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Creane una con il pulsante + qui sopra",
   "whiteboard.nav.emptySearch": "Nessuna lavagna corrisponde a “{query}”",
   "whiteboard.untitled": "Lavagna senza titolo",
+  "whiteboard.board.rename.menu": "Rinomina",
   "whiteboard.board.rename.aria": "Rinomina lavagna",
   "whiteboard.board.rename.hint": "Fai doppio clic per rinominare",
   "whiteboard.board.lock": "Blocca lavagna (sola lettura)",

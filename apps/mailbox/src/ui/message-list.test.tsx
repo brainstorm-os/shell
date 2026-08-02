@@ -147,3 +147,20 @@ describe("MessageList threaded rendering", () => {
 		expect(host.querySelector(".mb-thread__chevron")).not.toBeNull();
 	});
 });
+
+/**
+ * F-491 — the list's empty and the reading pane's empty sit side by side in
+ * one window; the list used `Compact` (small dim glyph) while the reading
+ * pane used the default `Hero` (large tinted tile), so the two read as two
+ * different designs. Compact stays for narrow nav panels (Agent's session
+ * sidebar, Whiteboard's layers), not for a primary content column.
+ */
+describe("MessageList empty state", () => {
+	it("uses the same Hero face as the reading pane's empty", () => {
+		renderList([], () => {});
+		const empty = host.querySelector(".mb-list__empty-row .bs-empty-state");
+		expect(empty).not.toBeNull();
+		expect(empty?.classList.contains("bs-empty-state--hero")).toBe(true);
+		expect(empty?.classList.contains("bs-empty-state--compact")).toBe(false);
+	});
+});

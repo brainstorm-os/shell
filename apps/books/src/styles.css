@@ -77,6 +77,23 @@ body {
 	grid-template-columns: 0 minmax(0, 1fr);
 }
 
+/* The right inspector is the shared `.bs-props` glass overlay — `position:
+ * fixed`, so it takes NO layout space (the standing "only the right inspector
+ * floats" rule). Every other app that uses it puts a left-aligned list under
+ * it, but the reader's measure is CENTRED and full-bleed, so with the panel
+ * open each line ran on underneath it: every paragraph appeared hard-cut
+ * mid-word at the panel edge, and the glass blur turned the occluded tail of
+ * each line into a grey bar inside the panel that read as a stuck loading
+ * skeleton beside "Author — Empty". Reserving the panel's width on the stage
+ * fixes both: the column recentres in the width that is actually visible. */
+.books__layout {
+	--books-inspector-width: 320px;
+}
+
+.books__layout[data-inspector-open="true"] .books__stage {
+	padding-inline-end: calc(var(--space-4) + var(--books-inspector-width));
+}
+
 .books__content {
 	position: relative;
 	grid-column: 2 / 3;
@@ -527,6 +544,9 @@ body {
 	display: flex;
 	justify-content: center;
 	padding: var(--space-6) var(--space-4);
+	/* Matches the inspector's own slide transition so the column glides to
+	 * its new centre instead of jumping. */
+	transition: padding-inline-end var(--motion-duration-normal, 180ms) ease;
 }
 
 .books__page {

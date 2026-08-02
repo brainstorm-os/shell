@@ -123,6 +123,11 @@ describe("ThemeEditorApp", () => {
 			container.querySelector<HTMLButtonElement>(".app-header__right .bs-object-menu__more")?.click();
 		});
 		expect(openAnchoredMenu).toHaveBeenCalled();
+		// F-489 — every row carries a glyph, like the ⋯ menus in Notes / Code
+		// Editor / Agent. A glyph-less list read as a half-built menu.
+		const items = vi.mocked(openAnchoredMenu).mock.calls.at(-1)?.[1] ?? [];
+		expect(items.length).toBeGreaterThan(0);
+		for (const item of items) expect(item.icon).toBeTruthy();
 		await unmount();
 	});
 

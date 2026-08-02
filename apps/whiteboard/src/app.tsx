@@ -51,6 +51,7 @@ import {
 import { useWhiteboardT } from "./i18n-hooks";
 import { type WhiteboardMessageKey, t } from "./i18n/t";
 import { AlignKind, DistributeAxis } from "./logic/align";
+import { boardMenuExtras } from "./logic/board-menu-extras";
 import { BOARD_TEMPLATES } from "./logic/templates";
 import { WhiteboardExportFormat } from "./logic/whiteboard-export";
 import { ZOrderOp } from "./logic/z-order";
@@ -69,10 +70,15 @@ function BoardTitle({
 	name,
 	canRename,
 	onCommit,
+	renameSignal,
 }: {
 	name: string;
 	canRename: boolean;
 	onCommit: (next: string) => void;
+	/** Bumped by the header ⋯ "Rename" row. Double-click is the only other
+	 *  way in, and it isn't discoverable — the object menu is where every
+	 *  other app puts the verb. */
+	renameSignal: number;
 }): ReactElement {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(name);
@@ -90,6 +96,13 @@ function BoardTitle({
 		setDraft(name);
 		setEditing(true);
 	}, [canRename, name]);
+
+	useEffect(() => {
+		if (renameSignal === 0) return; // initial mount, not a request
+		if (!canRename) return;
+		setDraft(name);
+		setEditing(true);
+	}, [renameSignal, canRename, name]);
 
 	const commit = useCallback(() => {
 		setEditing(false);
@@ -533,7 +546,29 @@ export function WhiteboardApp(): ReactElement {
 		[eng],
 	);
 
-	const boardContext = useCallback(() => eng()?.boardContext() ?? null, [eng]);
+	// The board's own verbs. The shared builder only ships Open / Pin / Share /
+	// Remove — everything else is an app contribution (Notes contributes Cover
+	// + Save-as-template the same way). Whiteboard contributed none, so its
+	// header ⋯ showed only Open + Pin while every sibling app offered the full
+	// set (329 audit). Change icon is the ONLY way to give an icon-less board an
+	// icon: the header icon button hides itself when there is no icon yet.
+	// Delete is deliberately absent — the app has no board-delete path to call.
+	const [renameSignal, setRenameSignal] = useState(0);
+	const boardContext = useCallback(() => {
+		const ctx = eng()?.boardContext() ?? null;
+		if (!ctx) return null;
+		const extras = boardMenuExtras({
+			locked: boardLocked,
+			labels: {
+				rename: t("whiteboard.board.rename.menu"),
+				changeIcon: t("whiteboard.board.icon.change"),
+			},
+			onRename: () => setRenameSignal((n) => n + 1),
+			onChangeIcon: () => eng()?.changeBoardIcon(),
+		});
+		if (extras.length === 0) return ctx;
+		return { ...ctx, extraItems: [...(ctx.extraItems ?? []), ...extras] };
+	}, [eng, boardLocked]);
 
 	const canStyle = snap?.canStyle ?? false;
 	const navOpen = snap?.navOpen ?? true;
@@ -562,6 +597,7 @@ export function WhiteboardApp(): ReactElement {
 							name={snap?.boardName ?? ""}
 							canRename={Boolean(snap?.boardId) && !boardLocked}
 							onCommit={(next) => eng()?.renameBoard(next)}
+							renameSignal={renameSignal}
 						/>
 					</ObjectMenuTrigger>
 				</div>

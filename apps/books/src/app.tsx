@@ -836,7 +836,11 @@ export function BooksApp(): ReactElement {
 					</button>
 				</div>
 			</header>
-			<div className="books__layout" data-library-open={showLibrary ? "true" : "false"}>
+			<div
+				className="books__layout"
+				data-library-open={showLibrary ? "true" : "false"}
+				data-inspector-open={selectedBook && subject && showInspector ? "true" : "false"}
+			>
 				<LibraryPanel
 					books={books}
 					selectedId={selectedId}

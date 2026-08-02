@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Create one with the + button above",
   "whiteboard.nav.emptySearch": "No boards match “{query}”",
   "whiteboard.untitled": "Untitled whiteboard",
+  "whiteboard.board.rename.menu": "Rename",
   "whiteboard.board.rename.aria": "Rename board",
   "whiteboard.board.rename.hint": "Double-click to rename",
   "whiteboard.board.lock": "Lock board (read-only)",

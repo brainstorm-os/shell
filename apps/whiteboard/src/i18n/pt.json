@@ -129,6 +129,7 @@
   "whiteboard.nav.emptyHint": "Crie um com o botão + acima",
   "whiteboard.nav.emptySearch": "Nenhum quadro corresponde a “{query}”",
   "whiteboard.untitled": "Quadro branco sem título",
+  "whiteboard.board.rename.menu": "Renomear",
   "whiteboard.board.rename.aria": "Renomear quadro",
   "whiteboard.board.rename.hint": "Clique duas vezes para renomear",
   "whiteboard.board.lock": "Bloquear quadro (somente leitura)",

@@ -174,4 +174,17 @@ describe("BooksApp shelf", () => {
 		});
 		expect(el.querySelector(".books__page")?.textContent).toContain("Anchor");
 	});
+
+	// F-487 — the shared `.bs-props` inspector is `position: fixed`, so it
+	// takes no layout space. Books centres a full-bleed reading measure under
+	// it, so with the panel open every line ran on underneath: paragraphs read
+	// as hard-cut mid-word at the panel edge, and the glass blur turned the
+	// occluded tail of each line into grey bars that looked like stuck loading
+	// skeletons beside "Author — Empty". The stage reserves the panel width
+	// off this flag.
+	it("flags the layout while the inspector is open so the reading stage reserves its width", async () => {
+		const el = await renderApp();
+		const layout = el.querySelector(".books__layout");
+		expect(layout?.getAttribute("data-inspector-open")).toBe("true");
+	});
 });
