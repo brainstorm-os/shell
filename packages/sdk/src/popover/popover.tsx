@@ -12,15 +12,26 @@
  * inline `e.key` here. Strings come from injected labels.
  */
 
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+	type CSSProperties,
+	type ReactNode,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { createIconElement } from "../icon/create-icon-element";
 import { IconName } from "../icon/icon-registry";
 import { type PopoverLabels, resolvePopoverLabels } from "./popover-labels";
 import {
 	DEFAULT_POPOVER_ESCAPE_MATCHER,
+	PopoverAlign,
 	PopoverBodyPadding,
 	type PopoverEscapeMatcher,
+	type PopoverPosition,
 	PopoverSize,
+	computeAnchoredPopoverPosition,
 } from "./popover-shared";
 import "./popover.css";
 
@@ -36,9 +47,22 @@ export type PopoverProps = {
 	 *  Default: bare-Escape via the shared matcher seam. */
 	escapeMatcher?: PopoverEscapeMatcher | null;
 	labels?: Partial<PopoverLabels>;
+	/** Trigger element to anchor to. When set the panel is positioned off the
+	 *  trigger's live rect (the click-anchored menu the repo's menus use)
+	 *  instead of centring itself as a modal, and the backdrop stops dimming
+	 *  — a menu hanging off a toolbar button, not a dialog. */
+	anchor?: HTMLElement | null;
+	/** Which trigger edge the panel lines up with. Default `End` (right
+	 *  edges flush), matching the header ⋯ menus. */
+	anchorAlign?: PopoverAlign;
 	/** Test hook for the panel root. */
 	testId?: string;
 };
+
+/** Pre-measure placement: off-screen so the panel never paints centred for a
+ *  frame before the layout effect measures it (the `useAnchoredPanel`
+ *  convention). */
+const OFFSCREEN_POSITION: PopoverPosition = { top: -9999, left: -9999 };
 
 function CloseGlyph() {
 	const ref = useRef<HTMLSpanElement>(null);
@@ -59,10 +83,36 @@ export function Popover({
 	bodyPadding = PopoverBodyPadding.Compact,
 	escapeMatcher = DEFAULT_POPOVER_ESCAPE_MATCHER,
 	labels,
+	anchor = null,
+	anchorAlign = PopoverAlign.End,
 	testId,
 }: PopoverProps) {
 	const titleId = useId();
 	const l = resolvePopoverLabels(labels);
+	const panelRef = useRef<HTMLDivElement>(null);
+	const [position, setPosition] = useState<PopoverPosition>(OFFSCREEN_POSITION);
+
+	useLayoutEffect(() => {
+		if (!anchor) return;
+		function place() {
+			const panel = panelRef.current;
+			if (!panel) return;
+			const trigger = anchor?.getBoundingClientRect();
+			if (!trigger) return;
+			const box = panel.getBoundingClientRect();
+			setPosition(
+				computeAnchoredPopoverPosition(
+					trigger,
+					{ width: box.width, height: box.height },
+					{ width: window.innerWidth, height: window.innerHeight },
+					anchorAlign,
+				),
+			);
+		}
+		place();
+		window.addEventListener("resize", place);
+		return () => window.removeEventListener("resize", place);
+	}, [anchor, anchorAlign]);
 
 	useEffect(() => {
 		if (escapeMatcher === null) return;
@@ -77,11 +127,16 @@ export function Popover({
 		return () => document.removeEventListener("keydown", onKeyDown, true);
 	}, [escapeMatcher, onClose]);
 
+	const anchored = anchor !== null;
+	const panelStyle: CSSProperties | undefined = anchored
+		? { position: "fixed", top: position.top, left: position.left }
+		: undefined;
+
 	return (
 		<div
-			className="bs-popover"
+			className={anchored ? "bs-popover bs-popover--anchored" : "bs-popover"}
 			role="dialog"
-			aria-modal="true"
+			aria-modal={anchored ? undefined : true}
 			aria-labelledby={titleId}
 			aria-label={l.region}
 		>
@@ -92,7 +147,13 @@ export function Popover({
 				aria-label={l.close}
 				tabIndex={-1}
 			/>
-			<div className={`bs-popover__panel bs-popover__panel--${size}`} data-testid={testId}>
+			<div
+				ref={panelRef}
+				className={`bs-popover__panel bs-popover__panel--${size}`}
+				style={panelStyle}
+				data-anchored={anchored ? "true" : undefined}
+				data-testid={testId}
+			>
 				<header className="bs-popover__header">
 					<h2 id={titleId} className="bs-popover__title">
 						{title}

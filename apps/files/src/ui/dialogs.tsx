@@ -9,7 +9,7 @@ import type { Cover, Icon as IconValue } from "@brainstorm-os/sdk-types";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { IconPicker } from "@brainstorm-os/sdk/icon-picker";
-import { Popover, PopoverSize } from "@brainstorm-os/sdk/popover";
+import { Popover, PopoverAlign, PopoverSize } from "@brainstorm-os/sdk/popover";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import type { DestinationFolder } from "../logic/destination-folders";
@@ -164,8 +164,17 @@ export type SortMenuProps = {
 	/** "Apply to all folders" (9.8.11) — current view options become the
 	 *  vault-wide default. */
 	onApplyToAll: () => void;
+	/** The toolbar "Sort by: …" button. The view-options menu hangs off it,
+	 *  right edges flush — it is a menu, not a centred modal. */
+	anchor: HTMLElement | null;
 	onClose: () => void;
 };
+
+/** The direction row's state glyph: the same caret the toolbar trigger shows,
+ *  so "which way is it sorting" reads identically in both places. */
+export function directionIcon(direction: SortDirection): IconName {
+	return direction === SortDirection.Asc ? IconName.CaretUp : IconName.CaretDown;
+}
 
 export function SortMenuPopover({
 	current,
@@ -179,6 +188,7 @@ export function SortMenuPopover({
 	onSelectTileSize,
 	onToggleColumn,
 	onApplyToAll,
+	anchor,
 	onClose,
 }: SortMenuProps) {
 	return (
@@ -186,6 +196,8 @@ export function SortMenuPopover({
 			title={t("brainstorm.files.sort.menu")}
 			onClose={onClose}
 			size={PopoverSize.Small}
+			anchor={anchor}
+			anchorAlign={PopoverAlign.End}
 			testId="sort-menu"
 		>
 			<div className="sort-menu__items" role="menu">
@@ -218,13 +230,16 @@ export function SortMenuPopover({
 					role="menuitem"
 					className="popover__item sort-menu__item"
 					data-testid="sort-toggle-direction"
+					data-direction={direction}
 					disabled={current === SortKey.Manual}
 					onClick={() => {
 						if (current === SortKey.Manual) return;
 						onToggleDirection();
 					}}
 				>
-					<span className="sort-menu__check" aria-hidden="true" />
+					<span className="sort-menu__check sort-menu__check--direction" aria-hidden="true">
+						<Icon name={directionIcon(direction)} size={14} />
+					</span>
 					<span>
 						{direction === SortDirection.Asc
 							? t("brainstorm.files.sort.directionAsc")

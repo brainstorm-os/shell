@@ -157,6 +157,9 @@ export function FilesApp() {
 
 	const [confirm, setConfirm] = useState<ConfirmState>(null);
 	const [sortMenuOpen, setSortMenuOpen] = useState(false);
+	// Callback ref (not a plain ref) so the menu re-renders once its trigger
+	// is mounted and can anchor off the live rect.
+	const [sortTrigger, setSortTrigger] = useState<HTMLButtonElement | null>(null);
 	const [storageOpen, setStorageOpen] = useState(false);
 	// Smart-folder name popover: `{ mode: "save" }` seeds from the active
 	// query; `{ mode: "rename", folder }` seeds from the saved name.
@@ -722,6 +725,7 @@ export function FilesApp() {
 						<div className="toolbar__group toolbar__group--end">
 							<button
 								type="button"
+								ref={setSortTrigger}
 								className="bs-select bs-select--sm toolbar__sort"
 								data-testid="toolbar-sort"
 								aria-haspopup="menu"
@@ -839,6 +843,7 @@ export function FilesApp() {
 						store.applyViewToAllFolders();
 						setSortMenuOpen(false);
 					}}
+					anchor={sortTrigger}
 					onClose={() => setSortMenuOpen(false)}
 				/>
 			) : null}
