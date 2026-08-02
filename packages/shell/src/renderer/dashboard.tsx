@@ -932,6 +932,15 @@ export function Dashboard() {
 			<CapabilityPromptHost />
 			<VaultRecoveryPromptHost />
 			<OsHandoffPromptHost />
+			{/* Open-with picker: MUST be mounted in the active-vault tree too, not
+			 * only the no-vault branch. With a vault open and 2+ https openers
+			 * (Browser + system default) the bus raises this picker for every
+			 * external link; unmounted, the request times out to Cancel after 60s
+			 * and the click reads as a dead button (Help → "Report on GitHub",
+			 * F-468's third recurrence — the fresh-vault e2e never caught it
+			 * because a vault without the Browser app takes the consent-prompt
+			 * path instead). */}
+			<OpenWithPromptHost />
 			<Suspense fallback={null}>
 				<WhatsNewPopover
 					lastSeenChangelogVersion={snapshot?.lastSeenChangelogVersion ?? null}
