@@ -18,6 +18,12 @@
  */
 
 import {
+	ActionGroup,
+	ActionTrustTier,
+	type ContributedAction,
+	ContributedVerb,
+} from "./contributed-actions";
+import {
 	CARDINALITY_HARD_MAX,
 	type Cardinality,
 	DateGranularity,
@@ -204,7 +210,73 @@ export type AppToolRecord = AppToolRegistration & {
 	 *  each one re-deriving it — and so a tool fetched by id for DISPATCH is
 	 *  refused too, not just one that fails to appear in a listing. */
 	declarationInvalid?: true;
+	/** Stamped by `tools.list` from the APPS REGISTRY (first-party, or a
+	 *  verified signature), never from the provider's manifest — a contributor
+	 *  cannot claim its own tier. Absent means the lister did not resolve one,
+	 *  which every consumer must read as `Sideloaded`. */
+	trustTier?: ActionTrustTier;
+	/** The provider's display name, for "<title> — <app>" attribution in a menu.
+	 *  Resolved by `tools.list`; falls back to the app id. */
+	appLabel?: string;
 };
+
+/** Project a registered tool onto the shared contributed-action shape, so app
+ *  tools flow through the SAME anti-rot policy (`groupContributedActions`:
+ *  group / dedupe / rank / inline cap / trust quarantine) as intent-derived
+ *  contributions instead of growing a second one (doc 78 `Tool-7`, doc 63
+ *  `AS-4`).
+ *
+ * Three mappings worth stating, because none is arbitrary:
+ *   - **group is always `Actions`.** A tool has no verb, and the `Share` /
+ *     `Convert` buckets are verb-derived; inventing a bucket from a tool's
+ *     prose would be guessing.
+ *   - **priority is always `secondary`.** `primary` is a slot an app claims for
+ *     its own registered intent; a tool contributed into someone else's menu
+ *     does not outrank the host's own actions.
+ *   - **`dedupeKey` is the tool id**, so two apps offering a same-named tool
+ *     both survive. They are genuinely two tools — that is the collision this
+ *     track exists to remove.
+ *
+ * `trustTier` defaults to `Sideloaded` when the lister did not stamp one:
+ * unknown provenance is quarantined, never promoted. */
+export function appToolToContributedAction(tool: AppToolRecord): ContributedAction {
+	return {
+		id: tool.id,
+		// The verb field is structural here, not semantic — a tool is addressed by
+		// id. `Process` is the neutral member of the closed set; `dedupeKey` is
+		// what actually distinguishes rows.
+		verb: ContributedVerb.Process,
+		label: tool.title,
+		group: ActionGroup.Actions,
+		priority: "secondary",
+		trustTier: tool.trustTier ?? ActionTrustTier.Sideloaded,
+		appId: tool.appId,
+		appLabel: tool.appLabel ?? tool.appId,
+		dedupeKey: tool.id,
+	};
+}
+
+/** Screen a PROVIDER-AUTHORED display name before it reaches a menu.
+ *
+ * `manifest.name` is validated as "a non-empty string" and nothing more — no
+ * length cap, no invisible-text screen — unlike a tool's `title`, which
+ * `validateAppTool` caps and screens. The moment that name is rendered as
+ * attribution it is the same untrusted-text surface, so it gets the same
+ * treatment. Returns null when the name is unusable; the caller falls back to
+ * the app id, which is registry-minted and safe by construction. */
+export function sanitizeAppLabel(raw: string | undefined): string | null {
+	if (typeof raw !== "string") return null;
+	const trimmed = raw.trim();
+	if (
+		trimmed.length === 0 ||
+		trimmed.length > APP_TOOL_TITLE_MAX ||
+		INVISIBLE_TEXT.test(trimmed) ||
+		BLANK_RENDERING.test(trimmed)
+	) {
+		return null;
+	}
+	return trimmed;
+}
 
 /** Build a tool's globally-unique id. */
 export function appToolId(appId: string, name: string): string {

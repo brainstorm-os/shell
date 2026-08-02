@@ -21,9 +21,15 @@
 import {
 	ACTION_GROUP_ORDER,
 	ActionGroup,
+	type AppToolRecord,
+	AppToolSurface,
 	type ContributedAction,
 	type ContributedActionGroup,
 	ContributedVerb,
+	ToolCallInitiator,
+	ToolFrictionDecision,
+	appToolToContributedAction,
+	decideAppToolFriction,
 	groupContributedActions,
 } from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
@@ -64,6 +70,14 @@ export type OpenObjectMenuOptions = Omit<BuildObjectMenuOptions, "pinned" | "lab
 	labels?: Partial<ObjectMenuChromeLabels>;
 	/** Cross-app "Add to collection" surface (9.3.5.V 7c). */
 	collections?: ObjectMenuCollections;
+	/** Report the outcome of an app tool run from this menu (Tool-7). A host
+	 *  that renders tool rows SHOULD supply one; without it a refusal surfaces
+	 *  as an unhandled rejection rather than silence. */
+	onToolResult?: ObjectMenuToolReporter;
+	/** Ask a human to approve a tool whose declared effect requires it (today:
+	 *  `external`). Without one, such tools are not offered at all rather than
+	 *  offered and always refused. */
+	onToolConfirm?: ObjectMenuToolConfirm;
 	/** The ⋯ / trigger element the menu drops from. When given, the menu
 	 *  anchors to its live rect, right-aligns to its edge, and the element
 	 *  shows its open state. Omit for cursor-anchored (right-click) opens. */
@@ -163,6 +177,8 @@ function collectionExtraItem(
  *  (OQ-AS-1 — object + selection menus). `open` is excluded — it stays on the
  *  open-resolution path (the "Open with ▸" cascade above), never routed through
  *  the contributed-action surface. */
+const APP_TOOL_MENU_SURFACE: string = AppToolSurface.Menu;
+
 const OBJECT_MENU_CONTRIBUTED_VERBS: readonly ContributedVerb[] = [
 	ContributedVerb.Process,
 	ContributedVerb.Convert,
@@ -193,6 +209,51 @@ function actionGroupLabel(group: ActionGroup, chrome: ObjectMenuChromeLabels): s
  *  object (we still surface actions — the suppression is only of the redundant
  *  *Open* item), or the lookup throws. The shell already relevance-gates +
  *  trust-tags; the menu only groups + caps + renders. */
+/** Can THIS menu actually run the tool, with only a click to go on?
+ *
+ * `tools.list` already dropped tools the caller lacks the capability to call.
+ * That is necessary and was not sufficient: a menu click carries no arguments
+ * and no human approval, so two further classes would have rendered as enabled
+ * rows that always fail —
+ *
+ *   - a tool with a REQUIRED input: `tools.call` refuses it `Invalid`
+ *     ("missing required argument") every single time;
+ *   - a tool whose effect asks for confirmation (`external`): refused
+ *     `NeedsConfirm` unless a human approved it first.
+ *
+ * The second is recoverable — a host that can ask supplies `onToolConfirm`, and
+ * then those tools ARE offered. The first needs an argument prompt, which is
+ * `Tool-8`'s proposal tray; until then such tools are simply not menu rows.
+ * Hiding beats a row that refuses on every click. */
+function menuCanInvoke(tool: AppToolRecord, canConfirm: boolean): boolean {
+	if (tool.input.some((i) => i.required)) return false;
+	if (
+		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) === ToolFrictionDecision.AutoRun
+	) {
+		return true;
+	}
+	return canConfirm;
+}
+
+/** Menu-surfaced tools that apply to this object. Declared-type match only —
+ *  `tools.list` never reads content — filtered server-side to what this caller
+ *  may CALL, then filtered here to what a click alone can actually invoke. */
+async function suggestAppTools(
+	runtime: ObjectMenuRuntime,
+	target: ObjectMenuTarget,
+	canConfirm: boolean,
+): Promise<AppToolRecord[]> {
+	const list = runtime?.services?.appTools?.list;
+	if (!list) return [];
+	try {
+		const input: { appliesTo?: string; surface?: string } = { surface: APP_TOOL_MENU_SURFACE };
+		if (target.entityType) input.appliesTo = target.entityType;
+		return [...(await list(input))].filter((tool) => menuCanInvoke(tool, canConfirm));
+	} catch {
+		return [];
+	}
+}
+
 async function suggestContributedActions(
 	runtime: ObjectMenuRuntime,
 	target: ObjectMenuTarget,
@@ -216,6 +277,37 @@ async function suggestContributedActions(
  *  sanitized, attributed) label + its validated icon, dispatching `(verb, kind)`
  *  to the contributor on select. The host runs no contributor code — it only
  *  dispatches the intent (doc 63 §Security). */
+/** A tool row carries the provider's name IN THE LABEL.
+ *
+ * It was a `hint` first, which reads better — but `toContextItem` does not map
+ * `hint` onto the shared menu runtime's item, so it rendered as nothing.
+ * Attribution is not decoration here: `dedupeKey` deliberately keeps two apps'
+ * same-titled tools as two rows, so without it the overflow can show two
+ * byte-identical labels and the user cannot tell the trusted provider from the
+ * sideloaded one.
+ *
+ * KNOWN RESIDUAL: a title may itself contain " — ", so a sideloaded app can
+ * make its row READ like another provider's ("Export — Notes" becomes
+ * "Export — Notes — Evil", and a narrow menu clips the true tail). Refusing the
+ * separator in titles was tried and reverted — it rejects legitimate titles
+ * (the repo's own example is "Rewrite — tone"), so the cure cost more than the
+ * disease. The real fix is a menu item that can render attribution as a
+ * separate muted element rather than as label text; until the shared item type
+ * grows one, this is a visible-text spoof against a length-capped,
+ * invisible-text-screened string, not a hidden one. */
+function appToolRow(
+	action: ContributedAction,
+	tool: AppToolRecord,
+	runtime: ObjectMenuRuntime,
+	report: ObjectMenuToolReporter | undefined,
+	confirm: ObjectMenuToolConfirm | undefined,
+): AnchoredMenuItem {
+	return {
+		label: `${action.label} — ${action.appLabel}`,
+		onSelect: () => runAppTool(runtime, tool, report, confirm),
+	};
+}
+
 function contributedActionRow(
 	action: ContributedAction,
 	runtime: ObjectMenuRuntime,
@@ -240,22 +332,87 @@ function contributedActionRow(
  *  overflow + every sideloaded contribution) collapses into a single trailing
  *  "More actions…" submenu (doc 63 §Anti-rot — grouped, capped, More…). Returns
  *  `[]` when there are no contributions. */
+/** Run an app tool from a menu row.
+ *
+ * NOT fire-and-forget. The intent precedent (`contributedActionRow`) drops the
+ * promise, which is tolerable for a dispatch that launches a visible app, and
+ * NOT tolerable here: `tools.call` refuses with named errors (`Denied`,
+ * `NeedsConfirm`, `Busy`, `TooLarge`, `Timeout`, `ProviderError`) and a
+ * swallowed refusal is a menu row that silently does nothing — doc 57's "never
+ * silent" rule, and the standing rule against a control that appears to work.
+ *
+ * The host decides how to show it: `onToolResult` is the reporting seam, and a
+ * menu WITHOUT one renders no tool rows at all (see the fetch above), so the
+ * `!report` rethrow below is a belt-and-braces path rather than the normal one. */
+function runAppTool(
+	runtime: ObjectMenuRuntime,
+	tool: AppToolRecord,
+	report: ObjectMenuToolReporter | undefined,
+	confirm: ObjectMenuToolConfirm | undefined,
+): void {
+	const call = runtime?.services?.appTools?.call;
+	if (!call) return;
+	const needsConfirm =
+		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) ===
+		ToolFrictionDecision.Confirm;
+	void (async () => {
+		try {
+			// A confirm-requiring tool is only OFFERED when the host can ask, so
+			// the approval is always a real human answer — never a flag this code
+			// invents on the caller's behalf.
+			if (needsConfirm && !(await confirm?.(tool))) return;
+			const result = await call({
+				tool: tool.id,
+				...(needsConfirm ? { confirmed: true } : {}),
+			});
+			report?.({ tool, ok: true, value: result.value });
+		} catch (error: unknown) {
+			const kind = error instanceof Error && error.name ? error.name : "Error";
+			// Provider-authored text — the reporter renders it as DATA, never as
+			// instructions (doc 78 §Security).
+			const message = error instanceof Error ? error.message : String(error);
+			if (!report) throw error;
+			report({ tool, ok: false, kind, message });
+		}
+	})();
+}
+
+/** How a host reports the outcome of a tool run started from an object menu.
+ *  A toast, an inline chip — the menu does not care, but it must not be
+ *  nothing. */
+export type ObjectMenuToolConfirm = (tool: AppToolRecord) => Promise<boolean>;
+
+export type ObjectMenuToolReporter = (
+	outcome:
+		| { tool: AppToolRecord; ok: true; value: unknown }
+		| { tool: AppToolRecord; ok: false; kind: string; message: string },
+) => void;
+
 function buildContributedRows(
 	actions: readonly ContributedAction[],
 	runtime: ObjectMenuRuntime,
 	target: ObjectMenuTarget,
 	chrome: ObjectMenuChromeLabels,
+	toolsById: ReadonlyMap<string, AppToolRecord>,
+	report?: ObjectMenuToolReporter,
+	confirm?: ObjectMenuToolConfirm,
 ): AnchoredMenuItem[] {
 	const groups: ContributedActionGroup[] = groupContributedActions(actions);
 	if (groups.length === 0) return [];
 	const rows: AnchoredMenuItem[] = [];
 	const overflow: AnchoredMenuItem[] = [];
 	for (const group of groups) {
+		const row = (action: ContributedAction): AnchoredMenuItem => {
+			const tool = toolsById.get(action.id);
+			return tool
+				? appToolRow(action, tool, runtime, report, confirm)
+				: contributedActionRow(action, runtime, target);
+		};
 		if (group.inline.length > 0) {
 			rows.push({ section: true, label: actionGroupLabel(group.group, chrome) });
-			for (const action of group.inline) rows.push(contributedActionRow(action, runtime, target));
+			for (const action of group.inline) rows.push(row(action));
 		}
-		for (const action of group.overflow) overflow.push(contributedActionRow(action, runtime, target));
+		for (const action of group.overflow) overflow.push(row(action));
 	}
 	if (overflow.length > 0) {
 		// Lead the More-actions submenu with a divider so it reads as the
@@ -300,7 +457,7 @@ export async function openObjectMenu(
 	options: OpenObjectMenuOptions,
 ): Promise<void> {
 	const chrome = resolveObjectMenuChromeLabels(options.labels);
-	const [pinned, openWithCandidates, contributedActions] = await Promise.all([
+	const [pinned, openWithCandidates, contributedActions, appTools] = await Promise.all([
 		isObjectPinned(options.runtime, options.target.entityId),
 		options.omitOpen
 			? Promise.resolve<OpenWithEntry[]>([])
@@ -309,6 +466,16 @@ export async function openObjectMenu(
 		// contribution-aware here with no per-app change — the same incremental
 		// rollout the universal-icon / cover passes used.
 		suggestContributedActions(options.runtime, options.target),
+		// Tool-7: menu-surfaced app tools, fetched in the SAME round trip so a
+		// menu open still costs one wait, not two.
+		// A host that cannot REPORT an outcome does not get tool rows. Every
+		// refusal `tools.call` can produce would otherwise vanish into an
+		// unhandled rejection, which is doc 57's "never silent" broken in the
+		// quietest possible way — and today no caller passes the seam, so this
+		// is not hypothetical.
+		options.onToolResult
+			? suggestAppTools(options.runtime, options.target, options.onToolConfirm !== undefined)
+			: Promise.resolve<AppToolRecord[]>([]),
 	]);
 
 	// Splice the cross-app "Add to collection…" item (before Remove) when the
@@ -333,7 +500,22 @@ export async function openObjectMenu(
 	});
 
 	const rows: AnchoredMenuItem[] = withSectionDividers(items);
-	rows.push(...buildContributedRows(contributedActions, options.runtime, options.target, chrome));
+	// ONE contributed block: app tools are projected onto the shared
+	// `ContributedAction` shape and grouped by the same AS-4 policy, so a
+	// sideloaded tool is quarantined under "More app actions" and the inline cap
+	// counts tools and intents together. Two parallel blocks would be exactly
+	// the menu rot AS-4 exists to prevent.
+	rows.push(
+		...buildContributedRows(
+			[...contributedActions, ...appTools.map(appToolToContributedAction)],
+			options.runtime,
+			options.target,
+			chrome,
+			new Map(appTools.map((tool) => [tool.id, tool])),
+			options.onToolResult,
+			options.onToolConfirm,
+		),
+	);
 	if (options.onRemove) {
 		if (rows.length > 0) rows.push({ divider: true });
 		rows.push({

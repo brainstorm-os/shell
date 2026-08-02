@@ -16,6 +16,7 @@ import {
 	ANTHROPIC_PROVIDER_ID,
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
+	ActionTrustTier,
 	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
@@ -83,6 +84,7 @@ import {
 	isAppIconHit,
 	resolveAppIconInBundle,
 } from "./apps/app-icon-resolver";
+import { resolveAppName } from "./apps/app-name";
 import { maskAppWindowsForLock } from "./apps/app-window-lock";
 import { setAppsChangedTarget } from "./apps/apps-changed";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
@@ -300,6 +302,7 @@ import { mentionTargets, shouldNotify } from "./roster/mention-notifier";
 import { makeRosterServiceHandler } from "./roster/roster-service";
 import { deepLinkFromArgv, parseEntityDeepLink } from "./runtime/deep-link";
 import { createLaunchSetup } from "./runtime/launch-setup";
+import { resolveActionTrustTier } from "./runtime/launch-setup";
 import { SHELL_ACTION_CHANNEL, createMenuSetup } from "./runtime/menu-setup";
 import { createShortcutSetup } from "./runtime/shortcut-setup";
 import { collectIndexableEntities } from "./search/collect-indexable";
@@ -2820,6 +2823,19 @@ void app.whenReady().then(async () => {
 	// the search collector, the entities service, and the vault-entities
 	// aggregator so all three read the same cached `open("entities")`
 	// handle (DRY; was duplicated three times).
+	/** The active vault's apps registry — Tool-7 reads trust tier + display name
+	 *  from it, the same source the intents bus uses. Null (⇒ Sideloaded) when
+	 *  no vault is open. */
+	const getAppsRepoForActiveSession = async (): Promise<AppsRepository | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		try {
+			return new AppsRepository(await session.dataStores.open("registry"));
+		} catch {
+			return null;
+		}
+	};
+
 	const getEntitiesRepoForActiveSession = async (): Promise<EntitiesRepository | null> => {
 		const session = getActiveVaultSession();
 		if (!session) return null;
@@ -4187,6 +4203,19 @@ void app.whenReady().then(async () => {
 		"tools",
 		makeToolsServiceHandler({
 			getCallHost: () => appCallHost,
+			// Tool-7 / AS-4 — trust tier + display name come from the APPS
+			// REGISTRY, never the provider's manifest, so a sideloaded tool is
+			// quarantined under "More app actions" until the user promotes it and
+			// a contributor cannot claim its own tier. Same resolvers the intents
+			// bus uses, so the two contribution sources rank identically.
+			resolveTrustTier: async (appId) => {
+				const repo = await getAppsRepoForActiveSession();
+				return repo ? resolveActionTrustTier(repo, appId) : ActionTrustTier.Sideloaded;
+			},
+			resolveAppLabel: async (appId) => {
+				const repo = await getAppsRepoForActiveSession();
+				return repo ? resolveAppName(repo, appId) : undefined;
+			},
 			// SECURITY — a tool declaring `allowedTypes` on an entityRef argument
 			// is checked against the entity's REAL type from entities.db, never
 			// the caller's claim about it (per-type read isolation; the same rule

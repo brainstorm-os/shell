@@ -13,10 +13,14 @@
  */
 
 import {
+	AppToolSurface,
 	type ContributedAction,
 	type ContributedActionGroup,
+	appToolToContributedAction,
 	groupContributedActions,
 } from "@brainstorm-os/sdk-types";
+
+const APP_TOOL_MENU_SURFACE: string = AppToolSurface.Menu;
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseContributedActionsInput } from "./types";
 
@@ -52,18 +56,33 @@ export function useContributedActions(
 	useEffect(() => {
 		const current = inputRef.current;
 		const suggestActions = current.runtime?.services?.intents?.suggestActions;
-		if (!suggestActions || current.verbs.length === 0) {
+		const listTools = current.runtime?.services?.appTools?.list;
+		if (!suggestActions && !listTools) {
 			setActions([]);
 			return;
 		}
 		let cancelled = false;
-		void suggestActions({ target: current.target, verbs: current.verbs })
-			.then((next) => {
-				if (!cancelled) setActions([...next]);
-			})
-			.catch(() => {
-				if (!cancelled) setActions([]);
-			});
+		// Two sources, ONE ranked list. They are fetched together and merged
+		// before grouping so the AS-4 inline cap counts intents and tools
+		// against the same budget — two independently-capped blocks would be
+		// twice the menu, which is the rot the policy exists to stop.
+		const intents =
+			suggestActions && current.verbs.length > 0
+				? suggestActions({ target: current.target, verbs: current.verbs }).catch(
+						() => [] as readonly ContributedAction[],
+					)
+				: Promise.resolve<readonly ContributedAction[]>([]);
+		const tools = listTools
+			? listTools({
+					surface: APP_TOOL_MENU_SURFACE,
+					...(current.target.entityType ? { appliesTo: current.target.entityType } : {}),
+				})
+					.then((rows) => rows.map(appToolToContributedAction))
+					.catch(() => [] as ContributedAction[])
+			: Promise.resolve<ContributedAction[]>([]);
+		void Promise.all([intents, tools]).then(([a, b]) => {
+			if (!cancelled) setActions([...a, ...b]);
+		});
 		return () => {
 			cancelled = true;
 		};

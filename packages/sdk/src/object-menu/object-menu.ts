@@ -24,7 +24,7 @@
  * appears when the app passes an `onRemove` handler.
  */
 
-import type { ContributedAction } from "@brainstorm-os/sdk-types";
+import type { AppToolRecord, ContributedAction } from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
 import { openEntity } from "../open-entity";
 
@@ -118,6 +118,20 @@ export type ObjectMenuRuntime = {
 				target: { entityId?: string; entityType?: string; mime?: string; format?: string };
 				verbs: readonly string[];
 			}) => Promise<readonly ContributedAction[]>;
+		};
+		/** App tools (doc 78 / `Tool-7`). Present only when the host runtime
+		 *  exposes it; absent ⇒ no tool rows splice in and the menu degrades to
+		 *  its built-ins, exactly as it does without `suggestActions`. */
+		appTools?: {
+			list?: (input?: {
+				appliesTo?: string;
+				surface?: string;
+			}) => Promise<readonly AppToolRecord[]>;
+			call?: (input: {
+				tool: string;
+				args?: Record<string, unknown>;
+				confirmed?: boolean;
+			}) => Promise<{ value: unknown }>;
 		};
 		dashboard?: {
 			pin?: (t: { entityId: string }) => Promise<boolean>;
