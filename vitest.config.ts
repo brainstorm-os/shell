@@ -102,6 +102,11 @@ export default defineConfig({
 			// so the longer prefix wins (alias matching is order-sensitive),
 			// else `@brainstorm-os/sdk/resizable` rewrites to `…/index.ts/resizable`.
 			"@brainstorm-os/sdk/app-tool-args": resolve(__dirname, "packages/sdk/src/app-tool-args.ts"),
+			"@brainstorm-os/sdk/tool-outcome.css": resolve(
+				__dirname,
+				"packages/sdk/src/tool-outcome/tool-outcome.css",
+			),
+			"@brainstorm-os/sdk/tool-outcome": resolve(__dirname, "packages/sdk/src/tool-outcome/index.ts"),
 			"@brainstorm-os/sdk/app-tool-commands": resolve(
 				__dirname,
 				"packages/sdk/src/app-tool-commands.tsx",
