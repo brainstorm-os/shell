@@ -61,6 +61,16 @@ export type LoadResult = {
 	tailEntries: number;
 	/** When true, the last tail entry was corrupt (truncated / mismatched CRC) and was skipped. */
 	truncatedTail: boolean;
+	/** When true, the reconstructed doc holds structs Yjs CANNOT integrate:
+	 *  they name a `left`/`parent` from a client whose update never reached
+	 *  this file, so they sit in `pendingStructs` and the content they carry
+	 *  is invisible forever — no read path will ever surface it. Distinct
+	 *  from `truncatedTail`: every byte here is intact and CRC-clean, the
+	 *  hole is a *missing* update, not a damaged one. The 329 audit found 7
+	 *  Journal days in this state (a blank body under a "5 words" counter);
+	 *  the renderer-side cause is fixed in `@brainstorm-os/react-yjs`'s
+	 *  resolver, and this flag is how a survivor stops being silent. */
+	pendingStructs: boolean;
 };
 
 export class YDocStore {
@@ -101,7 +111,7 @@ export class YDocStore {
 			raw = await readFile(filePath);
 		} catch (error) {
 			if (isNotFound(error)) {
-				return { doc, tailEntries: 0, truncatedTail: false };
+				return { doc, tailEntries: 0, truncatedTail: false, pendingStructs: false };
 			}
 			throw error;
 		}
@@ -146,7 +156,7 @@ export class YDocStore {
 			tailEntries += 1;
 			offset = crcEnd;
 		}
-		return { doc, tailEntries, truncatedTail };
+		return { doc, tailEntries, truncatedTail, pendingStructs: hasPendingStructs(doc) };
 	}
 
 	/**
@@ -282,6 +292,14 @@ function assertMagic(buf: Buffer): void {
 	if (!buf.subarray(0, 4).equals(MAGIC)) {
 		throw new Error("ydoc: bad magic — not a YDOC file");
 	}
+}
+
+/** Structs Yjs parked because the update they depend on never arrived.
+ *  `Y.Doc.store.pendingStructs` is Yjs's own queue for them; it is non-null
+ *  exactly while the doc is missing bytes it needs. Read-only probe — the
+ *  caller decides what to do about it. */
+function hasPendingStructs(doc: Y.Doc): boolean {
+	return (doc.store as { pendingStructs?: unknown }).pendingStructs != null;
 }
 
 function isNotFound(error: unknown): boolean {

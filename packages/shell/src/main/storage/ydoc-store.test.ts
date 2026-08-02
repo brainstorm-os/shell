@@ -195,3 +195,51 @@ describe("YDocStore", () => {
 		expect(result.doc.getText("body").toString()).toBe("Hello from B");
 	});
 });
+
+/**
+ * F-486 — a persisted update that never arrived leaves every struct that
+ * depends on it permanently unintegratable. The file is byte-perfect (clean
+ * CRCs, no truncation) and the doc simply reads as missing that content, so
+ * the loss is invisible without an explicit probe. Reproduces the 7 Journal
+ * days the 329 audit found rendering a blank body under a "5 words" counter.
+ */
+describe("YDocStore — a missing update is detectable, not silent", () => {
+	let vaultDir: string;
+	let store: YDocStore;
+
+	beforeEach(async () => {
+		vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-ydoc-hole-"));
+		store = new YDocStore(vaultDir);
+	});
+
+	afterEach(async () => {
+		await rm(vaultDir, { recursive: true, force: true });
+	});
+
+	it("flags a doc whose tail skips an update its later structs depend on", async () => {
+		const src = new Y.Doc();
+		// The first update is the one the renderer shipped while the entity row
+		// did not exist yet: the canonical side rejected it and it was dropped,
+		// so it is deliberately never appended.
+		captureUpdate(src, () => src.getText("t").insert(0, "hello"));
+		const second = captureUpdate(src, () => src.getText("t").insert(5, " world"));
+		await store.appendUpdate("ent_hole", second);
+
+		const result = await store.load("ent_hole");
+		expect(result.truncatedTail).toBe(false); // the bytes on disk are fine
+		expect(result.pendingStructs).toBe(true); // …but the doc is incomplete
+		expect(result.doc.getText("t").toString()).toBe("");
+	});
+
+	it("does not flag a complete doc", async () => {
+		const src = new Y.Doc();
+		const first = captureUpdate(src, () => src.getText("t").insert(0, "hello"));
+		const second = captureUpdate(src, () => src.getText("t").insert(5, " world"));
+		await store.appendUpdate("ent_whole", first);
+		await store.appendUpdate("ent_whole", second);
+
+		const result = await store.load("ent_whole");
+		expect(result.pendingStructs).toBe(false);
+		expect(result.doc.getText("t").toString()).toBe("hello world");
+	});
+});

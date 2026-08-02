@@ -81,17 +81,18 @@ export function createYDocResolverAccessor(
 					throw error;
 				}
 			},
-			persist: (entityId, update) => {
-				// Symmetric with `load`: an editor can mount + emit edits before the
-				// entity's create commits (e.g. a journal day created lazily on first
-				// input). Persisting to a not-yet-created entity is benign — drop it
-				// rather than surface an unhandled rejection; the next persist after
-				// the create carries the full CRDT state. Genuine failures still throw.
-				void Promise.resolve(applyDoc(entityId, bytesToB64(update))).catch((error) => {
-					if (isNotFoundError(error)) return;
-					throw error;
-				});
-			},
+			persist: (entityId, update) =>
+				// Rejections are the resolver's business, not ours. An editor can
+				// mount + emit edits before the entity's create commits (a journal
+				// day is created lazily on first input) and `entities.applyDoc`
+				// answers "not found" until it does. Swallowing that DROPPED the
+				// update for good: a Yjs update is a diff, so the next persist does
+				// NOT re-carry it — the canonical doc keeps a permanent hole and
+				// every later struct that depends on it never integrates, which is
+				// how a Journal day rendered a blank body while its denormalised
+				// snippet still read "5 words". Surfacing the rejection lets the
+				// resolver re-ship the replica's full state, which heals it.
+				Promise.resolve(applyDoc(entityId, bytesToB64(update))),
 			release: (entityId) => {
 				void closeDoc(entityId);
 			},

@@ -169,17 +169,25 @@ function evictIfOverCap(): void {
 async function ensureDoc(
 	vaultPath: string,
 	entityId: string,
-): Promise<{ doc: Y.Doc; truncatedTail: boolean }> {
+): Promise<{ doc: Y.Doc; truncatedTail: boolean; pendingStructs: boolean }> {
 	const key = docKey(vaultPath, entityId);
 	const cached = docs.get(key);
 	if (cached) {
 		touch(key, cached);
-		return { doc: cached, truncatedTail: false };
+		return { doc: cached, truncatedTail: false, pendingStructs: false };
 	}
-	const { doc, truncatedTail } = await storeFor(vaultPath).load(entityId);
+	const { doc, truncatedTail, pendingStructs } = await storeFor(vaultPath).load(entityId);
 	docs.set(key, doc);
 	evictIfOverCap();
-	return { doc, truncatedTail };
+	if (pendingStructs) {
+		// Not recoverable here — the bytes those structs depend on were never
+		// written. Say so loudly: without this the doc just reads as empty and
+		// the loss is indistinguishable from a document nobody wrote in.
+		console.warn(
+			`[ydoc] ${entityId}: document has unintegratable structs (a persisted update is missing) — part of its content will not render`,
+		);
+	}
+	return { doc, truncatedTail, pendingStructs };
 }
 
 /** Test seam — pure observation of the LRU's current size. Exported so
@@ -242,9 +250,9 @@ type ListAssetManifestsArgs = { vaultPath: string; entityId: string };
 const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknown> = {
 	load: async (envelope) => {
 		const args = parseArgs<LoadArgs>(envelope, "load");
-		const { doc, truncatedTail } = await ensureDoc(args.vaultPath, args.entityId);
+		const { doc, truncatedTail, pendingStructs } = await ensureDoc(args.vaultPath, args.entityId);
 		const snapshot = Y.encodeStateAsUpdate(doc);
-		return { snapshotB64: bytesToBase64(snapshot), truncatedTail };
+		return { snapshotB64: bytesToBase64(snapshot), truncatedTail, pendingStructs };
 	},
 	applyUpdate: async (envelope) => {
 		const args = parseArgs<ApplyArgs>(envelope, "applyUpdate");
@@ -352,8 +360,10 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 	},
 	recover: async (envelope) => {
 		const args = parseArgs<LoadArgs>(envelope, "recover");
-		const { tailEntries, truncatedTail } = await storeFor(args.vaultPath).load(args.entityId);
-		return { tailEntries, truncatedTail };
+		const { tailEntries, truncatedTail, pendingStructs } = await storeFor(args.vaultPath).load(
+			args.entityId,
+		);
+		return { tailEntries, truncatedTail, pendingStructs };
 	},
 	// Stage 10.3a — append a pre-built MemberWrapPayload (HPKE on main, no
 	// crypto here) to the entity Y.Doc's wraps array, idempotent on the
