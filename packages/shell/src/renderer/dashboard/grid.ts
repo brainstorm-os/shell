@@ -273,27 +273,67 @@ export function widgetOverlapsIcons(
 	});
 }
 
-/** Move a widget DOWN until it clears every icon, then re-clamp to the surface.
+type WidgetRect = { x: number; y: number; w?: number; h?: number };
+
+/** Do two widget records overlap? Both live on the same `WIDGET_UNIT` grid
+ *  from the same origin, so the comparison is a direct cell-rect
+ *  intersection; spans floor at the minimum footprint, mirroring
+ *  `widgetOverlapsIcons`. */
+export function widgetsOverlap(a: WidgetRect, b: WidgetRect): boolean {
+	const aw = Math.max(WIDGET_MIN_W, a.w ?? WIDGET_MIN_W);
+	const ah = Math.max(WIDGET_MIN_H, a.h ?? WIDGET_MIN_H);
+	const bw = Math.max(WIDGET_MIN_W, b.w ?? WIDGET_MIN_W);
+	const bh = Math.max(WIDGET_MIN_H, b.h ?? WIDGET_MIN_H);
+	return a.x < b.x + bw && a.x + aw > b.x && a.y < b.y + bh && a.y + ah > b.y;
+}
+
+/** Move a widget DOWN until it clears every icon AND every already-placed
+ *  sibling widget, then re-clamp to the surface.
  *
  * Down rather than sideways because that is the dashboard's actual shape: icons
- * band across the top, widgets live beneath them. A widget already clear is
+ * band across the top, widgets live beneath them. Siblings are the widgets the
+ * caller has already reconciled, processed in persisted order, so two
+ * overlapping records separate deterministically (the earlier one stays put)
+ * and a rescue can chain — A pushes B pushes C. A widget already clear is
  * returned untouched (identity preserved, so the caller's `changed` check still
  * works). If no clear row exists within the surface the record is returned as
  * clamped — never dropped; an invisible widget is worse than an overlapping
  * one. */
-export function rescueWidgetFromIcons<T extends { x: number; y: number; w?: number; h?: number }>(
+export function rescueWidgetFromOverlaps<
+	T extends { x: number; y: number; w?: number; h?: number },
+>(
 	record: T,
 	icons: readonly { x: number; y: number }[],
+	siblings: readonly WidgetRect[],
 	surface: GridPoint,
 ): T {
-	if (icons.length === 0 || !widgetOverlapsIcons(record, icons)) return record;
+	const collides = (widget: WidgetRect) =>
+		(icons.length > 0 && widgetOverlapsIcons(widget, icons)) ||
+		siblings.some((sibling) => widgetsOverlap(widget, sibling));
+	if (!collides(record)) return record;
 	const spanH = Math.max(WIDGET_MIN_H, record.h ?? WIDGET_MIN_H);
 	const maxRow = maxWidgetOriginCell(surface.y, spanH);
 	for (let row = record.y + 1; row <= maxRow; row += 1) {
 		const candidate = { ...record, y: row };
-		if (!widgetOverlapsIcons(candidate, icons)) return candidate;
+		if (!collides(candidate)) return candidate;
 	}
 	return record;
+}
+
+/** Clamp a persisted record's footprint up to the widget floor,
+ *  identity-preserving. The resize grip already floors at the minimum, but a
+ *  record can be persisted below it (a footprint between the legacy-migration
+ *  ceiling and the floor slips through `migrateWidgetRecord`) and then renders
+ *  too narrow to show even its own title (clipped to "Rece…", 327 audit). */
+export function clampWidgetRecordSize<T extends { w?: number; h?: number }>(record: T): T {
+	const w = typeof record.w === "number" ? Math.max(WIDGET_MIN_W, Math.round(record.w)) : undefined;
+	const h = typeof record.h === "number" ? Math.max(WIDGET_MIN_H, Math.round(record.h)) : undefined;
+	if ((w === undefined || w === record.w) && (h === undefined || h === record.h)) return record;
+	return {
+		...record,
+		...(w !== undefined ? { w } : {}),
+		...(h !== undefined ? { h } : {}),
+	};
 }
 
 /** Snap a window-content point to the nearest widget cell (origin-relative). */

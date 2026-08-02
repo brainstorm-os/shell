@@ -909,6 +909,13 @@
 	pointer-events: none;
 }
 
+/* Zero-usage state — the affordance always renders (an unused property must
+ * not read like an uncounted one, 327 audit) but in a fainter face. */
+.data__usage-pill--unused {
+	color: color-mix(in srgb, var(--color-text-tertiary) 70%, transparent);
+	background: color-mix(in srgb, var(--color-text-tertiary) 6%, transparent);
+}
+
 .data__row-actions {
 	display: inline-flex;
 	align-items: center;

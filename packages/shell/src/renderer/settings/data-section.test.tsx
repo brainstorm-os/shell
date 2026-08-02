@@ -9,22 +9,51 @@
  * a single checked item that arrow keys move.
  */
 
+import { type Dictionary, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { BrainstormMenuProvider, getActiveMenuStore } from "@brainstorm-os/sdk/menus";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./use-properties-snapshot", () => ({
-	usePropertiesSnapshot: () => ({
+type SnapshotShape = {
+	properties: Record<string, PropertyDef>;
+	dictionaries: Record<string, Dictionary>;
+	usage: {
+		propertyUsage: Record<string, number>;
+		dictionaryUsage: Record<string, number>;
+	};
+};
+
+const emptySnapshot = (): SnapshotShape => ({
+	properties: {},
+	dictionaries: {},
+	usage: { propertyUsage: {}, dictionaryUsage: {} },
+});
+
+const snapshotMock = vi.hoisted(() => ({
+	current: {
 		properties: {},
 		dictionaries: {},
 		usage: { propertyUsage: {}, dictionaryUsage: {} },
-	}),
+	} as SnapshotShape,
+}));
+
+vi.mock("./use-properties-snapshot", () => ({
+	usePropertiesSnapshot: () => snapshotMock.current,
 }));
 
 import { DataSection } from "./data-section";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// jsdom has no ResizeObserver; the virtualized property list observes its
+// scroller for the live viewport height.
+class ResizeObserverStub {
+	observe(): void {}
+	unobserve(): void {}
+	disconnect(): void {}
+}
+(globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= ResizeObserverStub;
 
 type RowClick = (item: unknown, e: unknown, ctx: unknown) => void;
 
@@ -40,6 +69,7 @@ describe("DataSection — KBN-G-roles constructor radiogroups", () => {
 	let setProperty: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
+		snapshotMock.current = emptySnapshot();
 		setProperty = vi.fn();
 		(window as unknown as { brainstorm: unknown }).brainstorm = {
 			properties: {
@@ -188,5 +218,121 @@ describe("DataSection — KBN-G-roles constructor radiogroups", () => {
 		act(() => blue?.onSelect?.());
 		const dot = document.querySelector(".data__vocab-color-dot") as HTMLElement;
 		expect(dot.style.background).toContain("rgb(37, 99, 235)");
+	});
+});
+
+/**
+ * UsagePill zero-count affordance (327 audit): "some properties show a usage
+ * count, others nothing" — the pill returned `null` at zero, so an unused
+ * property was indistinguishable from an uncounted one. It now always
+ * renders: a quiet "Not used" face at zero, the numeric pill otherwise, for
+ * both property rows and dictionary-item rows.
+ */
+describe("DataSection — usage pill zero-count affordance (327 audit)", () => {
+	let host: HTMLDivElement;
+	let root: Root;
+
+	const textDef = (key: string, name: string): PropertyDef => ({
+		key,
+		name,
+		icon: null,
+		valueType: ValueType.Text,
+	});
+	const DEF_USED = textDef("prop_used", "Owner");
+	const DEF_UNUSED = textDef("prop_unused", "Zebra");
+	const DEF_SELECT: PropertyDef = {
+		...textDef("prop_status", "Status"),
+		vocabulary: { dictionaryId: "dict_1" },
+	};
+	const DICT: Dictionary = {
+		id: "dict_1",
+		name: "Status",
+		items: [
+			{ id: "item_used", label: "Open", icon: null, sortIndex: 0 },
+			{ id: "item_unused", label: "Closed", icon: null, sortIndex: 1 },
+		],
+	};
+
+	beforeEach(() => {
+		snapshotMock.current = {
+			properties: {
+				[DEF_USED.key]: DEF_USED,
+				[DEF_UNUSED.key]: DEF_UNUSED,
+				[DEF_SELECT.key]: DEF_SELECT,
+			},
+			dictionaries: { dict_1: DICT },
+			usage: {
+				propertyUsage: { prop_used: 3, prop_status: 1 },
+				dictionaryUsage: { item_used: 2 },
+			},
+		} satisfies SnapshotShape;
+		(window as unknown as { brainstorm: unknown }).brainstorm = {
+			properties: {
+				setProperty: vi.fn(),
+				setDictionary: vi.fn(),
+				removeProperty: vi.fn(),
+				entityTypes: vi.fn().mockResolvedValue([]),
+			},
+		};
+		host = document.createElement("div");
+		document.body.appendChild(host);
+		root = createRoot(host);
+		act(() =>
+			root.render(
+				<BrainstormMenuProvider>
+					<DataSection />
+				</BrainstormMenuProvider>,
+			),
+		);
+	});
+
+	afterEach(() => {
+		act(() => root.unmount());
+		host.remove();
+		snapshotMock.current = emptySnapshot();
+		(window as unknown as { brainstorm?: unknown }).brainstorm = undefined;
+	});
+
+	const pillFor = (name: string): HTMLElement | null => {
+		const rows = [...document.querySelectorAll(".data__row")];
+		const row = rows.find((r) => r.querySelector(".data__row-name")?.textContent === name);
+		return row?.querySelector<HTMLElement>(".data__usage-pill") ?? null;
+	};
+
+	it("a counted property keeps the numeric pill", () => {
+		const pill = pillFor("Owner");
+		expect(pill?.textContent).toBe("3");
+		expect(pill?.classList.contains("data__usage-pill--unused")).toBe(false);
+		expect(pill?.getAttribute("aria-label")).toBe("Used by 3 objects");
+	});
+
+	it("a zero-count property renders the Not used pill instead of nothing", () => {
+		const pill = pillFor("Zebra");
+		expect(pill).not.toBeNull();
+		expect(pill?.textContent).toBe("Not used");
+		expect(pill?.classList.contains("data__usage-pill--unused")).toBe(true);
+		expect(pill?.getAttribute("aria-label")).toBe("Used by 0 objects");
+	});
+
+	it("dictionary-item rows get the same zero-count treatment", async () => {
+		// Open the Status property's constructor — its vocab list carries a
+		// usage pill per dictionary item.
+		const row = [...document.querySelectorAll(".data__row")].find(
+			(r) => r.querySelector(".data__row-name")?.textContent === "Status",
+		);
+		const trigger = row?.querySelector<HTMLButtonElement>(".data__row-trigger");
+		expect(trigger).not.toBeNull();
+		await act(async () => {
+			trigger?.click();
+		});
+
+		const pills = [...document.querySelectorAll<HTMLElement>(".data__vocab-list .data__usage-pill")];
+		expect(pills).toHaveLength(2);
+		const used = pills.find((p) => p.textContent === "2");
+		const unused = pills.find((p) => p.textContent === "Not used");
+		expect(used?.classList.contains("data__usage-pill--unused")).toBe(false);
+		expect(used?.getAttribute("aria-label")).toBe("2 objects use this value");
+		expect(unused?.classList.contains("data__usage-pill--unused")).toBe(true);
+		expect(unused?.getAttribute("aria-label")).toBe("0 objects use this value");
 	});
 });

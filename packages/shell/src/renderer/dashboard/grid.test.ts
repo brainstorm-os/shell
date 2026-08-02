@@ -13,6 +13,7 @@ import {
 	cellToPoint,
 	clampCell,
 	clampWidgetOrigin,
+	clampWidgetRecordSize,
 	clampWidgetSize,
 	clampWidgetSizeToSurface,
 	getCellSize,
@@ -22,11 +23,12 @@ import {
 	migrateWidgetRecord,
 	pointToCell,
 	repackIcons,
-	rescueWidgetFromIcons,
+	rescueWidgetFromOverlaps,
 	widgetFootprint,
 	widgetOverlapsIcons,
 	widgetPointToCell,
 	widgetRectPx,
+	widgetsOverlap,
 } from "./grid";
 
 const VIEWPORT = { x: 1280, y: 720 };
@@ -313,18 +315,14 @@ describe("matchedWidgetSize (F-462)", () => {
  *
  * Widgets and icons are placed on ONE coordinate system — both are
  * `GRID_OUTER_MARGIN + cell * unit` from the same origin, and `WIDGET_UNIT ===
- * GRID_UNIT` — but nothing reconciles them. `clampWidgetOrigin` only clamps to
- * the SURFACE, and `DashboardWidgetsLayerProps` is `{ widgets }` with no icon
- * data at all, so a widget can be persisted directly on top of an app icon and
- * will render there forever.
+ * GRID_UNIT` — but nothing reconciled them. `clampWidgetOrigin` only clamps to
+ * the SURFACE, so a widget could be persisted directly on top of an app icon
+ * and would render there forever.
  *
  * The audit caught exactly that on the untouched dashboard: two widgets
  * painting over the app icon row, one narrow enough that its title clipped to
  * `Rece…`. It survived every POLISH-APP pass because it changes no colour
  * literal and no font size.
- *
- * These are SKIPPED, not failing: they specify the contract the fix must meet
- * rather than redefining today's behaviour as correct. Un-skip with the fix.
  */
 describe("widget ↔ icon collision (327 audit)", () => {
 	const surface = { x: 1440, y: 900 };
@@ -333,7 +331,7 @@ describe("widget ↔ icon collision (327 audit)", () => {
 		// The defect exactly as the audit saw it: a widget persisted at the
 		// icon-row origin rendered on top of the app icons forever.
 		const icons = [{ x: 0, y: 0 }];
-		const placed = rescueWidgetFromIcons({ x: 0, y: 0, w: 40, h: 20 }, icons, surface);
+		const placed = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
 		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
 		// Pushed DOWN, not sideways — icons band across the top, widgets sit
 		// beneath them.
@@ -345,7 +343,7 @@ describe("widget ↔ icon collision (327 audit)", () => {
 		const icons = [{ x: 0, y: 0 }];
 		const widget = { x: 0, y: 60, w: 40, h: 20 };
 		// Identity preserved, so the layer's `changed` check does not churn.
-		expect(rescueWidgetFromIcons(widget, icons, surface)).toBe(widget);
+		expect(rescueWidgetFromOverlaps(widget, icons, [], surface)).toBe(widget);
 	});
 
 	it("clears EVERY icon, not just the first", () => {
@@ -354,25 +352,133 @@ describe("widget ↔ icon collision (327 audit)", () => {
 			{ x: 0, y: 14 },
 			{ x: 0, y: 28 },
 		];
-		const placed = rescueWidgetFromIcons({ x: 0, y: 0, w: 40, h: 20 }, icons, surface);
+		const placed = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
 		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
 	});
 
 	it("ignores unplaced icons", () => {
 		// An unplaced icon has no position to collide with.
 		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromIcons(widget, [UNPLACED_ICON_POSITION], surface)).toBe(widget);
+		expect(rescueWidgetFromOverlaps(widget, [UNPLACED_ICON_POSITION], [], surface)).toBe(widget);
 	});
 
 	it("returns the record rather than dropping it when no clear row exists", () => {
 		// An invisible widget is worse than an overlapping one.
 		const icons = Array.from({ length: 200 }, (_, i) => ({ x: 0, y: i }));
 		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromIcons(widget, icons, { x: 400, y: 200 })).toBeTruthy();
+		expect(rescueWidgetFromOverlaps(widget, icons, [], { x: 400, y: 200 })).toBeTruthy();
 	});
 
 	it("does nothing when there are no icons at all", () => {
 		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromIcons(widget, [], surface)).toBe(widget);
+		expect(rescueWidgetFromOverlaps(widget, [], [], surface)).toBe(widget);
+	});
+});
+
+/**
+ * Widget ↔ widget collision (327 audit, second half). PR #448 rescued widgets
+ * from the ICON band, but nothing reconciled widgets against each other — two
+ * persisted records could still paint on top of one another forever. The layer
+ * now processes widgets in persisted order and rescues any record that overlaps
+ * an already-placed earlier sibling downward, same shape as the icon rescue.
+ */
+describe("widgetsOverlap", () => {
+	it("detects an intersecting pair and clears a disjoint one", () => {
+		const a = { x: 0, y: 0, w: 40, h: 20 };
+		expect(widgetsOverlap(a, { x: 10, y: 10, w: 40, h: 20 })).toBe(true);
+		// Edge-adjacent is NOT overlapping (half-open rects).
+		expect(widgetsOverlap(a, { x: 40, y: 0, w: 40, h: 20 })).toBe(false);
+		expect(widgetsOverlap(a, { x: 0, y: 20, w: 40, h: 20 })).toBe(false);
+	});
+
+	it("floors a missing footprint at the widget minimum", () => {
+		// A bare {x,y} record still occupies the minimum footprint.
+		expect(widgetsOverlap({ x: 0, y: 0 }, { x: WIDGET_MIN_W - 1, y: WIDGET_MIN_H - 1 })).toBe(true);
+		expect(widgetsOverlap({ x: 0, y: 0 }, { x: WIDGET_MIN_W, y: 0 })).toBe(false);
+	});
+});
+
+describe("widget ↔ widget collision (327 audit)", () => {
+	const surface = { x: 1440, y: 900 };
+
+	it("separates two overlapping widgets — the later one moves down, the earlier stays", () => {
+		const a = { x: 0, y: 40, w: 40, h: 20 };
+		const b = { x: 10, y: 45, w: 40, h: 20 };
+		const placed = rescueWidgetFromOverlaps(b, [], [a], surface);
+		expect(widgetsOverlap(placed, a)).toBe(false);
+		// Pushed DOWN past A's bottom edge, never sideways.
+		expect(placed.x).toBe(b.x);
+		expect(placed.y).toBe(a.y + a.h);
+	});
+
+	it("chains — A pushes B pushes C", () => {
+		const a = { x: 0, y: 40, w: 40, h: 20 };
+		const b = rescueWidgetFromOverlaps({ x: 0, y: 40, w: 40, h: 20 }, [], [a], surface);
+		const c = rescueWidgetFromOverlaps({ x: 0, y: 40, w: 40, h: 20 }, [], [a, b], surface);
+		expect(widgetsOverlap(b, a)).toBe(false);
+		expect(widgetsOverlap(c, a)).toBe(false);
+		expect(widgetsOverlap(c, b)).toBe(false);
+		expect(c.y).toBe(b.y + b.h);
+	});
+
+	it("clears icons AND earlier widgets in one pass", () => {
+		const icons = [{ x: 0, y: 0 }];
+		const a = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
+		const b = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [a], surface);
+		expect(widgetOverlapsIcons(b, icons)).toBe(false);
+		expect(widgetsOverlap(b, a)).toBe(false);
+	});
+
+	it("leaves an already-clear widget by identity", () => {
+		const a = { x: 0, y: 40, w: 40, h: 20 };
+		const clear = { x: 0, y: 70, w: 40, h: 20 };
+		expect(rescueWidgetFromOverlaps(clear, [], [a], surface)).toBe(clear);
+	});
+
+	it("returns the record rather than dropping it when no clear row exists", () => {
+		// A sibling covering the whole tiny surface leaves nowhere to go.
+		const blanket = { x: 0, y: 0, w: 200, h: 200 };
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		const placed = rescueWidgetFromOverlaps(widget, [], [blanket], { x: 400, y: 200 });
+		expect(placed).toEqual(widget);
+	});
+});
+
+/**
+ * Persisted-footprint floor (327 audit): the resize grip floors at the
+ * minimum, but a record with `LEGACY_WIDGET_MAX_CELL < w < WIDGET_MIN_W`
+ * slips past both `migrateWidgetRecord` (width above the legacy ceiling) and
+ * the gesture clamps (it never went through one) — and renders too narrow to
+ * show even its own title ("Rece…").
+ */
+describe("clampWidgetRecordSize", () => {
+	it("clamps a sub-minimum footprint up to the floor", () => {
+		expect(clampWidgetRecordSize({ x: 4, y: 50, w: 7, h: 3 })).toEqual({
+			x: 4,
+			y: 50,
+			w: WIDGET_MIN_W,
+			h: WIDGET_MIN_H,
+		});
+	});
+
+	it("returns a conforming record by identity", () => {
+		const rec = { x: 4, y: 50, w: 40, h: 20 };
+		expect(clampWidgetRecordSize(rec)).toBe(rec);
+		const atFloor = { x: 4, y: 50, w: WIDGET_MIN_W, h: WIDGET_MIN_H };
+		expect(clampWidgetRecordSize(atFloor)).toBe(atFloor);
+	});
+
+	it("clamps one axis without touching the other", () => {
+		expect(clampWidgetRecordSize({ x: 0, y: 0, w: 7, h: 20 })).toEqual({
+			x: 0,
+			y: 0,
+			w: WIDGET_MIN_W,
+			h: 20,
+		});
+	});
+
+	it("leaves a record with no size alone", () => {
+		const rec: { x: number; y: number; w?: number; h?: number } = { x: 4, y: 50 };
+		expect(clampWidgetRecordSize(rec)).toBe(rec);
 	});
 });

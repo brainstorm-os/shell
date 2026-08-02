@@ -1722,6 +1722,17 @@ body:not([data-inspector="open"]) .inspector {
 	flex-shrink: 0;
 }
 
+/* Per-option concept glyph (the Tasks/Contacts sort-menu convention). */
+.sort-menu__glyph {
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-dim);
+	flex-shrink: 0;
+}
+
 .sort-menu__item[data-active="true"] {
 	color: var(--text);
 	font-weight: var(--text-weight-medium);

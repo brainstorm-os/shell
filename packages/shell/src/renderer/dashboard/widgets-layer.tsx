@@ -36,10 +36,11 @@ import {
 	WIDGET_UNIT,
 	WidgetSize,
 	clampWidgetOrigin,
+	clampWidgetRecordSize,
 	clampWidgetSizeToSurface,
 	matchedWidgetSize,
 	migrateWidgetRecord,
-	rescueWidgetFromIcons,
+	rescueWidgetFromOverlaps,
 	widgetFootprint,
 	widgetPointToCell,
 	widgetRectPx,
@@ -337,12 +338,22 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 		// a rescued widget persists its on-surface position.
 		let changed = false;
 		const out: Record<string, DashboardWidget> = {};
+		// Persisted order = reconciliation order: the earlier record of an
+		// overlapping pair stays put, so the separation is deterministic.
+		const placed: DashboardWidget[] = [];
 		for (const [id, w] of Object.entries(merged)) {
-			// Surface first, then icons: a record rescued onto the surface can
-			// still land on the icon band, and one pushed clear of the icons must
-			// stay on the surface.
-			const clamped = rescueWidgetFromIcons(clampWidgetOrigin(w, surface), iconCells, surface);
+			// Size floor first (a sub-minimum footprint clips its own title),
+			// then surface, then collisions: a record rescued onto the surface
+			// can still land on the icon band or an earlier widget, and one
+			// pushed clear of those must stay on the surface.
+			const clamped = rescueWidgetFromOverlaps(
+				clampWidgetOrigin(clampWidgetRecordSize(w), surface),
+				iconCells,
+				placed,
+				surface,
+			);
 			out[id] = clamped;
+			placed.push(clamped);
 			if (clamped !== w) changed = true;
 		}
 		return changed ? out : merged;

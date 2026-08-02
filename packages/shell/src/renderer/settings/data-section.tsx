@@ -532,7 +532,7 @@ function PropertyRow({
 			>
 				<KindGlyph preset={preset} tint={tint} size="sm" title={t(PRESET_LABEL_KEY[preset])} />
 				<span className="data__row-name">{def.name}</span>
-				<UsagePill count={usageCount} kind="property" />
+				<UsagePill count={usageCount} kind={UsagePillKind.Property} />
 			</button>
 			<span className="data__row-actions">
 				<IconButton
@@ -546,21 +546,31 @@ function PropertyRow({
 	);
 }
 
-/** Compact "used by N" affordance — empty span when count is zero so the
- *  row chrome stays still. Same chrome for property + dictionary-item
- *  usage so the visual language is consistent across the data section. */
-function UsagePill({ count, kind }: { count: number; kind: "property" | "dictionary-item" }) {
-	if (count <= 0) return null;
+enum UsagePillKind {
+	Property = "property",
+	DictionaryItem = "dictionary-item",
+}
+
+/** Compact "used by N" affordance. A zero count renders a quiet "Not used"
+ *  pill in a fainter face rather than nothing — rendering nothing left an
+ *  unused property indistinguishable from one whose usage wasn't counted
+ *  (327 audit). Same chrome for property + dictionary-item usage so the
+ *  visual language is consistent across the data section. */
+function UsagePill({ count, kind }: { count: number; kind: UsagePillKind }) {
 	const labelKey =
-		kind === "property"
+		kind === UsagePillKind.Property
 			? "shell.settings.data.properties.usagePill"
 			: "shell.settings.data.properties.itemUsagePill";
+	const label = t(labelKey, { count: Math.max(0, count) });
+	if (count <= 0) {
+		return (
+			<span className="data__usage-pill data__usage-pill--unused" title={label} aria-label={label}>
+				{t("shell.settings.data.properties.usagePillNotUsed")}
+			</span>
+		);
+	}
 	return (
-		<span
-			className="data__usage-pill"
-			title={t(labelKey, { count })}
-			aria-label={t(labelKey, { count })}
-		>
+		<span className="data__usage-pill" title={label} aria-label={label}>
 			{count}
 		</span>
 	);
@@ -1149,7 +1159,7 @@ function VocabularyEditor({
 								onChange={(e) => renameItem(it.id, e.target.value)}
 								aria-label={it.label}
 							/>
-							<UsagePill count={dictionaryUsage[it.id] ?? 0} kind="dictionary-item" />
+							<UsagePill count={dictionaryUsage[it.id] ?? 0} kind={UsagePillKind.DictionaryItem} />
 							<div className="data__vocab-actions">
 								<IconButton
 									icon={IconName.CaretUp}

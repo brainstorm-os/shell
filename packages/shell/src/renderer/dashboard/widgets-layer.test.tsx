@@ -130,6 +130,40 @@ describe("DashboardWidgetsLayer — apps:changed refresh (F-380)", () => {
 		expect(left).toBe(336);
 	});
 
+	it("separates two persisted widgets that overlap each other (327 audit)", async () => {
+		// PR #448 rescued widgets from the icon band, but two widget records
+		// could still be persisted on top of one another and render that way
+		// forever. The layer reconciles in persisted order: the earlier record
+		// stays put, the later one is pushed DOWN past it.
+		const a: DashboardWidget = { ...WIDGET, x: 0, y: 10 };
+		const b: DashboardWidget = { ...WIDGET, kind: "other", x: 10, y: 15 };
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_a: a, widget_b: b }} />);
+		});
+		await flush();
+
+		const cardA = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_a"]');
+		const cardB = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_b"]');
+		expect(cardA?.style.top).toBe("96px"); // 16 + 10*8 — untouched
+		// B clears A's bottom edge (row 30): 16 + 30*8; its column is untouched.
+		expect(cardB?.style.top).toBe("256px");
+		expect(cardB?.style.left).toBe("96px");
+	});
+
+	it("renders a sub-minimum persisted footprint at the widget floor (327 audit)", async () => {
+		// w=7 sits between the legacy-migration ceiling (6) and the floor (8):
+		// it slips through `migrateWidgetRecord` and rendered 56px wide — too
+		// narrow for its own title ("Rece…").
+		const narrow: DashboardWidget = { ...WIDGET, x: 0, y: 50, w: 7 };
+		await act(async () => {
+			root.render(<DashboardWidgetsLayer widgets={{ widget_1: narrow }} />);
+		});
+		await flush();
+
+		const card = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_1"]');
+		expect(card?.style.width).toBe("64px"); // WIDGET_MIN_W (8) * 8px
+	});
+
 	it("keeps a widget in place when shrunk to the minimum footprint, through the persistence echo (F-379)", async () => {
 		// Mira's original gesture: shrink as small as it goes. The position must
 		// survive both the optimistic update AND the store echo round-trip (the
