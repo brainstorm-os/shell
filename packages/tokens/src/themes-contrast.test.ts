@@ -13,7 +13,7 @@ import { flattenTokens } from "./tokens";
  * `accent.default`) and this test turns the decision into an enforced
  * invariant: every `CONTRAST_PAIRS` entry — primary/secondary/tertiary text,
  * link, accent-on-surface, accent-text-on-accent, inverse, chrome — must meet
- * its required ratio in all 12 themes. A regression (a new theme, or a token
+ * its required ratio in every built-in theme. A regression (a new theme, or a token
  * tweak that darkens a background) fails here, not in the field.
  */
 describe("built-in theme contrast — WCAG AA ratchet", () => {
@@ -24,7 +24,7 @@ describe("built-in theme contrast — WCAG AA ratchet", () => {
 			// Surface the offending pairs + ratios in the failure message. Zero
 			// deferrals — 12.16 fixed accent-as-text (`accent.onSurface`) and 12.17
 			// fixed white-text-on-accent-fill (`accent.onFill`); every pair now
-			// clears its bar in all 12 themes.
+			// clears its bar in every built-in theme.
 			const detail = issues
 				.map((issue) => `${issue.pairId} ${issue.ratio.toFixed(2)}:1 < ${issue.required}:1`)
 				.join(", ");

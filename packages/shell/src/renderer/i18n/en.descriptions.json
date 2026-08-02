@@ -462,6 +462,8 @@
   "shell.settings.themes.mint.label": "Display name of the 'Mint' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.nord.description": "Description of the 'Nord' theme (arctic blue-grey surfaces, frost-blue accent) in the theme picker.",
   "shell.settings.themes.nord.label": "Display name of the 'Nord' theme. Very short; a proper noun, may stay untranslated.",
+  "shell.settings.themes.porcelain.description": "Description of the 'Porcelain' theme (flat paper-white surfaces, cornflower-blue accent) in the theme picker.",
+  "shell.settings.themes.porcelain.label": "Display name of the 'Porcelain' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.rose.description": "Description of the 'Rose' theme (blush surfaces, warm rose accent) in the theme picker.",
   "shell.settings.themes.rose.label": "Display name of the 'Rose' theme. Very short; a proper noun, may stay untranslated.",
   "shell.settings.themes.slate.description": "Description of the 'Slate' theme (neutral-grey surfaces, indigo accent) in the theme picker.",
