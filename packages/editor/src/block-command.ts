@@ -60,5 +60,19 @@ export type BlockCommand = {
 	/** When true, the surface renders this command with a destructive
 	 *  affordance (red tint in the action menu, etc.). */
 	destructive?: boolean;
-	run: (ctx: CommandContext) => void;
+	/** May return a promise (Tool-7b).
+	 *
+	 * Every built-in command is synchronous — it edits the Lexical tree and
+	 * returns. A CONTRIBUTED command is not: an app tool crosses the broker,
+	 * may wait on a shell-owned approval, and refuses with a NAMED error
+	 * (`Denied` · `NeedsConfirm` · `Busy` · `TooLarge` · `Timeout` ·
+	 * `ProviderError`). A `void` return had nowhere to put any of that, which
+	 * is why the editor surfaces could not carry app tools at all.
+	 *
+	 * Surfaces MUST NOT await this — the menu closes on activation either way —
+	 * but they must not drop the promise either: a swallowed refusal is a menu
+	 * row that silently does nothing. A contributed command reports its own
+	 * outcome through the reporter it was built with, so the surface only has
+	 * to avoid an unhandled rejection. */
+	run: (ctx: CommandContext) => unknown;
 };

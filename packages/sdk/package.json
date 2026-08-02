@@ -114,6 +114,7 @@
     "./templates": "./src/templates.ts",
     "./entity-body-copy": "./src/entity-body-copy.ts",
     "./app-tool-args": "./src/app-tool-args.ts",
+    "./app-tool-commands": "./src/app-tool-commands.tsx",
     "./property-ui/pure": "./src/property-ui-pure.ts",
     "./property-ui/dictionary-editor": "./src/property-ui/dictionary-editor.tsx",
     "./property-ui": "./src/property-ui.ts",

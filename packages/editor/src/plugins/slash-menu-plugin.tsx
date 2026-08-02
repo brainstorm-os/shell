@@ -107,7 +107,11 @@ export function SlashMenuPlugin({ commands = [] }: SlashMenuPluginProps = {}) {
 			// lost and the block never transforms. Deferring runs the command after
 			// the Enter update commits, against a settled selection — identical to
 			// the click path (which is already top-level).
-			queueMicrotask(() => command.run({ editor }));
+			queueMicrotask(() => {
+				// See the gutter: async contributed commands report themselves, but
+				// the promise must not be dropped into an unhandled rejection.
+				void Promise.resolve(command.run({ editor })).catch(() => undefined);
+			});
 		},
 		[editor, state],
 	);
