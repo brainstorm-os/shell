@@ -4,6 +4,9 @@
  * from the shared settings + Button/TextField primitives. */
 
 .settings__section.backup-migration {
+	/* One var couples the icon chip's box to the content indent below it —
+	 * the old literal 32px lived in two places and drifted on resize. */
+	--backup-icon-chip: 32px;
 	gap: var(--space-3);
 }
 
@@ -15,14 +18,11 @@
 	background: var(--color-surface-default);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-lg);
+	/* No hover elevation: these cards aren't clickable — a border+shadow
+	 * lift on a non-interactive surface promises an affordance that isn't
+	 * there (strict-design pass 2026-08-02). The controls inside carry
+	 * their own hover states. */
 	box-shadow: var(--shadow-sm);
-	transition: border-color var(--motion-duration-normal) var(--motion-easing-standard),
-		box-shadow var(--motion-duration-normal) var(--motion-easing-standard);
-}
-
-.backup-migration__group:hover {
-	border-color: var(--color-border-default);
-	box-shadow: var(--shadow-md);
 }
 
 /* The flow's header grid: icon chip | title | action on one centered baseline,
@@ -55,8 +55,8 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 32px;
-	height: 32px;
+	width: var(--backup-icon-chip);
+	height: var(--backup-icon-chip);
 	border-radius: var(--radius-md);
 	background: var(--color-accent-subtle);
 	color: var(--color-accent-strong);
@@ -87,7 +87,7 @@
  * report, errors) hangs at the title's left edge — aligned with the copy, not
  * the icon chip — so the card reads as one indented block per flow. */
 .backup-migration__group > :not(.backup-migration__group-head) {
-	margin-inline-start: calc(32px + var(--space-3));
+	margin-inline-start: calc(var(--backup-icon-chip) + var(--space-3));
 }
 
 .backup-migration__stack {

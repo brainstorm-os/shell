@@ -150,7 +150,7 @@ function TrustedSitesGroup({
 			<p className="network-egress__hint">{t("shell.settings.webPrivacy.trust.summary")}</p>
 			<form className="browser-privacy__trust-add" onSubmit={(e) => void submit(e)}>
 				<TextField
-					size={TextFieldSize.Sm}
+					size={TextFieldSize.Md}
 					type="text"
 					inputMode="url"
 					spellCheck={false}

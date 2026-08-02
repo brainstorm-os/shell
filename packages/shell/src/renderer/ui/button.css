@@ -61,7 +61,6 @@
  * to a flat slab (owner report 2026-07-18). */
 .button--glass:disabled,
 .button--primary:disabled,
-.button--neutral:disabled,
 .button--destructive:disabled {
 	--gloss-top: var(--color-surface-raised);
 	--gloss-bottom: var(--color-surface-raised);
@@ -80,9 +79,6 @@
 .button--primary:disabled::before,
 .button--primary:disabled > .button__gloss::before,
 .button--primary:disabled > .button__gloss::after,
-.button--neutral:disabled::before,
-.button--neutral:disabled > .button__gloss::before,
-.button--neutral:disabled > .button__gloss::after,
 .button--destructive:disabled::before,
 .button--destructive:disabled > .button__gloss::before,
 .button--destructive:disabled > .button__gloss::after {
@@ -100,7 +96,10 @@
  * drift; padding governs width only (border-box). */
 .button--md {
 	height: var(--control-height-md);
-	padding: 0 var(--space-2);
+	/* space-3, not space-2 — an 8px inset on a 32px pill reads cramped; the
+	 * label needs the same breathing room the lg face gets proportionally
+	 * (owner call 2026-08-02). Width-only; heights stay on the control scale. */
+	padding: 0 var(--space-3);
 	font-size: var(--text-size-md);
 }
 
@@ -142,7 +141,7 @@
 	color: var(--color-state-error);
 }
 
-/* Glossy solid fills — shared by Glass, Primary, Neutral and Destructive.
+/* Glossy solid fills — shared by Glass, Primary and Destructive.
  *
  * The FACE is a saturated theme-driven TWO-colour gradient,
  * `--gloss-top` → `--gloss-bottom`, top-to-bottom. There is deliberately
@@ -155,9 +154,7 @@
  *   • .button__gloss::after  — bottom contact line          (shine-bottom)
  *
  * Glass + Primary share the same theme-accent face (the gradient is
- * theme-dependent — every theme defines its own two stops). Neutral uses
- * the inverse surface (dark chip on light themes, light on dark) so it
- * recedes next to the accent CTA without reading as a flat slab.
+ * theme-dependent — every theme defines its own two stops).
  * Destructive derives a red face from `state.error`. Hover is animated
  * by the speculars + box-shadow ONLY — the face gradient is held constant
  * (CSS can't interpolate between two `linear-gradient()`s; swapping it
@@ -165,7 +162,6 @@
  * so they hug the inner border. */
 .button--glass,
 .button--primary,
-.button--neutral,
 .button--destructive {
 	position: relative;
 	z-index: 1;
@@ -193,19 +189,42 @@
 	--gloss-bottom: var(--color-gloss-bottom);
 }
 
-/* Neutral face — the quiet filled secondary (dialog Cancel, toolbar
- * "Install from…"). POLISH-DSN-10: the original face rode the inverse
- * surface at full strength, which on light themes is a near-black slab —
- * the heaviest element on the surface, out-weighing the accent primary it
- * sits beside. It now rides the theme surface with a light inverse TINT
- * (stronger at the bottom so the specular stack still has travel), and
- * the ink is the theme's own text — quiet next to a glossy accent
- * primary in both appearances. */
+/* Neutral face — the quiet flat secondary (dialog Cancel, the Settings
+ * per-row chooser actions). NOT glossy: the specular inverse-tint face it
+ * carried until 2026-08-02 read as a heavy smudged chip on the settings
+ * glass and out-shouted the copy beside it (owner report). It now rides
+ * the shared FIELD face (`--color-field-*`, per #437) so it matches the
+ * inputs/selects it sits next to in both theme families — glossy themes
+ * keep the elevated bordered box, flat themes get the borderless tinted
+ * chip — and matches the app-side `.bs-btn--neutral`, which was always
+ * flat. Hover layers the interactive tint OVER the face (a replacement
+ * reads backwards on a flat theme whose chip is darker than the hover
+ * alpha — same rule as `.bs-input`). */
 .button--neutral {
-	--gloss-top: var(--color-gloss-neutral-top);
-	--gloss-bottom: var(--color-gloss-neutral-bottom);
+	background: var(--color-field-background);
+	border-color: var(--color-field-border);
 	color: var(--color-text-primary);
-	text-shadow: none;
+}
+
+.button--neutral:hover:not(:disabled) {
+	background:
+		linear-gradient(var(--color-interactive-hover), var(--color-interactive-hover)),
+		var(--color-field-background);
+}
+
+.button--neutral:active:not(:disabled) {
+	background:
+		linear-gradient(var(--color-interactive-active), var(--color-interactive-active)),
+		var(--color-field-background);
+}
+
+.button--neutral:disabled {
+	background: var(--color-field-background);
+	border-color: var(--color-border-subtle);
+	color: var(--color-text-tertiary);
+	/* Full opacity for the same F-410 reason as the glossy faces below —
+	 * the tertiary ink + subtle border already say "inactive". */
+	opacity: 1;
 }
 
 /* Destructive face — theme-owned stops (the glossy themes derive them
@@ -223,8 +242,6 @@
 .button--glass > .button__icon,
 .button--primary > .button__label,
 .button--primary > .button__icon,
-.button--neutral > .button__label,
-.button--neutral > .button__icon,
 .button--destructive > .button__label,
 .button--destructive > .button__icon {
 	position: relative;
@@ -237,9 +254,6 @@
 .button--primary::before,
 .button--primary > .button__gloss::before,
 .button--primary > .button__gloss::after,
-.button--neutral::before,
-.button--neutral > .button__gloss::before,
-.button--neutral > .button__gloss::after,
 .button--destructive::before,
 .button--destructive > .button__gloss::before,
 .button--destructive > .button__gloss::after {
@@ -262,7 +276,6 @@
  * reads as a faint sheen, never an opaque top band. */
 .button--glass::before,
 .button--primary::before,
-.button--neutral::before,
 .button--destructive::before {
 	top: -4px;
 	width: 56%;
@@ -275,7 +288,6 @@
 /* Bottom reflected glow. */
 .button--glass > .button__gloss::before,
 .button--primary > .button__gloss::before,
-.button--neutral > .button__gloss::before,
 .button--destructive > .button__gloss::before {
 	bottom: -4px;
 	width: 60%;
@@ -288,7 +300,6 @@
 /* Bottom contact hairline. */
 .button--glass > .button__gloss::after,
 .button--primary > .button__gloss::after,
-.button--neutral > .button__gloss::after,
 .button--destructive > .button__gloss::after {
 	bottom: 0;
 	width: 72%;
@@ -305,7 +316,6 @@
  * colour for the lift glow; the two insets are held constant. */
 .button--glass:hover:not(:disabled),
 .button--primary:hover:not(:disabled),
-.button--neutral:hover:not(:disabled),
 .button--destructive:hover:not(:disabled) {
 	box-shadow:
 		0 8px 20px -2px var(--gloss-bottom),
@@ -317,14 +327,12 @@
 
 .button--glass:hover:not(:disabled)::before,
 .button--primary:hover:not(:disabled)::before,
-.button--neutral:hover:not(:disabled)::before,
 .button--destructive:hover:not(:disabled)::before {
 	opacity: 0.85;
 }
 
 .button--glass:hover:not(:disabled) > .button__gloss::before,
 .button--primary:hover:not(:disabled) > .button__gloss::before,
-.button--neutral:hover:not(:disabled) > .button__gloss::before,
 .button--destructive:hover:not(:disabled) > .button__gloss::before {
 	opacity: 0.9;
 	transform: translateX(-50%) scale(1.25);
@@ -332,7 +340,6 @@
 
 .button--glass:hover:not(:disabled) > .button__gloss::after,
 .button--primary:hover:not(:disabled) > .button__gloss::after,
-.button--neutral:hover:not(:disabled) > .button__gloss::after,
 .button--destructive:hover:not(:disabled) > .button__gloss::after {
 	opacity: 1;
 }
@@ -343,9 +350,6 @@
 .button--primary:disabled::before,
 .button--primary:disabled > .button__gloss::before,
 .button--primary:disabled > .button__gloss::after,
-.button--neutral:disabled::before,
-.button--neutral:disabled > .button__gloss::before,
-.button--neutral:disabled > .button__gloss::after,
 .button--destructive:disabled::before,
 .button--destructive:disabled > .button__gloss::before,
 .button--destructive:disabled > .button__gloss::after {
@@ -402,7 +406,7 @@
 	font-size: 1.15em;
 }
 
-.button:not(.button--glass):not(.button--primary):not(.button--neutral):not(.button--destructive) {
+.button:not(.button--glass):not(.button--primary):not(.button--destructive) {
 	position: relative;
 }
 
