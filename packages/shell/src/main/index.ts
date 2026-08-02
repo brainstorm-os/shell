@@ -358,8 +358,10 @@ import { getRestoreEngine, setRestoreEngine } from "./sync/restore-wiring";
 import { SelectiveSyncStore, selectiveSyncPolicyPath } from "./sync/selective-sync-store";
 import { ThemePreviewService, makeThemeServiceHandler } from "./theme/theme-preview-service";
 import { AppCallHost } from "./tools/app-call-host";
+import { getToolApprovalHost } from "./tools/tool-approval-host";
 import { makeToolsServiceHandler } from "./tools/tools-service";
 import { wireAppCallIpc } from "./tools/wire-app-call";
+import { wireToolApprovalIpc } from "./tools/wire-tool-approval";
 import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
 import { getOsBadgeAggregator } from "./ui/os-badge";
@@ -4204,6 +4206,7 @@ void app.whenReady().then(async () => {
 		"tools",
 		makeToolsServiceHandler({
 			getCallHost: () => appCallHost,
+			getApprovalHost: () => toolApprovalHost,
 			// Tool-5 — the user's per-tool approvals, so an app UPDATE that
 			// rewrites a tool re-prompts instead of inheriting the friction its
 			// old description earned.
@@ -5841,8 +5844,16 @@ void app.whenReady().then(async () => {
 	});
 	registerIntentHandlers(() => launchSetup.getIntents());
 
+	let dashboardWebContentsId: number | null = null;
 	const promptHost = getCapabilityPromptHost();
 	wireCapabilityPromptIpc(promptHost);
+
+	// Tool-8 — the shell-owned approval for a tool call. Same shape as the
+	// capability prompt: a pure host posts the IPC, the wire dispatches the
+	// reply, and ONLY the dashboard may answer (an app answering would be the
+	// app approving itself).
+	const toolApprovalHost = getToolApprovalHost();
+	wireToolApprovalIpc(toolApprovalHost, (id) => dashboardWebContentsId === id);
 
 	// OpenRes-1c — first-use OS-handoff consent prompt. Mirrors the
 	// capability-prompt host: pure host posts the IPC, ipcMain wire
@@ -5976,6 +5987,8 @@ void app.whenReady().then(async () => {
 	shortcuts.attach(dashboardWindow.webContents);
 	wireDashboardLinkRouting(dashboardWindow.webContents);
 	promptHost.setDashboard(dashboardWindow.webContents);
+	toolApprovalHost.setDashboard(dashboardWindow.webContents);
+	dashboardWebContentsId = dashboardWindow.webContents.id;
 	osHandoffPromptHost.setDashboard(dashboardWindow.webContents);
 	openWithPromptHost.setDashboard(dashboardWindow.webContents);
 	dashboardWindow.once("ready-to-show", () => bootStage("dashboard-window-shown"));
@@ -5983,6 +5996,8 @@ void app.whenReady().then(async () => {
 	dashboardWindow.webContents.once("did-finish-load", () => bootStage("dashboard-renderer-paint"));
 	dashboardWindow.on("closed", () => {
 		promptHost.setDashboard(null);
+		toolApprovalHost.setDashboard(null);
+		dashboardWebContentsId = null;
 		osHandoffPromptHost.setDashboard(null);
 		openWithPromptHost.setDashboard(null);
 	});

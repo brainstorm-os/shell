@@ -57,6 +57,7 @@ import type { Envelope } from "../../ipc/envelope";
 import { APP_ID_PATTERN } from "../apps/manifest";
 import type { AppToolsRepository } from "../storage/registry-repo/app-tools-repo";
 import { AppCallFailure, type AppCallHost } from "./app-call-host";
+import { type ToolApprovalHost, approvalReasonFor } from "./tool-approval-host";
 import { providerSatisfiesEffect } from "./tool-effect-gate";
 
 /** Held by a PROVIDER. Unscoped: it is the right to be callable at all, not
@@ -138,6 +139,11 @@ export type ToolsCallOptions = {
 	 *  declaring `allowedTypes` may be called; the caller's claim about a
 	 *  referenced object's type is never trusted. */
 	resolveEntityType?: (entityId: string) => Promise<string | null>;
+	/** The shell-owned approval prompt (Tool-8). Absent = nothing can be
+	 *  approved, so a call needing approval refuses rather than proceeding. */
+	getApprovalHost?: () => ToolApprovalHost | null;
+	/** Provider display name for the approval prompt. */
+	resolveAppLabel?: (appId: string) => string | undefined | Promise<string | undefined>;
 	/** The user's per-tool approval record (Tool-5). Absent = no rug-pull check,
 	 *  which is the pre-Tool-5 behaviour and only used by callers that have no
 	 *  registry (tests). */
@@ -155,9 +161,10 @@ export type ToolApprovals = {
 export type ToolsCallInput = {
 	tool: string;
 	args?: Record<string, unknown>;
-	/** The caller asserting a human already approved this call. Only consulted
-	 *  when friction says Confirm; it is not authorization. */
-	confirmed?: boolean;
+	/** REMOVED in Tool-8. A caller cannot assert on a human's behalf; the shell
+	 *  asks. Still parsed and IGNORED so an older caller sending it neither
+	 *  breaks nor gains anything. */
+	confirmed?: never;
 };
 
 function parseCallInput(raw: unknown): ToolsCallInput {
@@ -180,7 +187,7 @@ function parseCallInput(raw: unknown): ToolsCallInput {
 	return {
 		tool: a.tool,
 		args: (a.args as Record<string, unknown>) ?? {},
-		confirmed: a.confirmed === true,
+		// Deliberately not read — see `confirmed` on the type.
 	};
 }
 
@@ -295,7 +302,7 @@ export async function handleToolsCall(
 	if (!parsed) throw makeError("Invalid", "tools.call: tool must be an app.<appId>.<name> id");
 
 	// Fail CLOSED into the *more* restricted class: `UserGesture` is the laxer
-	// branch (it is what lets `confirmed` be honoured at all), so it is granted
+	// branch (it is the one that can auto-run at all), so it is granted
 	// only to a principal that is a WELL-FORMED APP ID. Anything else — an agent
 	// fingerprint, a malformed one, or something unrecognisable — is an agent.
 	//
@@ -437,24 +444,33 @@ export async function handleToolsCall(
 			? decideAppToolFriction(tool.effect, initiator)
 			: ToolFrictionDecision.Confirm;
 	if (friction === ToolFrictionDecision.Confirm) {
-		// `confirmed` is a CALLER ASSERTION that a human already approved this.
-		// Sound for an app, where the assertion is backed by the gesture that
-		// reached the app's own code; NOT sound for an agent, which would be
-		// approving itself. So an agent-initiated call that needs confirmation is
-		// refused outright rather than self-approved. Making it reachable means
-		// minting a shell-owned single-use approval (Tool-8's proposal tray), not
-		// trusting a boolean off the wire.
-		const agentSelfApproving = initiator === ToolCallInitiator.Agent;
-		if (agentSelfApproving || input.confirmed !== true) {
-			const reason = agentSelfApproving
-				? "agent-needs-approval"
-				: approval === AppToolApprovalState.Changed
-					? "declaration-changed"
-					: approval === AppToolApprovalState.New
-						? "never-approved"
-						: "needs-confirm";
-			record("refused", reason, argKeys);
-			throw makeError("NeedsConfirm", `tools.call: ${input.tool} needs confirmation before it runs`);
+		// Tool-8 — the SHELL asks, in the dashboard the user trusts, and the
+		// answer never passes through the caller. `Tool-4`'s `confirmed: true`
+		// was a caller assertion about a human it could not prove: sound for an
+		// app backed by a real gesture, unsound for an agent (which would be
+		// approving itself) and unverifiable from a compromised one. Removing it
+		// closes both, and lets an AGENT-initiated call be approved at all —
+		// previously it was refused outright, which made agent tool-calling dead.
+		const approver = options.getApprovalHost?.();
+		if (!approver) {
+			record("refused", "no-approval-host", argKeys);
+			throw makeError(
+				"NeedsConfirm",
+				`tools.call: ${input.tool} needs approval and none can be asked`,
+			);
+		}
+		const accepted = await approver
+			.request({
+				callerAppId: envelope.app,
+				tool,
+				providerLabel: (await options.resolveAppLabel?.(tool.appId)) ?? tool.appId,
+				reason: approvalReasonFor(approval),
+				agentInitiated: initiator === ToolCallInitiator.Agent,
+			})
+			.catch(() => false);
+		if (!accepted) {
+			record("refused", `declined:${approvalReasonFor(approval)}`, argKeys);
+			throw makeError("NeedsConfirm", `tools.call: ${input.tool} was not approved`);
 		}
 	}
 
@@ -480,6 +496,8 @@ export async function handleToolsCall(
 		// worked — an approval recorded ahead of a failed dispatch would bless a
 		// surface the user never saw function. Blessing the whole app on one
 		// approval is the hole the MCP path documents.
+		// A Confirm that reached here means the SHELL asked and a human said yes,
+		// so this is a real approval to record — not a caller's claim.
 		if (approvals && friction === ToolFrictionDecision.Confirm) {
 			try {
 				approvals.approve(envelope.app, tool.id, tool.appId, appToolFingerprint(tool), now());

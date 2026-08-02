@@ -75,10 +75,6 @@ export type OpenObjectMenuOptions = Omit<BuildObjectMenuOptions, "pinned" | "lab
 	 *  that renders tool rows SHOULD supply one; without it a refusal surfaces
 	 *  as an unhandled rejection rather than silence. */
 	onToolResult?: ObjectMenuToolReporter;
-	/** Ask a human to approve a tool whose declared effect requires it (today:
-	 *  `external`). Without one, such tools are not offered at all rather than
-	 *  offered and always refused. */
-	onToolConfirm?: ObjectMenuToolConfirm;
 	/** The ⋯ / trigger element the menu drops from. When given, the menu
 	 *  anchors to its live rect, right-aligns to its edge, and the element
 	 *  shows its open state. Omit for cursor-anchored (right-click) opens. */
@@ -226,21 +222,21 @@ function actionGroupLabel(group: ActionGroup, chrome: ObjectMenuChromeLabels): s
  * then those tools ARE offered. The first needs an argument prompt, which is
  * `Tool-8`'s proposal tray; until then such tools are simply not menu rows.
  * Hiding beats a row that refuses on every click. */
-function needsHumanAnswer(tool: AppToolRecord): boolean {
-	// TWO independent reasons to ask, and both must be consulted. Deriving this
-	// from `effect` alone was a real regression: Tool-5 makes an UNAPPROVED tool
-	// refuse server-side, while the menu — seeing `pure` — sent no `confirmed`,
-	// so the approval was never recorded and the row failed on every click,
-	// forever.
-	if ((tool.approval ?? AppToolApprovalState.New) !== AppToolApprovalState.Approved) return true;
-	return (
-		decideAppToolFriction(tool.effect, ToolCallInitiator.UserGesture) === ToolFrictionDecision.Confirm
-	);
-}
-
-function menuCanInvoke(tool: AppToolRecord, canConfirm: boolean): boolean {
-	if (tool.input.some((i) => i.required)) return false;
-	return needsHumanAnswer(tool) ? canConfirm : true;
+/** Can THIS menu run the tool with only a click to go on?
+ *
+ * Only one class is excluded now: a tool with a REQUIRED input, because a click
+ * carries no arguments and `tools.call` would refuse it `Invalid` every time.
+ * (An argument prompt is the other half of `Tool-8`.)
+ *
+ * Approval is no longer the menu's problem. `Tool-8` moved the question to the
+ * SHELL, which prompts in the dashboard and records the answer itself — so a
+ * tool needing first-use approval, re-approval after an update, or a confirm
+ * for its effect is still offered here and simply asks when clicked. Gating the
+ * row on a host-supplied confirm seam, as the previous cut did, meant a host
+ * without one silently lost every such tool.
+ */
+function menuCanInvoke(tool: AppToolRecord): boolean {
+	return !tool.input.some((i) => i.required);
 }
 
 /** Menu-surfaced tools that apply to this object. Declared-type match only —
@@ -249,14 +245,13 @@ function menuCanInvoke(tool: AppToolRecord, canConfirm: boolean): boolean {
 async function suggestAppTools(
 	runtime: ObjectMenuRuntime,
 	target: ObjectMenuTarget,
-	canConfirm: boolean,
 ): Promise<AppToolRecord[]> {
 	const list = runtime?.services?.appTools?.list;
 	if (!list) return [];
 	try {
 		const input: { appliesTo?: string; surface?: string } = { surface: APP_TOOL_MENU_SURFACE };
 		if (target.entityType) input.appliesTo = target.entityType;
-		return [...(await list(input))].filter((tool) => menuCanInvoke(tool, canConfirm));
+		return [...(await list(input))].filter(menuCanInvoke);
 	} catch {
 		return [];
 	}
@@ -308,11 +303,10 @@ function appToolRow(
 	tool: AppToolRecord,
 	runtime: ObjectMenuRuntime,
 	report: ObjectMenuToolReporter | undefined,
-	confirm: ObjectMenuToolConfirm | undefined,
 ): AnchoredMenuItem {
 	return {
 		label: `${action.label} — ${action.appLabel}`,
-		onSelect: () => runAppTool(runtime, tool, report, confirm),
+		onSelect: () => runAppTool(runtime, tool, report),
 	};
 }
 
@@ -356,25 +350,17 @@ function runAppTool(
 	runtime: ObjectMenuRuntime,
 	tool: AppToolRecord,
 	report: ObjectMenuToolReporter | undefined,
-	confirm: ObjectMenuToolConfirm | undefined,
 ): void {
 	const call = runtime?.services?.appTools?.call;
 	if (!call) return;
-	const needsConfirm = needsHumanAnswer(tool);
 	void (async () => {
 		try {
-			// A confirm-requiring tool is only OFFERED when the host can ask, so
-			// the approval is always a real human answer — never a flag this code
-			// invents on the caller's behalf.
-			// The REASON is passed through, so a host can ask "this changed since
-			// you approved it" rather than showing the dialog it always shows —
-			// otherwise the rug-pull signal is computed and thrown away before it
-			// reaches a person.
-			if (needsConfirm && !(await confirm?.(tool, approvalReason(tool)))) return;
-			const result = await call({
-				tool: tool.id,
-				...(needsConfirm ? { confirmed: true } : {}),
-			});
+			// No confirm plumbing here: the SHELL prompts and records the answer
+			// itself (Tool-8), so a declined approval comes back as `NeedsConfirm`
+			// and the reporter renders it like any other named refusal. The
+			// previous cut asked through a host-supplied seam, which meant a host
+			// without one silently lost every tool that needed asking.
+			const result = await call({ tool: tool.id });
 			report?.({ tool, ok: true, value: result.value });
 		} catch (error: unknown) {
 			const kind = error instanceof Error && error.name ? error.name : "Error";
@@ -390,18 +376,6 @@ function runAppTool(
 /** How a host reports the outcome of a tool run started from an object menu.
  *  A toast, an inline chip — the menu does not care, but it must not be
  *  nothing. */
-/** Why the host is being asked. `Changed` is the rug-pull case and deserves
- *  different wording from a first-time approval. */
-export type ObjectMenuToolConfirm = (
-	tool: AppToolRecord,
-	reason: AppToolApprovalState | ToolFrictionDecision.Confirm,
-) => Promise<boolean>;
-
-function approvalReason(tool: AppToolRecord): AppToolApprovalState | ToolFrictionDecision.Confirm {
-	const state = tool.approval ?? AppToolApprovalState.New;
-	return state === AppToolApprovalState.Approved ? ToolFrictionDecision.Confirm : state;
-}
-
 export type ObjectMenuToolReporter = (
 	outcome:
 		| { tool: AppToolRecord; ok: true; value: unknown }
@@ -415,7 +389,6 @@ function buildContributedRows(
 	chrome: ObjectMenuChromeLabels,
 	toolsById: ReadonlyMap<string, AppToolRecord>,
 	report?: ObjectMenuToolReporter,
-	confirm?: ObjectMenuToolConfirm,
 ): AnchoredMenuItem[] {
 	const groups: ContributedActionGroup[] = groupContributedActions(actions);
 	if (groups.length === 0) return [];
@@ -425,7 +398,7 @@ function buildContributedRows(
 		const row = (action: ContributedAction): AnchoredMenuItem => {
 			const tool = toolsById.get(action.id);
 			return tool
-				? appToolRow(action, tool, runtime, report, confirm)
+				? appToolRow(action, tool, runtime, report)
 				: contributedActionRow(action, runtime, target);
 		};
 		if (group.inline.length > 0) {
@@ -494,7 +467,7 @@ export async function openObjectMenu(
 		// quietest possible way — and today no caller passes the seam, so this
 		// is not hypothetical.
 		options.onToolResult
-			? suggestAppTools(options.runtime, options.target, options.onToolConfirm !== undefined)
+			? suggestAppTools(options.runtime, options.target)
 			: Promise.resolve<AppToolRecord[]>([]),
 	]);
 
@@ -533,7 +506,6 @@ export async function openObjectMenu(
 			chrome,
 			new Map(appTools.map((tool) => [tool.id, tool])),
 			options.onToolResult,
-			options.onToolConfirm,
 		),
 	);
 	if (options.onRemove) {
