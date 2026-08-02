@@ -112,6 +112,7 @@ const THEME_LABEL_KEY: Record<ThemeName, ThemeEditorI18nKey> = {
 	[ThemeName.Rose]: "theme.rose",
 	[ThemeName.Slate]: "theme.slate",
 	[ThemeName.Porcelain]: "theme.porcelain",
+	[ThemeName.Graphite]: "theme.graphite",
 };
 
 enum EditorTab {

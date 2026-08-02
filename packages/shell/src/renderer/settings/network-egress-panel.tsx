@@ -166,7 +166,7 @@ export function NetworkEgressPanel() {
 				<p className="settings__error" role="alert">
 					{load.kind === "error" ? load.message : t("shell.settings.network.loadFailed")}
 				</p>
-				<Button onClick={() => void refresh()} size={ButtonSize.Md}>
+				<Button variant={ButtonVariant.Neutral} onClick={() => void refresh()} size={ButtonSize.Md}>
 					{t("shell.settings.network.retry")}
 				</Button>
 			</section>
@@ -522,7 +522,7 @@ function ProxyEditorPopover({
 				<fieldset disabled={!overrideOn} className="network-egress__fieldset">
 					<Select
 						label={t("shell.settings.network.proxy.editor.modeLabel")}
-						size={TextFieldSize.Sm}
+						size={TextFieldSize.Md}
 						value={state.mode}
 						onChange={(next) => setState((s) => ({ ...s, mode: next as NetworkProxyMode }))}
 						options={[
@@ -557,7 +557,7 @@ function ProxyEditorPopover({
 							/>
 							<TextField
 								label={t("shell.settings.network.proxy.editor.noProxyLabel")}
-								size={TextFieldSize.Sm}
+								size={TextFieldSize.Md}
 								value={state.noProxy}
 								placeholder="localhost, .internal, 10.0.0.0/8"
 								onChange={(next) => setState((s) => ({ ...s, noProxy: next }))}
@@ -568,7 +568,7 @@ function ProxyEditorPopover({
 					{state.mode === NetworkProxyMode.Pac && (
 						<TextField
 							label={t("shell.settings.network.proxy.editor.pacLabel")}
-							size={TextFieldSize.Sm}
+							size={TextFieldSize.Md}
 							type="url"
 							value={state.pacUrl}
 							placeholder="https://example.com/proxy.pac"
@@ -612,14 +612,14 @@ function ManualEndpointRow({
 		<div className="network-egress__endpoint-row">
 			<span className="network-egress__field network-egress__field--label">{label}</span>
 			<TextField
-				size={TextFieldSize.Sm}
+				size={TextFieldSize.Md}
 				value={host}
 				onChange={onHost}
 				placeholder={t("shell.settings.network.proxy.editor.hostLabel")}
 				aria-label={`${label} ${t("shell.settings.network.proxy.editor.hostLabel")}`}
 			/>
 			<TextField
-				size={TextFieldSize.Sm}
+				size={TextFieldSize.Md}
 				value={port}
 				onChange={onPort}
 				placeholder={t("shell.settings.network.proxy.editor.portLabel")}
@@ -824,7 +824,7 @@ function AllowlistEditor({
 			>
 				<TextField
 					ref={inputRef}
-					size={TextFieldSize.Sm}
+					size={TextFieldSize.Md}
 					value={input}
 					placeholder={t("shell.settings.network.privacy.allowlist.placeholder")}
 					onChange={setInput}
@@ -926,7 +926,7 @@ function AutomationEgressSection() {
 				}}
 			>
 				<TextField
-					size={TextFieldSize.Sm}
+					size={TextFieldSize.Md}
 					value={input}
 					placeholder={t("shell.settings.network.automation.placeholder")}
 					onChange={setInput}
@@ -1258,7 +1258,7 @@ function RecentSection({
 				<Select
 					value={appFilter}
 					onChange={onAppFilter}
-					size={TextFieldSize.Sm}
+					size={TextFieldSize.Md}
 					aria-label={t("shell.settings.network.recent.filter.appAll")}
 					data-testid="network-egress-recent-app-filter"
 					options={[
@@ -1271,7 +1271,7 @@ function RecentSection({
 						type="search"
 						value={hostFilter}
 						onChange={onHostFilter}
-						size={TextFieldSize.Sm}
+						size={TextFieldSize.Md}
 						iconLeft={IconName.Search}
 						placeholder={t("shell.settings.network.recent.filter.hostPlaceholder")}
 						aria-label={t("shell.settings.network.recent.filter.hostPlaceholder")}
