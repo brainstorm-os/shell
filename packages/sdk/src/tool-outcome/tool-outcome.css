@@ -1,0 +1,66 @@
+/**
+ * Tool outcome chips (Tool-8b). Imported once per app
+ * (`import "@brainstorm-os/sdk/tool-outcome.css"`). Every custom property
+ * here is an app-theme alias `app-theme.css` already provides.
+ */
+
+.bs-tool-outcomes {
+	position: absolute;
+	right: var(--space-3);
+	bottom: var(--space-3);
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	max-width: min(360px, 80vw);
+	pointer-events: none;
+}
+
+.bs-tool-outcome {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+	background: var(--bg-elev);
+	color: var(--text);
+	box-shadow: var(--shadow-md);
+	pointer-events: auto;
+}
+
+/* A refusal is the outcome a user may need to act on, so it carries a
+ * tinted edge rather than a colour-only cue. */
+.bs-tool-outcome--refused {
+	border-color: var(--color-border-strong);
+}
+
+.bs-tool-outcome__title {
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bs-tool-outcome__reason {
+	color: var(--text-dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bs-tool-outcome__dismiss {
+	margin-left: auto;
+	flex: 0 0 auto;
+	border: none;
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+	line-height: 1;
+}
+
+.bs-tool-outcome__dismiss:hover {
+	color: var(--text);
+	background: var(--hover);
+	border-radius: var(--radius-sm);
+}
