@@ -304,3 +304,61 @@ describe("matchedWidgetSize (F-462)", () => {
 		expect(matchedWidgetSize({ w: 40, h: 30 })).toBeNull();
 	});
 });
+
+/**
+ * Widget ↔ icon collision (found by the 327 screenshot audit).
+ *
+ * Widgets and icons are placed on ONE coordinate system — both are
+ * `GRID_OUTER_MARGIN + cell * unit` from the same origin, and `WIDGET_UNIT ===
+ * GRID_UNIT` — but nothing reconciles them. `clampWidgetOrigin` only clamps to
+ * the SURFACE, and `DashboardWidgetsLayerProps` is `{ widgets }` with no icon
+ * data at all, so a widget can be persisted directly on top of an app icon and
+ * will render there forever.
+ *
+ * The audit caught exactly that on the untouched dashboard: two widgets
+ * painting over the app icon row, one narrow enough that its title clipped to
+ * `Rece…`. It survived every POLISH-APP pass because it changes no colour
+ * literal and no font size.
+ *
+ * These are SKIPPED, not failing: they specify the contract the fix must meet
+ * rather than redefining today's behaviour as correct. Un-skip with the fix.
+ */
+describe.skip("widget ↔ icon collision (327 audit)", () => {
+	it("does not leave a widget on top of an occupied icon cell", () => {
+		// An icon occupies the top-left footprint; a widget persisted at the same
+		// origin must be relocated, not rendered over it.
+		const icons = [{ x: 0, y: 0 }];
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		const placed = clampWidgetOrigin(widget, { x: 1440, y: 900 });
+		// Today this returns the widget unchanged — that is the defect.
+		expect(overlapsAnyIcon(placed, icons)).toBe(false);
+	});
+
+	it("keeps a widget that was already clear of the icons where it is", () => {
+		const icons = [{ x: 0, y: 0 }];
+		const widget = { x: 0, y: 60, w: 40, h: 20 };
+		expect(clampWidgetOrigin(widget, { x: 1440, y: 900 })).toEqual(widget);
+	});
+});
+
+/** Pixel-space overlap between a widget record and any icon footprint. Both
+ *  live on the same origin and unit, so the comparison is direct. */
+function overlapsAnyIcon(
+	widget: { x: number; y: number; w?: number; h?: number },
+	icons: readonly { x: number; y: number }[],
+): boolean {
+	const wx = GRID_OUTER_MARGIN + widget.x * WIDGET_UNIT;
+	const wy = GRID_OUTER_MARGIN + widget.y * WIDGET_UNIT;
+	const ww = (widget.w ?? 0) * WIDGET_UNIT;
+	const wh = (widget.h ?? 0) * WIDGET_UNIT;
+	return icons.some((icon) => {
+		const ix = GRID_OUTER_MARGIN + icon.x * GRID_UNIT;
+		const iy = GRID_OUTER_MARGIN + icon.y * GRID_UNIT;
+		return (
+			wx < ix + ICON_FOOTPRINT_W * GRID_UNIT &&
+			wx + ww > ix &&
+			wy < iy + ICON_FOOTPRINT_H * GRID_UNIT &&
+			wy + wh > iy
+		);
+	});
+}
