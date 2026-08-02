@@ -3,6 +3,310 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.13.0",
+      "date": "2026-08-02",
+      "icon": "🤝",
+      "title": "Agents join the vault, and apps start talking to each other",
+      "summary": "An agent is now a member of your vault with a name, its own permissions, and a record of everything it did. Apps expose their abilities to each other, so an action from one app shows up where you are working in another. Plus two new themes and a pass over every app.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Agents are vault members"
+        },
+        {
+          "kind": "p",
+          "text": "An agent is no longer a hidden helper. It appears in your team with a name and a face, you grant it exactly what it may see and do, and it can be mentioned like anyone else."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Grant it, or don't.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Settings → Team lists every agent. Permissions are the same ones a person gets, and an agent with nothing granted says so plainly instead of failing quietly."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Mention it in a channel.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Type "
+            },
+            {
+              "text": "@",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and its name in Chat. It answers in the thread, with the vault as context."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "It proposes, you approve.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An agent never writes to your vault behind your back — changes arrive as a proposal you accept or discard."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Hand work to another agent.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " One agent can delegate to another, and the second runs with the "
+            },
+            {
+              "text": "intersection",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " of both their permissions — never more."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Put an agent on an automation.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Assign one as the assignee of an automation and it runs the work when the trigger fires."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "See exactly what an agent did"
+        },
+        {
+          "kind": "p",
+          "text": [
+            {
+              "text": "Settings → AI has a new "
+            },
+            {
+              "text": "Agent activity",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " panel: every run, every tool call, and every refusal, filterable by app, outcome, surface and period. It records metadata only — your prompts and the model's outputs are never stored."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Apps expose their abilities to each other"
+        },
+        {
+          "kind": "p",
+          "text": "Until now each app was an island. An app can now publish typed actions that other apps discover and call — so a thing one app is good at becomes available in the place you are actually working."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "In the ⋯ menu of any object",
+              "marks": ["bold"]
+            },
+            {
+              "text": " and in the editor's "
+            },
+            {
+              "text": "/",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " menu and block menu, alongside the built-in actions."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "As a step in an automation",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", and as something your agent can call on your behalf."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "You are asked first.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The first time an app runs another app's action, Brainstorm asks — and asks again if that action changes after you approved it. When one is refused, you get a named reason instead of a spinner that never stops."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Two new themes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Porcelain",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — a flat paper-white light theme, no gradients, no glass."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Graphite",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — its charcoal dark twin."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Polish and fixes"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A pass over all twenty apps",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the same faces for the same things: one control height, one chip, one empty state, one menu."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Slash menu",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the "
+            },
+            {
+              "text": "/",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " menu is grouped into sections by block type instead of one long list."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Code editor",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the file panel is resizable, and remembers its width."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Dashboard",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — widgets no longer render on top of your app icons."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Themes",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — switching to a theme this install doesn't know no longer leaves the window unpainted."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Browser",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — pop-up menus paint above the page instead of behind it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Sharing over the network",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — the device hosting a session now joins it, so the host sees the same thing everyone else does."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.12.0",
       "date": "2026-07-31",
       "icon": "🧱",
