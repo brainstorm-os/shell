@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountTooltipHost } from "./host";
 
@@ -199,5 +201,30 @@ describe("mountTooltipHost", () => {
 		expect(chip()).toBeNull();
 		// Re-arm for afterEach's dispose() call.
 		dispose = mountTooltipHost();
+	});
+});
+
+/**
+ * The chip's legibility is pure CSS, so it is asserted against the source
+ * stylesheet: the surface must be theme-inverse tokens, never a hardcoded
+ * colour. A fixed rgba(20,20,20) chip was invisible on every dark theme —
+ * the surface and the toolbar it floated over were the same near-black.
+ */
+describe("tooltip chip surface (stylesheet invariants)", () => {
+	const css = readFileSync(join(__dirname, "tooltip.css"), "utf8");
+	const chipRule = css
+		.replace(/\/\*[\s\S]*?\*\//g, "")
+		.split("}")
+		.find((block) => block.includes(".bs-tooltip {"));
+
+	it("paints the inverse-of-theme surface pair, not a fixed colour", () => {
+		expect(chipRule).toBeDefined();
+		expect(chipRule).toContain("background: var(--color-background-inverse)");
+		expect(chipRule).toContain("color: var(--color-text-inverse)");
+	});
+
+	it("declares no literal colour anywhere in the chip chrome", () => {
+		const declarations = css.replace(/\/\*[\s\S]*?\*\//g, "");
+		expect(declarations).not.toMatch(/(background|color):\s*(#|rgba?\()/);
 	});
 });

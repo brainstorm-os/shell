@@ -70,12 +70,6 @@
 	cursor: default;
 }
 
-/* Empty placeholder ("Empty") reads faint, never as a real value. */
-.bs-cell-pill--empty .bs-cell-pill-text,
-.bs-cell-plain--empty {
-	color: var(--text-faint);
-}
-
 /* Inline editor — shared by pill + plain (and the formatted Text cell).
  * Mirrors the popover search input so an in-row edit looks intentional.
  * Box math mirrors the resting button EXACTLY (the 1px border eats 1px of
@@ -138,10 +132,6 @@
 
 .bs-cell-multiline:disabled {
 	cursor: default;
-}
-
-.bs-cell-multiline--empty {
-	color: var(--text-faint);
 }
 
 /* Same rest ↔ edit box parity as the scalar editor: the 1px border eats
@@ -285,8 +275,6 @@
 
 .bs-cell-rating-empty {
 	margin-left: var(--space-2);
-	color: var(--text-faint);
-	font-size: var(--text-size-sm);
 }
 
 /* ── Shared cell popover (Tag / Date / Link pickers) ───────────────── */
@@ -464,11 +452,6 @@
 	min-width: 0;
 }
 
-.bs-cell-tag-empty {
-	color: var(--text-faint);
-	font-size: var(--text-size-sm);
-}
-
 .bs-cell-tag {
 	display: inline-flex;
 	align-items: center;
@@ -617,12 +600,6 @@
 .bs-cell-date-trigger:disabled,
 .bs-cell-link-trigger:disabled {
 	cursor: default;
-}
-
-.bs-cell-date-empty,
-.bs-cell-link-empty {
-	color: var(--text-faint);
-	font-size: var(--text-size-sm);
 }
 
 .bs-cell-date-value {
@@ -801,11 +778,6 @@
 	text-overflow: ellipsis;
 }
 
-.bs-cell-file-empty {
-	font-size: var(--text-size-sm);
-	color: var(--text-faint);
-}
-
 .bs-cell-file-pending {
 	font-size: var(--text-size-xs);
 	color: var(--text-faint);
@@ -868,4 +840,33 @@
 .bs-cell-formula--error {
 	color: var(--danger);
 	cursor: help;
+}
+
+/* ── The ONE empty affordance ──────────────────────────────────────── */
+/* Every cell kind renders the same `labels.cellEmpty` word, so it gets the
+ * same face: faint, and one step DOWN from the value type size so it never
+ * reads as a real value. This block is last in the file on purpose — the
+ * scalar / multiline / progress empties are modifiers on their own cell
+ * element, which declares `--text-size-md` at equal specificity, so only
+ * source order makes the shared face win.
+ *
+ * Before this, Date / EntityRef / Tag / File / Rating hardcoded
+ * `--text-size-sm` while Pill / Plain / Multiline / Progress set colour only
+ * and inherited `md` — two "Empty" faces in ONE property block (the 329 audit
+ * caught Tasks' Duration rows Estimate + Logged rendering visibly larger than
+ * Status / Due / Project / Tags directly above and below them).
+ *
+ * `.bs-cell-formula--empty` is deliberately NOT here: it renders an em-dash
+ * for "this formula has nothing to compute", not the Empty affordance. */
+.bs-cell-pill--empty .bs-cell-pill-text,
+.bs-cell-plain--empty,
+.bs-cell-multiline--empty,
+.bs-cell-progress--empty .bs-cell-progress-text,
+.bs-cell-rating-empty,
+.bs-cell-tag-empty,
+.bs-cell-date-empty,
+.bs-cell-link-empty,
+.bs-cell-file-empty {
+	color: var(--text-faint);
+	font-size: var(--text-size-sm);
 }

@@ -50,7 +50,7 @@ export function ProgressBarCell(props: CellProps): JSX.Element {
 	return (
 		<button
 			type="button"
-			className="bs-cell-progress"
+			className={num === null ? "bs-cell-progress bs-cell-progress--empty" : "bs-cell-progress"}
 			onClick={() => !readOnly && setEditing(true)}
 			disabled={readOnly}
 			aria-label={labels.cellEditValueFor(property.name)}

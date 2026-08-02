@@ -80,6 +80,20 @@ describe("ProgressBarCell", () => {
 		expect(h.container.querySelector<HTMLElement>(".bs-cell-progress-fill")?.style.transform).toBe(
 			"scaleX(0)",
 		);
+		// The `--empty` modifier is what lets the shared empty face in cells.css
+		// reach this cell — without it the placeholder keeps the value size and
+		// reads a step larger than every other kind's "Empty" in the same block.
+		expect(h.container.querySelector(".bs-cell-progress--empty")).not.toBeNull();
+	});
+
+	it("carries no empty modifier once a value exists", () => {
+		render(h, ProgressBarCell, {
+			property: def({ valueType: ValueType.Number }),
+			value: 40,
+			onChange: vi.fn(),
+			noteId: "n1",
+		});
+		expect(h.container.querySelector(".bs-cell-progress--empty")).toBeNull();
 	});
 });
 
