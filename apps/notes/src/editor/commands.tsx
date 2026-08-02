@@ -155,7 +155,7 @@ const NOTES_PROPERTY_COMMAND: BlockCommand = {
 
 const NOTES_TOC_COMMAND: BlockCommand = {
 	id: "block.embed.toc",
-	category: CommandCategory.Embed,
+	category: CommandCategory.Advanced,
 	label: t("notes.command.toc.label"),
 	description: t("notes.command.toc.description"),
 	icon: <TocIcon />,
@@ -250,7 +250,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 	},
 	{
 		id: "block.embed.equation",
-		category: CommandCategory.Embed,
+		category: CommandCategory.Advanced,
 		label: t("notes.command.equation.label"),
 		description: t("notes.command.equation.description"),
 		icon: <EquationIcon />,
@@ -269,7 +269,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 	},
 	{
 		id: "block.embed.checkbox",
-		category: CommandCategory.Embed,
+		category: CommandCategory.Property,
 		label: t("notes.command.checkbox.label"),
 		description: t("notes.command.checkbox.description"),
 		icon: <TodoListIcon />,
@@ -286,7 +286,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 	},
 	{
 		id: "block.embed.date",
-		category: CommandCategory.Embed,
+		category: CommandCategory.Property,
 		label: t("notes.command.date.label"),
 		description: t("notes.command.date.description"),
 		icon: <Icon name={IconName.KindDate} />,
@@ -304,7 +304,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 	},
 	{
 		id: "block.embed.number",
-		category: CommandCategory.Embed,
+		category: CommandCategory.Property,
 		label: t("notes.command.number.label"),
 		description: t("notes.command.number.description"),
 		icon: <Icon name={IconName.KindNumber} />,
@@ -322,7 +322,7 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 	},
 	{
 		id: "block.embed.select",
-		category: CommandCategory.Embed,
+		category: CommandCategory.Property,
 		label: t("notes.command.select.label"),
 		description: t("notes.command.select.description"),
 		icon: <Icon name={IconName.KindSelect} />,

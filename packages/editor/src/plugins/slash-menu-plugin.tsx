@@ -45,11 +45,16 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BlockCommand } from "../block-command";
 import { useEditorT } from "../i18n";
+import { SlashMenuRowKind, buildSlashMenuView } from "../slash-sections";
+
+export { filterCommands } from "../slash-sections";
 
 type MenuState = {
 	paragraphKey: NodeKey;
 	query: string;
 };
+
+const EMPTY_COMMANDS: readonly BlockCommand[] = [];
 
 export type SlashMenuPluginProps = {
 	/** Command catalogue surfaced in the menu. Apps assemble their own
@@ -64,10 +69,14 @@ export function SlashMenuPlugin({ commands = [] }: SlashMenuPluginProps = {}) {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [highlightIndex, setHighlightIndex] = useState(0);
 
-	const items = useMemo(
-		() => (state ? filterCommands(commands, state.query) : []),
+	// The view model: in browse mode (bare `/`) the palette groups under
+	// block-type section headers (B11.19) and navigation order follows the
+	// section order; with a query it stays the flat relevance-ranked list.
+	const view = useMemo(
+		() => (state ? buildSlashMenuView(commands, state.query) : null),
 		[state, commands],
 	);
+	const items = view?.commands ?? EMPTY_COMMANDS;
 
 	// Reset the highlight whenever the visible list shrinks past the cursor.
 	useEffect(() => {
@@ -169,7 +178,7 @@ export function SlashMenuPlugin({ commands = [] }: SlashMenuPluginProps = {}) {
 	// menu provider is mounted (some test/standalone shells), `openTypeaheadMenu`
 	// is a no-op and the keyboard path above still drives everything.
 	useEffect(() => {
-		if (!state || items.length === 0) {
+		if (!state || !view || items.length === 0) {
 			closeTypeaheadMenu();
 			return;
 		}
@@ -179,21 +188,28 @@ export function SlashMenuPlugin({ commands = [] }: SlashMenuPluginProps = {}) {
 			return;
 		}
 		openTypeaheadMenu({
-			items: items.map((command) => ({
-				id: command.id,
-				label: command.label,
-				icon: command.icon,
-				...(command.description ? { description: command.description } : {}),
-			})),
+			// Browse mode interleaves non-interactive section-header rows, so the
+			// runtime's active paint needs the ROW index of the highlighted
+			// command, not its command index — `commandRowIndex` carries the map.
+			items: view.rows.map((row) =>
+				row.kind === SlashMenuRowKind.Section
+					? { id: `section:${row.category}`, label: t(row.labelKey), section: true }
+					: {
+							id: row.command.id,
+							label: row.command.label,
+							icon: row.command.icon,
+							...(row.command.description ? { description: row.command.description } : {}),
+						},
+			),
 			anchor,
-			activeIndex: highlightIndex,
+			activeIndex: view.commandRowIndex[highlightIndex] ?? 0,
 			ariaLabel: t("editor.slashMenu.region"),
 			onSelect: (id) => {
 				const command = items.find((c) => c.id === id);
 				if (command) activate(command);
 			},
 		});
-	}, [editor, state, items, highlightIndex, activate, t]);
+	}, [editor, state, view, items, highlightIndex, activate, t]);
 
 	// Close on unmount so a torn-down editor can't leave the menu hanging.
 	useEffect(() => () => closeTypeaheadMenu(), []);
@@ -219,34 +235,4 @@ function computeMenuState(): MenuState | null {
 	const query = text.slice(1);
 	if (query.includes("\n")) return null;
 	return { paragraphKey: topLevel.getKey(), query };
-}
-
-/** Filter + RANK by relevance so the best match is highlighted first.
- *  Plain registry-order filtering shadowed real targets: e.g. "/sub"
- *  matched `Heading 2` (keyword "subtitle") and `Heading 3` (keyword
- *  "subheading") — both earlier in the registry — so pressing Enter
- *  inserted a heading instead of the `Sub-page` the user wanted. A
- *  label-prefix match must beat a keyword-substring match. Ties keep
- *  registry order (stable). */
-export function filterCommands(
-	commands: readonly BlockCommand[],
-	query: string,
-): readonly BlockCommand[] {
-	const q = query.trim().toLowerCase();
-	if (!q) return commands;
-	const scored: { command: BlockCommand; score: number; index: number }[] = [];
-	commands.forEach((command, index) => {
-		const label = command.label.toLowerCase();
-		const kw = command.keywords;
-		let score = -1;
-		if (label === q) score = 0;
-		else if (label.startsWith(q)) score = 1;
-		else if (kw.some((k) => k.toLowerCase() === q)) score = 2;
-		else if (label.includes(q)) score = 3;
-		else if (kw.some((k) => k.toLowerCase().startsWith(q))) score = 4;
-		else if (kw.some((k) => k.toLowerCase().includes(q))) score = 5;
-		if (score >= 0) scored.push({ command, score, index });
-	});
-	scored.sort((a, b) => a.score - b.score || a.index - b.index);
-	return scored.map((s) => s.command);
 }

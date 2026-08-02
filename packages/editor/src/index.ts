@@ -107,6 +107,16 @@ export {
 	filterCommands,
 } from "./plugins/slash-menu-plugin";
 export {
+	type SlashMenuRow,
+	type SlashMenuView,
+	type SlashSection,
+	SLASH_SECTION_LABEL,
+	SLASH_SECTION_ORDER,
+	SlashMenuRowKind,
+	buildSlashMenuView,
+	groupCommandsIntoSections,
+} from "./slash-sections";
+export {
 	AlignCenterIcon,
 	AlignJustifyIcon,
 	AlignLeftIcon,

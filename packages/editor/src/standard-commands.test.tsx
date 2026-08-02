@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CommandCategory } from "./block-command";
 import { createEditorT } from "./i18n";
+import { SLASH_SECTION_ORDER } from "./slash-sections";
 import {
 	createEntityEmbedCommand,
 	createStandardBlockActions,
@@ -43,6 +44,31 @@ describe("standard block commands", () => {
 		expect(cmds.find((c) => c.id === "block.todoList")?.description).toBe(
 			"Checklist with checkboxes",
 		);
+	});
+
+	it("every shared slash command carries a section-mapped category (B11.19 drift-fence)", () => {
+		// The slash menu's browse view groups by category — a command tagged with
+		// an action-menu-only category (TurnInto / Align / …) would land in the
+		// trailing header-less group and read as a taxonomy bug. Pin the deliberate
+		// assignments; a new shared command must pick a section on purpose.
+		const sectionOf = new Map<string, CommandCategory>([
+			["block.bulletList", CommandCategory.Lists],
+			["block.numberedList", CommandCategory.Lists],
+			["block.todoList", CommandCategory.Lists],
+			["block.divider", CommandCategory.Basic],
+			["block.table", CommandCategory.Layout],
+			["block.columns2", CommandCategory.Layout],
+			["block.columns3", CommandCategory.Layout],
+		]);
+		const cmds = createStandardBlockCommands(t);
+		for (const c of cmds) {
+			expect(
+				SLASH_SECTION_ORDER,
+				`${c.id} must carry a slash-section category, got "${c.category}"`,
+			).toContain(c.category);
+			const pinned = sectionOf.get(c.id);
+			if (pinned) expect(c.category, `${c.id} section`).toBe(pinned);
+		}
 	});
 
 	it("exposes block actions including a destructive delete", () => {
