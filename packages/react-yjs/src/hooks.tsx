@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type * as Y from "yjs";
 import { type AwarenessLike, type AwarenessSnapshot, awarenessStore } from "./awareness";
 import { type YDocHandle, type YDocResolver, useOptionalYDocResolver } from "./provider";
+import type { YDocResolverApi } from "./resolver";
 import {
 	yDocStore,
 	yMapKeyStore,
@@ -231,4 +232,30 @@ export function useAwareness(awareness: AwarenessLike): UseAwarenessResult {
 		setLocalState: (state) => awareness.setLocalState(state),
 		setLocalStateField: (field, value) => awareness.setLocalStateField(field, value),
 	};
+}
+
+/**
+ * 3.12 / F-491 — true when this entity's canonical document is missing content
+ * permanently: an update it depends on never reached disk, so part of what was
+ * written is gone and is NOT recoverable.
+ *
+ * Subscribes rather than reading once, because the load that discovers the
+ * damage resolves AFTER the first render — a component that only read
+ * `isDamaged` would paint the doc as ordinary-empty and never correct itself,
+ * which is the exact failure this exists to end. Pass the resolver API from
+ * the app's `getYDocResolverApi()`; `null` (no doc surface, e.g. the preview
+ * harness) reports healthy rather than throwing.
+ */
+export function useYDocDamaged(api: YDocResolverApi | null, entityId: string): boolean {
+	const subscribe = useCallback(
+		(onChange: () => void) => {
+			if (!api) return () => undefined;
+			return api.subscribeDamaged((changed) => {
+				if (changed === entityId) onChange();
+			});
+		},
+		[api, entityId],
+	);
+	const getSnapshot = useCallback(() => api?.isDamaged(entityId) ?? false, [api, entityId]);
+	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

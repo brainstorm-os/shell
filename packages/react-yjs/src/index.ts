@@ -17,6 +17,7 @@ export {
 	useBlankRecoveryGap,
 	useYDoc,
 	useYDocApplyPending,
+	useYDocDamaged,
 	useYDocLoaded,
 	useYMap,
 	useYText,
@@ -29,6 +30,7 @@ export {
 	useOptionalYDocResolver,
 } from "./provider";
 export {
+	type YDocLoadMeta,
 	type YDocResolverApi,
 	type YDocTransport,
 	PersistFailedError,

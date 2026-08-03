@@ -92,5 +92,7 @@
   "properties.meta.dateKey": "Date",
   "properties.openInNotesHint": "Use Notes for advanced property editing.",
   "widget.noEntryToday": "No entry yet today",
-  "widget.writeToday": "Write today's entry"
+  "widget.writeToday": "Write today's entry",
+  "bodyDamagedTitle": "Part of this entry is missing",
+  "bodyDamagedHint": "Some of what was written here was lost before it reached disk and cannot be recovered. Anything you write now is saved normally."
 }

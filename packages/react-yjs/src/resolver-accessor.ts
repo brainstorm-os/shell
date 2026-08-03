@@ -52,7 +52,12 @@ function isNotFoundError(error: unknown): boolean {
  *  optional so a runtime that only conditionally exposes them still
  *  type-checks; the accessor guards their presence at call time. */
 export type EntitiesDocApi = {
-	loadDoc?: (entityId: string) => Promise<{ snapshotB64?: string | null }>;
+	loadDoc?: (entityId: string) => Promise<{
+		snapshotB64?: string | null;
+		/** The stored doc is missing an update it depends on (F-491). Rides the
+		 *  `entities.loadDoc` reply straight from the ydoc worker. */
+		pendingStructs?: boolean;
+	}>;
 	applyDoc?: (entityId: string, updateB64: string) => unknown;
 	closeDoc?: (entityId: string) => unknown;
 };
@@ -93,9 +98,13 @@ export function createYDocResolverAccessor(
 		const applyDoc = entities.applyDoc.bind(entities);
 		const closeDoc = entities.closeDoc.bind(entities);
 		const transport: YDocTransport = {
-			load: async (entityId) => {
+			load: async (entityId, report) => {
 				try {
-					const { snapshotB64 } = await loadDoc(entityId);
+					const { snapshotB64, pendingStructs } = await loadDoc(entityId);
+					// The shell already knows; before 3.12 it told nobody, so an
+					// app could not tell a doc that lost content from one nobody
+					// had written in yet.
+					report?.({ damaged: pendingStructs === true });
 					return snapshotB64 ? b64ToBytes(snapshotB64) : null;
 				} catch (error) {
 					// A freshly-created entity may not have a persisted Y.Doc yet —

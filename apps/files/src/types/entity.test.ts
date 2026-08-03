@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	type Entity,
-	hasDisplayName,
-	readName,
-	resolveDisplayName,
-} from "./entity";
+import { type Entity, hasDisplayName, readName, resolveDisplayName } from "./entity";
 
 const bare = (properties: Record<string, unknown>): Entity =>
 	({
