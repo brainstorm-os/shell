@@ -4,7 +4,7 @@
   "releases": [
     {
       "version": "0.13.0",
-      "date": "2026-08-02",
+      "date": "2026-08-03",
       "icon": "🤝",
       "title": "Agents join the vault, and apps start talking to each other",
       "summary": "An agent is now a member of your vault with a name, its own permissions, and a record of everything it did. Apps expose their abilities to each other, so an action from one app shows up where you are working in another. Plus two new themes and a pass over every app.",
@@ -197,6 +197,25 @@
           "kind": "li",
           "text": [
             {
+              "text": "Journal",
+              "marks": ["bold"]
+            },
+            {
+              "text": " — an entry you started typing the moment you opened a new day is now saved. Previously the first words could be dropped, and the day's body would then stay "
+            },
+            {
+              "text": "blank",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on every later visit even though the word count still showed them."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
               "text": "A pass over all twenty apps",
               "marks": ["bold"]
             },
@@ -281,6 +300,26 @@
             },
             {
               "text": " — the device hosting a session now joins it, so the host sees the same thing everyone else does."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "📓",
+          "text": [
+            {
+              "text": "One caveat for Journal. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "This release stops new entries from being lost, but it cannot recover text that was already lost this way. If a day from before "
+            },
+            {
+              "text": "0.13.0",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " still shows an empty body, that content is unfortunately gone."
             }
           ]
         },
