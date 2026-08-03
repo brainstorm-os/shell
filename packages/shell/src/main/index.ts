@@ -3265,6 +3265,34 @@ void app.whenReady().then(async () => {
 			args: [{ vaultPath: session.vaultPath, entityId, wrap }],
 			caps: [],
 		});
+		// 10.3c — the local device now holds the DEK; the user's OTHER devices
+		// still do not. Before this, `installEntityWrap` wrapped for THIS device
+		// and stopped, which is why two of one user's own devices never synced.
+		//
+		// Deliberately not awaited into the caller's failure path: a sibling
+		// that is offline must not fail a local write. The version comes from
+		// the DEK store rather than the caller because the retro-wrap pass calls
+		// this with a PLACEHOLDER dek — fanning that out would ship version 0,
+		// which every receiver rejects forever, so `fanOutEntityWrap` refuses it.
+		void (async () => {
+			try {
+				const dekStore = await session.entityDekStore();
+				const handle = dekStore.open(entityId);
+				if (!handle) return;
+				try {
+					await autoShareEngine()?.fanOutEntityWrapToSiblings(
+						entityId,
+						handle.dek,
+						handle.version,
+						type,
+					);
+				} finally {
+					dekStore.close(handle.dek);
+				}
+			} catch (error) {
+				console.warn(`[sync] sibling wrap fan-out failed for ${entityId}: ${(error as Error).message}`);
+			}
+		})();
 		void bytesToBase64;
 	};
 
