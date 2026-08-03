@@ -80,16 +80,35 @@ export function entityTypeName(type: string): string {
 	return segments[segments.length - 1] ?? type;
 }
 
+/**
+ * Resolve a human label from an entity's property bag. Order matches the
+ * shared SDK title seam (title → name) plus CodeFile's path-only shape
+ * (`brainstorm/CodeFile/v1` stores `path`, never `name`/`title` — without
+ * the path leg every source file in the vault browser rendered as
+ * "(untitled)", the 329 audit wall). Nested paths surface as the leaf
+ * segment so a card reads `main.ts`, not `src/lib/main.ts`.
+ */
+export function resolveDisplayName(properties: EntityProperties): string | null {
+	const title = properties.title;
+	if (typeof title === "string" && title.length > 0) return title;
+	const name = properties.name;
+	if (typeof name === "string" && name.length > 0) return name;
+	const path = properties.path;
+	if (typeof path === "string" && path.length > 0) {
+		const segments = path.split("/").filter((s) => s.length > 0);
+		return segments[segments.length - 1] ?? path;
+	}
+	return null;
+}
+
 export function readName(entity: Entity): string {
-	const name = entity.properties.name;
-	return typeof name === "string" && name.length > 0 ? name : "(untitled)";
+	return resolveDisplayName(entity.properties) ?? "(untitled)";
 }
 
 /** True when the entity carries a real display name (the "(untitled)"
  *  fallback is presentation, not data — sorts treat it specially). */
 export function hasDisplayName(entity: Entity): boolean {
-	const name = entity.properties.name;
-	return typeof name === "string" && name.trim().length > 0;
+	return resolveDisplayName(entity.properties) !== null;
 }
 
 /** Byte size of a file, or 0 for folders / anything without a numeric size —

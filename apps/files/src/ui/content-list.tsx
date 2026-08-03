@@ -759,6 +759,7 @@ function ContentRow({
 				className="content-row"
 				data-testid="content-row"
 				data-id={entity.id}
+				data-entity-id={entity.id}
 				data-selected={selected ? "true" : "false"}
 				data-dragging={dragging ? "true" : undefined}
 				data-cross-over={isFolder && isOver ? "true" : undefined}

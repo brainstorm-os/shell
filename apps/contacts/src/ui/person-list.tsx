@@ -87,6 +87,7 @@ function PersonRow({ person, secondary, active, onSelect }: PersonRowProps) {
 		<button
 			type="button"
 			className={active ? "contacts-row contacts-row--active" : "contacts-row"}
+			data-entity-id={person.id}
 			aria-current={active ? "true" : undefined}
 			onClick={() => onSelect(person.id)}
 		>
