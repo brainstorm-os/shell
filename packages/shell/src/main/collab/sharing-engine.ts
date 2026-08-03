@@ -181,6 +181,14 @@ export class SharingEngine {
 				const handle = dekStore.persist(entityId, dekId);
 				dekStore.close(handle.dek);
 			});
+			// 10.3c — mirror the production create path. `createEntityWithDek` runs
+			// `installEntityWrap`, and the sibling fan-out hangs off exactly that
+			// hook, so a bridge that mints a DEK and stops leaves this device the
+			// only holder — and no dogfood session can ever reach the producer.
+			// That is precisely how `collab/012` kept failing on `no DEK for
+			// entity` with a working LAN link: the transport was never the problem,
+			// the harness simply never asked for a wrap.
+			await this.#fanOutProvisionedDek(entityId, type);
 		}
 		const exposed = this.#session.exposeIdentityForPairing();
 		await this.mutateAndEmit(entityId, (doc) => {
@@ -192,6 +200,24 @@ export class SharingEngine {
 				now: Date.now(),
 			});
 		});
+	}
+
+	/** Fan a freshly-provisioned entity's DEK out to this identity's other
+	 *  devices. Never throws and never blocks the create: an offline sibling
+	 *  must not fail a local write, and the pairing backfill is the catch-up. */
+	async #fanOutProvisionedDek(entityId: string, type: string): Promise<void> {
+		try {
+			const dekStore = await this.ensureDekStore();
+			const handle = dekStore.open(entityId);
+			if (!handle) return;
+			try {
+				await this.fanOutEntityWrapToSiblings(entityId, handle.dek, handle.version, type);
+			} finally {
+				dekStore.close(handle.dek);
+			}
+		} catch (error) {
+			console.warn(`[sharing] provision fan-out failed for ${entityId}: ${(error as Error).message}`);
+		}
 	}
 
 	/**
