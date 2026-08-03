@@ -365,6 +365,16 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		);
 		return { tailEntries, truncatedTail, pendingStructs };
 	},
+	// F-491 — enumerate every doc in the vault that is not intact. Answers
+	// "which of my documents lost content?", which had no answer before: the
+	// per-load flag existed and nothing ever asked, so a damaged doc was
+	// indistinguishable from one nobody wrote in. Repairs nothing — the
+	// missing bytes were never written and exist nowhere to restore from.
+	scanDamaged: async (envelope) => {
+		const args = parseArgs<{ vaultPath: string }>(envelope, "scanDamaged");
+		const damaged = await storeFor(args.vaultPath).scanDamaged();
+		return { damaged };
+	},
 	// Stage 10.3a — append a pre-built MemberWrapPayload (HPKE on main, no
 	// crypto here) to the entity Y.Doc's wraps array, idempotent on the
 	// recipient pubkey, and persist the resulting update. The wire-path
