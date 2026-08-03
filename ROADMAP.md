@@ -2,9 +2,9 @@
 
 Brainstorm is a local-first desktop OS for knowledge management. Your data lives in a plain folder on your machine, there is no account, and the apps are sandboxed with explicit permissions.
 
-This page is what we are building next, and — just as importantly — what we have **not** built yet. We would rather you find the gaps here than after you install.
+This page is what is coming. Most of it is the **What's coming** section below — per app, in detail. There is also an honest account of what is shipped, what is mid-flight, and what we will never build, so you can tell the difference.
 
-**No dates.** We ship when something is ready, and we would rather be honest about order than wrong about timing.
+**No dates.** We ship when something is ready. Order reflects intent, not commitment.
 
 Current release: **0.13.0**. See [releases](https://github.com/brainstorm-os/shell/releases) and the [changelog](https://getbrainstorm.online/blog).
 
@@ -31,14 +31,59 @@ Being actively worked on. Listed because it is honest, not because it is promise
 - **Peer-to-peer sync over a local network** — two machines on the same Wi-Fi syncing with no server in the middle. Pairing and discovery work; the data does not converge over that link yet.
 - **A marketplace** — the storefront, the signed catalog, install and update engines all exist in the product. Nothing is hosted yet, so there is nothing to browse. That is the remaining work.
 
-## Next
+## What's coming
 
-Decided, not started.
+The detail, by area. Order is roughly our intent; nothing here has a date.
 
-- **More ways to see your data.** Database has grid and board views; charts, calendar, gallery and timeline views are next, along with saved views. Graph has one force-directed layout; hierarchical, radial, timeline and clustered layouts are next.
-- **Depth in the apps that are thin.** Twenty apps exist, and several of them do the basics and stop. We would rather make the existing ones good than add a twenty-first.
-- **Publishing for third-party apps** — a developer portal, review queue and threat-intel feed so anyone can publish, not just us.
-- **A mobile companion** — read, capture and light editing against the same vault. Designed, not started.
+### Graph
+
+Today the graph draws itself one way — a force-directed cloud. That is a good default and a poor answer to most specific questions, so the next work is **layouts you choose per graph**:
+
+- **Hierarchical / layered** — dependencies top to bottom. Force-directed hides direction; this makes it the point. The one we most want.
+- **Radial / ego** — pick a node, see its world in rings by distance.
+- **Timeline** — position by when things were created, so the graph shows how your knowledge actually grew.
+- **Clustered** — automatic community grouping with collapsible super-nodes, which is also how very large graphs stay readable.
+- **Layout remembered per graph**, alongside saved filters.
+
+### Database
+
+The engine underneath is already strong — formulas, rollups, aggregations, typed filters, relations. What is missing is ways to *look* at it:
+
+- **Charts** — bar, line and pie over any grouping. The aggregation engine already computes these numbers; they just have nowhere to be drawn.
+- **Calendar view** — any list with a date column becomes a calendar.
+- **Gallery view** — cards with covers, for anything visual.
+- **Timeline / Gantt** — two date columns become a span, with relations as dependencies.
+- **Saved views** — name a filter + sort + layout and switch between them.
+
+### Notes and the editor
+
+- **Embed blocks** — YouTube and maps first, click-to-load so nothing calls out until you ask.
+- **Deeper backlinks** — see what references a note, in context, not just a list.
+- **Document outline** for long notes.
+
+### Tasks, Calendar, Files
+
+- **Recurring tasks** and **task dependencies**, with a workload view.
+- **Scheduling and availability** in Calendar, now that CalDAV sync is in.
+- **Broader file previews** and **bulk operations** in Files.
+
+### Whiteboard, Books, Bookmarks
+
+- **Whiteboard templates** and smarter connector routing.
+- **Annotations and highlights** that persist across Books and captured Bookmarks, and reading position that follows you.
+
+### Agent and automations
+
+- **Agents that hand work to each other** with the narrowest permissions of both — the groundwork shipped in 0.13.0.
+- **Richer automation triggers**, and agents you can put on a schedule.
+
+### Platform
+
+- **A marketplace you can browse** — install and update apps, including third-party ones. The product side is built; hosting it is the remaining work.
+- **Publishing for anyone** — a developer portal, review queue and threat-intel feed, so it is not just our apps.
+- **Peer-to-peer sync on a local network** — two machines on the same Wi-Fi, no server in the middle.
+- **A mobile companion** — read, capture and light editing against the same vault.
+- **More themes and deeper theming**, building on the theme editor.
 
 ## Not planned
 
