@@ -31,8 +31,15 @@ export const REMOTE_ORIGIN = Symbol("brainstorm-ydoc-remote");
 
 export type YDocTransport = {
 	/** Fetch the entity's canonical snapshot (Yjs update bytes), or null
-	 *  when the doc is empty / unavailable. */
-	load(entityId: string): Promise<Uint8Array | null>;
+	 *  when the doc is empty / unavailable.
+	 *
+	 *  `report` is optional on BOTH sides: a transport that knows nothing about
+	 *  document health simply ignores it, and the resolver treats a doc it
+	 *  hears nothing about as healthy. Transports that DO know (the shell's,
+	 *  via `pendingStructs` on the `loadDoc` reply) call it so the resolver can
+	 *  tell "you have not written yet" apart from "your writing is gone" —
+	 *  those rendered identically before 3.12. */
+	load(entityId: string, report?: (meta: YDocLoadMeta) => void): Promise<Uint8Array | null>;
 	/** Ship a local update to the canonical side. The replica is
 	 *  authoritative for the renderer per OQ-9, so the caller does not wait
 	 *  on the result — but a transport that CAN fail must return a promise
@@ -60,6 +67,15 @@ export type YDocTransport = {
 	onRemote?(entityId: string, apply: (update: Uint8Array) => void): () => void;
 };
 
+/** What a transport can tell the resolver about a doc it just loaded. */
+export type YDocLoadMeta = {
+	/** The stored doc holds structs Yjs cannot integrate: an update it depends
+	 *  on never reached disk, so part of its content is missing and is NOT
+	 *  recoverable. Distinct from an empty doc in the way that matters most to
+	 *  a user. */
+	damaged: boolean;
+};
+
 export type YDocResolverApi = {
 	/** Synchronous, refcounted resolver for `<YDocProvider resolver=…>`. */
 	resolve: YDocResolver;
@@ -67,6 +83,15 @@ export type YDocResolverApi = {
 	 *  none). Used by `getYFragment` / `getYText` which must hand back a
 	 *  hydrated fragment. Unknown entity → already-resolved. */
 	whenLoaded(entityId: string): Promise<void>;
+	/** True when this entity's canonical doc is missing content permanently
+	 *  (F-491). False until a load has reported otherwise, and false for an
+	 *  entity nobody has resolved — an unknown doc is not a damaged one. */
+	isDamaged(entityId: string): boolean;
+	/** Subscribe to damage discoveries. Required because a load resolves AFTER
+	 *  the first render, so a component that only read `isDamaged` would paint
+	 *  the doc as ordinary-empty and never correct itself. Returns an
+	 *  unsubscribe. */
+	subscribeDamaged(listener: (entityId: string) => void): () => void;
 	/** Detach every replica + observer (renderer teardown). */
 	dispose(): void;
 };
@@ -108,6 +133,9 @@ export type YDocResolverOptions = {
 	 *  attempt; when the last one fails the loss is reported through
 	 *  `onError`. Exposed for tests — production uses the default. */
 	persistRetryDelaysMs?: readonly number[];
+	/** Fires once per entity when a load discovers the doc is missing content.
+	 *  Lets a host log or surface it without polling `isDamaged`. */
+	onDamaged?(entityId: string): void;
 };
 
 /** Default backoff for the full-state resend. The dominant real cause of a
@@ -218,6 +246,17 @@ export function createYDocResolver(
 			? options.persistRetryDelaysMs
 			: PERSIST_RETRY_DELAYS_MS;
 	const entries = new Map<string, Entry>();
+	// Entities whose canonical doc is missing content permanently (F-491).
+	// Kept OUTSIDE `entries` deliberately: the finding outlives the replica, so
+	// releasing and reopening a doc must not make the damage look healed.
+	const damaged = new Set<string>();
+	const damagedListeners = new Set<(entityId: string) => void>();
+	const reportDamaged = (entityId: string): void => {
+		if (damaged.has(entityId)) return; // once per entity per session
+		damaged.add(entityId);
+		options.onDamaged?.(entityId);
+		for (const listener of damagedListeners) listener(entityId);
+	};
 	// Zero-ref entries kept live for instant reopen, in least-recently-
 	// released order (insertion order = LRU; re-resolving deletes the key so
 	// a later re-release re-appends it as most-recent). Eviction past the cap
@@ -323,10 +362,14 @@ export function createYDocResolver(
 		const loadedBytes: Promise<Uint8Array | null> =
 			seedState !== undefined
 				? Promise.resolve(seedState)
-				: transport.load(entityId).catch((err) => {
-						reportError(entityId, err);
-						return null;
-					});
+				: transport
+						.load(entityId, (meta) => {
+							if (meta.damaged) reportDamaged(entityId);
+						})
+						.catch((err) => {
+							reportError(entityId, err);
+							return null;
+						});
 
 		// Lazy apply: hold the snapshot until `applyPending()` is called from
 		// inside the editor's binding wiring (see Entry.applyPending docs
@@ -475,6 +518,13 @@ export function createYDocResolver(
 			const entry = entries.get(entityId) ?? retained.get(entityId);
 			if (!entry) return Promise.resolve();
 			return entry.applyPending();
+		},
+		isDamaged: (entityId: string) => damaged.has(entityId),
+		subscribeDamaged: (listener) => {
+			damagedListeners.add(listener);
+			return () => {
+				damagedListeners.delete(listener);
+			};
 		},
 		dispose: () => {
 			if (disposed) return;

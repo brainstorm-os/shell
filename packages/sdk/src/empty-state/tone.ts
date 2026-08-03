@@ -13,6 +13,15 @@ export enum EmptyStateTone {
 	/** In-panel list/section empty — a small dim glyph, no chip. Used when
 	 *  the empty sits inside other chrome (Automations' runs/reminders lists). */
 	Compact = "compact",
+	/** NOT an empty state — a notice that content is MISSING. Warning-tinted
+	 *  and sized to sit WITH the surface rather than replace it, because a
+	 *  damaged document stays open and editable: taking the pane away would
+	 *  stop the user writing new entries, which still save fine. Use only
+	 *  where content was lost, never where it merely does not exist yet — the
+	 *  whole point is that a user can tell the two apart, which they could not
+	 *  when a document that lost writing rendered as a blank page (3.12 /
+	 *  F-491). */
+	Damaged = "damaged",
 }
 
 /** The class string for an empty state at a given tone (+ optional extra

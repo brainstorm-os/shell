@@ -81,3 +81,30 @@
 	padding: 0 var(--space-4);
 	border-radius: var(--radius-md);
 }
+
+/* Damaged — content that is MISSING, not absent. Sized like Compact, not
+ * Hero, on purpose: a damaged document stays open and editable, so this sits
+ * WITH the content it is warning about instead of replacing it. Taking the
+ * pane away would stop the user writing new entries, which still save fine.
+ * The warning tint is what makes it unmistakable — an empty page and a page
+ * whose writing was lost rendered identically before 3.12, and that ambiguity
+ * is the entire defect. */
+.bs-empty-state--damaged {
+	gap: var(--space-1);
+	flex-direction: row;
+	align-items: center;
+	text-align: start;
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--color-state-warning) 8%, transparent);
+	border: var(--border-width) solid color-mix(in srgb, var(--color-state-warning) 24%, transparent);
+}
+
+.bs-empty-state--damaged .bs-empty-state__glyph {
+	color: var(--color-state-warning);
+	flex-shrink: 0;
+}
+
+.bs-empty-state--damaged .bs-empty-state__title {
+	color: var(--text);
+}

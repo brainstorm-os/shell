@@ -20,16 +20,18 @@
  */
 
 import "@brainstorm-os/sdk/app-theme.css";
+import "@brainstorm-os/sdk/empty-state.css";
 import "@brainstorm-os/editor/editor.css";
 import "@brainstorm-os/editor/editor-theme.css";
 import { type CommentsFocusRequest, RightPanelTab } from "@brainstorm-os/editor";
-import { useVaultEntities } from "@brainstorm-os/react-yjs";
+import { useVaultEntities, useYDocDamaged } from "@brainstorm-os/react-yjs";
 import { navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
 import type { CommentAnchor, Icon } from "@brainstorm-os/sdk-types";
 import { MiniCalendar, openCalendarPopover } from "@brainstorm-os/sdk/calendar";
 import type { MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
 import { DatePager } from "@brainstorm-os/sdk/date-pager";
+import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import {
 	attachFindBar,
 	attachFindShortcuts,
@@ -1778,6 +1780,18 @@ function EntryBody({
 	const resolver = getYDocResolverApi();
 	const linkRef = useRef<HTMLButtonElement>(null);
 
+	// Deterministic id for the focused day — identical before and after the
+	// lazy create, so the editor below reconciles as the SAME instance across
+	// the transition (no remount). Computed HERE, above every early return,
+	// because the damaged-doc hook below must run unconditionally.
+	const noteId = entry ? entry.noteId : journalEntryIdForKey(dateKeyForJournal(focus));
+	// 3.12 / F-491 — this day's stored doc is missing an update it depends on,
+	// so part of what was written is gone and is not recoverable. Surfaced
+	// ABOVE the editor rather than replacing it: new writing still saves
+	// normally, and a blank pane with no explanation is precisely what made
+	// this read as a render fault during the 329 audit.
+	const bodyDamaged = useYDocDamaged(resolver, noteId);
+
 	// First edit on an entry-less day promotes it to a real entity (idempotent
 	// create with the deterministic stable id), THEN denormalises — so the body
 	// snippet write happens against a row that exists. The editor never unmounts
@@ -1807,11 +1821,6 @@ function EntryBody({
 		);
 	}
 
-	// Deterministic id for the focused day — identical before and after the
-	// lazy create, so the editor below reconciles as the SAME instance across the
-	// transition (no remount).
-	const noteId = entry ? entry.noteId : journalEntryIdForKey(dateKeyForJournal(focus));
-
 	const pending = pendingSeedRef.current?.get(noteId);
 	if (pending !== undefined) pendingSeedRef.current?.delete(noteId);
 	// Seeds (templates / periodic) only apply to an already-created entry; the
@@ -1830,6 +1839,15 @@ function EntryBody({
 
 	return (
 		<div className="journal__entry-body">
+			{bodyDamaged ? (
+				<EmptyState
+					icon={IconName.Warning}
+					tone={EmptyStateTone.Damaged}
+					title={t("bodyDamagedTitle")}
+					hint={t("bodyDamagedHint")}
+					className="journal__body-damaged"
+				/>
+			) : null}
 			{!entry && mutable ? (
 				<div className="journal__templates">
 					<span className="journal__templates-label">{t("templatesLabel")}</span>

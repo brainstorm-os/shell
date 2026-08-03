@@ -937,3 +937,11 @@ body.is-resizing .journal__props-resize {
 	color: var(--text-faint);
 	flex: 0 0 auto;
 }
+
+/* 3.12 / F-491 — the "part of this entry is missing" notice sits above the
+ * editor, which stays mounted and writable: new entries still save normally
+ * and taking the pane away would stop the user writing. Layout only; the
+ * surface itself belongs to the shared `<EmptyState>` damaged tone. */
+.journal__body-damaged {
+	margin-bottom: var(--space-3);
+}

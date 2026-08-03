@@ -587,3 +587,63 @@ describe("createYDocResolver — persist failures are classified, not all retrie
 		expect(canonical.getText("t").toString()).toBe("hello");
 	});
 });
+
+/**
+ * 3.12 / F-491 — a document that LOST content still rendered as an ordinary
+ * empty page inside the app. That is the confusion that made the 329 audit
+ * read F-488 as a render fault for a day: the shell knows the doc is missing
+ * bytes (`pendingStructs` rides the `loadDoc` reply) and the app never heard
+ * about it, so "your writing is gone" and "you have not written yet" looked
+ * identical. The resolver is where the two stop being the same thing.
+ */
+describe("createYDocResolver — damaged docs are distinguishable from empty ones", () => {
+	function reportingTransport(damagedIds: string[]) {
+		const transport: YDocTransport = {
+			load: async (entityId, report) => {
+				report?.({ damaged: damagedIds.includes(entityId) });
+				return null;
+			},
+			persist: () => {},
+			release: () => {},
+		};
+		return transport;
+	}
+
+	it("reports a doc the canonical side says is missing content", async () => {
+		const r = createYDocResolver(reportingTransport(["journal-2026-07-26"]));
+		const handle = r.resolve("journal-2026-07-26");
+		await handle.applyPending?.();
+		expect(r.isDamaged("journal-2026-07-26")).toBe(true);
+	});
+
+	it("does not report a genuinely empty doc as damaged", async () => {
+		const r = createYDocResolver(reportingTransport([]));
+		const handle = r.resolve("journal-2026-07-30");
+		await handle.applyPending?.();
+		expect(r.isDamaged("journal-2026-07-30")).toBe(false);
+	});
+
+	it("is false before the load resolves, not undefined", () => {
+		const r = createYDocResolver(reportingTransport(["ent_1"]));
+		expect(r.isDamaged("ent_1")).toBe(false);
+		expect(r.isDamaged("never-resolved")).toBe(false);
+	});
+
+	it("notifies subscribers when a load discovers damage", async () => {
+		const seen: string[] = [];
+		const r = createYDocResolver(reportingTransport(["ent_bad"]), {
+			onDamaged: (id) => seen.push(id),
+		});
+		const handle = r.resolve("ent_bad");
+		await handle.applyPending?.();
+		expect(seen).toEqual(["ent_bad"]);
+	});
+
+	it("still works with a transport that ignores the report callback", async () => {
+		const t = fakeTransport();
+		const r = createYDocResolver(t.transport);
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		expect(r.isDamaged("ent_1")).toBe(false);
+	});
+});
