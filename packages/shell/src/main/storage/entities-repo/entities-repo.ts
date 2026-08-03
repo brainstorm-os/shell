@@ -295,6 +295,22 @@ export class EntitiesRepository {
 		return rows.map((r) => r.id);
 	}
 
+	/**
+	 * Stage 10.3c — every live entity that HAS a DEK, with its type, for the
+	 * pairing backfill to fan out to a newly-paired device.
+	 *
+	 * The inverse of `listMissingDekIds`: an entity with no DEK has no key to
+	 * distribute, and one that is deleted should not be resurrected on another
+	 * device. The `type` rides along because it is sealed into the wrap so a
+	 * cold device can materialise the row (10.14) — fetching it per id would
+	 * be a query per entity on a pass that is already O(entities × devices).
+	 */
+	listIdsWithDek(): Array<{ id: string; type: string }> {
+		return this.stmt(
+			"SELECT id, type FROM entities WHERE dek_id IS NOT NULL AND deleted_at IS NULL ORDER BY created_at, id",
+		).all() as Array<{ id: string; type: string }>;
+	}
+
 	/** Count of live (non-deleted) entity rows. Stage 10.14 uses `0` as the
 	 *  "empty vault" signal that makes cold restore-from-zero offerable. */
 	count(): number {

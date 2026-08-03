@@ -2491,6 +2491,13 @@ void app.whenReady().then(async () => {
 		onDevicesChanged: (activeRecords) => {
 			lanHostRuntime?.setDevices(activeRecords);
 			void lanHostRuntime?.controller.apply();
+			// 10.3c — the ongoing producer only fires when a DEK is installed, so
+			// it reaches entities created AFTER this pairing. Everything written
+			// before the other device existed would stay stranded forever: the
+			// new device would sync new notes and never see a single old one.
+			// This is the catch-up half, and either half alone leaves multi-device
+			// sync broken.
+			void runSiblingWrapBackfill();
 		},
 		// LAN-3's producing half: while this device hosts on the local network,
 		// the payload it hands the joining device carries its own private
@@ -3319,6 +3326,46 @@ void app.whenReady().then(async () => {
 		} catch (error) {
 			console.warn(`[brainstorm] retro-wrap pass failed: ${(error as Error).message}`);
 		}
+	};
+
+	// 10.3c — fan every EXISTING entity's DEK out to the user's other devices.
+	// Runs on pairing completion; idempotent, so a second pairing re-runs it
+	// harmlessly (the worker no-ops a duplicate recipient and `installEntityDek`
+	// ignores an equal ordinal). Serialised behind a single in-flight guard: the
+	// roster can change twice in quick succession and two concurrent passes over
+	// the same vault would double the HPKE work for no benefit.
+	let backfillInFlight: Promise<void> | null = null;
+	const runSiblingWrapBackfill = (): Promise<void> => {
+		backfillInFlight ??= (async () => {
+			try {
+				const session = getActiveVaultSession();
+				const repo = await getEntitiesRepoForActiveSession();
+				const engine = session ? autoShareEngine() : null;
+				if (!session || !repo || !engine) return;
+				const dekStore = await session.entityDekStore();
+				const { backfillWrapsForSiblings } = await import("./sync/wrap-backfill");
+				const result = await backfillWrapsForSiblings({
+					listCandidates: () => repo.listIdsWithDek().map((r) => ({ entityId: r.id, type: r.type })),
+					openDek: (entityId) => {
+						const handle = dekStore.open(entityId);
+						return handle ? { dek: handle.dek, version: handle.version } : null;
+					},
+					closeDek: (dek) => dekStore.close(dek),
+					fanOut: (entityId, dek, version, type) =>
+						engine.fanOutEntityWrapToSiblings(entityId, dek, version, type),
+				});
+				if (result.delivered > 0 || result.failed > 0) {
+					console.log(
+						`[sync] sibling wrap backfill: ${result.delivered} delivered, ${result.skipped} skipped, ${result.failed} failed of ${result.scanned}`,
+					);
+				}
+			} catch (error) {
+				console.warn(`[sync] sibling wrap backfill failed: ${(error as Error).message}`);
+			} finally {
+				backfillInFlight = null;
+			}
+		})();
+		return backfillInFlight;
 	};
 
 	// Asset-B1 — install a pre-sealed asset-DEK wrap on an entity Y.Doc. The
