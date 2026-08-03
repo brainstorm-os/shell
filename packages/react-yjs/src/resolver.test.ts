@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import { type YDocTransport, createYDocResolver } from "./resolver";
+import {
+	PersistFailedError,
+	PersistFailureKind,
+	type YDocTransport,
+	createYDocResolver,
+} from "./resolver";
 
 /** Controllable transport: records persist/release/load, lets a test
  *  push a "canonical" update via the registered onRemote callback. */
@@ -424,5 +429,161 @@ describe("createYDocResolver — persist failure heals instead of losing the edi
 		await handle.applyPending?.();
 		handle.doc.getText("t").insert(0, "x");
 		expect(t.persisted).toHaveLength(1);
+	});
+});
+
+/**
+ * F-490 — the F-486 heal treated EVERY rejection as the transient
+ * lazy-create case. Two consequences in the real shell, both found by dogfood
+ * session 938: paging past a Journal day you never wrote in fired five
+ * full-state resends and then logged "local edits are not durable" (six per
+ * session, from browsing alone, with nothing lost — the update was Lexical's
+ * mount scaffold, and no row was ever going to exist); and a genuinely
+ * refused write retried five times before reporting the same wrong sentence.
+ * The give-up report also discarded the underlying error, which is why
+ * diagnosing F-488 needed a separate probe to recover it.
+ */
+describe("createYDocResolver — persist failures are classified, not all retried", () => {
+	function rejectingTransport(error: Error, kind?: PersistFailureKind) {
+		const attempts: Uint8Array[] = [];
+		const transport: YDocTransport = {
+			load: async () => null,
+			persist: async (_id, update) => {
+				attempts.push(update);
+				throw error;
+			},
+			release: () => {},
+			...(kind ? { classifyPersistFailure: () => kind } : {}),
+		};
+		return { transport, attempts };
+	}
+
+	async function waitFor(predicate: () => boolean, ms = 500): Promise<void> {
+		const deadline = Date.now() + ms;
+		while (!predicate() && Date.now() < deadline) {
+			await new Promise((res) => setTimeout(res, 5));
+		}
+	}
+
+	it("does not retry a refused write — the ledger will not change mid-doc", async () => {
+		const denied = new Error("entities.applyDoc: no entities.write for Note/v1");
+		const c = rejectingTransport(denied, PersistFailureKind.Denied);
+		const onError = vi.fn();
+		const r = createYDocResolver(c.transport, { onError, persistRetryDelaysMs: [1, 1, 1, 1, 1] });
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "hello");
+
+		await waitFor(() => onError.mock.calls.length > 0);
+		await new Promise((res) => setTimeout(res, 30)); // let any stray retry land
+		expect(c.attempts).toHaveLength(1);
+		expect(onError.mock.calls[0]?.[1]).toBeInstanceOf(PersistFailedError);
+		expect((onError.mock.calls[0]?.[1] as PersistFailedError).kind).toBe(PersistFailureKind.Denied);
+	});
+
+	it("does not claim lost edits when the entity row simply never existed", async () => {
+		const missing = new Error("entities.applyDoc: ent_1 not found");
+		const c = rejectingTransport(missing, PersistFailureKind.EntityMissing);
+		const onError = vi.fn();
+		const r = createYDocResolver(c.transport, { onError, persistRetryDelaysMs: [1, 1] });
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "hello");
+
+		await waitFor(() => onError.mock.calls.length > 0);
+		const err = onError.mock.calls[0]?.[1] as PersistFailedError;
+		expect(err.kind).toBe(PersistFailureKind.EntityMissing);
+		expect(err.message).not.toMatch(/not durable/i);
+	});
+
+	it("carries the underlying cause into the give-up report", async () => {
+		const cause = new Error("entities.applyDoc: ydoc transport not wired");
+		const c = rejectingTransport(cause);
+		const onError = vi.fn();
+		const r = createYDocResolver(c.transport, { onError, persistRetryDelaysMs: [1, 1] });
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "hello");
+
+		await waitFor(() => onError.mock.calls.length > 0);
+		const err = onError.mock.calls[0]?.[1] as PersistFailedError;
+		expect(err.cause).toBe(cause);
+		expect(err.message).toContain("transport not wired");
+	});
+
+	it("reports an owed resend that teardown would otherwise drop silently", async () => {
+		const c = rejectingTransport(new Error("boom")); // transient — real loss
+		const onError = vi.fn();
+		// retentionCap 0 → release tears the replica down immediately, clearing
+		// the armed retry timer. Before F-490 that dropped the edit in silence.
+		const r = createYDocResolver(c.transport, {
+			onError,
+			persistRetryDelaysMs: [10_000],
+			retentionCap: 0,
+		});
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "hello"); // rejected, retry parked far out
+		await waitFor(() => c.attempts.length > 0);
+		handle.release(); // tears down with the resend still owed
+
+		expect(onError).toHaveBeenCalled();
+		expect((onError.mock.calls.at(-1)?.[1] as PersistFailedError).kind).toBe(
+			PersistFailureKind.Transient,
+		);
+	});
+
+	it("does not report a torn-down replica whose row never existed (nothing was lost)", async () => {
+		const c = rejectingTransport(
+			new Error("entities.applyDoc: ent_1 not found"),
+			PersistFailureKind.EntityMissing,
+		);
+		const onError = vi.fn();
+		const r = createYDocResolver(c.transport, {
+			onError,
+			persistRetryDelaysMs: [10_000],
+			retentionCap: 0,
+		});
+
+		const handle = r.resolve("ent_1");
+		await handle.applyPending?.();
+		handle.doc.getText("t").insert(0, "scaffold");
+		await waitFor(() => c.attempts.length > 0);
+		handle.release();
+
+		expect(onError).not.toHaveBeenCalled();
+	});
+
+	it("carries the debt across a revive even when the replica never hydrated", async () => {
+		let exists = false;
+		const shipped: Uint8Array[] = [];
+		const canonical = new Y.Doc();
+		const transport: YDocTransport = {
+			// Never resolves the snapshot, so `hasApplied()` stays false.
+			load: () => new Promise(() => {}),
+			persist: async (_id, update) => {
+				shipped.push(update);
+				if (!exists) throw new Error("entities.applyDoc: ent_1 not found");
+				Y.applyUpdate(canonical, update);
+			},
+			release: () => {},
+			classifyPersistFailure: () => PersistFailureKind.EntityMissing,
+		};
+		const r = createYDocResolver(transport, { persistRetryDelaysMs: [10_000] });
+
+		const first = r.resolve("ent_1"); // no applyPending — never hydrates
+		first.doc.getText("t").insert(0, "hello");
+		await waitFor(() => shipped.length > 0);
+		first.release();
+
+		exists = true;
+		r.resolve("ent_1"); // revive: seed is undefined because hasApplied() is false
+
+		await waitFor(() => canonical.getText("t").toString() === "hello");
+		expect(canonical.getText("t").toString()).toBe("hello");
 	});
 });

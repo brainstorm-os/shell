@@ -43,6 +43,14 @@ export type YDocTransport = {
 	 *  the replica's FULL state, which heals the hole (Yjs apply is
 	 *  idempotent). */
 	persist(entityId: string, update: Uint8Array): unknown;
+	/** Sort a `persist` rejection into "retrying can heal this" and "retrying
+	 *  cannot". Without it every rejection is treated as {@link
+	 *  PersistFailureKind.Transient}, which is what shipped in 0.13.0 and what
+	 *  made merely *opening* an uncreated Journal day fire five full-state
+	 *  resends and then report lost edits that never existed (F-490). The
+	 *  transport owns this because it is the only layer that knows the
+	 *  protocol's error shapes. */
+	classifyPersistFailure?(error: unknown): PersistFailureKind;
 	/** The last consumer for this entity unmounted — free the canonical
 	 *  handle (refcounted by the worker). Must be idempotent. */
 	release(entityId: string): void;
@@ -108,6 +116,58 @@ export type YDocResolverOptions = {
  *  lands, and `entities.applyDoc` answers "not found" until it does. That
  *  window is sub-second; the tail covers a slow disk / busy worker. */
 export const PERSIST_RETRY_DELAYS_MS: readonly number[] = [250, 500, 1000, 2000, 4000];
+
+/** Why the canonical side rejected a `persist`, which decides whether the
+ *  full-state resend can ever succeed and whether anything was actually lost. */
+export enum PersistFailureKind {
+	/** The canonical side is not ready yet (worker starting, disk busy, a row
+	 *  mid-create). Re-shipping full state heals it — this is the F-488 case. */
+	Transient = "transient",
+	/** No entity row exists and none is being created. Retrying cannot invent
+	 *  one, and the update was almost certainly an editor's mount scaffold
+	 *  rather than authored text, so this is NOT a data loss. */
+	EntityMissing = "entity-missing",
+	/** The caller may not write this entity. The ledger does not change under
+	 *  an open doc, so every resend would be refused identically. */
+	Denied = "denied",
+}
+
+/** A `persist` the resolver stopped trying to complete. Carries the kind and
+ *  the ORIGINAL rejection: 0.13.0 reported a fixed sentence and discarded the
+ *  cause, which is why diagnosing F-488 in the real shell needed a separate
+ *  probe to recover what the canonical side had actually said. */
+export class PersistFailedError extends Error {
+	readonly entityId: string;
+	readonly kind: PersistFailureKind;
+	readonly attempts: number;
+
+	constructor(entityId: string, kind: PersistFailureKind, attempts: number, cause: unknown) {
+		super(`ydoc: ${entityId}: ${describePersistFailure(kind, attempts)}: ${describeCause(cause)}`, {
+			cause,
+		});
+		this.name = "PersistFailedError";
+		this.entityId = entityId;
+		this.kind = kind;
+		this.attempts = attempts;
+	}
+}
+
+function describePersistFailure(kind: PersistFailureKind, attempts: number): string {
+	switch (kind) {
+		case PersistFailureKind.Denied:
+			return "the canonical side refused the write, so these edits cannot be saved";
+		case PersistFailureKind.EntityMissing:
+			// Deliberately makes no claim about lost edits — see the enum.
+			return "no entity row exists, so this document was never persisted";
+		default:
+			return `${attempts} persist attempts were rejected — local edits are not durable`;
+	}
+}
+
+function describeCause(cause: unknown): string {
+	if (cause instanceof Error) return cause.message;
+	return String(cause);
+}
 
 /** Default zero-ref retention. Bounds memory (each retained replica holds a
  *  full Y.Doc) while comfortably covering navigate-away-and-back plus a
@@ -193,15 +253,34 @@ export function createYDocResolver(
 		let detached = false;
 		let retryTimer: ReturnType<typeof setTimeout> | null = null;
 		let retryAttempt = 0;
+		let lastFailure: { kind: PersistFailureKind; cause: unknown } | null = null;
+
+		const classify = (error: unknown): PersistFailureKind =>
+			transport.classifyPersistFailure?.(error) ?? PersistFailureKind.Transient;
+
+		const giveUp = (kind: PersistFailureKind, cause: unknown, attempts: number): void => {
+			lastFailure = null;
+			reportError(entityId, new PersistFailedError(entityId, kind, attempts, cause));
+		};
+
+		const onPersistRejected = (error: unknown): void => {
+			const kind = classify(error);
+			lastFailure = { kind, cause: error };
+			// A refusal is not a race. The ledger does not change under an open
+			// doc, so every resend would be refused identically — retrying only
+			// re-ships the whole document at a boundary that has already said no.
+			if (kind === PersistFailureKind.Denied) {
+				giveUp(kind, error, 1);
+				return;
+			}
+			scheduleResend();
+		};
+
 		const scheduleResend = (): void => {
 			if (detached || retryTimer !== null) return;
 			if (retryAttempt >= retryDelays.length) {
-				reportError(
-					entityId,
-					new Error(
-						`ydoc: canonical side rejected ${retryDelays.length} persist attempts — local edits are not durable`,
-					),
-				);
+				const failure = lastFailure;
+				if (failure) giveUp(failure.kind, failure.cause, retryDelays.length);
 				return;
 			}
 			const delay = retryDelays[retryAttempt] ?? 0;
@@ -217,12 +296,10 @@ export function createYDocResolver(
 			// transport still satisfies it; only a thenable can report a failure.
 			const result = transport.persist(entityId, update);
 			if (!isThenable(result)) return;
-			void result.then(
-				() => {
-					retryAttempt = 0;
-				},
-				() => scheduleResend(),
-			);
+			void result.then(() => {
+				retryAttempt = 0;
+				lastFailure = null;
+			}, onPersistRejected);
 		};
 
 		const onUpdate = (update: Uint8Array, origin: unknown): void => {
@@ -307,6 +384,15 @@ export function createYDocResolver(
 				if (retryTimer !== null) {
 					clearTimeout(retryTimer);
 					retryTimer = null;
+					// Teardown cancels the heal. If the canonical side was still
+					// missing real content, saying nothing here is how a loss
+					// becomes invisible — the failure mode this whole path exists
+					// to end. EntityMissing is exempt: no row was ever created, so
+					// the update was a mount scaffold and nothing was lost.
+					const failure = lastFailure;
+					if (failure && failure.kind !== PersistFailureKind.EntityMissing) {
+						giveUp(failure.kind, failure.cause, retryAttempt);
+					}
 				}
 				doc.off("update", onUpdate);
 				offRemote?.();
@@ -337,10 +423,15 @@ export function createYDocResolver(
 				// canonical side), so a replica that still owed the canonical
 				// side an update would silently lose that debt across the
 				// revive. Carry it over and re-ship from the fresh replica.
-				const owed = kept.hasPendingPersist();
+				// Snapshot the debt BEFORE detaching. `seed` is undefined when the
+				// replica never hydrated, but it can still hold local edits the
+				// canonical side never took, so the owed state has to come from the
+				// replica's own doc rather than from `seed` (0.13.0 keyed the
+				// re-ship on `seed` and silently dropped the debt on that branch).
+				const owedState = kept.hasPendingPersist() ? Y.encodeStateAsUpdate(kept.doc) : undefined;
 				kept.detach(); // destroy the old replica WITHOUT closing canonical
 				entry = open(entityId, seed);
-				if (owed && seed) entry.resend(seed);
+				if (owedState) entry.resend(owedState);
 			} else {
 				entry = open(entityId);
 			}

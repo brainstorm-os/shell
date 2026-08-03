@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { PersistFailureKind } from "./resolver";
 import {
 	type YDocResolverRuntime,
 	b64ToBytes,
 	bytesToB64,
+	classifyPersistFailure,
 	createYDocResolverAccessor,
 } from "./resolver-accessor";
 
@@ -86,5 +88,42 @@ describe("base64 round-trip", () => {
 	it("bytesToB64 ∘ b64ToBytes is identity", () => {
 		const bytes = new Uint8Array([0, 1, 2, 250, 255, 128, 64]);
 		expect([...b64ToBytes(bytesToB64(bytes))]).toEqual([...bytes]);
+	});
+});
+
+/**
+ * F-490 — the accessor is the only layer that knows the protocol's error
+ * shapes, so it owns the classification the resolver acts on. The broker puts
+ * the handler's thrown `error.name` on the wire verbatim (`broker.ts` →
+ * `{ kind: error.name }`) and `makeSdkError` rebuilds it renderer-side, which
+ * is what makes these matchable at all.
+ */
+describe("classifyPersistFailure", () => {
+	it("treats a refused write as Denied (no resend can change the ledger)", () => {
+		const denied = new Error("entities.applyDoc: no entities.write for Note/v1");
+		denied.name = "Denied";
+		expect(classifyPersistFailure(denied)).toBe(PersistFailureKind.Denied);
+	});
+
+	it("treats an uncommitted row as EntityMissing, not as lost edits", () => {
+		const missing = new Error("entities.applyDoc: journal-2026-07-25 not found");
+		missing.name = "Invalid";
+		expect(classifyPersistFailure(missing)).toBe(PersistFailureKind.EntityMissing);
+	});
+
+	it("treats anything else as Transient so the F-488 heal still runs", () => {
+		const busy = new Error("entities.applyDoc: ydoc transport not wired");
+		busy.name = "Unavailable";
+		expect(classifyPersistFailure(busy)).toBe(PersistFailureKind.Transient);
+	});
+
+	it("treats a malformed Invalid as Transient — only a missing row is exempt", () => {
+		const bad = new Error("entities.applyDoc: updateB64 is not valid base64");
+		bad.name = "Invalid";
+		expect(classifyPersistFailure(bad)).toBe(PersistFailureKind.Transient);
+	});
+
+	it("treats a non-Error rejection as Transient rather than guessing", () => {
+		expect(classifyPersistFailure("nope")).toBe(PersistFailureKind.Transient);
 	});
 });
