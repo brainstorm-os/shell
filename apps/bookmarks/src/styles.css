@@ -749,6 +749,14 @@ body.is-resizing .bookmarks__resize {
 	border: var(--border-width) solid var(--border-strong);
 	color: var(--text-faint);
 	flex: 0 0 auto;
+	/* Fade with the hover-revealed ⋯ so the pill and the menu trigger never
+	   stack in the card's top-right (probe 933 / Tags "All" + Tag board). */
+	transition: opacity 0.12s ease;
+}
+
+.bookmarks__card:hover .bookmarks__surface-tag,
+.bookmarks__card:focus-within .bookmarks__surface-tag {
+	opacity: 0;
 }
 
 .bookmarks__surface-tag--read {
@@ -847,15 +855,6 @@ body.is-resizing .bookmarks__resize {
 .bookmarks__tag-board .bookmarks__card:focus-within .bookmarks__card-actions {
 	opacity: 1;
 	pointer-events: auto;
-}
-
-.bookmarks__tag-board .bookmarks__surface-tag {
-	transition: opacity 0.12s ease;
-}
-
-.bookmarks__tag-board .bookmarks__card:hover .bookmarks__surface-tag,
-.bookmarks__tag-board .bookmarks__card:focus-within .bookmarks__surface-tag {
-	opacity: 0;
 }
 
 .bookmarks__tag-board-head {

@@ -166,6 +166,45 @@ describe("buildVaultFileTree", () => {
 		expect((root?.properties.members as string[]).includes("calview_1")).toBe(false);
 	});
 
+	it("projects CodeFile path (and nested leaf) into the display name", () => {
+		const entities: VaultEntityInput[] = [
+			folder(ROOT_FOLDER_ID, "Vault", ["cf_root", "cf_nested", "note_titled"]),
+			{
+				id: "cf_root",
+				type: "brainstorm/CodeFile/v1",
+				properties: { path: "readme.md", content: "" },
+				createdAt: 1,
+				updatedAt: 1,
+				deletedAt: null,
+			},
+			{
+				id: "cf_nested",
+				type: "brainstorm/CodeFile/v1",
+				properties: { path: "src/lib/main.ts", content: "" },
+				createdAt: 1,
+				updatedAt: 1,
+				deletedAt: null,
+			},
+			{
+				id: "note_titled",
+				type: "io.brainstorm.notes/Note/v1",
+				properties: { title: "Northbound thesis" },
+				createdAt: 1,
+				updatedAt: 1,
+				deletedAt: null,
+			},
+		];
+		const tree = buildVaultFileTree(
+			entities,
+			ROOT_FOLDER_ID,
+			NOW,
+			new Set(["brainstorm/CodeFile/v1", "io.brainstorm.notes/Note/v1"]),
+		);
+		expect(tree.find((e) => e.id === "cf_root")?.properties.name).toBe("readme.md");
+		expect(tree.find((e) => e.id === "cf_nested")?.properties.name).toBe("main.ts");
+		expect(tree.find((e) => e.id === "note_titled")?.properties.name).toBe("Northbound thesis");
+	});
+
 	it("chat Message rows never surface as top-level items; untitled Notes still do (F-318)", () => {
 		// The generic fallback viewer answers `intents.suggest` for ANY typed
 		// entity, so the opener cache resolves Message too — the type filter is

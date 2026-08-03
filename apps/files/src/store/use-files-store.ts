@@ -75,6 +75,7 @@ import {
 	ROOT_FOLDER_ID,
 	readMembers,
 	readName,
+	resolveDisplayName,
 } from "../types/entity";
 import type { VaultEntityShape, VaultLinkShape } from "../types/runtime";
 
@@ -156,8 +157,7 @@ function buildVaultEntityIndex(
 	for (const raw of entities) {
 		if (raw.deletedAt) continue;
 		const props = raw.properties ?? {};
-		const nameValue = props.name ?? props.title;
-		const name = typeof nameValue === "string" && nameValue.length > 0 ? nameValue : "(untitled)";
+		const name = resolveDisplayName(props) ?? "(untitled)";
 		map.set(raw.id, {
 			id: raw.id,
 			type: raw.type,

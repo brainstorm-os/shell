@@ -19,7 +19,7 @@
  * changes, never this projection.
  */
 
-import { type Entity, FILE_TYPE, FOLDER_TYPE } from "../types/entity";
+import { type Entity, FILE_TYPE, FOLDER_TYPE, resolveDisplayName } from "../types/entity";
 
 /** A folder member that is LIVE in the vault but hidden from the browser
  *  (child-scoped / app-internal type filtered out of `browsableTypes`).
@@ -43,8 +43,7 @@ export type VaultEntityInput = {
 };
 
 function displayName(properties: Record<string, unknown>): string {
-	const value = properties.name ?? properties.title;
-	return typeof value === "string" && value.length > 0 ? value : "(untitled)";
+	return resolveDisplayName(properties) ?? "(untitled)";
 }
 
 /**
