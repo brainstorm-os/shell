@@ -3335,8 +3335,20 @@ void app.whenReady().then(async () => {
 	// roster can change twice in quick succession and two concurrent passes over
 	// the same vault would double the HPKE work for no benefit.
 	let backfillInFlight: Promise<void> | null = null;
+	// A roster change that arrives DURING a pass. The in-flight guard hands the
+	// caller the running promise, so without this the second pairing would be
+	// swallowed: the pass resolves its roster once (below), and a device that
+	// joined mid-pass would never be a recipient for any entity — not even the
+	// ones scanned after it joined. Re-running once at the end is cheap (the
+	// fan-out no-ops a recipient that already has a wrap) and is what makes the
+	// per-pass roster safe.
+	let backfillDirty = false;
 	const runSiblingWrapBackfill = (): Promise<void> => {
-		backfillInFlight ??= (async () => {
+		if (backfillInFlight) {
+			backfillDirty = true;
+			return backfillInFlight;
+		}
+		backfillInFlight = (async () => {
 			try {
 				const session = getActiveVaultSession();
 				const repo = await getEntitiesRepoForActiveSession();
@@ -3344,6 +3356,12 @@ void app.whenReady().then(async () => {
 				if (!session || !repo || !engine) return;
 				const dekStore = await session.entityDekStore();
 				const { backfillWrapsForSiblings } = await import("./sync/wrap-backfill");
+				// Resolved ONCE per pass. `fanOutEntityWrapToSiblings` otherwise
+				// re-opens `VaultPropertiesStore` — a Y.Doc load — for every entity,
+				// so an N-entity vault paid N properties-doc loads on top of its
+				// N × devices HPKE seals, on exactly the pairing gesture the IE-11
+				// long-pass treatment exists to keep responsive.
+				const roster = await engine.resolveSiblingRoster();
 				const result = await backfillWrapsForSiblings({
 					listCandidates: () => repo.listIdsWithDek().map((r) => ({ entityId: r.id, type: r.type })),
 					openDek: (entityId) => {
@@ -3352,7 +3370,7 @@ void app.whenReady().then(async () => {
 					},
 					closeDek: (dek) => dekStore.close(dek),
 					fanOut: (entityId, dek, version, type) =>
-						engine.fanOutEntityWrapToSiblings(entityId, dek, version, type),
+						engine.fanOutEntityWrapToSiblings(entityId, dek, version, type, roster),
 				});
 				if (result.delivered > 0 || result.failed > 0) {
 					console.log(
@@ -3365,7 +3383,11 @@ void app.whenReady().then(async () => {
 				backfillInFlight = null;
 			}
 		})();
-		return backfillInFlight;
+		return backfillInFlight.then(() => {
+			if (!backfillDirty) return;
+			backfillDirty = false;
+			return runSiblingWrapBackfill();
+		});
 	};
 
 	// Asset-B1 — install a pre-sealed asset-DEK wrap on an entity Y.Doc. The
