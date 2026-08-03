@@ -31,6 +31,8 @@ export {
 export {
 	type YDocResolverApi,
 	type YDocTransport,
+	PersistFailedError,
+	PersistFailureKind,
 	REMOTE_ORIGIN,
 	createYDocResolver,
 } from "./resolver";

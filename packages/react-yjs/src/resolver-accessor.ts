@@ -13,7 +13,33 @@
  * doc surface — e.g. the `vite preview` / Playwright harness drops.
  */
 
-import { type YDocResolverApi, type YDocTransport, createYDocResolver } from "./resolver";
+import {
+	PersistFailedError,
+	PersistFailureKind,
+	type YDocResolverApi,
+	type YDocTransport,
+	createYDocResolver,
+} from "./resolver";
+
+/** Sort an `entities.applyDoc` rejection for the resolver's retry logic.
+ *
+ *  The broker puts the handler's `error.name` on the wire as the error kind
+ *  (`broker.ts` → `{ kind: error.name }`), and `makeSdkError` rebuilds it
+ *  renderer-side, so the name survives intact: `entities-service` throws
+ *  `Denied` for a missing `entities.write`, and `Invalid` with a "not found"
+ *  message while a row has not committed.
+ *
+ *  Matching the message for the missing-row case is deliberate — `Invalid`
+ *  also covers malformed arguments, which a resend genuinely might not fix but
+ *  which is not the "nothing was ever created" case either. */
+export function classifyPersistFailure(error: unknown): PersistFailureKind {
+	if (!(error instanceof Error)) return PersistFailureKind.Transient;
+	if (error.name === "Denied" || error.name === "CapabilityDenied") {
+		return PersistFailureKind.Denied;
+	}
+	if (isNotFoundError(error)) return PersistFailureKind.EntityMissing;
+	return PersistFailureKind.Transient;
+}
 
 /** A `loadDoc` rejection for an entity whose Y.Doc isn't persisted yet (the
  *  renderer mounted the editor before the create committed). Benign — distinct
@@ -93,6 +119,7 @@ export function createYDocResolverAccessor(
 				// snippet still read "5 words". Surfacing the rejection lets the
 				// resolver re-ship the replica's full state, which heals it.
 				Promise.resolve(applyDoc(entityId, bytesToB64(update))),
+			classifyPersistFailure,
 			release: (entityId) => {
 				void closeDoc(entityId);
 			},
@@ -110,11 +137,22 @@ export function createYDocResolverAccessor(
 		};
 		cached = createYDocResolver(transport, {
 			onError: (entityId, error) => {
-				// Renderer-side: a snapshot load/apply failure leaves an empty
-				// replica that still accepts edits, so it's recoverable — but
-				// log it so a doc that silently failed to hydrate (corrupt
-				// snapshot, IPC/disk error) is visible instead of looking like
-				// a genuinely empty entity.
+				// Two different failures arrive here and 0.13.0 reported both as
+				// "failed to load", which is how six *persist* failures per session
+				// were logged as load errors (F-490). Say which one happened, and
+				// do not shout about a document nobody ever wrote in.
+				if (error instanceof PersistFailedError) {
+					if (error.kind === PersistFailureKind.EntityMissing) {
+						console.debug(`[react-yjs] ${entityId}: nothing to persist`, error.message);
+						return;
+					}
+					console.error(`[react-yjs] failed to persist Y.Doc for entity ${entityId}`, error);
+					return;
+				}
+				// A snapshot load/apply failure leaves an empty replica that still
+				// accepts edits, so it's recoverable — but log it so a doc that
+				// silently failed to hydrate (corrupt snapshot, IPC/disk error) is
+				// visible instead of looking like a genuinely empty entity.
 				console.error(`[react-yjs] failed to load Y.Doc for entity ${entityId}`, error);
 			},
 		});
