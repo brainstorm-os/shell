@@ -39,6 +39,7 @@ import {
 } from "../storage/entities-repo";
 import { type PipelineContext, emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
+import { type WrapFanoutResult, fanOutEntityWrap } from "../sync/wrap-fanout";
 import type { VaultSession } from "../vault/session";
 import {
 	AccessRole,
@@ -545,6 +546,53 @@ export class SharingEngine {
 		console.info(
 			`[sharing] rotated ${entityId} on revoke: v${version}, ${wraps.length} wrap(s), delivered=${delivered}`,
 		);
+	}
+
+	/**
+	 * Stage 10.3c — fan this entity's DEK out to the user's OTHER devices.
+	 *
+	 * The producer 10.3b never built. Without it nothing ever wrapped an entity
+	 * DEK for a paired device, so two of one user's own devices never synced a
+	 * single entity.
+	 *
+	 * Rides the IDENTITY inbox, not a per-device channel: every device of one
+	 * identity already subscribes it, and the frame `sender` is the sovereign
+	 * user key, so a device-scoped channel would hand the blind relay a new
+	 * identifier telling it how many devices this identity has. Siblings the
+	 * wrap is not addressed to drop it on an exact `recipientPubB64` compare —
+	 * see the guard in `installWrap`.
+	 *
+	 * Returns null when there is nothing to do (no relay, no siblings), so the
+	 * caller can tell "not delivered" from "nothing to deliver".
+	 */
+	async fanOutEntityWrapToSiblings(
+		entityId: string,
+		dek: Uint8Array,
+		version: number,
+		type?: string,
+	): Promise<WrapFanoutResult | null> {
+		const relay = this.#getRelay();
+		if (!relay) return null; // offline — the pairing backfill is the catch-up path
+		// `makeCtx` reads the DEK store, and this can be the first thing to run
+		// on a session (an entity created before anything else touched sharing),
+		// so initialise rather than assume.
+		await this.ensureDekStore();
+		const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
+		const props = await VaultPropertiesStore.open(this.#session.ydocStore);
+		const devices = props.devices().listActive();
+		const ctx = this.makeCtx(relay.currentPort());
+		return fanOutEntityWrap({
+			entityId,
+			dek,
+			version,
+			...(type === undefined ? {} : { type }),
+			devices,
+			selfDeviceEd25519Pub: this.#session.deviceEd25519.publicKeyBase64,
+			identityRoute: inboxChannelFor(this.#session.identity.publicKeyBase64),
+			wrapFor: (d, recipientPubB64, id, t, v) =>
+				wrapDekForRecipient(d, base64ToBytes(recipientPubB64), id, t, v),
+			emit: (id, wrap, route) => emitWrapBootstrap(id, wrap, ctx, route),
+		});
 	}
 
 	/** Deliver the inbox `WrapBootstrap` for each survivor wrap + re-seal the
