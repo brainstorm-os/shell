@@ -3841,6 +3841,16 @@ void app.whenReady().then(async () => {
 							console.warn(`[live-sync] refused a DEK rotation for ${entityId} from a non-Owner sender`);
 							return null;
 						}
+						// 10.3c — the identity inbox is shared by every device of this
+						// identity, so a wrap fanned out to a SIBLING is delivered here
+						// too. It is sealed to the sibling's X25519 key, so unwrapping
+						// it would throw once per entity per device. Compare the
+						// recipient the wrap names and stop: exact, silent, and cheap.
+						// Also defence in depth on the cross-user path, where a wrap
+						// addressed to another member is simply not ours to open.
+						if (wrap.recipientPubB64 !== bytesToBase64(session.deviceX25519.publicKey)) {
+							return null;
+						}
 						const { dek, type } = session.unwrapMemberWrapWithType(wrap, entityId);
 						try {
 							const repo = await getEntitiesRepoForActiveSession();
