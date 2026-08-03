@@ -560,3 +560,60 @@ describe("ydoc worker", () => {
 		});
 	});
 });
+
+/**
+ * F-491 — the damaged-doc sweep, over the worker boundary. This is the
+ * surface that answers "which of my documents lost content?", a question that
+ * had no answer before: the per-load flag existed and nothing ever asked it.
+ */
+describe("ydoc worker — scanDamaged", () => {
+	let vaultDir: string;
+
+	beforeEach(async () => {
+		vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-ydoc-scan-"));
+		__ydocCacheResetForTest();
+	});
+
+	afterEach(async () => {
+		await rm(vaultDir, { recursive: true, force: true });
+	});
+
+	/** Persist ONLY the second update, so the doc depends on bytes that never
+	 *  reached disk — the exact shape shell #460 stopped creating and that
+	 *  every pre-0.13.0 Journal day may already be in. */
+	async function writeHoledDoc(entityId: string): Promise<void> {
+		const src = new Y.Doc();
+		captureUpdate(src, () => src.getText("t").insert(0, "hello"));
+		const second = captureUpdate(src, () => src.getText("t").insert(5, " world"));
+		await handleYDocEnvelope(
+			mk("applyUpdate", {
+				vaultPath: vaultDir,
+				entityId,
+				updateB64: Buffer.from(second).toString("base64"),
+			}),
+		);
+		__ydocCacheResetForTest(); // force a cold re-read, as a restart would
+	}
+
+	it("reports an empty vault as undamaged rather than failing", async () => {
+		const reply = await handleYDocEnvelope(mk("scanDamaged", { vaultPath: vaultDir }));
+		if (!reply.ok) throw new Error("expected ok");
+		expect((reply.value as { damaged: unknown[] }).damaged).toEqual([]);
+	});
+
+	it("names every damaged entity so the loss can be enumerated", async () => {
+		await writeHoledDoc("journal-2026-07-26");
+		await writeHoledDoc("journal-2026-07-29");
+
+		const reply = await handleYDocEnvelope(mk("scanDamaged", { vaultPath: vaultDir }));
+		if (!reply.ok) throw new Error("expected ok");
+		const { damaged } = reply.value as {
+			damaged: Array<{ entityId: string; pendingStructs: boolean }>;
+		};
+		expect(damaged.map((d) => d.entityId).sort()).toEqual([
+			"journal-2026-07-26",
+			"journal-2026-07-29",
+		]);
+		expect(damaged.every((d) => d.pendingStructs)).toBe(true);
+	});
+});

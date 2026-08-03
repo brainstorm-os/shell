@@ -36,11 +36,22 @@
  */
 
 import { Buffer } from "node:buffer";
-import { access, appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import {
+	access,
+	appendFile,
+	mkdir,
+	readFile,
+	readdir,
+	rename,
+	stat,
+	writeFile,
+} from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { crc32 } from "node:zlib";
 import * as Y from "yjs";
 
+/** One doc per entity; the sweep derives an entity id back off this. */
+const DOC_EXT = ".ydoc";
 const MAGIC = Buffer.from("YDOC", "ascii");
 const FORMAT_VERSION = 1;
 const HEADER_BYTES = 4 /* magic */ + 4 /* version */ + 4 /* snap_len */;
@@ -73,6 +84,21 @@ export type LoadResult = {
 	pendingStructs: boolean;
 };
 
+/** One entity whose stored doc is not intact. */
+export type DamagedDoc = {
+	entityId: string;
+	/** Structs Yjs cannot integrate — an update this doc depends on was never
+	 *  written. The content they carry is unrecoverable: the bytes do not
+	 *  exist anywhere to be restored from. */
+	pendingStructs: boolean;
+	/** The final tail entry was corrupt (truncated / bad CRC) and was skipped
+	 *  — a crashed mid-write, distinct from a missing update. */
+	truncatedTail: boolean;
+	/** The file could not be parsed at all. Reported rather than thrown so one
+	 *  bad file cannot hide every other finding in the vault. */
+	unreadable?: boolean;
+};
+
 export class YDocStore {
 	private readonly baseDir: string;
 	private readonly compactThresholdBytes: number;
@@ -84,7 +110,7 @@ export class YDocStore {
 
 	pathFor(entityId: string): string {
 		const prefix = entityId.slice(0, 3) || "_";
-		const filePath = join(this.baseDir, prefix, `${entityId}.ydoc`);
+		const filePath = join(this.baseDir, prefix, `${entityId}${DOC_EXT}`);
 		// Final backstop (the id-charset guards at the service + worker
 		// boundaries are the primary fix): refuse to hand back any path that
 		// resolves outside the vault docs dir, so a traversing id can never
@@ -96,6 +122,57 @@ export class YDocStore {
 			throw new Error(`ydoc: entity id escapes the docs directory: ${JSON.stringify(entityId)}`);
 		}
 		return filePath;
+	}
+
+	/**
+	 * Walk every stored doc in the vault and report the ones that are not
+	 * intact (F-491).
+	 *
+	 * This repairs nothing and cannot: a doc with `pendingStructs` is missing
+	 * bytes that were never written to disk, so there is no source to restore
+	 * them from. What it buys is that the loss can be *named*. Before this,
+	 * the flag existed per-load and no caller ever asked, so a user who wrote
+	 * in Journal before 0.13.0 had no way to learn which days lost content —
+	 * a damaged doc is indistinguishable from a day nobody wrote in.
+	 *
+	 * Deliberately tolerant: an unreadable file is reported as a row rather
+	 * than thrown, because one bad file aborting the sweep would hide every
+	 * other finding in the vault — the exact failure this exists to end.
+	 */
+	async scanDamaged(): Promise<DamagedDoc[]> {
+		let shards: string[];
+		try {
+			shards = await readdir(this.baseDir);
+		} catch {
+			return []; // no docs dir yet — a vault nobody has written in
+		}
+		const damaged: DamagedDoc[] = [];
+		for (const shard of shards) {
+			let files: string[];
+			try {
+				files = await readdir(join(this.baseDir, shard));
+			} catch {
+				continue; // not a directory, or vanished mid-sweep
+			}
+			for (const file of files) {
+				if (!file.endsWith(DOC_EXT)) continue;
+				const entityId = file.slice(0, -DOC_EXT.length);
+				try {
+					const { pendingStructs, truncatedTail } = await this.load(entityId);
+					if (pendingStructs || truncatedTail) {
+						damaged.push({ entityId, pendingStructs, truncatedTail });
+					}
+				} catch {
+					damaged.push({
+						entityId,
+						pendingStructs: false,
+						truncatedTail: false,
+						unreadable: true,
+					});
+				}
+			}
+		}
+		return damaged;
 	}
 
 	/**

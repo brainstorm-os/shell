@@ -364,6 +364,11 @@ import { wireAppCallIpc } from "./tools/wire-app-call";
 import { wireToolApprovalIpc } from "./tools/wire-tool-approval";
 import { BADGES_CHANGED_CHANNEL, getBadgeHost } from "./ui/badge-host";
 import { getUiNotifyHost } from "./ui/notify-host";
+
+/** F-491 — entity ids already reported as permanently missing content this
+ *  session. A doc is re-loaded on every navigation, so without this the same
+ *  unrecoverable loss would re-notify every time the user opened it. */
+const damagedDocsNotified = new Set<string>();
 import { getOsBadgeAggregator } from "./ui/os-badge";
 import { makeOsNotifier } from "./ui/os-notification-host";
 import { type ComposedTray, getTrayHost } from "./ui/tray-host";
@@ -3648,6 +3653,23 @@ void app.whenReady().then(async () => {
 				title: "Recovered unsaved changes",
 				body:
 					"A document was recovered after an interrupted save. Its most recent edits may be missing.",
+			});
+		},
+		// F-491 — this is not recoverable and the notice must not imply it is.
+		// The update these structs depend on was never written to disk, so
+		// there is nothing to restore from; the honest thing is to tell the
+		// user which document lost content instead of letting it read as an
+		// ordinary empty page.
+		onDamagedDoc: (entityId) => {
+			if (damagedDocsNotified.has(entityId)) return; // once per doc per session
+			damagedDocsNotified.add(entityId);
+			console.warn(`[entities] ${entityId}: document is missing content permanently (F-491)`);
+			getUiNotifyHost().post({
+				appId: "io.brainstorm.shell",
+				kind: "warning",
+				title: "This document is missing content",
+				body:
+					"Part of this document was lost before it reached disk and cannot be recovered. Anything you write now is saved normally.",
 			});
 		},
 	});

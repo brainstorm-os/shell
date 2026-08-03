@@ -111,6 +111,10 @@ export type EntitiesServiceOptions = {
 	 *  once per cold load (the worker LRU returns `truncatedTail: false` on a
 	 *  cache hit), so a single warning per entity per session. */
 	onTruncatedTail?: (entityId: string) => void;
+	/** A loaded doc holds structs Yjs cannot integrate — content is missing and
+	 *  unrecoverable (F-491). Distinct from `onTruncatedTail`, which is a
+	 *  damaged write; here the bytes are clean and an update never arrived. */
+	onDamagedDoc?: (entityId: string, type: string) => void;
 	/** 11b.6 — post-commit change notification feeding the automations
 	 *  `EntityEvent` triggers. SECURITY: invoked ONLY after the per-type
 	 *  capability gate passed and the write committed; the payload carries
@@ -754,6 +758,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				// cold load — the worker cache returns false on a hit).
 				if ((loaded as { truncatedTail?: boolean } | null)?.truncatedTail) {
 					options.onTruncatedTail?.(id);
+				}
+				// F-491 — a doc missing an update it depends on renders as merely
+				// empty, which is why the 329 audit read a blank Journal body as a
+				// render fault for a day. Distinct from a truncated tail: those
+				// bytes are intact, an update simply never arrived, and it is not
+				// recoverable. Say so rather than let it pass as an empty page.
+				if ((loaded as { pendingStructs?: boolean } | null)?.pendingStructs) {
+					options.onDamagedDoc?.(id, row.type);
 				}
 				// Subscribe only after the read gate + a successful worker
 				// load — a failed load delivers nothing.

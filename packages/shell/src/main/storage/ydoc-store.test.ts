@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { DEFAULT_COMPACT_THRESHOLD, YDocStore } from "./ydoc-store";
@@ -241,5 +241,84 @@ describe("YDocStore — a missing update is detectable, not silent", () => {
 		const result = await store.load("ent_whole");
 		expect(result.pendingStructs).toBe(false);
 		expect(result.doc.getText("t").toString()).toBe("hello world");
+	});
+});
+
+/**
+ * F-491 — 0.13.0 stopped NEW holes but left every doc already damaged before
+ * it silently blank, and nothing enumerated them: the flag existed per-load
+ * and no caller ever asked. A user who wrote in Journal before 0.13.0 has no
+ * way to learn which days lost content. The sweep is the answer to "we don't
+ * detect which" — it cannot repair anything (the bytes were never written),
+ * but a loss you can name is categorically better than one you cannot.
+ */
+describe("YDocStore — sweeping a vault for damaged docs", () => {
+	let vaultDir: string;
+	let store: YDocStore;
+
+	beforeEach(async () => {
+		vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-ydoc-sweep-"));
+		store = new YDocStore(vaultDir);
+	});
+
+	afterEach(async () => {
+		await rm(vaultDir, { recursive: true, force: true });
+	});
+
+	/** Persist a doc that is missing the update its later structs depend on. */
+	async function writeHoledDoc(entityId: string): Promise<void> {
+		const src = new Y.Doc();
+		captureUpdate(src, () => src.getText("t").insert(0, "hello"));
+		const second = captureUpdate(src, () => src.getText("t").insert(5, " world"));
+		await store.appendUpdate(entityId, second);
+	}
+
+	async function writeWholeDoc(entityId: string): Promise<void> {
+		const src = new Y.Doc();
+		const first = captureUpdate(src, () => src.getText("t").insert(0, "hello"));
+		await store.appendUpdate(entityId, first);
+	}
+
+	it("returns nothing for a vault with no docs at all", async () => {
+		expect(await store.scanDamaged()).toEqual([]);
+	});
+
+	it("finds every damaged doc and leaves the healthy ones out", async () => {
+		await writeHoledDoc("journal-2026-07-26");
+		await writeHoledDoc("journal-2026-07-29");
+		await writeWholeDoc("journal-2026-07-30");
+		await writeWholeDoc("note_abc");
+
+		const damaged = await store.scanDamaged();
+		expect(damaged.map((d) => d.entityId).sort()).toEqual([
+			"journal-2026-07-26",
+			"journal-2026-07-29",
+		]);
+		expect(damaged.every((d) => d.pendingStructs)).toBe(true);
+	});
+
+	it("spans the sharded prefix directories rather than one of them", async () => {
+		// The store shards by the id's first 3 chars, so a sweep that only read
+		// one directory would silently under-report.
+		await writeHoledDoc("journal-2026-07-26");
+		await writeHoledDoc("note_damaged");
+		await writeHoledDoc("task_damaged");
+
+		const damaged = await store.scanDamaged();
+		expect(damaged).toHaveLength(3);
+	});
+
+	it("keeps going when one doc cannot be read, and says which failed", async () => {
+		await writeHoledDoc("journal-2026-07-26");
+		// A file that is not a valid ydoc at all — a partial write, a stray
+		// file. One unreadable doc must not abort the whole sweep.
+		const junk = store.pathFor("ent_junk");
+		await mkdir(dirname(junk), { recursive: true });
+		await writeFile(junk, Buffer.from("not a ydoc file"));
+
+		const damaged = await store.scanDamaged();
+		expect(damaged.map((d) => d.entityId)).toContain("journal-2026-07-26");
+		const junkRow = damaged.find((d) => d.entityId === "ent_junk");
+		expect(junkRow?.unreadable).toBe(true);
 	});
 });
