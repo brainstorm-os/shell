@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bytesToBase64 } from "../credentials/crypto";
+import { signAddDeviceRecord } from "../pairing/devices-store";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";
@@ -67,14 +68,21 @@ describe("SharingEngine.fanOutEntityWrapToSiblings", () => {
 
 	async function rosterSibling(x25519PubB64: string): Promise<void> {
 		const props = await VaultPropertiesStore.open(owner.ydocStore);
-		props.devices().add({
-			deviceEd25519Pub: "sibling-ed25519-pub",
-			deviceX25519Pub: x25519PubB64,
-			deviceLabel: "Second device",
-			addedAt: Date.now(),
-			addedBy: owner.identity.publicKeyBase64,
-			sig: "test-signature",
-		});
+		// LAN-2b — really signed under the owner's identity. This fixture used to
+		// plant `sig: "test-signature"`, which is precisely the forged-row shape
+		// the read path now rejects: a roster the vault owner never vouched for.
+		props.devices().add(
+			signAddDeviceRecord(
+				{
+					deviceEd25519Pub: "sibling-ed25519-pub",
+					deviceX25519Pub: x25519PubB64,
+					deviceLabel: "Second device",
+					addedAt: Date.now(),
+					addedBy: owner.identity.publicKeyBase64,
+				},
+				owner.exposeIdentityForPairing().secretKey,
+			),
+		);
 		// The store persists through an observer, and the engine re-opens the
 		// doc from disk rather than sharing this instance — let the write land.
 		await new Promise((resolve) => setTimeout(resolve, 50));

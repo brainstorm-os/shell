@@ -2218,7 +2218,15 @@ void app.whenReady().then(async () => {
 				.then(({ VaultPropertiesStore }) => VaultPropertiesStore.open(session.ydocStore))
 				.then((props) => {
 					// Guard against a vault switch completing mid-resolve.
-					if (getActiveVaultSession() === session) lanDevices = props.devices();
+					if (getActiveVaultSession() !== session) return;
+					// LAN-2b — bind the verifying key HERE, where the session that
+					// owns the roster is known, so the handshake's view of "who is
+					// rostered" is signature-verified rather than whatever the
+					// properties doc happens to hold. Adapting rather than handing
+					// the store over keeps the consumer's no-arg interface.
+					const store = props.devices();
+					const userEd25519Pub = session.identity.publicKey;
+					lanDevices = { listActive: () => store.listActive(userEd25519Pub) };
 				})
 				.catch(() => {
 					lanDevices = null;

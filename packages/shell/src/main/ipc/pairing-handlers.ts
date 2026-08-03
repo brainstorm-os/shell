@@ -433,7 +433,12 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 			// separate Y.Doc handle for the same id, so it cannot see a write that
 			// has only happened in this one. That is precisely why re-reading the
 			// roster after pairing still reported zero devices.
-			options.onDevicesChanged?.(active?.props.devices().listActive() ?? []);
+			// LAN-2b — verified under this vault's own identity key. This feeds
+			// LAN admission and the 10.3c DEK backfill, so an unverifiable row
+			// must never reach either.
+			options.onDevicesChanged?.(
+				active ? active.props.devices().listActive(active.session.identity.publicKey) : [],
+			);
 		} catch (error) {
 			console.warn("[brainstorm] pairing-devices main-process hook failed:", error);
 		}
