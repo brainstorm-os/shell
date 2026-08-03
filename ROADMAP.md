@@ -29,7 +29,6 @@ Being actively worked on. Listed because it is honest, not because it is promise
 
 - **Multi-device sync for your own devices.** The receiving half shipped some time ago; the half that hands your second device its keys is landing now. **It is not yet verified between two real machines**, so do not rely on it until this line moves to Shipped.
 - **Peer-to-peer sync over a local network** — two machines on the same Wi-Fi syncing with no server in the middle. Pairing and discovery work; the data does not converge over that link yet.
-- **A marketplace** — the storefront, the signed catalog, install and update engines all exist in the product. Nothing is hosted yet, so there is nothing to browse. That is the remaining work.
 
 ## What's coming
 
@@ -79,7 +78,7 @@ The engine underneath is already strong — formulas, rollups, aggregations, typ
 
 ### Platform
 
-- **A marketplace you can browse** — install and update apps, including third-party ones. The product side is built; hosting it is the remaining work.
+- **A marketplace you can browse** — install and update apps, including third-party ones. The product side is already built and shipping: the storefront, the signed catalog, and the install and update engines are all in the app today. What is missing is hosting — a deployed catalog origin and a real signing key — and that is deliberately later, so there is a working store with nothing in it.
 - **Publishing for anyone** — a developer portal, review queue and threat-intel feed, so it is not just our apps.
 - **Peer-to-peer sync on a local network** — two machines on the same Wi-Fi, no server in the middle.
 - **A mobile companion** — read, capture and light editing against the same vault.
