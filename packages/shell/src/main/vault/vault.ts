@@ -9,6 +9,7 @@ import {
 	reconcileAtRestMode,
 } from "@brainstorm-os/sqlite/at-rest-mode";
 import { ulid } from "ulid";
+import { fingerprintPublicKey, publicKeyToBase64 } from "../credentials/identity";
 import type { KeystoreBackendName, PickKeystoreOptions } from "../credentials/keystore";
 import { type DataStoreKind, archiveCorruptDb } from "../storage/data-stores";
 import { assertVaultFormatNotPreFreeze, assertVaultFormatSupported } from "../util/schema-version";
@@ -272,6 +273,39 @@ export async function openVault(path: string, options: OpenVaultOptions = {}): P
 		identityFingerprint: session.identity.fingerprint,
 	});
 	return entry;
+}
+
+/**
+ * F-493 — record an ADOPTED sovereign identity in `vault.json`.
+ *
+ * `identityPublicKey` is written once at vault creation and every later writer
+ * only preserves it, because `VaultSession.open` compares it against the
+ * keystore and refuses a mismatch — that check is the vault's tamper-evidence
+ * for key substitution. Pairing installs a different identity into the
+ * keystore, so without this the next open of a just-joined device throws and
+ * the vault cannot be opened at all.
+ *
+ * **Only ever called for a vault the pristine check passed** (see
+ * `pairing/vault-pristine.ts`). That ordering is the whole safety argument: on
+ * a vault holding the user's own work, re-pointing the identity would hand the
+ * other device unconditional authority over it via `authorizesWrapInstall`'s
+ * self-identity branch — so that case is refused before any of this runs, and
+ * the tamper signal is only ever rewritten when there is nothing behind it to
+ * protect.
+ */
+export async function adoptVaultIdentity(
+	vaultPath: string,
+	identityPublicKey: Uint8Array,
+): Promise<void> {
+	const vaultJsonPath = join(vaultPath, "vault.json");
+	const raw = await readFile(vaultJsonPath, "utf8");
+	const parsed = JSON.parse(raw) as VaultJson;
+	const next: VaultJson = {
+		...parsed,
+		identityPublicKey: publicKeyToBase64(identityPublicKey),
+		identityFingerprint: fingerprintPublicKey(identityPublicKey),
+	};
+	await writeFile(vaultJsonPath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
 export async function activateVault(
