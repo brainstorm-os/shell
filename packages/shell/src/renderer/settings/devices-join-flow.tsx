@@ -55,6 +55,10 @@ export type DevicesJoinFlowProps = {
 type Session = {
 	requestId: string;
 	sas: string;
+	/** The sovereign identity this device will adopt, as `ed25519:<16-hex>`.
+	 *  Shown at the confirm step because joining transfers authority, and the
+	 *  SAS alone only proves the channel — not WHOSE identity is on the far end. */
+	identityFingerprint?: string;
 	expiresAt: number;
 };
 
@@ -109,6 +113,12 @@ export function DevicesJoinFlow({ onClose, onJoined, embedded = false }: Devices
 			setSession({
 				requestId: result.requestId,
 				sas: result.sas,
+				// `exactOptionalPropertyTypes` — omit the key rather than set it to
+				// undefined, so an older main process that does not send one is
+				// "absent", not "present and empty".
+				...(result.identityFingerprint === undefined
+					? {}
+					: { identityFingerprint: result.identityFingerprint }),
 				expiresAt: result.expiresAt,
 			});
 			setState(DevicesJoinState.ConfirmSas);
@@ -218,6 +228,19 @@ export function DevicesJoinFlow({ onClose, onJoined, embedded = false }: Devices
 						<span className="devices-flow__sas-digits" data-testid="devices-join-sas">
 							{formatSas(session.sas)}
 						</span>
+						{session.identityFingerprint && (
+							<div className="devices-flow__adopting">
+								<p className="devices-flow__adopting-label">
+									{t("shell.settings.devices.join.adoptingLabel")}
+								</p>
+								<code className="devices-flow__adopting-fingerprint" data-testid="devices-join-fingerprint">
+									{session.identityFingerprint}
+								</code>
+								<p className="devices-flow__adopting-note">
+									{t("shell.settings.devices.join.adoptingNote")}
+								</p>
+							</div>
+						)}
 					</div>
 				)}
 				{state === DevicesJoinState.Joining && (
