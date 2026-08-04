@@ -20,6 +20,7 @@ function makeFakeSession(overrides: Partial<PairingServiceSession> = {}): Pairin
 	const deviceX = generateDeviceX25519();
 	const records: ReturnType<PairingServiceSession["devicesList"]> = [];
 	let storedIdentitySecret: Uint8Array | null = null;
+	let reopened = 0;
 	const base: PairingServiceSession = {
 		vaultId: "vlt_pair_test",
 		getUserIdentity: () => ({ publicKey: userPublic, secretKey: userSecret }),
@@ -28,6 +29,12 @@ function makeFakeSession(overrides: Partial<PairingServiceSession> = {}): Pairin
 		getRelayUrl: () => "wss://relay.example.test/v1",
 		saveIdentitySecret: async (secret) => {
 			storedIdentitySecret = new Uint8Array(secret);
+		},
+		// F-493 — a pristine vault by default, so the existing cases still join.
+		// The refusal path has its own cases below.
+		listEntityPrincipals: async () => [{ createdBy: "brainstorm.shell" }],
+		reopenForAdoptedIdentity: async () => {
+			reopened += 1;
 		},
 		devicesAdd: (record) => {
 			records.push(record);
@@ -204,5 +211,83 @@ describe("makePairingServiceHandler — broker handler", () => {
 		await expect(
 			handler(makeEnvelope("cancelPairing", [{ requestId: "does-not-exist" }])),
 		).rejects.toMatchObject({ name: "Invalid" });
+	});
+
+	it("F-493 — refuses to join when the vault already holds the user's own work", async () => {
+		const sourceSession = makeFakeSession();
+		const sourceSvc = new PairingService({ getSession: async () => sourceSession });
+		const started = await sourceSvc.startAddDevice({ mode: PairingMode.Qr });
+		const sourceIdentity = sourceSession.getUserIdentity();
+		const { decodePairingPayload } = await import("./pairing-payload");
+		const payload = decodePairingPayload(started.payload);
+		const sealedIdentity = sealQrIdentityForB(sourceIdentity.secretKey, payload.pairingSecret);
+
+		// A vault with one note the person wrote. Joining would re-point it at the
+		// source's identity, and `authorizesWrapInstall` treats a frame from this
+		// vault's own sovereign key as authorised to ROTATE a DEK on any entity —
+		// so the source would gain unconditional authority over that note.
+		const targetSession = makeFakeSession({
+			listEntityPrincipals: async () => [
+				{ createdBy: "brainstorm.shell" },
+				{ createdBy: "io.brainstorm.welcome" },
+				{ createdBy: "Se7lyssNZ0D+UDiRLKxlza4GlrSMNKed861JJCAyIYQ=" },
+			],
+		});
+		const targetSvc = new PairingService({ getSession: async () => targetSession });
+
+		await expect(
+			targetSvc.scanPayload({ payload: started.payload, sealedIdentity }),
+		).rejects.toMatchObject({ name: "Invalid" });
+
+		// And it refused BEFORE writing anything: the identity secret is the
+		// thing that would have bricked the vault, so a refusal that still
+		// stored it would be no refusal at all.
+		const stored = (targetSession as unknown as { _stored: () => Uint8Array | null })._stored();
+		expect(stored).toBeNull();
+	});
+
+	it("F-492 — re-opens the vault after joining so the session adopts the identity", async () => {
+		const sourceSession = makeFakeSession();
+		const sourceSvc = new PairingService({ getSession: async () => sourceSession });
+		const started = await sourceSvc.startAddDevice({ mode: PairingMode.Qr });
+		const sourceIdentity = sourceSession.getUserIdentity();
+		const { decodePairingPayload } = await import("./pairing-payload");
+		const payload = decodePairingPayload(started.payload);
+		const sealedIdentity = sealQrIdentityForB(sourceIdentity.secretKey, payload.pairingSecret);
+
+		let reopens = 0;
+		const targetSession = makeFakeSession({
+			reopenForAdoptedIdentity: async () => {
+				reopens += 1;
+			},
+		});
+		const targetSvc = new PairingService({ getSession: async () => targetSession });
+		const scanned = await targetSvc.scanPayload({ payload: started.payload, sealedIdentity });
+		expect(reopens).toBe(0); // not yet — the pair is not complete at scan time
+		await targetSvc.confirmSas({ requestId: scanned.requestId });
+		expect(reopens).toBe(1);
+	});
+
+	it("F-492 — a re-open failure leaves the device PAIRED, not half-joined", async () => {
+		const sourceSession = makeFakeSession();
+		const sourceSvc = new PairingService({ getSession: async () => sourceSession });
+		const started = await sourceSvc.startAddDevice({ mode: PairingMode.Qr });
+		const sourceIdentity = sourceSession.getUserIdentity();
+		const { decodePairingPayload } = await import("./pairing-payload");
+		const payload = decodePairingPayload(started.payload);
+		const sealedIdentity = sealQrIdentityForB(sourceIdentity.secretKey, payload.pairingSecret);
+
+		const targetSession = makeFakeSession({
+			reopenForAdoptedIdentity: async () => {
+				throw new Error("vault busy");
+			},
+		});
+		const targetSvc = new PairingService({ getSession: async () => targetSession });
+		const scanned = await targetSvc.scanPayload({ payload: started.payload, sealedIdentity });
+		// The pair itself is durable before the re-open is attempted, so a failure
+		// costs a restart — never an un-paired device holding a half-adopted key.
+		const confirmed = await targetSvc.confirmSas({ requestId: scanned.requestId });
+		expect(confirmed.addedRecord.sig.length).toBeGreaterThan(0);
+		expect(targetSession.devicesList().length).toBe(2);
 	});
 });

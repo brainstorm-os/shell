@@ -908,6 +908,11 @@ export type PairingScanPayloadResult = {
 	channelId: string;
 	expiresAt: number;
 	mode: PairingMode;
+	/** The sovereign identity this device will ADOPT, as `ed25519:<16-hex>`.
+	 *  The confirm step names it because joining is an authority transfer: the
+	 *  SAS proves the channel is not relayed, but not whose identity is on the
+	 *  other end of it. Optional so an older main process still type-checks. */
+	identityFingerprint?: string;
 };
 
 export type PairingConfirmSasResult = {

@@ -2490,6 +2490,21 @@ void app.whenReady().then(async () => {
 	}
 	registerPairingHandlers({
 		getDashboard: () => dashboardWindow,
+		// F-492 — the joining device adopts the source's sovereign identity, but
+		// `VaultSession.identity` is readonly and set once, so the running session
+		// is still its pre-pairing self: subscribed to the wrong `inbox:`, sending
+		// under the wrong `sender`, and failing the self-identity branch in
+		// `authorizesWrapInstall`. Re-activating rebuilds the session — and with it
+		// the live-sync engine, the sharing engine and the relay wiring — around
+		// the adopted identity, in one step, reusing the path a vault switch
+		// already takes. A hot swap would leave a window with the old key in some
+		// components and the new one in others, inside an authorization path.
+		reopenActiveVault: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return;
+			const { activateVault } = await import("./vault/vault");
+			await activateVault(session.vaultId);
+		},
 		// P2P-1 — a device joined (or was revoked), so re-read the roster the LAN
 		// handshake authenticates against. It is otherwise only read on a vault
 		// change, and pairing happens while the vault is already open, so the

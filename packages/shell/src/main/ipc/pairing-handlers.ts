@@ -26,6 +26,7 @@ import { join } from "node:path";
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { XCHACHA_NONCE_BYTES, bytesToBase64, isSealedSecret } from "../credentials/crypto";
+import { publicKeyFromSecret } from "../credentials/identity";
 import { base64UrlToBytes, bytesToBase64Url, pairingChannelId } from "../pairing/pairing-channel";
 // Used implicitly through the live transport seam — keeping the import
 // site explicit makes the relay-blind audit + reviewer scanning easier.
@@ -41,12 +42,14 @@ import {
 	type PairingServiceSession,
 	type PairingServiceTransport,
 } from "../pairing/pairing-service";
+import { EntitiesRepository } from "../storage/entities-repo";
 import { getActiveRelay } from "../sync/active-relay";
 import {
 	type VaultSession,
 	getActiveVaultSession,
 	onActiveVaultSessionChanged,
 } from "../vault/session";
+import { adoptVaultIdentity } from "../vault/vault";
 import {
 	type VaultPropertiesStore,
 	VaultPropertiesStore as VaultPropertiesStoreClass,
@@ -100,6 +103,22 @@ export type PairingHandlersOptions = {
 	 * non-LAN address is filtered downstream.
 	 */
 	onPairedPeerUrl?: (url: string) => void;
+	/**
+	 * F-492 — re-open the active vault so the running session adopts the identity
+	 * pairing just installed into the keystore.
+	 *
+	 * `VaultSession.identity` is `readonly`, set once in the constructor, and
+	 * `saveIdentitySecret` only writes the keystore for "the next
+	 * `VaultSession.open`". Without a re-open the joining device runs its whole
+	 * session as its pre-pairing self — subscribed to the wrong `inbox:`, sending
+	 * under the wrong `sender`, and failing the self-identity branch in
+	 * `authorizesWrapInstall` — so it pairs successfully and then syncs nothing.
+	 *
+	 * Supplied by the shell wiring, which owns vault open/close. Absent ⇒ the
+	 * adoption waits for the next launch (the pre-F-492 behaviour), which is why
+	 * the service treats a failure as a warning rather than un-pairing.
+	 */
+	reopenActiveVault?: () => Promise<void>;
 };
 
 type ActiveServiceHolder = {
@@ -133,9 +152,17 @@ function buildSession(
 	 *  listener can start or stop between one pairing and the next. */
 	relayUrl: () => string | null,
 	notify: () => void,
+	reopenActiveVault: (() => Promise<void>) | undefined,
 ): PairingServiceSession {
 	const devicesStore = props.devices();
 	const identityProvider = session.exposeIdentityForPairing();
+	// Opened lazily and once: the pristine check runs at most once per join, and
+	// a pairing attempt should not pay for an entities-db open it never uses.
+	let repo: Promise<EntitiesRepository> | null = null;
+	const entitiesRepo = (): Promise<EntitiesRepository> => {
+		repo ??= session.dataStores.open("entities").then((db) => new EntitiesRepository(db));
+		return repo;
+	};
 	return {
 		vaultId: session.vaultId,
 		getUserIdentity: () => ({
@@ -163,6 +190,29 @@ function buildSession(
 			// across, so the keys match by construction once the user
 			// re-opens with the freshly-installed identity).
 			await session.backend.setSecret(session.vaultId, "identity", secret);
+			// F-493 — the keystore and `vault.json` must name the SAME identity or
+			// the next open throws on the mismatch guard and the vault cannot be
+			// opened at all. Safe here and only here: `scanPayload` refused before
+			// this point unless the vault is pristine, so re-pointing the identity
+			// orphans nothing and hands nobody authority over existing work.
+			await adoptVaultIdentity(session.vaultPath, publicKeyFromSecret(secret));
+		},
+		// F-493 — provenance for the pristine check. Only `createdBy` leaves the
+		// repo; the decision never sees titles or bodies.
+		listEntityPrincipals: async () => {
+			try {
+				return (await entitiesRepo()).listCreatedByPrincipals();
+			} catch (error) {
+				// Fail closed: a vault we cannot read is treated as populated rather
+				// than assumed safe to re-point. `assessVaultPristine` counts an
+				// unknown principal as user content, so this one row refuses.
+				console.warn(`[pairing] could not read vault provenance: ${(error as Error).message}`);
+				return [{ createdBy: "unreadable" }];
+			}
+		},
+		reopenForAdoptedIdentity: async () => {
+			if (!reopenActiveVault) return;
+			await reopenActiveVault();
 		},
 		devicesAdd: (record) => {
 			const stored = devicesStore.add(record);
@@ -474,7 +524,8 @@ export function registerPairingHandlers(options: PairingHandlersOptions): () => 
 		// Relay first, LAN listener as the fallback — see `getLanListenerUrl`.
 		const relayUrl = (): string | null => vaultRelayUrl ?? options.getLanListenerUrl?.() ?? null;
 		const service = new PairingService({
-			getSession: async () => buildSession(session, props, relayUrl, notify),
+			getSession: async () =>
+				buildSession(session, props, relayUrl, notify, options.reopenActiveVault),
 			transport: buildTransport(),
 		});
 		active = { session, props, service };
