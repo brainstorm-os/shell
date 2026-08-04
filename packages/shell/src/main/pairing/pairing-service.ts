@@ -33,6 +33,7 @@
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import { type SealedSecret, isSealedSecret } from "../credentials/crypto";
+import { fingerprintPublicKey } from "../credentials/identity";
 import { PairingChannelGuard, exportSecretSealed } from "../credentials/identity-export";
 import { type SignedAddDeviceRecord, signAddDeviceRecord } from "./devices-store";
 import { base64UrlToBytes } from "./pairing-channel";
@@ -46,6 +47,7 @@ import {
 	startQrHandshakeOnSource,
 } from "./pairing-handshake";
 import { PairingMode } from "./pairing-payload";
+import { assessVaultPristine } from "./vault-pristine";
 
 export type PairingServiceSession = {
 	vaultId: string;
@@ -54,6 +56,15 @@ export type PairingServiceSession = {
 	getDeviceX25519(): { publicKey: Uint8Array };
 	getRelayUrl(): string | null;
 	saveIdentitySecret(secret: Uint8Array): Promise<void>;
+	/** F-493 — every entity row's creating principal, for the pristine check.
+	 *  Only `createdBy` is read; see `vault-pristine.ts` for why joining a vault
+	 *  that already holds the user's own work is refused. */
+	listEntityPrincipals(): Promise<readonly { createdBy: string }[]>;
+	/** F-492 — re-open the vault so the running session adopts the identity that
+	 *  was just installed. `VaultSession.identity` is readonly and set once, so
+	 *  without this the device keeps its pre-pairing identity for the rest of the
+	 *  session: wrong inbox, wrong wire sender, wrong self-identity authz branch. */
+	reopenForAdoptedIdentity(): Promise<void>;
 	devicesAdd(record: SignedAddDeviceRecord): SignedAddDeviceRecord;
 	devicesList(): SignedAddDeviceRecord[];
 	devicesRevoke(deviceEd25519Pub: string, now?: number): boolean;
@@ -341,6 +352,11 @@ export class PairingService {
 		channelId: string;
 		expiresAt: number;
 		mode: PairingMode;
+		/** The sovereign identity this device is about to ADOPT, as a
+		 *  `ed25519:<16-hex>` fingerprint. Joining is an authority transfer, not a
+		 *  settings change, so the confirm step names what is being adopted rather
+		 *  than only proving the channel with the SAS. */
+		identityFingerprint: string;
 	}> {
 		const session = await this.requireSession();
 		if (typeof args.payload !== "string" || args.payload.length === 0) {
@@ -349,6 +365,22 @@ export class PairingService {
 		if (!isSealedSecret(args.sealedIdentity)) {
 			invalid("sealedIdentity must be a SealedSecret");
 		}
+		// F-493 — BEFORE the handshake consumes its one-shot guard and before a
+		// single byte of the source's identity is written. Joining installs the
+		// source's sovereign key, and `authorizesWrapInstall` treats a frame from
+		// this vault's own sovereign key as authorised to rotate a DEK on ANY
+		// entity — so re-pointing a vault that already holds the user's work hands
+		// the other identity unconditional authority over content it was never a
+		// member of. Refuse instead; you join a vault, you do not merge two.
+		const pristine = assessVaultPristine(await session.listEntityPrincipals());
+		if (!pristine.pristine) {
+			const err = new Error(
+				`This device already has its own vault with ${pristine.userAuthored} item(s) in it. Joining would hand the other device authority over them. Open the vault you want to join on this device first, or join from a device with no work of its own.`,
+			);
+			err.name = "Invalid";
+			throw err;
+		}
+
 		const join = joinQrHandshakeOnTarget({
 			encodedPayload: args.payload,
 			sealedIdentity: args.sealedIdentity,
@@ -369,6 +401,7 @@ export class PairingService {
 			channelId: join.channelId,
 			expiresAt,
 			mode: PairingMode.Qr,
+			identityFingerprint: fingerprintPublicKey(join.userEd25519Pub),
 		};
 	}
 
@@ -438,6 +471,28 @@ export class PairingService {
 			console.warn("[pairing] could not record the source device:", error);
 		}
 		pending.machine.paired();
+
+		// F-492 — the identity was written to the keystore back in `scanPayload`,
+		// but `VaultSession.identity` is readonly and set once in the constructor,
+		// so this session is still running as its PRE-pairing self. Everything
+		// downstream keys off that: the `inbox:<identity>` the live-sync engine
+		// subscribed at session start, the wire `sender`, and the self-identity
+		// branch in `authorizesWrapInstall`. Re-open so the whole session is
+		// rebuilt around the adopted identity in one atomic step — a hot swap
+		// would leave a window where some components hold the old key and some
+		// the new, which in an authorization path is where the bugs live.
+		//
+		// Deliberately AFTER `paired()`: the pair itself is complete and durable
+		// at this point, so a re-open that fails leaves a paired device that needs
+		// a restart, never an un-paired one.
+		try {
+			await session.reopenForAdoptedIdentity();
+		} catch (error) {
+			console.warn(
+				`[pairing] identity adopted but the vault could not be re-opened; a restart will pick it up: ${(error as Error).message}`,
+			);
+		}
+
 		return { requestId: args.requestId, addedRecord: stored };
 	}
 
