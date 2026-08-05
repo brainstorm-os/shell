@@ -39,7 +39,7 @@ import {
 } from "../storage/entities-repo";
 import { type PipelineContext, emitWrapBootstrap, encryptAndEmit } from "../sync/envelope-pipeline";
 import type { RelayPort, RelaySurface } from "../sync/relay-port";
-import { type WrapFanoutResult, fanOutEntityWrap } from "../sync/wrap-fanout";
+import { type FanoutDevice, type WrapFanoutResult, fanOutEntityWrap } from "../sync/wrap-fanout";
 import type { VaultSession } from "../vault/session";
 import {
 	AccessRole,
@@ -181,6 +181,14 @@ export class SharingEngine {
 				const handle = dekStore.persist(entityId, dekId);
 				dekStore.close(handle.dek);
 			});
+			// 10.3c — mirror the production create path. `createEntityWithDek` runs
+			// `installEntityWrap`, and the sibling fan-out hangs off exactly that
+			// hook, so a bridge that mints a DEK and stops leaves this device the
+			// only holder — and no dogfood session can ever reach the producer.
+			// That is precisely how `collab/012` kept failing on `no DEK for
+			// entity` with a working LAN link: the transport was never the problem,
+			// the harness simply never asked for a wrap.
+			await this.#fanOutProvisionedDek(entityId, type);
 		}
 		const exposed = this.#session.exposeIdentityForPairing();
 		await this.mutateAndEmit(entityId, (doc) => {
@@ -192,6 +200,24 @@ export class SharingEngine {
 				now: Date.now(),
 			});
 		});
+	}
+
+	/** Fan a freshly-provisioned entity's DEK out to this identity's other
+	 *  devices. Never throws and never blocks the create: an offline sibling
+	 *  must not fail a local write, and the pairing backfill is the catch-up. */
+	async #fanOutProvisionedDek(entityId: string, type: string): Promise<void> {
+		try {
+			const dekStore = await this.ensureDekStore();
+			const handle = dekStore.open(entityId);
+			if (!handle) return;
+			try {
+				await this.fanOutEntityWrapToSiblings(entityId, handle.dek, handle.version, type);
+			} finally {
+				dekStore.close(handle.dek);
+			}
+		} catch (error) {
+			console.warn(`[sharing] provision fan-out failed for ${entityId}: ${(error as Error).message}`);
+		}
 	}
 
 	/**
@@ -549,6 +575,20 @@ export class SharingEngine {
 	}
 
 	/**
+	 * The user's currently-active device roster, as fan-out recipients.
+	 *
+	 * Opening `VaultPropertiesStore` is a Y.Doc load, so a caller fanning out N
+	 * entities must resolve this ONCE and pass it down rather than letting each
+	 * entity re-open it: the pairing backfill is O(entities) and this is exactly
+	 * the gesture `IE-11`'s long-pass treatment exists to keep responsive.
+	 */
+	async resolveSiblingRoster(): Promise<readonly FanoutDevice[]> {
+		const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
+		const props = await VaultPropertiesStore.open(this.#session.ydocStore);
+		return props.devices().listActive();
+	}
+
+	/**
 	 * Stage 10.3c — fan this entity's DEK out to the user's OTHER devices.
 	 *
 	 * The producer 10.3b never built. Without it nothing ever wrapped an entity
@@ -564,12 +604,18 @@ export class SharingEngine {
 	 *
 	 * Returns null when there is nothing to do (no relay, no siblings), so the
 	 * caller can tell "not delivered" from "nothing to deliver".
+	 *
+	 * `roster` lets a caller that fans out MANY entities resolve the device list
+	 * once instead of once per entity — see `resolveSiblingRoster`. Omitting it
+	 * reads the roster fresh, which is what the single-entity ongoing producer
+	 * wants.
 	 */
 	async fanOutEntityWrapToSiblings(
 		entityId: string,
 		dek: Uint8Array,
 		version: number,
 		type?: string,
+		roster?: readonly FanoutDevice[],
 	): Promise<WrapFanoutResult | null> {
 		const relay = this.#getRelay();
 		if (!relay) return null; // offline — the pairing backfill is the catch-up path
@@ -577,9 +623,7 @@ export class SharingEngine {
 		// on a session (an entity created before anything else touched sharing),
 		// so initialise rather than assume.
 		await this.ensureDekStore();
-		const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
-		const props = await VaultPropertiesStore.open(this.#session.ydocStore);
-		const devices = props.devices().listActive();
+		const devices = roster ?? (await this.resolveSiblingRoster());
 		const ctx = this.makeCtx(relay.currentPort());
 		return fanOutEntityWrap({
 			entityId,

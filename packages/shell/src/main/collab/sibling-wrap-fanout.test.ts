@@ -141,4 +141,51 @@ describe("SharingEngine.fanOutEntityWrapToSiblings", () => {
 		expect(result?.refused).toBe("placeholder-dek");
 		expect(result?.sent).toBe(0);
 	});
+
+	it("resolves the roster once and reuses it — a caller-supplied roster is honoured", async () => {
+		await rosterSibling(bytesToBase64(sibling.deviceX25519.publicKey));
+		const roster = await engine.resolveSiblingRoster();
+		expect(roster.length).toBeGreaterThan(0);
+
+		// The backfill's contract: N entities, ONE roster resolution. Passing the
+		// pre-resolved list must produce the same wire result as reading it per
+		// entity — that equivalence is what makes hoisting it safe.
+		for (const id of ["ent_4", "ent_5", "ent_6"]) {
+			await seedEntityDek(id);
+			const dekStore = await owner.entityDekStore();
+			const handle = dekStore.open(id);
+			if (!handle) throw new Error("expected a DEK");
+			const result = await engine.fanOutEntityWrapToSiblings(
+				id,
+				handle.dek,
+				handle.version,
+				"brainstorm/Note/v1",
+				roster,
+			);
+			dekStore.close(handle.dek);
+			expect(result?.sent).toBe(1);
+			expect(result?.failed).toEqual([]);
+		}
+	});
+
+	it("an empty caller-supplied roster wraps for nobody — the list is authoritative", async () => {
+		// Guards the hoist against the failure mode that would matter: a stale or
+		// empty pre-resolved roster must not silently fall back to a fresh read,
+		// or the caching would be untestable and its cost unbounded.
+		await rosterSibling(bytesToBase64(sibling.deviceX25519.publicKey));
+		await seedEntityDek("ent_7");
+		const dekStore = await owner.entityDekStore();
+		const handle = dekStore.open("ent_7");
+		if (!handle) throw new Error("expected a DEK");
+		const result = await engine.fanOutEntityWrapToSiblings(
+			"ent_7",
+			handle.dek,
+			handle.version,
+			"brainstorm/Note/v1",
+			[],
+		);
+		dekStore.close(handle.dek);
+
+		expect(result?.sent).toBe(0);
+	});
 });
