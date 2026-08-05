@@ -1,0 +1,103 @@
+# GitLab CI — test/lint pipeline, ported from .github/workflows/ci.yml.
+#
+# Scope: this replaces the `verify` and `e2e-smoke` jobs only. Packaging and
+# publishing (release.yml / alpha.yml / nightly.yml / publish-catalog.yml) are
+# NOT ported — they need macOS + Windows runners and the signing/notarisation
+# secrets, none of which exist on GitLab.com's free shared runners.
+#
+# Two deliberate differences from the GitHub pipeline:
+#   * No windows-x64 leg. GitLab.com's free tier offers Linux shared runners
+#     only, so the Windows path/SQLite-lock coverage that ci.yml got from
+#     windows-2022 has no home here. Run it locally before a release.
+#   * Bun and Rust are installed into the job rather than pulled from a
+#     marketplace action; caches are project-relative because GitLab can only
+#     cache paths inside the build directory.
+
+default:
+  image: debian:bookworm-slim
+  interruptible: true
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends
+      curl ca-certificates unzip build-essential pkg-config libssl-dev git
+    - curl -fsSL https://bun.sh/install | bash
+    - export PATH="$HOME/.bun/bin:$PATH"
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - bun install --frozen-lockfile
+
+variables:
+  # Cap parallel rustc units — the native addon builds inside `verify`, and the
+  # shared runners are small enough that an uncapped build gets OOM-killed.
+  CARGO_BUILD_JOBS: "2"
+  # GitLab only caches paths under the build dir, so point Bun's cache there.
+  BUN_INSTALL_CACHE_DIR: "$CI_PROJECT_DIR/.cache/bun"
+  CARGO_HOME: "$CI_PROJECT_DIR/.cache/cargo"
+
+cache:
+  key:
+    files:
+      - bun.lock
+      - packages/native/Cargo.lock
+  paths:
+    - .cache/bun
+    - .cache/cargo
+    - packages/native/target
+
+stages:
+  - verify
+  - e2e
+
+verify:
+  stage: verify
+  timeout: 45m
+  script:
+    # `verify` already builds the native addon + all apps before testing.
+    - bun run verify
+    # `verify` only runs the integration+entities vitest subset. Run the FULL
+    # suite so a green pipeline means the whole suite is green — that subset gap
+    # is how the read-only-lock rollout merged red.
+    - bun run test
+    # Formatter is Linux-only by design: a CRLF checkout makes biome report every
+    # file as mis-formatted.
+    - bunx biome check .
+    - bun run --filter @brainstorm-os/shell build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+e2e-smoke:
+  stage: e2e
+  timeout: 45m
+  script:
+    - apt-get install -y -qq --no-install-recommends
+      xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
+    - bun run --filter @brainstorm-os/native build:linux-x64
+    # bun install fetches Node-ABI prebuilds; the shell loads these inside
+    # Electron ("Module did not self-register" without the rebuild).
+    - cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers && cd -
+    - bun run e2e:build
+    - xvfb-run --auto-servernum -- npx playwright test --config=playwright.e2e.config.ts
+    - xvfb-run --auto-servernum -- npx playwright test --config=playwright.config.ts kbn-
+  variables:
+    # The runner's container kernel blocks Chromium's sandbox; the suite
+    # exercises app flows, not the sandbox itself.
+    ELECTRON_DISABLE_SANDBOX: "1"
+    # No Secret Service / unlocked keyring on a headless runner; the keystore
+    # has its own unit suites.
+    BRAINSTORM_DEV_INSECURE_CREDENTIALS: "1"
+    # Harness runs are hidden by default so an agent-driven shell never paints
+    # over a developer's desktop. Under xvfb there is no desktop and nobody to
+    # disturb, and an unmapped X11 window does not behave like an unmapped macOS
+    # one — these specs go red hidden on Linux while passing hidden on macOS.
+    BRAINSTORM_TEST_VISIBLE: "1"
+  artifacts:
+    when: on_failure
+    expire_in: 7 days
+    paths:
+      - test-results/
+      - tests/e2e/results/
+      - tests/perf/results/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
