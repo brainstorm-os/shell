@@ -145,9 +145,9 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "brainstorm-os",
-        "repo": "shell"
+        "provider": "generic",
+        "url": "https://gitlab.com/brainstorm-os/shell/-/releases/permalink/latest/downloads",
+        "channel": "latest"
       }
     ],
     "linux": {
