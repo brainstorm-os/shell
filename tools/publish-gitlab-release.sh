@@ -115,3 +115,13 @@ fi
 echo "published $TAG"
 echo "  release   : https://gitlab.com/brainstorm-os/shell/-/releases/$TAG"
 echo "  update feed: https://gitlab.com/brainstorm-os/shell/-/releases/permalink/latest/downloads/latest.yml"
+
+# Each release costs ~1.7 GB against a hard namespace storage cap, so old ones
+# have to go or a later publish fails on quota. Runs after a SUCCESSFUL publish
+# only — pruning before the new release exists would be the wrong order if the
+# upload above had failed.
+if [ "${BRAINSTORM_NO_PRUNE:-0}" != "1" ]; then
+  echo
+  echo "pruning old releases (keeping ${BRAINSTORM_KEEP_RELEASES:-3}) — set BRAINSTORM_NO_PRUNE=1 to skip"
+  "$ROOT/tools/prune-gitlab-releases.sh" "${BRAINSTORM_KEEP_RELEASES:-3}" --apply
+fi
