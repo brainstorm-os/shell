@@ -40,3 +40,8 @@ tests/dogfood/.screenshots-data/
 # test output (machine hostname + local paths leak in reports)
 tests/perf/results/
 tests/e2e/results/
+
+# graphify knowledge-graph output — a local analysis cache, not source. Untracked
+# it still gets scanned by `biome check .`, which reports errors on its generated
+# JSON and makes a clean local lint run look broken.
+/graphify-out/
