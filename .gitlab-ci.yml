@@ -83,6 +83,12 @@ e2e-smoke:
   stage: e2e
   timeout: 45m
   allow_failure: true
+  # Start immediately rather than queueing behind `verify`. This job builds and
+  # runs its own thing — it consumes none of verify's output — so the stage
+  # ordering was pure waiting: ~34 minutes before it could even begin, and again
+  # on every iteration while debugging it. With `needs: []` the two run
+  # concurrently and the pipeline finishes in the time of the slower one.
+  needs: []
   script:
     # xauth is NOT optional: xvfb-run shells out to it to create the X authority
     # file and exits 3 with "xauth command not found" without it. GitHub's ubuntu
