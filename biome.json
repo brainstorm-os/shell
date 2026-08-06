@@ -5,6 +5,8 @@
       "node_modules",
       ".claude",
       ".git",
+      "graphify-out",
+      ".cache",
       "out",
       "dist",
       "build",
