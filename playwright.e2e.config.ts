@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { scaled } from "./tests/e2e/lib/ci-timeouts";
 
 // 13.3 — Playwright end-to-end smoke. Functional (not perf): exercises the
 // beta-exit happy paths against the production-built shell under Electron —
@@ -24,6 +25,8 @@ export default defineConfig({
 	// One flaky retry — a smoke is a yes/no on the flow, and a real Electron
 	// boot occasionally loses a window event to OS scheduling jitter.
 	retries: 1,
-	timeout: 180_000,
+	// 180s locally; 3x on CI, where the same spec ran past this budget on a
+	// shared runner even after its internal poll was given room.
+	timeout: scaled(180_000),
 	reporter: [["list"], ["json", { outputFile: "tests/e2e/results/playwright-report.json" }]],
 });

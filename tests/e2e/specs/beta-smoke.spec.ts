@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { launchShell } from "../../perf/lib/launch-shell";
 import { waitForAppTabPage } from "../../visual/lib/app-window";
+import { scaled } from "../lib/ci-timeouts";
 
 /** Create (or re-activate) a vault and assert an active session — the
  *  precondition every other flow needs. Inline in the renderer, mirroring the
@@ -145,7 +146,7 @@ test("beta smoke — vault, apps, search, theme, pairing", async () => {
 				// is committed ASYNC by `seedNewVaultDefaults` after create. Anchor on
 				// the deterministic IPC snapshot until the dark slot is the seeded
 				// Default Dark, so the toggle below can't race a half-seeded slot.
-				await expect.poll(darkSlotTheme, { timeout: 30_000 }).toBe("default-dark");
+				await expect.poll(darkSlotTheme, { timeout: scaled(30_000) }).toBe("default-dark");
 				// The renderer only refreshes vault state on mount or via its own
 				// context methods — `createVault` used raw IPC, so the dashboard window
 				// can still be on the welcome screen (which pins Default Light). Reload to
