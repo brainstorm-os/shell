@@ -186,43 +186,53 @@ describe("vault.json atRestMode stamp + reconcile", () => {
 		);
 	});
 
-	it("activateVault: vault.json rewrite failure does not leave an active session (partial-state fix)", async () => {
-		// Repro of the post-iteration code-review CONFIRMED defect: the
-		// stamp upgrade was sequenced AFTER setActiveVaultSession, so a
-		// rewrite failure (disk full / EACCES) left a live session paired
-		// with a rejected IPC call. The fix moves the rewrite BEFORE
-		// setActiveVaultSession; a failed rewrite now unwinds cleanly with
-		// no active session, mirroring openVault's ordering.
-		let vaultId: string;
-		{
-			const { createVault, closeActiveVaultSession } = await loadVaultModule({
-				encryptedDriver: false,
-			});
-			const entry = await createVault({
-				name: "Plain",
-				path: vaultPath,
-				keystore: { forceInsecure: true },
-			});
-			vaultId = entry.id;
-			closeActiveVaultSession();
-		}
-		// Make the vault.json read-only so the upgrade rewrite throws.
-		const vaultJsonPath = join(vaultPath, "vault.json");
-		await chmod(vaultJsonPath, 0o444);
-		try {
-			// Activate with the encrypted driver — reconcile=UpgradeReady
-			// → rewriteVaultJsonAtRestMode runs → writeFile rejects with
-			// EACCES on the read-only file → activateVault throws.
-			const { activateVault, getActiveVaultSession } = await loadVaultModule({
-				encryptedDriver: true,
-			});
-			await expect(activateVault(vaultId, { keystore: { forceInsecure: true } })).rejects.toThrow();
-			expect(getActiveVaultSession()).toBeNull();
-		} finally {
-			// Restore so the afterEach cleanup can remove the temp dir.
-			await chmod(vaultJsonPath, 0o644);
-		}
-	});
+	// Root ignores permission bits, so chmod 0444 does not make writeFile fail
+	// and the failure this spec needs cannot be produced. CI containers run as
+	// root (GitHub's runners did not, which is why this only surfaced once the
+	// suite moved to GitLab). Skipping under root is not a weakened assertion —
+	// as root there is no denial to observe, so the scenario does not exist.
+	const itUnlessRoot = typeof process.getuid === "function" && process.getuid() === 0 ? it.skip : it;
+
+	itUnlessRoot(
+		"activateVault: vault.json rewrite failure does not leave an active session (partial-state fix)",
+		async () => {
+			// Repro of the post-iteration code-review CONFIRMED defect: the
+			// stamp upgrade was sequenced AFTER setActiveVaultSession, so a
+			// rewrite failure (disk full / EACCES) left a live session paired
+			// with a rejected IPC call. The fix moves the rewrite BEFORE
+			// setActiveVaultSession; a failed rewrite now unwinds cleanly with
+			// no active session, mirroring openVault's ordering.
+			let vaultId: string;
+			{
+				const { createVault, closeActiveVaultSession } = await loadVaultModule({
+					encryptedDriver: false,
+				});
+				const entry = await createVault({
+					name: "Plain",
+					path: vaultPath,
+					keystore: { forceInsecure: true },
+				});
+				vaultId = entry.id;
+				closeActiveVaultSession();
+			}
+			// Make the vault.json read-only so the upgrade rewrite throws.
+			const vaultJsonPath = join(vaultPath, "vault.json");
+			await chmod(vaultJsonPath, 0o444);
+			try {
+				// Activate with the encrypted driver — reconcile=UpgradeReady
+				// → rewriteVaultJsonAtRestMode runs → writeFile rejects with
+				// EACCES on the read-only file → activateVault throws.
+				const { activateVault, getActiveVaultSession } = await loadVaultModule({
+					encryptedDriver: true,
+				});
+				await expect(activateVault(vaultId, { keystore: { forceInsecure: true } })).rejects.toThrow();
+				expect(getActiveVaultSession()).toBeNull();
+			} finally {
+				// Restore so the afterEach cleanup can remove the temp dir.
+				await chmod(vaultJsonPath, 0o644);
+			}
+		},
+	);
 
 	it("openVault preserves unknown forward-compat fields when rewriting on stamp upgrade", async () => {
 		{

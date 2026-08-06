@@ -29,6 +29,23 @@ import { WebSocketRelayPort, WebSocketRelayState } from "./websocket-relay-port"
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Wait for a condition instead of guessing a duration. A fixed `settle(600)`
+// before asserting a socket has been dropped encodes an assumption about how
+// fast a connect → handshake → refusal → close round trip completes, which
+// holds on a dev machine and does not on a loaded shared CI runner — the
+// roster-refusal spec failed in CI on exactly that ("expected 'open' not to be
+// 'open'"). Polling keeps the fast path fast and only spends the full budget
+// when the machine is slow.
+async function waitUntil(
+	predicate: () => boolean,
+	{ timeoutMs = 5000, stepMs = 25 }: { timeoutMs?: number; stepMs?: number } = {},
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (!predicate() && Date.now() < deadline) {
+		await settle(stepMs);
+	}
+}
+
 function makeDevice() {
 	const ed = ed25519.keygen();
 	const x = generateDeviceX25519();
@@ -142,7 +159,7 @@ describe("the production LAN path, end to end over a real socket", () => {
 		});
 		try {
 			port.connect();
-			await settle(600);
+			await waitUntil(() => port.state !== WebSocketRelayState.Open);
 			expect(port.gatedAdmission()).toBe(false);
 			// Not merely ungated — dropped. An open host would leave this Open.
 			expect(port.state).not.toBe(WebSocketRelayState.Open);
