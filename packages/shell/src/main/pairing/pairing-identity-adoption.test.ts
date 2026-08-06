@@ -57,7 +57,11 @@ describe("F-492 — pairing's identity adoption on the joining device", () => {
 		expect(before).not.toBe(source.identity.publicKeyBase64);
 
 		// Exactly what `pairing-handlers.ts` binds `saveIdentitySecret` to.
-		await target.backend.setSecret(target.vaultId, "identity", source.exposeIdentityForPairing().secretKey);
+		await target.backend.setSecret(
+			target.vaultId,
+			"identity",
+			source.exposeIdentityForPairing().secretKey,
+		);
 
 		// The running session is unchanged — this is why the joining device
 		// keeps subscribing `inbox:<its OLD identity>` while the source fans
@@ -69,7 +73,11 @@ describe("F-492 — pairing's identity adoption on the joining device", () => {
 	it("makes the NEXT vault open fail — vault.json still names the old identity", async () => {
 		if (!source || !target) throw new Error("expected both sessions");
 		const targetOriginalPub = target.identity.publicKeyBase64;
-		await target.backend.setSecret(target.vaultId, "identity", source.exposeIdentityForPairing().secretKey);
+		await target.backend.setSecret(
+			target.vaultId,
+			"identity",
+			source.exposeIdentityForPairing().secretKey,
+		);
 		await target.dispose();
 		target = undefined;
 
