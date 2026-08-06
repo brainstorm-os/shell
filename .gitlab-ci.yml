@@ -84,9 +84,13 @@ e2e-smoke:
   timeout: 45m
   allow_failure: true
   script:
+    # xauth is NOT optional: xvfb-run shells out to it to create the X authority
+    # file and exits 3 with "xauth command not found" without it. GitHub's ubuntu
+    # runners ship it preinstalled, which is why the original workflow never
+    # named it — and why this only failed here.
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends
-      xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
+      xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
     - bun run --filter @brainstorm-os/native build:linux-x64
     # bun install fetches Node-ABI prebuilds; the shell loads these inside
     # Electron ("Module did not self-register" without the rebuild).
