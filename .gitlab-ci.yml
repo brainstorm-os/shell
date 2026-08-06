@@ -82,7 +82,10 @@ verify:
 e2e-smoke:
   stage: e2e
   timeout: 45m
-  allow_failure: true
+  # NOT allow_failure. It was, and that made the pipeline lie: the job failed at
+  # `xvfb-run: xauth command not found` without running a single spec while the
+  # pipeline reported success. A job whose result nobody can trust is worse than
+  # no job. If this goes red, e2e is genuinely broken and the merge should stop.
   # Start immediately rather than queueing behind `verify`. This job builds and
   # runs its own thing — it consumes none of verify's output — so the stage
   # ordering was pure waiting: ~34 minutes before it could even begin, and again
