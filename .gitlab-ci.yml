@@ -149,6 +149,15 @@ kbn-a11y:
   allow_failure: true
   needs: []
   script:
+    # Diagnostics for the `Target crashed` failures. /dev/shm is the suspect:
+    # Chromium maps shared memory for canvas surfaces and dies when it runs out,
+    # and container defaults are commonly 64 MB. Print it rather than guess —
+    # /dev/shm size comes from the RUNNER config, not the machine tier, so if it
+    # is already large then a bigger runner will not fix this and the real fix is
+    # --disable-dev-shm-usage in the launch harness.
+    - 'echo "shm: $(df -h /dev/shm | tail -1)"'
+    - 'echo "mem: $(free -m | awk "/Mem:/ {print \$2\" MB total, \"\$7\" MB available\"}")"'
+    - 'echo "cpu: $(nproc) cores"'
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends
       xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
