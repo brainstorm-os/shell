@@ -1,6 +1,6 @@
 # GitLab CI — test/lint pipeline, ported from .github/workflows/ci.yml.
 #
-# Scope: `verify` and `e2e-smoke` only. Packaging and publishing are NOT here —
+# Scope: `verify`, `e2e-smoke` and `kbn-a11y` only. Packaging and publishing are NOT here —
 # they need macOS + Windows runners and the signing/notarisation secrets.
 # Releases are published from a workstation via tools/publish-gitlab-release.sh.
 #
@@ -75,25 +75,36 @@ verify:
     - if: $CI_COMMIT_BRANCH == "main"
 
 # The expensive job: builds apps, rebuilds native modules for Electron's ABI and
-# drives a real renderer under xvfb. Runs automatically on main only; on merge
-# requests it is available but manual, so a routine MR costs one `verify` rather
-# than a full Electron build. Non-blocking either way (allow_failure) so a flaky
-# renderer run does not gate a merge — read the job, don't trust the badge.
+# drives a real renderer under xvfb. Runs automatically on main; on merge
+# requests it is manual, so a routine MR costs one `verify` rather than a full
+# Electron build.
 e2e-smoke:
   stage: e2e
   timeout: 45m
-  allow_failure: true
+  # NOT allow_failure. It was, and that made the pipeline lie: the job failed at
+  # `xvfb-run: xauth command not found` without running a single spec while the
+  # pipeline reported success. A job whose result nobody can trust is worse than
+  # no job. If this goes red, e2e is genuinely broken and the merge should stop.
+  # Start immediately rather than queueing behind `verify`. This job builds and
+  # runs its own thing — it consumes none of verify's output — so the stage
+  # ordering was pure waiting: ~34 minutes before it could even begin, and again
+  # on every iteration while debugging it. With `needs: []` the two run
+  # concurrently and the pipeline finishes in the time of the slower one.
+  needs: []
   script:
+    # xauth is NOT optional: xvfb-run shells out to it to create the X authority
+    # file and exits 3 with "xauth command not found" without it. GitHub's ubuntu
+    # runners ship it preinstalled, which is why the original workflow never
+    # named it — and why this only failed here.
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends
-      xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
+      xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
     - bun run --filter @brainstorm-os/native build:linux-x64
     # bun install fetches Node-ABI prebuilds; the shell loads these inside
     # Electron ("Module did not self-register" without the rebuild).
     - cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers && cd -
     - bun run e2e:build
     - xvfb-run --auto-servernum -- npx playwright test --config=playwright.e2e.config.ts
-    - xvfb-run --auto-servernum -- npx playwright test --config=playwright.config.ts kbn-
   variables:
     # The runner's container kernel blocks Chromium's sandbox; the suite
     # exercises app flows, not the sandbox itself.
@@ -113,6 +124,56 @@ e2e-smoke:
       - test-results/
       - tests/e2e/results/
       - tests/perf/results/
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+# The KBN keyboard-accessibility specs, split out of e2e-smoke. They were run
+# from the same job, which meant a KBN failure hid a passing e2e suite — the
+# first run where e2e went fully green still reported the job as failed.
+#
+# Currently 8 of 12 fail here, several with `Target crashed` on the canvas-heavy
+# specs (graph, whiteboard). That signature in a container is usually Chromium
+# running out of shared memory: runners default /dev/shm to 64 MB and a canvas
+# renderer exhausts it. It is not fixable from this file — /dev/shm size is set
+# by the runner, so the fix is either a runner with a larger shm or launching
+# Electron with --disable-dev-shm-usage via the launch harness.
+#
+# allow_failure until that is done: this suite has never passed on CI, so gating
+# merges on it now would block everything for a reason unrelated to the change
+# under review. e2e-smoke is the honest gate; this is a signal to work on.
+kbn-a11y:
+  stage: e2e
+  timeout: 45m
+  allow_failure: true
+  needs: []
+  script:
+    # Diagnostics for the `Target crashed` failures. /dev/shm is the suspect:
+    # Chromium maps shared memory for canvas surfaces and dies when it runs out,
+    # and container defaults are commonly 64 MB. Print it rather than guess —
+    # /dev/shm size comes from the RUNNER config, not the machine tier, so if it
+    # is already large then a bigger runner will not fix this and the real fix is
+    # --disable-dev-shm-usage in the launch harness.
+    - 'echo "shm: $(df -h /dev/shm | tail -1)"'
+    - 'echo "mem: $(free -m | awk "/Mem:/ {print \$2\" MB total, \"\$7\" MB available\"}")"'
+    - 'echo "cpu: $(nproc) cores"'
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends
+      xvfb xauth libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2 libxss1 libxtst6
+    - bun run --filter @brainstorm-os/native build:linux-x64
+    - cd packages/shell && bunx @electron/rebuild -f -w better-sqlite3,better-sqlite3-multiple-ciphers && cd -
+    - bun run e2e:build
+    - xvfb-run --auto-servernum -- npx playwright test --config=playwright.config.ts kbn-
+  variables:
+    ELECTRON_DISABLE_SANDBOX: "1"
+    BRAINSTORM_DEV_INSECURE_CREDENTIALS: "1"
+    BRAINSTORM_TEST_VISIBLE: "1"
+  artifacts:
+    when: on_failure
+    expire_in: 7 days
+    paths:
+      - test-results/
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
