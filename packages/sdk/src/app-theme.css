@@ -1067,6 +1067,13 @@ body.is-booting *::after {
 	 * own content without escaping behind the app body. */
 	position: relative;
 	isolation: isolate;
+	/* Clip the wallpaper layer to the header. It is scaled past the edges (see
+	 * ::before) so the blur has real pixels to sample, and without this the
+	 * scaled-up image bleeds a glow into the content below the header.
+	 * Safe to clip: menus (`mountMenuHost`) and tooltip chips (`tooltip/host`)
+	 * both portal to `document.body`, so nothing anchored in the header renders
+	 * as a descendant of it. */
+	overflow: hidden;
 }
 
 /* Wallpaper stripe. `--app-wallpaper-image` is injected by app-preload from the
