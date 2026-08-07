@@ -145,6 +145,12 @@
  * Fixed once, here.
  * ============================================================ */
 :root {
+	/* Blur radius for the app-header wallpaper stripe. An app-theme alias, not a
+	 * theme token: it describes chrome geometry, not a palette value, so it does
+	 * not vary per theme. Much wider than `--glass-blur` (5px) on purpose — that
+	 * one filters content sitting directly behind glass, whereas this smears a
+	 * photograph down to a colour field a 44px strip of text can sit on. */
+	--app-wallpaper-blur: 18px;
 	--bg: var(--color-background-primary);
 	--bg-elev: var(--color-background-elevated);
 	--bg-elevated: var(--color-background-elevated);
@@ -1049,9 +1055,48 @@ body.is-booting *::after {
 	gap: var(--space-2);
 	flex-shrink: 0;
 	background: var(--color-glass-background-subtle, var(--color-background-primary));
+	/* NOTE: `backdrop-filter` here is inert in an app window and kept only for
+	 * the widget-surface case, where the header does sit over other content.
+	 * An app view is a transparent WebContentsView over a window painted a flat
+	 * themed colour — there is nothing behind the header to filter, which is why
+	 * the wallpaper below is PAINTED in rather than blurred through. */
 	backdrop-filter: blur(var(--glass-blur, 5px)) saturate(var(--glass-saturate, 180%));
 	-webkit-backdrop-filter: blur(var(--glass-blur, 5px)) saturate(var(--glass-saturate, 180%));
 	border-bottom: var(--border-width) solid var(--color-glass-border, var(--color-border-subtle));
+	/* Own a stacking context so the wallpaper layer can sit behind the header's
+	 * own content without escaping behind the app body. */
+	position: relative;
+	isolation: isolate;
+}
+
+/* Wallpaper stripe. `--app-wallpaper-image` is injected by app-preload from the
+ * active vault's wallpaper; absent (no wallpaper set, or a surface that isn't an
+ * app window) the layer paints nothing and the header keeps its flat glass.
+ * Cover-fit per header — deliberately NOT aligned to the desktop behind the
+ * window, which would need the window rect pushed on every move and resize. */
+:root .app-header::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background-image: var(--app-wallpaper-image, none);
+	background-size: cover;
+	background-position: center;
+	/* Scaled past the edges so the blur has real pixels to sample instead of
+	 * smearing transparent ones into a lighter rim. */
+	transform: scale(1.3);
+	filter: blur(var(--app-wallpaper-blur, 18px))
+		saturate(var(--glass-saturate, 180%));
+}
+
+/* Scrim over the wallpaper so header text keeps its contrast on any image.
+ * Sits between the wallpaper and the content, both behind the flow. */
+:root .app-header::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--color-glass-background-subtle, transparent);
 }
 .app-header__left,
 .app-header__right {

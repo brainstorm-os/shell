@@ -32,6 +32,13 @@ export type LaunchOrchestratorOptions = {
 	 *  active (tests + early-boot callers); the preload then falls back to
 	 *  `DEFAULT_THEME`. */
 	getActiveTheme?: () => Promise<ThemeName | null>;
+	/** Resolve the active vault wallpaper as a `brainstorm://wallpaper/<file>`
+	 *  URL, for the app-header stripe. Awaited on each launch alongside the
+	 *  theme so the first paint already carries it. Returns `null` when there is
+	 *  no session, or when the wallpaper is a solid/gradient rather than an
+	 *  image — those have no URL to paint and would only restate the flat glass
+	 *  the header already has. */
+	getActiveWallpaperUrl?: () => Promise<string | null>;
 	/** Resolve the active UI locale (BCP-47 tag), awaited on each launch so the
 	 *  app window opens in the right language with no follow-up IPC round-trip
 	 *  (12.15). Returns `null` when no session is active (tests + early-boot
@@ -110,6 +117,12 @@ export class LaunchOrchestrator {
 					return null;
 				})
 			: null;
+		const wallpaperUrl = this.options.getActiveWallpaperUrl
+			? await this.options.getActiveWallpaperUrl().catch((error) => {
+					console.warn("[LaunchOrchestrator] getActiveWallpaperUrl failed:", error);
+					return null;
+				})
+			: null;
 		const locale = this.options.getActiveLocale
 			? await this.options.getActiveLocale().catch((error) => {
 					console.warn("[LaunchOrchestrator] getActiveLocale failed:", error);
@@ -132,6 +145,7 @@ export class LaunchOrchestrator {
 			sdk: record.sdk,
 		};
 		if (theme) options.theme = theme;
+		if (wallpaperUrl) options.wallpaperUrl = wallpaperUrl;
 		if (locale) options.locale = locale;
 		if (format) options.format = format;
 		if (request.windowId !== undefined) options.windowId = request.windowId;

@@ -56,6 +56,12 @@ export type LaunchOptions = {
 	/** Active shell theme name. Passed to the app preload via
 	 *  `--brainstorm-theme=<name>`. */
 	theme?: ThemeName;
+	/** Active vault wallpaper as a `brainstorm://wallpaper/<file>` URL, for the
+	 *  app-header stripe. Sibling of `theme`, passed via
+	 *  `--brainstorm-wallpaper=<url>`. Only image wallpapers have a URL — a
+	 *  solid or gradient one is left undefined, since painting it would just
+	 *  restate the flat glass the header already has. */
+	wallpaperUrl?: string;
 	/** Active UI locale (BCP-47 tag). Rides the handshake so a freshly-launched
 	 *  window renders its first frame in the right language (12.15). */
 	locale?: string;
@@ -498,6 +504,7 @@ export class AppLauncher {
 			`--brainstorm-build=${buildSha}`,
 		];
 		if (opts.theme) additionalArguments.push(`--brainstorm-theme=${opts.theme}`);
+		if (opts.wallpaperUrl) additionalArguments.push(`--brainstorm-wallpaper=${opts.wallpaperUrl}`);
 		console.info(
 			`[shell] launch ${opts.appId} v${opts.version} build ${buildSha} dir ${appRecord.bundleDir}`,
 		);

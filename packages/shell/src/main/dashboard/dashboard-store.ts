@@ -333,6 +333,16 @@ export class DashboardStore {
 		return (slot === AppearanceSlot.Dark ? appearance.dark : appearance.light).theme;
 	}
 
+	/** Sibling of `activeTheme` for the app-header wallpaper stripe: the active
+	 *  slot's wallpaper. Same reasoning — the launch path must not pay for a
+	 *  full `snapshot()`. Returns the whole `Wallpaper`; the caller decides what
+	 *  a solid or gradient means for its surface. */
+	activeWallpaper(osPrefersDark: boolean): Wallpaper {
+		const appearance = this.readAppearance();
+		const slot = effectiveSlotFor(appearance.mode, osPrefersDark);
+		return (slot === AppearanceSlot.Dark ? appearance.dark : appearance.light).wallpaper;
+	}
+
 	/** Write the wallpaper into the slot matching `slot`; if omitted, the
 	 *  slot is decided by the current mode (Light/Dark explicit, Auto
 	 *  defaults to the Dark slot — the renderer that knows the real OS

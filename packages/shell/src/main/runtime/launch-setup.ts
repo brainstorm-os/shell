@@ -178,6 +178,18 @@ export function createLaunchSetup(args: {
 				const dashboard = await active.dashboardStore();
 				return dashboard.activeTheme(nativeTheme.shouldUseDarkColors);
 			},
+			getActiveWallpaperUrl: async () => {
+				const active = getActiveVaultSession();
+				if (!active) return null;
+				const dashboard = await active.dashboardStore();
+				const wallpaper = dashboard.activeWallpaper(nativeTheme.shouldUseDarkColors);
+				// Only an image wallpaper has something to paint. Solid and
+				// gradient are already what the header's glass renders, and the
+				// custom-protocol guard keeps a hand-edited vault.json from
+				// pushing an arbitrary URL into every app renderer.
+				if (wallpaper.kind !== "image") return null;
+				return wallpaper.value.startsWith("brainstorm://wallpaper/") ? wallpaper.value : null;
+			},
 			getActiveLocale: async () => {
 				const active = getActiveVaultSession();
 				if (!active) return null;
