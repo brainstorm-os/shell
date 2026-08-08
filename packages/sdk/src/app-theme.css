@@ -151,6 +151,12 @@
 	 * one filters content sitting directly behind glass, whereas this smears a
 	 * photograph down to a colour field a 44px strip of text can sit on. */
 	--app-wallpaper-blur: 18px;
+	/* How far the wallpaper layer overshoots the header on every side. Must
+	 * exceed `--app-wallpaper-blur` so the blur always has real pixels to
+	 * sample past the edge; the header clips the overshoot. Also the exact
+	 * amount the background is pushed down by, which is what lands the image's
+	 * TOP edge on the header's top edge rather than showing its middle. */
+	--app-wallpaper-bleed: 40px;
 	--bg: var(--color-background-primary);
 	--bg-elev: var(--color-background-elevated);
 	--bg-elevated: var(--color-background-elevated);
@@ -1084,14 +1090,20 @@ body.is-booting *::after {
 :root .app-header::before {
 	content: "";
 	position: absolute;
-	inset: 0;
 	z-index: -1;
+	/* The layer overshoots the header on every side so the blur samples real
+	 * pixels instead of smearing transparent ones into a pale rim. The header
+	 * clips it (see `overflow` above).
+	 *
+	 * This replaces an earlier `transform: scale()`, which grew the layer about
+	 * its CENTRE and so could not also anchor the image's top edge — the header
+	 * showed a band from the middle of the wallpaper. Overshooting by inset and
+	 * pushing the background down by the same amount puts the image's TOP edge
+	 * exactly on the header's top edge, while still leaving blur margin above. */
+	inset: calc(var(--app-wallpaper-bleed, 40px) * -1);
 	background-image: var(--app-wallpaper-image, none);
 	background-size: cover;
-	background-position: center;
-	/* Scaled past the edges so the blur has real pixels to sample instead of
-	 * smearing transparent ones into a lighter rim. */
-	transform: scale(1.3);
+	background-position: center var(--app-wallpaper-bleed, 40px);
 	filter: blur(var(--app-wallpaper-blur, 18px))
 		saturate(var(--glass-saturate, 180%));
 }
