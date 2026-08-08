@@ -48,3 +48,22 @@ export const LIST_COLUMN_WIDTH: Record<ListColumn, string> = {
 	[ListColumn.Modified]: "120px",
 	[ListColumn.Size]: "88px",
 };
+
+/**
+ * The list-mode icon track, decided ONCE for a whole folder.
+ *
+ * `grid-template-columns` is a per-ROW declaration — each row is its own grid —
+ * so an `auto` leading track sizes independently per row. A row renders an
+ * empty icon span when its entity has no icon (the project-wide
+ * no-default-type-icon-fallback rule), which collapsed the track to 0 on those
+ * rows while icon-bearing rows reserved it. The result was two column
+ * geometries in one list: name, kind and modified each landing at two
+ * different x positions.
+ *
+ * `anyRowHasIcon` therefore has to be computed across the folder, not per row.
+ * The fallback rule survives: a folder where NOTHING has an icon still yields a
+ * zero track, so every name slides left into the slot.
+ */
+export function listIconTrack(anyRowHasIcon: boolean, iconSizePx: number): string {
+	return anyRowHasIcon ? `${iconSizePx}px` : "0px";
+}
