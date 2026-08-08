@@ -208,6 +208,76 @@ describe("LaunchOrchestrator", () => {
 		expect(getActiveTheme).toHaveBeenCalledTimes(2);
 	});
 
+	it("passes the active wallpaper url through, and omits it when the resolver declines", async () => {
+		const bundleDir = await setupApp({ id: "io.x.app" });
+		const appsRepo = {
+			getActive: vi.fn(() => ({
+				id: "io.x.app",
+				version: "1.0.0",
+				sdk: "1",
+				manifestPath: join(bundleDir, "manifest.json"),
+				bundleDir,
+				bundleSha256: "abc",
+				installedAt: 1,
+				updatedAt: 1,
+			})),
+		} as unknown as AppsRepository;
+		const ledger = { listActive: vi.fn(() => []) } as unknown as CapabilityLedger;
+		const { launcher, launches } = makeLauncher();
+
+		// null models both "no image wallpaper" (solid/gradient) and "no session".
+		let current: string | null = "brainstorm://wallpaper/rose-mountains.jpg";
+		const getActiveWallpaperUrl = vi.fn(async () => current);
+
+		const orchestrator = new LaunchOrchestrator({
+			appsRepo,
+			ledger,
+			launcher,
+			getActiveWallpaperUrl,
+		});
+
+		await orchestrator.launch({ appId: "io.x.app" });
+		expect(launches[0]?.wallpaperUrl).toBe("brainstorm://wallpaper/rose-mountains.jpg");
+
+		// Switching to a solid wallpaper must CLEAR the stripe, not leave the
+		// previous image painted into the next window's header.
+		current = null;
+		await orchestrator.launch({ appId: "io.x.app", windowId: "second" });
+		expect(launches[1]?.wallpaperUrl).toBeUndefined();
+		expect(getActiveWallpaperUrl).toHaveBeenCalledTimes(2);
+	});
+
+	it("survives a throwing wallpaper resolver — a launch must not fail on chrome decoration", async () => {
+		const bundleDir = await setupApp({ id: "io.x.app" });
+		const appsRepo = {
+			getActive: vi.fn(() => ({
+				id: "io.x.app",
+				version: "1.0.0",
+				sdk: "1",
+				manifestPath: join(bundleDir, "manifest.json"),
+				bundleDir,
+				bundleSha256: "abc",
+				installedAt: 1,
+				updatedAt: 1,
+			})),
+		} as unknown as AppsRepository;
+		const ledger = { listActive: vi.fn(() => []) } as unknown as CapabilityLedger;
+		const { launcher, launches } = makeLauncher();
+
+		const orchestrator = new LaunchOrchestrator({
+			appsRepo,
+			ledger,
+			launcher,
+			getActiveWallpaperUrl: vi.fn(async () => {
+				throw new Error("dashboard store unavailable");
+			}),
+		});
+
+		await orchestrator.launch({ appId: "io.x.app" });
+		expect(launches[0]?.appId).toBe("io.x.app");
+		expect(launches[0]?.wallpaperUrl).toBeUndefined();
+	});
+
 	it("reads the latest dashboard theme on every launch (regression for the launch-after-theme-switch bug)", async () => {
 		const bundleDir = await setupApp({ id: "io.x.app" });
 		const appsRepo = {

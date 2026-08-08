@@ -69,6 +69,12 @@ const appId = readArg("--brainstorm-app-id=");
 const handshakeEncoded = readArg("--brainstorm-handshake=");
 const themeArg = readArg("--brainstorm-theme=");
 const buildArg = readArg("--brainstorm-build=");
+/** Active vault wallpaper as a `brainstorm://wallpaper/<file>` URL, or null when
+ *  the vault has none. Painted as the header stripe by the SDK's `.app-header`
+ *  rule — see `--app-wallpaper-image` in `@brainstorm-os/sdk/app-theme.css`.
+ *  A boot arg rather than an IPC round-trip so the FIRST paint already carries
+ *  it; the sibling broadcast below keeps it live when the user changes it. */
+const wallpaperArg = readArg("--brainstorm-wallpaper=");
 
 if (!appId || !handshakeEncoded) {
 	throw new Error(
@@ -880,8 +886,24 @@ function applyChrome(): void {
 	}
 }
 
+/** Set (or clear) the header wallpaper stripe. Same two-channel treatment as
+ *  the tokens: an inline var for the fast first paint, and the managed chrome
+ *  `<style>` re-application covers a parser-replaced documentElement. */
+function applyWallpaper(url: string | null): void {
+	try {
+		const root = document?.documentElement;
+		if (!root) return;
+		if (url) root.style.setProperty("--app-wallpaper-image", `url("${encodeURI(url)}")`);
+		else root.style.removeProperty("--app-wallpaper-image");
+	} catch (error) {
+		console.error("[brainstorm] applyWallpaper failed:", error);
+	}
+}
+
 applyThemeByName(themeArg);
 applyChrome();
+applyWallpaper(wallpaperArg);
+whenDocumentReady(() => applyWallpaper(wallpaperArg));
 try {
 	applyInlineVars(appIconVars);
 } catch (error) {
