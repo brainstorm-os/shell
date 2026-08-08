@@ -26,7 +26,12 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { dragItemsForEntry } from "../logic/drag-items";
-import { DEFAULT_LIST_COLUMNS, LIST_COLUMN_WIDTH, ListColumn } from "../logic/list-columns";
+import {
+	DEFAULT_LIST_COLUMNS,
+	LIST_COLUMN_WIDTH,
+	ListColumn,
+	listIconTrack,
+} from "../logic/list-columns";
 import { RenameStatus } from "../logic/rename";
 import { initialSelectionRange } from "../logic/rename";
 import { SelectionModifier } from "../logic/selection";
@@ -216,6 +221,27 @@ export function ContentList({
 	const rows = store.visibleRows;
 	const mode = store.viewMode;
 	const isGrid = isGridMode(mode);
+
+	// One icon track for the whole list, not one per row. A row renders a glyph
+	// when it is a folder or the entity carries its own icon; `EntityIcon`
+	// renders an EMPTY span otherwise, per the project-wide
+	// no-default-type-icon-fallback rule. Because `grid-template-columns` is
+	// per-row, an `auto` first track then collapsed to 0 on exactly those rows
+	// and reserved space on the others — so name, kind and modified each landed
+	// at two different x positions in one list.
+	//
+	// The rule is preserved: when NOTHING in this folder has an icon the track
+	// is still 0 and every name slides left into the slot. It is only when the
+	// folder is mixed that the iconless rows keep the gutter, which is the
+	// alignment the list view exists for.
+	const iconTrack = useMemo(
+		() =>
+			listIconTrack(
+				rows.some((entity) => entity.type === FOLDER_TYPE || readEntityIcon(entity)),
+				iconSizeFor(mode, store.tileSize),
+			),
+		[rows, mode, store.tileSize],
+	);
 
 	// 9.8.15 — Finder/OS drag-in upload. The content area is the drop
 	// target for EXTERNAL files (`dataTransfer` carries the "Files" type);
@@ -495,6 +521,7 @@ export function ContentList({
 								onEditCover={onEditCover}
 								onMoveTo={onMoveTo}
 								onSaveToDisk={onSaveToDisk}
+								iconTrack={iconTrack}
 							/>
 						</div>
 					);
@@ -517,6 +544,16 @@ type ContentRowProps = {
 	 *  (the destination picker drops from it); null falls back to the content
 	 *  region. */
 	onMoveTo: (entity: Entity, anchor: HTMLElement | null) => void;
+	/** The icon track for list mode, decided ONCE for the whole list.
+	 *
+	 *  `grid-template-columns` is per-ROW — every row is its own grid — so an
+	 *  `auto` first track sizes independently per row. `EntityIcon` renders an
+	 *  empty span when an entity has no icon (the no-default-fallback rule), so
+	 *  those rows collapsed the track to 0 while icon-bearing rows reserved it:
+	 *  two column geometries in one list, with name, kind and modified all
+	 *  landing at different x. Deciding it once and giving every row the same
+	 *  value is what makes the columns line up. */
+	iconTrack: string;
 	/** DND-6 — keyboard twin of the DND-5 drag-out grip. Absent when the
 	 *  runtime has no save surface (older shells). */
 	onSaveToDisk: ((entity: Entity) => void) | undefined;
@@ -635,6 +672,7 @@ function ContentRow({
 	onEditCover,
 	onMoveTo,
 	onSaveToDisk,
+	iconTrack,
 }: ContentRowProps) {
 	const selected = store.selection.selected.has(entity.id);
 	const rowRef = useRef<HTMLDivElement | null>(null);
@@ -769,7 +807,7 @@ function ContentRow({
 				style={
 					isListMode(store.viewMode)
 						? {
-								gridTemplateColumns: `auto minmax(0, 1fr) ${store.listColumns
+								gridTemplateColumns: `${iconTrack} minmax(0, 1fr) ${store.listColumns
 									.map((c) => LIST_COLUMN_WIDTH[c])
 									.join(" ")}`.trimEnd(),
 							}
