@@ -1247,6 +1247,8 @@
   "shell.settings.devices.join.pasteSubmit": "Continue",
   "shell.settings.devices.join.pasteInvalid": "Payload doesn't look like a valid pairing code.",
   "shell.settings.devices.join.confirmInstruction": "These codes should match — confirm if they do.",
+  "shell.settings.devices.join.adoptingLabel": "You are joining this identity",
+  "shell.settings.devices.join.adoptingNote": "This device will take on the identity below and share its vault. Anything already on this device stays with it.",
   "shell.settings.devices.join.match": "Match",
   "shell.settings.devices.join.dontMatch": "Don't match",
   "shell.settings.devices.join.joining": "Joining vault…",

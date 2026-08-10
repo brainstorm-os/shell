@@ -2218,7 +2218,15 @@ void app.whenReady().then(async () => {
 				.then(({ VaultPropertiesStore }) => VaultPropertiesStore.open(session.ydocStore))
 				.then((props) => {
 					// Guard against a vault switch completing mid-resolve.
-					if (getActiveVaultSession() === session) lanDevices = props.devices();
+					if (getActiveVaultSession() !== session) return;
+					// LAN-2b — bind the verifying key HERE, where the session that
+					// owns the roster is known, so the handshake's view of "who is
+					// rostered" is signature-verified rather than whatever the
+					// properties doc happens to hold. Adapting rather than handing
+					// the store over keeps the consumer's no-arg interface.
+					const store = props.devices();
+					const userEd25519Pub = session.identity.publicKey;
+					lanDevices = { listActive: () => store.listActive(userEd25519Pub) };
 				})
 				.catch(() => {
 					lanDevices = null;
@@ -2482,6 +2490,21 @@ void app.whenReady().then(async () => {
 	}
 	registerPairingHandlers({
 		getDashboard: () => dashboardWindow,
+		// F-492 — the joining device adopts the source's sovereign identity, but
+		// `VaultSession.identity` is readonly and set once, so the running session
+		// is still its pre-pairing self: subscribed to the wrong `inbox:`, sending
+		// under the wrong `sender`, and failing the self-identity branch in
+		// `authorizesWrapInstall`. Re-activating rebuilds the session — and with it
+		// the live-sync engine, the sharing engine and the relay wiring — around
+		// the adopted identity, in one step, reusing the path a vault switch
+		// already takes. A hot swap would leave a window with the old key in some
+		// components and the new one in others, inside an authorization path.
+		reopenActiveVault: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return;
+			const { activateVault } = await import("./vault/vault");
+			await activateVault(session.vaultId);
+		},
 		// P2P-1 — a device joined (or was revoked), so re-read the roster the LAN
 		// handshake authenticates against. It is otherwise only read on a vault
 		// change, and pairing happens while the vault is already open, so the
