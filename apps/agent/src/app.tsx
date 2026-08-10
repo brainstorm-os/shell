@@ -53,6 +53,7 @@ import {
 	withMentionAttachments,
 } from "@brainstorm-os/sdk/composer-context";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { Markdown } from "@brainstorm-os/sdk/markdown";
 import {
@@ -117,7 +118,11 @@ import {
 import { seedFromProcessIntent } from "./logic/process-intent";
 import { canProposeCodeFiles } from "./logic/propose-code-file";
 import { persistProposedDatabase } from "./logic/propose-database-persist";
-import { CodeFilePathConflictError, persistApprovedProposal } from "./logic/propose-persist";
+import {
+	CodeFilePathConflictError,
+	LockedTargetError,
+	persistApprovedProposal,
+} from "./logic/propose-persist";
 import {
 	buildDatabaseContextBlock,
 	databaseSchemasFromEntities,
@@ -602,6 +607,10 @@ export function AgentApp(): ReactElement {
 				const persisted = await persistApprovedProposal(entitiesSvc, artifact, {
 					conversationId: activeId,
 					collectionMembers: collection?.properties.members as MemberOverrides | undefined,
+					// Lock-5(a) — the target collection's read-only lock, off the same
+					// live snapshot row. A locked collection refuses the approval before
+					// anything is written.
+					collectionLocked: isEntityLocked(collection),
 					existingCodeFiles: knownCodeFiles,
 					codeFileChoice: choice,
 					now: Date.now(),
@@ -615,7 +624,11 @@ export function AgentApp(): ReactElement {
 				dispatchProposal({ kind: ProposalActionKind.Discard, id: artifact.id });
 				setProposalNotice(t("propose.card.approved", { summary: artifact.summary }));
 			} catch (err) {
-				if (err instanceof CodeFilePathConflictError) {
+				if (err instanceof LockedTargetError) {
+					// Fail-closed, same as the path conflict: nothing was written, the
+					// card stays up, and the user is told what to do about it.
+					setError(t("propose.card.lockedTarget"));
+				} else if (err instanceof CodeFilePathConflictError) {
 					// Fail-closed: nothing was written. The card stays up and now shows
 					// the conflict, so the user picks update / save-a-copy / rename.
 					setError(t("propose.codeFile.conflictError", { path: err.path }));

@@ -224,6 +224,8 @@
   "link.already": "Déjà lié via {name}",
   "link.failed": "Impossible de créer le lien {name}",
   "link.unavailable": "La création de liens nécessite le service d'entités partagé",
+  "lock.refusedEdit": "{name} est verrouillé — déverrouillez-le pour le modifier",
+  "lock.refusedLink": "{name} est verrouillé — déverrouillez-le pour ajouter des liens",
   "history.fab": "Afficher la lecture de l'historique",
   "history.now": "Maintenant",
   "history.dialog": "Lecture de l'historique",

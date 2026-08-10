@@ -224,6 +224,8 @@
   "link.already": "Already linked via {name}",
   "link.failed": "Couldn't create the {name} link",
   "link.unavailable": "Link creation needs the shared entities service",
+  "lock.refusedEdit": "{name} is locked — unlock it to edit",
+  "lock.refusedLink": "{name} is locked — unlock it to add links",
   "history.fab": "Show history playback",
   "history.now": "Now",
   "history.dialog": "History playback",

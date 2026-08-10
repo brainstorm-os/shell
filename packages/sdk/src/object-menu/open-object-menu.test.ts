@@ -255,3 +255,78 @@ describe("openObjectMenu", () => {
 		expect(rows().map((b) => b.textContent)).toEqual(["Open"]);
 	});
 });
+
+describe("openObjectMenu — the read-only lock (Lock-5(c))", () => {
+	it("renders the Lock row after Pin, and Unlock when locked", async () => {
+		await openObjectMenu(
+			{ x: 10, y: 10 },
+			{ target, runtime: runtime(), locked: false, onToggleLock: () => undefined },
+		);
+		expect(rows().map((b) => b.textContent)).toEqual([
+			"Open",
+			"Pin to dashboard",
+			"Lock (read-only)",
+		]);
+		closeObjectMenu();
+
+		await openObjectMenu(
+			{ x: 10, y: 10 },
+			{ target, runtime: runtime(), locked: true, onToggleLock: () => undefined },
+		);
+		expect(rows().map((b) => b.textContent)).toContain("Unlock");
+	});
+
+	it("activating the row runs the app's toggle", async () => {
+		const onToggleLock = vi.fn();
+		await openObjectMenu({ x: 10, y: 10 }, { target, runtime: runtime(), onToggleLock });
+		rows()
+			.find((b) => b.textContent === "Lock (read-only)")
+			?.click();
+		expect(onToggleLock).toHaveBeenCalledTimes(1);
+	});
+
+	it("disables the RENDERER-owned Remove row on a locked object", async () => {
+		// `openObjectMenu` paints Remove itself (so contributed actions can splice
+		// in above it), which means the builder's lock gate does not reach it —
+		// this is the assertion that keeps the two paths agreeing.
+		await openObjectMenu(
+			{ x: 10, y: 10 },
+			{
+				target,
+				runtime: runtime(),
+				locked: true,
+				onToggleLock: () => undefined,
+				onRemove: vi.fn(),
+			},
+		);
+		const remove = rows().find((b) => b.textContent === "Remove");
+		// The shared menu keeps a hinted-disabled row FOCUSABLE and folds the
+		// reason into its accessible name, so keyboard + screen-reader users get
+		// the explanation a native `disabled` button would swallow.
+		expect(remove?.getAttribute("aria-disabled")).toBe("true");
+		expect(remove?.getAttribute("aria-label")).toBe(
+			"Remove, This object is locked — unlock it to make changes",
+		);
+		expect(remove?.title).toBe("This object is locked — unlock it to make changes");
+	});
+
+	it("a locked object's Remove does nothing when activated", async () => {
+		const onRemove = vi.fn();
+		await openObjectMenu(
+			{ x: 10, y: 10 },
+			{ target, runtime: runtime(), locked: true, onToggleLock: () => undefined, onRemove },
+		);
+		rows()
+			.find((b) => b.textContent === "Remove")
+			?.click();
+		expect(onRemove).not.toHaveBeenCalled();
+	});
+
+	it("leaves Remove live on an unlocked object", async () => {
+		const onRemove = vi.fn();
+		await openObjectMenu({ x: 10, y: 10 }, { target, runtime: runtime(), onRemove });
+		const remove = rows().find((b) => b.textContent === "Remove");
+		expect(remove?.getAttribute("aria-disabled")).toBeNull();
+		expect(remove?.disabled).toBe(false);
+	});
+});

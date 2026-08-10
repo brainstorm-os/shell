@@ -250,6 +250,130 @@ describe("buildObjectMenuItems", () => {
 		await items.find((i) => i.id === "pin")?.run();
 		expect(rt?.services?.dashboard?.pin).toHaveBeenCalledWith({ entityId: "ent-1" });
 	});
+
+	// Lock-5(c) — the lock's discoverability problem: it lived only in a header
+	// button, in the seven apps that had one. The ⋯ menu is the ONE identical
+	// surface fleet-wide, so the toggle belongs here too.
+	describe("Lock / Unlock", () => {
+		it("is absent when the app passes no lock handler (a surface with no lock concept)", () => {
+			const items = buildObjectMenuItems({ target, runtime: runtime(), pinned: false });
+			expect(items.some((i) => i.id === "lock" || i.id === "unlock")).toBe(false);
+		});
+
+		it("offers Lock on an unlocked object", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: false,
+				onToggleLock: () => undefined,
+			});
+			const lock = items.find((i) => i.id === "lock");
+			expect(lock?.label).toBe("Lock (read-only)");
+			expect(lock?.icon).toBe(IconName.Lock);
+			expect(items.some((i) => i.id === "unlock")).toBe(false);
+		});
+
+		it("offers Unlock on a locked object", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: true,
+				onToggleLock: () => undefined,
+			});
+			expect(items.find((i) => i.id === "unlock")?.label).toBe("Unlock");
+			expect(items.some((i) => i.id === "lock")).toBe(false);
+		});
+
+		it("sits after Pin and before Remove, so destructive stays last", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: false,
+				onToggleLock: () => undefined,
+				onRemove: () => undefined,
+			});
+			expect(items.map((i) => i.id)).toEqual(["open", "pin", "lock", "remove"]);
+		});
+
+		it("runs the app's toggle handler", async () => {
+			const onToggleLock = vi.fn();
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: true,
+				onToggleLock,
+			});
+			await items.find((i) => i.id === "unlock")?.run();
+			expect(onToggleLock).toHaveBeenCalledTimes(1);
+		});
+
+		it("takes localised labels", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: false,
+				onToggleLock: () => undefined,
+				labels: { lock: "Sperren (schreibgeschützt)" },
+			});
+			expect(items.find((i) => i.id === "lock")?.label).toBe("Sperren (schreibgeschützt)");
+		});
+
+		// The lock gates the app's OWN write paths; Remove is one of them. A menu
+		// that offers "Remove" on a locked object is offering a write the app is
+		// supposed to refuse — so the row is disabled with the reason, never
+		// hidden (the vanishing-control anti-pattern, per the panel-toggle rule).
+		it("disables Remove with a hint while the object is locked", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: true,
+				onToggleLock: () => undefined,
+				onRemove: () => undefined,
+			});
+			const remove = items.find((i) => i.id === "remove");
+			expect(remove?.disabled).toBe(true);
+			expect(remove?.hint).toBe("This object is locked — unlock it to make changes");
+		});
+
+		it("disables a locked object's app-supplied write extras, leaving read-only ones alone", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: true,
+				onToggleLock: () => undefined,
+				extraItems: [
+					{ id: "rename", label: "Rename…", writes: true, run: () => undefined },
+					{ id: "export", label: "Export…", run: () => undefined },
+				],
+			});
+			expect(items.find((i) => i.id === "rename")?.disabled).toBe(true);
+			expect(items.find((i) => i.id === "rename")?.hint).toBe(
+				"This object is locked — unlock it to make changes",
+			);
+			expect(items.find((i) => i.id === "export")?.disabled).toBeUndefined();
+		});
+
+		it("leaves write extras alone when the object is unlocked", () => {
+			const items = buildObjectMenuItems({
+				target,
+				runtime: runtime(),
+				pinned: false,
+				locked: false,
+				onToggleLock: () => undefined,
+				extraItems: [{ id: "rename", label: "Rename…", writes: true, run: () => undefined }],
+				onRemove: () => undefined,
+			});
+			expect(items.find((i) => i.id === "rename")?.disabled).toBeUndefined();
+			expect(items.find((i) => i.id === "remove")?.disabled).toBeUndefined();
+		});
+	});
 });
 
 describe("isObjectPinned", () => {

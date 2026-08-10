@@ -224,6 +224,8 @@
   "link.already": "Già collegato tramite {name}",
   "link.failed": "Impossibile creare il link {name}",
   "link.unavailable": "La creazione dei link richiede il servizio condiviso delle entità",
+  "lock.refusedEdit": "{name} è bloccato — sbloccalo per modificarlo",
+  "lock.refusedLink": "{name} è bloccato — sbloccalo per aggiungere link",
   "history.fab": "Mostra riproduzione della cronologia",
   "history.now": "Adesso",
   "history.dialog": "Riproduzione della cronologia",

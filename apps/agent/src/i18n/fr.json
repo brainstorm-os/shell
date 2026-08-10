@@ -133,5 +133,6 @@
   "propose.codeFile.label": "Proposez un nouveau fichier de code (un script ou extrait enregistré dans le coffre de l'utilisateur, ouvert par l'éditeur de code). args: {\"path\": \"<nom de fichier, p. ex. scripts/build.ts>\", \"language\": \"<id de langage optionnel, p. ex. typescript>\", \"content\": \"<le code source complet>\"}",
   "propose.kind.codeFile": "Fichier de code",
   "propose.field.path": "Chemin",
-  "propose.codeFile.preview": "Aperçu du code de {path}"
+  "propose.codeFile.preview": "Aperçu du code de {path}",
+  "propose.card.lockedTarget": "Rien n'a été enregistré — cet objet est verrouillé. Déverrouillez-le puis approuvez à nouveau."
 }

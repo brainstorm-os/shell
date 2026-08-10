@@ -133,5 +133,6 @@
   "propose.codeFile.label": "Proponi un nuovo file di codice (uno script o frammento salvato nel vault dell'utente, aperto dall'editor di codice). args: {\"path\": \"<nome file, ad es. scripts/build.ts>\", \"language\": \"<id di linguaggio opzionale, ad es. typescript>\", \"content\": \"<il codice sorgente completo>\"}",
   "propose.kind.codeFile": "File di codice",
   "propose.field.path": "Percorso",
-  "propose.codeFile.preview": "Anteprima del codice di {path}"
+  "propose.codeFile.preview": "Anteprima del codice di {path}",
+  "propose.card.lockedTarget": "Non è stato salvato nulla — quell'oggetto è bloccato. Sbloccalo e approva di nuovo."
 }

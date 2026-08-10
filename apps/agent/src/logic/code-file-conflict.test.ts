@@ -19,7 +19,11 @@ import {
 	releaseCodeFilePath,
 } from "./code-file-conflict";
 import { CODE_FILE_ENTITY_TYPE, buildCodeFileProposal } from "./propose-code-file";
-import { CodeFilePathConflictError, persistApprovedProposal } from "./propose-persist";
+import {
+	CodeFilePathConflictError,
+	LockedTargetError,
+	persistApprovedProposal,
+} from "./propose-persist";
 
 const NOW = 1_700_000_000_000;
 
@@ -35,15 +39,19 @@ function draft(path: string, content = "console.log(1)\n"): ProposedArtifact {
 
 /** A vault that actually stores rows — `create` appends, `update` merges — so a
  *  duplicate is observable as two rows at one path, not as a call count. */
-function fakeVault(seed: Array<{ id: string; path: string; content?: string }> = []) {
+function fakeVault(
+	seed: Array<{ id: string; path: string; content?: string; locked?: boolean }> = [],
+) {
 	let seq = 0;
 	const rows = seed.map((row) => ({
 		id: row.id,
 		type: CODE_FILE_ENTITY_TYPE,
-		properties: { path: row.path, content: row.content ?? "old", language: "typescript" } as Record<
-			string,
-			unknown
-		>,
+		properties: {
+			path: row.path,
+			content: row.content ?? "old",
+			language: "typescript",
+			...(row.locked ? { locked: true } : {}),
+		} as Record<string, unknown>,
 	}));
 	return {
 		rows,
@@ -137,6 +145,52 @@ describe("approving a code file at an EXISTING path (POLISH-FN-4)", () => {
 		expect(vault.at("hello-app/manifest.json")).toHaveLength(1);
 		expect(vault.at("hello-app/manifest-2.json")).toHaveLength(1);
 		expect(vault.rows.find((r) => r.id === "ent_old")?.properties.content).toBe("{}");
+	});
+
+	// Lock-5(a) — "Update" is the one branch that writes an object the user
+	// already had. If that file is locked, the agent's approval is a write into
+	// a read-only object and must be refused, exactly as the shell's
+	// `tools.call` refuses a `proposes-write` tool aimed at a locked target.
+	it("refuses Update into a LOCKED file, leaving its content untouched", async () => {
+		const vault = fakeVault([
+			{ id: "ent_old", path: "hello-app/manifest.json", content: "{}", locked: true },
+		]);
+		await expect(
+			persistApprovedProposal(vault, draft("hello-app/manifest.json", "overwritten"), {
+				conversationId: "conv_1",
+				now: NOW,
+				existingCodeFiles: vault.codeFiles(),
+				codeFileChoice: CodeFileConflictChoice.Update,
+			}),
+		).rejects.toBeInstanceOf(LockedTargetError);
+		expect(vault.rows.find((r) => r.id === "ent_old")?.properties.content).toBe("{}");
+		expect(vault.rows).toHaveLength(1);
+	});
+
+	it("Save a copy is still allowed beside a locked file (the locked row is not written)", async () => {
+		const vault = fakeVault([
+			{ id: "ent_old", path: "hello-app/manifest.json", content: "{}", locked: true },
+		]);
+		const result = await persistApprovedProposal(vault, draft("hello-app/manifest.json", "new"), {
+			conversationId: "conv_1",
+			now: NOW,
+			existingCodeFiles: vault.codeFiles(),
+			codeFileChoice: CodeFileConflictChoice.SaveCopy,
+		});
+		expect(result?.codeFilePath).toBe("hello-app/manifest-2.json");
+		expect(vault.rows.find((r) => r.id === "ent_old")?.properties.content).toBe("{}");
+	});
+
+	it("codeFilePathsFrom carries each row's lock forward from the snapshot", () => {
+		expect(
+			codeFilePathsFrom([
+				{ id: "a", type: CODE_FILE_ENTITY_TYPE, properties: { path: "a.ts", locked: true } },
+				{ id: "b", type: CODE_FILE_ENTITY_TYPE, properties: { path: "b.ts" } },
+			]),
+		).toEqual([
+			{ id: "a", path: "a.ts", locked: true },
+			{ id: "b", path: "b.ts" },
+		]);
 	});
 
 	it("a free path still creates, with the choice unset and provenance stamped", async () => {

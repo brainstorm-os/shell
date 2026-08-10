@@ -27,6 +27,7 @@
 import { openEntity } from "@brainstorm-os/sdk";
 import type { PropertyDef } from "@brainstorm-os/sdk-types";
 import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
+import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 import { IconName } from "@brainstorm-os/sdk/icon";
 import {
 	type AnchoredMenuItem,
@@ -754,20 +755,9 @@ export async function createGraphCanvasController(
 		getSnapshot,
 		getState: () => state,
 		updateNodeProperty: async (id, key, value) => {
-			// Optimistic local patch so the inspector reflects the edit at once;
-			// the vault write is authoritative and reconciles on the next push.
-			const node = state.scene.renderNodes.find((n) => n.id === id);
-			if (node) {
-				(node.entity.properties as Record<string, unknown>)[key] = value;
-				emit();
-			}
-			const runtime = getGraphEntitiesRuntime();
-			if (!runtime?.entities) return;
-			try {
-				await runtime.entities.update(id, { [key]: value });
-			} catch (error) {
-				console.warn("[graph] inspector property write failed:", error);
-			}
+			const entities = getGraphEntitiesRuntime()?.entities;
+			if (!entities) return;
+			await writeNodeProperty(state, entities, id, key, value, emit);
 		},
 		setPattern: (next, options) => {
 			applyPatternChange(state, next, options ?? { reseed: true });
@@ -1459,6 +1449,14 @@ async function writeCreateLink(
 	const targetLabel = nodeLabelById(state, targetId);
 	try {
 		const source = await entities.get(sourceId);
+		// Lock-5(a) — a typed link is a property write on the SOURCE, so a locked
+		// source refuses it exactly like any other edit of that object. The
+		// target is only referenced, never written, so its own lock says nothing
+		// about this write.
+		if (isEntityLocked(source)) {
+			setStatus(state, t("lock.refusedLink", { name: sourceLabel }), "warn", emit);
+			return;
+		}
 		const value = nextRefValue(def, source?.properties?.[def.key], targetId);
 		if (value === null) {
 			setStatus(state, t("link.already", { name: def.name }), "ready", emit);
@@ -1474,6 +1472,43 @@ async function writeCreateLink(
 	} catch (error) {
 		console.warn("[graph] link write failed:", error);
 		setStatus(state, t("link.failed", { name: def.name }), "warn", emit);
+	}
+}
+
+/**
+ * Write one inspector property onto a node's entity (Lock-5(a)).
+ *
+ * The graph is a VIEW of objects other apps own, and its inspector is a real
+ * write path into them — so the fleet's read-only lock has to hold here or it
+ * is decoration. The lock is read from the entity itself (`entities.get`),
+ * authoritatively, BEFORE the optimistic local patch: patching first and
+ * refusing after would paint an edit that never happened, which reads as a
+ * bypassed lock until the next snapshot lands.
+ */
+async function writeNodeProperty(
+	state: AppState,
+	entities: EntitiesService,
+	id: string,
+	key: string,
+	value: unknown,
+	emit: () => void,
+): Promise<void> {
+	try {
+		const current = await entities.get(id);
+		if (isEntityLocked(current)) {
+			setStatus(state, t("lock.refusedEdit", { name: nodeLabelById(state, id) }), "warn", emit);
+			return;
+		}
+		// Optimistic local patch so the inspector reflects the edit at once;
+		// the vault write is authoritative and reconciles on the next push.
+		const node = state.scene.renderNodes.find((n) => n.id === id);
+		if (node) {
+			(node.entity.properties as Record<string, unknown>)[key] = value;
+			emit();
+		}
+		await entities.update(id, { [key]: value });
+	} catch (error) {
+		console.warn("[graph] inspector property write failed:", error);
 	}
 }
 
@@ -2934,6 +2969,7 @@ export const __testing = {
 	persistViewCoords,
 	tryLoadViewCoords,
 	writeCreateLink,
+	writeNodeProperty,
 	applyPersistedState,
 	reconcileScene,
 	effectiveDb,

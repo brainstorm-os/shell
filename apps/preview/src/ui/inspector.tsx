@@ -36,7 +36,7 @@ import { type ReactElement, useCallback, useMemo } from "react";
 import { humaniseBytes, humaniseDate, humaniseMime } from "../host/inspector-format";
 import type { PreviewRuntime } from "../host/runtime";
 import { t } from "../i18n";
-import { entityValuesFromSnapshot } from "../logic/entity-values";
+import { entityLockedFromSnapshot, entityValuesFromSnapshot } from "../logic/entity-values";
 import { usePreviewCommentsAdapter } from "../store/comments-bindings";
 import type { PreviewFileInfo } from "../types/preview-module";
 
@@ -131,11 +131,18 @@ function EditableInspector({
 		[snapshot, entityId],
 	);
 
+	// Lock-5(b) — two independent questions, both of which must be yes:
+	// CAN the shell write (is the service exposed at all), and MAY this object
+	// be written (the fleet's read-only lock). Preview only ever asked the
+	// first, so a locked file stayed editable here alone.
+	const locked = useMemo(() => entityLockedFromSnapshot(snapshot, entityId), [snapshot, entityId]);
 	const updateEntity = runtime?.services?.entities?.update;
-	const canMutate = Boolean(updateEntity);
+	const canMutate = Boolean(updateEntity) && !locked;
 	const writeValues = useCallback(
 		(next: Record<string, unknown>): void => {
-			if (!updateEntity) return;
+			// Enforced here too, not only in the panel's chrome: a read-only panel
+			// that would still write if called is a lock made of CSS.
+			if (!updateEntity || locked) return;
 			void (async () => {
 				try {
 					await updateEntity.call(runtime?.services?.entities, entityId, { values: next });
@@ -144,7 +151,7 @@ function EditableInspector({
 				}
 			})();
 		},
-		[updateEntity, runtime, entityId],
+		[updateEntity, runtime, entityId, locked],
 	);
 
 	const meta = useMemo<PropertiesPanelMeta[]>(
