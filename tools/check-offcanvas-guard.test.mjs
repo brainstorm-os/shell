@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	auditOffCanvasGuards,
+	collapsedTrackValues,
 	declarationBlocks,
 	isOffCanvasTransform,
+	stateTokens,
+	unexplainedBaselineKeys,
 } from "./check-offcanvas-guard.mjs";
 
 describe("declarationBlocks", () => {
@@ -108,5 +111,102 @@ describe("auditOffCanvasGuards", () => {
 
 		const good = ".p {\n\ttransform: translateX(100%);\n\tvisibility: hidden;\n}";
 		expect(audit(good, [key]).staleBaseline).toEqual([key]);
+	});
+});
+
+describe("collapsedTrackValues", () => {
+	it.each([
+		["grid-template-columns: 0 minmax(0, 1fr)", true],
+		["grid-template-columns: 0px 340px 1fr", true],
+		["grid-template-columns: 0fr 1fr", true],
+		["grid-template-rows: 1fr 0", true],
+		["grid-template-columns: 248px minmax(0, 1fr)", false],
+		["grid-template-columns: var(--w, 248px) minmax(0, 1fr)", false],
+		["grid-template-columns: repeat(3, 1fr)", false],
+		["grid-template-columns: auto 1fr", false],
+	])("%s → collapsed: %s", (decl, collapsed) => {
+		expect(collapsedTrackValues(`\n\t${decl};\n`).length > 0).toBe(collapsed);
+	});
+});
+
+describe("stateTokens", () => {
+	it("reads the attribute condition off a closed-state selector", () => {
+		expect(stateTokens('.journal[data-nav-open="false"]')).toEqual(['[data-nav-open="false"]']);
+	});
+
+	it("reads a BEM modifier class", () => {
+		expect(stateTokens(".mb-app__panes--rail-closed")).toEqual([".mb-app__panes--rail-closed"]);
+	});
+
+	it("ignores plain block/element classes and elements", () => {
+		expect(stateTokens("body .window")).toEqual([]);
+	});
+});
+
+describe("auditOffCanvasGuards — collapsed grid track", () => {
+	const audit = (src, baseline = []) =>
+		auditOffCanvasGuards({ sources: [{ file: "apps/a/src/styles.css", src }], baseline });
+
+	// F-489 follow-up: Mailbox collapses its folder rail to a 0px grid track
+	// with no transform at all, so the translateX-only ratchet certified it
+	// clean while every rail button stayed focusable behind `overflow-x: hidden`.
+	it("flags a track collapsed to zero whose panel is never hidden", () => {
+		const src = [
+			".panes--rail-closed {",
+			"\tgrid-template-columns: 0px 340px 1fr;",
+			"}",
+			".panes--rail-closed .rail {",
+			"\tpadding-inline: 0;",
+			"}",
+		].join("\n");
+		expect(audit(src).newViolations.map((v) => v.selector)).toEqual([".panes--rail-closed"]);
+	});
+
+	it("passes once a rule under the same state hides the panel", () => {
+		const src = [
+			".panes--rail-closed {",
+			"\tgrid-template-columns: 0px 340px 1fr;",
+			"}",
+			".panes--rail-closed .rail {",
+			"\tvisibility: hidden;",
+			"}",
+		].join("\n");
+		expect(audit(src).newViolations).toEqual([]);
+	});
+
+	it("requires the guard to sit under the SAME state, not any closed state", () => {
+		const src = [
+			'.app[data-nav-open="false"] {',
+			"\tgrid-template-columns: 0 minmax(0, 1fr);",
+			"}",
+			'.app[data-props-open="false"] .props {',
+			"\tvisibility: hidden;",
+			"}",
+		].join("\n");
+		expect(audit(src).newViolations.map((v) => v.selector)).toEqual(['.app[data-nav-open="false"]']);
+	});
+
+	it("does not flag a grid whose tracks are all non-zero", () => {
+		const src = ".app {\n\tgrid-template-columns: var(--w, 248px) minmax(0, 1fr);\n}";
+		expect(audit(src).newViolations).toEqual([]);
+	});
+
+	it("reports a collapsed track with no state token at all — it cannot be attributed", () => {
+		const src = ".app {\n\tgrid-template-columns: 0 1fr;\n}";
+		expect(audit(src).newViolations.map((v) => v.selector)).toEqual([".app"]);
+	});
+});
+
+describe("unexplainedBaselineKeys", () => {
+	it("accepts a key that says where the real guard lives", () => {
+		expect(unexplainedBaselineKeys({ "a.css:.x": "guarded by inert in ui/panel.tsx:63" })).toEqual(
+			[],
+		);
+	});
+
+	// An allowlist that does not have to explain itself is a mute button —
+	// exactly how F-486 certified twenty broken apps.
+	it.each([["  "], [""], [null], [true]])("rejects a key whose reason is %j", (why) => {
+		expect(unexplainedBaselineKeys({ "a.css:.x": why })).toEqual(["a.css:.x"]);
 	});
 });

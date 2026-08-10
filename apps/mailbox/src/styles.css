@@ -62,10 +62,17 @@ body {
 
 /* Border-box width can never shrink below the element's own padding, so a
  * 0px grid track alone leaves a padding-wide sliver (the active row's accent
- * bleeds through). Collapse the inline padding with the track. */
+ * bleeds through). Collapse the inline padding with the track.
+ *
+ * `visibility: hidden` is the F-489 guard: a zero track clips the rail to
+ * invisibility (`overflow-x: hidden` above) but leaves every folder button
+ * rendered, tabbable and announced. It rides the same duration as the track
+ * so the rail stays painted for the whole collapse and is visible from the
+ * first frame of the expand — see `.mb-rail`'s transition. */
 .mb-app__panes--rail-closed .mb-rail {
 	border-inline-end-color: transparent;
 	padding-inline: 0;
+	visibility: hidden;
 }
 
 .mb-demo-banner {
@@ -90,7 +97,9 @@ body {
 	overflow-x: hidden;
 	border-inline-end: var(--border-width) solid var(--color-border-subtle, var(--border));
 	background: var(--bg);
-	transition: padding-inline var(--motion-duration-normal, 180ms) ease;
+	transition:
+		padding-inline var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 }
 
 .mb-rail__group {

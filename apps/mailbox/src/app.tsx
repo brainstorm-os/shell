@@ -606,6 +606,7 @@ export function MailboxApp(): ReactElement {
 			) : (
 				<div className={`mb-app__panes${railOpen ? "" : " mb-app__panes--rail-closed"}`}>
 					<FolderRail
+						open={railOpen}
 						accounts={accounts}
 						folders={folders}
 						selection={selection}
