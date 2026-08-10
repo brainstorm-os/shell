@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { type Envelope, validateEnvelope } from "../../ipc/envelope";
+import type { Envelope } from "../../ipc/envelope";
 import { BadgeHost } from "./badge-host";
 import { UiNotifyHost } from "./notify-host";
 import { TrayHost } from "./tray-host";
@@ -174,55 +174,5 @@ describe("makeUiServiceHandler — openSearch (9.8.9)", () => {
 		expect(() => handler(envelope("openSearch", "a", { query: "q" }))).toThrowError(
 			expect.objectContaining({ name: "Unavailable" }),
 		);
-	});
-});
-
-describe("makeUiServiceHandler — setRoute (9.8.2c)", () => {
-	function routeHandler() {
-		const calls: Array<{ app: string; source: unknown; entityId: string | null }> = [];
-		const handler = makeUiServiceHandler({
-			getHost: () => new UiNotifyHost(),
-			getTrayHost: () => new TrayHost(),
-			setRoute: (app, source, entityId) => calls.push({ app, source, entityId }),
-		});
-		return { handler, calls };
-	}
-
-	it("forwards the entity id with the broker-verified app + source", () => {
-		const { handler, calls } = routeHandler();
-		expect(handler(envelope("setRoute", "io.brainstorm.files", { entityId: "folder-7" }), 42)).toBe(
-			undefined,
-		);
-		expect(calls).toEqual([{ app: "io.brainstorm.files", source: 42, entityId: "folder-7" }]);
-	});
-
-	it("treats a null entity id as 'clear this tab's route'", () => {
-		const { handler, calls } = routeHandler();
-		handler(envelope("setRoute", "a", { entityId: null }), 7);
-		expect(calls[0]?.entityId).toBeNull();
-	});
-
-	it("rejects a malformed entity id instead of silently clearing the route", () => {
-		const { handler, calls } = routeHandler();
-		for (const arg of [{ entityId: 42 }, { entityId: "" }, { entityId: "x".repeat(300) }, {}]) {
-			expect(() => handler(envelope("setRoute", "a", arg), 7)).toThrowError(
-				expect.objectContaining({ name: "Invalid" }),
-			);
-		}
-		expect(calls).toEqual([]);
-	});
-
-	it("throws Unavailable when no route sink is wired", () => {
-		const { handler } = handlerWith();
-		expect(() => handler(envelope("setRoute", "a", { entityId: "x" }), 7)).toThrowError(
-			expect.objectContaining({ name: "Unavailable" }),
-		);
-	});
-
-	it("uses a dot-free wire method so the envelope validator accepts it", () => {
-		// `METHOD_PATTERN` in `envelope.ts` allows no dots, so a nested
-		// `windows.setRoute` wire name would be rejected before it ever
-		// reached this handler. The nesting lives in the SDK proxy instead.
-		expect(validateEnvelope(envelope("setRoute", "a", { entityId: "x" })).ok).toBe(true);
 	});
 });

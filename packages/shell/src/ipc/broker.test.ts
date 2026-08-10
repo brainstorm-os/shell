@@ -25,22 +25,6 @@ describe("Broker.dispatch", () => {
 		expect(reply.ok === true && reply.value).toEqual({ pong: 42 });
 	});
 
-	it("hands the verified caller source to the service handler (9.8.2c)", async () => {
-		// `ui.setRoute` may only re-label the CALLING tab, so the handler needs
-		// the same opaque source `verifyAppIdentity` just checked the envelope's
-		// `app` against — never a client-supplied window id.
-		const seen: unknown[] = [];
-		const handler: ServiceHandler = (_envelope, source) => {
-			seen.push(source);
-			return null;
-		};
-		const broker = new Broker({ services: new Map([["storage", handler]]) });
-
-		await broker.dispatch(mkEnvelope(), 17);
-
-		expect(seen).toEqual([17]);
-	});
-
 	it("rejects malformed envelopes with kind=Invalid", async () => {
 		const broker = new Broker({ services: new Map() });
 		const reply = await broker.dispatch({ wrong: "shape" }, "src");

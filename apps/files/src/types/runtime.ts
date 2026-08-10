@@ -97,14 +97,6 @@ export type BrainstormRuntime = {
 		 *  Cap `search.open` in the manifest; absent on older shells. */
 		ui?: {
 			openSearch?(args: { query?: string }): Promise<void>;
-			/** 9.8.2c — republish this tab's route after an IN-PLACE navigation
-			 *  so the shell's focus-existing matches the tab on what it holds
-			 *  now, not on the object it was launched with. No capability: the
-			 *  shell resolves the tab from the broker-verified caller. Absent on
-			 *  older shells. */
-			windows?: {
-				setRoute(target: { entityId: string } | null): Promise<void>;
-			};
 		};
 		/** Cover-content service consumed by the shared `<CoverPicker>`. */
 		covers?: {

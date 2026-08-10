@@ -11,13 +11,11 @@
  * cover DOM twins.
  *
  * The renderer binds to the EXISTING `vaultEntities.list` / `onChange`
- * read path — see `store/use-files-store.ts` for why `entities.subscribe`
- * is not a drop-in for it. The shell root-Folder bootstrap landed
+ * preview read path. The shell root-Folder bootstrap landed
  * (`VaultSession.ensureRootFolder`): the vault's canonical root
  * `Folder/v1` is provisioned on open, so the tree resolves a real root
- * instead of a synthetic placeholder. `ui.windows.setRoute` shipped at
- * 9.8.2c — the store publishes every in-place folder navigation so the
- * tab's route tracks what is on screen.
+ * instead of a synthetic placeholder. `entities.subscribe` /
+ * `ui.windows.setRoute` remain folded into the Stage 9.3 swap.
  *
  * `@brainstorm-os/react-yjs` is the app's CRDT seam. Files is read-only
  * over the `vaultEntities` snapshot today, so it does NOT install a

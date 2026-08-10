@@ -1897,24 +1897,6 @@ export type UiService = {
 	tray: TrayService;
 	/** 7.14 — app-icon notification badges. Cap `ui.badge`. */
 	badge: BadgeService;
-	/** 9.8.2c — the calling tab's own route. */
-	windows: WindowsService;
-};
-
-/**
- * 9.8.2c — an app publishes what its window/tab is CURRENTLY showing after
- * navigating in place, so the shell's per-tab route (seeded from the launch
- * context at open time) stays true. Without it, "focus the tab that already
- * shows this object" matches on the object the tab used to show.
- *
- * `setRoute({ entityId })` names an object, not a URI: the shell mints the
- * canonical `brainstorm://entity/<id>` route itself. `setRoute(null)` clears
- * the route for a view that shows nothing addressable. No capability — the
- * shell resolves the tab from the broker-verified caller, so an app can only
- * ever re-label its own tab.
- */
-export type WindowsService = {
-	setRoute(target: { entityId: EntityId } | null): Promise<void>;
 };
 
 /** Transient cross-surface theme preview (9.9.6; cap `theme.preview`). The

@@ -38,16 +38,7 @@ import {
 	validateEnvelope,
 } from "./envelope";
 
-/**
- * A service handler. `source` is the SAME opaque caller identity `dispatch`
- * received (a WebContents id in production) and is only ever passed on AFTER
- * `verifyAppIdentity` accepted the envelope's `app` for it — so a handler that
- * must act on the calling window (`ui.setRoute`, 9.8.2c) resolves the real
- * sender instead of trusting a window id in the args. Handlers that don't care
- * simply declare one parameter; it is optional so the shell's own in-process
- * handler-to-handler calls (and unit tests) can invoke a handler directly.
- */
-export type ServiceHandler = (envelope: Envelope, source?: unknown) => Promise<unknown> | unknown;
+export type ServiceHandler = (envelope: Envelope) => Promise<unknown> | unknown;
 
 export type ServiceRegistry = Map<string, ServiceHandler>;
 
@@ -243,7 +234,7 @@ export class Broker {
 		this.enroll(envelope.app, slot);
 
 		try {
-			const value = await handler(envelope, source);
+			const value = await handler(envelope);
 			if (aborted) {
 				const reply = makeErrorReply(envelope.msg, {
 					kind: "Unavailable",
