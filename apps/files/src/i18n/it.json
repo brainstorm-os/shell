@@ -45,6 +45,7 @@
   "brainstorm.files.type.file": "File",
   "brainstorm.files.type.note": "Nota",
   "brainstorm.files.search.placeholderFolder": "Cerca in questa cartella",
+  "brainstorm.files.search.clear": "Cancella ricerca",
   "brainstorm.files.search.scope.active": "Questa cartella",
   "brainstorm.files.search.scope.subfolders": "Sottocartelle",
   "brainstorm.files.search.scope.vault": "Vault",

@@ -45,6 +45,7 @@
   "brainstorm.files.type.file": "Archivo",
   "brainstorm.files.type.note": "Nota",
   "brainstorm.files.search.placeholderFolder": "Buscar en esta carpeta",
+  "brainstorm.files.search.clear": "Borrar búsqueda",
   "brainstorm.files.search.scope.active": "Esta carpeta",
   "brainstorm.files.search.scope.subfolders": "Subcarpetas",
   "brainstorm.files.search.scope.vault": "Bóveda",

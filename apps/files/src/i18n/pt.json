@@ -45,6 +45,7 @@
   "brainstorm.files.type.file": "Arquivo",
   "brainstorm.files.type.note": "Nota",
   "brainstorm.files.search.placeholderFolder": "Pesquisar nesta pasta",
+  "brainstorm.files.search.clear": "Limpar pesquisa",
   "brainstorm.files.search.scope.active": "Esta pasta",
   "brainstorm.files.search.scope.subfolders": "Subpastas",
   "brainstorm.files.search.scope.vault": "Vault",

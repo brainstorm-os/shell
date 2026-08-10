@@ -45,6 +45,7 @@
   "brainstorm.files.type.file": "Fichier",
   "brainstorm.files.type.note": "Note",
   "brainstorm.files.search.placeholderFolder": "Rechercher dans ce dossier",
+  "brainstorm.files.search.clear": "Effacer la recherche",
   "brainstorm.files.search.scope.active": "Ce dossier",
   "brainstorm.files.search.scope.subfolders": "Sous-dossiers",
   "brainstorm.files.search.scope.vault": "Coffre",

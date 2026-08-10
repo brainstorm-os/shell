@@ -45,6 +45,7 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -666,23 +667,20 @@ export function FilesApp() {
 				>
 					<div className="toolbar" data-testid="toolbar">
 						<div className="toolbar__group toolbar__group--start">
-							<label className="toolbar__search bs-input bs-input--sm">
-								<span aria-hidden="true" className="toolbar__search-glyph">
-									<Icon name={IconName.Search} size={15} />
-								</span>
-								<input
-									ref={searchInputRef}
-									className="toolbar__search-input bs-input__control"
-									type="search"
-									data-testid="toolbar-search-input"
-									placeholder={t("brainstorm.files.search.placeholderFolder")}
-									value={store.searchQuery}
-									onChange={(e) => store.setSearchQuery(e.target.value)}
-								/>
-								{store.searchQuery.trim() !== "" ? (
+							<Searchbar
+								className="toolbar__search bs-searchbar--field"
+								inputRef={searchInputRef}
+								inputTestId="toolbar-search-input"
+								placeholder={t("brainstorm.files.search.placeholderFolder")}
+								clearLabel={t("brainstorm.files.search.clear")}
+								value={store.searchQuery}
+								onChange={store.setSearchQuery}
+							/>
+							{store.searchQuery.trim() !== "" ? (
+								<>
 									<button
 										type="button"
-										className="toolbar__scope"
+										className="bs-btn bs-btn--secondary toolbar__scope"
 										data-testid="toolbar-scope"
 										data-scope={store.searchScope}
 										onClick={() => {
@@ -706,27 +704,25 @@ export function FilesApp() {
 									>
 										{scopeLabel(store.searchScope)}
 									</button>
-								) : null}
-							</label>
-							{store.searchQuery.trim() !== "" ? (
-								<button
-									type="button"
-									className="toolbar__save-search"
-									data-testid="toolbar-save-search"
-									data-bs-tooltip={t("brainstorm.files.smart.save")}
-									aria-label={t("brainstorm.files.smart.save")}
-									onClick={() => setSmartNamePrompt({ mode: "save" })}
-								>
-									<Icon name={IconName.Sparkle} size={15} />
-									<span className="toolbar__save-search-label">{t("brainstorm.files.smart.save")}</span>
-								</button>
+									<button
+										type="button"
+										className="bs-btn bs-btn--secondary toolbar__save-search"
+										data-testid="toolbar-save-search"
+										data-bs-tooltip={t("brainstorm.files.smart.save")}
+										aria-label={t("brainstorm.files.smart.save")}
+										onClick={() => setSmartNamePrompt({ mode: "save" })}
+									>
+										<Icon name={IconName.Sparkle} size={15} />
+										<span className="toolbar__save-search-label">{t("brainstorm.files.smart.save")}</span>
+									</button>
+								</>
 							) : null}
 						</div>
 						<div className="toolbar__group toolbar__group--end">
 							<button
 								type="button"
 								ref={setSortTrigger}
-								className="bs-select bs-select--sm toolbar__sort"
+								className="bs-select toolbar__sort"
 								data-testid="toolbar-sort"
 								aria-haspopup="menu"
 								aria-expanded={sortMenuOpen}
@@ -743,7 +739,7 @@ export function FilesApp() {
 								/>
 							</button>
 							<SelectMenu<ViewMode>
-								className="bs-select--sm view-switch"
+								className="view-switch"
 								data-testid="view-switch"
 								ariaLabel={t("brainstorm.files.view.label")}
 								value={store.viewMode}

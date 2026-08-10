@@ -565,13 +565,17 @@ body[data-nav-open="false"] .sidebar {
 	color: var(--text);
 }
 
+/* Filter row. Sits on the shared 44px panel band (the same band Contacts'
+ * `.contacts-list__search` and Mailbox's `.mb-list__search` use) with every
+ * control on the md tier, so the field, the scope pill, Save-search, Sort-by
+ * and the view picker all line up on one baseline. */
 .toolbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-3);
 	padding: 0 var(--space-2);
-	height: var(--control-height-lg);
+	height: 44px;
 	border-bottom: var(--border-width) solid var(--border);
 }
 
@@ -579,86 +583,32 @@ body[data-nav-open="false"] .sidebar {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-}
-
-.toolbar__group--start {
-	flex: 1 1 auto;
 	min-width: 0;
 }
 
-/* Composite search field: the box (height / border / surface) comes from the
- * shared `.bs-input` face on the <label>; this rule supplies only the layout
- * deltas (glyph gap, flex grow, max width). The inner <input> stays bare. */
-.toolbar__search {
-	gap: var(--space-2);
-	flex: 1 1 auto;
-	max-width: 360px;
+/* Shrink-to-fit, never grow. A growing start group swallows the row's free
+ * space while the field inside it is basis-sized, so the surplus lands INSIDE
+ * the group where nothing paints it and `justify-content: space-between`
+ * above goes inert — that dead gap between the field and Sort-by was ~210px
+ * at the default 1100×720 window. */
+.toolbar__group--start {
+	flex: 0 1 auto;
 }
 
-.toolbar__search:focus-within {
-	outline: 2px solid var(--color-focus-ring);
-	outline-offset: -1px;
-	border-color: transparent;
+/* Chrome — the 32px field face, the focus ring and the clear ✕ — is the
+ * shared `.bs-searchbar--field` control-row variant; this rule supplies only
+ * how the bar flexes in the row (same shape as the marketplace toolbar).
+ * `:root`-level specificity because `:root .bs-searchbar` pins `min-width: 0`. */
+:root .toolbar__search {
+	flex: 0 1 280px;
+	min-width: 160px;
 }
 
-.toolbar__search-glyph {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-faint);
-}
-
-.toolbar__search-glyph svg {
-	width: 14px;
-	height: 14px;
-}
-
-.toolbar__search-input {
-	flex: 1 1 auto;
-	background: transparent;
-	border: 0;
-	outline: none;
-	color: var(--text);
-	font: inherit;
-	font-size: var(--text-size-md);
-}
-
-.toolbar__search-input::placeholder {
-	color: var(--text-faint);
-}
-
-.toolbar__scope {
-	background: var(--hover);
-	border: 0;
-	border-radius: var(--radius-sm);
-	color: var(--text-dim);
-	padding: var(--space-0_5);
-	font-size: var(--text-size-xs);
-	cursor: pointer;
-}
-
-.toolbar__scope:hover {
-	color: var(--text);
-}
-
+/* Scope pill + Save-search wear the shared `.bs-btn --secondary` box; only
+ * their placement deltas live here. */
+.toolbar__scope,
 .toolbar__save-search {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
 	flex-shrink: 0;
-	background: transparent;
-	border: var(--border-width) solid var(--color-border-subtle);
-	border-radius: var(--radius-md);
-	color: var(--text-dim);
-	padding: var(--space-1);
-	font-size: var(--text-size-sm);
-	font-weight: var(--text-weight-medium);
-	cursor: pointer;
-}
-
-.toolbar__save-search:hover {
-	color: var(--text);
-	background: var(--hover);
 }
 
 .toolbar__save-search svg {
@@ -1695,7 +1645,7 @@ body:not([data-inspector="open"]) .inspector {
 /* ── Footer / status bar (28px) ──────────────────────────────────────── */
 
 /* Toolbar trigger faces (POLISH-DSN-4): the sort trigger and the view-mode
- * picker are the SAME `.bs-select--sm` face (one boxed trigger face per
+ * picker are the SAME `.bs-select` face (one boxed trigger face per
  * toolbar; chrome from `@brainstorm-os/sdk/select-menu.css`). The sort button
  * keeps its own popover (direction + group-by + layout controls, not a plain
  * option list) — only its face is the shared one; its caret shows the current
