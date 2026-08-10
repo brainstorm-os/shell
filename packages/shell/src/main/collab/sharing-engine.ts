@@ -585,7 +585,11 @@ export class SharingEngine {
 	async resolveSiblingRoster(): Promise<readonly FanoutDevice[]> {
 		const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
 		const props = await VaultPropertiesStore.open(this.#session.ydocStore);
-		return props.devices().listActive();
+		// LAN-2b — verified under THIS identity's key. A forged roster row here
+		// would be sealed an entity DEK, so the read path is where it has to be
+		// caught: this is the consumer 10.3c turned from "LAN admission" into
+		// "every entity key in the vault".
+		return props.devices().listActive(this.#session.identity.publicKey);
 	}
 
 	/**

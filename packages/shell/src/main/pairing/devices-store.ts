@@ -225,9 +225,36 @@ export class DevicesStore {
 	 * rotation operation (the "decoupled access change from key
 	 * rotation" decision recorded in OQ-27). The contract here is just:
 	 * a fresh wrap for an entity skips a revoked device entirely.
+	 *
+	 * **LAN-2b — every row is signature-verified here, and the key is a
+	 * REQUIRED parameter rather than an option, so a new call site cannot
+	 * silently opt out of verification.** `verifyAddDeviceRecord` existed
+	 * from the start but only `vault-validate` ever called it, so the two
+	 * consumers that decide real access — LAN admission and, since 10.3c,
+	 * the entity-DEK fan-out — trusted whatever the roster happened to
+	 * contain. 10.3c is what makes that matter: before it, a forged roster
+	 * row bought LAN admission; now it buys **every entity DEK in the
+	 * vault**, sealed to a key of the attacker's choosing.
+	 *
+	 * Fail-closed: a row whose signature does not verify under this
+	 * identity is dropped, not returned-and-flagged, because both callers
+	 * would otherwise have to remember to check. `list()` is deliberately
+	 * left unfiltered — Settings must still be able to SHOW a bad row so
+	 * the user can remove it.
 	 */
-	listActive(): SignedAddDeviceRecord[] {
-		return this.list().filter((r) => r.revokedAt === undefined);
+	listActive(userEd25519Pub: Uint8Array): SignedAddDeviceRecord[] {
+		const kept: SignedAddDeviceRecord[] = [];
+		for (const record of this.list()) {
+			if (record.revokedAt !== undefined) continue;
+			if (!verifyAddDeviceRecord(record, userEd25519Pub)) {
+				console.warn(
+					`[devices] dropped an unverifiable roster record for ${record.deviceEd25519Pub.slice(0, 12)}… — signature does not verify under this identity`,
+				);
+				continue;
+			}
+			kept.push(record);
+		}
+		return kept;
 	}
 
 	private readArray(): SignedAddDeviceRecord[] {

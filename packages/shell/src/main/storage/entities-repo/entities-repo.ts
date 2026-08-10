@@ -311,6 +311,20 @@ export class EntitiesRepository {
 		).all() as Array<{ id: string; type: string }>;
 	}
 
+	/**
+	 * F-493 — the creating principal of every live row, and nothing else.
+	 *
+	 * Pairing refuses to re-point a vault that already holds the user's own work
+	 * (`pairing/vault-pristine.ts`), and that decision is made on provenance. The
+	 * projection is deliberately narrow: the check never needs a title, a body or
+	 * a property, so it is not given one.
+	 */
+	listCreatedByPrincipals(): Array<{ createdBy: string }> {
+		return this.stmt(
+			"SELECT created_by AS createdBy FROM entities WHERE deleted_at IS NULL",
+		).all() as Array<{ createdBy: string }>;
+	}
+
 	/** Count of live (non-deleted) entity rows. Stage 10.14 uses `0` as the
 	 *  "empty vault" signal that makes cold restore-from-zero offerable. */
 	count(): number {

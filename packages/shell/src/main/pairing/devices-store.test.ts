@@ -192,10 +192,42 @@ describe("DevicesStore", () => {
 		store.add(r1);
 		store.add(r2);
 		store.revoke("dev-A", 1_800_000_000);
-		const active = store.listActive();
+		const active = store.listActive(user.pub);
 		expect(active.length).toBe(1);
 		expect(active[0]?.deviceEd25519Pub).toBe("dev-B");
 		expect(store.list().length).toBe(2); // list() still surfaces both.
+	});
+
+	it("listActive() drops a record whose signature does not verify (LAN-2b)", () => {
+		const doc = freshDoc();
+		const store = new DevicesStore(doc);
+		const user = freshUserPair();
+		const addedBy = Buffer.from(user.pub).toString("base64");
+		const good = signAddDeviceRecord(makeInput({ deviceEd25519Pub: "dev-good", addedBy }), user.sec);
+		// Signed by SOMEONE ELSE — the shape a forged roster row takes. Before
+		// 10.3c this bought LAN admission; now it would be sealed every entity DEK.
+		const attacker = freshUserPair();
+		const forged = signAddDeviceRecord(
+			makeInput({ deviceEd25519Pub: "dev-forged", addedBy }),
+			attacker.sec,
+		);
+		store.add(good);
+		store.add(forged);
+
+		const active = store.listActive(user.pub);
+		expect(active.map((r) => r.deviceEd25519Pub)).toEqual(["dev-good"]);
+		// `list()` stays unfiltered so Settings can still show the bad row to remove.
+		expect(store.list().length).toBe(2);
+	});
+
+	it("listActive() returns nothing when the verifying key is wrong — fail closed", () => {
+		const doc = freshDoc();
+		const store = new DevicesStore(doc);
+		const user = freshUserPair();
+		const addedBy = Buffer.from(user.pub).toString("base64");
+		store.add(signAddDeviceRecord(makeInput({ deviceEd25519Pub: "dev-A", addedBy }), user.sec));
+
+		expect(store.listActive(freshUserPair().pub)).toEqual([]);
 	});
 
 	it("rejects malformed records on add()", () => {
