@@ -125,5 +125,6 @@
   "duplicates.close": "Close",
   "duplicates.merge": "Merge {count} contacts",
   "duplicates.merged": "Merged {count} contacts into “{name}”.",
-  "duplicates.mergeFailed": "Couldn't merge contacts."
+  "duplicates.mergeFailed": "Couldn't merge contacts.",
+  "duplicates.mergeLocked": "Locked contacts can't be merged — unlock them first."
 }

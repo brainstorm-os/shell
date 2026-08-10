@@ -60,6 +60,13 @@ export type PersonDetailProps = {
 	entityTitleSource: EntityTitleSource;
 	showProperties: boolean;
 	onToggleProperties: () => void;
+	/** The contact's synced read-only lock (`person.locked`, passed explicitly
+	 *  so every affordance on this page has to answer for it). The page owns
+	 *  FOUR write affordances the app's `patchPerson` gate never sees until it
+	 *  is too late — the hero name field, "+ Add company" (which mints a
+	 *  Company and links it), the icon / cover pickers, and the body editor —
+	 *  so each one declares the lock rather than typing into a refusal. */
+	locked: boolean;
 	/** Cover-picker visibility is owned by the app shell so the object ⋯ menu's
 	 *  Add/Change-cover item can open it too (the Notes arrangement). */
 	coverPickerOpen: boolean;
@@ -104,6 +111,7 @@ export function PersonDetail({
 	entityTitleSource,
 	showProperties,
 	onToggleProperties,
+	locked,
 	coverPickerOpen,
 	onCoverPickerOpenChange,
 	onRenamePerson,
@@ -115,7 +123,7 @@ export function PersonDetail({
 
 	const commitCompany = (): void => {
 		const name = (companyDraft ?? "").trim();
-		if (name) onCreateCompany(name);
+		if (name && !locked) onCreateCompany(name);
 		setCompanyDraft(null);
 	};
 
@@ -125,6 +133,7 @@ export function PersonDetail({
 	const [nameDraft, setNameDraft] = useState(person.name);
 
 	const commitName = (): void => {
+		if (locked) return;
 		const trimmed = nameDraft.trim();
 		if (trimmed !== person.name) onRenamePerson(trimmed);
 	};
@@ -193,6 +202,8 @@ export function PersonDetail({
 						aria-label={t("detail.cover.edit")}
 						aria-haspopup="dialog"
 						aria-expanded={coverPickerOpen}
+						disabled={locked}
+						{...(locked ? { title: t("detail.menu.lockedHint") } : {})}
 						onClick={() => onCoverPickerOpenChange(!coverPickerOpen)}
 					>
 						{/* Slim banner aspect shared with Notes / Bookmarks (16 / 3.5). */}
@@ -207,7 +218,9 @@ export function PersonDetail({
 							aria-label={t("detail.icon.edit")}
 							aria-haspopup="dialog"
 							aria-expanded={iconPickerOpen}
-							data-bs-tooltip={t("detail.icon.edit")}
+							disabled={locked}
+							data-bs-tooltip={locked ? t("detail.menu.lockedHint") : t("detail.icon.edit")}
+							{...(locked ? { title: t("detail.menu.lockedHint") } : {})}
 							onClick={() => setIconPickerOpen((open) => !open)}
 						>
 							{person.icon ? (
@@ -221,6 +234,11 @@ export function PersonDetail({
 							value={nameDraft}
 							placeholder={t("detail.name.placeholder")}
 							aria-label={t("detail.name.aria")}
+							// A locked contact refuses the rename, so the field must not
+							// ACCEPT one: taking the keystrokes and then dropping the commit
+							// paints an edit that never happened (the Graph lesson).
+							readOnly={locked}
+							{...(locked ? { title: t("detail.menu.lockedHint") } : {})}
 							onChange={(e) => setNameDraft(e.target.value)}
 							onBlur={commitName}
 							onKeyDown={(e) => {
@@ -264,6 +282,12 @@ export function PersonDetail({
 								<button
 									type="button"
 									className="contacts-detail__add-company"
+									// Stays visible-but-disabled rather than vanishing: a control
+									// that disappears takes its explanation with it, and the
+									// native title is the only reason a disabled control can give
+									// (it fires no pointer events, so a tooltip chip never opens).
+									disabled={locked}
+									{...(locked ? { title: t("detail.menu.lockedHint") } : {})}
 									onClick={() => setCompanyDraft("")}
 								>
 									<Icon name={IconName.Plus} size={14} />
@@ -307,10 +331,14 @@ export function PersonDetail({
 						</div>
 					) : null}
 
+					{/* The legacy-`bio` seed PLANTS content into the body doc (and the
+					 *  first edit then clears `bio` on the entity) — a write, so a locked
+					 *  contact is not migrated on open. It migrates once unlocked. */}
 					<div className="contacts-detail__body">
 						<PersonBodyEditor
 							personId={person.id}
-							{...(seedBio.trim() ? { seedBio } : {})}
+							locked={locked}
+							{...(seedBio.trim() && !locked ? { seedBio } : {})}
 							onFirstEdit={onFirstEdit}
 						/>
 					</div>

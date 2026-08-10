@@ -125,5 +125,6 @@
   "duplicates.close": "Fermer",
   "duplicates.merge": "Fusionner {count} contacts",
   "duplicates.merged": "{count} contacts fusionnés dans « {name} ».",
-  "duplicates.mergeFailed": "Impossible de fusionner les contacts."
+  "duplicates.mergeFailed": "Impossible de fusionner les contacts.",
+  "duplicates.mergeLocked": "Les contacts verrouillés ne peuvent pas être fusionnés — déverrouillez-les d'abord."
 }

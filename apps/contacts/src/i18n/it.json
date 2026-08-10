@@ -125,5 +125,6 @@
   "duplicates.close": "Chiudi",
   "duplicates.merge": "Unisci {count} contatti",
   "duplicates.merged": "{count} contatti uniti in “{name}”.",
-  "duplicates.mergeFailed": "Impossibile unire i contatti."
+  "duplicates.mergeFailed": "Impossibile unire i contatti.",
+  "duplicates.mergeLocked": "I contatti bloccati non possono essere uniti: sbloccali prima."
 }

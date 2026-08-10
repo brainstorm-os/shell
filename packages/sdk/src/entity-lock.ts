@@ -46,3 +46,32 @@ export function isEntityLocked(
 export function lockTogglePatch(locked: boolean): { locked: boolean } {
 	return { [LOCKED_PROPERTY_KEY]: !locked };
 }
+
+/** Whether a patch does NOTHING but flip the lock — the one write a locked
+ *  object still takes (else a lock could never be undone).
+ *
+ *  Strictly lock-ONLY: the first spelling of this exemption asked "does the
+ *  patch mention `locked`?", so a mixed `{ locked: false, name: "…" }` patch
+ *  walked the whole write past the gate — one property key smuggling every
+ *  other one through. A caller that genuinely wants to unlock AND edit issues
+ *  two writes, in that order. */
+export function isLockOnlyPatch(
+	patch: Readonly<Record<string, unknown>> | null | undefined,
+): boolean {
+	if (!patch) return false;
+	const keys = Object.keys(patch);
+	return keys.length === 1 && keys[0] === LOCKED_PROPERTY_KEY;
+}
+
+/** The one reading of "may this write land?", for every gated write path.
+ *
+ *  `patch` omitted means a NON-property write (delete, merge, destroy): a
+ *  locked object refuses it outright — there is no lock-only exemption to
+ *  earn, because there is no patch. */
+export function lockRefusesWrite(
+	locked: boolean,
+	patch?: Readonly<Record<string, unknown>> | null,
+): boolean {
+	if (!locked) return false;
+	return patch === undefined || patch === null || !isLockOnlyPatch(patch);
+}

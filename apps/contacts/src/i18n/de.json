@@ -125,5 +125,6 @@
   "duplicates.close": "Schließen",
   "duplicates.merge": "{count} Kontakte zusammenführen",
   "duplicates.merged": "{count} Kontakte in „{name}“ zusammengeführt.",
-  "duplicates.mergeFailed": "Kontakte konnten nicht zusammengeführt werden."
+  "duplicates.mergeFailed": "Kontakte konnten nicht zusammengeführt werden.",
+  "duplicates.mergeLocked": "Gesperrte Kontakte können nicht zusammengeführt werden – entsperre sie zuerst."
 }

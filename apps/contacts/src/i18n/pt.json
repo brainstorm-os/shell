@@ -125,5 +125,6 @@
   "duplicates.close": "Fechar",
   "duplicates.merge": "Mesclar {count} contatos",
   "duplicates.merged": "{count} contatos mesclados em “{name}”.",
-  "duplicates.mergeFailed": "Não foi possível mesclar os contatos."
+  "duplicates.mergeFailed": "Não foi possível mesclar os contatos.",
+  "duplicates.mergeLocked": "Contatos bloqueados não podem ser mesclados — desbloqueie-os primeiro."
 }

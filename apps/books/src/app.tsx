@@ -61,9 +61,9 @@ import {
 	entityIdFromPayload,
 	fileSourceFromEntity,
 	isOpenablePdfBook,
-	readingPositionPatch,
 	resolveFileOpen,
 } from "./logic/book-open";
+import { bookWriteRefused, makePositionPersister, writeBookPatch } from "./logic/book-writes";
 import { parseEpub } from "./logic/epub-parser";
 import { booksFromEntities } from "./logic/library";
 import { type PdfInfo, pdfEnrichmentPatch } from "./logic/pdf-metadata";
@@ -74,12 +74,7 @@ import { enginePagePort } from "./render/pdf-engine-port";
 import type { PdfPagePort } from "./render/pdf-reader";
 import { mountPdfReader } from "./render/pdf-reader";
 import { mountReader } from "./render/reader";
-import {
-	type BooksEntitiesService,
-	type BooksRuntime,
-	type CreatedEntity,
-	getBooksRuntime,
-} from "./runtime";
+import { type BooksRuntime, type CreatedEntity, getBooksRuntime } from "./runtime";
 import { BOOK_ENTITY_TYPE, type Book } from "./types/book";
 import type { Locator } from "./types/locator";
 import { BookInspector } from "./ui/inspector";
@@ -152,25 +147,6 @@ type MountedReader = {
 	goTo: (locator: Locator) => void;
 };
 
-/** Persist a page turn onto the `Book/v1` row. Each write chains off the
- *  previously-advanced book so progress/lastReadAt never regress. */
-function makePositionPersister(
-	entities: BooksEntitiesService | null,
-	initial: Book,
-	spineLength: number,
-): (locator: Locator, progress: number) => void {
-	let current = initial;
-	return (locator, progress) => {
-		const { book, patch } = readingPositionPatch(current, locator, progress, spineLength, Date.now());
-		current = book;
-		const update = entities?.update;
-		if (!update) return;
-		void Promise.resolve(update(book.id, patch)).catch((error) => {
-			console.warn(`[books] reading-position write failed: ${(error as Error).message}`);
-		});
-	};
-}
-
 /** The new id off an `entities.create` reply, or `null` when malformed. */
 function createdEntityId(entity: CreatedEntity): string | null {
 	return typeof entity.id === "string" && entity.id.length > 0 ? entity.id : null;
@@ -180,19 +156,23 @@ function createdEntityId(entity: CreatedEntity): string | null {
  *  embedded info dictionary, a cover from the page-one render (stored in the
  *  vault cover store). Backfill-only — never clobbers a value the user set
  *  (see `pdfEnrichmentPatch`). Fire-and-forget; any failure is non-fatal to
- *  reading, so it degrades to a warn. */
+ *  reading, so it degrades to a warn.
+ *
+ *  Like the page-turn persister this writes through the app's ONE gated write
+ *  path, never a raw `entities.update` — opening a LOCKED book must not
+ *  backfill its author / cover behind the user's back. `null` when this shell
+ *  cannot write at all, which also skips the expensive cover render. */
 async function enrichBookFromPdf(args: {
 	doc: PdfEngineDocument;
 	port: PdfPagePort;
 	book: Book;
 	rawProperties: Record<string, unknown> | null;
-	entities: BooksEntitiesService | null;
+	write: ((patch: Record<string, unknown>) => void) | null;
 	covers: CoversService | null;
 	stillCurrent: () => boolean;
 }): Promise<void> {
-	const { doc, port, book, rawProperties, entities, covers, stillCurrent } = args;
-	const update = entities?.update;
-	if (!update) return;
+	const { doc, port, book, rawProperties, write, covers, stillCurrent } = args;
+	if (!write) return;
 	try {
 		const info = (await doc.getMetadata().catch(() => null))?.info as PdfInfo | undefined;
 		const hasCover = Boolean(rawProperties?.cover);
@@ -209,7 +189,7 @@ async function enrichBookFromPdf(args: {
 			hasCover,
 			coverUrl,
 		});
-		if (Object.keys(patch).length > 0) await update(book.id, patch);
+		if (Object.keys(patch).length > 0) write(patch);
 	} catch (error) {
 		console.warn(`[books] metadata enrichment failed for ${book.id}: ${(error as Error).message}`);
 	}
@@ -460,6 +440,15 @@ export function BooksApp(): ReactElement {
 		void rememberLastViewed(rt.current?.services?.settings ?? undefined, selectedId);
 	}, [usingVault, selectedId]);
 
+	// Lock-5(b) — the lock of the OPEN book, and the app's one gated write path,
+	// both read through refs: the reading surface is mounted by an effect that
+	// runs before `locked` / `patchBook` are computed further down, and a
+	// long-lived reader callback must see the CURRENT lock, not the one that
+	// held when the book was opened.
+	const lockedRef = useRef(false);
+	const patchBookRef = useRef<(patch: Record<string, unknown>) => void>(() => {});
+	const writeBook = useCallback((patch: Record<string, unknown>) => patchBookRef.current(patch), []);
+
 	// Mount/swap the reading surface. Keyed on the selection identity ONLY —
 	// snapshot churn (including our own reading-position writes) must not
 	// remount the reader mid-read.
@@ -527,7 +516,7 @@ export function BooksApp(): ReactElement {
 					const epubBytes = await withTimeout(fetchBookBytes(epubSource.url), OPEN_TIMEOUT_MS);
 					const content = await withTimeout(parseEpub(epubBytes), OPEN_TIMEOUT_MS);
 					if (seq !== openSeqRef.current) return;
-					const persist = makePositionPersister(entitiesSvc, book, content.spine.length);
+					const persist = makePositionPersister(writeBook, book, content.spine.length);
 					const handle = mountReader(stage, controls, content, {
 						bookId: book.id,
 						initialPosition: book.reading.position,
@@ -548,7 +537,7 @@ export function BooksApp(): ReactElement {
 					return;
 				}
 				const port = enginePagePort(doc);
-				const persist = makePositionPersister(entitiesSvc, book, doc.numPages);
+				const persist = makePositionPersister(writeBook, book, doc.numPages);
 				const title = book.name.length > 0 ? book.name : t("app.title");
 				const handle = mountPdfReader(stage, controls, title, port, {
 					initialPosition: book.reading.position,
@@ -572,7 +561,7 @@ export function BooksApp(): ReactElement {
 					port,
 					book,
 					rawProperties: entitiesRef.current.find((e) => e.id === book.id)?.properties ?? null,
-					entities: entitiesSvc,
+					write: entitiesSvc ? writeBook : null,
 					covers: coversSvc,
 					stillCurrent: () => seq === openSeqRef.current,
 				});
@@ -612,21 +601,37 @@ export function BooksApp(): ReactElement {
 		}
 	}, [books, status, selectedId, isSample]);
 
-	const lockedRef = useRef(false);
+	// EVERY property write in this app funnels through here — the inspector
+	// cells, the header's Lock toggle, the page-turn persister and the PDF
+	// metadata backfill — and the gate that decides them lives in
+	// `logic/book-writes.ts`, where it is unit-tested against real patches.
 	const patchBook = useCallback(
 		(patch: Record<string, unknown>) => {
-			if (!selectedId || selectedId === SAMPLE_BOOK_ID) return;
-			// Lock-5(b) — enforced on the write, not only in the panel's chrome.
-			if (lockedRef.current) return;
-			void entitiesSvc?.update?.(selectedId, patch)?.catch((error) => {
-				console.warn(`[books] property write failed: ${(error as Error).message}`);
-			});
+			writeBookPatch(
+				{
+					bookId: selectedId,
+					sample: selectedId === SAMPLE_BOOK_ID,
+					locked: lockedRef.current,
+					update: entitiesSvc?.update?.bind(entitiesSvc),
+				},
+				patch,
+			);
 		},
 		[entitiesSvc, selectedId],
 	);
+	patchBookRef.current = patchBook;
 
 	const removeBook = useCallback(() => {
-		if (!selectedId || selectedId === SAMPLE_BOOK_ID) return;
+		// Delete is a write with no patch to exempt: a locked book refuses it
+		// outright. The ⋯ already offers Remove disabled-with-the-reason, but the
+		// gate belongs where the write is, not only where the button is.
+		if (!selectedId) return;
+		const refused = bookWriteRefused({
+			bookId: selectedId,
+			sample: selectedId === SAMPLE_BOOK_ID,
+			locked: lockedRef.current,
+		});
+		if (refused) return;
 		void entitiesSvc?.delete?.(selectedId)?.catch((error) => {
 			console.warn(`[books] remove failed: ${(error as Error).message}`);
 		});
@@ -720,12 +725,12 @@ export function BooksApp(): ReactElement {
 	// reads the lock through a ref rather than closing over a value that does
 	// not exist yet.
 	lockedRef.current = locked;
-	const toggleLock = useCallback(() => {
-		if (!selectedId || selectedId === SAMPLE_BOOK_ID) return;
-		void entitiesSvc?.update?.(selectedId, lockTogglePatch(locked))?.catch((error) => {
-			console.warn(`[books] lock write failed: ${(error as Error).message}`);
-		});
-	}, [entitiesSvc, selectedId, locked]);
+	// The toggle is not a side door: it persists through the SAME gated
+	// `patchBook` every other write uses, which lets the lock-flip past
+	// precisely because it is the whole patch. A toggle that called
+	// `entities.update` directly was how Books' guard came to be untested —
+	// the only test that "proved" the lock could pass with the gate deleted.
+	const toggleLock = useCallback(() => patchBook(lockTogglePatch(locked)), [patchBook, locked]);
 
 	const menuContext = useCallback((): OpenObjectMenuOptions | null => {
 		if (!selectedBook || isSample) return null;

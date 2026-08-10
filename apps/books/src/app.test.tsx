@@ -242,7 +242,11 @@ describe("BooksApp — the read-only lock", () => {
 		expect(update).toHaveBeenCalledWith("b1", { locked: true });
 	});
 
-	it("refuses a property write on a locked book (the lock is not just chrome)", async () => {
+	// The lock toggle is not a side door — it persists through the SAME gated
+	// `patchBook` every other write uses (`logic/book-writes.ts`, where the
+	// refusals are pinned). Before Lock-5(e) it called `entities.update`
+	// directly, which is why deleting the gate left this whole suite green.
+	it("unlocking is the ONE write a locked book still takes", async () => {
 		installShell([bookRow("b1", "Deep Work", "pdf", "Cal Newport", true)]);
 		const el = await renderApp();
 		await act(async () => {
@@ -254,7 +258,6 @@ describe("BooksApp — the read-only lock", () => {
 			}
 		).brainstorm.services.entities.update;
 		update.mockClear();
-		// Unlocking is the ONE write a locked object still takes.
 		await act(async () => {
 			el.querySelector<HTMLButtonElement>(".bs-lock-button")?.click();
 		});
