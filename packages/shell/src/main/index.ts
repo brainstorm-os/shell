@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { makeBpHookRouter, makeBpRouter } from "@brainstorm-os/block-protocol";
 import { ActivityKind, ActivityPhase } from "@brainstorm-os/protocol/activity-types";
 import { AppearanceMode, AppearanceSlot } from "@brainstorm-os/protocol/appearance";
+import { entityRoute } from "@brainstorm-os/protocol/route";
 import {
 	DEFAULT_SELECTIVE_SYNC_POLICY,
 	SelectiveSyncMode,
@@ -5932,6 +5933,20 @@ void app.whenReady().then(async () => {
 				if (!dashboard || dashboard.isDestroyed() || dashboard.webContents.isDestroyed()) return;
 				surfaceWindow(dashboard);
 				dashboard.webContents.send(SHELL_ACTION_CHANNEL, { action: "search", query });
+			},
+			// 9.8.2c — `ui.windows.setRoute`: an app that navigated IN PLACE
+			// republishes what its tab now shows, so focus-existing keeps
+			// matching the tab on the object it CURRENTLY holds (the route was
+			// only ever seeded from the launch context). The tab is resolved
+			// from `source` — the WebContents id the broker just verified the
+			// caller's app id against — and the app id must still match, so a
+			// renderer can only re-label its own tab. The canonical route URI is
+			// minted here, never accepted from the app.
+			setRoute: (appId, source, entityId) => {
+				if (typeof source !== "number") return;
+				const hit = launchSetup.getLauncherSync()?.containerForTabSender(source);
+				if (!hit || hit.appId !== appId) return;
+				hit.container.setRoute(source, entityId === null ? null : entityRoute(entityId));
 			},
 		}),
 	);

@@ -817,6 +817,14 @@ function uiProxy(bridge: Bridge): UiService {
 			set: (spec) => callService<void>(bridge, "ui", "badge.set", [spec], ["ui.badge"]),
 			clear: () => callService<void>(bridge, "ui", "badge.clear", [], ["ui.badge"]),
 		},
+		windows: {
+			// 9.8.2c — nested here for readability; the WIRE method is flat
+			// (`setRoute`), because the envelope validator rejects dots in a
+			// method name. No caps: the shell resolves the tab from the
+			// broker-verified caller, never from an id in these args.
+			setRoute: (target) =>
+				callService<void>(bridge, "ui", "setRoute", [{ entityId: target?.entityId ?? null }], []),
+		},
 	};
 }
 

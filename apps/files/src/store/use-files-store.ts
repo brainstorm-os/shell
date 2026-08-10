@@ -13,9 +13,22 @@
  * → `ROOT_FOLDER_ID`): on vault open the canonical root `Folder/v1` is
  * provisioned in `entities.db`, so the snapshot carries a real root row
  * and the tree binds to it (`buildVaultFileTree` prefers it, synthesising
- * only when an older vault lacks it). `entities.subscribe` / `ui.windows.
- * setRoute` remain folded into the Stage 9.3 entities-service swap, which
- * replaces only the read source behind this hook.
+ * only when an older vault lacks it).
+ *
+ * `ui.windows.setRoute` shipped at 9.8.2c: every in-place navigation
+ * republishes the current folder as the tab's route (one effect in the
+ * navigation section), so the shell's focus-existing matches the tab on what
+ * it holds NOW rather than on the object it was launched with.
+ *
+ * The read path deliberately stays on `vaultEntities.list` / `onChange`
+ * (driven through the shared `createQueryStore`, the sanctioned reactivity
+ * core). `entities.subscribe` is NOT a drop-in for it: it pushes
+ * `Entity[]`, while Files needs the aggregator-only `deletedAt` (every
+ * folder-tree / search read filters on it), `ownerAppId` (routes an open
+ * intent for a linked object) and the shell-DERIVED links (note-body
+ * mentions, shared-property and property-ref edges) the Links inspector
+ * shows. Moving Files across needs a `{entities, links}`-shaped push
+ * channel first — a shell surface, not an app-side swap.
  */
 
 import {
@@ -457,6 +470,29 @@ export function useFilesStore() {
 		const id = navHist.forward();
 		if (id !== null) applyFolderLocation(id);
 	}, [navHist, applyFolderLocation]);
+
+	// 9.8.2c — publish in-place navigation to the shell (`ui.windows.setRoute`).
+	// A tab's route is seeded ONCE, from the launch context, so after the user
+	// browses on it still names the object Files opened WITH: `intent.open` on
+	// that object focuses this tab (showing something else entirely), and
+	// opening the folder actually on screen doesn't. The current folder id IS
+	// Files' navigable location, so it is what the tab route tracks — through
+	// this ONE effect rather than per navigation entry point, so reveal /
+	// back / forward / up / breadcrumb all publish without a call site each.
+	//
+	// The mount pass is deliberately skipped: the shell's seeded route is
+	// already correct at that instant (and may name the entity a launch asked
+	// us to reveal, which is more precise than its folder).
+	const publishedFolderRef = useRef<string | null>(null);
+	useEffect(() => {
+		const previous = publishedFolderRef.current;
+		publishedFolderRef.current = nav.current;
+		if (previous === null || previous === nav.current) return;
+		const setRoute = window.brainstorm?.services?.ui?.windows?.setRoute;
+		// Fire-and-forget: a shell without the surface (or a closed tab) must
+		// never break navigation the user already saw happen.
+		void setRoute?.({ entityId: nav.current }).catch(() => undefined);
+	}, [nav.current]);
 
 	const navigateUp = useCallback(() => {
 		const parent = tree.findParentId(navRef.current.current);
