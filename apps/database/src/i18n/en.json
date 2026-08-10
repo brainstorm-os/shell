@@ -56,6 +56,7 @@
   "brainstorm.database.chrome.inspector.disabled": "Nothing to inspect — this view has no rows",
   "brainstorm.database.record.lock": "Lock record (read-only)",
   "brainstorm.database.record.unlock": "Unlock record",
+  "brainstorm.database.record.lockUnavailable": "Select a single record to lock it",
   "brainstorm.database.menu.copyEmbedLink": "Copy embed link",
   "brainstorm.database.menu.export": "Export…",
   "brainstorm.database.menu.importContacts": "Import contacts (vCard / CSV)…",

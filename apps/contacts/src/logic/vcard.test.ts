@@ -156,6 +156,7 @@ describe("personToVCard", () => {
 			bio: "hi",
 			icon: null,
 			cover: null,
+			locked: false,
 			...over,
 		};
 	}

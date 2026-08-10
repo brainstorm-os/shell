@@ -145,13 +145,16 @@ body {
 	border-inline-end: var(--border-width) solid var(--color-border-subtle);
 	overflow: hidden;
 	z-index: 90;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 .books__library--closed {
 	transform: translateX(-100%);
 	border-color: transparent;
+	visibility: hidden;
 }
 
 /* 44px header on the shared panel-header baseline. */

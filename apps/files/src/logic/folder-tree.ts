@@ -21,6 +21,7 @@
  * containing itself transitively.
  */
 
+import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 import { type Entity, type EntityType, FOLDER_TYPE, readMembers, readName } from "../types/entity";
 import { type RetainedMember, mergeRetainedMembers } from "./vault-tree";
 
@@ -214,9 +215,20 @@ export class FolderTree {
 		return cloneEntity(entity);
 	}
 
+	/** Lock-5(b) — whether `id` carries the fleet's read-only lock. Unknown ids
+	 *  read as unlocked; the caller's own missing-entity handling covers those. */
+	isLocked(id: string): boolean {
+		return isEntityLocked(this.entities.get(id));
+	}
+
 	rename(id: string, name: string, now = Date.now()): boolean {
 		const entity = this.entities.get(id);
 		if (!entity || entity.deletedAt !== null) return false;
+		// Lock-5(b) — a locked object is read-only, and rename is a write. Refused
+		// HERE rather than in the row UI because every rename path (the inline
+		// editor, the F2 chord, the ⋯ menu, the collision "rename anyway") lands
+		// on this one method; a gate anywhere above it is one the next path skips.
+		if (isEntityLocked(entity)) return false;
 		entity.properties = { ...entity.properties, name };
 		entity.updatedAt = now;
 		this.notify();
@@ -324,6 +336,10 @@ export class FolderTree {
 	softDelete(id: string, now = Date.now()): boolean {
 		const entity = this.entities.get(id);
 		if (!entity || entity.deletedAt !== null) return false;
+		// Lock-5(b) — same reasoning as `rename`: Delete, the Backspace chord and
+		// the bulk bar all funnel here. `false` means "nothing was deleted", which
+		// the store already has to handle, so the vault write is skipped too.
+		if (isEntityLocked(entity)) return false;
 		entity.deletedAt = now;
 		entity.updatedAt = now;
 		const parentId = this.findParentId(id);

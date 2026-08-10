@@ -1,0 +1,6 @@
+{
+  "//": "Collapsed-panel rules whose focus guard provably lives somewhere the CSS cannot name. Each key MUST carry the reason — see tools/check-offcanvas-guard.mjs.",
+  "guardedElsewhere": {
+    "apps/books/src/styles.css:.books__layout[data-library-open=\"false\"]": "Books drives the panel from the SAME React state through a sibling modifier class instead of a descendant of the collapsing state, so the link is invisible to a per-file selector match: `LibraryPanel` renders `.books__library--closed` (styles.css:154 — transform: translateX(-100%) + visibility: hidden) and also passes `aria-hidden` + `inert` (ui/library-panel.tsx:63). Guarded twice over; the ratchet just cannot see the join."
+  }
+}

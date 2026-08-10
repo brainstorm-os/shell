@@ -118,7 +118,9 @@ body {
 .db-sidebar,
 .db-inspector {
 	overflow: hidden;
-	transition: transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
+	transition:
+		transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease),
+		visibility var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
 	will-change: transform;
 	z-index: 100;
 }
@@ -192,11 +194,13 @@ body.is-resizing .db-inspector__resize {
 
 .db-main[data-sidebar-open="false"] .db-sidebar {
 	transform: translateX(-100%);
+	visibility: hidden;
 }
 
 .db-main[data-inspector-open="false"] .db-inspector {
 	transform: translateX(100%);
 	box-shadow: none;
+	visibility: hidden;
 }
 
 .db-main[data-sidebar-open="false"] .db-sidebar,
@@ -2208,6 +2212,14 @@ body.is-resizing .dbv-tl__labels-resize {
 	height: var(--app-header-height);
 	padding: 0 var(--space-2) 0 var(--space-4);
 	border-bottom: var(--border-width) solid var(--border);
+}
+
+/* The shared lock toggle is inserted into this slot at runtime
+   (`createLockButton`). `display: contents` keeps the button itself a DIRECT
+   flex child of the header, so the slot changes nothing about the layout the
+   hand-rolled button had. */
+.db-inspector__lock-slot {
+	display: contents;
 }
 
 .db-inspector__title {

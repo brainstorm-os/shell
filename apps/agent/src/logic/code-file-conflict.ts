@@ -26,6 +26,7 @@
  * Pure — no DOM, no service, no React.
  */
 
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { firstFreeName, splitFileSuffix } from "@brainstorm-os/sdk/path-names";
 import { CODE_FILE_ENTITY_TYPE } from "./propose-code-file";
 
@@ -44,6 +45,10 @@ export enum CodeFileConflictChoice {
 export type CodeFilePathRow = {
 	id: string;
 	path: string;
+	/** Lock-5(a) — the row's read-only lock, carried forward from the snapshot
+	 *  so the persist step can refuse an `Update` into a locked file WITHOUT a
+	 *  second vault read. Absent reads as unlocked, matching `isEntityLocked`. */
+	locked?: boolean;
 };
 
 /** The shape of a live vault snapshot row this module reads. */
@@ -70,7 +75,11 @@ export function codeFilePathsFrom(entities: readonly SnapshotRow[]): CodeFilePat
 		if (entity.type !== CODE_FILE_ENTITY_TYPE) continue;
 		const path = entity.properties.path;
 		if (typeof path !== "string" || path.trim().length === 0) continue;
-		rows.push({ id: entity.id, path });
+		rows.push({
+			id: entity.id,
+			path,
+			...(isLockedProperties(entity.properties) ? { locked: true } : {}),
+		});
 	}
 	return rows;
 }

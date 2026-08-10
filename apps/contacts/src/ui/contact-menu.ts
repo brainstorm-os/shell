@@ -43,6 +43,9 @@ export type ContactMenuInput = {
 	onRemove: () => void;
 	/** App-specific entries (vCard import / export) spliced in before Remove. */
 	extraItems?: ObjectMenuExtraItem[];
+	/** Lock-5(b) — persist the flipped read-only lock. Omitted on a surface that
+	 *  cannot write (no entities service) → no Lock row rather than a dead one. */
+	onToggleLock?: () => void;
 };
 
 export function contactObjectMenuContext({
@@ -50,6 +53,7 @@ export function contactObjectMenuContext({
 	runtime,
 	onRemove,
 	extraItems,
+	onToggleLock,
 }: ContactMenuInput): ObjectMenuContext {
 	return {
 		target: { entityId: person.id, entityType: PERSON_TYPE, label: person.name || t("row.noName") },
@@ -58,10 +62,15 @@ export function contactObjectMenuContext({
 			open: t("menu.open"),
 			openUnavailable: t("menu.openUnavailable"),
 			remove: t("detail.menu.delete"),
+			lock: t("detail.menu.lock"),
+			unlock: t("detail.menu.unlock"),
+			lockedHint: t("detail.menu.lockedHint"),
 			menuRegion: t("menu.region"),
 			moreActions: t("detail.menu.more"),
 		},
 		...(extraItems && extraItems.length > 0 ? { extraItems } : {}),
+		locked: person.locked,
+		...(onToggleLock ? { onToggleLock } : {}),
 		onRemove,
 	};
 }

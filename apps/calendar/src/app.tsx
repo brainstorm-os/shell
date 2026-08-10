@@ -781,7 +781,14 @@ export function CalendarApp() {
 				data-view-kind={viewKind}
 				style={{ ["--cal-sidebar-width" as string]: `${width}px` }}
 			>
-				<div id="calendar-sidebar-slot">
+				{/* The CSS guard rides the 180ms slide, so it lands only at the
+				    end of the close; `inert` drops the sidebar from the tab
+				    order and the a11y tree immediately (F-489). */}
+				<div
+					id="calendar-sidebar-slot"
+					aria-hidden={sidebarOpen ? undefined : true}
+					inert={sidebarOpen ? undefined : true}
+				>
 					<Sidebar
 						anchor={anchor}
 						now={now}

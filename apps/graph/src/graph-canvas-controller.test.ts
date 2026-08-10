@@ -34,6 +34,7 @@ const {
 	persistViewCoords,
 	tryLoadViewCoords,
 	writeCreateLink,
+	writeNodeProperty,
 	applyPersistedState,
 	reconcileScene,
 	effectiveDb,
@@ -344,6 +345,80 @@ describe("writeCreateLink (9.13.11 drag-to-create-link write path)", () => {
 		const state = makeState();
 		await writeCreateLink(state, fake.entities, RELATED_TO_DEF, "missing-source", "t1", () => {});
 		expect(state.status?.kind).toBe("warn");
+	});
+
+	// Lock-5(a) — the graph is a VIEW of lockable objects, and dragging a link
+	// writes an `entityRef` property onto the SOURCE entity. A locked source is
+	// read-only, so the write is refused before it reaches the vault.
+	it("refuses the write when the source entity is locked", async () => {
+		const fake = makeFakeEntities();
+		const source = await fake.entities.create("brainstorm/Note/v1", {
+			name: "Source",
+			locked: true,
+		});
+		const state = makeState();
+
+		await writeCreateLink(state, fake.entities, RELATED_TO_DEF, source.id, "t1", () => {});
+
+		expect(fake.records.get(source.id)?.properties.related).toBeUndefined();
+		expect(state.status?.kind).toBe("warn");
+	});
+
+	it("still writes when only the TARGET is locked (the target isn't written)", async () => {
+		const fake = makeFakeEntities();
+		const source = await fake.entities.create("brainstorm/Note/v1", { name: "Source" });
+		await fake.entities.create("brainstorm/Person/v1", { name: "Target", locked: true }, "t1");
+		const state = makeState();
+
+		await writeCreateLink(state, fake.entities, RELATED_TO_DEF, source.id, "t1", () => {});
+
+		expect(fake.records.get(source.id)?.properties.related).toEqual([{ value: "t1" }]);
+	});
+});
+
+describe("writeNodeProperty (Lock-5(a) — inspector property writes)", () => {
+	it("writes the value through the entities service", async () => {
+		const fake = makeFakeEntities();
+		const created = await fake.entities.create("brainstorm/Note/v1", { name: "Old" });
+		const state = makeState();
+
+		await writeNodeProperty(state, fake.entities, created.id, "name", "New", () => {});
+
+		expect(fake.records.get(created.id)?.properties.name).toBe("New");
+	});
+
+	it("refuses the write on a locked entity and says why", async () => {
+		const fake = makeFakeEntities();
+		const created = await fake.entities.create("brainstorm/Note/v1", {
+			name: "Old",
+			locked: true,
+		});
+		const state = makeState();
+
+		await writeNodeProperty(state, fake.entities, created.id, "name", "New", () => {});
+
+		expect(fake.records.get(created.id)?.properties.name).toBe("Old");
+		expect(state.status?.kind).toBe("warn");
+	});
+
+	it("never leaves an optimistic local patch behind on a refused write", async () => {
+		// The optimistic patch is what the inspector renders from. Applying it
+		// and then refusing the vault write would show the user an edit that
+		// does not exist — a lock that LOOKS bypassed until the next snapshot.
+		const fake = makeFakeEntities();
+		const created = await fake.entities.create("brainstorm/Note/v1", {
+			name: "Old",
+			locked: true,
+		});
+		const state = makeState();
+		const node = state.scene.renderNodes[0];
+		if (!node) throw new Error("scene has no nodes");
+		node.id = created.id;
+		node.entity = { ...node.entity, id: created.id, properties: { name: "Old", locked: true } };
+
+		await writeNodeProperty(state, fake.entities, created.id, "name", "New", () => {});
+
+		expect(node.entity.properties.name).toBe("Old");
 	});
 });
 

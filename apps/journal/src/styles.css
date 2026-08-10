@@ -79,13 +79,16 @@ button {
 	border-inline-end: var(--border-width) solid var(--color-border-subtle, var(--border));
 	overflow: hidden;
 	z-index: 90;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 .journal[data-nav-open="false"] .journal__nav {
 	transform: translateX(-100%);
 	border-color: transparent;
+	visibility: hidden;
 }
 
 .journal__nav-inner {
@@ -128,7 +131,9 @@ button {
 	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	z-index: 100;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 	display: flex;
 	flex-direction: column;
@@ -146,6 +151,7 @@ button {
 	transform: translateX(100%);
 	box-shadow: none;
 	border-color: transparent;
+	visibility: hidden;
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the props panel's left edge geometrically */

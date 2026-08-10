@@ -1,6 +1,6 @@
 import type { VaultEntitiesSnapshot } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
-import { entityValuesFromSnapshot } from "./entity-values";
+import { entityLockedFromSnapshot, entityValuesFromSnapshot } from "./entity-values";
 
 function snapshot(entities: VaultEntitiesSnapshot["entities"]): VaultEntitiesSnapshot {
 	return { entities } as VaultEntitiesSnapshot;
@@ -38,5 +38,27 @@ describe("entityValuesFromSnapshot", () => {
 		expect(entityValuesFromSnapshot(snap, null)).toBeNull();
 		expect(entityValuesFromSnapshot(snap, "missing")).toBeNull();
 		expect(entityValuesFromSnapshot(snap, "ent_1")).toBeNull();
+	});
+});
+
+describe("entityLockedFromSnapshot (Lock-5(b))", () => {
+	it("reads the entity's read-only lock", () => {
+		const snap = snapshot([fileEntity("ent_1", { name: "lotr.pdf", locked: true })]);
+		expect(entityLockedFromSnapshot(snap, "ent_1")).toBe(true);
+	});
+
+	it("reads an unlocked / lock-less entity as unlocked", () => {
+		const snap = snapshot([fileEntity("ent_1", { name: "lotr.pdf" })]);
+		expect(entityLockedFromSnapshot(snap, "ent_1")).toBe(false);
+		expect(
+			entityLockedFromSnapshot(snapshot([fileEntity("ent_2", { locked: false })]), "ent_2"),
+		).toBe(false);
+	});
+
+	it("reads a missing / deleted / null-id target as unlocked (the panel is read-only anyway)", () => {
+		const snap = snapshot([fileEntity("ent_1", { locked: true }, 123)]);
+		expect(entityLockedFromSnapshot(snap, null)).toBe(false);
+		expect(entityLockedFromSnapshot(snap, "missing")).toBe(false);
+		expect(entityLockedFromSnapshot(snap, "ent_1")).toBe(false);
 	});
 });

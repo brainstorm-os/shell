@@ -73,8 +73,13 @@ const buildArg = readArg("--brainstorm-build=");
  *  the vault has none. Painted as the header stripe by the SDK's `.app-header`
  *  rule — see `--app-wallpaper-image` in `@brainstorm-os/sdk/app-theme.css`.
  *  A boot arg rather than an IPC round-trip so the FIRST paint already carries
- *  it; the sibling broadcast below keeps it live when the user changes it. */
+ *  it. argv is frozen for this renderer's lifetime (and a warm-kept window is
+ *  revived with the argv it launched with), so the boot value is only the
+ *  first frame — the `app:wallpaper-changed` listener below keeps it live. */
 const wallpaperArg = readArg("--brainstorm-wallpaper=");
+/** The last wallpaper URL applied (null = no image). Kept so `reapplyAll` can
+ *  re-set the inline var after a parser-replaced `documentElement` drops it. */
+let activeWallpaperUrl: string | null = null;
 
 if (!appId || !handshakeEncoded) {
 	throw new Error(
@@ -762,6 +767,10 @@ function reapplyAll(): void {
 	} catch (error) {
 		console.error("[brainstorm] failed to upsert app-icon vars:", error);
 	}
+	// The stripe is an inline var on `documentElement`, so it dies with the node
+	// a document.write / parser replacement swapped out — re-set it here rather
+	// than assume the managed chrome `<style>` carries it (it doesn't).
+	applyWallpaper(activeWallpaperUrl);
 }
 
 // The committed theme this window is on — recorded on every apply so a
@@ -886,9 +895,25 @@ function applyChrome(): void {
 	}
 }
 
-/** Set (or clear) the header wallpaper stripe. Same two-channel treatment as
- *  the tokens: an inline var for the fast first paint, and the managed chrome
- *  `<style>` re-application covers a parser-replaced documentElement. */
+/** The only origin the header stripe may be served from — mirrors
+ *  `WALLPAPER_URL_PREFIX` in `main/dashboard/wallpaper-url.ts`. Main already
+ *  applies this guard on both the boot arg and the broadcast; re-checking here
+ *  is defence in depth, because the value lands inside a CSS `url()` and one
+ *  bad string would turn the stripe into an arbitrary-origin fetch. */
+const WALLPAPER_URL_PREFIX = "brainstorm://wallpaper/";
+
+/** Adopt a wallpaper pushed by the shell (boot arg or `app:wallpaper-changed`).
+ *  Anything that isn't a vault-protocol URL — including `null`, which is how
+ *  the shell says "the slot is a solid/gradient now" — clears the stripe. */
+function setWallpaper(value: unknown): void {
+	activeWallpaperUrl =
+		typeof value === "string" && value.startsWith(WALLPAPER_URL_PREFIX) ? value : null;
+	applyWallpaper(activeWallpaperUrl);
+}
+
+/** Set (or clear) the header wallpaper stripe. Inline-var only — no managed
+ *  `<style>` — so `reapplyAll` re-applies it whenever the chrome is re-upserted
+ *  (a parser-replaced documentElement drops inline vars with the old node). */
 function applyWallpaper(url: string | null): void {
 	try {
 		const root = document?.documentElement;
@@ -902,8 +927,8 @@ function applyWallpaper(url: string | null): void {
 
 applyThemeByName(themeArg);
 applyChrome();
-applyWallpaper(wallpaperArg);
-whenDocumentReady(() => applyWallpaper(wallpaperArg));
+setWallpaper(wallpaperArg);
+whenDocumentReady(() => applyWallpaper(activeWallpaperUrl));
 try {
 	applyInlineVars(appIconVars);
 } catch (error) {
@@ -1038,6 +1063,17 @@ whenDocumentReady(() => {
 
 ipcRenderer.on("app:theme-changed", (_event, name: string) => {
 	applyThemeByName(name);
+});
+
+// Live header-stripe updates — the boot arg above is frozen at window create,
+// so without this an app opened before the change (or warm-kept and revived
+// with its original argv) keeps painting the previous wallpaper. `null` is a
+// value, not a no-op: it's how a switch to a solid/gradient slot clears the
+// stripe. Channel must match `APP_WALLPAPER_CHANGED_CHANNEL` in
+// `main/ipc/dashboard-handlers.ts`.
+ipcRenderer.on("app:wallpaper-changed", (_event, url: unknown) => {
+	setWallpaper(url);
+	whenDocumentReady(() => applyWallpaper(activeWallpaperUrl));
 });
 
 // Transient cross-surface theme preview (9.9.6). The payload is already

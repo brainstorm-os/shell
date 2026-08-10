@@ -61,6 +61,9 @@
   "detail.properties.title": "Propriétés",
   "detail.menu.more": "Plus d'actions",
   "detail.menu.delete": "Supprimer le contact",
+  "detail.menu.lock": "Verrouiller (lecture seule)",
+  "detail.menu.unlock": "Déverrouiller",
+  "detail.menu.lockedHint": "Ce contact est verrouillé — déverrouillez-le pour le modifier",
   "detail.name.placeholder": "Nom",
   "detail.name.aria": "Nom du contact",
   "detail.icon.edit": "Changer l'icône",
@@ -122,5 +125,6 @@
   "duplicates.close": "Fermer",
   "duplicates.merge": "Fusionner {count} contacts",
   "duplicates.merged": "{count} contacts fusionnés dans « {name} ».",
-  "duplicates.mergeFailed": "Impossible de fusionner les contacts."
+  "duplicates.mergeFailed": "Impossible de fusionner les contacts.",
+  "duplicates.mergeLocked": "Les contacts verrouillés ne peuvent pas être fusionnés — déverrouillez-les d'abord."
 }

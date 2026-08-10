@@ -110,7 +110,9 @@ body {
 	flex-direction: column;
 	gap: var(--space-4);
 	transform: translateX(0);
-	transition: transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
+	transition:
+		transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease),
+		visibility var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
 	z-index: 2;
 }
 
@@ -145,6 +147,7 @@ body.is-resizing .graph-sidebar__resize {
 	 * over-travel so the left border doesn't peek back into the canvas
 	 * when the transition settles on subpixel rounding. */
 	transform: translateX(calc(100% + 1px));
+	visibility: hidden;
 }
 
 /* Suppress slide transitions during hydration so the persisted-state

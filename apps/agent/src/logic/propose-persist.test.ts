@@ -9,7 +9,7 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { buildCodeFileProposal } from "./propose-code-file";
-import { memberPinPatch, persistApprovedProposal } from "./propose-persist";
+import { LockedTargetError, memberPinPatch, persistApprovedProposal } from "./propose-persist";
 
 const NOW = 1_700_000_000_000;
 
@@ -119,6 +119,45 @@ describe("persistApprovedProposal (the approve gesture's write path)", () => {
 			now: NOW,
 		});
 		expect(entities.update).not.toHaveBeenCalled();
+	});
+
+	// Lock-5(a) — approving a proposal is a human gesture, but it is still a
+	// WRITE, and two of its writes land on objects that already exist: the
+	// manual collection a row is pinned into, and the code file an Update
+	// choice overwrites. A locked object is read-only for the agent too.
+	it("refuses the whole approval when the target collection is locked", async () => {
+		const entities = stubEntities();
+		await expect(
+			persistApprovedProposal(entities, rowArtifact(true), {
+				conversationId: "conv_1",
+				collectionLocked: true,
+				now: NOW,
+			}),
+		).rejects.toBeInstanceOf(LockedTargetError);
+		// Fail-closed: nothing is written at all — not even the row, which would
+		// otherwise be stranded outside the collection it was proposed for.
+		expect(entities.create).not.toHaveBeenCalled();
+		expect(entities.update).not.toHaveBeenCalled();
+	});
+
+	it("names the locked target on the error so the app can say which object", async () => {
+		const entities = stubEntities();
+		const error = await persistApprovedProposal(entities, rowArtifact(true), {
+			conversationId: "conv_1",
+			collectionLocked: true,
+			now: NOW,
+		}).catch((err: unknown) => err);
+		expect((error as LockedTargetError).entityId).toBe("list_crm");
+	});
+
+	it("still creates a row for a typed database when the collection lock is irrelevant", async () => {
+		const entities = stubEntities();
+		await persistApprovedProposal(entities, rowArtifact(false), {
+			conversationId: "conv_1",
+			collectionLocked: true,
+			now: NOW,
+		});
+		expect(entities.create).toHaveBeenCalled();
 	});
 
 	it("omits provenance when there is no active conversation", async () => {

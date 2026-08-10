@@ -216,6 +216,7 @@ export default defineConfig({
 			"@brainstorm-os/sdk/panel-state": resolve(__dirname, "packages/sdk/src/panel-state.ts"),
 			"@brainstorm-os/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
 			"@brainstorm-os/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
+			"@brainstorm-os/sdk/entity-lock": resolve(__dirname, "packages/sdk/src/entity-lock.ts"),
 			"@brainstorm-os/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm-os/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
 			"@brainstorm-os/sdk/entity-body-copy": resolve(

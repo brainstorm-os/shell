@@ -529,7 +529,9 @@ textarea {
 	border-inline-end: var(--border-width) solid var(--color-glass-border);
 	overflow: hidden;
 	z-index: 90;
-	transition: transform var(--motion-duration-normal) ease;
+	transition:
+		transform var(--motion-duration-normal) ease,
+		visibility var(--motion-duration-normal) ease;
 	will-change: transform;
 }
 
@@ -554,6 +556,7 @@ textarea {
 .notes[data-nav-open="false"] .notes__nav {
 	transform: translateX(-100%);
 	border-color: transparent;
+	visibility: hidden;
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the nav's right edge geometrically */
@@ -591,7 +594,9 @@ textarea {
 	box-shadow: var(--shadow-xl);
 	overflow: hidden;
 	z-index: 100;
-	transition: transform var(--motion-duration-normal) ease;
+	transition:
+		transform var(--motion-duration-normal) ease,
+		visibility var(--motion-duration-normal) ease;
 	will-change: transform;
 	/* Tabbed inspector (B11.9): the tab strip pins, the active panel fills. */
 	display: flex;
@@ -610,6 +615,7 @@ textarea {
 	transform: translateX(100%);
 	box-shadow: none;
 	border-color: transparent;
+	visibility: hidden;
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the props panel's left edge geometrically */

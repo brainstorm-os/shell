@@ -40,11 +40,11 @@ function folder(id: string, name: string): Entity {
 	};
 }
 
-function file(id: string, name: string): Entity {
+function file(id: string, name: string, locked = false): Entity {
 	return {
 		id,
 		type: FILE_TYPE,
-		properties: { name },
+		properties: { name, ...(locked ? { locked: true } : {}) },
 		createdAt: 0,
 		updatedAt: 0,
 		deletedAt: null,
@@ -175,5 +175,84 @@ describe("filesObjectMenuContext (shared by content rows + the header breadcrumb
 		items.find((i) => i.id === "edit-cover")?.run();
 		expect(onEditIcon).toHaveBeenCalledWith("f_3");
 		expect(onEditCover).toHaveBeenCalledWith("f_3");
+	});
+
+	// Lock-5(b)/(c) — Files is the app with the strongest case for a lock
+	// (rename / delete / bulk-rename), and it had no lock affordance at all.
+	// The ⋯ menu is where it lands, because Files has no per-object header.
+	describe("the read-only lock", () => {
+		it("offers Lock on an unlocked object and Unlock on a locked one", () => {
+			const unlockedCtx = filesObjectMenuContext({
+				entity: file("x_1", "notes.txt"),
+				store: fakeStore(),
+				runtime: fakeRuntime(),
+				onEditIcon: noop,
+				onEditCover: noop,
+			});
+			expect(unlockedCtx.locked).toBe(false);
+
+			const lockedCtx = filesObjectMenuContext({
+				entity: file("x_2", "budget.xlsx", true),
+				store: fakeStore(),
+				runtime: fakeRuntime(),
+				onEditIcon: noop,
+				onEditCover: noop,
+			});
+			expect(lockedCtx.locked).toBe(true);
+		});
+
+		it("the toggle routes to store.toggleEntityLock", () => {
+			const toggleEntityLock = vi.fn();
+			const ctx = filesObjectMenuContext({
+				entity: file("x_1", "notes.txt"),
+				store: fakeStore({ toggleEntityLock } as unknown as Partial<FilesStore>),
+				runtime: fakeRuntime(),
+				onEditIcon: noop,
+				onEditCover: noop,
+			});
+			void ctx.onToggleLock?.();
+			expect(toggleEntityLock).toHaveBeenCalledWith("x_1");
+		});
+
+		it("marks the write rows so the shared builder disables them when locked", () => {
+			const ctx = filesObjectMenuContext({
+				entity: folder("f_1", "Projects"),
+				store: fakeStore(),
+				runtime: fakeRuntime(),
+				onEditIcon: noop,
+				onEditCover: noop,
+				onSaveToDisk: noop,
+			});
+			const writes = (ctx.extraItems ?? []).filter((i) => i.writes).map((i) => i.id);
+			expect(writes).toEqual(["rename", "edit-icon", "edit-cover"]);
+			// Duplicate and Save-to-disk create/read elsewhere; they never write
+			// the locked object, so a lock must not take them away.
+			expect((ctx.extraItems ?? []).find((i) => i.id === "duplicate")?.writes).toBeUndefined();
+			expect((ctx.extraItems ?? []).find((i) => i.id === "save-to-disk")?.writes).toBeUndefined();
+		});
+
+		it("a locked object's Rename and Remove come back disabled with the reason", () => {
+			const ctx = filesObjectMenuContext({
+				entity: file("x_2", "budget.xlsx", true),
+				store: fakeStore(),
+				runtime: fakeRuntime(),
+				onEditIcon: noop,
+				onEditCover: noop,
+			});
+			const items = buildObjectMenuItems({
+				target: ctx.target,
+				runtime: ctx.runtime,
+				pinned: false,
+				...(ctx.labels ? { labels: ctx.labels } : {}),
+				...(ctx.onRemove ? { onRemove: ctx.onRemove } : {}),
+				...(ctx.extraItems ? { extraItems: ctx.extraItems } : {}),
+				locked: ctx.locked ?? false,
+				...(ctx.onToggleLock ? { onToggleLock: ctx.onToggleLock } : {}),
+			});
+			expect(items.find((i) => i.id === "rename")?.disabled).toBe(true);
+			expect(items.find((i) => i.id === "remove")?.disabled).toBe(true);
+			expect(items.find((i) => i.id === "duplicate")?.disabled).toBeUndefined();
+			expect(items.find((i) => i.id === "unlock")).toBeDefined();
+		});
 	});
 });

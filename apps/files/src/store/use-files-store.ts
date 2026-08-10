@@ -24,6 +24,7 @@ import {
 	useOptionalYDocResolver,
 } from "@brainstorm-os/react-yjs";
 import { announce } from "@brainstorm-os/sdk/a11y";
+import { isEntityLocked, lockRefusesWrite, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural, t } from "../i18n";
@@ -560,6 +561,10 @@ export function useFilesStore() {
 		if (!id) return;
 		const entity = tree.get(id);
 		if (!entity) return;
+		// Lock-5(b) — don't open the inline editor on a locked row at all. The
+		// tree would refuse the commit anyway, but letting the user type a new
+		// name and then silently dropping it is the worst of both.
+		if (isEntityLocked(entity)) return;
 		setRename(
 			renameReducer(renameRef.current, {
 				kind: "start",
@@ -801,7 +806,11 @@ export function useFilesStore() {
 	const deleteIds = useCallback(
 		(ids: string[]) => {
 			for (const id of ids) {
-				tree.softDelete(id);
+				// Lock-5(b) — the tree refuses a locked row and answers `false`; the
+				// vault delete rides that answer so a refused local delete can never
+				// still tombstone the entity server-side. A mixed selection deletes
+				// the unlocked rows and leaves the locked ones standing.
+				if (!tree.softDelete(id)) continue;
 				void persistEntityDelete(id);
 			}
 			setSelection(EMPTY_SELECTION);
@@ -959,6 +968,13 @@ export function useFilesStore() {
 	// the shell fires after every entity write.
 	const patchEntityProperties = useCallback(
 		(id: string, patch: Record<string, unknown>) => {
+			// Lock-5(b) — every property write funnels here (name, description,
+			// icon, cover, and the bulk rename). A locked object refuses all of
+			// them; the ONE exception is the lock itself, or the user could never
+			// unlock what they locked — and only when the flip is the WHOLE patch
+			// (Lock-5(e): the old key-presence reading let `{ locked, name }` walk
+			// a rename through on the lock key's ticket).
+			if (lockRefusesWrite(tree.isLocked(id), patch)) return;
 			const next = tree.list().map((e) =>
 				e.id === id
 					? {
@@ -985,6 +1001,13 @@ export function useFilesStore() {
 	const setEntityName = useCallback(
 		(id: string, name: string) => patchEntityProperties(id, { name }),
 		[patchEntityProperties],
+	);
+	/** Lock-5(b) — flip the object's read-only lock. Goes through the same
+	 *  property-write path as every other field (so it syncs to every device and
+	 *  peer like any property), and is the one patch the lock gate lets past. */
+	const toggleEntityLock = useCallback(
+		(id: string) => patchEntityProperties(id, lockTogglePatch(tree.isLocked(id))),
+		[patchEntityProperties, tree],
 	);
 	const setEntityDescription = useCallback(
 		(id: string, description: string) => patchEntityProperties(id, { description }),
@@ -1316,6 +1339,7 @@ export function useFilesStore() {
 		setEntityIcon,
 		setEntityCover,
 		setEntityName,
+		toggleEntityLock,
 		setEntityDescription,
 		clipboard,
 		setClipboard,

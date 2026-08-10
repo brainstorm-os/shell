@@ -117,6 +117,7 @@ button {
 .bookmarks[data-nav-open="false"] .bookmarks__sidebar {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
+	visibility: hidden;
 }
 
 .bookmarks[data-nav-open="false"] .bookmarks__resize {
@@ -164,7 +165,9 @@ body.is-resizing .bookmarks__resize {
 	overflow-y: auto;
 	overflow-x: hidden;
 	z-index: 90;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 

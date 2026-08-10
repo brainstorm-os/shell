@@ -61,6 +61,9 @@
   "detail.properties.title": "Propiedades",
   "detail.menu.more": "Más acciones",
   "detail.menu.delete": "Eliminar contacto",
+  "detail.menu.lock": "Bloquear (solo lectura)",
+  "detail.menu.unlock": "Desbloquear",
+  "detail.menu.lockedHint": "Este contacto está bloqueado: desbloquéalo para hacer cambios",
   "detail.name.placeholder": "Nombre",
   "detail.name.aria": "Nombre del contacto",
   "detail.icon.edit": "Cambiar icono",
@@ -122,5 +125,6 @@
   "duplicates.close": "Cerrar",
   "duplicates.merge": "Fusionar {count} contactos",
   "duplicates.merged": "Se fusionaron {count} contactos en «{name}».",
-  "duplicates.mergeFailed": "No se pudieron fusionar los contactos."
+  "duplicates.mergeFailed": "No se pudieron fusionar los contactos.",
+  "duplicates.mergeLocked": "Los contactos bloqueados no se pueden fusionar: desbloquéalos primero."
 }

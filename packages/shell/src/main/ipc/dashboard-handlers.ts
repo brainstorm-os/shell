@@ -44,6 +44,7 @@ import {
 	defaultHandlerKey,
 } from "../dashboard/dashboard-store";
 import { resolvePins } from "../dashboard/pin-resolver";
+import { wallpaperImageUrl } from "../dashboard/wallpaper-url";
 import {
 	DEFAULT_HANDLER_VERB,
 	type DefaultsCatalog,
@@ -72,6 +73,15 @@ export const APP_THEME_CHANGED_CHANNEL = "app:theme-changed";
  *  SDK runtime so `runtime.locale` updates + `onLocaleChange` handlers fire
  *  without a window relaunch (12.15). */
 export const APP_LOCALE_CHANGED_CHANNEL = "app:locale-changed";
+
+/** App-renderer-bound channel: payload is the active slot's wallpaper as a
+ *  `brainstorm://wallpaper/<file>` URL, or `null` when the slot carries no
+ *  image (solid / gradient). Mirrors the bootstrap payload the app preload
+ *  reads from `--brainstorm-wallpaper=…`, which is argv and therefore frozen
+ *  for that renderer's lifetime — without this channel a warm-kept app window
+ *  keeps painting the wallpaper it launched with. `null` is a value, not a
+ *  skip: it CLEARS the stripe. */
+export const APP_WALLPAPER_CHANGED_CHANNEL = "app:wallpaper-changed";
 
 /** Per-tab signal that the regional-format context changed (12.15 slice 15f).
  *  Sibling of `APP_LOCALE_CHANGED_CHANNEL` — the app preload feeds it into the
@@ -120,6 +130,10 @@ export type RegisteredWidget = {
 	size: "small" | "medium" | "large";
 };
 let lastBroadcastTheme: ThemeName | null = null;
+/** `undefined` is the "never resolved" sentinel — `null` is a real wallpaper
+ *  state (solid / gradient), so it can't double as "unknown" or the first push
+ *  that clears an image would diff equal and never leave the shell. */
+let lastBroadcastWallpaper: string | null | undefined;
 let lastBroadcastLanguage: string | null = null;
 let lastBroadcastFormat: FormatContext | null = null;
 
@@ -840,6 +854,7 @@ async function ensureSubscribed(
 	}
 	subscribedStore = store;
 	lastBroadcastTheme = resolveEffectiveSnapshotTheme(store);
+	lastBroadcastWallpaper = resolveActiveWallpaperUrl(store);
 	lastBroadcastLanguage = store.snapshot().locale.language;
 	lastBroadcastFormat = regionalToFormatContext(
 		store.snapshot().locale.language,
@@ -884,6 +899,16 @@ async function ensureSubscribed(
 		if (effectiveTheme !== lastBroadcastTheme) {
 			lastBroadcastTheme = effectiveTheme;
 			broadcastTokens(effectiveTheme, getDashboard);
+		}
+		// Broadcast the active slot's header wallpaper to every app window. The
+		// boot arg only reaches a renderer at create time, and warm-kept windows
+		// are revived with their original argv, so without this an app opened
+		// before the change keeps painting the old stripe. The diff treats `null`
+		// as a value: image → solid must SEND null to clear, not skip.
+		const wallpaperUrl = resolveActiveWallpaperUrl(store);
+		if (wallpaperUrl !== lastBroadcastWallpaper) {
+			lastBroadcastWallpaper = wallpaperUrl;
+			broadcastWallpaperToWindows(wallpaperUrl, getAppWindowsRef?.() ?? []);
 		}
 		// Broadcast the active UI locale to every app window. Diff on the
 		// language so unrelated dashboard mutations don't re-notify apps (12.15).
@@ -936,6 +961,12 @@ function resolveEffectiveSnapshotTheme(store: DashboardStore): ThemeName {
 	return slot === AppearanceSlot.Dark ? appearance.dark.theme : appearance.light.theme;
 }
 
+/** The active slot's wallpaper as the URL an app renderer may paint, or null.
+ *  Goes through the same `wallpaperImageUrl` guard as the launch path. */
+function resolveActiveWallpaperUrl(store: DashboardStore): string | null {
+	return wallpaperImageUrl(store.activeWallpaper(osPrefersDark()));
+}
+
 function broadcastTokens(theme: ThemeName, getDashboard: DashboardTargetGetter): void {
 	broadcastThemeToWindows(theme, getDashboard(), getAppWindowsRef?.() ?? []);
 }
@@ -983,6 +1014,27 @@ export function broadcastThemeToWindows(
 			win.webContents.send(APP_THEME_CHANGED_CHANNEL, theme);
 		} catch (error) {
 			console.warn(`[brainstorm] theme broadcast to ${win.appId} failed:`, error);
+		}
+	}
+}
+
+/** Pure helper — push the active header wallpaper to every live app window
+ *  (including parked/warm-kept ones, whose renderers are alive and still hold
+ *  their launch argv). Mirrors `broadcastLocaleToWindows`' window walk; the
+ *  stripe carries no background colour, so no container repaint. `url` is
+ *  already through `wallpaperImageUrl`; `null` clears the stripe. Exported for
+ *  the regression test — a wallpaper change has to reach every sandboxed app
+ *  renderer or open apps keep painting the previous one. */
+export function broadcastWallpaperToWindows(
+	url: string | null,
+	appWindows: readonly AppWindow[],
+): void {
+	for (const win of appWindows) {
+		if (!isAppWindowLive(win)) continue;
+		try {
+			win.webContents.send(APP_WALLPAPER_CHANGED_CHANNEL, url);
+		} catch (error) {
+			console.warn(`[brainstorm] wallpaper broadcast to ${win.appId} failed:`, error);
 		}
 	}
 }

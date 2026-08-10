@@ -94,7 +94,17 @@ describe("entityToPerson", () => {
 			bio: "hi",
 			icon: null,
 			cover: null,
+			locked: false,
 		});
+	});
+	// Lock-5(b) — Contacts enforced a per-property-key `readOnly` (computed
+	// fields), which is a different question from the fleet's read-only lock.
+	// The projection has to carry the lock or nothing downstream can read it.
+	it("projects the read-only lock, and only the literal `true` locks", () => {
+		expect(entityToPerson(person("ent_l", "Ada", { locked: true })).locked).toBe(true);
+		expect(entityToPerson(person("ent_u", "Ada", { locked: false })).locked).toBe(false);
+		expect(entityToPerson(person("ent_s", "Ada", { locked: "true" })).locked).toBe(false);
+		expect(entityToPerson(person("ent_n", "Ada")).locked).toBe(false);
 	});
 	it("projects a valid icon + cover and rejects malformed ones", () => {
 		const good = entityToPerson(

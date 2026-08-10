@@ -13,6 +13,7 @@
  * the entity exists).
  */
 
+import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 import { IconName } from "@brainstorm-os/sdk/icon";
 import type { ObjectMenuExtraItem } from "@brainstorm-os/sdk/object-menu";
 import type { OpenObjectMenuOptions } from "@brainstorm-os/sdk/object-menu";
@@ -56,6 +57,11 @@ function filesExtraItems({
 			id: "rename",
 			label: t("brainstorm.files.menu.rename"),
 			icon: IconName.Pencil,
+			// Lock-5(b) — declared as a write, so the shared builder disables it
+			// (with the reason) on a locked object instead of every Files surface
+			// re-deriving that rule. Duplicate and Save-to-disk are NOT writes of
+			// this object: one creates a new row, the other reads bytes out.
+			writes: true,
 			run: () => {
 				store.selectRow(entity.id, SelectionModifier.None);
 				store.startRenameOnAnchor();
@@ -96,6 +102,7 @@ function filesExtraItems({
 						id: "edit-icon",
 						label: t("brainstorm.files.appearance.editIcon"),
 						icon: IconName.Pencil,
+						writes: true,
 						run: () => {
 							store.selectRow(entity.id, SelectionModifier.None);
 							onEditIcon(entity.id);
@@ -105,6 +112,7 @@ function filesExtraItems({
 						id: "edit-cover",
 						label: t("brainstorm.files.appearance.editCover"),
 						icon: IconName.Palette,
+						writes: true,
 						run: () => {
 							store.selectRow(entity.id, SelectionModifier.None);
 							onEditCover(entity.id);
@@ -125,9 +133,17 @@ export function filesObjectMenuContext(input: FilesObjectMenuInput): OpenObjectM
 			openWith: t("brainstorm.files.menu.openWith"),
 			pin: t("brainstorm.files.menu.pin"),
 			unpin: t("brainstorm.files.menu.unpin"),
+			lock: t("brainstorm.files.menu.lock"),
+			unlock: t("brainstorm.files.menu.unlock"),
+			lockedHint: t("brainstorm.files.menu.lockedHint"),
 			remove: t("brainstorm.files.menu.remove"),
 		},
 		extraItems: filesExtraItems(input),
+		// Lock-5(b)/(c) — Files has no per-object header to hang a `<LockButton>`
+		// on, so the ⋯ menu carries the toggle. The lock is read off the entity
+		// itself, so it is the same answer on every device and peer.
+		locked: isEntityLocked(entity),
+		onToggleLock: () => store.toggleEntityLock(entity.id),
 		onRemove: () => store.deleteIds([entity.id]),
 	};
 }

@@ -192,6 +192,34 @@ describe("ChatApp", () => {
 		expect(container.querySelector(".chat")?.getAttribute("data-members-open")).toBe("true");
 	});
 
+	// F-489: the CSS guard rides the 180ms slide, so it only lands at the END
+	// of the close. The React `inert` closes that window and defends the panel
+	// if the stylesheet is ever overridden.
+	it("takes the collapsed sidebar out of the tab order the moment it closes", async () => {
+		await mount([channel("c1", "general")]);
+		const sidebar = container.querySelector(".chat__sidebar") as HTMLElement;
+		expect(sidebar.hasAttribute("inert")).toBe(false);
+		const toggle = container.querySelector('[data-testid="sidebar-toggle"]') as HTMLButtonElement;
+		await act(async () => {
+			toggle.click();
+		});
+		expect(sidebar.hasAttribute("inert")).toBe(true);
+		expect(sidebar.getAttribute("aria-hidden")).toBe("true");
+	});
+
+	it("keeps the closed members panel out of the tab order", async () => {
+		await mount([channel("c1", "general")]);
+		const members = container.querySelector(".chat__members") as HTMLElement;
+		expect(members.hasAttribute("inert")).toBe(true);
+		expect(members.getAttribute("aria-hidden")).toBe("true");
+		const toggle = container.querySelector('[data-testid="members-toggle"]') as HTMLButtonElement;
+		await act(async () => {
+			toggle.click();
+		});
+		expect(members.hasAttribute("inert")).toBe(false);
+		expect(members.getAttribute("aria-hidden")).toBeNull();
+	});
+
 	it("renders a selected channel's messages grouped by author", async () => {
 		await mount([
 			channel("c1", "general"),

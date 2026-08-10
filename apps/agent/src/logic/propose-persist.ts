@@ -60,6 +60,26 @@ export class CodeFilePathConflictError extends Error {
 	}
 }
 
+/** Lock-5(a) — an approval refused because it would have written an object the
+ *  user marked read-only (`properties.locked`): the manual collection a row is
+ *  pinned into, or the code file an `Update` choice overwrites.
+ *
+ *  Thrown rather than returned for the same reason as
+ *  {@link CodeFilePathConflictError}: a caller that forgets to handle it FAILS
+ *  loudly instead of reporting a write that never happened. A locked target is
+ *  not an error the agent can resolve on the user's behalf — unlocking is a
+ *  deliberate human act, so the refusal surfaces and the card stays up. */
+export class LockedTargetError extends Error {
+	/** The locked object the approval would have written. */
+	readonly entityId: string;
+
+	constructor(entityId: string) {
+		super(`${entityId} is locked`);
+		this.name = "LockedTargetError";
+		this.entityId = entityId;
+	}
+}
+
 /** What an approval actually wrote. `codeFilePath` is the path the row landed
  *  on, which differs from the card's when the user chose "Save a copy" — the
  *  app carries it forward so the next card at that path sees it as taken. */
@@ -76,6 +96,11 @@ export type PersistProposalContext = {
 	/** The target collection's current membership overrides (row proposals into
 	 *  a manual collection only); read from the live snapshot. */
 	collectionMembers?: MemberOverrides | undefined;
+	/** Lock-5(a) — whether that collection is locked (read-only), read off the
+	 *  same live snapshot row the members come from. A locked collection refuses
+	 *  the approval outright, BEFORE the row is created, so the user is never
+	 *  left with an orphan row outside the collection it was proposed for. */
+	collectionLocked?: boolean | undefined;
 	/** Every code file the app can see (vault snapshot + this session's writes).
 	 *  POLISH-FN-4: the path-conflict guard is judged against this. */
 	existingCodeFiles?: readonly CodeFilePathRow[] | undefined;
@@ -109,6 +134,12 @@ export async function persistApprovedProposal(
 	if (artifact.kind === ProposeKind.CodeFile) {
 		return persistApprovedCodeFile(entities, plan, context);
 	}
+	// Lock-5(a) — checked BEFORE the create, not between create and pin: a
+	// membership patch refused halfway leaves a row the user never asked for
+	// sitting outside its collection, which is worse than no write at all.
+	if (artifact.row?.addToMembers && context.collectionLocked) {
+		throw new LockedTargetError(artifact.row.databaseId);
+	}
 	const created = await entities.create(
 		plan.entityType,
 		plan.properties,
@@ -139,6 +170,10 @@ export async function persistApprovedProposal(
  *    path (`manifest-2.json`), the original untouched;
  *  - taken + no choice → {@link CodeFilePathConflictError}. Fail-closed: the
  *    user was never asked, so nothing is written.
+ *
+ * Orthogonal to all four: an `Update` aimed at a LOCKED row throws
+ * {@link LockedTargetError} (Lock-5(a)) — the lock has to hold on every write
+ * path, and this is one.
  */
 async function persistApprovedCodeFile(
 	entities: ProposalEntitiesService,
@@ -153,6 +188,11 @@ async function persistApprovedCodeFile(
 
 	switch (context.codeFileChoice) {
 		case CodeFileConflictChoice.Update:
+			// Lock-5(a) — Update is the branch that writes a file the user already
+			// had; a locked one is read-only even to an approved proposal. "Save a
+			// copy" stays available (it creates beside the locked row, never into
+			// it), so the refusal blocks the write, not the user's intent.
+			if (conflict.locked) throw new LockedTargetError(conflict.id);
 			await entities.update(conflict.id, {
 				content: plan.properties.content,
 				language: plan.properties.language,

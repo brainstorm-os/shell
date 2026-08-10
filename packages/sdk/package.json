@@ -52,6 +52,7 @@
     "./last-viewed": "./src/last-viewed.ts",
     "./panel-state": "./src/panel-state.ts",
     "./entity-icon": "./src/entity-icon.ts",
+    "./entity-lock": "./src/entity-lock.ts",
     "./tab-identity": "./src/tab-identity.ts",
     "./entity-cover": "./src/entity-cover.ts",
     "./entity-drag": "./src/entity-drag.ts",

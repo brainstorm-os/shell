@@ -37,6 +37,11 @@ export type PersonBodyEditorProps = {
 	/** The person's stable entity id — resolved through the app-installed
 	 *  YDocResolver. */
 	personId: string;
+	/** The contact's synced read-only lock. The body is a WRITE PATH like any
+	 *  other — it persists through `entities.applyDoc`, which never passes the
+	 *  app's property-write gate — so a locked contact must lock it here or the
+	 *  lock is chrome (Lock-5(e), F-484). */
+	locked?: boolean;
 	/** Legacy `bio` string to seed the body from on first open. Empty /
 	 *  undefined when the contact has no legacy bio (or was already
 	 *  migrated). */
@@ -47,7 +52,12 @@ export type PersonBodyEditorProps = {
 	onFirstEdit?(): void;
 };
 
-export function PersonBodyEditor({ personId, seedBio, onFirstEdit }: PersonBodyEditorProps) {
+export function PersonBodyEditor({
+	personId,
+	seedBio,
+	locked = false,
+	onFirstEdit,
+}: PersonBodyEditorProps) {
 	const doc = useYDoc(personId);
 	const whenLoaded = useYDocLoaded(personId);
 	const applyPending = useYDocApplyPending(personId);
@@ -82,6 +92,7 @@ export function PersonBodyEditor({ personId, seedBio, onFirstEdit }: PersonBodyE
 		<BrainstormEditor
 			doc={doc}
 			docId={personId}
+			editable={!locked}
 			namespace="contacts"
 			theme={richTextTheme}
 			contentClassName="notes__contenteditable contacts-detail__editor"

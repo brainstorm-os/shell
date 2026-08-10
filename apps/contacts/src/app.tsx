@@ -15,8 +15,10 @@
 
 import { YDocProvider, useVaultEntities } from "@brainstorm-os/react-yjs";
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
@@ -37,6 +39,7 @@ import type { ReactElement } from "react";
 import { plural, t } from "./i18n";
 import { useContactsT } from "./i18n-hooks";
 import { type ComposeDraft, buildCompanyNameIndex, planCompose } from "./logic/compose";
+import { contactWriteRefused } from "./logic/contact-writes";
 import { demoEntities } from "./logic/demo";
 import { applyMergeToEntities, findDuplicateGroups, resolveGroups } from "./logic/duplicates";
 import { openEntityRef, resolveOpenTarget } from "./logic/open";
@@ -413,6 +416,13 @@ export function ContactsApp(): ReactElement {
 		[usingVault, entitiesSvc, allEntities, select],
 	);
 
+	// The ids currently locked, as a ref: every write callback below is declared
+	// above the `persons` projection it would otherwise close over, and a
+	// callback that outlives a render (a blur commit, a confirm dialog) must
+	// read the CURRENT lock rather than the one that held when it was built.
+	const lockedIdsRef = useRef<ReadonlySet<string>>(new Set());
+	const isLockedId = useCallback((id: string) => lockedIdsRef.current.has(id), []);
+
 	// Create a brand-new Company and link it to the person in one step — the
 	// shared ref picker can only pick EXISTING entities, and nothing else in the
 	// founder's toolset mints a Company, so Contacts owns this (write cap added
@@ -421,6 +431,13 @@ export function ContactsApp(): ReactElement {
 		async (personId: string, rawName: string) => {
 			const name = rawName.trim();
 			if (!name) return;
+			// Lock-5(e) — this writes `company` onto the PERSON, so a locked
+			// contact refuses it. Checked BEFORE the Company is minted: refusing
+			// halfway would leave an orphan Company nobody asked for.
+			// Asked WITHOUT a patch: the write is `{ company: <new id> }`, which the
+			// lock-flip exemption could never cover anyway, and the id does not
+			// exist yet — refusing here is what keeps the orphan Company unminted.
+			if (contactWriteRefused(isLockedId, [personId])) return;
 			if (usingVault && entitiesSvc) {
 				const company = await entitiesSvc.create(COMPANY_TYPE, { name });
 				await entitiesSvc.update(personId, { company: company.id });
@@ -440,11 +457,18 @@ export function ContactsApp(): ReactElement {
 				]);
 			}
 		},
-		[usingVault, entitiesSvc],
+		[usingVault, entitiesSvc, isLockedId],
 	);
 
 	const patchPerson = useCallback(
 		async (id: string, patch: Record<string, unknown>) => {
+			// Lock-5(b) — a locked contact is read-only on EVERY write path (the
+			// inline rows, the slide-over inspector, rename, icon, cover), so the
+			// gate lives on the one call they all reach. Flipping the lock itself
+			// is the sole exception, or a lock could never be undone — and only
+			// when it is the WHOLE patch (Lock-5(e): the old key-presence reading
+			// let `{ locked, name }` walk a rename through on the lock's ticket).
+			if (contactWriteRefused(isLockedId, [id], patch)) return;
 			if (usingVault && entitiesSvc) {
 				await entitiesSvc.update(id, patch);
 				// Reflect the edit on a still-optimistic (not-yet-broadcast) entity.
@@ -457,11 +481,15 @@ export function ContactsApp(): ReactElement {
 				);
 			}
 		},
-		[usingVault, entitiesSvc],
+		[usingVault, entitiesSvc, isLockedId],
 	);
 
 	const deletePerson = useCallback(
 		async (id: string) => {
+			// Lock-5(b) — delete is a write too. The ⋯ already offers Delete
+			// disabled-with-the-reason on a locked contact; this is the same rule
+			// where the write happens, so the chord and the confirm can't skip it.
+			if (contactWriteRefused(isLockedId, [id])) return;
 			if (usingVault && entitiesSvc) {
 				await entitiesSvc.delete(id);
 				// Drop it from the overlay too, else a not-yet-broadcast contact
@@ -477,7 +505,7 @@ export function ContactsApp(): ReactElement {
 				return { id: null };
 			});
 		},
-		[usingVault, entitiesSvc, nav],
+		[usingVault, entitiesSvc, nav, isLockedId],
 	);
 
 	const companyNameOf = useCallback((id: string | null) => resolveName(nameIndex, id), [nameIndex]);
@@ -493,13 +521,19 @@ export function ContactsApp(): ReactElement {
 		for (const e of allEntities) index.set(e.id, (e as Partial<VaultEntity>).createdAt ?? 0);
 		return index;
 	}, [allEntities]);
+	// Lock-5(e) — LOCKED contacts are not merge candidates and never enter
+	// detection. A merge patches the survivor and BINS the losers, so a locked
+	// contact on either side of one is the single most destructive write in this
+	// app; offering the group and refusing at the end would be a dialog that
+	// lies. Unlock the contact and it rejoins the candidate set.
+	const mergeCandidates = useMemo(() => persons.filter((p) => !p.locked), [persons]);
 	const duplicateGroups = useMemo(
 		() =>
 			resolveGroups(
-				findDuplicateGroups(persons, (id) => createdAtIndex.get(id) ?? 0),
-				persons,
+				findDuplicateGroups(mergeCandidates, (id) => createdAtIndex.get(id) ?? 0),
+				mergeCandidates,
 			),
-		[persons, createdAtIndex],
+		[mergeCandidates, createdAtIndex],
 	);
 	const canMerge = usingVault ? Boolean(entitiesSvc?.merge) : true;
 	const duplicateCount = canMerge ? duplicateGroups.length : 0;
@@ -507,6 +541,13 @@ export function ContactsApp(): ReactElement {
 	const mergeContacts = useCallback(
 		async (survivorId: string, loserIds: string[], patch: Record<string, unknown>) => {
 			setDuplicatesOpen(false);
+			// Detection already excludes locked contacts, so this is the gate at
+			// the write itself: a survivor takes a property patch and every loser
+			// is destroyed, and neither is something a locked object accepts.
+			if (contactWriteRefused(isLockedId, [survivorId, ...loserIds])) {
+				notify?.(t("duplicates.mergeLocked"));
+				return;
+			}
 			const survivor = persons.find((p) => p.id === survivorId);
 			const mergedCount = loserIds.length + 1;
 			try {
@@ -530,7 +571,7 @@ export function ContactsApp(): ReactElement {
 				notify?.(t("duplicates.mergeFailed"));
 			}
 		},
-		[usingVault, entitiesSvc, persons, location.id, select, notify],
+		[usingVault, entitiesSvc, persons, location.id, select, notify, isLockedId],
 	);
 
 	// Export every visible person as a vCard document (company id → resolved name).
@@ -594,6 +635,19 @@ export function ContactsApp(): ReactElement {
 		[location, persons],
 	);
 
+	// Lock-5(b) — the fleet's synced read-only lock, projected onto every person
+	// by `entityToPerson`. Distinct from the per-property-key `readOnly` on
+	// computed rows, which answers a different question.
+	lockedIdsRef.current = useMemo(
+		() => new Set(persons.filter((p) => p.locked).map((p) => p.id)),
+		[persons],
+	);
+	const activeLocked = activePerson?.locked ?? false;
+	const toggleActiveLock = useCallback(() => {
+		if (!activePerson) return;
+		void patchPerson(activePerson.id, lockTogglePatch(activePerson.locked));
+	}, [activePerson, patchPerson]);
+
 	// A picker left open for one contact must not greet the next.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: location.id IS the reset trigger
 	useEffect(() => setCoverPickerOpen(false), [location.id]);
@@ -638,6 +692,10 @@ export function ContactsApp(): ReactElement {
 								id: "cover",
 								label: person.cover ? t("detail.cover.edit") : t("detail.cover.add"),
 								icon: IconName.Palette,
+								// The picker's result is a property write, so the shared
+								// builder returns this row disabled-with-the-reason on a
+								// locked contact instead of opening a picker that refuses.
+								writes: true,
 								run: () => setCoverPickerOpen(true),
 							},
 						]
@@ -648,10 +706,11 @@ export function ContactsApp(): ReactElement {
 				person,
 				runtime: rt,
 				onRemove: () => setConfirmDeleteId(person.id),
+				onToggleLock: () => void patchPerson(person.id, lockTogglePatch(person.locked)),
 				...(extras.length > 0 ? { extraItems: extras } : {}),
 			});
 		},
-		[rt, vcardItems, activePerson],
+		[rt, vcardItems, activePerson, patchPerson],
 	);
 
 	const moreRef = useRef<HTMLButtonElement>(null);
@@ -708,6 +767,14 @@ export function ContactsApp(): ReactElement {
 					>
 						<Icon name={IconName.Plus} size={18} />
 					</button>
+					{activePerson ? (
+						<LockButton
+							locked={activeLocked}
+							onToggle={toggleActiveLock}
+							lockLabel={t("detail.menu.lock")}
+							unlockLabel={t("detail.menu.unlock")}
+						/>
+					) : null}
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={sidebarOpen}
@@ -783,6 +850,7 @@ export function ContactsApp(): ReactElement {
 								entityTitleSource={titleSource}
 								showProperties={showProperties}
 								onToggleProperties={() => setShowProperties((v) => !v)}
+								locked={activeLocked}
 								coverPickerOpen={coverPickerOpen}
 								onCoverPickerOpenChange={setCoverPickerOpen}
 								onRenamePerson={(name) => void patchPerson(activePerson.id, { name })}

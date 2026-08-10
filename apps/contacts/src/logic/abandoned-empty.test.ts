@@ -16,6 +16,7 @@ function person(overrides: Partial<Person> = {}): Person {
 		bio: "",
 		icon: null,
 		cover: null,
+		locked: false,
 		...overrides,
 	};
 }

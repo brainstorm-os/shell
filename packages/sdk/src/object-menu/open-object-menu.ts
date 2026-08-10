@@ -526,6 +526,8 @@ export async function openObjectMenu(
 		labels: chrome,
 		...(options.omitOpen ? { omitOpen: true } : {}),
 		...(options.onShare ? { onShare: options.onShare } : {}),
+		...(options.locked ? { locked: true } : {}),
+		...(options.onToggleLock ? { onToggleLock: options.onToggleLock } : {}),
 		...(extraItems.length > 0 ? { extraItems } : {}),
 		...(openWithCandidates.length > 0 ? { openWithCandidates } : {}),
 	});
@@ -549,11 +551,16 @@ export async function openObjectMenu(
 	);
 	if (options.onRemove) {
 		if (rows.length > 0) rows.push({ divider: true });
+		// Lock-5(c) — Remove is painted HERE rather than by the builder (so
+		// contributed actions can splice in above it), so the builder's lock gate
+		// does not cover it; this is the same gate, applied where the row is.
 		rows.push({
 			label: chrome.remove,
 			icon: IconName.Trash,
 			destructive: true,
+			...(options.locked ? { disabled: true, hint: chrome.lockedHint } : {}),
 			onSelect: () => {
+				if (options.locked) return;
 				void options.onRemove?.();
 			},
 		});

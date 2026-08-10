@@ -665,6 +665,7 @@ export function ChatApp(): ReactElement {
 
 			<div className="chat__body">
 				<ChannelSidebar
+					open={showSidebar}
 					channels={channels}
 					activeId={activeId}
 					onSelect={setActiveId}
@@ -712,7 +713,11 @@ export function ChatApp(): ReactElement {
 					)}
 				</main>
 
-				<MembersPanel members={members} onEditIdentity={() => setEditIdentity(true)} />
+				<MembersPanel
+					open={showMembers && !!activeChannel}
+					members={members}
+					onEditIdentity={() => setEditIdentity(true)}
+				/>
 			</div>
 
 			{composeNew ? (
@@ -744,18 +749,27 @@ export function ChatApp(): ReactElement {
 // ───────────────────────────── sidebar ─────────────────────────────
 
 function ChannelSidebar({
+	open,
 	channels,
 	activeId,
 	onSelect,
 	onNew,
 }: {
+	/** The CSS guard lands only at the END of the 180ms slide (F-489); `inert`
+	 *  removes the panel from the tab order and the a11y tree immediately. */
+	open: boolean;
 	channels: readonly ChatChannel[];
 	activeId: string | null;
 	onSelect: (id: string) => void;
 	onNew: () => void;
 }): ReactElement {
 	return (
-		<nav className="chat__sidebar" aria-label={t("sidebar.channels")}>
+		<nav
+			className="chat__sidebar"
+			aria-label={t("sidebar.channels")}
+			aria-hidden={open ? undefined : true}
+			inert={open ? undefined : true}
+		>
 			<div className="chat__sidebar-header">
 				<span className="chat__sidebar-title">{t("sidebar.channels")}</span>
 				<button
@@ -1047,14 +1061,23 @@ function shortFingerprint(fingerprint: string): string {
 }
 
 function MembersPanel({
+	open,
 	members,
 	onEditIdentity,
 }: {
+	/** See `ChannelSidebar` — the members panel boots CLOSED, so without this
+	 *  its rows and the edit-identity button are tabbable on every launch. */
+	open: boolean;
 	members: readonly PanelMember[];
 	onEditIdentity: () => void;
 }): ReactElement {
 	return (
-		<aside className="chat__members" aria-label={t("members.title")}>
+		<aside
+			className="chat__members"
+			aria-label={t("members.title")}
+			aria-hidden={open ? undefined : true}
+			inert={open ? undefined : true}
+		>
 			<div className="chat__members-header">
 				<span className="chat__members-title">{t("members.title")}</span>
 				<span className="chat__members-count">

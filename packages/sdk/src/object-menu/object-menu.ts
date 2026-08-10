@@ -59,8 +59,16 @@ export type ObjectMenuItem = {
 };
 
 /** An app-specific entry (Print, Duplicate, …) spliced in *before*
- *  Remove so destructive stays last. Same shape as a built-in item. */
-export type ObjectMenuExtraItem = ObjectMenuItem;
+ *  Remove so destructive stays last. Same shape as a built-in item, plus
+ *  `writes` so the builder can disable it on a locked object. */
+export type ObjectMenuExtraItem = ObjectMenuItem & {
+	/** This row MUTATES the target (Rename, Duplicate-in-place, Move…). The
+	 *  builder disables it with the locked hint while the object is locked, so
+	 *  an app that declares its write rows inherits lock enforcement in the menu
+	 *  instead of re-deriving it. Read-only rows (Export, Copy link, Reveal in
+	 *  Finder) leave it unset and stay live on a locked object. */
+	writes?: boolean;
+};
 
 /** Localisable labels — English defaults; an app passes its own `t()`
  *  output to keep menus in the user's language. */
@@ -76,6 +84,14 @@ export type ObjectMenuLabels = {
 	unpin: string;
 	/** Collab-C5 "Share…" — opens the share dialog (member list + invite). */
 	share: string;
+	/** Lock-5(c) — the lock action, shown while the object is UNLOCKED. Same
+	 *  wording as the shared `<LockButton>` so the two affordances read as one
+	 *  feature. */
+	lock: string;
+	/** The unlock action, shown while the object is LOCKED. */
+	unlock: string;
+	/** Why a write row is disabled on a locked object. */
+	lockedHint: string;
 	remove: string;
 };
 
@@ -86,6 +102,9 @@ export const DEFAULT_OBJECT_MENU_LABELS: ObjectMenuLabels = {
 	pin: "Pin to dashboard",
 	unpin: "Remove from dashboard",
 	share: "Share…",
+	lock: "Lock (read-only)",
+	unlock: "Unlock",
+	lockedHint: "This object is locked — unlock it to make changes",
 	remove: "Remove",
 };
 
@@ -162,6 +181,16 @@ export type BuildObjectMenuOptions = {
 	/** App-specific items (Print, Duplicate…). Inserted after the
 	 *  built-ins, before Remove, in array order. */
 	extraItems?: ObjectMenuExtraItem[];
+	/** Lock-5(c) — the target's current read-only lock (`properties.locked`,
+	 *  read with `isEntityLocked`). Drives two things: the Lock/Unlock row (with
+	 *  `onToggleLock`), and disabling every write row — Remove and any
+	 *  `writes: true` extra — with `labels.lockedHint`. */
+	locked?: boolean;
+	/** Persist the flipped lock (`entities.update(id, lockTogglePatch(locked))`).
+	 *  Omitted → no Lock/Unlock row: an app whose objects have no lock concept
+	 *  (Chat, Mailbox, Browser, Agent sessions — the owner's no-lock-by-design
+	 *  call) doesn't grow one from the shared menu. */
+	onToggleLock?: () => void | Promise<void>;
 	/** Suppress the leading **Open** item. A header ⋯ whose target is the
 	 *  object the app is ALREADY showing would offer "Open" on the current
 	 *  view — a visible no-op (open-the-already-open). Such self-targeting
@@ -262,6 +291,24 @@ export function buildObjectMenuItems(options: BuildObjectMenuOptions): ObjectMen
 		);
 	}
 
+	// Lock / Unlock — right after the Pin toggle, because it is the same kind of
+	// thing: a state flip on the object itself, not an action on its content.
+	// Lock-5(c): the header `<LockButton>` only ever existed in the apps that
+	// had a header for the object, which is why the owner found the lock in one
+	// app out of twenty. The ⋯ menu is the one identical surface fleet-wide.
+	const locked = options.locked === true;
+	if (options.onToggleLock) {
+		const onToggleLock = options.onToggleLock;
+		items.push({
+			id: locked ? "unlock" : "lock",
+			label: locked ? labels.unlock : labels.lock,
+			icon: IconName.Lock,
+			run: () => {
+				void onToggleLock();
+			},
+		});
+	}
+
 	// Share… — only when the app holds the scarce `sharing.share` grant cap.
 	// The app provides `onShare` (it owns the dialog mount).
 	if (options.onShare && hasCapability(runtime, SHARING_SHARE_CAPABILITY)) {
@@ -276,7 +323,18 @@ export function buildObjectMenuItems(options: BuildObjectMenuOptions): ObjectMen
 		});
 	}
 
-	if (options.extraItems) items.push(...options.extraItems);
+	// A locked object is read-only, so every row that would WRITE it is offered
+	// disabled-with-the-reason rather than hidden: a control that vanishes takes
+	// the explanation with it (the panel-toggle lesson). Rows that only read
+	// (Export, Copy link) stay live — locking is not hiding.
+	const lockGate = locked ? { disabled: true, hint: labels.lockedHint } : {};
+	if (options.extraItems) {
+		items.push(
+			...options.extraItems.map((item) =>
+				item.writes && locked && !item.disabled ? { ...item, ...lockGate } : item,
+			),
+		);
+	}
 
 	if (options.onRemove) {
 		items.push({
@@ -284,6 +342,7 @@ export function buildObjectMenuItems(options: BuildObjectMenuOptions): ObjectMen
 			label: labels.remove,
 			icon: IconName.Trash,
 			destructive: true,
+			...lockGate,
 			run: options.onRemove,
 		});
 	}

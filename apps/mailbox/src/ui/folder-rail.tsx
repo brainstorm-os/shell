@@ -74,6 +74,9 @@ function RailItem({ icon, label, unread, active, onSelect }: RailItemProps): Rea
 }
 
 export type FolderRailProps = {
+	/** The rail collapses to a zero grid track rather than sliding away, so it
+	 *  stays laid out and — without this — tabbable and announced (F-489). */
+	open: boolean;
 	accounts: AccountView[];
 	folders: FolderView[];
 	selection: FolderSelection;
@@ -87,6 +90,7 @@ export type FolderRailProps = {
 };
 
 export function FolderRail({
+	open,
 	accounts,
 	folders,
 	selection,
@@ -106,7 +110,13 @@ export function FolderRail({
 	}
 
 	return (
-		<nav className="mb-rail" id="mb-rail" aria-label={t("folders.aria")}>
+		<nav
+			className="mb-rail"
+			id="mb-rail"
+			aria-label={t("folders.aria")}
+			aria-hidden={open ? undefined : true}
+			inert={open ? undefined : true}
+		>
 			<div className="mb-rail__group">
 				<RailItem
 					icon={IconName.Inbox}

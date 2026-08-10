@@ -2,13 +2,17 @@ import { DEFAULT_THEME, themes } from "@brainstorm-os/tokens";
 import type { BrowserWindow } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import type { AppWindow } from "../apps/launcher";
+import { WallpaperKind } from "../dashboard/dashboard-store";
+import { wallpaperImageUrl } from "../dashboard/wallpaper-url";
 import {
 	APP_FORMAT_CHANGED_CHANNEL,
 	APP_LOCALE_CHANGED_CHANNEL,
 	APP_THEME_CHANGED_CHANNEL,
+	APP_WALLPAPER_CHANGED_CHANNEL,
 	broadcastFormatToWindows,
 	broadcastLocaleToWindows,
 	broadcastThemeToWindows,
+	broadcastWallpaperToWindows,
 	createSnapshotSequencer,
 } from "./dashboard-handlers";
 
@@ -218,6 +222,93 @@ describe("broadcastFormatToWindows (12.15 15f)", () => {
 		});
 		broadcastFormatToWindows({ locale: "fr" }, [broken.appWindow, healthy.appWindow]);
 		expect(healthy.send).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("broadcastWallpaperToWindows", () => {
+	const FOREST = "brainstorm://wallpaper/forest.jpg";
+
+	it("sends the wallpaper URL to every live app window on the wallpaper-changed channel", () => {
+		const notes = makeFakeAppWindow("io.brainstorm.notes");
+		const graph = makeFakeAppWindow("io.brainstorm.graph");
+
+		broadcastWallpaperToWindows(FOREST, [notes.appWindow, graph.appWindow]);
+
+		expect(notes.send).toHaveBeenCalledWith(APP_WALLPAPER_CHANGED_CHANNEL, FOREST);
+		expect(graph.send).toHaveBeenCalledWith(APP_WALLPAPER_CHANGED_CHANNEL, FOREST);
+	});
+
+	it("skips destroyed app windows without throwing", () => {
+		const live = makeFakeAppWindow("io.brainstorm.notes", false);
+		const dead = makeFakeAppWindow("io.brainstorm.graph", true);
+		broadcastWallpaperToWindows(FOREST, [live.appWindow, dead.appWindow]);
+		expect(live.send).toHaveBeenCalledTimes(1);
+		expect(dead.send).not.toHaveBeenCalled();
+	});
+
+	it("survives a broken renderer (send throws) and keeps broadcasting to siblings", () => {
+		const broken = makeFakeAppWindow("io.brainstorm.broken");
+		const healthy = makeFakeAppWindow("io.brainstorm.healthy");
+		broken.send.mockImplementation(() => {
+			throw new Error("send blew up");
+		});
+		broadcastWallpaperToWindows(FOREST, [broken.appWindow, healthy.appWindow]);
+		expect(healthy.send).toHaveBeenCalledTimes(1);
+	});
+
+	it("never paints a background color (the stripe carries no theme)", () => {
+		const notes = makeFakeAppWindow("io.brainstorm.notes");
+		broadcastWallpaperToWindows(FOREST, [notes.appWindow]);
+		expect(notes.setBackgroundColor).not.toHaveBeenCalled();
+		expect(notes.pushChromeTheme).not.toHaveBeenCalled();
+	});
+
+	// The payload the diff in `pushSnapshot` computes, resolved through the one
+	// shared guard the launch path uses. `null` is a VALUE here, not a skip:
+	// switching image → solid has to CLEAR the stripe, or every open app keeps
+	// painting the previous image.
+	it("carries the image URL through when the new wallpaper is another image", () => {
+		const notes = makeFakeAppWindow("io.brainstorm.notes");
+		const next = { kind: WallpaperKind.Image, value: "brainstorm://wallpaper/dunes.png" };
+		broadcastWallpaperToWindows(wallpaperImageUrl(next), [notes.appWindow]);
+		expect(notes.send).toHaveBeenCalledWith(
+			APP_WALLPAPER_CHANGED_CHANNEL,
+			"brainstorm://wallpaper/dunes.png",
+		);
+	});
+
+	it("sends null when the user switches to a solid or gradient (clears the stale image)", () => {
+		const notes = makeFakeAppWindow("io.brainstorm.notes");
+		broadcastWallpaperToWindows(wallpaperImageUrl({ kind: WallpaperKind.Solid, value: "#161616" }), [
+			notes.appWindow,
+		]);
+		expect(notes.send).toHaveBeenCalledWith(APP_WALLPAPER_CHANGED_CHANNEL, null);
+
+		const graph = makeFakeAppWindow("io.brainstorm.graph");
+		broadcastWallpaperToWindows(
+			wallpaperImageUrl({ kind: WallpaperKind.Gradient, value: "linear-gradient(0deg,#fff,#000)" }),
+			[graph.appWindow],
+		);
+		expect(graph.send).toHaveBeenCalledWith(APP_WALLPAPER_CHANGED_CHANNEL, null);
+	});
+
+	it("sends null for an image whose value is not a brainstorm://wallpaper/ URL", () => {
+		// A hand-edited vault doc must not be able to push an arbitrary origin
+		// into every sandboxed app renderer.
+		const notes = makeFakeAppWindow("io.brainstorm.notes");
+		for (const hostile of [
+			"https://evil.example/x.png",
+			"file:///etc/passwd",
+			"javascript:alert(1)",
+			"brainstorm://cover/forest.jpg",
+			"",
+		]) {
+			notes.send.mockClear();
+			broadcastWallpaperToWindows(wallpaperImageUrl({ kind: WallpaperKind.Image, value: hostile }), [
+				notes.appWindow,
+			]);
+			expect(notes.send).toHaveBeenCalledWith(APP_WALLPAPER_CHANGED_CHANNEL, null);
+		}
 	});
 });
 

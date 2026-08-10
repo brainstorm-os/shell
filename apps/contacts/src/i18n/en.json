@@ -61,6 +61,9 @@
   "detail.properties.title": "Properties",
   "detail.menu.more": "More actions",
   "detail.menu.delete": "Delete contact",
+  "detail.menu.lock": "Lock (read-only)",
+  "detail.menu.unlock": "Unlock",
+  "detail.menu.lockedHint": "This contact is locked — unlock it to make changes",
   "detail.name.placeholder": "Name",
   "detail.name.aria": "Contact name",
   "detail.icon.edit": "Change icon",
@@ -122,5 +125,6 @@
   "duplicates.close": "Close",
   "duplicates.merge": "Merge {count} contacts",
   "duplicates.merged": "Merged {count} contacts into “{name}”.",
-  "duplicates.mergeFailed": "Couldn't merge contacts."
+  "duplicates.mergeFailed": "Couldn't merge contacts.",
+  "duplicates.mergeLocked": "Locked contacts can't be merged — unlock them first."
 }

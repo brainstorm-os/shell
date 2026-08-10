@@ -61,6 +61,9 @@
   "detail.properties.title": "Proprietà",
   "detail.menu.more": "Altre azioni",
   "detail.menu.delete": "Elimina contatto",
+  "detail.menu.lock": "Blocca (sola lettura)",
+  "detail.menu.unlock": "Sblocca",
+  "detail.menu.lockedHint": "Questo contatto è bloccato — sbloccalo per modificarlo",
   "detail.name.placeholder": "Nome",
   "detail.name.aria": "Nome del contatto",
   "detail.icon.edit": "Cambia icona",
@@ -122,5 +125,6 @@
   "duplicates.close": "Chiudi",
   "duplicates.merge": "Unisci {count} contatti",
   "duplicates.merged": "{count} contatti uniti in “{name}”.",
-  "duplicates.mergeFailed": "Impossibile unire i contatti."
+  "duplicates.mergeFailed": "Impossibile unire i contatti.",
+  "duplicates.mergeLocked": "I contatti bloccati non possono essere uniti: sbloccali prima."
 }

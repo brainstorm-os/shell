@@ -93,10 +93,13 @@ body.is-resizing .editor__files-resize {
 .editor[data-nav-open="false"] .editor__files {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
+	visibility: hidden;
 }
 
 .editor__files {
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
@@ -791,7 +794,9 @@ body.is-resizing .editor__files-resize {
 	flex-direction: column;
 	min-height: 0;
 	z-index: 5;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
@@ -800,6 +805,7 @@ body.is-resizing .editor__files-resize {
 	box-shadow: none;
 	border-inline-start-color: transparent;
 	pointer-events: none;
+	visibility: hidden;
 }
 
 .editor__refs-head {

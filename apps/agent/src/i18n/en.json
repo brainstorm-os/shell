@@ -178,5 +178,6 @@
   "propose.codeFile.conflict": "A code file already exists at {path}. Rename this draft, or choose what to do with the one that's there.",
   "propose.codeFile.update": "Update the existing file",
   "propose.codeFile.saveCopy": "Save as {path}",
-  "propose.codeFile.conflictError": "Nothing was saved — a code file already exists at {path}. Update it or save a copy."
+  "propose.codeFile.conflictError": "Nothing was saved — a code file already exists at {path}. Update it or save a copy.",
+  "propose.card.lockedTarget": "Nothing was saved — that object is locked. Unlock it and approve again."
 }

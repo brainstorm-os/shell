@@ -77,7 +77,20 @@ import type { YDocStore } from "../storage/ydoc-store";
 
 export const DASHBOARD_DOC_ID = "brainstorm-Dashboard";
 
-export type WallpaperKind = "image" | "gradient" | "solid";
+/** Discriminator for `Wallpaper.kind`. The values ARE the wire format (the
+ *  `wp_kind` Yjs field and the renderer's own `WallpaperKind` enum in
+ *  `renderer/settings/wallpaper-kind.ts`), so the two are interchangeable.
+ *  Declared as a const map + derived union rather than a TS `enum` so
+ *  the still-literal call sites in `main/index.ts` and the store's own tests
+ *  keep compiling while they migrate — per the no-raw-discriminators rule in
+ *  CLAUDE.md, which sanctions this form. Reference it BY NAME in new code. */
+export const WallpaperKind = {
+	Image: "image",
+	Gradient: "gradient",
+	Solid: "solid",
+} as const;
+export type WallpaperKind = (typeof WallpaperKind)[keyof typeof WallpaperKind];
+
 export type Wallpaper = {
 	kind: WallpaperKind;
 	/**
@@ -186,8 +199,8 @@ export function osHandoffConsentKey(signature: string): string {
 	return signature;
 }
 
-const DEFAULT_LIGHT_WALLPAPER: Wallpaper = { kind: "solid", value: "#f5f3ef" };
-const DEFAULT_DARK_WALLPAPER: Wallpaper = { kind: "solid", value: "#161616" };
+const DEFAULT_LIGHT_WALLPAPER: Wallpaper = { kind: WallpaperKind.Solid, value: "#f5f3ef" };
+const DEFAULT_DARK_WALLPAPER: Wallpaper = { kind: WallpaperKind.Solid, value: "#161616" };
 
 const DEFAULT_LIGHT_PAIR: AppearancePair = {
 	theme: DEFAULT_THEME_BY_APPEARANCE[ThemeAppearance.Light],
@@ -948,7 +961,9 @@ export class DashboardStore {
 }
 
 function isWallpaperKind(value: string): value is WallpaperKind {
-	return value === "image" || value === "gradient" || value === "solid";
+	return (
+		value === WallpaperKind.Image || value === WallpaperKind.Gradient || value === WallpaperKind.Solid
+	);
 }
 
 /** Pick a slot for an effective resolution when the OS preference isn't

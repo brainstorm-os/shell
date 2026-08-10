@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForDashboard } from "../lib/keyboard-assertions";
-import { launchShell } from "../lib/launch-shell";
+import { launchShell, openAppFromDashboard } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
 async function openSeededDashboard(page: Page, userDataDir: string): Promise<void> {
@@ -42,24 +42,11 @@ async function openSeededDashboard(page: Page, userDataDir: string): Promise<voi
 	});
 }
 
-async function launchApp(app: ElectronApplication, dashboard: Page, label: string): Promise<Page> {
-	const whatsNew = dashboard.locator(".popover");
-	if (await whatsNew.isVisible().catch(() => false)) {
-		await dashboard.keyboard.press("Escape");
-		await whatsNew.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-	}
-	const icon = dashboard.locator(".dashboard-icons__icon", { hasText: label }).first();
-	await icon.waitFor({ state: "visible", timeout: 10_000 });
-	const [win] = await Promise.all([app.waitForEvent("window"), icon.click()]);
-	await win.waitForLoadState("domcontentloaded");
-	return win;
-}
-
 async function openNotesWithBlockSelection(
 	app: ElectronApplication,
 	dashboard: Page,
 ): Promise<Page> {
-	const notes = await launchApp(app, dashboard, "Notes");
+	const notes = await openAppFromDashboard(app, dashboard, { label: "Notes" });
 	const para = notes.locator('[contenteditable="true"] p').first();
 	await para.waitFor({ state: "visible", timeout: 20_000 });
 	// Caret in a block, Mod+a selects the containing block, a second Mod+a

@@ -31,6 +31,17 @@ function fil(id: string, name: string): Entity {
 	};
 }
 
+function locked(id: string, name: string): Entity {
+	return {
+		id,
+		type: FILE_TYPE,
+		properties: { name, mime: "text/plain", size: 0, locked: true },
+		createdAt: 0,
+		updatedAt: 0,
+		deletedAt: null,
+	};
+}
+
 function makeTree(): FolderTree {
 	const tree = new FolderTree();
 	tree.applySnapshot([
@@ -171,6 +182,20 @@ describe("FolderTree.rename + collisions", () => {
 	it("hasNameCollision excludes the entity being renamed", () => {
 		const tree = makeTree();
 		expect(tree.hasNameCollision("root", "A", "a")).toBe(false);
+	});
+
+	// Lock-5(b) — Files had no lock concept at all, so rename and delete were
+	// ungated: the one app in the fleet where "locked" meant nothing. The tree
+	// is the chokepoint both paths funnel through, so it is where the refusal
+	// lives — a UI-only gate is a lock the keyboard walks around.
+	it("refuses to rename a LOCKED entity, leaving its name and updatedAt alone", () => {
+		const tree = makeTree();
+		tree.applySnapshot([...tree.list(), locked("lk", "budget.xlsx")]);
+		expect(tree.rename("lk", "renamed.xlsx", 9999)).toBe(false);
+		const row = tree.get("lk");
+		if (!row) throw new Error("unreachable");
+		expect(readName(row)).toBe("budget.xlsx");
+		expect(row.updatedAt).toBe(0);
 	});
 
 	it("foldName normalises diacritics + case", () => {
@@ -513,5 +538,31 @@ describe("FolderTree.applySnapshot — readMembers on a Note (non-folder)", () =
 			},
 		]);
 		expect(tree.listFolderMembers("note")).toEqual([]);
+	});
+});
+
+describe("FolderTree — the read-only lock (Lock-5(b))", () => {
+	it("refuses to soft-delete a LOCKED entity, keeping it in its folder", () => {
+		const tree = makeTree();
+		tree.applySnapshot([...tree.list(), locked("lk", "budget.xlsx")]);
+		tree.move("root", "a", ["lk"]);
+
+		expect(tree.softDelete("lk")).toBe(false);
+		expect(tree.get("lk")?.deletedAt).toBeNull();
+		expect(tree.listFolderMembers("a").map((m) => m.id)).toContain("lk");
+	});
+
+	it("still deletes and renames UNLOCKED siblings", () => {
+		const tree = makeTree();
+		expect(tree.rename("f1", "renamed.txt")).toBe(true);
+		expect(tree.softDelete("f1")).toBe(true);
+	});
+
+	it("isLocked answers for any id (unknown ids read as unlocked)", () => {
+		const tree = makeTree();
+		tree.applySnapshot([...tree.list(), locked("lk", "budget.xlsx")]);
+		expect(tree.isLocked("lk")).toBe(true);
+		expect(tree.isLocked("f1")).toBe(false);
+		expect(tree.isLocked("nope")).toBe(false);
 	});
 });

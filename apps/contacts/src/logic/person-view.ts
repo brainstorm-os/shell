@@ -7,6 +7,7 @@
 
 import { parseCover } from "@brainstorm-os/sdk/entity-cover";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { PERSON_TYPE, type Person, type VaultEntityLike } from "../types/person";
 
 /** Normalise a stored multi-value text property (email / phone) into a
@@ -81,6 +82,7 @@ export function entityToPerson(entity: VaultEntityLike): Person {
 		bio: str(p.bio),
 		icon: parseIcon(p.icon),
 		cover: parseCover(p.cover),
+		locked: isLockedProperties(p),
 	};
 }
 

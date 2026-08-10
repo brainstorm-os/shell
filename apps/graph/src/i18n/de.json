@@ -224,6 +224,8 @@
   "link.already": "Bereits über {name} verlinkt",
   "link.failed": "Der Link {name} konnte nicht erstellt werden",
   "link.unavailable": "Linkerstellung benötigt den gemeinsamen Entitätendienst",
+  "lock.refusedEdit": "{name} ist gesperrt — zum Bearbeiten entsperren",
+  "lock.refusedLink": "{name} ist gesperrt — zum Verlinken entsperren",
   "history.fab": "Verlaufswiedergabe anzeigen",
   "history.now": "Jetzt",
   "history.dialog": "Verlaufswiedergabe",

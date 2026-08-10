@@ -86,13 +86,16 @@ button {
 	border-inline-end: var(--border-width) solid var(--border);
 	overflow: hidden;
 	z-index: 5;
-	transition: transform var(--motion-duration-normal, 0.18s) ease;
+	transition:
+		transform var(--motion-duration-normal, 0.18s) ease,
+		visibility var(--motion-duration-normal, 0.18s) ease;
 	will-change: transform;
 }
 
 .whiteboard[data-nav-open="false"] .whiteboard__nav {
 	transform: translateX(-100%);
 	border-color: transparent;
+	visibility: hidden;
 }
 
 /* Sidebar header row — holds the board search. Keeps the project-wide

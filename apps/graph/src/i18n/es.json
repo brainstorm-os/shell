@@ -224,6 +224,8 @@
   "link.already": "Ya enlazado mediante {name}",
   "link.failed": "No se pudo crear el enlace {name}",
   "link.unavailable": "Crear enlaces requiere el servicio compartido de entidades",
+  "lock.refusedEdit": "{name} está bloqueado: desbloquéalo para editarlo",
+  "lock.refusedLink": "{name} está bloqueado: desbloquéalo para añadir enlaces",
   "history.fab": "Mostrar reproducción del historial",
   "history.now": "Ahora",
   "history.dialog": "Reproducción del historial",

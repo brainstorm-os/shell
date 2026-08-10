@@ -26,6 +26,7 @@ import type {
 	WebContentsViewHandle,
 } from "../apps/window-container";
 import { defaultHandlerKey } from "../dashboard/dashboard-store";
+import { wallpaperImageUrl } from "../dashboard/wallpaper-url";
 import { GENERIC_OBJECT_EDITOR_APP_ID } from "../intents/defaults-catalog";
 import { makeEntityTargetResolver } from "../intents/entity-target";
 import { IntentsBus, OPEN_VERB } from "../intents/intents-bus";
@@ -182,13 +183,10 @@ export function createLaunchSetup(args: {
 				const active = getActiveVaultSession();
 				if (!active) return null;
 				const dashboard = await active.dashboardStore();
-				const wallpaper = dashboard.activeWallpaper(nativeTheme.shouldUseDarkColors);
-				// Only an image wallpaper has something to paint. Solid and
-				// gradient are already what the header's glass renders, and the
-				// custom-protocol guard keeps a hand-edited vault.json from
-				// pushing an arbitrary URL into every app renderer.
-				if (wallpaper.kind !== "image") return null;
-				return wallpaper.value.startsWith("brainstorm://wallpaper/") ? wallpaper.value : null;
+				// Same guard the live `app:wallpaper-changed` broadcast uses — one
+				// helper, so the boot arg and the broadcast can never disagree about
+				// which origins may reach an app renderer.
+				return wallpaperImageUrl(dashboard.activeWallpaper(nativeTheme.shouldUseDarkColors));
 			},
 			getActiveLocale: async () => {
 				const active = getActiveVaultSession();

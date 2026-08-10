@@ -21,8 +21,9 @@ import { contactObjectMenuContext } from "./contact-menu";
 
 const PIN_CAP = "dashboard.pin";
 
-function person(): Person {
+function person(locked = false): Person {
 	return {
+		locked,
 		id: "person-1",
 		name: "Ada Lovelace",
 		emails: [],
@@ -105,5 +106,42 @@ describe("contactObjectMenuContext", () => {
 		});
 		const ids = itemIds(ctx?.runtime ?? null, ctx?.extraItems ?? []);
 		expect(ids).toEqual(["open", "vcard-import", "vcard-export", "remove"]);
+	});
+});
+
+// Lock-5(b)/(c) — Contacts had a per-property-key `readOnly` (computed rows)
+// but no way to mark a contact read-only at all. The toggle lands on the ⋯
+// (and the header), and a locked contact's write rows come back disabled.
+describe("contactObjectMenuContext — the read-only lock", () => {
+	function build(locked: boolean, onToggleLock = () => undefined) {
+		const ctx = contactObjectMenuContext({
+			person: person(locked),
+			runtime: null,
+			onRemove: () => undefined,
+			onToggleLock,
+		});
+		if (!ctx) throw new Error("expected a menu context");
+		return buildObjectMenuItems({
+			target: ctx.target,
+			runtime: ctx.runtime,
+			pinned: false,
+			...(ctx.labels ? { labels: ctx.labels } : {}),
+			...(ctx.onRemove ? { onRemove: ctx.onRemove } : {}),
+			...(ctx.extraItems ? { extraItems: ctx.extraItems } : {}),
+			locked: ctx.locked ?? false,
+			...(ctx.onToggleLock ? { onToggleLock: ctx.onToggleLock } : {}),
+		});
+	}
+
+	it("offers Lock on an unlocked contact and Unlock on a locked one", () => {
+		expect(build(false).some((i) => i.id === "lock")).toBe(true);
+		expect(build(true).some((i) => i.id === "unlock")).toBe(true);
+	});
+
+	it("disables Delete on a locked contact, with the reason", () => {
+		const remove = build(true).find((i) => i.id === "remove");
+		expect(remove?.disabled).toBe(true);
+		expect(remove?.hint).toBeTruthy();
+		expect(build(false).find((i) => i.id === "remove")?.disabled).toBeUndefined();
 	});
 });

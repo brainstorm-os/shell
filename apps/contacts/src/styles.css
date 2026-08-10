@@ -553,12 +553,16 @@ body.is-resizing .contacts__resize {
 	max-width: 90vw;
 	border-inline-start: var(--border-width) solid var(--color-glass-border);
 	transform: translateX(100%);
-	transition: transform 160ms ease;
+	visibility: hidden;
+	transition:
+		transform 160ms ease,
+		visibility 160ms ease;
 	z-index: 5;
 }
 
 .bs-props--open {
 	transform: translateX(0);
+	visibility: visible;
 }
 
 /* ── Compose popover ─────────────────────────────────────────────────── */
