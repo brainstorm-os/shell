@@ -2214,6 +2214,14 @@ body.is-resizing .dbv-tl__labels-resize {
 	border-bottom: var(--border-width) solid var(--border);
 }
 
+/* The shared lock toggle is inserted into this slot at runtime
+   (`createLockButton`). `display: contents` keeps the button itself a DIRECT
+   flex child of the header, so the slot changes nothing about the layout the
+   hand-rolled button had. */
+.db-inspector__lock-slot {
+	display: contents;
+}
+
 .db-inspector__title {
 	margin: 0;
 	font-size: var(--text-size-md);

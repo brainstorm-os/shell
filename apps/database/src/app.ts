@@ -61,7 +61,9 @@ import { createCountBadge } from "@brainstorm-os/sdk/count-badge";
 import { copyEntityBody, hasBodyDocTransport } from "@brainstorm-os/sdk/entity-body-copy";
 import { coverOf, createEntityCoverElement } from "@brainstorm-os/sdk/entity-cover";
 import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { isEntityLocked, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
+import { type LockButtonHandle, createLockButton } from "@brainstorm-os/sdk/lock-button";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import {
 	type NavHistory,
@@ -1411,14 +1413,44 @@ function shiftCalendar(ms: number, range: CalendarRange, delta: number): number 
 	return d.getTime();
 }
 
+/** The inspector's read-only lock toggle — the SHARED affordance
+ *  (`createLockButton`), built once and kept in the header slot. It used to be
+ *  a hand-rolled button in `index.html` that hid itself whenever the inspector
+ *  wasn't on exactly one record; a control that vanishes can't be learned, so
+ *  it now stays put and explains itself instead (Lock-5(c)). */
+let inspectorLock: LockButtonHandle | null = null;
+
+function inspectorLockButton(state: AppState): LockButtonHandle | null {
+	if (inspectorLock) return inspectorLock;
+	const slot = document.getElementById("inspector-lock-slot");
+	if (!slot) return null;
+	inspectorLock = createLockButton({
+		locked: false,
+		labels: {
+			lock: t("brainstorm.database.record.lock"),
+			unlock: t("brainstorm.database.record.unlock"),
+		},
+		onToggle: (locked) => {
+			// Resolved at CLICK time, not at build time: the one handle serves
+			// every record the inspector lands on.
+			const entity = singleSelectedEntity(state);
+			if (!entity) return;
+			void persistEntityPatch(state, entity, lockTogglePatch(locked));
+		},
+	});
+	slot.replaceChildren(inspectorLock.element);
+	return inspectorLock;
+}
+
 function renderInspector(state: AppState): void {
 	const body = document.getElementById("inspector-body");
 	const title = document.getElementById("inspector-title");
 	if (!body || !title) return;
 	body.replaceChildren();
-	// The lock toggle shows only for a single inspected record (wired below).
-	const lockBtn = document.getElementById("inspector-lock") as HTMLButtonElement | null;
-	if (lockBtn) lockBtn.hidden = true;
+	// The toggle can only act on ONE record, so anything else disables it WITH
+	// the reason rather than taking it away.
+	const lockBtn = inspectorLockButton(state);
+	lockBtn?.setHint(t("brainstorm.database.record.lockUnavailable"));
 
 	const selected = state.selection.selectedIds;
 	if (selected.size === 0) {
@@ -1490,17 +1522,8 @@ function renderInspector(state: AppState): void {
 	// read-only across every view; here we surface the toggle + freeze rename.
 	const recordLocked = isRecordLocked(entity);
 	if (lockBtn) {
-		lockBtn.hidden = false;
-		lockBtn.replaceChildren(createIconElement(IconName.Lock));
-		lockBtn.setAttribute("aria-pressed", String(recordLocked));
-		const lockLabel = recordLocked
-			? t("brainstorm.database.record.unlock")
-			: t("brainstorm.database.record.lock");
-		lockBtn.setAttribute("aria-label", lockLabel);
-		lockBtn.setAttribute("data-bs-tooltip", lockLabel);
-		lockBtn.onclick = () => {
-			void persistEntityPatch(state, entity, { locked: !recordLocked });
-		};
+		lockBtn.setHint(undefined);
+		lockBtn.render(recordLocked);
 	}
 
 	// The inspector heading IS the rename field, for every entity type — the
@@ -3611,7 +3634,7 @@ function mutateEntityProperty(
  *  boundary (any collaborator can toggle it, and a write reaching the entities
  *  service is still capability-gated there). */
 export function isRecordLocked(entity: EntityRow): boolean {
-	return entity.properties?.locked === true;
+	return isEntityLocked(entity);
 }
 
 /** Write `patch` into an entity's `properties`: optimistic in-memory

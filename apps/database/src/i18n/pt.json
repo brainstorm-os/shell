@@ -56,6 +56,7 @@
   "brainstorm.database.chrome.inspector.disabled": "Nada para inspecionar — esta visualização não tem linhas",
   "brainstorm.database.record.lock": "Bloquear registro (somente leitura)",
   "brainstorm.database.record.unlock": "Desbloquear registro",
+  "brainstorm.database.record.lockUnavailable": "Selecione um único registro para bloqueá-lo",
   "brainstorm.database.menu.copyEmbedLink": "Copiar link de incorporação",
   "brainstorm.database.menu.export": "Exportar…",
   "brainstorm.database.menu.importContacts": "Importar contatos (vCard / CSV)…",
