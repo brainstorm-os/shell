@@ -13,10 +13,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ElectronApplication, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForDashboard } from "../lib/keyboard-assertions";
-import { launchShell } from "../lib/launch-shell";
+import { launchShell, openAppFromDashboard } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
 const MARKER = "BS-XCLUDE-MARKER-9b4f";
@@ -47,19 +47,6 @@ async function openSeededDashboard(page: Page, userDataDir: string): Promise<voi
 			window as unknown as { brainstorm: { dev: { seedDemoApps: () => Promise<unknown> } } }
 		).brainstorm.dev.seedDemoApps();
 	});
-}
-
-async function launchApp(app: ElectronApplication, dashboard: Page, label: string): Promise<Page> {
-	const whatsNew = dashboard.locator(".popover");
-	if (await whatsNew.isVisible().catch(() => false)) {
-		await dashboard.keyboard.press("Escape");
-		await whatsNew.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-	}
-	const icon = dashboard.locator(".dashboard-icons__icon", { hasText: label }).first();
-	await icon.waitFor({ state: "visible", timeout: 10_000 });
-	const [win] = await Promise.all([app.waitForEvent("window"), icon.click()]);
-	await win.waitForLoadState("domcontentloaded");
-	return win;
 }
 
 type NotesDev = {
@@ -108,7 +95,7 @@ test.describe("notes transclusion body preview (B6.4b)", () => {
 				await waitForFirstContentfulPaintAbsoluteMs(dashboard);
 				await openSeededDashboard(dashboard, userDataDir);
 
-				const notes = await launchApp(app, dashboard, "Notes");
+				const notes = await openAppFromDashboard(app, dashboard, { label: "Notes" });
 				await notes.locator('[contenteditable="true"]').first().waitFor({
 					state: "visible",
 					timeout: 20_000,

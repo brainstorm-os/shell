@@ -9,10 +9,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ElectronApplication, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForDashboard } from "../lib/keyboard-assertions";
-import { launchShell } from "../lib/launch-shell";
+import { launchShell, openAppFromDashboard } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
 async function openSeededDashboard(page: Page, userDataDir: string): Promise<void> {
@@ -42,20 +42,6 @@ async function openSeededDashboard(page: Page, userDataDir: string): Promise<voi
 	});
 }
 
-/** Click a dashboard app icon and return the app's new window. */
-async function launchApp(app: ElectronApplication, dashboard: Page, label: string): Promise<Page> {
-	const whatsNew = dashboard.locator(".popover");
-	if (await whatsNew.isVisible().catch(() => false)) {
-		await dashboard.keyboard.press("Escape");
-		await whatsNew.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-	}
-	const icon = dashboard.locator(".dashboard-icons__icon", { hasText: label }).first();
-	await icon.waitFor({ state: "visible", timeout: 10_000 });
-	const [appWindow] = await Promise.all([app.waitForEvent("window"), icon.click()]);
-	await appWindow.waitForLoadState("domcontentloaded");
-	return appWindow;
-}
-
 test.describe("fancy-menus graph export (app host)", () => {
 	test("the graph export menu opens as a fancy-menu in the app window", async () => {
 		test.setTimeout(180_000);
@@ -67,7 +53,7 @@ test.describe("fancy-menus graph export (app host)", () => {
 				await waitForFirstContentfulPaintAbsoluteMs(dashboard);
 				await openSeededDashboard(dashboard, userDataDir);
 
-				const graph = await launchApp(app, dashboard, "Graph");
+				const graph = await openAppFromDashboard(app, dashboard, { label: "Graph" });
 
 				const exportBtn = graph.locator('button[aria-haspopup="menu"]').first();
 				await exportBtn.waitFor({ state: "visible", timeout: 20_000 });

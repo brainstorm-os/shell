@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForDashboard } from "../lib/keyboard-assertions";
-import { launchShell } from "../lib/launch-shell";
+import { launchShell, openAppFromDashboard } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
 async function openSeededDashboard(page: Page, userDataDir: string): Promise<void> {
@@ -53,16 +53,8 @@ test.describe("fancy-menus window-strip context menu", () => {
 				await waitForFirstContentfulPaintAbsoluteMs(dashboard);
 				await openSeededDashboard(dashboard, userDataDir);
 
-				const whatsNew = dashboard.locator(".popover");
-				if (await whatsNew.isVisible().catch(() => false)) {
-					await dashboard.keyboard.press("Escape");
-					await whatsNew.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-				}
-
 				// Open any app so the running-windows strip has a tile.
-				const icon = dashboard.locator(".dashboard-icons__icon").first();
-				await icon.waitFor({ state: "visible", timeout: 10_000 });
-				await Promise.all([app.waitForEvent("window"), icon.click()]);
+				await openAppFromDashboard(app, dashboard);
 
 				const tile = dashboard.locator(".window-strip__tile").first();
 				await tile.waitFor({ state: "visible", timeout: 15_000 });

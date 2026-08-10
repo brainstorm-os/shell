@@ -10,10 +10,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ElectronApplication, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { waitForDashboard } from "../lib/keyboard-assertions";
-import { launchShell } from "../lib/launch-shell";
+import { launchShell, openAppFromDashboard } from "../lib/launch-shell";
 import { waitForFirstContentfulPaintAbsoluteMs } from "../lib/measure-paint";
 
 async function openSeededDashboard(page: Page, userDataDir: string): Promise<void> {
@@ -43,19 +43,6 @@ async function openSeededDashboard(page: Page, userDataDir: string): Promise<voi
 	});
 }
 
-async function launchApp(app: ElectronApplication, dashboard: Page, label: string): Promise<Page> {
-	const whatsNew = dashboard.locator(".popover");
-	if (await whatsNew.isVisible().catch(() => false)) {
-		await dashboard.keyboard.press("Escape");
-		await whatsNew.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-	}
-	const icon = dashboard.locator(".dashboard-icons__icon", { hasText: label }).first();
-	await icon.waitFor({ state: "visible", timeout: 10_000 });
-	const [win] = await Promise.all([app.waitForEvent("window"), icon.click()]);
-	await win.waitForLoadState("domcontentloaded");
-	return win;
-}
-
 test.describe("bookmarks reload-from-source", () => {
 	test("reloading source does not blank the edited body", async () => {
 		test.setTimeout(180_000);
@@ -67,7 +54,7 @@ test.describe("bookmarks reload-from-source", () => {
 				await waitForFirstContentfulPaintAbsoluteMs(dashboard);
 				await openSeededDashboard(dashboard, userDataDir);
 
-				const bm = await launchApp(app, dashboard, "Bookmarks");
+				const bm = await openAppFromDashboard(app, dashboard, { label: "Bookmarks" });
 
 				// Add a bookmark + open its detail.
 				await bm.locator(".bookmarks__header-add").first().click();
