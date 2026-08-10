@@ -19,7 +19,7 @@ import { enumGuard } from "./enum-guard";
 
 /** Bumped whenever the canonical token namespace changes shape, so a
  *  TokenSet authored against an older namespace can be detected. */
-export const TOKEN_NAME_VERSION = 2;
+export const TOKEN_NAME_VERSION = 3;
 
 /**
  * Every legal semantic-token CSS variable name, sorted. A `TokenSet`'s
@@ -58,6 +58,7 @@ export const CANONICAL_TOKEN_NAMES = Object.freeze([
 	"--color-gloss-destructive-top",
 	"--color-gloss-inner-bottom",
 	"--color-gloss-inner-top",
+	"--color-gloss-label",
 	"--color-gloss-neutral-bottom",
 	"--color-gloss-neutral-top",
 	"--color-gloss-shine-bottom",

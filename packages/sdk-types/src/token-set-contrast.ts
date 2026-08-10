@@ -194,6 +194,43 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = Object.freeze([
 		level: ContrastLevel.Normal,
 	},
 	{
+		id: "gloss-label-on-face-top",
+		label: "Accent button label on the face's top stop",
+		foreground: "--color-gloss-label",
+		background: "--color-gloss-top",
+		level: ContrastLevel.Normal,
+	},
+	{
+		id: "gloss-label-on-face-bottom",
+		label: "Accent button label on the face's bottom stop",
+		foreground: "--color-gloss-label",
+		background: "--color-gloss-bottom",
+		level: ContrastLevel.Normal,
+	},
+	{
+		// The tick/glyph a checkbox, radio and filled icon-button paint on the
+		// raw `accent.default` fill. A graphical object, not text — WCAG 1.4.11's
+		// 3:1 is the bar, and `accent.onFill` is what a *text* label must use.
+		id: "accent-text-on-accent-default",
+		label: "Accent glyph on the raw accent fill",
+		foreground: "--color-accent-text",
+		background: "--color-accent-default",
+		level: ContrastLevel.Large,
+	},
+	{
+		// The disabled filled-button face: BOTH gloss stops collapse to
+		// `surface.raised` and the ink drops to `text.tertiary`
+		// (`button.css` / F-410). WCAG exempts inactive controls from 1.4.3, but
+		// a label that dissolves into its own fill is the defect this ratchet
+		// exists for (Chat's disabled send glyph at ~1.3:1) — so it is held at
+		// the 3:1 affordance bar rather than exempted.
+		id: "disabled-label-on-disabled-face",
+		label: "Disabled control label on the disabled filled face",
+		foreground: "--color-text-tertiary",
+		background: "--color-surface-raised",
+		level: ContrastLevel.Large,
+	},
+	{
 		id: "accent-on-surface-on-bg",
 		label: "Accent-as-text on background",
 		foreground: "--color-accent-on-surface",
@@ -268,6 +305,65 @@ export function lintTokenContrast(
 		if (fg === undefined || bgRaw === undefined) continue;
 		const bg = opaqueBackground(bgRaw, base);
 		const ratio = contrastRatio(fg, bg);
+		if (ratio === null) continue;
+		if (ratio < pair.level) {
+			issues.push({
+				pairId: pair.id,
+				label: pair.label,
+				ratio: Math.round(ratio * 100) / 100,
+				required: pair.level,
+			});
+		}
+	}
+	return issues;
+}
+
+/** A surface that must be visually SEPARATE from what it floats over. Unlike
+ *  `ContrastPair` neither colour carries the other's text — the assertion is
+ *  that the two fills are distinguishable at all. */
+export type SurfacePair = {
+	id: string;
+	label: string;
+	surface: string;
+	against: string;
+	level: ContrastLevel;
+};
+
+/**
+ * Floating surfaces that must not dissolve into the page.
+ *
+ * The tooltip chip inherited a token that resolved to the page background on
+ * the dark themes, so "More actions" rendered as bare text on (20,20,20) over a
+ * (20,20,20) page — no fill, no border, no shadow — in theme-editor, graph,
+ * whiteboard, books and contacts (329 audit / POLISH-DSN-13 S6). A chip is a
+ * non-text UI component, so WCAG 1.4.11's 3:1 is the bar.
+ */
+export const SURFACE_PAIRS: readonly SurfacePair[] = Object.freeze([
+	{
+		id: "tooltip-chip-on-page",
+		label: "Tooltip chip surface against the page background",
+		surface: "--color-background-inverse",
+		against: "--color-background-primary",
+		level: ContrastLevel.Large,
+	},
+]) as readonly SurfacePair[];
+
+/**
+ * Lint the floating-surface separations. Same `resolve` contract and same
+ * skip-the-unevaluable policy as `lintTokenContrast`; a translucent surface is
+ * composited over `--color-background-primary` first so an overlay token is
+ * judged as the colour it renders.
+ */
+export function lintSurfaceSeparation(
+	resolve: (tokenName: string) => string | undefined,
+): ContrastIssue[] {
+	const issues: ContrastIssue[] = [];
+	const base = resolve(BASE_BACKGROUND_TOKEN);
+	for (const pair of SURFACE_PAIRS) {
+		const surfaceRaw = resolve(pair.surface);
+		const against = resolve(pair.against);
+		if (surfaceRaw === undefined || against === undefined) continue;
+		const ratio = contrastRatio(opaqueBackground(surfaceRaw, base), against);
 		if (ratio === null) continue;
 		if (ratio < pair.level) {
 			issues.push({

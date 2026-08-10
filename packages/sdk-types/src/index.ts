@@ -2547,11 +2547,13 @@ export type { StylePackSanitizeIssue } from "./style-pack-sanitizer";
 export {
 	CONTRAST_PAIRS,
 	ContrastLevel,
+	SURFACE_PAIRS,
 	contrastRatio,
+	lintSurfaceSeparation,
 	lintTokenContrast,
 	parseColor,
 } from "./token-set-contrast";
-export type { ContrastIssue, ContrastPair } from "./token-set-contrast";
+export type { ContrastIssue, ContrastPair, SurfacePair } from "./token-set-contrast";
 
 /**
  * The frozen `data-bs-region` hook contract (OQ-183) — stable chrome

@@ -660,7 +660,10 @@ select {
 	z-index: 1;
 	overflow: hidden;
 	border: none;
-	color: var(--color-accent-text);
+	/* The FACE's own ink, not `--color-accent-text` (which belongs to the
+	   `accent.default` / `accent.onFill` fills and is a near-black in the dark
+	   themes) — see packages/tokens `gloss.label`. */
+	color: var(--color-gloss-label);
 	text-shadow: 0 0.5px 0.5px rgba(0, 0, 0, 0.25);
 	background: linear-gradient(to bottom, var(--color-gloss-top), var(--color-gloss-bottom));
 	box-shadow:
@@ -750,11 +753,25 @@ select {
 :root .notes__inline-toolbar-btn--primary:disabled::after {
 	opacity: 0;
 }
+/* Disabled keeps a REAL face — the same answer the shell Button reached in
+   F-410 (packages/shell/src/renderer/ui/button.css), which never made it
+   across to the app-side hook: `opacity` multiplies through the face AND the
+   ink at once, so the label dissolves into its own fill. On the light themes
+   that shipped Agent's disabled send as a white label on pale lavender, and
+   Chat's send glyph at ~1.3:1 against the pill it sits in (329 audit /
+   POLISH-DSN-13 S5). Point both gloss stops at the raised surface and the ink
+   at tertiary — an alpha tint, so the face tracks whatever it sits on and can
+   never out-glow the enabled button beside it. The tokens contrast ratchet
+   holds that pair at 3:1 in every theme. */
 :root [data-bs-primary]:disabled,
 :root .notes__btn--primary:disabled,
 :root .notes__inline-toolbar-btn--primary:disabled {
 	cursor: not-allowed;
-	opacity: 0.55;
+	background: var(--color-surface-raised);
+	color: var(--color-text-tertiary);
+	text-shadow: none;
+	box-shadow: inset 0 0 0 var(--border-width) var(--color-border-subtle);
+	opacity: 1;
 }
 
 /* ============================================================

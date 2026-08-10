@@ -1037,6 +1037,7 @@ function Composer({
 				<button
 					type="button"
 					className="chat__send"
+					data-bs-primary=""
 					disabled={disabled || (draftEmpty && attachments.attachments.length === 0)}
 					onClick={() => commit(draftRef.current)}
 					data-bs-tooltip={t("composer.send")}
