@@ -398,10 +398,13 @@ body {
 	background: var(--color-accent-subtle);
 }
 
+/* `accent.onSurface`, not `accent.text` — the latter is the ink for an accent
+   FILL, and `accent.subtle` is a translucent tint over the page, so on the
+   dark themes it painted a near-black label on a near-black pill. */
 .au-pill--snoozed,
 .au-pill--running,
 .au-pill--queued {
-	color: var(--color-accent-text);
+	color: var(--color-accent-on-surface);
 	background: var(--color-accent-subtle);
 }
 

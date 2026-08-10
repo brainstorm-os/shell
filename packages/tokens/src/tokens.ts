@@ -79,6 +79,18 @@ export type Tokens = {
 		gloss: {
 			top: string;
 			bottom: string;
+			/** The ink the button FACE carries — NOT `accent.text`. The two are
+			 *  different surfaces: `accent.text` sits on `accent.default` /
+			 *  `accent.onFill`, which several dark themes deliberately keep light
+			 *  (a bright accent on a dark page), so its ink is a near-black. The
+			 *  glossy face is a saturated mid-tone in every theme, so it needs the
+			 *  opposite ink. Sharing one token is how Default Dark shipped a
+			 *  near-black label on the same indigo Default Light labels in white
+			 *  (329 audit / POLISH-DSN-13 S5). Held ≥ WCAG AA 4.5:1 against BOTH
+			 *  `top` and `bottom` in every theme by the tokens contrast ratchet —
+			 *  a linear gradient's extremes bound every colour along it, so
+			 *  clearing both stops clears the whole face. */
+			label: string;
 			neutralTop: string;
 			neutralBottom: string;
 			destructiveTop: string;

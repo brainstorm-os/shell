@@ -167,7 +167,7 @@
 	z-index: 1;
 	overflow: hidden;
 	border: none;
-	color: var(--color-accent-text);
+	color: var(--color-gloss-label);
 	text-shadow: 0 0.5px 0.5px rgba(0, 0, 0, 0.25);
 	background-image: linear-gradient(to bottom, var(--gloss-top), var(--gloss-bottom));
 	box-shadow:
@@ -180,9 +180,13 @@
 
 /* Glass + Primary — the theme-accent face. Glass is the default button
  * everywhere; Primary the emphasis variant. Both ride the theme's two
- * gloss stops; `--color-accent-text` is per-theme tuned to contrast that
- * accent (dark ink on the yellow High-Contrast accent, light on the
- * blues), so it stays legible without a hard-coded constant. */
+ * gloss stops, and the ink is `--color-gloss-label` — the FACE's own ink,
+ * NOT `--color-accent-text`. The two are different surfaces: accent.text
+ * sits on `accent.default`/`accent.onFill`, which the dark themes keep
+ * deliberately light, so it is a near-black there — and painting that on
+ * this saturated face is how Default Dark shipped a near-black label on the
+ * same indigo Default Light labels in white (POLISH-DSN-13 S5). The tokens
+ * contrast ratchet holds `gloss.label` at AA against BOTH stops. */
 .button--glass,
 .button--primary {
 	--gloss-top: var(--color-gloss-top);

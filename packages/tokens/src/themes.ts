@@ -547,8 +547,16 @@ export const defaultDark: Tokens = {
 			// reference purple→blue — NOT a single-hue lightness ramp). No
 			// light/white top stop; the glass cue is the thin inset edge
 			// glint + soft blurred speculars.
-			top: "#9a7cff",
-			bottom: "#4f7ef5",
+			//
+			// Both stops sit where a WHITE label clears AA, which is also where
+			// Default Light's face already sat: the two appearances now render
+			// the same indigo AND the same ink. Until POLISH-DSN-13 this face
+			// was two steps lighter and carried the near-black `background.
+			// primary` as its label — the same indigo Default Light labelled in
+			// white, which is what the 329 fleet audit read off the screen.
+			top: "#7951ff",
+			bottom: "#346af3",
+			label: "#ffffff",
 			shineTop: "rgba(214, 206, 255, 0.6)",
 			shineBottom: "rgba(190, 224, 255, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.30)",
@@ -646,8 +654,9 @@ export const defaultLight: Tokens = {
 			...glossVariantStops,
 			// Violet→blue, same hue travel as dark but a touch deeper for
 			// contrast on the light surfaces.
-			top: "#7c5cf6",
-			bottom: "#3f72e6",
+			top: "#7756f6",
+			bottom: "#386de5",
+			label: "#ffffff",
 			shineTop: "rgba(224, 218, 255, 0.65)",
 			shineBottom: "rgba(200, 224, 255, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.45)",
@@ -747,6 +756,7 @@ export const midnight: Tokens = {
 			// Bright cyan→blue — Midnight's cooler two-colour face.
 			top: "#5cc6f8",
 			bottom: "#2f7be0",
+			label: "#0a1020",
 			shineTop: "rgba(200, 236, 255, 0.65)",
 			shineBottom: "rgba(190, 240, 250, 0.7)",
 			innerTop: "rgba(216, 236, 255, 0.40)",
@@ -837,11 +847,13 @@ export const sepia: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Warm orange→brick two-colour face; warm (cream/amber)
+			// Warm burnt-orange→brick two-colour face; warm (cream/amber)
 			// speculars rather than the cool ones of the dark themes so the
-			// gloss stays inside Sepia's paper palette.
-			top: "#d4691f",
+			// gloss stays inside Sepia's paper palette. Both stops are deep
+			// enough for the paper-coloured label to clear AA.
+			top: "#a44f16",
 			bottom: "#8a360f",
+			label: "#f3ead8",
 			shineTop: "rgba(255, 225, 190, 0.6)",
 			shineBottom: "rgba(255, 210, 170, 0.6)",
 			innerTop: "rgba(255, 233, 199, 0.45)",
@@ -944,6 +956,7 @@ export const highContrast: Tokens = {
 			// and plain-white glints so the button reads as a crisp solid.
 			top: "#ffe000",
 			bottom: "#f0c800",
+			label: "#000000",
 			shineTop: "rgba(255, 255, 255, 0.5)",
 			shineBottom: "rgba(255, 255, 255, 0.5)",
 			innerTop: "rgba(255, 255, 255, 0.5)",
@@ -1038,9 +1051,11 @@ export const solar: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Warm orange→amber two-colour face — matches Solar's accent.
-			top: "#fb923c",
+			// Warm amber→brick two-colour face — matches Solar's accent, and
+			// deep enough at both stops for the white label to clear AA.
+			top: "#bb5604",
 			bottom: "#c2410c",
+			label: "#ffffff",
 			shineTop: "rgba(255, 222, 192, 0.65)",
 			shineBottom: "rgba(255, 210, 170, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.45)",
@@ -1137,6 +1152,7 @@ export const forest: Tokens = {
 			// Bright leaf-green → deep forest green two-colour face.
 			top: "#5be39b",
 			bottom: "#0f9d6e",
+			label: "#0c130f",
 			shineTop: "rgba(206, 255, 226, 0.6)",
 			shineBottom: "rgba(190, 250, 220, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.30)",
@@ -1227,9 +1243,12 @@ export const nord: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Frost teal → deep frost blue two-colour face.
+			// Frost teal → deep frost blue two-colour face. The dark label is a
+			// true near-black rather than the page `background.primary` — that
+			// slate was only 3.10:1 on the deeper stop.
 			top: "#8fbcbb",
 			bottom: "#5e81ac",
+			label: "#0d0f13",
 			shineTop: "rgba(224, 240, 244, 0.65)",
 			shineBottom: "rgba(208, 232, 240, 0.7)",
 			innerTop: "rgba(236, 244, 248, 0.40)",
@@ -1320,9 +1339,11 @@ export const aurora: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Orchid → magenta two-colour face — the aurora's brightest band.
-			top: "#e066f5",
+			// Magenta → purple two-colour face — the aurora's brightest band,
+			// pulled to where the white label clears AA on both stops.
+			top: "#c30fe2",
 			bottom: "#a21caf",
+			label: "#ffffff",
 			shineTop: "rgba(245, 214, 255, 0.6)",
 			shineBottom: "rgba(232, 200, 255, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.30)",
@@ -1413,9 +1434,10 @@ export const mint: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Bright teal → deep teal two-colour face.
-			top: "#2dd4bf",
+			// Teal → deep teal two-colour face, white label.
+			top: "#1b8275",
 			bottom: "#0f766e",
+			label: "#ffffff",
 			shineTop: "rgba(204, 250, 240, 0.65)",
 			shineBottom: "rgba(190, 244, 230, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.45)",
@@ -1506,9 +1528,10 @@ export const rose: Tokens = {
 		},
 		gloss: {
 			...glossVariantStops,
-			// Bright rose → deep crimson two-colour face.
-			top: "#fb7185",
+			// Crimson → deep crimson two-colour face, white label.
+			top: "#e70727",
 			bottom: "#be123c",
+			label: "#ffffff",
 			shineTop: "rgba(255, 220, 228, 0.65)",
 			shineBottom: "rgba(255, 206, 216, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.45)",
@@ -1600,8 +1623,9 @@ export const slate: Tokens = {
 		gloss: {
 			...glossVariantStops,
 			// Indigo → deep indigo two-colour face.
-			top: "#6366f1",
+			top: "#5f62f1",
 			bottom: "#4338ca",
+			label: "#ffffff",
 			shineTop: "rgba(220, 222, 255, 0.65)",
 			shineBottom: "rgba(204, 208, 255, 0.7)",
 			innerTop: "rgba(255, 255, 255, 0.45)",
@@ -1698,6 +1722,7 @@ export const porcelain: Tokens = {
 			// buttons are plain pills, no glossy effect.
 			top: "#2563eb",
 			bottom: "#2563eb",
+			label: "#ffffff",
 			shineTop: "rgba(255, 255, 255, 0)",
 			shineBottom: "rgba(255, 255, 255, 0)",
 			innerTop: "rgba(255, 255, 255, 0)",
@@ -1800,6 +1825,7 @@ export const graphite: Tokens = {
 			// buttons are plain pills, no glossy effect.
 			top: "#105aef",
 			bottom: "#105aef",
+			label: "#ffffff",
 			shineTop: "rgba(255, 255, 255, 0)",
 			shineBottom: "rgba(255, 255, 255, 0)",
 			innerTop: "rgba(255, 255, 255, 0)",
