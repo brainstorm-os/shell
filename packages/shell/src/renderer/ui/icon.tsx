@@ -48,6 +48,7 @@ import {
 	Globe,
 	Hash,
 	Heart,
+	ImageSquare,
 	Info,
 	Keyboard,
 	Laptop,
@@ -126,6 +127,9 @@ export enum IconName {
 	Globe = "globe",
 	Interface = "interface",
 	Clock = "clock",
+	/** Settings → Covers (the uploaded-cover library). Distinct from Sparkle,
+	 *  which used to do double duty for Covers / contributions / AI. */
+	Image = "image",
 	// Device-pairing glyphs (Stage 10.5b — Settings → Devices).
 	DeviceMobile = "device-mobile",
 	Laptop = "laptop",
@@ -209,6 +213,7 @@ const ICON_REGISTRY: Record<IconName, PhosphorIcon> = {
 	[IconName.Globe]: Globe,
 	[IconName.Interface]: Browsers,
 	[IconName.Clock]: ClockGlyph,
+	[IconName.Image]: ImageSquare,
 	[IconName.DeviceMobile]: DeviceMobile,
 	[IconName.Laptop]: Laptop,
 	[IconName.QrCode]: QrCode,

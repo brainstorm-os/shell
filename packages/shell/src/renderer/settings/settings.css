@@ -110,10 +110,33 @@
 	color: var(--color-text-primary);
 }
 
+/* The nav is grouped (owner report 2026-08-10 — a flat 22-item list where four
+ * sections lived below the fold with nothing to orient against). Groups are
+ * purely visual + semantic: the composite keyboard still walks one flat index
+ * space, so the gap between groups is the only thing a held ↓ notices. */
 .settings__nav {
 	display: flex;
 	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.settings__nav-group {
+	display: flex;
+	flex-direction: column;
 	gap: var(--space-0_5);
+}
+
+/* Inert label — no tabindex, `role="presentation"`, named to its group through
+ * aria-labelledby. Quiet enough to read as a divider rather than a nav item;
+ * the eye should land on the section names, not the headings. */
+.settings__nav-group-label {
+	padding: var(--space-1) var(--space-2) var(--space-0_5);
+	font-size: var(--text-size-xs);
+	font-weight: var(--text-weight-semibold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-text-tertiary);
+	user-select: none;
 }
 
 .settings__nav-item {
@@ -126,7 +149,11 @@
 	font: inherit;
 	font-size: var(--text-size-md);
 	text-align: start;
-	padding: var(--space-2) var(--space-2);
+	/* Denser rows than the pre-grouping list (8px → 4px block padding, 37px →
+	 * 29px). Six headings + their gaps cost ~180px of a sidebar that already
+	 * overflowed by ~145px; without this the grouping would push eight sections
+	 * below the fold instead of four, which is the defect it exists to fix. */
+	padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius-md);
 	cursor: pointer;
 }
