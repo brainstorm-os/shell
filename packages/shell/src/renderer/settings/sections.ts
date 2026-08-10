@@ -81,3 +81,54 @@ export enum SettingsSection {
 	 *  permanent delete stay there — one surface owns the list). */
 	RecentlyDeleted = "recently-deleted",
 }
+
+/**
+ * Sidebar nav groups. The flat 22-entry list was unreadable — four sections
+ * sat below the fold with nothing to orient against (owner report 2026-08-10:
+ * "the menu in settings is too complex and should be split in sections, now
+ * it's a mess").
+ *
+ * The grouping is a *property of each section* (`SECTIONS[n].group` in
+ * `settings.tsx`), not a second list of ids: a new section can't be declared
+ * without naming its group, and `NAV_GROUPS` is derived by filtering, so there
+ * is nothing for a nav list to drift from. `SETTINGS_GROUP_ORDER` is the one
+ * place the vertical order of the groups is decided.
+ */
+export enum SettingsGroup {
+	/** Shell-wide preferences that aren't about vault content: updates,
+	 *  appearance, chrome, locale, notifications, shortcuts. */
+	General = "general",
+	/** The vault's own content and its lifecycle — the property catalog, the
+	 *  cover library, the search index, export/import, the bin. */
+	Vault = "vault",
+	/** What runs *on* the vault: default openers, contributed app actions,
+	 *  the AI providers, and the agent members that use them. */
+	AppsAi = "apps-ai",
+	/** Who you are and what you pay for. */
+	Account = "account",
+	/** This install's relationship to your other installs. */
+	DevicesSync = "devices-sync",
+	/** What can read your data locally, and what leaves the machine. */
+	Privacy = "privacy",
+}
+
+/** Vertical order of the sidebar groups. Exhaustive over `SettingsGroup` —
+ *  a group missing here would drop its sections out of the nav, which
+ *  `nav-groups.test.ts` fails on. */
+export const SETTINGS_GROUP_ORDER: ReadonlyArray<SettingsGroup> = [
+	SettingsGroup.General,
+	SettingsGroup.Vault,
+	SettingsGroup.AppsAi,
+	SettingsGroup.Account,
+	SettingsGroup.DevicesSync,
+	SettingsGroup.Privacy,
+];
+
+export const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, string> = {
+	[SettingsGroup.General]: "shell.settings.group.general",
+	[SettingsGroup.Vault]: "shell.settings.group.vault",
+	[SettingsGroup.AppsAi]: "shell.settings.group.appsAi",
+	[SettingsGroup.Account]: "shell.settings.group.account",
+	[SettingsGroup.DevicesSync]: "shell.settings.group.devicesSync",
+	[SettingsGroup.Privacy]: "shell.settings.group.privacy",
+};

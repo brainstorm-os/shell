@@ -15,8 +15,17 @@ import { getEscapeStack, installEscapeHandler } from "@brainstorm-os/sdk/a11y";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SettingsSection } from "./sections";
-import { Settings } from "./settings";
+import { t } from "../i18n/t";
+import { SETTINGS_GROUP_LABEL_KEYS, SettingsSection } from "./sections";
+import { NAV_GROUPS, NAV_ITEMS, Settings } from "./settings";
+
+/** Narrow an indexed lookup without a non-null assertion (biome forbids `!`).
+ *  A miss is a broken fixture, so throwing here reads as the test's own
+ *  precondition failing rather than an obscure `undefined` deref downstream. */
+function required<T>(value: T | null | undefined, what: string): T {
+	if (value === null || value === undefined) throw new Error(`missing ${what}`);
+	return value;
+}
 
 vi.mock("../vault-context", () => ({
 	useVault: () => ({ current: { name: "Test Vault" }, close: vi.fn() }),
@@ -32,6 +41,25 @@ function dispatchKey(target: EventTarget, key: string, init: KeyboardEventInit =
 	});
 }
 
+function installBrainstormBridge(): void {
+	(window as unknown as { brainstorm: unknown }).brainstorm = {
+		version: "0.0.1",
+		vaults: { session: () => Promise.resolve(null) },
+		// General section now renders the Updates panel (13.6 + 13.12).
+		update: {
+			getPrefs: () => Promise.resolve({ channel: "stable", lastCheckedAt: null }),
+			check: () => Promise.resolve({}),
+			setChannel: () => Promise.resolve({ channel: "stable", lastCheckedAt: null }),
+			getState: () => Promise.resolve({ lifecycle: "unsupported" }),
+			checkAuto: () => Promise.resolve({ lifecycle: "unsupported" }),
+			download: () => Promise.resolve({ lifecycle: "unsupported" }),
+			installNow: () => Promise.resolve(),
+			onStateChange: () => () => {},
+		},
+		intents: { dispatch: () => Promise.resolve({ handled: true }) },
+	};
+}
+
 describe("Settings — KBN-S-settings focus trap + F6 region nav", () => {
 	let host: HTMLDivElement;
 	let root: Root;
@@ -39,22 +67,7 @@ describe("Settings — KBN-S-settings focus trap + F6 region nav", () => {
 	let onClose: Mock<() => void>;
 
 	beforeEach(() => {
-		(window as unknown as { brainstorm: unknown }).brainstorm = {
-			version: "0.0.1",
-			vaults: { session: () => Promise.resolve(null) },
-			// General section now renders the Updates panel (13.6 + 13.12).
-			update: {
-				getPrefs: () => Promise.resolve({ channel: "stable", lastCheckedAt: null }),
-				check: () => Promise.resolve({}),
-				setChannel: () => Promise.resolve({ channel: "stable", lastCheckedAt: null }),
-				getState: () => Promise.resolve({ lifecycle: "unsupported" }),
-				checkAuto: () => Promise.resolve({ lifecycle: "unsupported" }),
-				download: () => Promise.resolve({ lifecycle: "unsupported" }),
-				installNow: () => Promise.resolve(),
-				onStateChange: () => () => {},
-			},
-			intents: { dispatch: () => Promise.resolve({ handled: true }) },
-		};
+		installBrainstormBridge();
 		host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
@@ -141,5 +154,109 @@ describe("Settings — KBN-S-settings focus trap + F6 region nav", () => {
 
 		dispatchKey(document, "F6");
 		expect(document.activeElement).toBe(activeNavItem);
+	});
+});
+
+/**
+ * The sidebar nav is grouped (owner report 2026-08-10 — 22 flat entries, four
+ * of them below the fold). Grouping a composite listbox is exactly where the
+ * roving-tabindex contract breaks: a heading that lands in the item index
+ * space shifts every index after it, and a heading that is focusable stops
+ * ArrowDown at the group seam. These tests pin both.
+ */
+describe("Settings — grouped sidebar nav", () => {
+	let host: HTMLDivElement;
+	let root: Root;
+
+	beforeEach(() => {
+		installBrainstormBridge();
+		host = document.createElement("div");
+		document.body.appendChild(host);
+		root = createRoot(host);
+	});
+
+	afterEach(() => {
+		act(() => root.unmount());
+		host.remove();
+	});
+
+	function mountAt(section: SettingsSection): void {
+		act(() => {
+			root.render(<Settings onClose={() => {}} initialSection={section} />);
+		});
+	}
+
+	function nav(): HTMLElement {
+		const el = host.querySelector<HTMLElement>(".settings__nav");
+		if (!el) throw new Error("settings nav not mounted");
+		return el;
+	}
+
+	function options(): HTMLElement[] {
+		return [...nav().querySelectorAll<HTMLElement>('[role="option"]')];
+	}
+
+	it("renders one labelled group per NAV_GROUPS, in declared order", () => {
+		mountAt(SettingsSection.General);
+		const groups = [...nav().querySelectorAll<HTMLElement>('[role="group"]')];
+		expect(groups.length).toBe(NAV_GROUPS.length);
+		for (const [i, group] of groups.entries()) {
+			const declared = required(NAV_GROUPS[i], `NAV_GROUPS[${i}]`);
+			const labelledBy = group.getAttribute("aria-labelledby");
+			expect(labelledBy, `group ${i} has no aria-labelledby`).toBeTruthy();
+			const heading = document.getElementById(required(labelledBy, "aria-labelledby"));
+			expect(heading, `aria-labelledby=${labelledBy} resolves to nothing`).not.toBeNull();
+			expect(heading?.textContent).toBe(t(SETTINGS_GROUP_LABEL_KEYS[declared.id]));
+			// The group owns exactly its own options — no leakage across seams.
+			expect(group.querySelectorAll('[role="option"]').length).toBe(declared.items.length);
+		}
+	});
+
+	it("group headings are not focusable and are not options", () => {
+		mountAt(SettingsSection.General);
+		const headings = [...nav().querySelectorAll<HTMLElement>(".settings__nav-group-label")];
+		expect(headings.length).toBe(NAV_GROUPS.length);
+		for (const heading of headings) {
+			expect(heading.tagName).not.toBe("BUTTON");
+			expect(heading.hasAttribute("tabindex")).toBe(false);
+			expect(heading.getAttribute("role")).not.toBe("option");
+			// Not in the roving / type-ahead index space.
+			expect(heading.hasAttribute("data-composite-index")).toBe(false);
+		}
+	});
+
+	it("options hold a contiguous composite index space matching NAV_ITEMS order", () => {
+		mountAt(SettingsSection.General);
+		const indices = options().map((el) => Number(el.getAttribute("data-composite-index")));
+		expect(indices).toEqual(NAV_ITEMS.map((_, i) => i));
+		expect(options().map((el) => el.textContent?.trim())).toEqual(
+			NAV_ITEMS.map((entry) => t(entry.labelKey)),
+		);
+	});
+
+	it("exactly one option is tabbable (roving tabindex), and it is the active section", () => {
+		mountAt(SettingsSection.General);
+		const tabbable = options().filter((el) => el.getAttribute("tabindex") === "0");
+		expect(tabbable.length).toBe(1);
+		expect(tabbable[0]?.className).toContain("settings__nav-item--active");
+	});
+
+	it("ArrowDown crosses a group seam — the last item of a group reaches the first of the next", () => {
+		const firstGroup = required(NAV_GROUPS[0], "NAV_GROUPS[0]");
+		const secondGroup = required(NAV_GROUPS[1], "NAV_GROUPS[1]");
+		const seamIndex = firstGroup.items.length - 1;
+		const lastOfFirst = required(firstGroup.items[seamIndex], "last item of the first group");
+		const firstOfSecond = required(secondGroup.items[0], "first item of the second group");
+
+		mountAt(lastOfFirst.id);
+		const from = required(options()[seamIndex], `option at the group seam (${seamIndex})`);
+		act(() => from.focus());
+
+		dispatchKey(from, "ArrowDown");
+
+		const landed = document.activeElement as HTMLElement | null;
+		expect(landed?.getAttribute("data-composite-index")).toBe(String(seamIndex + 1));
+		expect(landed?.textContent?.trim()).toBe(t(firstOfSecond.labelKey));
+		expect(landed?.className).toContain("settings__nav-item--active");
 	});
 });

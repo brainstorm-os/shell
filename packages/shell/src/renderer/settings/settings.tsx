@@ -28,6 +28,7 @@ import {
 	lazy,
 	useCallback,
 	useEffect,
+	useId,
 	useMemo,
 	useRef,
 	useState,
@@ -85,111 +86,200 @@ const BackupMigrationPanel = lazy(() =>
 import { readLastSettingsSection, rememberLastSettingsSection } from "./last-section";
 import { RecentlyDeletedSection } from "./recently-deleted-section";
 import { SearchSection } from "./search-section";
-import { SettingsSection } from "./sections";
+import {
+	SETTINGS_GROUP_LABEL_KEYS,
+	SETTINGS_GROUP_ORDER,
+	SettingsGroup,
+	SettingsSection,
+} from "./sections";
 import { UpdatesSection } from "./updates-section";
 const SyncSection = lazy(() => import("./sync-section").then((m) => ({ default: m.SyncSection })));
 import "./settings.css";
 
-export const SECTIONS: ReadonlyArray<{ id: SettingsSection; labelKey: string; icon: IconName }> = [
+export type SettingsNavEntry = {
+	id: SettingsSection;
+	labelKey: string;
+	icon: IconName;
+	/** Which sidebar group the entry renders under. Required — a new section
+	 *  cannot be added without deciding where the user will look for it, and
+	 *  `NAV_GROUPS` below is derived from this field rather than from a second
+	 *  hand-maintained list of ids. */
+	group: SettingsGroup;
+};
+
+/** The single declaration site for a Settings section: id, label, glyph, group.
+ *  Listed in the order they render (grouped, then within-group) so the file
+ *  reads like the sidebar — but the render order is *derived* below, so a
+ *  mis-sorted entry re-homes itself instead of appearing under the wrong
+ *  heading. Every icon is distinct (`nav-groups.test.ts` fences it): the glyph
+ *  column is a wayfinding aid, and three sections sharing `Sparkle` made it
+ *  noise. */
+export const SECTIONS: ReadonlyArray<SettingsNavEntry> = [
 	{
 		id: SettingsSection.General,
 		labelKey: "shell.settings.section.general",
 		icon: IconName.Settings,
+		group: SettingsGroup.General,
 	},
 	{
 		id: SettingsSection.Appearance,
 		labelKey: "shell.settings.section.appearance",
 		icon: IconName.Palette,
+		group: SettingsGroup.General,
 	},
 	{
 		id: SettingsSection.Interface,
 		labelKey: "shell.settings.section.interface",
 		icon: IconName.Interface,
+		group: SettingsGroup.General,
 	},
 	{
 		id: SettingsSection.LanguageRegion,
 		labelKey: "shell.settings.section.languageRegion",
 		icon: IconName.Globe,
+		group: SettingsGroup.General,
 	},
 	{
 		id: SettingsSection.Notifications,
 		labelKey: "shell.settings.section.notifications",
 		icon: IconName.Bell,
-	},
-	{
-		id: SettingsSection.Covers,
-		labelKey: "shell.settings.section.covers",
-		icon: IconName.Sparkle,
-	},
-	{ id: SettingsSection.Data, labelKey: "shell.settings.section.data", icon: IconName.Entity },
-	{
-		id: SettingsSection.BackupMigration,
-		labelKey: "shell.settings.section.backupMigration",
-		icon: IconName.Download,
-	},
-	{
-		id: SettingsSection.RecentlyDeleted,
-		labelKey: "shell.settings.section.recentlyDeleted",
-		icon: IconName.Trash,
-	},
-	{
-		id: SettingsSection.Search,
-		labelKey: "shell.settings.section.search",
-		icon: IconName.Search,
-	},
-	{
-		id: SettingsSection.Defaults,
-		labelKey: "shell.settings.section.defaults",
-		icon: IconName.App,
-	},
-	{
-		id: SettingsSection.Contributions,
-		labelKey: "shell.settings.section.contributions",
-		icon: IconName.Sparkle,
+		group: SettingsGroup.General,
 	},
 	{
 		id: SettingsSection.Keyboard,
 		labelKey: "shell.settings.section.keyboard",
 		icon: IconName.Keyboard,
+		group: SettingsGroup.General,
 	},
-	{ id: SettingsSection.Ai, labelKey: "shell.settings.section.ai", icon: IconName.Sparkle },
 	{
-		id: SettingsSection.Identity,
-		labelKey: "shell.settings.section.identity",
-		icon: IconName.ShieldCheck,
+		id: SettingsSection.Data,
+		labelKey: "shell.settings.section.data",
+		icon: IconName.Entity,
+		group: SettingsGroup.Vault,
+	},
+	{
+		id: SettingsSection.Covers,
+		labelKey: "shell.settings.section.covers",
+		icon: IconName.Image,
+		group: SettingsGroup.Vault,
+	},
+	{
+		id: SettingsSection.Search,
+		labelKey: "shell.settings.section.search",
+		icon: IconName.Search,
+		group: SettingsGroup.Vault,
+	},
+	{
+		id: SettingsSection.BackupMigration,
+		labelKey: "shell.settings.section.backupMigration",
+		icon: IconName.Download,
+		group: SettingsGroup.Vault,
+	},
+	{
+		id: SettingsSection.RecentlyDeleted,
+		labelKey: "shell.settings.section.recentlyDeleted",
+		icon: IconName.Trash,
+		group: SettingsGroup.Vault,
+	},
+	{
+		id: SettingsSection.Defaults,
+		labelKey: "shell.settings.section.defaults",
+		icon: IconName.App,
+		group: SettingsGroup.AppsAi,
+	},
+	{
+		id: SettingsSection.Contributions,
+		labelKey: "shell.settings.section.contributions",
+		icon: IconName.Lightning,
+		group: SettingsGroup.AppsAi,
+	},
+	{
+		id: SettingsSection.Ai,
+		labelKey: "shell.settings.section.ai",
+		icon: IconName.Sparkle,
+		group: SettingsGroup.AppsAi,
 	},
 	{
 		id: SettingsSection.Team,
 		labelKey: "shell.settings.section.team",
 		icon: IconName.Buildings,
+		group: SettingsGroup.AppsAi,
 	},
 	{
-		id: SettingsSection.Devices,
-		labelKey: "shell.settings.section.devices",
-		icon: IconName.DeviceMobile,
-	},
-	{
-		id: SettingsSection.Sync,
-		labelKey: "shell.settings.section.sync",
-		icon: IconName.Cloud,
+		id: SettingsSection.Identity,
+		labelKey: "shell.settings.section.identity",
+		icon: IconName.ShieldCheck,
+		group: SettingsGroup.Account,
 	},
 	{
 		id: SettingsSection.Membership,
 		labelKey: "shell.settings.section.membership",
 		icon: IconName.Crown,
+		group: SettingsGroup.Account,
 	},
 	{
 		id: SettingsSection.Billing,
 		labelKey: "shell.settings.section.billing",
 		icon: IconName.CreditCard,
+		group: SettingsGroup.Account,
+	},
+	{
+		id: SettingsSection.Devices,
+		labelKey: "shell.settings.section.devices",
+		icon: IconName.DeviceMobile,
+		group: SettingsGroup.DevicesSync,
+	},
+	{
+		id: SettingsSection.Sync,
+		labelKey: "shell.settings.section.sync",
+		icon: IconName.Cloud,
+		group: SettingsGroup.DevicesSync,
+	},
+	{
+		id: SettingsSection.Security,
+		labelKey: "shell.settings.section.security",
+		icon: IconName.Lock,
+		group: SettingsGroup.Privacy,
 	},
 	{
 		id: SettingsSection.Network,
 		labelKey: "shell.settings.section.network",
 		icon: IconName.Network,
+		group: SettingsGroup.Privacy,
 	},
-	{ id: SettingsSection.Security, labelKey: "shell.settings.section.security", icon: IconName.Lock },
 ];
+
+export type SettingsNavGroup = {
+	id: SettingsGroup;
+	/** Index of this group's first item in `NAV_ITEMS` — the composite
+	 *  keyboard indexes the *flattened* list, so the renderer needs the offset
+	 *  to hand each button its true index. Derived, never hand-written. */
+	startIndex: number;
+	items: ReadonlyArray<SettingsNavEntry>;
+};
+
+/** The sidebar, grouped. Derived from `SECTIONS` + `SETTINGS_GROUP_ORDER`, so
+ *  the only way to lose a section from the nav is to add a `SettingsGroup`
+ *  value and leave it out of the order — which `nav-groups.test.ts` fails on
+ *  rather than silently hiding the item. */
+export const NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = (() => {
+	let startIndex = 0;
+	const groups: SettingsNavGroup[] = [];
+	for (const id of SETTINGS_GROUP_ORDER) {
+		const items = SECTIONS.filter((entry) => entry.group === id);
+		groups.push({ id, startIndex, items });
+		startIndex += items.length;
+	}
+	return groups;
+})();
+
+/** The flattened nav order — the index space the composite keyboard walks.
+ *  Group headings are NOT in it: they're inert labels, so ↑/↓ and type-ahead
+ *  treat the whole sidebar as one continuous list that happens to be visually
+ *  sectioned. */
+export const NAV_ITEMS: ReadonlyArray<SettingsNavEntry> = NAV_GROUPS.flatMap(
+	(group) => group.items,
+);
 
 /** Map section enum → i18n label key. SECTIONS is the canonical source;
  *  this lookup keeps the main header in sync with the sidebar rather
@@ -252,20 +342,26 @@ export function Settings({ onClose, initialSection, onOpenBin }: SettingsProps) 
 	// roving `tabindex`, the `listbox`/`option` roles, `aria-selected`, and
 	// focusing the active item; section state stays the single source of truth
 	// (active index is derived from it, every move writes back through it).
-	const sectionLabels = useMemo(() => SECTIONS.map((entry) => t(entry.labelKey)), []);
-	const activeSectionIndex = SECTIONS.findIndex((entry) => entry.id === section);
+	//
+	// The nav renders in visual groups, but the composite indexes the FLAT
+	// `NAV_ITEMS` — group headings are inert labels outside this index space, so
+	// a held ↓ walks the whole sidebar as one list and never stops at a seam.
+	const sectionLabels = useMemo(() => NAV_ITEMS.map((entry) => t(entry.labelKey)), []);
+	const activeSectionIndex = NAV_ITEMS.findIndex((entry) => entry.id === section);
 	const selectIndex = useCallback((index: number) => {
-		const entry = SECTIONS[index];
+		const entry = NAV_ITEMS[index];
 		if (entry) setSection(entry.id);
 	}, []);
 	const { containerProps, getItemProps } = useCompositeKeyboard({
 		orientation: Orientation.Vertical,
-		count: SECTIONS.length,
+		count: NAV_ITEMS.length,
 		activeIndex: activeSectionIndex,
 		onActiveIndexChange: selectIndex,
 		onActivate: selectIndex,
 		typeahead: (i) => sectionLabels[i] ?? "",
 	});
+	// Group-heading ids must be unique per mounted overlay, not per module.
+	const navId = useId();
 
 	// KBN-S-settings: trap focus inside the overlay so Tab can't reach the
 	// dashboard behind it, and restore focus to the opener on close. The
@@ -350,25 +446,44 @@ export function Settings({ onClose, initialSection, onOpenBin }: SettingsProps) 
 					</header>
 					<div className="settings__sidebar-body">
 						<nav className="settings__nav" aria-label={t("shell.settings.nav")} {...containerProps}>
-							{SECTIONS.map((entry, index) => (
-								<button
-									key={entry.id}
-									type="button"
-									ref={section === entry.id ? sidebarRegionRef : undefined}
-									className={
-										section === entry.id
-											? "settings__nav-item settings__nav-item--active"
-											: "settings__nav-item"
-									}
-									onClick={() => setSection(entry.id)}
-									{...getItemProps(index)}
-								>
-									<span className="settings__nav-icon" aria-hidden="true">
-										<Icon name={entry.icon} size={18} />
-									</span>
-									<span>{t(entry.labelKey)}</span>
-								</button>
-							))}
+							{NAV_GROUPS.map((group) => {
+								const headingId = `${navId}-${group.id}`;
+								return (
+									// `group` is the ARIA-legal way to section a listbox: the heading names
+									// the group via aria-labelledby and carries `role="presentation"` so it
+									// is never announced as an option, and it holds no tabindex so it stays
+									// out of the roving order.
+									<div
+										key={group.id}
+										className="settings__nav-group"
+										role="group"
+										aria-labelledby={headingId}
+									>
+										<div id={headingId} role="presentation" className="settings__nav-group-label">
+											{t(SETTINGS_GROUP_LABEL_KEYS[group.id])}
+										</div>
+										{group.items.map((entry, offset) => (
+											<button
+												key={entry.id}
+												type="button"
+												ref={section === entry.id ? sidebarRegionRef : undefined}
+												className={
+													section === entry.id
+														? "settings__nav-item settings__nav-item--active"
+														: "settings__nav-item"
+												}
+												onClick={() => setSection(entry.id)}
+												{...getItemProps(group.startIndex + offset)}
+											>
+												<span className="settings__nav-icon" aria-hidden="true">
+													<Icon name={entry.icon} size={18} />
+												</span>
+												<span>{t(entry.labelKey)}</span>
+											</button>
+										))}
+									</div>
+								);
+							})}
 						</nav>
 					</div>
 					<footer className="settings__sidebar-footer">
