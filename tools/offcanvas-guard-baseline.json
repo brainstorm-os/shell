@@ -1,0 +1,4 @@
+{
+  "//": "Off-canvas rules whose focus guard provably lives elsewhere. Zero by design — see tools/check-offcanvas-guard.mjs.",
+  "guardedElsewhere": []
+}

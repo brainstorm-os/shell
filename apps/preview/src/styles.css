@@ -346,7 +346,9 @@ button {
 	display: flex;
 	flex-direction: column;
 	transform: translateX(0);
-	transition: transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
+	transition:
+		transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease),
+		visibility var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
 	z-index: 2;
 }
 
@@ -362,6 +364,7 @@ button {
 	transform: translateX(calc(100% + 1px));
 	box-shadow: none;
 	border-inline-start-color: transparent;
+	visibility: hidden;
 }
 
 /* ── Filmstrip ──────────────────────────────────────────────────────── */

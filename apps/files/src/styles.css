@@ -235,13 +235,16 @@ body.is-resizing .window-resize {
 	overflow-y: auto;
 	overflow-x: hidden;
 	z-index: 4;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 body[data-nav-open="false"] .sidebar {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
+	visibility: hidden;
 }
 
 .sidebar__section {
@@ -1348,12 +1351,16 @@ body[data-view-mode="icon-list"] .content-row__size {
 	overflow: hidden;
 	z-index: 4;
 	transform: translateX(100%);
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	visibility: hidden;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 body[data-inspector="open"] .inspector {
 	transform: translateX(0);
+	visibility: visible;
 }
 
 body:not([data-inspector="open"]) .inspector {

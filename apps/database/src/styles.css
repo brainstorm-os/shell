@@ -118,7 +118,9 @@ body {
 .db-sidebar,
 .db-inspector {
 	overflow: hidden;
-	transition: transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
+	transition:
+		transform var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease),
+		visibility var(--motion-duration-normal, 200ms) var(--motion-easing-standard, ease);
 	will-change: transform;
 	z-index: 100;
 }
@@ -192,11 +194,13 @@ body.is-resizing .db-inspector__resize {
 
 .db-main[data-sidebar-open="false"] .db-sidebar {
 	transform: translateX(-100%);
+	visibility: hidden;
 }
 
 .db-main[data-inspector-open="false"] .db-inspector {
 	transform: translateX(100%);
 	box-shadow: none;
+	visibility: hidden;
 }
 
 .db-main[data-sidebar-open="false"] .db-sidebar,

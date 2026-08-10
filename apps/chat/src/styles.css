@@ -121,12 +121,15 @@ body {
 	border-right: 1px solid var(--border-subtle);
 	background: var(--bg-subtle);
 	z-index: 2;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 .chat[data-sidebar-open="false"] .chat__sidebar {
 	transform: translateX(-100%);
+	visibility: hidden;
 }
 
 .chat__sidebar-header {
@@ -583,12 +586,16 @@ body {
 	background: var(--bg-subtle);
 	z-index: 2;
 	transform: translateX(100%);
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	visibility: hidden;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 .chat[data-members-open="true"] .chat__members {
 	transform: translateX(0);
+	visibility: visible;
 }
 
 .chat__members-header {

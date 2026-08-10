@@ -10,7 +10,19 @@
  */
 
 /* Default container: a fixed glass panel pinned to the right edge below the
- * app header, sliding in/out over the content (Bookmarks). */
+ * app header, sliding in/out over the content (Bookmarks).
+ *
+ * CLOSED IS HIDDEN, not merely off-screen (F-489). The closed panel is slid
+ * out on `translateX(100%)` — that moves pixels and nothing else, so without
+ * `visibility: hidden` every row, field and close button inside it stays in
+ * the tab order and the accessibility tree. `visibility` is listed in the
+ * transition so the slide still animates: with one endpoint `visible` it
+ * interpolates as "visible for the whole duration, then snap", i.e. the panel
+ * slides OUT fully painted and slides IN visible from the first frame. Any
+ * host that re-declares this container (Contacts) owes both halves; the
+ * `tools/check-offcanvas-guard.mjs` ratchet enforces it repo-wide.
+ * Consumers additionally pass `inert` + `aria-hidden` when closed — that is
+ * correct and defends the React path; this is the floor underneath it. */
 :root .bs-props {
 	/* Width knob — a host overrides by re-declaring it on its own .bs-props
 	 * rule (no host does yet; this default makes the var real). */
@@ -26,7 +38,10 @@
 	overflow: hidden;
 	z-index: 50;
 	transform: translateX(100%);
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	visibility: hidden;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 	/* Column so an optional Properties|Comments tab strip (the shared
 	 * `@brainstorm-os/editor` CommentsRightPanel) sits above a filling panel —
@@ -43,6 +58,7 @@
 
 :root .bs-props--open {
 	transform: none;
+	visibility: visible;
 }
 
 :root .bs-props:not(.bs-props--open) {

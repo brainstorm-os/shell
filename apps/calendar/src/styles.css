@@ -91,13 +91,16 @@ button:focus-visible {
 	border-inline-end: var(--border-width) solid var(--color-glass-border);
 	overflow-y: auto;
 	z-index: 90;
-	transition: transform var(--motion-duration-normal, 180ms) ease;
+	transition:
+		transform var(--motion-duration-normal, 180ms) ease,
+		visibility var(--motion-duration-normal, 180ms) ease;
 	will-change: transform;
 }
 
 .calendar-main[data-sidebar-open="false"] #calendar-sidebar-slot {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
+	visibility: hidden;
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the panel edge geometrically */
