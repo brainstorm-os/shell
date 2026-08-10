@@ -24,8 +24,10 @@
 import { useLiveEntities } from "@brainstorm-os/react-yjs";
 import type { CoversService, Entity } from "@brainstorm-os/sdk-types";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
+import { isEntityLocked, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
@@ -610,9 +612,12 @@ export function BooksApp(): ReactElement {
 		}
 	}, [books, status, selectedId, isSample]);
 
+	const lockedRef = useRef(false);
 	const patchBook = useCallback(
 		(patch: Record<string, unknown>) => {
 			if (!selectedId || selectedId === SAMPLE_BOOK_ID) return;
+			// Lock-5(b) — enforced on the write, not only in the panel's chrome.
+			if (lockedRef.current) return;
 			void entitiesSvc?.update?.(selectedId, patch)?.catch((error) => {
 				console.warn(`[books] property write failed: ${(error as Error).message}`);
 			});
@@ -706,6 +711,22 @@ export function BooksApp(): ReactElement {
 		return { id: selectedBook.id, properties: raw?.properties ?? {} };
 	}, [selectedBook, isSample, bookRows]);
 
+	// Lock-5(b) — the fleet's synced read-only lock. Books' existing `readOnly`
+	// only ever meant "this is the built-in sample", so a book the user LOCKED
+	// stayed fully editable; these are two different questions and the inspector
+	// now ORs them.
+	const locked = isEntityLocked(subject);
+	// `patchBook` is declared above this point (it feeds the inspector), so it
+	// reads the lock through a ref rather than closing over a value that does
+	// not exist yet.
+	lockedRef.current = locked;
+	const toggleLock = useCallback(() => {
+		if (!selectedId || selectedId === SAMPLE_BOOK_ID) return;
+		void entitiesSvc?.update?.(selectedId, lockTogglePatch(locked))?.catch((error) => {
+			console.warn(`[books] lock write failed: ${(error as Error).message}`);
+		});
+	}, [entitiesSvc, selectedId, locked]);
+
 	const menuContext = useCallback((): OpenObjectMenuOptions | null => {
 		if (!selectedBook || isSample) return null;
 		return {
@@ -715,13 +736,20 @@ export function BooksApp(): ReactElement {
 				label: selectedBook.name,
 			},
 			runtime: rt.current ? asObjectMenuRuntime(rt.current) : null,
-			labels: { remove: t("menu.remove") },
+			labels: {
+				remove: t("menu.remove"),
+				lock: t("menu.lock"),
+				unlock: t("menu.unlock"),
+				lockedHint: t("menu.lockedHint"),
+			},
+			locked,
+			onToggleLock: toggleLock,
 			// The header ⋯ acts on the book already open in this window, so
 			// "Open" would re-open the current view (a no-op) — drop it.
 			omitOpen: true,
 			onRemove: removeBook,
 		};
-	}, [selectedBook, isSample, removeBook]);
+	}, [selectedBook, isSample, removeBook, locked, toggleLock]);
 
 	// Library view-level actions the ⋯ always offers, independent of a selected
 	// book — so the trailing overflow is never inert in the default library
@@ -801,6 +829,14 @@ export function BooksApp(): ReactElement {
 						</button>
 					) : null}
 					<span className="books__reader-controls" ref={controlsRef} />
+					{selectedBook && !isSample ? (
+						<LockButton
+							locked={locked}
+							onToggle={toggleLock}
+							lockLabel={t("menu.lock")}
+							unlockLabel={t("menu.unlock")}
+						/>
+					) : null}
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={showLibrary}
@@ -868,7 +904,7 @@ export function BooksApp(): ReactElement {
 						subject={subject}
 						toc={toc}
 						open={showInspector}
-						readOnly={isSample}
+						readOnly={isSample || locked}
 						onPatch={patchBook}
 						onNavigate={navigateTo}
 						onClose={() => {

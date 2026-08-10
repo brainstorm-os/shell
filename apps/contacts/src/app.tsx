@@ -15,8 +15,10 @@
 
 import { YDocProvider, useVaultEntities } from "@brainstorm-os/react-yjs";
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { LOCKED_PROPERTY_KEY, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
+import { LockButton } from "@brainstorm-os/sdk/lock-button";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { NavButtons, type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import {
@@ -443,8 +445,16 @@ export function ContactsApp(): ReactElement {
 		[usingVault, entitiesSvc],
 	);
 
+	// The ids currently locked, as a ref: `patchPerson` / `deletePerson` are
+	// declared above the `persons` projection they'd otherwise close over.
+	const lockedIdsRef = useRef<ReadonlySet<string>>(new Set());
 	const patchPerson = useCallback(
 		async (id: string, patch: Record<string, unknown>) => {
+			// Lock-5(b) — a locked contact is read-only on EVERY write path (the
+			// inline rows, the slide-over inspector, rename, icon, cover), so the
+			// gate lives on the one call they all reach. Flipping the lock itself
+			// is the sole exception, or a lock could never be undone.
+			if (lockedIdsRef.current.has(id) && !(LOCKED_PROPERTY_KEY in patch)) return;
 			if (usingVault && entitiesSvc) {
 				await entitiesSvc.update(id, patch);
 				// Reflect the edit on a still-optimistic (not-yet-broadcast) entity.
@@ -462,6 +472,10 @@ export function ContactsApp(): ReactElement {
 
 	const deletePerson = useCallback(
 		async (id: string) => {
+			// Lock-5(b) — delete is a write too. The ⋯ already offers Delete
+			// disabled-with-the-reason on a locked contact; this is the same rule
+			// where the write happens, so the chord and the confirm can't skip it.
+			if (lockedIdsRef.current.has(id)) return;
 			if (usingVault && entitiesSvc) {
 				await entitiesSvc.delete(id);
 				// Drop it from the overlay too, else a not-yet-broadcast contact
@@ -594,6 +608,19 @@ export function ContactsApp(): ReactElement {
 		[location, persons],
 	);
 
+	// Lock-5(b) — the fleet's synced read-only lock, projected onto every person
+	// by `entityToPerson`. Distinct from the per-property-key `readOnly` on
+	// computed rows, which answers a different question.
+	lockedIdsRef.current = useMemo(
+		() => new Set(persons.filter((p) => p.locked).map((p) => p.id)),
+		[persons],
+	);
+	const activeLocked = activePerson?.locked ?? false;
+	const toggleActiveLock = useCallback(() => {
+		if (!activePerson) return;
+		void patchPerson(activePerson.id, lockTogglePatch(activePerson.locked));
+	}, [activePerson, patchPerson]);
+
 	// A picker left open for one contact must not greet the next.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: location.id IS the reset trigger
 	useEffect(() => setCoverPickerOpen(false), [location.id]);
@@ -648,10 +675,11 @@ export function ContactsApp(): ReactElement {
 				person,
 				runtime: rt,
 				onRemove: () => setConfirmDeleteId(person.id),
+				onToggleLock: () => void patchPerson(person.id, lockTogglePatch(person.locked)),
 				...(extras.length > 0 ? { extraItems: extras } : {}),
 			});
 		},
-		[rt, vcardItems, activePerson],
+		[rt, vcardItems, activePerson, patchPerson],
 	);
 
 	const moreRef = useRef<HTMLButtonElement>(null);
@@ -708,6 +736,14 @@ export function ContactsApp(): ReactElement {
 					>
 						<Icon name={IconName.Plus} size={18} />
 					</button>
+					{activePerson ? (
+						<LockButton
+							locked={activeLocked}
+							onToggle={toggleActiveLock}
+							lockLabel={t("detail.menu.lock")}
+							unlockLabel={t("detail.menu.unlock")}
+						/>
+					) : null}
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={sidebarOpen}

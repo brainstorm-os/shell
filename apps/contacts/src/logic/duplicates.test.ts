@@ -25,6 +25,7 @@ function person(id: string, over: Partial<Person> = {}): Person {
 		bio: "",
 		icon: null,
 		cover: null,
+		locked: false,
 		...over,
 	};
 }

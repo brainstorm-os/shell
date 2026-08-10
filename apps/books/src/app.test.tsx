@@ -60,7 +60,13 @@ function installShell(entities: StubEntity[]): void {
 	};
 }
 
-function bookRow(id: string, name: string, format: string, author = ""): StubEntity {
+function bookRow(
+	id: string,
+	name: string,
+	format: string,
+	author = "",
+	locked = false,
+): StubEntity {
 	return {
 		id,
 		type: "brainstorm/Book/v1",
@@ -68,6 +74,7 @@ function bookRow(id: string, name: string, format: string, author = ""): StubEnt
 			name,
 			format,
 			author,
+			...(locked ? { locked: true } : {}),
 			fileId: null,
 			spineLength: 3,
 			reading: { position: null, progress: 0, lastReadAt: null },
@@ -186,5 +193,71 @@ describe("BooksApp shelf", () => {
 		const el = await renderApp();
 		const layout = el.querySelector(".books__layout");
 		expect(layout?.getAttribute("data-inspector-open")).toBe("true");
+	});
+});
+
+// Lock-5(b) — Books enforced a `readOnly` that only ever meant "this is the
+// built-in sample", so a book the user LOCKED was fully editable. The lock is
+// the fleet's synced `properties.locked`, and the header carries the shared
+// toggle so it can be set here, not only read.
+describe("BooksApp — the read-only lock", () => {
+	it("shows the shared lock toggle for a selected book, unpressed when unlocked", async () => {
+		installShell([bookRow("b1", "Deep Work", "pdf", "Cal Newport")]);
+		const el = await renderApp();
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".books__row")?.click();
+		});
+		const lock = el.querySelector<HTMLButtonElement>(".bs-lock-button");
+		expect(lock).not.toBeNull();
+		expect(lock?.getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("reads the lock off the entity and marks the inspector read-only", async () => {
+		installShell([bookRow("b1", "Deep Work", "pdf", "Cal Newport", true)]);
+		const el = await renderApp();
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".books__row")?.click();
+		});
+		expect(el.querySelector<HTMLButtonElement>(".bs-lock-button")?.getAttribute("aria-pressed")).toBe(
+			"true",
+		);
+		// The properties panel renders read-only: no add-property affordance.
+		expect(el.querySelector(".bs-props__add")).toBeNull();
+	});
+
+	it("the toggle persists the flipped lock through entities.update", async () => {
+		installShell([bookRow("b1", "Deep Work", "pdf", "Cal Newport")]);
+		const el = await renderApp();
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".books__row")?.click();
+		});
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".bs-lock-button")?.click();
+		});
+		const update = (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities.update;
+		expect(update).toHaveBeenCalledWith("b1", { locked: true });
+	});
+
+	it("refuses a property write on a locked book (the lock is not just chrome)", async () => {
+		installShell([bookRow("b1", "Deep Work", "pdf", "Cal Newport", true)]);
+		const el = await renderApp();
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".books__row")?.click();
+		});
+		const update = (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities.update;
+		update.mockClear();
+		// Unlocking is the ONE write a locked object still takes.
+		await act(async () => {
+			el.querySelector<HTMLButtonElement>(".bs-lock-button")?.click();
+		});
+		expect(update).toHaveBeenCalledWith("b1", { locked: false });
 	});
 });

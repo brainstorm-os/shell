@@ -30,7 +30,10 @@ export function personPropertyRows(
 ): PropertiesPanelRow[] {
 	const values = personToValues(person);
 	return PERSON_PROPERTY_DEFS.map((def) => {
-		const readOnly = READONLY_PERSON_PROP_KEYS.has(def.key);
+		// Two independent reasons a row can be read-only: the KEY is computed
+		// (`READONLY_PERSON_PROP_KEYS`), or the CONTACT is locked (Lock-5(b)).
+		// The second was missing, so a locked contact edited like any other.
+		const readOnly = person.locked || READONLY_PERSON_PROP_KEYS.has(def.key);
 		const row: PropertiesPanelRow = { def, value: readValue(values, def), readOnly };
 		if (!readOnly) {
 			row.onChange = (next) => {

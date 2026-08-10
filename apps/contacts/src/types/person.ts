@@ -38,4 +38,9 @@ export type Person = {
 	icon: Icon | null;
 	/** The person's OWN cover (`properties.cover`); `null` → no band. */
 	cover: Cover | null;
+	/** Lock-5(b) — the fleet's synced read-only lock (`properties.locked`).
+	 *  Distinct from the per-property-key `readOnly` on computed rows: this one
+	 *  is the user's own "don't let me edit this", set from the header toggle
+	 *  and honoured on every write path. */
+	locked: boolean;
 };

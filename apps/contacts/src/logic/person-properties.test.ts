@@ -22,6 +22,7 @@ function makePerson(over: Partial<Person> = {}): Person {
 		bio: "hi",
 		icon: null,
 		cover: null,
+		locked: false,
 		...over,
 	};
 }
