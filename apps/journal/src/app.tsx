@@ -32,6 +32,7 @@ import type { MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
 import { DatePager } from "@brainstorm-os/sdk/date-pager";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
+import { lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
 import {
 	attachFindBar,
 	attachFindShortcuts,
@@ -86,6 +87,7 @@ import {
 import { JournalDayBodyMode, journalDayBodyMode } from "./logic/day-body-mode";
 import { buildJournalDenormalizer } from "./logic/denormalize-entry";
 import { groupEntriesByMonth, monthLabelFromKey } from "./logic/entry-overview";
+import { type EntryWriteContext, writeEntryPatch } from "./logic/entry-writes";
 import { JOURNAL_CHORDS, JournalChordId } from "./logic/journal-chords";
 import {
 	type JournalExportLabels,
@@ -422,22 +424,41 @@ export function JournalApp(): ReactElement {
 		setMonthFocus(new Date(date.getFullYear(), date.getMonth(), 1));
 	}, []);
 
+	// EVERY `Note/v1` write from this app goes through `logic/entry-writes.ts`,
+	// where the read-only lock is decided inseparably from the write (Lock-5(k)).
+	// The lock is read from the LIVE vault through a ref, so a callback that
+	// outlives its render — an autosave, a check-in, a picker — sees a lock set
+	// on another device rather than the one that held when it was built.
+	const entryLockedRef = useRef<(noteId: string) => boolean>(() => false);
+	entryLockedRef.current = (noteId: string) =>
+		vault.entities.some((e) => e.id === noteId && e.properties.locked === true);
+	const entryWriteCtx = useCallback((): EntryWriteContext => {
+		const entities = getJournalRuntime()?.services?.entities;
+		const update = entities?.update;
+		return {
+			isLocked: (noteId) => entryLockedRef.current(noteId),
+			update: update ? (id, patch) => update.call(entities, id, patch) : undefined,
+		};
+	}, []);
+
 	// ── Pending placeholder seed → editor handoff (implicit create).
 	const pendingSeedRef = useRef<Map<string, unknown>>(new Map());
 	const inflightCreateRef = useRef<Map<string, Promise<string | null>>>(new Map());
 
 	/** Mirror an autosave's denormalised body into the entity's `body` snippet
 	 *  so calendar / week previews track edits. No-op without `entities.update`. */
-	const journalDenormalize = useCallback<JournalDenormalizeFn>((noteId, state) => {
-		const entities = getJournalRuntime()?.services?.entities;
-		const update = entities?.update;
-		if (!update) return;
-		buildJournalDenormalizer(
-			(id, patch) => update.call(entities, id, patch),
-			noteId,
-			() => {},
-		)(state);
-	}, []);
+	const journalDenormalize = useCallback<JournalDenormalizeFn>(
+		(noteId, state) => {
+			const ctx = entryWriteCtx();
+			if (!ctx.update) return;
+			buildJournalDenormalizer(
+				(id, patch) => void writeEntryPatch(ctx, id, patch),
+				noteId,
+				() => {},
+			)(state);
+		},
+		[entryWriteCtx],
+	);
 
 	/** Ensure a journal entry exists for `date`. Returns its id (or null when
 	 *  there's no entities service / the create rejected non-idempotently). */
@@ -503,38 +524,27 @@ export function JournalApp(): ReactElement {
 			const existing = mergedByDate.get(dateKey);
 			const noteId = existing ? existing.noteId : await ensureEntry(date, { icon });
 			if (!noteId) return;
-			const bs = getJournalRuntime();
-			const update = bs?.services?.entities?.update;
-			if (existing && update) {
-				try {
-					await update.call(bs?.services?.entities, noteId, { icon });
-				} catch (error) {
-					console.warn("[journal] entities.update icon failed:", error);
-					return;
-				}
-			}
+			// An EXISTING entry takes a property write, so a locked one refuses it.
+			// A just-created entry has no lock yet and skips straight to the paint.
+			if (existing && !(await writeEntryPatch(entryWriteCtx(), noteId, { icon }))) return;
 			setOptimistic((prev) => {
 				const cur = prev.get(dateKey);
 				if (!cur) return prev;
 				return new Map(prev).set(dateKey, { ...cur, icon });
 			});
 		},
-		[mergedByDate, ensureEntry],
+		[mergedByDate, ensureEntry, entryWriteCtx],
 	);
 
 	// ── Check-in: mood + habits.
 	const persistEntryPatch = useCallback(
 		async (entry: JournalEntry, patch: Record<string, unknown>): Promise<void> => {
-			const entities = getJournalRuntime()?.services?.entities;
-			const update = entities?.update;
-			if (!update) return;
-			try {
-				await update.call(entities, entry.noteId, patch);
-			} catch (error) {
-				console.warn("[journal] entities.update check-in failed:", error);
-			}
+			// Mood + habits are property writes like any other: a locked entry
+			// refuses them, and the check-in row is a surface the editor's
+			// read-only chrome never covered.
+			await writeEntryPatch(entryWriteCtx(), entry.noteId, patch);
 		},
-		[],
+		[entryWriteCtx],
 	);
 	const setEntryMood = useCallback(
 		(entry: JournalEntry, mood: MoodId | null) => void persistEntryPatch(entry, { mood }),
@@ -820,14 +830,13 @@ export function JournalApp(): ReactElement {
 	const presencePeers = usePresence(focusEntryNoteId, JOURNAL_ENTRY_TYPE, useSelf());
 	// Read-only lock — a synced `locked` property on the entry, same model as
 	// Notes. Read from the live vault so it reflects edits from any device.
-	const focusEntryLocked = focusEntryNoteId
-		? vault.entities.some((e) => e.id === focusEntryNoteId && e.properties.locked === true)
-		: false;
+	const focusEntryLocked = focusEntryNoteId ? entryLockedRef.current(focusEntryNoteId) : false;
 	const toggleFocusEntryLock = useCallback(() => {
 		if (!focusEntryNoteId) return;
-		const entities = getJournalRuntime()?.services?.entities;
-		void entities?.update?.call(entities, focusEntryNoteId, { locked: !focusEntryLocked });
-	}, [focusEntryNoteId, focusEntryLocked]);
+		// The lock-flip is the one patch a locked entry still takes, and it goes
+		// through the SAME gate carrying a lock-ONLY patch — not around it.
+		void writeEntryPatch(entryWriteCtx(), focusEntryNoteId, lockTogglePatch(focusEntryLocked));
+	}, [focusEntryNoteId, focusEntryLocked, entryWriteCtx]);
 	const commentHooks = useMemo<JournalCommentHooks>(
 		() => ({
 			onSelection(anchor) {

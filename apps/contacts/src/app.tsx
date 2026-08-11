@@ -39,7 +39,13 @@ import type { ReactElement } from "react";
 import { plural, t } from "./i18n";
 import { useContactsT } from "./i18n-hooks";
 import { type ComposeDraft, buildCompanyNameIndex, planCompose } from "./logic/compose";
-import { contactWriteRefused } from "./logic/contact-writes";
+import {
+	type ContactWriteContext,
+	createCompanyForWrite,
+	deletePersonWrite,
+	mergeContactsWrite,
+	patchPersonWrite,
+} from "./logic/contact-writes";
 import { demoEntities } from "./logic/demo";
 import { applyMergeToEntities, findDuplicateGroups, resolveGroups } from "./logic/duplicates";
 import { openEntityRef, resolveOpenTarget } from "./logic/open";
@@ -423,81 +429,69 @@ export function ContactsApp(): ReactElement {
 	const lockedIdsRef = useRef<ReadonlySet<string>>(new Set());
 	const isLockedId = useCallback((id: string) => lockedIdsRef.current.has(id), []);
 
+	// EVERY `Person/v1` write in this app goes through `logic/contact-writes.ts`,
+	// where the read-only lock is decided INSEPARABLY from the write (Lock-5(f):
+	// the previous four `if (contactWriteRefused(…)) return;` lines sat above
+	// their writes and could all be deleted with the suite still green). Built
+	// fresh per call so a callback that outlives its render reads the current lock.
+	const writeCtx = useCallback(
+		(): ContactWriteContext => ({
+			isLocked: isLockedId,
+			vault: usingVault && entitiesSvc ? entitiesSvc : null,
+			applyPatch: (id, patch) => {
+				const apply = (prev: VaultEntityLike[]): VaultEntityLike[] =>
+					prev.map((e) => (e.id === id ? { ...e, properties: { ...e.properties, ...patch } } : e));
+				// Reflect the edit on a still-optimistic (not-yet-broadcast) entity.
+				if (usingVault && entitiesSvc) setOptimistic(apply);
+				else setDemo(apply);
+			},
+			applyRemoval: (ids) => {
+				// Drop them from the overlay too, else a not-yet-broadcast contact
+				// reappears after delete (the snapshot never carried it to prune it).
+				const drop = (prev: VaultEntityLike[]): VaultEntityLike[] =>
+					prev.filter((e) => !ids.includes(e.id));
+				if (usingVault && entitiesSvc) setOptimistic(drop);
+				else setDemo(drop);
+			},
+			demoId: () => `demo_co_${Date.now()}`,
+			applyDemoMerge: (survivorId, loserIds, patch) =>
+				setDemo((prev) => applyMergeToEntities(prev, survivorId, [...loserIds], patch)),
+		}),
+		[usingVault, entitiesSvc, isLockedId],
+	);
+
 	// Create a brand-new Company and link it to the person in one step — the
 	// shared ref picker can only pick EXISTING entities, and nothing else in the
 	// founder's toolset mints a Company, so Contacts owns this (write cap added
-	// to the manifest). Returns the new id so the caller can reflect it.
+	// to the manifest).
 	const createCompanyFor = useCallback(
 		async (personId: string, rawName: string) => {
-			const name = rawName.trim();
-			if (!name) return;
-			// Lock-5(e) — this writes `company` onto the PERSON, so a locked
-			// contact refuses it. Checked BEFORE the Company is minted: refusing
-			// halfway would leave an orphan Company nobody asked for.
-			// Asked WITHOUT a patch: the write is `{ company: <new id> }`, which the
-			// lock-flip exemption could never cover anyway, and the id does not
-			// exist yet — refusing here is what keeps the orphan Company unminted.
-			if (contactWriteRefused(isLockedId, [personId])) return;
-			if (usingVault && entitiesSvc) {
-				const company = await entitiesSvc.create(COMPANY_TYPE, { name });
-				await entitiesSvc.update(personId, { company: company.id });
+			const companyId = await createCompanyForWrite(writeCtx(), COMPANY_TYPE, personId, rawName);
+			if (companyId && usingVault && entitiesSvc) {
 				setOptimistic((prev) => [
-					...prev.map((e) =>
-						e.id === personId ? { ...e, properties: { ...e.properties, company: company.id } } : e,
-					),
-					{ id: company.id, type: COMPANY_TYPE, properties: { name } },
+					...prev,
+					{ id: companyId, type: COMPANY_TYPE, properties: { name: rawName.trim() } },
 				]);
-			} else {
-				const id = `demo_co_${Date.now()}`;
+			} else if (companyId) {
 				setDemo((prev) => [
-					...prev.map((e) =>
-						e.id === personId ? { ...e, properties: { ...e.properties, company: id } } : e,
-					),
-					{ id, type: COMPANY_TYPE, properties: { name } },
+					...prev,
+					{ id: companyId, type: COMPANY_TYPE, properties: { name: rawName.trim() } },
 				]);
 			}
 		},
-		[usingVault, entitiesSvc, isLockedId],
+		[writeCtx, usingVault, entitiesSvc],
 	);
 
 	const patchPerson = useCallback(
 		async (id: string, patch: Record<string, unknown>) => {
-			// Lock-5(b) — a locked contact is read-only on EVERY write path (the
-			// inline rows, the slide-over inspector, rename, icon, cover), so the
-			// gate lives on the one call they all reach. Flipping the lock itself
-			// is the sole exception, or a lock could never be undone — and only
-			// when it is the WHOLE patch (Lock-5(e): the old key-presence reading
-			// let `{ locked, name }` walk a rename through on the lock's ticket).
-			if (contactWriteRefused(isLockedId, [id], patch)) return;
-			if (usingVault && entitiesSvc) {
-				await entitiesSvc.update(id, patch);
-				// Reflect the edit on a still-optimistic (not-yet-broadcast) entity.
-				setOptimistic((prev) =>
-					prev.map((e) => (e.id === id ? { ...e, properties: { ...e.properties, ...patch } } : e)),
-				);
-			} else {
-				setDemo((prev) =>
-					prev.map((e) => (e.id === id ? { ...e, properties: { ...e.properties, ...patch } } : e)),
-				);
-			}
+			await patchPersonWrite(writeCtx(), id, patch);
 		},
-		[usingVault, entitiesSvc, isLockedId],
+		[writeCtx],
 	);
 
 	const deletePerson = useCallback(
 		async (id: string) => {
-			// Lock-5(b) — delete is a write too. The ⋯ already offers Delete
-			// disabled-with-the-reason on a locked contact; this is the same rule
-			// where the write happens, so the chord and the confirm can't skip it.
-			if (contactWriteRefused(isLockedId, [id])) return;
-			if (usingVault && entitiesSvc) {
-				await entitiesSvc.delete(id);
-				// Drop it from the overlay too, else a not-yet-broadcast contact
-				// reappears after delete (the snapshot never carried it to prune it).
-				setOptimistic((prev) => prev.filter((e) => e.id !== id));
-			} else {
-				setDemo((prev) => prev.filter((e) => e.id !== id));
-			}
+			if (!(await deletePersonWrite(writeCtx(), id))) return;
 			// Only leave the detail pane if the deleted contact was the open one.
 			setLocation((loc) => {
 				if (loc.id !== id) return loc;
@@ -505,7 +499,7 @@ export function ContactsApp(): ReactElement {
 				return { id: null };
 			});
 		},
-		[usingVault, entitiesSvc, nav, isLockedId],
+		[writeCtx, nav],
 	);
 
 	const companyNameOf = useCallback((id: string | null) => resolveName(nameIndex, id), [nameIndex]);
@@ -541,23 +535,15 @@ export function ContactsApp(): ReactElement {
 	const mergeContacts = useCallback(
 		async (survivorId: string, loserIds: string[], patch: Record<string, unknown>) => {
 			setDuplicatesOpen(false);
-			// Detection already excludes locked contacts, so this is the gate at
-			// the write itself: a survivor takes a property patch and every loser
-			// is destroyed, and neither is something a locked object accepts.
-			if (contactWriteRefused(isLockedId, [survivorId, ...loserIds])) {
-				notify?.(t("duplicates.mergeLocked"));
-				return;
-			}
 			const survivor = persons.find((p) => p.id === survivorId);
 			const mergedCount = loserIds.length + 1;
 			try {
-				if (usingVault && entitiesSvc?.merge) {
-					await entitiesSvc.merge(survivorId, loserIds, patch);
-					// Drop merged-away rows from the optimistic overlay so a
-					// not-yet-broadcast duplicate can't resurface after the merge.
-					setOptimistic((prev) => prev.filter((e) => !loserIds.includes(e.id)));
-				} else {
-					setDemo((prev) => applyMergeToEntities(prev, survivorId, loserIds, patch));
+				// The gate lives inside `mergeContactsWrite`, ahead of the service
+				// call it owns: a survivor takes a property patch and every loser is
+				// DESTROYED, and neither is something a locked object accepts.
+				if (!(await mergeContactsWrite(writeCtx(), survivorId, loserIds, patch))) {
+					notify?.(t("duplicates.mergeLocked"));
+					return;
 				}
 				// If the open contact was merged away, land on the survivor.
 				if (location.id && loserIds.includes(location.id)) select(survivorId);
@@ -571,7 +557,7 @@ export function ContactsApp(): ReactElement {
 				notify?.(t("duplicates.mergeFailed"));
 			}
 		},
-		[usingVault, entitiesSvc, persons, location.id, select, notify, isLockedId],
+		[writeCtx, persons, location.id, select, notify],
 	);
 
 	// Export every visible person as a vCard document (company id → resolved name).

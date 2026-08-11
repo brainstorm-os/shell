@@ -132,6 +132,11 @@ export type BookmarkDetailProps = {
 	captureState: CaptureState;
 	/** Start (or retry) a readable-content capture of the page. */
 	onCapture: () => void;
+	/** Flip the read-only lock. Its own prop rather than an `onPropertyChange`
+	 *  partial: the app's write gate refuses EVERY property write on a locked
+	 *  bookmark, so an unlock routed through the ordinary property path would be
+	 *  refused by the very lock it is trying to undo (Lock-5(g)). */
+	onToggleLock: () => void;
 };
 
 export function BookmarkDetail({
@@ -143,6 +148,7 @@ export function BookmarkDetail({
 	onToggleProperties,
 	captureState,
 	onCapture,
+	onToggleLock,
 }: BookmarkDetailProps): React.ReactElement {
 	// A source label that just repeats the title (domain-titled captures) is
 	// noise — fall back to the full URL, which stays a useful link face
@@ -320,7 +326,7 @@ export function BookmarkDetail({
 					</h1>
 					<LockButton
 						locked={!!bookmark.locked}
-						onToggle={() => onPropertyChange({ locked: !bookmark.locked })}
+						onToggle={onToggleLock}
 						lockLabel={t("detail.lock")}
 						unlockLabel={t("detail.unlock")}
 					/>
