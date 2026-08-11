@@ -43,7 +43,8 @@
 .marketplace__sidebar {
 	display: flex;
 	flex-direction: column;
-	background: rgba(0, 0, 0, 0.18);
+	/* Same nav-column treatment as Settings / Help — theme token, not a wash. */
+	background: var(--color-glass-background-strong);
 	border-inline-end: var(--border-width) solid var(--color-glass-border);
 	min-height: 0;
 }
@@ -224,7 +225,7 @@
 	flex-direction: column;
 	gap: var(--space-2);
 	padding: var(--space-2);
-	background: rgba(0, 0, 0, 0.18);
+	background: var(--color-surface-default);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 	color: var(--color-text-primary);
@@ -235,7 +236,7 @@
 
 .marketplace__card:hover {
 	border-color: var(--color-border-strong);
-	background: rgba(0, 0, 0, 0.24);
+	background: var(--color-surface-overlay);
 }
 
 .marketplace__card:focus-visible {
@@ -341,7 +342,7 @@
 	align-items: center;
 	gap: var(--space-2);
 	padding: var(--space-2);
-	background: rgba(0, 0, 0, 0.18);
+	background: var(--color-surface-default);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 }
@@ -390,7 +391,7 @@
 	justify-content: space-between;
 	gap: var(--space-3);
 	padding: var(--space-2);
-	background: rgba(0, 0, 0, 0.18);
+	background: var(--color-surface-default);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);
 }
@@ -508,7 +509,7 @@
 	align-items: center;
 	gap: var(--space-1);
 	padding: var(--space-0_5);
-	background: rgba(0, 0, 0, 0.18);
+	background: var(--color-surface-default);
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-sm);
 	font-size: var(--text-size-xs);

@@ -64,6 +64,34 @@ describe("DashboardStore", () => {
 		await store.close();
 	});
 
+	// F-495 — every snapshot that leaves for a renderer must carry the OS
+	// reading its `theme` was resolved against, or the renderer has to guess and
+	// the shell tears (dark apps, light dashboard, no convergence).
+	it("snapshotForOs resolves Auto against the caller's reading AND reports it back", async () => {
+		const store = await DashboardStore.open(yStore);
+		const dark = store.snapshotForOs(true);
+		expect(dark.theme).toBe(ThemeName.DefaultDark);
+		expect(dark.systemPrefersDark).toBe(true);
+
+		const light = store.snapshotForOs(false);
+		expect(light.theme).toBe(ThemeName.DefaultLight);
+		expect(light.wallpaper.value).toBe("#f5f3ef");
+		expect(light.systemPrefersDark).toBe(false);
+		await store.close();
+	});
+
+	it("snapshotForOs still reports the reading when the mode ignores it", async () => {
+		const store = await DashboardStore.open(yStore);
+		store.setAppearanceMode(AppearanceMode.Light);
+		// An explicit mode pins the slot, but the reading travels anyway: the
+		// renderer keeps it for the moment the user picks Auto, so the first
+		// Auto paint doesn't have to fall back to a second opinion.
+		const snap = store.snapshotForOs(true);
+		expect(snap.theme).toBe(ThemeName.DefaultLight);
+		expect(snap.systemPrefersDark).toBe(true);
+		await store.close();
+	});
+
 	it("setTheme routes a dark theme into the dark slot regardless of mode", async () => {
 		const store = await DashboardStore.open(yStore);
 		store.setTheme(ThemeName.Midnight);

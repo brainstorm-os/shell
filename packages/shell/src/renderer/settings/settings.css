@@ -47,9 +47,12 @@
 .settings__sidebar {
 	display: flex;
 	flex-direction: column;
-	/* Sidebar sits at a denser glass level than the surrounding panel so
-	 * the eye separates nav from content. Same blur, lighter tint. */
-	background: rgba(0, 0, 0, 0.18);
+	/* Sidebar sits at a denser glass level than the surrounding panel so the eye
+	 * separates nav from content: the panel's `glass--strong` shows through and
+	 * this second layer of the same token composites over it. Was a hardcoded
+	 * `rgba(0, 0, 0, 0.18)` — theme-INVARIANT, so the nav column painted the
+	 * same black wash over the light theme's white glass (F-496). */
+	background: var(--color-glass-background-strong);
 	border-inline-end: var(--border-width) solid var(--color-glass-border);
 	min-height: 0;
 }
@@ -100,7 +103,7 @@
 
 .settings__signout:hover:not(:disabled) {
 	color: var(--color-state-error);
-	background: rgba(239, 68, 68, 0.08);
+	background: color-mix(in srgb, var(--color-state-error) 8%, transparent);
 }
 
 .settings__title {
@@ -756,7 +759,7 @@
 	width: 18px;
 	height: 18px;
 	border-radius: var(--radius-full);
-	box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+	box-shadow: 0 0 0 2px var(--color-glass-border);
 }
 
 .settings__theme-info {
@@ -1933,7 +1936,7 @@
 	border: var(--border-width) solid var(--color-glass-border);
 	overflow: hidden;
 	flex: 0 0 auto;
-	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+	box-shadow: inset 0 0 0 1px var(--color-glass-border);
 }
 
 .settings__appearance-theme-swatch-accent {
@@ -2376,6 +2379,8 @@
 	text-align: center;
 }
 
+/* The one deliberately theme-INVARIANT fill in this file: a QR code only scans
+ * as dark-on-white, so the quiet zone stays white in every theme. */
 .devices-flow__qr canvas {
 	border: var(--border-width) solid var(--color-border-subtle);
 	border-radius: var(--radius-md);

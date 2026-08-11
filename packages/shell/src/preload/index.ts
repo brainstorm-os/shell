@@ -442,6 +442,13 @@ export type DashboardSnapshot = {
 	wallpaper: DashboardWallpaper;
 	/** Active pair's theme. Same resolution as `wallpaper`. */
 	theme: ThemeName;
+	/** The OS dark-mode reading (`nativeTheme.shouldUseDarkColors`) the two
+	 *  fields above were resolved against. The renderer must resolve the Auto
+	 *  slot from THIS and never from its own `matchMedia` — the two were
+	 *  measured disagreeing in the live shell, which tore the dashboard away
+	 *  from the app windows with nothing to reconcile them (F-495). Optional
+	 *  only for the first paint, before any snapshot has arrived. */
+	systemPrefersDark?: boolean;
 	/** Raw appearance state — mode + both pair slots. The Settings UI
 	 *  reads/writes here; non-Appearance code keeps reading `theme` /
 	 *  `wallpaper` above. */
