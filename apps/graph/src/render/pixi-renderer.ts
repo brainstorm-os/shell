@@ -66,7 +66,12 @@ import { IconKind } from "../types/icon";
 import { type EdgeGeometryInput, buildEdgeBatches } from "./edge-batch";
 import type { LayoutNode } from "./force-layout";
 import { loadIconImage } from "./icon-source";
-import { type LabelBox, declutterLabels, estimateLabelWidth } from "./label-declutter";
+import {
+	type LabelBox,
+	declutterLabels,
+	estimateLabelWidth,
+	labelBoxHeight,
+} from "./label-declutter";
 import { NodeFront, chooseNodeFront } from "./node-front";
 import { nodeLabel } from "./node-label";
 import {
@@ -831,7 +836,7 @@ function syncLabelOverlay(
 			centerX,
 			top,
 			width: estimateLabelWidth(label),
-			height: labelLineHeightPx,
+			height: labelBoxHeight(labelLineHeightPx),
 			priority,
 		});
 	}
@@ -862,7 +867,11 @@ function syncLabelOverlay(
 			div.style.top = "0";
 			div.style.whiteSpace = "nowrap";
 			div.style.pointerEvents = "none";
-			div.style.color = "currentColor";
+			// Colour, surface, padding and radius are the `.graph-canvas__label`
+			// chip's job — an inline `style.color` here would beat the stylesheet
+			// and pin the caption to whatever the host element happens to carry
+			// (it used to say `currentColor`, which is how the labels ended up
+			// with no face at all).
 			div.style.fontFamily = "var(--text-family-ui)";
 			div.style.fontSize = `${fontSizePx}px`;
 			handles.labelsLayer.appendChild(div);

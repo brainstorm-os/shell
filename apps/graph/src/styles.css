@@ -902,10 +902,20 @@ body.is-resizing .graph-sidebar__resize {
 /* Node labels — typography pulled from shell tokens so the graph
  *  participates in theme changes. Font-family stays as the ui stack
  *  because SVG text doesn't inherit from a parent renderer's font
- *  unless explicitly set. */
+ *  unless explicitly set.
+ *
+ *  The legacy `?renderer=svg` path had the same defect the Pixi overlay did
+ *  (POLISH-DSN-13): bare `fill="currentColor"` text painted straight over the
+ *  discs and edges below it. SVG text takes no padding or background, so it
+ *  gets the equivalent of the chip below — a halo stroked in the same
+ *  elevated-surface colour, drawn UNDER the fill via `paint-order`. */
 .graph-canvas__labels text {
 	font-size: var(--text-size-xs);
 	font-family: var(--text-family-ui);
+	paint-order: stroke;
+	stroke: var(--bg-elev);
+	stroke-width: 3px;
+	stroke-linejoin: round;
 }
 
 /* Pixi renderer paints labels as absolutely-positioned HTML divs in the
@@ -916,7 +926,22 @@ body.is-resizing .graph-sidebar__resize {
  *  glyphs; this is the pixel-precise second line of defence so even a
  *  48-glyph CJK name can't smear past the node, per the
  *  [[long-strings-must-be-clipped]] convention (clip at the data layer
- *  AND the render layer). Matches the SVG label typography tokens. */
+ *  AND the render layer). Matches the SVG label typography tokens.
+ *
+ *  The label is a CHIP, not bare text (POLISH-DSN-13). It sits at
+ *  `node.y + radius + 4` — i.e. over whatever discs and edges happen to be
+ *  under it — and `declutterLabels` resolves label-vs-label overlap only, so
+ *  without a surface of its own the caption was unreadable in any dense
+ *  region. Elevated surface + hairline border + small radius is the same
+ *  idiom the whiteboard paints its edge labels with (a `roundRect` filled
+ *  with the background, stroked with the edge colour).
+ *
+ *  Cheap on purpose: a solid background + border only. No `backdrop-filter`
+ *  and no `box-shadow` — either would be a per-chip GPU pass on up to
+ *  `MAX_LABELED_NODES` (150) chips every frame, and the labels re-position
+ *  on every pan/zoom. The padding + border are mirrored by the chip
+ *  constants in `render/label-declutter.ts` so the de-clutter pass measures
+ *  what actually paints. */
 .graph-canvas__label {
 	max-width: 180px;
 	overflow: hidden;
@@ -924,6 +949,11 @@ body.is-resizing .graph-sidebar__resize {
 	white-space: nowrap;
 	font-size: var(--text-size-xs);
 	font-family: var(--text-family-ui);
+	color: var(--text);
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	padding: var(--space-0_5) var(--space-1);
 	/* Labels are suppressed while the layout animates (playback / settle)
 	 * and re-created when it cools; a from-only keyframe fades each div in
 	 * to whatever per-frame opacity the renderer writes inline. */

@@ -12,6 +12,16 @@
  * in priority order; we keep a label only when its axis-aligned box clears
  * every already-kept box. Greedy-by-priority means the most important labels
  * (hovered first, then highest-degree hubs) win the space and the rest drop.
+ *
+ * This tests label-vs-LABEL only, and deliberately still does after
+ * POLISH-DSN-13 ("node titles painted into the tangle"). A label sitting over
+ * a *disc* is a legibility problem, and legibility is now solved at the paint
+ * layer by the chip (`.graph-canvas__label`: elevated surface + border), which
+ * costs nothing per frame. Suppressing those labels instead would delete
+ * captions exactly where the graph is dense — the region the user most needs
+ * named — and would cost an O(labels × visible nodes) sweep every frame at the
+ * 600-node cap. Occluding a disc is the smaller harm than dropping its name;
+ * a chip that can't be read is no harm at all, it's just noise.
  */
 
 /** One label's screen-space footprint + how much it deserves to survive a
@@ -72,7 +82,38 @@ export function declutterLabels(candidates: readonly LabelBox[]): Set<string> {
  *  captions the user reads as a smear. */
 const AVG_GLYPH_WIDTH_PX = 5.6;
 
-/** Estimate a label's rendered width (px) from its character count. */
+/**
+ * The label is a CHIP, not a bare glyph run (POLISH-DSN-13): `.graph-canvas__
+ * label` carries `padding: var(--space-0_5) var(--space-1)` (2px / 4px) and a
+ * 1px border over the elevated surface, so it can be read against the discs
+ * and edges it floats over. The three constants below MIRROR that rule — the
+ * de-clutter pass measures what actually paints, or two chips overlap by the
+ * padding on each side and nothing here ever sees it.
+ */
+const CHIP_PADDING_X_PX = 4;
+const CHIP_PADDING_Y_PX = 2;
+const CHIP_BORDER_PX = 1;
+
+/** Screen px the chip adds to a label's glyph run horizontally (both sides). */
+export const LABEL_CHIP_EXTRA_X_PX = 2 * (CHIP_PADDING_X_PX + CHIP_BORDER_PX);
+
+/** The `max-width` the chip renders at, mirroring the CSS. Border-box sizing
+ *  means this caps the whole chip, so a 48-glyph name (the `nodeLabel`
+ *  character ceiling, ~278px of raw glyphs) paints exactly this wide with the
+ *  overflow ellipsised. Estimating past it drops neighbours that never
+ *  actually collided. */
+export const LABEL_MAX_WIDTH_PX = 180;
+
+/** Estimate a label chip's rendered width (px): the glyph run from its
+ *  character count, plus the chip's padding + border, clamped at the CSS
+ *  `max-width` where the text ellipsises. */
 export function estimateLabelWidth(text: string): number {
-	return text.length * AVG_GLYPH_WIDTH_PX;
+	const glyphs = text.length * AVG_GLYPH_WIDTH_PX;
+	return Math.min(glyphs + LABEL_CHIP_EXTRA_X_PX, LABEL_MAX_WIDTH_PX);
+}
+
+/** A label chip's rendered height (px) for a given font line box — the line
+ *  plus the chip's vertical padding + border. */
+export function labelBoxHeight(lineHeightPx: number): number {
+	return lineHeightPx + 2 * (CHIP_PADDING_Y_PX + CHIP_BORDER_PX);
 }
