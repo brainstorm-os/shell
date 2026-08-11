@@ -3,32 +3,35 @@
  * can live in the dashboard header (an `IconButton`) instead of a floating "+"
  * on the dashboard surface. Opens the shared fancy-menus runtime with one
  * section per app, each row carrying its app's brand glyph; picking a row
- * appends a new widget below the lowest existing one.
+ * creates the widget unplaced and lets the widgets layer choose its cell.
  */
 
 import type { ContextMenuItem, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import type { ReactNode } from "react";
-import type { DashboardWidget, RegisteredWidget } from "../../preload";
+import type { RegisteredWidget } from "../../preload";
 import { t } from "../i18n/t";
 import { AppIcon } from "./app-icon";
 import { resolveAppIconSrc } from "./app-icon-cache";
-import { WidgetSize, widgetFootprint } from "./grid";
+import { UNPLACED_WIDGET_POSITION, WidgetSize, widgetFootprint } from "./grid";
 
-/** Next free stacking row — place a new widget below the lowest existing one. */
-function nextWidgetRow(widgets: Record<string, DashboardWidget>): number {
-	let bottom = 0;
-	for (const w of Object.values(widgets)) bottom = Math.max(bottom, w.y + w.h);
-	return bottom;
-}
-
-function addWidget(w: RegisteredWidget, widgets: Record<string, DashboardWidget>): void {
+/**
+ * A new widget is created UNPLACED — the layer chooses its cell.
+ *
+ * This used to stack each new card below the lowest existing one, which is a
+ * position no one has checked against anything: on a full board it is a row off
+ * the bottom of a stage that does not scroll, i.e. a widget you cannot see and
+ * cannot remove. The picker has no idea how big the stage is or where the app
+ * icons are; the widgets layer does, so it decides — exactly as main defers an
+ * installed app's icon cell to the renderer (`UNPLACED_ICON_POSITION`).
+ */
+function addWidget(w: RegisteredWidget): void {
 	const fp = widgetFootprint((w.size as WidgetSize) ?? WidgetSize.Medium);
 	void window.brainstorm.dashboard.upsertWidget(`widget_${crypto.randomUUID()}`, {
 		appId: w.appId,
 		kind: w.widgetId,
-		x: 0,
-		y: nextWidgetRow(widgets),
+		x: UNPLACED_WIDGET_POSITION.x,
+		y: UNPLACED_WIDGET_POSITION.y,
 		w: fp.w,
 		h: fp.h,
 		paused: false,
@@ -86,17 +89,13 @@ function buildAddItems(
 }
 
 /** Open the add-widget picker anchored to `anchor` (the dashboard header's "+"
- *  button). `widgets` is the current placement set, used to stack the new widget
- *  below the lowest existing one. */
-export async function openAddWidgetMenu(
-	anchor: HTMLElement,
-	widgets: Record<string, DashboardWidget>,
-): Promise<void> {
+ *  button). */
+export async function openAddWidgetMenu(anchor: HTMLElement): Promise<void> {
 	const registered = await window.brainstorm.dashboard.registeredWidgets();
 	const items: ContextMenuItem[] =
 		registered.length === 0
 			? [{ id: "empty", label: t("shell.widgets.add.empty"), disabled: true }]
-			: buildAddItems(registered, (w) => addWidget(w, widgets));
+			: buildAddItems(registered, addWidget);
 	openAnchoredMenu(anchor.getBoundingClientRect(), items, {
 		menuLabel: t("shell.widgets.add.label"),
 		anchor,

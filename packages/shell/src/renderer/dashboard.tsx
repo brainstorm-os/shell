@@ -698,7 +698,7 @@ export function Dashboard() {
 						<IconButton
 							icon={IconName.Plus}
 							label={t("shell.widgets.add.label")}
-							onClick={(e) => void openAddWidgetMenu(e.currentTarget, snapshot?.widgets ?? {})}
+							onClick={(e) => void openAddWidgetMenu(e.currentTarget)}
 						/>
 					)}
 					{showControl(HeaderControlId.Search) && (

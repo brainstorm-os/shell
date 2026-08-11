@@ -134,7 +134,7 @@ describe("DashboardWidgetsLayer — apps:changed refresh (F-380)", () => {
 		// PR #448 rescued widgets from the icon band, but two widget records
 		// could still be persisted on top of one another and render that way
 		// forever. The layer reconciles in persisted order: the earlier record
-		// stays put, the later one is pushed DOWN past it.
+		// stays put, the later one takes the nearest legal slot.
 		const a: DashboardWidget = { ...WIDGET, x: 0, y: 10 };
 		const b: DashboardWidget = { ...WIDGET, kind: "other", x: 10, y: 15 };
 		await act(async () => {
@@ -145,8 +145,10 @@ describe("DashboardWidgetsLayer — apps:changed refresh (F-380)", () => {
 		const cardA = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_a"]');
 		const cardB = host.querySelector<HTMLElement>('[data-testid="dashboard-widget-widget_b"]');
 		expect(cardA?.style.top).toBe("96px"); // 16 + 10*8 — untouched
-		// B clears A's bottom edge (row 30): 16 + 30*8; its column is untouched.
-		expect(cardB?.style.top).toBe("256px");
+		// The nearest legal slot for B is straight down, one gutter past A's
+		// bottom edge (row 30 + 2): 16 + 32*8. Its column is untouched — a
+		// sideways slot exists but is further away.
+		expect(cardB?.style.top).toBe("272px");
 		expect(cardB?.style.left).toBe("96px");
 	});
 
