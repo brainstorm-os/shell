@@ -225,9 +225,7 @@ async function enrichSnapshot(
 	session: VaultSession,
 	store: DashboardStore,
 ): Promise<EnrichedDashboardSnapshot> {
-	const rawAppearance = store.snapshot().appearance;
-	const effectiveSlot = effectiveSlotFor(rawAppearance.mode, osPrefersDark());
-	const snap = store.snapshot(effectiveSlot);
+	const snap = store.snapshotForOs(osPrefersDark());
 	// App pins resolve too (live registry labels), not just entity pins —
 	// the entity-only gate left app tiles on their install-time snapshot.
 	const hasResolvablePin = Object.values(snap.icons).some(
@@ -880,16 +878,12 @@ async function ensureSubscribed(
 					.catch((error) => {
 						console.warn("[brainstorm] dashboard snapshot enrich failed:", error);
 						if (!target.isDestroyed() && snapshotSequencer.shouldSend(seq)) {
-							const fallback = store.snapshot(
-								effectiveSlotFor(store.snapshot().appearance.mode, osPrefersDark()),
-							);
+							const fallback = store.snapshotForOs(osPrefersDark());
 							target.webContents.send(DASHBOARD_SNAPSHOT_CHANNEL, { ...fallback, pins: {} });
 						}
 					});
 			} else if (snapshotSequencer.shouldSend(seq)) {
-				const fallback = store.snapshot(
-					effectiveSlotFor(store.snapshot().appearance.mode, osPrefersDark()),
-				);
+				const fallback = store.snapshotForOs(osPrefersDark());
 				target.webContents.send(DASHBOARD_SNAPSHOT_CHANNEL, { ...fallback, pins: {} });
 			}
 		}

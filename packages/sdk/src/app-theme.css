@@ -145,12 +145,27 @@
  * Fixed once, here.
  * ============================================================ */
 :root {
-	/* Blur radius for the app-header wallpaper stripe. An app-theme alias, not a
-	 * theme token: it describes chrome geometry, not a palette value, so it does
-	 * not vary per theme. Much wider than `--glass-blur` (5px) on purpose — that
-	 * one filters content sitting directly behind glass, whereas this smears a
-	 * photograph down to a colour field a 44px strip of text can sit on. */
-	--app-wallpaper-blur: 18px;
+	/* Blur radius for the app-header wallpaper stripe. Deliberately THE SAME
+	 * value the shell's own header uses, because they are the same surface and
+	 * the user sees them side by side.
+	 *
+	 * The shell dashboard header is `.glass--subtle`, i.e. a real
+	 * `backdrop-filter: blur(var(--glass-blur))` over the wallpaper element
+	 * behind it. An app window has no wallpaper element behind its header, so
+	 * that backdrop-filter is inert there and the stripe has to paint the image
+	 * itself — but it must still LOOK like the shell's, which means the same
+	 * blur radius and the same glass tint on top, not a second treatment.
+	 *
+	 * This was 18px with a comment arguing the wider blur was better for a
+	 * photograph. That argument produced two different-looking headers in one
+	 * product, which the owner spotted immediately: exactly the lookalike-
+	 * primitive defect POLISH-DSN-13 exists to catch. The shared value wins.
+	 *
+	 * The fallback is 10px because that is what `glass.blur` actually resolves
+	 * to (`themes.ts`). Several `var(--glass-blur, 5px)` fallbacks elsewhere in
+	 * this file cite 5px, which is simply wrong — harmless while the token is
+	 * present, and a silent 2× divergence the day it is not. */
+	--app-wallpaper-blur: var(--glass-blur, 10px);
 	/* How far the wallpaper layer overshoots the header on every side. Must
 	 * exceed `--app-wallpaper-blur` so the blur always has real pixels to
 	 * sample past the edge; the header clips the overshoot. Also the exact
