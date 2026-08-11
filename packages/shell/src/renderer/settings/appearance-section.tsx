@@ -4,10 +4,10 @@
  *
  * Layout:
  *   1. Mode segmented control (Light / Dark / Auto). Auto follows the OS
- *      via `matchMedia("(prefers-color-scheme: dark)")` — the renderer
- *      watches it to drive the "currently resolves to" hint; the
- *      authoritative resolution still happens main-side (`nativeTheme`)
- *      so app windows pick up the right theme too.
+ *      reading main resolves from `nativeTheme` and ships on the dashboard
+ *      snapshot (`useOsPrefersDark`) — the same authority the `:root` theme
+ *      and the header toggle use, so the "Active" badge can never point at a
+ *      different slot than the one the shell is actually painting (F-495).
  *   2. Two pair cards (Light slot + Dark slot). Each card is theme picker
  *      + wallpaper picker; the active slot (decided by mode + OS) gets a
  *      highlight + "Active" badge.
@@ -33,7 +33,7 @@ import {
 } from "@brainstorm-os/tokens";
 import { useCallback, useEffect, useState } from "react";
 import type { AppearancePair, DashboardWallpaper } from "../../preload";
-import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
+import { useOsPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { wallpaperBackground } from "../dashboard/wallpaper";
 import { t } from "../i18n/t";
@@ -117,7 +117,7 @@ type UploadedWallpaper = { url: string; thumbUrl: string };
 
 export function AppearanceSection() {
 	const snapshot = useDashboard();
-	const [prefersDark, setPrefersDark] = useState<boolean>(() => systemPrefersDark());
+	const prefersDark = useOsPrefersDark(snapshot);
 	const [uploaded, setUploaded] = useState<readonly UploadedWallpaper[]>([]);
 
 	const refreshUploaded = useCallback(async () => {
@@ -128,8 +128,6 @@ export function AppearanceSection() {
 	useEffect(() => {
 		void refreshUploaded();
 	}, [refreshUploaded]);
-
-	useEffect(() => onSystemPreferenceChange(setPrefersDark), []);
 
 	if (!snapshot) {
 		return <p className="settings__loading">{t("shell.common.loading")}</p>;

@@ -10,8 +10,8 @@ import {
 	isThemeName,
 	themes,
 } from "@brainstorm-os/tokens";
-import { type ReactNode, useEffect, useState } from "react";
-import { onSystemPreferenceChange, systemPrefersDark } from "../dashboard/appearance-watcher";
+import { type ReactNode, useEffect } from "react";
+import { useOsPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { useVaultMaybe } from "../vault-context";
 import { typographyCssVars } from "./typography-vars";
@@ -65,15 +65,12 @@ export function applyThemeVars(theme: ThemeName | string): void {
  * stale palette can't clash with the green-valley splash. `DEFAULT_THEME`
  * bridges the brief gap before the first snapshot arrives.
  *
- * The effective theme is resolved HERE from `appearance` + the live OS dark
- * preference — NOT read off the broadcast `snapshot.theme`. The store can't know
- * the renderer's OS preference, so its broadcast `snapshot.theme` falls back to
- * `defaultEffectiveSlot(mode)` (Auto→Dark always). Reading that left the
- * dashboard pinned to the wrong slot in Auto mode while app windows (which call
- * the OS-aware `activeTheme`) updated correctly — the "apps change, dashboard
- * doesn't" bug. Resolving via `effectiveSlotFor(mode, prefersDark)` makes the
- * dashboard track the same slot the apps do, so the appearance toggle (button +
- * shortcut) and OS light/dark changes repaint it.
+ * The Auto slot is resolved from `prefersDark` — which the caller must take
+ * from `useOsPrefersDark(snapshot)`, i.e. MAIN's `nativeTheme` reading carried
+ * on the snapshot. Resolving it from the renderer's own `matchMedia` instead is
+ * what tore the shell in F-495: the two disagreed inside the running shell, so
+ * the dashboard painted light while every app window painted dark, and main's
+ * corrective push was diffed away as redundant. One authority, always.
  */
 export function effectiveTheme(
 	hasVault: boolean,
@@ -104,8 +101,7 @@ export function ThemeProvider({ children }: Props) {
 	// shell — fall back to the no-vault pin and recover on the next render.
 	const current = useVaultMaybe()?.current ?? null;
 	const snapshot = useDashboard();
-	const [prefersDark, setPrefersDark] = useState<boolean>(() => systemPrefersDark());
-	useEffect(() => onSystemPreferenceChange(setPrefersDark), []);
+	const prefersDark = useOsPrefersDark(snapshot);
 	const theme = effectiveTheme(current !== null, snapshot?.appearance, prefersDark);
 
 	useEffect(() => {

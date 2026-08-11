@@ -136,6 +136,12 @@ export type DashboardSnapshot = {
 	wallpaper: Wallpaper;
 	/** Mirrors the active pair's theme. Same enrichment as `wallpaper`. */
 	theme: ThemeName;
+	/** The OS dark-mode reading `theme` / `wallpaper` above were resolved
+	 *  against — `nativeTheme.shouldUseDarkColors`, carried to the renderer so
+	 *  Auto has ONE authority (F-495). Present on every snapshot pushed to a
+	 *  renderer (they all go through `snapshotForOs`); absent only on the
+	 *  store-local `snapshot()`, which has no OS reading to report. */
+	systemPrefersDark?: boolean;
 	/** Raw appearance state: the user's chosen mode + both pair slots.
 	 *  Persisted in the dashboard doc; the Settings UI reads/writes here. */
 	appearance: AppearanceState;
@@ -333,6 +339,24 @@ export class DashboardStore {
 			notificationHistory: this.readNotificationHistory(),
 			disabledContributors: this.readDisabledContributors(),
 		};
+	}
+
+	/** The snapshot resolved against the caller's OS dark-mode reading, with
+	 *  that reading echoed back as `systemPrefersDark`. Every snapshot that
+	 *  leaves for a renderer goes through here.
+	 *
+	 *  F-495: `theme` / `wallpaper` alone can't tell a consumer WHICH reading
+	 *  produced them, so the dashboard renderer resolved the Auto slot a second
+	 *  time from its own `matchMedia` — and the two authorities were measured
+	 *  disagreeing in the live shell (main `shouldUseDarkColors=true` while the
+	 *  renderer's `matchMedia` said light). The shell then tore — dark apps, a
+	 *  light dashboard — and never converged, because main's corrective
+	 *  broadcast is diffed on the theme IT computed and looked redundant.
+	 *  Shipping the reading alongside the snapshot leaves exactly one
+	 *  authority; the renderer never re-derives the slot. */
+	snapshotForOs(systemPrefersDark: boolean): DashboardSnapshot {
+		const slot = effectiveSlotFor(this.readAppearanceMode(), systemPrefersDark);
+		return { ...this.snapshot(slot), systemPrefersDark };
 	}
 
 	/** Resolve just the active theme name for the current appearance + OS

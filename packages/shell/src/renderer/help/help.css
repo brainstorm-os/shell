@@ -40,7 +40,10 @@
 .help__sidebar {
 	display: flex;
 	flex-direction: column;
-	background: rgba(0, 0, 0, 0.18);
+	/* Denser glass than the panel it sits in — the same treatment (and the same
+	 * token) as the Settings and Marketplace nav columns. A hardcoded
+	 * `rgba(0, 0, 0, 0.18)` here was a black wash in the light theme (F-496). */
+	background: var(--color-glass-background-strong);
 	border-inline-end: var(--border-width) solid var(--color-glass-border);
 	min-height: 0;
 }

@@ -27,7 +27,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardIcon, InstalledApp, VaultEntry, VaultSessionMeta } from "../preload";
 import { UNPLACED_ICON_POSITION } from "../shared/dashboard-icon-grid";
-import { onSystemPreferenceChange, systemPrefersDark } from "./dashboard/appearance-watcher";
+import { useOsPrefersDark } from "./dashboard/appearance-watcher";
 import "./dashboard.css";
 import { AppGrid } from "./dashboard/app-grid";
 import { DashboardIconsLayer } from "./dashboard/icons-layer";
@@ -253,9 +253,11 @@ export function Dashboard() {
 		};
 	}, [current]);
 
-	const [prefersDark, setPrefersDark] = useState<boolean>(() => systemPrefersDark());
-
-	useEffect(() => onSystemPreferenceChange(setPrefersDark), []);
+	// Main's reading, not the renderer's `matchMedia` — the toggle's glyph and
+	// its destination mode both hang off the slot Auto currently resolves to,
+	// and resolving that locally is what let the shell disagree with itself
+	// (F-495). One authority for every Auto consumer.
+	const prefersDark = useOsPrefersDark(snapshot);
 
 	const toggleAppearance = useCallback(() => {
 		const mode = snapshot?.appearance?.mode;
@@ -272,9 +274,9 @@ export function Dashboard() {
 			);
 			return;
 		}
-		const next = nextModeForToggle(mode, systemPrefersDark());
+		const next = nextModeForToggle(mode, prefersDark);
 		void setter(next);
-	}, [snapshot]);
+	}, [snapshot, prefersDark]);
 
 	// Help-2 — refs mirror the focused-surface state so the shellActions
 	// listener's stable closure can read the *current* values without
