@@ -344,6 +344,35 @@ describe("dashboard layout — widgets never intersect, and never leave the stag
 		expect(intersectingPairs(host)).toEqual([]);
 	});
 
+	it("a widget stored off the edge is pulled back, even with nothing to collide with", async () => {
+		// The case the sibling test above CANNOT reach. That one stores a footprint
+		// bigger than the stage, which the footprint ceiling clamps before placement
+		// is consulted at all — so it stays green even with the stage check gone.
+		//
+		// This one is in-bounds by SIZE and out of bounds by POSITION: a 40×20 card
+		// at (110, 70) on a 135×80 stage hangs off both edges, and with an empty
+		// icon map and no siblings there is nothing for it to collide with. The
+		// collision test therefore passes it, and `placeWidgetInStage`'s early
+		// return hands a legal-looking record straight back — unless the stage
+		// check is part of that decision.
+		//
+		// It is the ordinary "saved on the big monitor, reopened on the laptop"
+		// record, and it is the single case that makes `widgetFitsStage`
+		// load-bearing rather than decorative: deleting it turns this red and
+		// nothing else.
+		const widgets = {
+			widget_offstage: widget("io.brainstorm.books", "currently-reading", 110, 70, 40, 20),
+		};
+		await renderDashboard({}, widgets);
+		// FIRST: it must actually be drawn. "No unreachable card" is satisfied by
+		// drawing nothing at all, and on an empty stage with one small widget,
+		// refusing it would be its own bug — there is nothing to refuse it for.
+		expect(host.querySelectorAll(".dashboard-widgets__card").length).toBe(1);
+		expect(host.querySelector(".dashboard-widgets__noroom")).toBeNull();
+		expect(unreachableCards(host)).toEqual([]);
+		expect(intersectingPairs(host)).toEqual([]);
+	});
+
 	it("an app installed under a widget still gets a clear cell", async () => {
 		// Main writes UNPLACED_ICON_POSITION and the renderer chooses the cell —
 		// so a widget must reconcile against where the icon LANDS, not against the
