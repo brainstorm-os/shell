@@ -21,24 +21,22 @@
 
 :root {
 	/* ─── Surface ─────────────────────────────────────────────────────── */
-	/* Frosted glass to match every other Brainstorm overlay (Popover,
-	   launcher) — but a MENU is dense text rows opened over ARBITRARY app
-	   content, so the glass tint rides on an OPAQUE base instead of being the
-	   whole fill. `--color-glass-background-strong` is 0.5–0.72 alpha in the
-	   built-in themes, and `.fm-menu`'s saturate(180%) backdrop-filter then
-	   AMPLIFIES whatever shows through: the 329 audit caught the Books cover
-	   band turning the ⋯ panel mint-green under red "Remove from library"
-	   text, Database's accent "+ New" button painting a blue blob across
-	   "Copy embed link", a Files card icon inside "Duplicate", Calendar's
-	   today-highlight under "Export to iCal…", and Graph's checkbox blue
-	   through the panel edge. Mixing the theme's opaque `background.elevated`
-	   under the glass keeps the frosted family look (~3% still bleeds, blurred)
-	   while guaranteeing row text keeps its contrast on every surface. */
-	--fm-surface-bg: color-mix(
-		in srgb,
-		var(--color-background-elevated) 92%,
-		var(--color-glass-background-strong, var(--color-surface-overlay))
-	);
+	/* OPAQUE. A menu is dense text rows opened over ARBITRARY app content, so
+	   nothing behind it may reach the reader — `POLISH-DSN-13 · S3`.
+
+	   This was 92% opaque + 8% glass, on the reasoning that a little bleed kept
+	   the frosted family look. The re-captured audit says otherwise: at ~93%
+	   alpha under a saturate(180%) backdrop-filter that AMPLIFIES what shows
+	   through, Files' orange note icons still read clearly through the Sort
+	   menu (`40-dark-files-06-sort-menu.png`, 2026-08-12). "Almost opaque" is
+	   not a surface — it is a defect with a smaller number attached, and the
+	   number is doing no visual work a border and a shadow are not already
+	   doing.
+
+	   The theme's `background.elevated` is an opaque hex in all fourteen
+	   built-in themes (pinned by `overlay-surfaces-are-opaque.test.ts`), and it
+	   is the token that already means "a panel raised off the page". */
+	--fm-surface-bg: var(--color-background-elevated);
 	--fm-surface-fg: var(--color-text-primary);
 	--fm-surface-border: var(--color-glass-border, var(--color-border-default));
 	--fm-surface-radius: var(--radius-lg);
@@ -103,8 +101,12 @@
 	 * loses the stacking contest and its rows can't be clicked. Pin it above
 	 * those overlays but below the full-screen pickers (icon-picker 1000). */
 	z-index: 130;
-	backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
-	-webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%));
+	/* No `backdrop-filter`. The panel fill above is opaque, so a blur of what is
+	 * behind it composites a layer nobody can see — and `backdrop-filter`
+	 * promotes the element and re-blurs on paint, which is exactly the cost that
+	 * forced the app-header wallpaper stripe out (`revert ebb756c7`). A menu
+	 * opens on a pointer-down, so this was paying that price on the most
+	 * latency-sensitive gesture in the product, to render nothing. */
 }
 
 /* The menu stack portals to `document.body`, so its full-screen dimmer and
