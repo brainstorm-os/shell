@@ -17,6 +17,7 @@ import {
 	type BookWriteContext,
 	bookWriteRefused,
 	makePositionPersister,
+	removeBookEntity,
 	writeBookPatch,
 } from "./book-writes";
 
@@ -86,13 +87,43 @@ describe("writeBookPatch", () => {
 	});
 });
 
-describe("bookWriteRefused — the patch-less writes", () => {
-	it("refuses REMOVE on a locked book, and allows it on an unlocked one", () => {
-		// Delete has no patch, so there is no lock-flip to exempt: a locked book
-		// refuses it outright. The ⋯ shows Remove disabled-with-the-reason, but
-		// this is the gate at the write, which the chord cannot walk around.
-		expect(bookWriteRefused({ bookId: "b1", sample: false, locked: true })).toBe(true);
-		expect(bookWriteRefused({ bookId: "b1", sample: false, locked: false })).toBe(false);
+describe("removeBookEntity — delete is a write too", () => {
+	function removeCtx(
+		over: Partial<{ bookId: string | null; sample: boolean; locked: boolean }> = {},
+	) {
+		const remove = vi.fn(() => Promise.resolve(null));
+		return {
+			ctx: { bookId: "b1", sample: false, locked: false, ...over, remove },
+			remove,
+		};
+	}
+
+	it("removes an unlocked book", () => {
+		const { ctx, remove } = removeCtx();
+		expect(removeBookEntity(ctx)).toBe(true);
+		expect(remove).toHaveBeenCalledWith("b1");
+	});
+
+	it("refuses to remove a LOCKED book — and issues no delete", () => {
+		// Lock-5(f): the previous spelling asserted only `bookWriteRefused(...)`
+		// returning `true`, so the `entities.delete` call site in `app.tsx` could
+		// lose its guard with this file still green. Now the refusal and the
+		// delete are the same function, and the mock proves nothing went out.
+		const { ctx, remove } = removeCtx({ locked: true });
+		expect(removeBookEntity(ctx)).toBe(false);
+		expect(remove).not.toHaveBeenCalled();
+	});
+
+	it("removes nothing for the sample book, the empty shelf, or a shell with no service", () => {
+		const sample = removeCtx({ sample: true });
+		expect(removeBookEntity(sample.ctx)).toBe(false);
+		const shelf = removeCtx({ bookId: null });
+		expect(removeBookEntity(shelf.ctx)).toBe(false);
+		expect(sample.remove).not.toHaveBeenCalled();
+		expect(shelf.remove).not.toHaveBeenCalled();
+		expect(removeBookEntity({ bookId: "b1", sample: false, locked: false, remove: undefined })).toBe(
+			false,
+		);
 	});
 
 	it("refuses anything aimed at the sample book or the empty shelf", () => {

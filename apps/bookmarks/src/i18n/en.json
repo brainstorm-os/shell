@@ -91,6 +91,7 @@
   "tags.submit": "Save",
   "tags.cancel": "Cancel",
   "menu.remove": "Remove bookmark",
+  "menu.lockedHint": "This bookmark is locked — unlock it to make changes",
   "header.groupBy": "Group by {axis}",
   "group.menuLabel": "Group bookmarks by",
   "group.tags": "Tag",

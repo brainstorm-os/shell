@@ -12,6 +12,7 @@
 
 import { createQueryStore } from "@brainstorm-os/react-yjs";
 import type { PropertyDef, PropertyValueByValueType, ValueType } from "@brainstorm-os/sdk-types";
+import { lockRefusesWrite } from "@brainstorm-os/sdk/entity-lock";
 import { writeValue } from "@brainstorm-os/sdk/property-ui/pure";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createEntitiesRepository, foreignEntityToNote } from "./entities-repository";
@@ -254,6 +255,13 @@ export function useNotes(): UseNotes {
 		setNotes((prev) => {
 			const existing = prev.get(id);
 			if (!existing) return prev;
+			// Lock-5(h) — the read-only lock is decided HERE, in the one funnel
+			// every writer reaches (the icon / cover pickers, the body
+			// denormaliser, the properties panel, and the dictionary rewrite that
+			// patches OTHER notes wholesale). Spelling it per call site is what
+			// left Notes writing locked notes through five of them. Flipping the
+			// lock is the one exempt patch, and only when it is the WHOLE patch.
+			if (lockRefusesWrite(existing.locked === true, patch)) return prev;
 			const next = new Map(prev);
 			const updated = { ...existing, ...patch, updatedAt: Date.now() };
 			next.set(id, updated);
@@ -271,6 +279,9 @@ export function useNotes(): UseNotes {
 			setNotes((prev) => {
 				const existing = prev.get(noteId);
 				if (!existing) return prev;
+				// A property value is a property write: a locked note refuses it,
+				// and there is no lock key in a `values` patch to exempt.
+				if (lockRefusesWrite(existing.locked === true)) return prev;
 				const nextValues = writeValue(existing.values, def, next);
 				if (nextValues === existing.values) return prev;
 				const updated: StoredNote = {
@@ -290,6 +301,9 @@ export function useNotes(): UseNotes {
 	const remove = useCallback(async (id: string) => {
 		const repo = repoRef.current;
 		if (!repo) return;
+		// Delete is a write with no patch to exempt — a locked note refuses it
+		// outright, whichever affordance asked (⋯ menu, chord, or the confirm).
+		if (lockRefusesWrite(notesMapRef.current.get(id)?.locked === true)) return;
 		try {
 			await repo.remove(id);
 		} catch (e) {
