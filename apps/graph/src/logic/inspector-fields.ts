@@ -9,6 +9,7 @@
  */
 
 import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { ENTITY_TITLE_KEYS } from "@brainstorm-os/sdk/entity-title";
 import type { EntityRow } from "./in-memory-graph";
 import { MAX_INSPECTOR_ROWS, humaniseKey } from "./node-properties";
 
@@ -35,6 +36,10 @@ const NON_FIELD_KEYS: ReadonlySet<string> = new Set([
 	"source",
 	"kind",
 ]);
+
+/** The keys the editable title field owns — surfaced there, never again as
+ *  a generic property row. */
+const TITLE_FIELD_KEYS: ReadonlySet<string> = new Set(ENTITY_TITLE_KEYS);
 
 export type EditableField = {
 	/** Property bag key the value lives + writes under. */
@@ -65,7 +70,7 @@ export function editableInspectorFields(entity: EntityRow): EditableField[] {
 	for (const [key, raw] of Object.entries(entity.properties)) {
 		if (out.length >= MAX_INSPECTOR_ROWS) break;
 		if (key.startsWith("__")) continue;
-		if (NON_FIELD_KEYS.has(key) || key === "name" || key === "title") continue;
+		if (NON_FIELD_KEYS.has(key) || TITLE_FIELD_KEYS.has(key)) continue;
 		const def = inferInspectorDef(key, raw);
 		if (!def) continue;
 		out.push({ key, def, value: raw as string | number | boolean });
@@ -73,9 +78,18 @@ export function editableInspectorFields(entity: EntityRow): EditableField[] {
 	return out;
 }
 
-/** The entity's display title for the editable name field (empty string when
- *  unset — the field still renders so a user can name a bare node). */
-export function inspectorTitle(entity: EntityRow): string {
-	const name = entity.properties.name ?? entity.properties.title;
-	return typeof name === "string" ? name : "";
+/** The editable name field: the property that ACTUALLY supplies this node's
+ *  label, plus its value — so the edit writes back to the key the canvas
+ *  reads. The field used to be hard-bound to `name` while *displaying* a
+ *  `title` fallback, so renaming a Note from the graph inspector wrote a
+ *  `name` the label chain never reads and the node appeared not to rename.
+ *  Empty (and keyed `name`) when unset — the field still renders so a user
+ *  can name a bare node. `path` is deliberately not offered here: a
+ *  CodeFile is renamed by moving it, not through a name box. */
+export function inspectorTitleField(entity: EntityRow): { key: string; value: string } {
+	for (const key of ENTITY_TITLE_KEYS) {
+		const raw = entity.properties[key];
+		if (typeof raw === "string" && raw.trim().length > 0) return { key, value: raw };
+	}
+	return { key: "name", value: "" };
 }

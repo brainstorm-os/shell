@@ -7,6 +7,7 @@
  */
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 
 interface BpEntity {
 	entityId: string;
@@ -16,8 +17,7 @@ interface BpEntity {
 }
 
 function eventTitle(props: Record<string, unknown>): string {
-	const title = props.title ?? props.name;
-	return typeof title === "string" && title.length > 0 ? title : "Untitled event";
+	return entityTitleOr(props, "Untitled event");
 }
 
 function num(value: unknown): number | null {

@@ -17,6 +17,7 @@
  */
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
+import { entityTitleOr, resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import {
 	EMPTY_REF_TITLES,
 	MAX_ROWS,
@@ -107,7 +108,7 @@ async function resolveRefTitles(
 		const entity = got[i];
 		const id = ids[i];
 		if (!entity || id === undefined) continue;
-		const title = plainText(entity.properties.name) || plainText(entity.properties.title);
+		const title = resolveEntityTitle(entity.properties) ?? "";
 		if (title) titles.set(id, title);
 	}
 	return titles;
@@ -185,7 +186,7 @@ function renderGrid(
 
 	const title = doc.createElement("div");
 	title.className = "bsdb__title";
-	const name = plainText(list.properties.name) || plainText(list.properties.title) || "Database";
+	const name = entityTitleOr(list.properties, "Database");
 	title.append(name);
 	const count = doc.createElement("span");
 	count.className = "bsdb__count";

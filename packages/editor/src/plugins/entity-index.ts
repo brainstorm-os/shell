@@ -28,6 +28,7 @@ import {
 	defaultIconForType,
 } from "@brainstorm-os/sdk-types";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 
 /** Coerce a raw `properties.icon` value into an `Icon`. Mirrors the SDK's
  *  `parseIcon` (incl. its cross-app image-egress guard) but additionally
@@ -54,11 +55,12 @@ let started = false;
 let unsubscribeSource: (() => void) | null = null;
 const listeners = new Set<() => void>();
 
+/** The entity's display title through the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), falling back to the bare id —
+ *  which `getEntityTitle` reads as "unknown" so callers render their own
+ *  "Untitled". */
 export function entityTitleOf(entity: VaultEntity): string {
-	const p = entity.properties as { title?: unknown; name?: unknown };
-	if (typeof p.title === "string" && p.title.length > 0) return p.title;
-	if (typeof p.name === "string" && p.name.length > 0) return p.name;
-	return entity.id;
+	return entityTitleOr(entity.properties as Record<string, unknown>, entity.id);
 }
 
 function emit(): void {
