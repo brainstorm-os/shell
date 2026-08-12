@@ -1,7 +1,11 @@
 import { ValueType } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { EntityRow } from "./in-memory-graph";
-import { editableInspectorFields, inferInspectorDef, inspectorTitle } from "./inspector-fields";
+import {
+	editableInspectorFields,
+	inferInspectorDef,
+	inspectorTitleField,
+} from "./inspector-fields";
 
 const entity = (properties: Record<string, unknown>): EntityRow => ({
 	id: "n1",
@@ -49,10 +53,25 @@ describe("editableInspectorFields", () => {
 	});
 });
 
-describe("inspectorTitle", () => {
-	it("reads name then title, empty when unset", () => {
-		expect(inspectorTitle(entity({ name: "Alice" }))).toBe("Alice");
-		expect(inspectorTitle(entity({ title: "Doc" }))).toBe("Doc");
-		expect(inspectorTitle(entity({}))).toBe("");
+describe("inspectorTitleField", () => {
+	it("binds the edit to the key that actually supplies the label", () => {
+		// Writing a `name` onto a title-bearing Note is a no-op the canvas
+		// never reflects — the field must edit the winning key.
+		expect(inspectorTitleField(entity({ name: "Alice" }))).toEqual({
+			key: "name",
+			value: "Alice",
+		});
+		expect(inspectorTitleField(entity({ title: "Doc", name: "n" }))).toEqual({
+			key: "title",
+			value: "Doc",
+		});
+		expect(inspectorTitleField(entity({ displayName: "Mira" }))).toEqual({
+			key: "displayName",
+			value: "Mira",
+		});
+	});
+
+	it("falls back to an empty `name` so a bare node can still be named", () => {
+		expect(inspectorTitleField(entity({}))).toEqual({ key: "name", value: "" });
 	});
 });

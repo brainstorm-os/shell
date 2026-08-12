@@ -17,6 +17,7 @@
  */
 
 import { readAgentProvenance } from "@brainstorm-os/sdk-types";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 
 /** One created-object chip: enough to render + `open` it. */
 export type CreatedObjectChip = {
@@ -32,11 +33,11 @@ type SnapshotEntity = {
 	deletedAt?: number | null;
 };
 
+/** The chip's label — the shared chain (`@brainstorm-os/sdk/entity-title`,
+ *  which includes the `path` leg a CodeFile/v1 chip needs), empty when the
+ *  object carries no name at all. */
 function titleOf(properties: Record<string, unknown>): string {
-	// `path` is the CodeFile/v1 naming property (AppForge-3) — the chip for an
-	// approved code file would otherwise render untitled.
-	const raw = properties.title ?? properties.name ?? properties.path;
-	return typeof raw === "string" ? raw.trim() : "";
+	return entityTitleOr(properties, "");
 }
 
 /**

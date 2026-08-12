@@ -54,6 +54,7 @@ import {
 } from "@brainstorm-os/sdk/composer-context";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
+import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { Markdown } from "@brainstorm-os/sdk/markdown";
 import {
@@ -671,7 +672,7 @@ export function AgentApp(): ReactElement {
 				const matches: ContextCandidate[] = [];
 				for (const e of all) {
 					if (AGENT_OWN_TYPES.has(e.type)) continue;
-					const title = str(e.properties.title) || str(e.properties.name) || "";
+					const title = resolveEntityTitle(e.properties) ?? "";
 					if (!title) continue;
 					if (q && !title.toLowerCase().includes(q)) continue;
 					const isPerson = e.type === "brainstorm/Person/v1" || e.type.endsWith("/Person/v1");

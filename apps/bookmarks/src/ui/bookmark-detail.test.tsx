@@ -102,6 +102,7 @@ const detail = (
 			onToggleProperties={noop}
 			captureState={CaptureState.Captured}
 			onCapture={noop}
+			onToggleLock={noop}
 			{...props}
 		/>
 	</YDocProvider>

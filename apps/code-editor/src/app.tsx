@@ -43,6 +43,11 @@ import { type CodeEditorMessageKey, plural as appPlural, t } from "./i18n";
 import { useCodeEditorPlural, useCodeEditorT } from "./i18n-hooks";
 import { type CitationIndex, CitationKind, buildCitationIndex } from "./logic/citation-index";
 import { type CitationReference, collectReferences } from "./logic/citation-scan";
+import {
+	type CodeWriteContext,
+	codeWriteRefused,
+	writeCodeFilePatch,
+} from "./logic/code-file-writes";
 import { type CodeFileRow, isCodeFileEditable, projectCodeFiles } from "./logic/code-projection";
 import { fileName, languageLabel } from "./logic/code-view";
 import type { EditorCommand } from "./logic/command-palette";
@@ -524,6 +529,18 @@ export function CodeEditorApp(): ReactElement {
 		});
 	}, []);
 
+	// EVERY `CodeFile` property write goes through `logic/code-file-writes.ts`,
+	// where the read-only lock is decided inseparably from the write (Lock-5(l)).
+	// Built fresh per call so a callback that outlives its render — a save
+	// chord, a rename popover, a folder drop — reads the CURRENT lock.
+	const codeWriteCtx = useCallback(
+		(): CodeWriteContext => ({
+			find: (id) => rowsRef.current.find((r) => r.id === id),
+			update: getCodeEditorRuntime()?.services?.entities?.update,
+		}),
+		[],
+	);
+
 	const persistSelected = useCallback(async (): Promise<void> => {
 		const row = rowsRef.current.find((r) => r.id === selectedIdRef.current);
 		if (!row) return;
@@ -532,15 +549,17 @@ export function CodeEditorApp(): ReactElement {
 		}
 		const content = editsRef.current.get(row.id);
 		if (content === undefined || content === row.content) return;
-		const update = getCodeEditorRuntime()?.services?.entities?.update;
-		if (!update) {
+		const ctx = codeWriteCtx();
+		if (!ctx.update) {
 			console.info(
 				"[code-editor] save: no entities.update surface; Y.Doc transport still persists the body",
 			);
 			return;
 		}
 		try {
-			await update(row.id, { [row.contentKey]: content });
+			// A locked file refuses the SAVE — the pane is read-only, but the save
+			// chord fires regardless and this is where the content would land.
+			if (!(await writeCodeFilePatch(ctx, row.id, { [row.contentKey]: content }))) return;
 			setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, content } : r)));
 			setEdits((prev) => {
 				const next = new Map(prev);
@@ -553,7 +572,7 @@ export function CodeEditorApp(): ReactElement {
 		} catch (error) {
 			console.warn("[code-editor] save failed:", error);
 		}
-	}, []);
+	}, [codeWriteCtx]);
 
 	const createNewFile = useCallback(async (folder?: string): Promise<void> => {
 		const create = getCodeEditorRuntime()?.services?.entities?.create;
@@ -582,27 +601,31 @@ export function CodeEditorApp(): ReactElement {
 		}
 	}, []);
 
-	const applyRename = useCallback(async (row: CodeFileRow, path: string): Promise<void> => {
-		const update = getCodeEditorRuntime()?.services?.entities?.update;
-		if (!update) return;
-		// A rename that changes the extension changes what the file IS — re-derive
-		// and PERSIST the language so highlighting, the header chip and the
-		// diagnostics rail all follow the new name (POLISH-FN-2). The stored
-		// property is the source of truth every reader (Preview, the agent's code
-		// preview, the projector) trusts, so a stale value has to be corrected at
-		// the write, not papered over per reader.
-		const language = languageAfterRename(
-			row.language,
-			path,
-			editsRef.current.get(row.id)?.split("\n", 1)[0] ?? row.content.split("\n", 1)[0] ?? "",
-		);
-		try {
-			await update(row.id, language === row.language ? { path } : { path, language });
-			setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, path, language } : r)));
-		} catch (err) {
-			console.warn("[code-editor] rename failed:", err);
-		}
-	}, []);
+	const applyRename = useCallback(
+		async (row: CodeFileRow, path: string): Promise<void> => {
+			const update = getCodeEditorRuntime()?.services?.entities?.update;
+			if (!update) return;
+			// A rename that changes the extension changes what the file IS — re-derive
+			// and PERSIST the language so highlighting, the header chip and the
+			// diagnostics rail all follow the new name (POLISH-FN-2). The stored
+			// property is the source of truth every reader (Preview, the agent's code
+			// preview, the projector) trusts, so a stale value has to be corrected at
+			// the write, not papered over per reader.
+			const language = languageAfterRename(
+				row.language,
+				path,
+				editsRef.current.get(row.id)?.split("\n", 1)[0] ?? row.content.split("\n", 1)[0] ?? "",
+			);
+			try {
+				const patch = language === row.language ? { path } : { path, language };
+				if (!(await writeCodeFilePatch(codeWriteCtx(), row.id, patch))) return;
+				setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, path, language } : r)));
+			} catch (err) {
+				console.warn("[code-editor] rename failed:", err);
+			}
+		},
+		[codeWriteCtx],
+	);
 
 	// ── Folder operations (9.7.12) ────────────────────────────────────────────
 	// A folder IS a path prefix, so every folder write is N file-path writes.
@@ -624,24 +647,30 @@ export function CodeEditorApp(): ReactElement {
 		[],
 	);
 
-	const applyMoves = useCallback(async (moves: readonly PathMove[]): Promise<void> => {
-		const update = getCodeEditorRuntime()?.services?.entities?.update;
-		if (!update || moves.length === 0) return;
-		const landed: PathMove[] = [];
-		for (const move of moves) {
-			try {
-				await update(move.id, { path: move.to });
-				landed.push(move);
-			} catch (err) {
-				console.warn("[code-editor] move failed:", err);
+	const applyMoves = useCallback(
+		async (moves: readonly PathMove[]): Promise<void> => {
+			const update = getCodeEditorRuntime()?.services?.entities?.update;
+			if (!update || moves.length === 0) return;
+			const landed: PathMove[] = [];
+			const ctx = codeWriteCtx();
+			for (const move of moves) {
+				try {
+					// A locked row sits the folder move out rather than refusing the
+					// whole drop: the batch has no per-row affordance to disable.
+					if (!(await writeCodeFilePatch(ctx, move.id, { path: move.to }))) continue;
+					landed.push(move);
+				} catch (err) {
+					console.warn("[code-editor] move failed:", err);
+				}
 			}
-		}
-		if (landed.length === 0) return;
-		const byId = new Map(landed.map((move) => [move.id, move.to]));
-		setRows((prev) =>
-			prev.map((r) => (byId.has(r.id) ? { ...r, path: byId.get(r.id) ?? r.path } : r)),
-		);
-	}, []);
+			if (landed.length === 0) return;
+			const byId = new Map(landed.map((move) => [move.id, move.to]));
+			setRows((prev) =>
+				prev.map((r) => (byId.has(r.id) ? { ...r, path: byId.get(r.id) ?? r.path } : r)),
+			);
+		},
+		[codeWriteCtx],
+	);
 
 	/** Carry the pending (file-less) folders through a prefix rewrite, and drop
 	 *  the ones a file now occupies — a folder that exists in the paths needs no
@@ -774,14 +803,14 @@ export function CodeEditorApp(): ReactElement {
 			if (!update) return;
 			void (async () => {
 				try {
-					await update(row.id, { language });
+					if (!(await writeCodeFilePatch(codeWriteCtx(), row.id, { language }))) return;
 					setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, language } : r)));
 				} catch (err) {
 					console.warn("[code-editor] language change failed:", err);
 				}
 			})();
 		},
-		[selectedRow],
+		[selectedRow, codeWriteCtx],
 	);
 
 	const pendingRenameIdRef = useRef<string | null>(null);
@@ -821,22 +850,28 @@ export function CodeEditorApp(): ReactElement {
 	);
 	renameFileRef.current = renameFile;
 
-	const deleteFile = useCallback(async (row: CodeFileRow): Promise<void> => {
-		if (row.locked) return;
-		const del = getCodeEditorRuntime()?.services?.entities?.delete;
-		if (!del) return;
-		try {
-			await del(row.id);
-			setEdits((prev) => {
-				const next = new Map(prev);
-				next.delete(row.id);
-				return next;
-			});
-			setRows((prev) => prev.filter((r) => r.id !== row.id));
-		} catch (err) {
-			console.warn("[code-editor] delete failed:", err);
-		}
-	}, []);
+	const deleteFile = useCallback(
+		async (row: CodeFileRow): Promise<void> => {
+			// Delete carries no patch to exempt. Asked against the LIVE row rather
+			// than the copy this callback closed over, so a lock that arrived from
+			// another device after the ⋯ opened still holds.
+			if (codeWriteRefused(codeWriteCtx(), row.id)) return;
+			const del = getCodeEditorRuntime()?.services?.entities?.delete;
+			if (!del) return;
+			try {
+				await del(row.id);
+				setEdits((prev) => {
+					const next = new Map(prev);
+					next.delete(row.id);
+					return next;
+				});
+				setRows((prev) => prev.filter((r) => r.id !== row.id));
+			} catch (err) {
+				console.warn("[code-editor] delete failed:", err);
+			}
+		},
+		[codeWriteCtx],
+	);
 
 	const confirmDeleteFile = useCallback(
 		(row: CodeFileRow): void => {

@@ -75,3 +75,19 @@ export function lockRefusesWrite(
 	if (!locked) return false;
 	return patch === undefined || patch === null || !isLockOnlyPatch(patch);
 }
+
+/** `lockRefusesWrite` for a write that touches SEVERAL objects — a merge
+ *  (patches the survivor, bins the losers), a dedup pass, a multi-select
+ *  action. ONE locked participant refuses the whole operation: a half-refused
+ *  merge destroys some rows and keeps others, which is worse than no merge.
+ *
+ *  This is the shape every app was spelling for itself (`contactWriteRefused`
+ *  was the first, Bookmarks had none at all and lost data for it), so it lives
+ *  next to the single-object reading rather than once per app. */
+export function anyLockRefusesWrite(
+	isLocked: (id: string) => boolean,
+	ids: readonly string[],
+	patch?: Readonly<Record<string, unknown>> | null,
+): boolean {
+	return ids.some((id) => lockRefusesWrite(isLocked(id), patch));
+}

@@ -63,7 +63,7 @@ import {
 	isOpenablePdfBook,
 	resolveFileOpen,
 } from "./logic/book-open";
-import { bookWriteRefused, makePositionPersister, writeBookPatch } from "./logic/book-writes";
+import { makePositionPersister, removeBookEntity, writeBookPatch } from "./logic/book-writes";
 import { parseEpub } from "./logic/epub-parser";
 import { booksFromEntities } from "./logic/library";
 import { type PdfInfo, pdfEnrichmentPatch } from "./logic/pdf-metadata";
@@ -622,19 +622,15 @@ export function BooksApp(): ReactElement {
 	patchBookRef.current = patchBook;
 
 	const removeBook = useCallback(() => {
-		// Delete is a write with no patch to exempt: a locked book refuses it
-		// outright. The ⋯ already offers Remove disabled-with-the-reason, but the
-		// gate belongs where the write is, not only where the button is.
-		if (!selectedId) return;
-		const refused = bookWriteRefused({
+		// The refusal lives INSIDE `removeBookEntity`, ahead of the delete it
+		// owns — a locked book refuses a write with no patch to exempt.
+		const removed = removeBookEntity({
 			bookId: selectedId,
 			sample: selectedId === SAMPLE_BOOK_ID,
 			locked: lockedRef.current,
+			remove: entitiesSvc?.delete?.bind(entitiesSvc),
 		});
-		if (refused) return;
-		void entitiesSvc?.delete?.(selectedId)?.catch((error) => {
-			console.warn(`[books] remove failed: ${(error as Error).message}`);
-		});
+		if (!removed) return;
 		openBook(null);
 	}, [entitiesSvc, selectedId, openBook]);
 

@@ -13,6 +13,7 @@
  */
 
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import {
 	type SearchPickerItem,
 	closeSearchPicker,
@@ -34,12 +35,10 @@ export type TaskEmbedPickerPluginProps = {
 	currentTaskId: string | null;
 };
 
-/** Human title for a task entity — the `name` property, with a fallback. */
+/** Human title for a task entity — the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), with a localized fallback. */
 export function taskEntityTitle(entity: VaultEntity): string {
-	const name = entity.properties.name ?? entity.properties.title;
-	return typeof name === "string" && name.trim().length > 0
-		? name.trim()
-		: t("tasks.embed.untitled");
+	return entityTitleOr(entity.properties, t("tasks.embed.untitled"));
 }
 
 /** Filter Task entities by a case-insensitive title substring, excluding the

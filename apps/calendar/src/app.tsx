@@ -47,6 +47,12 @@ import { copyEventBlockRef } from "./logic/copy-event-block-ref";
 import { addDays, addMonths, startOfDay, startOfMonth } from "./logic/date-range";
 import { defaultEventStart } from "./logic/default-event-start";
 import {
+	type EventWriteContext,
+	removeEventWrite,
+	saveEventWrite,
+	unlockedEvents,
+} from "./logic/event-writes";
+import {
 	eventToScheduledItem,
 	mergeScheduledItems,
 	vaultSnapshotToScheduledItems,
@@ -355,24 +361,39 @@ export function CalendarApp() {
 	}, []);
 
 	// ── Persistence: apply a detail-surface / drag result ──────────────
+	// EVERY `Event/v1` write goes through `logic/event-writes.ts`, where the
+	// read-only lock is decided INSEPARABLY from the write (Lock-5(j)).
+	const eventWriteCtx = useCallback(
+		(): EventWriteContext => ({
+			find: (id) => eventsRef.current.get(id),
+			sink: repository
+				? { save: (ev) => repository.save(ev), remove: (id) => repository.remove(id) }
+				: null,
+		}),
+		[repository],
+	);
+
 	const applyDetailResult = useCallback(
 		(result: EventDetailResult) => {
 			void (async () => {
+				const ctx = eventWriteCtx();
 				if (result.kind === EventDetailOutcome.Saved) {
+					// The optimistic paint waits on the gate: refusing AFTER it would
+					// leave an edit on screen that never happened.
+					if (!(await saveEventWrite(ctx, result.event))) return;
 					setEventsById((cur) => new Map(cur).set(result.event.id, result.event));
-					if (repository) await repository.save(result.event);
 				} else {
+					if (!(await removeEventWrite(ctx, result.id))) return;
 					setEventsById((cur) => {
 						const next = new Map(cur);
 						next.delete(result.id);
 						return next;
 					});
-					if (repository) await repository.remove(result.id);
 				}
 				setEventsVersion((v) => v + 1);
 			})();
 		},
-		[repository],
+		[eventWriteCtx],
 	);
 
 	// F-218: only Day view's anchor is an explicitly chosen day — the month /
@@ -411,17 +432,21 @@ export function CalendarApp() {
 				const ev = eventsRef.current.get(id);
 				if (ev) events.push(ev);
 			}
-			const shifted = bulkShiftToDate(events, targetDayStart);
+			// A locked event sits the bulk move out — the selection has no per-row
+			// affordance to disable, so this is the only place it can be honoured.
+			const shifted = bulkShiftToDate(unlockedEvents(events), targetDayStart);
+			const ctx = eventWriteCtx();
+			const landed: Event[] = [];
+			for (const ev of shifted) if (await saveEventWrite(ctx, ev)) landed.push(ev);
 			setEventsById((cur) => {
 				const next = new Map(cur);
-				for (const ev of shifted) next.set(ev.id, ev);
+				for (const ev of landed) next.set(ev.id, ev);
 				return next;
 			});
-			if (repository) for (const ev of shifted) await repository.save(ev);
 			clearSelection();
 			setEventsVersion((v) => v + 1);
 		},
-		[selectedIds, repository, clearSelection],
+		[selectedIds, eventWriteCtx, clearSelection],
 	);
 
 	// ── Item interactions ───────────────────────────────────────────────

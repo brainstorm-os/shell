@@ -5,6 +5,7 @@
     "paths": {
       "@brainstorm-os/tokens": ["./packages/tokens/src/index.ts"],
       "@brainstorm-os/sdk": ["./packages/sdk/src/index.ts"],
+      "@brainstorm-os/sdk/*": ["./packages/sdk/src/*"],
       "@brainstorm-os/sdk-types": ["./packages/sdk-types/src/index.ts"],
       "@brainstorm-os/react-yjs": ["./packages/react-yjs/src/index.ts"],
       "@brainstorm-os/editor": ["./packages/editor/src/index.ts"],

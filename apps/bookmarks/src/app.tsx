@@ -66,6 +66,15 @@ import {
 	buildBoardLanes,
 } from "./logic/board-lanes";
 import { bookmarkListEquals } from "./logic/bookmark-list-equals";
+import {
+	type BookmarkWriteContext,
+	bookmarkLocked,
+	mergeBookmarkWrite,
+	mutateBookmarkWrite,
+	removeBookmarkWrite,
+	saveBookmarkWrite,
+	toggleBookmarkLock,
+} from "./logic/bookmark-writes";
 import { capturedBlocksToApply } from "./logic/capture-merge";
 import { captureActionsFor, deriveCaptureState } from "./logic/capture-state";
 import {
@@ -353,23 +362,50 @@ export function BookmarksApp() {
 	// ── Mutations ───────────────────────────────────────────────────────
 	// Under the shell, a mutation updates the entity through the repo and the
 	// live list re-pulls via `useLiveEntities`; standalone, it patches the
-	// in-memory demo set. Both paths share one `mutateBookmark`.
+	// in-memory demo set. Both paths share one sink, and EVERY write in this
+	// app goes through `logic/bookmark-writes.ts` — the read-only lock is
+	// decided there, inseparably from the write, so there is no spelling of a
+	// repository call left in this file to forget it (Lock-5(g)).
 	const bookmarksRef = useRef(bookmarks);
 	bookmarksRef.current = bookmarks;
+	// The unlocked subset, kept as a ref for the same reason: `mergeAllDuplicates`
+	// runs from a banner click that outlives the render which built the groups.
+	const mergeCandidatesRef = useRef<readonly Bookmark[]>(bookmarks);
+
+	const writeCtx = useCallback(
+		(): BookmarkWriteContext => ({
+			find: (id) => bookmarksRef.current.find((b) => b.id === id),
+			sink: {
+				save: (bookmark) => {
+					if (repository) void repository.save(bookmark);
+					else
+						setDemoBookmarks((list) =>
+							list.some((b) => b.id === bookmark.id)
+								? list.map((b) => (b.id === bookmark.id ? bookmark : b))
+								: [bookmark, ...list],
+						);
+				},
+				remove: (id) => {
+					if (repository) void repository.remove(id);
+					else setDemoBookmarks((list) => list.filter((b) => b.id !== id));
+				},
+			},
+		}),
+		[repository],
+	);
 
 	const mutateBookmark = useCallback(
 		(id: string, fn: (b: Bookmark) => Bookmark): void => {
-			const current = bookmarksRef.current.find((b) => b.id === id);
-			if (!current) return;
-			const next = fn(current);
-			if (next === current) return;
-			if (repository) {
-				void repository.save(next);
-			} else {
-				setDemoBookmarks((list) => list.map((b) => (b.id === id ? next : b)));
-			}
+			mutateBookmarkWrite(writeCtx(), id, fn);
 		},
-		[repository],
+		[writeCtx],
+	);
+
+	const toggleLock = useCallback(
+		(id: string): void => {
+			toggleBookmarkLock(writeCtx(), id, Date.now());
+		},
+		[writeCtx],
 	);
 
 	const toggleRead = useCallback(
@@ -391,12 +427,10 @@ export function BookmarksApp() {
 
 	const removeBookmark = useCallback(
 		(id: string) => {
-			if (!bookmarksRef.current.some((b) => b.id === id)) return;
+			if (!removeBookmarkWrite(writeCtx(), id)) return;
 			setOpenBookmarkId((open) => (open === id ? null : open));
-			if (repository) void repository.remove(id);
-			else setDemoBookmarks((list) => list.filter((b) => b.id !== id));
 		},
-		[repository],
+		[writeCtx],
 	);
 
 	// ── Content capture (Net-2) ─────────────────────────────────────────
@@ -490,8 +524,10 @@ export function BookmarksApp() {
 			now: Date.now,
 			downloadContentDefault: settings.downloadContentDefault,
 			onSave: (bookmark, { downloadContent }) => {
-				if (repository) void repository.save(bookmark);
-				else setDemoBookmarks((list) => [bookmark, ...list]);
+				// A brand-new bookmark has nothing to be locked yet, so this goes
+				// straight to the sink — but through the SAME sink, so the file
+				// still owns exactly one spelling of "write a bookmark".
+				writeCtx().sink.save(bookmark);
 				// Enrich in the background, but in series — the metadata scrape and
 				// the content capture each write the entity (and the scrape stores
 				// cover/favicon assets too); running them concurrently piles writes
@@ -510,7 +546,7 @@ export function BookmarksApp() {
 				}
 			},
 		});
-	}, [settings, repository, enrichBookmarkMetadata, captureContent]);
+	}, [settings, writeCtx, enrichBookmarkMetadata, captureContent]);
 
 	const openEditTagsFor = useCallback(
 		(id: string) => {
@@ -519,14 +555,13 @@ export function BookmarksApp() {
 			openEditTags({
 				bookmark,
 				now: Date.now,
-				onSave: (next) => {
-					if (next === bookmark) return;
-					if (repository) void repository.save(next);
-					else setDemoBookmarks((list) => list.map((b) => (b.id === id ? next : b)));
-				},
+				// The dialog hands back a finished row rather than a rewrite, and it
+				// outlives the render that opened it — so the gate re-reads the lock
+				// at save time, not at open time.
+				onSave: (next) => void saveBookmarkWrite(writeCtx(), next),
 			});
 		},
-		[repository],
+		[writeCtx],
 	);
 
 	const openBookmarkIconPicker = useCallback(
@@ -659,24 +694,23 @@ export function BookmarksApp() {
 	}, []);
 
 	// ── Dedup merge ─────────────────────────────────────────────────────
+	// A merge patches the survivor and BINS the losers, so it is the most
+	// destructive write in this app. Locked bookmarks never enter detection
+	// (below) — offering the group and refusing at the end would be a banner
+	// that lies — and `mergeBookmarkWrite` is the gate at the write itself, so
+	// a lock arriving between the banner and the click still holds.
 	const mergeAllDuplicates = useCallback(() => {
-		const groups = findDuplicateGroups(bookmarksRef.current);
+		const groups = findDuplicateGroups(mergeCandidatesRef.current);
 		if (groups.length === 0) return;
 		const now = Date.now();
-		let local = bookmarksRef.current;
+		const ctx = writeCtx();
 		for (const group of groups) {
 			const { merged, removedIds } = mergeBookmarks(group, now);
+			if (!mergeBookmarkWrite(ctx, merged, removedIds)) continue;
 			const removed = new Set(removedIds);
 			setOpenBookmarkId((open) => (open !== null && removed.has(open) ? merged.id : open));
-			if (repository) {
-				void repository.save(merged);
-				for (const id of removedIds) void repository.remove(id);
-			} else {
-				local = local.map((b) => (b.id === merged.id ? merged : b)).filter((b) => !removed.has(b.id));
-			}
 		}
-		if (!repository) setDemoBookmarks(local);
-	}, [repository]);
+	}, [writeCtx]);
 
 	// ── Boot: load persisted settings / collections / tag order ──────────
 	useEffect(() => {
@@ -816,7 +850,11 @@ export function BookmarksApp() {
 		return rows;
 	}, [bookmarks]);
 
-	const duplicateGroups = useMemo(() => findDuplicateGroups(bookmarks), [bookmarks]);
+	// Lock-5(g) — a LOCKED bookmark is not a merge candidate and never enters
+	// detection. Unlock it and it rejoins the candidate set.
+	const mergeCandidates = useMemo(() => bookmarks.filter((b) => !bookmarkLocked(b)), [bookmarks]);
+	mergeCandidatesRef.current = mergeCandidates;
+	const duplicateGroups = useMemo(() => findDuplicateGroups(mergeCandidates), [mergeCandidates]);
 
 	const showTagsOverview =
 		activeCollection === null && surface === BookmarkSurface.Tags && selectedTag === null;
@@ -838,6 +876,9 @@ export function BookmarksApp() {
 		(): Partial<ObjectMenuChromeLabels> => ({
 			remove: t("menu.remove"),
 			moreActions: t("action.moreActions"),
+			lock: t("detail.lock"),
+			unlock: t("detail.unlock"),
+			lockedHint: t("menu.lockedHint"),
 		}),
 		[],
 	);
@@ -855,6 +896,7 @@ export function BookmarksApp() {
 						id: "toggle-read",
 						label: t("action.markRead"),
 						icon: SURFACE_ICON[BookmarkSurface.Read],
+						writes: true,
 						run: () => toggleRead(bookmark.id, true),
 					});
 				} else if (cardSurface === BookmarkSurface.Read) {
@@ -862,6 +904,7 @@ export function BookmarksApp() {
 						id: "toggle-read",
 						label: t("action.markUnread"),
 						icon: SURFACE_ICON[BookmarkSurface.Inbox],
+						writes: true,
 						run: () => toggleRead(bookmark.id, false),
 					});
 				}
@@ -871,12 +914,14 @@ export function BookmarksApp() {
 								id: "toggle-archive",
 								label: t("action.unarchive"),
 								icon: SURFACE_ICON[BookmarkSurface.Inbox],
+								writes: true,
 								run: () => toggleArchive(bookmark.id, false),
 							}
 						: {
 								id: "toggle-archive",
 								label: t("action.archive"),
 								icon: SURFACE_ICON[BookmarkSurface.Archive],
+								writes: true,
 								run: () => toggleArchive(bookmark.id, true),
 							},
 				);
@@ -892,6 +937,7 @@ export function BookmarksApp() {
 						id: "capture-content",
 						label: t("detail.capture"),
 						icon: IconName.Update,
+						writes: true,
 						run: () => void captureContent(bookmark),
 					});
 				}
@@ -900,6 +946,7 @@ export function BookmarksApp() {
 						id: "capture-content",
 						label: t("detail.reload"),
 						icon: IconName.Update,
+						writes: true,
 						run: () => void captureContent(bookmark),
 					});
 				}
@@ -908,6 +955,7 @@ export function BookmarksApp() {
 						id: "forget-content",
 						label: t("detail.forget"),
 						icon: IconName.Trash,
+						writes: true,
 						run: () => forgetContent(bookmark),
 					});
 				}
@@ -926,6 +974,7 @@ export function BookmarksApp() {
 							id: "change-icon",
 							label: t("action.changeIcon"),
 							icon: IconName.Palette,
+							writes: true,
 							run: () => openBookmarkIconPicker(bookmark),
 						},
 						...(getBrainstorm()?.services?.covers
@@ -934,6 +983,7 @@ export function BookmarksApp() {
 										id: "cover",
 										label: bookmark.cover ? t("detail.cover.edit") : t("detail.cover.add"),
 										icon: IconName.Palette,
+										writes: true,
 										run: () => openBookmarkCoverPicker(bookmark),
 									},
 								]
@@ -942,9 +992,16 @@ export function BookmarksApp() {
 							id: "edit-tags",
 							label: t("action.editTags"),
 							icon: IconName.Tag,
+							writes: true,
 							run: () => openEditTagsFor(bookmark.id),
 						},
 					],
+					// Lock-5(g) — the ⋯ carries the Lock row and reads the object's
+					// synced lock, so every `writes: true` row above (and Remove)
+					// comes back disabled-with-the-reason on a locked bookmark
+					// instead of firing an action the write gate silently refuses.
+					...(bookmarkLocked(bookmark) ? { locked: true } : {}),
+					onToggleLock: () => toggleLock(bookmark.id),
 					...(repository ? { onRemove: () => removeBookmark(bookmark.id) } : {}),
 				};
 			};
@@ -960,6 +1017,7 @@ export function BookmarksApp() {
 			openBookmarkCoverPicker,
 			openEditTagsFor,
 			removeBookmark,
+			toggleLock,
 			repository,
 		],
 	);
@@ -1099,6 +1157,7 @@ export function BookmarksApp() {
 					onMoveCardToLane={moveCardToLane}
 					onReorderLane={reorderLane}
 					mutateBookmark={mutateBookmark}
+					onToggleLock={toggleLock}
 					captureContent={captureContent}
 					contentInFlight={contentInFlight}
 					captureErrors={captureErrors}
@@ -1395,6 +1454,7 @@ type MainPaneProps = {
 	onMoveCardToLane: (payload: CardDragPayload, toTag: string | null) => void;
 	onReorderLane: (dragTag: string, targetTag: string) => void;
 	mutateBookmark: (id: string, fn: (b: Bookmark) => Bookmark) => void;
+	onToggleLock: (id: string) => void;
 	captureContent: (bookmark: Bookmark) => Promise<void>;
 	contentInFlight: React.MutableRefObject<Set<string>>;
 	captureErrors: React.MutableRefObject<Set<string>>;
@@ -1509,6 +1569,7 @@ function DetailPane(props: MainPaneProps & { openBookmark: Bookmark }) {
 					onPropertyChange={(partial) =>
 						mutateBookmark(openBookmark.id, (b) => ({ ...b, ...partial, updatedAt: Date.now() }))
 					}
+					onToggleLock={() => props.onToggleLock(openBookmark.id)}
 					properties={runtime?.services?.properties ?? null}
 					covers={runtime?.services?.covers ?? null}
 					showProperties={propsOpen}

@@ -18,6 +18,13 @@
  * renderer maps to a glyph and primary-opener intent.
  */
 
+import { entityTitleOr, hasEntityTitle } from "@brainstorm-os/sdk/entity-title";
+
+/** What a nameless row reads as. The label chain itself is the SDK's
+ *  (`@brainstorm-os/sdk/entity-title`) — only the fallback is ours, and it
+ *  is ONE constant because three surfaces (row, tree, store) paint it. */
+export const UNTITLED = "(untitled)";
+
 export const FOLDER_TYPE = "brainstorm/Folder/v1" as const;
 export const FILE_TYPE = "brainstorm/File/v1" as const;
 export const NOTE_TYPE = "io.brainstorm.notes/Note/v1" as const;
@@ -80,35 +87,14 @@ export function entityTypeName(type: string): string {
 	return segments[segments.length - 1] ?? type;
 }
 
-/**
- * Resolve a human label from an entity's property bag. Order matches the
- * shared SDK title seam (title → name) plus CodeFile's path-only shape
- * (`brainstorm/CodeFile/v1` stores `path`, never `name`/`title` — without
- * the path leg every source file in the vault browser rendered as
- * "(untitled)", the 329 audit wall). Nested paths surface as the leaf
- * segment so a card reads `main.ts`, not `src/lib/main.ts`.
- */
-export function resolveDisplayName(properties: EntityProperties): string | null {
-	const title = properties.title;
-	if (typeof title === "string" && title.length > 0) return title;
-	const name = properties.name;
-	if (typeof name === "string" && name.length > 0) return name;
-	const path = properties.path;
-	if (typeof path === "string" && path.length > 0) {
-		const segments = path.split("/").filter((s) => s.length > 0);
-		return segments[segments.length - 1] ?? path;
-	}
-	return null;
-}
-
 export function readName(entity: Entity): string {
-	return resolveDisplayName(entity.properties) ?? "(untitled)";
+	return entityTitleOr(entity.properties, UNTITLED);
 }
 
 /** True when the entity carries a real display name (the "(untitled)"
  *  fallback is presentation, not data — sorts treat it specially). */
 export function hasDisplayName(entity: Entity): boolean {
-	return resolveDisplayName(entity.properties) !== null;
+	return hasEntityTitle(entity.properties);
 }
 
 /** Byte size of a file, or 0 for folders / anything without a numeric size —

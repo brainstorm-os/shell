@@ -19,6 +19,7 @@
  * stays a one-table lookup.
  */
 
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import type { EntityRow, InMemoryGraph, LinkRow } from "./in-memory-graph";
 
 export enum GraphExportFormat {
@@ -28,15 +29,11 @@ export enum GraphExportFormat {
 	Mermaid = "mermaid",
 }
 
-/** Human label for a node — title/name property, else the raw id. Never
- *  empty (an untitled node still needs something on the canvas/in DOT). */
+/** Human label for a node — the shared title chain
+ *  (`@brainstorm-os/sdk/entity-title`), else the raw id. Never empty (an
+ *  untitled node still needs something on the canvas/in DOT). */
 export function entityLabel(e: EntityRow): string {
-	const p = e.properties as Record<string, unknown>;
-	const title = typeof p.title === "string" ? p.title.trim() : "";
-	if (title) return title;
-	const name = typeof p.name === "string" ? p.name.trim() : "";
-	if (name) return name;
-	return e.id;
+	return entityTitleOr(e.properties as Record<string, unknown>, e.id);
 }
 
 function liveLinks(graph: InMemoryGraph): LinkRow[] {
