@@ -56,6 +56,18 @@ export type PairingServiceSession = {
 	getDeviceX25519(): { publicKey: Uint8Array };
 	getRelayUrl(): string | null;
 	saveIdentitySecret(secret: Uint8Array): Promise<void>;
+	/** F-498 — read the sovereign secret back out of the keystore.
+	 *
+	 *  `getUserIdentity()` cannot serve this: the whole `PairingServiceSession`
+	 *  captures its identity provider once, from the session that existed when it
+	 *  was built, so on the joining device it keeps answering with the PRE-pairing
+	 *  identity right through `confirmSas` — and re-ordering the reopen does not
+	 *  change that. The keystore is the one place that already holds the adopted
+	 *  secret by then, written by `saveIdentitySecret` during `scanPayload`.
+	 *
+	 *  Returns null when nothing is stored, which on the join path means the
+	 *  adoption did not happen and the caller must not proceed as if it had. */
+	loadIdentitySecret(): Promise<Uint8Array | null>;
 	/** F-493 — every entity row's creating principal, for the pristine check.
 	 *  Only `createdBy` is read; see `vault-pristine.ts` for why joining a vault
 	 *  that already holds the user's own work is refused. */
@@ -424,51 +436,85 @@ export class PairingService {
 			invalid(`pairing ${args.requestId} is in state ${pending.machine.state}`);
 		}
 
-		const identity = session.getUserIdentity();
 		const deviceEd = session.getDeviceEd25519();
 		const deviceX = session.getDeviceX25519();
-		const record = signAddDeviceRecord(
-			{
-				deviceEd25519Pub: bytesToBase64(deviceEd.publicKey),
-				deviceX25519Pub: bytesToBase64(deviceX.publicKey),
-				deviceLabel: "",
-				addedAt: (this.options.now ?? Date.now)(),
-				addedBy: bytesToBase64(identity.publicKey),
-			},
-			identity.secretKey,
-		);
-		const stored = session.devicesAdd(record);
-		// P2P-1 — also record the device we just paired WITH. Without this the
-		// pair is asymmetric: the source records the joiner, the joiner records
-		// only itself, and nothing ever teaches the joiner who the source is.
-		// The LAN client refuses a host that is not in its own roster, so two
-		// paired machines could never admit each other and every dial fell back
-		// to the relay. Idempotent by `deviceEd25519Pub`, like every other add.
+
+		// F-498 — sign as the identity this device is ADOPTING, never the one it
+		// is about to stop being.
 		//
-		// Only the source's Ed25519 travels in the QR payload, which is all a
-		// CLIENT needs (it verifies the host's proof under that key). Sealing a
-		// challenge additionally needs the peer's X25519, so this device cannot
-		// yet act as HOST for the source; that direction wants the source's
-		// X25519 on the wire and is its own rung.
-		try {
-			session.devicesAdd(
-				signAddDeviceRecord(
-					{
-						deviceEd25519Pub: bytesToBase64(pending.join.sourceDeviceEd25519Pub),
-						// Only the source's Ed25519 travels in the QR payload; see the
-						// note in `DevicesStore.add` on why empty is legitimate here.
-						deviceX25519Pub: "",
-						deviceLabel: "",
-						addedAt: (this.options.now ?? Date.now)(),
-						addedBy: bytesToBase64(identity.publicKey),
-					},
-					identity.secretKey,
-				),
+		// Both records below are roster rows for the joined vault, and every
+		// reader verifies them under that vault's sovereign key
+		// (`DevicesStore.listActive`). Signing them with `getUserIdentity()` —
+		// which is still this device's PRE-pairing self, and stays that way even
+		// after the reopen below, because the session wrapper captured its
+		// identity provider once — produced two rows that verify under nobody.
+		// The joining device then dropped its own roster on the next read, could
+		// not answer the host's sealed challenge, and every LAN dial fell back to
+		// a relay. That is the whole of why `10.3d`(b) was red.
+		//
+		// The secret is fetched here rather than held since `scanPayload` (which
+		// zeroes it on purpose) and is zeroed again the moment both signatures
+		// exist.
+		const adoptedSecret = await session.loadIdentitySecret();
+		if (!adoptedSecret) {
+			// The adoption is what makes this device a member of the joined vault.
+			// Without it there is no key that could sign a row anyone will accept,
+			// and a row signed by the old identity is worse than none — it is a
+			// permanent unverifiable entry in the roster.
+			throw new Error(
+				"pairing: the adopted identity is not in the keystore; cannot sign a roster record this vault would accept",
 			);
-		} catch (error) {
-			// A failure here must not undo a completed pairing — the user is
-			// paired either way; only LAN admission is degraded.
-			console.warn("[pairing] could not record the source device:", error);
+		}
+		const adoptedPub = pending.join.userEd25519Pub;
+
+		let stored: SignedAddDeviceRecord;
+		try {
+			const record = signAddDeviceRecord(
+				{
+					deviceEd25519Pub: bytesToBase64(deviceEd.publicKey),
+					deviceX25519Pub: bytesToBase64(deviceX.publicKey),
+					deviceLabel: "",
+					addedAt: (this.options.now ?? Date.now)(),
+					addedBy: bytesToBase64(adoptedPub),
+				},
+				adoptedSecret,
+			);
+			stored = session.devicesAdd(record);
+
+			// P2P-1 — also record the device we just paired WITH. Without this the
+			// pair is asymmetric: the source records the joiner, the joiner records
+			// only itself, and nothing ever teaches the joiner who the source is.
+			// The LAN client refuses a host that is not in its own roster, so two
+			// paired machines could never admit each other and every dial fell back
+			// to the relay. Idempotent by `deviceEd25519Pub`, like every other add.
+			//
+			// Only the source's Ed25519 travels in the QR payload, which is all a
+			// CLIENT needs (it verifies the host's proof under that key). Sealing a
+			// challenge additionally needs the peer's X25519, so this device cannot
+			// yet act as HOST for the source; that direction wants the source's
+			// X25519 on the wire and is its own rung.
+			try {
+				session.devicesAdd(
+					signAddDeviceRecord(
+						{
+							deviceEd25519Pub: bytesToBase64(pending.join.sourceDeviceEd25519Pub),
+							// Only the source's Ed25519 travels in the QR payload; see the
+							// note in `DevicesStore.add` on why empty is legitimate here.
+							deviceX25519Pub: "",
+							deviceLabel: "",
+							addedAt: (this.options.now ?? Date.now)(),
+							addedBy: bytesToBase64(adoptedPub),
+						},
+						adoptedSecret,
+					),
+				);
+			} catch (error) {
+				// A failure here must not undo a completed pairing — the user is
+				// paired either way; only LAN admission is degraded.
+				console.warn("[pairing] could not record the source device:", error);
+			}
+		} finally {
+			zero(adoptedSecret);
 		}
 		pending.machine.paired();
 

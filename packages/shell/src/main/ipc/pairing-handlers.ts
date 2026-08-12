@@ -197,6 +197,12 @@ function buildSession(
 			// orphans nothing and hands nobody authority over existing work.
 			await adoptVaultIdentity(session.vaultPath, publicKeyFromSecret(secret));
 		},
+		// F-498 — the adopted secret, read back from the one place that holds it
+		// during `confirmSas`. Deliberately a fresh read per call rather than a
+		// cached copy: the caller zeroes what it gets, and a sovereign key should
+		// live for the length of the signature it is needed for, not the session.
+		loadIdentitySecret: async (): Promise<Uint8Array | null> =>
+			await session.backend.getSecret(session.vaultId, "identity"),
 		// F-493 — provenance for the pristine check. Only `createdBy` leaves the
 		// repo; the decision never sees titles or bodies.
 		listEntityPrincipals: async () => {
