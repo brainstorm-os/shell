@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	LOCKED_PROPERTY_KEY,
+	anyLockRefusesWrite,
 	isEntityLocked,
 	isLockOnlyPatch,
 	isLockedProperties,
@@ -97,5 +98,28 @@ describe("lockRefusesWrite", () => {
 	it("refuses a patch-less write (delete / merge / destroy) outright", () => {
 		expect(lockRefusesWrite(true)).toBe(true);
 		expect(lockRefusesWrite(true, null)).toBe(true);
+	});
+});
+
+describe("anyLockRefusesWrite — the multi-object write", () => {
+	const isLocked = (id: string): boolean => id.startsWith("locked");
+
+	it("lets a write through when every participant is unlocked", () => {
+		expect(anyLockRefusesWrite(isLocked, ["a", "b"], { name: "x" })).toBe(false);
+		expect(anyLockRefusesWrite(isLocked, ["a", "b"])).toBe(false);
+		expect(anyLockRefusesWrite(isLocked, [])).toBe(false);
+	});
+
+	it("refuses the WHOLE write when ONE participant is locked, either side", () => {
+		// The merge case: the survivor takes a patch and every loser is BINNED.
+		// A half-refused merge destroys some rows and keeps others, which is
+		// worse than no merge — so one locked member refuses all of it.
+		expect(anyLockRefusesWrite(isLocked, ["locked1", "a"])).toBe(true);
+		expect(anyLockRefusesWrite(isLocked, ["a", "locked2"])).toBe(true);
+	});
+
+	it("carries the single-object patch semantics through unchanged", () => {
+		expect(anyLockRefusesWrite(isLocked, ["locked1"], lockTogglePatch(true))).toBe(false);
+		expect(anyLockRefusesWrite(isLocked, ["locked1"], { locked: false, name: "x" })).toBe(true);
 	});
 });

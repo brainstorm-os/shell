@@ -19,6 +19,7 @@
  */
 
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 
 export type MentionTrigger = {
 	/** Character offset (in the paragraph text) where `@` sits. */
@@ -122,19 +123,11 @@ function matchesWordStart(name: string, q: string): boolean {
 	return false;
 }
 
-/** User-facing title for a vault entity, falling back to its id when
- *  `properties.title` / `properties.name` are missing or blank.
- *
- *  Reads `title` first, then `name` — Notes write `title`; future
- *  apps may write `name`. The fallback keeps the typeahead useful
- *  even on entities without a friendly title yet. */
+/** User-facing title for a vault entity through the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), falling back to its id so the
+ *  typeahead stays useful on an entity with no friendly title yet. */
 export function entityDisplayName(entity: VaultEntity): string {
-	const props = entity.properties ?? {};
-	const title = readString(props, "title");
-	if (title) return title;
-	const name = readString(props, "name");
-	if (name) return name;
-	return entity.id;
+	return entityTitleOr(entity.properties, entity.id);
 }
 
 /** Friendly caption for an entity type in the mention picker — the bare
@@ -150,11 +143,4 @@ export function mentionEntityTypeLabel(type: string): string {
 		if (candidate) return candidate;
 	}
 	return type;
-}
-
-function readString(props: Record<string, unknown>, key: string): string | null {
-	const value = props[key];
-	if (typeof value !== "string") return null;
-	const trimmed = value.trim();
-	return trimmed.length > 0 ? trimmed : null;
 }

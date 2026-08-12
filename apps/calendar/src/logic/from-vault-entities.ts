@@ -23,6 +23,7 @@
 
 import { yearlyRecurrenceForDate } from "@brainstorm-os/sdk-types";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { type TKey, t } from "../i18n/t";
 import { JOURNAL_ENTRY_TYPE, type VaultEntity, type VaultSnapshot } from "../runtime";
 import { EVENT_TYPE } from "../storage/entities-repository";
@@ -103,13 +104,12 @@ function isPlausibleDate(value: unknown): value is number {
 	);
 }
 
-/** Best title for an arbitrary entity: `name` → `title` → `fullName` → a
- *  localized fallback. */
+/** Best title for an arbitrary entity: the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), else a localized fallback. Calendar
+ *  used to prefer `name` over `title` and consult a `fullName` key no
+ *  entity type actually writes (Person reuses `name`). */
 function entityTitle(props: Record<string, unknown>): string {
-	if (typeof props.name === "string" && props.name.length > 0) return props.name;
-	if (typeof props.title === "string" && props.title.length > 0) return props.title;
-	if (typeof props.fullName === "string" && props.fullName.length > 0) return props.fullName;
-	return t("calendar.item.untitled");
+	return entityTitleOr(props, t("calendar.item.untitled"));
 }
 
 /** Project one entity to a `ScheduledItem` per date-typed property it carries

@@ -14,6 +14,7 @@
  */
 
 import { AttachmentKind, type MessageAttachment } from "@brainstorm-os/sdk-types";
+import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 
 /** A resolved vault object, reduced to what grounding needs. */
 export type ReferencedEntity = {
@@ -32,7 +33,6 @@ export const REFERENCE_TEXT_MAX = 1500;
  *  rail. */
 export const REFERENCE_MAX = 12;
 
-const TITLE_KEYS = ["title", "name", "label"] as const;
 const TEXT_KEYS = ["body", "text", "content", "description", "summary", "snippet", "note"] as const;
 
 /** Strip C0/C1/DEL control chars (a codepoint filter, not a control-char regex
@@ -53,14 +53,11 @@ function clamp(text: string, max: number): string {
 	return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** The entity's display title from its common title-bearing properties, falling
- *  back to the id. */
+/** The entity's display title through the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), control-stripped for the prompt,
+ *  falling back to the id. */
 export function entityTitle(properties: Record<string, unknown>, fallbackId: string): string {
-	for (const key of TITLE_KEYS) {
-		const value = clean(properties[key]);
-		if (value) return value;
-	}
-	return fallbackId;
+	return clean(resolveEntityTitle(properties)) || fallbackId;
 }
 
 /** A plain-text excerpt from the entity's text-bearing properties (Yjs richtext

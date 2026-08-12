@@ -87,6 +87,13 @@ import {
 } from "./logic/task-selection";
 import { TASK_SORTS, TaskSort } from "./logic/task-sort";
 import { tasksWithTag } from "./logic/task-tags";
+import {
+	type TaskWriteContext,
+	patchTaskWrite,
+	removeTaskWrite,
+	saveTaskWrite,
+	toggleTaskLock,
+} from "./logic/task-writes";
 import type { TaskFieldHandlers } from "./properties/task-properties";
 import { TAGS_DICT_ID, backfillTagDictionary } from "./properties/task-vocab";
 import { ActionId, bindShortcut } from "./shortcuts";
@@ -610,26 +617,45 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	// Under the shell a mutation writes through the repo and the live list
 	// re-pulls via `useLiveEntities`; standalone, it patches the in-memory demo
 	// snapshot. Both paths share these helpers.
-	const saveTask = useCallback(
-		(next: Task) => {
-			if (repository) void repository.saveTask(next);
-			else
-				setDemoData((d) => {
-					const idx = d.tasks.findIndex((x) => x.id === next.id);
-					if (idx < 0) return { ...d, tasks: [...d.tasks, next] };
-					const tasksNext = d.tasks.slice();
-					tasksNext[idx] = next;
-					return { ...d, tasks: tasksNext };
-				});
-		},
+	// EVERY `Task/v1` write goes through `logic/task-writes.ts`, where the
+	// read-only lock is decided INSEPARABLY from the write (Lock-5(i)): there
+	// is no ungated spelling of a task write left in this file for the next
+	// call site to forget. Built fresh per call so a callback that outlives its
+	// render reads the current lock.
+	const taskWriteCtx = useCallback(
+		(): TaskWriteContext => ({
+			find: (id) => dataRef.current.tasks.find((x) => x.id === id),
+			sink: {
+				save: (next) => {
+					if (repository) void repository.saveTask(next);
+					else
+						setDemoData((d) => {
+							const idx = d.tasks.findIndex((x) => x.id === next.id);
+							if (idx < 0) return { ...d, tasks: [...d.tasks, next] };
+							const tasksNext = d.tasks.slice();
+							tasksNext[idx] = next;
+							return { ...d, tasks: tasksNext };
+						});
+				},
+				remove: (id) => {
+					if (repository) void repository.deleteTask(id);
+					else setDemoData((d) => ({ ...d, tasks: d.tasks.filter((x) => x.id !== id) }));
+				},
+			},
+		}),
 		[repository],
 	);
+	const saveTask = useCallback(
+		(next: Task) => void saveTaskWrite(taskWriteCtx(), next),
+		[taskWriteCtx],
+	);
 	const deleteTaskRecord = useCallback(
-		(id: string) => {
-			if (repository) void repository.deleteTask(id);
-			else setDemoData((d) => ({ ...d, tasks: d.tasks.filter((x) => x.id !== id) }));
-		},
-		[repository],
+		(id: string) => void removeTaskWrite(taskWriteCtx(), id),
+		[taskWriteCtx],
+	);
+	const toggleTaskLockFor = useCallback(
+		(id: string) => void toggleTaskLock(taskWriteCtx(), id, nowAnchor()),
+		[taskWriteCtx, nowAnchor],
 	);
 	const saveProject = useCallback(
 		(next: Project) => {
@@ -654,14 +680,9 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 	);
 
 	const patchTask = useCallback(
-		(taskId: string, mutate: (t: Task) => Task) => {
-			const existing = dataRef.current.tasks.find((x) => x.id === taskId);
-			if (!existing) return;
-			const next = mutate(existing);
-			if (next === existing) return;
-			saveTask(next);
-		},
-		[saveTask],
+		(taskId: string, mutate: (t: Task) => Task) =>
+			void patchTaskWrite(taskWriteCtx(), taskId, mutate),
+		[taskWriteCtx],
 	);
 
 	const onToggleComplete = useCallback(
@@ -2115,13 +2136,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 					{openTaskRecord ? (
 						<LockButton
 							locked={!!openTaskRecord.locked}
-							onToggle={() =>
-								patchTask(openTaskRecord.id, (x) => ({
-									...x,
-									locked: !x.locked,
-									updatedAt: nowAnchor(),
-								}))
-							}
+							onToggle={() => toggleTaskLockFor(openTaskRecord.id)}
 							lockLabel={t("tasks.header.lock")}
 							unlockLabel={t("tasks.header.unlock")}
 						/>

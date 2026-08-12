@@ -47,6 +47,29 @@ export function bookWriteRefused(
 	return lockRefusesWrite(ctx.locked, patch);
 }
 
+/** Remove the open book, or refuse. Delete carries no patch to exempt, so a
+ *  locked book refuses it outright — the ⋯ offers Remove disabled-with-the-
+ *  reason, but the gate belongs where the write is, which the chord cannot walk
+ *  around. The refusal and the `entities.delete` live in ONE function on
+ *  purpose (Lock-5(f)): as a separate `if (refused) return` above the call, the
+ *  guard could be deleted with the delete left standing and the suite green.
+ *
+ *  Returns whether the removal went out. */
+export function removeBookEntity(
+	ctx: Omit<BookWriteContext, "update"> & {
+		remove: ((id: string) => Promise<unknown> | unknown) | undefined;
+	},
+): boolean {
+	const bookId = ctx.bookId;
+	if (!bookId || bookWriteRefused(ctx)) return false;
+	const remove = ctx.remove;
+	if (!remove) return false;
+	void Promise.resolve(remove(bookId)).catch((error: unknown) => {
+		console.warn(`[books] remove failed: ${(error as Error).message}`);
+	});
+	return true;
+}
+
 /** Issue a property write, or refuse it. Returns whether the write went out —
  *  callers that mirror state locally can ride that answer rather than assuming
  *  their patch landed. */

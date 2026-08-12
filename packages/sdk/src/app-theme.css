@@ -145,33 +145,6 @@
  * Fixed once, here.
  * ============================================================ */
 :root {
-	/* Blur radius for the app-header wallpaper stripe. Deliberately THE SAME
-	 * value the shell's own header uses, because they are the same surface and
-	 * the user sees them side by side.
-	 *
-	 * The shell dashboard header is `.glass--subtle`, i.e. a real
-	 * `backdrop-filter: blur(var(--glass-blur))` over the wallpaper element
-	 * behind it. An app window has no wallpaper element behind its header, so
-	 * that backdrop-filter is inert there and the stripe has to paint the image
-	 * itself — but it must still LOOK like the shell's, which means the same
-	 * blur radius and the same glass tint on top, not a second treatment.
-	 *
-	 * This was 18px with a comment arguing the wider blur was better for a
-	 * photograph. That argument produced two different-looking headers in one
-	 * product, which the owner spotted immediately: exactly the lookalike-
-	 * primitive defect POLISH-DSN-13 exists to catch. The shared value wins.
-	 *
-	 * The fallback is 10px because that is what `glass.blur` actually resolves
-	 * to (`themes.ts`). Several `var(--glass-blur, 5px)` fallbacks elsewhere in
-	 * this file cite 5px, which is simply wrong — harmless while the token is
-	 * present, and a silent 2× divergence the day it is not. */
-	--app-wallpaper-blur: var(--glass-blur, 10px);
-	/* How far the wallpaper layer overshoots the header on every side. Must
-	 * exceed `--app-wallpaper-blur` so the blur always has real pixels to
-	 * sample past the edge; the header clips the overshoot. Also the exact
-	 * amount the background is pushed down by, which is what lands the image's
-	 * TOP edge on the header's top edge rather than showing its middle. */
-	--app-wallpaper-bleed: 40px;
 	--bg: var(--color-background-primary);
 	--bg-elev: var(--color-background-elevated);
 	--bg-elevated: var(--color-background-elevated);
@@ -1114,41 +1087,32 @@ body.is-booting *::after {
 	overflow: hidden;
 }
 
-/* Wallpaper stripe. `--app-wallpaper-image` is injected by app-preload from the
- * active vault's wallpaper; absent (no wallpaper set, or a surface that isn't an
- * app window) the layer paints nothing and the header keeps its flat glass.
- * Cover-fit per header — deliberately NOT aligned to the desktop behind the
- * window, which would need the window rect pushed on every move and resize. */
-:root .app-header::before {
-	content: "";
-	position: absolute;
-	z-index: -1;
-	/* The layer overshoots the header on every side so the blur samples real
-	 * pixels instead of smearing transparent ones into a pale rim. The header
-	 * clips it (see `overflow` above).
-	 *
-	 * This replaces an earlier `transform: scale()`, which grew the layer about
-	 * its CENTRE and so could not also anchor the image's top edge — the header
-	 * showed a band from the middle of the wallpaper. Overshooting by inset and
-	 * pushing the background down by the same amount puts the image's TOP edge
-	 * exactly on the header's top edge, while still leaving blur margin above. */
-	inset: calc(var(--app-wallpaper-bleed, 40px) * -1);
-	background-image: var(--app-wallpaper-image, none);
-	background-size: cover;
-	background-position: center var(--app-wallpaper-bleed, 40px);
-	filter: blur(var(--app-wallpaper-blur, 18px))
-		saturate(var(--glass-saturate, 180%));
-}
+/* The wallpaper stripe is REMOVED (2026-08-11, owner: "app performance
+ * decreased — windows are not working very well, if blur affects this then we
+ * need to remove it").
+ *
+ * It affected it. The shell dashboard gets its stripe from `backdrop-filter`
+ * over a wallpaper element that already exists behind the header — the
+ * compositor blurs a surface it is drawing anyway. An app window has nothing
+ * behind its header, so this rule stood up its OWN copy of the wallpaper in a
+ * `::before` and ran a `filter: blur()` over it: a full-size photograph,
+ * inset 40px past the header on all four sides, rasterised and blurred
+ * PER APP WINDOW. `filter` (unlike `backdrop-filter`) forces the element and
+ * its subtree onto their own composited layer and re-blurs on paint, so the
+ * cost scaled with the number of open windows — which is exactly the symptom
+ * reported.
+ *
+ * The decoration was never worth that. It also never matched the shell's (it
+ * cover-fit the whole image, so every window showed the image's top slice
+ * rather than the region actually behind it), and it was never verified in a
+ * screenshot, because the dev vault uses SOLID wallpapers and no capture can
+ * render it at all.
+ *
+ * If it returns, it must be `backdrop-filter` over something real — which
+ * means giving app windows an actual wallpaper layer to blur, not a per-window
+ * copy of the image — and it must ship with a frame-cost measurement across
+ * several open windows before, not after. */
 
-/* Scrim over the wallpaper so header text keeps its contrast on any image.
- * Sits between the wallpaper and the content, both behind the flow. */
-:root .app-header::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	z-index: -1;
-	background: var(--color-glass-background-subtle, transparent);
-}
 .app-header__left,
 .app-header__right {
 	display: inline-flex;

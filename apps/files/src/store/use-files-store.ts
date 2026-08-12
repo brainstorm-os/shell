@@ -25,6 +25,7 @@ import {
 } from "@brainstorm-os/react-yjs";
 import { announce } from "@brainstorm-os/sdk/a11y";
 import { isEntityLocked, lockRefusesWrite, lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural, t } from "../i18n";
@@ -74,9 +75,9 @@ import {
 	FILE_TYPE,
 	FOLDER_TYPE,
 	ROOT_FOLDER_ID,
+	UNTITLED,
 	readMembers,
 	readName,
-	resolveDisplayName,
 } from "../types/entity";
 import type { VaultEntityShape, VaultLinkShape } from "../types/runtime";
 
@@ -158,7 +159,7 @@ function buildVaultEntityIndex(
 	for (const raw of entities) {
 		if (raw.deletedAt) continue;
 		const props = raw.properties ?? {};
-		const name = resolveDisplayName(props) ?? "(untitled)";
+		const name = entityTitleOr(props, UNTITLED);
 		map.set(raw.id, {
 			id: raw.id,
 			type: raw.type,

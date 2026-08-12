@@ -24,9 +24,17 @@ function entity(props: Record<string, unknown>, id = "abcdef0123456789"): Entity
 }
 
 describe("rawNodeLabel", () => {
-	it("prefers name, then title", () => {
-		expect(rawNodeLabel(entity({ name: "Alpha", title: "Beta" }))).toBe("Alpha");
+	// DS-entity-title-1: the canvas walks the SHARED chain
+	// (`@brainstorm-os/sdk/entity-title`), so a node reads the same as the
+	// same object's tile in Files. Graph used to prefer `name` over `title`
+	// and knew nothing of `displayName` / `path`.
+	it("walks the shared chain: title → name → displayName → label → path leaf", () => {
+		expect(rawNodeLabel(entity({ name: "Alpha", title: "Beta" }))).toBe("Beta");
 		expect(rawNodeLabel(entity({ title: "Beta" }))).toBe("Beta");
+		expect(rawNodeLabel(entity({ name: "Alpha" }))).toBe("Alpha");
+		expect(rawNodeLabel(entity({ displayName: "Mira" }))).toBe("Mira");
+		expect(rawNodeLabel(entity({ label: "Weekly digest" }))).toBe("Weekly digest");
+		expect(rawNodeLabel(entity({ path: "src/lib/main.ts" }))).toBe("main.ts");
 	});
 
 	it("falls back to a human type caption, never a raw id fragment (F-320)", () => {

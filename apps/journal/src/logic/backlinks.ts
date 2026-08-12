@@ -15,7 +15,12 @@
  * `entities.subscribe`. The panel keeps working.
  */
 
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { JOURNAL_ENTRY_TYPE, NOTE_ENTITY_TYPE, type VaultSnapshot } from "../runtime";
+
+/** What a nameless backlink row reads as. One constant — the outbound and
+ *  inbound walks paint the same label for the same object. */
+const UNTITLED_BACKLINK = "(untitled)";
 
 export type Backlink = {
 	sourceNoteId: string;
@@ -51,12 +56,7 @@ export function findBacklinks(snapshot: VaultSnapshot, noteId: string): Backlink
 		if (!BACKLINK_SOURCE_TYPES.has(source.type)) continue;
 		if (source.deletedAt !== null) continue;
 		seen.add(link.sourceEntityId);
-		const title =
-			typeof source.properties.title === "string" && source.properties.title.length > 0
-				? source.properties.title
-				: typeof source.properties.name === "string"
-					? source.properties.name
-					: "(untitled)";
+		const title = entityTitleOr(source.properties, UNTITLED_BACKLINK);
 		out.push({
 			sourceNoteId: source.id,
 			sourceType: source.type,
@@ -94,12 +94,7 @@ export function findOutgoingLinks(snapshot: VaultSnapshot, noteId: string): Outg
 		const dest = entityById.get(link.destEntityId);
 		if (!dest || dest.deletedAt !== null) continue;
 		seen.add(link.destEntityId);
-		const title =
-			typeof dest.properties.title === "string" && dest.properties.title.length > 0
-				? dest.properties.title
-				: typeof dest.properties.name === "string"
-					? dest.properties.name
-					: "(untitled)";
+		const title = entityTitleOr(dest.properties, UNTITLED_BACKLINK);
 		out.push({
 			destNoteId: dest.id,
 			destType: dest.type,

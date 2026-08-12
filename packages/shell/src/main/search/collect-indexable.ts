@@ -14,6 +14,7 @@
  * Tolerates a throwing / absent repo (degrades to `[]`, never throws).
  */
 
+import { ENTITY_TITLE_KEYS } from "@brainstorm-os/sdk/entity-title";
 import { deriveEntityTitle } from "../entities/derive-title";
 import { extractNoteBodyText } from "../entities/extract-note-text";
 import { STRUCTURAL_ENTITY_TYPES } from "../entities/vault-entities-service";
@@ -21,8 +22,12 @@ import type { SharedEntitiesRepo } from "../entities/vault-entities-service";
 import type { IndexableEntity } from "./search-indexer";
 
 /** Property keys whose values are surfaced through `title`, are the rich
- *  body itself, or are structural — never folded into the flat body text. */
-const NON_BODY_KEYS = new Set(["title", "name", "body"]);
+ *  body itself, or are structural — never folded into the flat body text.
+ *  The title half is the shared chain's own key list, so a key added there
+ *  can't silently start double-indexing as body text. `path` is
+ *  deliberately absent: it names the object AND is worth matching on
+ *  ("src/lib"). */
+const NON_BODY_KEYS = new Set<string>([...ENTITY_TITLE_KEYS, "body"]);
 
 /** Upper bound on the flat body text per entity. FTS5 copes with large
  *  rows, but a pathological property blob would bloat the index + skew
