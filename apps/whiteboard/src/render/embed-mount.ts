@@ -34,6 +34,7 @@ import {
 	defaultMintChannelId,
 } from "@brainstorm-os/sdk/block-frame";
 import { BlockControlKind, collectBlockThemeVars } from "@brainstorm-os/sdk/block-runtime";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { parseBrainstormEntityUri } from "@brainstorm-os/sdk/note-references";
 
 /** Hard ceiling on a live embed's reported height — a runaway block can't blow
@@ -59,12 +60,11 @@ function str(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
-/** Pick a human label for an entity from its common name-bearing properties,
- *  falling back to the id so a row is never blank. */
+/** Pick a human label for an entity through the shared chain
+ *  (`@brainstorm-os/sdk/entity-title`), falling back to the id so a row is
+ *  never blank. */
 export function embedEntityLabel(entity: EmbedTargetEntity): string {
-	const props = entity.properties;
-	const name = str(props.name) || str(props.title) || str(props.label);
-	return name.trim().length > 0 ? name.trim() : entity.id;
+	return entityTitleOr(entity.properties, entity.id);
 }
 
 /** The pickable embed targets: live (non-deleted) entities, excluding the board

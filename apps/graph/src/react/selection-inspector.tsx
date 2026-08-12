@@ -19,7 +19,7 @@ import { PropertiesPanel, type PropertiesPanelRow } from "@brainstorm-os/sdk/pro
 import type { ReactElement } from "react";
 import { plural, t } from "../i18n/t";
 import type { EntityRow } from "../logic/in-memory-graph";
-import { editableInspectorFields, inspectorTitle } from "../logic/inspector-fields";
+import { editableInspectorFields, inspectorTitleField } from "../logic/inspector-fields";
 
 export type SelectionInspectorProps = {
 	selectedCount: number;
@@ -50,8 +50,9 @@ export function SelectionInspector({
 		);
 	}
 
+	const titleField = inspectorTitleField(entity);
 	const nameDef: PropertyDef = {
-		key: "name",
+		key: titleField.key,
 		name: t("inspector.nameField"),
 		icon: null,
 		valueType: ValueType.Text,
@@ -59,8 +60,8 @@ export function SelectionInspector({
 	const rows: PropertiesPanelRow[] = [
 		{
 			def: nameDef,
-			value: inspectorTitle(entity),
-			onChange: (v) => onCommit(entity.id, "name", v),
+			value: titleField.value,
+			onChange: (v) => onCommit(entity.id, titleField.key, v),
 		},
 		...editableInspectorFields(entity).map((field) => ({
 			def: field.def,

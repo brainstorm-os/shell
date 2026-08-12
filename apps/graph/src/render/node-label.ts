@@ -17,6 +17,7 @@
  * when possible AND at the render layer always).
  */
 
+import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { typeDisplayName } from "@brainstorm-os/sdk/system-entities";
 import { t } from "../i18n/t";
 import type { EntityRow } from "../logic/in-memory-graph";
@@ -37,18 +38,20 @@ export const NODE_LABEL_MAX_CHARS = 48;
  *  manifest, no live locale switch (see `i18n/t.ts`). */
 const untitledCaptionByType = new Map<string, string>();
 
-/** The entity's display string before truncation: first non-empty string
- *  among `name` → `title`, else a human type caption ("Note (untitled)").
- *  The old fallback painted `entity.id.slice(0, 8)` — but ids are
- *  `ent_<base36-timestamp>…`, so every title-less entity minted the same
- *  day collapsed to one identical internal fragment ("ent_mr15" ×7 on the
- *  canvas, F-320). Matches how Files captions untitled rows
- *  ("(untitled) · Note"), sized for a one-line node caption. */
+/** The entity's display string before truncation: the SHARED title chain
+ *  (`@brainstorm-os/sdk/entity-title` — title → name → displayName → label
+ *  → path leaf), else a human type caption ("Note (untitled)").
+ *
+ *  The chain is not ours to pick: Graph used to prefer `name` over `title`
+ *  and know nothing of `displayName`/`path`, so the same object was called
+ *  one thing on the canvas and another on its Files tile (DS-entity-title-1).
+ *  Only the FALLBACK is Graph's — the old one painted
+ *  `entity.id.slice(0, 8)`, but ids are `ent_<base36-timestamp>…`, so every
+ *  title-less entity minted the same day collapsed to one identical
+ *  internal fragment ("ent_mr15" ×7 on the canvas, F-320). */
 export function rawNodeLabel(entity: EntityRow): string {
-	const props = entity.properties as Record<string, unknown>;
-	for (const raw of [props.name, props.title]) {
-		if (typeof raw === "string" && raw.trim().length > 0) return raw;
-	}
+	const resolved = resolveEntityTitle(entity.properties as Record<string, unknown>);
+	if (resolved !== null) return resolved;
 	let caption = untitledCaptionByType.get(entity.type);
 	if (caption === undefined) {
 		caption = t("node.untitled", { type: typeDisplayName(entity.type) });

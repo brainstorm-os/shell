@@ -35,6 +35,7 @@ import {
 } from "@brainstorm-os/sdk/composer-context";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
+import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm-os/sdk/menus";
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
@@ -197,7 +198,7 @@ export function ChatApp(): ReactElement {
 						if (rows.length >= 12) break;
 						if (e.type === CHANNEL_TYPE || e.type === MESSAGE_TYPE) continue;
 						if (e.type.endsWith("/Person/v1")) continue;
-						const title = str(e.properties.title) || str(e.properties.name) || "";
+						const title = resolveEntityTitle(e.properties) ?? "";
 						if (!title) continue;
 						if (q && !title.toLowerCase().includes(q)) continue;
 						rows.push({ id: e.id, label: title, caption: friendlyTypeName(e.type) });
@@ -214,7 +215,7 @@ export function ChatApp(): ReactElement {
 						candidateToAttachment({
 							id: e.id,
 							kind: AttachmentKind.Entity,
-							label: str(e.properties.title) || str(e.properties.name) || "",
+							label: resolveEntityTitle(e.properties) ?? "",
 							entityType: e.type,
 							description: friendlyTypeName(e.type),
 						}),

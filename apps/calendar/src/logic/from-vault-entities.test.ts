@@ -185,14 +185,22 @@ describe("entityToScheduledItems (catalog-driven)", () => {
 		expect(unlocked?.readonly).toBeUndefined();
 	});
 
-	it("prefers name → title → fullName → 'Untitled'", () => {
+	it("walks the shared title chain, then 'Untitled' (DS-entity-title-1)", () => {
 		const keys = buildDateKeyInfo([{ key: "scheduledAt", name: "Scheduled" }]);
+		// Calendar used to prefer `name` over `title`, so the same object was
+		// called one thing on the calendar and another in Files / on the graph.
 		expect(
 			entityToScheduledItems(
 				task({ id: "t", properties: { name: "A", title: "B", scheduledAt: MAY_2026 } }),
 				keys,
 			)[0]?.title,
-		).toBe("A");
+		).toBe("B");
+		expect(
+			entityToScheduledItems(
+				task({ id: "t", properties: { displayName: "D", scheduledAt: MAY_2026 } }),
+				keys,
+			)[0]?.title,
+		).toBe("D");
 		expect(
 			entityToScheduledItems(
 				task({ id: "t", properties: { title: "B", scheduledAt: MAY_2026 } }),

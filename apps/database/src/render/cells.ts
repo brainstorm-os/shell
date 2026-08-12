@@ -19,6 +19,7 @@ import {
 	resolveCoverForView,
 } from "@brainstorm-os/sdk/entity-cover";
 import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
+import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { formatScalar } from "@brainstorm-os/sdk/property-ui/pure";
 import { TYPE_LABELS } from "../demo/dataset";
 import { t } from "../i18n";
@@ -276,22 +277,20 @@ export function typeLabel(typeId: string): string {
 	return TYPE_LABELS[typeId] ?? typeId.split("/").slice(-2, -1)[0] ?? typeId;
 }
 
-const TITLE_KEYS = ["title", "name", "label"] as const;
 const TITLE_BODY_KEYS = ["body", "description", "summary", "content", "text", "note"] as const;
 const TITLE_FALLBACK_MAX = 120;
 
-/** Read a useful display title from an entity, regardless of which key the
- *  type uses. If no explicit title-shaped property is set, fall back to the
- *  first ~120 characters of any body/description-shaped text property so the
- *  row reads as content rather than an opaque id. */
+/** Read a useful display title from an entity. The chain is the shared one
+ *  (`@brainstorm-os/sdk/entity-title`) so a row reads the same as the same
+ *  object's Files tile / Graph node. Database adds ONE fallback of its own:
+ *  a grid row with no title-shaped property at all falls back to the first
+ *  ~120 characters of any body/description-shaped text property, so the row
+ *  reads as content rather than an opaque id. */
 export function entityTitle(entity: EntityRow): string {
-	const p = entity.properties;
-	for (const key of TITLE_KEYS) {
-		const v = p[key];
-		if (typeof v === "string" && v) return v;
-	}
+	const resolved = resolveEntityTitle(entity.properties);
+	if (resolved !== null) return resolved;
 	for (const key of TITLE_BODY_KEYS) {
-		const v = p[key];
+		const v = entity.properties[key];
 		if (typeof v === "string" && v.trim()) return truncateForTitle(v);
 	}
 	return entity.id;

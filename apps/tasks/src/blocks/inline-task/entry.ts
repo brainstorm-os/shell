@@ -8,6 +8,7 @@
  */
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { TaskStatus } from "../../types/task";
 
 interface BpEntity {
@@ -22,8 +23,7 @@ function isDone(props: Record<string, unknown>): boolean {
 }
 
 function taskTitle(props: Record<string, unknown>): string {
-	const name = props.name ?? props.title;
-	return typeof name === "string" && name.length > 0 ? name : "Untitled task";
+	return entityTitleOr(props, "Untitled task");
 }
 
 /** Format a due timestamp as a short, locale-aware day label. */

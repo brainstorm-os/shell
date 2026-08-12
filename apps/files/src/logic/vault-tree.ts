@@ -19,7 +19,8 @@
  * changes, never this projection.
  */
 
-import { type Entity, FILE_TYPE, FOLDER_TYPE, resolveDisplayName } from "../types/entity";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
+import { type Entity, FILE_TYPE, FOLDER_TYPE, UNTITLED } from "../types/entity";
 
 /** A folder member that is LIVE in the vault but hidden from the browser
  *  (child-scoped / app-internal type filtered out of `browsableTypes`).
@@ -43,7 +44,7 @@ export type VaultEntityInput = {
 };
 
 function displayName(properties: Record<string, unknown>): string {
-	return resolveDisplayName(properties) ?? "(untitled)";
+	return entityTitleOr(properties, UNTITLED);
 }
 
 /**

@@ -16,6 +16,7 @@
 import { YDocProvider, useVaultEntities } from "@brainstorm-os/react-yjs";
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
 import { lockTogglePatch } from "@brainstorm-os/sdk/entity-lock";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
 import { LockButton } from "@brainstorm-os/sdk/lock-button";
@@ -190,13 +191,7 @@ export function ContactsApp(): ReactElement {
 					ownerAppId: "",
 				}) satisfies VaultEntity,
 		);
-		const titleOf = (e: VaultEntity): string => {
-			const name = e.properties.name;
-			const title = e.properties.title;
-			if (typeof name === "string" && name.trim()) return name.trim();
-			if (typeof title === "string" && title.trim()) return title.trim();
-			return e.id;
-		};
+		const titleOf = (e: VaultEntity): string => entityTitleOr(e.properties, e.id);
 		return {
 			subscribe: () => () => undefined,
 			snapshotTick: () => list.length,

@@ -22,6 +22,7 @@
  * `useNotes` keeps its create/delete banner + silent autosave UX.
  */
 
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { parseStoredNote, serializeNote } from "./codec";
 import type { StoredNote } from "./note";
 import type { NotesRepository } from "./repository";
@@ -75,11 +76,6 @@ function entityToNote(e: EntityRecord): StoredNote | null {
 	});
 }
 
-function firstString(...vals: unknown[]): string {
-	for (const v of vals) if (typeof v === "string" && v.length > 0) return v;
-	return "";
-}
-
 /**
  * Adapt **any** vault entity (not just `Note/v1`) into the editable
  * `StoredNote` shape so Notes can be the universal object editor (the
@@ -93,7 +89,7 @@ function firstString(...vals: unknown[]): string {
  */
 export function foreignEntityToNote(e: EntityRecord): StoredNote {
 	const props = e.properties as Record<string, unknown>;
-	const title = firstString(props.title, props.name, props.label);
+	const title = entityTitleOr(props, "");
 	// parseStoredNote can't return null here — `id` is a non-empty string.
 	return parseStoredNote({
 		...props,

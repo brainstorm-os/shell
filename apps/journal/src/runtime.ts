@@ -13,6 +13,7 @@
  */
 
 import type { BpService, VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import type { SaveFileService } from "@brainstorm-os/sdk/export-file";
 import type { NoteLike } from "./logic/journal-projection";
 
@@ -194,12 +195,7 @@ export const NOTE_ENTITY_TYPE = "io.brainstorm.notes/Note/v1";
  *  the journal preview now renders real body text (empty only for a
  *  legacy body-less or non-string body). */
 export function vaultEntityToNoteLike(entity: VaultEntity): NoteLike {
-	const title =
-		typeof entity.properties.title === "string"
-			? entity.properties.title
-			: typeof entity.properties.name === "string"
-				? entity.properties.name
-				: "";
+	const title = entityTitleOr(entity.properties, "");
 	const body = (entity.properties.body as unknown) ?? undefined;
 	const wordCount =
 		typeof entity.properties.wordCount === "number" ? entity.properties.wordCount : undefined;

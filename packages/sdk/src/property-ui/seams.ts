@@ -16,6 +16,7 @@
  */
 
 import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import { entityTitleOr } from "../entity-title";
 
 export type KeyLike = KeyboardEvent | { key: string; nativeEvent?: { key: string } };
 
@@ -255,15 +256,13 @@ export type EntityTitleSource = {
 	list(): readonly VaultEntity[];
 	/** Display title for an entity id, or `undefined` when unknown. */
 	titleOf(entityId: string): string | undefined;
-	/** Display title for a concrete entity (title → name → id). */
+	/** Display title for a concrete entity — the shared chain
+	 *  (`../entity-title`), falling back to the id. */
 	displayTitle(entity: VaultEntity): string;
 };
 
 function defaultDisplayTitle(entity: VaultEntity): string {
-	const p = entity.properties as { title?: unknown; name?: unknown };
-	if (typeof p.title === "string" && p.title.length > 0) return p.title;
-	if (typeof p.name === "string" && p.name.length > 0) return p.name;
-	return entity.id;
+	return entityTitleOr(entity.properties as Record<string, unknown>, entity.id);
 }
 
 export const EMPTY_ENTITY_TITLE_SOURCE: EntityTitleSource = {
