@@ -2514,6 +2514,10 @@ void app.whenReady().then(async () => {
 		onDevicesChanged: (activeRecords) => {
 			lanHostRuntime?.setDevices(activeRecords);
 			void lanHostRuntime?.controller.apply();
+			// The roster the fan-out caches is exactly the list that just changed.
+			// Invalidate BEFORE the backfill runs, or the catch-up pass below would
+			// fan out to the roster that predates this pairing.
+			autoShareEngine()?.invalidateSiblingRoster();
 			// 10.3c — the ongoing producer only fires when a DEK is installed, so
 			// it reaches entities created AFTER this pairing. Everything written
 			// before the other device existed would stay stranded forever: the

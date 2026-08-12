@@ -103,6 +103,8 @@ export class SharingEngine {
 	#pendingRepo: PendingRotationsRepository | null = null;
 	#invitesRepo: ShareInvitesRepository | null = null;
 	#draining = false;
+	#rosterCache: readonly FanoutDevice[] | null = null;
+	#rosterInFlight: Promise<readonly FanoutDevice[]> | null = null;
 
 	constructor(session: VaultSession, getRelay: () => CollabRelayLike | null) {
 		this.#session = session;
@@ -583,13 +585,48 @@ export class SharingEngine {
 	 * the gesture `IE-11`'s long-pass treatment exists to keep responsive.
 	 */
 	async resolveSiblingRoster(): Promise<readonly FanoutDevice[]> {
-		const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
-		const props = await VaultPropertiesStore.open(this.#session.ydocStore);
-		// LAN-2b — verified under THIS identity's key. A forged roster row here
-		// would be sealed an entity DEK, so the read path is where it has to be
-		// caught: this is the consumer 10.3c turned from "LAN admission" into
-		// "every entity key in the vault".
-		return props.devices().listActive(this.#session.identity.publicKey);
+		const cached = this.#rosterCache;
+		if (cached) return cached;
+		// Concurrent entity writes would otherwise each open their own copy of the
+		// doc before the first finished — the cache only helps if the miss is
+		// shared too.
+		const inFlight = this.#rosterInFlight;
+		if (inFlight) return inFlight;
+
+		const load = (async () => {
+			const { VaultPropertiesStore } = await import("../vault/vault-properties-store");
+			const props = await VaultPropertiesStore.open(this.#session.ydocStore);
+			try {
+				// LAN-2b — verified under THIS identity's key. A forged roster row here
+				// would be sealed an entity DEK, so the read path is where it has to be
+				// caught: this is the consumer 10.3c turned from "LAN admission" into
+				// "every entity key in the vault".
+				const devices = props.devices().listActive(this.#session.identity.publicKey);
+				this.#rosterCache = devices;
+				return devices;
+			} finally {
+				// `open` loads a brand-new Y.Doc and wires an `update` observer that
+				// persists through `yStore`. Without this the ongoing per-entity
+				// producer left one of each behind on EVERY entity write — paid even
+				// for entities the fan-out then refused at version 0.
+				await props.close();
+				this.#rosterInFlight = null;
+			}
+		})();
+		this.#rosterInFlight = load;
+		return load;
+	}
+
+	/**
+	 * Drop the cached roster so the next fan-out re-reads it.
+	 *
+	 * Must be called whenever the device list changes — a pairing or a
+	 * revocation. A stale cache would silently strand a device: entities written
+	 * after it paired would be fanned out to the roster that predates it, which
+	 * is the same "two devices never sync" symptom `10.3c` existed to fix.
+	 */
+	invalidateSiblingRoster(): void {
+		this.#rosterCache = null;
 	}
 
 	/**
