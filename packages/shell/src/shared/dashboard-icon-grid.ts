@@ -127,6 +127,39 @@ export function occupiedIconCells(
 	return cells;
 }
 
+/**
+ * Where every icon will actually be PAINTED on a `surfaceWidthPx`-wide
+ * surface — stored cells for the icons that have a usable one, resolved cells
+ * for the ones the renderer places itself.
+ *
+ * Anything reconciling against the app grid has to ask this and not read the
+ * stored map, because an icon record and an icon on screen are not the same
+ * thing: a freshly installed app carries `UNPLACED_ICON_POSITION`, which reads
+ * as "no icon there", yet the icons layer paints it in a real free slot the
+ * moment it mounts. The dashboard widget layer read the stored map, so a widget
+ * sitting over that slot never learned an icon had landed under it
+ * (POLISH-DSN-13).
+ */
+export function resolvedIconCells(
+	icons: Readonly<Record<string, { x: number; y: number }>>,
+	surfaceWidthPx: number,
+): IconGridCell[] {
+	const resolved = new Map(
+		resolveIconPlacements(icons, surfaceWidthPx).map((change) => [change.id, change]),
+	);
+	const cells: IconGridCell[] = [];
+	for (const [id, icon] of Object.entries(icons)) {
+		const change = resolved.get(id);
+		if (change) {
+			cells.push({ col: change.col, row: change.row });
+			continue;
+		}
+		if (isUnplacedIcon(icon)) continue;
+		cells.push({ col: Math.floor(icon.x), row: Math.floor(icon.y) });
+	}
+	return cells;
+}
+
 /** Why the renderer chose a cell for an icon. `Unplaced` is a real placement
  *  decision and is persisted; `Offscreen` is a view-model rescue only. */
 export enum IconPlacementReason {

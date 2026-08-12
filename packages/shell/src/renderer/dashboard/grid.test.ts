@@ -6,6 +6,7 @@ import {
 	ICON_FOOTPRINT_W,
 	LEGACY_GRID_MAX,
 	UNPLACED_ICON_POSITION,
+	UNPLACED_WIDGET_POSITION,
 	WIDGET_MIN_H,
 	WIDGET_MIN_W,
 	WIDGET_UNIT,
@@ -18,20 +19,27 @@ import {
 	clampWidgetSizeToSurface,
 	getCellSize,
 	isLegacyIconLayout,
+	isUnplacedWidget,
 	layoutIcons,
 	matchedWidgetSize,
 	migrateWidgetRecord,
+	placeWidgetInStage,
 	pointToCell,
+	reconcileWidgetLayout,
 	repackIcons,
-	rescueWidgetFromOverlaps,
+	widgetFitsStage,
 	widgetFootprint,
 	widgetOverlapsIcons,
 	widgetPointToCell,
 	widgetRectPx,
 	widgetsOverlap,
 } from "./grid";
+import type { GridPoint, WidgetLayout } from "./grid";
 
 const VIEWPORT = { x: 1280, y: 720 };
+
+/** A fully-sized widget record — what every placement assertion below reads. */
+type WidgetRecord = { x: number; y: number; w: number; h: number };
 
 describe("getCellSize", () => {
 	it("is a fixed GRID_UNIT square, viewport-independent", () => {
@@ -324,26 +332,25 @@ describe("matchedWidgetSize (F-462)", () => {
  * `Rece…`. It survived every POLISH-APP pass because it changes no colour
  * literal and no font size.
  */
-describe("widget ↔ icon collision (327 audit)", () => {
+describe("placeWidgetInStage — widget ↔ icon collision (327 audit)", () => {
 	const surface = { x: 1440, y: 900 };
 
 	it("moves a widget off an occupied icon cell", () => {
 		// The defect exactly as the audit saw it: a widget persisted at the
 		// icon-row origin rendered on top of the app icons forever.
 		const icons = [{ x: 0, y: 0 }];
-		const placed = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
-		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
-		// Pushed DOWN, not sideways — icons band across the top, widgets sit
-		// beneath them.
-		expect(placed.x).toBe(0);
-		expect(placed.y).toBeGreaterThan(0);
+		const placed = placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
+		expect(placed).not.toBeNull();
+		expect(widgetOverlapsIcons(placed as WidgetRecord, icons)).toBe(false);
+		// Any direction is allowed — what is NOT allowed is leaving the stage.
+		expect(widgetFitsStage(placed as WidgetRecord, surface)).toBe(true);
 	});
 
 	it("leaves a widget that was already clear exactly where it is", () => {
 		const icons = [{ x: 0, y: 0 }];
 		const widget = { x: 0, y: 60, w: 40, h: 20 };
 		// Identity preserved, so the layer's `changed` check does not churn.
-		expect(rescueWidgetFromOverlaps(widget, icons, [], surface)).toBe(widget);
+		expect(placeWidgetInStage(widget, icons, [], surface)).toBe(widget);
 	});
 
 	it("clears EVERY icon, not just the first", () => {
@@ -352,26 +359,71 @@ describe("widget ↔ icon collision (327 audit)", () => {
 			{ x: 0, y: 14 },
 			{ x: 0, y: 28 },
 		];
-		const placed = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
-		expect(widgetOverlapsIcons(placed, icons)).toBe(false);
+		const placed = placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
+		expect(widgetOverlapsIcons(placed as WidgetRecord, icons)).toBe(false);
 	});
 
 	it("ignores unplaced icons", () => {
 		// An unplaced icon has no position to collide with.
 		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromOverlaps(widget, [UNPLACED_ICON_POSITION], [], surface)).toBe(widget);
+		expect(placeWidgetInStage(widget, [UNPLACED_ICON_POSITION], [], surface)).toBe(widget);
 	});
 
-	it("returns the record rather than dropping it when no clear row exists", () => {
-		// An invisible widget is worse than an overlapping one.
+	it("REFUSES rather than parking a widget off the stage", () => {
+		// The whole small stage is under icons. The predecessor of this function
+		// returned a record parked below every obstacle — header, grip and ⋯
+		// menu past a fold that does not scroll, i.e. invisible AND unremovable.
+		// `null` is the honest answer, and the caller owes the user a visible
+		// state for it.
 		const icons = Array.from({ length: 200 }, (_, i) => ({ x: 0, y: i }));
-		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromOverlaps(widget, icons, [], { x: 400, y: 200 })).toBeTruthy();
+		expect(
+			placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, icons, [], { x: 400, y: 200 }),
+		).toBeNull();
+	});
+
+	it("refuses a footprint larger than the stage itself", () => {
+		expect(placeWidgetInStage({ x: 0, y: 0, w: 200, h: 200 }, [], [], { x: 400, y: 200 })).toBeNull();
 	});
 
 	it("does nothing when there are no icons at all", () => {
 		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		expect(rescueWidgetFromOverlaps(widget, [], [], surface)).toBe(widget);
+		expect(placeWidgetInStage(widget, [], [], surface)).toBe(widget);
+	});
+
+	it("places nothing (and refuses nothing) on a pre-layout surface", () => {
+		const widget = { x: 0, y: 0, w: 40, h: 20 };
+		expect(placeWidgetInStage(widget, [{ x: 0, y: 0 }], [], { x: 0, y: 0 })).toBe(widget);
+	});
+});
+
+/**
+ * THE REACHABILITY INVARIANT. `.dashboard__body` is `overflow: hidden` with no
+ * scroll and no widget list, so a card past the fold is not merely awkward —
+ * its header, grip, resize handle and ⋯ menu are all gone, and the ⋯ is the
+ * only way to remove a widget. Every placement this module returns must satisfy
+ * this predicate; when it cannot, it refuses.
+ */
+describe("widgetFitsStage", () => {
+	const surface = { x: 1100, y: 660 };
+
+	it("accepts a card wholly inside the stage", () => {
+		expect(widgetFitsStage({ x: 0, y: 0, w: 40, h: 40 }, surface)).toBe(true);
+	});
+
+	it("rejects a card past the bottom fold — the f10a56dd parking spot", () => {
+		// 1100×660 holds rows 0..80; a 40-cell-tall card parked at row 74 (y=592
+		// px) ends at row 114, and the two behind it at 116 and 158.
+		expect(widgetFitsStage({ x: 0, y: 74, w: 40, h: 40 }, surface)).toBe(false);
+		expect(widgetFitsStage({ x: 0, y: 116, w: 40, h: 40 }, surface)).toBe(false);
+	});
+
+	it("rejects a card past the right edge, or at a negative origin", () => {
+		expect(widgetFitsStage({ x: 120, y: 0, w: 40, h: 20 }, surface)).toBe(false);
+		expect(widgetFitsStage({ x: -1, y: 0, w: 40, h: 20 }, surface)).toBe(false);
+	});
+
+	it("asserts nothing about a pre-layout surface", () => {
+		expect(widgetFitsStage({ x: 999, y: 999, w: 40, h: 40 }, { x: 0, y: 0 })).toBe(true);
 	});
 });
 
@@ -398,33 +450,47 @@ describe("widgetsOverlap", () => {
 	});
 });
 
-describe("widget ↔ widget collision (327 audit)", () => {
+describe("placeWidgetInStage — widget ↔ widget collision (327 audit)", () => {
 	const surface = { x: 1440, y: 900 };
 
-	it("separates two overlapping widgets — the later one moves down, the earlier stays", () => {
+	it("separates two overlapping widgets — the later one moves, the earlier stays", () => {
 		const a = { x: 0, y: 40, w: 40, h: 20 };
 		const b = { x: 10, y: 45, w: 40, h: 20 };
-		const placed = rescueWidgetFromOverlaps(b, [], [a], surface);
-		expect(widgetsOverlap(placed, a)).toBe(false);
-		// Pushed DOWN past A's bottom edge, never sideways.
-		expect(placed.x).toBe(b.x);
-		expect(placed.y).toBe(a.y + a.h);
+		const placed = placeWidgetInStage(b, [], [a], surface);
+		expect(widgetsOverlap(placed as WidgetRecord, a)).toBe(false);
+		expect(widgetFitsStage(placed as WidgetRecord, surface)).toBe(true);
+	});
+
+	it("moves the LEAST it can — the nearest legal slot, not the first row-major one", () => {
+		// A card the user parked at the bottom-right of the stage, overlapped by
+		// a sibling. A row-major scan from the stage origin (the shape this
+		// replaced) would drag it to the top-left and reshuffle the board around
+		// it; nearest-first keeps it in its own corner.
+		const sibling = { x: 100, y: 80, w: 40, h: 20 };
+		const record = { x: 105, y: 85, w: 40, h: 20 };
+		const placed = placeWidgetInStage(record, [], [sibling], surface);
+		expect(placed).not.toBeNull();
+		const moved = Math.hypot(
+			(placed as WidgetRecord).x - record.x,
+			(placed as WidgetRecord).y - record.y,
+		);
+		expect(moved).toBeLessThan(30);
+		expect(widgetsOverlap(placed as WidgetRecord, sibling)).toBe(false);
 	});
 
 	it("chains — A pushes B pushes C", () => {
 		const a = { x: 0, y: 40, w: 40, h: 20 };
-		const b = rescueWidgetFromOverlaps({ x: 0, y: 40, w: 40, h: 20 }, [], [a], surface);
-		const c = rescueWidgetFromOverlaps({ x: 0, y: 40, w: 40, h: 20 }, [], [a, b], surface);
+		const b = placeWidgetInStage({ x: 0, y: 40, w: 40, h: 20 }, [], [a], surface) as WidgetRecord;
+		const c = placeWidgetInStage({ x: 0, y: 40, w: 40, h: 20 }, [], [a, b], surface) as WidgetRecord;
 		expect(widgetsOverlap(b, a)).toBe(false);
 		expect(widgetsOverlap(c, a)).toBe(false);
 		expect(widgetsOverlap(c, b)).toBe(false);
-		expect(c.y).toBe(b.y + b.h);
 	});
 
 	it("clears icons AND earlier widgets in one pass", () => {
 		const icons = [{ x: 0, y: 0 }];
-		const a = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface);
-		const b = rescueWidgetFromOverlaps({ x: 0, y: 0, w: 40, h: 20 }, icons, [a], surface);
+		const a = placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, icons, [], surface) as WidgetRecord;
+		const b = placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, icons, [a], surface) as WidgetRecord;
 		expect(widgetOverlapsIcons(b, icons)).toBe(false);
 		expect(widgetsOverlap(b, a)).toBe(false);
 	});
@@ -432,15 +498,136 @@ describe("widget ↔ widget collision (327 audit)", () => {
 	it("leaves an already-clear widget by identity", () => {
 		const a = { x: 0, y: 40, w: 40, h: 20 };
 		const clear = { x: 0, y: 70, w: 40, h: 20 };
-		expect(rescueWidgetFromOverlaps(clear, [], [a], surface)).toBe(clear);
+		expect(placeWidgetInStage(clear, [], [a], surface)).toBe(clear);
 	});
 
-	it("returns the record rather than dropping it when no clear row exists", () => {
-		// A sibling covering the whole tiny surface leaves nowhere to go.
+	it("refuses when a sibling blankets the whole stage", () => {
 		const blanket = { x: 0, y: 0, w: 200, h: 200 };
-		const widget = { x: 0, y: 0, w: 40, h: 20 };
-		const placed = rescueWidgetFromOverlaps(widget, [], [blanket], { x: 400, y: 200 });
-		expect(placed).toEqual(widget);
+		expect(
+			placeWidgetInStage({ x: 0, y: 0, w: 40, h: 20 }, [], [blanket], { x: 400, y: 200 }),
+		).toBeNull();
+	});
+});
+
+/**
+ * The whole-board pass. Two properties beyond "nothing intersects": every card
+ * it places is reachable, and adding one card does not reshuffle the others.
+ */
+describe("reconcileWidgetLayout", () => {
+	/** The stage `21-light-01-dashboard.png` was captured on. */
+	const STAGE = { x: 1100, y: 660 };
+	/** A 20-app fleet packed across the top of that stage. */
+	const FLEET = Array.from({ length: 20 }, (_, i) => ({
+		x: (i % 12) * 11,
+		y: Math.floor(i / 12) * 14,
+	}));
+
+	function assertLegal(layout: WidgetLayout<WidgetRecord>, surface: GridPoint): void {
+		const placed = Object.entries(layout.placed);
+		for (const [id, record] of placed) {
+			expect(`${id} in stage: ${widgetFitsStage(record, surface)}`).toBe(`${id} in stage: true`);
+			expect(`${id} over icons: ${widgetOverlapsIcons(record, FLEET)}`).toBe(
+				`${id} over icons: false`,
+			);
+		}
+		for (let i = 0; i < placed.length; i += 1) {
+			for (let j = i + 1; j < placed.length; j += 1) {
+				const a = placed[i] as [string, WidgetRecord];
+				const b = placed[j] as [string, WidgetRecord];
+				expect(`${a[0]} ∩ ${b[0]}: ${widgetsOverlap(a[1], b[1])}`).toBe(`${a[0]} ∩ ${b[0]}: false`);
+			}
+		}
+	}
+
+	it("untangles the audit's own board", () => {
+		const layout = reconcileWidgetLayout(
+			{
+				widget_contacts: { x: 4, y: 2, w: 40, h: 20 },
+				widget_notes: { x: 5, y: 6, w: 40, h: 20 },
+				widget_journal: { x: 46, y: 8, w: 40, h: 20 },
+				widget_chat: { x: 88, y: 10, w: 40, h: 20 },
+			},
+			FLEET,
+			STAGE,
+		);
+		expect(layout.unplaced).toEqual([]);
+		assertLegal(layout, STAGE);
+	});
+
+	it("REFUSES the widgets that do not fit instead of parking them off the fold", () => {
+		// The exact case the previous fix shipped green: six Large (40×40) cards
+		// on the audit's 1100×660 stage under a 20-icon fleet. Cards 4, 5 and 6
+		// landed at y=592, y=928 and y=1264 — the last two entirely below a fold
+		// that does not scroll. Now the ones with no legal slot come back as
+		// `unplaced`, and everything the pass DOES place is reachable.
+		const records: Record<string, { x: number; y: number; w: number; h: number }> = {};
+		for (let i = 0; i < 6; i += 1) records[`widget_${i}`] = { x: 4, y: 2 + i * 4, w: 40, h: 40 };
+		const layout = reconcileWidgetLayout(records, FLEET, STAGE);
+		expect(layout.unplaced.length).toBeGreaterThan(0);
+		expect(Object.keys(layout.placed).length + layout.unplaced.length).toBe(6);
+		assertLegal(layout, STAGE);
+	});
+
+	it("adding a widget moves nothing that was already placed", () => {
+		const board = {
+			widget_a: { x: 4, y: 32, w: 40, h: 20 },
+			widget_b: { x: 48, y: 32, w: 40, h: 20 },
+			widget_c: { x: 4, y: 56, w: 40, h: 20 },
+		};
+		const before = reconcileWidgetLayout(board, FLEET, STAGE);
+		expect(before.unplaced).toEqual([]);
+		// The newcomer lands right on top of widget_a — the worst case for
+		// stability, because a global re-flow would re-derive every card.
+		const after = reconcileWidgetLayout(
+			{ ...board, widget_new: { x: 4, y: 32, w: 20, h: 20 } },
+			FLEET,
+			STAGE,
+		);
+		for (const id of Object.keys(board)) {
+			expect(`${id} ${JSON.stringify(after.placed[id])}`).toBe(
+				`${id} ${JSON.stringify(before.placed[id])}`,
+			);
+		}
+		assertLegal(after, STAGE);
+	});
+
+	it("lets the card the user is touching keep its spot — the neighbours yield", () => {
+		// Dropping a card onto a sibling that happens to be EARLIER in the map
+		// would otherwise teleport the card under the pointer.
+		const board = {
+			widget_old: { x: 4, y: 32, w: 40, h: 20 },
+			widget_dropped: { x: 6, y: 34, w: 40, h: 20 },
+		};
+		const layout = reconcileWidgetLayout(board, FLEET, STAGE, "widget_dropped");
+		expect(layout.placed.widget_dropped).toEqual(board.widget_dropped);
+		expect(layout.placed.widget_old).not.toEqual(board.widget_old);
+		assertLegal(layout, STAGE);
+	});
+
+	it("gives an unplaced (freshly added) widget a real cell", () => {
+		const layout = reconcileWidgetLayout(
+			{
+				widget_new: {
+					x: UNPLACED_WIDGET_POSITION.x,
+					y: UNPLACED_WIDGET_POSITION.y,
+					w: 40,
+					h: 20,
+				},
+			},
+			FLEET,
+			STAGE,
+		);
+		expect(layout.unplaced).toEqual([]);
+		const placed = layout.placed.widget_new as WidgetRecord;
+		expect(isUnplacedWidget(placed)).toBe(false);
+		assertLegal(layout, STAGE);
+	});
+
+	it("passes records through untouched on a pre-layout surface", () => {
+		const record = { x: 900, y: 900, w: 40, h: 20 };
+		const layout = reconcileWidgetLayout({ widget_a: record }, FLEET, { x: 0, y: 0 });
+		expect(layout.placed.widget_a).toBe(record);
+		expect(layout.unplaced).toEqual([]);
 	});
 });
 

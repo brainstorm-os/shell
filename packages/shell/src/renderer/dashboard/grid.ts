@@ -47,6 +47,7 @@ export {
 	isUnplacedIcon,
 	maxIconCol,
 	resolveIconPlacements,
+	resolvedIconCells,
 	UNPLACED_ICON_POSITION,
 } from "../../shared/dashboard-icon-grid";
 
@@ -136,7 +137,30 @@ export function clampCell(cell: GridCell): GridCell {
 // Widgets sit on their OWN fixed 8px grid (NOT the proportional icon grid), so
 // they place + resize finely and at a stable pixel size regardless of window
 // size. `x`/`y`/`w`/`h` in a `WidgetRecord` are counts of `WIDGET_UNIT`px cells.
-// This grid is independent of the icon collision system.
+// The grid is the same 8px lattice the icons use, from the same origin, so a
+// widget and an icon can be compared as plain rectangles.
+//
+// **The widget area is a BOUNDED STAGE, and that is a decision, not a
+// limitation** (POLISH-DSN-13 · S2). Two invariants hold at rest:
+//
+//   1. no widget intersects another widget or an app icon;
+//   2. every widget lies wholly inside the visible stage (`widgetFitsStage`).
+//
+// When both cannot hold, `placeWidgetInStage` REFUSES — it returns `null` and
+// `reconcileWidgetLayout` hands the id back to the layer, which owes the user a
+// visible, actionable state for it. The alternatives were considered and lost:
+//
+//   - *A scrolling widget area.* The dashboard is one absolutely-positioned
+//     coordinate space shared by the wallpaper, the app grid and the widgets.
+//     Scrolling the widget layer alone slides cards under a fixed app grid,
+//     which breaks invariant (1) the moment you scroll; scrolling
+//     `.dashboard__body` scrolls the icons and the wallpaper with it, which is
+//     not a desktop any more. Real scrolling here is a product change, not a
+//     layout fix.
+//   - *Smaller default footprints.* Postpones the wall instead of building a
+//     rail: N widgets always exhaust any finite stage, and it silently shrinks
+//     what the user chose. Shrinking stays available — as the user's remedy,
+//     offered on the "no room" state, not as a quiet default.
 
 /** The widget snap unit, in pixels. Drag + resize both snap to this. */
 export const WIDGET_UNIT = 8;
@@ -144,6 +168,39 @@ export const WIDGET_UNIT = 8;
 /** Floor on a widget's footprint, in `WIDGET_UNIT` cells (≈ 64×48px). */
 export const WIDGET_MIN_W = 8;
 export const WIDGET_MIN_H = 6;
+
+/**
+ * The ONE gutter of the dashboard layout, in `WIDGET_UNIT` cells (16px).
+ *
+ * It is the clearance a RE-PLACED widget prefers to keep from its neighbours
+ * (siblings and app icons alike) and the step of the placement lattice, so a
+ * reconciled dashboard reads as one grid rather than a pile of cards that
+ * happen not to touch. It is a preference, never an invariant: a card the user
+ * parked a hair from its neighbour is legal and is never moved for tidiness
+ * (POLISH-DSN-13 · S2).
+ */
+export const WIDGET_GUTTER = 2;
+
+/**
+ * The `{x, y}` written for a widget that has never been placed: "no position
+ * yet — the layer will choose one". Mirrors `UNPLACED_ICON_POSITION` on the
+ * icon grid, and for the same reason: only the renderer knows the stage, so
+ * only the renderer can choose a slot that is actually on it. The add-widget
+ * picker used to stack each new card below the lowest existing one, which on a
+ * full board writes a row that is off the bottom of the stage by construction.
+ */
+export const UNPLACED_WIDGET_COORD = -1;
+export const UNPLACED_WIDGET_POSITION: { x: number; y: number } = {
+	x: UNPLACED_WIDGET_COORD,
+	y: UNPLACED_WIDGET_COORD,
+};
+
+/** Does this record still need the layer to choose a cell for it? Any negative
+ *  or non-finite coordinate counts — a corrupt record is better re-placed than
+ *  pinned to the origin under whatever sits there. */
+export function isUnplacedWidget(record: { x: number; y: number }): boolean {
+	return !Number.isFinite(record.x) || !Number.isFinite(record.y) || record.x < 0 || record.y < 0;
+}
 
 /** Pre-7.3b widgets stored `w`/`h` as icon-grid cells (Small = 2×2, …). One old
  *  ~80px cell is ~10 units, so a stored footprint below this many cells is a
@@ -287,37 +344,217 @@ export function widgetsOverlap(a: WidgetRect, b: WidgetRect): boolean {
 	return a.x < b.x + bw && a.x + aw > b.x && a.y < b.y + bh && a.y + ah > b.y;
 }
 
-/** Move a widget DOWN until it clears every icon AND every already-placed
- *  sibling widget, then re-clamp to the surface.
+/** A widget's effective span in cells — the stored footprint, floored at the
+ *  minimum the card needs to draw its own chrome. */
+function widgetSpan(rect: WidgetRect): GridSize {
+	return {
+		w: Math.max(WIDGET_MIN_W, rect.w ?? WIDGET_MIN_W),
+		h: Math.max(WIDGET_MIN_H, rect.h ?? WIDGET_MIN_H),
+	};
+}
+
+/** How many widget cells the stage holds on each axis. Cell `cols` is the
+ *  first cell PAST the right edge, so a footprint fits iff `x + w <= cols`. */
+export function widgetStageCells(surface: GridPoint): GridBounds {
+	return {
+		cols: Math.floor((surface.x - GRID_OUTER_MARGIN) / WIDGET_UNIT),
+		rows: Math.floor((surface.y - GRID_OUTER_MARGIN) / WIDGET_UNIT),
+	};
+}
+
+/**
+ * THE REACHABILITY INVARIANT: is this widget's whole rect — header row, grip,
+ * ⋯ menu and resize grip included — inside the visible stage?
  *
- * Down rather than sideways because that is the dashboard's actual shape: icons
- * band across the top, widgets live beneath them. Siblings are the widgets the
- * caller has already reconciled, processed in persisted order, so two
- * overlapping records separate deterministically (the earlier one stays put)
- * and a rescue can chain — A pushes B pushes C. A widget already clear is
- * returned untouched (identity preserved, so the caller's `changed` check still
- * works). If no clear row exists within the surface the record is returned as
- * clamped — never dropped; an invisible widget is worse than an overlapping
- * one. */
-export function rescueWidgetFromOverlaps<
-	T extends { x: number; y: number; w?: number; h?: number },
->(
+ * The card's chrome is the top `WIDGET_HEADER_PX` of its own rect and its
+ * resize grip the bottom-right corner of it, so "the rect is inside the stage"
+ * is exactly "every control on the card can be pointed at". Nothing scrolls
+ * here: `.dashboard__body` is `overflow: hidden`, so a card one pixel past the
+ * fold is not merely awkward, it is gone — invisible AND unremovable, because
+ * the only handle for removing a widget is the ⋯ on its own header. A layout
+ * pass that cannot satisfy this must REFUSE (see `placeWidgetInStage`), never
+ * park a card past the edge.
+ *
+ * A zero/unknown surface (pre-layout mount) asserts nothing — there is no stage
+ * to be inside of yet.
+ */
+export function widgetFitsStage(rect: WidgetRect, surface: GridPoint): boolean {
+	if (surface.x <= 0 || surface.y <= 0) return true;
+	const span = widgetSpan(rect);
+	const stage = widgetStageCells(surface);
+	return (
+		rect.x >= 0 && rect.y >= 0 && rect.x + span.w <= stage.cols && rect.y + span.h <= stage.rows
+	);
+}
+
+/** A widget rect grown by `pad` cells on all four sides. Testing the grown rect
+ *  for intersection is how a re-placed card keeps a gutter of daylight from its
+ *  neighbours; `pad = 0` tests the hard invariant (no intersection at all). */
+function grownBy(rect: WidgetRect, pad: number): Required<WidgetRect> {
+	const span = widgetSpan(rect);
+	return {
+		x: rect.x - pad,
+		y: rect.y - pad,
+		w: span.w + 2 * pad,
+		h: span.h + 2 * pad,
+	};
+}
+
+/** Does `rect` (grown by `pad`) touch any app icon or any already-placed
+ *  widget? */
+function widgetCollides(
+	rect: WidgetRect,
+	icons: readonly { x: number; y: number }[],
+	siblings: readonly WidgetRect[],
+	pad: number,
+): boolean {
+	const probe = pad === 0 ? rect : grownBy(rect, pad);
+	return (
+		(icons.length > 0 && widgetOverlapsIcons(probe, icons)) ||
+		siblings.some((sibling) => widgetsOverlap(probe, sibling))
+	);
+}
+
+/** Every lattice origin a `span`-sized card could take on this stage, ordered
+ *  NEAREST-FIRST from `from`. The lattice is anchored at the stage origin and
+ *  stepped by `WIDGET_GUTTER`, so re-placed cards line up on one grid; the
+ *  ordering is what bounds the move — see `placeWidgetInStage`. */
+function stageCandidates(from: GridCell, span: GridSize, surface: GridPoint): GridCell[] {
+	const stage = widgetStageCells(surface);
+	const maxCol = stage.cols - span.w;
+	const maxRow = stage.rows - span.h;
+	const cells: GridCell[] = [];
+	for (let row = 0; row <= maxRow; row += WIDGET_GUTTER) {
+		for (let col = 0; col <= maxCol; col += WIDGET_GUTTER) cells.push({ col, row });
+	}
+	const distance = (cell: GridCell) => (cell.col - from.col) ** 2 + (cell.row - from.row) ** 2;
+	return cells.sort((a, b) => distance(a) - distance(b) || a.row - b.row || a.col - b.col);
+}
+
+/**
+ * Place one widget so that it clears every app icon and every already-placed
+ * sibling AND lies wholly inside the stage — or REFUSE by returning `null`.
+ *
+ * Three properties, in the order they matter:
+ *
+ * 1. **A legal card never moves.** A record that is inside the stage and
+ *    intersects nothing is returned by identity, whatever it looks like. Free
+ *    placement is still the model: this reconciles broken layouts, it does not
+ *    tidy good ones.
+ * 2. **A card that must move, moves the least it can.** The search walks the
+ *    lattice in order of distance from the card's own origin, so the result is
+ *    the nearest legal slot. That IS the locality bound — a fixed radius would
+ *    have to refuse placements that exist, and a row-major scan from the stage
+ *    origin (the shape this function replaced) would drag a card the user put
+ *    bottom-right up to the top-left, reshuffling the board around a single
+ *    change.
+ * 3. **No room means no room.** When no lattice slot is clear, or the footprint
+ *    is bigger than the stage, the answer is `null` and the CALLER has to
+ *    surface it (`reconcileWidgetLayout` → the layer's "no room" tray). The
+ *    predecessor of this function parked the overflow below every obstacle
+ *    instead: on the audit's own 1100×660 stage with six Large widgets, cards
+ *    5 and 6 landed at y=928 and y=1264 — header, grip, resize handle and ⋯
+ *    menu all past a fold that does not scroll. Invisible AND unremovable is
+ *    strictly worse than overlapping; refusing is the honest answer.
+ *
+ * The first pass demands a full `WIDGET_GUTTER` of daylight so a re-placed card
+ * looks placed rather than wedged; the second accepts mere non-intersection, so
+ * the aesthetic never costs a refusal.
+ *
+ * A zero/unknown surface (pre-layout mount) places nothing and refuses nothing.
+ */
+export function placeWidgetInStage<T extends { x: number; y: number; w?: number; h?: number }>(
 	record: T,
 	icons: readonly { x: number; y: number }[],
 	siblings: readonly WidgetRect[],
 	surface: GridPoint,
-): T {
-	const collides = (widget: WidgetRect) =>
-		(icons.length > 0 && widgetOverlapsIcons(widget, icons)) ||
-		siblings.some((sibling) => widgetsOverlap(widget, sibling));
-	if (!collides(record)) return record;
-	const spanH = Math.max(WIDGET_MIN_H, record.h ?? WIDGET_MIN_H);
-	const maxRow = maxWidgetOriginCell(surface.y, spanH);
-	for (let row = record.y + 1; row <= maxRow; row += 1) {
-		const candidate = { ...record, y: row };
-		if (!collides(candidate)) return candidate;
+): T | null {
+	if (surface.x <= 0 || surface.y <= 0) return record;
+	if (
+		!isUnplacedWidget(record) &&
+		widgetFitsStage(record, surface) &&
+		!widgetCollides(record, icons, siblings, 0)
+	) {
+		return record;
 	}
-	return record;
+	const span = widgetSpan(record);
+	const from = { col: Math.max(0, record.x), row: Math.max(0, record.y) };
+	const candidates = stageCandidates(from, span, surface);
+	for (const pad of [WIDGET_GUTTER, 0]) {
+		for (const cell of candidates) {
+			if (!widgetCollides({ ...record, x: cell.col, y: cell.row }, icons, siblings, pad)) {
+				return { ...record, x: cell.col, y: cell.row };
+			}
+		}
+	}
+	return null;
+}
+
+/** The outcome of one reconciliation pass: where each widget is drawn, and the
+ *  ids that could not be drawn at all. */
+export type WidgetLayout<T> = {
+	placed: Record<string, T>;
+	/** Ids with no legal slot on this stage, in record order. The layer MUST
+	 *  give these a visible, actionable home — they are not rendered on the
+	 *  surface, so this list is the only handle the user has on them. */
+	unplaced: string[];
+};
+
+/**
+ * Reconcile a whole widget map against the app grid and the stage.
+ *
+ * One pass, in persisted order, and the order is what keeps the board stable
+ * under a single change (requirement 3): each record is reconciled against the
+ * app grid and against the records BEFORE it only. A record that is already
+ * legal is returned by identity, so a card that was on the board before this
+ * pass keeps its exact cell and the newcomer is the one that moves — persisted
+ * order is insertion order, so "before" means "was already here". A widget that
+ * has to be refused can never displace one that fits, for the same reason.
+ *
+ * `priority` is the id of the widget the user is touching RIGHT NOW (the card
+ * just dropped, resized or nudged). It goes first, so the card under the
+ * pointer keeps the geometry the user just gave it and its neighbours are the
+ * ones that yield. Without it, dropping a card onto a sibling that happens to
+ * be earlier in the map teleports the card the user is holding.
+ *
+ * Footprints are normalised first: floor (a sub-minimum card clips its own
+ * title), then ceiling at the stage (no card may be bigger than the dashboard
+ * it sits on), then origin. Sizing before placing matters — the placer searches
+ * for a slot the footprint fits in, so it has to know the final footprint.
+ */
+export function reconcileWidgetLayout<T extends { x: number; y: number; w?: number; h?: number }>(
+	records: Readonly<Record<string, T>>,
+	icons: readonly { x: number; y: number }[],
+	surface: GridPoint,
+	priority?: string,
+): WidgetLayout<T> {
+	const placed: Record<string, T> = {};
+	if (surface.x <= 0 || surface.y <= 0) {
+		for (const [id, record] of Object.entries(records)) placed[id] = record;
+		return { placed, unplaced: [] };
+	}
+	const settled: T[] = [];
+	const unplaced: string[] = [];
+	const order = Object.entries(records);
+	if (priority !== undefined) {
+		const at = order.findIndex(([id]) => id === priority);
+		if (at > 0) order.unshift(...order.splice(at, 1));
+	}
+	for (const [id, record] of order) {
+		const sized = clampWidgetRecordToSurface(clampWidgetRecordSize(record), surface);
+		// A never-placed record keeps its negative origin through normalisation:
+		// `clampWidgetOrigin` would turn the sentinel into cell 0,0, which is a
+		// real cell the placer would then try to KEEP. It has no cell to keep.
+		const normalised = isUnplacedWidget(record) ? sized : clampWidgetOrigin(sized, surface);
+		const slot = placeWidgetInStage(normalised, icons, settled, surface);
+		if (slot === null) {
+			unplaced.push(id);
+			continue;
+		}
+		placed[id] = slot;
+		settled.push(slot);
+	}
+	return { placed, unplaced };
 }
 
 /** Clamp a persisted record's footprint up to the widget floor,
@@ -334,6 +571,22 @@ export function clampWidgetRecordSize<T extends { w?: number; h?: number }>(reco
 		...(w !== undefined ? { w } : {}),
 		...(h !== undefined ? { h } : {}),
 	};
+}
+
+/** Cap a stored footprint at the stage itself: no card may be wider or taller
+ *  than the dashboard it sits on, whatever the record says. Without this a
+ *  record written on a larger monitor (or by the F-379 ×10 migration) renders
+ *  as a card hanging off both far edges, and no origin clamp can pull it back —
+ *  `clampWidgetOrigin` moves the top-left, which is already at the margin.
+ *  Identity-preserving; a zero/unknown surface caps nothing. */
+export function clampWidgetRecordToSurface<
+	T extends { x: number; y: number; w?: number; h?: number },
+>(record: T, surface: GridPoint): T {
+	if (surface.x <= 0 || surface.y <= 0) return record;
+	if (typeof record.w !== "number" || typeof record.h !== "number") return record;
+	const size = clampWidgetSizeToSurface({ col: 0, row: 0 }, { w: record.w, h: record.h }, surface);
+	if (size.w === record.w && size.h === record.h) return record;
+	return { ...record, w: size.w, h: size.h };
 }
 
 /** Snap a window-content point to the nearest widget cell (origin-relative). */

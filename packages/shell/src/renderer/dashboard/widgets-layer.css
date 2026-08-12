@@ -227,3 +227,104 @@
 	opacity: 1;
 	color: var(--color-text-primary);
 }
+
+/* The "no room" tray (POLISH-DSN-13 · S2) — the visible half of a refused
+ * placement. It sits in a band along the bottom of the stage that the layout
+ * pass has ALREADY excluded from placement (`WIDGET_TRAY_BAND_PX`), so it can
+ * never cover a card's header or ⋯ menu; the reservation is what makes the
+ * reachability invariant hold for the cards that did fit as well as for the
+ * ones that didn't. Height here + the band constant move together. */
+.dashboard-widgets__noroom {
+	position: absolute;
+	left: var(--space-4);
+	right: var(--space-4);
+	bottom: var(--space-4);
+	z-index: 20;
+	pointer-events: auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	max-height: 140px;
+	padding: var(--space-3);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-lg);
+	background: var(--color-background-elevated);
+	box-shadow: var(--shadow-md);
+}
+
+.dashboard-widgets__noroom-head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex-shrink: 0;
+	color: var(--color-state-warning);
+}
+
+.dashboard-widgets__noroom-title {
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-medium);
+	color: var(--color-text-primary);
+}
+
+.dashboard-widgets__noroom-hint {
+	margin: 0;
+	flex-shrink: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+}
+
+.dashboard-widgets__noroom-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.dashboard-widgets__noroom-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	height: 28px;
+}
+
+.dashboard-widgets__noroom-name {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.dashboard-widgets__noroom-action {
+	flex-shrink: 0;
+	height: 22px;
+	padding: 0 var(--space-2);
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	font-size: var(--text-size-xs);
+	color: var(--color-text-secondary);
+	cursor: pointer;
+}
+
+.dashboard-widgets__noroom-action:hover:not(:disabled) {
+	background: var(--color-interactive-hover);
+	color: var(--color-text-primary);
+}
+
+.dashboard-widgets__noroom-action:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.dashboard-widgets__noroom-action--danger:hover:not(:disabled) {
+	color: var(--color-state-error);
+}
+
+.dashboard-widgets__noroom-action:focus-visible {
+	outline: var(--border-width) solid var(--color-accent-default);
+	outline-offset: 1px;
+}

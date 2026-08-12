@@ -36,11 +36,12 @@ import {
 	WIDGET_UNIT,
 	WidgetSize,
 	clampWidgetOrigin,
-	clampWidgetRecordSize,
 	clampWidgetSizeToSurface,
+	isUnplacedWidget,
 	matchedWidgetSize,
 	migrateWidgetRecord,
-	rescueWidgetFromOverlaps,
+	reconcileWidgetLayout,
+	resolvedIconCells,
 	widgetFootprint,
 	widgetPointToCell,
 	widgetRectPx,
@@ -49,6 +50,20 @@ import "./widgets-layer.css";
 
 /** Height of the card's chrome header strip. */
 export const WIDGET_HEADER_PX = 30;
+
+/**
+ * Height of the band along the bottom of the stage that the "no room" tray
+ * occupies, plus its margin — subtracted from the stage the layout reconciles
+ * against whenever the tray is showing.
+ *
+ * The tray is the only handle on a widget that could not be placed, so it must
+ * never itself sit on top of a card's header or ⋯ menu. Reserving its band
+ * rather than floating it over the surface is what makes that structural: no
+ * card can be placed where the tray will paint. Keep in lockstep with
+ * `.dashboard-widgets__noroom` in `widgets-layer.css`: its 140px cap, plus the
+ * 16px it is inset from the bottom, plus 16px of clearance above it.
+ */
+export const WIDGET_TRAY_BAND_PX = 172;
 
 /** Arrow-key → grid-cell delta for the focusable grips (F-383). */
 const ARROW_DELTAS: Record<string, readonly [number, number]> = {
@@ -249,8 +264,6 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 	const [gesture, setGesture] = useState<GestureRect | null>(null);
 	const [titles, setTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
 	const bridge = useWidgetBridge();
-	// Stable identity so the view-model memo does not rebuild every render.
-	const iconCells = useMemo(() => Object.values(icons ?? {}), [icons]);
 
 	// Surface size in CSS pixels, for the stranded-record rescue clamp
 	// (`clampWidgetOrigin`, F-379). Initialised from the window (the surface is
@@ -285,6 +298,16 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 		};
 	}, []);
 
+	// Where the icons layer will actually PAINT each icon on this surface, not
+	// what the store says: a freshly installed app carries the "unplaced"
+	// sentinel until the icons layer chooses its cell, and a widget reconciling
+	// against the sentinel decides there is no icon under it. Memoised for a
+	// stable identity so the layout pass below does not rebuild every render.
+	const iconCells = useMemo(
+		() => resolvedIconCells(icons ?? {}, surface.x).map((cell) => ({ x: cell.col, y: cell.row })),
+		[icons, surface.x],
+	);
+
 	// Pre-7.3b widgets stored their footprint in coarse icon-grid cells; migrate
 	// onto the 8px widget grid on read (self-terminating) and persist once.
 	const migrated = useMemo(() => {
@@ -316,48 +339,70 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 		() => new Map(),
 	);
 
-	const effectiveWidgets = useMemo(() => {
+	const merged = useMemo(() => {
 		const record = pending ? migrated[pending.id] : undefined;
-		const merged: Record<string, DashboardWidget> =
-			pending && record
-				? {
-						...migrated,
-						[pending.id]: {
-							...record,
-							...(pending.x !== undefined ? { x: pending.x } : {}),
-							...(pending.y !== undefined ? { y: pending.y } : {}),
-							...(pending.w !== undefined ? { w: pending.w } : {}),
-							...(pending.h !== undefined ? { h: pending.h } : {}),
-						},
-					}
-				: migrated;
-		// Rescue clamp (F-379): a record whose stored origin sits off-surface
-		// (the ×10-teleport bug baked such positions in) renders unreachable
-		// forever without this. Applied to the view-model — display, gesture
-		// origins, and subsequent writes all use the clamped cells, so touching
-		// a rescued widget persists its on-surface position.
-		let changed = false;
-		const out: Record<string, DashboardWidget> = {};
-		// Persisted order = reconciliation order: the earlier record of an
-		// overlapping pair stays put, so the separation is deterministic.
-		const placed: DashboardWidget[] = [];
-		for (const [id, w] of Object.entries(merged)) {
-			// Size floor first (a sub-minimum footprint clips its own title),
-			// then surface, then collisions: a record rescued onto the surface
-			// can still land on the icon band or an earlier widget, and one
-			// pushed clear of those must stay on the surface.
-			const clamped = rescueWidgetFromOverlaps(
-				clampWidgetOrigin(clampWidgetRecordSize(w), surface),
-				iconCells,
-				placed,
-				surface,
-			);
-			out[id] = clamped;
-			placed.push(clamped);
-			if (clamped !== w) changed = true;
+		return pending && record
+			? {
+					...migrated,
+					[pending.id]: {
+						...record,
+						...(pending.x !== undefined ? { x: pending.x } : {}),
+						...(pending.y !== undefined ? { y: pending.y } : {}),
+						...(pending.w !== undefined ? { w: pending.w } : {}),
+						...(pending.h !== undefined ? { h: pending.h } : {}),
+					},
+				}
+			: migrated;
+	}, [migrated, pending]);
+
+	// The layout pass. It answers with the cell each card is DRAWN on (a
+	// view-model rescue: a record clamped or moved here is not written back, so
+	// widening the window restores the user's own arrangement — the F-379 rule
+	// the icon grid follows too) and with the ids that have no legal cell at all.
+	//
+	// Two passes, because the "no room" tray owns a band along the bottom of the
+	// stage: reconcile against the full stage, and if anything refused, redo it
+	// against the stage minus that band so no card can be placed underneath the
+	// tray. It settles there — the second pass never re-grows the stage, so this
+	// cannot oscillate.
+	const layout = useMemo(() => {
+		// The card the user just dropped / resized / nudged is reconciled first,
+		// so it keeps the geometry they gave it and the neighbours yield.
+		const touched = pending?.id;
+		const full = reconcileWidgetLayout(merged, iconCells, surface, touched);
+		if (full.unplaced.length === 0) return full;
+		return reconcileWidgetLayout(
+			merged,
+			iconCells,
+			{ x: surface.x, y: Math.max(0, surface.y - WIDGET_TRAY_BAND_PX) },
+			touched,
+		);
+	}, [merged, surface, iconCells, pending?.id]);
+	const effectiveWidgets = layout.placed;
+	const unplaced = layout.unplaced;
+
+	// A widget the picker created carries the "place me" sentinel; once the
+	// layout has chosen a real cell for it, persist that — the layout is
+	// deterministic but not permanent, and without a stored cell the card would
+	// re-derive a different slot every time a sibling is removed. Nothing else
+	// is written back: only the never-placed records, exactly as the icon grid
+	// persists `Unplaced` and never `Offscreen`.
+	// Written-back ids, so a resize (which re-runs the layout) cannot write a
+	// second, different cell for the same sentinel before the doc echoes back.
+	const placedSentinels = useRef(new Set<string>());
+	useEffect(() => {
+		for (const [id, record] of Object.entries(widgets)) {
+			if (!isUnplacedWidget(record)) {
+				placedSentinels.current.delete(id);
+				continue;
+			}
+			const settled = effectiveWidgets[id];
+			if (!settled || isUnplacedWidget(settled)) continue;
+			if (placedSentinels.current.has(id)) continue;
+			placedSentinels.current.add(id);
+			void window.brainstorm.dashboard.upsertWidget(id, settled);
 		}
-		return changed ? out : merged;
-	}, [migrated, pending, surface, iconCells]);
+	}, [widgets, effectiveWidgets]);
 
 	const toggleCollapsed = useCallback(
 		(id: string) => {
@@ -697,6 +742,23 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 
 	const entries = useMemo(() => Object.entries(effectiveWidgets), [effectiveWidgets]);
 
+	// The two remedies the "no room" tray offers. Shrinking is the one that can
+	// give the widget a slot back; removing is the one that always works. Both
+	// write through the normal persistence path, so the next layout pass picks
+	// the change up and the tray empties itself.
+	const shrinkWidget = useCallback(
+		(id: string) => {
+			const record = merged[id];
+			if (!record) return;
+			const fp = widgetFootprint(WidgetSize.Small);
+			void window.brainstorm.dashboard.upsertWidget(id, { ...record, w: fp.w, h: fp.h });
+		},
+		[merged],
+	);
+	const removeWidget = useCallback((id: string) => {
+		void window.brainstorm.dashboard.removeWidget(id);
+	}, []);
+
 	return (
 		<div ref={surfaceRef} className="dashboard-widgets" aria-label={t("shell.widgets.layerLabel")}>
 			{entries.map(([id, w]) => {
@@ -742,6 +804,96 @@ function DashboardWidgetsLayerInner({ widgets, icons }: DashboardWidgetsLayerPro
 					/>
 				);
 			})}
+			{unplaced.length > 0 && (
+				<WidgetNoRoomTray
+					ids={unplaced}
+					records={merged}
+					titles={titles}
+					onShrink={shrinkWidget}
+					onRemove={removeWidget}
+				/>
+			)}
+		</div>
+	);
+}
+
+/**
+ * The "no room" state — the visible, actionable half of a refused placement.
+ *
+ * A widget that cannot be placed is NOT drawn on the surface, because the only
+ * places left to draw it are on top of another card, on top of the app grid, or
+ * past a fold that does not scroll. All three are worse than not drawing it:
+ * the last one in particular leaves a widget that is invisible AND unremovable,
+ * since the ⋯ that removes a widget lives on the widget's own header. So the
+ * card's handle moves here instead — named, with the two remedies that can give
+ * it a slot back (make it small, remove it) and the third stated in words
+ * (make the window bigger). The tray owns a reserved band of the stage
+ * (`WIDGET_TRAY_BAND_PX`), so it can never cover the cards that did fit.
+ */
+function WidgetNoRoomTray({
+	ids,
+	records,
+	titles,
+	onShrink,
+	onRemove,
+}: {
+	ids: readonly string[];
+	records: Record<string, DashboardWidget>;
+	titles: ReadonlyMap<string, string>;
+	onShrink: (id: string) => void;
+	onRemove: (id: string) => void;
+}) {
+	const smallest = widgetFootprint(WidgetSize.Small);
+	return (
+		<div className="dashboard-widgets__noroom" role="status" aria-live="polite">
+			<div className="dashboard-widgets__noroom-head">
+				<Icon name={IconName.Warning} />
+				<span className="dashboard-widgets__noroom-title">
+					{t("shell.widgets.noRoom.title", { count: ids.length })}
+				</span>
+			</div>
+			<p className="dashboard-widgets__noroom-hint">{t("shell.widgets.noRoom.hint")}</p>
+			<ul className="dashboard-widgets__noroom-list">
+				{ids.map((id) => {
+					const record = records[id];
+					if (!record) return null;
+					const title = titles.get(widgetKey(record.appId, record.kind)) ?? record.kind;
+					// A widget already at the smallest footprint cannot shrink further.
+					// The control stays, disabled, and says why in its `title` — a
+					// disabled button fires no pointer events, so the tooltip chip
+					// can't open and the native title is the only explanation left.
+					const atSmallest = record.w <= smallest.w && record.h <= smallest.h;
+					return (
+						<li className="dashboard-widgets__noroom-row" key={id} data-testid={`no-room-${id}`}>
+							<AppIcon
+								name={title}
+								seed={record.appId}
+								src={resolveAppIconSrc(record.appId)}
+								size={16}
+								glyph
+							/>
+							<span className="dashboard-widgets__noroom-name">{title}</span>
+							<button
+								type="button"
+								className="dashboard-widgets__noroom-action"
+								onClick={() => onShrink(id)}
+								disabled={atSmallest}
+								title={atSmallest ? t("shell.widgets.noRoom.shrinkAtMin") : undefined}
+							>
+								{t("shell.widgets.noRoom.shrink")}
+							</button>
+							<button
+								type="button"
+								className="dashboard-widgets__noroom-action dashboard-widgets__noroom-action--danger"
+								onClick={() => onRemove(id)}
+								aria-label={t("shell.widgets.noRoom.removeNamed", { name: title })}
+							>
+								{t("shell.widgets.menu.remove")}
+							</button>
+						</li>
+					);
+				})}
+			</ul>
 		</div>
 	);
 }
