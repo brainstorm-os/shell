@@ -590,27 +590,41 @@ describe("icon gutter is consistent within a menu (F-461)", () => {
 });
 
 /**
- * The menu panel's legibility is pure CSS, asserted against the source
- * bridge. A menu opens over arbitrary app content and `.fm-menu` amplifies
- * its backdrop with `saturate(180%)`, so the panel fill must sit on an
- * OPAQUE theme base: at the raw `--color-glass-background-strong` alphas
- * (0.5–0.72) saturated content painted straight through the rows — a book
- * cover turned the whole panel mint-green, an accent button bled a blue blob
- * across a row label.
+ * The menu panel's legibility is pure CSS, asserted against the source.
+ *
+ * This used to require the fill be a `color-mix` of ≥90% opaque base under a
+ * glass tint — the repair for saturated content painting through the rows (a
+ * book cover turning the panel mint-green, an accent button bleeding a blue
+ * blob across a row label). `POLISH-DSN-13 · S3` found that insufficient: at
+ * ~93% alpha, under a `saturate(180%)` backdrop-filter that AMPLIFIES what
+ * shows through, Files' tile icons still read through the panel. Measured on
+ * the 2026-08-12 capture at 58,43,37 behind an icon against 41,40,40 two
+ * hundred pixels away.
+ *
+ * So the bar is now the whole of it: NO transparency in the fill at all. The
+ * old assertions are inverted rather than deleted — a `color-mix` toward
+ * anything translucent is exactly the shape that regressed.
  */
 describe("menu panel surface (stylesheet invariants)", () => {
 	const css = readFileSync(join(__dirname, "menus.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 	const surface = css.slice(css.indexOf("--fm-surface-bg:")).split(";")[0] ?? "";
 
-	it("mixes the glass tint over an opaque theme background", () => {
-		expect(surface).toContain("color-mix(");
+	it("is a flat opaque theme token, not a mix toward glass", () => {
 		expect(surface).toContain("var(--color-background-elevated)");
-		expect(surface).toContain("var(--color-glass-background-strong");
+		// The shapes that let content through, each of which shipped once.
+		expect(surface).not.toContain("color-mix(");
+		expect(surface).not.toContain("glass");
+		expect(surface).not.toContain("transparent");
+		expect(surface).not.toMatch(/rgba?\([^)]*,\s*0?\.\d+\s*\)/);
 	});
 
-	it("keeps the opaque base as the dominant stop", () => {
-		const percent = Number(/([0-9]+)%/.exec(surface)?.[1] ?? "0");
-		expect(percent).toBeGreaterThanOrEqual(90);
-		expect(percent).toBeLessThan(100);
+	it("does not blur a backdrop nobody can see", () => {
+		// An opaque fill makes `backdrop-filter` invisible, but it still promotes
+		// the element and re-blurs on paint — the cost that forced the app-header
+		// wallpaper stripe out, paid here on every menu open.
+		const menuRule = /\.fm-menu\s*\{[^}]*\}/g;
+		for (const rule of css.match(menuRule) ?? []) {
+			expect(rule).not.toContain("backdrop-filter");
+		}
 	});
 });

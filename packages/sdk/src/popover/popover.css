@@ -57,28 +57,34 @@
 	}
 }
 
-/* Glass surface mirroring the shell's `.popover__panel.glass`: a translucent
- * blurred panel that reads the live theme tokens (`--color-glass-background`)
- * rather than a hardcoded hex, so it tracks light/dark. The opaque
- * `--color-background-elevated` is the no-glass-support fallback; the literal
- * is the last resort for a pre-theme mount. */
+/* OPAQUE panel surface — `POLISH-DSN-13 · S3`.
+ *
+ * This was a 52% veil of `background.elevated` over `--color-glass-background`.
+ * That veil was itself a repair (F-446: pure glass let a hero CTA bleed through
+ * as blobs behind form fields), and it did not go far enough. Measured on the
+ * 2026-08-12 re-capture, Files' Sort popover still reads 58,43,37 where a tile's
+ * orange note icon sits behind it against 41,40,40 two hundred pixels away —
+ * the icon is legible THROUGH the panel, and `saturate()` is amplifying it.
+ *
+ * The anchored variant is the reason this cannot stay translucent: it renders
+ * with a TRANSPARENT backdrop (see `.bs-popover--anchored` above), so there is
+ * no scrim between the panel and the page. A popover is dense text and form
+ * controls over arbitrary app content; the frosted look is not worth reading
+ * the content behind it.
+ *
+ * `background.elevated` is an opaque hex in all fourteen built-in themes,
+ * pinned by `overlay-surfaces-are-opaque.test.ts`. The literal stays as the
+ * last resort for a pre-theme mount. */
 .bs-popover__panel {
 	position: relative;
 	display: flex;
 	flex-direction: column;
 	color: var(--color-text-primary, inherit);
-	/* A veil of the elevated surface over the glass: pure glass let saturated
-	 * page content (a hero CTA) bleed through as blobs BEHIND form fields
-	 * (F-446, Marcus session 908). Keeps the frosted look, restores surface
-	 * legibility. */
-	background:
-		linear-gradient(
-			color-mix(in srgb, var(--color-background-elevated, #1c1c1f) 52%, transparent),
-			color-mix(in srgb, var(--color-background-elevated, #1c1c1f) 52%, transparent)
-		),
-		var(--color-glass-background, var(--color-background-elevated, #1c1c1f));
-	backdrop-filter: blur(var(--glass-blur, 24px)) saturate(var(--glass-saturate, 1.4));
-	-webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(var(--glass-saturate, 1.4));
+	background: var(--color-background-elevated, #1c1c1f);
+	/* No `backdrop-filter`: the fill above is opaque, so blurring what is behind
+	 * it composites a layer nobody can see. It also promotes the element and
+	 * re-blurs on paint — the cost that forced the app-header wallpaper stripe
+	 * out (revert `ebb756c7`), paid here on every popover open. */
 	border: var(--border-width) solid var(--color-glass-border, rgba(127, 127, 127, 0.28));
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-xl, 0 12px 40px rgba(0, 0, 0, 0.4));
