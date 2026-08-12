@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Envelope } from "../../ipc/envelope";
+import { bytesToBase64 } from "../credentials/crypto";
 import { generateDeviceEd25519 } from "../credentials/device-ed25519";
 import { generateDeviceX25519 } from "../credentials/device-x25519";
 import { ed25519 } from "../test-support/crypto-test-helpers";
@@ -30,6 +31,10 @@ function makeFakeSession(overrides: Partial<PairingServiceSession> = {}): Pairin
 		saveIdentitySecret: async (secret) => {
 			storedIdentitySecret = new Uint8Array(secret);
 		},
+		// F-498 — a COPY, as the real keystore read returns: `confirmSas` zeroes
+		// what it gets, and handing out the stored buffer would wipe the keystore.
+		loadIdentitySecret: async () =>
+			storedIdentitySecret === null ? null : new Uint8Array(storedIdentitySecret),
 		// F-493 — a pristine vault by default, so the existing cases still join.
 		// The refusal path has its own cases below.
 		listEntityPrincipals: async () => [{ createdBy: "brainstorm.shell" }],
@@ -119,6 +124,22 @@ describe("PairingService — IPC layer", () => {
 			(d) => d.deviceEd25519Pub !== confirmed.addedRecord.deviceEd25519Pub,
 		);
 		expect(sourceRow?.deviceX25519Pub).toBe("");
+
+		// F-498 — and BOTH rows must verify under the identity this device just
+		// ADOPTED, because that is the only key any reader checks them against
+		// (`DevicesStore.listActive`). They used to be signed by the joiner's
+		// PRE-pairing identity, so on the next read the device dropped its own
+		// roster, could not answer the host's sealed challenge, and every LAN
+		// dial fell back to a relay. Asserting the record merely EXISTS — which
+		// is all this case did — cannot see that.
+		const { verifyAddDeviceRecord } = await import("./devices-store");
+		for (const row of rostered) {
+			expect(verifyAddDeviceRecord(row, sourceIdentity.publicKey)).toBe(true);
+		}
+		// …and specifically NOT under the identity it is leaving behind.
+		const preAdoption = targetSession.getUserIdentity().publicKey;
+		expect(rostered.some((r) => verifyAddDeviceRecord(r, preAdoption))).toBe(false);
+		expect(rostered.every((r) => r.addedBy === bytesToBase64(sourceIdentity.publicKey))).toBe(true);
 
 		const stored = (targetSession as unknown as { _stored: () => Uint8Array | null })._stored();
 		expect(stored).not.toBeNull();
