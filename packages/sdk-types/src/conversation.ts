@@ -66,6 +66,13 @@ export const GLM_PROVIDER_ID = "glm";
  *  provider as OpenAI under its own base URL. Cap scope `ai.provider:mistral`. */
 export const MISTRAL_PROVIDER_ID = "mistral";
 
+/** Solheim cloud provider id — an EU-hosted, single-tenant instance serving
+ *  open-weight models over the OpenAI-compatible Chat Completions wire shape, so
+ *  it rides the same provider as OpenAI under its own base URL. Billing is a flat
+ *  per-instance fee rather than per token (see `model-rates`). Cap scope
+ *  `ai.provider:solheim`. */
+export const SOLHEIM_PROVIDER_ID = "solheim";
+
 /** Error kind (the app-side `error.name` / wire `error.kind`) the AI broker
  *  returns when the calling app's rolling AI budget is exhausted (14.8).
  *  Distinct from `Unavailable` so apps can surface "AI budget exhausted"

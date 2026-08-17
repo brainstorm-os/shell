@@ -2755,6 +2755,7 @@ export {
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
 	SENDER_KINDS,
+	SOLHEIM_PROVIDER_ID,
 	SenderKind,
 	messageText,
 	senderRole,

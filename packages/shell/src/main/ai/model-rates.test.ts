@@ -2,6 +2,7 @@ import {
 	ANTHROPIC_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { CREDIT_MICROS, FALLBACK_CLOUD_RATE, creditsMicroForUsage } from "./model-rates";
@@ -9,6 +10,17 @@ import { CREDIT_MICROS, FALLBACK_CLOUD_RATE, creditsMicroForUsage } from "./mode
 describe("creditsMicroForUsage", () => {
 	it("local provider (ollama) is free", () => {
 		expect(creditsMicroForUsage(OLLAMA_PROVIDER_ID, "llama3.2", 1_000_000, 1_000_000)).toBe(0);
+	});
+
+	it("flat-fee provider (solheim) meters at 0 rather than the cloud fallback", () => {
+		// Billing is a flat per-instance fee, so a call has no marginal price. The
+		// explicit entry is what keeps it off FALLBACK_CLOUD_RATE.
+		expect(creditsMicroForUsage(SOLHEIM_PROVIDER_ID, "qwen3.6-35b-a3b", 1_000_000, 1_000_000)).toBe(
+			0,
+		);
+		expect(creditsMicroForUsage(SOLHEIM_PROVIDER_ID, "some-future-pin", 1_000_000, 1_000_000)).toBe(
+			0,
+		);
 	});
 
 	it("prices a known model per MTok ($5/$25 opus)", () => {

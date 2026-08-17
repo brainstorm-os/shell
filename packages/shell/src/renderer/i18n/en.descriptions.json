@@ -140,6 +140,8 @@
   "shell.settings.ai.keyPlaceholder": "Placeholder in the API-key input when no key is set yet. Very short.",
   "shell.settings.ai.mistral.hint": "Helper text under the Mistral AI provider key field, noting it is the European OpenAI-compatible provider and where to get a key.",
   "shell.settings.ai.mistral.name": "Label for the Mistral AI cloud provider in the AI settings panel.",
+  "shell.settings.ai.solheim.hint": "Helper text under the Solheim provider key field, noting it is an EU-hosted OpenAI-compatible instance and where to get a key.",
+  "shell.settings.ai.solheim.name": "Label for the Solheim cloud provider in the AI settings panel.",
   "shell.settings.ai.openai.hint": "Helper text under the OpenAI provider key field, noting it also covers OpenAI-compatible endpoints and where to get a key.",
   "shell.settings.ai.openai.name": "Label for the OpenAI (and OpenAI-compatible) cloud provider in the AI settings panel.",
   "shell.settings.ai.replacePlaceholder": "Placeholder in the API-key input when a key is already configured (typing replaces it). Very short.",

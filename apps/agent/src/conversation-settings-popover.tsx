@@ -38,6 +38,7 @@ const PROVIDER_LABEL_KEY: Record<string, AgentI18nKey> = {
 	glm: "provider.glm",
 	mistral: "provider.mistral",
 	gemini: "provider.gemini",
+	solheim: "provider.solheim",
 };
 
 /** The intent verb → its catalog label key for the grants toggles. */

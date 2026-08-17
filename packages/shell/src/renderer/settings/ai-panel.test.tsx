@@ -18,7 +18,7 @@ describe("AiPanel", () => {
 	it("renders a provider tile per cloud provider", () => {
 		const html = renderToStaticMarkup(<AiPanel />);
 		expect(html).toContain('data-testid="ai-providers"');
-		for (const id of ["anthropic", "openai", "glm", "mistral", "gemini"]) {
+		for (const id of ["anthropic", "openai", "glm", "mistral", "gemini", "solheim"]) {
 			expect(html).toContain(`data-testid="ai-provider-${id}"`);
 		}
 		// Tile face drops the parenthetical so it fits the fixed-width face (F-416);

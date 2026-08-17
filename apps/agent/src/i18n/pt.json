@@ -54,6 +54,7 @@
   "provider.glm": "z.ai GLM",
   "provider.mistral": "Mistral AI",
   "provider.gemini": "Google Gemini",
+  "provider.solheim": "Solheim",
   "error.budget": "Esta conversa atingiu seu orçamento de tokens. Aumente ou limpe o orçamento nas configurações da conversa para continuar.",
   "escalation.title": "Permitir “{tool}”?",
   "escalation.blurb": "O agente tentou usar uma ferramenta que não está habilitada para esta conversa. Permitir apenas para esta conversa?",

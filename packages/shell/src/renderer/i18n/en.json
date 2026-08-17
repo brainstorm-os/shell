@@ -186,6 +186,8 @@
   "shell.settings.ai.mistral.hint": "Mistral's European models (OpenAI-compatible Chat Completions). Get a key from console.mistral.ai.",
   "shell.settings.ai.gemini.name": "Google Gemini",
   "shell.settings.ai.gemini.hint": "Google's Gemini models. Get a key from aistudio.google.com.",
+  "shell.settings.ai.solheim.name": "Solheim",
+  "shell.settings.ai.solheim.hint": "EU-hosted open-weight models on your own instance (OpenAI-compatible Chat Completions). Get a key from solheim.ai.",
   "shell.settings.ai.statusConfigured": "Key set",
   "shell.settings.ai.statusUnset": "No key",
   "shell.settings.ai.keyLabel": "API key",

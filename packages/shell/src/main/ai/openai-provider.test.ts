@@ -4,6 +4,7 @@ import {
 	GLM_PROVIDER_ID,
 	MessageRole,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
 import { type OpenAiHttp, createOpenAiProvider } from "./openai-provider";
@@ -137,5 +138,38 @@ describe("createOpenAiProvider", () => {
 				http,
 			}).generate({ messages: [{ role: MessageRole.User, content: "Hi" }] }),
 		).rejects.toMatchObject({ name: "Unavailable", message: expect.stringContaining("GLM") });
+	});
+
+	it("rides the same shape for Solheim under its own id, label, and EU base URL", async () => {
+		const http = vi.fn(async () => ({ status: 200, text: OK_BODY }));
+		const solheim = createOpenAiProvider({
+			id: SOLHEIM_PROVIDER_ID,
+			label: "Solheim",
+			baseUrl: "https://api.solheim.ai/v1",
+			defaultModel: "qwen3.6-35b-a3b",
+			getApiKey: () => "solheim-key",
+			http,
+		});
+		expect(solheim.id).toBe(SOLHEIM_PROVIDER_ID);
+		const out = (await solheim.generate({
+			messages: [{ role: MessageRole.User, content: "Hi" }],
+		})) as AiGenerateResult;
+		const [call] = (http.mock.calls[0] ?? []) as unknown as [
+			{ url: string; headers: Record<string, string>; bodyJson: { model: string } },
+		];
+		expect(call.url).toBe("https://api.solheim.ai/v1/chat/completions");
+		expect(call.headers.Authorization).toBe("Bearer solheim-key");
+		expect(call.bodyJson.model).toBe("qwen3.6-35b-a3b");
+		expect(out.provider).toBe(SOLHEIM_PROVIDER_ID);
+
+		await expect(
+			createOpenAiProvider({
+				id: SOLHEIM_PROVIDER_ID,
+				label: "Solheim",
+				defaultModel: "qwen3.6-35b-a3b",
+				getApiKey: () => null,
+				http,
+			}).generate({ messages: [{ role: MessageRole.User, content: "Hi" }] }),
+		).rejects.toMatchObject({ name: "Unavailable", message: expect.stringContaining("Solheim") });
 	});
 });
