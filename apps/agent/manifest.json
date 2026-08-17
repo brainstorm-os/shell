@@ -18,6 +18,7 @@
     "ai.provider:openai",
     "ai.provider:glm",
     "ai.provider:gemini",
+    "ai.provider:solheim",
     "search.read",
     "search.hybrid",
     "platform.read",

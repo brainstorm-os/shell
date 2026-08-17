@@ -13,6 +13,7 @@ import {
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { AiAppBudgetView, AiSettingsView, AiUsageWindowView } from "../../preload";
@@ -76,6 +77,12 @@ const CLOUD_PROVIDERS: ReadonlyArray<ProviderMeta> = [
 		nameKey: "shell.settings.ai.gemini.name",
 		hintKey: "shell.settings.ai.gemini.hint",
 		monogram: "G",
+	},
+	{
+		id: SOLHEIM_PROVIDER_ID,
+		nameKey: "shell.settings.ai.solheim.name",
+		hintKey: "shell.settings.ai.solheim.hint",
+		monogram: "S",
 	},
 ];
 

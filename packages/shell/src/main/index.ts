@@ -23,6 +23,7 @@ import {
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 	StoredAssetKind,
 	TRIGGER_TYPE_URL,
 	TabCommandKind,
@@ -4797,6 +4798,21 @@ void app.whenReady().then(async () => {
 			baseUrl: process.env.BRAINSTORM_MISTRAL_BASE_URL ?? "https://api.mistral.ai/v1",
 			defaultModel: process.env.BRAINSTORM_MISTRAL_MODEL ?? "mistral-large-latest",
 			getApiKey: cloudKey(MISTRAL_PROVIDER_ID, "BRAINSTORM_MISTRAL_API_KEY"),
+			http: cloudHttp,
+		}),
+	);
+	// Solheim (EU-hosted, single-tenant open-weight instance) — OpenAI-compatible
+	// Chat Completions, so it rides the OpenAI provider with its own id, key
+	// custody, and model. The model is pinned per instance, so the default is
+	// only a starting point: an instance serving a different pin needs
+	// BRAINSTORM_SOLHEIM_MODEL (or a per-request `model`) to match it.
+	aiProviders.register(
+		createOpenAiProvider({
+			id: SOLHEIM_PROVIDER_ID,
+			label: "Solheim",
+			baseUrl: process.env.BRAINSTORM_SOLHEIM_BASE_URL ?? "https://api.solheim.ai/v1",
+			defaultModel: process.env.BRAINSTORM_SOLHEIM_MODEL ?? "qwen3.6-35b-a3b",
+			getApiKey: cloudKey(SOLHEIM_PROVIDER_ID, "BRAINSTORM_SOLHEIM_API_KEY"),
 			http: cloudHttp,
 		}),
 	);

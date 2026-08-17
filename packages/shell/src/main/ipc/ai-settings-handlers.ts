@@ -16,6 +16,7 @@ import {
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 import { ipcMain } from "electron";
 import { AI_BUDGET_WINDOW_MS } from "../ai/ai-quota";
@@ -66,6 +67,7 @@ const KNOWN_CLOUD_PROVIDER_IDS: ReadonlySet<string> = new Set([
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
 	GEMINI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 ]);
 
 /** The active vault's credential store, but only for a recognised provider id. */

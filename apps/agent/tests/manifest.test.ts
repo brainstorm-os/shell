@@ -109,7 +109,7 @@ describe("apps/agent/manifest.json", () => {
 		// re-checked server-side). It can never offer a provider the manifest lacks.
 		const result = validateManifest(readManifest());
 		if (!result.ok) throw new Error(result.reason);
-		for (const id of ["ollama", "anthropic", "openai", "glm", "gemini"]) {
+		for (const id of ["ollama", "anthropic", "openai", "glm", "gemini", "solheim"]) {
 			expect(result.manifest.capabilities, `manifest declares ai.provider:${id}`).toContain(
 				`ai.provider:${id}`,
 			);

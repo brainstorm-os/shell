@@ -85,6 +85,11 @@
 	color: #fff;
 }
 
+[data-provider="solheim"] .settings__ai-avatar {
+	background: #1d4ed8;
+	color: #fff;
+}
+
 /* Key-status dot, pinned to the avatar corner. */
 .settings__ai-dot {
 	position: absolute;

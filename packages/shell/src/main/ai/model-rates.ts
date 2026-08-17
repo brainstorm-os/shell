@@ -23,6 +23,7 @@ import {
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 
 /** Micro-credits per credit (1 credit = 1e6 micro-credits). */
@@ -98,6 +99,12 @@ const RATES: Record<string, ProviderRates> = {
 		],
 		defaultRate: { inputMicrosPerMTok: 2 * M, outputMicrosPerMTok: 6 * M },
 	},
+	// Solheim bills a flat per-instance monthly fee, not per token — a call has
+	// no marginal price, so it meters at 0 like the local provider. This entry
+	// must exist: without it an unpriced provider falls through to
+	// FALLBACK_CLOUD_RATE and would burn per-app budgets against a cost the
+	// user never incurs.
+	[SOLHEIM_PROVIDER_ID]: { models: [], defaultRate: ZERO_RATE },
 };
 
 function rateFor(provider: string, model: string): Omit<ModelRate, "modelPrefix"> {
