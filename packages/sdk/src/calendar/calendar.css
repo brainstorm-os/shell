@@ -102,7 +102,7 @@
 }
 
 :root .bs-cal-month__cell--today .bs-cal-month__date {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	font-weight: var(--text-weight-medium, 500);
 }
@@ -219,7 +219,7 @@
 	.bs-cal-month--compact
 	.bs-cal-month__cell--selected.bs-cal-month__cell--today
 	.bs-cal-month__date {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	border-color: var(--accent);
 }

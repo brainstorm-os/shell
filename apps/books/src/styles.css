@@ -1037,7 +1037,7 @@ body {
 
 .books__hl-confirm {
 	border-color: transparent;
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 }
 

@@ -188,7 +188,7 @@ body {
 	min-width: 18px;
 	padding: 0 var(--space-2);
 	border-radius: var(--radius-full);
-	background: var(--accent, var(--text));
+	background: var(--accent-fill, var(--text));
 	color: var(--accent-fg, var(--bg));
 	font-size: var(--text-size-xs);
 	font-weight: var(--text-weight-medium);

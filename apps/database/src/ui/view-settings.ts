@@ -974,7 +974,7 @@ function renderFormulaPage(body: HTMLElement, props: ViewSettingsProps): void {
 
 	const addBtn = document.createElement("button");
 	addBtn.type = "button";
-	addBtn.className = "db-popover__formula-add";
+	addBtn.className = "db-popover__formula-add bs-filled";
 	addBtn.dataset.testid = "db-formula-submit";
 	addBtn.textContent = "Add formula";
 	rows.appendChild(addBtn);

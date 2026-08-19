@@ -1887,7 +1887,7 @@ body:not([data-inspector="open"]) .inspector {
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-full);
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	font-size: var(--text-size-xs);
 }

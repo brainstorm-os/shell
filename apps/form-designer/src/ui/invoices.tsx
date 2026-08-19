@@ -419,7 +419,7 @@ export function InvoicesSurface(props: InvoicesSurfaceProps): ReactElement {
 							<span className="invoices__label">{t("invoice.preview")}</span>
 							<button
 								type="button"
-								className="invoices__export"
+								className="invoices__export bs-filled"
 								onClick={() => void onExport()}
 								disabled={exporting || !exportSvc}
 							>

@@ -17,8 +17,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type * as Y from "yjs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type * as Y from "yjs";
 import { signAddDeviceRecord } from "../pairing/devices-store";
 import { LoopbackRelayPort, type RelayPort } from "../sync/relay-port";
 import { VaultSession } from "../vault/session";

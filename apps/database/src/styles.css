@@ -2186,7 +2186,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	/* PHYSICAL-AXIS INTENTIONAL: symmetric centring around the now-line position */
 	left: 0;
 	transform: translate(-50%, 0);
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	font-size: var(--text-size-xs);
 	padding: var(--space-0_5);
@@ -2945,7 +2945,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	width: 100%;
 	margin-top: var(--space-1);
 	padding: var(--space-2) var(--space-2);
-	background: var(--accent);
+	background: var(--accent-fill);
 	border: var(--border-width) solid var(--accent);
 	border-radius: var(--radius-sm);
 	color: var(--accent-fg);
@@ -2959,10 +2959,6 @@ body.is-resizing .dbv-tl__labels-resize {
 	filter: brightness(1.05);
 }
 
-.db-popover__formula-add:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
 
 /* ── Settings navigation (root → sub-page) ────────────────────────────── */
 
@@ -3155,7 +3151,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-popover__segment[data-active="true"] {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 }
 
@@ -3422,7 +3418,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .dbv-cal__segment[data-active="true"] {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 }
 
@@ -3690,7 +3686,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-import-modal__import {
-	background: var(--accent);
+	background: var(--accent-fill);
 	border: var(--border-width) solid var(--accent);
 	color: var(--accent-fg, white);
 }
@@ -3700,10 +3696,6 @@ body.is-resizing .dbv-tl__labels-resize {
 	filter: brightness(0.92);
 }
 
-.db-import-modal__import:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
 
 /* Slice-2 preview grid: one scrollable list of rows between the summary
    and the action row. The summary's bottom margin tightens because the

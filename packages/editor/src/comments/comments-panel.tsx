@@ -218,7 +218,7 @@ export function CommentsPanel({
 				) : null}
 				<button
 					type="submit"
-					className="bs-comments__submit"
+					className="bs-comments__submit bs-filled"
 					disabled={draft.isEmpty || (suggestionActive && replacementDraft.trim().length === 0)}
 				>
 					{t("editor.comments.new.submit")}
@@ -401,7 +401,7 @@ function CommentThreadView({
 					{/* Type-to-reveal: an always-on Reply button under every open
 					    thread is pure clutter; it appears once there's a draft. */}
 					{!replyDraft.isEmpty ? (
-						<button type="submit" className="bs-comments__submit">
+						<button type="submit" className="bs-comments__submit bs-filled">
 							{t("editor.comments.reply.submit")}
 						</button>
 					) : null}

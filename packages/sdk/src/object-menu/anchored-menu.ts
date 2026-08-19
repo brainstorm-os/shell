@@ -23,6 +23,7 @@ import {
 	type IconParam,
 	MenuAlign,
 	blankMenuIcon,
+	clampBelowAppHeader,
 	closeContextMenu,
 	getActiveMenuStore,
 	openContextMenu,
@@ -270,7 +271,7 @@ function positionLegacy(
 	const anchorRect = options.anchor?.getBoundingClientRect();
 	const rightAlign = options.align === MenuAlign.End || (!!options.anchor && options.align == null);
 	let left = rightAlign && anchorRect ? anchorRect.right - rect.width : point.x;
-	let top = point.y;
+	let top = clampBelowAppHeader(point);
 	if (left + rect.width > vw - VIEWPORT_GUTTER) left = vw - rect.width - VIEWPORT_GUTTER;
 	if (top + rect.height > vh - VIEWPORT_GUTTER) top = vh - rect.height - VIEWPORT_GUTTER;
 	if (left < VIEWPORT_GUTTER) left = VIEWPORT_GUTTER;
