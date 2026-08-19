@@ -160,6 +160,43 @@ describe("<BrainstormMenuProvider> suppression seam", () => {
 		act(() => root.unmount());
 	});
 
+	it("never opens a cursor menu inside the app-header band (S4)", () => {
+		act(() => {
+			root.render(
+				<BrainstormMenuProvider>
+					<div />
+				</BrainstormMenuProvider>,
+			);
+		});
+		const store = getActiveMenuStore();
+		const header = document.createElement("div");
+		header.className = "app-header";
+		header.getBoundingClientRect = () =>
+			({ top: 0, bottom: 44, left: 0, right: 1100, width: 1100, height: 44 }) as DOMRect;
+		document.body.appendChild(header);
+
+		// Right-clicking the header title is the sanctioned object-menu trigger,
+		// so the cursor point lands inside the 44px band. The menu must drop
+		// BELOW the header rather than slice through the title it was opened on.
+		act(() =>
+			openContextMenu({ x: 300, y: 21 }, [{ id: "a", label: "A", onSelect: () => undefined }]),
+		);
+		const open = store?.getAll().find((m) => m.id === CONTEXT_MENU_ID);
+		expect((open?.param.rect as DOMRect | undefined)?.top).toBe(44);
+
+		// A point below the band is untouched — the clamp is not a global offset.
+		act(() => closeContextMenu());
+		act(() =>
+			openContextMenu({ x: 300, y: 400 }, [{ id: "a", label: "A", onSelect: () => undefined }]),
+		);
+		const below = store?.getAll().find((m) => m.id === CONTEXT_MENU_ID);
+		expect((below?.param.rect as DOMRect | undefined)?.top).toBe(400);
+
+		act(() => closeContextMenu());
+		header.remove();
+		act(() => root.unmount());
+	});
+
 	it("anchors to the trigger element, right-aligns, and marks it open until close", () => {
 		act(() => {
 			root.render(

@@ -68,7 +68,7 @@
 }
 
 .bs-recur__weekday[data-selected="true"] {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg, #fff);
 	border-color: transparent;
 	font-weight: var(--text-weight-semibold);

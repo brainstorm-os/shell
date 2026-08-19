@@ -44,6 +44,7 @@ export {
 	MenuAlign,
 	type OpenContextMenuOptions,
 	closeContextMenu,
+	clampBelowAppHeader,
 	contextMenuConfig,
 	contextSubMenuConfig,
 	openContextMenu,

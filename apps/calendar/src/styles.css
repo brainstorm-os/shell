@@ -824,7 +824,7 @@ body.is-resizing .calendar-resize {
 }
 
 .cal-week__head-cell--today .cal-week__head-num {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 }
 
@@ -1448,7 +1448,7 @@ body.is-resizing .calendar-resize {
 }
 
 .cal-detail__reminder[data-selected="true"] {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	border-color: transparent;
 	font-weight: var(--text-weight-semibold);
@@ -1628,7 +1628,7 @@ body.is-resizing .calendar-resize {
 .cal-selection-bar__action {
 	appearance: none;
 	border: none;
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	font: inherit;
 	padding: var(--space-1);

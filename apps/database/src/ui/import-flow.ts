@@ -249,7 +249,7 @@ export function openImportPreviewModal(opts: {
 
 		const importBtn = document.createElement("button");
 		importBtn.type = "button";
-		importBtn.className = "db-import-modal__import";
+		importBtn.className = "db-import-modal__import bs-filled";
 
 		const currentAction = (row: PreviewRow): ImportAction =>
 			actionOverrides[row.index] ?? row.defaultAction;

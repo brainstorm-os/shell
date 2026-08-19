@@ -339,17 +339,37 @@ function markTriggerOpen(el: HTMLElement, menuId: string): void {
  *  viewport. A collapsed rect at the click point makes the menu open from
  *  there (the cursor / right-click case). */
 function anchorRectAt(point: { x: number; y: number }): DOMRect {
+	const y = clampBelowAppHeader(point);
 	return {
 		x: point.x,
-		y: point.y,
-		top: point.y,
-		bottom: point.y,
+		y,
+		top: y,
+		bottom: y,
 		left: point.x,
 		right: point.x,
 		width: 0,
 		height: 0,
-		toJSON: () => ({ x: point.x, y: point.y, width: 0, height: 0 }),
+		toJSON: () => ({ x: point.x, y, width: 0, height: 0 }),
 	};
+}
+
+/** The app header is a fixed 44px chrome band that owns the window drag
+ *  region and the title the object menu is opened from — so the sanctioned
+ *  right-click trigger puts the cursor INSIDE it, and a menu anchored at
+ *  that point slices through the very title it belongs to (`S4`,
+ *  POLISH-DSN-13, seen in Journal). The band is the one collision boundary
+ *  the viewport clamp cannot express, so the anchor drops to its bottom
+ *  edge. Every point-anchored menu in every app funnels through
+ *  `anchorRectAt`, which is why the fix lives here and not per-app. */
+export function clampBelowAppHeader(point: { x: number; y: number }): number {
+	if (typeof document === "undefined") return point.y;
+	const header = document.querySelector(".app-header");
+	if (!header) return point.y;
+	const rect = header.getBoundingClientRect();
+	if (rect.height <= 0) return point.y;
+	const inside =
+		point.y >= rect.top && point.y < rect.bottom && point.x >= rect.left && point.x <= rect.right;
+	return inside ? rect.bottom : point.y;
 }
 
 /**

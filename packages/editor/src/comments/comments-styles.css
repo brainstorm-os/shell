@@ -100,7 +100,7 @@
 	padding: 0 10px;
 	border: 0;
 	border-radius: var(--radius-sm);
-	background: var(--accent, #4c8dff);
+	background: var(--accent-fill, #4c8dff);
 	color: var(--accent-fg, #fff);
 	font: inherit;
 	font-size: var(--text-size-sm);
@@ -112,10 +112,6 @@
 	background: var(--accent-strong, var(--accent, #4c8dff));
 }
 
-.bs-comments__submit:disabled {
-	opacity: 0.45;
-	cursor: not-allowed;
-}
 
 .bs-comments__empty {
 	margin: 0;
@@ -214,7 +210,7 @@
 	min-width: 18px;
 	padding: 0 var(--space-1, var(--space-1));
 	border-radius: var(--radius-full);
-	background: var(--accent, #4c8dff);
+	background: var(--accent-fill, #4c8dff);
 	color: var(--accent-fg, #fff);
 	font-size: var(--text-size-xs);
 	line-height: 18px;

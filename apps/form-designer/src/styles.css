@@ -418,15 +418,11 @@ body.is-resizing .fd-resize {
 }
 
 .invoices__export {
-	background: var(--accent);
+	background: var(--accent-fill);
 	color: var(--accent-fg);
 	border-color: transparent;
 }
 
-.invoices__export:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
 
 .invoices__empty,
 .invoices__empty-main {

@@ -170,6 +170,15 @@
 	--active: var(--color-interactive-active);
 	--selected: var(--color-interactive-active);
 	--accent: var(--color-accent-default);
+	/* The fill a TEXT label sits on. `--accent` is the DECORATIVE accent —
+	 * legal under a glyph (WCAG 1.4.11, 3:1) but not under a label: measured
+	 * against `--accent-fg` it is 3.94 (default-light), 3.90 (graphite), 3.74
+	 * (mint), 3.71 (porcelain) and 3.56 (solar) — every one under the 4.5:1
+	 * text bar. `accent.onFill` is the theme-corrected fill 12.17 introduced
+	 * for exactly this, and the pair `accent-text-on-accent` holds it at
+	 * Normal in `themes-contrast.test.ts`. Any rule that sets a `color` on an
+	 * accent fill uses this one; `tools/check-accent-fill.mjs` enforces it. */
+	--accent-fill: var(--color-accent-on-fill);
 	--accent-strong: var(--color-accent-strong);
 	--accent-fg: var(--color-accent-text);
 	--accent-soft: var(--color-accent-subtle);
@@ -415,6 +424,42 @@ select {
 :root .bs-btn:disabled {
 	cursor: not-allowed;
 	opacity: 0.55;
+}
+
+/* The disabled face of a FILLED control (accent or danger).
+ *
+ * Blanket `opacity` is fine on an unfilled control — it fades ink against the
+ * page, which stays legible. On a filled one it fades the fill and the label
+ * TOGETHER, so what the user is left with is undefined: whatever the two
+ * happen to wash out to. That is the state Chat's send glyph dissolved into
+ * at ~1.3:1 (`S5`, POLISH-DSN-13), and it is why the audit called the
+ * disabled accent state undefined rather than merely low-contrast.
+ *
+ * A filled control declares the face instead — both stops collapse to
+ * `surface.raised` and the ink drops to `text.tertiary`, the same face the
+ * shell's `button.css` has painted since F-410, and the pair
+ * `disabled-label-on-disabled-face` holds it at 3:1 in every theme. Carry
+ * `bs-filled` on any accent/danger-filled control that can be disabled.
+ * `tools/check-accent-fill.mjs` fails a `:disabled { opacity }` on one. */
+:root .bs-filled:disabled,
+:root .bs-btn--primary:disabled,
+:root .bs-btn--danger:disabled {
+	opacity: 1;
+	background: var(--color-surface-raised);
+	border-color: var(--color-border-subtle);
+	color: var(--color-text-tertiary);
+	cursor: not-allowed;
+}
+
+/* The shared accent action. Its absence is why S5 found four apps that each
+ * invented an accent button and each reached for blanket `opacity`. */
+:root .bs-btn--primary {
+	background: var(--accent-fill);
+	border-color: transparent;
+	color: var(--accent-fg);
+}
+:root .bs-btn--primary:hover:not(:disabled) {
+	background: var(--accent-strong);
 }
 :root .bs-btn:focus-visible {
 	outline: 2px solid var(--color-focus-ring);
