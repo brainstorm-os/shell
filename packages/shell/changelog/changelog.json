@@ -3,6 +3,287 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.14.0",
+      "date": "2026-08-25",
+      "icon": "✨",
+      "title": "A polish pass over every surface, and your second device keeps up",
+      "summary": "We captured every app in both themes, read the screenshots, and fixed what we found — then fixed the class behind each defect so it cannot come back. Pairing a second device now actually moves your work to it, and a locked object refuses every write instead of just looking locked.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Polish, everywhere you look"
+        },
+        {
+          "kind": "p",
+          "text": "The biggest change in this release is not a feature. Every app was captured in both light and dark, the images were read one by one, and each defect was fixed at its cause rather than where it showed up."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Nothing overlaps.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Dashboard widgets sit on a bounded stage. A widget with no room says so in a tray instead of hiding underneath your app icons."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Menus and popovers are opaque.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " You can no longer read your dashboard through an open menu."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Menus open where you clicked.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A menu opened on a title no longer slices through the header band above it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Labels you can actually read.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A button filled with your accent colour now carries a label that meets contrast on all fourteen themes, and a disabled button no longer dissolves into its own fill."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Settings is navigable.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The twenty-two item list is now six labelled groups."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "One name for every object.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Eighteen separate answers to \"what do we call this?\" became one — which surfaced a Note you could rename from the graph without anything happening."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Your other device keeps up"
+        },
+        {
+          "kind": "p",
+          "text": "Pairing a second device now moves your work onto it, including everything that existed before the two devices ever met."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Backfill.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Objects that predate the pairing reach the newly paired device."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Ongoing.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Anything you create afterwards fans out to every paired device on its own."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Joining is safe.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A device joining a vault adopts that vault's identity, and refuses to re-point a vault that is already in use."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Lock an object and mean it"
+        },
+        {
+          "kind": "p",
+          "text": "Read-only used to be painted on the chrome — the editor refused, and other paths quietly wrote anyway. It is now enforced at the write."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Lock and Unlock live in the object "
+            },
+            {
+              "text": "⋯",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " menu, the one surface every app shares."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Books",
+              "marks": ["bold"]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "Contacts",
+              "marks": ["bold"]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "Database",
+              "marks": ["bold"]
+            },
+            {
+              "text": " can now set the lock, not only respect it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Every guard is covered by a test that fails when the guard is deleted."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Smaller things"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Keyboard and screen reader.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A collapsed sidebar leaves the tab order instead of trapping focus in a panel you cannot see."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Damaged documents look damaged.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " If a document lost content, the app tells you instead of showing a convincing blank page."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Graph",
+              "marks": ["bold"]
+            },
+            {
+              "text": " node labels get a chip, so they read against the tangle they float over."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files",
+              "marks": ["bold"]
+            },
+            {
+              "text": " list columns line up on one shared icon track."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Solheim",
+              "marks": ["bold"]
+            },
+            {
+              "text": " joins the AI providers you can bring your own key to."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.13.0",
       "date": "2026-08-03",
       "icon": "🤝",
