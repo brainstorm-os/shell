@@ -21,13 +21,14 @@ Things you can use today.
 - **Agents as vault members** — an agent has a name, holds permissions from the same list a person holds, proposes changes you approve, and has an activity log covering every run, tool call and refusal.
 - **Apps that call each other** — an app can publish typed actions other apps discover, appearing in object menus, the editor, automations, and to your agent. You approve the first call, and again if the app changes what the action does.
 - **Build an app inside Brainstorm** — an app is a manifest and an entry page. Write one in the code editor and install it into your own vault, or ask the agent to draft it.
+- **A read-only lock that holds.** Lock an object and every write path refuses it — the editor, the inspector, covers and icons, rename, delete, drag and merge — across Files, Books, Contacts, Database and the rest. Lock and Unlock live in the object menu every app shares.
 - **Signed and notarized builds** for macOS, Windows and Linux, with in-app updates.
 
 ## In progress
 
 Being actively worked on. Listed because it is honest, not because it is promised.
 
-- **Multi-device sync for your own devices.** The receiving half shipped some time ago; the half that hands your second device its keys is landing now. **It is not yet verified between two real machines**, so do not rely on it until this line moves to Shipped.
+- **Multi-device sync for your own devices.** Both halves now work: a newly paired device is backfilled with the objects that predate the pairing, and anything you create afterwards fans out on its own. This is proven end to end by an automated two-device run, which went green for the first time in 0.14.0 after a bug where pairing signed the joiner's records as the identity it was about to stop being. **It has still not been exercised across two physical machines**, so treat it as working-but-unconfirmed until this line moves to Shipped.
 - **Peer-to-peer sync over a local network** — two machines on the same Wi-Fi syncing with no server in the middle. Pairing and discovery work; the data does not converge over that link yet.
 
 ## What's coming
