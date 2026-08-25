@@ -81,7 +81,10 @@ echo "creating release $TAG"
 PAYLOAD=$(printf '%s' "$LINKS" | python3 -c "
 import sys, json
 ver = '$VER'; tag = '$TAG'
-base = 'https://gitlab.com/api/v4/projects/$PROJ/packages/generic/brainstorm/%s/' % ver
+# NOT %-formatting: $PROJ is URL-encoded ('brainstorm-os%2Fshell') and Python
+# reads that %2F as a format spec, so '... %s' % ver dies with a
+# TypeError about needing a real number. Concatenate instead.
+base = 'https://gitlab.com/api/v4/projects/$PROJ/packages/generic/brainstorm/' + ver + '/'
 links = []
 for name in sys.stdin.read().split():
     links.append({
@@ -95,7 +98,7 @@ for name in sys.stdin.read().split():
 print(json.dumps({
     'name': tag,
     'tag_name': tag,
-    'description': 'Brainstorm %s' % ver,
+    'description': 'Brainstorm ' + ver,
     'assets': {'links': links},
 }))
 ")
