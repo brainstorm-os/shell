@@ -146,21 +146,34 @@ jobs:
             done
           done
           cd packages/shell
-          # Publish only on a real tag push; a manual workflow_dispatch is a
-          # dry-run (build the matrix, upload nothing). electron-builder's
-          # --publish always already CREATES the draft release and uploads every
-          # artifact to it — no separate "create release" job (that produced a
-          # second, empty duplicate draft).
-          publish=${{ github.event_name == 'push' && 'always' || 'never' }}
-          bunx electron-builder ${{ matrix.builder-platform }} $spec --publish "$publish" ${{ matrix.sign-args }}
+          # The `publish` provider in packages/shell/package.json is now
+          # `generic` — the GitLab permalink electron-updater reads — and the
+          # generic provider is DOWNLOAD-only: it can serve an update feed but
+          # cannot upload. So no leg publishes anything. Each one builds and
+          # hands its artefacts to `finalize` as a workflow artifact.
+          bunx electron-builder ${{ matrix.builder-platform }} $spec --publish never ${{ matrix.sign-args }}
 
-  # electron-builder's `--publish always` (above) CREATES the release as a
-  # DRAFT and uploads every artifact to it, but never publishes it and never
-  # writes notes — so historically each release had to be published by hand and
-  # shipped with an empty body. This job runs once, after every matrix leg has
-  # uploaded its artifacts, to generate notes from the merged PRs and flip the
-  # draft to a published "latest" release. Tag-push only; a workflow_dispatch
-  # dry-run builds nothing to publish.
+      - name: Collect artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            packages/shell/dist/*.dmg
+            packages/shell/dist/*.zip
+            packages/shell/dist/*.exe
+            packages/shell/dist/*.AppImage
+            packages/shell/dist/*.deb
+            packages/shell/dist/*.blockmap
+            packages/shell/dist/latest*.yml
+
+  # No draft exists to flip any more: the generic provider cannot create one,
+  # so this job creates the GitHub release itself, writes notes generated from
+  # the merged PRs, and attaches every leg's artefacts. GitLab — which is what
+  # the auto-update feed actually reads — is published separately from a
+  # workstation with tools/publish-gitlab-release.sh, per .gitlab-ci.yml.
+  # Tag-push only; a workflow_dispatch dry-run builds nothing to publish.
   finalize:
     name: Publish release
     needs: build
@@ -175,7 +188,13 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Generate notes + publish the draft
+      - name: Download every leg's artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate notes + publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -193,6 +212,13 @@ jobs:
           git fetch origin --force "refs/tags/${TAG}:refs/tags/${TAG}"
           summary=$(git for-each-ref "refs/tags/${TAG}" --format='%(contents:subject)')
           { [ -n "$summary" ] && printf '%s\n\n' "$summary"; printf '%s\n' "$gen"; } > notes.md
-          # The draft already exists (electron-builder created it for this tag).
-          gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" \
-            --prerelease=false --draft=false --latest --notes-file notes.md
+          # Idempotent: a re-run of a partially-completed release must not fail
+          # on an existing tag, and must replace rather than duplicate assets.
+          if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" \
+              --prerelease=false --draft=false --latest --notes-file notes.md
+            gh release upload "$TAG" --repo "${GITHUB_REPOSITORY}" --clobber dist/*
+          else
+            gh release create "$TAG" --repo "${GITHUB_REPOSITORY}" \
+              --title "$TAG" --notes-file notes.md --latest dist/*
+          fi

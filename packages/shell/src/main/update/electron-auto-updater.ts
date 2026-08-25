@@ -5,9 +5,12 @@
  * `ManagedAutoUpdater` interface. This is the Electron/IO edge (like 13.6's
  * `update-feed-fetch.ts`); the tested logic lives in `auto-update-engine.ts`.
  *
- * Feed: the GitHub `publish` provider in package.json bakes `app-update.yml`
+ * Feed: the `generic` `publish` provider in package.json bakes `app-update.yml`
  * into the build, so electron-updater knows where to read `latest*.yml` with
- * no runtime URL. `autoDownload` is OFF — a check only detects; the engine
+ * no runtime URL. That provider points at the GitLab release permalink
+ * (`.../releases/permalink/latest/downloads`), which always resolves to the
+ * newest release — so the release must carry `direct_asset_path` links or
+ * every client silently stops updating (see tools/publish-gitlab-release.sh). `autoDownload` is OFF — a check only detects; the engine
  * downloads on explicit user action. Code-signature verification is
  * electron-updater's own (macOS Developer ID match / Windows publisher), so a
  * compromised feed can't push an artefact signed by a different identity.
