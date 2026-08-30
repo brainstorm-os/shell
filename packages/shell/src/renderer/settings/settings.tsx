@@ -65,14 +65,6 @@ import { FileHandlesPanel } from "./file-handles-panel";
 import { GrantsPanel } from "./grants-panel";
 import { SettingsHeaderActionsContext } from "./header-actions";
 import { KeyboardSection } from "./keyboard-section";
-const MembershipSection = lazy(() =>
-	import("./membership-section").then((m) => ({ default: m.MembershipSection })),
-);
-// 14.6 — Settings → Billing. Lazy-loaded like Membership: only reachable
-// from Settings, keeps the dashboard entry chunk lean.
-const BillingSection = lazy(() =>
-	import("./billing-section").then((m) => ({ default: m.BillingSection })),
-);
 // Net-1f — Settings → Privacy → Network panel. Lazy-loaded; the panel
 // pulls the virtualizer (~6 KB raw) + the proxy editor popover + every
 // audit-table row component (~12 KB raw together) only when the user
@@ -209,18 +201,6 @@ export const SECTIONS: ReadonlyArray<SettingsNavEntry> = [
 		id: SettingsSection.Identity,
 		labelKey: "shell.settings.section.identity",
 		icon: IconName.ShieldCheck,
-		group: SettingsGroup.Account,
-	},
-	{
-		id: SettingsSection.Membership,
-		labelKey: "shell.settings.section.membership",
-		icon: IconName.Crown,
-		group: SettingsGroup.Account,
-	},
-	{
-		id: SettingsSection.Billing,
-		labelKey: "shell.settings.section.billing",
-		icon: IconName.CreditCard,
 		group: SettingsGroup.Account,
 	},
 	{
@@ -584,18 +564,6 @@ function renderBody(
 			return (
 				<Suspense fallback={null}>
 					<SyncSection />
-				</Suspense>
-			);
-		case SettingsSection.Membership:
-			return (
-				<Suspense fallback={null}>
-					<MembershipSection />
-				</Suspense>
-			);
-		case SettingsSection.Billing:
-			return (
-				<Suspense fallback={null}>
-					<BillingSection />
 				</Suspense>
 			);
 		case SettingsSection.Network:

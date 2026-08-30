@@ -6,8 +6,9 @@
  * with the per-app sandbox CSP) is never instantiated.
  *
  * Not unit-tested (needs epub.js + a real EPUB + a DOM) — the extraction logic
- * it delegates to lives in the jsdom-tested `epub-content.ts`. Verified in the
- * real shell (a real EPUB renders in the reflow reader).
+ * it delegates to lives in the jsdom-tested `epub-content.ts`, and the
+ * navigation-label matching lives in the pure, tested `epub-nav.ts`. Verified in
+ * the real shell (a real EPUB renders in the reflow reader).
  *
  * epub.js (a heavy CJS lib + JSZip) is **dynamically imported** so it stays out
  * of the app's initial bundle/module graph — it loads only when a user actually
@@ -16,6 +17,7 @@
 
 import type { BookContent } from "./content";
 import { type RawSection, bookContentFrom } from "./epub-content";
+import { type NavEntry, navigationTitles, titleForHref } from "./epub-nav";
 
 /** Parse `bytes` (an EPUB file) into the reflow reader's `BookContent`. */
 export async function parseEpub(bytes: Uint8Array): Promise<BookContent> {
@@ -29,6 +31,17 @@ export async function parseEpub(bytes: Uint8Array): Promise<BookContent> {
 		await book.ready;
 		const metadata = book.packaging?.metadata;
 		const meta = { title: metadata?.title ?? "", author: metadata?.creator ?? "" };
+		// The NCX / nav-doc labels are the book's OWN chapter titles. Without
+		// them every chapter fell back to a positional "Chapter N", which is
+		// what the TOC showed. A book with no navigation document is normal —
+		// the extractor then falls back to the section's first heading.
+		let titles: ReadonlyMap<string, string> = new Map();
+		try {
+			const navigation = (await book.loaded.navigation) as { toc?: readonly NavEntry[] } | null;
+			titles = navigationTitles(navigation?.toc ?? []);
+		} catch (error) {
+			console.warn("[books] epub navigation unavailable:", error);
+		}
 		const sections: RawSection[] = [];
 		for (let i = 0; ; i += 1) {
 			const section = book.spine.get(i);
@@ -45,7 +58,7 @@ export async function parseEpub(bytes: Uint8Array): Promise<BookContent> {
 					| undefined;
 				const body = doc?.querySelector?.("body");
 				const html = body?.innerHTML ?? doc?.innerHTML ?? "";
-				sections.push({ title: "", html });
+				sections.push({ title: titleForHref(titles, section.href), html });
 			} catch (error) {
 				console.warn(`[books] epub section ${i} load failed:`, error);
 			} finally {

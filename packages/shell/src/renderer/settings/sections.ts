@@ -61,15 +61,6 @@ export enum SettingsSection {
 	 *  seq diagnostic). Drill-down for the dashboard chip; same data,
 	 *  expanded. */
 	Sync = "sync",
-	/** Plan + billing surface — visual-only pricing tiers, billing-cycle
-	 *  toggle, current-plan state, mocked checkout. Real Stripe / seat
-	 *  management arrive in v2 (see project_marketplace_mvp memory). */
-	Membership = "membership",
-	/** 14.6 — the real account/billing state: current plan + entitlement,
-	 *  account link (billing-edge refresh credential), invoices, and
-	 *  portal / Stripe-Checkout deep links (payment never renders
-	 *  in-product). Membership above stays the pricing/compare surface. */
-	Billing = "billing",
 	/** Net-1f — Privacy → Network egress UI. Active proxy, privacy mode
 	 *  (link previews + embeds), per-app egress audit (with revoke),
 	 *  recent + blocked requests over the rotated audit log, preview-

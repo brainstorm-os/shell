@@ -13,6 +13,26 @@ class StubResizeObserver {
 
 let handle: ReaderHandle | null = null;
 
+/** jsdom reports every box as 0x0, so the reader always took its
+ *  no-geometry fallback and the MEASURED pagination path never ran under
+ *  test. Faking a laid-out page is what exercises it. */
+function withLayoutBoxes(width: number, height: number): () => void {
+	// jsdom defines these on Element, not HTMLElement — patching the wrong
+	// prototype leaves nothing to restore and leaks the stub into every
+	// following test.
+	const proto = Element.prototype;
+	const w = Object.getOwnPropertyDescriptor(proto, "clientWidth");
+	const h = Object.getOwnPropertyDescriptor(proto, "clientHeight");
+	Object.defineProperty(proto, "clientWidth", { configurable: true, get: () => width });
+	Object.defineProperty(proto, "clientHeight", { configurable: true, get: () => height });
+	return () => {
+		if (w) Object.defineProperty(proto, "clientWidth", w);
+		else Reflect.deleteProperty(proto, "clientWidth");
+		if (h) Object.defineProperty(proto, "clientHeight", h);
+		else Reflect.deleteProperty(proto, "clientHeight");
+	};
+}
+
 function scaffold(): { root: HTMLElement; right: HTMLElement } {
 	document.body.innerHTML = `
 		<header class="app-header">
@@ -37,6 +57,51 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	document.body.innerHTML = "";
+});
+
+describe("reader render with a measured page box", () => {
+	// The measured path is only reachable once the page reports a real box.
+	// Its first run happens during mount, inside `createReaderState` — so a
+	// binding it closes over that is declared further down the function body
+	// throws a TDZ ReferenceError in a real browser while every jsdom test
+	// stays green on the fallback. That is exactly how it shipped once.
+	it("mounts and paginates without touching an uninitialised binding", () => {
+		const restore = withLayoutBoxes(700, 600);
+		try {
+			const { root, right } = scaffold();
+			handle = mountReader(root, right, SAMPLE_BOOK_CONTENT);
+			expect(root.querySelector(".books__page")).not.toBeNull();
+			expect(root.querySelector(".books__status")?.textContent).toMatch(/\d+/);
+		} finally {
+			restore();
+		}
+	});
+
+	it("leaves no ruler behind after measuring", () => {
+		const restore = withLayoutBoxes(700, 600);
+		try {
+			const { root, right } = scaffold();
+			handle = mountReader(root, right, SAMPLE_BOOK_CONTENT);
+			expect(root.querySelector(".books__ruler")).toBeNull();
+		} finally {
+			restore();
+		}
+	});
+
+	it("turns the page on a wheel gesture past the threshold", () => {
+		const restore = withLayoutBoxes(700, 600);
+		try {
+			const { root, right } = scaffold();
+			handle = mountReader(root, right, SAMPLE_BOOK_CONTENT);
+			const stage = root.querySelector(".books__stage");
+			if (!stage) throw new Error("no stage");
+			const before = root.querySelector(".books__status")?.textContent;
+			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 400, bubbles: true }));
+			expect(root.querySelector(".books__status")?.textContent).not.toBe(before);
+		} finally {
+			restore();
+		}
+	});
 });
 
 describe("reader render", () => {
