@@ -13,6 +13,16 @@ import { t } from "../i18n";
 export enum ReaderChord {
 	Next = "ArrowRight",
 	Prev = "ArrowLeft",
+	// A paginated reader has no scrollbar, so every gesture a reader already
+	// reaches for to move down a page has to turn one instead. Binding only
+	// the arrows left Space / PageDown / scroll doing nothing at all, which
+	// reads as a frozen book rather than a reader that wants ArrowRight.
+	NextLine = "ArrowDown",
+	PrevLine = "ArrowUp",
+	NextScreen = "PageDown",
+	PrevScreen = "PageUp",
+	NextSpace = "Space",
+	PrevSpace = "Shift+Space",
 	Larger = "CmdOrCtrl+=",
 	Smaller = "CmdOrCtrl+-",
 	Highlights = "CmdOrCtrl+Shift+H",

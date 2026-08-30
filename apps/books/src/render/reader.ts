@@ -19,7 +19,9 @@ import {
 	composeHighlight,
 	highlightsOnPage,
 } from "../logic/highlight-store";
+import { type SpineMetrics, paginateMeasured } from "../logic/measured-pagination";
 import { slicePage } from "../logic/page-slice";
+import { type Paginator, charBudgetPaginator } from "../logic/pagination";
 import {
 	type ReaderState,
 	canGoNext,
@@ -58,6 +60,14 @@ import {
 	paintFragment,
 	readFragmentSelection,
 } from "./highlights";
+import { contentBox, measureSpineBlocks } from "./measure-blocks";
+
+/** How much accumulated wheel travel turns a page, and how long the
+ *  momentum tail after it is ignored. */
+const WHEEL_THRESHOLD_PX = 60;
+const WHEEL_COOLDOWN_MS = 260;
+/** Coalescing window for resize-driven re-pagination. */
+const RESIZE_DEBOUNCE_MS = 100;
 
 const FAMILY_LABELS: Record<ReadingFamily, BooksI18nKey> = {
 	[ReadingFamily.System]: "typography.family.system",
@@ -161,7 +171,21 @@ export function mountReader(
 	root.append(stage, footer);
 
 	let typography: TypographySettings = options.initialTypography ?? DEFAULT_TYPOGRAPHY;
-	let state: ReaderState = createReaderState(content, budget());
+	/** Block geometry is stable for a given (width × typography), so it is
+	 *  measured once and reused across every page turn; only a resize or a
+	 *  typography change invalidates it. Declared HERE, above the first
+	 *  `makePaginator()` call: the paginator closure reads it during mount, and
+	 *  a `let` further down the body is in its temporal dead zone at that point
+	 *  (a ReferenceError in any real browser, invisible to jsdom — which
+	 *  reports every box as 0x0 and so only ever took the fallback path). */
+	let measured: { key: string; metrics: SpineMetrics } | null = null;
+	// The ruler measures against the live custom properties, and the metrics
+	// cache is keyed on the typography it believes it measured — so a restored
+	// per-book size has to be on the element BEFORE the first measurement, or
+	// the cache pins geometry measured at the stylesheet default under the
+	// restored size's key and never re-measures.
+	applyTypographyVars();
+	let state: ReaderState = createReaderState(content, makePaginator());
 	if (options.initialPosition) {
 		state = goToLocator(state, options.initialPosition);
 	}
@@ -172,11 +196,30 @@ export function mountReader(
 		options.newHighlightId ?? (() => `hl-${now()}-${Math.random().toString(36).slice(2, 8)}`);
 	const highlightStore = new HighlightStore(options.highlightPort ?? {});
 
-	function budget(): number {
-		const rect = stage.getBoundingClientRect();
-		const w = rect.width || 600;
-		const h = rect.height || 700;
-		return charsPerPageBudget(typography, w, h);
+	function metricsKey(width: number): string {
+		const { size, leading, measure, family } = typography;
+		return `${width.toFixed(2)}|${size}|${leading}|${measure}|${family}`;
+	}
+
+	/** The live pagination strategy. Once the page has a real box the reader
+	 *  paginates from MEASURED block heights, so a page holds exactly what
+	 *  fits; before then (a hidden window, the first paint) it falls back to
+	 *  the approximate character budget. */
+	function makePaginator(): Paginator {
+		const { width, height } = contentBox(page);
+		if (!(width > 0) || !(height > 0)) {
+			const rect = stage.getBoundingClientRect();
+			return charBudgetPaginator(
+				charsPerPageBudget(typography, rect.width || 600, rect.height || 700),
+			);
+		}
+		const key = metricsKey(width);
+		return (spine) => {
+			if (!measured || measured.key !== key) {
+				measured = { key, metrics: measureSpineBlocks(stage, page, spine) };
+			}
+			return paginateMeasured(spine, measured.metrics, height);
+		};
 	}
 
 	function applyTypographyVars(): void {
@@ -236,7 +279,10 @@ export function mountReader(
 	 *  current locator stays put, then persists the new settings. */
 	function setTypography(nextTypography: TypographySettings): void {
 		typography = nextTypography;
-		go((s) => repaginate(s, budget()));
+		// The ruler measures against the live custom properties, so the new
+		// glass has to be on the element before re-pagination measures it.
+		applyTypographyVars();
+		go((s) => repaginate(s, makePaginator()));
 		options.onTypographyChange?.(serializeTypography(typography), typography);
 	}
 
@@ -368,16 +414,62 @@ export function mountReader(
 		refreshHighlightPanel();
 	});
 
+	const NEXT_CHORDS: readonly ReaderChord[] = [
+		ReaderChord.Next,
+		ReaderChord.NextLine,
+		ReaderChord.NextScreen,
+		ReaderChord.NextSpace,
+	];
+	const PREV_CHORDS: readonly ReaderChord[] = [
+		ReaderChord.Prev,
+		ReaderChord.PrevLine,
+		ReaderChord.PrevScreen,
+		ReaderChord.PrevSpace,
+	];
+
 	const disposers: ShortcutDisposer[] = [
-		attachShortcut(window, ReaderChord.Next, () => go(nextPage)),
-		attachShortcut(window, ReaderChord.Prev, () => go(prevPage)),
+		...NEXT_CHORDS.map((chord) => attachShortcut(window, chord, () => go(nextPage))),
+		...PREV_CHORDS.map((chord) => attachShortcut(window, chord, () => go(prevPage))),
 		attachShortcut(window, ReaderChord.Larger, () => setTypography(stepSize(typography, 1))),
 		attachShortcut(window, ReaderChord.Smaller, () => setTypography(stepSize(typography, -1))),
 		attachShortcut(window, ReaderChord.Highlights, toggleHighlightPanel),
 	];
 
+	// Scrolling the reading surface turns the page. A paginated reader has no
+	// scrollbar, so without this a wheel or two-finger swipe over the text does
+	// nothing whatsoever — the single most common way to discover that the
+	// reader looks broken. Deltas accumulate to a threshold (one trackpad
+	// flick is dozens of small events) and a cooldown swallows the momentum
+	// tail so one gesture turns one page.
+	let wheelDelta = 0;
+	let wheelCooldown = 0;
+	function onWheel(event: WheelEvent): void {
+		event.preventDefault();
+		const now = Date.now();
+		if (now < wheelCooldown) {
+			wheelDelta = 0;
+			return;
+		}
+		// Trackpads emit both axes; a horizontal swipe should page too.
+		const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+		wheelDelta += delta;
+		if (Math.abs(wheelDelta) < WHEEL_THRESHOLD_PX) return;
+		const forward = wheelDelta > 0;
+		wheelDelta = 0;
+		wheelCooldown = now + WHEEL_COOLDOWN_MS;
+		go(forward ? nextPage : prevPage);
+	}
+	stage.addEventListener("wheel", onWheel, { passive: false });
+
+	// Re-measuring the whole book is far too costly to run on every frame of a
+	// window drag, so the observer coalesces a burst into one re-pagination.
+	let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 	const resize = new ResizeObserver(() => {
-		go((s) => repaginate(s, budget()));
+		if (resizeTimer !== null) clearTimeout(resizeTimer);
+		resizeTimer = setTimeout(() => {
+			resizeTimer = null;
+			go((s) => repaginate(s, makePaginator()));
+		}, RESIZE_DEBOUNCE_MS);
 	});
 	resize.observe(stage);
 
@@ -386,6 +478,8 @@ export function mountReader(
 	return {
 		dispose() {
 			for (const d of disposers) d();
+			stage.removeEventListener("wheel", onWheel);
+			if (resizeTimer !== null) clearTimeout(resizeTimer);
 			resize.disconnect();
 			unsubscribe();
 			closeSelectionMenu();

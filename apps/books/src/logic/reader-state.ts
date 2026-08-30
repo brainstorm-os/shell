@@ -11,25 +11,23 @@ import { type BookContent, type IndexedSpineItem, indexSpine, totalLength } from
 import {
 	type Page,
 	type Pagination,
+	type Paginator,
 	clampPageIndex,
 	pageIndexForLocator,
-	paginate,
 	progressAtLocator,
 } from "./pagination";
 
 export type ReaderState = {
 	spine: IndexedSpineItem[];
 	totalChars: number;
-	charsPerPage: number;
 	pagination: Pagination;
 	pageIndex: number;
 };
 
-export function createReaderState(content: BookContent, charsPerPage: number): ReaderState {
+export function createReaderState(content: BookContent, paginator: Paginator): ReaderState {
 	const spine = indexSpine(content);
 	const totalChars = totalLength(spine);
-	const pagination = paginate(spine, charsPerPage);
-	return { spine, totalChars, charsPerPage, pagination, pageIndex: 0 };
+	return { spine, totalChars, pagination: paginator(spine), pageIndex: 0 };
 }
 
 export function currentPage(state: ReaderState): Page | null {
@@ -82,13 +80,12 @@ export function readingProgress(state: ReaderState): number {
 	return progressAtLocator(state.spine, state.totalChars, page.range.end);
 }
 
-/** Re-paginate with a new chars-per-page budget (a typography change),
+/** Re-paginate against a fresh `Paginator` (a typography or viewport change),
  *  staying on the page that holds the *current* locator. This is the
  *  preview-drop's headline invariant: change the glass, keep your place. */
-export function repaginate(state: ReaderState, charsPerPage: number): ReaderState {
+export function repaginate(state: ReaderState, paginator: Paginator): ReaderState {
 	const anchor = currentLocator(state);
-	const pagination = paginate(state.spine, charsPerPage);
-	const next: ReaderState = { ...state, charsPerPage, pagination, pageIndex: 0 };
+	const next: ReaderState = { ...state, pagination: paginator(state.spine), pageIndex: 0 };
 	if (!anchor) return next;
 	return goToLocator(next, anchor);
 }

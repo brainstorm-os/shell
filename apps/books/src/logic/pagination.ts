@@ -52,6 +52,19 @@ export function paginate(spine: IndexedSpineItem[], charsPerPage: number): Pagin
 	return { pages, totalChars };
 }
 
+/** How a `ReaderState` turns content into pages. The reflow reader supplies a
+ *  layout-measured one (`paginateMeasured` bound to freshly measured block
+ *  geometry); the char-budget one below stays for content that has no rendered
+ *  geometry to measure — tests, and the first paint before the ruler has run. */
+export type Paginator = (spine: IndexedSpineItem[]) => Pagination;
+
+/** The original character-budget strategy as a `Paginator`. Approximate by
+ *  construction — it cannot see ragged line ends or paragraph margins — so it
+ *  is a fallback, never the reading path. */
+export function charBudgetPaginator(charsPerPage: number): Paginator {
+	return (spine) => paginate(spine, charsPerPage);
+}
+
 /** True when `locator` falls within `page.range` (start-inclusive,
  *  end-exclusive). A locator sitting exactly on a page break belongs to the
  *  next page, not this one — `pageIndexForLocator` resolves that boundary. */
