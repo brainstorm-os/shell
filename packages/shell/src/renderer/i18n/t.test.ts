@@ -28,7 +28,7 @@ describe("t()", () => {
 	});
 
 	it("renders literal apostrophes (not ICU quoting) in real catalog strings", () => {
-		expect(t("shell.settings.membership.cta.stay")).toBe("You're on this plan");
+		expect(t("shell.notifications.center.empty")).toBe("You're all caught up.");
 	});
 });
 
