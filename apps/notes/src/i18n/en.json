@@ -408,5 +408,7 @@
   "notes.transclusion.editHint": "Edit the source page here — changes are saved to it",
   "notes.transclusion.doneHint": "Stop editing the source page",
   "notes.transclusion.lockedHint": "The source page is locked — unlock it to edit here",
-  "notes.transclusion.editingBadge": "Editing the source page"
+  "notes.transclusion.editingBadge": "Editing the source page",
+  "notes.action.turnIntoPage.label": "Page",
+  "notes.action.turnIntoPage.description": "Move these blocks into a new sub-page"
 }

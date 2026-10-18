@@ -408,5 +408,7 @@
   "notes.transclusion.editHint": "Modifica qui la pagina di origine: le modifiche vengono salvate lì",
   "notes.transclusion.doneHint": "Interrompi la modifica della pagina di origine",
   "notes.transclusion.lockedHint": "La pagina di origine è bloccata: sbloccala per modificarla qui",
-  "notes.transclusion.editingBadge": "Modifica della pagina di origine"
+  "notes.transclusion.editingBadge": "Modifica della pagina di origine",
+  "notes.action.turnIntoPage.label": "Pagina",
+  "notes.action.turnIntoPage.description": "Sposta questi blocchi in una nuova sottopagina"
 }

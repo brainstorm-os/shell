@@ -408,5 +408,7 @@
   "notes.transclusion.editHint": "Modifier la page source ici — les modifications y sont enregistrées",
   "notes.transclusion.doneHint": "Arrêter de modifier la page source",
   "notes.transclusion.lockedHint": "La page source est verrouillée — déverrouillez-la pour la modifier ici",
-  "notes.transclusion.editingBadge": "Modification de la page source"
+  "notes.transclusion.editingBadge": "Modification de la page source",
+  "notes.action.turnIntoPage.label": "Page",
+  "notes.action.turnIntoPage.description": "Déplacer ces blocs dans une nouvelle sous-page"
 }

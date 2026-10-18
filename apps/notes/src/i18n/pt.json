@@ -408,5 +408,7 @@
   "notes.transclusion.editHint": "Editar a página de origem aqui — as alterações são salvas nela",
   "notes.transclusion.doneHint": "Parar de editar a página de origem",
   "notes.transclusion.lockedHint": "A página de origem está bloqueada — desbloqueie-a para editar aqui",
-  "notes.transclusion.editingBadge": "Editando a página de origem"
+  "notes.transclusion.editingBadge": "Editando a página de origem",
+  "notes.action.turnIntoPage.label": "Página",
+  "notes.action.turnIntoPage.description": "Mover estes blocos para uma nova subpágina"
 }
