@@ -100,7 +100,41 @@ export {
 	type BlockGutterPluginProps,
 	BlockGutterPlugin,
 } from "./plugins/block-gutter-plugin";
-export { useEditorShortcut } from "./plugins/editor-shortcut";
+export { isEventInNestedEditor, useEditorShortcut } from "./plugins/editor-shortcut";
+export { TaskCheckbox } from "./task-checkbox";
+export {
+	TASK_CHECK_ATTR,
+	TASK_ENTITY_TYPE,
+	isTaskDone,
+	newTaskProperties,
+	taskCompletionPatch,
+} from "./task-entity";
+export { createTaskCommand, insertTaskMention, newTaskId, taskPickerRows } from "./task-mention";
+export {
+	$canHaveBlockBackground,
+	BLOCK_BACKGROUND_ATTR,
+	BLOCK_BACKGROUND_STYLE_PROP,
+	BackgroundSwatch,
+	BlockBackgroundPlugin,
+	applyBlockBackground,
+	blockBackgroundToken,
+	createBlockBackgroundActions,
+	readBlockBackground,
+	registerBlockBackground,
+	swatchLabel,
+	withBlockBackground,
+} from "./block-background";
+export {
+	INSERT_MENU_CHORDS,
+	InsertPosition,
+	type OpenInsertMenuOptions,
+	createInsertBlockActions,
+	insertBlockWithCommand,
+	insertEmptyBlock,
+	insertMenuRows,
+	openInsertMenu,
+	pickInsertTarget,
+} from "./plugins/insert-menu";
 export {
 	type SlashMenuPluginProps,
 	SlashMenuPlugin,
@@ -146,8 +180,13 @@ export {
 	Heading1Icon,
 	Heading2Icon,
 	Heading3Icon,
+	BlockBackgroundIcon,
 	ImageIcon,
 	IndentIcon,
+	InsertAboveIcon,
+	InsertBelowIcon,
+	TaskIcon,
+	TurnIntoPageIcon,
 	InlineCodeIcon,
 	ItalicIcon,
 	LinkIcon,
@@ -279,6 +318,7 @@ export {
 } from "./nodes/file-block-node";
 export {
 	type EditorBlocksHost,
+	type EditorEntitiesHost,
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
@@ -303,6 +343,7 @@ export {
 	fetchEntities,
 	getEntityDisplayIcon,
 	getEntityIcon,
+	getEntityProperties,
 	getEntityTitle,
 	setEntityIndexSource,
 	subscribeEntityIcons,

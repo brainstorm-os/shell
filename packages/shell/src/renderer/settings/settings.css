@@ -1456,6 +1456,13 @@
 	color: var(--color-text-primary);
 }
 
+/* B11.31 — spelling-language picker + its "use system languages" reset. */
+.settings__spell-langs {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
 /* ── Settings → Search index (9.22.4) ─────────────────────────────────── */
 
 .search-index__stats {

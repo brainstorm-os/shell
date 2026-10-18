@@ -12,6 +12,7 @@ import {
 	ArrowLineDown,
 	ArrowLineLeft,
 	ArrowLineRight,
+	ArrowLineUp,
 	ArrowRight,
 	ArrowUp,
 	Bookmark,
@@ -20,12 +21,14 @@ import {
 	CaretRight,
 	ChatCircle,
 	Check,
+	CheckSquare,
 	Code,
 	Columns,
 	Copy,
 	DotsSixVertical,
 	DotsThree,
 	File,
+	FileArrowUp,
 	FilePlus,
 	FilmStrip,
 	Function as FunctionGlyph,
@@ -42,6 +45,7 @@ import {
 	MagnifyingGlass,
 	Minus,
 	MusicNote,
+	PaintBucket,
 	Paragraph,
 	Plus,
 	Quotes,
@@ -335,4 +339,24 @@ export function RichTextTypeIcon(): ReactNode {
 
 export function GripIcon(): ReactNode {
 	return <DotsSixVertical size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function InsertAboveIcon(): ReactNode {
+	return <ArrowLineUp size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function InsertBelowIcon(): ReactNode {
+	return <ArrowLineDown size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function BlockBackgroundIcon(): ReactNode {
+	return <PaintBucket size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function TaskIcon(): ReactNode {
+	return <CheckSquare size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function TurnIntoPageIcon(): ReactNode {
+	return <FileArrowUp size={SIZE} aria-hidden focusable={false} />;
 }

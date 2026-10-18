@@ -1,6 +1,7 @@
 import {
 	CONTRAST_PAIRS,
 	SURFACE_PAIRS,
+	contrastRatio,
 	lintSurfaceSeparation,
 	lintTokenContrast,
 } from "@brainstorm-os/sdk-types";
@@ -57,6 +58,18 @@ describe("built-in theme contrast — WCAG AA ratchet", () => {
 				.map((issue) => `${issue.pairId} ${issue.ratio.toFixed(2)}:1 < ${issue.required}:1`)
 				.join(", ");
 			expect(issues, `${name} fails: ${detail}`).toEqual([]);
+		});
+	}
+
+	for (const name of Object.values(ThemeName)) {
+		it(`${name}: body text reads on every block background tint (B11.23)`, () => {
+			const tokens = themes[name];
+			const ink = tokens.color.text.primary;
+			const failing = Object.entries(tokens.color.blockBackground)
+				.map(([hue, bg]) => [hue, contrastRatio(ink, bg) ?? 0] as const)
+				.filter(([, ratio]) => ratio < 4.5)
+				.map(([hue, ratio]) => `${hue} ${ratio.toFixed(2)}:1`);
+			expect(failing, `${name} fails: ${failing.join(", ")}`).toEqual([]);
 		});
 	}
 

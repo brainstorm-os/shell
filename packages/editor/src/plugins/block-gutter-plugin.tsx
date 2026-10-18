@@ -1,6 +1,10 @@
 /**
  * BlockGutterPlugin — left-margin hover affordance for the editor:
- *   - A `+` button inserts an empty paragraph below the hovered row.
+ *   - A `+` button opens the Insert menu (B11.21) — the host's slash
+ *     catalogue as a filterable picker anchored to the button — and inserts
+ *     the chosen block below the hovered row. Without `insertCommands` it
+ *     inserts an empty paragraph. `Mod+Shift+Enter` opens the same picker
+ *     below the caret's block (the keyboard path).
  *   - A grip handle:
  *       - On click → opens the block-action menu (TurnInto + Delete),
  *         scoped to the current block-selection if any (else the
@@ -20,9 +24,9 @@
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
-	$createParagraphNode,
-	$getNodeByKey,
 	$getRoot,
+	$getSelection,
+	$isRangeSelection,
 	type LexicalEditor,
 	type NodeKey,
 } from "lexical";
@@ -36,6 +40,14 @@ import { openBlockActionMenu } from "./block-action-menu";
 import { gutterAnchor } from "./block-gutter-anchor";
 import { moveBlocksTo } from "./block-ops";
 import { useBlockSelectionStore } from "./block-selection-plugin";
+import { useEditorShortcut } from "./editor-shortcut";
+import {
+	INSERT_MENU_CHORDS,
+	InsertPosition,
+	insertEmptyBlock,
+	openInsertMenu,
+	pickInsertTarget,
+} from "./insert-menu";
 
 /** Distance from the block's left edge to the gutter element's left
  *  edge. The gutter is two 22px buttons with a 2px gap (46px wide). At
@@ -59,6 +71,9 @@ export type BlockGutterPluginProps = {
 	 *  type). When omitted, the action menu renders no command rows —
 	 *  the gutter still works for `+` insert + drag-to-reorder. */
 	commands?: readonly BlockCommand[];
+	/** The slash catalogue the `+` Insert menu (and `Mod+Shift+Enter`) offers.
+	 *  Omit to keep `+` as a plain "empty paragraph below". */
+	insertCommands?: readonly BlockCommand[];
 	/** CSS selector for the scroll container that owns the document.
 	 *  Defaults to walking the editor root's nearest scrollable ancestor.
 	 *  Notes passes `.notes__main`, Journal passes its own scroll host. */
@@ -71,6 +86,7 @@ export type BlockGutterPluginProps = {
 
 export function BlockGutterPlugin({
 	commands,
+	insertCommands,
 	scrollContainerSelector,
 	documentId,
 }: BlockGutterPluginProps = {}) {
@@ -81,6 +97,10 @@ export function BlockGutterPlugin({
 	const [drag, setDrag] = useState<DragState | null>(null);
 	const frameRef = useRef<number | null>(null);
 	const dragActiveRef = useRef(false);
+	// While the Insert menu is open the gutter is pinned to its block: the
+	// picker anchors to the `+` button, so letting hover move the button to
+	// another row (or unmount it) would drag the picker along / orphan it.
+	const insertOpenRef = useRef(false);
 	// Mirror of `hover` for listeners (scroll/resize) whose closure would
 	// otherwise capture a stale value — they reposition the *currently*
 	// hovered block, so they need its live key.
@@ -123,7 +143,7 @@ export function BlockGutterPlugin({
 		}
 
 		function onMouseMove(event: MouseEvent) {
-			if (dragActiveRef.current) return;
+			if (dragActiveRef.current || insertOpenRef.current) return;
 			if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
 			frameRef.current = requestAnimationFrame(() => {
 				setHover(compute(event));
@@ -147,7 +167,7 @@ export function BlockGutterPlugin({
 		}
 
 		function onMouseLeave(event: MouseEvent) {
-			if (dragActiveRef.current) return;
+			if (dragActiveRef.current || insertOpenRef.current) return;
 			// The gutter is portaled to <body> (fixed overlay), so it is NOT a
 			// DOM descendant of `.notes__main`. Moving the pointer from a block
 			// onto the gutter button therefore fires `mouseleave` on main —
@@ -180,16 +200,62 @@ export function BlockGutterPlugin({
 		};
 	}, [editor, scrollContainerSelector]);
 
-	const addBelow = useCallback(() => {
-		if (!hover) return;
-		editor.update(() => {
-			const node = $getNodeByKey(hover.key);
-			if (!node) return;
-			const paragraph = $createParagraphNode();
-			node.insertAfter(paragraph);
-			paragraph.selectStart();
-		});
-	}, [editor, hover]);
+	const addBelow = useCallback(
+		(event: React.MouseEvent<HTMLButtonElement>) => {
+			if (!hover) return;
+			if (!insertCommands || insertCommands.length === 0) {
+				insertEmptyBlock(editor, hover.key, InsertPosition.Below);
+				return;
+			}
+			insertOpenRef.current = true;
+			openInsertMenu({
+				editor,
+				blockKey: hover.key,
+				position: InsertPosition.Below,
+				commands: insertCommands,
+				t,
+				anchor: event.currentTarget,
+				...(documentId ? { documentId } : {}),
+				onClose: () => {
+					insertOpenRef.current = false;
+				},
+			});
+		},
+		[editor, hover, insertCommands, t, documentId],
+	);
+
+	useEditorShortcut(
+		INSERT_MENU_CHORDS,
+		useCallback(
+			(event: KeyboardEvent) => {
+				if (!insertCommands || insertCommands.length === 0 || !editor.isEditable()) return;
+				const root = editor.getRootElement();
+				const active = document.activeElement;
+				const selected = selectionStore.getSnapshot().selectedKeys;
+				const focused = root !== null && active !== null && root.contains(active);
+				if (!focused && selected.size === 0) return;
+				const blockKey =
+					selected.size > 0
+						? pickInsertTarget(editor, selected, InsertPosition.Below)
+						: caretBlockKey(editor);
+				if (!blockKey) return;
+				event.preventDefault();
+				event.stopPropagation();
+				const rect = editor.getElementByKey(blockKey)?.getBoundingClientRect();
+				openInsertMenu({
+					editor,
+					blockKey,
+					position: InsertPosition.Below,
+					commands: insertCommands,
+					t,
+					...(rect ? { rect } : {}),
+					...(documentId ? { documentId } : {}),
+				});
+			},
+			[editor, insertCommands, selectionStore, t, documentId],
+		),
+		{ enabled: insertCommands !== undefined && insertCommands.length > 0 },
+	);
 
 	const openMenu = useCallback(
 		(event: React.MouseEvent<HTMLButtonElement>) => {
@@ -306,6 +372,9 @@ export function BlockGutterPlugin({
 						type="button"
 						className="bs-editor__block-gutter-btn bs-editor__block-gutter-btn--add"
 						onClick={addBelow}
+						{...(insertCommands && insertCommands.length > 0
+							? { "aria-haspopup": "dialog" as const }
+							: {})}
 						aria-label={t("editor.gutter.addBelow")}
 						title={t("editor.gutter.addBelow")}
 					>
@@ -337,6 +406,20 @@ export function BlockGutterPlugin({
 		</>,
 		document.body,
 	);
+}
+
+function caretBlockKey(editor: LexicalEditor): NodeKey | null {
+	let key: NodeKey | null = null;
+	editor.getEditorState().read(() => {
+		const selection = $getSelection();
+		if (!$isRangeSelection(selection)) return;
+		try {
+			key = selection.anchor.getNode().getTopLevelElementOrThrow().getKey();
+		} catch {
+			key = null;
+		}
+	});
+	return key;
 }
 
 function findScrollableAncestor(el: HTMLElement): HTMLElement | null {

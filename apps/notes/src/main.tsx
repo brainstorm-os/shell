@@ -82,6 +82,7 @@ function mountFullApp(mountRoot: HTMLElement): void {
 	const storage = runtime?.services.storage;
 	const blocksSvc = runtime?.services.blocks;
 	const bpSvc = runtime?.services.bp;
+	const entitiesSvc = runtime?.services.entities;
 	setEditorHost({
 		...(intents
 			? {
@@ -113,6 +114,16 @@ function mountFullApp(mountRoot: HTMLElement): void {
 				}
 			: {}),
 		...(bpSvc ? { bp: bpSvc } : {}),
+		// `/task` + the task-mention checkbox (B11.24) create / complete tasks
+		// under Notes' existing `entities.write:*` grant.
+		...(entitiesSvc
+			? {
+					entities: {
+						create: (type, properties, id) => entitiesSvc.create(type, properties, id),
+						update: (id, patch) => entitiesSvc.update(id, patch),
+					},
+				}
+			: {}),
 	});
 
 	const blocksService = runtime?.services.blocks;

@@ -196,6 +196,9 @@ export function deepCloneNode(node: LexicalNode): LexicalNode {
 	const ctor = node.constructor as unknown as NodeCtor;
 	const cloned = ctor.importJSON(node.exportJSON());
 	if ($isElementNode(node) && $isElementNode(cloned)) {
+		// Lexical 0.21's element `exportJSON` drops `style` (the block
+		// background lives there, B11.23) — carry it across explicitly.
+		cloned.setStyle(node.getStyle());
 		// Some node types pre-fill children inside importJSON (rare, but
 		// belt-and-braces). Reset before re-appending the original's tree.
 		for (const child of cloned.getChildren()) child.remove();

@@ -644,13 +644,21 @@ const importExport = {
 		ipcRenderer.invoke("import-export:export-vault"),
 };
 
+type SpellcheckLanguagesSnapshot = {
+	active: string[];
+	available: string[];
+	chosen: string[] | null;
+};
+
 /** B11.17b — Settings → spellcheck custom-dictionary manager (privileged). */
 const spellcheck = {
 	listWords: (): Promise<string[]> => ipcRenderer.invoke("spellcheck:list-words"),
 	removeWord: (word: string): Promise<string[]> =>
 		ipcRenderer.invoke("spellcheck:remove-word", word),
-	languages: (): Promise<{ active: string[]; available: string[] }> =>
-		ipcRenderer.invoke("spellcheck:languages"),
+	languages: (): Promise<SpellcheckLanguagesSnapshot> => ipcRenderer.invoke("spellcheck:languages"),
+	/** B11.31 — an ordered subset of `available`, or `null` to follow the OS. */
+	setLanguages: (languages: readonly string[] | null): Promise<SpellcheckLanguagesSnapshot> =>
+		ipcRenderer.invoke("spellcheck:set-languages", languages),
 };
 
 /** 11.9 — Settings → AI panel (privileged). Manages BYO cloud provider API

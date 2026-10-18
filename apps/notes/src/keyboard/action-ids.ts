@@ -58,6 +58,9 @@ export enum ActionId {
 	 *  `Mod+Enter` — conventional escape hatch when Enter alone inserts a
 	 *  newline inside the code. */
 	ExitCodeBlock = "notes.exit-code-block",
+	/** Open the block Insert menu below the caret's block (B11.21). Bound to
+	 *  `Mod+Shift+Enter`; the editor's `INSERT_MENU_CHORDS` owns the binding. */
+	OpenInsertMenu = "notes.open-insert-menu",
 	/** Close the media inspector popover. Bound to `Escape`. */
 	CloseMediaInspector = "notes.close-media-inspector",
 	/** Toggle the strikethrough text mark on the selection (B11.6). Lexical

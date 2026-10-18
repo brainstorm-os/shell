@@ -36,6 +36,16 @@ export type EditorI18nKey =
 	| "editor.table.deleteRow"
 	| "editor.table.deleteCol"
 	| "editor.table.deleteTable"
+	| "editor.table.cellBackground"
+	// Inline task (B11.24) — `/task` + the task-mention checkbox.
+	| "editor.block.task"
+	| "editor.block.task.description"
+	| "editor.task.picker.region"
+	| "editor.task.picker.placeholder"
+	| "editor.task.picker.create"
+	| "editor.task.picker.empty"
+	| "editor.task.markDone"
+	| "editor.task.markOpen"
 	// Block selection — aria-live announcements (BlockSelectionPlugin).
 	| "editor.a11y.blocksSelected.one"
 	| "editor.a11y.blocksSelected.other"
@@ -50,6 +60,14 @@ export type EditorI18nKey =
 	| "editor.action.menu.alignSection"
 	| "editor.action.menu.indentSection"
 	| "editor.action.menu.actionsSection"
+	| "editor.action.menu.insertSection"
+	| "editor.action.menu.backgroundSection"
+	// Insert menu (B11.21) — gutter `+`, action-menu rows, Mod+Shift+Enter.
+	| "editor.insert.above"
+	| "editor.insert.below"
+	| "editor.insertMenu.region"
+	| "editor.insertMenu.placeholder"
+	| "editor.insertMenu.empty"
 	// Slash menu (SlashMenuPlugin).
 	| "editor.slashMenu.region"
 	| "editor.slashMenu.empty"
@@ -280,6 +298,15 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.table.deleteRow": "Delete row",
 	"editor.table.deleteCol": "Delete column",
 	"editor.table.deleteTable": "Delete table",
+	"editor.table.cellBackground": "Cell background",
+	"editor.block.task": "Task",
+	"editor.block.task.description": "Create a task linked to this page",
+	"editor.task.picker.region": "Create a task",
+	"editor.task.picker.placeholder": "Name the task…",
+	"editor.task.picker.create": "Create task “{name}”",
+	"editor.task.picker.empty": "Type a name, then press Enter",
+	"editor.task.markDone": "Mark “{name}” done",
+	"editor.task.markOpen": "Mark “{name}” not done",
 	"editor.a11y.blocksSelected.one": "1 block selected",
 	"editor.a11y.blocksSelected.other": "{count} blocks selected",
 	"editor.gutter.addBelow": "Add block below",
@@ -291,6 +318,13 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.action.menu.alignSection": "Align",
 	"editor.action.menu.indentSection": "Indent",
 	"editor.action.menu.actionsSection": "Actions",
+	"editor.action.menu.insertSection": "Insert",
+	"editor.action.menu.backgroundSection": "Background",
+	"editor.insert.above": "Insert above…",
+	"editor.insert.below": "Insert below…",
+	"editor.insertMenu.region": "Insert a block",
+	"editor.insertMenu.placeholder": "Search blocks…",
+	"editor.insertMenu.empty": "No matching blocks",
 	"editor.inline.toolbar.region": "Text formatting",
 	"editor.inline.bold": "Bold",
 	"editor.inline.italic": "Italic",

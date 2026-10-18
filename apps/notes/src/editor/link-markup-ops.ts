@@ -22,6 +22,7 @@
  *  stays one source of truth across the plugin + future tooling.
  */
 
+import { TASK_CHECK_ATTR } from "@brainstorm-os/editor";
 import { parseBrainstormEntityUri } from "./extract-references";
 
 export const BRAINSTORM_ENTITY_LINK_PREFIX = "brainstorm://entity/";
@@ -170,6 +171,7 @@ export function findMentionFromEvent(
 	root: Element,
 ): { entityId: string; entityType: string } | null {
 	if (!(target instanceof Element)) return null;
+	if (target.closest(`[${TASK_CHECK_ATTR}]`)) return null;
 	const el = target.closest("[data-entity-id][data-entity-type]");
 	if (!el || !root.contains(el)) return null;
 	const entityId = el.getAttribute("data-entity-id") ?? "";

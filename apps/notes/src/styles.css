@@ -788,3 +788,31 @@ body.is-resizing .notes__props-resize {
 	min-width: 0;
 }
 
+
+/* B11.22 — in-place transclusion editing. The toggle row sits between the
+   source card (the chip naming where the content lives) and the body; while
+   editing, the body's well gains an accent boundary so it is unmistakable
+   that keystrokes land in ANOTHER page. */
+.notes__transclusion-edit {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.notes__transclusion-edit-bar {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+.notes__transclusion-edit-badge {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+}
+
+.notes__transclusion-edit--active .notes__transclusion-body-content {
+	outline: var(--border-width) solid var(--accent);
+	outline-offset: var(--space-1);
+	border-radius: var(--radius-sm);
+}
