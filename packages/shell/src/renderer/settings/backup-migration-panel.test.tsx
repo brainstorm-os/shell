@@ -8,7 +8,12 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BackupMigrationPanel, ImportDoneState } from "./backup-migration-panel";
+import { BackupFrequency } from "../../shared/backup-frequency";
+import {
+	BackupMigrationPanel,
+	ImportDoneState,
+	backupScheduleLines,
+} from "./backup-migration-panel";
 import { SettingsSection } from "./sections";
 
 describe("BackupMigrationPanel", () => {
@@ -38,6 +43,7 @@ describe("BackupMigrationPanel", () => {
 			"backup-migration-anytype-pick",
 			"backup-migration-notion-pick",
 			"backup-migration-markdown-btn",
+			"backup-migration-schedule-folder",
 		]) {
 			const idx = html.indexOf(`data-testid="${id}"`);
 			expect(idx).toBeGreaterThan(-1);
@@ -46,6 +52,40 @@ describe("BackupMigrationPanel", () => {
 			expect(tag).toContain("button--neutral");
 			expect(tag).not.toContain("button--primary");
 		}
+	});
+
+	it("renders the scheduled-backup controls disabled until a folder is chosen (IE-14)", () => {
+		const html = renderToStaticMarkup(<BackupMigrationPanel />);
+		expect(html).toContain("backup-migration-schedule");
+		const idx = html.indexOf('data-testid="backup-migration-schedule-run"');
+		const tag = html.slice(html.lastIndexOf("<button", idx), idx);
+		expect(tag).toContain("disabled");
+		expect(html).not.toContain("backup-migration-restore-points");
+	});
+
+	it("summarises last / next / failed runs (IE-14)", () => {
+		const base = {
+			frequency: BackupFrequency.Daily,
+			folder: "/b",
+			retention: 7,
+			lastBackupAt: null,
+			lastError: null,
+			nextDueAt: 0,
+			running: false,
+		};
+		expect(backupScheduleLines(base)).toEqual(["No backup yet", "next within the hour"]);
+		const ran = backupScheduleLines({
+			...base,
+			lastBackupAt: Date.UTC(2026, 0, 1),
+			nextDueAt: Date.UTC(2026, 0, 2),
+			lastError: "disk full",
+		});
+		expect(ran).toHaveLength(3);
+		expect(ran[0]).toMatch(/^Last backup /);
+		expect(ran[2]).toBe("last attempt failed: disk full");
+		expect(backupScheduleLines({ ...base, frequency: BackupFrequency.Off, nextDueAt: null })).toEqual(
+			["No backup yet"],
+		);
 	});
 
 	it("registers a stable section enum value", () => {

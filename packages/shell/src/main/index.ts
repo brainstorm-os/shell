@@ -135,6 +135,10 @@ import {
 } from "./blocks/block-frame-protocol";
 import { makeBlocksServiceHandler } from "./blocks/blocks-service";
 import { makeBpGraphRouter } from "./bp/graph-router";
+import { BackupService } from "./bundle/backup-service";
+import { BundleExportScopeKind } from "./bundle/bundle-format";
+import { exportVaultBundle } from "./bundle/vault-export";
+import { importVaultBundle } from "./bundle/vault-import";
 import { makeCalDavServiceHandler } from "./caldav/caldav-service";
 import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/access-record";
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
@@ -213,6 +217,7 @@ import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
+import { registerBackupHandlers } from "./ipc/backup-handlers";
 import { registerBillingSettingsHandlers } from "./ipc/billing-settings-handlers";
 import { registerBinHandlers } from "./ipc/bin-handlers";
 import { registerBrokerHandler } from "./ipc/broker-handler";
@@ -1472,6 +1477,8 @@ app.on("open-url", (event, url) => {
 
 let workers: WorkersHandle | null = null;
 let dashboardWindow: BrowserWindow | null = null;
+/** Provenance `importedBy` for objects a backup restore brings back. */
+const BACKUP_RESTORE_AUTHOR = "shell:backup-restore";
 
 const FULLSCREEN_CHANNEL = "window:fullscreen-changed" as const;
 
@@ -6033,6 +6040,31 @@ void app.whenReady().then(async () => {
 		},
 	});
 	registerIntentHandlers(() => launchSetup.getIntents());
+
+	// IE-14 — scheduled backups. The service reads the ACTIVE vault on every
+	// call, so one instance + one timer serve every vault the user opens.
+	const backupService = new BackupService({
+		getVault: async () => {
+			const session = getActiveVaultSession();
+			if (!session) return null;
+			const settings = await getSettingsRepoForActiveSession();
+			if (!settings) return null;
+			return {
+				vaultId: session.vaultId,
+				settings,
+				exportBundle: () =>
+					exportVaultBundle(session, {
+						scope: { kind: BundleExportScopeKind.WholeVault },
+						now: Date.now(),
+					}),
+				importBundle: (bytes) =>
+					importVaultBundle(session, bytes, { now: Date.now(), importedBy: BACKUP_RESTORE_AUTHOR }),
+			};
+		},
+		onRestored: rebuildSearchIndex,
+	});
+	registerBackupHandlers({ service: backupService, getDashboard: () => dashboardWindow });
+	backupService.start();
 
 	let dashboardWebContentsId: number | null = null;
 	const promptHost = getCapabilityPromptHost();
