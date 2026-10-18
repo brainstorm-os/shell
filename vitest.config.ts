@@ -300,6 +300,14 @@ export default defineConfig({
 			"@brainstorm-os/sdk/typography": resolve(__dirname, "packages/sdk/src/typography/index.ts"),
 			"@brainstorm-os/sdk/popover": resolve(__dirname, "packages/sdk/src/popover/index.ts"),
 			// `.css` precedes the bare JS alias so the longer prefix wins.
+			"@brainstorm-os/sdk/version-history.css": resolve(
+				__dirname,
+				"packages/sdk/src/version-history/version-history.css",
+			),
+			"@brainstorm-os/sdk/version-history": resolve(
+				__dirname,
+				"packages/sdk/src/version-history/index.ts",
+			),
 			"@brainstorm-os/sdk/share-dialog.css": resolve(
 				__dirname,
 				"packages/sdk/src/share-dialog/share-dialog.css",
