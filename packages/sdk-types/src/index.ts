@@ -30,6 +30,7 @@ import type {
 	AiExtractResult,
 	AiGenerateRequest,
 	AiGenerateResult,
+	AiProviderInfo,
 	AiTransformRequest,
 	AiTransformResult,
 } from "./conversation";
@@ -2072,6 +2073,9 @@ export type AiService = {
 	extract(req: AiExtractRequest): Promise<AiExtractResult>;
 	/** Pre-send token/cost estimate for a generate request (doc 22 §Cost). */
 	cost(req: AiGenerateRequest): Promise<AiCostEstimate>;
+	/** The providers the calling app may pin (filtered by its `ai.provider:<id>`
+	 *  grants), with model suggestions. Capability: `ai.use`. */
+	providers?(): Promise<readonly AiProviderInfo[]>;
 };
 
 /**
@@ -2742,12 +2746,17 @@ export {
 	AI_CONTENT_PART_KINDS,
 	ANTHROPIC_PROVIDER_ID,
 	ATTACHMENT_KINDS,
+	AI_MODEL_ID_MAX_LENGTH,
 	AiContentPartKind,
 	AttachmentKind,
+	CUSTOM_PROVIDER_ID_PREFIX,
+	containsControlChars,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	isAiContentPartKind,
 	isAttachmentKind,
+	isCustomProviderId,
+	isValidModelId,
 	MESSAGE_ROLES,
 	MESSAGE_TYPE_URL,
 	MISTRAL_PROVIDER_ID,
@@ -2773,6 +2782,7 @@ export type {
 	AiGenerateResult,
 	AiImagePart,
 	AiProvenance,
+	AiProviderInfo,
 	AiTextPart,
 	AiStreamEvent,
 	AiTransformRequest,

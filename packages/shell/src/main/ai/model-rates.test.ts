@@ -8,6 +8,15 @@ import { describe, expect, it } from "vitest";
 import { CREDIT_MICROS, FALLBACK_CLOUD_RATE, creditsMicroForUsage } from "./model-rates";
 
 describe("creditsMicroForUsage", () => {
+	it("Agent-14 — a custom endpoint meters at the conservative cloud fallback, never free", () => {
+		const fallback = FALLBACK_CLOUD_RATE.inputMicrosPerMTok + FALLBACK_CLOUD_RATE.outputMicrosPerMTok;
+		expect(
+			creditsMicroForUsage("custom-0123abcd", "anthropic/claude-haiku", 1_000_000, 1_000_000),
+		).toBe(fallback);
+		expect(creditsMicroForUsage("custom-0123abcd", "llama3.2", 1_000_000, 1_000_000)).toBe(fallback);
+		expect(creditsMicroForUsage("custom-0123abcd", "x", 1, 1)).toBeGreaterThan(0);
+	});
+
 	it("local provider (ollama) is free", () => {
 		expect(creditsMicroForUsage(OLLAMA_PROVIDER_ID, "llama3.2", 1_000_000, 1_000_000)).toBe(0);
 	});

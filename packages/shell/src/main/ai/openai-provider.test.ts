@@ -29,6 +29,38 @@ function provider(over: {
 }
 
 describe("createOpenAiProvider", () => {
+	it("Agent-14 — scrubs the API key from an error body an endpoint echoes back", async () => {
+		const http = vi.fn(async () => ({
+			status: 401,
+			text: "bad header Authorization: Bearer sk-openai-test",
+		}));
+		const err = await provider({ http })
+			.generate({ messages: [{ role: MessageRole.User, content: "Hi" }] })
+			.catch((e: Error) => e);
+		expect((err as Error).message).not.toContain("sk-openai-test");
+		expect((err as Error).message).toContain("[redacted]");
+	});
+
+	it("Agent-14 — a keyless endpoint sends no Authorization header; a keyed one still fails closed", async () => {
+		const http = vi.fn(async () => ({ status: 200, text: OK_BODY }));
+		const keyless = createOpenAiProvider({
+			id: "custom-0123abcd",
+			defaultModel: "local-model",
+			baseUrl: "http://127.0.0.1:1234/v1",
+			getApiKey: () => null,
+			requireApiKey: false,
+			http,
+		});
+		await keyless.generate({ messages: [{ role: MessageRole.User, content: "Hi" }] });
+		const [call] = (http.mock.calls[0] ?? []) as unknown as [{ headers: Record<string, string> }];
+		expect(call.headers).toEqual({});
+		await expect(
+			provider({ getApiKey: () => null }).generate({
+				messages: [{ role: MessageRole.User, content: "Hi" }],
+			}),
+		).rejects.toMatchObject({ name: "Unavailable" });
+	});
+
 	it("posts to {baseUrl}/chat/completions with a Bearer header and flat messages (system passes through)", async () => {
 		const http = vi.fn(async () => ({ status: 200, text: OK_BODY }));
 		await provider({ http, baseUrl: "https://openrouter.ai/api/v1" }).generate({
