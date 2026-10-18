@@ -1804,6 +1804,118 @@ body.is-resizing .db-inspector__resize {
 	color: var(--text);
 }
 
+/* Column / lane collapse (9.12.28). */
+.dbv-board__collapse {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.dbv-board__collapse:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.dbv-board__collapse-glyph {
+	display: inline-flex;
+}
+
+.dbv-board__column[data-collapsed="true"] {
+	width: 44px;
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__header {
+	flex-direction: column;
+	border-bottom: 0;
+	padding: var(--space-2) var(--space-1);
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__label {
+	writing-mode: vertical-rl;
+	white-space: nowrap;
+}
+
+.dbv-board__column[data-collapsed="true"] .dbv-board__count {
+	margin-inline-start: 0;
+}
+
+/* Swimlanes (9.12.28): one sticky column-header strip, then a row of
+ * per-column cells per lane. */
+.dbv-board__lanes {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	min-width: max-content;
+	padding-inline-end: var(--space-4);
+}
+
+.dbv-board__lane-head,
+.dbv-board__lane-row {
+	display: flex;
+	gap: var(--space-3);
+	align-items: stretch;
+}
+
+.dbv-board__lane-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg);
+}
+
+.dbv-board__column[data-header-only="true"] {
+	max-height: none;
+}
+
+.dbv-board__column[data-header-only="true"] .dbv-board__header {
+	border-bottom: 0;
+}
+
+.dbv-board__lane-header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-1);
+	border-bottom: var(--border-width) solid var(--border);
+}
+
+.dbv-board__cell {
+	width: var(--dbv-board-col-w);
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-lg);
+	display: flex;
+	flex-direction: column;
+	max-height: 420px;
+	min-height: 56px;
+}
+
+.dbv-board__cell[data-collapsed="true"] {
+	width: 44px;
+	align-items: center;
+	justify-content: center;
+}
+
+.dbv-board__cell[data-dropping="true"],
+.dbv-board__column[data-dropping="true"] {
+	box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.dbv-board__cell-count {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+}
+
 /* ── Calendar view ────────────────────────────────────────────────────── */
 
 .dbv-calendar {
@@ -3101,6 +3213,11 @@ body.is-resizing .dbv-tl__labels-resize {
 	margin-top: var(--space-0_5);
 }
 
+.db-popover__row--actions {
+	justify-content: flex-start;
+	gap: var(--space-2);
+}
+
 .db-popover__row--toggle {
 	justify-content: space-between;
 	cursor: pointer;
@@ -3706,7 +3823,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-modal__cancel {
 	background: transparent;
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	color: var(--text);
 }
 
@@ -3745,7 +3862,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-import-row {
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-md);
 	background: var(--bg-elevated, var(--bg));
 }
@@ -3765,7 +3882,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	flex: 0 0 auto;
 	min-width: 56px;
 	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-full);
 	background: var(--hover);
 	color: var(--text-dim);
@@ -3803,7 +3920,7 @@ body.is-resizing .dbv-tl__labels-resize {
 .db-import-row__expand {
 	flex: 0 0 auto;
 	padding: var(--space-0_5);
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-sm);
 	background: transparent;
 	color: var(--text-dim);
@@ -3813,7 +3930,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-row__detail {
 	padding: var(--space-2) var(--space-2) var(--space-3);
-	border-top: var(--border-width) solid var(--border-subtle);
+	border-top: var(--border-width) solid var(--border);
 }
 
 .db-import-row__fields {
@@ -3836,7 +3953,7 @@ body.is-resizing .dbv-tl__labels-resize {
 
 .db-import-row__fields dd input {
 	width: 100%;
-	border: var(--border-width) solid var(--border-subtle);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--radius-sm);
 	background: var(--bg);
 	color: var(--text);

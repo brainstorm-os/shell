@@ -280,4 +280,26 @@ describe("view-settings — select rows (shared select-menu control)", () => {
 		act(() => items[0]?.onSelect?.());
 		expect(onChange).toHaveBeenCalledWith({ groupBy: null });
 	});
+
+	it("offers swimlanes over the non-group properties and commits a pick (9.12.28)", () => {
+		const { onChange } = openBoard({ propertyId: "status" });
+		act(() => trigger("Swimlanes").click());
+		const items = openItems("Swimlanes");
+		expect(items.map((it) => it.label)).toEqual(["— none —", "Owner"]);
+		act(() => items[1]?.onSelect?.());
+		expect(onChange).toHaveBeenCalledWith({
+			layoutOptions: { ...BOARD_LAYOUT, swimlaneBy: "owner" },
+		});
+	});
+
+	it("switches the group order to item count", () => {
+		const { onChange } = openBoard({ propertyId: "status" });
+		const seg = [...document.querySelectorAll<HTMLButtonElement>(".db-popover__segment")].find(
+			(b) => b.textContent === "Most items",
+		);
+		act(() => seg?.click());
+		expect(onChange).toHaveBeenCalledWith({
+			layoutOptions: { ...BOARD_LAYOUT, groupOrderMode: "count-desc" },
+		});
+	});
 });

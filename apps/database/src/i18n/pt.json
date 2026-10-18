@@ -288,5 +288,15 @@
   "brainstorm.database.grid.chooseAggregation": "Escolher agregação",
   "brainstorm.database.grid.rowNumberAria": "Número da linha",
   "brainstorm.database.grid.nameColumn": "Nome",
-  "brainstorm.database.grid.open": "Abrir"
+  "brainstorm.database.grid.open": "Abrir",
+  "brainstorm.database.board.collapseGroup": "Recolher “{group}”",
+  "brainstorm.database.board.expandGroup": "Expandir “{group}”",
+  "brainstorm.database.status.movedCard": "Cartão movido",
+  "brainstorm.database.settings.swimlanes": "Raias",
+  "brainstorm.database.settings.groupOrder": "Ordem dos grupos",
+  "brainstorm.database.settings.groupOrder.default": "Opções",
+  "brainstorm.database.settings.groupOrder.countDesc": "Mais itens",
+  "brainstorm.database.settings.groupOrder.countAsc": "Menos itens",
+  "brainstorm.database.settings.collapseAll": "Recolher tudo",
+  "brainstorm.database.settings.expandAll": "Expandir tudo"
 }

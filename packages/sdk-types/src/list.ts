@@ -188,6 +188,15 @@ export type GalleryLayoutOptions = {
 	showFilename: boolean;
 };
 
+/** How a grouped view orders its groups (9.12.28). `Default` = the group
+ *  property's option rank, then any manual `groupOrder`; the count modes
+ *  sort by how many items each group holds and ignore `groupOrder`. */
+export enum GroupOrderMode {
+	Default = "default",
+	CountDesc = "count-desc",
+	CountAsc = "count-asc",
+}
+
 export type BoardLayoutOptions = {
 	columnWidth: number;
 	collapseEmptyColumns: boolean;
@@ -196,6 +205,17 @@ export type BoardLayoutOptions = {
 	 *  null / "Uncategorized" group). Keys not listed render after, in
 	 *  data order; unknown keys are ignored. Absent → pure data order. */
 	groupOrder?: string[];
+	/** Horizontal swimlanes (9.12.28): a second property splitting the board
+	 *  into rows; each lane holds the full set of columns. Absent / null → one
+	 *  unlaned board. */
+	swimlaneBy?: string | null;
+	/** Group ordering mode (9.12.28). Absent → `GroupOrderMode.Default`. */
+	groupOrderMode?: GroupOrderMode;
+	/** Column group keys rendered collapsed (same `""` null-key wire form as
+	 *  `groupOrder`). */
+	collapsedGroups?: string[];
+	/** Swimlane keys rendered collapsed. */
+	collapsedLanes?: string[];
 };
 
 export enum CalendarRange {

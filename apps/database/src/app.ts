@@ -99,6 +99,14 @@ import {
 	objectToTemplateProperties,
 } from "@brainstorm-os/sdk/templates";
 import { type VirtualListHandle, createVirtualList } from "@brainstorm-os/sdk/virtual-list";
+import {
+	type CollapseAllAction,
+	buildSwimlanes,
+	cellMovePatch,
+	collapseAllPatch,
+	groupWireKey,
+	toggleCollapsed,
+} from "./logic/board-groups";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -1330,12 +1338,34 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.Board: {
 			if (!view.groupBy) break;
 			const groupBy = view.groupBy;
+			const boardLayout = view.layoutOptions as BoardLayoutOptions;
+			const swimlaneBy = boardLayout.swimlaneBy ?? null;
 			reactBody = createElement(BoardView, {
 				compiled: compiledView,
 				columns: view.columns,
 				allRows: state.db.entities,
-				layout: view.layoutOptions as BoardLayoutOptions,
+				layout: boardLayout,
 				groupBy,
+				...(swimlaneBy
+					? {
+							lanes: buildSwimlanes(
+								compiledView.rows,
+								swimlaneBy,
+								groupLabelResolver(state),
+								groupOrderResolver(state),
+							),
+							onMoveToCell: (entity: EntityRow, key: string | null, laneKey: string | null) =>
+								onMoveToCell(state, view, entity, key, laneKey),
+						}
+					: {}),
+				onToggleGroupCollapsed: (key: string) =>
+					patchBoardLayout(state, view, {
+						collapsedGroups: toggleCollapsed(boardLayout.collapsedGroups, key),
+					}),
+				onToggleLaneCollapsed: (key: string) =>
+					patchBoardLayout(state, view, {
+						collapsedLanes: toggleCollapsed(boardLayout.collapsedLanes, key),
+					}),
 				subtitleProperty: view.cardSubtitleProperty,
 				selectedIds: state.selection.selectedIds,
 				onSelect: handleSelect,
@@ -2579,9 +2609,7 @@ function onMoveToGroup(
 	groupKey: string | null,
 ): void {
 	if (!view.groupBy || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, view.groupBy.propertyId, groupKey ?? "");
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [view.groupBy.propertyId]: groupKey ?? "" });
 	flashStatus(
 		groupKey === null
 			? t("brainstorm.database.status.clearedGroup")
@@ -2648,9 +2676,7 @@ function onMoveToDay(state: AppState, view: ListView, entity: EntityRow, dayStar
 	// never moved — i.e. drag looked broken.
 	const dateProp = (view.layoutOptions as CalendarLayoutOptions)?.primaryDateProperty;
 	if (!dateProp || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, dateProp, dayStart);
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [dateProp]: dayStart });
 	flashStatus(t("brainstorm.database.status.movedToDate", { date: formatDate(dayStart) }), "ready");
 }
 
@@ -2666,12 +2692,10 @@ function onTimelineMove(
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
 	if (!layout?.primaryDateProperty || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, layout.primaryDateProperty, newStartMs);
-	if (newEndMs !== null && layout.endDateProperty) {
-		mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
-	}
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, {
+		[layout.primaryDateProperty]: newStartMs,
+		...(newEndMs !== null && layout.endDateProperty ? { [layout.endDateProperty]: newEndMs } : {}),
+	});
 	flashStatus(`Moved to ${formatDate(newStartMs)}`, "ready");
 }
 
@@ -2685,9 +2709,7 @@ function onTimelineResize(
 ): void {
 	const layout = view.layoutOptions as TimelineLayoutOptions;
 	if (!layout?.endDateProperty || isRecordLocked(entity)) return;
-	mutateEntityProperty(state, entity.id, layout.endDateProperty, newEndMs);
-	renderActiveView(state);
-	renderInspector(state);
+	void persistEntityPatch(state, entity, { [layout.endDateProperty]: newEndMs });
 	flashStatus(`Resized to end ${formatDate(newEndMs)}`, "ready");
 }
 
@@ -2702,13 +2724,55 @@ function updateCalendarRange(state: AppState, view: ListView, range: CalendarRan
 }
 
 function reorderBoardColumns(state: AppState, view: ListView, orderedKeys: string[]): void {
-	const next: BoardLayoutOptions = {
-		...(view.layoutOptions as BoardLayoutOptions),
-		groupOrder: orderedKeys,
-	};
+	patchBoardLayout(state, view, { groupOrder: orderedKeys });
+}
+
+function patchBoardLayout(
+	state: AppState,
+	view: ListView,
+	patch: Partial<BoardLayoutOptions>,
+): void {
+	const next: BoardLayoutOptions = { ...(view.layoutOptions as BoardLayoutOptions), ...patch };
 	updateViewLayout(state, view.id, next);
 	renderActiveView(state);
 	schedulePersist(state);
+}
+
+/** A card dropped into a swimlane cell (9.12.28): the column AND the lane
+ *  property land in one entity write. */
+function onMoveToCell(
+	state: AppState,
+	view: ListView,
+	entity: EntityRow,
+	groupKey: string | null,
+	laneKey: string | null,
+): void {
+	if (!view.groupBy || isRecordLocked(entity)) return;
+	const swimlaneBy = (view.layoutOptions as BoardLayoutOptions).swimlaneBy;
+	const patch = cellMovePatch(entity, view.groupBy.propertyId, groupKey, swimlaneBy, laneKey);
+	if (Object.keys(patch).length === 0) return;
+	void persistEntityPatch(state, entity, patch);
+	flashStatus(t("brainstorm.database.status.movedCard"), "ready");
+}
+
+/** "Collapse all" / "Expand all" on a board: every lane on a laned board,
+ *  every column otherwise. */
+function boardCollapseAll(state: AppState, view: ListView, action: CollapseAllAction): void {
+	const layout = view.layoutOptions as BoardLayoutOptions;
+	const compiled = compileActive(state);
+	if (!compiled) return;
+	const compiledView = compileViewCached(
+		view,
+		compiled.entities,
+		groupLabelResolver(state),
+		groupOrderResolver(state),
+	);
+	const keys = (
+		layout.swimlaneBy
+			? buildSwimlanes(compiledView.rows, layout.swimlaneBy, groupLabelResolver(state))
+			: compiledView.groups
+	).map((g) => groupWireKey(g.key));
+	patchBoardLayout(state, view, collapseAllPatch(layout, keys, action));
 }
 
 /** Apply one pure `ViewConfigChange` to the live view by id and store the
@@ -4475,6 +4539,14 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 		// every member inherits (surfaced in their inspectors), not a column.
 		...(list && deriveListMode(list) !== ListMode.Query
 			? { onCreateCollectionProperty: () => openCollectionPropertyConstructor(state, list) }
+			: {}),
+		...(view.kind === ListViewKind.Board
+			? {
+					onCollapseAll: (action: CollapseAllAction) => {
+						boardCollapseAll(state, view, action);
+						openViewSettingsForActive(state, anchor);
+					},
+				}
 			: {}),
 		onChange: (patch) => {
 			if (patch.name) commitViewRename(state, view.id, patch.name);

@@ -19,6 +19,7 @@ export {
 	type GalleryLayoutOptions,
 	type GridLayoutOptions,
 	type GroupBy,
+	GroupOrderMode,
 	type LayoutOptions,
 	type ListLayoutOptions,
 	type ListView,

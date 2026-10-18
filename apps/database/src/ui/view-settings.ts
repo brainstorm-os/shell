@@ -23,6 +23,8 @@ import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { createSelectMenu } from "@brainstorm-os/sdk/select-menu";
+import { t } from "../i18n";
+import { CollapseAllAction } from "../logic/board-groups";
 import {
 	ColumnAdderOptionKind,
 	appendColumnForProperty,
@@ -54,6 +56,7 @@ import type {
 import {
 	CalendarRange,
 	CalendarWeekStart,
+	GroupOrderMode,
 	ListViewKind,
 	TimelineDensity,
 } from "../types/list-view";
@@ -120,6 +123,9 @@ export type ViewSettingsProps = {
 	sourceEditable?: boolean;
 	/** Live-applies a new type set to the list's source. */
 	onChangeSource?: (types: string[]) => void;
+	/** Board "Collapse all" / "Expand all" (9.12.28) — the host resolves the
+	 *  live group / lane keys. Omitted → the buttons are hidden. */
+	onCollapseAll?: (action: CollapseAllAction) => void;
 	onChange: (patch: ViewSettingsPatch) => void;
 	onClose: () => void;
 };
@@ -818,11 +824,53 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 	rows.className = "db-popover__rows";
 
 	if (view.kind === ListViewKind.Board) {
+		const layout = view.layoutOptions as BoardLayoutOptions;
+		const patchLayout = (p: Partial<BoardLayoutOptions>): void =>
+			props.onChange({ layoutOptions: { ...layout, ...p } });
 		rows.appendChild(
 			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
 				props.onChange({ groupBy: v ? { propertyId: v } : null }),
 			),
 		);
+		const laneKeys = keys.filter((k) => k !== view.groupBy?.propertyId);
+		const laneRow = selectRow(
+			t("brainstorm.database.settings.swimlanes"),
+			propertyOptions(laneKeys, true, names),
+			layout.swimlaneBy ?? "",
+			(v) => patchLayout({ swimlaneBy: v || null }),
+		);
+		laneRow.dataset.testid = "db-view-settings-swimlanes";
+		rows.appendChild(laneRow);
+		rows.appendChild(
+			segmented(
+				t("brainstorm.database.settings.groupOrder"),
+				[
+					[GroupOrderMode.Default, t("brainstorm.database.settings.groupOrder.default")],
+					[GroupOrderMode.CountDesc, t("brainstorm.database.settings.groupOrder.countDesc")],
+					[GroupOrderMode.CountAsc, t("brainstorm.database.settings.groupOrder.countAsc")],
+				],
+				layout.groupOrderMode ?? GroupOrderMode.Default,
+				(v) => patchLayout({ groupOrderMode: v as GroupOrderMode }),
+			),
+		);
+		const onCollapseAll = props.onCollapseAll;
+		if (onCollapseAll) {
+			const actions = document.createElement("div");
+			actions.className = "db-popover__row db-popover__row--actions";
+			for (const [action, key] of [
+				[CollapseAllAction.Collapse, "brainstorm.database.settings.collapseAll"],
+				[CollapseAllAction.Expand, "brainstorm.database.settings.expandAll"],
+			] as const) {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "bs-btn db-popover__action-btn";
+				btn.dataset.testid = `db-view-settings-${action}-all`;
+				btn.textContent = t(key);
+				btn.addEventListener("click", () => onCollapseAll(action));
+				actions.appendChild(btn);
+			}
+			rows.appendChild(actions);
+		}
 	} else if (view.kind === ListViewKind.Calendar) {
 		const layout = view.layoutOptions as CalendarLayoutOptions;
 		rows.appendChild(
