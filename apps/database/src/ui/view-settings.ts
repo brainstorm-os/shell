@@ -25,7 +25,9 @@ import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { createSelectMenu } from "@brainstorm-os/sdk/select-menu";
 import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { type TranslationKey, t } from "../i18n";
+import { AggregationKind, aggregationLabel } from "../logic/aggregations";
 import { CollapseAllAction } from "../logic/board-groups";
+import { CHART_AGGREGATIONS, chartAggregationKind } from "../logic/chart-data";
 import {
 	ColumnAdderOptionKind,
 	appendColumnForProperty,
@@ -53,6 +55,7 @@ import {
 import type {
 	BoardLayoutOptions,
 	CalendarLayoutOptions,
+	ChartLayoutOptions,
 	ColumnSpec,
 	GalleryLayoutOptions,
 	GridLayoutOptions,
@@ -63,6 +66,7 @@ import type {
 import {
 	CalendarRange,
 	CalendarWeekStart,
+	ChartType,
 	ColumnWrap,
 	GroupOrderMode,
 	ListViewKind,
@@ -131,6 +135,8 @@ export type ViewSettingsProps = {
 	sourceEditable?: boolean;
 	/** Live-applies a new type set to the list's source. */
 	onChangeSource?: (types: string[]) => void;
+	/** Numeric properties a Chart view can measure (9.12.30). */
+	numericProperties?: ReadonlyArray<string>;
 	/** Board "Collapse all" / "Expand all" (9.12.28) — the host resolves the
 	 *  live group / lane keys. Omitted → the buttons are hidden. */
 	onCollapseAll?: (action: CollapseAllAction) => void;
@@ -157,6 +163,7 @@ const VIEW_KIND_META: ReadonlyArray<[ListViewKind, string, DatabaseIcon]> = [
 	[ListViewKind.Board, "Board", DatabaseIcon.Board],
 	[ListViewKind.Calendar, "Calendar", DatabaseIcon.Calendar],
 	[ListViewKind.Timeline, "Timeline", DatabaseIcon.Timeline],
+	[ListViewKind.Chart, "Chart", DatabaseIcon.Chart],
 ];
 
 function viewKindLabel(kind: ListViewKind): string {
@@ -309,7 +316,10 @@ function parentPage(page: SettingsPage): SettingsPage {
 
 function groupingApplies(kind: ListViewKind): boolean {
 	return (
-		kind === ListViewKind.Board || kind === ListViewKind.Calendar || kind === ListViewKind.Timeline
+		kind === ListViewKind.Board ||
+		kind === ListViewKind.Calendar ||
+		kind === ListViewKind.Timeline ||
+		kind === ListViewKind.Chart
 	);
 }
 
@@ -336,11 +346,12 @@ function layoutPageLabel(kind: ListViewKind): string {
 	if (kind === ListViewKind.Gallery) return "Cards";
 	if (kind === ListViewKind.Calendar) return "Calendar";
 	if (kind === ListViewKind.Timeline) return "Timeline";
+	if (kind === ListViewKind.Chart) return t("brainstorm.database.settings.chart");
 	return "Layout";
 }
 
 function groupingPageLabel(kind: ListViewKind): string {
-	if (kind === ListViewKind.Board) return "Grouping";
+	if (kind === ListViewKind.Board || kind === ListViewKind.Chart) return "Grouping";
 	return "Dates";
 }
 
@@ -640,6 +651,9 @@ function renderLayoutPage(body: HTMLElement, props: ViewSettingsProps): void {
 				props.onChange({ layoutOptions: { ...(view.layoutOptions as TimelineLayoutOptions), ...p } }),
 			);
 			break;
+		case ListViewKind.Chart:
+			chartControls(rows, props);
+			break;
 	}
 	body.appendChild(rows);
 }
@@ -758,6 +772,57 @@ function boardControls(
 	);
 }
 
+function chartControls(rows: HTMLElement, props: ViewSettingsProps): void {
+	const layout = props.view.layoutOptions as ChartLayoutOptions;
+	const patch = (p: Partial<ChartLayoutOptions>): void =>
+		props.onChange({ layoutOptions: { ...layout, ...p } });
+	rows.appendChild(
+		segmented(
+			t("brainstorm.database.settings.chart.type"),
+			[
+				[ChartType.Bar, t("brainstorm.database.settings.chart.bar")],
+				[ChartType.Line, t("brainstorm.database.settings.chart.line")],
+				[ChartType.Pie, t("brainstorm.database.settings.chart.pie")],
+				[ChartType.Number, t("brainstorm.database.settings.chart.number")],
+			],
+			layout.chartType,
+			(v) => patch({ chartType: v as ChartType }),
+		),
+	);
+	const numeric = props.numericProperties ?? [];
+	const valueRow = selectRow(
+		t("brainstorm.database.settings.chart.measure"),
+		[
+			["", t("brainstorm.database.settings.chart.rowCount")],
+			...propertyOptions(numeric, false, nameMap(props)),
+		],
+		layout.valueProperty ?? "",
+		(v) =>
+			patch(
+				v
+					? {
+							valueProperty: v,
+							aggregation:
+								layout.aggregation === AggregationKind.CountAll ? AggregationKind.Sum : layout.aggregation,
+						}
+					: { valueProperty: null, aggregation: AggregationKind.CountAll },
+			),
+	);
+	rows.appendChild(valueRow);
+	if (layout.valueProperty) {
+		rows.appendChild(
+			selectRow(
+				t("brainstorm.database.settings.chart.aggregation"),
+				CHART_AGGREGATIONS.filter((k) => k !== AggregationKind.CountAll).map(
+					(k) => [k, aggregationLabel(k)] as [string, string],
+				),
+				chartAggregationKind(layout.aggregation, layout.valueProperty),
+				(v) => patch({ aggregation: v }),
+			),
+		);
+	}
+}
+
 function calendarControls(
 	rows: HTMLElement,
 	layout: CalendarLayoutOptions,
@@ -827,7 +892,13 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 	const rows = document.createElement("div");
 	rows.className = "db-popover__rows";
 
-	if (view.kind === ListViewKind.Board) {
+	if (view.kind === ListViewKind.Chart) {
+		rows.appendChild(
+			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
+				props.onChange({ groupBy: v ? { propertyId: v } : null }),
+			),
+		);
+	} else if (view.kind === ListViewKind.Board) {
 		const layout = view.layoutOptions as BoardLayoutOptions;
 		const patchLayout = (p: Partial<BoardLayoutOptions>): void =>
 			props.onChange({ layoutOptions: { ...layout, ...p } });

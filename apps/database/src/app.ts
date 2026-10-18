@@ -84,6 +84,7 @@ import {
 	createPanelToggleButton,
 } from "@brainstorm-os/sdk/panel-toggle";
 import { createAddIconGlyph } from "@brainstorm-os/sdk/picker-host";
+import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import "@brainstorm-os/sdk/presence-stack.css";
 import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
@@ -110,8 +111,9 @@ import {
 	toggleCollapsed,
 } from "./logic/board-groups";
 import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
+import { buildChartModel } from "./logic/chart-data";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
-import { flattenFilter } from "./logic/compile-view";
+import { type CompiledView, flattenFilter } from "./logic/compile-view";
 import { effectiveColumnDef } from "./logic/effective-def";
 import {
 	OBJECT_NAV_SHORTCUTS,
@@ -122,6 +124,8 @@ import {
 	stepObjectNav,
 } from "./logic/object-nav";
 import { propertyKindIconFor } from "./logic/property-kind-icon";
+import { ChartView } from "./react/chart-view";
+import { ChartWidget, type ChartWidgetRuntime } from "./react/chart-widget";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -317,6 +321,7 @@ import {
 	type SelectionProps,
 	StageEmpty,
 	mountInspectorProps,
+	mountReactRoot,
 	renderEmpty,
 	renderViewBodyReact,
 } from "./react/mount";
@@ -329,6 +334,7 @@ import { ListMode, type ListSource, ListSourceKind } from "./types/list-source";
 import type {
 	BoardLayoutOptions,
 	CalendarLayoutOptions,
+	ChartLayoutOptions,
 	ColumnSpec,
 	GalleryLayoutOptions,
 	GridLayoutOptions,
@@ -581,6 +587,22 @@ function bootApp(): void {
 	// Stand up the fancy-menus runtime so object / context menus open through
 	// the shared bridge (Stage 8.8).
 	mountMenuHost();
+	// Widget-mode (9.12.30): the dashboard launched this bundle as the Chart
+	// widget — mount the compact chart instead of the full app.
+	const widgetLaunch = getWidgetLaunch();
+	if (widgetLaunch) {
+		const host = document.createElement("div");
+		host.className = "dbv-chart-widget-host";
+		document.body.replaceChildren(host);
+		mountReactRoot(
+			host,
+			createElement(ChartWidget, {
+				launch: widgetLaunch,
+				runtime: getRuntime() as unknown as ChartWidgetRuntime | null,
+			}),
+		);
+		return;
+	}
 	// B11.16c — spellcheck suggestion menu for editable text cells.
 	mountSpellcheckMenuFromWindow();
 	// Surface over-budget renders to the runtime error log. The doc-13
@@ -1037,6 +1059,8 @@ function viewKindIcon(kind: ListViewKind): DatabaseIcon {
 			return DatabaseIcon.Calendar;
 		case ListViewKind.Timeline:
 			return DatabaseIcon.Timeline;
+		case ListViewKind.Chart:
+			return DatabaseIcon.Chart;
 	}
 }
 
@@ -1193,6 +1217,38 @@ function emptyStateContent(state: AppState): { title: string; body: string } {
  *  Calendar, a group for Board). When that property is unset the per-kind
  *  switch breaks without a body — surface a guiding empty-state instead of a
  *  blank stage so the user knows why it's empty and how to fix it. */
+/** The Chart view body (9.12.30) — shared by the stage and nothing else; the
+ *  widget builds its own model from the same `buildChartModel`. */
+function chartElement(state: AppState, view: ListView, compiledView: CompiledView): ReactElement {
+	const layout = view.layoutOptions as ChartLayoutOptions;
+	const model = buildChartModel(
+		compiledView,
+		layout.chartType,
+		layout.aggregation,
+		layout.valueProperty,
+		{
+			empty: t("brainstorm.database.chart.noValue"),
+			other: t("brainstorm.database.chart.other"),
+			all: t("brainstorm.database.board.allLane"),
+		},
+	);
+	return createElement(ChartView, {
+		model,
+		chartType: layout.chartType,
+		valueName: layout.valueProperty ? propertyDisplayName(layout.valueProperty) : null,
+		groupName: view.groupBy ? propertyDisplayName(view.groupBy.propertyId) : null,
+		valueDef: layout.valueProperty
+			? (cachedVaultProperties.find((d) => d.key === layout.valueProperty) ?? null)
+			: null,
+		showTable: layout.showTable === true,
+		onToggleTable: (showTable: boolean) => {
+			updateViewLayout(state, view.id, { ...layout, showTable });
+			renderActiveView(state);
+			schedulePersist(state);
+		},
+	});
+}
+
 function viewReferencesHost(view: ListView): boolean {
 	const flat = flattenFilter(view.filters);
 	return flat !== null && predicateReferencesHost(flat);
@@ -1416,6 +1472,10 @@ function renderActiveViewInner(state: AppState): void {
 				onRangeChange: (range) => updateCalendarRange(state, view, range),
 				onMoveToDay: (entity, dayStart) => onMoveToDay(state, view, entity, dayStart),
 			});
+			break;
+		}
+		case ListViewKind.Chart: {
+			reactBody = chartElement(state, view, compiledView);
 			break;
 		}
 		case ListViewKind.Timeline: {
@@ -4813,6 +4873,11 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	openViewSettings(anchor, {
 		view,
 		availableProperties: [...propKeys],
+		numericProperties: [...propKeys].filter(
+			(k) =>
+				(cachedVaultProperties.find((d) => d.key === k)?.valueType ??
+					effectiveColumnDef(k, compiled?.entities ?? [])?.valueType) === ValueType.Number,
+		),
 		vaultProperties: cachedVaultProperties,
 		availableTypes: availableVaultTypes(state),
 		listSourceTypes,

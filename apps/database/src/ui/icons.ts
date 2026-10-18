@@ -25,6 +25,7 @@ export enum DatabaseIcon {
 	Board = "board",
 	Calendar = "calendar",
 	Timeline = "timeline",
+	Chart = "chart",
 	Filter = "filter",
 	Sort = "sort",
 	Database = "database",
@@ -50,6 +51,9 @@ const SPECS: Record<DatabaseIcon, PathSpec> = {
 	},
 	[DatabaseIcon.Timeline]: {
 		paths: ["M2 8h12", "M3.5 4h5v2h-5zM6 10h6.5v2H6z", "M4.5 4v2M10.5 10v2"],
+	},
+	[DatabaseIcon.Chart]: {
+		paths: ["M2.5 13.5h11", "M4 13.5v-4h2v4M7 13.5v-8h2v8M10 13.5v-6h2v6"],
 	},
 	[DatabaseIcon.Filter]: {
 		paths: ["M2.5 3.5h11l-4 5v4l-3 1.5v-5.5l-4-5Z"],

@@ -13,7 +13,8 @@ import { uniqueName } from "@brainstorm-os/sdk";
 import { type Icon, IconKind } from "@brainstorm-os/sdk-types";
 import type { List } from "../types/list";
 import type { ListSource } from "../types/list-source";
-import { type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";
+import { ChartType, type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";
+import { AggregationKind } from "./aggregations";
 
 let idCounter = 0;
 
@@ -267,6 +268,12 @@ function defaultLayoutFor(kind: ListViewKind): ListView["layoutOptions"] {
 				colorBy: null,
 				labelProperty: null,
 			} as ListView["layoutOptions"];
+		case ListViewKind.Chart:
+			return {
+				chartType: ChartType.Bar,
+				aggregation: AggregationKind.CountAll,
+				valueProperty: null,
+			};
 	}
 }
 

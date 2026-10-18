@@ -90,6 +90,9 @@ export enum ListViewKind {
 	Board = "board",
 	Calendar = "calendar",
 	Timeline = "timeline",
+	/** Chart (9.12.30) — the group-by × aggregation engine drawn as a bar /
+	 *  line / pie chart or a single number. */
+	Chart = "chart",
 }
 
 export enum SortDirection {
@@ -298,7 +301,27 @@ export type TimelineLayoutOptions = {
 	labelProperty: string | null;
 };
 
+/** Chart form (9.12.30). */
+export enum ChartType {
+	Bar = "bar",
+	Line = "line",
+	Pie = "pie",
+	Number = "number",
+}
+
+export type ChartLayoutOptions = {
+	chartType: ChartType;
+	/** An `AggregationKind` value (plain string, same rationale as
+	 *  `ColumnSpec.aggregation`). `countAll` needs no `valueProperty`. */
+	aggregation: string;
+	/** The property the aggregation reduces; null for a row count. */
+	valueProperty: string | null;
+	/** Render the accessible data table instead of the plot. */
+	showTable?: boolean;
+};
+
 export type LayoutOptions =
+	| ChartLayoutOptions
 	| GridLayoutOptions
 	| ListLayoutOptions
 	| GalleryLayoutOptions

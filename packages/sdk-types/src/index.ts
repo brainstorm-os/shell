@@ -3206,6 +3206,8 @@ export {
 export {
 	type BoardLayoutOptions,
 	type CalendarLayoutOptions,
+	type ChartLayoutOptions,
+	ChartType,
 	CalendarRange,
 	CalendarRecurring,
 	CalendarWeekStart,

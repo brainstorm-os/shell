@@ -1955,6 +1955,229 @@ body.is-resizing .db-inspector__resize {
 	font-variant-numeric: tabular-nums;
 }
 
+/* ── Chart view (9.12.30) ─────────────────────────────────────────── */
+
+.dbv-chart {
+	padding: var(--space-4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	min-width: 0;
+}
+
+.dbv-chart__head {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.dbv-chart__title {
+	margin: 0;
+	font-size: var(--text-size-md);
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+}
+
+.dbv-chart__toggle {
+	margin-inline-start: auto;
+}
+
+.dbv-chart__plot {
+	position: relative;
+	min-width: 0;
+}
+
+.dbv-chart__svg {
+	display: block;
+	overflow: visible;
+}
+
+.dbv-chart__label,
+.dbv-chart__value,
+.dbv-chart__axis {
+	font-size: var(--text-size-xs);
+	fill: var(--text-dim);
+}
+
+.dbv-chart__value {
+	fill: var(--text);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__axis {
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__grid {
+	stroke: var(--border);
+	stroke-width: 1;
+}
+
+.dbv-chart__crosshair {
+	stroke: var(--text-faint);
+	stroke-width: 1;
+}
+
+.dbv-chart__dot {
+	stroke: var(--bg);
+	stroke-width: 2;
+}
+
+/* A 2px surface gap between adjacent slices. */
+.dbv-chart__slice {
+	stroke: var(--bg);
+	stroke-width: 2;
+}
+
+.dbv-chart__tooltip {
+	position: absolute;
+	transform: translate(-50%, calc(-100% - 8px));
+	pointer-events: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-0_5);
+	padding: var(--space-1) var(--space-2);
+	background: var(--bg-elev);
+	border: var(--border-width) solid var(--border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md, none);
+	font-size: var(--text-size-xs);
+	white-space: nowrap;
+	z-index: 2;
+}
+
+.dbv-chart__tooltip-label {
+	color: var(--text-dim);
+}
+
+.dbv-chart__tooltip-value {
+	color: var(--text);
+	font-weight: var(--text-weight-semibold);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__pie {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	flex-wrap: wrap;
+}
+
+.dbv-chart__legend {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	min-width: 0;
+}
+
+.dbv-chart__legend-item {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text);
+}
+
+.dbv-chart__swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-sm);
+	flex-shrink: 0;
+}
+
+.dbv-chart__legend-value {
+	margin-inline-start: auto;
+	padding-inline-start: var(--space-3);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__hero {
+	padding: var(--space-4) 0;
+}
+
+.dbv-chart__hero-value {
+	font-size: var(--text-size-3xl, var(--text-size-xl));
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__table {
+	border-collapse: collapse;
+	width: 100%;
+	max-width: 560px;
+	font-size: var(--text-size-sm);
+}
+
+.dbv-chart__table th,
+.dbv-chart__table td {
+	text-align: start;
+	padding: var(--space-1) var(--space-2);
+	border-bottom: var(--border-width) solid var(--border);
+	font-weight: var(--text-weight-regular);
+}
+
+.dbv-chart__table thead th {
+	color: var(--text-dim);
+	font-weight: var(--text-weight-medium);
+}
+
+.dbv-chart__num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+.dbv-chart__table .dbv-chart__num {
+	text-align: end;
+}
+
+.dbv-chart__empty {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
+/* Chart dashboard widget (9.12.30). */
+.dbv-chart-widget {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-2);
+	min-width: 0;
+}
+
+.dbv-chart-widget__toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.dbv-chart-widget__open {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+	border-radius: var(--radius-md);
+}
+
+.dbv-chart-widget__open:hover {
+	background: var(--hover);
+}
+
+.dbv-chart[data-compact="true"] {
+	padding: var(--space-2);
+	gap: var(--space-2);
+}
+
 /* ── Calendar view ────────────────────────────────────────────────────── */
 
 .dbv-calendar {
