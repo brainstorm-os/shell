@@ -158,6 +158,20 @@ function docStateKey(doc: Y.Doc): string {
 	return createHash("sha256").update(JSON.stringify(content)).digest("base64url");
 }
 
+/** History methods are main-process-only: the entities + history services
+ *  authorise the caller and resolve the version before reaching here. The
+ *  broker verifies `envelope.app` against the renderer identity, so no app
+ *  can present the shell's id. */
+const SHELL_APP_ID = "io.brainstorm.shell";
+
+function assertShellCaller(envelope: Envelope, method: string): void {
+	if (envelope.app !== SHELL_APP_ID) {
+		const err = new Error(`ydoc.${method} is shell-internal`);
+		err.name = "Denied";
+		throw err;
+	}
+}
+
 function frameRefArg(raw: { offset?: unknown; length?: unknown }, method: string): HistFrameRef {
 	const { offset, length } = raw;
 	if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length)) {
@@ -407,6 +421,7 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 	// the entity's `.yhist` unless its state equals `sinceStateKey` (the last
 	// checkpoint's), and reports the encode cost (the Idle-capture perf gate).
 	historyCapture: async (envelope) => {
+		assertShellCaller(envelope, "historyCapture");
 		const args = parseArgs<HistoryCaptureArgs>(envelope, "historyCapture");
 		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
 		const stateKey = docStateKey(doc);
@@ -427,6 +442,7 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		};
 	},
 	historyPreview: async (envelope) => {
+		assertShellCaller(envelope, "historyPreview");
 		const args = parseArgs<HistoryFrameArgs>(envelope, "historyPreview");
 		const ref = frameRefArg(args, "historyPreview");
 		const doc = await readCheckpointDoc(args.vaultPath, args.entityId, ref);
@@ -443,6 +459,7 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 	// live doc, persisted like any other write; the update is returned so main
 	// can fan it to open windows and the live-sync relay.
 	historyRestoreBody: async (envelope) => {
+		assertShellCaller(envelope, "historyRestoreBody");
 		const args = parseArgs<HistoryFrameArgs>(envelope, "historyRestoreBody");
 		const ref = frameRefArg(args, "historyRestoreBody");
 		const source = await readCheckpointDoc(args.vaultPath, args.entityId, ref);
@@ -473,6 +490,7 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		}
 	},
 	historyCompact: async (envelope) => {
+		assertShellCaller(envelope, "historyCompact");
 		const args = parseArgs<HistoryCompactArgs>(envelope, "historyCompact");
 		if (!Array.isArray(args.keep)) throw new Error("ydoc.historyCompact: keep must be an array");
 		const keep = args.keep.map((r) => frameRefArg(r, "historyCompact"));

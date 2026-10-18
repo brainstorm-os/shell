@@ -617,3 +617,73 @@ describe("ydoc worker — scanDamaged", () => {
 		expect(damaged.every((d) => d.pendingStructs)).toBe(true);
 	});
 });
+
+describe("ydoc worker — version history methods (10.16)", () => {
+	let dir: string;
+	beforeEach(async () => {
+		dir = await mkdtemp(join(tmpdir(), "bs-ydoc-hist-"));
+		__ydocCacheResetForTest();
+	});
+	afterEach(async () => {
+		__ydocCacheResetForTest();
+		await rm(dir, { recursive: true, force: true });
+	});
+
+	const as = (app: string, method: string, args: unknown) =>
+		handleYDocEnvelope(
+			makeEnvelope({ msg: "h1", app, service: "ydoc", method, args: [args], caps: [] }),
+		);
+
+	it("refuses every history method to anyone but the shell", async () => {
+		for (const method of [
+			"historyCapture",
+			"historyPreview",
+			"historyRestoreBody",
+			"historyCompact",
+		]) {
+			const reply = await as("io.evil", method, {
+				vaultPath: dir,
+				entityId: "ent_a",
+				offset: 8,
+				length: 1,
+				keep: [],
+			});
+			expect(reply.ok).toBe(false);
+			if (!reply.ok) expect(reply.error.kind).toBe("Denied");
+		}
+	});
+
+	it("captures only when content changed, and previews the captured body", async () => {
+		const first = await as("io.brainstorm.shell", "historyCapture", {
+			vaultPath: dir,
+			entityId: "ent_a",
+			sinceStateKey: null,
+		});
+		if (!first.ok) throw new Error(first.error.message);
+		const v = first.value as { captured: boolean; stateKey: string; offset: number; length: number };
+		expect(v.captured).toBe(true);
+		const again = await as("io.brainstorm.shell", "historyCapture", {
+			vaultPath: dir,
+			entityId: "ent_a",
+			sinceStateKey: v.stateKey,
+		});
+		expect(again.ok && (again.value as { captured: boolean }).captured).toBe(false);
+		const preview = await as("io.brainstorm.shell", "historyPreview", {
+			vaultPath: dir,
+			entityId: "ent_a",
+			offset: v.offset,
+			length: v.length,
+		});
+		expect(preview.ok && (preview.value as { bodyText: string }).bodyText).toBe("");
+	});
+
+	it("rejects a non-integer frame ref", async () => {
+		const reply = await as("io.brainstorm.shell", "historyPreview", {
+			vaultPath: dir,
+			entityId: "ent_a",
+			offset: "8",
+			length: 1,
+		});
+		expect(reply.ok).toBe(false);
+	});
+});
