@@ -21,6 +21,7 @@
 import {
 	CommentsProvider,
 	CommentsRightPanel,
+	RichTextPropertyEditor,
 	type RightPanelTab,
 	localPresenceName,
 } from "@brainstorm-os/editor";
@@ -190,7 +191,9 @@ function EditableInspector({
 	);
 
 	const withProvider = propertiesRuntime ? (
-		<PropertiesProvider runtime={propertiesRuntime}>{propertiesPanel}</PropertiesProvider>
+		<PropertiesProvider richTextEditor={RichTextPropertyEditor} runtime={propertiesRuntime}>
+			{propertiesPanel}
+		</PropertiesProvider>
 	) : (
 		propertiesPanel
 	);

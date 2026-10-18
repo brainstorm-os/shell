@@ -11,6 +11,7 @@ import {
 	type CommentsFocusRequest,
 	CommentsProvider,
 	PlusIcon,
+	RichTextPropertyEditor,
 	type SelectionCommentAnchor,
 	TocIcon,
 	applySuggestionInEditor,
@@ -1320,6 +1321,7 @@ export function NotesApp() {
 	if (!runtime) return shell;
 	return (
 		<PropertiesProvider
+			richTextEditor={RichTextPropertyEditor}
 			runtime={runtime}
 			labels={notesPropertyUiLabels}
 			escapeMatcher={notesEscapeMatcher}
