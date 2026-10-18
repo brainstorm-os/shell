@@ -11,6 +11,13 @@
  * no-raw-string-discriminators rule.
  */
 
+import {
+	DisplayAttribute,
+	DisplayAttributeValue,
+	type Tokens,
+	higherContrastOverrides,
+} from "@brainstorm-os/tokens";
+
 /** Time-of-day presentation. `Auto` defers to the active locale / OS. */
 export enum HourCyclePref {
 	Auto = "auto",
@@ -220,4 +227,78 @@ function parseHhMm(value: string): number | null {
 	const match = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(value);
 	if (!match) return null;
 	return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/** Settings → Appearance visibility preferences (12.18). Per-vault like every
+ *  other appearance setting; the shell paints them into its own renderer and
+ *  pushes them to every app renderer beside the theme (`app:display-changed`).
+ *  All off by default ⇒ every theme renders exactly as designed. */
+export type DisplayPrefs = {
+	/** Stronger borders, dividers, muted labels and active-item fills — token
+	 *  overrides from `@brainstorm-os/tokens` `higherContrastOverrides`. */
+	higherContrast: boolean;
+	/** Accent caret + a stronger selection wash in every text field. */
+	emphasizeTextCursor: boolean;
+	/** Classic always-visible scrollbars instead of macOS overlay bars. */
+	alwaysShowScrollbars: boolean;
+};
+
+export const DEFAULT_DISPLAY_PREFS: DisplayPrefs = {
+	higherContrast: false,
+	emphasizeTextCursor: false,
+	alwaysShowScrollbars: false,
+};
+
+/** Every `DisplayPrefs` key, in Settings order — the one list the store,
+ *  the boot-arg codec and the Settings UI iterate. */
+export const DISPLAY_PREF_KEYS: readonly (keyof DisplayPrefs)[] = [
+	"higherContrast",
+	"emphasizeTextCursor",
+	"alwaysShowScrollbars",
+];
+
+/** Normalise an untrusted payload (IPC arg, persisted map, argv) to a full
+ *  `DisplayPrefs`: unknown keys drop, non-boolean values fall to the default. */
+export function toDisplayPrefs(raw: unknown): DisplayPrefs {
+	const out: DisplayPrefs = { ...DEFAULT_DISPLAY_PREFS };
+	if (!raw || typeof raw !== "object") return out;
+	const record = raw as Record<string, unknown>;
+	for (const key of DISPLAY_PREF_KEYS) {
+		if (typeof record[key] === "boolean") out[key] = record[key];
+	}
+	return out;
+}
+
+/** argv form for an app renderer's first paint: the comma-joined names of the
+ *  preferences that are on (`""` ⇒ all off). Names only — never values — so a
+ *  launch arg can't carry anything the decoder doesn't already know. */
+export function encodeDisplayPrefs(prefs: DisplayPrefs): string {
+	return DISPLAY_PREF_KEYS.filter((key) => prefs[key]).join(",");
+}
+
+export function decodeDisplayPrefs(encoded: string | null | undefined): DisplayPrefs {
+	const on = new Set((encoded ?? "").split(","));
+	const out: DisplayPrefs = { ...DEFAULT_DISPLAY_PREFS };
+	for (const key of DISPLAY_PREF_KEYS) out[key] = on.has(key);
+	return out;
+}
+
+/** What a renderer paints for a set of display prefs over a theme: the root
+ *  attributes to set (`null` ⇒ remove) and the inline token overrides to layer
+ *  after the theme's own vars. Pure, so the shell renderer and the app preload
+ *  resolve identically. */
+export type DisplayPaint = {
+	attributes: Record<DisplayAttribute, DisplayAttributeValue | null>;
+	vars: Record<string, string>;
+};
+
+export function resolveDisplayPaint(prefs: DisplayPrefs, tokens: Tokens): DisplayPaint {
+	return {
+		attributes: {
+			[DisplayAttribute.Contrast]: prefs.higherContrast ? DisplayAttributeValue.More : null,
+			[DisplayAttribute.TextEmphasis]: prefs.emphasizeTextCursor ? DisplayAttributeValue.On : null,
+			[DisplayAttribute.Scrollbars]: prefs.alwaysShowScrollbars ? DisplayAttributeValue.Always : null,
+		},
+		vars: prefs.higherContrast ? higherContrastOverrides(tokens) : {},
+	};
 }

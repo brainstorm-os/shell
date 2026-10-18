@@ -349,20 +349,24 @@ select {
 }
 
 :root[data-platform="win32"] ::-webkit-scrollbar,
-:root[data-platform="linux"] ::-webkit-scrollbar {
+:root[data-platform="linux"] ::-webkit-scrollbar,
+:root[data-bs-scrollbars="always"] ::-webkit-scrollbar {
 	width: 12px;
 	height: 12px;
 }
 
 :root[data-platform="win32"] ::-webkit-scrollbar-track,
 :root[data-platform="linux"] ::-webkit-scrollbar-track,
+:root[data-bs-scrollbars="always"] ::-webkit-scrollbar-track,
 :root[data-platform="win32"] ::-webkit-scrollbar-corner,
-:root[data-platform="linux"] ::-webkit-scrollbar-corner {
+:root[data-platform="linux"] ::-webkit-scrollbar-corner,
+:root[data-bs-scrollbars="always"] ::-webkit-scrollbar-corner {
 	background: transparent;
 }
 
 :root[data-platform="win32"] ::-webkit-scrollbar-thumb,
-:root[data-platform="linux"] ::-webkit-scrollbar-thumb {
+:root[data-platform="linux"] ::-webkit-scrollbar-thumb,
+:root[data-bs-scrollbars="always"] ::-webkit-scrollbar-thumb {
 	background: var(--color-border-strong);
 	border-radius: var(--radius-md);
 	/* A transparent border + padding-box clip is the only way to inset a
@@ -372,9 +376,26 @@ select {
 }
 
 :root[data-platform="win32"] ::-webkit-scrollbar-thumb:hover,
-:root[data-platform="linux"] ::-webkit-scrollbar-thumb:hover {
+:root[data-platform="linux"] ::-webkit-scrollbar-thumb:hover,
+:root[data-bs-scrollbars="always"] ::-webkit-scrollbar-thumb:hover {
 	background: var(--color-text-tertiary);
 	background-clip: padding-box;
+}
+
+/* 12.18 — Settings → Appearance → "Text cursor & selection". The root
+ * attribute is stamped by the shell (renderer + app preload) only while the
+ * preference is on; the tokens are theme-derived (`color.emphasis.*`). The
+ * scrollbar rules above extend to every platform under
+ * `data-bs-scrollbars="always"` ("Always show scrollbars"): styling
+ * `::-webkit-scrollbar` swaps macOS overlay bars for classic visible ones —
+ * which is why the standard `scrollbar-color` block above stays platform-only:
+ * Chromium ignores the webkit pseudo-elements wherever it is set. */
+:root[data-bs-text-emphasis="on"] ::selection {
+	background-color: var(--color-emphasis-selection);
+}
+
+:root[data-bs-text-emphasis="on"] :is(input, textarea, [contenteditable]) {
+	caret-color: var(--color-emphasis-caret);
 }
 
 /* ============================================================

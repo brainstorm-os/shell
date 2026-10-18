@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { regionalToFormatContext } from "@brainstorm-os/protocol/format-context";
+import { encodeDisplayPrefs } from "@brainstorm-os/protocol/shell-prefs";
 import {
 	ActionTrustTier,
 	type OpenTarget,
@@ -187,6 +188,11 @@ export function createLaunchSetup(args: {
 				// helper, so the boot arg and the broadcast can never disagree about
 				// which origins may reach an app renderer.
 				return wallpaperImageUrl(dashboard.activeWallpaper(nativeTheme.shouldUseDarkColors));
+			},
+			getActiveDisplay: async () => {
+				const active = getActiveVaultSession();
+				if (!active) return null;
+				return encodeDisplayPrefs((await active.dashboardStore()).displayPrefs());
 			},
 			getActiveLocale: async () => {
 				const active = getActiveVaultSession();

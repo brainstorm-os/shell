@@ -5,10 +5,12 @@ import type { AppWindow } from "../apps/launcher";
 import { WallpaperKind } from "../dashboard/dashboard-store";
 import { wallpaperImageUrl } from "../dashboard/wallpaper-url";
 import {
+	APP_DISPLAY_CHANGED_CHANNEL,
 	APP_FORMAT_CHANGED_CHANNEL,
 	APP_LOCALE_CHANGED_CHANNEL,
 	APP_THEME_CHANGED_CHANNEL,
 	APP_WALLPAPER_CHANGED_CHANNEL,
+	broadcastDisplayToWindows,
 	broadcastFormatToWindows,
 	broadcastLocaleToWindows,
 	broadcastThemeToWindows,
@@ -154,6 +156,17 @@ describe("broadcastThemeToWindows", () => {
 		const [, payload] = notes.send.mock.calls[0] ?? [];
 		expect(typeof payload).toBe("string");
 		expect(payload).toBe(DEFAULT_THEME);
+	});
+});
+
+describe("broadcastDisplayToWindows (12.18)", () => {
+	it("sends the visibility preferences to every live app window, skipping dead ones", () => {
+		const live = makeFakeAppWindow("io.brainstorm.notes");
+		const dead = makeFakeAppWindow("io.brainstorm.graph", true);
+		const prefs = { higherContrast: true, emphasizeTextCursor: false, alwaysShowScrollbars: true };
+		broadcastDisplayToWindows(prefs, [live.appWindow, dead.appWindow]);
+		expect(live.send).toHaveBeenCalledWith(APP_DISPLAY_CHANGED_CHANNEL, prefs);
+		expect(dead.send).not.toHaveBeenCalled();
 	});
 });
 

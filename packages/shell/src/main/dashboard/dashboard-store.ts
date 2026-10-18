@@ -49,7 +49,9 @@ import {
 	DEFAULT_LANGUAGE,
 	DEFAULT_NOTIFICATIONS,
 	DEFAULT_REGIONAL,
+	DISPLAY_PREF_KEYS,
 	DateStylePref,
+	type DisplayPrefs,
 	type DndPrefs,
 	FIRST_DAY_AUTO,
 	type FirstDayOfWeek,
@@ -63,6 +65,7 @@ import {
 	type RegionalState,
 	isHeaderControlId,
 	isNotificationKind,
+	toDisplayPrefs,
 } from "@brainstorm-os/protocol/shell-prefs";
 import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import {
@@ -179,6 +182,8 @@ export type DashboardSnapshot = {
 	regional: RegionalState;
 	/** Shell-interface settings: header-control visibility + clock options. */
 	chrome: ChromeState;
+	/** Settings → Appearance visibility preferences (12.18). */
+	display: DisplayPrefs;
 	/** Notification preferences: OS-native toggle, DND window, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped + drop-oldest. */
@@ -335,6 +340,7 @@ export class DashboardStore {
 			locale: this.readLocale(),
 			regional: this.readRegional(),
 			chrome: this.readChrome(),
+			display: this.displayPrefs(),
 			notifications: this.readNotifications(),
 			notificationHistory: this.readNotificationHistory(),
 			disabledContributors: this.readDisabledContributors(),
@@ -521,6 +527,23 @@ export class DashboardStore {
 			if (partial.show !== undefined) clock.set("show", partial.show);
 			if (partial.showSeconds !== undefined) clock.set("showSeconds", partial.showSeconds);
 			if (partial.hourCycle !== undefined) clock.set("hourCycle", partial.hourCycle);
+		});
+	}
+
+	/** Visibility preferences only — the launch path's cheap read, sibling of
+	 *  `activeTheme`. */
+	displayPrefs(): DisplayPrefs {
+		return toDisplayPrefs(this.doc.getMap<unknown>("display").toJSON());
+	}
+
+	/** Patch any subset of the visibility preferences in one transaction. */
+	setDisplayPrefs(partial: Partial<DisplayPrefs>): void {
+		const map = this.doc.getMap<unknown>("display");
+		this.doc.transact(() => {
+			for (const key of DISPLAY_PREF_KEYS) {
+				const value = partial[key];
+				if (typeof value === "boolean") map.set(key, value);
+			}
 		});
 	}
 

@@ -9,7 +9,13 @@
  * theming fine.
  */
 
-import { DEFAULT_THEME, ThemeName } from "@brainstorm-os/tokens";
+import {
+	DEFAULT_THEME,
+	DisplayAttribute,
+	DisplayAttributeValue,
+	ThemeName,
+	themes,
+} from "@brainstorm-os/tokens";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyThemeVars } from "./theme-provider";
 
@@ -37,5 +43,30 @@ describe("applyThemeVars", () => {
 		applyThemeVars("theme-from-a-newer-build");
 		applyThemeVars(ThemeName.Nord);
 		expect(document.documentElement.dataset.theme).toBe(ThemeName.Nord);
+	});
+});
+
+describe("applyThemeVars — visibility preferences (12.18)", () => {
+	const ALL_ON = { higherContrast: true, emphasizeTextCursor: true, alwaysShowScrollbars: true };
+
+	it("layers the higher-contrast overrides and stamps every root attribute", () => {
+		applyThemeVars(ThemeName.DefaultLight, ALL_ON);
+		const root = document.documentElement;
+		expect(root.getAttribute(DisplayAttribute.Contrast)).toBe(DisplayAttributeValue.More);
+		expect(root.getAttribute(DisplayAttribute.TextEmphasis)).toBe(DisplayAttributeValue.On);
+		expect(root.getAttribute(DisplayAttribute.Scrollbars)).toBe(DisplayAttributeValue.Always);
+		expect(root.style.getPropertyValue("--color-border-default")).toBe(
+			themes[ThemeName.DefaultLight].color.border.strong,
+		);
+	});
+
+	it("turning the preferences off reverts the tokens and removes the attributes", () => {
+		applyThemeVars(ThemeName.DefaultLight, ALL_ON);
+		applyThemeVars(ThemeName.DefaultLight);
+		const root = document.documentElement;
+		for (const name of Object.values(DisplayAttribute)) expect(root.hasAttribute(name)).toBe(false);
+		expect(root.style.getPropertyValue("--color-border-default")).toBe(
+			themes[ThemeName.DefaultLight].color.border.default,
+		);
 	});
 });

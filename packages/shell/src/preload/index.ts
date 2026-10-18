@@ -15,6 +15,7 @@ import type {
 import type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
@@ -59,6 +60,7 @@ export { UpdateAvailability, UpdateChannel };
 export type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
@@ -480,6 +482,9 @@ export type DashboardSnapshot = {
 	regional: RegionalState;
 	/** Shell-interface settings: header-control visibility + clock options. */
 	chrome: ChromeState;
+	/** Settings → Appearance visibility preferences (12.18). Optional so a
+	 *  renderer newer than its main process degrades to the defaults. */
+	display?: DisplayPrefs;
 	/** Notification preferences: OS-native toggle, DND, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped. */
@@ -1629,6 +1634,9 @@ const dashboard = {
 		ipcRenderer.invoke("dashboard:set-clock-prefs", partial),
 	/** Reset all interface (chrome) settings to defaults. */
 	resetChrome: (): Promise<void> => ipcRenderer.invoke("dashboard:reset-chrome"),
+	/** Patch the Settings → Appearance visibility preferences (12.18). */
+	setDisplayPrefs: (partial: Partial<DisplayPrefs>): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-display-prefs", partial),
 	/** Toggle OS-native notifications. */
 	setNotificationsOsNative: (osNative: boolean): Promise<void> =>
 		ipcRenderer.invoke("dashboard:set-notifications-os-native", osNative),

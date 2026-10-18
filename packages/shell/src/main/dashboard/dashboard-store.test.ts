@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AppearanceMode, AppearanceSlot } from "@brainstorm-os/protocol/appearance";
 import {
+	DEFAULT_DISPLAY_PREFS,
 	DateStylePref,
 	HeaderControlId,
 	HourCyclePref,
@@ -651,6 +652,19 @@ describe("DashboardStore — shell prefs (locale / regional / chrome / notificat
 			hourCycle: HourCyclePref.Auto,
 		});
 		await store.close();
+	});
+
+	it("display prefs (12.18): default off, patch round-trips through reopen, junk ignored", async () => {
+		const store = await DashboardStore.open(yStore);
+		expect(store.snapshot().display).toEqual(DEFAULT_DISPLAY_PREFS);
+		store.setDisplayPrefs({ higherContrast: true });
+		store.setDisplayPrefs({ alwaysShowScrollbars: "yes" as unknown as boolean });
+		await store.flush();
+		await store.close();
+		const reopened = await DashboardStore.open(yStore);
+		expect(reopened.displayPrefs()).toEqual({ ...DEFAULT_DISPLAY_PREFS, higherContrast: true });
+		expect(reopened.snapshot().display.higherContrast).toBe(true);
+		await reopened.close();
 	});
 
 	it("notification prefs: osNative toggle, dnd patch, per-app mute add/remove", async () => {
