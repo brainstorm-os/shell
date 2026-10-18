@@ -1341,7 +1341,12 @@ export type SearchHit = {
 	snippet: string;
 	score: number;
 	updatedAt: number;
+	/** 9.22.7 — how many live objects link to this one. */
+	backlinkCount?: number;
 };
+
+/** 9.22.7 — a launcher query the user saved, listed on an empty query. */
+export type SavedSearch = { id: string; text: string; createdAt: number };
 
 export type SearchQuery = {
 	text: string;
@@ -1370,6 +1375,12 @@ const search = {
 	reindex: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:reindex"),
 	// 11.3 consent gate — opt into the ~130 MB semantic-model download.
 	enableSemantic: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:enable-semantic"),
+	// 9.22.7 — the launcher's empty-query memory.
+	recents: (): Promise<SearchHit[]> => ipcRenderer.invoke("search:recents"),
+	savedSearches: (): Promise<SavedSearch[]> => ipcRenderer.invoke("search:saved-list"),
+	saveSearch: (text: string): Promise<SavedSearch | null> =>
+		ipcRenderer.invoke("search:saved-save", text),
+	deleteSavedSearch: (id: string): Promise<boolean> => ipcRenderer.invoke("search:saved-delete", id),
 };
 
 /** Privileged intent-dispatch surface — for the launcher palette + future

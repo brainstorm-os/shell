@@ -50,7 +50,12 @@ const hits: readonly SearchHit[] = [
 	},
 ];
 
-const labels = { sectionApps: "Apps", sectionEntities: "Entities" };
+const labels = {
+	sectionApps: "Apps",
+	sectionEntities: "Entities",
+	sectionRecent: "Recent",
+	sectionSaved: "Saved searches",
+};
 
 describe("filterApps", () => {
 	it("returns all apps alphabetically on empty query", () => {
@@ -228,5 +233,82 @@ describe("clampSelectionGrouped", () => {
 
 	it("returns -1 when there are no rows", () => {
 		expect(clampSelectionGrouped(0, [])).toBe(-1);
+	});
+});
+
+describe("buildRows — empty-query memory (9.22.7)", () => {
+	const saved = [{ id: "s1", text: "q3 plan", createdAt: 1 }];
+
+	it("leads an empty query with saved searches, then recents, then apps", () => {
+		const rows = buildRows({
+			query: "  ",
+			apps,
+			entities: hits,
+			recents: [hits[1] as SearchHit],
+			savedSearches: saved,
+			offerSaveSearch: true,
+			labels,
+		});
+		expect(rows.map((r) => r.id)).toEqual([
+			"section:saved",
+			"saved:s1",
+			"section:recent",
+			"recent:n_2",
+			"section:apps",
+			"app:io.brainstorm.calendar",
+			"app:io.brainstorm.notes",
+			"app:io.brainstorm.tasks",
+		]);
+		const recent = rows[3];
+		expect(recent?.rowKind === LauncherRowKind.Entity && recent.ownerAppName).toBe("Notes");
+	});
+
+	it("hides saved searches and recents once the user types", () => {
+		const rows = buildRows({
+			query: "hello",
+			apps,
+			entities: hits,
+			recents: [hits[1] as SearchHit],
+			savedSearches: saved,
+			labels,
+		});
+		expect(rows.some((r) => r.rowKind === LauncherRowKind.SavedSearch)).toBe(false);
+		expect(rows.some((r) => r.id.startsWith("recent:"))).toBe(false);
+	});
+
+	it("ends a typed query with a save row carrying the collapsed text", () => {
+		const rows = buildRows({
+			query: "  hello   world ",
+			apps,
+			entities: hits,
+			offerSaveSearch: true,
+			labels,
+		});
+		const last = rows[rows.length - 1];
+		expect(last?.rowKind).toBe(LauncherRowKind.SaveSearch);
+		expect(last?.rowKind === LauncherRowKind.SaveSearch && last.text).toBe("hello world");
+	});
+
+	it("offers no save row for text that is already saved (case-insensitive)", () => {
+		const rows = buildRows({
+			query: "Q3 Plan",
+			apps,
+			entities: [],
+			savedSearches: saved,
+			offerSaveSearch: true,
+			labels,
+		});
+		expect(rows.some((r) => r.rowKind === LauncherRowKind.SaveSearch)).toBe(false);
+	});
+
+	it("keeps the save row selectable and saved-search rows navigable", () => {
+		const rows = buildRows({
+			query: "",
+			apps: [],
+			entities: [],
+			savedSearches: saved,
+			labels,
+		});
+		expect(firstSelectableIndex(rows)).toBe(1);
 	});
 });

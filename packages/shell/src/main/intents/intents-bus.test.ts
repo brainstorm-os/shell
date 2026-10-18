@@ -123,6 +123,37 @@ describe("IntentsBus", () => {
 		expect(result.rung).toBe(OpenRung.InVaultOpeners);
 	});
 
+	it("reports a delivered entity open to onEntityOpened (9.22.7 recents), never a refused one", async () => {
+		env.repos.intents.insert({
+			appId: "io.example.editor",
+			verb: "open",
+			entityType: "io.example/Note/v1",
+			mime: null,
+			format: null,
+			kind: null,
+			blockId: null,
+			label: null,
+			priority: "primary",
+			registeredAt: 1,
+		});
+		const opened: string[] = [];
+		const bus = new IntentsBus({
+			intents: env.repos.intents,
+			orchestrator: env.orchestrator,
+			onEntityOpened: (id) => {
+				opened.push(id);
+				throw new Error("a failing observer must not fail the open");
+			},
+		});
+		const delivered = await bus.dispatch(
+			{ verb: "open", payload: { entityId: "ent_7", entityType: "io.example/Note/v1" } },
+			{ app: "shell" },
+		);
+		expect(delivered.handled).toBe(true);
+		await bus.dispatch({ verb: "open", payload: { entityId: "ent_404" } }, { app: "shell" });
+		expect(opened).toEqual(["ent_7"]);
+	});
+
 	it("dispatch entity-open with no handler returns no-handler (no rung stamped)", async () => {
 		// The entity-flow rung stamp wraps a successful launchInto;
 		// a no-handler outcome is returned before launchInto runs, so

@@ -349,6 +349,10 @@ export type IntentsBusOptions = {
 	 *  Resolved once per call (off the active vault's dashboard doc); absent ⇒
 	 *  nothing is disabled. */
 	resolveDisabledContributors?: () => ReadonlySet<string> | Promise<ReadonlySet<string>>;
+	/** 9.22.7 — told the id of every entity an `open` actually delivered, so
+	 *  the launcher can list recent objects. Fire-and-forget: a throw here
+	 *  never fails the open. */
+	onEntityOpened?: (entityId: string) => void;
 };
 
 export class IntentsBus {
@@ -546,12 +550,24 @@ export class IntentsBus {
 		}
 
 		const launched = await this.launchInto(handler.appId, launchContext, envelope, source);
+		this.noteEntityOpened(envelope, launched);
 		// The entity-flow + verb-with-explicit-handler paths land here.
 		// Stamp `InVaultOpeners` so the renderer-side explainer (OpenRes-1c)
 		// can surface "Opened in <App>" toasts uniformly. The external-open
 		// branch stamps its own rung via `stampRung(...)` on each arm
 		// (InVaultOpeners / StoredDefault / OsHandoff / Refused).
 		return stampRung(launched, OpenRung.InVaultOpeners);
+	}
+
+	private noteEntityOpened(envelope: IntentEnvelope, result: IntentDispatchResult): void {
+		if (envelope.verb !== OPEN_VERB || !result.handled || !this.options.onEntityOpened) return;
+		const entityId = stringOrUndefined(envelope.payload.entityId);
+		if (!entityId) return;
+		try {
+			this.options.onEntityOpened(entityId);
+		} catch (error) {
+			console.warn("[brainstorm] intents: onEntityOpened failed:", error);
+		}
 	}
 
 	/**

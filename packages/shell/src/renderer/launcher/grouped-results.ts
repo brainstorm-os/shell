@@ -7,6 +7,10 @@
  *   2. **Entities** — FTS5 hits from the vault-wide search index, grouped
  *      by the owning app (visible when the query has any non-whitespace).
  *
+ * An empty query (9.22.7) leads with the user's saved searches and recently
+ * opened objects above the app list; a typed query ends with a "save this
+ * search" row unless that text is already saved.
+ *
  * Result rendering, keyboard navigation, and activation operate on the
  * **flat** `LauncherRow[]` returned by `buildRows` — selection-only rows
  * (`section-header`) are skipped by `moveSelectionGrouped` so arrow keys
@@ -17,12 +21,14 @@
  * under Vitest without rendering.
  */
 
-import type { InstalledApp, SearchHit } from "../../preload";
+import type { InstalledApp, SavedSearch, SearchHit } from "../../preload";
 
 export enum LauncherRowKind {
 	SectionHeader = "section-header",
 	App = "app",
 	Entity = "entity",
+	SavedSearch = "saved-search",
+	SaveSearch = "save-search",
 }
 
 export type LauncherSectionHeaderRow = {
@@ -48,15 +54,38 @@ export type LauncherEntityRow = {
 	ownerAppName: string;
 };
 
-export type LauncherRow = LauncherSectionHeaderRow | LauncherAppRow | LauncherEntityRow;
+export type LauncherSavedSearchRow = {
+	rowKind: LauncherRowKind.SavedSearch;
+	id: string;
+	search: SavedSearch;
+};
+
+export type LauncherSaveSearchRow = {
+	rowKind: LauncherRowKind.SaveSearch;
+	id: string;
+	text: string;
+};
+
+export type LauncherRow =
+	| LauncherSectionHeaderRow
+	| LauncherAppRow
+	| LauncherEntityRow
+	| LauncherSavedSearchRow
+	| LauncherSaveSearchRow;
 
 export type BuildRowsOptions = {
 	query: string;
 	apps: readonly InstalledApp[];
 	entities: readonly SearchHit[];
+	recents?: readonly SearchHit[];
+	savedSearches?: readonly SavedSearch[];
+	/** Append the "save this search" row to a typed query. */
+	offerSaveSearch?: boolean;
 	labels: {
 		sectionApps: string;
 		sectionEntities: string;
+		sectionRecent: string;
+		sectionSaved: string;
 	};
 };
 
@@ -64,6 +93,30 @@ export function buildRows(options: BuildRowsOptions): LauncherRow[] {
 	const norm = options.query.trim().toLowerCase();
 	const filteredApps = filterApps(norm, options.apps);
 	const rows: LauncherRow[] = [];
+	const appNamesById = new Map<string, string>();
+	for (const app of options.apps) appNamesById.set(app.id, app.name);
+	const saved = options.savedSearches ?? [];
+	if (norm.length === 0) {
+		if (saved.length > 0) {
+			rows.push({
+				rowKind: LauncherRowKind.SectionHeader,
+				id: "section:saved",
+				label: options.labels.sectionSaved,
+			});
+			for (const search of saved) {
+				rows.push({ rowKind: LauncherRowKind.SavedSearch, id: `saved:${search.id}`, search });
+			}
+		}
+		const recents = options.recents ?? [];
+		if (recents.length > 0) {
+			rows.push({
+				rowKind: LauncherRowKind.SectionHeader,
+				id: "section:recent",
+				label: options.labels.sectionRecent,
+			});
+			for (const hit of recents) rows.push(entityRow("recent", hit, appNamesById));
+		}
+	}
 	if (filteredApps.length > 0) {
 		rows.push({
 			rowKind: LauncherRowKind.SectionHeader,
@@ -82,18 +135,30 @@ export function buildRows(options: BuildRowsOptions): LauncherRow[] {
 			id: "section:entities",
 			label: options.labels.sectionEntities,
 		});
-		const appNamesById = new Map<string, string>();
-		for (const app of options.apps) appNamesById.set(app.id, app.name);
-		for (const hit of options.entities) {
-			rows.push({
-				rowKind: LauncherRowKind.Entity,
-				id: `entity:${hit.entityId}`,
-				hit,
-				ownerAppName: appNamesById.get(hit.ownerAppId) ?? hit.ownerAppId,
-			});
-		}
+		for (const hit of options.entities) rows.push(entityRow("entity", hit, appNamesById));
+	}
+	const typed = options.query.replace(/\s+/g, " ").trim();
+	if (
+		options.offerSaveSearch &&
+		typed.length > 0 &&
+		!saved.some((s) => s.text.toLowerCase() === typed.toLowerCase())
+	) {
+		rows.push({ rowKind: LauncherRowKind.SaveSearch, id: "save-search", text: typed });
 	}
 	return rows;
+}
+
+function entityRow(
+	prefix: string,
+	hit: SearchHit,
+	appNamesById: ReadonlyMap<string, string>,
+): LauncherEntityRow {
+	return {
+		rowKind: LauncherRowKind.Entity,
+		id: `${prefix}:${hit.entityId}`,
+		hit,
+		ownerAppName: appNamesById.get(hit.ownerAppId) ?? hit.ownerAppId,
+	};
 }
 
 /** Apps that match the query via name or description (case-insensitive,
@@ -167,6 +232,6 @@ export function clampSelectionGrouped(current: number, rows: readonly LauncherRo
 	return -1;
 }
 
-function isSelectable(row: LauncherRow): row is LauncherAppRow | LauncherEntityRow {
+function isSelectable(row: LauncherRow): boolean {
 	return row.rowKind !== LauncherRowKind.SectionHeader;
 }

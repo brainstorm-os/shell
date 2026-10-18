@@ -314,6 +314,7 @@ import {
 	initialStatus,
 	needsConsentStatus,
 } from "./search/embedder-status";
+import { LauncherMemory } from "./search/launcher-memory";
 import { loadFastembedEmbedder } from "./search/local-embedder";
 import { SearchIndexer, pickIndexable } from "./search/search-indexer";
 import { makeSearchServiceHandler } from "./search/search-service";
@@ -6021,6 +6022,14 @@ void app.whenReady().then(async () => {
 				getEntitiesRepoForActiveSession,
 			);
 			return pickIndexable(entities).length;
+		},
+		countBacklinks: async (ids) => {
+			const repo = await getEntitiesRepoForActiveSession();
+			return repo ? repo.countBacklinks(ids) : new Map();
+		},
+		getLauncherMemory: async () => {
+			const repo = await getSettingsRepoForActiveSession();
+			return repo ? new LauncherMemory(repo) : null;
 		},
 	});
 	registerIntentHandlers(() => launchSetup.getIntents());

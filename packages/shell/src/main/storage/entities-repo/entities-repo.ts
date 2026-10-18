@@ -660,6 +660,34 @@ export class EntitiesRepository {
 	}
 
 	/**
+	 * Backlink count per entity: the number of distinct live entities with a
+	 * live link pointing at it (self-links excluded). One grouped query per
+	 * chunk, so the launcher's result list never runs N+1. Ids with no
+	 * backlinks are absent from the map (read as 0).
+	 */
+	countBacklinks(entityIds: readonly string[]): Map<string, number> {
+		const out = new Map<string, number>();
+		if (entityIds.length === 0) return out;
+		const chunkSize = 64;
+		const placeholders = new Array(chunkSize).fill("?").join(",");
+		const sql = `SELECT l.dest_entity_id AS id, COUNT(DISTINCT l.source_entity_id) AS n
+		             FROM links AS l
+		             JOIN entities AS s ON s.id = l.source_entity_id AND s.deleted_at IS NULL
+		             WHERE l.dest_entity_id IN (${placeholders})
+		               AND l.deleted_at IS NULL
+		               AND l.source_entity_id != l.dest_entity_id
+		             GROUP BY l.dest_entity_id`;
+		const padding = new Array<unknown>(chunkSize);
+		for (let start = 0; start < entityIds.length; start += chunkSize) {
+			const chunk = entityIds.slice(start, start + chunkSize);
+			for (let i = 0; i < chunkSize; i += 1) padding[i] = i < chunk.length ? chunk[i] : null;
+			const rows = this.stmt(sql).all(...padding) as Array<{ id: string; n: number }>;
+			for (const row of rows) out.set(row.id, Number(row.n));
+		}
+		return out;
+	}
+
+	/**
 	 * Live entity ids whose type is in `types` — the `ListSource` `byType`
 	 * fast path (rides `idx_entities_type`). Chunked + NULL-padded like
 	 * `linksFromMany` so the prepared-statement cache holds ONE entry.
