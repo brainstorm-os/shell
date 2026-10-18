@@ -39,16 +39,6 @@ export type { AssetRefRecord, CreateAssetRefInput } from "./asset-refs-repo";
 export { PendingRotationsRepository } from "./pending-rotations-repo";
 export type { PendingRotationRecord } from "./pending-rotations-repo";
 export { ShareInvitesRepository } from "./share-invites-repo";
-<<<<<<< HEAD
-export { EntityVersionsRepository } from "./entity-versions-repo";
-export type {
-	EntityVersionRecord,
-	EntityVersionRetentionRow,
-	StoredPrincipal,
-} from "./entity-versions-repo";
-export { HistoryChangeSetsRepository } from "./history-change-sets-repo";
-export type { ChangeSetPrincipal, HistoryChangeSetRecord } from "./history-change-sets-repo";
-=======
 export {
 	AGENT_WRITES_MAX_ROWS,
 	AGENT_WRITES_PER_AGENT_MAX,
@@ -60,7 +50,14 @@ export {
 export type { AgentWriteBefore, AgentWriteInsert, AgentWriteRecord } from "./agent-writes-repo";
 export { LastEditsRepository } from "./last-edits-repo";
 export type { LastEditRecord } from "./last-edits-repo";
->>>>>>> feat/0.15.0-market-demand
+export { EntityVersionsRepository } from "./entity-versions-repo";
+export type {
+	EntityVersionRecord,
+	EntityVersionRetentionRow,
+	StoredPrincipal,
+} from "./entity-versions-repo";
+export { HistoryChangeSetsRepository } from "./history-change-sets-repo";
+export type { ChangeSetPrincipal, HistoryChangeSetRecord } from "./history-change-sets-repo";
 export type { MintShareInviteInput } from "./share-invites-repo";
 
 export class EntitiesRepositories {
