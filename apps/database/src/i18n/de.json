@@ -325,5 +325,12 @@
   "brainstorm.database.bulk.undone": "Massenbearbeitung rückgängig gemacht.",
   "brainstorm.database.inspector.nextObject": "Nächstes Objekt",
   "brainstorm.database.inspector.previousObject": "Vorheriges Objekt",
-  "brainstorm.database.inspector.position": "{index} von {total}"
+  "brainstorm.database.inspector.position": "{index} von {total}",
+  "brainstorm.database.empty.hostOnly.title": "Diese Ansicht zeigt Einträge für die Seite, in die sie eingebettet ist",
+  "brainstorm.database.empty.hostOnly.body": "Ihr Filter vergleicht mit „diesem Objekt“ und trifft daher allein nichts. Öffne die Seite, die sie einbettet, oder ändere den Filter auf einen festen Wert.",
+  "brainstorm.database.property.form.inverseLabel": "Zweiseitig mit",
+  "brainstorm.database.property.form.inverseNone": "Einseitig",
+  "brainstorm.database.property.form.inverseSelf": "Sich selbst (symmetrisch)",
+  "brainstorm.database.property.form.inverseNew": "Neue gekoppelte Eigenschaft…",
+  "brainstorm.database.property.form.inverseNewNameLabel": "Name der gekoppelten Eigenschaft"
 }

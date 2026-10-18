@@ -216,6 +216,13 @@ export type InlinePropertyFormLabels = {
 	optionsHint: string;
 	relationTargetLabel: string;
 	relationTargetAny: string;
+	/** Two-way relation picker (9.12.25 follow-up). Optional so hosts that
+	 *  never pass `inverseCandidates` need not supply them. */
+	inverseLabel?: string;
+	inverseNone?: string;
+	inverseSelf?: string;
+	inverseNew?: string;
+	inverseNewNameLabel?: string;
 };
 
 export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
@@ -254,6 +261,11 @@ export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
 	optionsHint: "One per line, or comma-separated.",
 	relationTargetLabel: "Links to",
 	relationTargetAny: "Anything",
+	inverseLabel: "Two-way with",
+	inverseNone: "One-way",
+	inverseSelf: "Itself (symmetric)",
+	inverseNew: "New paired property…",
+	inverseNewNameLabel: "Paired property name",
 };
 
 /** Every user-visible string in the shared add-property picker chrome.

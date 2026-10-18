@@ -325,5 +325,12 @@
   "brainstorm.database.bulk.undone": "Edición en bloque deshecha.",
   "brainstorm.database.inspector.nextObject": "Objeto siguiente",
   "brainstorm.database.inspector.previousObject": "Objeto anterior",
-  "brainstorm.database.inspector.position": "{index} de {total}"
+  "brainstorm.database.inspector.position": "{index} de {total}",
+  "brainstorm.database.empty.hostOnly.title": "Esta vista muestra elementos de la página donde está insertada",
+  "brainstorm.database.empty.hostOnly.body": "Su filtro compara con “este objeto”, así que por sí sola no coincide con nada. Abre la página que la inserta o cambia el filtro a un valor fijo.",
+  "brainstorm.database.property.form.inverseLabel": "Bidireccional con",
+  "brainstorm.database.property.form.inverseNone": "Unidireccional",
+  "brainstorm.database.property.form.inverseSelf": "Sí misma (simétrica)",
+  "brainstorm.database.property.form.inverseNew": "Nueva propiedad emparejada…",
+  "brainstorm.database.property.form.inverseNewNameLabel": "Nombre de la propiedad emparejada"
 }

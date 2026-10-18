@@ -56,6 +56,7 @@ import {
 	coerceScalarValue,
 	decideRowCreate,
 	isMultiValued,
+	predicateReferencesHost,
 } from "@brainstorm-os/sdk-types";
 import { type LiveRegionHandle, attachLiveRegion } from "@brainstorm-os/sdk/a11y";
 import { createCountBadge } from "@brainstorm-os/sdk/count-badge";
@@ -110,6 +111,7 @@ import {
 } from "./logic/board-groups";
 import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
+import { flattenFilter } from "./logic/compile-view";
 import { effectiveColumnDef } from "./logic/effective-def";
 import {
 	OBJECT_NAV_SHORTCUTS,
@@ -1191,6 +1193,11 @@ function emptyStateContent(state: AppState): { title: string; body: string } {
  *  Calendar, a group for Board). When that property is unset the per-kind
  *  switch breaks without a body — surface a guiding empty-state instead of a
  *  blank stage so the user knows why it's empty and how to fix it. */
+function viewReferencesHost(view: ListView): boolean {
+	const flat = flattenFilter(view.filters);
+	return flat !== null && predicateReferencesHost(flat);
+}
+
 function grouplessViewEmptyState(kind: ListViewKind): { title: string; body: string } {
 	if (kind === ListViewKind.Calendar) {
 		return {
@@ -1234,6 +1241,20 @@ function renderActiveViewInner(state: AppState): void {
 	// React owns its children, not its host attributes.
 	body.className = "db-stage__body";
 	body.dataset.viewKind = view.kind;
+
+	// A contextual view ("author is this page", 9.12.24) has no host when it
+	// is opened here directly, so it matches nothing — say why instead of
+	// painting a bare empty grid.
+	if (compiledView.rows.length === 0 && viewReferencesHost(view)) {
+		renderViewBodyReact(body, {
+			selection: null,
+			element: createElement(StageEmpty, {
+				title: t("brainstorm.database.empty.hostOnly.title"),
+				body: t("brainstorm.database.empty.hostOnly.body"),
+			}),
+		});
+		return;
+	}
 
 	const handleSelect = (entity: EntityRow, modifiers: SelectionModifiers) =>
 		onSelectEntity(state, entity, modifiers);
@@ -5309,14 +5330,27 @@ function inlinePropertyFormLabels() {
 		optionsHint: t("brainstorm.database.property.form.optionsHint"),
 		relationTargetLabel: t("brainstorm.database.property.form.relationTargetLabel"),
 		relationTargetAny: t("brainstorm.database.property.form.relationTargetAny"),
+		inverseLabel: t("brainstorm.database.property.form.inverseLabel"),
+		inverseNone: t("brainstorm.database.property.form.inverseNone"),
+		inverseSelf: t("brainstorm.database.property.form.inverseSelf"),
+		inverseNew: t("brainstorm.database.property.form.inverseNew"),
+		inverseNewNameLabel: t("brainstorm.database.property.form.inverseNewNameLabel"),
 	};
+}
+
+/** Existing relations a new Relation can pair with (two-way, 9.12.25). */
+function inverseCandidates(): { key: string; label: string }[] {
+	return cachedVaultProperties
+		.filter((d) => d.valueType === ValueType.EntityRef && !d.inverseOf)
+		.map((d) => ({ key: d.key, label: d.name?.trim() ? d.name : humanize(d.key) }));
 }
 
 function openColumnPropertyConstructor(state: AppState, view: ListView, _seedName: string): void {
 	openInlinePropertyForm({
 		labels: inlinePropertyFormLabels(),
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
-		onCommit: async ({ def, dictionary }) => {
+		inverseCandidates: inverseCandidates(),
+		onCommit: async ({ def, dictionary, partner }) => {
 			// Reuse an existing catalog def with the same name + type instead of
 			// minting a duplicate (F-034): re-adding "Deal size · Number" should
 			// land the column on the property that already exists, not a fourth
@@ -5338,6 +5372,7 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			// resolves (blank cells) and we'd flash a contradictory success
 			// on top of the persist warning.
 			if (!(await persistNewPropertyDef(def, dictionary))) return;
+			if (partner) await persistNewPropertyDef(partner, null);
 			// Cache + resolvers refresh against the new catalog; the next
 			// view-settings render uses them.
 			await loadVaultProperties(state);
@@ -5363,7 +5398,8 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			region: t("brainstorm.database.property.form.collectionRegion"),
 		},
 		relationTargetTypes: relationTargetTypesFromEntities(state.db.entities),
-		onCommit: async ({ def, dictionary }) => {
+		inverseCandidates: inverseCandidates(),
+		onCommit: async ({ def, dictionary, partner }) => {
 			// Same name + type already exists → reuse, never mint a twin that
 			// silently splits values across two defs (F-419 / F-034).
 			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
@@ -5376,6 +5412,7 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			}
 			const scoped: PropertyDef = { ...def, scope: { kind: "list", target: list.id } };
 			if (!(await persistNewPropertyDef(scoped, dictionary))) return;
+			if (partner) await persistNewPropertyDef(partner, null);
 			await loadVaultProperties(state);
 			renderActiveView(state);
 			schedulePersist(state);

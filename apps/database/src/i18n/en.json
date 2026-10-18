@@ -325,5 +325,12 @@
   "brainstorm.database.bulk.undone": "Bulk edit undone.",
   "brainstorm.database.inspector.nextObject": "Next object",
   "brainstorm.database.inspector.previousObject": "Previous object",
-  "brainstorm.database.inspector.position": "{index} of {total}"
+  "brainstorm.database.inspector.position": "{index} of {total}",
+  "brainstorm.database.empty.hostOnly.title": "This view shows items for the page it’s embedded in",
+  "brainstorm.database.empty.hostOnly.body": "Its filter compares against “this object”, so on its own it matches nothing. Open the page that embeds it, or change the filter to a fixed value.",
+  "brainstorm.database.property.form.inverseLabel": "Two-way with",
+  "brainstorm.database.property.form.inverseNone": "One-way",
+  "brainstorm.database.property.form.inverseSelf": "Itself (symmetric)",
+  "brainstorm.database.property.form.inverseNew": "New paired property…",
+  "brainstorm.database.property.form.inverseNewNameLabel": "Paired property name"
 }

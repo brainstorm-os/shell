@@ -31,7 +31,7 @@ import {
 	type InlinePropertyFormCommit,
 	type InlinePropertyFormLabels,
 } from "./inline-property-form";
-import type { RelationTargetType } from "./inline-property-form-logic";
+import type { InverseCandidate, RelationTargetType } from "./inline-property-form-logic";
 
 let container: HTMLElement | null = null;
 let root: Root | null = null;
@@ -293,6 +293,9 @@ export function openInlinePropertyForm(opts: {
 	/** Forwarded to `<InlinePropertyForm>` — entity types a Relation can
 	 *  target (surfaces the "Links to" picker). */
 	relationTargetTypes?: readonly RelationTargetType[];
+	/** Forwarded to `<InlinePropertyForm>` — relations a new Relation can
+	 *  pair with (surfaces the "Two-way with" picker). */
+	inverseCandidates?: readonly InverseCandidate[];
 }): void {
 	ensureInlinePropertyHostStyles();
 	const r = ensureRoot();
@@ -303,6 +306,7 @@ export function openInlinePropertyForm(opts: {
 			{...(opts.onCancel ? { onCancel: opts.onCancel } : {})}
 			{...(opts.autoFocus !== undefined ? { autoFocus: opts.autoFocus } : {})}
 			{...(opts.relationTargetTypes ? { relationTargetTypes: opts.relationTargetTypes } : {})}
+			{...(opts.inverseCandidates ? { inverseCandidates: opts.inverseCandidates } : {})}
 		/>,
 	);
 }
@@ -317,6 +321,7 @@ function InlinePropertyHost(props: {
 	onCancel?: () => void;
 	autoFocus?: boolean;
 	relationTargetTypes?: readonly RelationTargetType[];
+	inverseCandidates?: readonly InverseCandidate[];
 }) {
 	const handleCancel = (): void => {
 		// Capture the caller's hook BEFORE `closePicker()` triggers the
@@ -347,6 +352,7 @@ function InlinePropertyHost(props: {
 					onCancel={handleCancel}
 					{...(props.autoFocus !== undefined ? { autoFocus: props.autoFocus } : {})}
 					{...(props.relationTargetTypes ? { relationTargetTypes: props.relationTargetTypes } : {})}
+					{...(props.inverseCandidates ? { inverseCandidates: props.inverseCandidates } : {})}
 				/>
 			</div>
 		</div>

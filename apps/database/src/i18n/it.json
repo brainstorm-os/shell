@@ -325,5 +325,12 @@
   "brainstorm.database.bulk.undone": "Modifica multipla annullata.",
   "brainstorm.database.inspector.nextObject": "Oggetto successivo",
   "brainstorm.database.inspector.previousObject": "Oggetto precedente",
-  "brainstorm.database.inspector.position": "{index} di {total}"
+  "brainstorm.database.inspector.position": "{index} di {total}",
+  "brainstorm.database.empty.hostOnly.title": "Questa vista mostra gli elementi della pagina in cui è incorporata",
+  "brainstorm.database.empty.hostOnly.body": "Il suo filtro confronta con “questo oggetto”, quindi da sola non trova nulla. Apri la pagina che la incorpora o imposta il filtro su un valore fisso.",
+  "brainstorm.database.property.form.inverseLabel": "Bidirezionale con",
+  "brainstorm.database.property.form.inverseNone": "Unidirezionale",
+  "brainstorm.database.property.form.inverseSelf": "Se stessa (simmetrica)",
+  "brainstorm.database.property.form.inverseNew": "Nuova proprietà abbinata…",
+  "brainstorm.database.property.form.inverseNewNameLabel": "Nome della proprietà abbinata"
 }
