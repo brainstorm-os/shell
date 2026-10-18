@@ -402,5 +402,11 @@
   "notes.coverPicker.libraryEmpty": "No covers uploaded yet.",
   "notes.coverPicker.focalHint": "Drag to choose the focal point.",
   "notes.coverPicker.useCover": "Use cover",
-  "notes.coverPicker.galleryRegion": "Gradient and colour covers"
+  "notes.coverPicker.galleryRegion": "Gradient and colour covers",
+  "notes.transclusion.editHere": "Edit here",
+  "notes.transclusion.doneEditing": "Done",
+  "notes.transclusion.editHint": "Edit the source page here — changes are saved to it",
+  "notes.transclusion.doneHint": "Stop editing the source page",
+  "notes.transclusion.lockedHint": "The source page is locked — unlock it to edit here",
+  "notes.transclusion.editingBadge": "Editing the source page"
 }

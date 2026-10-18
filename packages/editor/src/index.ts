@@ -100,7 +100,7 @@ export {
 	type BlockGutterPluginProps,
 	BlockGutterPlugin,
 } from "./plugins/block-gutter-plugin";
-export { useEditorShortcut } from "./plugins/editor-shortcut";
+export { isEventInNestedEditor, useEditorShortcut } from "./plugins/editor-shortcut";
 export {
 	INSERT_MENU_CHORDS,
 	InsertPosition,

@@ -58,6 +58,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
 import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
 import { queuePendingEntityLinks } from "./editor/pending-link";
+import type { TransclusionEditHost } from "./editor/transclusion-edit-host";
 import { useNotesT } from "./i18n-hooks";
 import { t } from "./i18n/t";
 import { ActionId } from "./keyboard/action-ids";
@@ -97,6 +98,26 @@ const PROPS_PREF_KEY = "notes.propsOpen";
 /** Cheap order-insensitive equality for the autosave's body-ref diff, so a
  *  keystroke that doesn't change the set of cross-references doesn't re-persist
  *  `bodyRefs`. Compares `kind:entityId` keys. */
+/** The denormalised mirrors (`title`, `body` snippet, `bodyRefs`) a body edit
+ *  changes, or `null` when none moved. Shared by the open note's autosave and
+ *  an in-place transclusion edit of another note (B11.22). */
+function bodyDenormalizationPatch(
+	note: StoredNote,
+	body: SerializedEditorState,
+): Partial<StoredNote> | null {
+	const { title, snippet } = denormalizeBody(body);
+	const refs = extractNoteReferences(body);
+	const titleChanged = title !== note.title;
+	const snippetChanged = snippet !== note.body;
+	const refsChanged = !noteRefsEqual(refs, note.bodyRefs);
+	if (!titleChanged && !snippetChanged && !refsChanged) return null;
+	const patch: Partial<StoredNote> = {};
+	if (titleChanged) patch.title = title;
+	if (snippetChanged) patch.body = snippet;
+	if (refsChanged) patch.bodyRefs = refs;
+	return patch;
+}
+
 function noteRefsEqual(
 	a: readonly NoteReference[],
 	b: readonly NoteReference[] | undefined,
@@ -694,22 +715,28 @@ export function NotesApp() {
 			// AutosavePlugin gates this on real user interaction so the
 			// mount-settle echo doesn't re-fire (the [[project_notes_
 			// autosave_swallows_first_edit]] invariant).
-			const { title, snippet } = denormalizeBody(body);
-			// Extract body cross-refs from the live editor state and persist them
-			// so the shell can project note→note graph edges — the snippet has no
-			// rich nodes to walk (F-067).
-			const refs = extractNoteReferences(body);
-			const titleChanged = title !== note.title;
-			const snippetChanged = snippet !== note.body;
-			const refsChanged = !noteRefsEqual(refs, note.bodyRefs);
-			if (!titleChanged && !snippetChanged && !refsChanged) return;
-			const patch: Partial<StoredNote> = {};
-			if (titleChanged) patch.title = title;
-			if (snippetChanged) patch.body = snippet;
-			if (refsChanged) patch.bodyRefs = refs;
+			const patch = bodyDenormalizationPatch(note, body);
+			if (!patch) return;
 			update(note.id, patch);
 		},
 		[note, update],
+	);
+
+	// B11.22 — an in-place transclusion edit writes the SOURCE's Y.Doc directly;
+	// this keeps the source's denormalised mirrors in step, through the same
+	// lock-gated `update` funnel the open note uses.
+	const transclusionHost = useMemo<TransclusionEditHost>(
+		() => ({
+			canEdit: (id) => notes.has(id),
+			isLocked: (id) => notes.get(id)?.locked ?? false,
+			onSourceChange: (id, body) => {
+				const source = notes.get(id);
+				if (!source) return;
+				const patch = bodyDenormalizationPatch(source, body);
+				if (patch) update(id, patch);
+			},
+		}),
+		[notes, update],
 	);
 
 	// F-241 — insert applied (or failed) in the editor. The append is a
@@ -1123,6 +1150,7 @@ export function NotesApp() {
 											insertRequest && insertRequest.noteId === note.id && !locked ? insertRequest : null
 										}
 										onInsertDone={onInsertDone}
+										transclusionHost={transclusionHost}
 									/>
 								)}
 							</div>

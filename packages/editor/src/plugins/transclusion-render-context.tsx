@@ -48,11 +48,17 @@ export type TransclusionRenderContextValue = {
 	 *  NOT including the node currently deciding whether to paint. */
 	ancestorChain: readonly string[];
 	renderBody: TransclusionBodyRenderer | null;
+	/** Whether the document hosting this render point is editable (B11.22). A
+	 *  transcluded body may only be edited in place under an editable host; a
+	 *  read-only host (locked page, preview) keeps every nested body read-only.
+	 *  Absent ⇒ read-only. */
+	editable?: boolean;
 };
 
 const TransclusionRenderContext = createContext<TransclusionRenderContextValue>({
 	ancestorChain: [],
 	renderBody: null,
+	editable: false,
 });
 
 export type TransclusionRenderProviderProps = TransclusionRenderContextValue & {
@@ -62,11 +68,12 @@ export type TransclusionRenderProviderProps = TransclusionRenderContextValue & {
 export function TransclusionRenderProvider({
 	ancestorChain,
 	renderBody,
+	editable = false,
 	children,
 }: TransclusionRenderProviderProps) {
 	const value = useMemo<TransclusionRenderContextValue>(
-		() => ({ ancestorChain, renderBody }),
-		[ancestorChain, renderBody],
+		() => ({ ancestorChain, renderBody, editable }),
+		[ancestorChain, renderBody, editable],
 	);
 	return (
 		<TransclusionRenderContext.Provider value={value}>{children}</TransclusionRenderContext.Provider>

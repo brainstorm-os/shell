@@ -402,5 +402,11 @@
   "notes.coverPicker.libraryEmpty": "Aún no se han subido portadas.",
   "notes.coverPicker.focalHint": "Arrastre para elegir el punto focal.",
   "notes.coverPicker.useCover": "Usar portada",
-  "notes.coverPicker.galleryRegion": "Portadas de degradados y colores"
+  "notes.coverPicker.galleryRegion": "Portadas de degradados y colores",
+  "notes.transclusion.editHere": "Editar aquí",
+  "notes.transclusion.doneEditing": "Listo",
+  "notes.transclusion.editHint": "Editar la página de origen aquí: los cambios se guardan en ella",
+  "notes.transclusion.doneHint": "Dejar de editar la página de origen",
+  "notes.transclusion.lockedHint": "La página de origen está bloqueada: desbloquéala para editarla aquí",
+  "notes.transclusion.editingBadge": "Editando la página de origen"
 }

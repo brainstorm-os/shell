@@ -402,5 +402,11 @@
   "notes.coverPicker.libraryEmpty": "Noch keine Titelbilder hochgeladen.",
   "notes.coverPicker.focalHint": "Ziehen Sie, um den Fokuspunkt zu wählen.",
   "notes.coverPicker.useCover": "Titelbild verwenden",
-  "notes.coverPicker.galleryRegion": "Verlaufs- und Farbtitelbilder"
+  "notes.coverPicker.galleryRegion": "Verlaufs- und Farbtitelbilder",
+  "notes.transclusion.editHere": "Hier bearbeiten",
+  "notes.transclusion.doneEditing": "Fertig",
+  "notes.transclusion.editHint": "Die Quellseite hier bearbeiten – Änderungen werden dort gespeichert",
+  "notes.transclusion.doneHint": "Bearbeitung der Quellseite beenden",
+  "notes.transclusion.lockedHint": "Die Quellseite ist gesperrt – entsperre sie, um hier zu bearbeiten",
+  "notes.transclusion.editingBadge": "Quellseite wird bearbeitet"
 }

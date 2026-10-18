@@ -402,5 +402,11 @@
   "notes.coverPicker.libraryEmpty": "Pas encore de couvertures importées.",
   "notes.coverPicker.focalHint": "Faites glisser pour choisir le point focal.",
   "notes.coverPicker.useCover": "Utiliser la couverture",
-  "notes.coverPicker.galleryRegion": "Couvertures en dégradés et couleurs"
+  "notes.coverPicker.galleryRegion": "Couvertures en dégradés et couleurs",
+  "notes.transclusion.editHere": "Modifier ici",
+  "notes.transclusion.doneEditing": "Terminé",
+  "notes.transclusion.editHint": "Modifier la page source ici — les modifications y sont enregistrées",
+  "notes.transclusion.doneHint": "Arrêter de modifier la page source",
+  "notes.transclusion.lockedHint": "La page source est verrouillée — déverrouillez-la pour la modifier ici",
+  "notes.transclusion.editingBadge": "Modification de la page source"
 }

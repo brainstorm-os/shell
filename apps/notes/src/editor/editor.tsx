@@ -121,6 +121,7 @@ import { makeNoteBootstrap } from "./seed-title";
 import { editorTheme } from "./theme";
 import { TOGGLE_HEADING_TRANSFORMER } from "./toggle-heading-transformer";
 import { renderTransclusionBody } from "./transclusion-body";
+import { type TransclusionEditHost, TransclusionEditProvider } from "./transclusion-edit-host";
 import { TransclusionRenderProvider } from "./transclusion-render-context";
 import { UNICODE_SHORTCUT_TRANSFORMERS } from "./typing-shortcuts";
 
@@ -167,6 +168,9 @@ export type EditorProps = {
 	 *  snippet/refs). Only ever passed for the open, unlocked target note. */
 	insertRequest?: InsertAtEndRequest | null;
 	onInsertDone?: (applied: boolean) => void;
+	/** Lets a transcluded body be edited in place (B11.22). Omit ⇒ every
+	 *  transclusion in this document stays read-only. */
+	transclusionHost?: TransclusionEditHost | null;
 };
 
 export function Editor({
@@ -182,6 +186,7 @@ export function Editor({
 	onAnchorDone,
 	insertRequest = null,
 	onInsertDone,
+	transclusionHost = null,
 }: EditorProps) {
 	const doc = useYDoc(noteId);
 	const whenLoaded = useYDocLoaded(noteId);
@@ -216,116 +221,122 @@ export function Editor({
 		[doc],
 	);
 	return (
-		<TransclusionRenderProvider ancestorChain={ancestorChain} renderBody={renderTransclusionBody}>
-			<BrainstormEditor
-				doc={doc}
-				docId={noteId}
-				namespace="notes"
-				theme={editorTheme}
-				contentClassName="notes__contenteditable"
-				additionalNodes={NOTES_ADDITIONAL_NODES}
+		<TransclusionEditProvider value={transclusionHost}>
+			<TransclusionRenderProvider
+				ancestorChain={ancestorChain}
+				renderBody={renderTransclusionBody}
 				editable={!locked}
-				presence={presence}
-				initialEditorState={bootstrapRef.current}
-				{...(whenLoaded ? { whenLoaded } : {})}
-				{...(applyPending ? { applyPending } : {})}
-				onError={(error) => {
-					console.error("[notes/editor]", error);
-				}}
 			>
-				{/* Forward the WHOLE context object — cherry-picking fields here is
+				<BrainstormEditor
+					doc={doc}
+					docId={noteId}
+					namespace="notes"
+					theme={editorTheme}
+					contentClassName="notes__contenteditable"
+					additionalNodes={NOTES_ADDITIONAL_NODES}
+					editable={!locked}
+					presence={presence}
+					initialEditorState={bootstrapRef.current}
+					{...(whenLoaded ? { whenLoaded } : {})}
+					{...(applyPending ? { applyPending } : {})}
+					onError={(error) => {
+						console.error("[notes/editor]", error);
+					}}
+				>
+					{/* Forward the WHOLE context object — cherry-picking fields here is
 				    what silently dropped the comment wiring (F-163): the app passed
 				    onCommentSelection/commentedBlockIds/onCommentBlockClick and this
 				    mount forwarded only values+setValue, so the toolbar Comment row,
 				    the block highlight and the click-to-thread chip never reached a
 				    real shell. */}
-				<NoteContextProvider noteId={noteId} {...noteContext}>
-					<BlockSelectionPlugin selectionPreservingSelector=".notes__media-inspector">
-						<TitlePlugin />
-						<EditablePlugin editable={!locked} />
-						<NormalizeEmptyDocPlugin
-							doc={doc}
-							storedTitle={storedTitle}
-							{...(whenLoaded ? { whenLoaded } : {})}
-						/>
-						{onRecoverBlank && (
-							<BlankRecoveryPlugin
+					<NoteContextProvider noteId={noteId} {...noteContext}>
+						<BlockSelectionPlugin selectionPreservingSelector=".notes__media-inspector">
+							<TitlePlugin />
+							<EditablePlugin editable={!locked} />
+							<NormalizeEmptyDocPlugin
 								doc={doc}
-								onRecover={onRecoverBlank}
-								{...(onRecoverReset ? { onHydrated: onRecoverReset } : {})}
+								storedTitle={storedTitle}
 								{...(whenLoaded ? { whenLoaded } : {})}
 							/>
-						)}
-						<CheckListPlugin />
-						<HorizontalRulePlugin />
-						<MarkdownShortcutPlugin
-							transformers={[
-								...BLOCK_MARKDOWN_TRANSFORMERS,
-								TOGGLE_HEADING_TRANSFORMER,
-								...TRANSFORMERS,
-								EQUATION_TRANSFORMER,
-								EMOJI_SHORTCODE_TRANSFORMER,
-								...UNICODE_SHORTCUT_TRANSFORMERS,
-							]}
-						/>
-						<ListMarkdownShortcutsPlugin />
-						<TabIndentationPlugin />
-						<TurnIntoPlugin />
-						<SlashMenuPlugin commands={BLOCK_COMMANDS} />
-						<TablesPlugin />
-						<TableColumnResizePlugin />
-						<TogglePlugin docId={noteId} />
-						<EmbedPlugin />
-						<ColumnsPlugin />
-						<MentionTypeaheadPlugin currentNoteId={noteId} />
-						<TransclusionTypeaheadPlugin currentNoteId={noteId} />
-						<BlockEmbedPickerPlugin currentNoteId={noteId} />
-						<LinkMarkupPlugin currentNoteId={noteId} />
-						<BlockGutterPlugin
-							commands={BLOCK_ACTIONS}
-							insertCommands={BLOCK_COMMANDS}
-							scrollContainerSelector=".notes__main"
-							documentId={noteId}
-						/>
-						<BlockAnchorsPlugin
-							store={anchorStore}
-							reveal={anchorReveal}
-							{...(onAnchorDone ? { onRevealDone: onAnchorDone } : {})}
-						/>
-						{onInsertDone && (
-							<InsertAtEndPlugin
-								request={insertRequest}
-								{...(whenLoaded ? { whenLoaded } : {})}
-								onDone={onInsertDone}
+							{onRecoverBlank && (
+								<BlankRecoveryPlugin
+									doc={doc}
+									onRecover={onRecoverBlank}
+									{...(onRecoverReset ? { onHydrated: onRecoverReset } : {})}
+									{...(whenLoaded ? { whenLoaded } : {})}
+								/>
+							)}
+							<CheckListPlugin />
+							<HorizontalRulePlugin />
+							<MarkdownShortcutPlugin
+								transformers={[
+									...BLOCK_MARKDOWN_TRANSFORMERS,
+									TOGGLE_HEADING_TRANSFORMER,
+									...TRANSFORMERS,
+									EQUATION_TRANSFORMER,
+									EMOJI_SHORTCODE_TRANSFORMER,
+									...UNICODE_SHORTCUT_TRANSFORMERS,
+								]}
 							/>
-						)}
-						<FindPlugin />
-						<BlockContextMenuPlugin />
-						<MarqueePlugin />
-						<CodeBlockPlugin />
-						<CodeBlockToolbarPlugin />
-						<CodeHighlightPlugin />
-						<CodeLineNumbersPlugin />
-						<MediaDropPlugin />
-						<BookmarkSuggestPlugin currentNoteId={noteId} />
-						<EntityDropPlugin currentNoteId={noteId} noteTitle={storedTitle} />
-						<PendingEntityLinkPlugin currentNoteId={noteId} noteTitle={storedTitle} />
-						<MediaInspectorPlugin />
-						<AddPropertyMenuPlugin />
-						{editorHandleRef && <EditorHandlePlugin handleRef={editorHandleRef} />}
-						<EmojiTypeaheadPlugin />
-						<FormatChordsPlugin />
-						<InlineToolbarPlugin />
-						<CommentHighlightPlugin />
-						<EmptyParagraphHintPlugin />
-						<BacklinksPlugin currentNoteId={noteId} />
-						<AutosavePlugin onChange={onChange} />
-						<InitialFocusPlugin />
-						{/* Unconditional mount — rationale in dev-bench-plugin.tsx header. */}
-						<DevBenchPlugin noteId={noteId} />
-					</BlockSelectionPlugin>
-				</NoteContextProvider>
-			</BrainstormEditor>
-		</TransclusionRenderProvider>
+							<ListMarkdownShortcutsPlugin />
+							<TabIndentationPlugin />
+							<TurnIntoPlugin />
+							<SlashMenuPlugin commands={BLOCK_COMMANDS} />
+							<TablesPlugin />
+							<TableColumnResizePlugin />
+							<TogglePlugin docId={noteId} />
+							<EmbedPlugin />
+							<ColumnsPlugin />
+							<MentionTypeaheadPlugin currentNoteId={noteId} />
+							<TransclusionTypeaheadPlugin currentNoteId={noteId} />
+							<BlockEmbedPickerPlugin currentNoteId={noteId} />
+							<LinkMarkupPlugin currentNoteId={noteId} />
+							<BlockGutterPlugin
+								commands={BLOCK_ACTIONS}
+								insertCommands={BLOCK_COMMANDS}
+								scrollContainerSelector=".notes__main"
+								documentId={noteId}
+							/>
+							<BlockAnchorsPlugin
+								store={anchorStore}
+								reveal={anchorReveal}
+								{...(onAnchorDone ? { onRevealDone: onAnchorDone } : {})}
+							/>
+							{onInsertDone && (
+								<InsertAtEndPlugin
+									request={insertRequest}
+									{...(whenLoaded ? { whenLoaded } : {})}
+									onDone={onInsertDone}
+								/>
+							)}
+							<FindPlugin />
+							<BlockContextMenuPlugin />
+							<MarqueePlugin />
+							<CodeBlockPlugin />
+							<CodeBlockToolbarPlugin />
+							<CodeHighlightPlugin />
+							<CodeLineNumbersPlugin />
+							<MediaDropPlugin />
+							<BookmarkSuggestPlugin currentNoteId={noteId} />
+							<EntityDropPlugin currentNoteId={noteId} noteTitle={storedTitle} />
+							<PendingEntityLinkPlugin currentNoteId={noteId} noteTitle={storedTitle} />
+							<MediaInspectorPlugin />
+							<AddPropertyMenuPlugin />
+							{editorHandleRef && <EditorHandlePlugin handleRef={editorHandleRef} />}
+							<EmojiTypeaheadPlugin />
+							<FormatChordsPlugin />
+							<InlineToolbarPlugin />
+							<CommentHighlightPlugin />
+							<EmptyParagraphHintPlugin />
+							<BacklinksPlugin currentNoteId={noteId} />
+							<AutosavePlugin onChange={onChange} />
+							<InitialFocusPlugin />
+							{/* Unconditional mount — rationale in dev-bench-plugin.tsx header. */}
+							<DevBenchPlugin noteId={noteId} />
+						</BlockSelectionPlugin>
+					</NoteContextProvider>
+				</BrainstormEditor>
+			</TransclusionRenderProvider>
+		</TransclusionEditProvider>
 	);
 }
