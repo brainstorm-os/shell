@@ -18,12 +18,15 @@
  */
 
 import {
+	CREATED_BY_AGENT_PROPERTY_KEY,
 	type Comparand,
 	type EntityQuery,
 	LinkDirection,
 	type LinkPredicate,
 	type PropertyPredicate,
 	isPropertyRef,
+	projectAgentAuthorship,
+	stripDerivedAuthorship,
 } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
@@ -158,9 +161,16 @@ class InvalidPropertyKeyError extends Error {
 	}
 }
 
+/** Agent-16 — derived keys that are not stored: a predicate on one compiles to
+ *  the stored path it is projected from, so a server-side filter on "created by
+ *  agent" matches exactly what a reader sees. */
+const DERIVED_KEY_PATHS: Readonly<Record<string, string>> = {
+	[CREATED_BY_AGENT_PROPERTY_KEY]: "$.agentProvenance.agent",
+};
+
 function jsonPath(key: string): string {
 	if (!PROPERTY_KEY_RE.test(key)) throw new InvalidPropertyKeyError(key);
-	return `$.${key}`;
+	return DERIVED_KEY_PATHS[key] ?? `$.${key}`;
 }
 
 /** Upper bound on the per-handle prepared-statement LRU. Fixed-SQL repos use a
@@ -236,13 +246,14 @@ export class EntitiesRepository {
 		// path (shell-internal singletons that don't yet have a DEK row).
 		const dekId = input.dekId === "" ? null : input.dekId;
 		const updatedAt = input.updatedAt ?? input.now;
+		const stored = stripDerivedAuthorship(input.properties);
 		this.stmt(
 			"INSERT INTO entities (id, type, space_id, properties, created_by, created_at, updated_at, dek_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
 		).run(
 			input.id,
 			input.type,
 			input.spaceId ?? null,
-			JSON.stringify(input.properties),
+			JSON.stringify(stored),
 			input.createdBy,
 			input.now,
 			updatedAt,
@@ -253,7 +264,7 @@ export class EntitiesRepository {
 			id: input.id,
 			type: input.type,
 			spaceId: input.spaceId ?? null,
-			properties: input.properties,
+			properties: projectAgentAuthorship(stored),
 			createdBy: input.createdBy,
 			createdAt: input.now,
 			updatedAt,
@@ -283,12 +294,12 @@ export class EntitiesRepository {
 	update(id: string, patch: Record<string, unknown>, now: number): EntityRow | null {
 		const current = this.get(id);
 		if (!current) return null;
-		const properties = { ...current.properties, ...patch };
+		const stored = stripDerivedAuthorship({ ...current.properties, ...patch });
 		this.stmt(
 			"UPDATE entities SET properties = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-		).run(JSON.stringify(properties), now, id);
+		).run(JSON.stringify(stored), now, id);
 		this.recordChange(id, "update", this.nextVersion(id), now);
-		return { ...current, properties, updatedAt: now };
+		return { ...current, properties: projectAgentAuthorship(stored), updatedAt: now };
 	}
 
 	/**
@@ -870,7 +881,7 @@ function rowToEntity(row: DbEntityRow): EntityRow {
 	try {
 		const parsed = JSON.parse(row.properties) as unknown;
 		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-			properties = parsed as Record<string, unknown>;
+			properties = projectAgentAuthorship(parsed as Record<string, unknown>);
 		}
 	} catch {
 		// Corrupt row — treat as empty rather than failing the whole query.

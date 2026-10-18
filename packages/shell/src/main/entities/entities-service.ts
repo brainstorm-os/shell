@@ -35,6 +35,7 @@ import {
 	type EntityQuery,
 	buildAgentProvenance,
 	parseProvenanceRequest,
+	stripDerivedAuthorship,
 	stripReservedProperties,
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
@@ -416,7 +417,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				vaultPath,
 				entityId: row.id,
 				props: patch,
-				seedProps: row.properties,
+				seedProps: stripDerivedAuthorship(row.properties),
 			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
 			if (res?.projection?.properties) propsForRow = res.projection.properties;
 			// 10.12 — emit the property write through live-sync if shared.

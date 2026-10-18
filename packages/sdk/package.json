@@ -53,6 +53,7 @@
     "./panel-state": "./src/panel-state.ts",
     "./entity-icon": "./src/entity-icon.ts",
     "./entity-title": "./src/entity-title.ts",
+    "./entity-authorship": "./src/entity-authorship.ts",
     "./entity-lock": "./src/entity-lock.ts",
     "./tab-identity": "./src/tab-identity.ts",
     "./entity-cover": "./src/entity-cover.ts",

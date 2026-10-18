@@ -19,6 +19,7 @@
 
 import { type PropertyDef, defaultViewFor } from "@brainstorm-os/sdk-types";
 import type { ReactNode } from "react";
+import { type AuthorshipInput, authorshipMeta } from "../entity-authorship";
 import { Icon, IconName } from "../icon";
 import { getCell } from "../property-ui";
 
@@ -67,6 +68,11 @@ export type PropertiesPanelProps = {
 	addButtonRef?: React.Ref<HTMLButtonElement>;
 	/** Footer metadata rows (created / updated, word count, …). */
 	meta?: readonly PropertiesPanelMeta[];
+	/** Agent-16 / Collab-C7 — the object's authorship ("Created by <agent>",
+	 *  "Last edited by <member>"), rendered read-only ahead of `meta`. Pass the
+	 *  object's property bag; the agent comes from its server-stamped
+	 *  provenance, never from anything editable. */
+	authorship?: AuthorshipInput;
 	/** Rendered at the top of the scrolling body, before the rows — the
 	 *  cover-band slot (the host's cover wrapper carries `flex-shrink: 0`). */
 	lead?: ReactNode;
@@ -94,11 +100,15 @@ export function PropertiesPanel({
 	onAdd,
 	addLabel,
 	addButtonRef,
-	meta,
+	meta: hostMeta,
+	authorship,
 	lead,
 	children,
 	inline,
 }: PropertiesPanelProps): ReactNode {
+	const meta: readonly PropertiesPanelMeta[] = authorship
+		? [...authorshipMeta(authorship), ...(hostMeta ?? [])]
+		: (hostMeta ?? []);
 	// The whole entity's values, keyed by property key — passed to each cell so a
 	// computed cell (formula) can resolve references to sibling properties.
 	const siblingValues: Record<string, unknown> = {};
