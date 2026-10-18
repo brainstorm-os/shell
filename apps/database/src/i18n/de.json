@@ -373,5 +373,10 @@
   "brainstorm.database.changeType.previewHeading": "Vorschau",
   "brainstorm.database.changeType.more": "…und {count} weitere",
   "brainstorm.database.changeType.confirm": "Typ ändern",
-  "brainstorm.database.changeType.done": "„{name}“ ist jetzt {type}"
+  "brainstorm.database.changeType.done": "„{name}“ ist jetzt {type}",
+  "brainstorm.database.view.menu.pin": "An Dashboard anheften",
+  "brainstorm.database.view.menu.unpin": "Vom Dashboard lösen",
+  "brainstorm.database.view.menu.pin.vaultHint": "Integrierte Ansichten lassen sich nicht anheften – dupliziere sie zuerst",
+  "brainstorm.database.view.pinned": "„{name}“ ans Dashboard angeheftet",
+  "brainstorm.database.view.unpinned": "„{name}“ gelöst"
 }

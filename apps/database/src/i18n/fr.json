@@ -373,5 +373,10 @@
   "brainstorm.database.changeType.previewHeading": "Aperçu",
   "brainstorm.database.changeType.more": "…et {count} de plus",
   "brainstorm.database.changeType.confirm": "Changer le type",
-  "brainstorm.database.changeType.done": "« {name} » est maintenant {type}"
+  "brainstorm.database.changeType.done": "« {name} » est maintenant {type}",
+  "brainstorm.database.view.menu.pin": "Épingler au tableau de bord",
+  "brainstorm.database.view.menu.unpin": "Désépingler du tableau de bord",
+  "brainstorm.database.view.menu.pin.vaultHint": "Les vues intégrées ne peuvent pas être épinglées — dupliquez-la d’abord",
+  "brainstorm.database.view.pinned": "« {name} » épinglée au tableau de bord",
+  "brainstorm.database.view.unpinned": "« {name} » désépinglée"
 }

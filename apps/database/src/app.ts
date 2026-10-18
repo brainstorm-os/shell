@@ -126,6 +126,7 @@ import {
 	stepObjectNav,
 } from "./logic/object-nav";
 import { propertyKindIconFor } from "./logic/property-kind-icon";
+import { ViewPinAvailability, canPinToDashboard, viewPinAvailability } from "./logic/view-pin";
 import { ChartView } from "./react/chart-view";
 import { ChartWidget, type ChartWidgetRuntime } from "./react/chart-widget";
 import { installFirstMediaTransport } from "./react/use-first-media";
@@ -982,7 +983,7 @@ function renderViewTabs(state: AppState): void {
 		});
 		tab.addEventListener("contextmenu", (event) => {
 			event.preventDefault();
-			openViewContextMenu(state, view, { x: event.clientX, y: event.clientY });
+			void openViewContextMenu(state, view, { x: event.clientX, y: event.clientY });
 		});
 		bindViewTabDrag(state, tab, view.id);
 		root.appendChild(tab);
@@ -4623,12 +4624,51 @@ function openListContextMenu(
 	]);
 }
 
-function openViewContextMenu(
+async function openViewContextMenu(
 	state: AppState,
 	view: ListView,
 	point: { x: number; y: number },
-): void {
+): Promise<void> {
 	const siblings = viewsForList(state, view.listId);
+	const runtime = getRuntime();
+	const dashboard = runtime?.services?.dashboard;
+	const availability = viewPinAvailability(
+		view.id,
+		isVaultDerivedViewId,
+		canPinToDashboard(runtime?.capabilities, Boolean(dashboard)),
+	);
+	const pinned =
+		availability === ViewPinAvailability.Pinnable && dashboard
+			? await dashboard.isPinned({ entityId: view.id }).catch(() => false)
+			: false;
+	const pinItems: MenuItem[] =
+		availability === ViewPinAvailability.Unsupported
+			? []
+			: [
+					{
+						label: pinned
+							? t("brainstorm.database.view.menu.unpin")
+							: t("brainstorm.database.view.menu.pin"),
+						icon: pinned ? IconName.PinSlash : IconName.Pin,
+						disabled: availability === ViewPinAvailability.NotAnObject,
+						...(availability === ViewPinAvailability.NotAnObject
+							? { hint: t("brainstorm.database.view.menu.pin.vaultHint") }
+							: {}),
+						onClick: () => {
+							if (!dashboard) return;
+							const op = pinned ? dashboard.unpin : dashboard.pin;
+							void op({ entityId: view.id }).then((ok) => {
+								if (ok)
+									flashStatus(
+										pinned
+											? t("brainstorm.database.view.unpinned", { name: view.name })
+											: t("brainstorm.database.view.pinned", { name: view.name }),
+										"ready",
+									);
+							});
+						},
+					},
+				];
 	openContextMenu(point, [
 		{
 			label: t("brainstorm.database.view.menu.rename"),
@@ -4640,6 +4680,7 @@ function openViewContextMenu(
 			icon: IconName.Copy,
 			onClick: () => duplicateViewAndSelect(state, view),
 		},
+		...pinItems,
 		{
 			label: t("brainstorm.database.view.menu.delete"),
 			icon: IconName.Trash,
@@ -5059,6 +5100,16 @@ function bindViewTabKeyboard(state: AppState): void {
 	// Keyboard reorder — the accessible twin of the tab drag (KBN). Mod+Shift
 	// steps the focused tab toward the arrow; focus follows the moved tab so a
 	// run of steps keeps working without re-grabbing.
+	// Shift+F10 — the keyboard twin of the tab right-click menu (rename /
+	// duplicate / pin / delete), at the focused tab.
+	attachShortcut(root, "Shift+F10", (event) => {
+		const tab =
+			event.target instanceof Element ? event.target.closest<HTMLElement>("[data-view-id]") : null;
+		const view = state.views.find((v) => v.id === tab?.dataset.viewId);
+		if (!tab || !view) return;
+		const rect = tab.getBoundingClientRect();
+		void openViewContextMenu(state, view, { x: rect.left, y: rect.bottom + 4 });
+	});
 	attachShortcut(root, "Mod+Shift+ArrowLeft", (event) => moveFocusedViewTab(state, event, -1));
 	attachShortcut(root, "Mod+Shift+ArrowRight", (event) => moveFocusedViewTab(state, event, 1));
 }

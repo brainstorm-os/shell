@@ -373,5 +373,10 @@
   "brainstorm.database.changeType.previewHeading": "Vista previa",
   "brainstorm.database.changeType.more": "…y {count} más",
   "brainstorm.database.changeType.confirm": "Cambiar tipo",
-  "brainstorm.database.changeType.done": "“{name}” ahora es {type}"
+  "brainstorm.database.changeType.done": "“{name}” ahora es {type}",
+  "brainstorm.database.view.menu.pin": "Fijar en el panel",
+  "brainstorm.database.view.menu.unpin": "Desfijar del panel",
+  "brainstorm.database.view.menu.pin.vaultHint": "Las vistas integradas no se pueden fijar: duplícala primero",
+  "brainstorm.database.view.pinned": "“{name}” fijada en el panel",
+  "brainstorm.database.view.unpinned": "“{name}” desfijada"
 }

@@ -373,5 +373,10 @@
   "brainstorm.database.changeType.previewHeading": "Preview",
   "brainstorm.database.changeType.more": "…and {count} more",
   "brainstorm.database.changeType.confirm": "Change type",
-  "brainstorm.database.changeType.done": "“{name}” is now {type}"
+  "brainstorm.database.changeType.done": "“{name}” is now {type}",
+  "brainstorm.database.view.menu.pin": "Pin to dashboard",
+  "brainstorm.database.view.menu.unpin": "Unpin from dashboard",
+  "brainstorm.database.view.menu.pin.vaultHint": "Built-in views can’t be pinned — duplicate it first",
+  "brainstorm.database.view.pinned": "Pinned “{name}” to the dashboard",
+  "brainstorm.database.view.unpinned": "Unpinned “{name}”"
 }
