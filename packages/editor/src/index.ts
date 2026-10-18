@@ -102,6 +102,17 @@ export {
 } from "./plugins/block-gutter-plugin";
 export { useEditorShortcut } from "./plugins/editor-shortcut";
 export {
+	INSERT_MENU_CHORDS,
+	InsertPosition,
+	type OpenInsertMenuOptions,
+	createInsertBlockActions,
+	insertBlockWithCommand,
+	insertEmptyBlock,
+	insertMenuRows,
+	openInsertMenu,
+	pickInsertTarget,
+} from "./plugins/insert-menu";
+export {
 	type SlashMenuPluginProps,
 	SlashMenuPlugin,
 	filterCommands,
@@ -146,8 +157,13 @@ export {
 	Heading1Icon,
 	Heading2Icon,
 	Heading3Icon,
+	BlockBackgroundIcon,
 	ImageIcon,
 	IndentIcon,
+	InsertAboveIcon,
+	InsertBelowIcon,
+	TaskIcon,
+	TurnIntoPageIcon,
 	InlineCodeIcon,
 	ItalicIcon,
 	LinkIcon,

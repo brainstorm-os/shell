@@ -30,6 +30,7 @@ import {
 	applySwatchToBlocks,
 	createEditorT,
 	createEntityEmbedCommand,
+	createInsertBlockActions,
 	createMediaBlockCommands,
 	createStandardBlockActions,
 	createStandardBlockCommands,
@@ -471,6 +472,7 @@ const deleteActionIndex = sharedActions.findIndex((c) => c.id === "block.action.
  *  add-property actions slotted before Delete, plus the colour /
  *  highlight swatch rows. */
 export const BLOCK_ACTIONS: readonly BlockCommand[] = [
+	...createInsertBlockActions(editorT, BLOCK_COMMANDS),
 	...sharedActions.slice(0, deleteActionIndex),
 	COPY_LINK_ACTION,
 	ADD_PROPERTY_ACTION,

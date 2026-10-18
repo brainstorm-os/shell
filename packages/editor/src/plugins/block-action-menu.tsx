@@ -42,6 +42,8 @@ function nodeIcon(node: ReactNode): IconParam {
 type EditorI18nKey = Parameters<EditorT>[0];
 
 const SECTION_LABEL: Partial<Record<CommandCategory, EditorI18nKey>> = {
+	[CommandCategory.Insert]: "editor.action.menu.insertSection",
+	[CommandCategory.Background]: "editor.action.menu.backgroundSection",
 	[CommandCategory.TurnInto]: "editor.action.menu.turnIntoSection",
 	[CommandCategory.Color]: "editor.action.menu.colorSection",
 	[CommandCategory.Highlight]: "editor.action.menu.highlightSection",
@@ -54,12 +56,14 @@ const SECTION_LABEL: Partial<Record<CommandCategory, EditorI18nKey>> = {
 // / Align / Indent / Actions) — they're a tall, less-frequent block, so burying
 // the everyday actions under ~20 swatch rows would be the wrong trade.
 const SECTION_ORDER: readonly CommandCategory[] = [
+	CommandCategory.Insert,
 	CommandCategory.TurnInto,
 	CommandCategory.Align,
 	CommandCategory.Indent,
 	CommandCategory.Action,
 	CommandCategory.Color,
 	CommandCategory.Highlight,
+	CommandCategory.Background,
 ];
 
 export function openBlockActionMenu(options: OpenBlockActionMenuOptions): void {

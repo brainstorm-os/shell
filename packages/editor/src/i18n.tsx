@@ -50,6 +50,14 @@ export type EditorI18nKey =
 	| "editor.action.menu.alignSection"
 	| "editor.action.menu.indentSection"
 	| "editor.action.menu.actionsSection"
+	| "editor.action.menu.insertSection"
+	| "editor.action.menu.backgroundSection"
+	// Insert menu (B11.21) — gutter `+`, action-menu rows, Mod+Shift+Enter.
+	| "editor.insert.above"
+	| "editor.insert.below"
+	| "editor.insertMenu.region"
+	| "editor.insertMenu.placeholder"
+	| "editor.insertMenu.empty"
 	// Slash menu (SlashMenuPlugin).
 	| "editor.slashMenu.region"
 	| "editor.slashMenu.empty"
@@ -291,6 +299,13 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.action.menu.alignSection": "Align",
 	"editor.action.menu.indentSection": "Indent",
 	"editor.action.menu.actionsSection": "Actions",
+	"editor.action.menu.insertSection": "Insert",
+	"editor.action.menu.backgroundSection": "Background",
+	"editor.insert.above": "Insert above…",
+	"editor.insert.below": "Insert below…",
+	"editor.insertMenu.region": "Insert a block",
+	"editor.insertMenu.placeholder": "Search blocks…",
+	"editor.insertMenu.empty": "No matching blocks",
 	"editor.inline.toolbar.region": "Text formatting",
 	"editor.inline.bold": "Bold",
 	"editor.inline.italic": "Italic",

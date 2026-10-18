@@ -38,6 +38,7 @@ import { ColumnsPlugin } from "./columns-plugin";
 import { FormatChordsPlugin } from "./format-chords-plugin";
 import { InitialFocusPlugin } from "./initial-focus-plugin";
 import { InlineToolbarPlugin } from "./inline-toolbar-plugin";
+import { createInsertBlockActions } from "./insert-menu";
 import { ListMarkdownShortcutsPlugin } from "./list-markdown-shortcuts-plugin";
 import { SlashMenuPlugin } from "./slash-menu-plugin";
 import { TablesPlugin } from "./table-plugin";
@@ -89,7 +90,10 @@ export function StandardEditingPlugins({
 		const base = orderCommandsByPalette(createStandardBlockCommands(t), palette);
 		return extraCommands && extraCommands.length > 0 ? [...base, ...extraCommands] : base;
 	}, [t, extraCommands, palette]);
-	const actions = useMemo(() => createStandardBlockActions(t), [t]);
+	const actions = useMemo(
+		() => [...createInsertBlockActions(t, commands), ...createStandardBlockActions(t)],
+		[t, commands],
+	);
 
 	return (
 		<BlockSelectionPlugin>
@@ -105,6 +109,7 @@ export function StandardEditingPlugins({
 			<ColumnsPlugin />
 			<BlockGutterPlugin
 				commands={actions}
+				insertCommands={commands}
 				{...(scrollContainerSelector ? { scrollContainerSelector } : {})}
 			/>
 			{autoFocus ? <InitialFocusPlugin /> : null}

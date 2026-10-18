@@ -41,6 +41,7 @@ export const DEFAULT_CHORDS: Readonly<Record<ActionId, readonly string[]>> = {
 	[ActionId.CutSelectedBlocks]: ["Mod+x"],
 	[ActionId.PasteSelectedBlocks]: ["Mod+v"],
 	[ActionId.ExitCodeBlock]: ["Mod+Enter"],
+	[ActionId.OpenInsertMenu]: ["Mod+Shift+Enter"],
 	[ActionId.CloseMediaInspector]: ["Escape"],
 	[ActionId.OpenLinkMarkup]: ["Mod+k"],
 	[ActionId.ToggleStrikeMark]: ["Mod+Shift+S"],

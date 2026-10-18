@@ -32,6 +32,11 @@ export enum CommandCategory {
 	Align = "align",
 	Indent = "indent",
 	TurnInto = "turn-into",
+	/** Insert a block above / below the targeted one (B11.21) — block action
+	 *  menu only; opens the slash catalogue as an insert picker. */
+	Insert = "insert",
+	/** Block-level background tint (B11.23) — block action menu only. */
+	Background = "background",
 	/** Bulk text colour / highlight on the selected block(s) (B11.7) — only
 	 *  surfaced in the block action menu, never the slash menu. */
 	Color = "color",

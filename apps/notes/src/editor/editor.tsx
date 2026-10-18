@@ -283,6 +283,7 @@ export function Editor({
 						<LinkMarkupPlugin currentNoteId={noteId} />
 						<BlockGutterPlugin
 							commands={BLOCK_ACTIONS}
+							insertCommands={BLOCK_COMMANDS}
 							scrollContainerSelector=".notes__main"
 							documentId={noteId}
 						/>
