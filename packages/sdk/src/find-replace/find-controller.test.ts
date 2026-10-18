@@ -9,6 +9,7 @@ import {
 	type TextSearchProvider,
 	createFindController,
 } from "./find-controller";
+import { FindPatternError } from "./find-pattern";
 
 /** A trivial in-memory text model so the pure controller is exercised
  *  without a real editor. A `Match` here is just a `[start,end]` span. */
@@ -256,6 +257,48 @@ describe("createFindController", () => {
 			const c = createFindController(noSeed);
 			expect(() => c.open()).not.toThrow();
 			expect(c.getState().term).toBe("");
+		});
+	});
+
+	describe("regex (B11.27)", () => {
+		it("an invalid pattern reports InvalidPattern without calling the provider", () => {
+			const { provider, calls } = fakeProvider("abc");
+			const c = createFindController(provider);
+			c.open();
+			c.setOptions({ regex: true });
+			const before = calls.search;
+			c.setTerm("(abc");
+			expect(c.getState().status).toBe(FindStatus.InvalidPattern);
+			expect(c.getState().patternError).toBe(FindPatternError.Invalid);
+			expect(calls.search).toBe(before);
+			expect(c.replaceAll("x")).toBe(0);
+		});
+
+		it("an unsafe pattern is refused before it runs", () => {
+			const { provider } = fakeProvider("aaaa");
+			const c = createFindController(provider);
+			c.open();
+			c.setOptions({ regex: true });
+			c.setTerm("(a+)+$");
+			expect(c.getState().patternError).toBe(FindPatternError.Unsafe);
+			c.setTerm("a+");
+			expect(c.getState().patternError).toBeNull();
+		});
+
+		it("hands the provider a budget and surfaces truncation", () => {
+			const { provider } = fakeProvider("aaa");
+			const seen: FindQuery[] = [];
+			const search = provider.search.bind(provider);
+			provider.search = (query) => {
+				seen.push(query);
+				if (query.budget) query.budget.exhausted = true;
+				return search(query);
+			};
+			const c = createFindController(provider);
+			c.open();
+			c.setTerm("a");
+			expect(seen.at(-1)?.budget).toBeDefined();
+			expect(c.getState().truncated).toBe(true);
 		});
 	});
 });

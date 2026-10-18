@@ -55,6 +55,28 @@ export type EditorEntitiesHost = {
 	update: (id: string, patch: Record<string, unknown>) => Promise<unknown>;
 };
 
+/** The `entities` host slice from an app's `services.entities`, or
+ *  `undefined` when the service (or either verb) is absent — so `/task`
+ *  stays hidden rather than offering a command that can only no-op. Every
+ *  app wires it the same way; the capability gate stays shell-side. */
+export function editorEntitiesHost(
+	service:
+		| {
+				create?: EditorEntitiesHost["create"];
+				update?: EditorEntitiesHost["update"];
+		  }
+		| null
+		| undefined,
+): EditorEntitiesHost | undefined {
+	const create = service?.create;
+	const update = service?.update;
+	if (!create || !update) return undefined;
+	return {
+		create: (type, properties, id) => create.call(service, type, properties, id),
+		update: (id, patch) => update.call(service, id, patch),
+	};
+}
+
 export type EditorHost = {
 	/** Navigate to an entity (link-markup click, mention chip, backlink,
 	 *  page-ref). Wraps the shell's open-entity intent. `mode` carries the

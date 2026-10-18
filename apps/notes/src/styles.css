@@ -816,3 +816,118 @@ body.is-resizing .notes__props-resize {
 	outline-offset: var(--space-1);
 	border-radius: var(--radius-sm);
 }
+
+/* ── Side Outline panel (B11.26) ───────────────────────────────────────
+   A second glass overlay on the right edge, docked beside the properties
+   panel when both are open (never stacked over it). Same GPU-transform
+   slide as `.notes__props`. */
+.notes__outline {
+	position: absolute;
+	top: 44px;
+	bottom: 0;
+	inset-inline-end: 0;
+	width: 240px;
+	display: flex;
+	flex-direction: column;
+	border-inline-start: var(--border-width) solid var(--color-glass-border);
+	box-shadow: var(--shadow-xl);
+	overflow: hidden;
+	z-index: 99;
+	transition:
+		transform var(--motion-duration-normal) ease,
+		inset-inline-end var(--motion-duration-normal) ease,
+		visibility var(--motion-duration-normal) ease;
+	will-change: transform;
+}
+
+.notes[data-props-open="true"] .notes__outline {
+	inset-inline-end: var(--notes-props-width, 320px);
+}
+
+.notes[data-outline-open="false"] .notes__outline {
+	transform: translateX(100%);
+	box-shadow: none;
+	border-color: transparent;
+	visibility: hidden;
+}
+
+.notes__outline-header {
+	display: flex;
+	align-items: center;
+	flex: none;
+	height: 44px;
+	padding: 0 var(--space-3);
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-sm);
+	font-weight: 600;
+}
+
+.notes__outline-empty {
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+.notes__outline-list {
+	flex: 1 1 0;
+	min-height: 0;
+	margin: 0;
+	padding: var(--space-2) 0;
+	list-style: none;
+	overflow-y: auto;
+	outline: none;
+}
+
+.notes__outline-item {
+	--outline-depth: 0;
+	outline: none;
+}
+
+.notes__outline-item[data-depth="1"] {
+	--outline-depth: 1;
+}
+.notes__outline-item[data-depth="2"] {
+	--outline-depth: 2;
+}
+.notes__outline-item[data-depth="3"] {
+	--outline-depth: 3;
+}
+.notes__outline-item[data-depth="4"] {
+	--outline-depth: 4;
+}
+.notes__outline-item[data-depth="5"] {
+	--outline-depth: 5;
+}
+
+.notes__outline-link {
+	display: block;
+	width: 100%;
+	padding: var(--space-1) var(--space-3);
+	padding-inline-start: calc(var(--space-3) + var(--outline-depth) * var(--space-3));
+	border: none;
+	border-inline-start: 2px solid transparent;
+	background: transparent;
+	color: var(--color-text-secondary);
+	font-size: var(--text-size-sm);
+	text-align: start;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.notes__outline-link:hover {
+	background: var(--hover);
+	color: var(--color-text-primary);
+}
+
+.notes__outline-item:focus-visible .notes__outline-link {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -2px;
+}
+
+.notes__outline-item[aria-current="location"] .notes__outline-link {
+	border-inline-start-color: var(--accent);
+	color: var(--color-text-primary);
+	font-weight: 600;
+}

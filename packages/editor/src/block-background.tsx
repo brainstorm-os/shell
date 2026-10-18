@@ -30,12 +30,14 @@ import {
 	type LexicalEditor,
 	type LexicalNode,
 	type NodeKey,
+	type SerializedEditorState,
+	type SerializedLexicalNode,
 } from "lexical";
 import { type ReactNode, useEffect } from "react";
 import { type BlockCommand, CommandCategory } from "./block-command";
 import type { EditorT } from "./i18n";
 import { $isColumnNode, $isColumnsNode } from "./nodes/columns-node";
-import { SWATCH_COLORS, SwatchColor, mergeStyleProp } from "./text-color";
+import { SWATCH_COLORS, SwatchColor, highlightFallback, mergeStyleProp } from "./text-color";
 
 export const BLOCK_BACKGROUND_STYLE_PROP = "--bs-block-background";
 export const BLOCK_BACKGROUND_ATTR = "data-bs-block-background";
@@ -66,6 +68,18 @@ export function withBlockBackground(style: string, color: SwatchColor): string {
 /** The theme token a hue renders through. */
 export function blockBackgroundToken(color: SwatchColor): string | null {
 	return color === SwatchColor.Default ? null : `var(--color-block-background-${color})`;
+}
+
+/** The inline CSS an exported (stylesheet-less) HTML block carries for its
+ *  stored background: the theme token, with the baked swatch tint as the
+ *  fallback a standalone page actually resolves. `null` for none. */
+export function blockBackgroundExportCss(style: unknown): string | null {
+	if (typeof style !== "string") return null;
+	const color = readBlockBackground(style);
+	const token = blockBackgroundToken(color);
+	const fallback = highlightFallback(color);
+	if (!token || !fallback) return null;
+	return `background-color: ${token.slice(0, -1)}, ${fallback})`;
 }
 
 /** Whether `node` takes a block background: a block-level element that is
@@ -114,6 +128,30 @@ function syncAll(editor: LexicalEditor): void {
 		};
 		walk($getRoot());
 	});
+}
+
+/** `editorState.toJSON()` plus each element's stored `style` (Lexical 0.21's
+ *  element `exportJSON` drops it), so export paths keep block backgrounds.
+ *  The JSON tree and the node tree are walked in lockstep — same order by
+ *  construction. */
+export function serializedStateWithBlockStyles(editor: LexicalEditor): SerializedEditorState {
+	const state = editor.getEditorState();
+	const json = state.toJSON();
+	state.read(() => {
+		const walk = (node: LexicalNode, out: SerializedLexicalNode): void => {
+			if (!$isElementNode(node)) return;
+			const style = node.getStyle();
+			if (style && !$isRootNode(node))
+				(out as SerializedLexicalNode & { style?: string }).style = style;
+			const kids = (out as { children?: SerializedLexicalNode[] }).children ?? [];
+			node.getChildren().forEach((child, i) => {
+				const childOut = kids[i];
+				if (childOut) walk(child, childOut);
+			});
+		};
+		walk($getRoot(), json.root);
+	});
+	return json;
 }
 
 /** Mirror stored block backgrounds onto the editor's DOM, now and on every

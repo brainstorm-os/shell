@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { gutterAnchor } from "./block-gutter-anchor";
+import { gutterAnchor, gutterOwnsPointer } from "./block-gutter-anchor";
 
 const main = { top: 100, bottom: 700, left: 0 };
 
@@ -32,5 +33,41 @@ describe("gutterAnchor", () => {
 		expect(gutterAnchor({ top: 40, bottom: 100, left: 220 }, main, 68)).not.toBeNull();
 		// Top edge exactly at the container bottom → still touching.
 		expect(gutterAnchor({ top: 700, bottom: 760, left: 220 }, main, 68)).not.toBeNull();
+	});
+});
+
+describe("gutterOwnsPointer (nested editors, B11.22)", () => {
+	function editorEl(top: number, bottom: number, editable: boolean): HTMLElement {
+		const el = document.createElement("div");
+		el.setAttribute("data-lexical-editor", "true");
+		el.setAttribute("contenteditable", editable ? "true" : "false");
+		el.getBoundingClientRect = () => ({ top, bottom }) as DOMRect;
+		return el;
+	}
+
+	function tree(nestedEditable: boolean) {
+		const host = editorEl(0, 1000, true);
+		const card = document.createElement("div");
+		const nested = editorEl(300, 500, nestedEditable);
+		card.append(nested);
+		host.append(card);
+		return { host, nested };
+	}
+
+	it("the host yields inside an editing nested body, keeps the rest of the page", () => {
+		const { host } = tree(true);
+		expect(gutterOwnsPointer(host, 400)).toBe(false);
+		expect(gutterOwnsPointer(host, 100)).toBe(true);
+	});
+
+	it("the host keeps a read-only nested body (the transclusion acts as one block)", () => {
+		const { host } = tree(false);
+		expect(gutterOwnsPointer(host, 400)).toBe(true);
+	});
+
+	it("a nested editor answers only inside its own band", () => {
+		const { nested } = tree(true);
+		expect(gutterOwnsPointer(nested, 400)).toBe(true);
+		expect(gutterOwnsPointer(nested, 100)).toBe(false);
 	});
 });

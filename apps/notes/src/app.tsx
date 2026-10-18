@@ -11,9 +11,12 @@ import {
 	type CommentsFocusRequest,
 	CommentsProvider,
 	PlusIcon,
+	RichTextPropertyEditor,
 	type SelectionCommentAnchor,
+	TocIcon,
 	applySuggestionInEditor,
 	denormalizeBody,
+	serializedStateWithBlockStyles,
 	useCommentMentionHost,
 } from "@brainstorm-os/editor";
 import { useBlankRecoveryGap } from "@brainstorm-os/react-yjs";
@@ -59,6 +62,7 @@ import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
 import type { InsertAtEndRequest } from "./editor/insert-at-end-plugin";
+import type { OutlineEntry } from "./editor/outline";
 import { queuePendingEntityLinks } from "./editor/pending-link";
 import type { TransclusionEditHost } from "./editor/transclusion-edit-host";
 import { useNotesT } from "./i18n-hooks";
@@ -92,10 +96,15 @@ import {
 } from "./ui/note-export";
 import { NotesList } from "./ui/notes-list";
 import { noteObjectMenuContext } from "./ui/object-menu-context";
+import { OutlinePanel } from "./ui/outline-panel";
 import { NotesRightPanel, RightTab } from "./ui/right-panel-tabs";
 
 const NAV_PREF_KEY = "notes.navOpen";
 const PROPS_PREF_KEY = "notes.propsOpen";
+const OUTLINE_PREF_KEY = "notes.outlineOpen";
+
+const notesScrollContainer = (): HTMLElement | null =>
+	document.querySelector<HTMLElement>(".notes__main");
 
 /** Cheap order-insensitive equality for the autosave's body-ref diff, so a
  *  keystroke that doesn't change the set of cross-references doesn't re-persist
@@ -311,6 +320,8 @@ export function NotesApp() {
 	const [lastViewedLoaded, setLastViewedLoaded] = useState(false);
 	const [navOpen, setNavOpen] = useState(() => readPref(NAV_PREF_KEY, true));
 	const [propsOpen, setPropsOpen] = useState(() => readPanelOpen(PROPS_PREF_KEY, false));
+	const [outlineOpen, setOutlineOpen] = useState(() => readPanelOpen(OUTLINE_PREF_KEY, false));
+	const [outline, setOutline] = useState<OutlineEntry[]>([]);
 	const [rightTab, setRightTab] = useState<RightTab>(RightTab.Properties);
 
 	// Live comments adapter for the open note (B11.9). Bridges the vault
@@ -662,6 +673,25 @@ export function NotesApp() {
 		});
 	}, []);
 
+	const toggleOutline = useCallback(() => {
+		setOutlineOpen((open) => {
+			const next = !open;
+			writePanelOpen(OUTLINE_PREF_KEY, next);
+			return next;
+		});
+	}, []);
+
+	useShortcut(
+		ActionId.ToggleOutline,
+		useCallback(
+			(event: KeyboardEvent) => {
+				event.preventDefault();
+				toggleOutline();
+			},
+			[toggleOutline],
+		),
+	);
+
 	// Page-level lock (B11.11) — a SYNCED note property (`properties.locked`),
 	// not per-device chrome, so a lock set on one device/user is visible
 	// everywhere. Derived straight from the open note; the toggle persists
@@ -853,7 +883,10 @@ export function NotesApp() {
 		return {
 			files,
 			title: headerTitle,
-			getState: () => editorHandleRef.current?.getEditorState().toJSON() ?? null,
+			getState: () => {
+				const editor = editorHandleRef.current;
+				return editor ? serializedStateWithBlockStyles(editor) : null;
+			},
 			...(exportService ? { exportPdf: (html: string) => exportService.printToPdf({ html }) } : {}),
 			labels: {
 				filterName: (format) => filterByFormat[format],
@@ -970,7 +1003,12 @@ export function NotesApp() {
 	) : null;
 
 	const shell = (
-		<div className="notes" data-nav-open={navOpen} data-props-open={propsVisible}>
+		<div
+			className="notes"
+			data-nav-open={navOpen}
+			data-props-open={propsVisible}
+			data-outline-open={outlineOpen}
+		>
 			{/* DND-6 — screen-reader surface for drop / link-twin announcements. */}
 			<LiveRegion />
 			<header className="app-header notes__header">
@@ -1043,6 +1081,18 @@ export function NotesApp() {
 						labels={{ show: t("notes.sidebar.show"), hide: t("notes.sidebar.hide") }}
 						controls="notes-nav"
 					/>
+					<button
+						type="button"
+						className="header-icon-btn"
+						onClick={toggleOutline}
+						aria-pressed={outlineOpen}
+						aria-controls="notes-outline"
+						aria-label={outlineOpen ? t("notes.outline.hide") : t("notes.outline.show")}
+						data-bs-tooltip={outlineOpen ? t("notes.outline.hide") : t("notes.outline.show")}
+						data-testid="notes-outline-toggle"
+					>
+						<TocIcon />
+					</button>
 					<PanelToggleButton
 						side={PanelSide.Right}
 						open={propsOpen}
@@ -1191,6 +1241,7 @@ export function NotesApp() {
 										}
 										onInsertDone={onInsertDone}
 										transclusionHost={transclusionHost}
+										onOutlineChange={setOutline}
 									/>
 								)}
 							</div>
@@ -1260,6 +1311,22 @@ export function NotesApp() {
 					))}
 			</aside>
 
+			<aside
+				id="notes-outline"
+				className="notes__outline glass--strong"
+				aria-label={t("notes.outline.region")}
+				aria-hidden={!outlineOpen}
+				inert={!outlineOpen ? true : undefined}
+			>
+				<div className="notes__outline-header">{t("notes.outline.region")}</div>
+				<OutlinePanel
+					hasNote={note !== null}
+					entries={note ? outline : []}
+					editorRef={editorHandleRef}
+					scrollContainer={notesScrollContainer}
+				/>
+			</aside>
+
 			{pickerOpen && note && (
 				<IconPicker value={note.icon} onChange={onPickIcon} onClose={() => setPickerOpen(false)} />
 			)}
@@ -1305,6 +1372,7 @@ export function NotesApp() {
 	if (!runtime) return shell;
 	return (
 		<PropertiesProvider
+			richTextEditor={RichTextPropertyEditor}
 			runtime={runtime}
 			labels={notesPropertyUiLabels}
 			escapeMatcher={notesEscapeMatcher}

@@ -15,6 +15,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { DEFAULT_FIND_LABELS, type FindLabels } from "../i18n/common-labels";
 import { Icon, IconDirection, IconName } from "../icon";
 import { type FindController, FindStatus } from "./find-controller";
+import { findCounterText } from "./find-counter";
 
 export type FindBarProps = {
 	controller: FindController;
@@ -23,10 +24,6 @@ export type FindBarProps = {
 	labels?: Partial<FindLabels>;
 	className?: string;
 };
-
-function fill(template: string, vars: Record<string, string | number>): string {
-	return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
-}
 
 export function FindBar({ controller, mode = "find", labels, className }: FindBarProps) {
 	const merged: FindLabels = { ...DEFAULT_FIND_LABELS, ...labels };
@@ -55,15 +52,8 @@ export function FindBar({ controller, mode = "find", labels, className }: FindBa
 
 	if (!state.open) return null;
 
-	const counter =
-		state.status === FindStatus.NoMatches
-			? merged.noResults
-			: state.status === FindStatus.Matches
-				? fill(merged.matchCount, {
-						current: state.activeIndex + 1,
-						total: state.matchCount,
-					})
-				: "";
+	const counter = findCounterText(state, merged);
+	const invalid = state.status === FindStatus.InvalidPattern;
 	const hasMatches = state.matchCount > 0;
 
 	const toggle = (key: keyof typeof state.options) =>
@@ -85,6 +75,7 @@ export function FindBar({ controller, mode = "find", labels, className }: FindBa
 					placeholder={merged.term}
 					value={state.term}
 					aria-describedby={counterId}
+					aria-invalid={invalid || undefined}
 					onChange={(e) => controller.setTerm(e.target.value)}
 					// keyboard-exempt: input-local — Enter steps matches (Shift = previous),
 					// Escape closes the find bar; scoped to the find input the user is typing
@@ -99,7 +90,13 @@ export function FindBar({ controller, mode = "find", labels, className }: FindBa
 						}
 					}}
 				/>
-				<span id={counterId} className="bs-find-bar__count" data-testid="find-count" aria-live="polite">
+				<span
+					id={counterId}
+					className="bs-find-bar__count"
+					data-testid="find-count"
+					data-invalid={invalid || undefined}
+					aria-live="polite"
+				>
 					{counter}
 				</span>
 				<button

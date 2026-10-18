@@ -276,6 +276,22 @@
 	list-style: lower-roman;
 }
 
+/* Indentation guides (B11.30) — a hairline down each nested list, under
+   its parent item's marker, so depth reads at a glance in long outlines.
+   Decorative only: never a hit target. */
+.notes__list-item--nested > .notes__list {
+	position: relative;
+}
+
+.notes__list-item--nested > .notes__list::before {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	inset-inline-start: -1.15em;
+	border-inline-start: var(--border-width) solid var(--color-border-subtle);
+	pointer-events: none;
+}
+
 .notes__code {
 	display: block;
 	background: var(--code-bg);
@@ -451,6 +467,7 @@
 }
 
 .notes__image {
+	position: relative;
 	margin: 0;
 	display: flex;
 	flex-direction: column;
@@ -488,6 +505,43 @@
 	display: block;
 	object-fit: contain;
 	background: var(--bg-elev);
+}
+
+/* Trailing-edge resize grip (B11.28) — revealed on hover / while dragging;
+   pointer-only, the inspector's width slider is the keyboard path. */
+.notes__image-resize {
+	position: absolute;
+	top: 50%;
+	inset-inline-end: calc(-1 * var(--space-1));
+	width: 6px;
+	height: 40px;
+	max-height: 60%;
+	transform: translateY(-50%);
+	border-radius: var(--radius-full);
+	background: var(--color-border-strong);
+	cursor: ew-resize;
+	opacity: 0;
+	touch-action: none;
+	transition: opacity 80ms ease;
+}
+
+.notes__image:hover .notes__image-resize,
+.notes__image-resize:active {
+	opacity: 1;
+}
+
+/* Inline image (B11.28) — sits on the text baseline, sized in em by the node. */
+.bs-inline-image-host {
+	display: inline;
+}
+
+.bs-inline-image {
+	display: inline-block;
+	width: auto;
+	max-width: 100%;
+	vertical-align: text-bottom;
+	border-radius: var(--radius-sm);
+	object-fit: contain;
 }
 
 .notes__media-edit-button {
@@ -1579,6 +1633,18 @@
 
 .notes__toggle > :not(:first-child) {
 	margin-inline-start: var(--space-0_5);
+}
+
+/* The same guide down an open toggle's body, so nested toggles read as an
+   outline (B11.30). Sits under the disclosure caret. */
+.notes__toggle[data-open="true"]::after {
+	content: "";
+	position: absolute;
+	top: 1.6em;
+	bottom: 0;
+	inset-inline-start: 8px;
+	border-inline-start: var(--border-width) solid var(--color-border-subtle);
+	pointer-events: none;
 }
 
 .notes__toggle--h1 > :first-child {
@@ -2853,4 +2919,98 @@ body.bs-table-col-resizing * {
 .notes__mention-chip--task:has(.checkbox__input:checked) .notes__mention-label {
 	color: var(--text-dim);
 	text-decoration: line-through;
+}
+
+/* Tabs block (B11.29) — a strip of tabs over the active pane. Panes the
+   strip isn't showing carry `hidden`; their blocks stay in the document. */
+.bs-tabs {
+	margin: var(--space-3) 0;
+	border: var(--border-width) solid var(--color-border-subtle);
+	border-radius: var(--radius-md);
+}
+
+.bs-tabs__strip {
+	user-select: none;
+}
+
+.bs-tabs__bar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-2) 0;
+	border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+
+.bs-tabs__list {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+	gap: var(--space-1);
+	overflow-x: auto;
+	outline: none;
+}
+
+.bs-tabs__tab {
+	flex: none;
+	max-width: 220px;
+	padding: var(--space-1) var(--space-2);
+	border: none;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--color-text-secondary);
+	font: inherit;
+	font-size: var(--text-size-sm);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.bs-tabs__tab:hover {
+	color: var(--color-text-primary);
+	background: var(--hover);
+}
+
+.bs-tabs__tab[data-active="true"] {
+	border-bottom-color: var(--accent);
+	color: var(--color-text-primary);
+	font-weight: 600;
+}
+
+.bs-tabs__tab:focus-visible,
+.bs-tabs__action:focus-visible {
+	outline: 2px solid var(--color-focus-ring);
+	outline-offset: -2px;
+}
+
+.bs-tabs__rename {
+	flex: none;
+	width: 160px;
+}
+
+.bs-tabs__action {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--control-height-sm);
+	height: var(--control-height-sm);
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--color-text-secondary);
+	cursor: pointer;
+}
+
+.bs-tabs__action:hover {
+	background: var(--hover);
+	color: var(--color-text-primary);
+}
+
+.bs-tabs__pane {
+	padding: var(--space-2) var(--space-3);
+}
+
+.bs-tabs__pane[hidden] {
+	display: none;
 }

@@ -230,3 +230,27 @@ describe("seedTerm (OQ-FR-4 — prefill from selection)", () => {
 		expect(p.seedTerm?.()).toBe("beta");
 	});
 });
+
+describe("createLexicalSearchProvider — regex (B11.27)", () => {
+	it("matches a regex per text node and replaces with $1 / $&", () => {
+		const editor = editorWith(["call 555-1234 or 555-9876", "no digits"]);
+		const p = createLexicalSearchProvider(editor);
+		const query = q("(\\d{3})-(\\d{4})", { regex: true });
+		const m = p.search(query) as LexicalMatch[];
+		expect(m.map((x) => [x.start, x.end])).toEqual([
+			[5, 13],
+			[17, 25],
+		]);
+		p.replaceMatch(m[0] as LexicalMatch, "$2-$1");
+		expect(text(editor)).toContain("call 1234-555 or 555-9876");
+		expect(p.replaceAll(q("\\d+", { regex: true }), "[$&]")).toBe(4);
+		expect(text(editor)).toContain("call [1234]-[555] or [555]-[9876]");
+	});
+
+	it("a literal replace never expands $ tokens", () => {
+		const editor = editorWith(["price"]);
+		const p = createLexicalSearchProvider(editor);
+		expect(p.replaceAll(q("price"), "$&1")).toBe(1);
+		expect(text(editor)).toBe("$&1");
+	});
+});

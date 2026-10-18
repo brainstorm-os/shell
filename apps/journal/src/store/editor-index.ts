@@ -14,7 +14,7 @@
  * simply lists whatever snapshot was last pushed).
  */
 
-import { setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
+import { editorEntitiesHost, setEditorHost, setEntityIndexSource } from "@brainstorm-os/editor";
 import { openEntity } from "@brainstorm-os/sdk";
 import type { Intent, VaultEntity } from "@brainstorm-os/sdk-types";
 import { getJournalRuntime } from "../runtime";
@@ -39,6 +39,7 @@ export function wireEditorIndex(): void {
 	const storageSvc = getJournalRuntime()?.services?.storage;
 	const blocksSvc = getJournalRuntime()?.services?.blocks;
 	const bpSvc = getJournalRuntime()?.services?.bp;
+	const entities = editorEntitiesHost(getJournalRuntime()?.services?.entities);
 	setEditorHost({
 		...(intentsSvc
 			? {
@@ -70,6 +71,9 @@ export function wireEditorIndex(): void {
 				}
 			: {}),
 		...(bpSvc ? { bp: bpSvc } : {}),
+		// `/task` + the task-mention checkbox (B11.24) create / complete
+		// `brainstorm/Task/v1` rows under the manifest's narrow Task write grant.
+		...(entities ? { entities } : {}),
 	});
 }
 

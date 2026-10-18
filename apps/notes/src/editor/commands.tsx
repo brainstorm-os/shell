@@ -128,7 +128,7 @@ const PALETTE_STRUCTURE: readonly string[] = [
 	"block.toggleHeading3",
 	"block.table",
 ];
-const PALETTE_LAYOUT: readonly string[] = ["block.columns2", "block.columns3"];
+const PALETTE_LAYOUT: readonly string[] = ["block.columns2", "block.columns3", "block.tabs"];
 
 /** The full ordered shared-id palette (F-070 rung (b)) — exported for the
  *  drift-fence test against the shared catalogue. */

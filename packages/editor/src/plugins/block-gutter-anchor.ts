@@ -40,3 +40,24 @@ export function gutterAnchor(
 		left: blockRect.left - offsetLeft,
 	};
 }
+
+const EDITOR_ROOT_SELECTOR = '[data-lexical-editor="true"]';
+
+/** Which editor's gutter owns a pointer at `clientY` when editors nest (an
+ *  "Edit here" transclusion inside a note, B11.22): the innermost EDITABLE
+ *  editor whose vertical band holds the pointer. The host yields inside a
+ *  nested editable editor's band; a nested editor only answers inside its
+ *  own band. Read-only nested editors never claim the pointer — the host's
+ *  gutter keeps acting on the transclusion block as a whole. */
+export function gutterOwnsPointer(root: HTMLElement, clientY: number): boolean {
+	const within = (el: Element): boolean => {
+		const r = el.getBoundingClientRect();
+		return clientY >= r.top && clientY <= r.bottom;
+	};
+	const host = root.parentElement?.closest(EDITOR_ROOT_SELECTOR);
+	if (host && !within(root)) return false;
+	for (const nested of root.querySelectorAll<HTMLElement>(EDITOR_ROOT_SELECTOR)) {
+		if (nested.getAttribute("contenteditable") === "true" && within(nested)) return false;
+	}
+	return true;
+}

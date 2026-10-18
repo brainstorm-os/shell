@@ -79,6 +79,12 @@ const FALLBACK: Record<Hued, { text: string; highlight: string }> = {
 	[SwatchColor.Red]: { text: "#dd6058", highlight: "light-dark(#fbdbd7, #4d2926)" },
 };
 
+/** The baked tint behind a swatch (a `light-dark()` pair) — also what an
+ *  exported page with no app stylesheet falls back to. */
+export function highlightFallback(color: SwatchColor): string | null {
+	return color === SwatchColor.Default ? null : FALLBACK[color].highlight;
+}
+
 function channel(target: ColorTarget): "text" | "highlight" {
 	return target === ColorTarget.Text ? "text" : "highlight";
 }

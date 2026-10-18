@@ -37,7 +37,7 @@ import { useEditorT } from "../i18n";
 import { GripIcon, PlusIcon } from "../icons";
 import { getAllBlocks } from "../top-level-block";
 import { openBlockActionMenu } from "./block-action-menu";
-import { gutterAnchor } from "./block-gutter-anchor";
+import { gutterAnchor, gutterOwnsPointer } from "./block-gutter-anchor";
 import { moveBlocksTo } from "./block-ops";
 import { useBlockSelectionStore } from "./block-selection-plugin";
 import { useEditorShortcut } from "./editor-shortcut";
@@ -137,6 +137,8 @@ export function BlockGutterPlugin({
 		}
 
 		function compute(event: MouseEvent): HoverState | null {
+			const current = editor.getRootElement();
+			if (current && !gutterOwnsPointer(current, event.clientY)) return null;
 			const next = findHoveredBlock(editor, event.clientY);
 			if (!next) return null;
 			return positionFor(next);

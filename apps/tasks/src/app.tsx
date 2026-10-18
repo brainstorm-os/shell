@@ -22,7 +22,11 @@
  *     `DEMO_TASKS` / `DEMO_PROJECTS`; mutations patch the local snapshot.
  */
 
-import { getEntityTitle, subscribeEntityTitles } from "@brainstorm-os/editor";
+import {
+	RichTextPropertyEditor,
+	getEntityTitle,
+	subscribeEntityTitles,
+} from "@brainstorm-os/editor";
 import { type LiveEntitiesSource, useLiveEntities } from "@brainstorm-os/react-yjs";
 import type { Icon, Intent } from "@brainstorm-os/sdk-types";
 import { IconName, Icon as IconView } from "@brainstorm-os/sdk/icon";
@@ -2214,6 +2218,7 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 				</div>
 				{propertiesSvc && openTaskRecord ? (
 					<PropertiesProvider
+						richTextEditor={RichTextPropertyEditor}
 						runtime={{ services: { properties: propertiesSvc } }}
 						entityTitleSource={entityTitleSource}
 					>

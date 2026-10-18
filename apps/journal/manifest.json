@@ -16,6 +16,7 @@
     "entities.write:brainstorm/Comment/v1",
     "entities.write:brainstorm/Object/v1",
     "entities.write:brainstorm/List/v1",
+    "entities.write:brainstorm/Task/v1",
     "intents.dispatch:open",
     "intents.dispatch:compose",
     "notifications.post",

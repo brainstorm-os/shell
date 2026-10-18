@@ -43,6 +43,7 @@ import { createInsertBlockActions } from "./insert-menu";
 import { ListMarkdownShortcutsPlugin } from "./list-markdown-shortcuts-plugin";
 import { SlashMenuPlugin } from "./slash-menu-plugin";
 import { TablesPlugin } from "./table-plugin";
+import { TabsPlugin } from "./tabs-plugin";
 import { TogglePlugin } from "./toggle-plugin";
 import { TurnIntoPlugin } from "./turn-into-plugin";
 
@@ -112,6 +113,7 @@ export function StandardEditingPlugins({
 			<TablesPlugin />
 			<TogglePlugin {...(docId ? { docId } : {})} />
 			<ColumnsPlugin />
+			<TabsPlugin />
 			<BlockGutterPlugin
 				commands={actions}
 				insertCommands={commands}

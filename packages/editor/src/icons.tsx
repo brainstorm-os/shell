@@ -47,6 +47,7 @@ import {
 	MusicNote,
 	PaintBucket,
 	Paragraph,
+	PencilSimple,
 	Plus,
 	Quotes,
 	Rows,
@@ -55,6 +56,7 @@ import {
 	SortAscending,
 	SortDescending,
 	Table,
+	Tabs,
 	TextAa,
 	TextAlignCenter,
 	TextAlignJustify,
@@ -359,4 +361,12 @@ export function TaskIcon(): ReactNode {
 
 export function TurnIntoPageIcon(): ReactNode {
 	return <FileArrowUp size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function TabsIcon(): ReactNode {
+	return <Tabs size={SIZE} aria-hidden focusable={false} />;
+}
+
+export function RenameIcon(): ReactNode {
+	return <PencilSimple size={SIZE} aria-hidden focusable={false} />;
 }

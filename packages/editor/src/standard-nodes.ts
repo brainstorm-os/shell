@@ -24,8 +24,10 @@ import { ColumnNode, ColumnsNode } from "./nodes/columns-node";
 import { DateMentionNode } from "./nodes/date-mention-node";
 import { FileBlockNode } from "./nodes/file-block-node";
 import { ImageBlockNode } from "./nodes/image-block-node";
+import { InlineImageNode } from "./nodes/inline-image-node";
 import { InlineTransclusionNode } from "./nodes/inline-transclusion-node";
 import { MentionNode } from "./nodes/mention-node";
+import { TabPaneNode, TabsNode } from "./nodes/tabs-node";
 import { ToggleNode } from "./nodes/toggle-node";
 import { TransclusionNode } from "./nodes/transclusion-node";
 import { VideoBlockNode } from "./nodes/video-block-node";
@@ -38,6 +40,8 @@ export const STANDARD_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	ToggleNode,
 	ColumnsNode,
 	ColumnNode,
+	TabsNode,
+	TabPaneNode,
 	TableNode,
 	TableRowNode,
 	TableCellNode,
@@ -50,6 +54,7 @@ export const STANDARD_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
  *  device authored even when its own `media` flag is off. */
 export const MEDIA_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	ImageBlockNode,
+	InlineImageNode,
 	VideoBlockNode,
 	AudioBlockNode,
 	FileBlockNode,

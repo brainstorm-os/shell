@@ -91,4 +91,12 @@ describe("apps/journal/manifest.json", () => {
 			entityType: "io.brainstorm.journal/Entry/v1",
 		});
 	});
+
+	it("requests narrowly-scoped Task write — `/task` in the day body creates + completes a Task/v1 (B11.24)", () => {
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		const caps = result.manifest.capabilities;
+		expect(caps).toContain("entities.write:brainstorm/Task/v1");
+		expect(caps).not.toContain("entities.write:*");
+	});
 });

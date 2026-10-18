@@ -14,6 +14,7 @@
  * reused from `preview.ts` rather than re-declared.
  */
 
+import { blockBackgroundExportCss } from "./block-background";
 import { type SerializedEditorStateLike, type SerializedNode, TextFormat } from "./preview";
 
 /** URL schemes safe to keep in an exported `href`/`src`. Anything else (incl.
@@ -45,6 +46,10 @@ function safeUrl(raw: string): string | null {
 	return escapeHtml(url);
 }
 
+function clampPercent(value: number): number {
+	return Number.isFinite(value) ? Math.min(100, Math.max(10, Math.round(value))) : 100;
+}
+
 function renderText(node: SerializedNode): string {
 	const text = str(node.text);
 	if (text === "") return "";
@@ -62,22 +67,28 @@ function renderChildren(node: SerializedNode): string {
 	return asNodes(node.children).map(renderNode).join("");
 }
 
+/** ` style="…"` for a block's stored background (B11.23), or "". */
+function blockStyleAttr(node: SerializedNode): string {
+	const css = blockBackgroundExportCss(node.style);
+	return css ? ` style="${escapeHtml(css)}"` : "";
+}
+
 function renderNode(node: SerializedNode): string {
 	switch (str(node.type)) {
 		case "paragraph":
-			return `<p>${renderChildren(node)}</p>`;
+			return `<p${blockStyleAttr(node)}>${renderChildren(node)}</p>`;
 		case "heading": {
 			const tag = ["h1", "h2", "h3", "h4", "h5", "h6"].includes(str(node.tag)) ? str(node.tag) : "h2";
-			return `<${tag}>${renderChildren(node)}</${tag}>`;
+			return `<${tag}${blockStyleAttr(node)}>${renderChildren(node)}</${tag}>`;
 		}
 		case "quote":
-			return `<blockquote>${renderChildren(node)}</blockquote>`;
+			return `<blockquote${blockStyleAttr(node)}>${renderChildren(node)}</blockquote>`;
 		case "list": {
 			const tag = str(node.listType) === "number" ? "ol" : "ul";
 			return `<${tag}>${renderChildren(node)}</${tag}>`;
 		}
 		case "listitem":
-			return `<li>${renderChildren(node)}</li>`;
+			return `<li${blockStyleAttr(node)}>${renderChildren(node)}</li>`;
 		case "link":
 		case "autolink": {
 			const href = safeUrl(str(node.url));
@@ -100,6 +111,34 @@ function renderNode(node: SerializedNode): string {
 			const caption = str(node.caption);
 			const fig = `<img src="${src}" alt="${alt}" />`;
 			return caption ? `<figure>${fig}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : fig;
+		}
+		case "tabs":
+			// No portable tab widget: every pane renders in order under its
+			// title, so nothing hidden behind an inactive tab is lost.
+			return `<div>${asNodes(node.children)
+				.filter((pane) => str(pane.type) === "tab-pane")
+				.map(
+					(pane) => `<section><h3>${escapeHtml(str(pane.title))}</h3>${renderChildren(pane)}</section>`,
+				)
+				.join("")}</div>`;
+		case "image-block": {
+			const src = safeUrl(str(node.src));
+			if (!src) return "";
+			const alt = escapeHtml(str(node.alt));
+			const width = typeof node.widthPercent === "number" ? clampPercent(node.widthPercent) : 100;
+			const style = width < 100 ? ` style="width:${width}%"` : "";
+			const caption = str(node.caption);
+			const fig = `<img src="${src}" alt="${alt}"${style} />`;
+			return `<figure>${fig}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
+		}
+		case "inline-image": {
+			const src = safeUrl(str(node.src));
+			if (!src) return "";
+			const height =
+				typeof node.heightEm === "number" && Number.isFinite(node.heightEm)
+					? Math.min(4, Math.max(0.75, node.heightEm))
+					: 1.25;
+			return `<img src="${src}" alt="${escapeHtml(str(node.alt))}" style="height:${height}em;vertical-align:text-bottom" />`;
 		}
 		default:
 			// Unknown / decorator nodes (mentions, embeds, equations…) have no

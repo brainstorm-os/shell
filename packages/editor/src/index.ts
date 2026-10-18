@@ -117,10 +117,12 @@ export {
 	BackgroundSwatch,
 	BlockBackgroundPlugin,
 	applyBlockBackground,
+	blockBackgroundExportCss,
 	blockBackgroundToken,
 	createBlockBackgroundActions,
 	readBlockBackground,
 	registerBlockBackground,
+	serializedStateWithBlockStyles,
 	swatchLabel,
 	withBlockBackground,
 } from "./block-background";
@@ -215,6 +217,7 @@ export {
 	VideoIcon,
 } from "./icons";
 export { ColumnsPlugin, INSERT_COLUMNS_COMMAND } from "./plugins/columns-plugin";
+export { INSERT_TABS_COMMAND, TabsPlugin } from "./plugins/tabs-plugin";
 export { EditablePlugin, type EditablePluginProps } from "./plugins/editable-plugin";
 export { InitialFocusPlugin } from "./plugins/initial-focus-plugin";
 export { TablesPlugin } from "./plugins/table-plugin";
@@ -295,6 +298,22 @@ export {
 	type SerializedImageBlockNode,
 } from "./nodes/image-block-node";
 export {
+	$createInlineImageNode,
+	$isInlineImageNode,
+	DEFAULT_INLINE_IMAGE_HEIGHT_EM,
+	INLINE_IMAGE_TYPE,
+	InlineImageNode,
+	type SerializedInlineImageNode,
+} from "./nodes/inline-image-node";
+export {
+	VaultMediaFilter,
+	type VaultMedia,
+	filterVaultMedia,
+	isImageMime,
+	vaultMediaFromEntity,
+} from "./vault-media";
+export { openVaultMediaPicker, type VaultMediaPick } from "./vault-media-picker";
+export {
 	$createVideoBlockNode,
 	$isVideoBlockNode,
 	VIDEO_BLOCK_TYPE,
@@ -322,6 +341,7 @@ export {
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
+	editorEntitiesHost,
 	getEditorHost,
 	setEditorHost,
 } from "./plugins/editor-host";
@@ -520,6 +540,18 @@ export {
 	type SerializedColumnNode,
 	type SerializedColumnsNode,
 } from "./nodes/columns-node";
+export {
+	$createTabPaneNode,
+	$createTabsNode,
+	$isTabPaneNode,
+	$isTabsNode,
+	type SerializedTabPaneNode,
+	type SerializedTabsNode,
+	TAB_PANE_NODE_TYPE,
+	TABS_NODE_TYPE,
+	TabPaneNode,
+	TabsNode,
+} from "./nodes/tabs-node";
 export {
 	$createTitleNode,
 	$isTitleNode,

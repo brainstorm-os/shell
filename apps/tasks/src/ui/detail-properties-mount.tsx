@@ -15,6 +15,7 @@
  * the caller simply skips the block.
  */
 
+import { RichTextPropertyEditor } from "@brainstorm-os/editor";
 import type { PropertiesService } from "@brainstorm-os/sdk-types";
 import { PropertiesPanel } from "@brainstorm-os/sdk/properties-panel";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
@@ -64,6 +65,7 @@ export function mountTaskDetailProperties(
 	const render = (next: Task): void => {
 		root.render(
 			<PropertiesProvider
+				richTextEditor={RichTextPropertyEditor}
 				runtime={{ services: { properties: deps.properties } }}
 				entityTitleSource={deps.entityTitleSource}
 			>

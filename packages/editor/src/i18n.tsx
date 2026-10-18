@@ -259,6 +259,17 @@ export type EditorI18nKey =
 	// Media block commands (createMediaBlockCommands) + the click-to-edit
 	// inspector (MediaInspectorPlugin). Surfaced when the host enables the
 	// `media` flag on `<FullEditorPlugins>` and wires `uploadFile`.
+	| "editor.block.tabs"
+	| "editor.block.tabs.description"
+	| "editor.tabs.region"
+	| "editor.tabs.defaultTitle"
+	| "editor.tabs.add"
+	| "editor.tabs.menu"
+	| "editor.tabs.rename"
+	| "editor.tabs.renameLabel"
+	| "editor.tabs.moveLeft"
+	| "editor.tabs.moveRight"
+	| "editor.tabs.delete"
 	| "editor.media.image"
 	| "editor.media.image.description"
 	| "editor.media.video"
@@ -267,6 +278,19 @@ export type EditorI18nKey =
 	| "editor.media.audio.description"
 	| "editor.media.file"
 	| "editor.media.file.description"
+	| "editor.media.imageFromVault"
+	| "editor.media.imageFromVault.description"
+	| "editor.media.inlineImage"
+	| "editor.media.inlineImage.description"
+	| "editor.media.fileFromVault"
+	| "editor.media.fileFromVault.description"
+	| "editor.media.vault.region"
+	| "editor.media.vault.placeholder"
+	| "editor.media.vault.placeholderImage"
+	| "editor.media.vault.empty"
+	| "editor.media.vault.emptyImages"
+	| "editor.media.vault.noResults"
+	| "editor.media.resize"
 	| "editor.media.inspector.region"
 	| "editor.media.inspector.altLabel"
 	| "editor.media.inspector.altPlaceholder"
@@ -490,6 +514,17 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.rightPanel.properties": "Properties",
 	"editor.rightPanel.comments": "Comments",
 	"editor.rightPanel.history": "History",
+	"editor.block.tabs": "Tabs",
+	"editor.block.tabs.description": "Switch between panes of content",
+	"editor.tabs.region": "Tabs",
+	"editor.tabs.defaultTitle": "Tab {n}",
+	"editor.tabs.add": "Add tab",
+	"editor.tabs.menu": "Tab options",
+	"editor.tabs.rename": "Rename",
+	"editor.tabs.renameLabel": "Tab name",
+	"editor.tabs.moveLeft": "Move left",
+	"editor.tabs.moveRight": "Move right",
+	"editor.tabs.delete": "Delete tab",
 	"editor.media.image": "Image",
 	"editor.media.image.description": "Upload or embed an image",
 	"editor.media.video": "Video",
@@ -498,6 +533,19 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.media.audio.description": "Upload an audio clip",
 	"editor.media.file": "File",
 	"editor.media.file.description": "Attach any file as a download",
+	"editor.media.imageFromVault": "Image from vault",
+	"editor.media.imageFromVault.description": "Reuse an image already in your vault",
+	"editor.media.inlineImage": "Inline image",
+	"editor.media.inlineImage.description": "A small vault image inside a line of text",
+	"editor.media.fileFromVault": "File from vault",
+	"editor.media.fileFromVault.description": "Attach a file already in your vault",
+	"editor.media.vault.region": "Choose from vault",
+	"editor.media.vault.placeholder": "Search vault files…",
+	"editor.media.vault.placeholderImage": "Search vault images…",
+	"editor.media.vault.empty": "No files in your vault yet",
+	"editor.media.vault.emptyImages": "No images in your vault yet",
+	"editor.media.vault.noResults": "No files match “{query}”",
+	"editor.media.resize": "Resize image",
 	"editor.media.inspector.region": "Media settings",
 	"editor.media.inspector.altLabel": "Alt text",
 	"editor.media.inspector.altPlaceholder": "Describe the image",

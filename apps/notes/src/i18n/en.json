@@ -440,5 +440,13 @@
   "notes.history.restoring": "Restoring…",
   "notes.history.restoreFailed": "Couldn't restore this version.",
   "notes.history.restored": "Version restored. You can undo it from History.",
-  "notes.history.previewFailed": "Couldn't load this version."
+  "notes.history.previewFailed": "Couldn't load this version.",
+  "notes.outline.show": "Show outline",
+  "notes.outline.hide": "Hide outline",
+  "notes.outline.region": "Outline",
+  "notes.outline.list": "Headings in this note",
+  "notes.outline.emptyTitle": "No headings yet",
+  "notes.outline.emptyHint": "Add headings to this note to build its outline.",
+  "notes.outline.noNoteTitle": "No note open",
+  "notes.outline.noNoteHint": "Open a note to see its outline."
 }
