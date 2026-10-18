@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatApp } from "./app";
 import { CHANNEL_TYPE, MESSAGE_TYPE } from "./logic/chat";
 import { READ_WATERMARKS_KEY } from "./logic/unread";
+import { USER_STATE_TYPE } from "./logic/user-state";
+import { USER_STATE_WRITE_DEBOUNCE_MS } from "./use-user-state";
 
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
@@ -35,6 +37,7 @@ const created: { type: string; properties: Record<string, unknown> }[] = [];
 type StorageStub = {
 	get: (key: string) => Promise<unknown>;
 	put: (key: string, value: unknown) => Promise<void>;
+	delete?: (key: string) => Promise<void>;
 };
 
 /** 7.14 — records the app-icon badge mirror (`services.ui.badge`). */
@@ -48,7 +51,11 @@ const approveProposal = vi.fn(() =>
 const discardProposal = vi.fn(() => Promise.resolve({ ok: true, status: "discarded" }));
 const dispatchIntent = vi.fn(() => Promise.resolve({ ok: true }));
 
-function installShell(entities: StubEntity[], storageOverride?: StorageStub): void {
+function installShell(
+	entities: StubEntity[],
+	storageOverride?: StorageStub,
+	extraServices: Record<string, unknown> = {},
+): void {
 	created.length = 0;
 	badgeSet.mockClear();
 	approveProposal.mockClear();
@@ -74,6 +81,7 @@ function installShell(entities: StubEntity[], storageOverride?: StorageStub): vo
 				update: vi.fn(() => Promise.resolve(null)),
 				delete: vi.fn(() => Promise.resolve(null)),
 			},
+			...extraServices,
 			storage: storageOverride ?? {
 				get: (key: string) => Promise.resolve(kv.get(key) ?? null),
 				put: (key: string, value: unknown) => {
@@ -106,8 +114,12 @@ function message(id: string, channelId: string, name: string, body: string): Stu
 let container: HTMLElement;
 let root: Root;
 
-async function mount(entities: StubEntity[], storageOverride?: StorageStub): Promise<void> {
-	installShell(entities, storageOverride);
+async function mount(
+	entities: StubEntity[],
+	storageOverride?: StorageStub,
+	extraServices?: Record<string, unknown>,
+): Promise<void> {
+	installShell(entities, storageOverride, extraServices);
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -506,5 +518,503 @@ describe("ChatApp — app-icon unread badge (7.14)", () => {
 		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
 		// The baseline ack persisted, so the next arrival counts from here.
 		expect(kv.get(READ_WATERMARKS_KEY)).toMatchObject({ c2: 3 });
+	});
+});
+
+function pressChord(key: string, mods: { cmdOrCtrl?: boolean; shift?: boolean } = {}): void {
+	const isMac = /mac|iphone|ipad/i.test(navigator.platform ?? navigator.userAgent);
+	act(() => {
+		window.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key,
+				bubbles: true,
+				metaKey: !!mods.cmdOrCtrl && isMac,
+				ctrlKey: !!mods.cmdOrCtrl && !isMac,
+				shiftKey: !!mods.shift,
+			}),
+		);
+	});
+}
+
+function typeInput(input: HTMLInputElement, value: string): void {
+	const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+	act(() => {
+		setter?.call(input, value);
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
+}
+
+describe("ChatApp — message search (Chats-1)", () => {
+	const seed = (): StubEntity[] => [
+		channel("c1", "general"),
+		channel("c2", "design"),
+		message("m1", "c1", "Mira", "kickoff at noon"),
+		message("m2", "c2", "Mira", "the launch banner is ready"),
+	];
+
+	it("opens from the header, searches across channels, and jumps to + flashes the hit", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			await mount(seed());
+			const toggle = container.querySelector('[data-testid="search-toggle"]') as HTMLButtonElement;
+			await act(async () => toggle.click());
+			expect(container.querySelector('[data-testid="search-panel"]')).not.toBeNull();
+			expect(toggle.getAttribute("aria-pressed")).toBe("true");
+
+			const input = container.querySelector('[data-testid="search-input"]') as HTMLInputElement;
+			typeInput(input, "launch");
+			expect(container.querySelector('[data-testid="search-status"]')?.textContent).toBe(
+				"No messages match.",
+			);
+
+			await act(async () => {
+				(container.querySelector('[data-testid="search-scope-all"]') as HTMLButtonElement).click();
+			});
+			const hits = container.querySelectorAll(".chat__search-hit");
+			expect(hits).toHaveLength(1);
+			expect(hits[0]?.textContent).toContain("design");
+			expect(hits[0]?.textContent).toContain("launch banner");
+
+			await act(async () => (hits[0] as HTMLButtonElement).click());
+			expect(container.querySelector('[data-testid="active-channel"]')?.textContent).toContain(
+				"design",
+			);
+			const line = container.querySelector('[data-message-id="m2"]');
+			expect(line?.classList.contains("chat__line-wrap--flash")).toBe(true);
+			await act(async () => {
+				vi.advanceTimersByTime(3000);
+			});
+			expect(line?.classList.contains("chat__line-wrap--flash")).toBe(false);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("opens with CmdOrCtrl+F (this channel) and CmdOrCtrl+Shift+F (all), Escape closes", async () => {
+		await mount(seed());
+		pressChord("f", { cmdOrCtrl: true });
+		expect(
+			container.querySelector('[data-testid="search-scope-channel"]')?.getAttribute("aria-pressed"),
+		).toBe("true");
+		const input = container.querySelector('[data-testid="search-input"]') as HTMLInputElement;
+		act(() => {
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+		});
+		expect(container.querySelector('[data-testid="search-panel"]')).toBeNull();
+
+		pressChord("f", { cmdOrCtrl: true, shift: true });
+		expect(
+			container.querySelector('[data-testid="search-scope-all"]')?.getAttribute("aria-pressed"),
+		).toBe("true");
+	});
+});
+
+describe("ChatApp — read state that follows the user (Chats-2)", () => {
+	const SELF = { pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" };
+	const roster = {
+		self: vi.fn(() => Promise.resolve(SELF)),
+		members: vi.fn(() => Promise.resolve([])),
+	};
+
+	function kvStub(seed: Record<string, unknown>): { kv: Map<string, unknown>; stub: StorageStub } {
+		const kv = new Map<string, unknown>(Object.entries(seed));
+		return {
+			kv,
+			stub: {
+				get: (key) => Promise.resolve(kv.get(key) ?? null),
+				put: (key, value) => {
+					kv.set(key, value);
+					return Promise.resolve();
+				},
+				delete: (key: string) => {
+					kv.delete(key);
+					return Promise.resolve();
+				},
+			} as StorageStub,
+		};
+	}
+
+	function userStateRow(
+		id: string,
+		watermarks: Record<string, number>,
+		owner = "pk-me",
+	): StubEntity {
+		return {
+			id,
+			type: USER_STATE_TYPE,
+			properties: { owner, watermarks, updatedAt: "2026-06-20T09:00:00.000Z" },
+		};
+	}
+
+	async function settle(ms = USER_STATE_WRITE_DEBOUNCE_MS + 50): Promise<void> {
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, ms));
+		});
+	}
+
+	function services(): { entities: { update: ReturnType<typeof vi.fn> } } {
+		return (window as unknown as { brainstorm: { services: never } }).brainstorm.services;
+	}
+
+	it("migrates the device-local watermarks onto a synced per-user row, then drops the local key", async () => {
+		const { kv, stub } = kvStub({ [READ_WATERMARKS_KEY]: { c2: 0 } });
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m0", "c2", "Mira", "seen"),
+				message("m1", "c2", "Mira", "new"),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		const row = created.find((c) => c.type === USER_STATE_TYPE);
+		expect(row?.properties).toMatchObject({ owner: "pk-me", watermarks: { c1: -1, c2: 0 } });
+		expect(kv.has(READ_WATERMARKS_KEY)).toBe(false);
+	});
+
+	it("honours a watermark another device wrote — nothing it already read badges here", async () => {
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m1", "c2", "Mira", "read on my laptop"),
+				message("m2", "c2", "Mira", "arrived after"),
+				userStateRow("us-1", { c1: -1, c2: 1 }),
+				userStateRow("us-other", { c2: -1 }, "pk-someone-else"),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		const badge = [...container.querySelectorAll(".chat__channel")]
+			.find((b) => b.textContent?.includes("design"))
+			?.querySelector(".bs-count-badge");
+		expect(badge?.textContent).toBe("1");
+		expect(created.some((c) => c.type === USER_STATE_TYPE)).toBe(false);
+	});
+
+	it("marks every channel read from the channel context menu and the header menu", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				channel("c3", "random"),
+				message("m1", "c2", "Mira", "a"),
+				message("m2", "c3", "Mira", "b"),
+				userStateRow("us-1", { c1: -1, c2: 0, c3: 1 }),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 2 });
+
+		const design = [...container.querySelectorAll<HTMLButtonElement>(".chat__channel")].find((b) =>
+			b.textContent?.includes("design"),
+		);
+		open.mockClear();
+		act(() => {
+			design?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+		});
+		const items = open.mock.calls[0]?.[1] ?? [];
+		expect(items.map((i) => i.label)).toEqual(["Mark as read", "Mark all as read"]);
+		await act(async () => items[1]?.onSelect?.());
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+		expect(container.querySelector(".chat__channel .bs-count-badge")).toBeNull();
+		await settle();
+		expect(services().entities.update).toHaveBeenLastCalledWith(
+			"us-1",
+			expect.objectContaining({ watermarks: { c1: -1, c2: 1, c3: 2 } }),
+		);
+
+		open.mockClear();
+		act(() => {
+			(container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click();
+		});
+		const header = open.mock.calls[0]?.[1] ?? [];
+		const markAll = header.find((i) => i.label === "Mark all as read");
+		expect(markAll?.disabled).toBe(true);
+	});
+
+	it("Shift+Escape marks all as read", async () => {
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m1", "c2", "Mira", "a"),
+				userStateRow("us-1", { c1: -1, c2: 0 }),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		pressChord("Escape", { shift: true });
+		await act(async () => undefined);
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+	});
+});
+
+describe("ChatApp — composer expand + absolute timestamps (Chats-3)", () => {
+	it("expands and collapses the composer from its button and CmdOrCtrl+Shift+E", async () => {
+		await mount([channel("c1", "general")]);
+		const wrap = () => container.querySelector('[data-testid="composer"]') as HTMLElement;
+		const btn = container.querySelector('[data-testid="composer-expand"]') as HTMLButtonElement;
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(false);
+		await act(async () => btn.click());
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(true);
+		expect(btn.getAttribute("aria-pressed")).toBe("true");
+		pressChord("e", { cmdOrCtrl: true, shift: true });
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(false);
+	});
+
+	it("toggles full dates from the header menu and persists the preference", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const kv = new Map<string, unknown>();
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "hi")], {
+			get: (key) => Promise.resolve(kv.get(key) ?? null),
+			put: (key, value) => {
+				kv.set(key, value);
+				return Promise.resolve();
+			},
+		});
+		const time = () => container.querySelector(".chat__time")?.textContent ?? "";
+		expect(time()).not.toContain("2026");
+
+		open.mockClear();
+		act(() => (container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click());
+		const item = open.mock.calls[0]?.[1].find((i) => i.label === "Show full dates and times");
+		expect(item?.selected).toBe(false);
+		await act(async () => item?.onSelect?.());
+		expect(time()).toContain("2026");
+		expect(kv.get("chat:prefs")).toEqual({ absoluteTimestamps: true });
+	});
+
+	it("restores the persisted preference on the next launch", async () => {
+		const kv = new Map<string, unknown>([["chat:prefs", { absoluteTimestamps: true }]]);
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "hi")], {
+			get: (key) => Promise.resolve(kv.get(key) ?? null),
+			put: () => Promise.resolve(),
+		});
+		await act(async () => undefined);
+		expect(container.querySelector(".chat__time")?.textContent).toContain("2026");
+	});
+});
+
+describe("ChatApp — preferences follow the user (Chats-3)", () => {
+	it("reads the synced preference and writes a change back onto the per-user row", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const roster = {
+			self: vi.fn(() =>
+				Promise.resolve({ pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" }),
+			),
+			members: vi.fn(() => Promise.resolve([])),
+		};
+		await mount(
+			[
+				channel("c1", "general"),
+				message("m1", "c1", "Mira", "hi"),
+				{
+					id: "us-1",
+					type: USER_STATE_TYPE,
+					properties: {
+						owner: "pk-me",
+						watermarks: { c1: 1 },
+						prefs: { absoluteTimestamps: true },
+						updatedAt: "2026-06-20T09:00:00.000Z",
+					},
+				},
+			],
+			undefined,
+			{ roster },
+		);
+		await act(async () => undefined);
+		expect(container.querySelector(".chat__time")?.textContent).toContain("2026");
+
+		open.mockClear();
+		act(() => (container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click());
+		const item = open.mock.calls[0]?.[1].find((i) => i.label === "Show full dates and times");
+		expect(item?.selected).toBe(true);
+		await act(async () => item?.onSelect?.());
+		expect(container.querySelector(".chat__time")?.textContent).not.toContain("2026");
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, USER_STATE_WRITE_DEBOUNCE_MS + 50));
+		});
+		const update = (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities.update;
+		expect(update).toHaveBeenLastCalledWith(
+			"us-1",
+			expect.objectContaining({ owner: "pk-me", prefs: { absoluteTimestamps: false } }),
+		);
+	});
+});
+
+describe("ChatApp — pinned messages (Chats-4)", () => {
+	function entitiesSvc(): { update: ReturnType<typeof vi.fn> } {
+		return (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities;
+	}
+
+	it("pins from the message menu onto the channel row and marks the message", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "remember this")]);
+		open.mockClear();
+		act(() => {
+			(container.querySelector(".chat__line-more") as HTMLButtonElement).click();
+		});
+		const item = open.mock.calls[0]?.[1][0];
+		expect(item?.label).toBe("Pin message");
+		await act(async () => item?.onSelect?.());
+		expect(entitiesSvc().update).toHaveBeenCalledWith("c1", { pinned: ["m1"] });
+		expect(container.querySelector('[data-message-id="m1"] .chat__line-pin')).not.toBeNull();
+
+		open.mockClear();
+		act(() => {
+			container
+				.querySelector('[data-message-id="m1"]')
+				?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+		});
+		expect(open.mock.calls[0]?.[1][0]?.label).toBe("Unpin message");
+	});
+
+	it("lists a channel's pins from the header and jumps to one", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const pinnedChannel = channel("c1", "general");
+		pinnedChannel.properties.pinned = ["m1", "missing"];
+		await mount([
+			pinnedChannel,
+			message("m1", "c1", "Mira", "the plan"),
+			message("m2", "c1", "Ben", "x"),
+		]);
+		const btn = container.querySelector('[data-testid="pins-toggle"]') as HTMLButtonElement;
+		expect(btn.getAttribute("aria-label")).toBe("1 pinned message");
+		open.mockClear();
+		act(() => btn.click());
+		const items = open.mock.calls[0]?.[1] ?? [];
+		expect(items.map((i) => i.label)).toEqual(["Mira: the plan"]);
+		await act(async () => items[0]?.onSelect?.());
+		expect(
+			container.querySelector('[data-message-id="m1"]')?.classList.contains("chat__line-wrap--flash"),
+		).toBe(true);
+	});
+
+	it("disables the pins button with no channel open (and says why)", async () => {
+		await mount([]);
+		const btn = container.querySelector('[data-testid="pins-toggle"]') as HTMLButtonElement;
+		expect(btn.disabled).toBe(true);
+		expect(btn.title).toBe("Open a channel to see its pinned messages");
+	});
+});
+
+describe("ChatApp — typing indicator over presence (Chats-4)", () => {
+	function presenceShell(): {
+		services: Record<string, unknown>;
+		publish: ReturnType<typeof vi.fn>;
+		push: (peers: { clientId: number; state: Record<string, unknown> }[]) => void;
+	} {
+		const publish = vi.fn(() => Promise.resolve());
+		let cb: ((peers: { clientId: number; state: Record<string, unknown> }[]) => void) | null = null;
+		return {
+			publish,
+			push: (peers) => cb?.(peers),
+			services: {
+				presence: { publish, untrack: vi.fn(() => Promise.resolve()) },
+				roster: {
+					self: vi.fn(() =>
+						Promise.resolve({ pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" }),
+					),
+					members: vi.fn(() => Promise.resolve([])),
+				},
+				__onPeers: (_id: string, c: typeof cb) => {
+					cb = c;
+					return () => {};
+				},
+			},
+		};
+	}
+
+	async function mountWithPresence(): Promise<ReturnType<typeof presenceShell>> {
+		const shell = presenceShell();
+		installShell([channel("c1", "general")], undefined, shell.services);
+		const bs = (window as unknown as { brainstorm: Record<string, unknown> }).brainstorm;
+		bs.presence = { onPeers: shell.services.__onPeers };
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		await act(async () => root.render(<ChatApp />));
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+		return shell;
+	}
+
+	const lastActivity = (publish: ReturnType<typeof vi.fn>): unknown =>
+		(
+			publish.mock.calls[publish.mock.calls.length - 1]?.[0] as {
+				state: { presence?: { activity?: string } } | null;
+			}
+		)?.state?.presence?.activity;
+
+	it("publishes typing once per burst, clears it after the idle window, never writes an entity", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			const shell = await mountWithPresence();
+			expect(lastActivity(shell.publish)).toBeUndefined();
+			typeComposer("h");
+			expect(lastActivity(shell.publish)).toBe("typing");
+			const afterFirst = shell.publish.mock.calls.length;
+			typeComposer("he");
+			typeComposer("hel");
+			expect(shell.publish.mock.calls.length).toBe(afterFirst);
+			await act(async () => {
+				vi.advanceTimersByTime(4100);
+			});
+			expect(lastActivity(shell.publish)).toBeUndefined();
+			expect(created.filter((c) => c.type !== USER_STATE_TYPE)).toHaveLength(0);
+			expect(JSON.stringify(created)).not.toContain("typing");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("shows who else is typing in the channel", async () => {
+		const shell = await mountWithPresence();
+		await act(async () => {
+			shell.push([
+				{
+					clientId: 7,
+					state: { presence: { id: "pk-ada", name: "Ada", color: "#000", activity: "typing" } },
+				},
+				{
+					clientId: 8,
+					state: { presence: { id: "pk-me", name: "Me", color: "#000", activity: "typing" } },
+				},
+			]);
+		});
+		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("Ada is typing…");
+		await act(async () => {
+			shell.push([{ clientId: 7, state: { presence: { id: "pk-ada", name: "Ada", color: "#000" } } }]);
+		});
+		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("");
 	});
 });

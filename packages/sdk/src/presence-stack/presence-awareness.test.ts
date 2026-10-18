@@ -6,9 +6,28 @@ import {
 	buildLocalPresence,
 	peerFromState,
 } from "./presence-awareness";
+import { PresenceActivity } from "./presence-stack";
 
 const payload = (id: string, name: string, color = "#2f6df6", avatarRef?: string) => ({
 	[PRESENCE_STATE_KEY]: { id, name, color, ...(avatarRef ? { avatarRef } : {}) },
+});
+
+describe("presence activity (Chats-4)", () => {
+	const self = { pubkey: "pk", displayName: "Ada", fingerprint: "fp" };
+
+	it("round-trips a known activity through the payload", () => {
+		const built = buildLocalPresence(self, 3, PresenceActivity.Typing);
+		expect(built.activity).toBe(PresenceActivity.Typing);
+		expect(peerFromState({ [PRESENCE_STATE_KEY]: built })?.activity).toBe(PresenceActivity.Typing);
+	});
+
+	it("omits activity when idle and drops an unknown one from a peer", () => {
+		expect("activity" in buildLocalPresence(self, 3, null)).toBe(false);
+		const peer = peerFromState({
+			[PRESENCE_STATE_KEY]: { id: "u1", name: "A", color: "#000", activity: "<script>" },
+		});
+		expect(peer).toEqual({ id: "u1", name: "A", color: "#000" });
+	});
 });
 
 describe("peerFromState", () => {

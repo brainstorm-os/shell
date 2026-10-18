@@ -13,6 +13,8 @@
  *   - `name` / `color` — resolved by the publisher (roster displayName +
  *     `peerColor`); this side trusts them (it's the member's own device).
  *   - `avatarRef?` — `brainstorm://asset/…`.
+ *   - `activity?` — a {@link PresenceActivity} (e.g. typing); unknown values
+ *     are dropped on read.
  * A state with no valid `presence` payload (a peer that only publishes a
  * cursor, say) contributes no avatar — it's skipped, not rendered blank.
  *
@@ -21,7 +23,9 @@
  */
 
 import { peerColor } from "../peer-presence";
-import type { PresencePeer } from "./presence-stack";
+import { PresenceActivity, type PresencePeer } from "./presence-stack";
+
+const ACTIVITIES: ReadonlySet<string> = new Set(Object.values(PresenceActivity));
 
 /** The awareness field a client publishes its stack presence under. */
 export const PRESENCE_STATE_KEY = "presence";
@@ -47,12 +51,20 @@ export type PresenceSelf = {
  * client id via `peerColor` (so a member's two tabs get distinct caret hues,
  * while `capPresence` still collapses them to one avatar by `id`).
  */
-export function buildLocalPresence(self: PresenceSelf, clientId: number): PresencePeer {
+export function buildLocalPresence(
+	self: PresenceSelf,
+	clientId: number,
+	activity?: PresenceActivity | null,
+): PresencePeer {
 	const name = self.displayName.trim() || self.fingerprint;
 	const color = peerColor(clientId);
-	return self.avatarRef
-		? { id: self.pubkey, name, color, avatarRef: self.avatarRef }
-		: { id: self.pubkey, name, color };
+	return {
+		id: self.pubkey,
+		name,
+		color,
+		...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
+		...(activity ? { activity } : {}),
+	};
 }
 
 function readString(o: Record<string, unknown>, key: string): string | null {
@@ -71,7 +83,14 @@ export function peerFromState(state: unknown): PresencePeer | null {
 	const color = readString(p, "color");
 	if (!id || !name || !color) return null;
 	const avatarRef = readString(p, "avatarRef");
-	return avatarRef ? { id, name, color, avatarRef } : { id, name, color };
+	const activity = readString(p, "activity");
+	return {
+		id,
+		name,
+		color,
+		...(avatarRef ? { avatarRef } : {}),
+		...(activity && ACTIVITIES.has(activity) ? { activity: activity as PresenceActivity } : {}),
+	};
 }
 
 /**

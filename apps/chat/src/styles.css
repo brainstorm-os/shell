@@ -679,3 +679,185 @@ body {
 	color: var(--text-dim);
 }
 
+
+/* ── message search (Chats-1) ─────────────────────────────────── */
+.chat__search {
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	max-height: 45%;
+	min-height: 0;
+	border-bottom: 1px solid var(--border-subtle);
+	background: var(--bg-subtle);
+}
+
+.chat__search-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 18px;
+}
+
+.chat__search-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.chat__search-status {
+	margin: 0;
+	padding: 0 18px var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text-faint);
+}
+
+.chat__search-results {
+	list-style: none;
+	margin: 0;
+	padding: 0 6px 6px;
+	overflow-y: auto;
+	min-height: 0;
+}
+
+.chat__search-hit {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	padding: 6px 12px;
+	border: none;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.chat__search-hit:hover,
+.chat__search-hit:focus-visible {
+	background: var(--hover);
+}
+
+.chat__search-hit-meta {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+}
+
+.chat__search-hit-channel {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.chat__search-hit-time {
+	margin-left: auto;
+	color: var(--text-faint);
+}
+
+.chat__search-hit-snippet {
+	font-size: var(--text-size-md);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* A search jump target pulses an accent wash, then fades back. */
+.chat__line-wrap {
+	border-radius: var(--radius-sm);
+	transition: background 600ms ease;
+}
+
+.chat__line-wrap--flash {
+	background: var(--accent-soft);
+	transition: none;
+}
+
+/* ── unread (Chats-2) ─────────────────────────────────────────── */
+.chat__channel--unread {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.chat__channel-badge {
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+/* ── composer expand (Chats-3) ────────────────────────────────── */
+.chat__composer-expand {
+	flex: 0 0 auto;
+	width: 40px;
+	height: 40px;
+}
+
+.chat__composer-wrap--expanded .chat__composer {
+	align-items: stretch;
+}
+
+.chat__composer-wrap--expanded .chat__composer-input {
+	min-height: 30vh;
+	max-height: 55vh;
+}
+
+.chat__composer-wrap--expanded .chat__composer-expand,
+.chat__composer-wrap--expanded .chat__send,
+.chat__composer-wrap--expanded .bs-composer-context__attach {
+	align-self: flex-end;
+}
+
+/* ── pins + typing (Chats-4) ──────────────────────────────────── */
+.chat__line-wrap {
+	position: relative;
+}
+
+.chat__line-wrap--pinned {
+	padding-left: 18px;
+}
+
+.chat__line-pin {
+	position: absolute;
+	left: 0;
+	top: 4px;
+	display: inline-flex;
+	color: var(--accent);
+}
+
+/* The per-message ⋯ surfaces on hover / keyboard focus only, so a quiet
+ * transcript stays quiet. */
+.chat__line-more {
+	position: absolute;
+	top: -2px;
+	right: 0;
+	width: 24px;
+	height: 24px;
+	opacity: 0;
+	background: var(--bg-elev);
+	border: 1px solid var(--border-subtle);
+}
+
+.chat__line-wrap:hover .chat__line-more,
+.chat__line-more:focus-visible,
+.chat__line-more[aria-expanded="true"] {
+	opacity: 1;
+}
+
+.chat__composer-wrap {
+	position: relative;
+}
+
+.chat__typing {
+	position: absolute;
+	bottom: 100%;
+	left: 18px;
+	right: 18px;
+	margin: 0;
+	padding: 2px 0;
+	font-size: var(--text-size-xs);
+	color: var(--text-faint);
+	pointer-events: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

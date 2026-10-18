@@ -1,4 +1,5 @@
 export {
+	PresenceActivity,
 	type PresencePeer,
 	type PresenceStackProps,
 	type PresenceSummary,

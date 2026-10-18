@@ -9,8 +9,10 @@
  * badges on first run; only messages that arrive after the app has seen a
  * channel count. Own messages (the local author's `personRef`) never count.
  *
- * Watermarks persist via the app-private `storage.kv` service (same home as
- * the local identity — see `identity.ts` for why not localStorage).
+ * Watermarks persist on the synced per-user entity (`user-state.ts`, Chats-2).
+ * The app-private `storage.kv` key below is the pre-Chats-2 device-local home:
+ * still read once as the migration source, and still the store when the host
+ * offers no roster/entities (standalone preview).
  */
 
 import { CHANNEL_TYPE, type EntityLike, MESSAGE_TYPE, toMessage } from "./chat";
@@ -60,19 +62,20 @@ export function channelMaxSeqs(entities: readonly EntityLike[]): Map<string, num
 	return maxes;
 }
 
-/** Count of messages from OTHER authors above their channel's watermark.
- *  A channel absent from `marks` contributes 0 — it hasn't been observed
- *  yet; the first-observation ack (see `ackChannels`) baselines it. */
-export function unreadTotal(
+/** Per-channel count of messages from OTHER authors above that channel's
+ *  watermark. A channel absent from `marks` is omitted — it hasn't been
+ *  observed yet; the first-observation ack (see `ackChannels`) baselines it.
+ *  Channels with nothing unread are omitted too. */
+export function unreadByChannel(
 	entities: readonly EntityLike[],
 	selfRef: string,
 	marks: ReadWatermarks,
-): number {
+): Map<string, number> {
 	const channelIds = new Set<string>();
 	for (const e of entities) {
 		if (e.type === CHANNEL_TYPE) channelIds.add(e.id);
 	}
-	let total = 0;
+	const counts = new Map<string, number>();
 	for (const e of entities) {
 		if (e.type !== MESSAGE_TYPE) continue;
 		const m = toMessage(e);
@@ -80,8 +83,19 @@ export function unreadTotal(
 		if (m.authorRef === selfRef) continue;
 		const mark = marks[m.channelId];
 		if (mark === undefined) continue;
-		if (m.seq > mark) total += 1;
+		if (m.seq > mark) counts.set(m.channelId, (counts.get(m.channelId) ?? 0) + 1);
 	}
+	return counts;
+}
+
+/** Total of {@link unreadByChannel} — the app-icon badge count. */
+export function unreadTotal(
+	entities: readonly EntityLike[],
+	selfRef: string,
+	marks: ReadWatermarks,
+): number {
+	let total = 0;
+	for (const n of unreadByChannel(entities, selfRef, marks).values()) total += n;
 	return total;
 }
 
