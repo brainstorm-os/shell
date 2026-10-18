@@ -374,7 +374,7 @@ import { getUiNotifyHost } from "./ui/notify-host";
 const damagedDocsNotified = new Set<string>();
 import { getOsBadgeAggregator } from "./ui/os-badge";
 import { makeOsNotifier } from "./ui/os-notification-host";
-import { type ComposedTray, getTrayHost } from "./ui/tray-host";
+import { type ComposedTray, TrayShellAction, getTrayHost } from "./ui/tray-host";
 import { makeUiServiceHandler } from "./ui/ui-service";
 import { AutoUpdateEngine } from "./update/auto-update-engine";
 import { createElectronAutoUpdater, isAutoUpdateSupported } from "./update/electron-auto-updater";
@@ -408,6 +408,13 @@ import { toExtractedText } from "./web/web-live-dom";
 import { createWebPrivacyRuntime } from "./web/web-privacy-runtime";
 import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
+import {
+	BackgroundPrefsStore,
+	DEFAULT_BACKGROUND_PREFS,
+	backgroundPrefsPath,
+	shouldQuitWhenAllWindowsClosed,
+	supportsCloseToTray,
+} from "./window/background-prefs";
 import { brainstormChromeOptions } from "./window/chrome-options";
 import { DockActivation, resolveDockActivation } from "./window/dashboard-activation";
 import { focusStealingDisabled, revealWindow, surfaceWindow } from "./window/reveal-window";
@@ -1473,6 +1480,8 @@ app.on("open-url", (event, url) => {
 
 let workers: WorkersHandle | null = null;
 let dashboardWindow: BrowserWindow | null = null;
+/** 7.16 — loaded in `whenReady`; `window-all-closed` reads its cache. */
+let backgroundPrefs: BackgroundPrefsStore | null = null;
 
 const FULLSCREEN_CHANNEL = "window:fullscreen-changed" as const;
 
@@ -6226,6 +6235,24 @@ void app.whenReady().then(async () => {
 		attachDashboardHosts(null);
 	});
 
+	// Bring the dashboard back: surface the live one, or recreate it after the
+	// user closed it (dock activation, the close-to-tray "Open" item).
+	function reopenDashboard(): void {
+		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+			surfaceWindow(dashboardWindow);
+			return;
+		}
+		dashboardWindow = createDashboardWindow();
+		registerAndTrack(dashboardWindow);
+		shortcuts.attach(dashboardWindow.webContents);
+		// Re-bind the prompt hosts. Without this a close/reopen left every
+		// dashboard-owned prompt pointing at a dead renderer: capability
+		// requests, OS-handoff consent, the open-with picker and tool
+		// approval all refused silently.
+		attachDashboardHosts(dashboardWindow.webContents);
+		wireDashboardLinkRouting(dashboardWindow.webContents);
+	}
+
 	// 7.8 — render the pure tray model into a single OS `Tray`. The host
 	// owns *what* the menu is; this owns the Electron object's lifecycle:
 	// created on the first publish, rebuilt on every change, destroyed
@@ -6255,6 +6282,15 @@ void app.whenReady().then(async () => {
 		tray.setToolTip(composed.tooltip);
 		const template = composed.entries.map((entry) => {
 			if (entry.kind === "separator") return { type: "separator" as const };
+			if (entry.kind === "shell") {
+				return {
+					label: entry.label,
+					click: () => {
+						if (entry.action === TrayShellAction.Quit) app.quit();
+						else reopenDashboard();
+					},
+				};
+			}
 			if (entry.kind === "header") return { label: entry.appId, enabled: false };
 			return {
 				label: entry.label,
@@ -6270,6 +6306,34 @@ void app.whenReady().then(async () => {
 		tray.setContextMenu(Menu.buildFromTemplate(template));
 	};
 	trayHost.setListener(renderTray);
+	// 7.16 — close to tray. While "Keep running in the background" is on (never
+	// on macOS, whose dock already keeps a windowless app alive), the tray
+	// always carries Open / Quit so the process is never unreachable.
+	const closeToTrayPrefs = new BackgroundPrefsStore(backgroundPrefsPath(app.getPath("userData")));
+	backgroundPrefs = closeToTrayPrefs;
+	const applyCloseToTray = (): void => {
+		const keep = supportsCloseToTray(process.platform) && closeToTrayPrefs.cached.keepRunning;
+		trayHost.setShellItems(
+			keep
+				? [
+						{ action: TrayShellAction.Open, label: "Open Brainstorm" },
+						{ action: TrayShellAction.Quit, label: "Quit Brainstorm" },
+					]
+				: [],
+		);
+	};
+	await closeToTrayPrefs.load();
+	applyCloseToTray();
+	ipcMain.handle("background:get-prefs", () => ({
+		supported: supportsCloseToTray(process.platform),
+		keepRunning: closeToTrayPrefs.cached.keepRunning,
+	}));
+	ipcMain.handle("background:set-prefs", async (_event, keepRunning: unknown) => {
+		if (typeof keepRunning !== "boolean") throw new Error("background:set-prefs: boolean expected");
+		await closeToTrayPrefs.set(keepRunning);
+		applyCloseToTray();
+		return { supported: supportsCloseToTray(process.platform), keepRunning };
+	});
 	// 7.14 follow-up — the OS dock/taskbar badge single owner: BOTH signals
 	// (notification unread via `dashboard-handlers.updateNotificationBadge`,
 	// app badges via the BadgeHost listener below) report to the aggregator,
@@ -6606,15 +6670,7 @@ void app.whenReady().then(async () => {
 		// parked; gating on it left the app running with only unreachable hidden
 		// windows and no way back to the dashboard.
 		if (decision.action === DockActivation.CreateDashboard) {
-			dashboardWindow = createDashboardWindow();
-			registerAndTrack(dashboardWindow);
-			shortcuts.attach(dashboardWindow.webContents);
-			// Re-bind the prompt hosts. Without this a close/reopen left every
-			// dashboard-owned prompt pointing at a dead renderer: capability
-			// requests, OS-handoff consent, the open-with picker and tool
-			// approval all refused silently.
-			attachDashboardHosts(dashboardWindow.webContents);
-			wireDashboardLinkRouting(dashboardWindow.webContents);
+			reopenDashboard();
 		} else if (dashboardWindow) {
 			surfaceWindow(dashboardWindow);
 		}
@@ -6622,7 +6678,12 @@ void app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-	if (!isMac) {
+	if (
+		shouldQuitWhenAllWindowsClosed(
+			process.platform,
+			backgroundPrefs?.cached ?? DEFAULT_BACKGROUND_PREFS,
+		)
+	) {
 		app.quit();
 	}
 });

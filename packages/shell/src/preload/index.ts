@@ -2120,6 +2120,15 @@ const confirmations = {
 	reset: (): Promise<number> => ipcRenderer.invoke("confirmations:reset"),
 };
 
+/** 7.16 — "Keep running in the background" (close to tray). App-global, not
+ *  per vault; `supported` is false on macOS, where the preference is moot. */
+export type BackgroundPrefsView = { supported: boolean; keepRunning: boolean };
+const background = {
+	getPrefs: (): Promise<BackgroundPrefsView> => ipcRenderer.invoke("background:get-prefs"),
+	setKeepRunning: (keepRunning: boolean): Promise<BackgroundPrefsView> =>
+		ipcRenderer.invoke("background:set-prefs", keepRunning),
+};
+
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
@@ -2162,6 +2171,7 @@ const brainstorm = {
 	help,
 	shortcuts,
 	confirmations,
+	background,
 	shellActions: { on: onShellAction },
 	capabilityPrompt: { on: onCapabilityPrompt, respond: respondCapabilityPrompt },
 	toolApprovalPrompt: { on: onToolApprovalPrompt, respond: respondToolApprovalPrompt },

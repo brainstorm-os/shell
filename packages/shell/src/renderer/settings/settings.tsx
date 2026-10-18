@@ -84,6 +84,7 @@ import {
 	SettingsGroup,
 	SettingsSection,
 } from "./sections";
+import { StartupSection } from "./startup-section";
 import { UpdatesSection } from "./updates-section";
 const SyncSection = lazy(() => import("./sync-section").then((m) => ({ default: m.SyncSection })));
 import "./settings.css";
@@ -580,7 +581,12 @@ function renderBody(
 }
 
 function GeneralBody() {
-	return <UpdatesSection />;
+	return (
+		<>
+			<StartupSection />
+			<UpdatesSection />
+		</>
+	);
 }
 
 function SecurityBody({ session }: { session: VaultSessionMeta | null }) {
