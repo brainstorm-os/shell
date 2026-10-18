@@ -15,11 +15,13 @@ import type {
 import type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
 	NotificationsState,
 	RegionalState,
+	StartupPage,
 } from "@brainstorm-os/protocol/shell-prefs";
 import {
 	type AutoUpdateState,
@@ -63,6 +65,7 @@ export { UpdateAvailability, UpdateChannel };
 export type {
 	ChromeState,
 	ClockPrefs,
+	DisplayPrefs,
 	DndPrefs,
 	LocaleState,
 	NotificationRecord,
@@ -484,6 +487,11 @@ export type DashboardSnapshot = {
 	regional: RegionalState;
 	/** Shell-interface settings: header-control visibility + clock options. */
 	chrome: ChromeState;
+	/** Settings → Appearance visibility preferences (12.18). Optional so a
+	 *  renderer newer than its main process degrades to the defaults. */
+	display?: DisplayPrefs;
+	/** 7.17 — what opens once after unlock. Optional for a stale main. */
+	startupPage?: StartupPage;
 	/** Notification preferences: OS-native toggle, DND, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped. */
@@ -1688,6 +1696,12 @@ const dashboard = {
 		ipcRenderer.invoke("dashboard:set-clock-prefs", partial),
 	/** Reset all interface (chrome) settings to defaults. */
 	resetChrome: (): Promise<void> => ipcRenderer.invoke("dashboard:reset-chrome"),
+	/** Set what opens once after unlock (7.17). */
+	setStartupPage: (page: StartupPage): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-startup-page", page),
+	/** Patch the Settings → Appearance visibility preferences (12.18). */
+	setDisplayPrefs: (partial: Partial<DisplayPrefs>): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-display-prefs", partial),
 	/** Toggle OS-native notifications. */
 	setNotificationsOsNative: (osNative: boolean): Promise<void> =>
 		ipcRenderer.invoke("dashboard:set-notifications-os-native", osNative),
@@ -2162,6 +2176,24 @@ function resolveAnalyticsDeviceId(): string {
 	}
 }
 
+/** 6.15 — remembered "Don't ask again" choices for the dashboard's own
+ *  confirm prompts, and the Settings reset that clears every app's. Kinds are
+ *  `ConfirmKind` values; main refuses to remember an irreversible one. */
+const confirmations = {
+	list: (): Promise<string[]> => ipcRenderer.invoke("confirmations:list"),
+	remember: (kind: string): Promise<boolean> => ipcRenderer.invoke("confirmations:remember", kind),
+	reset: (): Promise<number> => ipcRenderer.invoke("confirmations:reset"),
+};
+
+/** 7.16 — "Keep running in the background" (close to tray). App-global, not
+ *  per vault; `supported` is false on macOS, where the preference is moot. */
+export type BackgroundPrefsView = { supported: boolean; keepRunning: boolean };
+const background = {
+	getPrefs: (): Promise<BackgroundPrefsView> => ipcRenderer.invoke("background:get-prefs"),
+	setKeepRunning: (keepRunning: boolean): Promise<BackgroundPrefsView> =>
+		ipcRenderer.invoke("background:set-prefs", keepRunning),
+};
+
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
@@ -2205,6 +2237,8 @@ const brainstorm = {
 	feedback,
 	help,
 	shortcuts,
+	confirmations,
+	background,
 	shellActions: { on: onShellAction },
 	capabilityPrompt: { on: onCapabilityPrompt, respond: respondCapabilityPrompt },
 	toolApprovalPrompt: { on: onToolApprovalPrompt, respond: respondToolApprovalPrompt },

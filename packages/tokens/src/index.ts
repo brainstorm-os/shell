@@ -27,3 +27,4 @@ export {
 	themeCatalog,
 	themes,
 } from "./themes";
+export { DisplayAttribute, DisplayAttributeValue, higherContrastOverrides } from "./visibility";

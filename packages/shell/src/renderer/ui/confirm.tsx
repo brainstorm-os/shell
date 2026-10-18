@@ -17,12 +17,20 @@
  *       confirmVariant: ConfirmVariant.Destructive,
  *   });
  *   if (ok) doIt();
+ *
+ * 6.15 — pass `kind` to name the prompt. A REVERSIBLE kind
+ * (`canRememberConfirm`) adds a "Don't ask again" checkbox; once the user
+ * confirms with it ticked, later `confirm()` calls of that kind resolve `true`
+ * without a dialog until Settings → Interface → "Reset confirmations". An
+ * irreversible kind never shows the checkbox, and main refuses to store one.
  */
 
+import { type ConfirmKind, canRememberConfirm } from "@brainstorm-os/sdk-types";
 import { AnimatePresence } from "framer-motion";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { t } from "../i18n/t";
 import { Button, ButtonVariant } from "./button";
+import { Checkbox } from "./checkbox";
 import { Popover } from "./popover";
 import { PopoverBodyPadding, PopoverSize } from "./popover-types";
 
@@ -39,6 +47,8 @@ export type ConfirmParams = {
 	confirmVariant?: ConfirmVariant;
 	/** Hide the cancel button (rare — defaults to false). */
 	noCancel?: boolean;
+	/** The prompt kind — see the module note. */
+	kind?: ConfirmKind;
 };
 
 type ConfirmRequest = {
@@ -67,7 +77,22 @@ function getSnapshot(): readonly ConfirmRequest[] {
 	return queue;
 }
 
-export function confirm(params: ConfirmParams): Promise<boolean> {
+export async function confirm(params: ConfirmParams): Promise<boolean> {
+	if (canRememberConfirm(params.kind) && (await isRemembered(params.kind))) return true;
+	return ask(params);
+}
+
+/** Read fresh on every ask: the choice is per vault, and Settings can reset it. */
+async function isRemembered(kind: ConfirmKind): Promise<boolean> {
+	try {
+		const list = (await window.brainstorm?.confirmations?.list?.()) ?? [];
+		return list.includes(kind);
+	} catch {
+		return false;
+	}
+}
+
+function ask(params: ConfirmParams): Promise<boolean> {
 	return new Promise<boolean>((resolve) => {
 		const id = `cf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 		queue = [...queue, { id, params, resolve }];
@@ -75,11 +100,15 @@ export function confirm(params: ConfirmParams): Promise<boolean> {
 	});
 }
 
-function respond(id: string, ok: boolean): void {
+function respond(id: string, ok: boolean, remember = false): void {
 	const target = queue.find((r) => r.id === id);
 	if (!target) return;
 	queue = queue.filter((r) => r.id !== id);
 	emit();
+	const { kind } = target.params;
+	if (ok && remember && canRememberConfirm(kind)) {
+		void window.brainstorm?.confirmations?.remember?.(kind)?.catch(() => false);
+	}
 	target.resolve(ok);
 }
 
@@ -101,8 +130,11 @@ function ConfirmDialog({ request }: { request: ConfirmRequest }) {
 		cancelLabel,
 		confirmVariant = ConfirmVariant.Primary,
 		noCancel = false,
+		kind,
 	} = request.params;
-	const onConfirm = () => respond(request.id, true);
+	const rememberable = canRememberConfirm(kind);
+	const [remember, setRemember] = useState(false);
+	const onConfirm = () => respond(request.id, true, remember);
 	const onCancel = () => respond(request.id, false);
 	const buttonVariant =
 		confirmVariant === ConfirmVariant.Destructive ? ButtonVariant.Destructive : ButtonVariant.Primary;
@@ -128,6 +160,16 @@ function ConfirmDialog({ request }: { request: ConfirmRequest }) {
 			}
 		>
 			{body && <p className="confirm__body">{body}</p>}
+			{rememberable && (
+				<div className="confirm__remember">
+					<Checkbox
+						checked={remember}
+						onChange={setRemember}
+						label={t("shell.confirm.dontAskAgain")}
+						data-testid="confirm-dont-ask-again"
+					/>
+				</div>
+			)}
 		</Popover>
 	);
 }

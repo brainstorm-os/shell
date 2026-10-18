@@ -52,6 +52,7 @@
   "deleteBody": "«{name}» se moverá a la papelera. No se puede deshacer aquí.",
   "deleteConfirm": "Eliminar",
   "deleteCancel": "Cancelar",
+  "deleteDontAskAgain": "No volver a preguntar",
   "wrapEnable": "Activar ajuste de línea",
   "wrapDisable": "Desactivar ajuste de línea",
   "completion.listLabel": "Completados",

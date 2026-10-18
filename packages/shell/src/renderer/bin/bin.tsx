@@ -10,6 +10,7 @@
  * empty-bin) route through the shared `confirm()` primitive.
  */
 
+import { ConfirmKind } from "@brainstorm-os/sdk-types";
 import { Orientation, useCompositeKeyboard, useFocusTrap } from "@brainstorm-os/sdk/a11y";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion } from "framer-motion";
@@ -190,6 +191,7 @@ export function Bin({ onClose }: BinProps) {
 				body: t("shell.bin.purgeConfirm.body", { title }),
 				confirmLabel: t("shell.bin.purge"),
 				confirmVariant: ConfirmVariant.Destructive,
+				kind: ConfirmKind.PurgeFromBin,
 			});
 			if (!accepted) return;
 			setBusyId(id);
@@ -214,6 +216,7 @@ export function Bin({ onClose }: BinProps) {
 			body: t("shell.bin.emptyConfirm.body", { count }),
 			confirmLabel: t("shell.bin.emptyBin"),
 			confirmVariant: ConfirmVariant.Destructive,
+			kind: ConfirmKind.EmptyBin,
 		});
 		if (!accepted) return;
 		const purged = await empty();
@@ -248,6 +251,7 @@ export function Bin({ onClose }: BinProps) {
 			body: t("shell.bin.purgeManyConfirm.body", { count: ids.length }),
 			confirmLabel: t("shell.bin.purge"),
 			confirmVariant: ConfirmVariant.Destructive,
+			kind: ConfirmKind.PurgeFromBin,
 		});
 		if (!accepted) return;
 		const purged = await purgeMany(ids);

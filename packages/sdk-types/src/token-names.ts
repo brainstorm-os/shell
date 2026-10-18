@@ -55,6 +55,8 @@ export const CANONICAL_TOKEN_NAMES = Object.freeze([
 	"--color-chrome-background",
 	"--color-chrome-text",
 	"--color-dimmer",
+	"--color-emphasis-caret",
+	"--color-emphasis-selection",
 	"--color-field-background",
 	"--color-field-border",
 	"--color-focus-ring",

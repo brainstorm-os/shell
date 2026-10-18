@@ -49,6 +49,8 @@ function makeDashboardMock() {
 	};
 }
 
+const confirmationsReset = vi.fn(() => Promise.resolve(3));
+
 describe("InterfaceSection — header-control toggle round-trip", () => {
 	let host: HTMLDivElement;
 	let root: Root;
@@ -56,7 +58,11 @@ describe("InterfaceSection — header-control toggle round-trip", () => {
 
 	beforeEach(async () => {
 		dashboard = makeDashboardMock();
-		(window as unknown as { brainstorm: unknown }).brainstorm = { dashboard, vaults: {} };
+		(window as unknown as { brainstorm: unknown }).brainstorm = {
+			dashboard,
+			vaults: {},
+			confirmations: { reset: confirmationsReset },
+		};
 		host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
@@ -77,6 +83,17 @@ describe("InterfaceSection — header-control toggle round-trip", () => {
 
 	const clockInput = () =>
 		document.querySelector(`input[aria-label="Clock"]`) as HTMLInputElement | null;
+
+	it("6.15: Reset confirmations clears every remembered choice", async () => {
+		const button = document.querySelector<HTMLButtonElement>(
+			'[data-testid="settings-reset-confirmations"]',
+		);
+		expect(button).not.toBeNull();
+		await act(async () => {
+			button?.click();
+		});
+		expect(confirmationsReset).toHaveBeenCalledTimes(1);
+	});
 
 	it("clicking the hidden input flips the painted box live (no remount)", async () => {
 		const input = clockInput();

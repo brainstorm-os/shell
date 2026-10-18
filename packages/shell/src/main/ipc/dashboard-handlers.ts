@@ -24,9 +24,12 @@ import {
 import { regionalToFormatContext, sameFormatContext } from "@brainstorm-os/protocol/format-context";
 import {
 	type ClockPrefs,
+	DISPLAY_PREF_KEYS,
+	type DisplayPrefs,
 	type DndPrefs,
 	type HeaderControlId,
 	type RegionalState,
+	encodeDisplayPrefs,
 	isHeaderControlId,
 } from "@brainstorm-os/protocol/shell-prefs";
 import type { FormatContext, PinResolution, ThemePreviewPayload } from "@brainstorm-os/sdk-types";
@@ -89,6 +92,12 @@ export const APP_WALLPAPER_CHANGED_CHANNEL = "app:wallpaper-changed";
  *  the user edits a Settings → Regional value, no relaunch. */
 export const APP_FORMAT_CHANGED_CHANNEL = "app:format-changed";
 
+/** App-renderer-bound channel: payload is the full `DisplayPrefs` (12.18
+ *  visibility preferences). Sibling of `APP_THEME_CHANGED_CHANNEL`; the boot
+ *  value rides `--brainstorm-display=…`. The preload re-normalises the
+ *  payload and resolves the overrides against its bundled theme tokens. */
+export const APP_DISPLAY_CHANGED_CHANNEL = "app:display-changed";
+
 /** Transient theme-preview channel (9.9.6). Carries a sanitized
  *  `ThemePreviewPayload` to paint over the committed theme, or `null` to
  *  revert. The renderer applies the vars via CSSOM `setProperty` (never
@@ -136,6 +145,7 @@ let lastBroadcastTheme: ThemeName | null = null;
 let lastBroadcastWallpaper: string | null | undefined;
 let lastBroadcastLanguage: string | null = null;
 let lastBroadcastFormat: FormatContext | null = null;
+let lastBroadcastDisplay: string | null = null;
 
 /**
  * Guards dashboard-snapshot delivery against out-of-order async resolution.
@@ -504,6 +514,25 @@ export function registerDashboardHandlers(
 	);
 
 	ipcMain.handle(
+		"dashboard:set-display-prefs",
+		(_event, partial: unknown): Promise<void> =>
+			withStore((store) => {
+				if (!partial || typeof partial !== "object") return;
+				const raw = partial as Record<string, unknown>;
+				const patch: Partial<DisplayPrefs> = {};
+				for (const key of DISPLAY_PREF_KEYS) {
+					if (typeof raw[key] === "boolean") patch[key] = raw[key];
+				}
+				store.setDisplayPrefs(patch);
+			}),
+	);
+
+	ipcMain.handle(
+		"dashboard:set-startup-page",
+		(_event, page: unknown): Promise<void> => withStore((store) => store.setStartupPage(page)),
+	);
+
+	ipcMain.handle(
 		"dashboard:reset-chrome",
 		(): Promise<void> => withStore((store) => store.resetChrome()),
 	);
@@ -854,6 +883,7 @@ async function ensureSubscribed(
 	lastBroadcastTheme = resolveEffectiveSnapshotTheme(store);
 	lastBroadcastWallpaper = resolveActiveWallpaperUrl(store);
 	lastBroadcastLanguage = store.snapshot().locale.language;
+	lastBroadcastDisplay = encodeDisplayPrefs(store.displayPrefs());
 	lastBroadcastFormat = regionalToFormatContext(
 		store.snapshot().locale.language,
 		store.snapshot().regional,
@@ -918,6 +948,14 @@ async function ensureSubscribed(
 		if (!lastBroadcastFormat || !sameFormatContext(format, lastBroadcastFormat)) {
 			lastBroadcastFormat = format;
 			broadcastFormatToWindows(format, getAppWindowsRef?.() ?? []);
+		}
+		// Broadcast the visibility preferences (12.18). Diffed on the argv
+		// encoding — one string per distinct preference set.
+		const display = store.displayPrefs();
+		const displayKey = encodeDisplayPrefs(display);
+		if (displayKey !== lastBroadcastDisplay) {
+			lastBroadcastDisplay = displayKey;
+			broadcastDisplayToWindows(display, getAppWindowsRef?.() ?? []);
 		}
 		// Stage 7.3 — reconcile the dashboard's native widget surfaces against the
 		// placed-widget set on every snapshot (also fires immediately on subscribe,
@@ -1029,6 +1067,23 @@ export function broadcastWallpaperToWindows(
 			win.webContents.send(APP_WALLPAPER_CHANGED_CHANNEL, url);
 		} catch (error) {
 			console.warn(`[brainstorm] wallpaper broadcast to ${win.appId} failed:`, error);
+		}
+	}
+}
+
+/** Pure helper — push the visibility preferences to every live app window.
+ *  Exported for the regression test: a preference that only reaches the shell
+ *  renderer splits the product in two, exactly like a theme that does. */
+export function broadcastDisplayToWindows(
+	display: DisplayPrefs,
+	appWindows: readonly AppWindow[],
+): void {
+	for (const win of appWindows) {
+		if (!isAppWindowLive(win)) continue;
+		try {
+			win.webContents.send(APP_DISPLAY_CHANGED_CHANNEL, display);
+		} catch (error) {
+			console.warn(`[brainstorm] display broadcast to ${win.appId} failed:`, error);
 		}
 	}
 }

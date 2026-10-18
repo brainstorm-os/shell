@@ -1279,6 +1279,14 @@ body.is-resizing .editor__files-resize {
 	color: var(--danger);
 }
 
+.editor__delete-body {
+	margin: 0;
+}
+
+.editor__delete-remember {
+	margin-top: var(--space-3);
+}
+
 .editor__rename-actions {
 	display: flex;
 	justify-content: flex-end;

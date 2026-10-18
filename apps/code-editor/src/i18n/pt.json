@@ -52,6 +52,7 @@
   "deleteBody": "“{name}” será movido para a lixeira. Isso não pode ser desfeito aqui.",
   "deleteConfirm": "Excluir",
   "deleteCancel": "Cancelar",
+  "deleteDontAskAgain": "Não perguntar novamente",
   "wrapEnable": "Ativar quebra de linha",
   "wrapDisable": "Desativar quebra de linha",
   "completion.listLabel": "Preenchimentos",

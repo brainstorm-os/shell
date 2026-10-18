@@ -165,6 +165,14 @@ const flatVariantStops = {
 	destructiveBottom: "var(--color-state-error)",
 } as const;
 
+// Emphasised caret + selection (12.18) — shared by every theme because both
+// derive from the theme's own accent tokens; `visibility.test.ts` holds the
+// selection wash under AA for primary text in each theme.
+const textEmphasis = {
+	caret: "var(--color-accent-on-surface)",
+	selection: "color-mix(in srgb, var(--color-accent-default) 40%, transparent)",
+} as const;
+
 // Pill-button control scale for the flat themes (Porcelain / Graphite).
 const pillControl = {
 	...control,
@@ -601,6 +609,7 @@ export const defaultDark: Tokens = {
 			default: "rgba(0, 0, 0, 0.28)",
 			strong: "rgba(0, 0, 0, 0.45)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: palette.blue["400"],
 		},
@@ -702,6 +711,7 @@ export const defaultLight: Tokens = {
 			default: "rgba(17, 26, 46, 0.10)",
 			strong: "rgba(17, 26, 46, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: palette.blue["500"],
 		},
@@ -803,6 +813,7 @@ export const midnight: Tokens = {
 			default: "rgba(0, 0, 0, 0.36)",
 			strong: "rgba(0, 0, 0, 0.55)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#38bdf8",
 		},
@@ -901,6 +912,7 @@ export const sepia: Tokens = {
 			default: "rgba(58, 46, 26, 0.14)",
 			strong: "rgba(58, 46, 26, 0.22)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#b04a18",
 		},
@@ -1005,6 +1017,7 @@ export const highContrast: Tokens = {
 			default: "rgba(0, 0, 0, 0.9)",
 			strong: "rgba(0, 0, 0, 1)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#ffd400",
 		},
@@ -1105,6 +1118,7 @@ export const solar: Tokens = {
 			default: "rgba(31, 41, 55, 0.10)",
 			strong: "rgba(31, 41, 55, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#ea580c",
 		},
@@ -1203,6 +1217,7 @@ export const forest: Tokens = {
 			default: "rgba(0, 0, 0, 0.32)",
 			strong: "rgba(0, 0, 0, 0.5)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#34d399",
 		},
@@ -1300,6 +1315,7 @@ export const nord: Tokens = {
 			default: "rgba(0, 0, 0, 0.30)",
 			strong: "rgba(0, 0, 0, 0.45)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#88c0d0",
 		},
@@ -1396,6 +1412,7 @@ export const aurora: Tokens = {
 			default: "rgba(0, 0, 0, 0.36)",
 			strong: "rgba(0, 0, 0, 0.55)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#d946ef",
 		},
@@ -1491,6 +1508,7 @@ export const mint: Tokens = {
 			default: "rgba(20, 48, 40, 0.10)",
 			strong: "rgba(20, 48, 40, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#0d9488",
 		},
@@ -1586,6 +1604,7 @@ export const rose: Tokens = {
 			default: "rgba(58, 31, 41, 0.10)",
 			strong: "rgba(58, 31, 41, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#e11d48",
 		},
@@ -1681,6 +1700,7 @@ export const slate: Tokens = {
 			default: "rgba(30, 41, 59, 0.10)",
 			strong: "rgba(30, 41, 59, 0.18)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#4f46e5",
 		},
@@ -1779,6 +1799,7 @@ export const porcelain: Tokens = {
 			default: "rgba(23, 23, 23, 0.09)",
 			strong: "rgba(23, 23, 23, 0.16)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#4d80f0",
 		},
@@ -1883,6 +1904,7 @@ export const graphite: Tokens = {
 			default: "rgba(0, 0, 0, 0.2)",
 			strong: "rgba(0, 0, 0, 0.38)",
 		},
+		emphasis: textEmphasis,
 		focus: {
 			ring: "#377aff",
 		},

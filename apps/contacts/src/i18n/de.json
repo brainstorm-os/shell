@@ -95,6 +95,7 @@
   "delete.confirm.body": "„{name}“ wird in den Papierkorb verschoben. Das kann hier nicht rückgängig gemacht werden.",
   "delete.confirm.confirm": "Löschen",
   "delete.confirm.cancel": "Abbrechen",
+  "delete.confirm.dontAskAgain": "Nicht mehr fragen",
   "demo.banner": "Vorschaudaten — öffne einen Vault, um echte Kontakte zu verwalten.",
   "vcard.import": "vCard importieren…",
   "vcard.export": "vCard exportieren…",

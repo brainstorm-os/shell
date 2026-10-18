@@ -52,6 +52,7 @@
   "deleteBody": "«{name}» verrà spostato nel cestino. Non può essere annullato qui.",
   "deleteConfirm": "Elimina",
   "deleteCancel": "Annulla",
+  "deleteDontAskAgain": "Non chiedere più",
   "wrapEnable": "Attiva a capo automatico",
   "wrapDisable": "Disattiva a capo automatico",
   "completion.listLabel": "Completamenti",
