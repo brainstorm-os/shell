@@ -11,7 +11,10 @@
  * mode: the nested editor becomes editable and mounts the Notes editing
  * plugins, so every keystroke writes straight into the SOURCE's Y.Doc (the
  * same doc the source's own editor binds), with a visible boundary + the
- * source card as its chip. Guarantees:
+ * source card as its chip. The nested editor carries its own block gutter,
+ * block selection (with its keyboard chords) and block context menu, scoped
+ * to the source's blocks: the host gutter yields inside the editing body
+ * (`gutterOwnsPointer`) and host chords skip keystrokes from it. Guarantees:
  *   - a locked source, a source Notes hasn't loaded, or a read-only host keeps
  *     the body read-only (the toggle is disabled with a hint, never hidden);
  *     a lock that lands mid-edit drops the body back to read-only live;
@@ -34,6 +37,7 @@ import {
 	AutosavePlugin,
 	BLOCK_MARKDOWN_TRANSFORMERS,
 	BlockEmbedPickerPlugin,
+	BlockGutterPlugin,
 	BlockSelectionPlugin,
 	BrainstormEditor,
 	CodeBlockPlugin,
@@ -65,7 +69,8 @@ import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin
 import type { SerializedEditorState } from "lexical";
 import { useCallback, useMemo, useState } from "react";
 import { t } from "../i18n/t";
-import { BLOCK_COMMANDS } from "./commands";
+import { BLOCK_ACTIONS, BLOCK_COMMANDS } from "./commands";
+import { BlockContextMenuPlugin } from "./context-menu-plugin";
 import { LinkMarkupPlugin } from "./link-markup-plugin";
 import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";
 import { editorTheme } from "./theme";
@@ -124,6 +129,13 @@ function TransclusionEditingPlugins({
 			<TransclusionTypeaheadPlugin currentNoteId={entityId} />
 			<BlockEmbedPickerPlugin currentNoteId={entityId} />
 			<LinkMarkupPlugin currentNoteId={entityId} />
+			<BlockGutterPlugin
+				commands={BLOCK_ACTIONS}
+				insertCommands={BLOCK_COMMANDS}
+				scrollContainerSelector=".notes__main"
+				documentId={entityId}
+			/>
+			<BlockContextMenuPlugin documentId={entityId} />
 			<InlineToolbarPlugin />
 			<AutosavePlugin onChange={onChange} />
 		</BlockSelectionPlugin>

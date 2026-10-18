@@ -8,20 +8,30 @@
  * `contextmenu` is intercepted (preventDefault) so the native menu doesn't
  * appear; the cursor's `clientX/Y` becomes a 1×1 synthetic rect the menu
  * anchors against.
+ *
+ * A right-click inside a nested editor ("Edit here" transclusion, B11.22)
+ * belongs to that editor's own instance (`documentId` = the source), never
+ * the host's.
  */
 
-import { openBlockActionMenu, useBlockSelectionStore, useEditorT } from "@brainstorm-os/editor";
+import {
+	isEventInNestedEditor,
+	openBlockActionMenu,
+	useBlockSelectionStore,
+	useEditorT,
+} from "@brainstorm-os/editor";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getNearestNodeFromDOMNode, type NodeKey } from "lexical";
 import { useEffect } from "react";
 import { BLOCK_ACTIONS } from "./commands";
-import { useNoteContext } from "./note-context";
+import { useNoteContextOptional } from "./note-context";
 
-export function BlockContextMenuPlugin() {
+export function BlockContextMenuPlugin({ documentId }: { documentId?: string } = {}) {
 	const [editor] = useLexicalComposerContext();
 	const selectionStore = useBlockSelectionStore();
 	const t = useEditorT();
-	const { noteId } = useNoteContext();
+	const host = useNoteContextOptional();
+	const noteId = documentId ?? host?.noteId;
 
 	useEffect(() => {
 		const root = editor.getRootElement();
@@ -29,6 +39,7 @@ export function BlockContextMenuPlugin() {
 
 		function onContextMenu(event: MouseEvent) {
 			if (!(event.target instanceof Node)) return;
+			if (isEventInNestedEditor(event, root)) return;
 			let blockKey: NodeKey | null = null;
 			// `$getNearestNodeFromDOMNode` needs an active *editor* — route
 			// through `editor.read(...)` rather than `editorState.read(...)`.
@@ -58,7 +69,7 @@ export function BlockContextMenuPlugin() {
 				onActivate: (command) => {
 					const s = selectionStore.getSnapshot();
 					const blockKeys = s.selectedKeys.size > 0 ? s.selectedKeys : new Set<NodeKey>([targetKey]);
-					command.run({ editor, blockKeys, documentId: noteId });
+					command.run({ editor, blockKeys, ...(noteId ? { documentId: noteId } : {}) });
 				},
 			});
 		}

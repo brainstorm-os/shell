@@ -156,6 +156,29 @@ describe("transclusion body edit mode", () => {
 		expect(editableRoot()).toBe("false");
 	});
 
+	it("mounts its own block gutter while editing, and drops it on Done", async () => {
+		vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+			cb(0);
+			return 1;
+		});
+		await render(host(), true);
+		const gutter = () => document.querySelector(".bs-editor__block-gutter");
+		const hover = async () =>
+			act(async () => {
+				container
+					.querySelector(".notes__transclusion-body-content")
+					?.dispatchEvent(new MouseEvent("mousemove", { clientY: 0, bubbles: true }));
+			});
+		await hover();
+		expect(gutter()).toBeNull();
+		await act(async () => toggle()?.click());
+		await hover();
+		expect(gutter()).not.toBeNull();
+		await act(async () => toggle()?.click());
+		expect(gutter()).toBeNull();
+		vi.unstubAllGlobals();
+	});
+
 	it("keeps a locked source read-only, with a disabled toggle that says why", async () => {
 		await render(host({ isLocked: () => true }), true);
 		expect(state()).toBe(TransclusionEditState.Locked);
