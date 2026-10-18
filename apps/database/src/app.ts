@@ -43,6 +43,7 @@ import {
 	type Dictionary,
 	type Entity,
 	type EntityQuery,
+	type FileImportResult,
 	GENERIC_OBJECT_TYPE,
 	type Icon,
 	type ObjectDragPayload,
@@ -78,6 +79,7 @@ import {
 	openAnchoredMenu,
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
+import { bindOsFileDrop, importOsFilesAsEntities } from "@brainstorm-os/sdk/os-file-drop";
 import {
 	PanelSide,
 	type PanelToggleButtonHandle,
@@ -117,6 +119,7 @@ import { buildChartModel } from "./logic/chart-data";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
 import { type CompiledView, flattenFilter } from "./logic/compile-view";
 import { effectiveColumnDef } from "./logic/effective-def";
+import { acceptsFileDrop, membersWithDroppedFiles } from "./logic/file-drop";
 import {
 	OBJECT_NAV_SHORTCUTS,
 	type ObjectNavContext,
@@ -5018,9 +5021,71 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	});
 }
 
+/** OS files dropped on the stage (9.8.17): import each as a File/v1 object
+ *  and add it to the active collection. */
+function bindFileDrop(state: AppState, body: HTMLElement): void {
+	bindOsFileDrop(body, {
+		enabled: () => {
+			const services = getRuntime()?.services;
+			const list = activeList(state);
+			return (
+				Boolean(services?.files?.import && services.entities) &&
+				acceptsFileDrop(list, list ? isVaultDerivedListId(list.id) : false)
+			);
+		},
+		onFiles: (files) => void importDroppedFiles(state, files),
+	});
+}
+
+async function importDroppedFiles(state: AppState, files: File[]): Promise<void> {
+	const services = getRuntime()?.services;
+	const importer = services?.files?.import;
+	const entities = services?.entities;
+	const list = activeList(state);
+	if (!importer || !entities || !list) return;
+	const filesService = services?.files;
+	if (!filesService) return;
+	let failed = 0;
+	const created = await importOsFilesAsEntities(
+		files,
+		{
+			files: { import: (input) => importer.call(filesService, input) },
+			entities: { create: (type, properties) => entities.create(type, properties) },
+		},
+		{ onError: () => (failed += 1) },
+	);
+	const members = membersWithDroppedFiles(
+		list,
+		isVaultDerivedListId(list.id),
+		created.map((c) => c.id),
+	);
+	if (members) {
+		state.lists = state.lists.map((l) =>
+			l.id === list.id ? { ...l, members, updatedAt: Date.now() } : l,
+		);
+		schedulePersist(state);
+	}
+	await loadVaultEntities(state);
+	renderActiveView(state);
+	renderListNav(state);
+	flashStatus(
+		plural(
+			created.length,
+			"brainstorm.database.status.filesAdded.one",
+			"brainstorm.database.status.filesAdded.other",
+			{
+				count: created.length,
+				name: list.name,
+			},
+		) + (failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : ""),
+		failed > 0 ? "warn" : "ready",
+	);
+}
+
 function bindStageKeyboard(state: AppState): void {
 	const body = document.getElementById("stage-body");
 	if (!body) return;
+	bindFileDrop(state, body);
 	// Bound through the SDK shortcut layer (the imperative twin of `useShortcut`),
 	// matching `bindViewTabKeyboard` below — raw `keydown`/`e.key` comparisons are
 	// a PR-blocker. The single-key chords (Escape / Space) auto-suppress while a
@@ -5318,6 +5383,8 @@ type BrainstormRuntime = {
 				readonly multi?: boolean;
 			}): Promise<readonly { readonly handleId: string; readonly displayName: string }[]>;
 			read(handle: { readonly handleId: string; readonly displayName: string }): Promise<Uint8Array>;
+			/** Store dropped OS bytes as a vault asset (9.8.17; `files.read`). */
+			import?(input: { name: string; bytes: Uint8Array | ArrayBuffer }): Promise<FileImportResult>;
 			/** Save half (granted by `files.write`) — drives the 9.12.19
 			 *  list-export flow. Absent on older shells → Export… no-shows. */
 			requestSave(opts?: {

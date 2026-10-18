@@ -378,5 +378,8 @@
   "brainstorm.database.view.menu.unpin": "Unpin from dashboard",
   "brainstorm.database.view.menu.pin.vaultHint": "Built-in views can’t be pinned — duplicate it first",
   "brainstorm.database.view.pinned": "Pinned “{name}” to the dashboard",
-  "brainstorm.database.view.unpinned": "Unpinned “{name}”"
+  "brainstorm.database.view.unpinned": "Unpinned “{name}”",
+  "brainstorm.database.status.filesAdded.one": "Added {count} file to {name}",
+  "brainstorm.database.status.filesAdded.other": "Added {count} files to {name}",
+  "brainstorm.database.status.filesFailed": "{count} couldn’t be imported."
 }

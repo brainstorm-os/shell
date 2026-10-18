@@ -378,5 +378,8 @@
   "brainstorm.database.view.menu.unpin": "Rimuovi dalla dashboard",
   "brainstorm.database.view.menu.pin.vaultHint": "Le viste integrate non si possono fissare: duplicala prima",
   "brainstorm.database.view.pinned": "“{name}” fissata sulla dashboard",
-  "brainstorm.database.view.unpinned": "“{name}” rimossa"
+  "brainstorm.database.view.unpinned": "“{name}” rimossa",
+  "brainstorm.database.status.filesAdded.one": "{count} file aggiunto a {name}",
+  "brainstorm.database.status.filesAdded.other": "{count} file aggiunti a {name}",
+  "brainstorm.database.status.filesFailed": "{count} non sono stati importati."
 }

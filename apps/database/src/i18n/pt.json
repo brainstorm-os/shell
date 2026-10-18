@@ -378,5 +378,8 @@
   "brainstorm.database.view.menu.unpin": "Desafixar do painel",
   "brainstorm.database.view.menu.pin.vaultHint": "Vistas integradas não podem ser fixadas — duplique-a primeiro",
   "brainstorm.database.view.pinned": "“{name}” fixada no painel",
-  "brainstorm.database.view.unpinned": "“{name}” desafixada"
+  "brainstorm.database.view.unpinned": "“{name}” desafixada",
+  "brainstorm.database.status.filesAdded.one": "{count} ficheiro adicionado a {name}",
+  "brainstorm.database.status.filesAdded.other": "{count} ficheiros adicionados a {name}",
+  "brainstorm.database.status.filesFailed": "{count} não puderam ser importados."
 }

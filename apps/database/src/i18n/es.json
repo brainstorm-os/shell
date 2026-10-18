@@ -378,5 +378,8 @@
   "brainstorm.database.view.menu.unpin": "Desfijar del panel",
   "brainstorm.database.view.menu.pin.vaultHint": "Las vistas integradas no se pueden fijar: duplícala primero",
   "brainstorm.database.view.pinned": "“{name}” fijada en el panel",
-  "brainstorm.database.view.unpinned": "“{name}” desfijada"
+  "brainstorm.database.view.unpinned": "“{name}” desfijada",
+  "brainstorm.database.status.filesAdded.one": "{count} archivo añadido a {name}",
+  "brainstorm.database.status.filesAdded.other": "{count} archivos añadidos a {name}",
+  "brainstorm.database.status.filesFailed": "{count} no se pudieron importar."
 }

@@ -2229,6 +2229,12 @@ body.is-resizing .db-inspector__resize {
 	color: var(--text-faint);
 }
 
+/* OS file drag hovering the stage (9.8.17) — an accent ring, the same
+ * drop-the-object-here face as the board's cross-app column target. */
+.db-stage__body[data-os-drop="true"] {
+	box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 /* ── Calendar view ────────────────────────────────────────────────────── */
 
 .dbv-calendar {

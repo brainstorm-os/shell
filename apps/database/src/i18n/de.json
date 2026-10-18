@@ -378,5 +378,8 @@
   "brainstorm.database.view.menu.unpin": "Vom Dashboard lösen",
   "brainstorm.database.view.menu.pin.vaultHint": "Integrierte Ansichten lassen sich nicht anheften – dupliziere sie zuerst",
   "brainstorm.database.view.pinned": "„{name}“ ans Dashboard angeheftet",
-  "brainstorm.database.view.unpinned": "„{name}“ gelöst"
+  "brainstorm.database.view.unpinned": "„{name}“ gelöst",
+  "brainstorm.database.status.filesAdded.one": "{count} Datei zu {name} hinzugefügt",
+  "brainstorm.database.status.filesAdded.other": "{count} Dateien zu {name} hinzugefügt",
+  "brainstorm.database.status.filesFailed": "{count} konnten nicht importiert werden."
 }
