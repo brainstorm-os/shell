@@ -85,6 +85,11 @@
 	color: #fff;
 }
 
+[data-provider="ollama"] .settings__ai-avatar {
+	background: var(--color-text-primary);
+	color: var(--color-surface-default);
+}
+
 [data-provider="solheim"] .settings__ai-avatar {
 	background: #1d4ed8;
 	color: #fff;
@@ -259,4 +264,12 @@
 	border: 1px solid var(--color-state-error);
 	border-radius: var(--radius-sm);
 	padding: 0 var(--space-1);
+}
+
+/* Agent-14 — the add-endpoint buttons under the custom endpoint list. */
+.settings__ai-endpoint-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	margin-top: var(--space-2);
 }

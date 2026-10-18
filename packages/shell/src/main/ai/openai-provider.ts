@@ -56,6 +56,9 @@ export type OpenAiProviderConfig = {
 	defaultModel: string;
 	defaultMaxTokens?: number;
 	getApiKey: () => Promise<string | null> | string | null;
+	/** `false` for a keyless endpoint (local LM Studio / vLLM): a missing key
+	 *  then sends no `Authorization` header instead of failing closed. */
+	requireApiKey?: boolean;
 	http: OpenAiHttp;
 };
 
@@ -80,7 +83,7 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 		id,
 		async generate(req: AiGenerateRequest, signal?: AbortSignal): Promise<AiGenerateResult> {
 			const apiKey = await config.getApiKey();
-			if (!apiKey) {
+			if (!apiKey && config.requireApiKey !== false) {
 				throw new AiServiceError(
 					"Unavailable",
 					`ai.generate: no ${label} API key is configured (add one in Settings → AI)`,
@@ -100,7 +103,7 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 			try {
 				res = await config.http({
 					url,
-					headers: { Authorization: `Bearer ${apiKey}` },
+					headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
 					bodyJson: body,
 					...(signal ? { signal } : {}),
 				});
@@ -112,9 +115,13 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 			}
 
 			if (res.status < 200 || res.status >= 300) {
+				// The error text reaches the calling app. A user-added endpoint is
+				// arbitrary code on the other end and may echo request headers back,
+				// so the key is scrubbed before the body is quoted.
+				const body = apiKey ? res.text.split(apiKey).join("[redacted]") : res.text;
 				throw new AiServiceError(
 					"Unavailable",
-					`${label} API returned HTTP ${res.status}${res.text ? `: ${res.text.slice(0, 200)}` : ""}`,
+					`${label} API returned HTTP ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`,
 				);
 			}
 

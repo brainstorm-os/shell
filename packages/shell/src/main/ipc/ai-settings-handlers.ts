@@ -8,6 +8,12 @@
  * `clear` deletes it. The key is **never returned** to any renderer, and only a
  * curated set of provider ids may be addressed (so the dashboard can't write
  * arbitrary credential entries under the AI namespace).
+ *
+ * Agent-14 — custom OpenAI-compatible endpoints and the Ollama override are
+ * managed here too. A custom endpoint's key rides the same write-only
+ * channels, addressable only while the endpoint exists in the vault's
+ * settings; removing an endpoint deletes its key. Every change is re-applied
+ * to the live provider registry through `applySettings`.
  */
 
 import {
@@ -17,6 +23,7 @@ import {
 	MISTRAL_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
 	SOLHEIM_PROVIDER_ID,
+	isCustomProviderId,
 } from "@brainstorm-os/sdk-types";
 import { ipcMain } from "electron";
 import { AI_BUDGET_WINDOW_MS } from "../ai/ai-quota";
@@ -30,9 +37,15 @@ import type { CredentialStore } from "../credentials/store";
 import {
 	type AiSettings,
 	type AppAiBudget,
+	type CustomEndpointResult,
+	type OllamaSettingsResult,
+	defaultAiSettings,
 	readAiSettings,
+	removeCustomEndpoint,
 	setAppBudget,
 	setDefaultProvider,
+	setOllamaSettings,
+	upsertCustomEndpoint,
 } from "../vault/ai-settings-store";
 import { getActiveVaultSession } from "../vault/session";
 
@@ -43,6 +56,9 @@ export const AI_USAGE_CHANNEL = "ai-settings:usage" as const;
 export const AI_GET_SETTINGS_CHANNEL = "ai-settings:get-settings" as const;
 export const AI_SET_DEFAULT_PROVIDER_CHANNEL = "ai-settings:set-default-provider" as const;
 export const AI_SET_APP_BUDGET_CHANNEL = "ai-settings:set-app-budget" as const;
+export const AI_UPSERT_ENDPOINT_CHANNEL = "ai-settings:upsert-endpoint" as const;
+export const AI_REMOVE_ENDPOINT_CHANNEL = "ai-settings:remove-endpoint" as const;
+export const AI_SET_OLLAMA_CHANNEL = "ai-settings:set-ollama" as const;
 
 /** What the Settings → AI usage list renders (14.8): per-app rolling-window
  *  aggregates from the `ai_usage` accounting table — metadata only. */
@@ -53,10 +69,10 @@ export type AiUsageView = {
 };
 
 export type AiSettingsHandlerDeps = {
-	/** Apply a routing default change to the live provider registry so it takes
-	 *  effect without a vault re-open (11.9). `null` restores the built-in
-	 *  default. Optional — omitted in tests that only assert persistence. */
-	readonly applyDefaultProvider?: (providerId: string | null) => void;
+	/** Apply changed settings (routing default, custom endpoints, Ollama) to the
+	 *  live provider registry so they take effect without a vault re-open.
+	 *  Optional — omitted in tests that only assert persistence. */
+	readonly applySettings?: (settings: AiSettings) => void;
 };
 
 /** The cloud providers whose keys this surface may manage. Bounds the
@@ -70,11 +86,21 @@ const KNOWN_CLOUD_PROVIDER_IDS: ReadonlySet<string> = new Set([
 	SOLHEIM_PROVIDER_ID,
 ]);
 
-/** The active vault's credential store, but only for a recognised provider id. */
-function storeFor(providerId: unknown): { store: CredentialStore; id: string } | null {
-	if (typeof providerId !== "string" || !KNOWN_CLOUD_PROVIDER_IDS.has(providerId)) return null;
-	const store = getActiveVaultSession()?.credentials ?? null;
-	return store ? { store, id: providerId } : null;
+/** The active vault's credential store, but only for a recognised provider id:
+ *  a built-in cloud provider, or a custom endpoint that exists right now. */
+async function storeFor(
+	providerId: unknown,
+): Promise<{ store: CredentialStore; id: string } | null> {
+	if (typeof providerId !== "string") return null;
+	const session = getActiveVaultSession();
+	if (!session) return null;
+	if (KNOWN_CLOUD_PROVIDER_IDS.has(providerId))
+		return { store: session.credentials, id: providerId };
+	if (!isCustomProviderId(providerId)) return null;
+	const settings = await readAiSettings(session.vaultPath);
+	return settings.customEndpoints.some((e) => e.id === providerId)
+		? { store: session.credentials, id: providerId }
+		: null;
 }
 
 export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
@@ -94,7 +120,7 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 	ipcMain.handle(
 		AI_HAS_PROVIDER_KEY_CHANNEL,
 		async (_event, providerId: unknown): Promise<boolean> => {
-			const target = storeFor(providerId);
+			const target = await storeFor(providerId);
 			return target ? (await readAiProviderKey(target.store, target.id)) !== null : false;
 		},
 	);
@@ -102,7 +128,7 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 	ipcMain.handle(
 		AI_SET_PROVIDER_KEY_CHANNEL,
 		async (_event, providerId: unknown, key: unknown): Promise<boolean> => {
-			const target = storeFor(providerId);
+			const target = await storeFor(providerId);
 			if (!target || typeof key !== "string" || key.trim().length === 0) return false;
 			await writeAiProviderKey(target.store, target.id, key.trim());
 			return true;
@@ -112,7 +138,7 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 	ipcMain.handle(
 		AI_CLEAR_PROVIDER_KEY_CHANNEL,
 		async (_event, providerId: unknown): Promise<boolean> => {
-			const target = storeFor(providerId);
+			const target = await storeFor(providerId);
 			return target ? deleteAiProviderKey(target.store, target.id) : false;
 		},
 	);
@@ -122,7 +148,7 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 	// defaults, persist nothing.
 	ipcMain.handle(AI_GET_SETTINGS_CHANNEL, async (): Promise<AiSettings> => {
 		const vaultPath = getActiveVaultSession()?.vaultPath ?? null;
-		if (!vaultPath) return { defaultProvider: null, appBudgets: {} };
+		if (!vaultPath) return defaultAiSettings();
 		return readAiSettings(vaultPath);
 	});
 
@@ -135,8 +161,43 @@ export function registerAiSettingsHandlers(deps: AiSettingsHandlerDeps): void {
 			const next = await setDefaultProvider(vaultPath, id);
 			// Reflect the (validated) stored value into the live registry so the
 			// next AI call routes there immediately.
-			deps.applyDefaultProvider?.(next.defaultProvider);
+			deps.applySettings?.(next);
 			return next;
+		},
+	);
+
+	ipcMain.handle(
+		AI_UPSERT_ENDPOINT_CHANNEL,
+		async (_event, input: unknown): Promise<CustomEndpointResult | null> => {
+			const vaultPath = getActiveVaultSession()?.vaultPath ?? null;
+			if (!vaultPath) return null;
+			const result = await upsertCustomEndpoint(vaultPath, input);
+			if (result.ok) deps.applySettings?.(result.settings);
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		AI_REMOVE_ENDPOINT_CHANNEL,
+		async (_event, id: unknown): Promise<AiSettings | null> => {
+			const session = getActiveVaultSession();
+			if (!session || typeof id !== "string" || !isCustomProviderId(id)) return null;
+			const next = await removeCustomEndpoint(session.vaultPath, id);
+			if (!next) return null;
+			await deleteAiProviderKey(session.credentials, id);
+			deps.applySettings?.(next);
+			return next;
+		},
+	);
+
+	ipcMain.handle(
+		AI_SET_OLLAMA_CHANNEL,
+		async (_event, input: unknown): Promise<OllamaSettingsResult | null> => {
+			const vaultPath = getActiveVaultSession()?.vaultPath ?? null;
+			if (!vaultPath || !input || typeof input !== "object") return null;
+			const result = await setOllamaSettings(vaultPath, input as Record<string, unknown>);
+			if (result.ok) deps.applySettings?.(result.settings);
+			return result;
 		},
 	);
 

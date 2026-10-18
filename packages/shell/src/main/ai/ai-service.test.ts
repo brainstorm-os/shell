@@ -1,6 +1,7 @@
 import {
 	type AiGenerateRequest,
 	type AiGenerateResult,
+	AiTransformKind,
 	MessageRole,
 } from "@brainstorm-os/sdk-types";
 import { describe, expect, it, vi } from "vitest";
@@ -449,5 +450,105 @@ describe("ProviderRegistry", () => {
 		expect(reg.get(undefined)?.id).toBe("b");
 		expect(reg.get("a")?.id).toBe("a");
 		expect(reg.get("missing")).toBeNull();
+	});
+});
+
+describe("Agent-14 — model pass-through, custom endpoints, providers listing", () => {
+	const msg = [{ role: MessageRole.User, content: "Hi" }];
+
+	it("passes a pinned model through to the provider unchanged", async () => {
+		const gen = vi.fn(async () => result);
+		const handler = makeAiServiceHandler({ getProvider: () => fakeProvider("ollama", gen) });
+		await handler(baseEnvelope("generate", [{ messages: msg, model: "openai/gpt-4o:free" }]));
+		const [req] = (gen.mock.calls[0] ?? []) as unknown as [AiGenerateRequest];
+		expect(req.model).toBe("openai/gpt-4o:free");
+	});
+
+	it.each([
+		["empty", ""],
+		["too long", "m".repeat(201)],
+		["newline", "gpt-4o\nX-Injected: 1"],
+		["NUL", "gpt\u0000"],
+		["DEL", "gpt\u007f"],
+		["line separator", "gpt "],
+		["padded", " gpt-4o "],
+		["non-string", 42],
+	])("rejects a %s model id as Invalid on every model-calling verb", async (_label, model) => {
+		const gen = vi.fn(async () => result);
+		const handler = makeAiServiceHandler({ getProvider: () => fakeProvider("ollama", gen) });
+		await expect(handler(baseEnvelope("generate", [{ messages: msg, model }]))).rejects.toMatchObject(
+			{ name: "Invalid" },
+		);
+		await expect(
+			handler(baseEnvelope("transform", [{ source: "x", kind: AiTransformKind.Rewrite, model }])),
+		).rejects.toMatchObject({ name: "Invalid" });
+		await expect(
+			handler(baseEnvelope("extract", [{ source: "x", fields: [{ name: "a" }], model }])),
+		).rejects.toMatchObject({ name: "Invalid" });
+		expect(gen).not.toHaveBeenCalled();
+	});
+
+	it("refuses a pinned custom endpoint unless the envelope carries its ai.provider cap", async () => {
+		const gen = vi.fn(async () => ({ ...result, provider: "custom-0123abcd" }));
+		const reg = new ProviderRegistry();
+		reg.register(fakeProvider("custom-0123abcd", gen));
+		const handler = makeAiServiceHandler({ getProvider: (id) => reg.get(id) });
+		const req = { provider: "custom-0123abcd", messages: msg };
+
+		await expect(handler(baseEnvelope("generate", [req]))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+		expect(gen).not.toHaveBeenCalled();
+
+		await handler({
+			...baseEnvelope("generate", [req]),
+			caps: ["ai.use", "ai.provider:custom-0123abcd"],
+		});
+		await handler({ ...baseEnvelope("generate", [req]), caps: ["ai.use", "ai.provider:*"] });
+		expect(gen).toHaveBeenCalledTimes(2);
+	});
+
+	it("meters an endpoint that reports no usage by estimate, never as zero tokens", async () => {
+		const onUsage = vi.fn();
+		const handler = makeAiServiceHandler({
+			getProvider: () =>
+				fakeProvider(
+					"custom-0123abcd",
+					vi.fn(async () => ({ content: "x".repeat(40), provider: "custom-0123abcd", model: "m" })),
+				),
+			onUsage,
+		});
+		await handler({
+			...baseEnvelope("generate", [{ provider: "custom-0123abcd", messages: msg }]),
+			caps: ["ai.use", "ai.provider:custom-0123abcd"],
+		});
+		const row = onUsage.mock.calls[0]?.[0];
+		expect(row.promptTokens).toBeGreaterThan(0);
+		expect(row.completionTokens).toBe(10);
+		expect(row.totalTokens).toBe(row.promptTokens + row.completionTokens);
+	});
+
+	it("lists only the providers the caller's ledger grants, and fails closed without ai.use", async () => {
+		const infos = [
+			{ id: "ollama", label: "Ollama", defaultModel: "llama3.2", models: ["llama3.2"], custom: false },
+			{ id: "custom-0123abcd", label: "Box", defaultModel: "m", models: ["m"], custom: true },
+		];
+		const grants = new Set(["ai.use", "ai.provider:ollama"]);
+		const handler = makeAiServiceHandler({
+			getProvider: () => null,
+			listProviders: () => infos,
+			appHoldsCapability: async (_app, cap) => grants.has(cap),
+		});
+		expect(await handler(baseEnvelope("providers", []))).toEqual([infos[0]]);
+
+		grants.delete("ai.use");
+		await expect(handler(baseEnvelope("providers", []))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
+
+		const noLedger = makeAiServiceHandler({ getProvider: () => null, listProviders: () => infos });
+		await expect(noLedger(baseEnvelope("providers", []))).rejects.toMatchObject({
+			name: "Unavailable",
+		});
 	});
 });

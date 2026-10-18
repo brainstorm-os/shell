@@ -73,6 +73,53 @@ export const MISTRAL_PROVIDER_ID = "mistral";
  *  `ai.provider:solheim`. */
 export const SOLHEIM_PROVIDER_ID = "solheim";
 
+/** Prefix of every user-added OpenAI-compatible endpoint's provider id
+ *  (Settings → AI → Custom endpoints). The suffix is a shell-minted slug; the
+ *  cap scope is `ai.provider:custom-<slug>` (or the `ai.provider:*` wildcard). */
+export const CUSTOM_PROVIDER_ID_PREFIX = "custom-";
+
+export function isCustomProviderId(id: string): boolean {
+	return id.startsWith(CUSTOM_PROVIDER_ID_PREFIX) && id.length > CUSTOM_PROVIDER_ID_PREFIX.length;
+}
+
+/** Upper bound on a model id crossing the broker. Real ids (OpenRouter's
+ *  `vendor/model:variant` included) are well under 100 characters. */
+export const AI_MODEL_ID_MAX_LENGTH = 200;
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the class IS the control-char floor.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+
+/** True when `value` holds a C0/C1 control or a line/paragraph separator. */
+export function containsControlChars(value: string): boolean {
+	return CONTROL_CHARS.test(value);
+}
+
+/** A model id the broker forwards verbatim into a provider request body: a
+ *  non-empty, length-capped string with no control characters and no
+ *  leading/trailing whitespace. Shared by the broker (enforcement) and apps
+ *  (inline validation) so both reject the same inputs. */
+export function isValidModelId(value: unknown): value is string {
+	return (
+		typeof value === "string" &&
+		value.length > 0 &&
+		value.length <= AI_MODEL_ID_MAX_LENGTH &&
+		value.trim() === value &&
+		!containsControlChars(value)
+	);
+}
+
+/** One routable provider as `ai.providers()` reports it — display metadata
+ *  only (never a key, never an endpoint URL). `models` are suggestions; the
+ *  model field stays free-form. */
+export type AiProviderInfo = {
+	id: string;
+	label: string;
+	defaultModel: string;
+	models: readonly string[];
+	/** True for a user-added custom endpoint. */
+	custom: boolean;
+};
+
 /** Error kind (the app-side `error.name` / wire `error.kind`) the AI broker
  *  returns when the calling app's rolling AI budget is exhausted (14.8).
  *  Distinct from `Unavailable` so apps can surface "AI budget exhausted"

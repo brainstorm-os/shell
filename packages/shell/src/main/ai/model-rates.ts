@@ -24,6 +24,7 @@ import {
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
 	SOLHEIM_PROVIDER_ID,
+	isCustomProviderId,
 } from "@brainstorm-os/sdk-types";
 
 /** Micro-credits per credit (1 credit = 1e6 micro-credits). */
@@ -108,6 +109,13 @@ const RATES: Record<string, ProviderRates> = {
 };
 
 function rateFor(provider: string, model: string): Omit<ModelRate, "modelPrefix"> {
+	// Agent-14 — a user-added custom endpoint (OpenRouter, a hosted gateway, a
+	// LAN server) has no price the shell can know: one model id costs different
+	// amounts behind different gateways, and a LAN box costs nothing. It meters
+	// at the conservative cloud fallback so a credit budget still binds, even
+	// when its model id happens to match a priced prefix below. Token budgets
+	// always count too (the broker estimates tokens when an endpoint reports none).
+	if (isCustomProviderId(provider)) return FALLBACK_CLOUD_RATE;
 	const entry = RATES[provider];
 	if (!entry) return FALLBACK_CLOUD_RATE;
 	let best: ModelRate | null = null;

@@ -20,6 +20,7 @@ import type {
 	AiExtractResult,
 	AiGenerateRequest,
 	AiGenerateResult,
+	AiProviderInfo,
 	AiService,
 	AiTransformRequest,
 	AiTransformResult,
@@ -1073,6 +1074,8 @@ function aiProxy(bridge: Bridge): AiService {
 			const caps = req.provider ? ["ai.use", `ai.provider:${req.provider}`] : ["ai.use"];
 			return callService<AiCostEstimate>(bridge, "ai", "cost", [req], caps);
 		},
+		providers: () =>
+			callService<readonly AiProviderInfo[]>(bridge, "ai", "providers", [], ["ai.use"]),
 	};
 }
 

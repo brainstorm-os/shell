@@ -69,13 +69,13 @@ import {
 } from "./agents/mention-runner";
 import { AgentTraceRecorder, makeBrokerTraceObserver } from "./agents/trace/agent-trace-recorder";
 import { makeAgentTraceServiceHandler } from "./agents/trace/agent-trace-service";
+import { type ApplyAiSettingsDeps, applyAiSettings, builtinInfo } from "./ai/ai-provider-config";
 import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
-import { type AnthropicHttp, createAnthropicProvider } from "./ai/anthropic-provider";
+import { createAnthropicProvider } from "./ai/anthropic-provider";
 import { DEMO_AGENT_PROVIDER_ID, createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
-import { type OllamaHttp, createOllamaProvider } from "./ai/ollama-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
 import { ProviderRegistry } from "./ai/provider-registry";
 import {
@@ -379,7 +379,7 @@ import { createElectronAutoUpdater, isAutoUpdateSupported } from "./update/elect
 import { DEFAULT_UPDATE_FEED_URL, fetchUpdateFeedJson } from "./update/update-feed-fetch";
 import { UpdatePrefsStore, updatePrefsPath } from "./update/update-prefs-store";
 import { UpdateService } from "./update/update-service";
-import { readAiSettings } from "./vault/ai-settings-store";
+import { type AiSettings, defaultAiSettings, readAiSettings } from "./vault/ai-settings-store";
 import { appActivityIdleSeconds, noteAppActivity } from "./vault/app-activity-tracker";
 import { createAppLockWatcher } from "./vault/app-lock-watcher";
 import { readRegistry, writeRegistry } from "./vault/registry";
@@ -1845,12 +1845,13 @@ void app.whenReady().then(async () => {
 	// the live audit log.
 	const networkAuditPath = join(app.getPath("userData"), "network-audit.jsonl");
 	const aiUsagePath = join(app.getPath("userData"), "ai-usage.jsonl");
-	// 11.9 — late-bound to the provider registry (built further down), so a
-	// routing-default change from Settings → AI takes effect live. Null until
-	// the registry exists; an already-open vault is applied post-registry below.
-	let applyAiDefaultProvider: ((id: string | null) => void) | null = null;
+	// 11.9 / Agent-14 — late-bound to the provider registry (built further
+	// down), so a Settings → AI change (routing default, custom endpoints,
+	// Ollama) takes effect live. Null until the registry exists; an
+	// already-open vault is applied post-registry below.
+	let applyAiSettingsLive: ((settings: AiSettings) => void) | null = null;
 	registerAiSettingsHandlers({
-		applyDefaultProvider: (id) => applyAiDefaultProvider?.(id),
+		applySettings: (settings) => applyAiSettingsLive?.(settings),
 	});
 	// Agent-12d — Settings → AI → Agent activity (dashboard-privileged, not
 	// broker; OQ-AO-2 shell-surfaces-only). Bounded projections over the
@@ -3533,10 +3534,10 @@ void app.whenReady().then(async () => {
 			// the starter content without a reopen.
 			broadcastVaultEntitiesStaleSignal(launchSetup.getLauncherSync()?.allWindows() ?? []);
 		}
-		// 11.9 — apply this vault's AI routing default to the provider registry.
-		if (session && applyAiDefaultProvider) {
+		// 11.9 / Agent-14 — apply this vault's AI settings to the provider registry.
+		if (session && applyAiSettingsLive) {
 			try {
-				applyAiDefaultProvider((await readAiSettings(session.vaultPath)).defaultProvider);
+				applyAiSettingsLive(await readAiSettings(session.vaultPath));
 			} catch (error) {
 				console.warn(`[brainstorm] AI settings load failed: ${(error as Error).message}`);
 			}
@@ -4673,37 +4674,64 @@ void app.whenReady().then(async () => {
 	// broker's `executeNetworkFetch` with `allowPrivate` so the shell can
 	// POST to `localhost:11434` (apps never hold raw network reach for AI —
 	// the gate is `ai.use`, enforced by the broker before this runs).
-	// Endpoint + default model are dev/BYO config; the app-facing contract
-	// is provider-agnostic.
-	const ollamaHttp: OllamaHttp = async ({ url, bodyJson }) => {
-		const res = await executeNetworkFetch(
-			{
-				appId: "_shell.ai",
-				url,
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: new TextEncoder().encode(JSON.stringify(bodyJson)),
-				allowPrivate: true,
-				timeoutMs: 120_000,
-				sizeCapBytes: 8 * 1024 * 1024,
-			},
-			{
-				fetchImpl: productionFetchImpl,
-				lookupHost: productionLookupHost,
-				auditSink: makeFileAuditSink(networkAuditPath),
-			},
-		);
-		return { status: res.status, text: new TextDecoder().decode(res.body) };
-	};
+	// Endpoint + default model are Settings → AI config (env as the default);
+	// the app-facing contract is provider-agnostic.
+	//
+	// ONE transport for every provider — POST JSON over the network broker
+	// (SSRF floor, DNS pinning, shared proxy, egress audit; the auth header is
+	// forwarded but never logged). `allowPrivate` is set only for the local
+	// model server and for user-added endpoints whose host is loopback/LAN.
+	const aiBrokerHttp =
+		({ allowPrivate }: { allowPrivate: boolean }) =>
+		async ({
+			url,
+			headers,
+			bodyJson,
+		}: { url: string; headers?: Record<string, string>; bodyJson: unknown }) => {
+			const res = await executeNetworkFetch(
+				{
+					appId: "_shell.ai",
+					url,
+					method: "POST",
+					headers: { "Content-Type": "application/json", ...headers },
+					body: new TextEncoder().encode(JSON.stringify(bodyJson)),
+					...(allowPrivate ? { allowPrivate: true } : {}),
+					timeoutMs: 120_000,
+					sizeCapBytes: 8 * 1024 * 1024,
+				},
+				{
+					fetchImpl: productionFetchImpl,
+					lookupHost: productionLookupHost,
+					auditSink: makeFileAuditSink(networkAuditPath),
+				},
+			);
+			return { status: res.status, text: new TextDecoder().decode(res.body) };
+		};
 	const aiProviders = new ProviderRegistry();
-	aiProviders.register(
-		createOllamaProvider({
-			endpoint: process.env.BRAINSTORM_OLLAMA_ENDPOINT ?? "http://localhost:11434",
-			defaultModel: process.env.BRAINSTORM_OLLAMA_MODEL ?? "llama3.2",
-			http: ollamaHttp,
-		}),
-		{ default: true },
-	);
+	// In capture-only demo mode the built-in fallback IS the scripted provider —
+	// otherwise a vault open with no persisted default resets routing to Ollama
+	// and the demo turn fails "no model reached".
+	const fallbackProviderId = process.env.BRAINSTORM_DEMO_AGENT
+		? DEMO_AGENT_PROVIDER_ID
+		: OLLAMA_PROVIDER_ID;
+	const aiConfigDeps: ApplyAiSettingsDeps = {
+		registry: aiProviders,
+		openAiHttp: aiBrokerHttp,
+		ollamaHttp: aiBrokerHttp,
+		// A custom endpoint's optional key — the active vault's Tier-2
+		// credential, read in main per request; never crosses IPC.
+		getApiKey: async (providerId) => {
+			const session = getActiveVaultSession();
+			return session ? await readAiProviderKey(session.credentials, providerId) : null;
+		},
+		ollamaEnv: {
+			endpoint: process.env.BRAINSTORM_OLLAMA_ENDPOINT,
+			model: process.env.BRAINSTORM_OLLAMA_MODEL,
+		},
+		fallbackProviderId,
+	};
+	// Registers Ollama (env / built-in endpoint) as the first provider + default.
+	applyAiSettings(defaultAiSettings(), aiConfigDeps);
 	// Capture-only: the scripted demo provider powers the Agent-11 propose→approve
 	// promo reel without a live model (the rig is deterministic + model-free).
 	// Gated behind BRAINSTORM_DEMO_AGENT — never registered in normal dev/prod;
@@ -4726,28 +4754,13 @@ void app.whenReady().then(async () => {
 	// closed (`Unavailable`); registered always so a pinned `provider:"anthropic"`
 	// resolves, but Ollama stays the default. The Settings AI panel (11.9) writes
 	// the credential via `writeAiProviderKey`.
-	// Shared transport for every cloud provider — POST JSON over the network
-	// broker (public host, no `allowPrivate`; the auth header is forwarded but
-	// never logged). The provider-specific Http types are structurally identical.
-	const cloudHttp: AnthropicHttp = async ({ url, headers, bodyJson }) => {
-		const res = await executeNetworkFetch(
-			{
-				appId: "_shell.ai",
-				url,
-				method: "POST",
-				headers: { "Content-Type": "application/json", ...headers },
-				body: new TextEncoder().encode(JSON.stringify(bodyJson)),
-				timeoutMs: 120_000,
-				sizeCapBytes: 8 * 1024 * 1024,
-			},
-			{
-				fetchImpl: productionFetchImpl,
-				lookupHost: productionLookupHost,
-				auditSink: makeFileAuditSink(networkAuditPath),
-			},
-		);
-		return { status: res.status, text: new TextDecoder().decode(res.body) };
-	};
+	const cloudHttp = aiBrokerHttp({ allowPrivate: false });
+	const anthropicModel = process.env.BRAINSTORM_ANTHROPIC_MODEL ?? "claude-opus-4-8";
+	const openAiModel = process.env.BRAINSTORM_OPENAI_MODEL ?? "gpt-4o-mini";
+	const glmModel = process.env.BRAINSTORM_GLM_MODEL ?? "glm-5.2";
+	const mistralModel = process.env.BRAINSTORM_MISTRAL_MODEL ?? "mistral-large-latest";
+	const solheimModel = process.env.BRAINSTORM_SOLHEIM_MODEL ?? "qwen3.6-35b-a3b";
+	const geminiModel = process.env.BRAINSTORM_GEMINI_MODEL ?? "gemini-2.0-flash";
 	// Resolve a provider's BYO key: the active vault's Tier-2 credential first,
 	// then a dev-only env fallback. Read in main only; never crosses IPC.
 	const cloudKey = (providerId: string, envVar: string) => async (): Promise<string | null> => {
@@ -4760,10 +4773,11 @@ void app.whenReady().then(async () => {
 	};
 	aiProviders.register(
 		createAnthropicProvider({
-			defaultModel: process.env.BRAINSTORM_ANTHROPIC_MODEL ?? "claude-opus-4-8",
+			defaultModel: anthropicModel,
 			getApiKey: cloudKey(ANTHROPIC_PROVIDER_ID, "BRAINSTORM_ANTHROPIC_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(ANTHROPIC_PROVIDER_ID, "Anthropic", anthropicModel) },
 	);
 	// OpenAI-compatible (configurable base URL → OpenAI / OpenRouter / Together /
 	// Groq / local LM Studio). Pinned only by the key being present.
@@ -4772,10 +4786,11 @@ void app.whenReady().then(async () => {
 			...(process.env.BRAINSTORM_OPENAI_BASE_URL
 				? { baseUrl: process.env.BRAINSTORM_OPENAI_BASE_URL }
 				: {}),
-			defaultModel: process.env.BRAINSTORM_OPENAI_MODEL ?? "gpt-4o-mini",
+			defaultModel: openAiModel,
 			getApiKey: cloudKey(OPENAI_PROVIDER_ID, "BRAINSTORM_OPENAI_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(OPENAI_PROVIDER_ID, "OpenAI", openAiModel) },
 	);
 	// z.ai GLM — OpenAI-compatible Chat Completions under z.ai's base URL, so it
 	// rides the OpenAI provider with its own id, key custody, and default model.
@@ -4784,10 +4799,11 @@ void app.whenReady().then(async () => {
 			id: GLM_PROVIDER_ID,
 			label: "GLM",
 			baseUrl: process.env.BRAINSTORM_GLM_BASE_URL ?? "https://api.z.ai/api/paas/v4",
-			defaultModel: process.env.BRAINSTORM_GLM_MODEL ?? "glm-5.2",
+			defaultModel: glmModel,
 			getApiKey: cloudKey(GLM_PROVIDER_ID, "BRAINSTORM_GLM_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(GLM_PROVIDER_ID, "GLM", glmModel) },
 	);
 	// Mistral AI (European) — OpenAI-compatible Chat Completions under la Plateforme's
 	// base URL, so it rides the OpenAI provider with its own id, key custody, and model.
@@ -4796,10 +4812,11 @@ void app.whenReady().then(async () => {
 			id: MISTRAL_PROVIDER_ID,
 			label: "Mistral",
 			baseUrl: process.env.BRAINSTORM_MISTRAL_BASE_URL ?? "https://api.mistral.ai/v1",
-			defaultModel: process.env.BRAINSTORM_MISTRAL_MODEL ?? "mistral-large-latest",
+			defaultModel: mistralModel,
 			getApiKey: cloudKey(MISTRAL_PROVIDER_ID, "BRAINSTORM_MISTRAL_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(MISTRAL_PROVIDER_ID, "Mistral", mistralModel) },
 	);
 	// Solheim (EU-hosted, single-tenant open-weight instance) — OpenAI-compatible
 	// Chat Completions, so it rides the OpenAI provider with its own id, key
@@ -4811,39 +4828,33 @@ void app.whenReady().then(async () => {
 			id: SOLHEIM_PROVIDER_ID,
 			label: "Solheim",
 			baseUrl: process.env.BRAINSTORM_SOLHEIM_BASE_URL ?? "https://api.solheim.ai/v1",
-			defaultModel: process.env.BRAINSTORM_SOLHEIM_MODEL ?? "qwen3.6-35b-a3b",
+			defaultModel: solheimModel,
 			getApiKey: cloudKey(SOLHEIM_PROVIDER_ID, "BRAINSTORM_SOLHEIM_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(SOLHEIM_PROVIDER_ID, "Solheim", solheimModel) },
 	);
 	aiProviders.register(
 		createGeminiProvider({
 			...(process.env.BRAINSTORM_GEMINI_BASE_URL
 				? { baseUrl: process.env.BRAINSTORM_GEMINI_BASE_URL }
 				: {}),
-			defaultModel: process.env.BRAINSTORM_GEMINI_MODEL ?? "gemini-2.0-flash",
+			defaultModel: geminiModel,
 			getApiKey: cloudKey(GEMINI_PROVIDER_ID, "BRAINSTORM_GEMINI_API_KEY"),
 			http: cloudHttp,
 		}),
+		{ info: builtinInfo(GEMINI_PROVIDER_ID, "Gemini", geminiModel) },
 	);
-	// 11.9 — bind the routing applier now that the registry exists. A persisted
-	// `defaultProvider` (Settings → AI) pins routing; `null` restores the
-	// built-in default (local Ollama, registered first). Applied per vault open
-	// (onVaultOpened) + immediately for an already-open vault.
-	// In capture-only demo mode the built-in fallback IS the scripted provider —
-	// otherwise a vault open with no persisted default resets routing to Ollama
-	// and the demo turn fails "no model reached".
-	const fallbackProviderId = process.env.BRAINSTORM_DEMO_AGENT
-		? DEMO_AGENT_PROVIDER_ID
-		: OLLAMA_PROVIDER_ID;
-	applyAiDefaultProvider = (id) => {
-		aiProviders.setDefault(id && aiProviders.has(id) ? id : fallbackProviderId);
-	};
+	// 11.9 / Agent-14 — bind the settings applier now that the registry
+	// exists. A persisted `defaultProvider` pins routing (`null` restores the
+	// built-in default); custom endpoints register/unregister; Ollama re-points.
+	// Applied per vault open (onVaultOpened) + immediately for an open vault.
+	applyAiSettingsLive = (settings) => applyAiSettings(settings, aiConfigDeps);
 	{
 		const openSession = getActiveVaultSession();
 		if (openSession) {
 			void readAiSettings(openSession.vaultPath)
-				.then((s) => applyAiDefaultProvider?.(s.defaultProvider))
+				.then((s) => applyAiSettingsLive?.(s))
 				.catch(() => {});
 		}
 	}
@@ -4892,6 +4903,12 @@ void app.whenReady().then(async () => {
 		makeAiServiceHandler({
 			getProvider: (id) => aiProviders.get(id),
 			quota: aiQuota,
+			listProviders: () => aiProviders.list(),
+			appHoldsCapability: async (appId, capability) => {
+				const session = getActiveVaultSession();
+				if (!session) return false;
+				return (await session.capabilityLedger()).has(appId, capability);
+			},
 			onUsage: (rec) => {
 				void recordAiUsage(aiUsageSink, rec);
 				void aiQuota.recordUsage(rec);

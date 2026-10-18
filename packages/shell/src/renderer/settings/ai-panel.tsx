@@ -4,7 +4,13 @@
  * is not a sandboxed app, so it uses direct ipcMain, not the broker. The raw
  * key is write-only: we send it on Save and only ever read back a
  * configured/not boolean, never the key itself (11.6 custody). The local model
- * (Ollama) needs no key, so it isn't listed here.
+ * (Ollama) needs no key; its tile edits the endpoint + model instead.
+ *
+ * Agent-14 — custom OpenAI-compatible endpoints (with an OpenRouter preset):
+ * name, base URL, default model, optional key. Adding one is the user's
+ * consent to egress there; the request still rides the network broker. The
+ * URL policy is the same pure `checkEndpointUrl` main enforces, run here only
+ * to explain a refusal before Save.
  */
 
 import {
@@ -12,11 +18,27 @@ import {
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
 	MISTRAL_PROVIDER_ID,
+	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
 	SOLHEIM_PROVIDER_ID,
 } from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import type { AiAppBudgetView, AiSettingsView, AiUsageWindowView } from "../../preload";
+import { checkEndpointUrl } from "../../main/ai/endpoint-url";
+import type {
+	AiAppBudgetView,
+	AiCustomEndpointView,
+	AiSettingsView,
+	AiUsageWindowView,
+} from "../../preload";
+import {
+	CustomEndpointError,
+	CustomEndpointPreset,
+	EndpointUrlError,
+	OLLAMA_DEFAULT_ENDPOINT,
+	OLLAMA_DEFAULT_MODEL,
+	OllamaSettingsError,
+	PRESET_BASE_URL,
+} from "../../shared/ai-endpoints";
 import { t } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Popover } from "../ui/popover";
@@ -91,8 +113,9 @@ const CLOUD_PROVIDERS: ReadonlyArray<ProviderMeta> = [
 function ProviderTile({
 	provider,
 	configured,
+	statusLabel,
 	onOpen,
-}: { provider: ProviderMeta; configured: boolean; onOpen: () => void }) {
+}: { provider: ProviderMeta; configured: boolean; statusLabel?: string; onOpen: () => void }) {
 	const tileLabel = t(provider.tileNameKey ?? provider.nameKey);
 	return (
 		<button
@@ -110,7 +133,8 @@ function ProviderTile({
 			</span>
 			<span className="settings__ai-tile-name">{tileLabel}</span>
 			<span className="settings__ai-tile-status">
-				{configured ? t("shell.settings.ai.statusConfigured") : t("shell.settings.ai.statusUnset")}
+				{statusLabel ??
+					(configured ? t("shell.settings.ai.statusConfigured") : t("shell.settings.ai.statusUnset"))}
 			</span>
 		</button>
 	);
@@ -233,9 +257,14 @@ function ProviderKeyPopover({
 /** The provider grid: one tile per cloud provider, each opening a credential
  *  popover. Key-configured state is loaded once and refreshed after a change so
  *  every tile's status dot stays live. */
-function ProviderGrid() {
+function ProviderGrid({
+	settings,
+	onSettings,
+}: { settings: AiSettingsView | null; onSettings: (next: AiSettingsView) => void }) {
 	const [configured, setConfigured] = useState<Record<string, boolean>>({});
 	const [openId, setOpenId] = useState<string | null>(null);
+	const [ollamaOpen, setOllamaOpen] = useState(false);
+	const ollamaCustomised = Boolean(settings?.ollama?.endpoint || settings?.ollama?.model);
 
 	const refresh = useCallback(async () => {
 		const entries = await Promise.all(
@@ -255,6 +284,16 @@ function ProviderGrid() {
 	return (
 		<div className="settings__field" data-testid="ai-providers">
 			<div className="settings__ai-grid">
+				<ProviderTile
+					provider={OLLAMA_META}
+					configured={ollamaCustomised}
+					statusLabel={
+						ollamaCustomised
+							? t("shell.settings.ai.statusCustomised")
+							: t("shell.settings.ai.statusDefault")
+					}
+					onOpen={() => setOllamaOpen(true)}
+				/>
 				{CLOUD_PROVIDERS.map((p) => (
 					<ProviderTile
 						key={p.id}
@@ -270,6 +309,424 @@ function ProviderGrid() {
 					configured={configured[open.id] ?? false}
 					onClose={() => setOpenId(null)}
 					onChanged={refresh}
+				/>
+			)}
+			{ollamaOpen && (
+				<OllamaPopover settings={settings} onClose={() => setOllamaOpen(false)} onSaved={onSettings} />
+			)}
+		</div>
+	);
+}
+
+const OLLAMA_META: ProviderMeta = {
+	id: OLLAMA_PROVIDER_ID,
+	nameKey: "shell.settings.ai.ollama.name",
+	tileNameKey: "shell.settings.ai.ollama.tile",
+	hintKey: "shell.settings.ai.ollama.hint",
+	monogram: "L",
+};
+
+const URL_ERROR_KEY: Record<EndpointUrlError, string> = {
+	[EndpointUrlError.Malformed]: "shell.settings.ai.url.malformed",
+	[EndpointUrlError.Scheme]: "shell.settings.ai.url.scheme",
+	[EndpointUrlError.Credentials]: "shell.settings.ai.url.credentials",
+	[EndpointUrlError.QueryOrFragment]: "shell.settings.ai.url.queryOrFragment",
+	[EndpointUrlError.InsecurePublic]: "shell.settings.ai.url.insecurePublic",
+	[EndpointUrlError.BlockedPort]: "shell.settings.ai.url.blockedPort",
+	[EndpointUrlError.TooLong]: "shell.settings.ai.url.tooLong",
+};
+
+const ENDPOINT_ERROR_KEY: Record<
+	Exclude<CustomEndpointError, CustomEndpointError.InvalidUrl>,
+	string
+> = {
+	[CustomEndpointError.InvalidName]: "shell.settings.ai.endpoints.error.name",
+	[CustomEndpointError.InvalidModel]: "shell.settings.ai.endpoints.error.model",
+	[CustomEndpointError.TooMany]: "shell.settings.ai.endpoints.error.tooMany",
+	[CustomEndpointError.NotFound]: "shell.settings.ai.endpoints.error.notFound",
+};
+
+/** Live URL feedback for a draft: the refusal reason, or the cleartext-LAN
+ *  note, or nothing. Empty drafts say nothing (the field is just unfilled). */
+function urlFeedback(draft: string): { error?: string; hint?: string } {
+	if (draft.trim().length === 0) return {};
+	const check = checkEndpointUrl(draft);
+	if (!check.ok) return { error: t(URL_ERROR_KEY[check.error]) };
+	if (check.privateHost && check.url.startsWith("http:")) {
+		return { hint: t("shell.settings.ai.endpoints.lanNote") };
+	}
+	return {};
+}
+
+/** Ollama endpoint + model. Empty fields fall back to the env / built-in
+ *  default, shown as placeholders. */
+function OllamaPopover({
+	settings,
+	onClose,
+	onSaved,
+}: {
+	settings: AiSettingsView | null;
+	onClose: () => void;
+	onSaved: (next: AiSettingsView) => void;
+}) {
+	const [endpoint, setEndpoint] = useState(settings?.ollama?.endpoint ?? "");
+	const [model, setModel] = useState(settings?.ollama?.model ?? "");
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const feedback = urlFeedback(endpoint);
+
+	const submit = async (next: { endpoint: string; model: string }) => {
+		setBusy(true);
+		try {
+			const result = await window.brainstorm.aiSettings.setOllama?.(next);
+			if (!result) return;
+			if (result.ok) {
+				onSaved(result.settings);
+				onClose();
+			} else if (result.error === OllamaSettingsError.InvalidUrl && result.urlError) {
+				setError(t(URL_ERROR_KEY[result.urlError]));
+			} else {
+				setError(t("shell.settings.ai.endpoints.error.model"));
+			}
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<Popover
+			title={t(OLLAMA_META.nameKey)}
+			onClose={onClose}
+			size={PopoverSize.Small}
+			bodyPadding={PopoverBodyPadding.Comfortable}
+			fitContent
+			initialFocusRef={inputRef}
+			testId="ai-ollama-popover"
+			footer={
+				<>
+					<Button
+						variant={ButtonVariant.Ghost}
+						size={ButtonSize.Md}
+						className="popover__footer-lead"
+						onClick={() => void submit({ endpoint: "", model: "" })}
+						disabled={busy}
+					>
+						{t("shell.settings.ai.ollama.reset")}
+					</Button>
+					<Button
+						variant={ButtonVariant.Primary}
+						size={ButtonSize.Md}
+						onClick={() => void submit({ endpoint, model })}
+						disabled={busy || Boolean(feedback.error)}
+					>
+						{t("shell.settings.ai.save")}
+					</Button>
+				</>
+			}
+		>
+			<form
+				className="settings__ai-key-form"
+				onSubmit={(e) => {
+					e.preventDefault();
+					if (!feedback.error) void submit({ endpoint, model });
+				}}
+			>
+				<p className="settings__hint">{t(OLLAMA_META.hintKey)}</p>
+				<TextField
+					ref={inputRef}
+					label={t("shell.settings.ai.ollama.endpointLabel")}
+					type="url"
+					spellCheck={false}
+					value={endpoint}
+					placeholder={OLLAMA_DEFAULT_ENDPOINT}
+					onChange={(v) => {
+						setEndpoint(v);
+						setError(null);
+					}}
+					{...(feedback.error ? { error: feedback.error } : {})}
+					{...(feedback.hint ? { hint: feedback.hint } : {})}
+					data-testid="ai-ollama-endpoint"
+				/>
+				<TextField
+					label={t("shell.settings.ai.ollama.modelLabel")}
+					spellCheck={false}
+					value={model}
+					placeholder={OLLAMA_DEFAULT_MODEL}
+					onChange={(v) => {
+						setModel(v);
+						setError(null);
+					}}
+					data-testid="ai-ollama-model"
+				/>
+				{error && <p className="settings__error">{error}</p>}
+			</form>
+		</Popover>
+	);
+}
+
+/** Host part of a stored base URL, for the endpoint row's detail line. */
+function endpointHost(baseUrl: string): string {
+	try {
+		return new URL(baseUrl).host;
+	} catch {
+		return baseUrl;
+	}
+}
+
+/** Add / edit one custom endpoint. The key is write-only like the built-in
+ *  providers': typed, saved through `setProviderKey`, never read back. */
+function EndpointPopover({
+	endpoint,
+	preset,
+	onClose,
+	onSaved,
+}: {
+	endpoint: AiCustomEndpointView | null;
+	preset: CustomEndpointPreset;
+	onClose: () => void;
+	onSaved: (next: AiSettingsView) => void;
+}) {
+	const bridge = window.brainstorm.aiSettings;
+	const [name, setName] = useState(
+		endpoint?.name ?? (preset === CustomEndpointPreset.OpenRouter ? "OpenRouter" : ""),
+	);
+	const [baseUrl, setBaseUrl] = useState(endpoint?.baseUrl ?? PRESET_BASE_URL[preset] ?? "");
+	const [model, setModel] = useState(endpoint?.defaultModel ?? "");
+	const [key, setKey] = useState("");
+	const [hasKey, setHasKey] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const feedback = urlFeedback(baseUrl);
+	const isOpenRouter = (endpoint?.preset ?? preset) === CustomEndpointPreset.OpenRouter;
+
+	useEffect(() => {
+		if (!endpoint) return;
+		let live = true;
+		void bridge.hasProviderKey(endpoint.id).then((has) => live && setHasKey(has));
+		return () => {
+			live = false;
+		};
+	}, [bridge, endpoint]);
+
+	const canSave =
+		!busy &&
+		name.trim().length > 0 &&
+		model.trim().length > 0 &&
+		baseUrl.trim().length > 0 &&
+		!feedback.error;
+
+	const save = async () => {
+		if (!canSave) return;
+		setBusy(true);
+		try {
+			const result = await bridge.upsertEndpoint?.({
+				...(endpoint ? { id: endpoint.id } : {}),
+				name,
+				baseUrl,
+				defaultModel: model,
+				preset: endpoint?.preset ?? preset,
+			});
+			if (!result) return;
+			if (!result.ok) {
+				setError(
+					result.error === CustomEndpointError.InvalidUrl
+						? t(URL_ERROR_KEY[result.urlError ?? EndpointUrlError.Malformed])
+						: t(ENDPOINT_ERROR_KEY[result.error]),
+				);
+				return;
+			}
+			if (key.trim().length > 0) await bridge.setProviderKey(result.endpoint.id, key.trim());
+			onSaved(result.settings);
+			onClose();
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const remove = async () => {
+		if (!endpoint) return;
+		setBusy(true);
+		try {
+			const next = await bridge.removeEndpoint?.(endpoint.id);
+			if (next) onSaved(next);
+			onClose();
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<Popover
+			title={endpoint ? endpoint.name : t("shell.settings.ai.endpoints.newTitle")}
+			onClose={onClose}
+			size={PopoverSize.Small}
+			bodyPadding={PopoverBodyPadding.Comfortable}
+			fitContent
+			initialFocusRef={inputRef}
+			testId="ai-endpoint-popover"
+			footer={
+				<>
+					{endpoint && (
+						<Button
+							variant={ButtonVariant.Ghost}
+							danger
+							size={ButtonSize.Md}
+							className="popover__footer-lead"
+							onClick={() => void remove()}
+							disabled={busy}
+						>
+							{t("shell.settings.ai.endpoints.remove")}
+						</Button>
+					)}
+					<Button
+						variant={ButtonVariant.Primary}
+						size={ButtonSize.Md}
+						onClick={() => void save()}
+						disabled={!canSave}
+					>
+						{t("shell.settings.ai.save")}
+					</Button>
+				</>
+			}
+		>
+			<form
+				className="settings__ai-key-form"
+				onSubmit={(e) => {
+					e.preventDefault();
+					void save();
+				}}
+			>
+				<p className="settings__hint">{t("shell.settings.ai.endpoints.hint")}</p>
+				<TextField
+					ref={inputRef}
+					label={t("shell.settings.ai.endpoints.nameLabel")}
+					value={name}
+					maxLength={64}
+					placeholder={t("shell.settings.ai.endpoints.namePlaceholder")}
+					onChange={setName}
+					data-testid="ai-endpoint-name"
+				/>
+				<TextField
+					label={t("shell.settings.ai.endpoints.urlLabel")}
+					type="url"
+					spellCheck={false}
+					value={baseUrl}
+					placeholder={t("shell.settings.ai.endpoints.urlPlaceholder")}
+					onChange={(v) => {
+						setBaseUrl(v);
+						setError(null);
+					}}
+					{...(feedback.error ? { error: feedback.error } : {})}
+					{...(feedback.hint ? { hint: feedback.hint } : {})}
+					data-testid="ai-endpoint-url"
+				/>
+				<TextField
+					label={t("shell.settings.ai.endpoints.modelLabel")}
+					spellCheck={false}
+					value={model}
+					maxLength={200}
+					placeholder={t("shell.settings.ai.endpoints.modelPlaceholder")}
+					onChange={(v) => {
+						setModel(v);
+						setError(null);
+					}}
+					{...(isOpenRouter ? { hint: t("shell.settings.ai.endpoints.openRouterHint") } : {})}
+					data-testid="ai-endpoint-model"
+				/>
+				<TextField
+					label={t("shell.settings.ai.endpoints.keyLabel")}
+					type="password"
+					autoComplete="off"
+					spellCheck={false}
+					value={key}
+					placeholder={
+						hasKey ? t("shell.settings.ai.replacePlaceholder") : t("shell.settings.ai.keyPlaceholder")
+					}
+					onChange={setKey}
+					hint={t("shell.settings.ai.endpoints.keyHint")}
+					data-testid="ai-endpoint-key"
+				/>
+				{error && <p className="settings__error">{error}</p>}
+			</form>
+		</Popover>
+	);
+}
+
+/** The editor target: an existing endpoint, or a new one from a preset. */
+type EndpointEditTarget =
+	| { kind: EndpointEditKind.Edit; endpoint: AiCustomEndpointView }
+	| { kind: EndpointEditKind.New; preset: CustomEndpointPreset };
+
+enum EndpointEditKind {
+	Edit = "edit",
+	New = "new",
+}
+
+/** Agent-14 — the custom endpoint list + the add affordances. */
+function CustomEndpointsSection({
+	settings,
+	onSettings,
+}: { settings: AiSettingsView | null; onSettings: (next: AiSettingsView) => void }) {
+	const [target, setTarget] = useState<EndpointEditTarget | null>(null);
+	const endpoints = settings?.customEndpoints ?? [];
+	return (
+		<div className="settings__field" data-testid="ai-endpoints">
+			<div className="settings__field-head">
+				<span className="settings__field-label">{t("shell.settings.ai.endpoints.title")}</span>
+			</div>
+			<p className="settings__hint">{t("shell.settings.ai.endpoints.hint")}</p>
+			{endpoints.length === 0 ? (
+				<p className="settings__hint">{t("shell.settings.ai.endpoints.empty")}</p>
+			) : (
+				<ul className="settings__ai-usage-list">
+					{endpoints.map((e) => (
+						<li key={e.id} className="settings__ai-usage-row">
+							<button
+								type="button"
+								className="settings__ai-usage-trigger"
+								data-testid={`ai-endpoint-${e.id}`}
+								onClick={() => setTarget({ kind: EndpointEditKind.Edit, endpoint: e })}
+							>
+								<span className="settings__ai-usage-app">{e.name}</span>
+								<span className="settings__ai-usage-stat">
+									{t("shell.settings.ai.endpoints.rowDetail", {
+										host: endpointHost(e.baseUrl),
+										model: e.defaultModel,
+									})}
+								</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+			<div className="settings__ai-endpoint-actions">
+				<Button
+					variant={ButtonVariant.Neutral}
+					size={ButtonSize.Md}
+					onClick={() => setTarget({ kind: EndpointEditKind.New, preset: CustomEndpointPreset.Generic })}
+					data-testid="ai-endpoint-add"
+				>
+					{t("shell.settings.ai.endpoints.add")}
+				</Button>
+				<Button
+					variant={ButtonVariant.Neutral}
+					size={ButtonSize.Md}
+					onClick={() =>
+						setTarget({ kind: EndpointEditKind.New, preset: CustomEndpointPreset.OpenRouter })
+					}
+					data-testid="ai-endpoint-add-openrouter"
+				>
+					{t("shell.settings.ai.endpoints.addOpenRouter")}
+				</Button>
+			</div>
+			{target && (
+				<EndpointPopover
+					endpoint={target.kind === EndpointEditKind.Edit ? target.endpoint : null}
+					preset={target.kind === EndpointEditKind.Edit ? target.endpoint.preset : target.preset}
+					onClose={() => setTarget(null)}
+					onSaved={onSettings}
 				/>
 			)}
 		</div>
@@ -288,7 +745,9 @@ function RoutingSection({
 	const value = settings?.defaultProvider ?? AUTO_ROUTING_VALUE;
 	const options = [
 		{ value: AUTO_ROUTING_VALUE, label: t("shell.settings.ai.routingAuto") },
+		{ value: OLLAMA_PROVIDER_ID, label: t(OLLAMA_META.nameKey) },
 		...CLOUD_PROVIDERS.map((p) => ({ value: p.id, label: t(p.nameKey) })),
+		...(settings?.customEndpoints ?? []).map((e) => ({ value: e.id, label: e.name })),
 	];
 	return (
 		<div className="settings__field" data-testid="ai-routing">
@@ -584,7 +1043,8 @@ export function AiPanel() {
 		<section className="settings__section">
 			<h4 className="settings__section-title">{t("shell.settings.ai.title")}</h4>
 			<p className="settings__hint">{t("shell.settings.ai.intro")}</p>
-			<ProviderGrid />
+			<ProviderGrid settings={settings} onSettings={setSettings} />
+			<CustomEndpointsSection settings={settings} onSettings={setSettings} />
 			<RoutingSection settings={settings} onChange={setDefaultProvider} />
 			<McpServersSection />
 			<UsageAndBudgetsSection usage={usage} settings={settings} onSetBudget={setBudget} />

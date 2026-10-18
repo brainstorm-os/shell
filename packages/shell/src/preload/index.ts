@@ -45,6 +45,12 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
+import type {
+	CustomEndpointError,
+	CustomEndpointPreset,
+	EndpointUrlError,
+	OllamaSettingsError,
+} from "../shared/ai-endpoints";
 import { appIconUrl } from "../shared/app-icon-url";
 
 export type { AppearanceMode, AppearancePair, AppearanceSlot, AppearanceState };
@@ -669,6 +675,16 @@ const aiSettings = {
 		ipcRenderer.invoke("ai-settings:set-default-provider", providerId),
 	setAppBudget: (appId: string, budget: AiAppBudgetView): Promise<AiSettingsView | null> =>
 		ipcRenderer.invoke("ai-settings:set-app-budget", appId, budget),
+	/** Agent-14 — add (no `id`) or edit a custom OpenAI-compatible endpoint.
+	 *  Its optional key goes through `setProviderKey(endpoint.id, …)`. */
+	upsertEndpoint: (input: AiCustomEndpointInputView): Promise<AiCustomEndpointResultView | null> =>
+		ipcRenderer.invoke("ai-settings:upsert-endpoint", input),
+	/** Remove a custom endpoint (its stored key is deleted with it). */
+	removeEndpoint: (id: string): Promise<AiSettingsView | null> =>
+		ipcRenderer.invoke("ai-settings:remove-endpoint", id),
+	/** Set the Ollama endpoint/model override (empty = env / built-in default). */
+	setOllama: (input: { endpoint: string; model: string }): Promise<AiOllamaResultView | null> =>
+		ipcRenderer.invoke("ai-settings:set-ollama", input),
 };
 
 /** Agent-12d — Settings → AI → Agent activity (privileged; OQ-AO-2
@@ -737,10 +753,37 @@ export type AiAppBudgetView = {
 	maxCredits?: number;
 };
 
-/** Mirrors the main-side `AiSettings` shape (11.9/14.8). */
+/** Mirrors the main-side `CustomAiEndpoint` (Agent-14). */
+export type AiCustomEndpointView = {
+	id: string;
+	name: string;
+	baseUrl: string;
+	defaultModel: string;
+	preset: CustomEndpointPreset;
+};
+
+export type AiCustomEndpointInputView = {
+	id?: string;
+	name: string;
+	baseUrl: string;
+	defaultModel: string;
+	preset?: CustomEndpointPreset;
+};
+
+export type AiCustomEndpointResultView =
+	| { ok: true; settings: AiSettingsView; endpoint: AiCustomEndpointView }
+	| { ok: false; error: CustomEndpointError; urlError?: EndpointUrlError };
+
+export type AiOllamaResultView =
+	| { ok: true; settings: AiSettingsView }
+	| { ok: false; error: OllamaSettingsError; urlError?: EndpointUrlError };
+
+/** Mirrors the main-side `AiSettings` shape (11.9/14.8/Agent-14). */
 export type AiSettingsView = {
 	defaultProvider: string | null;
 	appBudgets: Record<string, AiAppBudgetView>;
+	customEndpoints: AiCustomEndpointView[];
+	ollama: { endpoint: string | null; model: string | null };
 };
 
 /** Mirrors the main-side `AiUsageView` (14.8): rolling-window per-app usage

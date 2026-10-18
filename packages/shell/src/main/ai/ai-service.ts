@@ -9,6 +9,13 @@
  * network broker.
  *
  * v1 method: `generate` (single-shot). Streaming is the next rung.
+ *
+ * Agent-14: `providers` lists the providers the caller may pin (ledger-
+ * filtered display metadata). A pinned `model` must pass `isValidModelId`
+ * before it reaches a provider body. A pinned **custom endpoint** must also be
+ * covered by an `ai.provider:<id>` cap on the envelope — the broker has
+ * verified every declared cap against the ledger, and in-process callers
+ * (automations, agents) carry their frozen grants there.
  */
 
 import {
@@ -16,13 +23,17 @@ import {
 	type AiExtractField,
 	type AiExtractRequest,
 	type AiGenerateRequest,
+	type AiProviderInfo,
 	type AiTransformRequest,
 	buildExtractMessages,
 	buildTransformMessages,
+	capabilityImplies,
 	estimateTokens,
 	isAiExtractFieldType,
 	isAiTransformKind,
+	isCustomProviderId,
 	isMessageRole,
+	isValidModelId,
 	mergeExtractFields,
 	parseExtractResult,
 } from "@brainstorm-os/sdk-types";
@@ -53,7 +64,50 @@ export type AiServiceOptions = {
 	 *  store unreadable with a budget set → `Unavailable` (fail-closed).
 	 *  Omitted in tests that don't exercise quota. */
 	quota?: { checkBudget: (appId: string) => Promise<void> };
+	/** Agent-14 — every registered provider's display metadata (`ai.providers`). */
+	listProviders?: () => readonly AiProviderInfo[];
+	/** Agent-14 — the live ledger check `ai.providers` filters through, so an
+	 *  app only learns the names of providers it may pin. Absent → the method
+	 *  fails closed. */
+	appHoldsCapability?: (appId: string, capability: string) => Promise<boolean>;
 };
+
+function requireModel(model: unknown, verb: string): string | undefined {
+	if (model === undefined) return undefined;
+	if (!isValidModelId(model)) {
+		throw new AiServiceError(
+			"Invalid",
+			`ai.${verb}: { model } must be a non-empty string without control characters`,
+		);
+	}
+	return model;
+}
+
+/** A custom endpoint is reachable only by a caller whose envelope carries a
+ *  cap implying `ai.provider:<id>`. */
+function requireCustomProviderCap(envelope: Envelope, provider: string | undefined): void {
+	if (!provider || !isCustomProviderId(provider)) return;
+	const needed = `ai.provider:${provider}`;
+	if (!envelope.caps.some((cap) => capabilityImplies(cap, needed))) {
+		throw new AiServiceError("Unavailable", `ai.${envelope.method}: missing capability ${needed}`);
+	}
+}
+
+/** Providers that report no token counts still consume the caller's budget:
+ *  estimate the prompt from the transcript and the completion at ~4 chars per
+ *  token, so a custom endpoint cannot meter as zero. */
+function usageOrEstimate(
+	usage: ProviderUsage | undefined,
+	messages: readonly AiChatMessage[],
+	content: string,
+): ProviderUsage {
+	if (usage && (usage.promptTokens !== undefined || usage.completionTokens !== undefined)) {
+		return usage;
+	}
+	const promptTokens = estimateTokens(messages);
+	const completionTokens = Math.max(1, Math.ceil(content.length / 4));
+	return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+}
 
 /** Token usage as the provider reports it (subset of `AiGenerateResult["usage"]`). */
 type ProviderUsage = { promptTokens?: number; completionTokens?: number; totalTokens?: number };
@@ -83,13 +137,11 @@ function requireRequest(envelope: Envelope): AiGenerateRequest {
 	if (req.provider !== undefined && typeof req.provider !== "string") {
 		throw new AiServiceError("Invalid", "ai.generate: { provider } must be a string");
 	}
-	if (req.model !== undefined && typeof req.model !== "string") {
-		throw new AiServiceError("Invalid", "ai.generate: { model } must be a string");
-	}
+	const model = requireModel(req.model, "generate");
 	return {
 		messages,
 		...(typeof req.provider === "string" ? { provider: req.provider } : {}),
-		...(typeof req.model === "string" ? { model: req.model } : {}),
+		...(model !== undefined ? { model } : {}),
 	};
 }
 
@@ -128,15 +180,13 @@ function requireTransformRequest(envelope: Envelope): AiTransformRequest {
 	if (req.provider !== undefined && typeof req.provider !== "string") {
 		throw new AiServiceError("Invalid", "ai.transform: { provider } must be a string");
 	}
-	if (req.model !== undefined && typeof req.model !== "string") {
-		throw new AiServiceError("Invalid", "ai.transform: { model } must be a string");
-	}
+	const model = requireModel(req.model, "transform");
 	return {
 		source: req.source,
 		kind: req.kind,
 		...(params ? { params } : {}),
 		...(typeof req.provider === "string" ? { provider: req.provider } : {}),
-		...(typeof req.model === "string" ? { model: req.model } : {}),
+		...(model !== undefined ? { model } : {}),
 	};
 }
 
@@ -198,15 +248,13 @@ function requireExtractRequest(envelope: Envelope): AiExtractRequest {
 	if (req.provider !== undefined && typeof req.provider !== "string") {
 		throw new AiServiceError("Invalid", "ai.extract: { provider } must be a string");
 	}
-	if (req.model !== undefined && typeof req.model !== "string") {
-		throw new AiServiceError("Invalid", "ai.extract: { model } must be a string");
-	}
+	const model = requireModel(req.model, "extract");
 	return {
 		source: req.source,
 		fields,
 		...(typeof req.intoType === "string" ? { intoType: req.intoType } : {}),
 		...(typeof req.provider === "string" ? { provider: req.provider } : {}),
-		...(typeof req.model === "string" ? { model: req.model } : {}),
+		...(model !== undefined ? { model } : {}),
 	};
 }
 
@@ -271,13 +319,20 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 			switch (envelope.method) {
 				case "generate": {
 					const req = requireRequest(envelope);
+					requireCustomProviderCap(envelope, req.provider);
 					const result = await resolveProvider(options, req.provider, "generate").generate(req);
-					record(result.provider, result.model, result.usage, AiUsageOutcome.Ok);
+					record(
+						result.provider,
+						result.model,
+						usageOrEstimate(result.usage, req.messages, result.content),
+						AiUsageOutcome.Ok,
+					);
 					return result;
 				}
 				case "cost": {
 					// Same request shape as generate; estimate without calling the model.
 					const req = requireRequest(envelope);
+					requireCustomProviderCap(envelope, req.provider);
 					const provider = resolveProvider(options, req.provider, "cost");
 					return {
 						promptTokens: estimateTokens(req.messages),
@@ -287,13 +342,20 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 				}
 				case "transform": {
 					const req = requireTransformRequest(envelope);
+					requireCustomProviderCap(envelope, req.provider);
 					const provider = resolveProvider(options, req.provider, "transform");
+					const messages = buildTransformMessages(req);
 					const result = await provider.generate({
-						messages: buildTransformMessages(req),
+						messages,
 						...(req.provider ? { provider: req.provider } : {}),
 						...(req.model ? { model: req.model } : {}),
 					});
-					record(result.provider, result.model, result.usage, AiUsageOutcome.Ok);
+					record(
+						result.provider,
+						result.model,
+						usageOrEstimate(result.usage, messages, result.content),
+						AiUsageOutcome.Ok,
+					);
 					return {
 						content: result.content,
 						provider: result.provider,
@@ -317,24 +379,38 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 						}
 						fieldSet = mergeExtractFields(typeFields, req.fields);
 					}
+					requireCustomProviderCap(envelope, req.provider);
 					const provider = resolveProvider(options, req.provider, "extract");
+					const messages = buildExtractMessages({ ...req, fields: fieldSet });
 					const result = await provider.generate({
-						messages: buildExtractMessages({ ...req, fields: fieldSet }),
+						messages,
 						...(req.provider ? { provider: req.provider } : {}),
 						...(req.model ? { model: req.model } : {}),
 					});
+					const usage = usageOrEstimate(result.usage, messages, result.content);
 					const fields = parseExtractResult(result.content, fieldSet);
 					if (!fields) {
-						record(result.provider, result.model, result.usage, AiUsageOutcome.Error);
+						record(result.provider, result.model, usage, AiUsageOutcome.Error);
 						throw new AiServiceError("Unavailable", "ai.extract: model did not return valid JSON");
 					}
-					record(result.provider, result.model, result.usage, AiUsageOutcome.Ok);
+					record(result.provider, result.model, usage, AiUsageOutcome.Ok);
 					return {
 						fields,
 						provider: result.provider,
 						model: result.model,
 						...(result.usage ? { usage: result.usage } : {}),
 					};
+				}
+				case "providers": {
+					const holds = options.appHoldsCapability;
+					if (!holds || !(await holds(envelope.app, "ai.use"))) {
+						throw new AiServiceError("Unavailable", "ai.providers: missing capability ai.use");
+					}
+					const out: AiProviderInfo[] = [];
+					for (const info of options.listProviders?.() ?? []) {
+						if (await holds(envelope.app, `ai.provider:${info.id}`)) out.push(info);
+					}
+					return out;
 				}
 				default:
 					throw new AiServiceError("Invalid", `unknown ai method: ${envelope.method}`);
