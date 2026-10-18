@@ -3,6 +3,7 @@ import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import "@brainstorm-os/sdk/app-theme.css";
 import "@brainstorm-os/sdk/composer-context.css";
 import "@brainstorm-os/sdk/empty-state.css";
+import "@brainstorm-os/sdk/segmented.css";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import { StrictMode } from "react";

@@ -46,6 +46,7 @@ import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-di
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactElement } from "react";
+import { formatDay, formatTime, navigatorLanguage } from "./format";
 import { plural, t } from "./i18n";
 import { useChatT } from "./i18n-hooks";
 import {
@@ -72,6 +73,7 @@ import {
 	type ProposalDecisionResult,
 	readDecisionResult,
 } from "./logic/proposal";
+import { type SearchHit, SearchScope } from "./logic/search";
 import {
 	type ReadWatermarks,
 	ackChannels,
@@ -82,6 +84,8 @@ import {
 } from "./logic/unread";
 import { ProposalCard, type ProposalHost } from "./proposal-card";
 import { getBrainstorm } from "./runtime";
+import { SearchPanel } from "./search-panel";
+import { ChatAction, useChatShortcut } from "./shortcuts";
 import "./styles.css";
 
 const DEFAULT_NAME = "You";
@@ -89,6 +93,8 @@ const DEFAULT_NAME = "You";
 const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+const FLASH_MS = 2400;
 
 /** A pending optimistic echo of a just-sent message, keyed so it can be dropped
  *  once the persisted twin arrives over the reactive snapshot. */
@@ -251,6 +257,10 @@ export function ChatApp(): ReactElement {
 	}, [storage, attachments]);
 
 	const [pending, setPending] = useState<Pending[]>([]);
+	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [searchScope, setSearchScope] = useState<SearchScope>(SearchScope.Channel);
+	const [highlight, setHighlight] = useState<{ messageId: string; nonce: number } | null>(null);
 	const [showSidebar, setShowSidebar] = useState(true);
 	const [showMembers, setShowMembers] = useState(false);
 	const [composeNew, setComposeNew] = useState(false);
@@ -576,6 +586,20 @@ export function ChatApp(): ReactElement {
 		[roster, activeId, identity.avatarRef],
 	);
 
+	const openSearch = useCallback(
+		(scope: SearchScope) => {
+			setSearchScope(activeId ? scope : SearchScope.All);
+			setSearchOpen(true);
+		},
+		[activeId],
+	);
+	useChatShortcut(ChatAction.Search, () => openSearch(SearchScope.Channel));
+	useChatShortcut(ChatAction.SearchAll, () => openSearch(SearchScope.All));
+	const jumpToHit = useCallback((hit: SearchHit) => {
+		setActiveId(hit.channelId);
+		setHighlight((prev) => ({ messageId: hit.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
+	}, []);
+
 	const moreRef = useRef<HTMLButtonElement>(null);
 	const [shareOpen, setShareOpen] = useState(false);
 	useEffect(() => closeObjectMenu, []);
@@ -634,6 +658,17 @@ export function ChatApp(): ReactElement {
 				</div>
 				<div className="app-header__right">
 					{channelPeers.length > 0 && <PresenceStack peers={channelPeers} />}
+					<button
+						type="button"
+						className="chat__icon-btn"
+						data-bs-tooltip={t("search.open")}
+						aria-label={t("search.open")}
+						aria-pressed={searchOpen}
+						onClick={() => (searchOpen ? setSearchOpen(false) : openSearch(SearchScope.Channel))}
+						data-testid="search-toggle"
+					>
+						<Icon name={IconName.Search} size={18} />
+					</button>
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={showSidebar}
@@ -674,6 +709,19 @@ export function ChatApp(): ReactElement {
 				/>
 
 				<main className="chat__main">
+					{searchOpen ? (
+						<SearchPanel
+							entities={entities}
+							activeChannelId={activeChannel?.id ?? null}
+							activeChannelName={activeChannel?.name ?? null}
+							query={searchQuery}
+							scope={searchScope}
+							onQueryChange={setSearchQuery}
+							onScopeChange={setSearchScope}
+							onSelect={jumpToHit}
+							onClose={() => setSearchOpen(false)}
+						/>
+					) : null}
 					{activeChannel ? (
 						<>
 							<MessageView
@@ -682,6 +730,7 @@ export function ChatApp(): ReactElement {
 								avatarByAuthor={avatarByAuthor}
 								emptyName={activeChannel.name}
 								proposalHost={proposalHost}
+								highlight={highlight}
 							/>
 							<Composer
 								channelName={activeChannel.name}
@@ -855,12 +904,15 @@ function MessageView({
 	avatarByAuthor,
 	emptyName,
 	proposalHost,
+	highlight,
 }: {
 	channel: ChatChannel;
 	groups: ReturnType<typeof groupMessages>;
 	avatarByAuthor: ReadonlyMap<string, string>;
 	emptyName: string;
 	proposalHost: ProposalHost;
+	/** Chats-1 — a search jump target; `nonce` re-fires a repeat pick. */
+	highlight: { messageId: string; nonce: number } | null;
 }): ReactElement {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const count = groups.reduce((n, g) => n + g.messages.length, 0);
@@ -871,6 +923,24 @@ function MessageView({
 		const el = scrollRef.current;
 		if (el) el.scrollTop = el.scrollHeight;
 	}, [count]);
+
+	// Declared after the pin-to-latest effect so a jump that also switched
+	// channels lands on the hit, not the bottom.
+	const [flashId, setFlashId] = useState<string | null>(null);
+	const targetId = highlight?.messageId ?? null;
+	const targetNonce = highlight?.nonce ?? 0;
+	useEffect(() => {
+		if (!targetId || targetNonce === 0 || !channel.id) return;
+		const host = scrollRef.current;
+		const el = [...(host?.querySelectorAll<HTMLElement>("[data-message-id]") ?? [])].find(
+			(node) => node.dataset.messageId === targetId,
+		);
+		if (!el) return;
+		el.scrollIntoView?.({ block: "center" });
+		setFlashId(targetId);
+		const timer = setTimeout(() => setFlashId(null), FLASH_MS);
+		return () => clearTimeout(timer);
+	}, [targetId, targetNonce, channel.id]);
 
 	if (groups.length === 0) {
 		return (
@@ -909,7 +979,11 @@ function MessageView({
 								{g.messages.map((m) => {
 									const chips = visibleAttachments(m);
 									return (
-										<div key={m.id} className="chat__line-wrap">
+										<div
+											key={m.id}
+											className={`chat__line-wrap${m.id === flashId ? " chat__line-wrap--flash" : ""}`}
+											data-message-id={m.id}
+										>
 											{m.richBody ? (
 												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
 													{renderEditorState(m.richBody)}
@@ -1224,37 +1298,4 @@ function IdentityPopover({
 			</label>
 		</Popover>
 	);
-}
-
-// ───────────────────────────── formatting ─────────────────────────────
-
-function navigatorLanguage(): string {
-	return typeof navigator !== "undefined" ? navigator.language || "en" : "en";
-}
-
-/** `HH:MM` in the user's locale; "" for an unparseable stamp. */
-function formatTime(iso: string): string {
-	const ms = Date.parse(iso);
-	if (!Number.isFinite(ms)) return "";
-	return new Date(ms).toLocaleTimeString(navigatorLanguage(), {
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-}
-
-/** A friendly day-divider label: Today / Yesterday / a localized date. */
-function formatDay(dayKey: string): string {
-	const ms = Date.parse(dayKey);
-	if (!Number.isFinite(ms)) return dayKey;
-	const that = new Date(ms);
-	const now = new Date();
-	const startOf = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-	const diffDays = Math.round((startOf(now) - startOf(that)) / 86_400_000);
-	if (diffDays === 0) return t("day.today");
-	if (diffDays === 1) return t("day.yesterday");
-	return that.toLocaleDateString(navigatorLanguage(), {
-		weekday: "long",
-		month: "short",
-		day: "numeric",
-	});
 }

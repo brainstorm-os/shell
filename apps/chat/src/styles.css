@@ -679,3 +679,97 @@ body {
 	color: var(--text-dim);
 }
 
+
+/* ── message search (Chats-1) ─────────────────────────────────── */
+.chat__search {
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	max-height: 45%;
+	min-height: 0;
+	border-bottom: 1px solid var(--border-subtle);
+	background: var(--bg-subtle);
+}
+
+.chat__search-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 18px;
+}
+
+.chat__search-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.chat__search-status {
+	margin: 0;
+	padding: 0 18px var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text-faint);
+}
+
+.chat__search-results {
+	list-style: none;
+	margin: 0;
+	padding: 0 6px 6px;
+	overflow-y: auto;
+	min-height: 0;
+}
+
+.chat__search-hit {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	padding: 6px 12px;
+	border: none;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.chat__search-hit:hover,
+.chat__search-hit:focus-visible {
+	background: var(--hover);
+}
+
+.chat__search-hit-meta {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2);
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+}
+
+.chat__search-hit-channel {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.chat__search-hit-time {
+	margin-left: auto;
+	color: var(--text-faint);
+}
+
+.chat__search-hit-snippet {
+	font-size: var(--text-size-md);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* A search jump target pulses an accent wash, then fades back. */
+.chat__line-wrap {
+	border-radius: var(--radius-sm);
+	transition: background 600ms ease;
+}
+
+.chat__line-wrap--flash {
+	background: var(--accent-soft);
+	transition: none;
+}

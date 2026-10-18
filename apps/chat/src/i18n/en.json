@@ -108,5 +108,19 @@
   "proposal.error.alreadyDecided": "Someone already decided this one.",
   "proposal.error.untrustedAgent": "The agent that proposed this is no longer a trusted member.",
   "proposal.error.unavailable": "Couldn't reach your vault — try again.",
-  "proposal.error.generic": "Couldn't decide that — try again."
+  "proposal.error.generic": "Couldn't decide that — try again.",
+  "search.open": "Search messages",
+  "search.title": "Search messages",
+  "search.close": "Close search",
+  "search.clear": "Clear search",
+  "search.placeholder.channel": "Search #{name}…",
+  "search.placeholder.all": "Search all channels…",
+  "search.scope": "Search scope",
+  "search.scope.channel": "This channel",
+  "search.scope.all": "All channels",
+  "search.hint": "Type at least two characters to search.",
+  "search.none": "No messages match.",
+  "search.capped": "Showing the {count} newest matches — refine the search to narrow it.",
+  "search.results.one": "{count} match",
+  "search.results.other": "{count} matches"
 }

@@ -508,3 +508,91 @@ describe("ChatApp — app-icon unread badge (7.14)", () => {
 		expect(kv.get(READ_WATERMARKS_KEY)).toMatchObject({ c2: 3 });
 	});
 });
+
+function pressChord(key: string, mods: { cmdOrCtrl?: boolean; shift?: boolean } = {}): void {
+	const isMac = /mac|iphone|ipad/i.test(navigator.platform ?? navigator.userAgent);
+	act(() => {
+		window.dispatchEvent(
+			new KeyboardEvent("keydown", {
+				key,
+				bubbles: true,
+				metaKey: !!mods.cmdOrCtrl && isMac,
+				ctrlKey: !!mods.cmdOrCtrl && !isMac,
+				shiftKey: !!mods.shift,
+			}),
+		);
+	});
+}
+
+function typeInput(input: HTMLInputElement, value: string): void {
+	const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+	act(() => {
+		setter?.call(input, value);
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
+}
+
+describe("ChatApp — message search (Chats-1)", () => {
+	const seed = (): StubEntity[] => [
+		channel("c1", "general"),
+		channel("c2", "design"),
+		message("m1", "c1", "Mira", "kickoff at noon"),
+		message("m2", "c2", "Mira", "the launch banner is ready"),
+	];
+
+	it("opens from the header, searches across channels, and jumps to + flashes the hit", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			await mount(seed());
+			const toggle = container.querySelector('[data-testid="search-toggle"]') as HTMLButtonElement;
+			await act(async () => toggle.click());
+			expect(container.querySelector('[data-testid="search-panel"]')).not.toBeNull();
+			expect(toggle.getAttribute("aria-pressed")).toBe("true");
+
+			const input = container.querySelector('[data-testid="search-input"]') as HTMLInputElement;
+			typeInput(input, "launch");
+			expect(container.querySelector('[data-testid="search-status"]')?.textContent).toBe(
+				"No messages match.",
+			);
+
+			await act(async () => {
+				(container.querySelector('[data-testid="search-scope-all"]') as HTMLButtonElement).click();
+			});
+			const hits = container.querySelectorAll(".chat__search-hit");
+			expect(hits).toHaveLength(1);
+			expect(hits[0]?.textContent).toContain("design");
+			expect(hits[0]?.textContent).toContain("launch banner");
+
+			await act(async () => (hits[0] as HTMLButtonElement).click());
+			expect(container.querySelector('[data-testid="active-channel"]')?.textContent).toContain(
+				"design",
+			);
+			const line = container.querySelector('[data-message-id="m2"]');
+			expect(line?.classList.contains("chat__line-wrap--flash")).toBe(true);
+			await act(async () => {
+				vi.advanceTimersByTime(3000);
+			});
+			expect(line?.classList.contains("chat__line-wrap--flash")).toBe(false);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("opens with CmdOrCtrl+F (this channel) and CmdOrCtrl+Shift+F (all), Escape closes", async () => {
+		await mount(seed());
+		pressChord("f", { cmdOrCtrl: true });
+		expect(
+			container.querySelector('[data-testid="search-scope-channel"]')?.getAttribute("aria-pressed"),
+		).toBe("true");
+		const input = container.querySelector('[data-testid="search-input"]') as HTMLInputElement;
+		act(() => {
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+		});
+		expect(container.querySelector('[data-testid="search-panel"]')).toBeNull();
+
+		pressChord("f", { cmdOrCtrl: true, shift: true });
+		expect(
+			container.querySelector('[data-testid="search-scope-all"]')?.getAttribute("aria-pressed"),
+		).toBe("true");
+	});
+});
