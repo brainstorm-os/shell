@@ -276,6 +276,22 @@
 	list-style: lower-roman;
 }
 
+/* Indentation guides (B11.30) — a hairline down each nested list, under
+   its parent item's marker, so depth reads at a glance in long outlines.
+   Decorative only: never a hit target. */
+.notes__list-item--nested > .notes__list {
+	position: relative;
+}
+
+.notes__list-item--nested > .notes__list::before {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	inset-inline-start: -1.15em;
+	border-inline-start: var(--border-width) solid var(--color-border-subtle);
+	pointer-events: none;
+}
+
 .notes__code {
 	display: block;
 	background: var(--code-bg);
@@ -1617,6 +1633,18 @@
 
 .notes__toggle > :not(:first-child) {
 	margin-inline-start: var(--space-0_5);
+}
+
+/* The same guide down an open toggle's body, so nested toggles read as an
+   outline (B11.30). Sits under the disclosure caret. */
+.notes__toggle[data-open="true"]::after {
+	content: "";
+	position: absolute;
+	top: 1.6em;
+	bottom: 0;
+	inset-inline-start: 8px;
+	border-inline-start: var(--border-width) solid var(--color-border-subtle);
+	pointer-events: none;
 }
 
 .notes__toggle--h1 > :first-child {

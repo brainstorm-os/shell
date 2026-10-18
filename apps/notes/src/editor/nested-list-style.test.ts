@@ -59,3 +59,18 @@ describe("nested list marker styling", () => {
 		).toMatch(/list-style:\s*lower-roman/);
 	});
 });
+
+describe("indentation guides (B11.30)", () => {
+	it("a nested list draws a token-coloured, non-interactive guide", () => {
+		const body = ruleBody(".notes__list-item--nested > .notes__list::before");
+		expect(body).not.toBeNull();
+		expect(body).toMatch(/border-inline-start:[^;]*var\(--color-border-subtle\)/);
+		expect(body).toMatch(/pointer-events:\s*none/);
+	});
+
+	it("an open toggle draws the same guide down its body", () => {
+		const body = ruleBody('.notes__toggle[data-open="true"]::after');
+		expect(body).not.toBeNull();
+		expect(body).toMatch(/var\(--color-border-subtle\)/);
+	});
+});
