@@ -117,6 +117,13 @@ describe("$host ref — examples", () => {
 		expect(evaluatePredicate(book, pred, 0)).toBe(false);
 	});
 
+	it("a multi-valued relation's { value } envelopes match by id", () => {
+		const multi = row("b2", { authors: [{ value: "page_1" }, { value: "page_3" }] });
+		const pred: PropertyPredicate = { $contains: { authors: HOST } };
+		expect(evaluatePredicate(multi, pred, 0, { hostEntityId: "page_3" })).toBe(true);
+		expect(evaluatePredicate(multi, pred, 0, { hostEntityId: "page_2" })).toBe(false);
+	});
+
 	it("scalar relation is this page", () => {
 		const pred: PropertyPredicate = { $eq: { author: HOST } };
 		expect(evaluatePredicate(book, pred, 0, { hostEntityId: "page_1" })).toBe(true);

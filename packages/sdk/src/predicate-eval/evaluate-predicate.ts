@@ -176,9 +176,16 @@ function collectionContains(collection: unknown, want: ScalarValue): boolean {
 		return collection.toLowerCase().includes(want.toLowerCase());
 	}
 	if (Array.isArray(collection)) {
-		return collection.some((c) => scalarEq(c, want));
+		return collection.some((c) => scalarEq(unwrapLabeled(c), want));
 	}
 	return false;
+}
+
+/** A multi-valued property stores `{ value, label? }` envelopes (a relation is
+ *  `[{ value: "<id>" }]`); membership compares the envelope's `value`. */
+function unwrapLabeled(item: unknown): unknown {
+	if (item && typeof item === "object" && "value" in item) return (item as { value: unknown }).value;
+	return item;
 }
 
 function collectAll(value: unknown): unknown[] {
