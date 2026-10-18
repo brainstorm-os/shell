@@ -3,7 +3,10 @@ import {
 	DEFAULT_SPELLCHECK_LANGUAGES,
 	type SpellcheckSession,
 	enableSessionSpellcheck,
+	getChosenSpellcheckLanguages,
+	resolveEffectiveSpellCheckLanguages,
 	resolveSpellCheckLanguages,
+	setChosenSpellcheckLanguages,
 	spellcheckContextFromParams,
 } from "./spellcheck";
 
@@ -92,5 +95,46 @@ describe("spellcheckContextFromParams", () => {
 
 	it("returns null when there is no misspelled word", () => {
 		expect(spellcheckContextFromParams({ ...base, misspelledWord: "" })).toBeNull();
+	});
+});
+
+describe("resolveEffectiveSpellCheckLanguages (B11.31)", () => {
+	it("prefers the user's choice, in order, filtered to what's available", () => {
+		expect(
+			resolveEffectiveSpellCheckLanguages(["fr", "xx", "de"], ["en-US"], ["en-US", "de", "fr"]),
+		).toEqual(["fr", "de"]);
+	});
+
+	it("falls back to the OS order when nothing chosen is available (or nothing is chosen)", () => {
+		expect(resolveEffectiveSpellCheckLanguages(["xx"], ["de"], ["en-US", "de"])).toEqual(["de"]);
+		expect(resolveEffectiveSpellCheckLanguages(null, ["de"], ["en-US", "de"])).toEqual(["de"]);
+	});
+
+	it("never sets a list on macOS (no available dictionaries)", () => {
+		expect(resolveEffectiveSpellCheckLanguages(["de"], ["de"], [])).toEqual([]);
+	});
+});
+
+describe("setChosenSpellcheckLanguages (B11.31)", () => {
+	it("re-applies the choice live to every enabled session, and null restores the OS order", () => {
+		const make = () => {
+			const setSpellCheckerLanguages = vi.fn();
+			return {
+				availableSpellCheckerLanguages: ["en-US", "de", "fr"],
+				setSpellCheckerEnabled: vi.fn(),
+				setSpellCheckerLanguages,
+			};
+		};
+		const a = make();
+		const b = make();
+		enableSessionSpellcheck(a, ["en-US"]);
+		enableSessionSpellcheck(b, ["en-US"]);
+		setChosenSpellcheckLanguages(["fr", "de"]);
+		expect(getChosenSpellcheckLanguages()).toEqual(["fr", "de"]);
+		expect(a.setSpellCheckerLanguages).toHaveBeenLastCalledWith(["fr", "de"]);
+		expect(b.setSpellCheckerLanguages).toHaveBeenLastCalledWith(["fr", "de"]);
+		setChosenSpellcheckLanguages(null);
+		expect(getChosenSpellcheckLanguages()).toBeNull();
+		expect(a.setSpellCheckerLanguages).toHaveBeenLastCalledWith(["en-US"]);
 	});
 });

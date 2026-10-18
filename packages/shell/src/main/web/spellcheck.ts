@@ -118,10 +118,43 @@ export function hydrateSessionDictionary(
 	for (const word of words) session.addWordToSpellCheckerDictionary(word);
 }
 
+/**
+ * B11.31 — the languages actually applied: the user's explicit choice (from
+ * Settings, per device) when any of it has a dictionary here, else the OS
+ * preference order through {@link resolveSpellCheckLanguages}. Pure.
+ */
+export function resolveEffectiveSpellCheckLanguages(
+	chosen: readonly string[] | null,
+	systemPreferred: readonly string[],
+	available: readonly string[],
+): string[] {
+	if (available.length === 0) return [];
+	if (chosen && chosen.length > 0) {
+		const supported = new Set(available);
+		const picked = chosen.filter((lang, i) => supported.has(lang) && chosen.indexOf(lang) === i);
+		if (picked.length > 0) return picked;
+	}
+	return resolveSpellCheckLanguages(systemPreferred, available);
+}
+
 /** Sessions already configured — Brainstorm app renderers share
  *  `session.defaultSession`, so the per-view factory would otherwise re-run this
  *  on every launch. A WeakSet so a discarded session is collectable. */
 const configuredSpellcheckSessions = new WeakSet<SpellcheckSession>();
+/** The same sessions, iterable, so a Settings change re-applies to all of them. */
+const liveSpellcheckSessions = new Set<WeakRef<SpellcheckSession>>();
+
+let chosenLanguages: readonly string[] | null = null;
+let systemLanguages: readonly string[] = [];
+
+function applyLanguages(session: SpellcheckSession): void {
+	const languages = resolveEffectiveSpellCheckLanguages(
+		chosenLanguages,
+		systemLanguages,
+		session.availableSpellCheckerLanguages,
+	);
+	if (languages.length > 0) session.setSpellCheckerLanguages(languages);
+}
 
 /**
  * Enable Chromium's spellchecker on `session` (idempotent per session).
@@ -133,12 +166,26 @@ export function enableSessionSpellcheck(
 	session: SpellcheckSession,
 	preferredLanguages: readonly string[],
 ): void {
+	systemLanguages = preferredLanguages;
 	if (configuredSpellcheckSessions.has(session)) return;
 	configuredSpellcheckSessions.add(session);
+	liveSpellcheckSessions.add(new WeakRef(session));
 	session.setSpellCheckerEnabled(true);
-	const languages = resolveSpellCheckLanguages(
-		preferredLanguages,
-		session.availableSpellCheckerLanguages,
-	);
-	if (languages.length > 0) session.setSpellCheckerLanguages(languages);
+	applyLanguages(session);
+}
+
+/** The user's explicit language choice (`null` = follow the OS). */
+export function getChosenSpellcheckLanguages(): readonly string[] | null {
+	return chosenLanguages;
+}
+
+/** Set the user's choice (`null` = follow the OS) and re-apply it to every
+ *  session spellcheck is enabled on. */
+export function setChosenSpellcheckLanguages(languages: readonly string[] | null): void {
+	chosenLanguages = languages && languages.length > 0 ? [...languages] : null;
+	for (const ref of liveSpellcheckSessions) {
+		const session = ref.deref();
+		if (session) applyLanguages(session);
+		else liveSpellcheckSessions.delete(ref);
+	}
 }
