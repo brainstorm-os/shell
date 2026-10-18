@@ -180,6 +180,14 @@ export function validatePropertyDef(def: PropertyDef): ValidationResult {
 		errors.push("entityFilter is only valid for entityRef");
 	}
 
+	if (def.inverseOf !== undefined) {
+		if (def.valueType !== ValueType.EntityRef) {
+			errors.push("inverseOf is only valid for entityRef");
+		} else if (typeof def.inverseOf !== "string" || def.inverseOf.length === 0) {
+			errors.push("inverseOf must be a non-empty property key");
+		}
+	}
+
 	// Pattern — text only.
 	if (def.pattern !== undefined && def.valueType !== ValueType.Text) {
 		errors.push("pattern is only valid for text");

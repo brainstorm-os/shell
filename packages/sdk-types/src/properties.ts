@@ -194,6 +194,12 @@ export type PropertyDef = {
 	/** Optional structured filter narrowing which `allowedTypes` entities
 	 *  qualify. */
 	entityFilter?: EntityFilter;
+	/** Two-way relation (9.12.25): the key of the paired `entityRef` property
+	 *  on the far end. When A.`key` gains/loses B, B.`inverseOf` gains/loses A
+	 *  in the same entities-service write; deleting either end cleans the pair.
+	 *  The pairing is symmetric — the partner need not declare it back. A
+	 *  property may pair with itself (a symmetric "related" relation). */
+	inverseOf?: string;
 	/** Each value must be unique within the scope. Applies to
 	 *  `text` / `number` / `entityRef`. */
 	unique?: boolean;

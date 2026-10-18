@@ -26,6 +26,7 @@
  * prompt.
  */
 
+import { validatePropertyDef } from "@brainstorm-os/sdk";
 import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
@@ -35,6 +36,12 @@ export type PropertiesServiceOptions = {
 	/** Resolve the active vault's `PropertiesStore`. Returns null when no
 	 *  vault session is open — the handler maps that to `Unavailable`. */
 	getStore: () => Promise<PropertiesStore | null>;
+	/** 9.12.25 — when a def newly declares (or re-targets) `inverseOf`, make
+	 *  the existing one-sided references two-sided, acting as the calling app.
+	 *  Runs BEFORE the def is saved: a refusal (`Denied` — a far end the app
+	 *  can't write, or a locked one) leaves both the catalog and the data
+	 *  untouched. */
+	backfillInverse?: (app: string, def: PropertyDef) => Promise<number>;
 };
 
 export function makePropertiesServiceHandler(options: PropertiesServiceOptions): ServiceHandler {
@@ -56,6 +63,12 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 
 			case "setProperty": {
 				const def = requireDef(envelope);
+				const prior = store.snapshot().properties[def.key];
+				if (def.inverseOf && def.inverseOf !== prior?.inverseOf && options.backfillInverse) {
+					const validation = validatePropertyDef(def);
+					if (!validation.ok) throw makeError("Invalid", validation.errors.join("; "));
+					await options.backfillInverse(envelope.app, def);
+				}
 				try {
 					store.setProperty(def);
 				} catch (error) {

@@ -23,6 +23,7 @@ import {
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
+	type PropertyDef,
 	SOLHEIM_PROVIDER_ID,
 	StoredAssetKind,
 	TRIGGER_TYPE_URL,
@@ -168,7 +169,11 @@ import { makeDndServiceHandler } from "./dnd/dnd-service";
 import { DragSessionStore } from "./dnd/drag-session";
 import { createFileExporter } from "./dnd/file-exporter";
 import { createElectronGhostWindow, createGhostOverlay } from "./dnd/ghost-overlay";
-import { type ApplyRemoteDocFn, makeEntitiesServiceHandler } from "./entities/entities-service";
+import {
+	type ApplyRemoteDocFn,
+	type InverseBackfillFn,
+	makeEntitiesServiceHandler,
+} from "./entities/entities-service";
 import { EntityChangeEmitter } from "./entities/entity-change-emitter";
 import { installEntityDek } from "./entities/install-wrap";
 import { rehomeAssetDeks } from "./entities/rehome-asset-deks";
@@ -3675,7 +3680,19 @@ void app.whenReady().then(async () => {
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
+	let inverseBackfillFn: InverseBackfillFn | null = null;
+	const getVaultPropertyDefs = async (): Promise<ReadonlyArray<PropertyDef> | null> => {
+		const session = getActiveVaultSession();
+		if (!session) return null;
+		const store = await session.propertiesStore();
+		return Object.values(store.snapshot().properties);
+	};
 	const entitiesHandler = makeEntitiesServiceHandler({
+		// 9.12.25 — `inverseOf` pairs make relations two-way.
+		getPropertyDefs: getVaultPropertyDefs,
+		bindInverseBackfill: (fn) => {
+			inverseBackfillFn = fn;
+		},
 		onEntityChange: (change) => automationsChangeEmitter.emit(change),
 		// Agent-12a — a provenance-carrying create IS the approve gesture:
 		// record `proposal-approved` on the caller's latest run in that
@@ -4316,12 +4333,7 @@ void app.whenReady().then(async () => {
 		// The vault property catalog drives the catalog-driven reference
 		// edges (any `entityRef` property → a graph link). Best-effort: a
 		// failure degrades to "no ref edges", never an empty snapshot.
-		getPropertyDefs: async () => {
-			const session = getActiveVaultSession();
-			if (!session) return null;
-			const store = await session.propertiesStore();
-			return Object.values(store.snapshot().properties);
-		},
+		getPropertyDefs: getVaultPropertyDefs,
 	});
 	workers.broker.registerService("vault-entities", vaultEntitiesHandler);
 
@@ -4333,6 +4345,8 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return await session.propertiesStore();
 			},
+			backfillInverse: (app, def) =>
+				inverseBackfillFn ? inverseBackfillFn(app, def) : Promise.resolve(0),
 		}),
 	);
 
