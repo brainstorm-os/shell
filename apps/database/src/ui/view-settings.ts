@@ -68,6 +68,7 @@ import {
 	CalendarWeekStart,
 	ChartType,
 	ColumnWrap,
+	GalleryCoverSource,
 	GroupOrderMode,
 	ListViewKind,
 	TimelineDensity,
@@ -735,13 +736,32 @@ function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
 		),
 	);
 	rows.appendChild(
-		selectRow("Cover", propOpts, view.coverProperty ?? "", (v) =>
-			props.onChange({ coverProperty: v || null }),
+		segmented(
+			t("brainstorm.database.settings.gallery.coverSource"),
+			[
+				[GalleryCoverSource.Default, t("brainstorm.database.settings.gallery.coverDefault")],
+				[GalleryCoverSource.FirstMedia, t("brainstorm.database.settings.gallery.coverFirstMedia")],
+				[GalleryCoverSource.None, t("brainstorm.database.settings.gallery.coverNone")],
+			],
+			layout.coverSource ?? GalleryCoverSource.Default,
+			(v) => patch({ coverSource: v as GalleryCoverSource }),
 		),
 	);
+	if ((layout.coverSource ?? GalleryCoverSource.Default) === GalleryCoverSource.Default) {
+		rows.appendChild(
+			selectRow("Cover", propOpts, view.coverProperty ?? "", (v) =>
+				props.onChange({ coverProperty: v || null }),
+			),
+		);
+	}
 	rows.appendChild(
 		selectRow("Subtitle", propOpts, view.cardSubtitleProperty ?? "", (v) =>
 			props.onChange({ cardSubtitleProperty: v || null }),
+		),
+	);
+	rows.appendChild(
+		toggleRow(t("brainstorm.database.settings.gallery.showLabels"), !layout.hideFieldLabels, (v) =>
+			patch({ hideFieldLabels: !v }),
 		),
 	);
 }

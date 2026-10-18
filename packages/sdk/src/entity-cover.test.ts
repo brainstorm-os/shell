@@ -398,3 +398,26 @@ describe("createEntityCoverElement", () => {
 		expect(Number.parseFloat(el.style.aspectRatio)).toBeCloseTo(DEFAULT_COVER_ASPECT);
 	});
 });
+
+describe("resolveCoverForView — FirstMedia (9.12.31)", () => {
+	const subject = { id: "e1", properties: {} };
+
+	it("uses a local body image as the cover", () => {
+		const r = resolveCoverForView(subject, {
+			mode: ViewCoverMode.FirstMedia,
+			mediaUrl: "brainstorm://files/a.png",
+		});
+		expect(r.kind).toBe(CoverRenderKind.Image);
+		expect(r.kind === CoverRenderKind.Image && r.url).toBe("brainstorm://files/a.png");
+	});
+
+	it("never admits a remote image; falls back to the object's own cover", () => {
+		const r = resolveCoverForView(subject, {
+			mode: ViewCoverMode.FirstMedia,
+			mediaUrl: "https://tracker.test/pixel.png",
+		});
+		expect(r.kind).toBe(CoverRenderKind.Paint);
+		const none = resolveCoverForView(subject, { mode: ViewCoverMode.FirstMedia, mediaUrl: null });
+		expect(none.kind).toBe(CoverRenderKind.Paint);
+	});
+});

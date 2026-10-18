@@ -3218,6 +3218,7 @@ export {
 	type CompiledViewFilter,
 	CompositeOp,
 	EmptyPlacement,
+	GalleryCoverSource,
 	type GalleryLayoutOptions,
 	type GridLayoutOptions,
 	type GroupBy,

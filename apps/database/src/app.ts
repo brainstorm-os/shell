@@ -126,6 +126,7 @@ import {
 import { propertyKindIconFor } from "./logic/property-kind-icon";
 import { ChartView } from "./react/chart-view";
 import { ChartWidget, type ChartWidgetRuntime } from "./react/chart-widget";
+import { installFirstMediaTransport } from "./react/use-first-media";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -605,6 +606,8 @@ function bootApp(): void {
 	}
 	// B11.16c — spellcheck suggestion menu for editable text cells.
 	mountSpellcheckMenuFromWindow();
+	const bodyDocs = getRuntime()?.services?.entities;
+	installFirstMediaTransport(bodyDocs && hasBodyDocTransport(bodyDocs) ? bodyDocs : null);
 	// Surface over-budget renders to the runtime error log. The doc-13
 	// keystroke→paint budget is 16ms; the noise floor for a *warning* sits
 	// at 50ms (three frames at 60fps — comfortably past first-paint /

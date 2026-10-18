@@ -38,7 +38,7 @@ import { t } from "../i18n";
 import type { CompiledView } from "../logic/compile-view";
 import type { EntityRow } from "../logic/in-memory-entities";
 import { coverBackgroundFor, entityIcon, entityTitle, renderCell } from "../render/cells";
-import type { ColumnSpec, GalleryLayoutOptions } from "../types/list-view";
+import { type ColumnSpec, GalleryCoverSource, type GalleryLayoutOptions } from "../types/list-view";
 import { CardFields, type ColumnDefs, useEditableColumnDefs } from "./card-fields";
 import {
 	ComputedCellsProvider,
@@ -48,6 +48,7 @@ import {
 } from "./computed-cells";
 import { DomSlot } from "./dom-slot";
 import type { EntityPropertyEdit } from "./editable-cell";
+import { useFirstMedia } from "./use-first-media";
 import { useStableCallback } from "./use-stable-callback";
 
 const ENTITY_MIME = "application/x-brainstorm-entity";
@@ -227,6 +228,8 @@ export function GalleryView(props: GalleryViewProps): ReactElement {
 										columns={columns}
 										columnDefs={columnDefs}
 										coverProperty={coverProperty}
+										coverSource={layout.coverSource ?? GalleryCoverSource.Default}
+										hideFieldLabels={layout.hideFieldLabels === true}
 										subtitleProperty={subtitleProperty}
 										selected={selectedIds.has(entity.id)}
 										itemProps={getItemProps(virtualRow.index * cols + offset)}
@@ -249,6 +252,8 @@ type GalleryCardProps = {
 	columns: ReadonlyArray<ColumnSpec>;
 	columnDefs: ColumnDefs;
 	coverProperty: string | null;
+	coverSource: GalleryCoverSource;
+	hideFieldLabels: boolean;
 	subtitleProperty: string | null;
 	selected: boolean;
 	/** Roving gridcell props from the container's `useCompositeKeyboard`
@@ -265,6 +270,8 @@ const GalleryCard = memo(function GalleryCard({
 	columns,
 	columnDefs,
 	coverProperty,
+	coverSource,
+	hideFieldLabels,
 	subtitleProperty,
 	selected,
 	itemProps,
@@ -294,6 +301,8 @@ const GalleryCard = memo(function GalleryCard({
 		delete (event.currentTarget as HTMLElement).dataset.dragging;
 	}, []);
 
+	const firstMediaOn = coverSource === GalleryCoverSource.FirstMedia;
+	const mediaUrl = useFirstMedia(entity, firstMediaOn);
 	const subtitle = subtitleProperty ? renderCell(entity, subtitleProperty).text : null;
 	const editableColumns = columns.filter(
 		(c) => c.visible !== false && c.propertyId !== "title" && c.propertyId !== "name",
@@ -314,10 +323,18 @@ const GalleryCard = memo(function GalleryCard({
 			onDragStart={handleDragStart}
 			onDragEnd={handleDragEnd}
 		>
-			<div
-				className="dbv-card__cover"
-				style={{ background: coverBackgroundFor(entity, coverProperty) }}
-			/>
+			{coverSource === GalleryCoverSource.None ? null : (
+				<div
+					className="dbv-card__cover"
+					style={{
+						background: coverBackgroundFor(
+							entity,
+							coverProperty,
+							firstMediaOn ? { mediaUrl } : undefined,
+						),
+					}}
+				/>
+			)}
 			<div className="dbv-card__body">
 				<div className="dbv-card__title">
 					<DomSlot
@@ -334,6 +351,8 @@ const GalleryCard = memo(function GalleryCard({
 						columns={editableColumns}
 						columnDefs={columnDefs}
 						onEdit={onEdit}
+						hideLabels={hideFieldLabels}
+						urlAsButton
 					/>
 				) : (
 					<div className="dbv-card__chips">

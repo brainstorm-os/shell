@@ -200,10 +200,23 @@ export type ListLayoutOptions = {
 	showIcon: boolean;
 };
 
+/** Where a gallery card's cover comes from (9.12.31). `Default` keeps the
+ *  existing rule (the view's cover property, else the object's own cover). */
+export enum GalleryCoverSource {
+	Default = "default",
+	/** The first image in the object's body. */
+	FirstMedia = "first-media",
+	/** No cover band at all in this view. */
+	None = "none",
+}
+
 export type GalleryLayoutOptions = {
 	thumbnailSize: "small" | "medium" | "large";
 	cardAspectRatio: "square" | "video" | "portrait";
 	showFilename: boolean;
+	coverSource?: GalleryCoverSource;
+	/** Hide the field names on cards — values only (9.12.31). */
+	hideFieldLabels?: boolean;
 };
 
 /** How a grouped view orders its groups (9.12.28). `Default` = the group

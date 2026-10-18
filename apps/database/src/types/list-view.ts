@@ -19,6 +19,7 @@ export {
 	ColumnWrap,
 	type CompiledViewFilter,
 	EmptyPlacement,
+	GalleryCoverSource,
 	type GalleryLayoutOptions,
 	type GridLayoutOptions,
 	type GroupBy,

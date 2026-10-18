@@ -1660,6 +1660,35 @@ body.is-resizing .db-inspector__resize {
 	min-width: 0;
 }
 
+/* Values-only cards (9.12.31): the field name leaves the layout but stays the
+ * accessible label of its value. */
+.dbv-card__fields[data-hide-labels="true"] .dbv-card__field {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.dbv-card__fields[data-hide-labels="true"] .dbv-card__field-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.dbv-card__url {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	max-width: 100%;
+	text-decoration: none;
+}
+
+.dbv-card__url-host {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* ── Board view ───────────────────────────────────────────────────────── */
 
 .dbv-board {

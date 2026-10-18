@@ -351,5 +351,11 @@
   "brainstorm.database.settings.chart.aggregation": "Calcular",
   "brainstorm.database.widget.chart.pick": "Gráfico",
   "brainstorm.database.widget.chart.empty": "Ainda não há vistas de gráfico. Adicione uma vista de gráfico a uma base de dados para a mostrar aqui.",
-  "brainstorm.database.widget.chart.open": "Abrir Base de dados"
+  "brainstorm.database.widget.chart.open": "Abrir Base de dados",
+  "brainstorm.database.card.openUrl": "Abrir {name}: {host}",
+  "brainstorm.database.settings.gallery.coverSource": "Capa de",
+  "brainstorm.database.settings.gallery.coverDefault": "Capa",
+  "brainstorm.database.settings.gallery.coverFirstMedia": "Primeira imagem",
+  "brainstorm.database.settings.gallery.coverNone": "Nenhuma",
+  "brainstorm.database.settings.gallery.showLabels": "Mostrar nomes dos campos"
 }
