@@ -20,6 +20,8 @@
  */
 
 import {
+	CHROME_SPLIT_DRAG,
+	CHROME_SPLIT_STEP,
 	CHROME_TABS_ACTIVATE,
 	CHROME_TABS_CLOSE,
 	CHROME_TABS_NEW,
@@ -60,6 +62,8 @@ const bridge: ChromeBridge = {
 	closeTab: (tabId) => ipcRenderer.invoke(CHROME_TABS_CLOSE, tabId),
 	newTab: () => ipcRenderer.invoke(CHROME_TABS_NEW),
 	reorderTabs: (order) => ipcRenderer.invoke(CHROME_TABS_REORDER, order),
+	dragSplit: (x) => ipcRenderer.invoke(CHROME_SPLIT_DRAG, x),
+	stepSplit: (step) => ipcRenderer.invoke(CHROME_SPLIT_STEP, step),
 };
 
 contextBridge.exposeInMainWorld("brainstormChrome", bridge);

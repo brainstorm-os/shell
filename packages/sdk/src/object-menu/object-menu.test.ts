@@ -96,7 +96,7 @@ describe("buildObjectMenuItems", () => {
 			],
 		});
 		expect(items[0]?.id).toBe("open");
-		const openWith = items[1];
+		const openWith = items[2];
 		expect(openWith?.id).toBe("open-with");
 		expect(openWith?.label).toBe("Open with");
 		expect(openWith?.submenu?.map((s) => s.label)).toEqual(["Books", "Preview"]);
@@ -141,12 +141,27 @@ describe("buildObjectMenuItems", () => {
 
 	it("offers Pin when not pinned, Unpin when pinned", () => {
 		const pin = buildObjectMenuItems({ target, runtime: runtime(), pinned: false });
-		expect(pin.map((i) => i.id)).toEqual(["open", "pin"]);
-		expect(pin[1]?.label).toBe("Pin to dashboard");
+		expect(pin.map((i) => i.id)).toEqual(["open", "open-to-side", "pin"]);
+		expect(pin[2]?.label).toBe("Pin to dashboard");
 
 		const unpin = buildObjectMenuItems({ target, runtime: runtime(), pinned: true });
-		expect(unpin.map((i) => i.id)).toEqual(["open", "unpin"]);
-		expect(unpin[1]?.label).toBe("Remove from dashboard");
+		expect(unpin.map((i) => i.id)).toEqual(["open", "open-to-side", "unpin"]);
+		expect(unpin[2]?.label).toBe("Remove from dashboard");
+	});
+
+	it("Open to the side dispatches the open with the side navigation mode", () => {
+		const rt = runtime();
+		const items = buildObjectMenuItems({ target, runtime: rt, pinned: false });
+		items.find((i) => i.id === "open-to-side")?.run();
+		expect(rt?.services?.intents?.dispatch).toHaveBeenCalledWith({
+			verb: "open",
+			payload: expect.objectContaining({ entityId: target.entityId, navMode: "new-panel" }),
+		});
+	});
+
+	it("omits Open to the side when the open can't be dispatched", () => {
+		const items = buildObjectMenuItems({ target, runtime: null, pinned: false });
+		expect(items.some((i) => i.id === "open-to-side")).toBe(false);
 	});
 
 	it("hides the pin toggle without the dashboard.pin capability", () => {
@@ -155,7 +170,7 @@ describe("buildObjectMenuItems", () => {
 			runtime: runtime({ capabilities: ["intents.dispatch:open"] }),
 			pinned: false,
 		});
-		expect(items.map((i) => i.id)).toEqual(["open"]);
+		expect(items.map((i) => i.id)).toEqual(["open", "open-to-side"]);
 	});
 
 	it("accepts a scoped dashboard.pin grant too", () => {
@@ -177,7 +192,7 @@ describe("buildObjectMenuItems", () => {
 			extraItems: [{ id: "print", label: "Print…", run: printRun }],
 			onRemove: removeRun,
 		});
-		expect(items.map((i) => i.id)).toEqual(["open", "pin", "print", "remove"]);
+		expect(items.map((i) => i.id)).toEqual(["open", "open-to-side", "pin", "print", "remove"]);
 		const remove = items.find((i) => i.id === "remove");
 		expect(remove?.destructive).toBe(true);
 	});
@@ -199,7 +214,7 @@ describe("buildObjectMenuItems", () => {
 			onShare,
 			onRemove: () => undefined,
 		});
-		expect(items.map((i) => i.id)).toEqual(["open", "pin", "share", "remove"]);
+		expect(items.map((i) => i.id)).toEqual(["open", "open-to-side", "pin", "share", "remove"]);
 		const share = items.find((i) => i.id === "share");
 		expect(share?.icon).toBe(IconName.KindLink);
 		share?.run();
@@ -295,7 +310,7 @@ describe("buildObjectMenuItems", () => {
 				onToggleLock: () => undefined,
 				onRemove: () => undefined,
 			});
-			expect(items.map((i) => i.id)).toEqual(["open", "pin", "lock", "remove"]);
+			expect(items.map((i) => i.id)).toEqual(["open", "open-to-side", "pin", "lock", "remove"]);
 		});
 
 		it("runs the app's toggle handler", async () => {

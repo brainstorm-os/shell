@@ -90,6 +90,7 @@ import { maskAppWindowsForLock } from "./apps/app-window-lock";
 import { setAppsChangedTarget } from "./apps/apps-changed";
 import { wireExternalLinkRouting } from "./apps/external-link-routing";
 import { validateManifest } from "./apps/manifest";
+import { isSplitShortcut, runSplitShortcut } from "./apps/split-actions";
 import { appSelfManagesTabs } from "./apps/window-container";
 import type { WebContentsViewHandle } from "./apps/window-container";
 import { type AssetChunkManifest, parseAssetChunkManifest } from "./assets/asset-chunks";
@@ -6118,6 +6119,19 @@ void app.whenReady().then(async () => {
 	const shortcuts = createShortcutSetup({
 		getDashboard: () => dashboardWindow?.webContents ?? null,
 		getWindowCount: () => launchSetup.getWindowIndexSync()?.list().length ?? 0,
+		runWindowAction: (id, webContentsId) => {
+			if (!isSplitShortcut(id)) return false;
+			return runSplitShortcut(id, webContentsId, {
+				containerFor: (wcId) =>
+					launchSetup.getLauncherSync()?.containerForTabSender(wcId)?.container ?? null,
+				openSide: (containerId, appId, launch) => {
+					const orchestrator = launchSetup.getOrchestratorSync();
+					void orchestrator?.openSidePane(containerId, { appId, launch }).catch((error) => {
+						console.warn("[split] open to the side failed:", error);
+					});
+				},
+			});
+		},
 	});
 	// The boot session may have opened before the registry existed (the
 	// `onVaultOpened` hook is wired earlier than this); run the migration +

@@ -22,6 +22,17 @@ import {
 } from "@brainstorm-os/protocol/chrome-tabs";
 import { APP_TAB_COMMAND_CHANNEL, TAB_ICON_NONE, TabCommandKind } from "@brainstorm-os/sdk-types";
 import { focusStealingDisabled } from "../window/reveal-window";
+import { type SplitStep, ratioFromDividerX, splitRects } from "../window/split-layout";
+import {
+	INITIAL_SPLIT_STATE,
+	type SplitEvent,
+	SplitEventKind,
+	SplitOrder,
+	SplitPane,
+	type SplitState,
+	leftRatioOf,
+	reduceSplit,
+} from "../window/split-state";
 
 export type Rectangle = { x: number; y: number; width: number; height: number };
 
@@ -155,6 +166,10 @@ export type TabSpec = {
 	title: string;
 };
 
+/** A side pane is a tab that lives beside the strip rather than in it, and may
+ *  belong to a different app than the container. */
+export type SidePaneSpec = TabSpec & { appId: string };
+
 export type Tab = {
 	tabId: string;
 	appId: string;
@@ -198,6 +213,8 @@ export class WindowContainer {
 	readonly baseWindow: BaseWindowHandle;
 	private readonly tabsList: Tab[] = [];
 	private activeTabId: string | null = null;
+	private side: Tab | null = null;
+	private split: SplitState = INITIAL_SPLIT_STATE;
 	private chromeView: WebContentsViewHandle | null = null;
 	private stripHeight = DEFAULT_STRIP_HEIGHT;
 	private stripVisible = false;
@@ -228,7 +245,136 @@ export class WindowContainer {
 	}
 
 	tabByWebContents(webContentsId: number): Tab | null {
+		if (this.side?.webContentsId === webContentsId) return this.side;
 		return this.tabsList.find((t) => t.webContentsId === webContentsId) ?? null;
+	}
+
+	/** Every live renderer in this window: the strip tabs plus the side pane.
+	 *  Anything that must reach ALL of a window's renderers (vault lock,
+	 *  broadcasts) iterates this, never `tabs()` — a side pane missed by a lock
+	 *  signal would keep showing vault content. */
+	panes(): readonly Tab[] {
+		return this.side ? [...this.tabsList, this.side] : this.tabsList;
+	}
+
+	sidePane(): Tab | null {
+		return this.side;
+	}
+
+	splitState(): SplitState {
+		return this.split;
+	}
+
+	/** The pane that receives keyboard input + names the window. */
+	focusedPane(): Tab | null {
+		if (this.side && this.split.open && this.split.focused === SplitPane.Side) return this.side;
+		return this.activeTab();
+	}
+
+	/** Open `spec` beside the active tab. Replaces an existing side pane — a
+	 *  window holds at most two objects. */
+	openSidePane(spec: SidePaneSpec): Tab {
+		if (this.disposed) throw new Error("WindowContainer: openSidePane after dispose");
+		if (this.side) this.dropSide(this.side);
+		const view = this.options.tabViewFactory({
+			appId: spec.appId,
+			preloadPath: spec.preloadPath,
+			additionalArguments: spec.additionalArguments,
+			backgroundColor: spec.backgroundColor,
+		});
+		const tab: Tab = {
+			tabId: this.options.nextTabId(),
+			appId: spec.appId,
+			view,
+			webContentsId: view.webContents.id,
+			route: spec.route,
+			title: spec.title,
+			icon: null,
+		};
+		this.side = tab;
+		this.options.onTabCreated(this, tab);
+		this.wireTab(tab);
+		this.baseWindow.contentView.addChildView(view);
+		void view.webContents.loadURL(spec.entryUrl);
+		this.applySplit({ kind: SplitEventKind.OpenSide });
+		this.focusPaneRenderer(tab);
+		return tab;
+	}
+
+	/** Close the side pane; the window returns to a single view. */
+	closeSidePane(): boolean {
+		const side = this.side;
+		if (!side) return false;
+		this.dropSide(side);
+		this.applySplit({ kind: SplitEventKind.CloseSide });
+		this.focusActiveTab();
+		return true;
+	}
+
+	/** Lift the side pane out WITHOUT closing its renderer, so the launcher can
+	 *  re-home it into a window of its own app (the primary pane's last tab
+	 *  closed and the side pane is a different app). The renderer keeps its
+	 *  webContents id, so its identity registration stays valid. */
+	detachSidePane(): Tab | null {
+		const side = this.side;
+		if (!side) return null;
+		this.unwireTab(side);
+		this.removeView(side);
+		this.side = null;
+		this.split = reduceSplit(this.split, { kind: SplitEventKind.CloseSide });
+		this.layout();
+		return side;
+	}
+
+	/** Take ownership of a live renderer detached from another window. Tabs are
+	 *  intra-app, so only a same-app renderer can join the strip. */
+	adoptTab(tab: Tab): void {
+		if (this.disposed) throw new Error("WindowContainer: adoptTab after dispose");
+		if (tab.appId !== this.appId) {
+			throw new Error(`WindowContainer: cannot adopt a ${tab.appId} tab into ${this.appId}`);
+		}
+		this.tabsList.push(tab);
+		this.wireTab(tab);
+		this.baseWindow.contentView.addChildView(tab.view);
+		this.activateTab(tab.tabId);
+		// An adopted renderer has already painted, so no load event will reveal
+		// this window for it.
+		this.reveal();
+	}
+
+	swapPanes(): boolean {
+		if (!this.isSplit()) return false;
+		this.applySplit({ kind: SplitEventKind.Swap });
+		return true;
+	}
+
+	focusOtherPane(): boolean {
+		if (!this.isSplit()) return false;
+		this.applySplit({ kind: SplitEventKind.FocusOther });
+		const target = this.focusedPane();
+		if (target) this.focusPaneRenderer(target);
+		return true;
+	}
+
+	focusSidePane(): boolean {
+		if (!this.isSplit() || !this.side) return false;
+		this.focusPaneRenderer(this.side);
+		return true;
+	}
+
+	stepSplit(step: SplitStep): boolean {
+		if (!this.isSplit()) return false;
+		this.applySplit({ kind: SplitEventKind.Step, step, width: this.contentBody().width });
+		return true;
+	}
+
+	/** Divider drag from the chrome view, `x` in chrome-view coordinates. */
+	dragSplitTo(chromeX: number): boolean {
+		if (!this.isSplit() || !Number.isFinite(chromeX)) return false;
+		const body = this.contentBody();
+		const leftRatio = ratioFromDividerX(chromeX + this.chromeInsets().left, body);
+		this.applySplit({ kind: SplitEventKind.SetLeftRatio, leftRatio, width: body.width });
+		return true;
 	}
 
 	/** Re-stack the active app renderer's view on top of every other child
@@ -245,7 +391,7 @@ export class WindowContainer {
 	}
 
 	activeTitle(): string {
-		return this.activeTab()?.title ?? this.appId;
+		return this.focusedPane()?.title ?? this.appId;
 	}
 
 	activeRoute(): string | null {
@@ -332,7 +478,7 @@ export class WindowContainer {
 		const target = this.tabById(tabId);
 		if (!target) return false;
 		if (this.activeTabId === tabId) {
-			this.baseWindow.setTitle(target.title);
+			this.syncTitle();
 			return true;
 		}
 		for (const tab of this.tabsList) {
@@ -344,7 +490,7 @@ export class WindowContainer {
 			this.sendVisibility(tab, isActive);
 		}
 		this.activeTabId = tabId;
-		this.baseWindow.setTitle(target.title);
+		this.syncTitle();
 		this.layout();
 		this.focusActiveTab();
 		this.fireChanged();
@@ -358,12 +504,29 @@ export class WindowContainer {
 	 *  clicks into the renderer. */
 	private focusActiveTab(): void {
 		const active = this.activeTab();
-		if (!active || active.view.webContents.isDestroyed()) return;
+		if (active) this.focusPaneRenderer(active);
+	}
+
+	private focusPaneRenderer(tab: Tab): void {
+		this.notePaneFocused(tab);
+		if (tab.view.webContents.isDestroyed()) return;
 		try {
-			active.view.webContents.focus();
+			tab.view.webContents.focus();
 		} catch {
 			// Renderer gone between activate and focus — harmless.
 		}
+	}
+
+	/** Record which pane holds focus. Driven both by our own `focus()` calls and
+	 *  by the renderer's `focus` event (the user clicking into a pane). */
+	private notePaneFocused(tab: Tab): void {
+		const pane = tab === this.side ? SplitPane.Side : SplitPane.Primary;
+		if (pane === SplitPane.Primary && tab.tabId !== this.activeTabId) return;
+		const next = reduceSplit(this.split, { kind: SplitEventKind.Focus, pane });
+		if (next === this.split) return;
+		this.split = next;
+		this.syncTitle();
+		this.fireChanged();
 	}
 
 	/** Cycle the active tab by `delta` (wraps). Used by the Ctrl+Tab chord. */
@@ -386,6 +549,18 @@ export class WindowContainer {
 		const [tab] = this.tabsList.splice(idx, 1);
 		if (!tab) return false;
 		this.teardownTab(tab);
+		if (this.tabsList.length === 0 && this.side?.appId === this.appId) {
+			// The primary pane emptied; a same-app side pane becomes the window.
+			const side = this.side;
+			this.unwireTab(side);
+			this.side = null;
+			this.split = reduceSplit(this.split, { kind: SplitEventKind.PromoteSide });
+			this.activeTabId = null;
+			this.tabsList.push(side);
+			this.wireTab(side);
+			this.activateTab(side.tabId);
+			return true;
+		}
 		let relaidOut = false;
 		if (this.activeTabId === tabId) {
 			const neighbor = this.tabsList[idx] ?? this.tabsList[idx - 1] ?? null;
@@ -455,14 +630,7 @@ export class WindowContainer {
 		// clicks: macOS traffic lights sit top-left (hidden in fullscreen);
 		// Windows/Linux `titleBarOverlay` reserves the top-right. The uncovered
 		// gutter shows the window frame (and its controls) through.
-		const fullscreen = safe(() => this.baseWindow.isFullScreen(), false);
-		const left = PLATFORM === "darwin" && !fullscreen ? TRAFFIC_LIGHT_GUTTER : 0;
-		const right =
-			PLATFORM === "win32"
-				? WINDOWS_CONTROLS_GUTTER
-				: PLATFORM === "linux"
-					? LINUX_CONTROLS_GUTTER
-					: 0;
+		const { left, right } = this.chromeInsets();
 		// The strip earns its vertical space only with 2+ tabs. A lone tab is the
 		// window, not something to switch between, so the strip collapses and the
 		// app fills the frame — its own `.app-header` already reserves the
@@ -472,7 +640,7 @@ export class WindowContainer {
 			this.stripVisible = stripVisible;
 			// The strip row now owns (or releases) the OS window-control gutter, so
 			// the app header below no longer needs to reserve it. Tell every tab.
-			for (const tab of this.tabsList) this.sendStripVisible(tab, stripVisible);
+			for (const tab of this.panes()) this.sendStripVisible(tab, stripVisible);
 		}
 		const stripH = stripVisible ? this.stripHeight : 0;
 		// Bleed the strip 1px past its nominal bottom so it underlaps the active
@@ -494,12 +662,25 @@ export class WindowContainer {
 			width: bounds.width,
 			height: Math.max(0, bounds.height - stripH),
 		};
-		if (this.chromeView) {
-			this.chromeView.setVisible(stripVisible);
-			this.chromeView.setBounds(strip);
-		}
 		const active = this.activeTab();
-		if (active) active.view.setBounds(body);
+		const split = this.isSplit() && active !== null;
+		if (this.chromeView) {
+			// While split, the chrome view spans the whole window UNDER both panes:
+			// the divider gap between them is where it shows through and takes
+			// the drag.
+			this.chromeView.setVisible(stripVisible || split);
+			this.chromeView.setBounds(split ? { ...strip, height: bounds.height } : strip);
+		}
+		if (active && this.side && split) {
+			const rects = splitRects(body, leftRatioOf(this.split));
+			const primaryFirst = this.split.order === SplitOrder.PrimaryFirst;
+			active.view.setBounds(primaryFirst ? rects.left : rects.right);
+			this.side.view.setBounds(primaryFirst ? rects.right : rects.left);
+			// A resize moves the divider; the chrome draws it, so it must hear.
+			this.pushChromeState();
+		} else if (active) {
+			active.view.setBounds(body);
+		}
 	}
 
 	/** The window-content rect the active app tab occupies (below the tab
@@ -507,6 +688,10 @@ export class WindowContainer {
 	 *  viewport (origin = this rect's top-left), so Browser-2 offsets a web
 	 *  `WebContentsView` by this origin to land it in window-content coords. */
 	bodyBounds(): Rectangle {
+		return this.contentBody();
+	}
+
+	private contentBody(): Rectangle {
 		const bounds = safe(() => this.baseWindow.getContentBounds(), {
 			x: 0,
 			y: 0,
@@ -518,6 +703,53 @@ export class WindowContainer {
 		return { x: 0, y: stripH, width: bounds.width, height: Math.max(0, bounds.height - stripH) };
 	}
 
+	/** Gutters the chrome view leaves for the OS window controls: macOS traffic
+	 *  lights top-left (gone in fullscreen); Windows/Linux `titleBarOverlay`
+	 *  top-right. The chrome view's x origin is `left`. */
+	private chromeInsets(): { left: number; right: number } {
+		const fullscreen = safe(() => this.baseWindow.isFullScreen(), false);
+		const left = PLATFORM === "darwin" && !fullscreen ? TRAFFIC_LIGHT_GUTTER : 0;
+		const right =
+			PLATFORM === "win32"
+				? WINDOWS_CONTROLS_GUTTER
+				: PLATFORM === "linux"
+					? LINUX_CONTROLS_GUTTER
+					: 0;
+		return { left, right };
+	}
+
+	private isSplit(): boolean {
+		return this.split.open && this.side !== null;
+	}
+
+	private applySplit(event: SplitEvent): void {
+		const next = reduceSplit(this.split, event);
+		if (next === this.split) return;
+		this.split = next;
+		this.layout();
+		this.syncTitle();
+		this.fireChanged();
+	}
+
+	/** The OS window title names the focused pane's object. */
+	private syncTitle(): void {
+		const pane = this.focusedPane();
+		if (pane) this.baseWindow.setTitle(pane.title);
+	}
+
+	private dropSide(side: Tab): void {
+		this.side = null;
+		this.teardownTab(side);
+	}
+
+	private removeView(tab: Tab): void {
+		try {
+			if (!this.baseWindow.isDestroyed()) this.baseWindow.contentView.removeChildView(tab.view);
+		} catch {
+			// Window mid-teardown — child views go with it.
+		}
+	}
+
 	dispose(): void {
 		if (this.disposed) return;
 		this.disposed = true;
@@ -525,6 +757,7 @@ export class WindowContainer {
 		this.detachBaseWindow = null;
 		for (const tab of [...this.tabsList]) this.teardownTab(tab);
 		this.tabsList.length = 0;
+		if (this.side) this.dropSide(this.side);
 		this.activeTabId = null;
 		if (!this.baseWindow.isDestroyed()) this.baseWindow.destroy();
 	}
@@ -554,6 +787,15 @@ export class WindowContainer {
 				active: tab.tabId === this.activeTabId,
 			})),
 		};
+		if (this.isSplit()) {
+			const rects = splitRects(this.contentBody(), leftRatioOf(this.split));
+			const { left } = this.chromeInsets();
+			state.split = {
+				divider: { ...rects.divider, x: rects.divider.x - left },
+				leftRatio: leftRatioOf(this.split),
+				stripHeight: this.stripVisible ? this.stripHeight : 0,
+			};
+		}
 		try {
 			this.chromeView.webContents.send(CHROME_TABS_STATE_CHANNEL, state);
 		} catch {
@@ -592,9 +834,10 @@ export class WindowContainer {
 		const onTitle = () => {
 			if (wc.isDestroyed()) return;
 			tab.title = wc.getTitle();
-			if (tab.tabId === this.activeTabId) this.baseWindow.setTitle(tab.title);
+			if (tab === this.focusedPane()) this.baseWindow.setTitle(tab.title);
 			this.fireChanged();
 		};
+		const onFocus = () => this.notePaneFocused(tab);
 		// The app's favicon labels the tab with its open object's icon (the icon
 		// twin of `page-title-updated`; published via `@brainstorm-os/sdk/tab-identity`).
 		// Scheme gate, same invariant as entity-icon's parseIcon: `properties.icon`
@@ -632,9 +875,12 @@ export class WindowContainer {
 			if (!chord) return;
 			event.preventDefault();
 			if (chord === TabChord.CloseTab) {
-				// A self-tabbing app owns Cmd+W: forward it to the renderer (which
-				// closes a tab in its own strip) instead of closing the container tab.
-				if (appSelfManagesTabs(this.appId)) {
+				// Cmd+W in the side pane closes the side pane, not a strip tab.
+				if (tab === this.side) {
+					this.closeSidePane();
+				} else if (appSelfManagesTabs(this.appId)) {
+					// A self-tabbing app owns Cmd+W: forward it to the renderer (which
+					// closes a tab in its own strip) instead of closing the container tab.
 					wc.send(APP_TAB_COMMAND_CHANNEL, { kind: TabCommandKind.CloseTab });
 				} else {
 					this.closeActiveTab();
@@ -646,6 +892,7 @@ export class WindowContainer {
 		wc.on("did-finish-load", onLoaded);
 		wc.on("dom-ready", onLoaded);
 		wc.on("before-input-event", onChord);
+		wc.on("focus", onFocus);
 		this.perTabDetach.set(tab.tabId, () => {
 			try {
 				wc.off("page-title-updated", onTitle);
@@ -653,20 +900,21 @@ export class WindowContainer {
 				wc.off("did-finish-load", onLoaded);
 				wc.off("dom-ready", onLoaded);
 				wc.off("before-input-event", onChord);
+				wc.off("focus", onFocus);
 			} catch {
 				// Renderer already gone — Electron cleaned the listeners up.
 			}
 		});
 	}
 
-	private teardownTab(tab: Tab): void {
+	private unwireTab(tab: Tab): void {
 		this.perTabDetach.get(tab.tabId)?.();
 		this.perTabDetach.delete(tab.tabId);
-		try {
-			if (!this.baseWindow.isDestroyed()) this.baseWindow.contentView.removeChildView(tab.view);
-		} catch {
-			// Window mid-teardown — child views go with it.
-		}
+	}
+
+	private teardownTab(tab: Tab): void {
+		this.unwireTab(tab);
+		this.removeView(tab);
 		try {
 			if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
 		} catch {
@@ -695,6 +943,7 @@ export class WindowContainer {
 			// the active tab becomes visible again (others stay paused).
 			this.sendVisibility(tab, visible && tab.tabId === this.activeTabId);
 		}
+		if (this.side) this.sendVisibility(this.side, visible);
 	}
 
 	private sendStripVisible(tab: Tab, visible: boolean): void {
@@ -710,7 +959,7 @@ export class WindowContainer {
 	private emitFullscreen(): void {
 		if (this.baseWindow.isDestroyed()) return;
 		const fs = safe(() => this.baseWindow.isFullScreen(), false);
-		for (const tab of this.tabsList) {
+		for (const tab of this.panes()) {
 			if (tab.view.webContents.isDestroyed()) continue;
 			try {
 				tab.view.webContents.send("window:fullscreen-changed", fs);

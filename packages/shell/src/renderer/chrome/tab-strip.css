@@ -169,3 +169,19 @@ body {
 	background: var(--color-surface-default, rgba(255, 255, 255, 0.06));
 	color: var(--color-text-primary, #f2f2f2);
 }
+
+/* Split view (6.14): the gap between the two app panes. The chrome view lies
+ * under both panes, so this is the one sliver of it that shows. */
+.split-divider {
+	position: fixed;
+	-webkit-app-region: no-drag;
+	cursor: col-resize;
+	background: var(--color-border-subtle);
+	outline: none;
+	touch-action: none;
+}
+
+.split-divider:hover,
+.split-divider:focus-visible {
+	background: var(--color-accent-default);
+}

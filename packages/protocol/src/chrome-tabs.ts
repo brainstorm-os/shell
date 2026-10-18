@@ -25,6 +25,28 @@ export const CHROME_TABS_REORDER = "chrome:tabs:reorder";
 /** Strip → main: re-send the current state (the strip pulls on mount so it
  *  never depends on the initial push racing its renderer load). */
 export const CHROME_TABS_REQUEST = "chrome:tabs:request";
+/** Strip → main: the split divider was dragged to this x (chrome-view
+ *  coordinates). Main converts + clamps; the chrome never names a ratio. */
+export const CHROME_SPLIT_DRAG = "chrome:split:drag";
+/** Strip → main: nudge the divider one keyboard step (`SplitStep`). */
+export const CHROME_SPLIT_STEP = "chrome:split:step";
+
+export enum SplitStep {
+	Left = "left",
+	Right = "right",
+}
+
+/** Where the split divider sits, in chrome-view coordinates, while a window
+ *  is split (6.14). The chrome view lies under both panes, so this rect is
+ *  the part of it the user can see and grab. */
+export type ChromeSplitState = {
+	divider: { x: number; y: number; width: number; height: number };
+	/** Left pane's share of the usable width, 0–1 — for `aria-valuenow`. */
+	leftRatio: number;
+	/** Height the tab strip keeps at the top (0 when it's collapsed). Below it
+	 *  the chrome view must be no-drag, or the divider would move the window. */
+	stripHeight: number;
+};
 
 export type ChromeTab = {
 	tabId: string;
@@ -39,6 +61,8 @@ export type ChromeTab = {
 export type ChromeTabsState = {
 	appId: string;
 	tabs: ChromeTab[];
+	/** Present only while the window is split. */
+	split?: ChromeSplitState;
 };
 
 /** The bridge the chrome preload exposes on `window.brainstormChrome`. */
@@ -52,4 +76,6 @@ export type ChromeBridge = {
 	closeTab: (tabId: string) => void;
 	newTab: () => void;
 	reorderTabs: (order: string[]) => void;
+	dragSplit: (x: number) => void;
+	stepSplit: (step: SplitStep) => void;
 };

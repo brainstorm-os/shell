@@ -73,7 +73,7 @@ describe("codeFileObjectMenuContext (shared by the file list rows + the pane hea
 			...(ctx.onRemove ? { onRemove: ctx.onRemove } : {}),
 		});
 		const ids = items.map((i) => i.id);
-		expect(ids).toEqual(["open", "pin", "rename", "remove"]);
+		expect(ids).toEqual(["open", "open-to-side", "pin", "rename", "remove"]);
 		const rename = items.find((i) => i.id === "rename");
 		const remove = items.find((i) => i.id === "remove");
 		rename?.run();

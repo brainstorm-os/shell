@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { decodeHandshake, encodeHandshake } from "@brainstorm-os/sdk";
 import type { AppHandshake } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Broker } from "../../ipc/broker";
+import { makeEnvelope } from "../../ipc/envelope";
 import { RendererIdentityRegistry } from "../ipc/renderer-identity";
 import { DataStores } from "../storage/data-stores";
 import { AppsRepository } from "../storage/registry-repo";
@@ -514,6 +516,206 @@ describe("AppLauncher", () => {
 		env.launcher.prepareForQuit();
 		env.containers[1]?.window.close(); // quit path — never reveals
 		expect(env.revealDashboard).toHaveBeenCalledTimes(1);
+	});
+});
+
+const TASKS = "io.example.tasks";
+const BROWSER = "io.brainstorm.browser";
+
+function install(env: Awaited<ReturnType<typeof setup>>, id: string): string {
+	const bundleDir = join(env.vaultDir, "apps", id, "1.0.0");
+	env.appsRepo.upsert({
+		id,
+		version: "1.0.0",
+		sdk: "1",
+		manifestPath: join(bundleDir, "manifest.json"),
+		bundleDir,
+		bundleSha256: "b".repeat(64),
+		installedAt: 1,
+		updatedAt: 1,
+		signatureStatus: AppSignatureStatus.Unsigned,
+		signatureKeyId: null,
+		...DEFAULT_INSTALL_PROVENANCE,
+	});
+	return bundleDir;
+}
+
+describe("AppLauncher split view (6.14)", () => {
+	let env: Awaited<ReturnType<typeof setup>>;
+	let tasksDir: string;
+
+	beforeEach(async () => {
+		env = await setup();
+		tasksDir = install(env, TASKS);
+	});
+
+	afterEach(async () => {
+		env.stores.close();
+		await rm(env.vaultDir, { recursive: true, force: true });
+	});
+
+	const openSplit = () => {
+		const primary = env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		const side = env.launcher.openSidePane(primary.container.id, {
+			...baseLaunch,
+			appId: TASKS,
+			bundleDir: tasksDir,
+			launch: { reason: "open-entity", entityId: "task_1" },
+		});
+		if (!side) throw new Error("split refused");
+		return { primary, side };
+	};
+
+	it("hosts the side pane in the SAME OS window but a separate renderer", () => {
+		const { primary, side } = openSplit();
+		expect(env.containers).toHaveLength(1);
+		expect(env.tabViews).toHaveLength(2);
+		expect(side.container).toBe(primary.container);
+		expect(side.webContentsId).not.toBe(primary.webContentsId);
+		expect(env.tabViews[1]?.args.appId).toBe(TASKS);
+	});
+
+	it("registers each pane's renderer under its OWN app id", () => {
+		const { primary, side } = openSplit();
+		expect(env.identities.get(primary.webContentsId)).toBe("io.example.notes");
+		expect(env.identities.get(side.webContentsId)).toBe(TASKS);
+		expect(env.identities.verify(TASKS, side.webContentsId)).toBe(true);
+		// Neither pane can speak as the other.
+		expect(env.identities.verify("io.example.notes", side.webContentsId)).toBe(false);
+		expect(env.identities.verify(TASKS, primary.webContentsId)).toBe(false);
+	});
+
+	it("stamps the side pane's own app id into its preload handshake", () => {
+		openSplit();
+		const args = env.tabViews[1]?.args.additionalArguments ?? [];
+		expect(args).toContain(`--brainstorm-app-id=${TASKS}`);
+		const handshake = args.find((a) => a.startsWith("--brainstorm-handshake="))?.split("=")[1];
+		expect(decodeHandshake(handshake ?? "")?.app.id).toBe(TASKS);
+	});
+
+	it("the broker attributes each pane's calls to the right app", async () => {
+		const { primary, side } = openSplit();
+		const seen: string[] = [];
+		const broker = new Broker({
+			services: new Map([
+				[
+					"storage",
+					(envelope) => {
+						seen.push(envelope.app);
+						return null;
+					},
+				],
+			]),
+			verifyAppIdentity: (app, source) => env.identities.verify(app, source),
+		});
+		const call = (app: string) =>
+			makeEnvelope({ msg: `m-${app}`, app, service: "storage", method: "get", args: [], caps: [] });
+		expect((await broker.dispatch(call("io.example.notes"), primary.webContentsId)).ok).toBe(true);
+		expect((await broker.dispatch(call(TASKS), side.webContentsId)).ok).toBe(true);
+		// The side pane forging the primary's app id is rejected.
+		expect((await broker.dispatch(call("io.example.notes"), side.webContentsId)).ok).toBe(false);
+		expect(seen).toEqual(["io.example.notes", TASKS]);
+	});
+
+	it("surfaces the side pane to per-app broadcasters + the running set", () => {
+		const { side } = openSplit();
+		expect(env.launcher.windowsFor(TASKS).map((w) => w.webContentsId)).toEqual([side.webContentsId]);
+		expect(env.launcher.windowsFor(TASKS)[0]?.appId).toBe(TASKS);
+		expect(env.launcher.allWindows()).toHaveLength(2);
+		expect(env.launcher.runningAppIds().sort()).toEqual(["io.example.notes", TASKS].sort());
+	});
+
+	it("focus-existing finds an object open in a side pane", () => {
+		const { side } = openSplit();
+		const hit = env.launcher.focusTabByRoute("brainstorm://entity/task_1");
+		expect(hit?.webContentsId).toBe(side.webContentsId);
+		expect(side.container.splitState().focused).toBe("side");
+	});
+
+	it("closing the side pane unregisters its identity and returns to one view", () => {
+		const { primary, side } = openSplit();
+		side.container.closeSidePane();
+		expect(env.identities.get(side.webContentsId)).toBeUndefined();
+		expect(env.identities.get(primary.webContentsId)).toBe("io.example.notes");
+		expect(env.launcher.windowsFor(TASKS)).toEqual([]);
+	});
+
+	it("uninstalling/closing the side app closes just its pane", () => {
+		const { primary, side } = openSplit();
+		env.launcher.closeApp(TASKS);
+		expect(primary.container.sidePane()).toBeNull();
+		expect(env.containers[0]?.window.isDestroyed()).toBe(false);
+		expect(env.identities.get(side.webContentsId)).toBeUndefined();
+	});
+
+	it("closing the primary re-homes a different-app side pane into its own window, renderer intact", () => {
+		const { primary, side } = openSplit();
+		primary.container.closeTab(primary.tabId);
+		expect(env.containers).toHaveLength(2);
+		expect(env.containers[0]?.window.isDestroyed()).toBe(true);
+		expect(env.tabViews).toHaveLength(2); // no re-spawn
+		const rehomed = env.launcher.windowsFor(TASKS);
+		expect(rehomed).toHaveLength(1);
+		expect(rehomed[0]?.webContentsId).toBe(side.webContentsId);
+		expect(rehomed[0]?.container).not.toBe(primary.container);
+		expect(rehomed[0]?.container.appId).toBe(TASKS);
+		// Identity survives the move; the old renderer's is gone.
+		expect(env.identities.get(side.webContentsId)).toBe(TASKS);
+		expect(env.identities.get(primary.webContentsId)).toBeUndefined();
+		expect(env.containers[1]?.window.setBounds).toHaveBeenCalledWith({
+			x: 0,
+			y: 0,
+			width: 1100,
+			height: 720,
+		});
+		expect(env.launcher.containerForTabSender(side.webContentsId)?.appId).toBe(TASKS);
+	});
+
+	it("parks and restores a split window as one unit", () => {
+		const { primary, side } = openSplit();
+		env.containers[0]?.window.close();
+		expect(env.launcher.runningAppIds()).toEqual([]);
+		expect(side.webContents.isDestroyed()).toBe(false);
+		env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		expect(primary.container.sidePane()?.webContentsId).toBe(side.webContentsId);
+	});
+
+	it("refuses to split a self-tabbing app's window on either side", () => {
+		const browserDir = install(env, BROWSER);
+		const browser = env.launcher.launch({ ...baseLaunch, appId: BROWSER, bundleDir: browserDir });
+		expect(
+			env.launcher.openSidePane(browser.container.id, {
+				...baseLaunch,
+				appId: TASKS,
+				bundleDir: tasksDir,
+			}),
+		).toBeNull();
+		const notes = env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		expect(
+			env.launcher.openSidePane(notes.container.id, {
+				...baseLaunch,
+				appId: BROWSER,
+				bundleDir: browserDir,
+			}),
+		).toBeNull();
+		expect(env.tabViews).toHaveLength(2);
+	});
+
+	it("returns null for an unknown container", () => {
+		expect(
+			env.launcher.openSidePane("nope", { ...baseLaunch, appId: TASKS, bundleDir: tasksDir }),
+		).toBeNull();
+	});
+
+	it("never adds another app's launch to a container's strip", () => {
+		const notes = env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		const tab = env.launcher.addTabToContainer(notes.container.id, {
+			...baseLaunch,
+			appId: TASKS,
+			bundleDir: tasksDir,
+		});
+		expect(tab.container).not.toBe(notes.container);
+		expect(notes.container.tabs()).toHaveLength(1);
 	});
 });
 

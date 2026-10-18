@@ -29,6 +29,11 @@ const DEFAULT_CHORDS: Record<string, string | null> = {
 	"shell/help": "?",
 	"shell/appearance.toggle": "CmdOrCtrl+Shift+L",
 	"shell/vault-switcher": "CmdOrCtrl+Shift+V",
+	"shell/split.open": "CmdOrCtrl+Alt+D",
+	"shell/split.focus-other": "CmdOrCtrl+Alt+O",
+	"shell/split.swap": "CmdOrCtrl+Alt+Shift+D",
+	"shell/split.divider-left": "CmdOrCtrl+Alt+Shift+H",
+	"shell/split.divider-right": "CmdOrCtrl+Alt+Shift+L",
 
 	// Help-1 — search-input chord while the Help overlay is open. The
 	// `useShortcut` only binds while the overlay is mounted, so it doesn't

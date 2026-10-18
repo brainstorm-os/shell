@@ -36,12 +36,15 @@ export type OpenCapableRuntime =
 
 /** What the shell does with a navigation result. Browser-identical: a plain
  *  click replaces in place; Cmd/Ctrl+click opens a new tab; Shift+click opens a
- *  new window. The wire value is the string; the shell mirrors this enum in its
+ *  new window; Alt+click opens it beside the current pane (doc 37 `new-panel`). The wire value is the string; the shell mirrors this enum in its
  *  navigation resolver. Per §Navigation modes. */
 export enum NavigationMode {
 	Replace = "replace",
 	NewTab = "new-tab",
 	NewWindow = "new-window",
+	/** Split view (6.14, doc 37's `new-panel`): open beside the source pane in
+	 *  the same window. */
+	NewPanel = "new-panel",
 }
 
 /** Derive the navigation mode from a mouse/keyboard event's modifiers — the
@@ -49,12 +52,19 @@ export enum NavigationMode {
  *  across apps. Middle-click is a new tab (Chrome convention). */
 export function navModeFromEvent(
 	event:
-		| { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; button?: number }
+		| {
+				metaKey?: boolean;
+				ctrlKey?: boolean;
+				shiftKey?: boolean;
+				altKey?: boolean;
+				button?: number;
+		  }
 		| null
 		| undefined,
 ): NavigationMode {
 	if (!event) return NavigationMode.Replace;
 	if (event.shiftKey) return NavigationMode.NewWindow;
+	if (event.altKey) return NavigationMode.NewPanel;
 	if (event.metaKey || event.ctrlKey || event.button === 1) return NavigationMode.NewTab;
 	return NavigationMode.Replace;
 }

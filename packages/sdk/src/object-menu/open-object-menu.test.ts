@@ -58,7 +58,11 @@ describe("openObjectMenu", () => {
 
 	it("Open is first; Pin shows when not pinned (the Database parity order)", async () => {
 		await openObjectMenu({ x: 10, y: 10 }, { target, runtime: runtime() });
-		expect(rows().map((b) => b.textContent)).toEqual(["Open", "Pin to dashboard"]);
+		expect(rows().map((b) => b.textContent)).toEqual([
+			"Open",
+			"Open to the side",
+			"Pin to dashboard",
+		]);
 	});
 
 	it("pre-fetches pin state → labels Unpin without a flash", async () => {
@@ -87,7 +91,12 @@ describe("openObjectMenu", () => {
 			verb: "open",
 			payload: { entityId: "ent-1", entityType: "io.acme/Doc/v1" },
 		});
-		expect(rows().map((b) => b.textContent)).toEqual(["Open", "Open with", "Pin to dashboard"]);
+		expect(rows().map((b) => b.textContent)).toEqual([
+			"Open",
+			"Open to the side",
+			"Open with",
+			"Pin to dashboard",
+		]);
 	});
 
 	it("no 'Open with' row when only one app claims the object", async () => {
@@ -99,7 +108,11 @@ describe("openObjectMenu", () => {
 			},
 		});
 		await openObjectMenu({ x: 10, y: 10 }, { target, runtime: rt });
-		expect(rows().map((b) => b.textContent)).toEqual(["Open", "Pin to dashboard"]);
+		expect(rows().map((b) => b.textContent)).toEqual([
+			"Open",
+			"Open to the side",
+			"Pin to dashboard",
+		]);
 	});
 
 	it("destructive Remove is last, glyph'd and data-destructive", async () => {
@@ -126,6 +139,7 @@ describe("openObjectMenu", () => {
 		);
 		expect(rows().map((b) => b.textContent)).toEqual([
 			"Open",
+			"Open to the side",
 			"Pin to dashboard",
 			"Print…",
 			"Remove",
@@ -252,7 +266,7 @@ describe("openObjectMenu", () => {
 		await openObjectMenu({ x: 10, y: 10 }, { target, runtime: contributedRuntime([]) });
 		// No dashboard surface in this runtime, so only Open shows — and crucially
 		// no contributed rows / group headers are added.
-		expect(rows().map((b) => b.textContent)).toEqual(["Open"]);
+		expect(rows().map((b) => b.textContent)).toEqual(["Open", "Open to the side"]);
 	});
 });
 
@@ -264,6 +278,7 @@ describe("openObjectMenu — the read-only lock (Lock-5(c))", () => {
 		);
 		expect(rows().map((b) => b.textContent)).toEqual([
 			"Open",
+			"Open to the side",
 			"Pin to dashboard",
 			"Lock (read-only)",
 		]);

@@ -383,6 +383,11 @@ const ROW_LABEL_KEYS: Record<string, string> = {
 	"shell/switch-window": "shell.settings.keyboard.action.switchWindow",
 	"shell/close-window": "shell.settings.keyboard.action.closeWindow",
 	"shell/quit": "shell.settings.keyboard.action.quit",
+	"shell/split.open": "shell.settings.keyboard.action.splitOpen",
+	"shell/split.focus-other": "shell.settings.keyboard.action.splitFocusOther",
+	"shell/split.swap": "shell.settings.keyboard.action.splitSwap",
+	"shell/split.divider-left": "shell.settings.keyboard.action.splitDividerLeft",
+	"shell/split.divider-right": "shell.settings.keyboard.action.splitDividerRight",
 };
 
 function labelKeyForRowId(id: string): string | null {
