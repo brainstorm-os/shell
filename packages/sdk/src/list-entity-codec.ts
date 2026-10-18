@@ -68,7 +68,11 @@ export function listToEntityProperties(list: List): ListEntityProperties {
 /** Reconstruct a `List` from a `brainstorm/List/v1` entity. Returns `null`
  *  for a non-List entity (so a mixed query can `.map(entityToList).filter`).
  *  Every property field coerces to a safe default when missing / malformed. */
-export function entityToList(entity: Entity): List | null {
+/** The entity fields the List codec reads — any entity row (a service
+ *  `Entity`, a vault-snapshot row) satisfies it structurally. */
+export type ListEntityRow = Pick<Entity, "id" | "type" | "properties" | "createdAt" | "updatedAt">;
+
+export function entityToList(entity: ListEntityRow): List | null {
 	if (entity.type !== LIST_ENTITY_TYPE) return null;
 	const p = entity.properties as Record<string, unknown>;
 	return {

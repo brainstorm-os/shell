@@ -1450,10 +1450,27 @@ body.is-resizing .tasks-resize {
 	border-color: var(--accent);
 }
 
-.task-row[data-done="true"] .task-row__toggle {
+.task-row[data-done="true"] .task-row__toggle,
+.task-row__toggle[data-completion="done"] {
 	background: var(--accent-fill);
 	border-color: var(--accent);
 	color: var(--accent-fg);
+}
+
+/* 9.14.17 — "won't do": closed without completing. A muted, dashed ring
+ * with a cross, so it reads as neither open (empty ring) nor done (filled
+ * accent tick); the row's name is struck through like done, but dimmer. */
+.task-row__toggle[data-completion="wont-do"] {
+	border-style: dashed;
+	border-color: var(--text-faint);
+	color: var(--text-dim);
+}
+
+.task-row[data-completion="wont-do"] .task-row__name,
+.tasks-detail__subtask[data-completion="wont-do"] .tasks-detail__subtask-name {
+	color: var(--text-faint);
+	text-decoration: line-through;
+	font-style: italic;
 }
 
 .task-row__tick {

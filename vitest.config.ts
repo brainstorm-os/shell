@@ -226,6 +226,8 @@ export default defineConfig({
 			),
 			"@brainstorm-os/sdk/templates": resolve(__dirname, "packages/sdk/src/templates.ts"),
 			"@brainstorm-os/sdk/entity-drag": resolve(__dirname, "packages/sdk/src/entity-drag.ts"),
+			"@brainstorm-os/sdk/os-file-drop": resolve(__dirname, "packages/sdk/src/os-file-drop/index.ts"),
+			"@brainstorm-os/sdk/backlinks": resolve(__dirname, "packages/sdk/src/backlinks.ts"),
 			"@brainstorm-os/sdk/object-dnd": resolve(__dirname, "packages/sdk/src/object-dnd/index.ts"),
 			"@brainstorm-os/sdk/icon-picker": resolve(__dirname, "packages/sdk/src/icon-picker/index.ts"),
 			"@brainstorm-os/sdk/cover-picker": resolve(__dirname, "packages/sdk/src/cover-picker/index.ts"),

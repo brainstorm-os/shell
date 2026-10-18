@@ -1,6 +1,7 @@
 import "@brainstorm-os/sdk/app-theme.css";
 import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import "@brainstorm-os/editor/editor.css";
+import "@brainstorm-os/sdk/count-badge.css";
 import { AppErrorBoundary } from "@brainstorm-os/sdk/error-boundary";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { applyPersistedPanelWidth } from "@brainstorm-os/sdk/resizable";

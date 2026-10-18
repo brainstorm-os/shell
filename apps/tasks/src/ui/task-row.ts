@@ -21,9 +21,9 @@ import { summarizeRecurrence } from "@brainstorm-os/sdk-types";
 import { createEntityIconElement } from "@brainstorm-os/sdk/entity-icon";
 import { type SelectionModifier, modifierFromEvent } from "@brainstorm-os/sdk/selection";
 import { recurrenceLabels } from "../i18n/recurrence-labels";
-import { t } from "../i18n/t";
+import { type TranslationKey, t } from "../i18n/t";
 import { dateKey } from "../logic/date-buckets";
-import { isPastDue } from "../logic/task-status";
+import { CompletionState, completionStateOf, isPastDue } from "../logic/task-status";
 import { formatMinutes } from "../logic/task-time";
 import { TASK_TYPE } from "../storage/entities-repository";
 import type { Project } from "../types/project";
@@ -105,13 +105,15 @@ export type TaskRowProps = {
 
 export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 	const { task, now, projectsById, showProjectChip, onToggleComplete, onPickIcon } = props;
-	const done = task.completedAt !== null;
+	const completion = completionStateOf(task);
+	const done = completion === CompletionState.Done;
 	const overdue = isPastDue(task, now);
 
 	const root = document.createElement("li");
 	root.className = "task-row";
 	root.dataset.taskId = task.id;
 	root.dataset.done = String(done);
+	root.dataset.completion = completion;
 	root.dataset.overdue = String(overdue);
 	root.dataset.priority = task.priority;
 	root.dataset.selected = String(props.selectedTaskId === task.id);
@@ -129,7 +131,7 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 		root.setAttribute(ENTITY_TYPE_ATTR, TASK_TYPE);
 	}
 
-	root.appendChild(renderCompletionToggle(task, done, onToggleComplete));
+	root.appendChild(renderCompletionToggle(task, completion, onToggleComplete));
 
 	// Body — name + chip strip. A click anywhere on the body that isn't an
 	// interactive control selects the task (opens the inspector). The
@@ -277,35 +279,64 @@ export function renderTaskRow(props: TaskRowProps): HTMLLIElement {
 	return root;
 }
 
-/** Completion toggle — a real `<button>` so it gets focus + keyboard
- *  activation for free. Exported so the inspector header reuses it. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Done paints a tick, won't do a cross; open paints nothing. */
+const COMPLETION_GLYPH: Partial<Record<CompletionState, string>> = {
+	[CompletionState.Done]: "M3.5 8.5 L7 12 L13 5",
+	[CompletionState.WontDo]: "M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5",
+};
+
+const COMPLETION_LABEL_KEY: Record<CompletionState, TranslationKey> = {
+	[CompletionState.Open]: "tasks.row.toggle.open",
+	[CompletionState.Done]: "tasks.row.toggle.done",
+	[CompletionState.WontDo]: "tasks.row.toggle.wontDo",
+};
+
+/** ARIA's tri-state checkbox: done is checked, won't do is "mixed" (closed
+ *  but not completed), open is unchecked. The label names the current state
+ *  AND what activating does next, so the cycle is never a guess. */
+const COMPLETION_ARIA_CHECKED: Record<CompletionState, "true" | "false" | "mixed"> = {
+	[CompletionState.Open]: "false",
+	[CompletionState.Done]: "true",
+	[CompletionState.WontDo]: "mixed",
+};
+
+/** Three-state completion toggle (9.14.17) — a real `<button>` with
+ *  `role="checkbox"` so it gets focus + keyboard activation for free.
+ *  Exported so the inspector header reuses it. */
 export function renderCompletionToggle(
 	task: Task,
-	done: boolean,
+	state: CompletionState,
 	onToggleComplete: (task: Task) => void,
 ): HTMLButtonElement {
 	const toggle = document.createElement("button");
 	toggle.type = "button";
 	toggle.className = "task-row__toggle";
-	toggle.setAttribute("aria-label", t("tasks.row.toggle.aria"));
-	toggle.setAttribute("aria-pressed", String(done));
+	toggle.dataset.completion = state;
+	toggle.setAttribute("role", "checkbox");
+	toggle.setAttribute("aria-checked", COMPLETION_ARIA_CHECKED[state]);
+	toggle.setAttribute("aria-label", t(COMPLETION_LABEL_KEY[state], { name: task.name }));
 	toggle.addEventListener("click", (event) => {
 		event.stopPropagation();
 		onToggleComplete(task);
 	});
 
-	const tick = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	const tick = document.createElementNS(SVG_NS, "svg");
 	tick.setAttribute("viewBox", "0 0 16 16");
 	tick.setAttribute("aria-hidden", "true");
 	tick.classList.add("task-row__tick");
-	const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-	path.setAttribute("d", "M3.5 8.5 L7 12 L13 5");
-	path.setAttribute("fill", "none");
-	path.setAttribute("stroke", "currentColor");
-	path.setAttribute("stroke-width", "2");
-	path.setAttribute("stroke-linecap", "round");
-	path.setAttribute("stroke-linejoin", "round");
-	tick.appendChild(path);
+	const glyph = COMPLETION_GLYPH[state];
+	if (glyph) {
+		const path = document.createElementNS(SVG_NS, "path");
+		path.setAttribute("d", glyph);
+		path.setAttribute("fill", "none");
+		path.setAttribute("stroke", "currentColor");
+		path.setAttribute("stroke-width", "2");
+		path.setAttribute("stroke-linecap", "round");
+		path.setAttribute("stroke-linejoin", "round");
+		tick.appendChild(path);
+	}
 	toggle.appendChild(tick);
 	return toggle;
 }

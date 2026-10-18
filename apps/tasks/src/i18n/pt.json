@@ -99,7 +99,6 @@
   "tasks.header.sidebar.hide": "Ocultar a barra lateral",
   "tasks.header.iconPicker.open": "Alterar o ícone do projeto",
   "tasks.header.renameProject": "Renomear projeto",
-  "tasks.row.toggle.aria": "Alternar concluída",
   "tasks.row.icon.aria": "Alterar ícone",
   "tasks.row.due.sr": "Vence em {date}",
   "tasks.row.scheduled.sr": "Agendada para {date}",

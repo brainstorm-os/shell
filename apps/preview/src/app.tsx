@@ -13,6 +13,7 @@
  */
 
 import { RightPanelTab } from "@brainstorm-os/editor";
+import { LiveRegion } from "@brainstorm-os/sdk/a11y";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { requestSaveBytes } from "@brainstorm-os/sdk/export-file";
 import { IconName } from "@brainstorm-os/sdk/icon";
@@ -22,7 +23,7 @@ import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } 
 import type { PreviewFile } from "./demo/dataset";
 import { type GalleryState, resolveOpenPayload, toPreviewFiles } from "./host/apply-open";
 import { chipLabelFor } from "./host/context-label";
-import { indexOfId, jumpTo, step } from "./host/host-state";
+import { indexOfId, jumpTo, removeById, step } from "./host/host-state";
 import {
 	type OpenPayload,
 	type PreviewContextSibling,
@@ -171,6 +172,16 @@ export function PreviewApp(): ReactElement {
 		[navigateTo],
 	);
 
+	// 9.20.15 — a file moved to the Bin from the inspector leaves the gallery;
+	// the cursor stays on whatever slid into its slot.
+	const removeFromGallery = useCallback((id: string): void => {
+		const next = removeById({ siblings: siblingsRef.current, cursor: cursorRef.current }, id);
+		if (next.siblings === siblingsRef.current) return;
+		setPairs(EMPTY_PAIRS);
+		setSiblings(next.siblings);
+		setCursor(next.cursor);
+	}, []);
+
 	const toggleInspector = useCallback(
 		() =>
 			setInspectorOpen((v) => {
@@ -304,6 +315,7 @@ export function PreviewApp(): ReactElement {
 
 	return (
 		<>
+			<LiveRegion />
 			<header className="app-header" data-testid="app-header">
 				<div className="app-header__left">
 					<Nav
@@ -358,6 +370,7 @@ export function PreviewApp(): ReactElement {
 								activeTab={rightTab}
 								onTabChange={setRightTab}
 								onClose={closeInspector}
+								onDeleted={removeFromGallery}
 							/>
 						</aside>
 					</div>

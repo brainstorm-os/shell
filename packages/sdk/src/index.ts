@@ -103,6 +103,7 @@ export {
 export {
 	LIST_ENTITY_TYPE,
 	type ListEntityProperties,
+	type ListEntityRow,
 	entityToList,
 	listToEntityProperties,
 } from "./list-entity-codec";

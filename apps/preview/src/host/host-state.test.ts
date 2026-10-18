@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { PreviewFile } from "../demo/dataset";
-import { activeFile, indexOfId, initState, jumpTo, step } from "./host-state";
+import { activeFile, indexOfId, initState, jumpTo, removeById, step } from "./host-state";
 
 function fakeFile(id: string): PreviewFile {
 	return {
@@ -55,5 +55,17 @@ describe("host-state", () => {
 		const s = initState([fakeFile("a"), fakeFile("b"), fakeFile("c")], 0);
 		expect(indexOfId(s, "b")).toBe(1);
 		expect(indexOfId(s, "missing")).toBe(-1);
+	});
+
+	it("removeById keeps the cursor on the file that slides into the removed slot", () => {
+		const files = [fakeFile("a"), fakeFile("b"), fakeFile("c")];
+		expect(activeFile(removeById(initState(files, 1), "b"))?.id).toBe("c");
+		expect(activeFile(removeById(initState(files, 2), "c"))?.id).toBe("b");
+		expect(activeFile(removeById(initState(files, 2), "a"))?.id).toBe("c");
+		const emptied = removeById(initState([fakeFile("a")], 0), "a");
+		expect(emptied.siblings).toHaveLength(0);
+		expect(activeFile(emptied)).toBeNull();
+		const same = initState(files, 0);
+		expect(removeById(same, "zzz")).toBe(same);
 	});
 });

@@ -22,10 +22,12 @@ import {
 	useDropTarget,
 } from "@brainstorm-os/sdk/object-dnd";
 import { ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
+import { useOsFileDrop } from "@brainstorm-os/sdk/os-file-drop";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { dragItemsForEntry } from "../logic/drag-items";
+import { hasActiveFilters } from "../logic/filters";
 import {
 	DEFAULT_LIST_COLUMNS,
 	LIST_COLUMN_WIDTH,
@@ -243,35 +245,13 @@ export function ContentList({
 		[rows, mode, store.tileSize],
 	);
 
-	// 9.8.15 — Finder/OS drag-in upload. The content area is the drop
-	// target for EXTERNAL files (`dataTransfer` carries the "Files" type);
-	// internal entity drags ride DND_MIME on the rows and never enter this
-	// path. Depth-counted so dragging across child rows doesn't flicker
-	// the affordance off.
-	const [osDragDepth, setOsDragDepth] = useState(0);
-	const isOsFileDrag = (e: React.DragEvent) =>
-		e.dataTransfer.types.includes("Files") && !e.dataTransfer.types.includes(DND_MIME);
-	const onOsDragEnter = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		setOsDragDepth((d) => d + 1);
-	};
-	const onOsDragOver = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		e.dataTransfer.dropEffect = "copy";
-	};
-	const onOsDragLeave = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		setOsDragDepth((d) => Math.max(0, d - 1));
-	};
-	const onOsDrop = (e: React.DragEvent) => {
-		if (!isOsFileDrag(e)) return;
-		e.preventDefault();
-		setOsDragDepth(0);
-		const files = Array.from(e.dataTransfer.files);
-		if (files.length > 0) void store.uploadDroppedFiles(files);
-	};
+	// 9.8.15 — Finder/OS drag-in upload, through the shared
+	// `@brainstorm-os/sdk/os-file-drop` zone (9.8.17): EXTERNAL files only —
+	// internal row drags ride DND_MIME and are ignored here.
+	const osDrop = useOsFileDrop({
+		onFiles: (files) => void store.uploadDroppedFiles(files),
+		ignoreTypes: [DND_MIME],
+	});
 
 	// Group-by section headers (9.8.11) — injected as their own virtual rows
 	// in List mode. Grid/Gallery render group-ORDERED tiles without header
@@ -398,42 +378,75 @@ export function ContentList({
 	);
 
 	if (rows.length === 0) {
-		const searching = store.searchQuery.trim() !== "";
+		const filtered = hasActiveFilters(store.filters);
+		const searching = !store.duplicatesActive && store.searchQuery.trim() !== "";
+		const empty = store.duplicatesActive
+			? {
+					icon: IconName.Copy,
+					title: t("brainstorm.files.duplicates.emptyTitle"),
+					hint: filtered
+						? t("brainstorm.files.filter.emptyBody")
+						: t("brainstorm.files.duplicates.emptyBody"),
+				}
+			: searching
+				? {
+						icon: IconName.Search,
+						title: t("brainstorm.files.empty.searchTitle"),
+						hint: t("brainstorm.files.empty.searchBody", { query: store.searchQuery }),
+					}
+				: filtered
+					? {
+							icon: IconName.Search,
+							title: t("brainstorm.files.filter.emptyTitle"),
+							hint: t("brainstorm.files.filter.emptyBody"),
+						}
+					: null;
 		return (
 			<div
 				className="content-empty"
 				data-testid="content-empty"
-				data-os-drop={osDragDepth > 0 ? "true" : "false"}
-				onDragEnter={onOsDragEnter}
-				onDragOver={onOsDragOver}
-				onDragLeave={onOsDragLeave}
-				onDrop={onOsDrop}
+				data-os-drop={osDrop.isOver ? "true" : "false"}
+				{...osDrop.dropProps}
 			>
-				<EmptyState
-					icon={searching ? IconName.Search : IconName.Folder}
-					title={searching ? t("brainstorm.files.empty.searchTitle") : t("brainstorm.files.empty.title")}
-					hint={
-						searching
-							? t("brainstorm.files.empty.searchBody", { query: store.searchQuery })
-							: t("brainstorm.files.empty.body")
-					}
-					{...(searching
-						? {}
-						: {
-								action: (
-									<button
-										type="button"
-										className="bs-btn"
-										data-bs-primary=""
-										data-testid="content-empty-new-folder"
-										onClick={store.newFolder}
-									>
-										<Icon name={IconName.Plus} size={15} />
-										{t("brainstorm.files.empty.newFolder")}
-									</button>
-								),
-							})}
-				/>
+				{empty ? (
+					<EmptyState
+						icon={empty.icon}
+						title={empty.title}
+						hint={empty.hint}
+						{...(filtered
+							? {
+									action: (
+										<button
+											type="button"
+											className="bs-btn"
+											data-testid="content-empty-clear-filters"
+											onClick={store.clearFilters}
+										>
+											{t("brainstorm.files.filter.clear")}
+										</button>
+									),
+								}
+							: {})}
+					/>
+				) : (
+					<EmptyState
+						icon={IconName.Folder}
+						title={t("brainstorm.files.empty.title")}
+						hint={t("brainstorm.files.empty.body")}
+						action={
+							<button
+								type="button"
+								className="bs-btn"
+								data-bs-primary=""
+								data-testid="content-empty-new-folder"
+								onClick={store.newFolder}
+							>
+								<Icon name={IconName.Plus} size={15} />
+								{t("brainstorm.files.empty.newFolder")}
+							</button>
+						}
+					/>
+				)}
 			</div>
 		);
 	}
@@ -448,13 +461,10 @@ export function ContentList({
 			id="content-list"
 			data-testid="content-list"
 			data-view-mode={store.viewMode}
-			data-os-drop={osDragDepth > 0 ? "true" : "false"}
+			data-os-drop={osDrop.isOver ? "true" : "false"}
 			ref={setListRef}
 			aria-label={t("brainstorm.files.contentList.label")}
-			onDragEnter={onOsDragEnter}
-			onDragOver={onOsDragOver}
-			onDragLeave={onOsDragLeave}
-			onDrop={onOsDrop}
+			{...osDrop.dropProps}
 		>
 			<div
 				style={{
