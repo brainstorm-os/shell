@@ -862,3 +862,159 @@ describe("ChatApp — preferences follow the user (Chats-3)", () => {
 		);
 	});
 });
+
+describe("ChatApp — pinned messages (Chats-4)", () => {
+	function entitiesSvc(): { update: ReturnType<typeof vi.fn> } {
+		return (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities;
+	}
+
+	it("pins from the message menu onto the channel row and marks the message", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "remember this")]);
+		open.mockClear();
+		act(() => {
+			(container.querySelector(".chat__line-more") as HTMLButtonElement).click();
+		});
+		const item = open.mock.calls[0]?.[1][0];
+		expect(item?.label).toBe("Pin message");
+		await act(async () => item?.onSelect?.());
+		expect(entitiesSvc().update).toHaveBeenCalledWith("c1", { pinned: ["m1"] });
+		expect(container.querySelector('[data-message-id="m1"] .chat__line-pin')).not.toBeNull();
+
+		open.mockClear();
+		act(() => {
+			container
+				.querySelector('[data-message-id="m1"]')
+				?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+		});
+		expect(open.mock.calls[0]?.[1][0]?.label).toBe("Unpin message");
+	});
+
+	it("lists a channel's pins from the header and jumps to one", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const pinnedChannel = channel("c1", "general");
+		pinnedChannel.properties.pinned = ["m1", "missing"];
+		await mount([
+			pinnedChannel,
+			message("m1", "c1", "Mira", "the plan"),
+			message("m2", "c1", "Ben", "x"),
+		]);
+		const btn = container.querySelector('[data-testid="pins-toggle"]') as HTMLButtonElement;
+		expect(btn.getAttribute("aria-label")).toBe("1 pinned message");
+		open.mockClear();
+		act(() => btn.click());
+		const items = open.mock.calls[0]?.[1] ?? [];
+		expect(items.map((i) => i.label)).toEqual(["Mira: the plan"]);
+		await act(async () => items[0]?.onSelect?.());
+		expect(
+			container.querySelector('[data-message-id="m1"]')?.classList.contains("chat__line-wrap--flash"),
+		).toBe(true);
+	});
+
+	it("disables the pins button with no channel open (and says why)", async () => {
+		await mount([]);
+		const btn = container.querySelector('[data-testid="pins-toggle"]') as HTMLButtonElement;
+		expect(btn.disabled).toBe(true);
+		expect(btn.title).toBe("Open a channel to see its pinned messages");
+	});
+});
+
+describe("ChatApp — typing indicator over presence (Chats-4)", () => {
+	function presenceShell(): {
+		services: Record<string, unknown>;
+		publish: ReturnType<typeof vi.fn>;
+		push: (peers: { clientId: number; state: Record<string, unknown> }[]) => void;
+	} {
+		const publish = vi.fn(() => Promise.resolve());
+		let cb: ((peers: { clientId: number; state: Record<string, unknown> }[]) => void) | null = null;
+		return {
+			publish,
+			push: (peers) => cb?.(peers),
+			services: {
+				presence: { publish, untrack: vi.fn(() => Promise.resolve()) },
+				roster: {
+					self: vi.fn(() =>
+						Promise.resolve({ pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" }),
+					),
+					members: vi.fn(() => Promise.resolve([])),
+				},
+				__onPeers: (_id: string, c: typeof cb) => {
+					cb = c;
+					return () => {};
+				},
+			},
+		};
+	}
+
+	async function mountWithPresence(): Promise<ReturnType<typeof presenceShell>> {
+		const shell = presenceShell();
+		installShell([channel("c1", "general")], undefined, shell.services);
+		const bs = (window as unknown as { brainstorm: Record<string, unknown> }).brainstorm;
+		bs.presence = { onPeers: shell.services.__onPeers };
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		await act(async () => root.render(<ChatApp />));
+		await act(async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+		});
+		return shell;
+	}
+
+	const lastActivity = (publish: ReturnType<typeof vi.fn>): unknown =>
+		(
+			publish.mock.calls[publish.mock.calls.length - 1]?.[0] as {
+				state: { presence?: { activity?: string } } | null;
+			}
+		)?.state?.presence?.activity;
+
+	it("publishes typing once per burst, clears it after the idle window, never writes an entity", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			const shell = await mountWithPresence();
+			expect(lastActivity(shell.publish)).toBeUndefined();
+			typeComposer("h");
+			expect(lastActivity(shell.publish)).toBe("typing");
+			const afterFirst = shell.publish.mock.calls.length;
+			typeComposer("he");
+			typeComposer("hel");
+			expect(shell.publish.mock.calls.length).toBe(afterFirst);
+			await act(async () => {
+				vi.advanceTimersByTime(4100);
+			});
+			expect(lastActivity(shell.publish)).toBeUndefined();
+			expect(created.filter((c) => c.type !== USER_STATE_TYPE)).toHaveLength(0);
+			expect(JSON.stringify(created)).not.toContain("typing");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("shows who else is typing in the channel", async () => {
+		const shell = await mountWithPresence();
+		await act(async () => {
+			shell.push([
+				{
+					clientId: 7,
+					state: { presence: { id: "pk-ada", name: "Ada", color: "#000", activity: "typing" } },
+				},
+				{
+					clientId: 8,
+					state: { presence: { id: "pk-me", name: "Me", color: "#000", activity: "typing" } },
+				},
+			]);
+		});
+		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("Ada is typing…");
+		await act(async () => {
+			shell.push([{ clientId: 7, state: { presence: { id: "pk-ada", name: "Ada", color: "#000" } } }]);
+		});
+		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("");
+	});
+});

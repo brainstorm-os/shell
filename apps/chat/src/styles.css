@@ -806,3 +806,58 @@ body {
 .chat__composer-wrap--expanded .bs-composer-context__attach {
 	align-self: flex-end;
 }
+
+/* ── pins + typing (Chats-4) ──────────────────────────────────── */
+.chat__line-wrap {
+	position: relative;
+}
+
+.chat__line-wrap--pinned {
+	padding-left: 18px;
+}
+
+.chat__line-pin {
+	position: absolute;
+	left: 0;
+	top: 4px;
+	display: inline-flex;
+	color: var(--accent);
+}
+
+/* The per-message ⋯ surfaces on hover / keyboard focus only, so a quiet
+ * transcript stays quiet. */
+.chat__line-more {
+	position: absolute;
+	top: -2px;
+	right: 0;
+	width: 24px;
+	height: 24px;
+	opacity: 0;
+	background: var(--bg-elev);
+	border: 1px solid var(--border-subtle);
+}
+
+.chat__line-wrap:hover .chat__line-more,
+.chat__line-more:focus-visible,
+.chat__line-more[aria-expanded="true"] {
+	opacity: 1;
+}
+
+.chat__composer-wrap {
+	position: relative;
+}
+
+.chat__typing {
+	position: absolute;
+	bottom: 100%;
+	left: 18px;
+	right: 18px;
+	margin: 0;
+	padding: 2px 0;
+	font-size: var(--text-size-xs);
+	color: var(--text-faint);
+	pointer-events: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

@@ -34,7 +34,8 @@
             "name": { "type": "string" },
             "topic": { "type": "string" },
             "createdAt": { "type": "string" },
-            "participants": { "type": "array", "items": { "type": "object" } }
+            "participants": { "type": "array", "items": { "type": "object" } },
+            "pinned": { "type": "array", "items": { "type": "string" } }
           }
         }
       },

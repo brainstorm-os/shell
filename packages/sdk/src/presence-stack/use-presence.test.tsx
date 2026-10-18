@@ -9,6 +9,7 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PresenceSelf } from "./presence-awareness";
+import { PresenceActivity } from "./presence-stack";
 import { presenceAwarenessFor, usePresence } from "./use-presence";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -93,8 +94,11 @@ describe("presenceAwarenessFor", () => {
 	});
 });
 
-function Harness({ entityId }: { entityId: string | null }) {
-	const peers = usePresence(entityId, TYPE, SELF);
+function Harness({
+	entityId,
+	activity = null,
+}: { entityId: string | null; activity?: PresenceActivity | null }) {
+	const peers = usePresence(entityId, TYPE, SELF, { activity });
 	return <output data-testid="peers">{peers.map((p) => p.name).join(",")}</output>;
 }
 
@@ -107,12 +111,32 @@ describe("usePresence", () => {
 		host.remove();
 	});
 
-	function render(entityId: string | null): void {
+	function render(entityId: string | null, activity: PresenceActivity | null = null): void {
 		host = document.createElement("div");
 		document.body.appendChild(host);
 		root = createRoot(host);
-		act(() => root.render(<Harness entityId={entityId} />));
+		act(() => root.render(<Harness entityId={entityId} activity={activity} />));
 	}
+
+	it("publishes an ephemeral activity only on a transition (Chats-4 typing)", () => {
+		const shell = makeShell();
+		render("note-1");
+		const presenceOf = (i: number) =>
+			(shell.publish.mock.calls[i]?.[0] as { state: { presence?: { activity?: string } } }).state
+				.presence;
+		const before = shell.publish.mock.calls.length;
+		expect(presenceOf(before - 1)?.activity).toBeUndefined();
+
+		act(() => root.render(<Harness entityId="note-1" activity={PresenceActivity.Typing} />));
+		expect(shell.publish.mock.calls.length).toBe(before + 1);
+		expect(presenceOf(before)?.activity).toBe(PresenceActivity.Typing);
+
+		act(() => root.render(<Harness entityId="note-1" activity={PresenceActivity.Typing} />));
+		expect(shell.publish.mock.calls.length).toBe(before + 1);
+
+		act(() => root.render(<Harness entityId="note-1" activity={null} />));
+		expect(presenceOf(before + 1)?.activity).toBeUndefined();
+	});
 
 	it("publishes self on mount and renders inbound peers", async () => {
 		const shell = makeShell();

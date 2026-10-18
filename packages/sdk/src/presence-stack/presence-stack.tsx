@@ -29,7 +29,16 @@ export type PresencePeer = {
 	color: string;
 	/** `brainstorm://asset/…` avatar, if the peer has one. */
 	avatarRef?: string;
+	/** What the peer is doing right now, when they publish it (Chats-4:
+	 *  typing in a channel). Ephemeral — presence only, never persisted. */
+	activity?: PresenceActivity;
 };
+
+/** Known ephemeral activities a peer may publish alongside its presence. A
+ *  closed set: an unknown value from a peer is dropped, never rendered. */
+export enum PresenceActivity {
+	Typing = "typing",
+}
 
 export type PresenceSummary = {
 	/** Distinct peers to show, capped at `max`, first-seen order preserved. */

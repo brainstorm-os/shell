@@ -42,7 +42,12 @@ import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm-
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
 import { Popover } from "@brainstorm-os/sdk/popover";
-import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
+import {
+	PresenceActivity,
+	PresenceStack,
+	usePresence,
+	useSelf,
+} from "@brainstorm-os/sdk/presence-stack";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -68,13 +73,15 @@ import {
 	toPanelMembers,
 } from "./logic/chat";
 import { type LocalIdentity, mintPersonRef } from "./logic/identity";
+import { pinnedMessages, togglePin } from "./logic/pins";
 import {
 	ProposalDecision,
 	ProposalDecisionFailure,
 	type ProposalDecisionResult,
 	readDecisionResult,
 } from "./logic/proposal";
-import { type SearchHit, SearchScope } from "./logic/search";
+import { type SearchHit, SearchScope, snippetFor } from "./logic/search";
+import { TYPING_IDLE_MS, typingLabel, typingPeers } from "./logic/typing";
 import { ackChannels, channelMaxSeqs, unreadByChannel } from "./logic/unread";
 import { ProposalCard, type ProposalHost } from "./proposal-card";
 import { getBrainstorm } from "./runtime";
@@ -97,6 +104,8 @@ const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", html: 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
 const FLASH_MS = 2400;
+
+const PENDING_PREFIX = "pending-";
 
 /** A pending optimistic echo of a just-sent message, keyed so it can be dropped
  *  once the persisted twin arrives over the reactive snapshot. */
@@ -326,7 +335,31 @@ export function ChatApp(): ReactElement {
 
 	// PRES-3 — who's-here on the open channel (live avatars, distinct from the
 	// channel MEMBER roster). Cross-device in the shell; empty otherwise.
-	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf());
+	// Chats-4 — typing rides this presence payload (ephemeral, never an
+	// entity). The flag flips on at a burst's first keystroke and off after
+	// TYPING_IDLE_MS quiet / on send / on channel switch: two publishes a burst.
+	const [typing, setTyping] = useState(false);
+	const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const stopTyping = useCallback(() => {
+		if (typingTimerRef.current !== null) clearTimeout(typingTimerRef.current);
+		typingTimerRef.current = null;
+		setTyping(false);
+	}, []);
+	const noteTyping = useCallback(() => {
+		setTyping(true);
+		if (typingTimerRef.current !== null) clearTimeout(typingTimerRef.current);
+		typingTimerRef.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+	}, [stopTyping]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a channel switch is the trigger.
+	useEffect(() => stopTyping, [activeId, stopTyping]);
+
+	const channelPeers = usePresence(activeChannel?.id ?? null, CHANNEL_TYPE, useSelf(), {
+		activity: typing ? PresenceActivity.Typing : null,
+	});
+	const typingText = useMemo(() => {
+		const label = typingLabel(typingPeers(channelPeers, identity.personRef));
+		return label ? t(label.key, label.params) : "";
+	}, [channelPeers, identity.personRef]);
 
 	// ── 7.14 — the app-icon unread badge. Seen semantics are app-owned: the
 	// ACTIVE channel is continuously read (you're looking at it); a channel
@@ -540,7 +573,7 @@ export function ChatApp(): ReactElement {
 			const now = new Date().toISOString();
 			const seq = nextSeq(messages);
 			const echo: ChatMessage = {
-				id: `pending-${now}-${seq}`,
+				id: `${PENDING_PREFIX}${now}-${seq}`,
 				channelId: activeId,
 				body: text,
 				...(rich ? { richBody: rich } : {}),
@@ -617,6 +650,77 @@ export function ChatApp(): ReactElement {
 		setActiveId(hit.channelId);
 		setHighlight((prev) => ({ messageId: hit.messageId, nonce: (prev?.nonce ?? 0) + 1 }));
 	}, []);
+
+	// Chats-4 — pins live on the channel row. The override shows a pin the
+	// instant it's toggled; it drops once the snapshot carries the same list.
+	const [pinOverride, setPinOverride] = useState<ReadonlyMap<string, readonly string[]>>(
+		() => new Map(),
+	);
+	useEffect(() => {
+		setPinOverride((prev) => {
+			if (prev.size === 0) return prev;
+			let next: Map<string, readonly string[]> | null = null;
+			for (const [id, list] of prev) {
+				const live = channels.find((c) => c.id === id)?.pinned;
+				if (live && live.length === list.length && live.every((x, i) => x === list[i])) {
+					next = next ?? new Map(prev);
+					next.delete(id);
+				}
+			}
+			return next ?? prev;
+		});
+	}, [channels]);
+	const activePinned = useMemo<readonly string[]>(
+		() => (activeChannel ? (pinOverride.get(activeChannel.id) ?? activeChannel.pinned) : []),
+		[activeChannel, pinOverride],
+	);
+	const pinnedSet = useMemo(() => new Set(activePinned), [activePinned]);
+	const togglePinMessage = useCallback(
+		async (messageId: string) => {
+			if (!entitiesSvc || !activeChannel) return;
+			const channelId = activeChannel.id;
+			const next = togglePin(activePinned, messageId);
+			setPinOverride((prev) => new Map(prev).set(channelId, next));
+			try {
+				await entitiesSvc.update(channelId, { pinned: next });
+			} catch (err) {
+				console.warn("[chat] failed to update pins:", err);
+				setPinOverride((prev) => {
+					const rolled = new Map(prev);
+					rolled.delete(channelId);
+					return rolled;
+				});
+			}
+		},
+		[entitiesSvc, activeChannel, activePinned],
+	);
+	const pinsRef = useRef<HTMLButtonElement>(null);
+	const pinnedList = useMemo(() => pinnedMessages(activePinned, messages), [activePinned, messages]);
+	const openPins = useCallback(() => {
+		const el = pinsRef.current;
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		const items =
+			pinnedList.length > 0
+				? pinnedList.map((m) => ({
+						label: t("pins.item", {
+							author: m.authorName,
+							text: snippetFor(m.body, []) || t("pins.noText"),
+						}),
+						icon: IconName.Pin,
+						onSelect: () => setHighlight((prev) => ({ messageId: m.id, nonce: (prev?.nonce ?? 0) + 1 })),
+					}))
+				: [{ label: t("pins.empty"), disabled: true }];
+		openAnchoredMenu({ x: r.right, y: r.bottom + 4 }, items, {
+			menuLabel: t("pins.title"),
+			anchor: el,
+			align: MenuAlign.End,
+		});
+	}, [pinnedList]);
+
+	const pinsLabel = activeChannel
+		? plural(pinnedList.length, "pins.open.one", "pins.open.other")
+		: t("pins.disabled");
 
 	const moreRef = useRef<HTMLButtonElement>(null);
 	const [shareOpen, setShareOpen] = useState(false);
@@ -698,6 +802,20 @@ export function ChatApp(): ReactElement {
 					>
 						<Icon name={IconName.Search} size={18} />
 					</button>
+					<button
+						ref={pinsRef}
+						type="button"
+						className="chat__icon-btn"
+						data-bs-tooltip={pinsLabel}
+						aria-label={pinsLabel}
+						title={activeChannel ? undefined : pinsLabel}
+						aria-haspopup="menu"
+						disabled={!activeChannel}
+						onClick={openPins}
+						data-testid="pins-toggle"
+					>
+						<Icon name={IconName.Pin} size={18} />
+					</button>
 					<PanelToggleButton
 						side={PanelSide.Left}
 						open={showSidebar}
@@ -764,12 +882,19 @@ export function ChatApp(): ReactElement {
 								proposalHost={proposalHost}
 								highlight={highlight}
 								absoluteTimestamps={prefs.absoluteTimestamps}
+								pinnedIds={pinnedSet}
+								onTogglePin={entitiesSvc ? (id) => void togglePinMessage(id) : null}
 							/>
 							<Composer
 								expanded={composerExpanded}
 								onToggleExpanded={() => setComposerExpanded((v) => !v)}
 								channelName={activeChannel.name}
-								onSend={sendMessage}
+								typingText={typingText}
+								onDraftChange={noteTyping}
+								onSend={(body, rich, atts) => {
+									stopTyping();
+									void sendMessage(body, rich, atts);
+								}}
 								disabled={!entitiesSvc}
 								host={contextHost}
 								attachments={attachments}
@@ -989,6 +1114,8 @@ function MessageView({
 	proposalHost,
 	highlight,
 	absoluteTimestamps,
+	pinnedIds,
+	onTogglePin,
 }: {
 	channel: ChatChannel;
 	groups: ReturnType<typeof groupMessages>;
@@ -999,7 +1126,31 @@ function MessageView({
 	highlight: { messageId: string; nonce: number } | null;
 	/** Chats-3 — full date + time instead of Today / Yesterday + clock. */
 	absoluteTimestamps: boolean;
+	/** Chats-4 — this channel's pinned message ids. */
+	pinnedIds: ReadonlySet<string>;
+	/** Null when the host can't write the channel (no pin affordance). */
+	onTogglePin: ((messageId: string) => void) | null;
 }): ReactElement {
+	const openMessageMenu = (
+		point: { x: number; y: number },
+		m: ChatMessage,
+		anchor?: HTMLElement,
+	) => {
+		if (!onTogglePin) return;
+		const pinned = pinnedIds.has(m.id);
+		openAnchoredMenu(
+			point,
+			[
+				{
+					label: pinned ? t("pins.unpin") : t("pins.pin"),
+					icon: pinned ? IconName.PinSlash : IconName.Pin,
+					disabled: m.id.startsWith(PENDING_PREFIX),
+					onSelect: () => onTogglePin(m.id),
+				},
+			],
+			{ menuLabel: t("message.menu"), ...(anchor ? { anchor, align: MenuAlign.End } : {}) },
+		);
+	};
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const count = groups.reduce((n, g) => n + g.messages.length, 0);
 	// Pin to the latest message as the transcript grows. `count` both gates the
@@ -1067,9 +1218,40 @@ function MessageView({
 									return (
 										<div
 											key={m.id}
-											className={`chat__line-wrap${m.id === flashId ? " chat__line-wrap--flash" : ""}`}
+											className={`chat__line-wrap${m.id === flashId ? " chat__line-wrap--flash" : ""}${pinnedIds.has(m.id) ? " chat__line-wrap--pinned" : ""}`}
 											data-message-id={m.id}
+											onContextMenu={(e) => {
+												if (!onTogglePin) return;
+												e.preventDefault();
+												openMessageMenu({ x: e.clientX, y: e.clientY }, m);
+											}}
 										>
+											{pinnedIds.has(m.id) ? (
+												<span
+													className="chat__line-pin"
+													role="img"
+													aria-label={t("pins.pinned")}
+													title={t("pins.pinned")}
+												>
+													<Icon name={IconName.Pin} size={12} />
+												</span>
+											) : null}
+											{onTogglePin ? (
+												<button
+													type="button"
+													className="chat__icon-btn chat__line-more"
+													aria-label={t("message.menu")}
+													aria-haspopup="menu"
+													data-bs-tooltip={t("message.menu")}
+													onClick={(e) => {
+														const el = e.currentTarget;
+														const r = el.getBoundingClientRect();
+														openMessageMenu({ x: r.right, y: r.bottom + 4 }, m, el);
+													}}
+												>
+													<Icon name={IconName.More} size={14} />
+												</button>
+											) : null}
 											{m.richBody ? (
 												<div className="chat__line chat__line--rich bs-editor bs-editor--readonly">
 													{renderEditorState(m.richBody)}
@@ -1116,6 +1298,8 @@ function Composer({
 	expanded,
 	onToggleExpanded,
 	channelName,
+	typingText,
+	onDraftChange,
 	onSend,
 	disabled,
 	host,
@@ -1127,6 +1311,10 @@ function Composer({
 	expanded: boolean;
 	onToggleExpanded: () => void;
 	channelName: string;
+	/** Chats-4 — "Ada is typing…", or "" when nobody is. */
+	typingText: string;
+	/** Fires on each non-empty draft edit (drives the typing presence). */
+	onDraftChange: () => void;
 	onSend: (body: string, richBody: string, atts: readonly MessageAttachment[]) => void;
 	disabled: boolean;
 	host: ComposerContextHost;
@@ -1159,6 +1347,9 @@ function Composer({
 			data-testid="composer"
 			{...objectDrop.dropProps}
 		>
+			<p className="chat__typing" aria-live="polite" data-testid="typing">
+				{typingText}
+			</p>
 			<ComposerContextRail
 				attachments={attachments.attachments}
 				onRemove={attachments.remove}
@@ -1185,8 +1376,10 @@ function Composer({
 					disabled={disabled}
 					additionalNodes={[MentionNode]}
 					onChange={(p) => {
+						const changed = p.text !== draftRef.current.text;
 						draftRef.current = p;
 						setDraftEmpty(p.isEmpty);
+						if (changed && !p.isEmpty) onDraftChange();
 					}}
 					onSubmit={commit}
 				>

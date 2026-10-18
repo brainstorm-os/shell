@@ -130,5 +130,19 @@
   "sidebar.channelUnread.other": "{name}, {count} unread messages",
   "menu.absoluteTimestamps": "Show full dates and times",
   "composer.expand": "Expand composer",
-  "composer.collapse": "Collapse composer"
+  "composer.collapse": "Collapse composer",
+  "typing.one": "{name} is typing…",
+  "typing.two": "{a} and {b} are typing…",
+  "typing.many": "Several people are typing…",
+  "pins.title": "Pinned messages",
+  "pins.open.one": "{count} pinned message",
+  "pins.open.other": "{count} pinned messages",
+  "pins.disabled": "Open a channel to see its pinned messages",
+  "pins.empty": "No pinned messages yet",
+  "pins.item": "{author}: {text}",
+  "pins.noText": "(attachment)",
+  "pins.pin": "Pin message",
+  "pins.unpin": "Unpin message",
+  "pins.pinned": "Pinned",
+  "message.menu": "Message actions"
 }
