@@ -306,5 +306,21 @@
   "brainstorm.database.settings.column.wrap": "Text wrap",
   "brainstorm.database.settings.column.wrap.default": "Same as view",
   "brainstorm.database.settings.column.wrap.wrap": "Wrap",
-  "brainstorm.database.settings.column.wrap.noWrap": "Don’t wrap"
+  "brainstorm.database.settings.column.wrap.noWrap": "Don’t wrap",
+  "brainstorm.database.bulk.setProperty": "Set property…",
+  "brainstorm.database.bulk.setTo": "Set {name} to",
+  "brainstorm.database.bulk.clearValue": "Clear value",
+  "brainstorm.database.bulk.yes": "Yes",
+  "brainstorm.database.bulk.no": "No",
+  "brainstorm.database.bulk.invalidValue": "That isn’t a valid value for {name}",
+  "brainstorm.database.bulk.nothingChanged": "Nothing to change.",
+  "brainstorm.database.bulk.updated.one": "Set {name} on {count} item.",
+  "brainstorm.database.bulk.updated.other": "Set {name} on {count} items.",
+  "brainstorm.database.bulk.added.one": "Added {count} item to {name}.",
+  "brainstorm.database.bulk.added.other": "Added {count} items to {name}.",
+  "brainstorm.database.bulk.lockedSkipped.one": "{count} locked item skipped.",
+  "brainstorm.database.bulk.lockedSkipped.other": "{count} locked items skipped.",
+  "brainstorm.database.bulk.overCapacity": "{count} not added: the collection is full.",
+  "brainstorm.database.bulk.undo": "Undo",
+  "brainstorm.database.bulk.undone": "Bulk edit undone."
 }

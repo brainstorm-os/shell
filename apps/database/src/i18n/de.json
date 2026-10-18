@@ -306,5 +306,21 @@
   "brainstorm.database.settings.column.wrap": "Textumbruch",
   "brainstorm.database.settings.column.wrap.default": "Wie Ansicht",
   "brainstorm.database.settings.column.wrap.wrap": "Umbrechen",
-  "brainstorm.database.settings.column.wrap.noWrap": "Nicht umbrechen"
+  "brainstorm.database.settings.column.wrap.noWrap": "Nicht umbrechen",
+  "brainstorm.database.bulk.setProperty": "Eigenschaft setzen…",
+  "brainstorm.database.bulk.setTo": "{name} setzen auf",
+  "brainstorm.database.bulk.clearValue": "Wert leeren",
+  "brainstorm.database.bulk.yes": "Ja",
+  "brainstorm.database.bulk.no": "Nein",
+  "brainstorm.database.bulk.invalidValue": "Kein gültiger Wert für {name}",
+  "brainstorm.database.bulk.nothingChanged": "Nichts zu ändern.",
+  "brainstorm.database.bulk.updated.one": "{name} bei {count} Eintrag gesetzt.",
+  "brainstorm.database.bulk.updated.other": "{name} bei {count} Einträgen gesetzt.",
+  "brainstorm.database.bulk.added.one": "{count} Eintrag zu {name} hinzugefügt.",
+  "brainstorm.database.bulk.added.other": "{count} Einträge zu {name} hinzugefügt.",
+  "brainstorm.database.bulk.lockedSkipped.one": "{count} gesperrter Eintrag übersprungen.",
+  "brainstorm.database.bulk.lockedSkipped.other": "{count} gesperrte Einträge übersprungen.",
+  "brainstorm.database.bulk.overCapacity": "{count} nicht hinzugefügt: Die Sammlung ist voll.",
+  "brainstorm.database.bulk.undo": "Rückgängig",
+  "brainstorm.database.bulk.undone": "Massenbearbeitung rückgängig gemacht."
 }

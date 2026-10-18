@@ -306,5 +306,21 @@
   "brainstorm.database.settings.column.wrap": "A capo",
   "brainstorm.database.settings.column.wrap.default": "Come la vista",
   "brainstorm.database.settings.column.wrap.wrap": "Vai a capo",
-  "brainstorm.database.settings.column.wrap.noWrap": "Non andare a capo"
+  "brainstorm.database.settings.column.wrap.noWrap": "Non andare a capo",
+  "brainstorm.database.bulk.setProperty": "Imposta proprietà…",
+  "brainstorm.database.bulk.setTo": "Imposta {name} a",
+  "brainstorm.database.bulk.clearValue": "Cancella valore",
+  "brainstorm.database.bulk.yes": "Sì",
+  "brainstorm.database.bulk.no": "No",
+  "brainstorm.database.bulk.invalidValue": "Non è un valore valido per {name}",
+  "brainstorm.database.bulk.nothingChanged": "Niente da modificare.",
+  "brainstorm.database.bulk.updated.one": "{name} impostato su {count} elemento.",
+  "brainstorm.database.bulk.updated.other": "{name} impostato su {count} elementi.",
+  "brainstorm.database.bulk.added.one": "{count} elemento aggiunto a {name}.",
+  "brainstorm.database.bulk.added.other": "{count} elementi aggiunti a {name}.",
+  "brainstorm.database.bulk.lockedSkipped.one": "{count} elemento bloccato saltato.",
+  "brainstorm.database.bulk.lockedSkipped.other": "{count} elementi bloccati saltati.",
+  "brainstorm.database.bulk.overCapacity": "{count} non aggiunti: la raccolta è piena.",
+  "brainstorm.database.bulk.undo": "Annulla",
+  "brainstorm.database.bulk.undone": "Modifica multipla annullata."
 }

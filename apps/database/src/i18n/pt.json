@@ -306,5 +306,21 @@
   "brainstorm.database.settings.column.wrap": "Quebra de texto",
   "brainstorm.database.settings.column.wrap.default": "Igual à vista",
   "brainstorm.database.settings.column.wrap.wrap": "Quebrar",
-  "brainstorm.database.settings.column.wrap.noWrap": "Não quebrar"
+  "brainstorm.database.settings.column.wrap.noWrap": "Não quebrar",
+  "brainstorm.database.bulk.setProperty": "Definir propriedade…",
+  "brainstorm.database.bulk.setTo": "Definir {name} como",
+  "brainstorm.database.bulk.clearValue": "Limpar valor",
+  "brainstorm.database.bulk.yes": "Sim",
+  "brainstorm.database.bulk.no": "Não",
+  "brainstorm.database.bulk.invalidValue": "Não é um valor válido para {name}",
+  "brainstorm.database.bulk.nothingChanged": "Nada para alterar.",
+  "brainstorm.database.bulk.updated.one": "{name} definido em {count} item.",
+  "brainstorm.database.bulk.updated.other": "{name} definido em {count} itens.",
+  "brainstorm.database.bulk.added.one": "{count} item adicionado a {name}.",
+  "brainstorm.database.bulk.added.other": "{count} itens adicionados a {name}.",
+  "brainstorm.database.bulk.lockedSkipped.one": "{count} item bloqueado ignorado.",
+  "brainstorm.database.bulk.lockedSkipped.other": "{count} itens bloqueados ignorados.",
+  "brainstorm.database.bulk.overCapacity": "{count} não adicionados: a coleção está cheia.",
+  "brainstorm.database.bulk.undo": "Desfazer",
+  "brainstorm.database.bulk.undone": "Edição em massa desfeita."
 }

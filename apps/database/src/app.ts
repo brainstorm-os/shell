@@ -53,6 +53,7 @@ import {
 	type SourceQueryResult,
 	ValueType,
 	type VaultEntity,
+	coerceScalarValue,
 	decideRowCreate,
 	isMultiValued,
 } from "@brainstorm-os/sdk-types";
@@ -86,7 +87,7 @@ import "@brainstorm-os/sdk/presence-stack.css";
 import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
-import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { attachShortcut, isEditableElement } from "@brainstorm-os/sdk/shortcut";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import {
 	CreateOptionKind,
@@ -107,7 +108,9 @@ import {
 	groupWireKey,
 	toggleCollapsed,
 } from "./logic/board-groups";
+import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
+import { effectiveColumnDef } from "./logic/effective-def";
 import { propertyKindIconFor } from "./logic/property-kind-icon";
 
 applyPersistedPanelWidth({
@@ -300,7 +303,13 @@ import { InspectorProperties } from "./react/inspector-properties";
 // React component of the same name. Keep the component name parity in
 // the `react/` directory and disambiguate here.
 import { ListView as ListViewComponent } from "./react/list-view";
-import { StageEmpty, mountInspectorProps, renderEmpty, renderViewBodyReact } from "./react/mount";
+import {
+	type SelectionProps,
+	StageEmpty,
+	mountInspectorProps,
+	renderEmpty,
+	renderViewBodyReact,
+} from "./react/mount";
 import { TimelineView } from "./react/timeline-view";
 import { entityIcon, entityTitle, formatDate, formatDateTime, typeLabel } from "./render/cells";
 import { IconKind } from "./types/icon";
@@ -1223,19 +1232,7 @@ function renderActiveViewInner(state: AppState): void {
 	const handleOpen = (entity: EntityRow) => onOpenEntity(state, entity);
 	const handleOpenInspector = (entity: EntityRow) => onOpenInspector(state, entity);
 
-	const selectionCount = state.selection.selectedIds.size;
-	const selection =
-		selectionCount > 1
-			? {
-					count: selectionCount,
-					clearLabel: "Clear",
-					onClear: () => {
-						state.selection = clearSelection();
-						renderActiveView(state);
-						renderInspector(state);
-					},
-				}
-			: null;
+	const selection = selectionBarProps(state);
 
 	// Every active view kind is React now (some still delegate their body
 	// painting to imperative renderers from `render/` via `<DomPaint>`,
@@ -2009,35 +2006,232 @@ function repaintSelection(state: AppState): void {
 	}
 }
 
+/** The selection bar is part of the React view body; a selection change
+ *  re-renders it (with its bulk actions) through the active-view render. */
 function updateSelectionBar(state: AppState): void {
-	const body = document.getElementById("stage-body");
-	if (!body) return;
-	let bar = body.querySelector<HTMLElement>(".db-selection-bar");
+	renderActiveView(state);
+}
+
+/** The pending one-step undo for the last bulk edit (9.12.32). Cleared by the
+ *  undo itself or by the next bulk edit. */
+let lastBulkUndo: BulkUndo | null = null;
+
+function selectionBarProps(state: AppState): SelectionProps | null {
 	const count = state.selection.selectedIds.size;
+	const undoAction = lastBulkUndo
+		? [
+				{
+					id: "undo",
+					label: t("brainstorm.database.bulk.undo"),
+					onClick: () => void undoBulkEdit(state),
+				},
+			]
+		: [];
 	if (count <= 1) {
-		bar?.remove();
-		return;
+		return undoAction.length > 0
+			? {
+					count,
+					countLabel: "",
+					clearLabel: t("brainstorm.database.selection.clear"),
+					onClear: () => {
+						lastBulkUndo = null;
+						renderActiveView(state);
+					},
+					actions: undoAction,
+				}
+			: null;
 	}
-	if (!bar) {
-		bar = document.createElement("div");
-		bar.className = "db-selection-bar";
-		const text = document.createElement("span");
-		text.className = "db-selection-bar__count";
-		bar.appendChild(text);
-		const clear = document.createElement("button");
-		clear.type = "button";
-		clear.className = "bs-btn bs-btn--secondary bs-btn--sm db-selection-bar__clear";
-		clear.textContent = t("brainstorm.database.selection.clear");
-		clear.addEventListener("click", () => {
+	return {
+		count,
+		countLabel: t("brainstorm.database.selection.count", { count }),
+		clearLabel: t("brainstorm.database.selection.clear"),
+		onClear: () => {
 			state.selection = clearSelection();
 			renderActiveView(state);
 			renderInspector(state);
-		});
-		bar.appendChild(clear);
-		body.prepend(bar);
+		},
+		actions: [
+			{
+				id: "set-property",
+				label: t("brainstorm.database.bulk.setProperty"),
+				opensMenu: true,
+				onClick: (anchor) => openBulkSetPropertyMenu(state, anchor),
+			},
+			{
+				id: "add-to-collection",
+				label: t("brainstorm.database.menu.addToCollection"),
+				opensMenu: true,
+				onClick: (anchor) => openBulkAddToCollectionMenu(state, anchor),
+			},
+			...undoAction,
+		],
+	};
+}
+
+function anchorBelow(anchor: HTMLElement): { x: number; y: number } {
+	const r = anchor.getBoundingClientRect();
+	return { x: r.left, y: r.bottom + 4 };
+}
+
+/** Step 1 of "Set property…": which property. Computed (rollup / formula)
+ *  columns are derived, never written. */
+function openBulkSetPropertyMenu(state: AppState, anchor: HTMLElement): void {
+	const view = activeView(state);
+	if (!view) return;
+	const cols = propertyColumns(view.columns).filter(
+		(c) => !c.rollup && !c.formula && c.propertyId !== "title" && c.propertyId !== "name",
+	);
+	openAnchoredMenu(
+		anchorBelow(anchor),
+		cols.map((c) => ({
+			label: propertyDisplayName(c.propertyId),
+			icon: propertyKindIcon(c.propertyId),
+			onSelect: () => openBulkValuePicker(state, anchor, c.propertyId),
+		})),
+		{ menuLabel: t("brainstorm.database.bulk.setProperty"), anchor },
+	);
+}
+
+/** Step 2: the value. A Select offers its options, a boolean Yes / No, every
+ *  other type a typed text prompt coerced to the column's value type. */
+function openBulkValuePicker(state: AppState, anchor: HTMLElement, propertyId: string): void {
+	const name = propertyDisplayName(propertyId);
+	const apply = (value: unknown): void => void applyBulkSet(state, propertyId, value);
+	const options = selectOptionsFor(propertyId);
+	const clearItem = {
+		label: t("brainstorm.database.bulk.clearValue"),
+		onSelect: () => apply(null),
+	};
+	if (options) {
+		openAnchoredMenu(
+			anchorBelow(anchor),
+			[
+				...options.map((o) => ({ label: o.label, onSelect: () => apply(o.id) })),
+				{ divider: true },
+				clearItem,
+			],
+			{ menuLabel: t("brainstorm.database.bulk.setTo", { name }), anchor },
+		);
+		return;
 	}
-	const text = bar.querySelector<HTMLElement>(".db-selection-bar__count");
-	if (text) text.textContent = t("brainstorm.database.selection.count", { count });
+	const valueType =
+		cachedVaultProperties.find((d) => d.key === propertyId)?.valueType ??
+		effectiveColumnDef(propertyId, state.db.entities)?.valueType ??
+		ValueType.Text;
+	if (valueType === ValueType.Boolean) {
+		openAnchoredMenu(
+			anchorBelow(anchor),
+			[
+				{ label: t("brainstorm.database.bulk.yes"), onSelect: () => apply(true) },
+				{ label: t("brainstorm.database.bulk.no"), onSelect: () => apply(false) },
+			],
+			{ menuLabel: t("brainstorm.database.bulk.setTo", { name }), anchor },
+		);
+		return;
+	}
+	promptInline(
+		anchor,
+		"",
+		(raw) => {
+			const value = coerceScalarValue(raw, valueType);
+			if (value === undefined && raw.trim() !== "") {
+				flashStatus(t("brainstorm.database.bulk.invalidValue", { name }), "warn");
+				return;
+			}
+			apply(value ?? null);
+		},
+		{ title: t("brainstorm.database.bulk.setTo", { name }) },
+	);
+}
+
+function lockedSuffix(lockedSkipped: number): string {
+	return lockedSkipped > 0
+		? ` ${plural(lockedSkipped, "brainstorm.database.bulk.lockedSkipped.one", "brainstorm.database.bulk.lockedSkipped.other", { count: lockedSkipped })}`
+		: "";
+}
+
+async function applyBulkSet(state: AppState, propertyId: string, value: unknown): Promise<void> {
+	const plan = planBulkSet(state.db.entities, state.selection.selectedIds, propertyId, value);
+	if (plan.apply.length === 0) {
+		flashStatus(
+			t("brainstorm.database.bulk.nothingChanged") + lockedSuffix(plan.lockedSkipped),
+			plan.lockedSkipped > 0 ? "warn" : "ready",
+		);
+		return;
+	}
+	lastBulkUndo = plan.undo;
+	await persistEntityPatches(state, plan.apply);
+	flashStatus(
+		plural(
+			plan.apply.length,
+			"brainstorm.database.bulk.updated.one",
+			"brainstorm.database.bulk.updated.other",
+			{
+				count: plan.apply.length,
+				name: propertyDisplayName(propertyId),
+			},
+		) + lockedSuffix(plan.lockedSkipped),
+		"ready",
+	);
+}
+
+function openBulkAddToCollectionMenu(state: AppState, anchor: HTMLElement): void {
+	const candidates = state.lists.filter((l) => !isVaultDerivedListId(l.id));
+	if (candidates.length === 0) {
+		flashStatus(t("brainstorm.database.status.noCollectionsToAdd"), "warn");
+		return;
+	}
+	openAnchoredMenu(
+		anchorBelow(anchor),
+		candidates.map((list) => ({
+			label: list.name,
+			...(list.description.trim() ? { description: list.description.trim() } : {}),
+			onSelect: () => applyBulkAddToList(state, list.id),
+		})),
+		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion"), anchor },
+	);
+}
+
+function applyBulkAddToList(state: AppState, listId: string): void {
+	const list = state.lists.find((l) => l.id === listId);
+	if (!list) return;
+	const plan = planBulkAddToList(list, state.db.entities, state.selection.selectedIds, state.db);
+	if (plan.added > 0) {
+		lastBulkUndo = plan.undo;
+		state.lists = state.lists.map((l) => (l.id === listId ? plan.next : l));
+		schedulePersist(state);
+	}
+	renderActiveView(state);
+	renderInspector(state);
+	const capacity =
+		plan.overCapacity > 0
+			? ` ${t("brainstorm.database.bulk.overCapacity", { count: plan.overCapacity })}`
+			: "";
+	flashStatus(
+		plural(plan.added, "brainstorm.database.bulk.added.one", "brainstorm.database.bulk.added.other", {
+			count: plan.added,
+			name: list.name,
+		}) +
+			lockedSuffix(plan.lockedSkipped) +
+			capacity,
+		plan.lockedSkipped > 0 || plan.overCapacity > 0 ? "warn" : "ready",
+	);
+}
+
+/** Revert the last bulk edit as one step. */
+async function undoBulkEdit(state: AppState): Promise<void> {
+	const undo = lastBulkUndo;
+	if (!undo) return;
+	lastBulkUndo = null;
+	if (undo.kind === BulkUndoKind.SetProperty) {
+		await persistEntityPatches(state, undo.revert);
+	} else {
+		state.lists = state.lists.map((l) => (l.id === undo.listId ? undo.previous : l));
+		schedulePersist(state);
+		renderActiveView(state);
+		renderInspector(state);
+	}
+	flashStatus(t("brainstorm.database.bulk.undone"), "ready");
 }
 
 function onOpenEntity(state: AppState, entity: EntityRow): void {
@@ -3753,6 +3947,36 @@ export function isRecordLocked(entity: EntityRow): boolean {
 	return isEntityLocked(entity);
 }
 
+/** The batch twin of `persistEntityPatch`: every patch merges in memory and
+ *  the stage paints ONCE, then each write goes to the entities service. */
+async function persistEntityPatches(
+	state: AppState,
+	patches: ReadonlyArray<{ id: string; patch: Record<string, unknown> }>,
+): Promise<void> {
+	for (const { id, patch } of patches) {
+		for (const [k, v] of Object.entries(patch)) mutateEntityProperty(state, id, k, v);
+	}
+	renderActiveView(state);
+	renderInspector(state);
+	const update = getRuntime()?.services?.entities?.update;
+	if (!update) {
+		flashStatus(t("brainstorm.database.status.savedLocally"), "warn");
+		return;
+	}
+	let failed = 0;
+	let lastMessage = "";
+	for (const { id, patch } of patches) {
+		try {
+			await update(id, patch);
+		} catch (error) {
+			failed += 1;
+			lastMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+		}
+	}
+	if (failed > 0)
+		flashStatus(t("brainstorm.database.status.saveFailed", { message: lastMessage }), "warn");
+}
+
 /** Write `patch` into an entity's `properties`: optimistic in-memory
  *  merge + the shared `entities.update` service (the same path the
  *  create flow uses), then re-paint the stage + inspector so the new
@@ -4575,6 +4799,19 @@ function bindStageKeyboard(state: AppState): void {
 		renderInspector(state);
 	});
 	attachShortcut(body, "Mod+A", () => selectAllVisible(state));
+	// One-step undo of the last bulk edit (9.12.32). A modifier chord, so it
+	// would also fire inside a cell editor — there the native text undo wins.
+	attachShortcut(
+		body,
+		"Mod+Z",
+		(event) => {
+			if (!lastBulkUndo || isEditableElement(event.target)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			void undoBulkEdit(state);
+		},
+		{ preventDefault: false },
+	);
 	attachShortcut(body, "Space", () => {
 		const entity = singleSelectedEntity(state);
 		if (entity) void dispatchQuickLook(entity);
