@@ -95,6 +95,7 @@
   "delete.confirm.body": "“{name}” verrà spostato nel cestino. Non può essere annullato qui.",
   "delete.confirm.confirm": "Elimina",
   "delete.confirm.cancel": "Annulla",
+  "delete.confirm.dontAskAgain": "Non chiedere più",
   "demo.banner": "Dati di anteprima — apri un vault per gestire contatti reali.",
   "vcard.import": "Importa vCard…",
   "vcard.export": "Esporta vCard…",

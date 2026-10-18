@@ -17,9 +17,11 @@ import {
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
 	ActionTrustTier,
+	AgentEventKind,
 	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
+	INVITE_LINK_PREFIX,
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
@@ -31,6 +33,7 @@ import {
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
 	extractFieldsFromTypeSchema,
+	sanitizeTraceText,
 } from "@brainstorm-os/sdk-types";
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
@@ -146,6 +149,7 @@ import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/acce
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
 import { deriveInviteSecret } from "./collab/invite-anchor";
+import { LastEditRecorder } from "./collab/last-edit-recorder";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
 import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
@@ -175,6 +179,7 @@ import { DragSessionStore } from "./dnd/drag-session";
 import { createFileExporter } from "./dnd/file-exporter";
 import { createElectronGhostWindow, createGhostOverlay } from "./dnd/ghost-overlay";
 import {
+	type AgentRunOps,
 	type ApplyRemoteDocFn,
 	type InverseBackfillFn,
 	makeEntitiesServiceHandler,
@@ -219,7 +224,10 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
-import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
+import {
+	bindAgentActivityRunOps,
+	registerAgentActivityHandlers,
+} from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
@@ -230,6 +238,7 @@ import { registerBrokerHandler } from "./ipc/broker-handler";
 import { getCapabilityPromptHost } from "./ipc/capability-prompt";
 import { wireCapabilityPromptIpc } from "./ipc/capability-prompt-ipc";
 import { registerChromeTabsHandlers } from "./ipc/chrome-tabs-handlers";
+import { makeConfirmationsApi, registerConfirmationsHandlers } from "./ipc/confirmations-handlers";
 import { listCovers } from "./ipc/covers-handlers";
 import { registerCoversHandlers } from "./ipc/covers-handlers";
 import {
@@ -271,6 +280,7 @@ import {
 } from "./ipc/properties-handlers";
 import { registerDashboard } from "./ipc/renderer-identity";
 import { registerSearchHandlers } from "./ipc/search-handlers";
+import { registerSharingSettingsHandlers } from "./ipc/sharing-settings-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
@@ -333,6 +343,7 @@ import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-s
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
+import { PendingInviteSlot } from "./sharing/pending-invite";
 import { makeEngineHolder, makeSharingServiceHandler } from "./sharing/sharing-service";
 import { setActiveShortcutRegistry } from "./shortcuts/active-registry";
 import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcuts/bindings-entity";
@@ -384,7 +395,7 @@ import { getUiNotifyHost } from "./ui/notify-host";
 const damagedDocsNotified = new Set<string>();
 import { getOsBadgeAggregator } from "./ui/os-badge";
 import { makeOsNotifier } from "./ui/os-notification-host";
-import { type ComposedTray, getTrayHost } from "./ui/tray-host";
+import { type ComposedTray, TrayShellAction, getTrayHost } from "./ui/tray-host";
 import { makeUiServiceHandler } from "./ui/ui-service";
 import { AutoUpdateEngine } from "./update/auto-update-engine";
 import { createElectronAutoUpdater, isAutoUpdateSupported } from "./update/electron-auto-updater";
@@ -418,6 +429,13 @@ import { toExtractedText } from "./web/web-live-dom";
 import { createWebPrivacyRuntime } from "./web/web-privacy-runtime";
 import { createLockedWebView } from "./web/web-view-factory";
 import { PERSISTENT_WEB_PARTITION, makeWebViewServiceHandler } from "./web/web-view-service";
+import {
+	BackgroundPrefsStore,
+	DEFAULT_BACKGROUND_PREFS,
+	backgroundPrefsPath,
+	shouldQuitWhenAllWindowsClosed,
+	supportsCloseToTray,
+} from "./window/background-prefs";
 import { brainstormChromeOptions } from "./window/chrome-options";
 import { DockActivation, resolveDockActivation } from "./window/dashboard-activation";
 import { focusStealingDisabled, revealWindow, surfaceWindow } from "./window/reveal-window";
@@ -1459,6 +1477,9 @@ setupSingleInstance();
 // arrive before then — a cold-start `open-url` on macOS, or the launch argv —
 // queue here and flush once ready.
 const pendingDeepLinks: string[] = [];
+// Collab-C7 — the single, short-lived slot an invite deep link fills. The link
+// only PRE-FILLS the share dialog; see `sharing/pending-invite.ts`.
+const pendingInviteSlot = new PendingInviteSlot();
 let deepLinkRouter: ((url: string) => void) | null = null;
 function handleInboundDeepLink(url: string): void {
 	if (deepLinkRouter) deepLinkRouter(url);
@@ -1485,6 +1506,9 @@ let workers: WorkersHandle | null = null;
 let dashboardWindow: BrowserWindow | null = null;
 /** Provenance `importedBy` for objects a backup restore brings back. */
 const BACKUP_RESTORE_AUTHOR = "shell:backup-restore";
+
+/** 7.16 — loaded in `whenReady`; `window-all-closed` reads its cache. */
+let backgroundPrefs: BackgroundPrefsStore | null = null;
 
 const FULLSCREEN_CHANNEL = "window:fullscreen-changed" as const;
 
@@ -1687,14 +1711,35 @@ void app.whenReady().then(async () => {
 	// dashboard, and dispatch an `open` for that entity through the same ladder
 	// a dashboard link uses (shell-sourced). Then flush any links queued during
 	// boot + the cold-start launch argv.
-	deepLinkRouter = (url: string) => {
-		const entityId = parseEntityDeepLink(url);
-		if (!entityId) return;
+	const surfaceDashboardForLink = () => {
 		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
 			if (dashboardWindow.isMinimized()) dashboardWindow.restore();
 			revealWindow(dashboardWindow);
 			if (!focusStealingDisabled()) dashboardWindow.focus();
 		}
+	};
+	deepLinkRouter = (url: string) => {
+		// Collab-C7 — an invite link. Strictly parsed + verified, then parked
+		// for the share dialog to pre-fill; it never shares anything itself.
+		if (url.startsWith(INVITE_LINK_PREFIX)) {
+			const pending = pendingInviteSlot.offerLink(url, Date.now());
+			if (!pending) {
+				console.warn("[deep-link] refused a malformed or unverifiable invite link");
+				return;
+			}
+			surfaceDashboardForLink();
+			const from = sanitizeTraceText(pending.label, 80);
+			getUiNotifyHost().post({
+				appId: "io.brainstorm.shell",
+				kind: "info",
+				title: "Invite link received",
+				body: `${from ? `${from} (${pending.fingerprint})` : pending.fingerprint} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
+			});
+			return;
+		}
+		const entityId = parseEntityDeepLink(url);
+		if (!entityId) return;
+		surfaceDashboardForLink();
 		void launchSetup
 			.getIntents()
 			.then((intents) =>
@@ -2955,6 +3000,9 @@ void app.whenReady().then(async () => {
 			return null;
 		}
 	};
+	// 6.15 — remembered "Don't ask again" confirmation choices + the Settings
+	// reset, over the same per-device settings store apps write their own to.
+	registerConfirmationsHandlers(ipcMain, makeConfirmationsApi(getSettingsRepoForActiveSession));
 
 	const SEARCH_INDEX_OP_ID = "search-index";
 	const INDEXING_ACTIVITY_DELAY_MS = 500;
@@ -3658,6 +3706,9 @@ void app.whenReady().then(async () => {
 			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
 		},
 	});
+	// Agent-15 — bound by the entities service below; read lazily so the
+	// trace service and Settings both reach the same ops.
+	let agentRunOps: AgentRunOps | null = null;
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,
 		makeAgentTraceServiceHandler({
@@ -3666,6 +3717,7 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				return session ? await session.agentTraceRepo() : null;
 			},
+			getRunOps: () => agentRunOps,
 		}),
 	);
 	// The chat-surface chokepoint: every identity-verified envelope an app
@@ -3714,6 +3766,16 @@ void app.whenReady().then(async () => {
 				approved: true,
 				entityId,
 			});
+		},
+		// Agent-15 — journal agent-attributed writes against the run they
+		// belong to, and hand the diff/undo ops to the trace service + Settings.
+		resolveAgentRun: (app, conversationId) => agentTraceRecorder.latestRunIdFor(app, conversationId),
+		bindAgentRunOps: (ops) => {
+			agentRunOps = ops;
+			bindAgentActivityRunOps(ops);
+		},
+		onAgentRunUndone: (runId) => {
+			void agentTraceRecorder.event(runId, { kind: AgentEventKind.RunUndone });
 		},
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
@@ -3846,6 +3908,9 @@ void app.whenReady().then(async () => {
 				// container. Opened once per session alongside the DEK store.
 				const entitiesDb = await session.dataStores.open("entities");
 				const entitiesRepo = new EntitiesRepository(entitiesDb);
+				// Collab-C7 — the sync path records who last edited each shared
+				// object (verified inbound sender, or this device on a local edit).
+				const lastEditRecorder = new LastEditRecorder(entitiesRepo.lastEdits);
 				const shareInvites = new ShareInvitesRepository(entitiesDb);
 				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
 				// from an Owner (or ourselves), or any member could re-key an entity
@@ -3882,6 +3947,7 @@ void app.whenReady().then(async () => {
 				};
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
+					onEdit: (entityId, editor) => lastEditRecorder.note(entityId, editor),
 					dekStore,
 					devicePub: session.identity.publicKey,
 					deviceSign: (bytes) => session.signPayload(bytes),
@@ -4529,9 +4595,16 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return new ContactsStore({ path: contactsStorePath(session.vaultPath) });
 			},
+			// Collab-C7 — the deep-link invite slot, the default share role, and
+			// the last-editor read.
+			takePendingInvite: () => pendingInviteSlot.take(Date.now()),
+			getSettingsRepo: getSettingsRepoForActiveSession,
+			getEntitiesRepo: getEntitiesRepoForActiveSession,
 			now: () => Date.now(),
 		}),
 	);
+	onActiveVaultSessionChanged(() => pendingInviteSlot.clear());
+	registerSharingSettingsHandlers({ getSettingsRepo: getSettingsRepoForActiveSession });
 
 	// PRES-2b — the `presence` service: the sandbox surface for live presence
 	// (avatar stack + remote cursors). `publish` is re-checked against
@@ -6277,6 +6350,24 @@ void app.whenReady().then(async () => {
 		attachDashboardHosts(null);
 	});
 
+	// Bring the dashboard back: surface the live one, or recreate it after the
+	// user closed it (dock activation, the close-to-tray "Open" item).
+	function reopenDashboard(): void {
+		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+			surfaceWindow(dashboardWindow);
+			return;
+		}
+		dashboardWindow = createDashboardWindow();
+		registerAndTrack(dashboardWindow);
+		shortcuts.attach(dashboardWindow.webContents);
+		// Re-bind the prompt hosts. Without this a close/reopen left every
+		// dashboard-owned prompt pointing at a dead renderer: capability
+		// requests, OS-handoff consent, the open-with picker and tool
+		// approval all refused silently.
+		attachDashboardHosts(dashboardWindow.webContents);
+		wireDashboardLinkRouting(dashboardWindow.webContents);
+	}
+
 	// 7.8 — render the pure tray model into a single OS `Tray`. The host
 	// owns *what* the menu is; this owns the Electron object's lifecycle:
 	// created on the first publish, rebuilt on every change, destroyed
@@ -6306,6 +6397,15 @@ void app.whenReady().then(async () => {
 		tray.setToolTip(composed.tooltip);
 		const template = composed.entries.map((entry) => {
 			if (entry.kind === "separator") return { type: "separator" as const };
+			if (entry.kind === "shell") {
+				return {
+					label: entry.label,
+					click: () => {
+						if (entry.action === TrayShellAction.Quit) app.quit();
+						else reopenDashboard();
+					},
+				};
+			}
 			if (entry.kind === "header") return { label: entry.appId, enabled: false };
 			return {
 				label: entry.label,
@@ -6321,6 +6421,34 @@ void app.whenReady().then(async () => {
 		tray.setContextMenu(Menu.buildFromTemplate(template));
 	};
 	trayHost.setListener(renderTray);
+	// 7.16 — close to tray. While "Keep running in the background" is on (never
+	// on macOS, whose dock already keeps a windowless app alive), the tray
+	// always carries Open / Quit so the process is never unreachable.
+	const closeToTrayPrefs = new BackgroundPrefsStore(backgroundPrefsPath(app.getPath("userData")));
+	backgroundPrefs = closeToTrayPrefs;
+	const applyCloseToTray = (): void => {
+		const keep = supportsCloseToTray(process.platform) && closeToTrayPrefs.cached.keepRunning;
+		trayHost.setShellItems(
+			keep
+				? [
+						{ action: TrayShellAction.Open, label: "Open Brainstorm" },
+						{ action: TrayShellAction.Quit, label: "Quit Brainstorm" },
+					]
+				: [],
+		);
+	};
+	await closeToTrayPrefs.load();
+	applyCloseToTray();
+	ipcMain.handle("background:get-prefs", () => ({
+		supported: supportsCloseToTray(process.platform),
+		keepRunning: closeToTrayPrefs.cached.keepRunning,
+	}));
+	ipcMain.handle("background:set-prefs", async (_event, keepRunning: unknown) => {
+		if (typeof keepRunning !== "boolean") throw new Error("background:set-prefs: boolean expected");
+		await closeToTrayPrefs.set(keepRunning);
+		applyCloseToTray();
+		return { supported: supportsCloseToTray(process.platform), keepRunning };
+	});
 	// 7.14 follow-up — the OS dock/taskbar badge single owner: BOTH signals
 	// (notification unread via `dashboard-handlers.updateNotificationBadge`,
 	// app badges via the BadgeHost listener below) report to the aggregator,
@@ -6657,15 +6785,7 @@ void app.whenReady().then(async () => {
 		// parked; gating on it left the app running with only unreachable hidden
 		// windows and no way back to the dashboard.
 		if (decision.action === DockActivation.CreateDashboard) {
-			dashboardWindow = createDashboardWindow();
-			registerAndTrack(dashboardWindow);
-			shortcuts.attach(dashboardWindow.webContents);
-			// Re-bind the prompt hosts. Without this a close/reopen left every
-			// dashboard-owned prompt pointing at a dead renderer: capability
-			// requests, OS-handoff consent, the open-with picker and tool
-			// approval all refused silently.
-			attachDashboardHosts(dashboardWindow.webContents);
-			wireDashboardLinkRouting(dashboardWindow.webContents);
+			reopenDashboard();
 		} else if (dashboardWindow) {
 			surfaceWindow(dashboardWindow);
 		}
@@ -6673,7 +6793,12 @@ void app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-	if (!isMac) {
+	if (
+		shouldQuitWhenAllWindowsClosed(
+			process.platform,
+			backgroundPrefs?.cached ?? DEFAULT_BACKGROUND_PREFS,
+		)
+	) {
 		app.quit();
 	}
 });

@@ -103,6 +103,31 @@ describe("inline-task block", () => {
 		expect(typeof arg.properties.completedAt).toBe("number");
 	});
 
+	it("cycles done → won't do → open, painting indeterminate for won't do", async () => {
+		const h = makeCtx({
+			entityId: "task-1",
+			entityTypeId: TASK_TYPE,
+			properties: { name: "Ship v1 spec", completedAt: 5, statusKey: "done" },
+			updatedAt: 1,
+		});
+		await h.run();
+		const check = h.root.querySelector<HTMLInputElement>(".bstask__check");
+		if (!check) throw new Error("no checkbox");
+		check.dispatchEvent(new Event("change"));
+		expect(check.indeterminate).toBe(true);
+		expect(check.checked).toBe(false);
+		expect(h.root.classList.contains("bstask--wont-do")).toBe(true);
+		check.dispatchEvent(new Event("change"));
+		expect(check.indeterminate).toBe(false);
+		const writes = h.graph.mock.calls
+			.filter((c) => c[0] === "updateEntity")
+			.map((c) => (c[1] as { properties: Record<string, unknown> }).properties);
+		expect(writes).toEqual([
+			{ completedAt: null, statusKey: "cancelled" },
+			{ completedAt: null, statusKey: null },
+		]);
+	});
+
 	it("clicking the title navigates to the task", async () => {
 		const h = makeCtx({
 			entityId: "task-1",

@@ -95,6 +95,7 @@
   "delete.confirm.body": "«{name}» se moverá a la papelera. No se puede deshacer aquí.",
   "delete.confirm.confirm": "Eliminar",
   "delete.confirm.cancel": "Cancelar",
+  "delete.confirm.dontAskAgain": "No volver a preguntar",
   "demo.banner": "Datos de vista previa — abre una bóveda para gestionar contactos reales.",
   "vcard.import": "Importar vCard…",
   "vcard.export": "Exportar vCard…",

@@ -4,13 +4,19 @@ import {
 	effectiveSlotFor,
 } from "@brainstorm-os/protocol/appearance";
 import {
+	DEFAULT_DISPLAY_PREFS,
+	type DisplayPrefs,
+	encodeDisplayPrefs,
+	resolveDisplayPaint,
+} from "@brainstorm-os/protocol/shell-prefs";
+import {
 	DEFAULT_THEME,
 	ThemeName,
 	flattenTokens,
 	isThemeName,
 	themes,
 } from "@brainstorm-os/tokens";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useOsPrefersDark } from "../dashboard/appearance-watcher";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { useVaultMaybe } from "../vault-context";
@@ -36,7 +42,10 @@ const FLATTENED: Record<ThemeName, Record<string, string>> = Object.fromEntries(
  * is preserved), while `--typography-scale` and any role a theme omits fall to
  * the contract default.
  */
-export function applyThemeVars(theme: ThemeName | string): void {
+export function applyThemeVars(
+	theme: ThemeName | string,
+	display: DisplayPrefs = DEFAULT_DISPLAY_PREFS,
+): void {
 	// The name comes from persisted vault state (or a main-process push), so it
 	// can belong to a theme this renderer doesn't ship — a newer install wrote
 	// the slot, or the dev renderer pre-bundled tokens before a theme merged.
@@ -55,6 +64,16 @@ export function applyThemeVars(theme: ThemeName | string): void {
 	}
 	for (const [key, value] of Object.entries(FLATTENED[resolved])) {
 		root.style.setProperty(key, value);
+	}
+	// 12.18 — visibility preferences layer over the theme. The overrides name
+	// theme tokens only, so re-applying the theme (above) is what reverts one.
+	const paint = resolveDisplayPaint(display, themes[resolved]);
+	for (const [key, value] of Object.entries(paint.vars)) {
+		root.style.setProperty(key, value);
+	}
+	for (const [name, value] of Object.entries(paint.attributes)) {
+		if (value === null) root.removeAttribute(name);
+		else root.setAttribute(name, value);
 	}
 	root.dataset.theme = resolved;
 }
@@ -103,10 +122,17 @@ export function ThemeProvider({ children }: Props) {
 	const snapshot = useDashboard();
 	const prefersDark = useOsPrefersDark(snapshot);
 	const theme = effectiveTheme(current !== null, snapshot?.appearance, prefersDark);
+	// The welcome screen (no vault) keeps the designed defaults, like its theme.
+	const display =
+		current !== null ? (snapshot?.display ?? DEFAULT_DISPLAY_PREFS) : DEFAULT_DISPLAY_PREFS;
+	const displayKey = encodeDisplayPrefs(display);
+	const displayRef = useRef(display);
+	displayRef.current = display;
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `displayKey` is the value identity of `display` (read through the ref) — a fresh snapshot object with the same prefs must not repaint.
 	useEffect(() => {
-		applyThemeVars(theme);
-	}, [theme]);
+		applyThemeVars(theme, displayRef.current);
+	}, [theme, displayKey]);
 
 	// Fast-path repaint. The shell resolves its theme from the entity-pin-enriched
 	// `dashboard:snapshot`, which awaits a DB read on a pinned dashboard — so a
@@ -120,7 +146,7 @@ export function ThemeProvider({ children }: Props) {
 	useEffect(() => {
 		const onTheme = window.brainstorm?.dashboard?.onTheme;
 		if (!onTheme || current === null) return;
-		return onTheme((pushed) => applyThemeVars(pushed));
+		return onTheme((pushed) => applyThemeVars(pushed, displayRef.current));
 	}, [current]);
 
 	// Transient cross-surface theme preview (9.9.6). A sanitized payload paints
@@ -133,7 +159,7 @@ export function ThemeProvider({ children }: Props) {
 		if (!onPreview) return;
 		return onPreview((payload) => {
 			if (!payload) {
-				applyThemeVars(theme);
+				applyThemeVars(theme, displayRef.current);
 				return;
 			}
 			const root = document.documentElement;

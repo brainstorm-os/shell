@@ -22,6 +22,13 @@
  */
 
 import {
+	type DisplayPaint,
+	type DisplayPrefs,
+	decodeDisplayPrefs,
+	resolveDisplayPaint,
+	toDisplayPrefs,
+} from "@brainstorm-os/protocol/shell-prefs";
+import {
 	type Bridge,
 	buildRuntimeWithEmitter,
 	decodeHandshake,
@@ -77,6 +84,10 @@ const buildArg = readArg("--brainstorm-build=");
  *  revived with the argv it launched with), so the boot value is only the
  *  first frame — the `app:wallpaper-changed` listener below keeps it live. */
 const wallpaperArg = readArg("--brainstorm-wallpaper=");
+/** Visibility preferences (12.18). The boot value paints the first frame; the
+ *  `app:display-changed` listener keeps it live. */
+let activeDisplay: DisplayPrefs = decodeDisplayPrefs(readArg("--brainstorm-display="));
+let lastDisplayPaint: DisplayPaint | null = null;
 /** The last wallpaper URL applied (null = no image). Kept so `reapplyAll` can
  *  re-set the inline var after a parser-replaced `documentElement` drops it. */
 let activeWallpaperUrl: string | null = null;
@@ -684,6 +695,16 @@ function stampPlatform(): void {
 	if (root) root.dataset.platform = PLATFORM;
 }
 
+function stampDisplayAttributes(): void {
+	if (typeof document === "undefined" || !lastDisplayPaint) return;
+	const root = document.documentElement;
+	if (!root) return;
+	for (const [name, value] of Object.entries(lastDisplayPaint.attributes)) {
+		if (value === null) root.removeAttribute(name);
+		else root.setAttribute(name, value);
+	}
+}
+
 // The frozen `data-bs-region` app-frame hooks (the shared `.app-header`
 // chrome — `@brainstorm-os/sdk-types` `STYLE_HOOK_REGIONS`). Stamped from the
 // single preload chokepoint so StylePack CSS can target stable anchors in
@@ -782,7 +803,8 @@ function applyThemeByName(name: string | null): void {
 	try {
 		const resolved = isThemeName(name) ? name : DEFAULT_THEME;
 		committedTheme = resolved;
-		const tokens = flattenTokens(themes[resolved]);
+		lastDisplayPaint = resolveDisplayPaint(activeDisplay, themes[resolved]);
+		const tokens = { ...flattenTokens(themes[resolved]), ...lastDisplayPaint.vars };
 		const pairs: [string, string][] = [];
 		const lines: string[] = [];
 		for (const [key, value] of Object.entries(tokens)) {
@@ -806,6 +828,7 @@ function applyThemeByName(name: string | null): void {
 		// once it lands.
 		lastTokensCss = `:root {\n${lines.join("\n")}\n}\nhtml, body {\n\tbackground-color: var(--color-background-primary);\n\tcolor: var(--color-text-primary);\n\tcolor-scheme: ${scheme};\n}`;
 		upsertStyleEl(STYLE_EL_TOKENS, lastTokensCss);
+		stampDisplayAttributes();
 		// Notify renderer-side surfaces that mirror the theme into a context the
 		// CSS cascade can't reach on its own — chiefly the opaque-origin BP-block
 		// embed frames, which can't read this document's `:root` and need the
@@ -941,6 +964,7 @@ try {
 }
 stampPlatform();
 whenDocumentReady(stampPlatform);
+whenDocumentReady(stampDisplayAttributes);
 whenDocumentReady(reapplyAll);
 whenDocumentReady(installAppFrameHooks);
 
@@ -1063,6 +1087,14 @@ whenDocumentReady(() => {
 
 ipcRenderer.on("app:theme-changed", (_event, name: string) => {
 	applyThemeByName(name);
+});
+
+// 12.18 — live visibility preferences. Re-applying the committed theme
+// re-sets every token inline, which is also how a turned-off override reverts.
+// Channel must match `APP_DISPLAY_CHANGED_CHANNEL`.
+ipcRenderer.on("app:display-changed", (_event, raw: unknown) => {
+	activeDisplay = toDisplayPrefs(raw);
+	applyThemeByName(committedTheme);
 });
 
 // Live header-stripe updates — the boot arg above is frozen at window create,

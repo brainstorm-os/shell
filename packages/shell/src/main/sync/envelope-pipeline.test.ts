@@ -502,6 +502,37 @@ describe("revocation enforcement (Stage 10.5c, OQ-203)", () => {
 		expect(applied).toEqual(new Uint8Array([9, 9, 9]));
 	});
 
+	it("Collab-C7: onApplied names the verified sender only after a successful, authorized apply", async () => {
+		const [aRelay, bRelay] = LoopbackRelayPort.pair(2);
+		if (!aRelay || !bRelay) throw new Error("missing relay ports");
+		const dekStore = new FakeDekStore();
+		dekStore.mint("ent_edit");
+		const entities = new Map([["ent_edit", { id: "ent_edit", type: "T" }]]);
+		const aCtx = makeCtx({ dekStore, relay: aRelay, entities });
+		const edits: Array<[string, string]> = [];
+		let allow = false;
+		const bCtx: PipelineContext = {
+			...makeCtx({ dekStore, relay: bRelay, entities }),
+			deviceVerify: (sig, bytes, senderPub) => ed25519.verify(sig, bytes, senderPub),
+			authorizeWriter: () => allow,
+			onApplied: (id, editor) => edits.push([id, editor]),
+		};
+		const frames: Uint8Array[] = [];
+		bRelay.onFrame((f) => frames.push(f));
+		await encryptAndEmit("ent_edit", new Uint8Array([1]), aCtx);
+		await encryptAndEmit("ent_edit", new Uint8Array([2]), aCtx);
+		await flushMicrotasks();
+		const [denied, allowed] = frames;
+		if (!denied || !allowed) throw new Error("expected two frames on B");
+		await expect(receiveAndApply(denied, bCtx, () => undefined)).rejects.toMatchObject({
+			name: "Unauthorized",
+		});
+		expect(edits).toEqual([]);
+		allow = true;
+		await receiveAndApply(allowed, bCtx, () => undefined);
+		expect(edits).toEqual([["ent_edit", Buffer.from(aCtx.devicePub).toString("base64")]]);
+	});
+
 	it("receiveAndApply throws Unauthorized and never applies when authorizeWriter denies (Viewer, F-288)", async () => {
 		const [aRelay, bRelay] = LoopbackRelayPort.pair(2);
 		if (!aRelay || !bRelay) throw new Error("missing relay ports");

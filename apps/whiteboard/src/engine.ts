@@ -59,6 +59,7 @@ import {
 	distributeRects,
 } from "./logic/align";
 import { filterAndSortBoards } from "./logic/board-list";
+import { type Camera, createCameraMemory, fitCamera } from "./logic/camera-memory";
 import {
 	type ConnectorEnd,
 	buildConnectorEdge,
@@ -442,6 +443,9 @@ mountSpellcheckMenuFromWindow();
 
 export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	const root = hosts.root;
+	// 9.17.24 — where the user left each board, per device. Primed before the
+	// first board opens so an open reads its camera synchronously.
+	const cameraMemory = createCameraMemory(getBrainstorm()?.services?.settings);
 
 	const state: AppState = {
 		// Fresh `nodes` array — a shallow spread would share the placeholder's
@@ -751,7 +755,22 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		return dx > half || dy > half;
 	}
 
+	/** Every user camera move (wheel / drag pan, zoom, reset) lands here; the
+	 *  open-time camera is applied through `paint()` and never remembered, so
+	 *  an untouched board keeps re-fitting its content. */
+	function rememberCamera(): void {
+		const boardId = state.whiteboard.id;
+		if (boardId === "") return;
+		cameraMemory.remember(boardId, { panX: state.pan.x, panY: state.pan.y, zoom: state.zoom });
+	}
+
+	function applyCamera(camera: Camera): void {
+		state.zoom = camera.zoom;
+		state.pan = { x: camera.panX, y: camera.panY };
+	}
+
 	function paintCamera(): void {
+		rememberCamera();
 		canvas.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
 		canvas.style.setProperty("--wb-inv-zoom", String(1 / state.zoom));
 		zoomLevel.textContent = t("whiteboard.zoom.level", { percent: Math.round(state.zoom * 100) });
@@ -2437,6 +2456,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	function resetCamera(): void {
 		state.zoom = 1;
 		state.pan = { x: 0, y: 0 };
+		rememberCamera();
 		paint();
 	}
 
@@ -2468,8 +2488,13 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		state.editingNodeId = null;
 		state.editingEdgeId = null;
 		state.selectedEdgeId = null;
-		state.zoom = 1;
-		state.pan = { x: 0, y: 0 };
+		applyCamera(
+			cameraMemory.recall(board.id) ??
+				fitCamera(board.nodes, {
+					width: canvasWrap.clientWidth,
+					height: canvasWrap.clientHeight,
+				}),
+		);
 		paintedHeaderBoardId = null;
 		if (!applyingNavHistory) {
 			if (wbNav.current() === "") wbNav.replace(id);
@@ -2752,7 +2777,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 		paint();
 		runtime.on("ready", () => {
 			void (async () => {
-				await loadBoards();
+				await Promise.all([loadBoards(), cameraMemory.load()]);
 				const first = state.allWhiteboards[0];
 				if (first) {
 					openBoard(first.id);
@@ -2765,6 +2790,11 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	function start(): void {
+		// A closing window never unmounts React, so pending camera writes flush
+		// on pagehide too, not only on dispose.
+		const flushCameras = (): void => cameraMemory.flush();
+		window.addEventListener("pagehide", flushCameras);
+		unbinders.push(() => window.removeEventListener("pagehide", flushCameras));
 		const navOpenInitial = readNavPref();
 		root.dataset.navOpen = navOpenInitial ? "true" : "false";
 		bindShortcuts();
@@ -2775,6 +2805,7 @@ export function createWhiteboardEngine(hosts: EngineHosts): WhiteboardEngine {
 	}
 
 	function dispose(): void {
+		cameraMemory.dispose();
 		removeFormatToolbar();
 		awareness.off("change", paintPresence);
 		awareness.destroy();

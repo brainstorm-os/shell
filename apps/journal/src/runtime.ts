@@ -108,6 +108,9 @@ export type EntitiesDocService = {
 	 *  a collision rejects with `Invalid` which the caller treats as
 	 *  "entry already exists, fall through". */
 	create?(type: string, properties: Record<string, unknown>, id?: string): Promise<EntityRecord>;
+	/** Read one entity — quick capture (9.16.14) re-reads a Collection
+	 *  before writing its membership. */
+	get?(id: string): Promise<EntityRecord | null>;
 	/** Patch one or more properties on an existing entity — used by the
 	 *  icon picker to set `properties.icon` on the day's note. */
 	update?(id: string, patch: Record<string, unknown>): Promise<EntityRecord>;

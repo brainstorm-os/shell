@@ -184,6 +184,25 @@ describe("EntitiesRepository", () => {
 		expect(env.repo.query({ type: [] })).toEqual([]);
 	});
 
+	it("Agent-16: projects createdByAgent from the stamp on read, never stores it, and filters on it", () => {
+		const stamp = { agent: "io.brainstorm.agent", conversationId: "c1", createdAt: 1 };
+		seed({ id: "a", properties: { title: "by agent", agentProvenance: stamp } });
+		// A forged flat value with no stamp behind it never surfaces.
+		seed({ id: "h", properties: { title: "by me", createdByAgent: "io.brainstorm.agent" } });
+		expect(env.repo.get("a")?.properties.createdByAgent).toBe("io.brainstorm.agent");
+		expect(env.repo.get("h")?.properties).not.toHaveProperty("createdByAgent");
+		const stored = env.db.prepare("SELECT properties FROM entities WHERE id = ?").get("a") as {
+			properties: string;
+		};
+		expect(JSON.parse(stored.properties)).not.toHaveProperty("createdByAgent");
+		// An update carrying the projected bag back does not persist the key.
+		env.repo.update("a", { title: "renamed", createdByAgent: "io.evil" }, 2);
+		expect(env.repo.get("a")?.properties.createdByAgent).toBe("io.brainstorm.agent");
+		expect(
+			env.repo.query({ where: { $eq: { createdByAgent: "io.brainstorm.agent" } } }).map((e) => e.id),
+		).toEqual(["a"]);
+	});
+
 	it("query compiles property predicates", () => {
 		seed({ id: "a", properties: { n: 5, s: "hello", flag: true } });
 		seed({ id: "b", properties: { n: 50, s: "world" } });

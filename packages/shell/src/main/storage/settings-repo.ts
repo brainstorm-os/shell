@@ -45,6 +45,13 @@ export class SettingsRepository {
 		return Number(result.changes) > 0;
 	}
 
+	/** Delete `key` from EVERY app's namespace — a shell-only reset (6.15
+	 *  "Reset confirmations"), never reachable from the app-scoped service. */
+	deleteKeyForAllApps(key: string): number {
+		const result = this.stmt("DELETE FROM settings WHERE key = ?").run(key);
+		return Number(result.changes);
+	}
+
 	/** All entries for an app whose key starts with `prefix` (""=all),
 	 *  ordered by key for deterministic listing. */
 	list(appId: string, prefix = ""): SettingsEntry[] {

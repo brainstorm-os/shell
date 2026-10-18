@@ -46,6 +46,7 @@ type Section = {
 export type ComposedTrayEntry =
 	| { kind: "header"; appId: string }
 	| { kind: "separator" }
+	| { kind: "shell"; action: TrayShellAction; label: string }
 	| {
 			kind: "item";
 			appId: string;
@@ -60,11 +61,21 @@ export type ComposedTray = {
 	entries: ComposedTrayEntry[];
 };
 
+/** 7.16 — the shell's own tray items, present while "Keep running in the
+ *  background" is on so a windowless process always has a way back (and out). */
+export enum TrayShellAction {
+	Open = "open",
+	Quit = "quit",
+}
+
+export type TrayShellItem = { action: TrayShellAction; label: string };
+
 export type TrayChangeListener = (tray: ComposedTray | null) => void;
 
 export class TrayHost {
 	/** Insertion-ordered so the tray menu is stable as apps publish. */
 	private readonly sections = new Map<string, Section>();
+	private shellItems: readonly TrayShellItem[] = [];
 	private onChange: TrayChangeListener = () => undefined;
 
 	setListener(listener: TrayChangeListener): void {
@@ -81,6 +92,14 @@ export class TrayHost {
 		if (this.sections.delete(appId)) this.emit();
 	}
 
+	/** Install (non-empty) or remove (empty) the shell's own items. They lead
+	 *  the menu and keep the tray alive with no app publishing. */
+	setShellItems(items: readonly TrayShellItem[]): void {
+		if (items.length === 0 && this.shellItems.length === 0) return;
+		this.shellItems = [...items];
+		this.emit();
+	}
+
 	/** Drop every publisher (e.g. on vault close) and tear the tray down. */
 	reset(): void {
 		if (this.sections.size === 0) return;
@@ -88,11 +107,16 @@ export class TrayHost {
 		this.emit();
 	}
 
-	/** Pure menu model — `null` when no app is publishing (the tray is
-	 *  torn down rather than left as an empty icon). */
+	/** Pure menu model — `null` when neither an app nor the shell has items
+	 *  (the tray is torn down rather than left as an empty icon). */
 	compose(): ComposedTray | null {
-		if (this.sections.size === 0) return null;
-		const entries: ComposedTrayEntry[] = [];
+		if (this.sections.size === 0 && this.shellItems.length === 0) return null;
+		const entries: ComposedTrayEntry[] = this.shellItems.map((item) => ({
+			kind: "shell" as const,
+			action: item.action,
+			label: item.label,
+		}));
+		if (entries.length > 0 && this.sections.size > 0) entries.push({ kind: "separator" });
 		let first = true;
 		for (const [appId, section] of this.sections) {
 			if (!first) entries.push({ kind: "separator" });

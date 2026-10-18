@@ -70,6 +70,9 @@ export type LaunchOptions = {
 	/** Active regional-format context. Rides the handshake so a freshly-launched
 	 *  window formats dates / numbers per Settings → Regional (12.15 15f). */
 	format?: FormatContext;
+	/** Visibility preferences (12.18) as `encodeDisplayPrefs` output, passed
+	 *  via `--brainstorm-display=<names>` for the first paint. */
+	display?: string;
 };
 
 /** Public per-tab record consumed by the window index, intents bus, and the
@@ -564,6 +567,7 @@ export class AppLauncher {
 		];
 		if (opts.theme) additionalArguments.push(`--brainstorm-theme=${opts.theme}`);
 		if (opts.wallpaperUrl) additionalArguments.push(`--brainstorm-wallpaper=${opts.wallpaperUrl}`);
+		if (opts.display) additionalArguments.push(`--brainstorm-display=${opts.display}`);
 		console.info(
 			`[shell] launch ${opts.appId} v${opts.version} build ${buildSha} dir ${appRecord.bundleDir}`,
 		);

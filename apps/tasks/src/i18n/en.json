@@ -99,7 +99,6 @@
   "tasks.header.sidebar.hide": "Hide sidebar",
   "tasks.header.iconPicker.open": "Change project icon",
   "tasks.header.renameProject": "Rename project",
-  "tasks.row.toggle.aria": "Toggle complete",
   "tasks.row.icon.aria": "Change icon",
   "tasks.row.due.sr": "Due {date}",
   "tasks.row.scheduled.sr": "Scheduled {date}",
@@ -280,5 +279,12 @@
   "tasks.export.cancel": "Cancel",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Mark done",
+  "tasks.menu.markWontDo": "Mark won’t do",
+  "tasks.menu.reopen": "Reopen",
+  "tasks.row.toggle.open": "Mark “{name}” done",
+  "tasks.row.toggle.done": "“{name}” is done — mark won’t do",
+  "tasks.row.toggle.wontDo": "“{name}” won’t be done — reopen",
+  "tasks.quickLook.value.wontDo": "Won’t do"
 }

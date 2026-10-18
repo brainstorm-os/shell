@@ -45,7 +45,14 @@ import {
 } from "../a11y";
 import { DEFAULT_ICON_PICKER_LABELS, type IconPickerLabels } from "../i18n/common-labels";
 import { Icon as Glyph, IconName } from "../icon";
-import { EMOJI_GROUPS, type EmojiData, applySkinTone, emojiUrl, searchEmojis } from "./emoji-data";
+import {
+	ALL_EMOJIS,
+	EMOJI_GROUPS,
+	type EmojiData,
+	applySkinTone,
+	emojiUrl,
+	searchEmojis,
+} from "./emoji-data";
 import "./icon-picker.css";
 
 export type { IconPickerLabels } from "../i18n/common-labels";
@@ -54,10 +61,12 @@ import {
 	PHOSPHOR_PACK_ID,
 	type PhosphorComponent,
 	type PhosphorMeta,
+	findPhosphor,
 	loadPhosphorReact,
 	searchPhosphor,
 	subscribePhosphorReact,
 } from "./phosphor-data";
+import { recentsOfKind, useRecentIcons } from "./recent-icons";
 
 /** Backing store for the Upload + Library tabs (B11.14 custom emoji). When a
  *  host wires one, the Upload tab uploads an image and the Library tab lists
@@ -120,6 +129,14 @@ export function IconPicker({ value, onChange, onClose, labels, iconUpload }: Ico
 	const [search, setSearch] = useState("");
 	const [skinTone, setSkinTone] = useState<SkinTone>(ST.None);
 	const [tintColor, setTintColor] = useState<string>(packTint(value) ?? "currentColor");
+	const { recents, record } = useRecentIcons();
+	const recentEmoji = useMemo(() => recentsOfKind(recents, IconKind.Emoji), [recents]);
+	const recentPack = useMemo(() => recentsOfKind(recents, IconKind.Pack), [recents]);
+	const pick = (icon: Icon) => {
+		record(icon);
+		onChange(icon);
+		onClose();
+	};
 
 	// KBN-S-pickers: the tab row is a horizontal tablist (←/→ move + activate),
 	// so the role flows through the hook (drops the hand-written literals).
@@ -194,10 +211,9 @@ export function IconPicker({ value, onChange, onClose, labels, iconUpload }: Ico
 							search={search}
 							skinTone={skinTone}
 							noMatch={L.noMatch}
-							onPick={(char) => {
-								onChange({ kind: IconKind.Emoji, value: applySkinTone(char, skinTone) });
-								onClose();
-							}}
+							recentLabel={L.recent}
+							recent={recentEmoji}
+							onPick={(char) => pick({ kind: IconKind.Emoji, value: applySkinTone(char, skinTone) })}
 						/>
 					)}
 					{tab === PickerTab.Icon && (
@@ -205,14 +221,15 @@ export function IconPicker({ value, onChange, onClose, labels, iconUpload }: Ico
 							search={search}
 							tint={tintColor}
 							noMatch={L.noMatch}
-							onPick={(glyph) => {
-								onChange({
+							recentLabel={L.recent}
+							recent={recentPack}
+							onPick={(glyph) =>
+								pick({
 									kind: IconKind.Pack,
 									value: `${PHOSPHOR_PACK_ID}/${glyph.name}`,
 									...(tintColor !== "currentColor" ? { color: tintColor } : {}),
-								});
-								onClose();
-							}}
+								})
+							}
 						/>
 					)}
 					{tab === PickerTab.Upload &&
@@ -254,15 +271,46 @@ export function IconPicker({ value, onChange, onClose, labels, iconUpload }: Ico
 
 // ─── Emoji tab ──────────────────────────────────────────────────────────
 
+const EMOJI_BY_CHAR = new Map<string, EmojiData>(ALL_EMOJIS.map((e) => [e.char, e]));
+
+/** A recorded emoji as a grid item — the catalog entry when the value is a
+ *  base emoji, else (a skin-toned variant) a stand-in that keeps its tone. */
+function recentEmojiData(value: string): EmojiData {
+	return (
+		EMOJI_BY_CHAR.get(value) ?? {
+			char: value,
+			name: EMOJI_BY_CHAR.get(stripSkinTone(value))?.name ?? value,
+			slug: `recent-${value}`,
+			skinToneSupport: false,
+		}
+	);
+}
+
+const SKIN_TONE_FIRST = 0x1f3fb;
+const SKIN_TONE_LAST = 0x1f3ff;
+
+function stripSkinTone(value: string): string {
+	return Array.from(value)
+		.filter((cp) => {
+			const code = cp.codePointAt(0) ?? 0;
+			return code < SKIN_TONE_FIRST || code > SKIN_TONE_LAST;
+		})
+		.join("");
+}
+
 function EmojiTab({
 	search,
 	skinTone,
 	noMatch,
+	recent,
+	recentLabel,
 	onPick,
 }: {
 	search: string;
 	skinTone: SkinTone;
 	noMatch: string;
+	recent: readonly string[];
+	recentLabel: string;
 	onPick: (char: string) => void;
 }) {
 	const { scrollRef, cellsPerRow } = useVirtualGridContainer();
@@ -270,12 +318,14 @@ function EmojiTab({
 	const sections = useMemo<readonly VirtualGridSection<EmojiData>[]>(() => {
 		const q = search.trim();
 		if (q) return [{ key: "results", label: null, items: searchEmojis(q) }];
-		return EMOJI_GROUPS.map((group) => ({
+		const groups = EMOJI_GROUPS.map((group) => ({
 			key: group.slug,
 			label: group.name,
 			items: group.emojis,
 		}));
-	}, [search]);
+		if (recent.length === 0) return groups;
+		return [{ key: "recent", label: recentLabel, items: recent.map(recentEmojiData) }, ...groups];
+	}, [search, recent, recentLabel]);
 
 	// KBN-S-pickers: the virtual grid is one Tab stop; arrows move an
 	// aria-activedescendant cursor, Enter picks (see `useVirtualGridNav`).
@@ -351,15 +401,27 @@ function EmojiCell({
 
 // ─── Icon tab ───────────────────────────────────────────────────────────
 
+function recentPhosphor(values: readonly string[]): PhosphorMeta[] {
+	const prefix = `${PHOSPHOR_PACK_ID}/`;
+	return values.flatMap((value) => {
+		const meta = value.startsWith(prefix) ? findPhosphor(value.slice(prefix.length)) : undefined;
+		return meta ? [meta] : [];
+	});
+}
+
 function IconTab({
 	search,
 	tint,
 	noMatch,
+	recent,
+	recentLabel,
 	onPick,
 }: {
 	search: string;
 	tint: string;
 	noMatch: string;
+	recent: readonly string[];
+	recentLabel: string;
 	onPick: (icon: PhosphorMeta) => void;
 }) {
 	const { scrollRef, cellsPerRow } = useVirtualGridContainer();
@@ -368,12 +430,15 @@ function IconTab({
 	const sections = useMemo<readonly VirtualGridSection<PhosphorMeta>[]>(() => {
 		const q = search.trim();
 		if (q) return [{ key: "results", label: null, items: searchPhosphor(q) }];
-		return PHOSPHOR_GROUPS.map((group) => ({
+		const groups = PHOSPHOR_GROUPS.map((group) => ({
 			key: group.name,
 			label: group.name,
 			items: group.icons,
 		}));
-	}, [search]);
+		const recentIcons = recentPhosphor(recent);
+		if (recentIcons.length === 0) return groups;
+		return [{ key: "recent", label: recentLabel, items: recentIcons }, ...groups];
+	}, [search, recent, recentLabel]);
 
 	const { rows, containerProps, getCellProps, activeRow } = useVirtualGridNav(
 		sections,

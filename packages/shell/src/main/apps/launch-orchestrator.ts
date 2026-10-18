@@ -48,6 +48,9 @@ export type LaunchOrchestratorOptions = {
 	 *  app window's first frame formats dates / numbers per Settings → Regional
 	 *  (12.15 15f). `null` when no session is active (host defaults). */
 	getActiveFormat?: () => Promise<FormatContext | null>;
+	/** Resolve the visibility preferences (12.18) as their argv encoding, so
+	 *  the first frame already paints them. `null` when no session is active. */
+	getActiveDisplay?: () => Promise<string | null>;
 };
 
 export type OrchestratedLaunch = {
@@ -141,6 +144,12 @@ export class LaunchOrchestrator {
 					return null;
 				})
 			: null;
+		const display = this.options.getActiveDisplay
+			? await this.options.getActiveDisplay().catch((error) => {
+					console.warn("[LaunchOrchestrator] getActiveDisplay failed:", error);
+					return null;
+				})
+			: null;
 		const options: LaunchOptions = {
 			appId: request.appId,
 			bundleDir: record.bundleDir,
@@ -154,6 +163,7 @@ export class LaunchOrchestrator {
 		if (wallpaperUrl) options.wallpaperUrl = wallpaperUrl;
 		if (locale) options.locale = locale;
 		if (format) options.format = format;
+		if (display) options.display = display;
 		if (request.windowId !== undefined) options.windowId = request.windowId;
 		return options;
 	}

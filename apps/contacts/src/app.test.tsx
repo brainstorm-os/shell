@@ -242,3 +242,46 @@ describe("ContactsApp — the read-only lock holds on every write path", () => {
 		expect(services.merge).toHaveBeenCalled();
 	});
 });
+
+describe("ContactsApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+		window.localStorage.removeItem("contacts:sidebar-open");
+	});
+
+	const sidebar = (el: HTMLElement) => el.querySelector("#contacts-sidebar") as HTMLElement;
+	const pressToggle = async () => {
+		await act(async () => {
+			window.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "\\",
+					...(/mac/i.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true }),
+					bubbles: true,
+				}),
+			);
+		});
+	};
+
+	it("without the preference, the shortcut collapses the list out of the tab order", async () => {
+		installShell([person("p1", "Ada")]);
+		const el = await renderApp();
+		expect(sidebar(el).hasAttribute("inert")).toBe(false);
+		await pressToggle();
+		expect(sidebar(el).hasAttribute("inert")).toBe(true);
+		expect(sidebar(el).hasAttribute("data-bs-autohide")).toBe(false);
+		expect(el.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed list becomes a hidden overlay the shortcut reveals", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		window.localStorage.setItem("contacts:sidebar-open", "false");
+		installShell([person("p1", "Ada")]);
+		const el = await renderApp();
+		expect(sidebar(el).getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(sidebar(el).hasAttribute("inert")).toBe(true);
+		expect(el.querySelector(".bs-autohide-edge")).not.toBeNull();
+		await pressToggle();
+		expect(sidebar(el).getAttribute("data-bs-autohide")).toBe("revealed");
+		expect(sidebar(el).hasAttribute("inert")).toBe(false);
+	});
+});

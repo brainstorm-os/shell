@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CONFIRM_SKIP_KEY_PREFIX, ConfirmKind, confirmSkipKey } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import { DataStores } from "../storage/data-stores";
@@ -101,6 +102,34 @@ describe("settings service handler", () => {
 		await e.handler(env("io.x", "put", { key: "axxb", value: 2 }));
 		const hits = (await e.handler(env("io.x", "list", { prefix: "a%" }))) as Array<{ key: string }>;
 		expect(hits.map((h) => h.key)).toEqual(["a%b"]);
+	});
+
+	it("6.15: stores a skip for a reversible confirmation kind only", async () => {
+		const reversible = confirmSkipKey(ConfirmKind.MoveToBin);
+		await e.handler(env("io.x", "put", { key: reversible, value: true }));
+		expect(await e.handler(env("io.x", "get", { key: reversible }))).toBe(true);
+		for (const key of [
+			confirmSkipKey(ConfirmKind.EmptyBin),
+			confirmSkipKey(ConfirmKind.PurgeFromBin),
+			confirmSkipKey(ConfirmKind.DeleteVault),
+			confirmSkipKey(ConfirmKind.RemoveCredential),
+			`${CONFIRM_SKIP_KEY_PREFIX}some-future-kind`,
+		]) {
+			await expect(e.handler(env("io.x", "put", { key, value: true })), key).rejects.toMatchObject({
+				name: "Invalid",
+			});
+			expect(e.repo.get("io.x", key)).toBeNull();
+		}
+	});
+
+	it("6.15: deleteKeyForAllApps resets one key across every app namespace", async () => {
+		const key = confirmSkipKey(ConfirmKind.MoveToBin);
+		await e.handler(env("io.a", "put", { key, value: true }));
+		await e.handler(env("io.b", "put", { key, value: true }));
+		await e.handler(env("io.b", "put", { key: "other", value: 1 }));
+		expect(e.repo.deleteKeyForAllApps(key)).toBe(2);
+		expect(e.repo.get("io.a", key)).toBeNull();
+		expect(e.repo.get("io.b", "other")).toBe("1");
 	});
 
 	it("no active vault → Unavailable, fail closed", async () => {

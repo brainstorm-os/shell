@@ -52,6 +52,7 @@
   "deleteBody": "“{name}” will be moved to the bin. This can't be undone here.",
   "deleteConfirm": "Delete",
   "deleteCancel": "Cancel",
+  "deleteDontAskAgain": "Don't ask again",
   "wrapEnable": "Enable line wrap",
   "wrapDisable": "Disable line wrap",
   "completion.listLabel": "Completions",

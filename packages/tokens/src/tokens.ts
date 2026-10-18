@@ -118,6 +118,16 @@ export type Tokens = {
 		focus: {
 			ring: string;
 		};
+		/** The emphasised text-cursor face behind Settings → Appearance →
+		 *  "Text cursor & selection" (12.18). Only painted while the root carries
+		 *  `data-bs-text-emphasis`; the default caret / selection stay native.
+		 *  `caret` aliases accent-as-text (AA on the page by the contrast ratchet)
+		 *  and `selection` is a translucent accent wash that keeps primary text
+		 *  at AA over it in every theme (`visibility.test.ts`). */
+		emphasis: {
+			caret: string;
+			selection: string;
+		};
 		/** Interactive overlay colors — applied to icon buttons, list rows,
 		 *  any clickable surface that needs a hover / active treatment that
 		 *  works equally well over solid backgrounds and glass surfaces. */

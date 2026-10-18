@@ -24,8 +24,11 @@
 
 import {
 	AGENT_TRACE_ID_MAX,
+	type AgentRunChanges,
 	type AgentRunSummary,
 	type AgentTraceEventRecord,
+	AgentUndoRefusal,
+	type AgentUndoResult,
 	isAgentRunOutcome,
 	isAgentRunSurface,
 	sanitizeTraceText,
@@ -33,12 +36,22 @@ import {
 import { ipcMain } from "electron";
 import type { AgentRunFilter, AgentTraceRepository } from "../agents/trace/agent-trace-repo";
 import { AGENT_EVENTS_PAGE_MAX, AGENT_RUNS_PAGE_MAX } from "../agents/trace/agent-trace-repo";
+import type { AgentRunOps } from "../entities/entities-service";
 import { getActiveVaultSession } from "../vault/session";
 
 export const AGENT_ACTIVITY_RUNS_CHANNEL = "agent-activity:runs" as const;
 export const AGENT_ACTIVITY_EVENTS_CHANNEL = "agent-activity:events" as const;
 export const AGENT_ACTIVITY_ENTITY_HISTORY_CHANNEL = "agent-activity:entity-history" as const;
 export const AGENT_ACTIVITY_AGENTS_CHANNEL = "agent-activity:agents" as const;
+export const AGENT_ACTIVITY_CHANGES_CHANNEL = "agent-activity:changes" as const;
+export const AGENT_ACTIVITY_UNDO_CHANNEL = "agent-activity:undo" as const;
+
+/** Agent-15 — the run diff + undo ops, bound once by the entities service
+ *  (via `index.ts`). Until bound, changes read null and undo refuses. */
+let runOps: AgentRunOps | null = null;
+export function bindAgentActivityRunOps(ops: AgentRunOps): void {
+	runOps = ops;
+}
 
 /** The 12d list-runs page ceiling: smaller than the repo's absolute clamp —
  *  a Settings list never needs 100 rows per page. */
@@ -129,6 +142,29 @@ export function agentActivityAgents(repo: AgentTraceRepository): AgentActivityAg
 	return { agents: repo.listAgents(AGENT_RUNS_PAGE_MAX) };
 }
 
+/** Agent-15 — one run's content diff for the privileged Settings surface. The
+ *  run id is bounded like every other id here; an unknown run reads null. */
+export async function agentActivityChanges(
+	ops: AgentRunOps | null,
+	rawRunId: unknown,
+): Promise<AgentRunChanges | null> {
+	const runId = sanitizeTraceText(rawRunId, AGENT_TRACE_ID_MAX);
+	if (!runId || !ops) return null;
+	return await ops.changes(runId, { privileged: true });
+}
+
+/** Agent-15 — undo one run from Settings, acting for the user. */
+export async function agentActivityUndo(
+	ops: AgentRunOps | null,
+	rawRunId: unknown,
+): Promise<AgentUndoResult> {
+	const runId = sanitizeTraceText(rawRunId, AGENT_TRACE_ID_MAX);
+	if (!runId || !ops) {
+		return { ok: false, reason: AgentUndoRefusal.NotFound, entityId: null, field: null };
+	}
+	return await ops.undo(runId, { privileged: true });
+}
+
 /** The active vault's trace repo, or null (no vault open → empty views). */
 async function activeRepo(): Promise<AgentTraceRepository | null> {
 	const session = getActiveVaultSession();
@@ -158,6 +194,14 @@ export function registerAgentActivityHandlers(): void {
 			const repo = await activeRepo();
 			return repo ? agentActivityEntityHistory(repo, entityId) : { events: [] };
 		},
+	);
+
+	ipcMain.handle(AGENT_ACTIVITY_CHANGES_CHANNEL, async (_event, runId: unknown) =>
+		agentActivityChanges(runOps, runId),
+	);
+
+	ipcMain.handle(AGENT_ACTIVITY_UNDO_CHANNEL, async (_event, runId: unknown) =>
+		agentActivityUndo(runOps, runId),
 	);
 
 	ipcMain.handle(AGENT_ACTIVITY_AGENTS_CHANNEL, async (): Promise<AgentActivityAgentsView> => {

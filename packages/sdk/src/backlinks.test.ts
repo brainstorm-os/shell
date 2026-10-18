@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-	JOURNAL_ENTRY_TYPE,
-	NOTE_ENTITY_TYPE,
-	type VaultEntity,
-	type VaultLink,
-	type VaultSnapshot,
-} from "../runtime";
-import { findBacklinks, findOutgoingLinks } from "./backlinks";
+	type LinkGraphEntity,
+	type LinkGraphLink,
+	type LinkGraphSnapshot,
+	findBacklinks as findAllBacklinks,
+	findOutgoingLinks,
+} from "./backlinks";
+
+const NOTE_ENTITY_TYPE = "io.brainstorm.notes/Note/v1";
+const JOURNAL_ENTRY_TYPE = "io.brainstorm.journal/Entry/v1";
+const NOTE_SOURCES: ReadonlySet<string> = new Set([NOTE_ENTITY_TYPE, JOURNAL_ENTRY_TYPE]);
+
+type VaultEntity = LinkGraphEntity & { createdAt?: number; ownerAppId?: string };
+type VaultLink = LinkGraphLink & { id: string; createdAt: number; deletedAt: null };
+type VaultSnapshot = LinkGraphSnapshot;
+
+/** The Journal-shaped walk: only rich-text bodies count as backlink sources. */
+function findBacklinks(snapshot: VaultSnapshot, id: string) {
+	return findAllBacklinks(snapshot, id, { types: NOTE_SOURCES });
+}
 
 function note(over: Partial<VaultEntity> & { id: string; title?: string }): VaultEntity {
 	return {
@@ -36,7 +48,7 @@ function snap(entities: VaultEntity[], links: VaultLink[]): VaultSnapshot {
 }
 
 describe("findBacklinks", () => {
-	it("returns empty when noteId is empty", () => {
+	it("returns empty when the id is empty", () => {
 		expect(findBacklinks(snap([], []), "")).toEqual([]);
 	});
 
@@ -46,7 +58,7 @@ describe("findBacklinks", () => {
 			[link("src1", "target"), link("src2", "target")],
 		);
 		const out = findBacklinks(s, "target");
-		expect(out.map((b) => b.sourceNoteId).sort()).toEqual(["src1", "src2"]);
+		expect(out.map((b) => b.entityId).sort()).toEqual(["src1", "src2"]);
 	});
 
 	it("orders by source.updatedAt descending (freshest first)", () => {
@@ -58,7 +70,7 @@ describe("findBacklinks", () => {
 			],
 			[link("old", "target"), link("fresh", "target")],
 		);
-		expect(findBacklinks(s, "target").map((b) => b.sourceNoteId)).toEqual(["fresh", "old"]);
+		expect(findBacklinks(s, "target").map((b) => b.entityId)).toEqual(["fresh", "old"]);
 	});
 
 	it("dedupes when the same source has multiple links to the target", () => {
@@ -78,7 +90,7 @@ describe("findBacklinks", () => {
 			[link("self", "self"), link("src", "self")],
 		);
 		const out = findBacklinks(s, "self");
-		expect(out.map((b) => b.sourceNoteId)).toEqual(["src"]);
+		expect(out.map((b) => b.entityId)).toEqual(["src"]);
 	});
 
 	it("accepts a journal entry as a backlink source and carries its real type", () => {
@@ -91,10 +103,10 @@ describe("findBacklinks", () => {
 			[link("n1", "target"), link("journal-2026-06-01", "target")],
 		);
 		const out = findBacklinks(s, "target");
-		expect(out.map((b) => b.sourceNoteId).sort()).toEqual(["journal-2026-06-01", "n1"]);
-		const byId = new Map(out.map((b) => [b.sourceNoteId, b] as const));
-		expect(byId.get("n1")?.sourceType).toBe(NOTE_ENTITY_TYPE);
-		expect(byId.get("journal-2026-06-01")?.sourceType).toBe(JOURNAL_ENTRY_TYPE);
+		expect(out.map((b) => b.entityId).sort()).toEqual(["journal-2026-06-01", "n1"]);
+		const byId = new Map(out.map((b) => [b.entityId, b] as const));
+		expect(byId.get("n1")?.entityType).toBe(NOTE_ENTITY_TYPE);
+		expect(byId.get("journal-2026-06-01")?.entityType).toBe(JOURNAL_ENTRY_TYPE);
 	});
 
 	it("ignores links from non-Note entities (tasks, projects)", () => {
@@ -114,7 +126,7 @@ describe("findBacklinks", () => {
 			],
 			[link("n1", "target"), link("t1", "target")],
 		);
-		expect(findBacklinks(s, "target").map((b) => b.sourceNoteId)).toEqual(["n1"]);
+		expect(findBacklinks(s, "target").map((b) => b.entityId)).toEqual(["n1"]);
 	});
 
 	it("filters soft-deleted source notes", () => {
@@ -122,7 +134,7 @@ describe("findBacklinks", () => {
 			[note({ id: "target" }), note({ id: "live" }), note({ id: "gone", deletedAt: 100 })],
 			[link("live", "target"), link("gone", "target")],
 		);
-		expect(findBacklinks(s, "target").map((b) => b.sourceNoteId)).toEqual(["live"]);
+		expect(findBacklinks(s, "target").map((b) => b.entityId)).toEqual(["live"]);
 	});
 
 	it("falls back to '(untitled)' when source has no title or name", () => {
@@ -164,8 +176,8 @@ describe("findOutgoingLinks", () => {
 			[link("src", "a"), link("src", "b")],
 		);
 		const out = findOutgoingLinks(s, "src");
-		expect(out.map((l) => l.destNoteId)).toEqual(["b", "a"]);
-		expect(out[0]?.destType).toBe(NOTE_ENTITY_TYPE);
+		expect(out.map((l) => l.entityId)).toEqual(["b", "a"]);
+		expect(out[0]?.entityType).toBe(NOTE_ENTITY_TYPE);
 	});
 
 	it("ignores incoming links, self-links, and soft-deleted targets", () => {
@@ -190,5 +202,34 @@ describe("findOutgoingLinks", () => {
 			[link("src", "a", "io.brainstorm.notes/mention"), link("src", "a", "io.brainstorm.notes/link")],
 		);
 		expect(findOutgoingLinks(s, "src")).toHaveLength(1);
+	});
+});
+
+describe("findBacklinks without a type filter", () => {
+	it("counts every live source type — a Task linking to a File is a backlink", () => {
+		const s = snap(
+			[
+				note({ id: "file", type: "brainstorm/File/v1" }),
+				note({ id: "t1", type: "brainstorm/Task/v1" }),
+				note({ id: "n1" }),
+			],
+			[link("t1", "file"), link("n1", "file")],
+		);
+		expect(
+			findAllBacklinks(s, "file")
+				.map((b) => b.entityId)
+				.sort(),
+		).toEqual(["n1", "t1"]);
+	});
+
+	it("uses the caller's untitled fallback", () => {
+		const s = snap(
+			[
+				note({ id: "file" }),
+				{ id: "blank", type: NOTE_ENTITY_TYPE, properties: {}, updatedAt: 0, deletedAt: null },
+			],
+			[link("blank", "file")],
+		);
+		expect(findAllBacklinks(s, "file", { untitled: "Untitled" })[0]?.title).toBe("Untitled");
 	});
 });

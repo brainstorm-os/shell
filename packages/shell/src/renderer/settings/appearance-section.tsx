@@ -38,6 +38,7 @@ import { useDashboard } from "../dashboard/use-dashboard";
 import { wallpaperBackground } from "../dashboard/wallpaper";
 import { t } from "../i18n/t";
 import { Icon, IconName } from "../ui/icon";
+import { VisibilityPreferences } from "./visibility-preferences";
 import { WallpaperKind } from "./wallpaper-kind";
 
 type Preset = { id: string; labelKey: string; wallpaper: DashboardWallpaper };
@@ -190,6 +191,8 @@ export function AppearanceSection() {
 					/>
 				</div>
 			</section>
+
+			<VisibilityPreferences display={snapshot.display} />
 		</>
 	);
 }

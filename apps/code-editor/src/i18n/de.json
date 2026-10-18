@@ -52,6 +52,7 @@
   "deleteBody": "„{name}“ wird in den Papierkorb verschoben. Das kann hier nicht rückgängig gemacht werden.",
   "deleteConfirm": "Löschen",
   "deleteCancel": "Abbrechen",
+  "deleteDontAskAgain": "Nicht mehr fragen",
   "wrapEnable": "Zeilenumbruch aktivieren",
   "wrapDisable": "Zeilenumbruch deaktivieren",
   "completion.listLabel": "Vervollständigungen",

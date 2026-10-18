@@ -37,6 +37,17 @@ export type { AssetRefRecord, CreateAssetRefInput } from "./asset-refs-repo";
 export { PendingRotationsRepository } from "./pending-rotations-repo";
 export type { PendingRotationRecord } from "./pending-rotations-repo";
 export { ShareInvitesRepository } from "./share-invites-repo";
+export {
+	AGENT_WRITES_MAX_ROWS,
+	AGENT_WRITES_PER_AGENT_MAX,
+	AGENT_WRITES_PER_RUN_MAX,
+	AGENT_WRITES_RETENTION_MS,
+	AGENT_WRITE_VALUE_MAX_BYTES,
+	AgentWritesRepository,
+} from "./agent-writes-repo";
+export type { AgentWriteBefore, AgentWriteInsert, AgentWriteRecord } from "./agent-writes-repo";
+export { LastEditsRepository } from "./last-edits-repo";
+export type { LastEditRecord } from "./last-edits-repo";
 export type { MintShareInviteInput } from "./share-invites-repo";
 
 export class EntitiesRepositories {

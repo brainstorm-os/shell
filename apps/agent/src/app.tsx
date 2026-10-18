@@ -157,6 +157,7 @@ import { buildVaultDataContextBlock } from "./logic/vault-data-context";
 import { buildWorkspaceContextBlock, joinContextBlocks } from "./logic/workspace-context";
 import { MemoryPopover } from "./memory-popover";
 import { ProposalTray } from "./proposal-tray";
+import { RunChangesPanel } from "./run-changes-panel";
 import { getBrainstorm } from "./runtime";
 import { SaveAsAutomationPopover } from "./save-as-automation-popover";
 import { TurnTimeline } from "./turn-timeline";
@@ -1826,6 +1827,12 @@ export function AgentApp(): ReactElement {
 							</div>
 						</section>
 					) : null}
+					<RunChangesPanel
+						trace={agentTraceSvc}
+						conversationId={activeId}
+						refreshKey={createdObjects.map((obj) => obj.id).join(",")}
+						onOpenEntity={openCitation}
+					/>
 					{insertNotice ? (
 						<div className="agent__error-row">
 							<div className="agent__notice" role="status" data-testid="agent-insert-notice">

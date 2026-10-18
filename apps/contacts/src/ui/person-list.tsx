@@ -9,6 +9,7 @@
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ObjectMenuContext, ObjectMenuTrigger } from "@brainstorm-os/sdk/object-menu";
+import type { AutoHidePanelProps } from "@brainstorm-os/sdk/panel-toggle";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { openSelectMenu } from "@brainstorm-os/sdk/select-menu";
 import "@brainstorm-os/sdk/select-menu.css";
@@ -34,7 +35,11 @@ export type PersonSidebarProps = {
 	query: string;
 	now: number;
 	demo: boolean;
+	/** The list is on screen — pinned open, or revealed by auto-hide. */
 	open: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel` (inert while the
+	 *  sidebar is pinned or the preference is off). */
+	autoHide?: AutoHidePanelProps;
 	activeId: string | null;
 	companyNameOf: (id: string | null) => string | null;
 	grouping: ContactsGrouping;
@@ -168,6 +173,7 @@ export function PersonSidebar({
 	now,
 	demo,
 	open,
+	autoHide,
 	activeId,
 	companyNameOf,
 	grouping,
@@ -208,6 +214,7 @@ export function PersonSidebar({
 
 	return (
 		<aside
+			{...autoHide}
 			id="contacts-sidebar"
 			className="contacts__sidebar"
 			aria-label={t("sidebar.region")}

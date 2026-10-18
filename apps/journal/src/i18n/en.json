@@ -94,5 +94,14 @@
   "widget.noEntryToday": "No entry yet today",
   "widget.writeToday": "Write today's entry",
   "bodyDamagedTitle": "Part of this entry is missing",
-  "bodyDamagedHint": "Some of what was written here was lost before it reached disk and cannot be recovered. Anything you write now is saved normally."
+  "bodyDamagedHint": "Some of what was written here was lost before it reached disk and cannot be recovered. Anything you write now is saved normally.",
+  "captureLabel": "Quick capture",
+  "capturePlaceholder": "Capture a thought — Enter adds it to today",
+  "capturePlaceholderTagged": "Capture a thought — add #collection to file it there",
+  "captureSubmit": "Add",
+  "captureAppended": "Added to today",
+  "captureFiled": "Filed in {collection} and linked from today",
+  "captureFiledWithoutMembership": "Created and linked from today, but it could not join {collection}",
+  "captureFileFailed": "Could not file it in {collection} — kept as a line in today",
+  "captureUnavailable": "Today’s entry isn’t ready to write into yet"
 }

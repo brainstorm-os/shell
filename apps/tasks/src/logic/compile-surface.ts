@@ -31,7 +31,7 @@ import {
 } from "./date-buckets";
 import { topLevelTasks } from "./subtask-tree";
 import { PRIORITY_RANK, TaskSort, sortTasks } from "./task-sort";
-import { isOverdue, isPastDue } from "./task-status";
+import { closedAt, isClosed, isOverdue, isPastDue } from "./task-status";
 
 export type CompiledSection = {
 	/** Stable section key — `inbox` / `today.overdue` / `today.today` /
@@ -102,7 +102,7 @@ export function compileSurface(
 	// standalone rows in the flat surfaces — so a child with an existing parent
 	// is excluded here (an orphan whose parent is gone still surfaces).
 	const topLevel = topLevelTasks(allTasks);
-	const filtered = topLevel.filter((t) => (showCompleted ? true : t.completedAt === null));
+	const filtered = topLevel.filter((t) => (showCompleted ? true : !isClosed(t)));
 
 	let compiled: CompiledSurface;
 	switch (surface) {
@@ -203,8 +203,9 @@ function todaySurface(tasks: readonly Task[], now: number, endOfToday: number): 
 		// forward, but applied to done tasks it pulled in the entire backlog of
 		// long-finished work the moment `showCompleted` was on (hundreds of
 		// rows whose only crime was a past scheduled date).
-		if (t.completedAt !== null) {
-			return t.completedAt >= startOfToday && t.completedAt <= endOfToday;
+		if (isClosed(t)) {
+			const at = closedAt(t);
+			return at >= startOfToday && at <= endOfToday;
 		}
 		return (t.scheduledAt !== null && t.scheduledAt <= endOfToday) || isOverdue(t, now);
 	});
@@ -469,11 +470,11 @@ function sortFlatList(
 	tasks: readonly Task[],
 	autoSort: (input: readonly Task[]) => Task[],
 ): Task[] {
-	const hasManual = tasks.some((t) => t.completedAt === null && typeof t.sortIndex === "number");
+	const hasManual = tasks.some((t) => !isClosed(t) && typeof t.sortIndex === "number");
 	if (!hasManual) return autoSort(tasks);
 
-	const open = tasks.filter((t) => t.completedAt === null);
-	const done = tasks.filter((t) => t.completedAt !== null);
+	const open = tasks.filter((t) => !isClosed(t));
+	const done = tasks.filter((t) => isClosed(t));
 	const manual = open.filter((t) => typeof t.sortIndex === "number");
 	const auto = open.filter((t) => typeof t.sortIndex !== "number");
 
@@ -484,7 +485,7 @@ function sortFlatList(
 		return a.createdAt - b.createdAt;
 	});
 	const autoSorted = autoSort(auto);
-	done.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+	done.sort((a, b) => closedAt(b) - closedAt(a));
 	return [...manual, ...autoSorted, ...done];
 }
 
@@ -492,10 +493,10 @@ function sortFlatList(
  *  done tasks (by completedAt desc — most recently completed first). */
 function sortByPriorityThenCreated(tasks: readonly Task[]): Task[] {
 	return [...tasks].sort((a, b) => {
-		const aDone = a.completedAt !== null;
-		const bDone = b.completedAt !== null;
+		const aDone = isClosed(a);
+		const bDone = isClosed(b);
 		if (aDone !== bDone) return aDone ? 1 : -1;
-		if (aDone && bDone) return (b.completedAt ?? 0) - (a.completedAt ?? 0);
+		if (aDone && bDone) return closedAt(b) - closedAt(a);
 		const dp = (PRIORITY_RANK[b.priority] ?? 0) - (PRIORITY_RANK[a.priority] ?? 0);
 		if (dp !== 0) return dp;
 		return a.createdAt - b.createdAt;
@@ -507,10 +508,10 @@ function sortByPriorityThenCreated(tasks: readonly Task[]): Task[] {
  *  tasks go to the bottom in completedAt-desc order. */
 function sortByDueOrScheduled(tasks: readonly Task[]): Task[] {
 	return [...tasks].sort((a, b) => {
-		const aDone = a.completedAt !== null;
-		const bDone = b.completedAt !== null;
+		const aDone = isClosed(a);
+		const bDone = isClosed(b);
 		if (aDone !== bDone) return aDone ? 1 : -1;
-		if (aDone && bDone) return (b.completedAt ?? 0) - (a.completedAt ?? 0);
+		if (aDone && bDone) return closedAt(b) - closedAt(a);
 		const ak = a.dueAt ?? a.scheduledAt ?? null;
 		const bk = b.dueAt ?? b.scheduledAt ?? null;
 		if (ak !== null && bk !== null && ak !== bk) return ak - bk;

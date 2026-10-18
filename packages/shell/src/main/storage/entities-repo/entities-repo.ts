@@ -18,6 +18,7 @@
  */
 
 import {
+	CREATED_BY_AGENT_PROPERTY_KEY,
 	type Comparand,
 	type EntityQuery,
 	LinkDirection,
@@ -25,6 +26,8 @@ import {
 	type PropertyPredicate,
 	isPropertyRef,
 	predicateReferencesHost,
+	projectAgentAuthorship,
+	stripDerivedAuthorship,
 } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
@@ -34,7 +37,9 @@ import {
 	MULTI_HOP_CTE_ROW_LIMIT,
 	compilePattern,
 } from "../../entities/pattern-compiler";
+import { AgentWritesRepository } from "./agent-writes-repo";
 import { AssetRefsRepository } from "./asset-refs-repo";
+import { LastEditsRepository } from "./last-edits-repo";
 
 export type EntityRow = {
 	id: string;
@@ -158,9 +163,16 @@ class InvalidPropertyKeyError extends Error {
 	}
 }
 
+/** Agent-16 — derived keys that are not stored: a predicate on one compiles to
+ *  the stored path it is projected from, so a server-side filter on "created by
+ *  agent" matches exactly what a reader sees. */
+const DERIVED_KEY_PATHS: Readonly<Record<string, string>> = {
+	[CREATED_BY_AGENT_PROPERTY_KEY]: "$.agentProvenance.agent",
+};
+
 function jsonPath(key: string): string {
 	if (!PROPERTY_KEY_RE.test(key)) throw new InvalidPropertyKeyError(key);
-	return `$.${key}`;
+	return DERIVED_KEY_PATHS[key] ?? `$.${key}`;
 }
 
 /** Upper bound on the per-handle prepared-statement LRU. Fixed-SQL repos use a
@@ -177,6 +189,8 @@ export class EntitiesRepository {
 	// adds up to GB of native memory before any JS-side reference is dropped.
 	private readonly statements = new Map<string, SqliteStatement>();
 	private assetRefsRepo: AssetRefsRepository | null = null;
+	private agentWritesRepo: AgentWritesRepository | null = null;
+	private lastEditsRepo: LastEditsRepository | null = null;
 
 	constructor(private readonly db: SqliteDatabase) {}
 
@@ -187,6 +201,19 @@ export class EntitiesRepository {
 	get assetRefs(): AssetRefsRepository {
 		if (!this.assetRefsRepo) this.assetRefsRepo = new AssetRefsRepository(this.db);
 		return this.assetRefsRepo;
+	}
+
+	/** Agent-15 — the agent write journal over this same handle, for the
+	 *  entities service's run-diff capture + undo. */
+	get agentWrites(): AgentWritesRepository {
+		if (!this.agentWritesRepo) this.agentWritesRepo = new AgentWritesRepository(this.db);
+		return this.agentWritesRepo;
+	}
+
+	/** Collab-C7 — the last-editor table over this same handle. */
+	get lastEdits(): LastEditsRepository {
+		if (!this.lastEditsRepo) this.lastEditsRepo = new LastEditsRepository(this.db);
+		return this.lastEditsRepo;
 	}
 
 	/** Run `fn` inside a single SQLite transaction against `entities.db`.
@@ -228,13 +255,14 @@ export class EntitiesRepository {
 		// path (shell-internal singletons that don't yet have a DEK row).
 		const dekId = input.dekId === "" ? null : input.dekId;
 		const updatedAt = input.updatedAt ?? input.now;
+		const stored = stripDerivedAuthorship(input.properties);
 		this.stmt(
 			"INSERT INTO entities (id, type, space_id, properties, created_by, created_at, updated_at, dek_id, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
 		).run(
 			input.id,
 			input.type,
 			input.spaceId ?? null,
-			JSON.stringify(input.properties),
+			JSON.stringify(stored),
 			input.createdBy,
 			input.now,
 			updatedAt,
@@ -245,11 +273,20 @@ export class EntitiesRepository {
 			id: input.id,
 			type: input.type,
 			spaceId: input.spaceId ?? null,
-			properties: input.properties,
+			properties: projectAgentAuthorship(stored),
 			createdBy: input.createdBy,
 			createdAt: input.now,
 			updatedAt,
 		};
+	}
+
+	/** The entity whether live or in the Bin, with its deletion time (null when
+	 *  live). Null only when the row does not exist at all (purged / never). */
+	getIncludingDeleted(id: string): (EntityRow & { deletedAt: number | null }) | null {
+		const row = this.stmt(
+			"SELECT id, type, space_id, properties, created_by, created_at, updated_at, deleted_at FROM entities WHERE id = ?",
+		).get(id) as (DbEntityRow & { deleted_at: number | null }) | undefined;
+		return row ? { ...rowToEntity(row), deletedAt: row.deleted_at } : null;
 	}
 
 	/** Live (non-deleted) entity, or null. */
@@ -266,12 +303,12 @@ export class EntitiesRepository {
 	update(id: string, patch: Record<string, unknown>, now: number): EntityRow | null {
 		const current = this.get(id);
 		if (!current) return null;
-		const properties = { ...current.properties, ...patch };
+		const stored = stripDerivedAuthorship({ ...current.properties, ...patch });
 		this.stmt(
 			"UPDATE entities SET properties = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-		).run(JSON.stringify(properties), now, id);
+		).run(JSON.stringify(stored), now, id);
 		this.recordChange(id, "update", this.nextVersion(id), now);
-		return { ...current, properties, updatedAt: now };
+		return { ...current, properties: projectAgentAuthorship(stored), updatedAt: now };
 	}
 
 	/**
@@ -497,6 +534,7 @@ export class EntitiesRepository {
 		this.stmt("DELETE FROM entity_deks WHERE entity_id = ?").run(id);
 		// ROT-3a-ii — the deferred-rotation mark (same pragma-independent posture).
 		this.stmt("DELETE FROM pending_rotations WHERE entity_id = ?").run(id);
+		this.stmt("DELETE FROM entity_last_edits WHERE entity_id = ?").run(id);
 		return true;
 	}
 
@@ -881,7 +919,7 @@ function rowToEntity(row: DbEntityRow): EntityRow {
 	try {
 		const parsed = JSON.parse(row.properties) as unknown;
 		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-			properties = parsed as Record<string, unknown>;
+			properties = projectAgentAuthorship(parsed as Record<string, unknown>);
 		}
 	} catch {
 		// Corrupt row — treat as empty rather than failing the whole query.

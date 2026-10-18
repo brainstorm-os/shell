@@ -17,8 +17,10 @@ import {
 import { useEffect, useId } from "react";
 import { useDashboard } from "../dashboard/use-dashboard";
 import { t } from "../i18n/t";
+import { Button, ButtonVariant } from "../ui/button";
 import { IconName } from "../ui/icon";
 import { IconButton } from "../ui/icon-button";
+import { ToastKind, pushToast } from "../ui/toasts";
 import { useSettingsHeaderActions } from "./header-actions";
 import { SettingRow, SettingSelect, ToggleRow } from "./settings-controls";
 
@@ -133,6 +135,32 @@ export function InterfaceSection() {
 					}
 				/>
 			</section>
+
+			<section className="settings__section">
+				<h4 className="settings__section-title">{t("shell.settings.interface.confirmations.title")}</h4>
+				<SettingRow
+					title={t("shell.settings.interface.confirmations.reset")}
+					description={t("shell.settings.interface.confirmations.summary")}
+					control={
+						<Button
+							variant={ButtonVariant.Neutral}
+							onClick={() => void resetConfirmations()}
+							data-testid="settings-reset-confirmations"
+						>
+							{t("shell.settings.interface.confirmations.resetAction")}
+						</Button>
+					}
+				/>
+			</section>
 		</>
 	);
+}
+
+async function resetConfirmations(): Promise<void> {
+	const cleared = (await window.brainstorm.confirmations?.reset?.()) ?? 0;
+	pushToast({
+		kind: ToastKind.Success,
+		title: t("shell.settings.interface.confirmations.resetToast.title"),
+		body: t("shell.settings.interface.confirmations.resetToast.body", { count: cleared }),
+	});
 }

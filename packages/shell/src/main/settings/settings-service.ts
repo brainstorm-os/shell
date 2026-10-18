@@ -19,6 +19,11 @@
  * JSON values, not strings).
  */
 
+import {
+	CONFIRM_SKIP_KEY_PREFIX,
+	canRememberConfirm,
+	confirmKindFromSkipKey,
+} from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { SettingsRepository } from "../storage/settings-repo";
 
@@ -65,6 +70,15 @@ export function makeSettingsServiceHandler(options: SettingsServiceOptions): Ser
 				const a = arg(envelope);
 				const key = String(a.key ?? "");
 				if (key === "") throw named("Invalid", "settings.put: missing key");
+				// 6.15 — the reserved confirmation-skip namespace only ever holds a
+				// skip for a REVERSIBLE prompt kind: an irreversible prompt must not
+				// be silenceable, however the write arrives.
+				if (
+					key.startsWith(CONFIRM_SKIP_KEY_PREFIX) &&
+					!canRememberConfirm(confirmKindFromSkipKey(key))
+				) {
+					throw named("Invalid", "settings.put: that confirmation cannot be skipped");
+				}
 				repo.set(app, key, JSON.stringify(a.value ?? null));
 				return undefined;
 			}
