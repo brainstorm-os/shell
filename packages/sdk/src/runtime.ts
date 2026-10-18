@@ -97,6 +97,7 @@ import type {
 	NetworkService,
 	ObjectDragItem,
 	PatternQueryResult,
+	PendingInvite,
 	PlatformCatalog,
 	PlatformService,
 	PresenceService,
@@ -106,6 +107,7 @@ import type {
 	RosterAgent,
 	RosterMember,
 	RosterProfileInput,
+	RosterRole,
 	RosterSelf,
 	RosterService,
 	SearchHit,
@@ -116,6 +118,7 @@ import type {
 	SettingsService,
 	ShareInviteToken,
 	SharedContact,
+	SharedLastEdit,
 	SharedMember,
 	SharingService,
 	ShortcutDeclaration,
@@ -1199,6 +1202,15 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
 			callService<SharedMember[]>(bridge, "sharing", "access", [entityId], ["sharing.read"]),
+		// Collab-C7 — the deep-link invite (scarce, like `share`), the default
+		// share role, and the last recorded editor (also read-gated on the
+		// entity's type, resolved server-side).
+		pendingInvite: () =>
+			callService<PendingInvite | null>(bridge, "sharing", "pendingInvite", [], ["sharing.share"]),
+		defaultRole: () =>
+			callService<RosterRole>(bridge, "sharing", "defaultRole", [], ["sharing.read"]),
+		lastEdit: (entityId) =>
+			callService<SharedLastEdit | null>(bridge, "sharing", "lastEdit", [entityId], ["sharing.read"]),
 	};
 }
 

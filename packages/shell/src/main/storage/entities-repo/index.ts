@@ -46,6 +46,8 @@ export {
 	AgentWritesRepository,
 } from "./agent-writes-repo";
 export type { AgentWriteBefore, AgentWriteInsert, AgentWriteRecord } from "./agent-writes-repo";
+export { LastEditsRepository } from "./last-edits-repo";
+export type { LastEditRecord } from "./last-edits-repo";
 export type { MintShareInviteInput } from "./share-invites-repo";
 
 export class EntitiesRepositories {

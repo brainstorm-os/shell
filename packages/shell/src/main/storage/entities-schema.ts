@@ -372,4 +372,24 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 12,
+		description: "entities.db v12 — entity_last_edits (Collab-C7 last edited by)",
+		up: (db) => {
+			// Collab-C7 — who last edited a SHARED object, and when. Written only on
+			// the sync path: an inbound update after its sender is authenticated
+			// and authorized as a writer, or a local edit to a tracked (shared)
+			// entity. `editor` is the std-base64 Ed25519 key (the roster's join
+			// key); the name is resolved through the roster at read time, never
+			// stored. One row per entity, so the table is bounded by the vault.
+			// LOCAL state — each device records what it observed; never syncs.
+			db.exec(`
+				CREATE TABLE entity_last_edits (
+					entity_id  TEXT PRIMARY KEY,
+					editor     TEXT NOT NULL,
+					edited_at  INTEGER NOT NULL
+				);
+			`);
+		},
+	},
 ];

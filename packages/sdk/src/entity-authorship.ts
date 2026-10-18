@@ -9,7 +9,13 @@
  * every app that renders `<PropertiesPanel authorship={…}>` reads the same.
  */
 
-import { CREATED_BY_AGENT_PROPERTY_KEY, readAgentProvenance } from "@brainstorm-os/sdk-types";
+import {
+	CREATED_BY_AGENT_PROPERTY_KEY,
+	type RosterMember,
+	type RosterService,
+	type SharingService,
+	readAgentProvenance,
+} from "@brainstorm-os/sdk-types";
 import { humanizeKey } from "./humanize-key";
 import { type AuthorshipLabels, DEFAULT_AUTHORSHIP_LABELS } from "./i18n/common-labels";
 
@@ -88,4 +94,35 @@ export function authorshipMeta(
 		});
 	}
 	return rows;
+}
+
+/** Collab-C7 — the last editor of a shared object, resolved to a display name
+ *  through the roster (the editor key is the roster's join key). `youLabel`
+ *  names the local user. An editor no longer on the roster reads as a short
+ *  key. Null when nothing is recorded or the shell does not expose it. */
+export async function resolveLastEdit(
+	sharing: Pick<SharingService, "lastEdit">,
+	roster: Pick<RosterService, "members"> | null,
+	entityId: string,
+	youLabel: string,
+	members?: readonly RosterMember[],
+): Promise<LastEditView | null> {
+	if (!sharing.lastEdit) return null;
+	const edit = await sharing.lastEdit(entityId);
+	if (!edit) return null;
+	let roll = members;
+	if (!roll && roster) {
+		try {
+			roll = await roster.members(entityId);
+		} catch {
+			roll = [];
+		}
+	}
+	const member = roll?.find((m) => m.pubkey === edit.editor);
+	const name = member
+		? member.isSelf
+			? youLabel
+			: member.displayName || member.fingerprint
+		: `${edit.editor.slice(0, FINGERPRINT_SHOWN)}…`;
+	return { name, at: edit.editedAt };
 }

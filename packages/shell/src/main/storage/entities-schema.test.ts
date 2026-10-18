@@ -46,6 +46,7 @@ describe("entities.db schema", () => {
 			expect(names).toContain("asset_refs");
 			expect(names).toContain("share_invites");
 			expect(names).toContain("agent_writes");
+			expect(names).toContain("entity_last_edits");
 		} finally {
 			db.close();
 		}

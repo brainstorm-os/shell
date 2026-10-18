@@ -38,6 +38,7 @@ import {
 } from "../../entities/pattern-compiler";
 import { AgentWritesRepository } from "./agent-writes-repo";
 import { AssetRefsRepository } from "./asset-refs-repo";
+import { LastEditsRepository } from "./last-edits-repo";
 
 export type EntityRow = {
 	id: string;
@@ -188,6 +189,7 @@ export class EntitiesRepository {
 	private readonly statements = new Map<string, SqliteStatement>();
 	private assetRefsRepo: AssetRefsRepository | null = null;
 	private agentWritesRepo: AgentWritesRepository | null = null;
+	private lastEditsRepo: LastEditsRepository | null = null;
 
 	constructor(private readonly db: SqliteDatabase) {}
 
@@ -205,6 +207,12 @@ export class EntitiesRepository {
 	get agentWrites(): AgentWritesRepository {
 		if (!this.agentWritesRepo) this.agentWritesRepo = new AgentWritesRepository(this.db);
 		return this.agentWritesRepo;
+	}
+
+	/** Collab-C7 — the last-editor table over this same handle. */
+	get lastEdits(): LastEditsRepository {
+		if (!this.lastEditsRepo) this.lastEditsRepo = new LastEditsRepository(this.db);
+		return this.lastEditsRepo;
 	}
 
 	/** Run `fn` inside a single SQLite transaction against `entities.db`.
@@ -525,6 +533,7 @@ export class EntitiesRepository {
 		this.stmt("DELETE FROM entity_deks WHERE entity_id = ?").run(id);
 		// ROT-3a-ii — the deferred-rotation mark (same pragma-independent posture).
 		this.stmt("DELETE FROM pending_rotations WHERE entity_id = ?").run(id);
+		this.stmt("DELETE FROM entity_last_edits WHERE entity_id = ?").run(id);
 		return true;
 	}
 

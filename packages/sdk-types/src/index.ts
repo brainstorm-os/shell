@@ -1799,7 +1799,47 @@ export type SharingService = {
 	/** The resolved access record (active grants + revoked audit) for `entityId`.
 	 *  Requires `sharing.read`. */
 	access(entityId: string): Promise<SharedMember[]>;
+	/** Collab-C7 — the invite a `brainstorm://invite/` link the user opened
+	 *  delivered, verified, for the share dialog to PRE-FILL (consumed on read).
+	 *  Null when none is waiting. Requires `sharing.share`. Optional: an older
+	 *  shell may not expose it. */
+	pendingInvite?(): Promise<PendingInvite | null>;
+	/** Collab-C7 — the role new shares start at (the user's setting; Viewer by
+	 *  default). Requires `sharing.read`. */
+	defaultRole?(): Promise<RosterRole>;
+	/** Collab-C7 — who last edited a shared object and when (the authenticated
+	 *  sync sender, base64 pubkey — resolve a name via `roster.members`). Null
+	 *  for an object never edited while shared. Requires `sharing.read` AND
+	 *  read access to the object's type. */
+	lastEdit?(entityId: string): Promise<SharedLastEdit | null>;
 };
+
+/** Collab-C7 — an invite delivered by a deep link, waiting for the owner. */
+export type PendingInvite = {
+	invite: ShareInviteToken;
+	/** The inviter's self-asserted label / display name (a hint, not identity). */
+	label: string;
+	/** `ed25519:<hex>` fingerprint of the inviter's key — the identity. */
+	fingerprint: string;
+	receivedAt: number;
+};
+
+/** Collab-C7 — the last recorded editor of a shared object. */
+export type SharedLastEdit = { editor: string; editedAt: number };
+
+/** Collab-C7 — the roles a NEW share may default to (never Owner). */
+export const SHARE_DEFAULT_ROLES: readonly RosterRole[] = [RosterRole.Viewer, RosterRole.Editor];
+
+/** The safe default for a new share: read-only until the owner says otherwise. */
+export const DEFAULT_SHARE_ROLE = RosterRole.Viewer;
+
+/** Parse a stored / wire default role; anything but Viewer / Editor reads as
+ *  the safe default. */
+export function parseShareDefaultRole(value: unknown): RosterRole {
+	return SHARE_DEFAULT_ROLES.includes(value as RosterRole)
+		? (value as RosterRole)
+		: DEFAULT_SHARE_ROLE;
+}
 
 /** PRES-2b — the app-facing surface for LIVE PRESENCE (the avatar stack + remote
  *  cursors on a shared entity). Publish this device's presence for an entity and
@@ -2848,6 +2888,17 @@ export type {
 	AgentLoopStep,
 	AgentToolCall,
 } from "./agent-loop";
+
+// ─── Invite deep links (Collab-C7) ──────────────────────────────────────────
+export {
+	INVITE_LINK_PREFIX,
+	INVITE_TOKEN_MAX_LENGTH,
+	INVITE_TOKEN_MIN_LENGTH,
+	inviteLinkFor,
+	inviteTokenFromInput,
+	isInviteTokenShape,
+	parseInviteLink,
+} from "./invite-link";
 
 // ─── Agent run diff + undo (Agent-15) ───────────────────────────────────────
 export {

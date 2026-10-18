@@ -688,6 +688,14 @@ const aiSettings = {
 		ipcRenderer.invoke("ai-settings:set-ollama", input),
 };
 
+/** Collab-C7 — Settings → Identity → the role new shares start at
+ *  (Viewer / Editor; re-validated main-side). */
+const sharingSettings = {
+	getDefaultRole: (): Promise<string> => ipcRenderer.invoke("sharing-settings:get-default-role"),
+	setDefaultRole: (role: string): Promise<string> =>
+		ipcRenderer.invoke("sharing-settings:set-default-role", role),
+};
+
 /** Agent-12d — Settings → AI → Agent activity (privileged; OQ-AO-2
  *  shell-surfaces-only, so this bridge is the ONLY road to vault-wide trace
  *  reads — no app capability exists). Replies are bounded, metadata-only
@@ -2139,6 +2147,7 @@ const brainstorm = {
 	spellcheck,
 	aiSettings,
 	agentActivity,
+	sharingSettings,
 	billing,
 	mcpSettings,
 	filesHandles,
