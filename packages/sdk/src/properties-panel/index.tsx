@@ -17,7 +17,12 @@
  * component. Wrap in `<PropertiesProvider>` so the cells reach the vault.
  */
 
-import { type PropertyDef, defaultViewFor } from "@brainstorm-os/sdk-types";
+import {
+	CellPresentation,
+	type CellProps,
+	type PropertyDef,
+	defaultViewFor,
+} from "@brainstorm-os/sdk-types";
 import type { ReactNode } from "react";
 import { Icon, IconName } from "../icon";
 import { getCell } from "../property-ui";
@@ -190,7 +195,8 @@ function PropertyRow({
 				) : Cell ? (
 					<Cell
 						property={def}
-						value={row.value}
+						value={row.value as CellProps["value"]}
+						presentation={CellPresentation.Expanded}
 						onChange={(next) => row.onChange?.(next)}
 						readOnly={row.readOnly ?? row.onChange === undefined}
 						noteId={entityId}

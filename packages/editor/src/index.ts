@@ -515,6 +515,7 @@ export {
 	type CompactEditorProps,
 	CompactEditor,
 } from "./compact-editor";
+export { RichTextPropertyEditor, richTextValueFromPayload } from "./rich-text-property-editor";
 export {
 	type MentionComposerHandle,
 	type MentionComposerPluginProps,

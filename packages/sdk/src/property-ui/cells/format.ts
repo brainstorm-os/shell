@@ -19,6 +19,7 @@ import {
 	type PropertyDef,
 	PropertyFormat,
 	ValueType,
+	richTextPlain,
 } from "@brainstorm-os/sdk-types";
 
 export type FormatOptions = {
@@ -80,7 +81,7 @@ export function formatScalar(def: PropertyDef, value: unknown, opts: FormatOptio
 		case ValueType.Boolean:
 			return value ? "✓" : "";
 		case ValueType.RichText:
-			return "";
+			return richTextPlain(value);
 	}
 }
 
@@ -205,7 +206,7 @@ export function parseScalar(def: PropertyDef, raw: string): unknown {
 		case ValueType.Boolean:
 			return /^(true|yes|1|on)$/i.test(trimmed);
 		case ValueType.RichText:
-			return null;
+			return trimmed.length === 0 ? null : { text: raw };
 	}
 }
 

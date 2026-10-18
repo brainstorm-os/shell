@@ -58,3 +58,19 @@ describe("db-cell-bridge", () => {
 		expect(toDbValue(bool, null)).toBe(false);
 	});
 });
+
+describe("db-cell-bridge — rich text (9.12.26)", () => {
+	const rich: PropertyDef = { key: "body", name: "Body", icon: null, valueType: ValueType.RichText };
+
+	it("passes a stored rich-text value through both ways", () => {
+		const v = { text: "Hi", state: "{}" };
+		expect(toCellValue(rich, v)).toEqual(v);
+		expect(toDbValue(rich, v)).toEqual(v);
+	});
+
+	it("reads a legacy bare string as its text and anything else as empty", () => {
+		expect(toCellValue(rich, "old")).toEqual({ text: "old" });
+		expect(toCellValue(rich, "")).toBeNull();
+		expect(toCellValue(rich, 42)).toBeNull();
+	});
+});

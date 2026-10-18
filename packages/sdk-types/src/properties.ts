@@ -231,6 +231,26 @@ export type DateValue = {
 	granularity: DateGranularity;
 };
 
+/** Stored shape of a RichText value (9.12.26): the serialized Lexical editor
+ *  state (`state`, the compact-editor vocabulary — marks, links, lists,
+ *  quote, code) plus its plain-text projection (`text`), which the grid,
+ *  search and sort read without parsing editor JSON. `state` is absent when
+ *  the value was entered through a plain-text fallback editor. */
+export type RichTextValue = {
+	text: string;
+	state?: string;
+};
+
+/** The plain-text projection of a stored RichText value. A legacy bare
+ *  string reads as itself; anything else malformed reads as empty. */
+export function richTextPlain(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string") {
+		return (value as { text: string }).text;
+	}
+	return "";
+}
+
 /** One element of a multi-valued storage envelope. `count.max > 1`
  *  properties store an array of these regardless of how many values
  *  are present. `label` is optional and drawn from the def's local
@@ -374,12 +394,15 @@ export enum PropertyKindPreset {
 	File = "file",
 	Link = "link",
 	Formula = "formula",
+	/** A formatted text block (9.12.26) — stored as a {@link RichTextValue}. */
+	RichText = "rich-text",
 }
 
 /** Order the constructor lists presets in. Source of truth for the
  *  segmented control + slash menu picker. */
 export const KIND_PRESET_ORDER: readonly PropertyKindPreset[] = Object.freeze([
 	PropertyKindPreset.Text,
+	PropertyKindPreset.RichText,
 	PropertyKindPreset.Number,
 	PropertyKindPreset.Boolean,
 	PropertyKindPreset.Date,
@@ -435,6 +458,7 @@ export const PRESET_DEFAULTS: Readonly<Record<PropertyKindPreset, PresetDefaults
 		valueType: ValueType.Number,
 		format: PropertyFormat.Formula,
 	},
+	[PropertyKindPreset.RichText]: { valueType: ValueType.RichText },
 });
 
 /** Derive the preset a def looks like, for chrome (badges,
@@ -450,7 +474,7 @@ export function presetOf(def: PropertyDef): PropertyKindPreset {
 		case ValueType.Date:
 			return PropertyKindPreset.Date;
 		case ValueType.RichText:
-			return PropertyKindPreset.Text;
+			return PropertyKindPreset.RichText;
 		case ValueType.EntityRef:
 			if (def.allowedTypes?.includes(FILE_ENTITY_TYPE)) return PropertyKindPreset.File;
 			return PropertyKindPreset.Link;
@@ -526,6 +550,14 @@ export type Scope =
  *  inline-block use today and for the future Database app + entity
  *  inspector reuse. Cells switch on `def.valueType` (and `def.count`
  *  for cardinality-aware behavior) at runtime. */
+/** How much room a cell has (9.12.26). A grid cell is `Compact` — one line,
+ *  editing in a popover; an inspector / properties panel row is `Expanded`
+ *  and may edit in place at full height. Absent ⇒ `Compact`. */
+export enum CellPresentation {
+	Compact = "compact",
+	Expanded = "expanded",
+}
+
 export type CellProps<V extends ValueType = ValueType> = {
 	property: PropertyDef & { valueType: V };
 	value: PropertyValueByValueType[V];
@@ -554,4 +586,7 @@ export type CellProps<V extends ValueType = ValueType> = {
 	 *  or commit a new one) instead of a bare text field. Absent / empty ⇒ the
 	 *  cell stays a plain inline input, so existing consumers are unaffected. */
 	suggestions?: readonly string[];
+	/** See {@link CellPresentation}. Only cells whose resting view differs by
+	 *  room (rich text) read it. */
+	presentation?: CellPresentation;
 };

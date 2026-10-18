@@ -35,7 +35,7 @@ import "@brainstorm-os/editor/editor.css";
 import "@brainstorm-os/sdk/virtual-list.css";
 import "@brainstorm-os/sdk/property-ui/dictionary-editor.css";
 import "@brainstorm-os/sdk/count-badge.css";
-import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { EntityCommentsPanel, RichTextPropertyEditor } from "@brainstorm-os/editor";
 import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm-os/sdk";
 import {
 	COLLECTION_TYPE_URL,
@@ -1385,6 +1385,7 @@ function withProperties(state: AppState, element: ReactElement): ReactElement {
 	return createElement(PropertiesProvider, {
 		runtime: { services: { properties } },
 		entityTitleSource: getTitleSource(state),
+		richTextEditor: RichTextPropertyEditor,
 		// biome-ignore lint/correctness/noChildrenProp: app.ts is .ts (no JSX); the createElement overload for a component with a required `children` prop only type-checks when `children` is in the props object, not the variadic 3rd arg.
 		children: element,
 	});
@@ -4850,6 +4851,7 @@ function inlinePropertyFormLabels() {
 		formatUrl: t("brainstorm.database.property.form.formatUrl"),
 		formatEmail: t("brainstorm.database.property.form.formatEmail"),
 		formatPhone: t("brainstorm.database.property.form.formatPhone"),
+		formatRichText: t("brainstorm.database.property.form.formatRichText"),
 		formatCurrency: t("brainstorm.database.property.form.formatCurrency"),
 		formatPercent: t("brainstorm.database.property.form.formatPercent"),
 		formatDuration: t("brainstorm.database.property.form.formatDuration"),

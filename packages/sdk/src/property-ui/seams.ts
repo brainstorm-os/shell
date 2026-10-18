@@ -15,7 +15,8 @@
  *   4. entityTitleSource — the Link cell's vault title lookup.
  */
 
-import type { VaultEntity } from "@brainstorm-os/sdk-types";
+import type { RichTextValue, VaultEntity } from "@brainstorm-os/sdk-types";
+import type { ComponentType } from "react";
 import { entityTitleOr } from "../entity-title";
 
 export type KeyLike = KeyboardEvent | { key: string; nativeEvent?: { key: string } };
@@ -41,6 +42,24 @@ export const defaultCommitMatcher: CommitMatcher = (event) => readKey(event) ===
  *  the defaults are the bare keys those ids bind to (Escape / Mod+F /
  *  Space / Arrow↑↓) so the editor is keyboard-operable with no
  *  registry — no raw `e.key` outside this module. */
+/** The rich-text editing surface the RichText cell mounts (9.12.26). The SDK
+ *  cannot depend on `@brainstorm-os/editor` (the editor depends on the SDK),
+ *  so a host injects one — `RichTextPropertyEditor` from the editor package,
+ *  over the shared `CompactEditor`. Uninjected, the cell edits the plain-text
+ *  projection in a textarea instead. Emits on every edit; the cell decides
+ *  when to persist. */
+export type RichTextEditorProps = {
+	initialValue: RichTextValue | null;
+	ariaLabel: string;
+	autoFocus?: boolean;
+	/** Show the floating format toolbar. Off inside a popover, whose
+	 *  outside-click dismiss would fire on the toolbar's own portal. */
+	toolbar: boolean;
+	onChange: (next: RichTextValue) => void;
+};
+
+export type RichTextEditorComponent = ComponentType<RichTextEditorProps>;
+
 export type DictionaryEditorMatchers = {
 	closeEditor: (event: KeyLike) => boolean;
 	focusSearch: (event: KeyLike) => boolean;

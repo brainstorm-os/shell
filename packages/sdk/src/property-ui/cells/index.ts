@@ -18,6 +18,7 @@ import { PillCell } from "./pill-cell";
 import { PlainCell } from "./plain-cell";
 import { ProgressBarCell } from "./progress-cell";
 import { RatingCell } from "./rating-cell";
+import { RichTextCell } from "./rich-text-cell";
 import { TagCell } from "./tag-cell";
 import { ToggleCell } from "./toggle-cell";
 
@@ -92,6 +93,9 @@ register(VT.EntityRef, PropertyView.LinkInline, LinkInlineCell);
 register(VT.EntityRef, PropertyView.LinkCard, LinkCardCell);
 register(VT.EntityRef, PropertyView.Chip, LinkInlineCell);
 register(VT.EntityRef, PropertyView.Card, LinkCardCell);
+
+// RichText Block — one-line projection in a grid, full editor in an inspector.
+register(VT.RichText, PropertyView.Block, RichTextCell);
 
 /** Look up a cell. `undefined` when the (valueType, view) pair has no
  *  registered component yet (e.g. Tag / TagList / File views in B5.3). */

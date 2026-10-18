@@ -121,6 +121,7 @@ export function InlinePropertyForm({
 			[InlineTextFormat.Url]: labels.formatUrl,
 			[InlineTextFormat.Email]: labels.formatEmail,
 			[InlineTextFormat.Phone]: labels.formatPhone,
+			[InlineTextFormat.RichText]: labels.formatRichText,
 		}),
 		[labels],
 	);

@@ -206,6 +206,7 @@ export type InlinePropertyFormLabels = {
 	formatUrl: string;
 	formatEmail: string;
 	formatPhone: string;
+	formatRichText: string;
 	formatCurrency: string;
 	formatPercent: string;
 	formatDuration: string;
@@ -243,6 +244,7 @@ export const DEFAULT_INLINE_PROPERTY_FORM_LABELS: InlinePropertyFormLabels = {
 	formatUrl: "URL",
 	formatEmail: "Email",
 	formatPhone: "Phone",
+	formatRichText: "Rich text",
 	formatCurrency: "Currency",
 	formatPercent: "Percent",
 	formatDuration: "Duration",

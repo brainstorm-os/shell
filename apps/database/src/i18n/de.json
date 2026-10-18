@@ -240,6 +240,7 @@
   "brainstorm.database.property.form.formatUrl": "URL",
   "brainstorm.database.property.form.formatEmail": "E-Mail",
   "brainstorm.database.property.form.formatPhone": "Telefon",
+  "brainstorm.database.property.form.formatRichText": "Formatierter Text",
   "brainstorm.database.property.form.formatCurrency": "Währung",
   "brainstorm.database.property.form.formatPercent": "Prozent",
   "brainstorm.database.property.form.formatDuration": "Dauer",

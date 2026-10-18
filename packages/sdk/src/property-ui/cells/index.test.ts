@@ -65,9 +65,9 @@ describe("cell registry", () => {
 	});
 
 	it("returns undefined for still-unshipped (valueType, view) pairs", () => {
-		// RichText Block / Inline + the file Viewer / Thumbnail views have no
-		// cell yet.
-		expect(getCell(ValueType.RichText, PropertyView.Block)).toBeUndefined();
+		// RichText Inline + the file Viewer / Thumbnail views have no cell yet
+		// (RichText Block shipped in 9.12.26).
+		expect(getCell(ValueType.RichText, PropertyView.Inline)).toBeUndefined();
 		expect(getCell(ValueType.EntityRef, PropertyView.Viewer)).toBeUndefined();
 	});
 
@@ -75,15 +75,17 @@ describe("cell registry", () => {
 		expect(hasCell(ValueType.Text, PropertyView.Pill)).toBe(true);
 		expect(hasCell(ValueType.EntityRef, PropertyView.Gallery)).toBe(true);
 		expect(hasCell(ValueType.Boolean, PropertyView.Toggle)).toBe(true);
-		expect(hasCell(ValueType.RichText, PropertyView.Block)).toBe(false);
+		expect(hasCell(ValueType.RichText, PropertyView.Block)).toBe(true);
+		expect(hasCell(ValueType.RichText, PropertyView.Inline)).toBe(false);
 	});
 
-	it("ships exactly the expected 25 registry entries", () => {
+	it("ships exactly the expected 26 registry entries", () => {
 		// 8 Pill/Plain (Text/Number/Date/EntityRef ×2) + 1 Text::Multiline
 		// + 1 Boolean::Checkbox + 1 Boolean::Toggle + 2 Tag + 1 ProgressBar
 		// + 1 Rating + 2 extra Date (Calendar + Relative) + 3 File-aware
-		// + 2 Link + 2 EntityRef Chip/Card + 1 Number::Formula = 25.
-		expect(registeredCellKeys().length).toBe(25);
+		// + 2 Link + 2 EntityRef Chip/Card + 1 Number::Formula
+		// + 1 RichText::Block = 26.
+		expect(registeredCellKeys().length).toBe(26);
 	});
 
 	it("never registers a (valueType, view) pair the spec does not allow", () => {
