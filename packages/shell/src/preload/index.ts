@@ -45,14 +45,14 @@ import {
 } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
+import type { BackupStatus, RestorePoint } from "../main/bundle/backup-service";
+import type { ImportReport } from "../main/bundle/bundle-format";
 import type {
 	CustomEndpointError,
 	CustomEndpointPreset,
 	EndpointUrlError,
 	OllamaSettingsError,
 } from "../shared/ai-endpoints";
-import type { BackupStatus, RestorePoint } from "../main/bundle/backup-service";
-import type { ImportReport } from "../main/bundle/bundle-format";
 import { appIconUrl } from "../shared/app-icon-url";
 import type { BackupFrequency } from "../shared/backup-frequency";
 
