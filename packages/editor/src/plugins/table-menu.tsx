@@ -19,12 +19,14 @@ import {
 } from "@brainstorm-os/sdk/menus";
 import type { LexicalEditor } from "lexical";
 import type { ReactNode } from "react";
+import { BackgroundSwatch, blockBackgroundToken, swatchLabel } from "../block-background";
 import type { EditorT } from "../i18n";
 import {
 	ArrowDownIcon,
 	ArrowLeftIcon,
 	ArrowRightIcon,
 	ArrowUpIcon,
+	BlockBackgroundIcon,
 	FillDownIcon,
 	MoveColLeftIcon,
 	MoveColRightIcon,
@@ -33,6 +35,7 @@ import {
 	TableIcon,
 	TrashIcon,
 } from "../icons";
+import { SWATCH_COLORS } from "../text-color";
 import {
 	TableAxis,
 	TableEdge,
@@ -41,6 +44,7 @@ import {
 	fillDownColumn,
 	insertTableLine,
 	moveTableColumn,
+	setTableCellBackground,
 	sortTableBySelectedColumn,
 	toggleHeaderRow,
 } from "./table-ops";
@@ -128,6 +132,17 @@ export function openTableMenu(options: OpenTableMenuOptions): void {
 			label: t("editor.table.moveColRight"),
 			icon: nodeIcon(MoveColRightIcon()),
 			onSelect: op(() => moveTableColumn(editor, true)),
+		},
+		{
+			id: "cell-background",
+			label: t("editor.table.cellBackground"),
+			icon: nodeIcon(BlockBackgroundIcon()),
+			submenu: SWATCH_COLORS.map((color) => ({
+				id: `cell-background:${color}`,
+				label: swatchLabel(t, color),
+				icon: nodeIcon(<BackgroundSwatch color={color} />),
+				onSelect: op(() => setTableCellBackground(editor, blockBackgroundToken(color))),
+			})),
 		},
 		{ id: "divider-2", label: "", divider: true },
 		{

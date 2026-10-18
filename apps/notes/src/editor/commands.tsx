@@ -28,6 +28,7 @@ import {
 	TocIcon,
 	TodoListIcon,
 	applySwatchToBlocks,
+	createBlockBackgroundActions,
 	createEditorT,
 	createEntityEmbedCommand,
 	createInsertBlockActions,
@@ -480,6 +481,7 @@ export const BLOCK_ACTIONS: readonly BlockCommand[] = [
 	...sharedActions.slice(deleteActionIndex),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Text, color)),
 	...SWATCH_COLORS.map((color) => colorAction(ColorTarget.Highlight, color)),
+	...createBlockBackgroundActions(editorT),
 ];
 
 /** Slash-trigger path: the caller's paragraph (the one with `/property`)

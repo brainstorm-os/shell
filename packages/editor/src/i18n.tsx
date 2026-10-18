@@ -36,6 +36,7 @@ export type EditorI18nKey =
 	| "editor.table.deleteRow"
 	| "editor.table.deleteCol"
 	| "editor.table.deleteTable"
+	| "editor.table.cellBackground"
 	// Block selection — aria-live announcements (BlockSelectionPlugin).
 	| "editor.a11y.blocksSelected.one"
 	| "editor.a11y.blocksSelected.other"
@@ -288,6 +289,7 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.table.deleteRow": "Delete row",
 	"editor.table.deleteCol": "Delete column",
 	"editor.table.deleteTable": "Delete table",
+	"editor.table.cellBackground": "Cell background",
 	"editor.a11y.blocksSelected.one": "1 block selected",
 	"editor.a11y.blocksSelected.other": "{count} blocks selected",
 	"editor.gutter.addBelow": "Add block below",

@@ -102,6 +102,20 @@ export {
 } from "./plugins/block-gutter-plugin";
 export { isEventInNestedEditor, useEditorShortcut } from "./plugins/editor-shortcut";
 export {
+	$canHaveBlockBackground,
+	BLOCK_BACKGROUND_ATTR,
+	BLOCK_BACKGROUND_STYLE_PROP,
+	BackgroundSwatch,
+	BlockBackgroundPlugin,
+	applyBlockBackground,
+	blockBackgroundToken,
+	createBlockBackgroundActions,
+	readBlockBackground,
+	registerBlockBackground,
+	swatchLabel,
+	withBlockBackground,
+} from "./block-background";
+export {
 	INSERT_MENU_CHORDS,
 	InsertPosition,
 	type OpenInsertMenuOptions,

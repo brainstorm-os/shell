@@ -2781,3 +2781,60 @@ body.bs-table-col-resizing * {
 	font-size: var(--text-size-sm);
 	color: var(--text-dim, var(--text));
 }
+
+/* B11.23 — block-level background. The stored swatch NAME is mirrored onto
+   the block as `data-bs-block-background` (BlockBackgroundPlugin); the colour
+   is always the active theme's token, defined in every theme. The inline
+   padding keeps text off the tint's edge without shifting the text column. */
+[data-bs-block-background] {
+	border-radius: var(--radius-sm);
+	padding-inline: var(--space-1);
+	margin-inline: calc(-1 * var(--space-1));
+}
+
+[data-bs-block-background="gray"] {
+	background-color: var(--color-block-background-gray);
+}
+
+[data-bs-block-background="brown"] {
+	background-color: var(--color-block-background-brown);
+}
+
+[data-bs-block-background="orange"] {
+	background-color: var(--color-block-background-orange);
+}
+
+[data-bs-block-background="yellow"] {
+	background-color: var(--color-block-background-yellow);
+}
+
+[data-bs-block-background="green"] {
+	background-color: var(--color-block-background-green);
+}
+
+[data-bs-block-background="blue"] {
+	background-color: var(--color-block-background-blue);
+}
+
+[data-bs-block-background="purple"] {
+	background-color: var(--color-block-background-purple);
+}
+
+[data-bs-block-background="pink"] {
+	background-color: var(--color-block-background-pink);
+}
+
+[data-bs-block-background="red"] {
+	background-color: var(--color-block-background-red);
+}
+
+/* The swatch chip in the block action menu / table cell-background submenu. */
+.bs-editor__bg-swatch {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	margin: 0;
+	padding: 0;
+	border: var(--border-width) solid var(--border-subtle);
+	border-radius: var(--radius-sm);
+}

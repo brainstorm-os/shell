@@ -151,6 +151,23 @@ export type Tokens = {
 		 *  outside the current pattern. Per the
 		 *  [[apps-inherit-shell-theme]] memory: the graph app reads these
 		 *  via CSS vars (no parallel palette in the app). */
+		/** Block-level background tints (B11.23) — the editor's paragraph /
+		 *  heading / callout / table-cell backgrounds. A tint sits BEHIND body
+		 *  text, so light themes carry a pale wash under dark ink and dark
+		 *  themes a deep tint under light ink; every hue clears `text.primary`
+		 *  at AA in every theme (themes-contrast ratchet). Same hue set as the
+		 *  editor's inline swatches. */
+		blockBackground: {
+			gray: string;
+			brown: string;
+			orange: string;
+			yellow: string;
+			green: string;
+			blue: string;
+			purple: string;
+			pink: string;
+			red: string;
+		};
 		graph: {
 			subject: {
 				"1": string;

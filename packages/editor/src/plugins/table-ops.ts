@@ -18,7 +18,9 @@ import {
 	$isTableCellNode,
 	$isTableNode,
 	$isTableRowNode,
+	$isTableSelection,
 	TableCellHeaderStates,
+	type TableCellNode,
 	type TableRowNode,
 } from "@lexical/table";
 import {
@@ -31,6 +33,27 @@ import {
 	type LexicalEditor,
 	type NodeKey,
 } from "lexical";
+
+/** The cells the selection covers: every cell of a table (multi-cell)
+ *  selection, else the cell holding the caret. Must run inside an update. */
+function $selectedTableCells(): TableCellNode[] {
+	const selection = $getSelection();
+	if ($isTableSelection(selection)) return selection.getNodes().filter($isTableCellNode);
+	if (!$isRangeSelection(selection)) return [];
+	const cell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+	return cell ? [cell] : [];
+}
+
+/** Tint the selected cell(s) with a theme block-background token (B11.23);
+ *  `null` clears it. Persists as Lexical's own cell `backgroundColor`. */
+export function setTableCellBackground(editor: LexicalEditor, token: string | null): void {
+	editor.update(
+		() => {
+			for (const cell of $selectedTableCells()) cell.setBackgroundColor(token);
+		},
+		{ discrete: true },
+	);
+}
 
 /** Minimum width (px) a table column can be dragged to. */
 export const MIN_TABLE_COLUMN_WIDTH = 48;

@@ -36,6 +36,7 @@ import type { Provider } from "@lexical/yjs";
 import type { Klass, LexicalNode } from "lexical";
 import { type MutableRefObject, type ReactNode, useCallback, useMemo } from "react";
 import type { Doc } from "yjs";
+import { BlockBackgroundPlugin } from "./block-background";
 import { type BrainstormEditorConfigOptions, createEditorConfig } from "./config";
 import { EditorI18nProvider, type EditorManifest } from "./i18n";
 import { createLocalProvider } from "./local-provider";
@@ -181,6 +182,7 @@ export function BrainstormEditor(props: BrainstormEditorProps): ReactNode {
 				/>
 				<ListPlugin />
 				<LinkPlugin />
+				<BlockBackgroundPlugin />
 				<VirtualizePlugin />
 				<EditableSync editable={editable} />
 				{children}

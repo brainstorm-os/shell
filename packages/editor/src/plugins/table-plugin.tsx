@@ -105,7 +105,7 @@ export function TablesPlugin() {
 
 	return (
 		<>
-			<TablePlugin hasCellMerge hasCellBackgroundColor={false} />
+			<TablePlugin hasCellMerge hasCellBackgroundColor />
 			{state && (
 				<button
 					ref={triggerRef}

@@ -24,6 +24,7 @@ import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { type ReactNode, useMemo } from "react";
+import { createBlockBackgroundActions } from "../block-background";
 import type { BlockCommand } from "../block-command";
 import { useEditorT } from "../i18n";
 import { BLOCK_MARKDOWN_TRANSFORMERS } from "../markdown-block-transformers";
@@ -91,7 +92,11 @@ export function StandardEditingPlugins({
 		return extraCommands && extraCommands.length > 0 ? [...base, ...extraCommands] : base;
 	}, [t, extraCommands, palette]);
 	const actions = useMemo(
-		() => [...createInsertBlockActions(t, commands), ...createStandardBlockActions(t)],
+		() => [
+			...createInsertBlockActions(t, commands),
+			...createStandardBlockActions(t),
+			...createBlockBackgroundActions(t),
+		],
 		[t, commands],
 	);
 
