@@ -1192,6 +1192,45 @@ body.is-resizing .db-inspector__resize {
 	color: var(--text-faint);
 }
 
+/* Per-column wrap override (9.12.29) — a column's own setting beats the
+ * view's Wrap toggle in either direction. */
+.dbv-grid__cell[data-wrap="true"] {
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
+	align-items: flex-start;
+	word-break: break-word;
+}
+
+.dbv-grid[data-wrap="true"] .dbv-grid__cell[data-wrap="false"] {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	align-items: center;
+	word-break: normal;
+}
+
+.dbv-grid__cell[data-wrap="false"] .dbv-tags {
+	flex-wrap: nowrap;
+	overflow: hidden;
+}
+
+.dbv-grid__cell[data-wrap="true"] .dbv-tags {
+	flex-wrap: wrap;
+	overflow: visible;
+}
+
+/* Icon-only header (9.12.29): the kind glyph, centred. */
+.dbv-grid__cell--head[data-icon-only="true"] {
+	justify-content: center;
+	color: var(--text-dim);
+}
+
+.db-popover__column-alias {
+	flex: 1;
+	min-width: 0;
+}
+
 /* Wrap toggle (view settings). Default is single-line + ellipsis;
  * `data-wrap="true"` lets cell content flow onto multiple lines and the
  * row grow to fit (top-aligned so wrapped text reads naturally). */
@@ -3378,7 +3417,8 @@ body.is-resizing .dbv-tl__labels-resize {
 
 /* Remove-column affordance (F-022): dim, brightens on row hover; sits at the
  * trailing edge after the flex-grown name. */
-.db-popover__column-remove {
+.db-popover__column-remove,
+.db-popover__column-more {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -3395,11 +3435,15 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-popover__column-row:hover .db-popover__column-remove,
-.db-popover__column-remove:focus-visible {
+.db-popover__column-remove:focus-visible,
+.db-popover__column-row:hover .db-popover__column-more,
+.db-popover__column-more:focus-visible,
+.db-popover__column-more[aria-expanded="true"] {
 	opacity: 1;
 }
 
-.db-popover__column-remove:hover {
+.db-popover__column-remove:hover,
+.db-popover__column-more:hover {
 	background: var(--color-accent-subtle, var(--hover));
 	color: var(--text);
 }

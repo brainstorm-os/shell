@@ -158,7 +158,22 @@ export type ColumnSpec = {
 	 *  `AggregationKind` value (a plain string, same rationale as
 	 *  `ColumnRollup.aggregation`). Absent → the column's type default. */
 	aggregation?: string;
+	/** Per-VIEW short label (9.12.29) — renames the column header in this view
+	 *  only; the property's catalog name is untouched. */
+	label?: string;
+	/** Compact header (9.12.29): the property-kind glyph instead of the label
+	 *  (the label stays the accessible name + tooltip). */
+	iconOnly?: boolean;
+	/** Per-column text-wrap override (9.12.29). Absent → the view's Wrap
+	 *  setting. */
+	wrap?: ColumnWrap;
 };
+
+/** A column's text-wrap override (9.12.29). */
+export enum ColumnWrap {
+	Wrap = "wrap",
+	NoWrap = "no-wrap",
+}
 
 /** Per-kind layout option shapes. Discriminated by `ListView.kind`.
  *

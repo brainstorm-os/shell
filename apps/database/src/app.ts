@@ -107,6 +107,8 @@ import {
 	groupWireKey,
 	toggleCollapsed,
 } from "./logic/board-groups";
+import { patchColumn, propertyColumns } from "./logic/column-layout";
+import { propertyKindIconFor } from "./logic/property-kind-icon";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -461,27 +463,10 @@ function propertyDisplayName(propertyId: string): string {
  *  off the catalog `valueType` + `format`. Built-ins with no def fall back by
  *  key (`__title__`/name → text, the `*At` timestamps → date). */
 function propertyKindIcon(propertyId: string): IconName {
-	if (propertyId === "__title__") return IconName.KindText;
-	const def = cachedVaultProperties.find((d) => d.key === propertyId);
-	if (!def) return /at$/i.test(propertyId) ? IconName.KindDate : IconName.KindText;
-	if (def.vocabulary?.dictionaryId) {
-		return isMultiValued(def.count) ? IconName.KindMultiSelect : IconName.KindSelect;
-	}
-	switch (def.valueType) {
-		case ValueType.Number:
-			return IconName.KindNumber;
-		case ValueType.Boolean:
-			return IconName.KindBoolean;
-		case ValueType.Date:
-			return IconName.KindDate;
-		case ValueType.EntityRef:
-			return IconName.KindLink;
-		default:
-			if (def.format === PropertyFormat.Email) return IconName.KindEmail;
-			if (def.format === PropertyFormat.Url) return IconName.KindUrl;
-			if (def.format === PropertyFormat.Phone) return IconName.KindPhone;
-			return IconName.KindText;
-	}
+	return propertyKindIconFor(
+		propertyId,
+		cachedVaultProperties.find((d) => d.key === propertyId),
+	);
 }
 
 /** Vault dictionaries (vocabulary option sets), keyed by dictionary id —
@@ -1285,22 +1270,14 @@ function renderActiveViewInner(state: AppState): void {
 					schedulePersist(state);
 				},
 				onResizeColumn: (propertyId, width) => {
-					updateViewColumns(
-						state,
-						view.id,
-						view.columns.map((c) => (c.propertyId === propertyId ? { ...c, width } : c)),
-					);
+					updateViewColumns(state, view.id, patchColumn(view.columns, propertyId, { width }));
 					renderActiveView(state);
 					schedulePersist(state);
 				},
 				onReorderRows: (ids) => updateViewManualOrder(state, view.id, ids),
 				onEdit: editProperty,
 				onSetColumnAggregation: (propertyId, aggregation) => {
-					updateViewColumns(
-						state,
-						view.id,
-						view.columns.map((c) => (c.propertyId === propertyId ? { ...c, aggregation } : c)),
-					);
+					updateViewColumns(state, view.id, patchColumn(view.columns, propertyId, { aggregation }));
 					renderActiveView(state);
 					schedulePersist(state);
 				},
@@ -1310,7 +1287,7 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.List: {
 			reactBody = createElement(ListViewComponent, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
 				layout: view.layoutOptions as ListLayoutOptions,
 				selectedIds: state.selection.selectedIds,
@@ -1323,7 +1300,7 @@ function renderActiveViewInner(state: AppState): void {
 		case ListViewKind.Gallery: {
 			reactBody = createElement(GalleryView, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
 				layout: view.layoutOptions as GalleryLayoutOptions,
 				coverProperty: view.coverProperty,
@@ -1342,7 +1319,7 @@ function renderActiveViewInner(state: AppState): void {
 			const swimlaneBy = boardLayout.swimlaneBy ?? null;
 			reactBody = createElement(BoardView, {
 				compiled: compiledView,
-				columns: view.columns,
+				columns: propertyColumns(view.columns),
 				allRows: state.db.entities,
 				layout: boardLayout,
 				groupBy,
@@ -2388,7 +2365,7 @@ function buildHeaderExtraItems(
 		);
 		// Every exportable column (any visibility); the default selection is the
 		// columns currently visible in the view.
-		const exportableColumns = view.columns.filter(
+		const exportableColumns = propertyColumns(view.columns).filter(
 			(c) => c.propertyId !== "title" && c.propertyId !== "name",
 		);
 		const columnChoices = exportableColumns.map((c) => ({
@@ -3032,7 +3009,7 @@ function openFilterPropertyMenu(
 	openSubmenuNextFrame(() =>
 		openContextMenu(
 			{ x: r.left, y: r.bottom + 4 },
-			v.columns
+			propertyColumns(v.columns)
 				.filter((c) => c.visible !== false)
 				.map((c) => ({
 					label: colLabel(c.propertyId),
@@ -3115,7 +3092,7 @@ function openFilterOperatorMenu(
 					const hostRef = isRefProperty && opAcceptsHostRef(o.op);
 					if (opAcceptsRef(o.op) || hostRef) {
 						const cols = opAcceptsRef(o.op)
-							? (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
+							? propertyColumns(state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
 									(c) => c.visible !== false && c.propertyId !== propertyId,
 								)
 							: [];
@@ -3402,7 +3379,7 @@ function openSortMenu(state: AppState, anchor: HTMLElement): void {
 	const view = activeView(state);
 	if (!view) return;
 	const current = view.sorts[0] ?? null;
-	const cols = view.columns.filter((c) => c.visible !== false);
+	const cols = propertyColumns(view.columns).filter((c) => c.visible !== false);
 	const r = anchor.getBoundingClientRect();
 	const items: MenuItem[] = cols.map((c) => {
 		const isActive = current?.propertyId === c.propertyId;

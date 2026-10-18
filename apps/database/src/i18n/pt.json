@@ -298,5 +298,13 @@
   "brainstorm.database.settings.groupOrder.countDesc": "Mais itens",
   "brainstorm.database.settings.groupOrder.countAsc": "Menos itens",
   "brainstorm.database.settings.collapseAll": "Recolher tudo",
-  "brainstorm.database.settings.expandAll": "Expandir tudo"
+  "brainstorm.database.settings.expandAll": "Expandir tudo",
+  "brainstorm.database.settings.columnOptions": "Opções de {name}",
+  "brainstorm.database.settings.column.rename": "Renomear nesta vista…",
+  "brainstorm.database.settings.column.resetName": "Usar “{name}”",
+  "brainstorm.database.settings.column.iconOnly": "Cabeçalho só com ícone",
+  "brainstorm.database.settings.column.wrap": "Quebra de texto",
+  "brainstorm.database.settings.column.wrap.default": "Igual à vista",
+  "brainstorm.database.settings.column.wrap.wrap": "Quebrar",
+  "brainstorm.database.settings.column.wrap.noWrap": "Não quebrar"
 }

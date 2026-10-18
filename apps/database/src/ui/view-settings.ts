@@ -23,13 +23,20 @@ import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { createSelectMenu } from "@brainstorm-os/sdk/select-menu";
-import { t } from "../i18n";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { type TranslationKey, t } from "../i18n";
 import { CollapseAllAction } from "../logic/board-groups";
 import {
 	ColumnAdderOptionKind,
 	appendColumnForProperty,
 	buildColumnAdderOptions,
 } from "../logic/column-adder";
+import {
+	TITLE_COLUMN_ID,
+	columnHeaderLabel,
+	setColumnPresentation,
+	withTitleColumn,
+} from "../logic/column-layout";
 import {
 	FormulaDraftErrorKind,
 	type FormulaDraftResult,
@@ -56,6 +63,7 @@ import type {
 import {
 	CalendarRange,
 	CalendarWeekStart,
+	ColumnWrap,
 	GroupOrderMode,
 	ListViewKind,
 	TimelineDensity,
@@ -129,10 +137,6 @@ export type ViewSettingsProps = {
 	onChange: (patch: ViewSettingsPatch) => void;
 	onClose: () => void;
 };
-
-/** The synthetic Name/title column id (mirrors `grid-view`'s `TITLE_COL`).
- *  The title column is the collection's identity — never removable. */
-const TITLE_COLUMN_ID = "__title__";
 
 /** The drill-down pages the popover can show. Held in module state (not a
  *  closure) so the page survives the host's re-open-on-`onChange`. */
@@ -1200,7 +1204,11 @@ function renderColumns(
 	const list = document.createElement("ul");
 	list.className = "db-popover__column-list";
 
-	columns.forEach((column, index) => {
+	// Name is an ordinary reorderable row (9.12.29) — present even when the
+	// view never moved it, so it can be dragged anywhere.
+	const allColumns = withTitleColumn(columns);
+	allColumns.forEach((column, index) => {
+		const isTitle = column.propertyId === TITLE_COLUMN_ID;
 		const li = document.createElement("li");
 		li.className = "db-popover__column-row";
 		li.draggable = true;
@@ -1212,14 +1220,18 @@ function renderColumns(
 		handle.appendChild(createIconElement(IconName.DragHandle, { size: 16 }));
 		li.appendChild(handle);
 
-		const defName = column.rollup?.name ?? nameByKey.get(column.propertyId);
-		const labelText = defName?.trim() ? defName : humanize(column.propertyId);
+		const defName = isTitle
+			? t("brainstorm.database.grid.nameColumn")
+			: (column.rollup?.name ?? column.formula?.name ?? nameByKey.get(column.propertyId));
+		const resolvedName = defName?.trim() ? defName : humanize(column.propertyId);
+		const labelText = columnHeaderLabel(column, resolvedName);
 
 		const toggle = createCheckbox({
-			checked: column.visible !== false,
+			checked: isTitle || column.visible !== false,
+			disabled: isTitle,
 			ariaLabel: `Show column ${labelText}`,
 			onChange: (checked) => {
-				const next = columns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
+				const next = allColumns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
 				onChange(next);
 			},
 		});
@@ -1229,13 +1241,33 @@ function renderColumns(
 		const label = document.createElement("span");
 		label.className = "db-popover__column-name";
 		label.textContent = labelText;
+		if (column.label) label.title = resolvedName;
 		li.appendChild(label);
+
+		const more = document.createElement("button");
+		more.type = "button";
+		more.className = "db-popover__column-more";
+		more.dataset.testid = "db-view-settings-column-options";
+		more.setAttribute("aria-haspopup", "menu");
+		more.setAttribute(
+			"aria-label",
+			t("brainstorm.database.settings.columnOptions", { name: labelText }),
+		);
+		more.dataset.bsTooltip = t("brainstorm.database.settings.columnOptions", { name: labelText });
+		setSharedIcon(more, IconName.More);
+		more.addEventListener("click", (event) => {
+			event.stopPropagation();
+			openColumnOptionsMenu(more, column, resolvedName, label, (patch) =>
+				onChange(setColumnPresentation(allColumns, column.propertyId, patch)),
+			);
+		});
+		li.appendChild(more);
 
 		// Remove the column from this collection (F-022). Drops it from the
 		// view's columns only — the property def stays in the vault catalog, so
 		// it can be re-added later via "Add column". The Name column is the
 		// collection's identity and can't be removed.
-		if (column.propertyId !== TITLE_COLUMN_ID) {
+		if (!isTitle) {
 			const remove = document.createElement("button");
 			remove.type = "button";
 			remove.className = "db-popover__column-remove";
@@ -1245,7 +1277,7 @@ function renderColumns(
 			setSharedIcon(remove, IconName.Close);
 			remove.addEventListener("click", (event) => {
 				event.stopPropagation();
-				onChange(columns.filter((_, i) => i !== index));
+				onChange(allColumns.filter((_, i) => i !== index));
 			});
 			li.appendChild(remove);
 		}
@@ -1268,7 +1300,7 @@ function renderColumns(
 			if (!raw) return;
 			const from = Number.parseInt(raw, 10);
 			if (Number.isNaN(from) || from === index) return;
-			const next = columns.slice();
+			const next = allColumns.slice();
 			const [moved] = next.splice(from, 1);
 			if (!moved) return;
 			next.splice(index, 0, moved);
@@ -1305,6 +1337,80 @@ function renderColumns(
 		});
 	});
 	body.appendChild(adderBtn);
+}
+
+/** Per-column presentation menu (9.12.29): a per-view alias, an icon-only
+ *  header, and the wrap override. */
+function openColumnOptionsMenu(
+	anchor: HTMLElement,
+	column: ColumnSpec,
+	resolvedName: string,
+	labelEl: HTMLElement,
+	commit: (patch: { label?: string | null; iconOnly?: boolean; wrap?: ColumnWrap | null }) => void,
+): void {
+	const wrapItem = (value: ColumnWrap | null, key: TranslationKey) => ({
+		label: t(key),
+		selected: (column.wrap ?? null) === value,
+		onSelect: () => commit({ wrap: value }),
+	});
+	openAnchoredMenu(
+		anchorPoint(anchor),
+		[
+			{
+				label: t("brainstorm.database.settings.column.rename"),
+				onSelect: () => beginAliasEdit(labelEl, column.label ?? resolvedName, resolvedName, commit),
+			},
+			...(column.label
+				? [
+						{
+							label: t("brainstorm.database.settings.column.resetName", { name: resolvedName }),
+							onSelect: () => commit({ label: null }),
+						},
+					]
+				: []),
+			{
+				label: t("brainstorm.database.settings.column.iconOnly"),
+				selected: column.iconOnly === true,
+				onSelect: () => commit({ iconOnly: !column.iconOnly }),
+			},
+			{ divider: true },
+			{ label: t("brainstorm.database.settings.column.wrap"), section: true },
+			wrapItem(null, "brainstorm.database.settings.column.wrap.default"),
+			wrapItem(ColumnWrap.Wrap, "brainstorm.database.settings.column.wrap.wrap"),
+			wrapItem(ColumnWrap.NoWrap, "brainstorm.database.settings.column.wrap.noWrap"),
+		],
+		{ menuLabel: t("brainstorm.database.settings.columnOptions", { name: resolvedName }), anchor },
+	);
+}
+
+/** Swap the column-row label for an inline input; Enter / blur commits the
+ *  alias (blank or the full name clears it), Escape reverts. */
+function beginAliasEdit(
+	labelEl: HTMLElement,
+	current: string,
+	resolvedName: string,
+	commit: (patch: { label: string | null }) => void,
+): void {
+	const input = document.createElement("input");
+	input.type = "text";
+	input.className = "db-popover__input db-popover__column-alias";
+	input.dataset.testid = "db-view-settings-column-alias";
+	input.value = current;
+	input.setAttribute("aria-label", t("brainstorm.database.settings.column.rename"));
+	let done = false;
+	const finish = (save: boolean): void => {
+		if (done) return;
+		done = true;
+		const next = input.value.trim();
+		if (save && next !== current) commit({ label: next && next !== resolvedName ? next : null });
+		else input.replaceWith(labelEl);
+	};
+	attachShortcut(input, "Enter", () => finish(true), { allowWhileSuppressed: true });
+	attachShortcut(input, "Escape", () => finish(false), { allowWhileSuppressed: true });
+	input.addEventListener("blur", () => finish(true));
+	labelEl.replaceWith(input);
+	input.focus();
+	input.select();
 }
 
 type OpenColumnAdderPickerOptions = {

@@ -19,6 +19,7 @@ import {
 	useContext,
 	useMemo,
 } from "react";
+import { columnHeaderLabel } from "../logic/column-layout";
 import { effectiveColumnDef } from "../logic/effective-def";
 import type { EntityRow } from "../logic/in-memory-entities";
 import type { ColumnSpec } from "../types/list-view";
@@ -117,7 +118,9 @@ export function CardFields({
 				if (c.rollup || c.formula) {
 					return (
 						<div className="dbv-card__field" data-computed="true" key={c.propertyId}>
-							<dt className="dbv-card__field-label">{computedColumnLabel(c)}</dt>
+							<dt className="dbv-card__field-label">
+								{columnHeaderLabel(c, computedColumnLabel(c) ?? "")}
+							</dt>
 							<dd className="dbv-card__field-value">
 								<ComputedCell column={c} entity={entity} />
 							</dd>
@@ -125,7 +128,7 @@ export function CardFields({
 					);
 				}
 				const def = columnDefs.get(c.propertyId) ?? null;
-				const label = def?.name?.trim() ? def.name : humanize(c.propertyId);
+				const label = columnHeaderLabel(c, def?.name?.trim() ? def.name : humanize(c.propertyId));
 				return (
 					<div className="dbv-card__field" key={c.propertyId}>
 						<dt className="dbv-card__field-label">{label}</dt>

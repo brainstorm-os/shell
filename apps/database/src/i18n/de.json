@@ -298,5 +298,13 @@
   "brainstorm.database.settings.groupOrder.countDesc": "Meiste Einträge",
   "brainstorm.database.settings.groupOrder.countAsc": "Wenigste Einträge",
   "brainstorm.database.settings.collapseAll": "Alle einklappen",
-  "brainstorm.database.settings.expandAll": "Alle ausklappen"
+  "brainstorm.database.settings.expandAll": "Alle ausklappen",
+  "brainstorm.database.settings.columnOptions": "Optionen für {name}",
+  "brainstorm.database.settings.column.rename": "In dieser Ansicht umbenennen…",
+  "brainstorm.database.settings.column.resetName": "„{name}“ verwenden",
+  "brainstorm.database.settings.column.iconOnly": "Nur Symbol im Kopf",
+  "brainstorm.database.settings.column.wrap": "Textumbruch",
+  "brainstorm.database.settings.column.wrap.default": "Wie Ansicht",
+  "brainstorm.database.settings.column.wrap.wrap": "Umbrechen",
+  "brainstorm.database.settings.column.wrap.noWrap": "Nicht umbrechen"
 }

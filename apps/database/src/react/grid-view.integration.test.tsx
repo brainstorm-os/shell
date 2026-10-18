@@ -16,7 +16,7 @@ import { AggregationKind } from "../logic/aggregations";
 import type { CompiledView } from "../logic/compile-view";
 import type { EntityRow } from "../logic/in-memory-entities";
 import { installPropertyDefResolver } from "../logic/property-resolver";
-import type { ColumnSpec, GridLayoutOptions } from "../types/list-view";
+import { type ColumnSpec, ColumnWrap, type GridLayoutOptions } from "../types/list-view";
 import { EditableTitle, GridView, type GridViewProps, OpenRecordButton } from "./grid-view";
 
 function must<T>(value: T | null | undefined): T {
@@ -79,7 +79,7 @@ describe("GridView — structural DnD wiring", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("renders one pinned Name + one sortable cell per non-title column", () => {
+	it("renders Name first + one sortable cell per column, Name included (9.12.29)", () => {
 		h = mountGrid({
 			compiled: COMPILED,
 			columns: columns(["status", "priority", "due"]),
@@ -93,7 +93,12 @@ describe("GridView — structural DnD wiring", () => {
 		const heads = h.container.querySelectorAll<HTMLElement>(".dbv-grid__cell--head");
 		expect(heads.length).toBe(4);
 		const sortable = h.container.querySelectorAll<HTMLElement>("[data-prop]");
-		expect(Array.from(sortable).map((el) => el.dataset.prop)).toEqual(["status", "priority", "due"]);
+		expect(Array.from(sortable).map((el) => el.dataset.prop)).toEqual([
+			"__title__",
+			"status",
+			"priority",
+			"due",
+		]);
 	});
 
 	it("pluralizes the footer row count (1 row, not 1 rows)", () => {
@@ -185,7 +190,7 @@ describe("GridView — structural DnD wiring", () => {
 			onReorderColumns: vi.fn(),
 		});
 		const sortable = h.container.querySelectorAll<HTMLElement>("[data-prop]");
-		expect(sortable.length).toBe(2);
+		expect(sortable.length).toBe(3);
 		for (const cell of sortable) {
 			// dnd-kit assigns these via `useSortable({ attributes })` —
 			// load-bearing for keyboard sensors + screen-reader semantics.
@@ -245,7 +250,7 @@ describe("GridView — structural DnD wiring", () => {
 		expect(h.container.querySelectorAll(".dbv-grid__foot-button").length).toBe(0);
 	});
 
-	it("pins the Name column outside the sortable set (no data-prop, not draggable)", () => {
+	it("makes the Name column a sortable header like any other (9.12.29)", () => {
 		h = mountGrid({
 			compiled: COMPILED,
 			columns: columns(["status"]),
@@ -257,10 +262,10 @@ describe("GridView — structural DnD wiring", () => {
 			onReorderColumns: vi.fn(),
 		});
 		const heads = h.container.querySelectorAll<HTMLElement>(".dbv-grid__cell--head");
-		// First head is Name (pinned), no `data-prop`.
 		expect(heads[0]?.textContent).toContain("Name");
-		expect(heads[0]?.hasAttribute("data-prop")).toBe(false);
-		expect(heads[0]?.hasAttribute("aria-roledescription")).toBe(false);
+		expect(heads[0]?.dataset.prop).toBe("__title__");
+		expect(heads[0]?.dataset.col).toBe("title");
+		expect(heads[0]?.getAttribute("aria-roledescription")).toBe("sortable column");
 	});
 
 	it("renders the title column with `touch-action: none` + `user-select: none` (dnd-kit pointer prerequisites)", () => {
@@ -615,9 +620,9 @@ describe("GridView — column header label (F-017)", () => {
 	});
 
 	const headLabels = (container: HTMLElement): string[] =>
-		Array.from(container.querySelectorAll<HTMLElement>("[data-prop]")).map((el) =>
-			(el.textContent ?? "").trim(),
-		);
+		Array.from(
+			container.querySelectorAll<HTMLElement>('[data-prop]:not([data-prop="__title__"])'),
+		).map((el) => (el.textContent ?? "").trim());
 
 	it("shows a user-created property's display name, not its generated key", () => {
 		// A property created via the inline form has a generated key but a real
@@ -656,5 +661,70 @@ describe("GridView — column header label (F-017)", () => {
 			onEdit: vi.fn(),
 		});
 		expect(headLabels(h.container)).toEqual(["Due date"]);
+	});
+});
+
+describe("GridView — column freedom (9.12.29)", () => {
+	let h: Harness | null = null;
+	afterEach(() => {
+		h?.cleanup();
+		h = null;
+		document.body.innerHTML = "";
+	});
+
+	const base = {
+		compiled: COMPILED,
+		layout: LAYOUT,
+		selectedIds: new Set<string>(),
+		onSelect: () => {},
+		onOpen: () => {},
+		onOpenInspector: () => {},
+	};
+
+	it("renders Name where the view placed it", () => {
+		h = mountGrid({
+			...base,
+			columns: [
+				{ propertyId: "status", visible: true },
+				{ propertyId: "__title__", visible: true },
+			],
+		});
+		const props = Array.from(h.container.querySelectorAll<HTMLElement>(".dbv-grid__cell--head")).map(
+			(el) => el.dataset.prop,
+		);
+		expect(props).toEqual(["status", "__title__"]);
+		const foot = Array.from(h.container.querySelectorAll<HTMLElement>(".dbv-grid__foot-cell"));
+		expect(foot[1]?.dataset.col).toBe("title");
+	});
+
+	it("shows a per-view alias and an icon-only header with the label as its name", () => {
+		h = mountGrid({
+			...base,
+			columns: [
+				{ propertyId: "status", visible: true, label: "St." },
+				{ propertyId: "due", visible: true, iconOnly: true, label: "Due date" },
+			],
+		});
+		const status = h.container.querySelector<HTMLElement>('[data-prop="status"]');
+		expect(status?.textContent).toBe("St.");
+		const due = h.container.querySelector<HTMLElement>('[data-prop="due"]');
+		expect(due?.dataset.iconOnly).toBe("true");
+		expect(due?.getAttribute("aria-label")).toBe("Due date");
+		expect(due?.textContent).toBe("");
+	});
+
+	it("applies a per-column wrap override over the view setting", () => {
+		h = mountGrid({
+			...base,
+			layout: { ...LAYOUT, wrap: true },
+			columns: [
+				{ propertyId: "status", visible: true, wrap: ColumnWrap.NoWrap },
+				{ propertyId: "due", visible: true },
+			],
+		});
+		expect(h.container.querySelector<HTMLElement>('[data-prop="status"]')?.dataset.wrap).toBe(
+			"false",
+		);
+		expect(h.container.querySelector<HTMLElement>('[data-prop="due"]')?.dataset.wrap).toBe("true");
 	});
 });

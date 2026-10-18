@@ -303,3 +303,86 @@ describe("view-settings — select rows (shared select-menu control)", () => {
 		});
 	});
 });
+
+describe("view-settings — column freedom (9.12.29)", () => {
+	let disposeMenuHost: () => void = () => {};
+	beforeEach(() => {
+		act(() => {
+			disposeMenuHost = mountMenuHost();
+		});
+	});
+	afterEach(() => {
+		act(() => closeContextMenu());
+		act(() => disposeMenuHost());
+	});
+
+	function menuItems(): ContextMenuItem[] {
+		const store = getActiveMenuStore();
+		const open = store?.getAll().find((m) => m.id.startsWith(`${CONTEXT_MENU_ID}:Options for`));
+		return (open?.param.data as { items: ContextMenuItem[] } | undefined)?.items ?? [];
+	}
+
+	it("lists Name as a draggable row whose visibility can't be turned off", () => {
+		open();
+		gotoProperties();
+		const rows = [...document.querySelectorAll<HTMLElement>(".db-popover__column-row")];
+		expect(rows[0]?.textContent).toContain("Name");
+		expect(rows[0]?.draggable).toBe(true);
+		expect(rows[0]?.querySelector("input")?.disabled).toBe(true);
+	});
+
+	it("sets an icon-only header and a no-wrap override from the column options menu", () => {
+		const { onChange } = open();
+		gotoProperties();
+		const more = document.querySelectorAll<HTMLElement>(
+			'[data-testid="db-view-settings-column-options"]',
+		);
+		act(() => more[1]?.click());
+		act(() =>
+			menuItems()
+				.find((i) => i.label === "Icon-only header")
+				?.onSelect?.(),
+		);
+		expect(onChange).toHaveBeenLastCalledWith({
+			columns: [
+				{ propertyId: "__title__", visible: true },
+				{ propertyId: "fee", visible: true, iconOnly: true },
+			],
+		});
+		act(() => more[1]?.click());
+		act(() =>
+			menuItems()
+				.find((i) => i.label === "Don’t wrap")
+				?.onSelect?.(),
+		);
+		expect(onChange).toHaveBeenLastCalledWith({
+			columns: [
+				{ propertyId: "__title__", visible: true },
+				{ propertyId: "fee", visible: true, wrap: "no-wrap" },
+			],
+		});
+	});
+
+	it("renames a column for this view only", () => {
+		const { onChange } = open();
+		gotoProperties();
+		const more = document.querySelectorAll<HTMLElement>(
+			'[data-testid="db-view-settings-column-options"]',
+		);
+		act(() => more[1]?.click());
+		act(() =>
+			menuItems()
+				.find((i) => i.label === "Rename in this view…")
+				?.onSelect?.(),
+		);
+		const input = $<HTMLInputElement>("db-view-settings-column-alias");
+		input.value = "Fee $";
+		input.dispatchEvent(new Event("blur"));
+		expect(onChange).toHaveBeenLastCalledWith({
+			columns: [
+				{ propertyId: "__title__", visible: true },
+				{ propertyId: "fee", visible: true, label: "Fee $" },
+			],
+		});
+	});
+});

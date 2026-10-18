@@ -3212,6 +3212,7 @@ export {
 	type ColumnFormula,
 	type ColumnRollup,
 	type ColumnSpec,
+	ColumnWrap,
 	type CompiledViewFilter,
 	CompositeOp,
 	EmptyPlacement,

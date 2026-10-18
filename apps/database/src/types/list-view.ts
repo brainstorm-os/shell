@@ -14,6 +14,7 @@ export {
 	CalendarRecurring,
 	CalendarWeekStart,
 	type ColumnSpec,
+	ColumnWrap,
 	type CompiledViewFilter,
 	EmptyPlacement,
 	type GalleryLayoutOptions,
