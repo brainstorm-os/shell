@@ -5052,7 +5052,11 @@ async function importDroppedFiles(state: AppState, files: File[]): Promise<void>
 			files: { import: (input) => importer.call(filesService, input) },
 			entities: { create: (type, properties) => entities.create(type, properties) },
 		},
-		{ onError: () => (failed += 1) },
+		{
+			onError: () => {
+				failed += 1;
+			},
+		},
 	);
 	const members = membersWithDroppedFiles(
 		list,
