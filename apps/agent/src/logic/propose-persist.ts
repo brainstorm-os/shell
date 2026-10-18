@@ -39,7 +39,11 @@ export type ProposalEntitiesService = {
 		id?: string,
 		provenance?: { conversationId: string },
 	): Promise<{ id: string } | null>;
-	update(id: string, patch: Record<string, unknown>): Promise<unknown>;
+	update(
+		id: string,
+		patch: Record<string, unknown>,
+		provenance?: { conversationId: string },
+	): Promise<unknown>;
 };
 
 /** POLISH-FN-4 — an approval refused because the drafted path is already
@@ -148,7 +152,7 @@ export async function persistApprovedProposal(
 	);
 	if (artifact.row?.addToMembers && created?.id) {
 		const patch = memberPinPatch(context.collectionMembers, created.id, context.now);
-		if (patch) await entities.update(artifact.row.databaseId, patch);
+		if (patch) await entities.update(artifact.row.databaseId, patch, provenanceOf(context));
 	}
 	return created;
 }
@@ -193,13 +197,17 @@ async function persistApprovedCodeFile(
 			// copy" stays available (it creates beside the locked row, never into
 			// it), so the refusal blocks the write, not the user's intent.
 			if (conflict.locked) throw new LockedTargetError(conflict.id);
-			await entities.update(conflict.id, {
-				content: plan.properties.content,
-				language: plan.properties.language,
-				sizeBytes: plan.properties.sizeBytes,
-				lineCount: plan.properties.lineCount,
-				updatedAt: context.now,
-			});
+			await entities.update(
+				conflict.id,
+				{
+					content: plan.properties.content,
+					language: plan.properties.language,
+					sizeBytes: plan.properties.sizeBytes,
+					lineCount: plan.properties.lineCount,
+					updatedAt: context.now,
+				},
+				provenanceOf(context),
+			);
 			return { id: conflict.id, codeFilePath: conflict.path };
 		case CodeFileConflictChoice.SaveCopy:
 			return createCodeFile(entities, plan, nextFreeCodeFilePath(existing, path), context);

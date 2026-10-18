@@ -101,6 +101,7 @@ export function BookInspector({
 						entityId={book.id}
 						{...(tabbed ? { hideHeader: true } : { onClose, closeLabel: t("inspector.hide") })}
 						meta={meta}
+						authorship={{ properties: subject.properties }}
 						lead={
 							<div className="books__cover">
 								<EntityCover subject={subject} aspect={16 / 6} />

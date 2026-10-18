@@ -3,8 +3,11 @@ import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	buildAgentProvenance,
 	parseProvenanceRequest,
+	projectAgentAuthorship,
 	readAgentProvenance,
 	stripAgentProvenance,
+	stripDerivedAuthorship,
+	stripReservedProperties,
 } from "./agent-provenance";
 
 describe("agent-provenance", () => {
@@ -71,6 +74,26 @@ describe("agent-provenance", () => {
 		it("returns the same reference when the key is absent", () => {
 			const props = { title: "N" };
 			expect(stripAgentProvenance(props)).toBe(props);
+		});
+	});
+});
+
+describe("Agent-16 derived createdByAgent", () => {
+	const stamp = { agent: "io.brainstorm.agent", conversationId: "c", createdAt: 1 };
+
+	it("projects the stamp's agent and drops a stray stored value", () => {
+		expect(projectAgentAuthorship({ agentProvenance: stamp }).createdByAgent).toBe(
+			"io.brainstorm.agent",
+		);
+		expect(projectAgentAuthorship({ createdByAgent: "forged" })).toEqual({});
+		const plain = { title: "x" };
+		expect(projectAgentAuthorship(plain)).toBe(plain);
+	});
+
+	it("is reserved (an app write drops it) and never persisted", () => {
+		expect(stripReservedProperties({ createdByAgent: "x", title: "t" })).toEqual({ title: "t" });
+		expect(stripDerivedAuthorship({ createdByAgent: "x", agentProvenance: stamp })).toEqual({
+			agentProvenance: stamp,
 		});
 	});
 });

@@ -152,6 +152,13 @@ export type PipelineContext = {
 	 */
 	onSent?: (frameBytes: number) => void;
 	onReceived?: (frameBytes: number) => void;
+	/**
+	 * Collab-C7 — an inbound `Update` was authenticated (signature), authorized
+	 * (`authorizeWriter`) and applied. `editorPubB64` is the verified sender's
+	 * key in std base64 (the roster / access-record spelling). Fired only on
+	 * that success path; contained — a throw never affects the apply.
+	 */
+	onApplied?: (resolvedEntityId: string, editorPubB64: string) => void;
 };
 
 export type ApplyPlaintextFn = (plaintext: Uint8Array) => void | Promise<void>;
@@ -302,6 +309,11 @@ export async function receiveAndApply(
 		}
 		await applyUpdate(plaintext);
 		ctx.onReceived?.(frame.byteLength);
+		try {
+			ctx.onApplied?.(resolved.id, bytesToBase64(senderPub));
+		} catch {
+			// Contained: last-editor bookkeeping never fails an apply.
+		}
 	} finally {
 		ctx.dekStore.close(handle.dek);
 	}

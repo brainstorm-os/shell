@@ -107,6 +107,11 @@ export default defineConfig({
 				"packages/sdk/src/tool-outcome/tool-outcome.css",
 			),
 			"@brainstorm-os/sdk/tool-outcome": resolve(__dirname, "packages/sdk/src/tool-outcome/index.ts"),
+			"@brainstorm-os/sdk/run-changes.css": resolve(
+				__dirname,
+				"packages/sdk/src/run-changes/run-changes.css",
+			),
+			"@brainstorm-os/sdk/run-changes": resolve(__dirname, "packages/sdk/src/run-changes/index.ts"),
 			"@brainstorm-os/sdk/proposal-tray.css": resolve(
 				__dirname,
 				"packages/sdk/src/proposal-tray/proposal-tray.css",
@@ -217,6 +222,10 @@ export default defineConfig({
 			"@brainstorm-os/sdk/lock-button": resolve(__dirname, "packages/sdk/src/lock-button/index.ts"),
 			"@brainstorm-os/sdk/entity-icon": resolve(__dirname, "packages/sdk/src/entity-icon.ts"),
 			"@brainstorm-os/sdk/entity-title": resolve(__dirname, "packages/sdk/src/entity-title.ts"),
+			"@brainstorm-os/sdk/entity-authorship": resolve(
+				__dirname,
+				"packages/sdk/src/entity-authorship.ts",
+			),
 			"@brainstorm-os/sdk/entity-lock": resolve(__dirname, "packages/sdk/src/entity-lock.ts"),
 			"@brainstorm-os/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm-os/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),

@@ -24,6 +24,10 @@ import { LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
 import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
+	type AgentRunChanges,
+	AgentUndoRefusal,
+	type AgentUndoResult,
+	AgentWriteKind,
 	type Entity,
 	type EntityDocLink,
 	EntityEventVerb,
@@ -32,12 +36,14 @@ import {
 	type PropertyDef,
 	buildAgentProvenance,
 	parseProvenanceRequest,
+	stripDerivedAuthorship,
 	stripReservedProperties,
 } from "@brainstorm-os/sdk-types";
 import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
+import { UndoOpKind, buildRunChanges, planRunUndo } from "../agents/run-undo/agent-run-undo";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
-import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
+import type { AgentWriteBefore, EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import { DekWrapFailurePolicy, createEntityWithDek } from "./create-with-dek";
 import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
@@ -58,6 +64,9 @@ import { isShellOwnedEntityType } from "./shell-owned-types";
  *  handful of rows; a pathological request must not pin the main process in
  *  the per-loser referrer scan. */
 const MERGE_MAX_LOSERS = 100;
+
+/** How often the agent write journal's retention caps are enforced. */
+const AGENT_JOURNAL_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export type EntitiesServiceOptions = {
 	/** The entities repo for the active vault, or null when no vault is
@@ -202,6 +211,28 @@ export type EntitiesServiceOptions = {
 	 *  construction (kept off the broker, like `bindApplyRemoteDoc`); the
 	 *  properties service runs it when a def first declares `inverseOf`. */
 	bindInverseBackfill?: (backfill: InverseBackfillFn) => void;
+	/** Agent-15 — resolve the trace run an agent-attributed write belongs to
+	 *  (the principal's latest run in that conversation — where the approve
+	 *  gesture already attaches). Presence of this hook turns on the write
+	 *  journal; a write with no attributable run is not journaled. */
+	resolveAgentRun?: (app: string, conversationId: string) => Promise<string | null>;
+	/** Agent-15 — hands the run diff + undo operations out to the trace
+	 *  service and the privileged Settings surface, ONCE at construction. Off
+	 *  the broker for the same reason as `bindApplyRemoteDoc`: the callers
+	 *  authorize the run (own-run / privileged) before invoking. */
+	bindAgentRunOps?: (ops: AgentRunOps) => void;
+	/** Agent-15 — a run was undone (post-commit, contained). */
+	onAgentRunUndone?: (runId: string) => void;
+};
+
+/** Who is asking for a run's diff / undo. `Privileged` is the shell's own
+ *  Settings surface acting for the user; an app principal is limited to the
+ *  types its ledger grants. */
+export type AgentRunCaller = { privileged: true } | { privileged: false; app: string };
+
+export type AgentRunOps = {
+	changes(runId: string, caller: AgentRunCaller): Promise<AgentRunChanges | null>;
+	undo(runId: string, caller: AgentRunCaller): Promise<AgentUndoResult>;
 };
 
 /** Make an existing one-sided relation two-sided across the vault, acting as
@@ -435,7 +466,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				vaultPath,
 				entityId: row.id,
 				props: patch,
-				seedProps: row.properties,
+				seedProps: stripDerivedAuthorship(row.properties),
 			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
 			if (res?.projection?.properties) propsForRow = res.projection.properties;
 			// 10.12 — emit the property write through live-sync if shared.
@@ -553,6 +584,142 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			const vaultPath = options.getVaultPath?.() ?? null;
 			if (!vaultPath) return;
 			await applyCanonicalDelta(vaultPath, id, updateB64, null);
+		});
+	}
+
+	// Agent-15 — the agent write journal. Contained like every post-commit
+	// hook: the write already committed, so a journal failure is logged and
+	// never surfaces as a failed write. The run, the principal and the entity
+	// type are all resolved HERE (the broker-verified app; the repo's row) —
+	// the caller supplies only the conversation id it already supplies for
+	// provenance.
+	let lastJournalPruneMs = 0;
+	const journalAgentWrite = async (
+		repo: EntitiesRepository,
+		app: string,
+		provenance: unknown,
+		write: {
+			entityId: string;
+			entityType: string;
+			kind: AgentWriteKind;
+			before: AgentWriteBefore | null;
+			after: Record<string, unknown>;
+		},
+	): Promise<void> => {
+		if (!options.resolveAgentRun) return;
+		const request = parseProvenanceRequest(provenance);
+		if (!request) return;
+		try {
+			const runId = await options.resolveAgentRun(app, request.conversationId);
+			if (!runId) return;
+			const now = clock();
+			repo.agentWrites.insert({ runId, agent: app, ...write, ts: now });
+			if (now - lastJournalPruneMs >= AGENT_JOURNAL_PRUNE_INTERVAL_MS) {
+				lastJournalPruneMs = now;
+				repo.agentWrites.prune(now);
+			}
+		} catch (error) {
+			console.warn(`[entities] agent write journal failed: ${(error as Error).message}`);
+		}
+	};
+
+	if (options.bindAgentRunOps) {
+		const authorityFor = async (
+			caller: AgentRunCaller,
+			verb: EntityAccess,
+		): Promise<(type: string) => boolean> => {
+			if (caller.privileged) {
+				return (type) => verb === EntityAccess.Read || !isShellOwnedEntityType(type);
+			}
+			const ledger = await options.getLedger();
+			if (!ledger) throw named("Unavailable", "agent run: no active vault session");
+			return (type) => {
+				if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
+				try {
+					return ledger.has(caller.app, `entities.${verb}:${type}`);
+				} catch {
+					return false;
+				}
+			};
+		};
+		const callerEntries = (repo: EntitiesRepository, runId: string, caller: AgentRunCaller) => {
+			const all = repo.agentWrites.listForRun(runId);
+			return caller.privileged ? all : all.filter((e) => e.agent === caller.app);
+		};
+		// One undo at a time: the plan is checked against live state and then
+		// applied, and two interleaved undos must not both pass the check.
+		let undoChain: Promise<unknown> = Promise.resolve();
+		const undo = async (runId: string, caller: AgentRunCaller): Promise<AgentUndoResult> => {
+			const repo = await options.getRepo();
+			if (!repo) throw named("Unavailable", "agent run: no active vault session");
+			const entries = callerEntries(repo, runId, caller);
+			if (entries.length === 0) {
+				return { ok: false, reason: AgentUndoRefusal.NotFound, entityId: null, field: null };
+			}
+			const canWrite = await authorityFor(caller, EntityAccess.Write);
+			const plan = planRunUndo(
+				entries,
+				(id) => {
+					const row = repo.getIncludingDeleted(id);
+					return row
+						? { properties: row.properties, updatedAt: row.updatedAt, deletedAt: row.deletedAt }
+						: null;
+				},
+				canWrite,
+			);
+			if (!plan.ok) return plan;
+			for (const op of plan.ops) {
+				switch (op.kind) {
+					case UndoOpKind.Trash:
+						if (repo.softDelete(op.entityId, clock())) {
+							emitChange(EntityEventVerb.Delete, op.entityId, op.entityType);
+							if (options.getAssetKind) {
+								try {
+									repo.assetRefs.deleteByEntity(op.entityId);
+								} catch (error) {
+									console.error("[entities] asset-ref delete-prune failed:", error);
+								}
+							}
+						}
+						break;
+					case UndoOpKind.Restore:
+						if (repo.restore(op.entityId, clock())) {
+							emitChange(EntityEventVerb.Update, op.entityId, op.entityType);
+						}
+						break;
+					case UndoOpKind.Patch: {
+						const row = repo.get(op.entityId);
+						if (!row) break;
+						const updated = await writePropsThroughDoc(repo, row, op.patch);
+						if (updated) {
+							emitChange(EntityEventVerb.Update, op.entityId, op.entityType);
+							await reconcileAssetRefs(repo, op.entityId, updated.properties);
+						}
+						break;
+					}
+				}
+			}
+			repo.agentWrites.markRunReverted(runId, clock());
+			try {
+				options.onAgentRunUndone?.(runId);
+			} catch {
+				// Contained: a trace failure never fails the undo.
+			}
+			return { ok: true, reverted: plan.ops.length };
+		};
+		options.bindAgentRunOps({
+			changes: async (runId, caller) => {
+				const repo = await options.getRepo();
+				if (!repo) return null;
+				const canRead = await authorityFor(caller, EntityAccess.Read);
+				const entries = callerEntries(repo, runId, caller).filter((e) => canRead(e.entityType));
+				return buildRunChanges(runId, entries);
+			},
+			undo: (runId, caller) => {
+				const next = undoChain.then(() => undo(runId, caller));
+				undoChain = next.catch(() => undefined);
+				return next;
+			},
 		});
 	}
 
@@ -708,6 +875,15 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 							// Contained: a trace failure never fails the create.
 						}
 					}
+					if (provReq) {
+						await journalAgentWrite(repo, app, a.provenance, {
+							entityId,
+							entityType: type,
+							kind: AgentWriteKind.Created,
+							before: null,
+							after: stripReservedProperties(row.properties),
+						});
+					}
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
@@ -742,6 +918,24 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
 				await applyFarWrites(repo, farOnUpdate);
+				// Agent-15 — an agent-attributed edit journals the prior values of
+				// exactly the keys it touched, read from the row BEFORE the write.
+				if (a.provenance !== undefined && Object.keys(patch).length > 0) {
+					const before: AgentWriteBefore = { present: {}, absent: [] };
+					const after: Record<string, unknown> = {};
+					for (const key of Object.keys(patch)) {
+						if (key in existing.properties) before.present[key] = existing.properties[key];
+						else before.absent.push(key);
+						after[key] = updated.properties[key] ?? null;
+					}
+					await journalAgentWrite(repo, app, a.provenance, {
+						entityId: id,
+						entityType: existing.type,
+						kind: AgentWriteKind.Updated,
+						before,
+						after,
+					});
+				}
 				// Asset-B4 — reconcile against the row's FULL post-write property
 				// set (a patch merges into existing, so pruning off just the patch
 				// would drop refs for assets the patch never touched).
@@ -756,6 +950,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!can(EntityAccess.Write, existing.type)) {
 					throw named("Denied", `entities.delete: no entities.write for ${existing.type}`);
 				}
+				const a = arg(envelope);
 				const farOnDelete = await planFarWrites(
 					repo,
 					(t) => can(EntityAccess.Write, t),
@@ -767,6 +962,15 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				repo.softDelete(id, clock());
 				emitChange(EntityEventVerb.Delete, id, existing.type);
 				await applyFarWrites(repo, farOnDelete);
+				if (a.provenance !== undefined) {
+					await journalAgentWrite(repo, app, a.provenance, {
+						entityId: id,
+						entityType: existing.type,
+						kind: AgentWriteKind.Trashed,
+						before: null,
+						after: {},
+					});
+				}
 				// Asset-B4 — this is a SOFT delete (the row persists), so the
 				// `asset_refs.entity_id` ON DELETE CASCADE never fires; drop the
 				// owner's refs explicitly or they'd strand and keep the asset

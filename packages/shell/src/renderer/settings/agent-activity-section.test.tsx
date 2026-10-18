@@ -16,6 +16,8 @@ import {
 	AgentEventOutcome,
 	AgentRunOutcome,
 	AgentRunSurface,
+	AgentUndoRefusal,
+	AgentWriteKind,
 } from "@brainstorm-os/sdk-types";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -221,5 +223,46 @@ describe("AgentActivitySection (12d)", () => {
 		const el = await mount();
 		expect(el.querySelector(".bs-empty-state")).not.toBeNull();
 		expect(el.textContent).toContain("No agent runs yet");
+	});
+
+	it("Agent-15: a run's detail lists what it changed and undoes it through the bridge", async () => {
+		installBridge([run()]);
+		const undo = vi.fn(async () => ({
+			ok: false,
+			reason: AgentUndoRefusal.EditedSince,
+			entityId: "ent_1",
+			field: "status",
+		}));
+		const bridge = (window as unknown as { brainstorm: { agentActivity: Record<string, unknown> } })
+			.brainstorm.agentActivity;
+		bridge.changes = async () => ({
+			runId: "run_1",
+			changes: [
+				{
+					entityId: "ent_1",
+					entityType: "brainstorm/Task/v1",
+					kind: AgentWriteKind.Updated,
+					title: null,
+					fields: [{ key: "status", before: "todo", after: "done" }],
+					moreFields: 0,
+					oversize: false,
+					at: NOW,
+				},
+			],
+			moreChanges: 0,
+			revertedAt: null,
+		});
+		bridge.undo = undo;
+		const el = await mount();
+		await click(el.querySelector(".settings__activity-run-head"));
+		const panel = el.querySelector('[data-testid="agent-activity-run-changes"]');
+		expect(panel?.textContent).toContain("Edited");
+		expect(panel?.textContent).toContain("status: todo → done");
+		const button = [...(panel?.querySelectorAll("button") ?? [])].find(
+			(b) => b.textContent === "Undo this run",
+		);
+		await click(button ?? null);
+		expect(undo).toHaveBeenCalledWith("run_1");
+		expect(panel?.querySelector('[role="status"]')?.textContent).toContain("“status” was edited");
 	});
 });

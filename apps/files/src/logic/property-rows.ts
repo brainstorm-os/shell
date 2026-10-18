@@ -44,6 +44,9 @@ const RENDERED_ELSEWHERE: ReadonlySet<string> = new Set([
 	"modified",
 	"id",
 	"type",
+	// Agent-16 — authorship renders as the panel's own "Created by" row.
+	"agentprovenance",
+	"createdbyagent",
 ]);
 
 export type PropertyRow = {

@@ -328,6 +328,21 @@ export const DEFAULT_ADD_PROPERTY_PICKER_LABELS: AddPropertyPickerLabels = {
  * key; an unknown key (only reachable via a cast) degrades to the key
  * string so a missing translation is visible, never a crash.
  */
+/** Agent-16 / Collab-C7 — the authorship rows the shared properties panel
+ *  renders ("Created by <agent>", "Last edited by <member> · <time>"). */
+export type AuthorshipLabels = {
+	createdBy: string;
+	lastEdited: string;
+	/** `{name}` / `{time}` substituted by the panel. */
+	lastEditedValue: string;
+};
+
+export const DEFAULT_AUTHORSHIP_LABELS: AuthorshipLabels = {
+	createdBy: "Created by",
+	lastEdited: "Last edited",
+	lastEditedValue: "{name} · {time}",
+};
+
 export type TParams = Record<string, string | number>;
 
 export type TFunction<M extends Record<string, string>> = (
