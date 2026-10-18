@@ -24,6 +24,7 @@ import {
 	type LinkPredicate,
 	type PropertyPredicate,
 	isPropertyRef,
+	predicateReferencesHost,
 } from "@brainstorm-os/sdk-types";
 import type { SqliteDatabase, SqliteStatement } from "@brainstorm-os/sqlite";
 import { EdgeMatch, type GraphPattern } from "../../entities/pattern";
@@ -954,16 +955,26 @@ function decodePatternRows(
 
 type Compiled = { sql: string; params: unknown[] };
 
+const MATCH_NOTHING: Compiled = { sql: "0 = 1", params: [] };
+
+/** A query has no host entity, so a `$host`-relative predicate (9.12.24) is
+ *  rejected WHOLE — compiling it per leaf would let `$or`/`$not` around a
+ *  dead leaf widen into rows the author never asked for. */
 function compilePredicate(pred: PropertyPredicate): Compiled {
+	if (predicateReferencesHost(pred)) return MATCH_NOTHING;
+	return compilePredicateNode(pred);
+}
+
+function compilePredicateNode(pred: PropertyPredicate): Compiled {
 	if ("$and" in pred) {
-		const parts = pred.$and.map(compilePredicate);
+		const parts = pred.$and.map(compilePredicateNode);
 		return {
 			sql: `(${parts.map((p) => p.sql).join(" AND ")})`,
 			params: parts.flatMap((p) => p.params),
 		};
 	}
 	if ("$or" in pred) {
-		const parts = pred.$or.map(compilePredicate);
+		const parts = pred.$or.map(compilePredicateNode);
 		return {
 			sql: `(${parts.map((p) => p.sql).join(" OR ")})`,
 			params: parts.flatMap((p) => p.params),
@@ -980,8 +991,10 @@ function compilePredicate(pred: PropertyPredicate): Compiled {
 				if ("$now" in rhs) {
 					clauses.push(`${left} = ?`);
 					params.push(Date.now());
-				} else {
+				} else if ("$prop" in rhs) {
 					clauses.push(`${left} = json_extract(e.properties, '${jsonPath(rhs.$prop)}')`);
+				} else {
+					return MATCH_NOTHING;
 				}
 			} else {
 				clauses.push(`${left} = ?`);
@@ -991,6 +1004,10 @@ function compilePredicate(pred: PropertyPredicate): Compiled {
 		return { sql: `(${clauses.join(" AND ")})`, params };
 	}
 	if ("$contains" in pred) {
+		// A computed `$contains` RHS is an in-memory-evaluator feature; SQL
+		// has no row-relative LIKE here, so it matches nothing rather than
+		// LIKE-ing the stringified ref object.
+		if (Object.values(pred.$contains).some(isPropertyRef)) return MATCH_NOTHING;
 		return conjunction(
 			pred.$contains,
 			(path) => `lower(json_extract(e.properties, '${path}')) LIKE ?`,
@@ -1031,8 +1048,10 @@ function compileComparison(obj: Record<string, Comparand>, op: ">" | "<"): Compi
 			if ("$now" in rhs) {
 				right = "?";
 				params.push(Date.now());
-			} else {
+			} else if ("$prop" in rhs) {
 				right = `CAST(${jsonAtOrSelf(rhs.$prop)} AS REAL)`;
+			} else {
+				return MATCH_NOTHING;
 			}
 		} else {
 			right = "?";

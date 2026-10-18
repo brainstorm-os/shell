@@ -26,6 +26,7 @@ function makeCtx(opts: {
 	list: unknown;
 	rowsById?: Record<string, unknown>;
 	queryRows?: unknown[];
+	hostEntityId?: string | null;
 }): {
 	root: HTMLElement;
 	navigate: ReturnType<typeof vi.fn>;
@@ -44,9 +45,11 @@ function makeCtx(opts: {
 			return r;
 		}
 		if (messageName === "queryEntities") {
+			const type = (data as { operation: { entityTypeId?: string } }).operation.entityTypeId;
 			const vertices: Record<string, [unknown]> = {};
 			for (const r of opts.queryRows ?? []) {
-				vertices[(r as { entityId: string }).entityId] = [r];
+				const e = r as { entityId: string; entityTypeId: string };
+				if (type === undefined || e.entityTypeId === type) vertices[e.entityId] = [r];
 			}
 			return { results: { vertices } };
 		}
@@ -55,6 +58,7 @@ function makeCtx(opts: {
 	const ctx = {
 		entityId: "list-1",
 		capabilities: () => [],
+		hostEntityId: () => opts.hostEntityId ?? null,
 		root,
 		graph,
 		navigate,
@@ -149,6 +153,7 @@ describe("embedded-list (database grid) block", () => {
 			entityId: "list-1",
 			capabilities: () => [],
 			root,
+			hostEntityId: () => null,
 			graph: (async () => {
 				throw new Error("denied");
 			}) as unknown as <T>(m: string, d: unknown) => Promise<T>,
@@ -256,6 +261,84 @@ describe("embedded-list (database grid) block", () => {
 		expect(css).toMatch(/var\(--color-text-primary,\s*light-dark\(/);
 		expect(css).toMatch(/var\(--color-state-error,\s*light-dark\(/);
 		expect(css).not.toMatch(/@media\s*\(prefers-color-scheme/);
+	});
+});
+
+describe("embedded-list contextual views (9.12.24)", () => {
+	const BOOK = "io.test/Book/v1";
+	const VIEW_TYPE = "brainstorm/ListView/v1";
+	const book = (id: string, author: unknown) => ({
+		entityId: id,
+		entityTypeId: BOOK,
+		properties: { name: id, author },
+		updatedAt: 1,
+	});
+	const list = (extra: Record<string, unknown> = {}) => ({
+		entityId: "list-1",
+		entityTypeId: LIST_TYPE,
+		properties: {
+			name: "Books",
+			source: { kind: "byType", types: [BOOK] },
+			members: { include: [], exclude: [] },
+			defaultViewId: "view-1",
+			...extra,
+		},
+		updatedAt: 1,
+	});
+	const view = (filters: unknown, extra: Record<string, unknown> = {}) => ({
+		entityId: "view-1",
+		entityTypeId: VIEW_TYPE,
+		properties: { listId: "list-1", kind: "grid", filters, sorts: [], columns: [], ...extra },
+		updatedAt: 1,
+	});
+	const hostFilter = {
+		kind: "predicate",
+		predicate: { $contains: { author: { $host: true } } },
+	};
+	const books = [book("b1", ["page-1"]), book("b2", ["page-2"]), book("b3", ["page-1", "page-2"])];
+	const rowNames = (root: HTMLElement) =>
+		[...root.querySelectorAll(".bsdb__row")].map((r) => r.querySelector(".bsdb__td")?.textContent);
+
+	it("filters rows by the host document through the default view", async () => {
+		const h = makeCtx({
+			list: list(),
+			queryRows: [...books, view(hostFilter)],
+			hostEntityId: "page-1",
+		});
+		await h.run();
+		expect(rowNames(h.root)).toEqual(["b1", "b3"]);
+	});
+
+	it("a host-relative view with no host shows nothing, never everything", async () => {
+		const h = makeCtx({ list: list(), queryRows: [...books, view(hostFilter)] });
+		await h.run();
+		expect(h.root.querySelectorAll(".bsdb__row")).toHaveLength(0);
+		expect(h.root.querySelector(".bsdb__empty")).not.toBeNull();
+	});
+
+	it("honours member excludes and a byFilter source with $host", async () => {
+		const h = makeCtx({
+			list: list({
+				source: { kind: "byFilter", where: { $contains: { author: { $host: true } } } },
+				members: { include: [], exclude: [{ entityId: "b3" }] },
+			}),
+			queryRows: books,
+			hostEntityId: "page-2",
+		});
+		await h.run();
+		expect(rowNames(h.root)).toEqual(["b2"]);
+	});
+
+	it("applies the view sort", async () => {
+		const h = makeCtx({
+			list: list(),
+			queryRows: [
+				...books,
+				view(null, { sorts: [{ propertyId: "name", direction: "desc", emptyPlacement: "end" }] }),
+			],
+		});
+		await h.run();
+		expect(rowNames(h.root)).toEqual(["b3", "b2", "b1"]);
 	});
 });
 

@@ -19,6 +19,7 @@ function makeCtx(graph: unknown): {
 	const ctx = {
 		entityId: "gr-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: (async (messageName: string) =>
 			messageName === "getEntity" ? graph : null) as unknown as <T>(

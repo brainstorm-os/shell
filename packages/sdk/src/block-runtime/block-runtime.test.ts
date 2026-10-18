@@ -96,6 +96,41 @@ describe("startBlock — in-iframe harness", () => {
 		expect(seen).toEqual(["entities.read:Database"]);
 	});
 
+	it("exposes the Startup host entity id (9.12.24), validated", () => {
+		const seen: Array<string | null> = [];
+		startBlock(
+			(ctx) => {
+				seen.push(ctx.hostEntityId());
+				ctx.onLoad(() => {
+					seen.push(ctx.hostEntityId());
+				});
+			},
+			{ win: h.win, parent: h.parent },
+		);
+		h.deliver({ capabilities: [], hostEntityId: "ent_page_1" }, BlockFrameMessageKind.Startup);
+		expect(seen).toEqual([null, "ent_page_1"]);
+	});
+
+	it.each([
+		["a non-string", 42],
+		["an empty string", ""],
+		["whitespace", "ent page"],
+		["an over-long id", "x".repeat(257)],
+		["a control char", "ent\u0000"],
+	])("drops %s host entity id", (_label, hostEntityId) => {
+		let seen: string | null | undefined;
+		startBlock(
+			(ctx) => {
+				ctx.onLoad(() => {
+					seen = ctx.hostEntityId();
+				});
+			},
+			{ win: h.win, parent: h.parent },
+		);
+		h.deliver({ capabilities: [], hostEntityId }, BlockFrameMessageKind.Startup);
+		expect(seen).toBeNull();
+	});
+
 	it("frames a BP graph request and resolves the correlated *Response", async () => {
 		let ctxRef: BlockRuntimeContext | null = null;
 		startBlock(

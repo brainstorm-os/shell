@@ -394,3 +394,23 @@ describe("collectAndOnlyPredicatesFromFilterNode", () => {
 		).toEqual([]);
 	});
 });
+
+describe("draftForList — this object ($host) pins (9.12.24)", () => {
+	const viewFilters: FilterNode = {
+		kind: FilterNodeKind.Group,
+		op: FilterGroupOp.And,
+		children: [
+			{ kind: FilterNodeKind.Predicate, predicate: { $contains: { authors: { $host: true } } } },
+			{ kind: FilterNodeKind.Predicate, predicate: { $eq: { owner: { $host: true } } } },
+		],
+	};
+
+	it("pre-fills the host into the relation a contextual view filters on", () => {
+		const draft = draftForList({ ...noSource, viewFilters, hostEntityId: "page_1" });
+		expect(draft.properties).toEqual({ authors: ["page_1"], owner: "page_1" });
+	});
+
+	it("pins nothing for a $host ref without a host", () => {
+		expect(draftForList({ ...noSource, viewFilters }).properties).toEqual({});
+	});
+});

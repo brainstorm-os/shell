@@ -19,21 +19,27 @@ import {
 } from "@brainstorm-os/sdk-types";
 import { effectiveMembers } from "../collections";
 import type { InMemoryVault } from "../in-memory-entities";
-import { evaluatePredicate } from "./evaluate-predicate";
+import { type PredicateContext, evaluatePredicate } from "./evaluate-predicate";
 
-export function evaluateSource(source: ListSource | null, db: InMemoryVault): Set<string> {
+/** `ctx` carries the host entity a `$host` ref in a `byFilter` source resolves
+ *  to (9.12.24); without it a host-relative filter contributes no members. */
+export function evaluateSource(
+	source: ListSource | null,
+	db: InMemoryVault,
+	ctx?: PredicateContext,
+): Set<string> {
 	if (source === null) return new Set();
 	switch (source.kind) {
 		case ListSourceKind.ByType:
 			return collectByType(db, source.types);
 		case ListSourceKind.ByFilter:
-			return collectByFilter(db, source.where);
+			return collectByFilter(db, source.where, ctx);
 		case ListSourceKind.ByLink:
 			return collectByLink(db, source);
 		case ListSourceKind.ByVocabulary:
 			return collectByVocabulary(db, source.vocabularyId, source.values);
 		case ListSourceKind.Composite:
-			return collectComposite(db, source);
+			return collectComposite(db, source, ctx);
 	}
 }
 
@@ -50,11 +56,13 @@ function collectByType(db: InMemoryVault, types: ReadonlyArray<string>): Set<str
 function collectByFilter(
 	db: InMemoryVault,
 	where: Parameters<typeof evaluatePredicate>[1],
+	ctx: PredicateContext | undefined,
 ): Set<string> {
 	const out = new Set<string>();
+	const now = Date.now();
 	for (const e of db.entities) {
 		if (e.deletedAt !== null) continue;
-		if (evaluatePredicate(e, where)) out.add(e.id);
+		if (evaluatePredicate(e, where, now, ctx)) out.add(e.id);
 	}
 	return out;
 }
@@ -129,9 +137,10 @@ function collectByVocabulary(
 function collectComposite(
 	db: InMemoryVault,
 	source: { op: CompositeOp; sources: ReadonlyArray<ListSource> },
+	ctx: PredicateContext | undefined,
 ): Set<string> {
 	if (source.sources.length === 0) return new Set();
-	const childSets = source.sources.map((s) => evaluateSource(s, db));
+	const childSets = source.sources.map((s) => evaluateSource(s, db, ctx));
 	if (source.op === CompositeOp.And) {
 		return intersectAll(childSets);
 	}

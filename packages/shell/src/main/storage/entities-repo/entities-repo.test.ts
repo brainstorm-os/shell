@@ -180,6 +180,22 @@ describe("EntitiesRepository", () => {
 		expect(ids({ where: { $and: [{ $gt: { n: 1 } }, { $lt: { n: 10 } }] } })).toEqual(["a"]);
 	});
 
+	it("a $host-relative predicate matches nothing — no host exists at the SQL layer (9.12.24)", () => {
+		seed({ id: "a", properties: { author: "page_1", n: 5 } });
+		seed({ id: "b", properties: { author: "page_2", n: 50 } });
+		const ids = (q: Parameters<EntitiesRepository["query"]>[0]) =>
+			env.repo
+				.query(q)
+				.map((e) => e.id)
+				.sort();
+		const host = { $host: true } as const;
+		expect(ids({ where: { $eq: { author: host } } })).toEqual([]);
+		expect(ids({ where: { $contains: { author: host } } })).toEqual([]);
+		expect(ids({ where: { $gt: { n: host } } })).toEqual([]);
+		expect(ids({ where: { $or: [{ $eq: { n: 5 } }, { $eq: { author: host } }] } })).toEqual([]);
+		expect(ids({ where: { $contains: { author: { $prop: "n" } } } })).toEqual([]);
+	});
+
 	it("query compiles comparison refs ($now / $prop) (9.12.21)", () => {
 		const now = Date.now();
 		const DAY = 86_400_000;

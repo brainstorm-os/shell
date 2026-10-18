@@ -19,6 +19,7 @@ function makeCtx(board: unknown): {
 	const ctx = {
 		entityId: "wb-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: (async (messageName: string) =>
 			messageName === "getEntity" ? board : null) as unknown as <T>(

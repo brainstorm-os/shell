@@ -196,12 +196,14 @@ import {
 	type FilterCompareTo,
 	type FilterDraft,
 	FilterOp,
+	FilterRefKind,
 	type FilterRule,
 	countDraftRules,
 	describeGroup,
 	describeRule,
 	draftToFilterNode,
 	filterNodeToDraft,
+	opAcceptsHostRef,
 	opAcceptsRef,
 	opIsList,
 	opLabel,
@@ -501,6 +503,15 @@ function selectLabelForValue(propertyId: string, value: string): string {
 /** The human label for a rule's value in the filter chip / menu: a relative-
  *  date rule shows its range name ("Last 7 days"), a vocabulary value its
  *  option label, everything else the raw value. */
+function describeFilterRule(rule: FilterRule): string {
+	return describeRule(
+		rule,
+		colLabel(rule.propertyId),
+		ruleValueLabel(rule),
+		undefined,
+		t("brainstorm.database.filter.thisObject"),
+	);
+}
 function ruleValueLabel(rule: FilterRule): string {
 	return rule.op === FilterOp.RelativeDate
 		? relativeRangeLabel(rule.value)
@@ -2762,7 +2773,7 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 	// value / change condition / remove) — one consistent gesture across the
 	// manager and the pills bar, instead of "click here = silently delete".
 	const items: MenuItem[] = draft.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: propertyKindIcon(rule.propertyId),
 		onClick: () => openFilterRulePillMenu(state, anchor, view.id, draft, i),
 	}));
@@ -2856,7 +2867,7 @@ function openFilterGroupMenu(
 	};
 
 	const items: MenuItem[] = group.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: IconName.Close,
 		onClick: () => replaceGroup({ ...group, rules: group.rules.filter((_, j) => j !== i) }),
 	}));
@@ -2937,6 +2948,7 @@ function openFilterOperatorMenu(
 	// of every other property's operator menu.
 	const def = cachedVaultProperties.find((d) => d.key === propertyId);
 	const isDateProperty = def ? def.valueType === ValueType.Date : /at$/i.test(propertyId);
+	const isRefProperty = def ? def.valueType === ValueType.EntityRef : /ids?$/i.test(propertyId);
 	const operators = FILTER_OPERATORS.filter((o) => o.op !== FilterOp.RelativeDate || isDateProperty);
 	openSubmenuNextFrame(() =>
 		openContextMenu(
@@ -2987,23 +2999,40 @@ function openFilterOperatorMenu(
 					// option id (so is/contains matches the stored id), instead of
 					// free-texting a label that never matches (F-027).
 					// Comparison op → offer a literal, the clock (now), or another
-					// property as the right-hand side (9.12.21 cross-property).
-					if (opAcceptsRef(o.op)) {
-						const cols = (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
-							(c) => c.visible !== false && c.propertyId !== propertyId,
-						);
+					// property as the right-hand side (9.12.21 cross-property). A
+					// relation also offers "this object" — the page an embedded view
+					// sits in (9.12.24 contextual views).
+					const hostRef = isRefProperty && opAcceptsHostRef(o.op);
+					if (opAcceptsRef(o.op) || hostRef) {
+						const cols = opAcceptsRef(o.op)
+							? (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
+									(c) => c.visible !== false && c.propertyId !== propertyId,
+								)
+							: [];
 						const refItems: MenuItem[] = [
 							{
 								label: t("brainstorm.database.filter.dateValuePlaceholder"),
 								onClick: () => promptInline(anchor, "", (v) => append(v.trim())),
 							},
-							{
-								label: t("brainstorm.database.filter.dateNow"),
-								onClick: () => append("", { kind: "now" }),
-							},
+							...(hostRef
+								? [
+										{
+											label: t("brainstorm.database.filter.thisObject"),
+											onClick: () => append("", { kind: FilterRefKind.Host }),
+										},
+									]
+								: []),
+							...(opAcceptsRef(o.op)
+								? [
+										{
+											label: t("brainstorm.database.filter.dateNow"),
+											onClick: () => append("", { kind: FilterRefKind.Now }),
+										},
+									]
+								: []),
 							...cols.map((c) => ({
 								label: `property: ${colLabel(c.propertyId)}`,
-								onClick: () => append("", { kind: "prop", propertyId: c.propertyId }),
+								onClick: () => append("", { kind: FilterRefKind.Prop, propertyId: c.propertyId }),
 							})),
 						];
 						openSubmenuNextFrame(() => openContextMenu({ x: r.left, y: r.bottom + 4 }, refItems, anchor));
@@ -3386,7 +3415,7 @@ function buildFilterRulePill(
 	return createPill({
 		variant: "filter",
 		icon: DatabaseIcon.Filter,
-		text: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		text: describeFilterRule(rule),
 		title: t("brainstorm.database.filter.editRule"),
 		onClick: (anchor) => openFilterRulePillMenu(state, anchor, viewId, draft, index),
 		onRemove: remove,

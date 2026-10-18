@@ -25,6 +25,7 @@ function makeCtx(task: unknown): CtxHarness {
 	const ctx = {
 		entityId: "task-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: graph as unknown as <T>(m: string, d: unknown) => Promise<T>,
 		navigate,
@@ -121,6 +122,7 @@ describe("inline-task block", () => {
 		const ctx = {
 			entityId: "task-1",
 			capabilities: () => [],
+			hostEntityId: () => null,
 			root,
 			graph: (async () => {
 				throw new Error("denied");

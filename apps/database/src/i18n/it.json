@@ -72,6 +72,7 @@
   "brainstorm.database.filter.editValue": "Modifica valore…",
   "brainstorm.database.filter.dateValuePlaceholder": "un valore…",
   "brainstorm.database.filter.dateNow": "adesso",
+  "brainstorm.database.filter.thisObject": "questo oggetto",
   "brainstorm.database.sort.clear": "Cancella ordinamento",
   "brainstorm.database.collection.newBlank": "Raccolta vuota",
   "brainstorm.database.collection.newFromObjects": "Da oggetti esistenti…",

@@ -59,6 +59,7 @@ export {
 	BLOCK_FRAME_BOOTSTRAP_GLOBAL,
 	type BlockFrameBootstrap,
 	BLOCK_FRAME_ROOT_ID,
+	sanitizeHostEntityId,
 } from "./block-frame-constants";
 import {
 	type BlockFrameEnvelope,

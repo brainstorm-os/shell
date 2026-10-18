@@ -10,6 +10,7 @@ import {
 	BLOCK_EMBED_NODE_TYPE,
 	BlockEmbedNode,
 	SHELL_ENTITY_CARD_BLOCK_ID,
+	embedHostEntityId,
 } from "./block-embed-node";
 
 function editor(): LexicalEditor {
@@ -539,5 +540,17 @@ describe("BlockEmbedNode", () => {
 				expect(produced.getLabel()).toBe(labelIn);
 			});
 		});
+	});
+});
+
+describe("embedHostEntityId (9.12.24)", () => {
+	it("is the innermost document of the render chain", () => {
+		expect(embedHostEntityId(["note_1"], "list_1")).toBe("note_1");
+		expect(embedHostEntityId(["note_1", "note_2"], "list_1")).toBe("note_2");
+	});
+
+	it("is null with no document context or for a self-embed", () => {
+		expect(embedHostEntityId([], "list_1")).toBeNull();
+		expect(embedHostEntityId(["list_1"], "list_1")).toBeNull();
 	});
 });
