@@ -47,8 +47,8 @@ import {
 	writeFile,
 } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import { crc32 } from "node:zlib";
 import * as Y from "yjs";
+import { FrameReadStatus, encodeFrame, readFrameAt } from "./ydoc-frame";
 
 /** One doc per entity; the sweep derives an entity id back off this. */
 const DOC_EXT = ".ydoc";
@@ -211,27 +211,15 @@ export class YDocStore {
 		let tailEntries = 0;
 		let truncatedTail = false;
 		while (offset < raw.length) {
-			if (raw.length - offset < 8) {
-				truncatedTail = true; // not enough bytes for len + crc — partial
-				break;
-			}
-			const updateLen = raw.readUInt32LE(offset);
-			const updateStart = offset + 4;
-			const updateEnd = updateStart + updateLen;
-			const crcEnd = updateEnd + 4;
-			if (crcEnd > raw.length) {
+			// A partial or CRC-mismatched final entry is a crash mid-append.
+			const frame = readFrameAt(raw, offset);
+			if (frame.status !== FrameReadStatus.Ok) {
 				truncatedTail = true;
 				break;
 			}
-			const update = raw.subarray(updateStart, updateEnd);
-			const storedCrc = raw.readUInt32LE(updateEnd);
-			if (crc32(update) !== storedCrc) {
-				truncatedTail = true;
-				break;
-			}
-			Y.applyUpdate(doc, update);
+			Y.applyUpdate(doc, frame.bytes);
 			tailEntries += 1;
-			offset = crcEnd;
+			offset = frame.next;
 		}
 		return { doc, tailEntries, truncatedTail, pendingStructs: hasPendingStructs(doc) };
 	}
@@ -265,7 +253,7 @@ export class YDocStore {
 			fileSize = HEADER_BYTES;
 		}
 
-		const entry = encodeTailEntry(update);
+		const entry = encodeFrame(update);
 		await appendFile(filePath, entry);
 		return fileSize + entry.length;
 	}
@@ -351,15 +339,6 @@ function encodeFile(snapshot: Uint8Array, tailEntries: Buffer[]): Buffer {
 	header.writeUInt32LE(snapshot.length, 8);
 	const snap = Buffer.from(snapshot);
 	return Buffer.concat([header, snap, ...tailEntries]);
-}
-
-function encodeTailEntry(update: Uint8Array): Buffer {
-	const head = Buffer.alloc(4);
-	head.writeUInt32LE(update.length, 0);
-	const body = Buffer.from(update);
-	const tail = Buffer.alloc(4);
-	tail.writeUInt32LE(crc32(body) >>> 0, 0);
-	return Buffer.concat([head, body, tail]);
 }
 
 function assertMagic(buf: Buffer): void {

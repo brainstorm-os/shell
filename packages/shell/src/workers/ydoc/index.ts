@@ -31,7 +31,9 @@
  */
 
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { ENTITY_PROPS_MAP_NAME, type EntityDocLink } from "@brainstorm-os/sdk-types";
 import * as Y from "yjs";
 import type { Envelope, EnvelopeReply } from "../../ipc/envelope";
@@ -41,8 +43,10 @@ import {
 	writeEntityLinks,
 	writeEntityProps,
 } from "../../main/entities/entity-doc-codec";
+import { bodyPlainText, replaceBody } from "../../main/history/body-replace";
 import { assertSafeEntityId } from "../../main/storage/entity-id";
 import { YDocStore } from "../../main/storage/ydoc-store";
+import { type HistFrameRef, YHistStore } from "../../main/storage/yhist-store";
 import { installWorkerProcessGuards, wireParentPort } from "../worker-runtime";
 
 // Stage 10.3a — the wraps schema lives on the entity's Y.Doc at
@@ -135,6 +139,42 @@ const docCacheMax = ((): number => {
 const docs = new Map<string, Y.Doc>();
 const docCacheMaxOverride: { value: number | null } = { value: null };
 
+/** 10.16 — one version-history byte store per vault. The worker is its only
+ *  writer, so appends and retention rewrites never race. */
+const histStores = new Map<string, YHistStore>();
+
+function histFor(vaultPath: string): YHistStore {
+	const cached = histStores.get(vaultPath);
+	if (cached) return cached;
+	const store = new YHistStore(vaultPath);
+	histStores.set(vaultPath, store);
+	return store;
+}
+
+/** Identity of a doc's CRDT state: state vector AND delete set, so a pure
+ *  deletion (which does not advance the state vector) still reads as a change. */
+function docStateKey(doc: Y.Doc): string {
+	return createHash("sha256").update(Y.encodeSnapshot(Y.snapshot(doc))).digest("base64url");
+}
+
+function frameRefArg(raw: { offset?: unknown; length?: unknown }, method: string): HistFrameRef {
+	const { offset, length } = raw;
+	if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length)) {
+		throw new Error(`ydoc.${method}: offset/length must be integers`);
+	}
+	if ((offset as number) < 0 || (length as number) < 0) {
+		throw new Error(`ydoc.${method}: offset/length must be non-negative`);
+	}
+	return { offset: offset as number, length: length as number };
+}
+
+async function readCheckpointDoc(vaultPath: string, entityId: string, ref: HistFrameRef): Promise<Y.Doc> {
+	const bytes = await histFor(vaultPath).read(entityId, ref);
+	const doc = new Y.Doc();
+	Y.applyUpdate(doc, bytes);
+	return doc;
+}
+
 function storeFor(vaultPath: string): YDocStore {
 	const cached = stores.get(vaultPath);
 	if (cached) return cached;
@@ -205,6 +245,7 @@ export function __ydocCacheResetForTest(maxOverride?: number): void {
 	for (const doc of docs.values()) doc.destroy();
 	docs.clear();
 	stores.clear();
+	histStores.clear();
 	if (typeof maxOverride === "number" && maxOverride > 0) {
 		docCacheMaxOverride.value = Math.floor(maxOverride);
 	} else {
@@ -245,6 +286,13 @@ type InstallAssetManifestArgs = {
 	manifest: Record<string, unknown>;
 };
 type ReadAssetManifestArgs = { vaultPath: string; entityId: string; assetId: string };
+type HistoryCaptureArgs = { vaultPath: string; entityId: string; sinceStateKey?: string | null };
+type HistoryFrameArgs = { vaultPath: string; entityId: string; offset: number; length: number };
+type HistoryCompactArgs = {
+	vaultPath: string;
+	entityId: string;
+	keep: Array<{ offset: number; length: number }>;
+};
 type ListAssetManifestsArgs = { vaultPath: string; entityId: string };
 
 const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknown> = {
@@ -349,6 +397,82 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 			projection: readEntityDocProjection(doc),
 			updateB64: captured ? bytesToBase64(captured) : null,
 		};
+	},
+	// 10.16 — version history. `historyCapture` checkpoints the live doc into
+	// the entity's `.yhist` unless its state equals `sinceStateKey` (the last
+	// checkpoint's), and reports the encode cost (the Idle-capture perf gate).
+	historyCapture: async (envelope) => {
+		const args = parseArgs<HistoryCaptureArgs>(envelope, "historyCapture");
+		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
+		const stateKey = docStateKey(doc);
+		if (typeof args.sinceStateKey === "string" && args.sinceStateKey === stateKey) {
+			return { captured: false, stateKey };
+		}
+		const started = performance.now();
+		const body = Y.encodeStateAsUpdate(doc);
+		const encodeMs = performance.now() - started;
+		const ref = await histFor(args.vaultPath).append(args.entityId, body);
+		return {
+			captured: true,
+			stateKey,
+			offset: ref.offset,
+			length: ref.length,
+			properties: readEntityDocProjection(doc).properties ?? null,
+			encodeMs,
+		};
+	},
+	historyPreview: async (envelope) => {
+		const args = parseArgs<HistoryFrameArgs>(envelope, "historyPreview");
+		const ref = frameRefArg(args, "historyPreview");
+		const doc = await readCheckpointDoc(args.vaultPath, args.entityId, ref);
+		try {
+			return {
+				bodyText: bodyPlainText(doc),
+				properties: readEntityDocProjection(doc).properties ?? null,
+			};
+		} finally {
+			doc.destroy();
+		}
+	},
+	// OQ-VH-5 — whole-body restore as a forward edit: one transaction on the
+	// live doc, persisted like any other write; the update is returned so main
+	// can fan it to open windows and the live-sync relay.
+	historyRestoreBody: async (envelope) => {
+		const args = parseArgs<HistoryFrameArgs>(envelope, "historyRestoreBody");
+		const ref = frameRefArg(args, "historyRestoreBody");
+		const source = await readCheckpointDoc(args.vaultPath, args.entityId, ref);
+		try {
+			const { doc } = await ensureDoc(args.vaultPath, args.entityId);
+			let captured: Uint8Array | null = null;
+			const capture = (update: Uint8Array): void => {
+				captured = update;
+			};
+			doc.on("update", capture);
+			try {
+				replaceBody(doc, source);
+			} finally {
+				doc.off("update", capture);
+			}
+			let compacted = false;
+			if (captured) {
+				const result = await storeFor(args.vaultPath).appendAndMaybeCompact(args.entityId, captured);
+				compacted = result.compacted;
+			}
+			return {
+				updateB64: captured ? bytesToBase64(captured) : null,
+				compacted,
+				projection: readEntityDocProjection(doc),
+			};
+		} finally {
+			source.destroy();
+		}
+	},
+	historyCompact: async (envelope) => {
+		const args = parseArgs<HistoryCompactArgs>(envelope, "historyCompact");
+		if (!Array.isArray(args.keep)) throw new Error("ydoc.historyCompact: keep must be an array");
+		const keep = args.keep.map((r) => frameRefArg(r, "historyCompact"));
+		const moved = await histFor(args.vaultPath).rewrite(args.entityId, keep);
+		return { moved: [...moved].map(([from, to]) => [from, to.offset]) };
 	},
 	close: async (envelope) => {
 		const args = parseArgs<CloseArgs>(envelope, "close");
