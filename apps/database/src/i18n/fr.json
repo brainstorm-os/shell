@@ -357,5 +357,21 @@
   "brainstorm.database.settings.gallery.coverDefault": "Couverture",
   "brainstorm.database.settings.gallery.coverFirstMedia": "Première image",
   "brainstorm.database.settings.gallery.coverNone": "Aucune",
-  "brainstorm.database.settings.gallery.showLabels": "Afficher les noms des champs"
+  "brainstorm.database.settings.gallery.showLabels": "Afficher les noms des champs",
+  "brainstorm.database.settings.column.changeType": "Changer le type",
+  "brainstorm.database.settings.column.unit": "Unité numérique…",
+  "brainstorm.database.settings.column.unitIs": "Unité : {unit}…",
+  "brainstorm.database.settings.column.unitPlaceholder": "ex. kg, km/h, pts",
+  "brainstorm.database.changeType.title": "Changer « {name} » en {type}",
+  "brainstorm.database.changeType.converted.one": "{count} valeur convertie",
+  "brainstorm.database.changeType.converted.other": "{count} valeurs converties",
+  "brainstorm.database.changeType.lost.one": "{count} perdrait sa valeur",
+  "brainstorm.database.changeType.lost.other": "{count} perdraient leur valeur",
+  "brainstorm.database.changeType.locked.one": "{count} élément verrouillé reste inchangé",
+  "brainstorm.database.changeType.locked.other": "{count} éléments verrouillés restent inchangés",
+  "brainstorm.database.changeType.lostHeading": "Ces valeurs seraient effacées",
+  "brainstorm.database.changeType.previewHeading": "Aperçu",
+  "brainstorm.database.changeType.more": "…et {count} de plus",
+  "brainstorm.database.changeType.confirm": "Changer le type",
+  "brainstorm.database.changeType.done": "« {name} » est maintenant {type}"
 }

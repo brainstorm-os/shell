@@ -128,8 +128,14 @@ export function formatNumber(
 		case PropertyFormat.Duration:
 			return formatDuration(value);
 		default:
-			return numberFormatter(locale, formatOpts).format(value);
+			return withUnit(numberFormatter(locale, formatOpts).format(value), def.unit);
 	}
+}
+
+/** Append a plain number's free-text unit suffix (9.12.33). */
+export function withUnit(text: string, unit: string | undefined): string {
+	const u = unit?.trim();
+	return u ? `${text} ${u}` : text;
 }
 
 /** Render a number of **hours** as a human duration: `3h 30m`, `45m`,

@@ -18,7 +18,7 @@
  * without a host round-trip.
  */
 
-import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
@@ -27,6 +27,7 @@ import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
 import { type TranslationKey, t } from "../i18n";
 import { AggregationKind, aggregationLabel } from "../logic/aggregations";
 import { CollapseAllAction } from "../logic/board-groups";
+import { CONVERTIBLE_TYPES } from "../logic/change-type";
 import { CHART_AGGREGATIONS, chartAggregationKind } from "../logic/chart-data";
 import {
 	ColumnAdderOptionKind,
@@ -136,6 +137,8 @@ export type ViewSettingsProps = {
 	sourceEditable?: boolean;
 	/** Live-applies a new type set to the list's source. */
 	onChangeSource?: (types: string[]) => void;
+	/** Change-type + unit hooks for the column options menu (9.12.33). */
+	columnType?: ColumnTypeHost;
 	/** Numeric properties a Chart view can measure (9.12.30). */
 	numericProperties?: ReadonlyArray<string>;
 	/** Board "Collapse all" / "Expand all" (9.12.28) — the host resolves the
@@ -1002,6 +1005,7 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 		props.availableProperties ?? [],
 		props.vaultProperties ?? [],
 		props.onCreateProperty,
+		props.columnType,
 	);
 
 	// "Add rollup…" — a computed column aggregating a property of the row's
@@ -1286,6 +1290,7 @@ function renderColumns(
 	available: string[],
 	vaultProperties: ReadonlyArray<PropertyDef>,
 	onCreateProperty: ((seedName: string) => void) | undefined,
+	columnType?: ColumnTypeHost,
 ): void {
 	// A user-created property has a generated key (`prop_<…>`) but a real display
 	// name in the catalog — show the name, not "Prop Mpx6xww2 2vzk7i" (F-017,
@@ -1348,8 +1353,13 @@ function renderColumns(
 		setSharedIcon(more, IconName.More);
 		more.addEventListener("click", (event) => {
 			event.stopPropagation();
-			openColumnOptionsMenu(more, column, resolvedName, label, (patch) =>
-				onChange(setColumnPresentation(allColumns, column.propertyId, patch)),
+			openColumnOptionsMenu(
+				more,
+				column,
+				resolvedName,
+				label,
+				(patch) => onChange(setColumnPresentation(allColumns, column.propertyId, patch)),
+				columnType,
 			);
 		});
 		li.appendChild(more);
@@ -1438,7 +1448,36 @@ function openColumnOptionsMenu(
 	resolvedName: string,
 	labelEl: HTMLElement,
 	commit: (patch: { label?: string | null; iconOnly?: boolean; wrap?: ColumnWrap | null }) => void,
+	columnType?: ColumnTypeHost,
 ): void {
+	const typeInfo =
+		column.rollup || column.formula ? null : (columnType?.infoFor(column.propertyId) ?? null);
+	const typeItems = typeInfo
+		? [
+				{ divider: true },
+				...(typeInfo.convertible
+					? [
+							{
+								label: t("brainstorm.database.settings.column.changeType"),
+								submenu: CONVERTIBLE_TYPES.filter((vt) => vt !== typeInfo.valueType).map((vt) => ({
+									label: valueTypeLabel(vt),
+									onSelect: () => columnType?.onChangeType(column.propertyId, vt),
+								})),
+							},
+						]
+					: []),
+				...(typeInfo.valueType === ValueType.Number && typeInfo.plainNumber
+					? [
+							{
+								label: typeInfo.unit
+									? t("brainstorm.database.settings.column.unitIs", { unit: typeInfo.unit })
+									: t("brainstorm.database.settings.column.unit"),
+								onSelect: () => columnType?.onEditUnit(column.propertyId, anchor),
+							},
+						]
+					: []),
+			]
+		: [];
 	const wrapItem = (value: ColumnWrap | null, key: TranslationKey) => ({
 		label: t(key),
 		selected: (column.wrap ?? null) === value,
@@ -1469,9 +1508,35 @@ function openColumnOptionsMenu(
 			wrapItem(null, "brainstorm.database.settings.column.wrap.default"),
 			wrapItem(ColumnWrap.Wrap, "brainstorm.database.settings.column.wrap.wrap"),
 			wrapItem(ColumnWrap.NoWrap, "brainstorm.database.settings.column.wrap.noWrap"),
+			...typeItems,
 		],
 		{ menuLabel: t("brainstorm.database.settings.columnOptions", { name: resolvedName }), anchor },
 	);
+}
+
+/** Host hooks for a column's type + unit (9.12.33). */
+export type ColumnTypeHost = {
+	infoFor: (propertyId: string) => {
+		valueType: ValueType;
+		convertible: boolean;
+		plainNumber: boolean;
+		unit?: string;
+	} | null;
+	onChangeType: (propertyId: string, to: ValueType) => void;
+	onEditUnit: (propertyId: string, anchor: HTMLElement) => void;
+};
+
+function valueTypeLabel(vt: ValueType): string {
+	switch (vt) {
+		case ValueType.Number:
+			return t("brainstorm.database.property.form.kindNumber");
+		case ValueType.Boolean:
+			return t("brainstorm.database.property.form.kindBoolean");
+		case ValueType.Date:
+			return t("brainstorm.database.property.form.kindDate");
+		default:
+			return t("brainstorm.database.property.form.kindText");
+	}
 }
 
 /** Swap the column-row label for an inline input; Enter / blur commits the

@@ -409,3 +409,16 @@ describe("Dictionary validators", () => {
 		expect(result.ok).toBe(false);
 	});
 });
+
+describe("validatePropertyDef — number unit (9.12.33)", () => {
+	const base = { key: "w", name: "Weight", icon: null, valueType: ValueType.Number } as const;
+	it("accepts a short unit on a plain number only", () => {
+		expect(validatePropertyDef({ ...base, unit: "kg" }).ok).toBe(true);
+		expect(validatePropertyDef({ ...base, unit: "" }).ok).toBe(false);
+		expect(validatePropertyDef({ ...base, unit: "x".repeat(17) }).ok).toBe(false);
+		expect(validatePropertyDef({ ...base, format: PropertyFormat.Currency, unit: "kg" }).ok).toBe(
+			false,
+		);
+		expect(validatePropertyDef({ ...base, valueType: ValueType.Text, unit: "kg" }).ok).toBe(false);
+	});
+});

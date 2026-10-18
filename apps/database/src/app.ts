@@ -88,6 +88,7 @@ import { getWidgetLaunch } from "@brainstorm-os/sdk/widget";
 import "@brainstorm-os/sdk/presence-stack.css";
 import { renderPresenceHeader } from "@brainstorm-os/sdk/presence-stack";
 import { type EntityTitleSource, PropertiesProvider } from "@brainstorm-os/sdk/property-ui";
+import { formatScalar } from "@brainstorm-os/sdk/property-ui/pure";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
 import { attachShortcut, isEditableElement } from "@brainstorm-os/sdk/shortcut";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
@@ -111,6 +112,7 @@ import {
 	toggleCollapsed,
 } from "./logic/board-groups";
 import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
+import { canChangeType, planTypeChange, typeChangePatches } from "./logic/change-type";
 import { buildChartModel } from "./logic/chart-data";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
 import { type CompiledView, flattenFilter } from "./logic/compile-view";
@@ -127,6 +129,7 @@ import { propertyKindIconFor } from "./logic/property-kind-icon";
 import { ChartView } from "./react/chart-view";
 import { ChartWidget, type ChartWidgetRuntime } from "./react/chart-widget";
 import { installFirstMediaTransport } from "./react/use-first-media";
+import { openChangeTypeModal } from "./ui/change-type-modal";
 
 applyPersistedPanelWidth({
 	storageKey: "database:sidebar-width",
@@ -4876,6 +4879,20 @@ function openViewSettingsForActive(state: AppState, anchor: HTMLElement): void {
 	openViewSettings(anchor, {
 		view,
 		availableProperties: [...propKeys],
+		columnType: {
+			infoFor: (propertyId) => {
+				const def = cachedVaultProperties.find((d) => d.key === propertyId);
+				if (!def) return null;
+				return {
+					valueType: def.valueType,
+					convertible: canChangeType(def),
+					plainNumber: def.valueType === ValueType.Number && def.format === undefined,
+					...(def.unit ? { unit: def.unit } : {}),
+				};
+			},
+			onChangeType: (propertyId, to) => void changePropertyType(state, propertyId, to),
+			onEditUnit: (propertyId, unitAnchor) => editPropertyUnit(state, propertyId, unitAnchor),
+		},
 		numericProperties: [...propKeys].filter(
 			(k) =>
 				(cachedVaultProperties.find((d) => d.key === k)?.valueType ??
@@ -5490,6 +5507,81 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			);
 		},
 	});
+}
+
+/** Change a property's type (9.12.33): preview every bound value's
+ *  conversion (and the rows that would lose data), then — on confirm — write
+ *  the new def and the converted values. Locked records keep their value. */
+async function changePropertyType(
+	state: AppState,
+	propertyId: string,
+	to: ValueType,
+): Promise<void> {
+	const def = cachedVaultProperties.find((d) => d.key === propertyId);
+	if (!canChangeType(def)) return;
+	closeViewSettings();
+	const plan = planTypeChange(state.db.entities, def, to);
+	const confirmed = await openChangeTypeModal({
+		plan,
+		propertyName: propertyDisplayName(propertyId),
+		typeLabel: valueTypeName(to),
+		titleOf: (id) => {
+			const row = state.db.entities.find((e) => e.id === id);
+			return row ? entityTitle(row) : id;
+		},
+		display: (value) =>
+			value === null || value === undefined || value === ""
+				? "—"
+				: formatScalar(def, value) || String(value),
+	});
+	if (!confirmed) return;
+	if (!(await persistNewPropertyDef(plan.nextDef, null))) return;
+	await persistEntityPatches(state, typeChangePatches(plan));
+	await loadVaultProperties(state);
+	renderActiveView(state);
+	flashStatus(
+		t("brainstorm.database.changeType.done", {
+			name: propertyDisplayName(propertyId),
+			type: valueTypeName(to),
+		}),
+		plan.lost > 0 || plan.locked > 0 ? "warn" : "ready",
+	);
+}
+
+function valueTypeName(vt: ValueType): string {
+	switch (vt) {
+		case ValueType.Number:
+			return t("brainstorm.database.property.form.kindNumber");
+		case ValueType.Boolean:
+			return t("brainstorm.database.property.form.kindBoolean");
+		case ValueType.Date:
+			return t("brainstorm.database.property.form.kindDate");
+		default:
+			return t("brainstorm.database.property.form.kindText");
+	}
+}
+
+/** Set / clear a plain number's free-text unit suffix (9.12.33). */
+function editPropertyUnit(state: AppState, propertyId: string, anchor: HTMLElement): void {
+	const def = cachedVaultProperties.find((d) => d.key === propertyId);
+	if (!def || def.valueType !== ValueType.Number) return;
+	promptInline(
+		anchor,
+		def.unit ?? "",
+		(raw) => {
+			const unit = raw.trim().slice(0, 16);
+			const { unit: _prior, ...rest } = def;
+			void persistNewPropertyDef(unit ? { ...rest, unit } : rest, null).then(async (ok) => {
+				if (!ok) return;
+				await loadVaultProperties(state);
+				renderActiveView(state);
+			});
+		},
+		{
+			title: t("brainstorm.database.settings.column.unit"),
+			placeholder: t("brainstorm.database.settings.column.unitPlaceholder"),
+		},
+	);
 }
 
 /** Returns `true` only when the def actually reached the vault catalog,

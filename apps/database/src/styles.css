@@ -2207,6 +2207,28 @@ body.is-resizing .db-inspector__resize {
 	gap: var(--space-2);
 }
 
+/* Change-type preview (9.12.33) — rides the import modal chrome. */
+.db-change-type__heading {
+	margin: var(--space-3) 0 var(--space-1);
+	font-size: var(--text-size-sm);
+	font-weight: var(--text-weight-semibold);
+	color: var(--text);
+}
+
+.db-change-type__list {
+	margin: 0;
+	padding-inline-start: var(--space-4);
+	max-height: 180px;
+	overflow: auto;
+	font-size: var(--text-size-sm);
+	color: var(--text-dim);
+}
+
+.db-change-type__more {
+	list-style: none;
+	color: var(--text-faint);
+}
+
 /* ── Calendar view ────────────────────────────────────────────────────── */
 
 .dbv-calendar {
