@@ -25,7 +25,9 @@ import {
 	localPresenceName,
 } from "@brainstorm-os/editor";
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, PropertyView, ValueType } from "@brainstorm-os/sdk-types";
+import { announce } from "@brainstorm-os/sdk/a11y";
+import { findBacklinks } from "@brainstorm-os/sdk/backlinks";
 import {
 	PropertiesPanel,
 	type PropertiesPanelMeta,
@@ -36,9 +38,15 @@ import { type ReactElement, useCallback, useMemo } from "react";
 import { humaniseBytes, humaniseDate, humaniseMime } from "../host/inspector-format";
 import type { PreviewRuntime } from "../host/runtime";
 import { t } from "../i18n";
-import { entityLockedFromSnapshot, entityValuesFromSnapshot } from "../logic/entity-values";
+import {
+	CAPTION_KEY,
+	entityCaptionFromSnapshot,
+	entityLockedFromSnapshot,
+	entityValuesFromSnapshot,
+} from "../logic/entity-values";
 import { usePreviewCommentsAdapter } from "../store/comments-bindings";
 import type { PreviewFileInfo } from "../types/preview-module";
+import { FileBacklinks, MoveToBinButton } from "./inspector-context";
 
 export type InspectorPairs = ReadonlyArray<readonly [label: string, value: string]>;
 
@@ -52,6 +60,8 @@ export type InspectorProps = {
 	activeTab: RightPanelTab;
 	onTabChange: (tab: RightPanelTab) => void;
 	onClose: () => void;
+	/** The file was moved to the Bin — the host drops it from the gallery. */
+	onDeleted?: (entityId: string) => void;
 };
 
 /** The file's intrinsic + renderer-extracted facts, read-only. Shown as the
@@ -123,6 +133,7 @@ function EditableInspector({
 	activeTab,
 	onTabChange,
 	onClose,
+	onDeleted,
 }: InspectorProps & { file: PreviewFileInfo; entityId: string }): ReactElement {
 	const vaultEntities = runtime?.services?.vaultEntities ?? null;
 	const snapshot = useVaultEntities(vaultEntities);
@@ -154,6 +165,54 @@ function EditableInspector({
 		[updateEntity, runtime, entityId, locked],
 	);
 
+	// 9.20.15 — the caption is a first-class File property (not a bound
+	// catalog value), so it rides the grid as a host-owned row with its own
+	// lock-aware persister.
+	const caption = useMemo(() => entityCaptionFromSnapshot(snapshot, entityId), [snapshot, entityId]);
+	const writeCaption = useCallback(
+		(next: unknown): void => {
+			if (!updateEntity || locked) return;
+			const text = typeof next === "string" ? next : "";
+			void updateEntity
+				.call(runtime?.services?.entities, entityId, { [CAPTION_KEY]: text })
+				.catch((error: unknown) => console.warn("[preview] entities.update caption failed:", error));
+		},
+		[updateEntity, runtime, entityId, locked],
+	);
+	const captionRows = useMemo<PropertiesPanelRow[]>(
+		() => [
+			{
+				def: {
+					key: CAPTION_KEY,
+					name: t("inspector.caption"),
+					icon: null,
+					valueType: ValueType.Text,
+					display: { view: PropertyView.Multiline },
+				},
+				value: caption,
+				...(canMutate ? { onChange: writeCaption } : { readOnly: true }),
+			},
+		],
+		[caption, canMutate, writeCaption],
+	);
+
+	const backlinks = useMemo(() => findBacklinks(snapshot, entityId), [snapshot, entityId]);
+
+	const deleteEntity = runtime?.services?.entities?.delete;
+	const moveToBin = useCallback((): void => {
+		if (!deleteEntity || locked) return;
+		void (async () => {
+			try {
+				await deleteEntity.call(runtime?.services?.entities, entityId);
+				announce(t("inspector.deleted", { name: file.name }));
+				onDeleted?.(entityId);
+			} catch (error) {
+				console.warn("[preview] entities.delete failed:", error);
+				announce(t("inspector.deleteFailed", { name: file.name }));
+			}
+		})();
+	}, [deleteEntity, locked, runtime, entityId, file.name, onDeleted]);
+
 	const meta = useMemo<PropertiesPanelMeta[]>(
 		() => factPairs(file, pairs).map(([label, value]) => ({ label, value })),
 		[file, pairs],
@@ -183,10 +242,14 @@ function EditableInspector({
 			emptyLabel={t("inspector.noProperties")}
 			addLabel={t("inspector.addProperty")}
 			removeLabel={(name) => t("inspector.removeProperty", { name })}
+			extraRows={captionRows}
 			meta={meta}
 			closeLabel={t("menu.hideInspector")}
 			{...(tabbed ? { hideHeader: true } : { onClose })}
-		/>
+		>
+			<FileBacklinks runtime={runtime} backlinks={backlinks} />
+			<MoveToBinButton locked={locked} available={Boolean(deleteEntity)} onMove={moveToBin} />
+		</EntityPropertiesPanel>
 	);
 
 	const withProvider = propertiesRuntime ? (

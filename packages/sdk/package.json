@@ -58,6 +58,7 @@
     "./entity-cover": "./src/entity-cover.ts",
     "./entity-drag": "./src/entity-drag.ts",
     "./os-file-drop": "./src/os-file-drop/index.ts",
+    "./backlinks": "./src/backlinks.ts",
     "./object-dnd": "./src/object-dnd/index.ts",
     "./icon": "./src/icon/index.ts",
     "./typography": "./src/typography/index.ts",

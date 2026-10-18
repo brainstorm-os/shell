@@ -27,6 +27,7 @@ import { type CommentsFocusRequest, RightPanelTab } from "@brainstorm-os/editor"
 import { useVaultEntities, useYDocDamaged } from "@brainstorm-os/react-yjs";
 import { navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
 import type { CommentAnchor, Icon } from "@brainstorm-os/sdk-types";
+import { type LinkedEntity, findBacklinks, findOutgoingLinks } from "@brainstorm-os/sdk/backlinks";
 import { MiniCalendar, openCalendarPopover } from "@brainstorm-os/sdk/calendar";
 import type { MonthGridReactCell } from "@brainstorm-os/sdk/calendar";
 import { Checkbox } from "@brainstorm-os/sdk/checkbox";
@@ -68,12 +69,6 @@ import {
 } from "react";
 import { buildJournalDemo } from "./demo/dataset";
 import { useJournalT } from "./i18n-hooks";
-import {
-	type Backlink,
-	type OutgoingLink,
-	findBacklinks,
-	findOutgoingLinks,
-} from "./logic/backlinks";
 import { shiftByDays } from "./logic/calendar-grid";
 import {
 	HABIT_LABEL_KEY,
@@ -122,6 +117,7 @@ import {
 import { parseReminderTime, shouldFireWriteReminder } from "./logic/write-reminder";
 import {
 	JOURNAL_ENTRY_TYPE,
+	NOTE_ENTITY_TYPE,
 	type VaultSnapshot,
 	getJournalRuntime,
 	notesFromSnapshot,
@@ -1652,24 +1648,28 @@ function LinkRow({
 	);
 }
 
-function BacklinksPanel({
-	backlinks,
+/** "Linked from" (backlinks) / "Links to" (outgoing) — one panel, two
+ *  headings; both walks resolve to the same `LinkedEntity` row. */
+function LinksPanel({
+	heading,
+	links,
 	onOpen,
 }: {
-	backlinks: readonly Backlink[];
-	onOpen: (link: Backlink, event: React.MouseEvent) => void;
+	heading: string;
+	links: readonly LinkedEntity[];
+	onOpen: (link: LinkedEntity, event: React.MouseEvent) => void;
 }): ReactElement {
 	return (
 		<aside className="journal__backlinks">
-			<h2 className="journal__backlinks-heading">{t("linkedFrom", { count: backlinks.length })}</h2>
+			<h2 className="journal__backlinks-heading">{heading}</h2>
 			<ul className="journal__backlinks-list">
-				{backlinks.map((link) => (
+				{links.map((link) => (
 					<LinkRow
-						key={`${link.sourceNoteId}:${link.linkType}`}
+						key={`${link.entityId}:${link.linkType}`}
 						title={link.title}
 						meta={link.linkType === LINK_TYPE_NOTE_LINK ? t("link") : t("mention")}
-						noteId={link.sourceNoteId}
-						type={link.sourceType}
+						noteId={link.entityId}
+						type={link.entityType}
 						onOpen={(event) => onOpen(link, event)}
 					/>
 				))}
@@ -1678,30 +1678,23 @@ function BacklinksPanel({
 	);
 }
 
-function OutgoingPanel({
-	links,
-	onOpen,
-}: {
-	links: readonly OutgoingLink[];
-	onOpen: (link: OutgoingLink, event: React.MouseEvent) => void;
-}): ReactElement {
-	return (
-		<aside className="journal__backlinks">
-			<h2 className="journal__backlinks-heading">{t("linksTo", { count: links.length })}</h2>
-			<ul className="journal__backlinks-list">
-				{links.map((link) => (
-					<LinkRow
-						key={`${link.destNoteId}:${link.linkType}`}
-						title={link.title}
-						meta={link.linkType === LINK_TYPE_NOTE_LINK ? t("link") : t("mention")}
-						noteId={link.destNoteId}
-						type={link.destType}
-						onOpen={(event) => onOpen(link, event)}
-					/>
-				))}
-			</ul>
-		</aside>
-	);
+/** Only rich-text bodies count as journal backlink sources — a Task or a
+ *  Database row pointing at an entry is not a "mention". */
+const JOURNAL_BACKLINK_SOURCES: ReadonlySet<string> = new Set([
+	NOTE_ENTITY_TYPE,
+	JOURNAL_ENTRY_TYPE,
+]);
+
+function journalBacklinks(snapshot: VaultSnapshot, id: string): LinkedEntity[] {
+	return findBacklinks(snapshot, id, { types: JOURNAL_BACKLINK_SOURCES });
+}
+
+function openLinked(link: LinkedEntity, event: React.MouseEvent): void {
+	void openEntity(getJournalRuntime(), {
+		entityId: link.entityId,
+		entityType: link.entityType,
+		mode: navModeFromEvent(event.nativeEvent),
+	});
 }
 
 // ── Periodic rollup body. ──
@@ -1718,7 +1711,7 @@ function PeriodicBody({
 	const pending = pendingSeedRef.current?.get(periodic.id);
 	if (pending !== undefined) pendingSeedRef.current?.delete(periodic.id);
 	const outgoing = snapshot ? findOutgoingLinks(snapshot, periodic.id) : [];
-	const backlinks = snapshot ? findBacklinks(snapshot, periodic.id) : [];
+	const backlinks = snapshot ? journalBacklinks(snapshot, periodic.id) : [];
 	return (
 		<div className="journal__entry-body">
 			<div className="journal__entry-editor-host">
@@ -1729,27 +1722,17 @@ function PeriodicBody({
 				)}
 			</div>
 			{outgoing.length > 0 ? (
-				<OutgoingPanel
+				<LinksPanel
+					heading={t("linksTo", { count: outgoing.length })}
 					links={outgoing}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.destNoteId,
-							entityType: link.destType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
+					onOpen={openLinked}
 				/>
 			) : null}
 			{backlinks.length > 0 ? (
-				<BacklinksPanel
-					backlinks={backlinks}
-					onOpen={(link, event) =>
-						void openEntity(getJournalRuntime(), {
-							entityId: link.sourceNoteId,
-							entityType: link.sourceType,
-							mode: navModeFromEvent(event.nativeEvent),
-						})
-					}
+				<LinksPanel
+					heading={t("linkedFrom", { count: backlinks.length })}
+					links={backlinks}
+					onOpen={openLinked}
 				/>
 			) : null}
 		</div>
@@ -1844,7 +1827,7 @@ function EntryBody({
 	const onBodyDenormalize = entry ? journalDenormalize : lazyDenormalize;
 
 	const outgoing = entry && snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
-	const backlinks = entry && snapshot ? findBacklinks(snapshot, entry.noteId) : [];
+	const backlinks = entry && snapshot ? journalBacklinks(snapshot, entry.noteId) : [];
 
 	return (
 		<div className="journal__entry-body">
@@ -1913,27 +1896,17 @@ function EntryBody({
 					</div>
 					<CheckIn entry={entry} onMood={onMood} onHabit={onHabit} />
 					{outgoing.length > 0 ? (
-						<OutgoingPanel
+						<LinksPanel
+							heading={t("linksTo", { count: outgoing.length })}
 							links={outgoing}
-							onOpen={(link, event) =>
-								void openEntity(getJournalRuntime(), {
-									entityId: link.destNoteId,
-									entityType: link.destType,
-									mode: navModeFromEvent(event.nativeEvent),
-								})
-							}
+							onOpen={openLinked}
 						/>
 					) : null}
 					{backlinks.length > 0 ? (
-						<BacklinksPanel
-							backlinks={backlinks}
-							onOpen={(link, event) =>
-								void openEntity(getJournalRuntime(), {
-									entityId: link.sourceNoteId,
-									entityType: link.sourceType,
-									mode: navModeFromEvent(event.nativeEvent),
-								})
-							}
+						<LinksPanel
+							heading={t("linkedFrom", { count: backlinks.length })}
+							links={backlinks}
+							onOpen={openLinked}
 						/>
 					) : null}
 				</>

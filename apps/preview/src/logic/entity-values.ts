@@ -46,3 +46,16 @@ export function entityLockedFromSnapshot(
 ): boolean {
 	return isEntityLocked(liveEntity(snapshot, entityId));
 }
+
+/** The File entity's top-level caption property (9.20.15). */
+export const CAPTION_KEY = "caption";
+
+export function entityCaptionFromSnapshot(
+	snapshot: VaultEntitiesSnapshot,
+	entityId: string | null,
+): string {
+	const caption = (
+		liveEntity(snapshot, entityId)?.properties as Record<string, unknown> | undefined
+	)?.[CAPTION_KEY];
+	return typeof caption === "string" ? caption : "";
+}
