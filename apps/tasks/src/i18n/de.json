@@ -99,7 +99,6 @@
   "tasks.header.sidebar.hide": "Seitenleiste ausblenden",
   "tasks.header.iconPicker.open": "Projektsymbol ändern",
   "tasks.header.renameProject": "Projekt umbenennen",
-  "tasks.row.toggle.aria": "Erledigt umschalten",
   "tasks.row.icon.aria": "Symbol ändern",
   "tasks.row.due.sr": "Fällig am {date}",
   "tasks.row.scheduled.sr": "Geplant für {date}",
