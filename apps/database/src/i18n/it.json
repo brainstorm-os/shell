@@ -322,5 +322,8 @@
   "brainstorm.database.bulk.lockedSkipped.other": "{count} elementi bloccati saltati.",
   "brainstorm.database.bulk.overCapacity": "{count} non aggiunti: la raccolta è piena.",
   "brainstorm.database.bulk.undo": "Annulla",
-  "brainstorm.database.bulk.undone": "Modifica multipla annullata."
+  "brainstorm.database.bulk.undone": "Modifica multipla annullata.",
+  "brainstorm.database.inspector.nextObject": "Oggetto successivo",
+  "brainstorm.database.inspector.previousObject": "Oggetto precedente",
+  "brainstorm.database.inspector.position": "{index} di {total}"
 }

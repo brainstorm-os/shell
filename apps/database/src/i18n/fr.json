@@ -322,5 +322,8 @@
   "brainstorm.database.bulk.lockedSkipped.other": "{count} éléments verrouillés ignorés.",
   "brainstorm.database.bulk.overCapacity": "{count} non ajoutés : la collection est pleine.",
   "brainstorm.database.bulk.undo": "Annuler",
-  "brainstorm.database.bulk.undone": "Modification groupée annulée."
+  "brainstorm.database.bulk.undone": "Modification groupée annulée.",
+  "brainstorm.database.inspector.nextObject": "Objet suivant",
+  "brainstorm.database.inspector.previousObject": "Objet précédent",
+  "brainstorm.database.inspector.position": "{index} sur {total}"
 }

@@ -111,6 +111,14 @@ import {
 import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
 import { effectiveColumnDef } from "./logic/effective-def";
+import {
+	OBJECT_NAV_SHORTCUTS,
+	type ObjectNavContext,
+	ObjectNavDirection,
+	ObjectOpenMode,
+	objectNavPosition,
+	stepObjectNav,
+} from "./logic/object-nav";
 import { propertyKindIconFor } from "./logic/property-kind-icon";
 
 applyPersistedPanelWidth({
@@ -1503,6 +1511,7 @@ function inspectorLockButton(state: AppState): LockButtonHandle | null {
 }
 
 function renderInspector(state: AppState): void {
+	renderInspectorNav(state);
 	const body = document.getElementById("inspector-body");
 	const title = document.getElementById("inspector-title");
 	if (!body || !title) return;
@@ -1963,6 +1972,86 @@ function onSelectEntity(state: AppState, entity: EntityRow, modifiers: Selection
  *  "Open" affordance in the title cell (F-023). Selects the row and opens the
  *  right panel, but unlike `onOpenEntity` does NOT dispatch a cross-app open
  *  intent: this is the in-Database "peek", not "open it in its own app". */
+/** The live walk (9.12.34) — which object was opened from which view, and
+ *  how, so prev / next re-show the neighbour the same way. */
+let objectNav: ObjectNavContext | null = null;
+
+function beginObjectNav(state: AppState, entity: EntityRow, mode: ObjectOpenMode): void {
+	const view = activeView(state);
+	objectNav = view ? { viewId: view.id, entityId: entity.id, mode } : null;
+}
+
+/** The walk context for the single selected object — the recorded one when
+ *  it still points at the selection, else an inspector walk from it. */
+function currentObjectNav(state: AppState): ObjectNavContext | null {
+	const view = activeView(state);
+	const entity = singleSelectedEntity(state);
+	if (!view || !entity) return null;
+	if (objectNav && objectNav.entityId === entity.id && objectNav.viewId === view.id)
+		return objectNav;
+	return { viewId: view.id, entityId: entity.id, mode: ObjectOpenMode.Inspector };
+}
+
+function stepObject(state: AppState, direction: ObjectNavDirection): void {
+	const context = currentObjectNav(state);
+	if (!context) return;
+	const ids = orderedVisibleIds(state);
+	const next = stepObjectNav(context, ids, direction);
+	if (!next) return;
+	const entity = state.db.entities.find((e) => e.id === next.entityId);
+	if (!entity) return;
+	objectNav = next;
+	state.selection = applyClick(state.selection, entity.id, { shiftKey: false, metaKey: false }, ids);
+	if (next.mode === ObjectOpenMode.QuickLook) void dispatchQuickLook(entity);
+	if (next.mode === ObjectOpenMode.Open) void dispatchOpenIntent(entity);
+	renderInspector(state);
+	repaintSelection(state);
+	document
+		.querySelector<HTMLElement>(`#stage-body [data-entity-id="${CSS.escape(entity.id)}"]`)
+		?.scrollIntoView?.({ block: "nearest" });
+}
+
+/** Prev / next + "3 of 24" in the inspector header; empty unless exactly one
+ *  object is selected in a view. */
+function renderInspectorNav(state: AppState): void {
+	const slot = document.getElementById("inspector-nav-slot");
+	if (!slot) return;
+	slot.replaceChildren();
+	const context = currentObjectNav(state);
+	const position = context ? objectNavPosition(context, orderedVisibleIds(state)) : null;
+	if (!position || position.total < 2) return;
+	const button = (direction: ObjectNavDirection, enabled: boolean): HTMLButtonElement => {
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "db-inspector__nav-btn";
+		btn.dataset.testid =
+			direction === ObjectNavDirection.Next ? "db-inspector-next" : "db-inspector-prev";
+		const label = t(
+			direction === ObjectNavDirection.Next
+				? "brainstorm.database.inspector.nextObject"
+				: "brainstorm.database.inspector.previousObject",
+		);
+		btn.setAttribute("aria-label", label);
+		btn.dataset.bsTooltip = label;
+		btn.setAttribute("aria-keyshortcuts", OBJECT_NAV_SHORTCUTS[direction]);
+		btn.disabled = !enabled;
+		setSharedIcon(btn, direction === ObjectNavDirection.Next ? IconName.CaretDown : IconName.CaretUp);
+		btn.addEventListener("click", () => stepObject(state, direction));
+		return btn;
+	};
+	const count = document.createElement("span");
+	count.className = "db-inspector__nav-count";
+	count.textContent = t("brainstorm.database.inspector.position", {
+		index: position.index + 1,
+		total: position.total,
+	});
+	slot.append(
+		button(ObjectNavDirection.Previous, position.hasPrev),
+		count,
+		button(ObjectNavDirection.Next, position.hasNext),
+	);
+}
+
 function onOpenInspector(state: AppState, entity: EntityRow): void {
 	state.selection = applyClick(
 		state.selection,
@@ -2236,6 +2325,7 @@ async function undoBulkEdit(state: AppState): Promise<void> {
 
 function onOpenEntity(state: AppState, entity: EntityRow): void {
 	void dispatchOpenIntent(entity);
+	beginObjectNav(state, entity, ObjectOpenMode.Open);
 	state.selection = applyClick(
 		state.selection,
 		entity.id,
@@ -4799,6 +4889,19 @@ function bindStageKeyboard(state: AppState): void {
 		renderInspector(state);
 	});
 	attachShortcut(body, "Mod+A", () => selectAllVisible(state));
+	for (const direction of [ObjectNavDirection.Previous, ObjectNavDirection.Next]) {
+		attachShortcut(
+			window,
+			OBJECT_NAV_SHORTCUTS[direction],
+			(event) => {
+				if (isEditableElement(event.target) || !currentObjectNav(state)) return;
+				event.preventDefault();
+				event.stopPropagation();
+				stepObject(state, direction);
+			},
+			{ preventDefault: false },
+		);
+	}
 	// One-step undo of the last bulk edit (9.12.32). A modifier chord, so it
 	// would also fire inside a cell editor — there the native text undo wins.
 	attachShortcut(
@@ -4814,7 +4917,10 @@ function bindStageKeyboard(state: AppState): void {
 	);
 	attachShortcut(body, "Space", () => {
 		const entity = singleSelectedEntity(state);
-		if (entity) void dispatchQuickLook(entity);
+		if (!entity) return;
+		void dispatchQuickLook(entity);
+		beginObjectNav(state, entity, ObjectOpenMode.QuickLook);
+		renderInspectorNav(state);
 	});
 	// DND-6 — keyboard entry to the row object menu (the twin surface for
 	// Add-to-collection / Move-to-column): Shift+F10 (the platform context-menu

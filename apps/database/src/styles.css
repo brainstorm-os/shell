@@ -2382,6 +2382,32 @@ body.is-resizing .dbv-tl__labels-resize {
 	white-space: nowrap;
 }
 
+/* Prev / next object walk (9.12.34). */
+.db-inspector__nav-slot {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-0_5);
+	margin-inline-start: auto;
+}
+
+.db-inspector__nav-slot:empty {
+	display: none;
+}
+
+.db-inspector__nav-count {
+	font-size: var(--text-size-xs);
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+	padding-inline: var(--space-1);
+}
+
+.db-inspector__nav-btn:disabled {
+	color: var(--text-faint);
+	cursor: default;
+	background: transparent;
+}
+
+.db-inspector__nav-btn,
 .db-inspector__close {
 	width: var(--control-height-sm, 24px);
 	height: var(--control-height-sm, 24px);
@@ -2395,6 +2421,7 @@ body.is-resizing .dbv-tl__labels-resize {
 	border-radius: var(--radius-sm);
 }
 
+.db-inspector__nav-btn:not(:disabled):hover,
 .db-inspector__close:hover {
 	background: var(--hover);
 	color: var(--text);

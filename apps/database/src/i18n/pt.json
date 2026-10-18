@@ -322,5 +322,8 @@
   "brainstorm.database.bulk.lockedSkipped.other": "{count} itens bloqueados ignorados.",
   "brainstorm.database.bulk.overCapacity": "{count} não adicionados: a coleção está cheia.",
   "brainstorm.database.bulk.undo": "Desfazer",
-  "brainstorm.database.bulk.undone": "Edição em massa desfeita."
+  "brainstorm.database.bulk.undone": "Edição em massa desfeita.",
+  "brainstorm.database.inspector.nextObject": "Próximo objeto",
+  "brainstorm.database.inspector.previousObject": "Objeto anterior",
+  "brainstorm.database.inspector.position": "{index} de {total}"
 }

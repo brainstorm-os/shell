@@ -322,5 +322,8 @@
   "brainstorm.database.bulk.lockedSkipped.other": "{count} gesperrte Einträge übersprungen.",
   "brainstorm.database.bulk.overCapacity": "{count} nicht hinzugefügt: Die Sammlung ist voll.",
   "brainstorm.database.bulk.undo": "Rückgängig",
-  "brainstorm.database.bulk.undone": "Massenbearbeitung rückgängig gemacht."
+  "brainstorm.database.bulk.undone": "Massenbearbeitung rückgängig gemacht.",
+  "brainstorm.database.inspector.nextObject": "Nächstes Objekt",
+  "brainstorm.database.inspector.previousObject": "Vorheriges Objekt",
+  "brainstorm.database.inspector.position": "{index} von {total}"
 }

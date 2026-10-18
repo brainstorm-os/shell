@@ -322,5 +322,8 @@
   "brainstorm.database.bulk.lockedSkipped.other": "{count} locked items skipped.",
   "brainstorm.database.bulk.overCapacity": "{count} not added: the collection is full.",
   "brainstorm.database.bulk.undo": "Undo",
-  "brainstorm.database.bulk.undone": "Bulk edit undone."
+  "brainstorm.database.bulk.undone": "Bulk edit undone.",
+  "brainstorm.database.inspector.nextObject": "Next object",
+  "brainstorm.database.inspector.previousObject": "Previous object",
+  "brainstorm.database.inspector.position": "{index} of {total}"
 }
