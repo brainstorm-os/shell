@@ -37,12 +37,18 @@ describe("display prefs (12.18)", () => {
 
 	it("stamps each attribute and layers contrast overrides only for higher contrast", () => {
 		const paint = resolveDisplayPaint(
-			{ higherContrast: true, emphasizeTextCursor: true, alwaysShowScrollbars: true },
+			{
+				higherContrast: true,
+				emphasizeTextCursor: true,
+				alwaysShowScrollbars: true,
+				autoHideSidebars: true,
+			},
 			themes[ThemeName.DefaultDark],
 		);
 		expect(paint.attributes[DisplayAttribute.Contrast]).toBe(DisplayAttributeValue.More);
 		expect(paint.attributes[DisplayAttribute.TextEmphasis]).toBe(DisplayAttributeValue.On);
 		expect(paint.attributes[DisplayAttribute.Scrollbars]).toBe(DisplayAttributeValue.Always);
+		expect(paint.attributes[DisplayAttribute.AutoHideSidebars]).toBe(DisplayAttributeValue.On);
 		expect(Object.keys(paint.vars)).toContain("--color-border-default");
 	});
 });

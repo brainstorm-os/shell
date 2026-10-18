@@ -399,6 +399,75 @@ select {
 }
 
 /* ============================================================
+ * AUTO-HIDE SIDEBARS (7.15) — `useAutoHidePanel` from
+ * `@brainstorm-os/sdk/panel-toggle`. While a collapsed sidebar is in
+ * auto-hide mode it renders as an overlay (`data-bs-autohide`) beside an
+ * invisible edge hot-zone; the app's sidebar container must be the
+ * positioned ancestor. Hidden = slid off its edge AND `visibility: hidden`
+ * (plus `inert` from the hook's `visible`), so it leaves the tab order and
+ * the accessibility tree; `visibility` flips only after the slide finishes.
+ * PHYSICAL-AXIS INTENTIONAL: the slide follows the screen edge, so RTL flips it.
+ * ============================================================ */
+.bs-autohide-edge {
+	position: absolute;
+	inset-block: 0;
+	inline-size: var(--space-2);
+	z-index: var(--z-sticky);
+}
+
+.bs-autohide-edge[data-bs-side="left"] {
+	inset-inline-start: 0;
+}
+
+.bs-autohide-edge[data-bs-side="right"] {
+	inset-inline-end: 0;
+}
+
+[data-bs-autohide] {
+	position: absolute;
+	inset-block: 0;
+	z-index: var(--z-overlay);
+	background: var(--color-background-elevated);
+	box-shadow: var(--shadow-lg);
+	transition:
+		transform var(--motion-duration-fast) var(--motion-easing-standard),
+		visibility 0s;
+}
+
+[data-bs-autohide][data-bs-side="left"] {
+	inset-inline-start: 0;
+}
+
+[data-bs-autohide][data-bs-side="right"] {
+	inset-inline-end: 0;
+}
+
+[data-bs-autohide="hidden"] {
+	transition:
+		transform var(--motion-duration-fast) var(--motion-easing-standard),
+		visibility 0s linear var(--motion-duration-fast);
+}
+
+[data-bs-autohide="hidden"][data-bs-side="left"],
+:root[dir="rtl"] [data-bs-autohide="hidden"][data-bs-side="right"] {
+	transform: translateX(-100%);
+	visibility: hidden;
+}
+
+[data-bs-autohide="hidden"][data-bs-side="right"],
+:root[dir="rtl"] [data-bs-autohide="hidden"][data-bs-side="left"] {
+	transform: translateX(100%);
+	visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-bs-autohide],
+	[data-bs-autohide="hidden"] {
+		transition: none;
+	}
+}
+
+/* ============================================================
  * BUTTON — shared structural primitive `.bs-btn`. Every app's
  * generic buttons (toolbar / dialog / form actions) build on this
  * so height / padding / radius / type / surface live in ONE place;

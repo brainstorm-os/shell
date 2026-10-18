@@ -29,9 +29,14 @@ describe("VisibilityPreferences (12.18)", () => {
 	const input = (label: string) =>
 		host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null;
 
-	it("renders the three preferences off by default (missing on a stale main)", () => {
+	it("renders every preference off by default (missing on a stale main)", () => {
 		act(() => root.render(<VisibilityPreferences display={undefined} />));
-		for (const label of ["Higher contrast", "Text cursor and selection", "Always show scrollbars"]) {
+		for (const label of [
+			"Higher contrast",
+			"Text cursor and selection",
+			"Always show scrollbars",
+			"Auto-hide sidebars",
+		]) {
 			expect(input(label)?.checked, label).toBe(false);
 		}
 	});
@@ -45,5 +50,7 @@ describe("VisibilityPreferences (12.18)", () => {
 		expect(input("Always show scrollbars")?.checked).toBe(true);
 		act(() => input("Higher contrast")?.click());
 		expect(setDisplayPrefs).toHaveBeenCalledWith({ higherContrast: true });
+		act(() => input("Auto-hide sidebars")?.click());
+		expect(setDisplayPrefs).toHaveBeenCalledWith({ autoHideSidebars: true });
 	});
 });

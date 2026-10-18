@@ -9,6 +9,7 @@
  * theming fine.
  */
 
+import { AUTO_HIDE_SIDEBARS_ATTRIBUTE } from "@brainstorm-os/sdk/panel-toggle";
 import {
 	DEFAULT_THEME,
 	DisplayAttribute,
@@ -47,7 +48,16 @@ describe("applyThemeVars", () => {
 });
 
 describe("applyThemeVars — visibility preferences (12.18)", () => {
-	const ALL_ON = { higherContrast: true, emphasizeTextCursor: true, alwaysShowScrollbars: true };
+	it("the SDK auto-hide hook reads the same root attribute the shell stamps (7.15)", () => {
+		expect(AUTO_HIDE_SIDEBARS_ATTRIBUTE).toBe(DisplayAttribute.AutoHideSidebars);
+	});
+
+	const ALL_ON = {
+		higherContrast: true,
+		emphasizeTextCursor: true,
+		alwaysShowScrollbars: true,
+		autoHideSidebars: true,
+	};
 
 	it("layers the higher-contrast overrides and stamps every root attribute", () => {
 		applyThemeVars(ThemeName.DefaultLight, ALL_ON);
@@ -55,6 +65,7 @@ describe("applyThemeVars — visibility preferences (12.18)", () => {
 		expect(root.getAttribute(DisplayAttribute.Contrast)).toBe(DisplayAttributeValue.More);
 		expect(root.getAttribute(DisplayAttribute.TextEmphasis)).toBe(DisplayAttributeValue.On);
 		expect(root.getAttribute(DisplayAttribute.Scrollbars)).toBe(DisplayAttributeValue.Always);
+		expect(root.getAttribute(DisplayAttribute.AutoHideSidebars)).toBe(DisplayAttributeValue.On);
 		expect(root.style.getPropertyValue("--color-border-default")).toBe(
 			themes[ThemeName.DefaultLight].color.border.strong,
 		);

@@ -30,10 +30,11 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { Popover } from "@brainstorm-os/sdk/popover";
 import type { EntityTitleSource } from "@brainstorm-os/sdk/property-ui";
 import { useResizable } from "@brainstorm-os/sdk/resizable";
+import { useShortcut } from "@brainstorm-os/sdk/shortcut";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
@@ -73,6 +74,9 @@ import { PersonSidebar } from "./ui/person-list";
 import { exportContactsToVCard, importContactsFromVCard } from "./ui/vcard-actions";
 
 const SIDEBAR_OPEN_KEY = "contacts:sidebar-open";
+/** Show/hide the contact list — while auto-hide (7.15) governs a collapsed
+ *  list, the same chord reveals it as an overlay instead of pinning it. */
+const TOGGLE_SIDEBAR_CHORD = "CmdOrCtrl+\\";
 const PROPS_OPEN_KEY = "contacts:props-open";
 const GROUP_BY_KEY = "contacts:group-by";
 const SORT_BY_KEY = "contacts:sort-by";
@@ -717,6 +721,13 @@ export function ContactsApp(): ReactElement {
 		? (persons.find((p) => p.id === confirmDeleteId) ?? null)
 		: null;
 
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
+	useShortcut(TOGGLE_SIDEBAR_CHORD, (event) => {
+		event.preventDefault();
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else toggleSidebar();
+	});
+
 	const companyName = activePerson ? companyNameOf(activePerson.companyId) : null;
 
 	return (
@@ -802,7 +813,8 @@ export function ContactsApp(): ReactElement {
 					query={query}
 					now={now}
 					demo={!usingVault}
-					open={sidebarOpen}
+					open={sidebarAutoHide.visible}
+					autoHide={sidebarAutoHide.panelProps}
 					activeId={location.id}
 					companyNameOf={companyNameOf}
 					grouping={grouping}
@@ -816,6 +828,7 @@ export function ContactsApp(): ReactElement {
 					onSetSorting={setSortingPref}
 					onReviewDuplicates={() => setDuplicatesOpen(true)}
 				/>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 				{sidebarOpen && (
 					<div className="contacts__resize" aria-label={t("sidebar.resize")} {...handleProps} />
 				)}

@@ -163,7 +163,12 @@ describe("broadcastDisplayToWindows (12.18)", () => {
 	it("sends the visibility preferences to every live app window, skipping dead ones", () => {
 		const live = makeFakeAppWindow("io.brainstorm.notes");
 		const dead = makeFakeAppWindow("io.brainstorm.graph", true);
-		const prefs = { higherContrast: true, emphasizeTextCursor: false, alwaysShowScrollbars: true };
+		const prefs = {
+			higherContrast: true,
+			emphasizeTextCursor: false,
+			alwaysShowScrollbars: true,
+			autoHideSidebars: false,
+		};
 		broadcastDisplayToWindows(prefs, [live.appWindow, dead.appWindow]);
 		expect(live.send).toHaveBeenCalledWith(APP_DISPLAY_CHANGED_CHANNEL, prefs);
 		expect(dead.send).not.toHaveBeenCalled();

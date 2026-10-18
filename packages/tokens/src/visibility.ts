@@ -22,6 +22,9 @@ export enum DisplayAttribute {
 	Contrast = "data-bs-contrast",
 	TextEmphasis = "data-bs-text-emphasis",
 	Scrollbars = "data-bs-scrollbars",
+	/** Auto-hide sidebars (7.15) — read by `@brainstorm-os/sdk/panel-toggle`
+	 *  `useAutoHidePanel`; a layout preference, so it carries no tokens. */
+	AutoHideSidebars = "data-bs-autohide-sidebars",
 }
 
 /** The single value each attribute carries while its preference is on; the

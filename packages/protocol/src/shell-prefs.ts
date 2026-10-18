@@ -241,12 +241,16 @@ export type DisplayPrefs = {
 	emphasizeTextCursor: boolean;
 	/** Classic always-visible scrollbars instead of macOS overlay bars. */
 	alwaysShowScrollbars: boolean;
+	/** 7.15 — a collapsed sidebar reveals as an overlay on edge hover / its
+	 *  shortcut instead of staying gone (apps opt in via the SDK). */
+	autoHideSidebars: boolean;
 };
 
 export const DEFAULT_DISPLAY_PREFS: DisplayPrefs = {
 	higherContrast: false,
 	emphasizeTextCursor: false,
 	alwaysShowScrollbars: false,
+	autoHideSidebars: false,
 };
 
 /** Every `DisplayPrefs` key, in Settings order — the one list the store,
@@ -255,6 +259,7 @@ export const DISPLAY_PREF_KEYS: readonly (keyof DisplayPrefs)[] = [
 	"higherContrast",
 	"emphasizeTextCursor",
 	"alwaysShowScrollbars",
+	"autoHideSidebars",
 ];
 
 /** Normalise an untrusted payload (IPC arg, persisted map, argv) to a full
@@ -298,6 +303,7 @@ export function resolveDisplayPaint(prefs: DisplayPrefs, tokens: Tokens): Displa
 			[DisplayAttribute.Contrast]: prefs.higherContrast ? DisplayAttributeValue.More : null,
 			[DisplayAttribute.TextEmphasis]: prefs.emphasizeTextCursor ? DisplayAttributeValue.On : null,
 			[DisplayAttribute.Scrollbars]: prefs.alwaysShowScrollbars ? DisplayAttributeValue.Always : null,
+			[DisplayAttribute.AutoHideSidebars]: prefs.autoHideSidebars ? DisplayAttributeValue.On : null,
 		},
 		vars: prefs.higherContrast ? higherContrastOverrides(tokens) : {},
 	};

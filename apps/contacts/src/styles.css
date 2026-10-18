@@ -41,6 +41,7 @@ body {
 }
 
 .contacts__body {
+	position: relative; /* anchor for the auto-hide sidebar overlay (7.15) */
 	flex: 1;
 	display: flex;
 	min-height: 0;
@@ -55,7 +56,7 @@ body {
 	border-inline-end: var(--border-width) solid var(--color-border-subtle);
 }
 
-.contacts[data-nav-open="false"] .contacts__sidebar {
+.contacts[data-nav-open="false"] .contacts__sidebar:not([data-bs-autohide]) {
 	display: none;
 }
 
