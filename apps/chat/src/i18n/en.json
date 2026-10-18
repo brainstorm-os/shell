@@ -122,5 +122,10 @@
   "search.none": "No messages match.",
   "search.capped": "Showing the {count} newest matches — refine the search to narrow it.",
   "search.results.one": "{count} match",
-  "search.results.other": "{count} matches"
+  "search.results.other": "{count} matches",
+  "menu.markRead": "Mark as read",
+  "menu.markAllRead": "Mark all as read",
+  "sidebar.channelMenu": "Channel actions",
+  "sidebar.channelUnread.one": "{name}, {count} unread message",
+  "sidebar.channelUnread.other": "{name}, {count} unread messages"
 }

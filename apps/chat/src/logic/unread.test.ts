@@ -14,7 +14,7 @@ import {
 	loadWatermarks,
 	saveWatermarks,
 } from "./unread";
-import { READ_WATERMARKS_KEY, unreadTotal } from "./unread";
+import { READ_WATERMARKS_KEY, unreadByChannel, unreadTotal } from "./unread";
 
 function channel(id: string): EntityLike {
 	return { id, type: CHANNEL_TYPE, properties: { name: id, createdAt: "2026-01-01" } };
@@ -80,6 +80,11 @@ describe("unreadTotal", () => {
 
 	it("counts others' messages above the channel watermark", () => {
 		expect(unreadTotal(entities, "me", { ch1: 0, ch2: -1 })).toBe(2);
+	});
+
+	it("breaks the count down per channel, omitting read and unobserved channels (Chats-2)", () => {
+		expect([...unreadByChannel(entities, "me", { ch1: -1, ch2: 5 })]).toEqual([["ch1", 2]]);
+		expect([...unreadByChannel(entities, "me", { ch2: -1 })]).toEqual([["ch2", 1]]);
 	});
 
 	it("excludes own messages", () => {

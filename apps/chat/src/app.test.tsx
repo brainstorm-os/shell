@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatApp } from "./app";
 import { CHANNEL_TYPE, MESSAGE_TYPE } from "./logic/chat";
 import { READ_WATERMARKS_KEY } from "./logic/unread";
+import { USER_STATE_TYPE } from "./logic/user-state";
+import { USER_STATE_WRITE_DEBOUNCE_MS } from "./use-user-state";
 
 vi.mock("@brainstorm-os/sdk/object-menu", () => ({
 	openAnchoredMenu: vi.fn(),
@@ -35,6 +37,7 @@ const created: { type: string; properties: Record<string, unknown> }[] = [];
 type StorageStub = {
 	get: (key: string) => Promise<unknown>;
 	put: (key: string, value: unknown) => Promise<void>;
+	delete?: (key: string) => Promise<void>;
 };
 
 /** 7.14 — records the app-icon badge mirror (`services.ui.badge`). */
@@ -48,7 +51,11 @@ const approveProposal = vi.fn(() =>
 const discardProposal = vi.fn(() => Promise.resolve({ ok: true, status: "discarded" }));
 const dispatchIntent = vi.fn(() => Promise.resolve({ ok: true }));
 
-function installShell(entities: StubEntity[], storageOverride?: StorageStub): void {
+function installShell(
+	entities: StubEntity[],
+	storageOverride?: StorageStub,
+	extraServices: Record<string, unknown> = {},
+): void {
 	created.length = 0;
 	badgeSet.mockClear();
 	approveProposal.mockClear();
@@ -74,6 +81,7 @@ function installShell(entities: StubEntity[], storageOverride?: StorageStub): vo
 				update: vi.fn(() => Promise.resolve(null)),
 				delete: vi.fn(() => Promise.resolve(null)),
 			},
+			...extraServices,
 			storage: storageOverride ?? {
 				get: (key: string) => Promise.resolve(kv.get(key) ?? null),
 				put: (key: string, value: unknown) => {
@@ -106,8 +114,12 @@ function message(id: string, channelId: string, name: string, body: string): Stu
 let container: HTMLElement;
 let root: Root;
 
-async function mount(entities: StubEntity[], storageOverride?: StorageStub): Promise<void> {
-	installShell(entities, storageOverride);
+async function mount(
+	entities: StubEntity[],
+	storageOverride?: StorageStub,
+	extraServices?: Record<string, unknown>,
+): Promise<void> {
+	installShell(entities, storageOverride, extraServices);
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -594,5 +606,160 @@ describe("ChatApp — message search (Chats-1)", () => {
 		expect(
 			container.querySelector('[data-testid="search-scope-all"]')?.getAttribute("aria-pressed"),
 		).toBe("true");
+	});
+});
+
+describe("ChatApp — read state that follows the user (Chats-2)", () => {
+	const SELF = { pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" };
+	const roster = {
+		self: vi.fn(() => Promise.resolve(SELF)),
+		members: vi.fn(() => Promise.resolve([])),
+	};
+
+	function kvStub(seed: Record<string, unknown>): { kv: Map<string, unknown>; stub: StorageStub } {
+		const kv = new Map<string, unknown>(Object.entries(seed));
+		return {
+			kv,
+			stub: {
+				get: (key) => Promise.resolve(kv.get(key) ?? null),
+				put: (key, value) => {
+					kv.set(key, value);
+					return Promise.resolve();
+				},
+				delete: (key: string) => {
+					kv.delete(key);
+					return Promise.resolve();
+				},
+			} as StorageStub,
+		};
+	}
+
+	function userStateRow(
+		id: string,
+		watermarks: Record<string, number>,
+		owner = "pk-me",
+	): StubEntity {
+		return {
+			id,
+			type: USER_STATE_TYPE,
+			properties: { owner, watermarks, updatedAt: "2026-06-20T09:00:00.000Z" },
+		};
+	}
+
+	async function settle(ms = USER_STATE_WRITE_DEBOUNCE_MS + 50): Promise<void> {
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, ms));
+		});
+	}
+
+	function services(): { entities: { update: ReturnType<typeof vi.fn> } } {
+		return (window as unknown as { brainstorm: { services: never } }).brainstorm.services;
+	}
+
+	it("migrates the device-local watermarks onto a synced per-user row, then drops the local key", async () => {
+		const { kv, stub } = kvStub({ [READ_WATERMARKS_KEY]: { c2: 0 } });
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m0", "c2", "Mira", "seen"),
+				message("m1", "c2", "Mira", "new"),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		const row = created.find((c) => c.type === USER_STATE_TYPE);
+		expect(row?.properties).toMatchObject({ owner: "pk-me", watermarks: { c1: -1, c2: 0 } });
+		expect(kv.has(READ_WATERMARKS_KEY)).toBe(false);
+	});
+
+	it("honours a watermark another device wrote — nothing it already read badges here", async () => {
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m1", "c2", "Mira", "read on my laptop"),
+				message("m2", "c2", "Mira", "arrived after"),
+				userStateRow("us-1", { c1: -1, c2: 1 }),
+				userStateRow("us-other", { c2: -1 }, "pk-someone-else"),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		const badge = [...container.querySelectorAll(".chat__channel")]
+			.find((b) => b.textContent?.includes("design"))
+			?.querySelector(".bs-count-badge");
+		expect(badge?.textContent).toBe("1");
+		expect(created.some((c) => c.type === USER_STATE_TYPE)).toBe(false);
+	});
+
+	it("marks every channel read from the channel context menu and the header menu", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				channel("c3", "random"),
+				message("m1", "c2", "Mira", "a"),
+				message("m2", "c3", "Mira", "b"),
+				userStateRow("us-1", { c1: -1, c2: 0, c3: 1 }),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 2 });
+
+		const design = [...container.querySelectorAll<HTMLButtonElement>(".chat__channel")].find((b) =>
+			b.textContent?.includes("design"),
+		);
+		open.mockClear();
+		act(() => {
+			design?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+		});
+		const items = open.mock.calls[0]?.[1] ?? [];
+		expect(items.map((i) => i.label)).toEqual(["Mark as read", "Mark all as read"]);
+		await act(async () => items[1]?.onSelect?.());
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
+		expect(container.querySelector(".chat__channel .bs-count-badge")).toBeNull();
+		await settle();
+		expect(services().entities.update).toHaveBeenLastCalledWith(
+			"us-1",
+			expect.objectContaining({ watermarks: { c1: -1, c2: 1, c3: 2 } }),
+		);
+
+		open.mockClear();
+		act(() => {
+			(container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click();
+		});
+		const header = open.mock.calls[0]?.[1] ?? [];
+		const markAll = header.find((i) => i.label === "Mark all as read");
+		expect(markAll?.disabled).toBe(true);
+	});
+
+	it("Shift+Escape marks all as read", async () => {
+		const { stub } = kvStub({});
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m1", "c2", "Mira", "a"),
+				userStateRow("us-1", { c1: -1, c2: 0 }),
+			],
+			stub,
+			{ roster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 1 });
+		pressChord("Escape", { shift: true });
+		await act(async () => undefined);
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
 	});
 });

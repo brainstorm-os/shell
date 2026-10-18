@@ -773,3 +773,14 @@ body {
 	background: var(--accent-soft);
 	transition: none;
 }
+
+/* ── unread (Chats-2) ─────────────────────────────────────────── */
+.chat__channel--unread {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.chat__channel-badge {
+	margin-left: auto;
+	flex-shrink: 0;
+}

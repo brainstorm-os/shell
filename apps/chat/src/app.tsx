@@ -33,6 +33,7 @@ import {
 	visibleAttachments,
 	withMentionAttachments,
 } from "@brainstorm-os/sdk/composer-context";
+import { CountBadge, CountBadgeTone } from "@brainstorm-os/sdk/count-badge";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
@@ -74,21 +75,22 @@ import {
 	readDecisionResult,
 } from "./logic/proposal";
 import { type SearchHit, SearchScope } from "./logic/search";
-import {
-	type ReadWatermarks,
-	ackChannels,
-	channelMaxSeqs,
-	loadWatermarks,
-	saveWatermarks,
-	unreadTotal,
-} from "./logic/unread";
+import { ackChannels, channelMaxSeqs, unreadByChannel } from "./logic/unread";
 import { ProposalCard, type ProposalHost } from "./proposal-card";
 import { getBrainstorm } from "./runtime";
 import { SearchPanel } from "./search-panel";
 import { ChatAction, useChatShortcut } from "./shortcuts";
+import { useChatUserState } from "./use-user-state";
 import "./styles.css";
 
 const DEFAULT_NAME = "You";
+
+/** Where the sovereign self (the synced read-state owner key) stands. */
+enum SelfStatus {
+	Pending = "pending",
+	Resolved = "resolved",
+	Failed = "failed",
+}
 
 const EMPTY_COMPOSER_DRAFT: CompactEditorPayload = { state: "", text: "", html: "", isEmpty: true };
 
@@ -289,21 +291,24 @@ export function ChatApp(): ReactElement {
 	// `mintPersonRef` fallback above keeps send working for the brief window before
 	// this resolves (an older personRef-authored message still renders via its
 	// denormalised name, just unlinked from the live roster).
+	const [selfStatus, setSelfStatus] = useState<SelfStatus>(SelfStatus.Pending);
 	useEffect(() => {
 		if (!roster) return;
 		let live = true;
 		roster
 			.self()
 			.then((self) => {
-				if (live)
-					setIdentity({
-						personRef: self.pubkey,
-						displayName: self.displayName || DEFAULT_NAME,
-						...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
-					});
+				if (!live) return;
+				setIdentity({
+					personRef: self.pubkey,
+					displayName: self.displayName || DEFAULT_NAME,
+					...(self.avatarRef ? { avatarRef: self.avatarRef } : {}),
+				});
+				setSelfStatus(SelfStatus.Resolved);
 			})
 			.catch((err) => {
 				console.warn("[chat] profile load failed; using local identity", err);
+				if (live) setSelfStatus(SelfStatus.Failed);
 			});
 		return () => {
 			live = false;
@@ -327,53 +332,62 @@ export function ChatApp(): ReactElement {
 	// ACTIVE channel is continuously read (you're looking at it); a channel
 	// observed for the first time baselines at its current max seq (history
 	// never badges on first run); everything else counts others' messages
-	// above the per-channel watermark. Watermarks persist in the app-private
-	// kv store; `null` until loaded so a premature 0 never clears a live badge.
-	const [watermarks, setWatermarks] = useState<ReadWatermarks | null>(null);
-	useEffect(() => {
-		if (!storage) {
-			setWatermarks({});
-			return;
-		}
-		let live = true;
-		loadWatermarks(storage)
-			.then((marks) => {
-				if (live) setWatermarks(marks);
-			})
-			.catch(() => {
-				if (live) setWatermarks({});
-			});
-		return () => {
-			live = false;
-		};
-	}, [storage]);
+	// above the per-channel watermark. Chats-2: the watermarks follow the user
+	// on a synced per-user entity (`use-user-state.ts`), migrated once from the
+	// old device-local kv key; nothing acks until they're known, so a premature
+	// 0 never clears a live badge.
+	const userState = useChatUserState({
+		entities,
+		entitiesSvc,
+		storage,
+		canSync: !!roster && selfStatus !== SelfStatus.Failed,
+		ownerRef: selfStatus === SelfStatus.Resolved ? identity.personRef : "",
+	});
+	const { ready: marksReady, watermarks, raiseWatermarks } = userState;
 
 	useEffect(() => {
-		if (watermarks === null) return;
+		if (!marksReady) return;
 		const maxes = channelMaxSeqs(entities);
 		const toAck = [...maxes.keys()].filter((id) => watermarks[id] === undefined);
 		if (activeId !== null) toAck.push(activeId);
 		const next = ackChannels(watermarks, maxes, toAck);
-		if (next === watermarks) return;
-		setWatermarks(next);
-		if (storage) void saveWatermarks(storage, next).catch(() => undefined);
-	}, [watermarks, entities, activeId, storage]);
+		if (next !== watermarks) raiseWatermarks(next);
+	}, [marksReady, watermarks, entities, activeId, raiseWatermarks]);
 
-	const unread = useMemo(
-		() => (watermarks === null ? 0 : unreadTotal(entities, identity.personRef, watermarks)),
-		[entities, identity.personRef, watermarks],
+	const unreadCounts = useMemo(
+		() =>
+			marksReady
+				? unreadByChannel(entities, identity.personRef, watermarks)
+				: new Map<string, number>(),
+		[marksReady, entities, identity.personRef, watermarks],
 	);
+	const unread = useMemo(() => {
+		let total = 0;
+		for (const n of unreadCounts.values()) total += n;
+		return total;
+	}, [unreadCounts]);
+
+	const markRead = useCallback(
+		(channelIds: readonly string[]) => {
+			if (!marksReady) return;
+			const next = ackChannels(watermarks, channelMaxSeqs(entities), channelIds);
+			if (next !== watermarks) raiseWatermarks(next);
+		},
+		[marksReady, watermarks, entities, raiseWatermarks],
+	);
+	const markAllRead = useCallback(() => markRead(channels.map((c) => c.id)), [markRead, channels]);
+	useChatShortcut(ChatAction.MarkAllRead, markAllRead);
 
 	// Mirror the unread count onto the dashboard app-icon badge (cap
 	// `ui.badge`; the Mailbox pattern). `set({count})` treats count<=0 as a
 	// clear, so draining to all-read clears the chip. Keyed on the derived
 	// count; fire-and-forget and a no-op on shells without the badge service.
 	useEffect(() => {
-		if (watermarks === null) return;
+		if (!marksReady) return;
 		const badge = services?.ui?.badge;
 		if (!badge) return;
 		void badge.set({ count: unread }).catch(() => undefined);
-	}, [unread, watermarks, services]);
+	}, [unread, marksReady, services]);
 
 	const persisted = useMemo(
 		() => (activeId ? channelMessages(entities, activeId) : []),
@@ -616,6 +630,12 @@ export function ChatApp(): ReactElement {
 					icon: IconName.Plus,
 					onSelect: () => setComposeNew(true),
 				},
+				{
+					label: t("menu.markAllRead"),
+					icon: IconName.Read,
+					disabled: unread === 0,
+					onSelect: markAllRead,
+				},
 				...(canShare
 					? [
 							{
@@ -633,7 +653,7 @@ export function ChatApp(): ReactElement {
 			],
 			{ menuLabel: t("header.moreActions"), anchor: el, align: MenuAlign.End },
 		);
-	}, [canShare]);
+	}, [canShare, unread, markAllRead]);
 
 	return (
 		<div
@@ -704,8 +724,11 @@ export function ChatApp(): ReactElement {
 					open={showSidebar}
 					channels={channels}
 					activeId={activeId}
+					unreadCounts={unreadCounts}
 					onSelect={setActiveId}
 					onNew={() => setComposeNew(true)}
+					onMarkRead={(id) => markRead([id])}
+					onMarkAllRead={markAllRead}
 				/>
 
 				<main className="chat__main">
@@ -802,17 +825,45 @@ function ChannelSidebar({
 	open,
 	channels,
 	activeId,
+	unreadCounts,
 	onSelect,
 	onNew,
+	onMarkRead,
+	onMarkAllRead,
 }: {
 	/** The CSS guard lands only at the END of the 180ms slide (F-489); `inert`
 	 *  removes the panel from the tab order and the a11y tree immediately. */
 	open: boolean;
 	channels: readonly ChatChannel[];
 	activeId: string | null;
+	unreadCounts: ReadonlyMap<string, number>;
 	onSelect: (id: string) => void;
 	onNew: () => void;
+	onMarkRead: (channelId: string) => void;
+	onMarkAllRead: () => void;
 }): ReactElement {
+	const anyUnread = unreadCounts.size > 0;
+	const openChannelMenu = (event: MouseEvent, channelId: string): void => {
+		event.preventDefault();
+		openAnchoredMenu(
+			{ x: event.clientX, y: event.clientY },
+			[
+				{
+					label: t("menu.markRead"),
+					icon: IconName.Read,
+					disabled: !unreadCounts.has(channelId),
+					onSelect: () => onMarkRead(channelId),
+				},
+				{
+					label: t("menu.markAllRead"),
+					icon: IconName.Read,
+					disabled: !anyUnread,
+					onSelect: onMarkAllRead,
+				},
+			],
+			{ menuLabel: t("sidebar.channelMenu") },
+		);
+	};
 	return (
 		<nav
 			className="chat__sidebar"
@@ -836,21 +887,41 @@ function ChannelSidebar({
 				<p className="chat__sidebar-empty">{t("sidebar.empty")}</p>
 			) : (
 				<ul className="chat__channel-list">
-					{channels.map((c) => (
-						<li key={c.id}>
-							<button
-								type="button"
-								className={`chat__channel${c.id === activeId ? " chat__channel--active" : ""}`}
-								aria-current={c.id === activeId ? "true" : undefined}
-								onClick={() => onSelect(c.id)}
-							>
-								<span className="chat__channel-hash" aria-hidden="true">
-									#
-								</span>
-								<span className="chat__channel-name">{c.name}</span>
-							</button>
-						</li>
-					))}
+					{channels.map((c) => {
+						const count = unreadCounts.get(c.id) ?? 0;
+						const active = c.id === activeId;
+						return (
+							<li key={c.id}>
+								<button
+									type="button"
+									className={`chat__channel${active ? " chat__channel--active" : ""}${count > 0 ? " chat__channel--unread" : ""}`}
+									aria-current={active ? "true" : undefined}
+									aria-label={
+										count > 0
+											? plural(count, "sidebar.channelUnread.one", "sidebar.channelUnread.other", {
+													name: c.name,
+												})
+											: undefined
+									}
+									onClick={() => onSelect(c.id)}
+									onContextMenu={(e) => openChannelMenu(e.nativeEvent, c.id)}
+								>
+									<span className="chat__channel-hash" aria-hidden="true">
+										#
+									</span>
+									<span className="chat__channel-name">{c.name}</span>
+									{count > 0 ? (
+										<CountBadge
+											count={count}
+											max={99}
+											tone={active ? CountBadgeTone.Accent : CountBadgeTone.Neutral}
+											className="chat__channel-badge"
+										/>
+									) : null}
+								</button>
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</nav>

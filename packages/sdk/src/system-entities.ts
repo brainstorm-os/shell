@@ -22,6 +22,7 @@
 export const SystemEntityType = {
 	BrowsingHistory: "brainstorm/BrowsingHistory/v1",
 	BrowsingSession: "brainstorm/BrowsingSession/v1",
+	ChatUserState: "io.brainstorm.chat/UserState/v1",
 	GraphExport: "brainstorm/graph-export/v1",
 	ListView: "brainstorm/ListView/v1",
 	ShortcutBindings: "brainstorm/ShortcutBindings/v1",
