@@ -12,15 +12,16 @@ import type { AppLauncher } from "./launcher";
 
 const APP_LOCK_CHANGED_CHANNEL = "app:lock-changed";
 
-function fakeContainer(opts: { destroyed?: boolean; tabCount?: number } = {}) {
+function fakeContainer(opts: { destroyed?: boolean; tabCount?: number; split?: boolean } = {}) {
 	const hide = vi.fn();
-	const tabs = Array.from({ length: opts.tabCount ?? 1 }, () => ({
-		view: { webContents: { send: vi.fn() } },
-	}));
+	const pane = () => ({ view: { webContents: { send: vi.fn() } } });
+	const strip = Array.from({ length: opts.tabCount ?? 1 }, pane);
+	const tabs = opts.split ? [...strip, pane()] : strip;
 	return {
 		container: {
 			baseWindow: { isDestroyed: () => opts.destroyed ?? false, hide },
-			tabs: () => tabs,
+			tabs: () => strip,
+			panes: () => tabs,
 		},
 		_hide: hide,
 		_tabs: tabs,
@@ -61,6 +62,17 @@ describe("maskAppWindowsForLock", () => {
 		});
 		expect(reveal).toHaveBeenCalledOnce();
 		expect(a._hide).not.toHaveBeenCalled();
+	});
+
+	it("signals a split window's side pane too — not just its strip tabs", () => {
+		const split = fakeContainer({ split: true });
+		maskAppWindowsForLock(launcherOf(split), true, vi.fn());
+		expect(split._tabs).toHaveLength(2);
+		for (const tab of split._tabs) {
+			expect(tab.view.webContents.send).toHaveBeenCalledWith(APP_LOCK_CHANGED_CHANNEL, {
+				locked: true,
+			});
+		}
 	});
 
 	it("skips a destroyed base window entirely (no signal, no hide)", () => {

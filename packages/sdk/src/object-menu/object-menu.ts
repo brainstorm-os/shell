@@ -26,7 +26,7 @@
 
 import type { AppToolRecord, ContributedAction } from "@brainstorm-os/sdk-types";
 import { IconName } from "../icon/icon-registry";
-import { openEntity } from "../open-entity";
+import { NavigationMode, openEntity } from "../open-entity";
 
 /** The object the menu acts on. `entityType` lets the open dispatch
  *  route to the type's registered opener; `label` is only used in
@@ -80,6 +80,8 @@ export type ObjectMenuLabels = {
 	/** Parent row of the "Open with ▸ <app>" cascade, shown only when 2+ apps
 	 *  can open the object. */
 	openWith: string;
+	/** Split view (6.14): open the object beside the current pane. */
+	openToSide: string;
 	pin: string;
 	unpin: string;
 	/** Collab-C5 "Share…" — opens the share dialog (member list + invite). */
@@ -99,6 +101,7 @@ export const DEFAULT_OBJECT_MENU_LABELS: ObjectMenuLabels = {
 	open: "Open",
 	openUnavailable: "Running standalone — open this inside the shell to use it",
 	openWith: "Open with",
+	openToSide: "Open to the side",
 	pin: "Pin to dashboard",
 	unpin: "Remove from dashboard",
 	share: "Share…",
@@ -240,6 +243,22 @@ export function buildObjectMenuItems(options: BuildObjectMenuOptions): ObjectMen
 				});
 			},
 		});
+		// Open to the side — a second view beside the current pane, in the same
+		// window. Only where the open can actually be dispatched.
+		if (canDispatch) {
+			items.push({
+				id: "open-to-side",
+				label: labels.openToSide,
+				icon: IconName.OpenExternal,
+				run: () => {
+					void openEntity(runtime, {
+						entityId: target.entityId,
+						mode: NavigationMode.NewPanel,
+						...(target.entityType ? { entityType: target.entityType } : {}),
+					});
+				},
+			});
+		}
 		// "Open with ▸ <app>" — only when more than one app claims the object
 		// (e.g. a PDF → Books / Preview). With one opener the plain "Open" above
 		// already routes there, so there's nothing to choose. Each child forces

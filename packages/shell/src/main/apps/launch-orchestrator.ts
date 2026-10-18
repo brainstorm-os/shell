@@ -89,6 +89,12 @@ export class LaunchOrchestrator {
 		return this.options.launcher.addTabToContainer(containerId, await this.buildOptions(request));
 	}
 
+	/** Open the launch context beside the active tab of an existing container
+	 *  (split view). Null when that window can't be split. */
+	async openSidePane(containerId: string, request: OrchestratedLaunch): Promise<AppWindow | null> {
+		return this.options.launcher.openSidePane(containerId, await this.buildOptions(request));
+	}
+
 	/** Open the launch context in a brand-new container (new-window mode). */
 	async openInNewWindow(request: OrchestratedLaunch): Promise<AppWindow> {
 		return this.options.launcher.openInNewWindow(await this.buildOptions(request));

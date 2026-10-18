@@ -49,6 +49,46 @@ function fakeWebContents() {
 	};
 }
 
+describe("createShortcutSetup — window-routed (split) actions", () => {
+	const withPlatform = (platform: string, fn: () => void) => {
+		const original = Object.getOwnPropertyDescriptor(process, "platform");
+		Object.defineProperty(process, "platform", { value: platform });
+		try {
+			fn();
+		} finally {
+			if (original) Object.defineProperty(process, "platform", original);
+		}
+	};
+	const focusOther = { key: "ø", code: "KeyO", meta: true, alt: true };
+
+	it("runs the action in main against the SOURCE renderer, never the dashboard", () => {
+		withPlatform("darwin", () => {
+			const dashboard = fakeWebContents();
+			const app = fakeWebContents();
+			const runWindowAction = vi.fn(() => true);
+			const setup = createShortcutSetup({ getDashboard: () => dashboard.wc, runWindowAction });
+			setup.attach(app.wc);
+			expect(app.fire(focusOther)).toBe(true);
+			expect(runWindowAction).toHaveBeenCalledWith("shell/split.focus-other", app.wc.id);
+			expect(dashboard.sent).toEqual([]);
+		});
+	});
+
+	it("falls through to the app when there is nothing to act on", () => {
+		withPlatform("darwin", () => {
+			const dashboard = fakeWebContents();
+			const app = fakeWebContents();
+			const setup = createShortcutSetup({
+				getDashboard: () => dashboard.wc,
+				runWindowAction: () => false,
+			});
+			setup.attach(app.wc);
+			expect(app.fire(focusOther)).toBe(false);
+			expect(dashboard.sent).toEqual([]);
+		});
+	});
+});
+
 describe("createShortcutSetup", () => {
 	it("attach binds a before-input-event listener that fires shell:action for matching chords", () => {
 		const original = Object.getOwnPropertyDescriptor(process, "platform");

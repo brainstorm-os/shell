@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalizeRoute, entityRoute, routesEquivalent } from "./route";
+import { canonicalizeRoute, entityIdFromRoute, entityRoute, routesEquivalent } from "./route";
 
 describe("entityRoute", () => {
 	it("builds a canonical brainstorm://entity URI", () => {
@@ -47,5 +47,24 @@ describe("routesEquivalent", () => {
 
 	it("does not match different entities", () => {
 		expect(routesEquivalent("brainstorm://entity/ent_x", "brainstorm://entity/ent_y")).toBe(false);
+	});
+});
+
+describe("entityIdFromRoute", () => {
+	it("round-trips entityRoute, including ids that need encoding", () => {
+		expect(entityIdFromRoute(entityRoute("ent_1"))).toBe("ent_1");
+		expect(entityIdFromRoute(entityRoute("a b/c"))).toBe("a b/c");
+	});
+
+	it("ignores fragments and queries", () => {
+		expect(entityIdFromRoute("brainstorm://entity/ent_1?from=x#h2")).toBe("ent_1");
+	});
+
+	it("is null for anything that isn't an entity route", () => {
+		expect(entityIdFromRoute("brainstorm://settings/x")).toBeNull();
+		expect(entityIdFromRoute("https://entity/ent_1")).toBeNull();
+		expect(entityIdFromRoute("brainstorm://entity/")).toBeNull();
+		expect(entityIdFromRoute("not a url")).toBeNull();
+		expect(entityIdFromRoute("brainstorm://entity/%E0%A4%A")).toBeNull();
 	});
 });

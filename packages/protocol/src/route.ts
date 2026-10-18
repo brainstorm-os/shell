@@ -16,6 +16,24 @@ export function entityRoute(entityId: string): string {
 	return `${ENTITY_ROUTE_SCHEME}//${ENTITY_ROUTE_AUTHORITY}/${encodeURIComponent(entityId)}`;
 }
 
+/** The entity id an entity route addresses, or null for any other route. */
+export function entityIdFromRoute(route: string): string | null {
+	let url: URL;
+	try {
+		url = new URL(route.trim());
+	} catch {
+		return null;
+	}
+	if (url.protocol !== ENTITY_ROUTE_SCHEME || url.host !== ENTITY_ROUTE_AUTHORITY) return null;
+	const raw = url.pathname.replace(/^\/+|\/+$/g, "");
+	if (!raw) return null;
+	try {
+		return decodeURIComponent(raw);
+	} catch {
+		return null;
+	}
+}
+
 /** Query params that don't bear on a route's identity (per doc-37 §Route
  *  normalization — shell-curated for v1, OQ-157). */
 const EPHEMERAL_QUERY_KEYS = new Set(["from", "via", "referrer"]);

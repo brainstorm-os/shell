@@ -38,7 +38,10 @@ import {
 	validateEnvelope,
 } from "./envelope";
 
-export type ServiceHandler = (envelope: Envelope) => Promise<unknown> | unknown;
+/** `source` is the caller identity the broker already VERIFIED against the
+ *  envelope's `app` (a WebContents id in production) — a handler may use it
+ *  to locate the calling renderer, never to re-derive the app. */
+export type ServiceHandler = (envelope: Envelope, source?: unknown) => Promise<unknown> | unknown;
 
 export type ServiceRegistry = Map<string, ServiceHandler>;
 
@@ -234,7 +237,7 @@ export class Broker {
 		this.enroll(envelope.app, slot);
 
 		try {
-			const value = await handler(envelope);
+			const value = await handler(envelope, source);
 			if (aborted) {
 				const reply = makeErrorReply(envelope.msg, {
 					kind: "Unavailable",

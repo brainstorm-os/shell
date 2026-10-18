@@ -716,5 +716,10 @@
   "tools.approval.changed.body": "Body of the re-approval prompt; {tool} and {provider} as above. Tells the user to review what the tool does before allowing it again.",
   "tools.approval.approve": "Confirm button of the tool-approval prompt — lets the call proceed. Verb, imperative.",
   "tools.approval.decline": "Cancel button of the tool-approval prompt — refuses the call. Verb, imperative.",
-  "shell.settings.data.properties.usagePillNotUsed": "Pill on a property or dictionary-item row that nothing uses yet. Renders in place of the usage count so \"used by zero objects\" is visibly different from \"not counted\", rather than both being blank."
+  "shell.settings.data.properties.usagePillNotUsed": "Pill on a property or dictionary-item row that nothing uses yet. Renders in place of the usage count so \"used by zero objects\" is visibly different from \"not counted\", rather than both being blank.",
+  "shell.settings.keyboard.action.splitOpen": "Settings → Keyboard / cheatsheet row: opens the focused object a second time beside it, splitting the window into two panes. Imperative verb phrase.",
+  "shell.settings.keyboard.action.splitFocusOther": "Settings → Keyboard / cheatsheet row: moves keyboard focus to the other pane of a split window. Imperative verb phrase.",
+  "shell.settings.keyboard.action.splitSwap": "Settings → Keyboard / cheatsheet row: exchanges the left and right panes of a split window. Imperative verb phrase.",
+  "shell.settings.keyboard.action.splitDividerLeft": "Settings → Keyboard / cheatsheet row: moves the divider between two split panes to the left by one step. Imperative verb phrase.",
+  "shell.settings.keyboard.action.splitDividerRight": "Settings → Keyboard / cheatsheet row: moves the divider between two split panes to the right by one step. Imperative verb phrase."
 }

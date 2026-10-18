@@ -573,8 +573,9 @@ export class IntentsBus {
 		const route = launchContext.reason === "open-entity" ? entityRoute(launchContext.entityId) : null;
 
 		// Focus-existing: a plain click or new-tab on an already-open route focuses
-		// that tab instead of opening a duplicate. Explicit new-window skips it.
-		if (route && mode !== NavigationMode.NewWindow) {
+		// that tab instead of opening a duplicate. Explicit new-window and
+		// open-to-the-side skip it — both ask for a second view on purpose.
+		if (route && mode !== NavigationMode.NewWindow && mode !== NavigationMode.NewPanel) {
 			const focused = this.options.launcher?.focusTabByRoute?.(route);
 			if (focused) return { handled: true, handler: { appId, windowId: focused.windowId } };
 		}
@@ -585,6 +586,8 @@ export class IntentsBus {
 				window = await this.options.orchestrator.openInNewWindow({ appId, launch: launchContext });
 			} else if (mode === NavigationMode.NewTab) {
 				window = await this.openInNewTab(appId, launchContext, source);
+			} else if (mode === NavigationMode.NewPanel) {
+				window = await this.openToSide(appId, launchContext, source);
 			} else {
 				// Replace — focus/create the app's main window; if it was already
 				// running, push the intent so the renderer navigates in place.
@@ -624,6 +627,29 @@ export class IntentsBus {
 			return this.options.orchestrator.addTab(targetContainerId, { appId, launch: launchContext });
 		}
 		return this.options.orchestrator.launch({ appId, launch: launchContext });
+	}
+
+	/** Split view (6.14): open beside the SOURCE pane, in the source's window.
+	 *  Only a source that is itself an app pane has a window to split; a
+	 *  dashboard / shell-sourced open, or a window that refuses a split, falls
+	 *  back to new-tab placement so the open is never lost. */
+	private async openToSide(
+		appId: string,
+		launchContext: LaunchContext,
+		source: { app: string; webContentsId?: number },
+	): Promise<AppWindow> {
+		const containerId =
+			source.webContentsId !== undefined
+				? (this.options.launcher?.containerIdForWebContents(source.webContentsId) ?? null)
+				: null;
+		if (containerId) {
+			const side = await this.options.orchestrator.openSidePane(containerId, {
+				appId,
+				launch: launchContext,
+			});
+			if (side) return side;
+		}
+		return this.openInNewTab(appId, launchContext, source);
 	}
 
 	/**
@@ -1036,6 +1062,7 @@ function navModeFromPayload(payload: Record<string, unknown>): NavigationMode {
 	const raw = payload.navMode;
 	if (raw === NavigationMode.NewTab) return NavigationMode.NewTab;
 	if (raw === NavigationMode.NewWindow) return NavigationMode.NewWindow;
+	if (raw === NavigationMode.NewPanel) return NavigationMode.NewPanel;
 	return NavigationMode.Replace;
 }
 
