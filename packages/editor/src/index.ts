@@ -341,6 +341,7 @@ export {
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
+	editorEntitiesHost,
 	getEditorHost,
 	setEditorHost,
 } from "./plugins/editor-host";

@@ -22,6 +22,7 @@ import "@brainstorm-os/editor/editor-theme.css";
 import "./types"; // keep the type surface in the build graph
 
 import {
+	editorEntitiesHost,
 	entitiesSnapshotList,
 	entityTitleOf,
 	entityTitlesSnapshot,
@@ -109,6 +110,7 @@ function bootstrapTasksApp(): void {
 	const storageSvc = runtime?.services.storage;
 	const blocksSvc = runtime?.services.blocks;
 	const bpSvc = runtime?.services.bp;
+	const entities = editorEntitiesHost(runtime?.services.entities);
 	setEditorHost({
 		...(intentsSvc
 			? {
@@ -140,6 +142,9 @@ function bootstrapTasksApp(): void {
 				}
 			: {}),
 		...(bpSvc ? { bp: bpSvc } : {}),
+		// `/task` inside a task's notes + the task-mention checkbox (B11.24),
+		// under Tasks' own `entities.write:brainstorm/Task/v1`.
+		...(entities ? { entities } : {}),
 	});
 
 	// Ensure the vault catalog carries the Task→Person assignee EntityRef def
