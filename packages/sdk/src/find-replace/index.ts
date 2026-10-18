@@ -39,6 +39,21 @@ export {
 	FindAction,
 	type FindShortcutTarget,
 } from "./shortcuts";
+export {
+	type CompiledFind,
+	compileFindQuery,
+	createFindBudget,
+	expandReplacement,
+	FIND_MAX_MATCHES,
+	FIND_MAX_SEGMENT_CHARS,
+	FIND_MAX_STEPS,
+	FIND_TIME_BUDGET_MS,
+	type FindBudget,
+	FindPatternError,
+	type FindRange,
+	findRanges,
+	unsafeRegexReason,
+} from "./find-pattern";
 export { FindBar, type FindBarProps } from "./find-bar";
 export { attachFindBar, type AttachFindBarOptions } from "./attach-find-bar";
 export {

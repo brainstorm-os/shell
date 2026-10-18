@@ -12,8 +12,17 @@
  * `@lexical/headless` (no renderer), the same way `table-ops` is.
  */
 
-import { FIND_SEED_MAX_LEN } from "@brainstorm-os/sdk/find-replace";
-import type { FindQuery, Match, TextSearchProvider } from "@brainstorm-os/sdk/find-replace";
+import {
+	FIND_SEED_MAX_LEN,
+	type FindQuery,
+	type FindRange,
+	type Match,
+	type TextSearchProvider,
+	compileFindQuery,
+	createFindBudget,
+	expandReplacement,
+	findRanges,
+} from "@brainstorm-os/sdk/find-replace";
 import {
 	$createRangeSelection,
 	$getNodeByKey,
@@ -29,8 +38,9 @@ import {
 } from "lexical";
 
 /** A model-addressed match: which text node, and the half-open
- *  `[start,end)` char range within that node's text. */
-export type LexicalMatch = { nodeKey: string; start: number; end: number };
+ *  `[start,end)` char range within that node's text. A regex match also
+ *  carries its captures so a replace can expand `$1` / `$&`. */
+export type LexicalMatch = FindRange & { nodeKey: string };
 
 /** Mutations + the reveal selection must apply *synchronously*: the
  *  shared find controller re-runs `search()` and reads state immediately
@@ -39,34 +49,12 @@ export type LexicalMatch = { nodeKey: string; start: number; end: number };
  *  pre-edit model. `discrete` flushes the reconcile in-call. */
 const DISCRETE = { discrete: true } as const;
 
-const WORD = /[\p{L}\p{N}_]/u;
-
-function isWordBoundary(text: string, start: number, end: number): boolean {
-	const before = start > 0 ? text[start - 1] : "";
-	const after = end < text.length ? text[end] : "";
-	return !(before && WORD.test(before)) && !(after && WORD.test(after));
-}
-
-/** All `[start,end)` ranges of `term` in `haystack` under the options.
- *  Non-overlapping, left-to-right; regex matching itself is OQ-FR-1
- *  (v2) — the flag is carried but treated literally here. */
-function rangesIn(
-	haystack: string,
-	term: string,
-	caseSensitive: boolean,
-	wholeWord: boolean,
-): Array<[number, number]> {
-	if (term.length === 0) return [];
-	const hay = caseSensitive ? haystack : haystack.toLowerCase();
-	const needle = caseSensitive ? term : term.toLowerCase();
-	const out: Array<[number, number]> = [];
-	let i = hay.indexOf(needle);
-	while (i !== -1) {
-		const end = i + needle.length;
-		if (!wholeWord || isWordBoundary(haystack, i, end)) out.push([i, end]);
-		i = hay.indexOf(needle, end);
-	}
-	return out;
+/** Ranges of the query in one text node, charged to the search budget
+ *  (B11.27) — literal and regex share the bounded `findRanges` loop. */
+function rangesIn(haystack: string, query: FindQuery): FindRange[] {
+	if (query.term.length === 0) return [];
+	const compiled = compileFindQuery(query);
+	return findRanges(haystack, compiled, query.budget ?? createFindBudget());
 }
 
 /** Depth-first text nodes in document order — find walks the model,
@@ -126,16 +114,12 @@ export function createLexicalSearchProvider(editor: LexicalEditor): TextSearchPr
 			// selection; with nothing usable selected the toggle is a
 			// no-op (whole-doc) — see `selectionSpan`.
 			const span = options.inSelection ? selectionSpan(nodes) : null;
+			const bounded: FindQuery = { term, options, budget: query.budget ?? createFindBudget() };
 			nodes.forEach((node, idx) => {
 				const key = node.getKey();
-				for (const [start, end] of rangesIn(
-					node.getTextContent(),
-					term,
-					options.caseSensitive,
-					options.wholeWord,
-				)) {
-					if (span && !withinSpan(span, idx, start, end)) continue;
-					matches.push({ nodeKey: key, start, end });
+				for (const range of rangesIn(node.getTextContent(), bounded)) {
+					if (span && !withinSpan(span, idx, range.start, range.end)) continue;
+					matches.push({ ...range, nodeKey: key });
 				}
 			});
 		});
@@ -201,7 +185,7 @@ export function createLexicalSearchProvider(editor: LexicalEditor): TextSearchPr
 				const node = $getNodeByKey(m.nodeKey);
 				if (!node || !$isTextNode(node)) return;
 				// Lexical's own splice → collab-safe, one undo step ([07]).
-				node.spliceText(m.start, m.end - m.start, replacement, false);
+				node.spliceText(m.start, m.end - m.start, expandReplacement(replacement, m), false);
 			}, DISCRETE);
 		},
 
@@ -213,17 +197,24 @@ export function createLexicalSearchProvider(editor: LexicalEditor): TextSearchPr
 			editor.update(() => {
 				const nodes: TextNode[] = [];
 				collectTextNodes($getRoot(), nodes);
+				// A regex replace-all shares one budget (a hostile pattern stays
+				// bounded); a literal one can't backtrack, so each node gets its
+				// own and replace-all is never silently capped at the match limit.
+				const shared = query.options.regex ? (query.budget ?? createFindBudget()) : null;
 				for (const node of nodes) {
-					const ranges = rangesIn(
-						node.getTextContent(),
-						query.term,
-						query.options.caseSensitive,
-						query.options.wholeWord,
-					);
+					const ranges = rangesIn(node.getTextContent(), {
+						...query,
+						budget: shared ?? createFindBudget(),
+					});
 					for (let r = ranges.length - 1; r >= 0; r--) {
 						const range = ranges[r];
 						if (!range) continue;
-						node.spliceText(range[0], range[1] - range[0], replacement, false);
+						node.spliceText(
+							range.start,
+							range.end - range.start,
+							expandReplacement(replacement, range),
+							false,
+						);
 						count++;
 					}
 				}

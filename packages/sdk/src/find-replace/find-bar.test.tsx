@@ -9,6 +9,7 @@ import {
 import { attachFindBar } from "./attach-find-bar";
 import { FindBar } from "./find-bar";
 import { type FindController, type FindControllerState, FindStatus } from "./find-controller";
+import { FindPatternError } from "./find-pattern";
 import { attachFindShortcuts } from "./shortcuts";
 
 /** A controllable fake controller: settable state + spied actions, with
@@ -21,6 +22,8 @@ function fakeController(initial?: Partial<FindControllerState>) {
 		matchCount: 0,
 		activeIndex: -1,
 		status: FindStatus.Empty,
+		patternError: null,
+		truncated: false,
 		...initial,
 	};
 	const listeners = new Set<() => void>();
@@ -116,6 +119,31 @@ describe("<FindBar>", () => {
 		expect(q("find-count")?.textContent).toBe("No results");
 		expect((q("find-next") as HTMLButtonElement).disabled).toBe(true);
 		expect((q("find-prev") as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it("flags an invalid or unsafe regex on the input and the counter (B11.27)", () => {
+		const f = fakeController({
+			term: "(",
+			status: FindStatus.InvalidPattern,
+			patternError: FindPatternError.Invalid,
+		});
+		act(() => root.render(<FindBar controller={f.controller} />));
+		expect(q("find-count")?.textContent).toBe("Invalid pattern");
+		expect(q("find-term")?.getAttribute("aria-invalid")).toBe("true");
+		act(() => f.set({ patternError: FindPatternError.Unsafe }));
+		expect(q("find-count")?.textContent).toBe("Pattern too complex");
+	});
+
+	it("marks a truncated count with a trailing +", () => {
+		const f = fakeController({
+			term: "a",
+			matchCount: 1000,
+			activeIndex: 0,
+			status: FindStatus.Matches,
+			truncated: true,
+		});
+		act(() => root.render(<FindBar controller={f.controller} />));
+		expect(q("find-count")?.textContent).toBe("1 of 1000+");
 	});
 
 	it("wires typing, stepping, options and close to the controller", () => {

@@ -111,6 +111,10 @@ export type FindLabels = {
 	wholeWord: string;
 	regex: string;
 	inSelection: string;
+	/** Counter when the search stopped at its budget (`{total}` = found so far). */
+	matchCountTruncated: string;
+	invalidPattern: string;
+	unsafePattern: string;
 };
 
 export const DEFAULT_FIND_LABELS: FindLabels = {
@@ -128,6 +132,9 @@ export const DEFAULT_FIND_LABELS: FindLabels = {
 	wholeWord: "Whole word",
 	regex: "Regular expression",
 	inSelection: "In selection",
+	matchCountTruncated: "{current} of {total}+",
+	invalidPattern: "Invalid pattern",
+	unsafePattern: "Pattern too complex",
 };
 
 export const DEFAULT_ICON_PICKER_LABELS: IconPickerLabels = {
