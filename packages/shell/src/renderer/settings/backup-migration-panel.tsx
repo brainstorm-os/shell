@@ -5,6 +5,8 @@
  * engine + the IE-5 Obsidian importer, via `window.brainstorm.importExport.*`
  * (privileged; apps never see it). Three flows:
  *   - Export: write the whole vault to a `.bsbundle` takeout (save dialog).
+ *   - Export as Markdown (IE-13): a folder tree of `.md` files + attachments
+ *     into a picked directory.
  *   - Import data: pick a JSON/JSONL/CSV/MD/HTML file → choose the target type →
  *     a non-destructive dry-run plan → interactive column remap (rename target
  *     property, toggle include) → commit, with the run report.
@@ -63,7 +65,8 @@ export function BackupMigrationPanel() {
 	return (
 		<section className="settings__section backup-migration" data-testid="backup-migration-panel">
 			<p className="settings__section-summary">{t("shell.settings.backupMigration.summary")}</p>
-			<ExportSection />
+			<ExportSection flow={BUNDLE_EXPORT} />
+			<ExportSection flow={MARKDOWN_EXPORT} />
 			<ImportSection />
 			<ObsidianSection />
 			<NotionSection />
@@ -351,40 +354,73 @@ function SectionRunState({
  *  imports (IE-11 residue): starting it hands the run to the module-level
  *  store, so navigating away keeps it alive and progress/stop render inline
  *  here when the user comes back. */
-function ExportSection() {
+type ExportFlow = {
+	readonly section: TransferRunSection;
+	readonly testId: string;
+	readonly icon: IconName;
+	readonly titleKey: string;
+	readonly hintKey: string;
+	readonly actionKey: string;
+	readonly variant: ButtonVariant;
+	readonly run: () => Promise<{ path: string } | null>;
+};
+
+const BUNDLE_EXPORT: ExportFlow = {
+	section: TransferRunSection.Export,
+	testId: "backup-migration-export",
+	icon: IconName.Download,
+	titleKey: "shell.settings.backupMigration.export.title",
+	hintKey: "shell.settings.backupMigration.export.hint",
+	actionKey: "shell.settings.backupMigration.export.action",
+	variant: ButtonVariant.Primary,
+	run: () => window.brainstorm.importExport.exportVault(),
+};
+
+const MARKDOWN_EXPORT: ExportFlow = {
+	section: TransferRunSection.MarkdownExport,
+	testId: "backup-migration-markdown",
+	icon: IconName.Folder,
+	titleKey: "shell.settings.backupMigration.markdown.title",
+	hintKey: "shell.settings.backupMigration.markdown.hint",
+	actionKey: "shell.settings.backupMigration.markdown.action",
+	variant: ButtonVariant.Neutral,
+	run: () => window.brainstorm.importExport.exportMarkdown(),
+};
+
+function ExportSection({ flow }: { flow: ExportFlow }) {
 	const run = useTransferRun();
 	const [busyError, setBusyError] = useState<string | null>(null);
-	const mine = run.section === TransferRunSection.Export;
+	const mine = run.section === flow.section;
 	const running = mine && run.status === TransferRunStatus.Running;
 
 	const onExport = useCallback(() => {
 		setBusyError(null);
-		if (!startExportRun(() => window.brainstorm.importExport.exportVault())) {
+		if (!startExportRun(flow.run, flow.section)) {
 			setBusyError(t("shell.settings.backupMigration.export.runBusy"));
 		}
-	}, []);
+	}, [flow]);
 
 	return (
-		<div className="backup-migration__group" data-testid="backup-migration-export">
+		<div className="backup-migration__group" data-testid={flow.testId}>
 			<SectionHead
-				icon={IconName.Download}
-				title={t("shell.settings.backupMigration.export.title")}
-				hint={t("shell.settings.backupMigration.export.hint")}
+				icon={flow.icon}
+				title={t(flow.titleKey)}
+				hint={t(flow.hintKey)}
 				action={
 					<Button
-						variant={ButtonVariant.Primary}
+						variant={flow.variant}
 						size={ButtonSize.Md}
-						iconLeft={IconName.Download}
+						iconLeft={flow.icon}
 						loading={running}
 						onClick={onExport}
-						data-testid="backup-migration-export-btn"
+						data-testid={`${flow.testId}-btn`}
 					>
-						{t("shell.settings.backupMigration.export.action")}
+						{t(flow.actionKey)}
 					</Button>
 				}
 			/>
 			{running && (
-				<div className="backup-migration__progress" data-testid="backup-migration-export-progress">
+				<div className="backup-migration__progress" data-testid={`${flow.testId}-progress`}>
 					<p className="settings__hint" role="status">
 						{run.progress
 							? t("shell.settings.backupMigration.export.progress", {
@@ -397,14 +433,14 @@ function ExportSection() {
 						variant={ButtonVariant.Ghost}
 						size={ButtonSize.Md}
 						onClick={cancelTransferRun}
-						data-testid="backup-migration-export-stop"
+						data-testid={`${flow.testId}-stop`}
 					>
 						{t("shell.settings.backupMigration.import.stop")}
 					</Button>
 				</div>
 			)}
 			{mine && run.status === TransferRunStatus.Done && run.exportPath && (
-				<p className="settings__hint" data-testid="backup-migration-export-done">
+				<p className="settings__hint" data-testid={`${flow.testId}-done`}>
 					{t("shell.settings.backupMigration.export.done", { path: run.exportPath })}{" "}
 					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissTransferRun}>
 						{t("shell.settings.backupMigration.export.dismiss")}

@@ -684,5 +684,8 @@
   "shell.launcher.section.recent": "Launcher section heading over the objects the user opened most recently (shown before typing).",
   "shell.launcher.section.saved": "Launcher section heading over the user's saved searches (shown before typing).",
   "shell.launcher.saveSearch": "Launcher action row that saves the typed query so it is listed next time the launcher opens. {text} is the query.",
-  "shell.launcher.savedSearch.remove": "Accessible label for the remove button on a saved-search row. {text} is the saved query."
+  "shell.launcher.savedSearch.remove": "Accessible label for the remove button on a saved-search row. {text} is the saved query.",
+  "shell.settings.backupMigration.markdown.title": "Settings → Backup & migration heading for exporting the whole vault as a folder of Markdown files.",
+  "shell.settings.backupMigration.markdown.hint": "Explanation under the Markdown export heading: what the folder contains and that it is for reading elsewhere, not for restoring.",
+  "shell.settings.backupMigration.markdown.action": "Button that opens a folder picker and starts the Markdown export into the chosen folder."
 }

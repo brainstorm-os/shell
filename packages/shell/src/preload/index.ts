@@ -636,6 +636,8 @@ const importExport = {
 		subscribe<{ done: number; total: number }>("import-export:progress", handler),
 	exportVault: (): Promise<{ path: string } | null> =>
 		ipcRenderer.invoke("import-export:export-vault"),
+	exportMarkdown: (): Promise<{ path: string } | null> =>
+		ipcRenderer.invoke("import-export:export-markdown"),
 };
 
 /** B11.17b — Settings → spellcheck custom-dictionary manager (privileged). */

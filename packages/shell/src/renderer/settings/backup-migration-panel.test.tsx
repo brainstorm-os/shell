@@ -37,6 +37,7 @@ describe("BackupMigrationPanel", () => {
 			"backup-migration-obsidian-pick",
 			"backup-migration-anytype-pick",
 			"backup-migration-notion-pick",
+			"backup-migration-markdown-btn",
 		]) {
 			const idx = html.indexOf(`data-testid="${id}"`);
 			expect(idx).toBeGreaterThan(-1);

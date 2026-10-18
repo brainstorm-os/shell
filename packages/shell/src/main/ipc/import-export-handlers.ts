@@ -21,6 +21,7 @@ import type { ValueType } from "@brainstorm-os/sdk-types";
 import { type BrowserWindow, dialog, ipcMain } from "electron";
 import { BundleExportScopeKind } from "../bundle/bundle-format";
 import { exportVaultBundle } from "../bundle/vault-export";
+import { exportVaultMarkdown } from "../export/vault-markdown-export";
 import {
 	type AnytypeAttachment,
 	type AnytypeFile,
@@ -1062,6 +1063,37 @@ export function registerImportExportHandlers(options: ImportExportHandlersOption
 			if (bytes === null) return null;
 			await writeFile(result.filePath, bytes);
 			return { path: result.filePath };
+		} finally {
+			if (activeRun === controller) activeRun = null;
+		}
+	});
+
+	// IE-13 — the whole vault as a Markdown folder tree. A directory pick (no
+	// extension filter applies); the export creates its own dated folder inside
+	// it and shares the single background-run slot + progress stream.
+	ipcMain.handle("import-export:export-markdown", async (): Promise<{ path: string } | null> => {
+		const session = requireSession();
+		const win = options.getDashboard();
+		const dialogOptions = {
+			title: "Export vault as Markdown",
+			buttonLabel: "Export here",
+			properties: ["openDirectory" as const, "createDirectory" as const],
+		};
+		const result = win
+			? await dialog.showOpenDialog(win, dialogOptions)
+			: await dialog.showOpenDialog(dialogOptions);
+		const destDir = result.filePaths[0];
+		if (result.canceled || !destDir) return null;
+		const controller = new AbortController();
+		activeRun = controller;
+		try {
+			const exported = await exportVaultMarkdown(session, {
+				destDir,
+				now: Date.now(),
+				signal: controller.signal,
+				onProgress: (done, total) => win?.webContents.send("import-export:progress", { done, total }),
+			});
+			return exported ? { path: exported.path } : null;
 		} finally {
 			if (activeRun === controller) activeRun = null;
 		}
