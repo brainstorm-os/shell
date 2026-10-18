@@ -222,6 +222,34 @@ body.is-resizing .journal__props-resize {
 	margin: 0 0 var(--space-3);
 }
 
+/* Quick-capture stream on today's entry (9.16.14): field + Add on one
+ * control row (both on the shared md control height), the outcome line
+ * underneath. */
+.journal__capture {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	margin: 0 0 var(--space-3);
+}
+
+.journal__capture-input {
+	flex: 1 1 240px;
+	min-width: 0;
+}
+
+.journal__capture-submit {
+	flex-shrink: 0;
+}
+
+.journal__capture-status {
+	flex-basis: 100%;
+	margin: 0;
+	min-height: 1lh;
+	color: var(--text-dim);
+	font-size: var(--text-size-sm);
+}
+
 /* Lexical contenteditable inside the journal entry. Read-only-looking
  * by default (no border, no background); the cursor + selection are
  * how the user knows it's editable. Matches the Notes default theme. */

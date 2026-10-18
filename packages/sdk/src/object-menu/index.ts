@@ -39,6 +39,7 @@ export {
 	listCollectionsForObject,
 	toggleCollectionMembership,
 	type CollectionOption,
+	type CollectionMembershipService,
 	type CollectionsEntitiesService,
 } from "./collections";
 export {

@@ -14,6 +14,8 @@
     "entities.read:*",
     "entities.write:io.brainstorm.journal/Entry/v1",
     "entities.write:brainstorm/Comment/v1",
+    "entities.write:brainstorm/Object/v1",
+    "entities.write:brainstorm/List/v1",
     "intents.dispatch:open",
     "intents.dispatch:compose",
     "notifications.post",

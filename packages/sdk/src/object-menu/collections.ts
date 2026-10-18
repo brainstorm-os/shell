@@ -16,7 +16,7 @@
 
 import type { Entity, EntityQuery, Icon, MemberOverrideSource } from "@brainstorm-os/sdk-types";
 import { AddOutcome, RemoveOutcome, addToList, removeFromList } from "../collections";
-import { LIST_ENTITY_TYPE, entityToList } from "../list-entity-codec";
+import { LIST_ENTITY_TYPE, type ListEntityRow, entityToList } from "../list-entity-codec";
 
 /** The slice of the entities service the collection surface needs — narrowed
  *  so a host/test can inject a stub. Each method is a per-type-gated call on
@@ -25,6 +25,14 @@ export type CollectionsEntitiesService = {
 	query(query: EntityQuery): Promise<Entity[]>;
 	get(id: string): Promise<Entity | null>;
 	update(id: string, patch: Record<string, unknown>): Promise<Entity>;
+};
+
+/** The two calls a membership toggle makes — re-read the List, write its
+ *  overrides. Narrower than `CollectionsEntitiesService` so a host that only
+ *  files into a known Collection (Journal's quick capture) needs no query. */
+export type CollectionMembershipService = {
+	get(id: string): Promise<ListEntityRow | null>;
+	update(id: string, patch: Record<string, unknown>): Promise<unknown>;
 };
 
 /** The capability an app must hold to write Collection membership — the same
@@ -68,7 +76,7 @@ export async function listCollectionsForObject(
  *  changed (so a no-op never broadcasts). Returns the resulting membership
  *  state; `false` if the Collection can't be loaded. */
 export async function toggleCollectionMembership(
-	svc: CollectionsEntitiesService,
+	svc: CollectionMembershipService,
 	listId: string,
 	entityId: string,
 	add: boolean,

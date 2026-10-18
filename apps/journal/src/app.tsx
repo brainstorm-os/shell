@@ -71,6 +71,12 @@ import { buildJournalDemo } from "./demo/dataset";
 import { useJournalT } from "./i18n-hooks";
 import { shiftByDays } from "./logic/calendar-grid";
 import {
+	type CaptureWriter,
+	type FileableCollection,
+	commitCapture,
+	fileableCollections,
+} from "./logic/capture-filing";
+import {
 	HABIT_LABEL_KEY,
 	type HabitId,
 	JOURNAL_HABITS,
@@ -108,6 +114,7 @@ import {
 	periodLabel,
 	periodStableId,
 } from "./logic/periods";
+import { CaptureKind } from "./logic/quick-capture";
 import { currentStreak, densityBucket, streakAtRisk } from "./logic/streaks";
 import {
 	JOURNAL_TEMPLATE_SPECS,
@@ -132,10 +139,16 @@ import {
 	type JournalMenuResolver,
 	bindDelegatedObjectMenu,
 } from "./ui/delegated-object-menu";
-import { applyJournalSuggestion, insertEntityMention } from "./ui/editor-bridge";
+import {
+	appendJournalLine,
+	applyJournalSuggestion,
+	hasJournalEditor,
+	insertEntityMention,
+} from "./ui/editor-bridge";
 import type { JournalCommentHooks, JournalDenormalizeFn } from "./ui/entry-editor-mount";
 import { attachOverviewKeyboard } from "./ui/overview-keyboard";
 import { JournalPropertiesIsland, type JournalPropertiesOptions } from "./ui/properties-panel";
+import { QuickCapture, type QuickCaptureResult } from "./ui/quick-capture";
 import { EntityIcon } from "./ui/react/entity-icon";
 import { EntryEditorIsland } from "./ui/react/entry-editor-island";
 import { openJournalSearch } from "./ui/search-overlay";
@@ -1215,6 +1228,7 @@ export function JournalApp(): ReactElement {
 								journalDenormalize={journalDenormalize}
 								commentHooks={commentHooks}
 								onPlaceholderCreate={ensureEntry}
+								captureEnabled={isToday}
 								resolveTemplates={resolveTemplates}
 								onTemplate={startEntryFromTemplate}
 								onMood={setEntryMood}
@@ -1739,6 +1753,55 @@ function PeriodicBody({
 	);
 }
 
+// ── Quick capture (9.16.14). ──
+const JOURNAL_APP_ID = "io.brainstorm.journal";
+
+/** Make sure today's entry exists, then commit the capture through the live
+ *  editor; the appended state is mirrored into the `body` snippet directly,
+ *  since the interaction-gated autosave never sees a programmatic edit. */
+async function captureIntoDay(input: {
+	raw: string;
+	noteId: string;
+	collections: readonly FileableCollection[];
+	ensureEntry: () => Promise<string | null>;
+	denormalize: JournalDenormalizeFn;
+}): Promise<QuickCaptureResult> {
+	const created = await input.ensureEntry();
+	const entities = getJournalRuntime()?.services?.entities;
+	const create = entities?.create;
+	const get = entities?.get;
+	const update = entities?.update;
+	const writer: CaptureWriter | null = create
+		? {
+				create: (type, properties) => create.call(entities, type, properties),
+				membership:
+					get && update
+						? {
+								get: (id) => get.call(entities, id),
+								update: (id, patch) => update.call(entities, id, patch),
+							}
+						: null,
+				appId: JOURNAL_APP_ID,
+				now: Date.now(),
+			}
+		: null;
+	const result = await commitCapture({
+		raw: input.raw,
+		collections: input.collections,
+		writer,
+		canAppend: () => created !== null && hasJournalEditor(),
+		append: (parts) => {
+			const state = appendJournalLine(parts);
+			if (!state) return false;
+			input.denormalize(input.noteId, state);
+			return true;
+		},
+	});
+	const collectionName =
+		result.route.kind === CaptureKind.File ? result.route.collection.name : null;
+	return { outcome: result.outcome, collectionName };
+}
+
 // ── Day entry body. ──
 function EntryBody({
 	entry,
@@ -1749,6 +1812,7 @@ function EntryBody({
 	journalDenormalize,
 	commentHooks,
 	onPlaceholderCreate,
+	captureEnabled,
 	resolveTemplates,
 	onTemplate,
 	onMood,
@@ -1763,6 +1827,8 @@ function EntryBody({
 	journalDenormalize: JournalDenormalizeFn;
 	commentHooks: JournalCommentHooks;
 	onPlaceholderCreate: (date: Date) => Promise<string | null>;
+	/** Today only (9.16.14) — the capture stream appends to the current day. */
+	captureEnabled: boolean;
 	resolveTemplates: () => JournalTemplate[];
 	onTemplate: (date: Date, template: JournalTemplate) => void;
 	onMood: (entry: JournalEntry, mood: MoodId | null) => void;
@@ -1825,6 +1891,11 @@ function EntryBody({
 		(snapshot?.entities.some((e) => e.id === entry.noteId && e.properties.locked === true) ?? false);
 	const editable = mutable && !entryLocked;
 	const onBodyDenormalize = entry ? journalDenormalize : lazyDenormalize;
+	const runtime = getJournalRuntime();
+	const captureCollections = fileableCollections(
+		snapshot?.entities ?? [],
+		runtime?.capabilities ?? [],
+	);
 
 	const outgoing = entry && snapshot ? findOutgoingLinks(snapshot, entry.noteId) : [];
 	const backlinks = entry && snapshot ? journalBacklinks(snapshot, entry.noteId) : [];
@@ -1861,6 +1932,20 @@ function EntryBody({
 			    then (before the first keystroke), not on mere navigation — keeps
 			    browsing from minting empty days while ensuring the row exists in
 			    time for content-bearing persists. Lazy create on first edit backstops. */}
+			{captureEnabled && editable && resolver ? (
+				<QuickCapture
+					collectionCount={captureCollections.length}
+					onCapture={(raw) =>
+						captureIntoDay({
+							raw,
+							noteId,
+							collections: captureCollections,
+							ensureEntry: () => onPlaceholderCreate(focus),
+							denormalize: journalDenormalize,
+						})
+					}
+				/>
+			) : null}
 			<div
 				className="journal__entry-editor-host"
 				{...(entry ? {} : { onFocus: () => void onPlaceholderCreate(focus) })}
