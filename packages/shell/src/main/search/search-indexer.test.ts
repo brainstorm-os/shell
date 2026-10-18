@@ -448,3 +448,18 @@ describe("SearchIndexer — lifecycle", () => {
 		}
 	});
 });
+
+describe("SearchIndexer — lookup (9.22.7 recents)", () => {
+	it("returns indexed rows in the caller's order, skipping unknown ids", async () => {
+		const { indexer } = await openIndexer();
+		indexer.indexEntity(entity("n1", "First", "a"), 10);
+		indexer.indexEntity(entity("n2", "Second", "b"), 20);
+		expect(indexer.lookup([])).toEqual([]);
+		const hits = indexer.lookup(["n2", "missing", "n1"]);
+		expect(hits.map((h) => [h.entityId, h.title, h.ownerAppId, h.updatedAt])).toEqual([
+			["n2", "Second", NOTES, 20],
+			["n1", "First", NOTES, 10],
+		]);
+		expect(hits[0]?.snippet).toBe("");
+	});
+});

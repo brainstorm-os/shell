@@ -691,6 +691,7 @@ export {
 } from "./preview";
 export { serializedStateToHtml } from "./serialize-html";
 export { serializedStateToMarkdown } from "./serialize-markdown";
+export { serializedStateFromDoc } from "./serialized-state-from-doc";
 export { baselineTheme, mergeTheme, richTextTheme } from "./theme";
 export {
 	blockParentOf,

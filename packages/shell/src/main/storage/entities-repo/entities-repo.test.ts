@@ -106,6 +106,28 @@ describe("EntitiesRepository", () => {
 		);
 	});
 
+	it("countBacklinks counts distinct live referrers per target in one batched read", () => {
+		for (const id of ["a", "b", "c", "gone", "t"]) seed({ id, properties: {} });
+		const link = (id: string, source: string, dest: string, linkType = "rel") =>
+			env.repo.putLink({ id, sourceEntityId: source, destEntityId: dest, linkType, createdAt: 1 });
+		link("at", "a", "t");
+		link("at2", "a", "t", "mention");
+		link("bt", "b", "t");
+		link("tt", "t", "t");
+		link("gt", "gone", "t");
+		link("ct", "c", "t");
+		link("ab", "a", "b");
+		env.repo.deleteLink("ct", 5);
+		env.repo.softDelete("gone", 6);
+		expect(env.repo.countBacklinks([]).size).toBe(0);
+		const counts = env.repo.countBacklinks(["t", "b", "c", "missing"]);
+		expect(counts.get("t")).toBe(2);
+		expect(counts.get("b")).toBe(1);
+		expect(counts.has("c")).toBe(false);
+		const many = Array.from({ length: 130 }, (_, i) => `x${i}`);
+		expect(env.repo.countBacklinks([...many, "t"]).get("t")).toBe(2);
+	});
+
 	it("listIdsWithPropertyIn batches value lookups, filters soft-deleted, ignores empty input", () => {
 		seed({ id: "a", properties: { ext: "k1" } });
 		seed({ id: "b", properties: { ext: "k2" } });

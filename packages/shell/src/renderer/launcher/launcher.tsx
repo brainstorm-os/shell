@@ -10,6 +10,10 @@
  *     entity id; the IntentsBus routes to the owning app's primary `open`
  *     handler.
  *
+ * An empty query (9.22.7) lists saved searches and recently opened objects
+ * above the apps; a typed query offers a "save this search" row. Entity rows
+ * carry a backlink count from the same batched search IPC.
+ *
  * Stage 9.22.2 wires the entity half. The shell renderer is shell-trusted
  * so search + intent dispatch ride privileged `ipcMain.handle` channels
  * (`window.brainstorm.search.query`, `window.brainstorm.intents.dispatch`)
@@ -37,14 +41,19 @@ import {
 	useMenu,
 	useMenuState,
 } from "@brainstorm-os/sdk/menus";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { InstalledApp, IntentDispatchResult, SearchHit } from "../../preload";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { InstalledApp, IntentDispatchResult, SavedSearch, SearchHit } from "../../preload";
 import { t } from "../i18n/t";
 import { formatOpenExplainer } from "../intents/open-explainer";
 import { Icon, IconName } from "../ui/icon";
 import { pushToast } from "../ui/toasts";
 import { LauncherRowKind, buildRows } from "./grouped-results";
-import type { LauncherAppRow, LauncherEntityRow, LauncherRow } from "./grouped-results";
+import type {
+	LauncherAppRow,
+	LauncherEntityRow,
+	LauncherRow,
+	LauncherSavedSearchRow,
+} from "./grouped-results";
 import "./launcher.css";
 import { track } from "@brainstorm-os/sdk/analytics";
 import { launchApp, rememberAppNames } from "../analytics/track-app-launch";
@@ -70,7 +79,13 @@ type LauncherData = { rows: LauncherRow[] };
 
 /** Stable handler box so the config (built once) reads the latest setters /
  *  close callback without rebuilding (and re-registering) on every render. */
-type Handlers = { onQuery: (value: string) => void; onClose: () => void };
+type Handlers = {
+	onQuery: (value: string) => void;
+	onClose: () => void;
+	onApplySaved: (search: SavedSearch) => void;
+	onSave: (text: string) => void;
+	onDeleteSaved: (search: SavedSearch) => void;
+};
 
 function appRowContent(app: InstalledApp): ReactNode {
 	return (
@@ -98,10 +113,15 @@ function appRowContent(app: InstalledApp): ReactNode {
 }
 
 function entityRowContent(row: LauncherEntityRow): ReactNode {
-	const subtitle = t("shell.launcher.entity.subtitle", {
+	const base = t("shell.launcher.entity.subtitle", {
 		appName: row.ownerAppName,
 		type: prettyEntityType(row.hit.type),
 	});
+	const backlinks = row.hit.backlinkCount ?? 0;
+	const subtitle =
+		backlinks > 0
+			? t("shell.launcher.entity.subtitleWithBacklinks", { base, count: backlinks })
+			: base;
 	return (
 		<span className="launcher-menu__row">
 			<span className="launcher-menu__icon" aria-hidden="true">
@@ -121,6 +141,28 @@ function entityRowContent(row: LauncherEntityRow): ReactNode {
 				) : null}
 				<span className="launcher-menu__subtitle">{subtitle}</span>
 			</span>
+		</span>
+	);
+}
+
+function savedSearchContent(row: LauncherSavedSearchRow): ReactNode {
+	return (
+		<span className="launcher-menu__row">
+			<span className="launcher-menu__icon" aria-hidden="true">
+				<Icon name={IconName.Search} />
+			</span>
+			<span className="launcher-menu__title">{row.search.text}</span>
+		</span>
+	);
+}
+
+function saveSearchContent(text: string): ReactNode {
+	return (
+		<span className="launcher-menu__row">
+			<span className="launcher-menu__icon" aria-hidden="true">
+				<Icon name={IconName.Plus} />
+			</span>
+			<span className="launcher-menu__title">{t("shell.launcher.saveSearch", { text })}</span>
 		</span>
 	);
 }
@@ -189,6 +231,31 @@ function buildConfig(handlers: { current: Handlers }): MenuConfig<LauncherData> 
 								ctx.close();
 							},
 						},
+						{
+							kind: RowKind.Chip,
+							match: (r: LauncherRow) => r.rowKind === LauncherRowKind.SavedSearch,
+							name: (r: LauncherRow) =>
+								r.rowKind === LauncherRowKind.SavedSearch ? savedSearchContent(r) : "",
+							deleteAriaLabel: (r: LauncherRow) =>
+								r.rowKind === LauncherRowKind.SavedSearch
+									? t("shell.launcher.savedSearch.remove", { text: r.search.text })
+									: "",
+							onClick: (r) => {
+								if (r.rowKind === LauncherRowKind.SavedSearch) handlers.current.onApplySaved(r.search);
+							},
+							onDelete: (r) => {
+								if (r.rowKind === LauncherRowKind.SavedSearch) handlers.current.onDeleteSaved(r.search);
+							},
+						},
+						{
+							kind: RowKind.Item,
+							match: (r: LauncherRow) => r.rowKind === LauncherRowKind.SaveSearch,
+							name: (r: LauncherRow) =>
+								r.rowKind === LauncherRowKind.SaveSearch ? saveSearchContent(r.text) : "",
+							onClick: (r) => {
+								if (r.rowKind === LauncherRowKind.SaveSearch) handlers.current.onSave(r.text);
+							},
+						},
 					],
 					emptyState: { kind: PanelKind.EmptyState, message: t("shell.launcher.empty") },
 				},
@@ -217,11 +284,40 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 	const [query, setQuery] = useState("");
 	const [apps, setApps] = useState<InstalledApp[]>([]);
 	const [entities, setEntities] = useState<SearchHit[]>([]);
+	const [recents, setRecents] = useState<SearchHit[]>([]);
+	const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
 
 	const { open: openMenu, close, register, updateData } = useMenu();
 	const state = useMenuState(LAUNCHER_MENU_ID);
 
-	const handlersRef = useRef<Handlers>({ onQuery: setQuery, onClose });
+	const applyQuery = useCallback((text: string) => {
+		setQuery(text);
+		prefillSearchInput(text);
+	}, []);
+	const onSave = useCallback((text: string) => {
+		void window.brainstorm.search
+			.saveSearch(text)
+			.then((saved) => {
+				if (saved) setSavedSearches((list) => [saved, ...list.filter((s) => s.id !== saved.id)]);
+			})
+			.catch((error: unknown) => console.warn("[brainstorm] launcher: save search failed:", error));
+	}, []);
+	const onDeleteSaved = useCallback((search: SavedSearch) => {
+		setSavedSearches((list) => list.filter((s) => s.id !== search.id));
+		void window.brainstorm.search
+			.deleteSavedSearch(search.id)
+			.catch((error: unknown) =>
+				console.warn("[brainstorm] launcher: delete saved search failed:", error),
+			);
+	}, []);
+
+	const handlersRef = useRef<Handlers>({
+		onQuery: setQuery,
+		onClose,
+		onApplySaved: (search) => applyQuery(search.text),
+		onSave,
+		onDeleteSaved,
+	});
 	handlersRef.current.onQuery = setQuery;
 	handlersRef.current.onClose = onClose;
 	const config = useMemo(() => buildConfig(handlersRef), []);
@@ -243,6 +339,15 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 			setApps(list);
 			rememberAppNames(list);
 		});
+		void Promise.all([window.brainstorm.search.recents(), window.brainstorm.search.savedSearches()])
+			.then(([recentHits, saved]) => {
+				if (cancelled) return;
+				setRecents(recentHits);
+				setSavedSearches(saved);
+			})
+			.catch((error: unknown) => {
+				console.warn("[brainstorm] launcher: loading recents failed:", error);
+			});
 		return () => {
 			cancelled = true;
 		};
@@ -278,13 +383,26 @@ export function Launcher({ open, onClose, initialQuery }: LauncherProps) {
 		() => ({
 			sectionApps: t("shell.launcher.section.apps"),
 			sectionEntities: t("shell.launcher.section.entities"),
+			sectionRecent: t("shell.launcher.section.recent"),
+			sectionSaved: t("shell.launcher.section.saved"),
 		}),
 		[],
 	);
 
 	const rows = useMemo<LauncherRow[]>(
-		() => (open ? buildRows({ query, apps, entities, labels }) : []),
-		[apps, entities, query, open, labels],
+		() =>
+			open
+				? buildRows({
+						query,
+						apps,
+						entities,
+						recents,
+						savedSearches,
+						offerSaveSearch: true,
+						labels,
+					})
+				: [],
+		[apps, entities, recents, savedSearches, query, open, labels],
 	);
 
 	// Open / close the menu in step with the `open` prop. After the menu

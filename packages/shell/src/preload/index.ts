@@ -51,7 +51,10 @@ import type {
 	EndpointUrlError,
 	OllamaSettingsError,
 } from "../shared/ai-endpoints";
+import type { BackupStatus, RestorePoint } from "../main/bundle/backup-service";
+import type { ImportReport } from "../main/bundle/bundle-format";
 import { appIconUrl } from "../shared/app-icon-url";
+import type { BackupFrequency } from "../shared/backup-frequency";
 
 export type { AppearanceMode, AppearancePair, AppearanceSlot, AppearanceState };
 export type { ReleaseInfo, UpdateCheckResult, UpdatePrefs };
@@ -604,6 +607,26 @@ const covers = {
 
 /** IE-3 — Settings → Backup & Migration (privileged dashboard surface over the
  *  IE-1 bundle codec + IE-2 import engine). Apps never see this. */
+/** IE-14 — scheduled backups + restore points (`main/bundle/backup-service.ts`). */
+export type {
+	BackupStatus,
+	RestorePoint as BackupRestorePoint,
+} from "../main/bundle/backup-service";
+export type { ImportReport as BackupRestoreReport } from "../main/bundle/bundle-format";
+
+const backup = {
+	status: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:status"),
+	updateSchedule: (patch: {
+		frequency?: BackupFrequency;
+		retention?: number;
+	}): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:update-schedule", patch),
+	pickFolder: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:pick-folder"),
+	runNow: (): Promise<BackupStatus | null> => ipcRenderer.invoke("backup:run-now"),
+	restorePoints: (): Promise<RestorePoint[]> => ipcRenderer.invoke("backup:restore-points"),
+	restore: (name: string): Promise<ImportReport> => ipcRenderer.invoke("backup:restore", name),
+	openFolder: (): Promise<void> => ipcRenderer.invoke("backup:open-folder"),
+};
+
 const importExport = {
 	pickSource: (): Promise<ImportSourcePreview | null> =>
 		ipcRenderer.invoke("import-export:pick-source"),
@@ -642,6 +665,8 @@ const importExport = {
 		subscribe<{ done: number; total: number }>("import-export:progress", handler),
 	exportVault: (): Promise<{ path: string } | null> =>
 		ipcRenderer.invoke("import-export:export-vault"),
+	exportMarkdown: (): Promise<{ path: string } | null> =>
+		ipcRenderer.invoke("import-export:export-markdown"),
 };
 
 type SpellcheckLanguagesSnapshot = {
@@ -1392,7 +1417,12 @@ export type SearchHit = {
 	snippet: string;
 	score: number;
 	updatedAt: number;
+	/** 9.22.7 — how many live objects link to this one. */
+	backlinkCount?: number;
 };
+
+/** 9.22.7 — a launcher query the user saved, listed on an empty query. */
+export type SavedSearch = { id: string; text: string; createdAt: number };
 
 export type SearchQuery = {
 	text: string;
@@ -1421,6 +1451,12 @@ const search = {
 	reindex: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:reindex"),
 	// 11.3 consent gate — opt into the ~130 MB semantic-model download.
 	enableSemantic: (): Promise<SearchIndexReport> => ipcRenderer.invoke("search:enable-semantic"),
+	// 9.22.7 — the launcher's empty-query memory.
+	recents: (): Promise<SearchHit[]> => ipcRenderer.invoke("search:recents"),
+	savedSearches: (): Promise<SavedSearch[]> => ipcRenderer.invoke("search:saved-list"),
+	saveSearch: (text: string): Promise<SavedSearch | null> =>
+		ipcRenderer.invoke("search:saved-save", text),
+	deleteSavedSearch: (id: string): Promise<boolean> => ipcRenderer.invoke("search:saved-delete", id),
 };
 
 /** Privileged intent-dispatch surface — for the launcher palette + future
@@ -2137,6 +2173,7 @@ const brainstorm = {
 	icons,
 	covers,
 	importExport,
+	backup,
 	spellcheck,
 	aiSettings,
 	agentActivity,

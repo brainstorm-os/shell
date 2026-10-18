@@ -15,6 +15,7 @@
 
 import { ipcMain } from "electron";
 import { type SemanticModelStatus, absentStatus } from "../search/embedder-status";
+import type { LauncherMemory, SavedSearch } from "../search/launcher-memory";
 import type { IndexStats, IndexerQuery, SearchHit, SearchIndexer } from "../search/search-indexer";
 import { runHybridQuery } from "../search/search-service";
 import type { VectorIndexer } from "../search/vector-indexer";
@@ -23,6 +24,15 @@ export const SEARCH_QUERY_CHANNEL = "search:query";
 export const SEARCH_STATS_CHANNEL = "search:stats";
 export const SEARCH_REINDEX_CHANNEL = "search:reindex";
 export const SEARCH_ENABLE_SEMANTIC_CHANNEL = "search:enable-semantic";
+export const SEARCH_RECENTS_CHANNEL = "search:recents";
+export const SEARCH_SAVED_LIST_CHANNEL = "search:saved-list";
+export const SEARCH_SAVED_SAVE_CHANNEL = "search:saved-save";
+export const SEARCH_SAVED_DELETE_CHANNEL = "search:saved-delete";
+
+/** A launcher row's hit: the index hit plus how many objects link to it. */
+export type LauncherSearchHit = SearchHit & { backlinkCount: number };
+
+export type CountBacklinks = (entityIds: readonly string[]) => Promise<ReadonlyMap<string, number>>;
 
 /** What the Settings → Search panel renders. `available` is the number of
  *  indexable entities the *sources* currently hold (entities.db + the
@@ -57,25 +67,62 @@ export type SearchHandlerDeps = {
 	/** Count of indexable entities the sources hold right now; null when
 	 *  there's no session or the scan failed. Drives the coverage estimate. */
 	getAvailableCount: () => Promise<number | null>;
+	/** 9.22.7 — batched backlink counts for a result list (one grouped query,
+	 *  never per hit). Absent ⇒ every count reads 0. */
+	countBacklinks?: CountBacklinks;
+	/** 9.22.7 — the active vault's recents + saved searches, or null when no
+	 *  session is open. */
+	getLauncherMemory?: () => Promise<LauncherMemory | null>;
 };
 
 const EMPTY_STATS: IndexStats = { total: 0, byType: [], lastIndexedAt: 0, bytes: 0 };
 
 export function registerSearchHandlers(deps: SearchHandlerDeps): void {
-	ipcMain.handle(SEARCH_QUERY_CHANNEL, async (_event, query: unknown): Promise<SearchHit[]> => {
-		const indexer = deps.getIndexer();
-		if (!indexer) return [];
-		const validated = validateQuery(query);
-		if (!validated) return [];
+	ipcMain.handle(
+		SEARCH_QUERY_CHANNEL,
+		async (_event, query: unknown): Promise<LauncherSearchHit[]> => {
+			const indexer = deps.getIndexer();
+			if (!indexer) return [];
+			const validated = validateQuery(query);
+			if (!validated) return [];
+			try {
+				// 11.4 — the launcher's default search is now hybrid (lexical + vector
+				// RRF). Degrades to pure lexical when no vector indexer is wired, so
+				// it's identical to the prior behaviour today and sharpens with 11.3.
+				const hits = await runHybridQuery(indexer, deps.getVectorIndexer?.() ?? null, validated);
+				return await withBacklinks(hits, deps.countBacklinks);
+			} catch (error) {
+				console.warn("[brainstorm] search:query failed:", error);
+				return [];
+			}
+		},
+	);
+
+	ipcMain.handle(SEARCH_RECENTS_CHANNEL, async (): Promise<LauncherSearchHit[]> => {
 		try {
-			// 11.4 — the launcher's default search is now hybrid (lexical + vector
-			// RRF). Degrades to pure lexical when no vector indexer is wired, so
-			// it's identical to the prior behaviour today and sharpens with 11.3.
-			return await runHybridQuery(indexer, deps.getVectorIndexer?.() ?? null, validated);
+			return await resolveRecents(deps);
 		} catch (error) {
-			console.warn("[brainstorm] search:query failed:", error);
+			console.warn("[brainstorm] search:recents failed:", error);
 			return [];
 		}
+	});
+
+	ipcMain.handle(SEARCH_SAVED_LIST_CHANNEL, async (): Promise<SavedSearch[]> => {
+		const memory = await deps.getLauncherMemory?.();
+		return memory ? memory.savedSearches() : [];
+	});
+
+	ipcMain.handle(
+		SEARCH_SAVED_SAVE_CHANNEL,
+		async (_event, text: unknown): Promise<SavedSearch | null> => {
+			const memory = await deps.getLauncherMemory?.();
+			return memory ? memory.saveSearch(text) : null;
+		},
+	);
+
+	ipcMain.handle(SEARCH_SAVED_DELETE_CHANNEL, async (_event, id: unknown): Promise<boolean> => {
+		const memory = await deps.getLauncherMemory?.();
+		return memory ? memory.deleteSavedSearch(id) : false;
 	});
 
 	ipcMain.handle(SEARCH_STATS_CHANNEL, async (): Promise<SearchIndexReport> => {
@@ -99,6 +146,33 @@ export function registerSearchHandlers(deps: SearchHandlerDeps): void {
 		}
 		return buildReport(deps);
 	});
+}
+
+/** Attach each hit's backlink count from ONE batched lookup. A failed count
+ *  degrades to 0 rather than dropping the results. */
+export async function withBacklinks(
+	hits: readonly SearchHit[],
+	countBacklinks: CountBacklinks | undefined,
+): Promise<LauncherSearchHit[]> {
+	let counts: ReadonlyMap<string, number> = new Map();
+	if (countBacklinks && hits.length > 0) {
+		try {
+			counts = await countBacklinks(hits.map((h) => h.entityId));
+		} catch (error) {
+			console.warn("[brainstorm] backlink count failed:", error);
+		}
+	}
+	return hits.map((hit) => ({ ...hit, backlinkCount: counts.get(hit.entityId) ?? 0 }));
+}
+
+/** The recent-objects list as launcher hits, newest first. Ids the index no
+ *  longer holds are skipped (not forgotten — the index may be mid-rebuild). */
+export async function resolveRecents(deps: SearchHandlerDeps): Promise<LauncherSearchHit[]> {
+	const indexer = deps.getIndexer();
+	const memory = await deps.getLauncherMemory?.();
+	if (!indexer || !memory) return [];
+	const ids = memory.recents().map((entry) => entry.entityId);
+	return withBacklinks(indexer.lookup(ids), deps.countBacklinks);
 }
 
 /** Join the indexer's self-view with a source count. Each half degrades

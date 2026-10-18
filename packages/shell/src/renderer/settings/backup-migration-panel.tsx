@@ -5,6 +5,10 @@
  * engine + the IE-5 Obsidian importer, via `window.brainstorm.importExport.*`
  * (privileged; apps never see it). Three flows:
  *   - Export: write the whole vault to a `.bsbundle` takeout (save dialog).
+ *   - Export as Markdown (IE-13): a folder tree of `.md` files + attachments
+ *     into a picked directory.
+ *   - Scheduled backups (IE-14): off / daily / weekly `.bsbundle` restore
+ *     points in a chosen folder, with retention and per-point restore.
  *   - Import data: pick a JSON/JSONL/CSV/MD/HTML file → choose the target type →
  *     a non-destructive dry-run plan → interactive column remap (rename target
  *     property, toggle include) → commit, with the run report.
@@ -23,11 +27,16 @@ import { AnimatePresence } from "framer-motion";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+	BackupRestorePoint,
+	BackupRestoreReport,
+	BackupStatus,
 	ImportMappingEdit,
 	ImportPlan,
 	ImportRunReport,
 	ImportSourcePreview,
 } from "../../preload";
+import { BackupFrequency } from "../../shared/backup-frequency";
+import { formatBytes } from "../format/relative-time";
 import { t, tIfKey } from "../i18n/t";
 import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -63,7 +72,9 @@ export function BackupMigrationPanel() {
 	return (
 		<section className="settings__section backup-migration" data-testid="backup-migration-panel">
 			<p className="settings__section-summary">{t("shell.settings.backupMigration.summary")}</p>
-			<ExportSection />
+			<ExportSection flow={BUNDLE_EXPORT} />
+			<ExportSection flow={MARKDOWN_EXPORT} />
+			<ScheduledBackupSection />
 			<ImportSection />
 			<ObsidianSection />
 			<NotionSection />
@@ -351,40 +362,73 @@ function SectionRunState({
  *  imports (IE-11 residue): starting it hands the run to the module-level
  *  store, so navigating away keeps it alive and progress/stop render inline
  *  here when the user comes back. */
-function ExportSection() {
+type ExportFlow = {
+	readonly section: TransferRunSection;
+	readonly testId: string;
+	readonly icon: IconName;
+	readonly titleKey: string;
+	readonly hintKey: string;
+	readonly actionKey: string;
+	readonly variant: ButtonVariant;
+	readonly run: () => Promise<{ path: string } | null>;
+};
+
+const BUNDLE_EXPORT: ExportFlow = {
+	section: TransferRunSection.Export,
+	testId: "backup-migration-export",
+	icon: IconName.Download,
+	titleKey: "shell.settings.backupMigration.export.title",
+	hintKey: "shell.settings.backupMigration.export.hint",
+	actionKey: "shell.settings.backupMigration.export.action",
+	variant: ButtonVariant.Primary,
+	run: () => window.brainstorm.importExport.exportVault(),
+};
+
+const MARKDOWN_EXPORT: ExportFlow = {
+	section: TransferRunSection.MarkdownExport,
+	testId: "backup-migration-markdown",
+	icon: IconName.Folder,
+	titleKey: "shell.settings.backupMigration.markdown.title",
+	hintKey: "shell.settings.backupMigration.markdown.hint",
+	actionKey: "shell.settings.backupMigration.markdown.action",
+	variant: ButtonVariant.Neutral,
+	run: () => window.brainstorm.importExport.exportMarkdown(),
+};
+
+function ExportSection({ flow }: { flow: ExportFlow }) {
 	const run = useTransferRun();
 	const [busyError, setBusyError] = useState<string | null>(null);
-	const mine = run.section === TransferRunSection.Export;
+	const mine = run.section === flow.section;
 	const running = mine && run.status === TransferRunStatus.Running;
 
 	const onExport = useCallback(() => {
 		setBusyError(null);
-		if (!startExportRun(() => window.brainstorm.importExport.exportVault())) {
+		if (!startExportRun(flow.run, flow.section)) {
 			setBusyError(t("shell.settings.backupMigration.export.runBusy"));
 		}
-	}, []);
+	}, [flow]);
 
 	return (
-		<div className="backup-migration__group" data-testid="backup-migration-export">
+		<div className="backup-migration__group" data-testid={flow.testId}>
 			<SectionHead
-				icon={IconName.Download}
-				title={t("shell.settings.backupMigration.export.title")}
-				hint={t("shell.settings.backupMigration.export.hint")}
+				icon={flow.icon}
+				title={t(flow.titleKey)}
+				hint={t(flow.hintKey)}
 				action={
 					<Button
-						variant={ButtonVariant.Primary}
+						variant={flow.variant}
 						size={ButtonSize.Md}
-						iconLeft={IconName.Download}
+						iconLeft={flow.icon}
 						loading={running}
 						onClick={onExport}
-						data-testid="backup-migration-export-btn"
+						data-testid={`${flow.testId}-btn`}
 					>
-						{t("shell.settings.backupMigration.export.action")}
+						{t(flow.actionKey)}
 					</Button>
 				}
 			/>
 			{running && (
-				<div className="backup-migration__progress" data-testid="backup-migration-export-progress">
+				<div className="backup-migration__progress" data-testid={`${flow.testId}-progress`}>
 					<p className="settings__hint" role="status">
 						{run.progress
 							? t("shell.settings.backupMigration.export.progress", {
@@ -397,14 +441,14 @@ function ExportSection() {
 						variant={ButtonVariant.Ghost}
 						size={ButtonSize.Md}
 						onClick={cancelTransferRun}
-						data-testid="backup-migration-export-stop"
+						data-testid={`${flow.testId}-stop`}
 					>
 						{t("shell.settings.backupMigration.import.stop")}
 					</Button>
 				</div>
 			)}
 			{mine && run.status === TransferRunStatus.Done && run.exportPath && (
-				<p className="settings__hint" data-testid="backup-migration-export-done">
+				<p className="settings__hint" data-testid={`${flow.testId}-done`}>
 					{t("shell.settings.backupMigration.export.done", { path: run.exportPath })}{" "}
 					<Button variant={ButtonVariant.Ghost} size={ButtonSize.Md} onClick={dismissTransferRun}>
 						{t("shell.settings.backupMigration.export.dismiss")}
@@ -424,6 +468,252 @@ function ExportSection() {
 					{busyError}
 				</p>
 			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------
+// Scheduled backups (IE-14)
+// ---------------------------------------------------------------------
+
+const RETENTION_CHOICES = [3, 7, 14, 30] as const;
+
+const FREQUENCY_LABEL_KEYS: Record<BackupFrequency, string> = {
+	[BackupFrequency.Off]: "shell.settings.backupMigration.schedule.frequency.off",
+	[BackupFrequency.Daily]: "shell.settings.backupMigration.schedule.frequency.daily",
+	[BackupFrequency.Weekly]: "shell.settings.backupMigration.schedule.frequency.weekly",
+};
+
+function formatWhen(ms: number): string {
+	return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** The schedule line under the controls: last run, next run, last failure. */
+export function backupScheduleLines(status: BackupStatus): string[] {
+	const lines = [
+		status.lastBackupAt === null
+			? t("shell.settings.backupMigration.schedule.never")
+			: t("shell.settings.backupMigration.schedule.last", { when: formatWhen(status.lastBackupAt) }),
+	];
+	if (status.nextDueAt !== null) {
+		lines.push(
+			status.lastBackupAt === null
+				? t("shell.settings.backupMigration.schedule.nextSoon")
+				: t("shell.settings.backupMigration.schedule.next", { when: formatWhen(status.nextDueAt) }),
+		);
+	}
+	if (status.lastError) {
+		lines.push(t("shell.settings.backupMigration.schedule.error", { error: status.lastError }));
+	}
+	return lines;
+}
+
+function ScheduledBackupSection() {
+	const [status, setStatus] = useState<BackupStatus | null>(null);
+	const [points, setPoints] = useState<readonly BackupRestorePoint[]>([]);
+	const [confirming, setConfirming] = useState<string | null>(null);
+	const [restoring, setRestoring] = useState<string | null>(null);
+	const [restoreReport, setRestoreReport] = useState<BackupRestoreReport | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	const refreshPoints = useCallback(() => {
+		void window.brainstorm.backup.restorePoints().then(setPoints, () => setPoints([]));
+	}, []);
+
+	useEffect(() => {
+		let cancelled = false;
+		void window.brainstorm.backup.status().then((next) => {
+			if (!cancelled) setStatus(next);
+		});
+		void window.brainstorm.backup.restorePoints().then((next) => {
+			if (!cancelled) setPoints(next);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const apply = useCallback(
+		(pending: Promise<BackupStatus | null>, refresh = false) => {
+			setError(null);
+			pending
+				.then((next) => {
+					if (next) setStatus(next);
+					if (refresh) refreshPoints();
+				})
+				.catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+		},
+		[refreshPoints],
+	);
+
+	const onRestore = useCallback(
+		(name: string) => {
+			if (confirming !== name) {
+				setConfirming(name);
+				return;
+			}
+			setConfirming(null);
+			setRestoring(name);
+			setRestoreReport(null);
+			setError(null);
+			window.brainstorm.backup
+				.restore(name)
+				.then(setRestoreReport)
+				.catch((e: unknown) =>
+					setError(
+						t("shell.settings.backupMigration.schedule.restoreFailed", {
+							error: e instanceof Error ? e.message : String(e),
+						}),
+					),
+				)
+				.finally(() => setRestoring(null));
+		},
+		[confirming],
+	);
+
+	const frequencyOptions = useMemo(
+		() =>
+			Object.values(BackupFrequency).map((value) => ({
+				value,
+				label: t(FREQUENCY_LABEL_KEYS[value]),
+			})),
+		[],
+	);
+	const retention = status?.retention ?? 7;
+	const retentionOptions = useMemo(
+		() =>
+			[...new Set<number>([...RETENTION_CHOICES, retention])]
+				.sort((a, b) => a - b)
+				.map((n) => ({
+					value: String(n),
+					label: t("shell.settings.backupMigration.schedule.retention", { count: n }),
+				})),
+		[retention],
+	);
+
+	const hasFolder = Boolean(status?.folder);
+	return (
+		<div className="backup-migration__group" data-testid="backup-migration-schedule">
+			<SectionHead
+				icon={IconName.Clock}
+				title={t("shell.settings.backupMigration.schedule.title")}
+				hint={t("shell.settings.backupMigration.schedule.hint")}
+				action={
+					<Button
+						variant={ButtonVariant.Neutral}
+						size={ButtonSize.Md}
+						iconLeft={IconName.Folder}
+						onClick={() => apply(window.brainstorm.backup.pickFolder(), true)}
+						data-testid="backup-migration-schedule-folder"
+					>
+						{t(
+							hasFolder
+								? "shell.settings.backupMigration.schedule.changeFolder"
+								: "shell.settings.backupMigration.schedule.chooseFolder",
+						)}
+					</Button>
+				}
+			/>
+			<p className="settings__hint" data-testid="backup-migration-schedule-path">
+				{status?.folder
+					? t("shell.settings.backupMigration.schedule.folder", { path: status.folder })
+					: t("shell.settings.backupMigration.schedule.noFolder")}
+			</p>
+			<div className="backup-migration__row">
+				<SelectMenu
+					value={status?.frequency ?? BackupFrequency.Off}
+					options={frequencyOptions}
+					onChange={(frequency) => apply(window.brainstorm.backup.updateSchedule({ frequency }))}
+					ariaLabel={t("shell.settings.backupMigration.schedule.frequencyLabel")}
+					disabled={!hasFolder}
+					data-testid="backup-migration-schedule-frequency"
+				/>
+				<SelectMenu
+					value={String(retention)}
+					options={retentionOptions}
+					onChange={(next) =>
+						apply(window.brainstorm.backup.updateSchedule({ retention: Number(next) }))
+					}
+					ariaLabel={t("shell.settings.backupMigration.schedule.retentionLabel")}
+					disabled={!hasFolder}
+					data-testid="backup-migration-schedule-retention"
+				/>
+				<Button
+					variant={ButtonVariant.Neutral}
+					size={ButtonSize.Md}
+					loading={status?.running ?? false}
+					disabled={!hasFolder}
+					onClick={() => apply(window.brainstorm.backup.runNow(), true)}
+					data-testid="backup-migration-schedule-run"
+				>
+					{t("shell.settings.backupMigration.schedule.runNow")}
+				</Button>
+				<Button
+					variant={ButtonVariant.Ghost}
+					size={ButtonSize.Md}
+					disabled={!hasFolder}
+					onClick={() => void window.brainstorm.backup.openFolder()}
+					data-testid="backup-migration-schedule-open"
+				>
+					{t("shell.settings.backupMigration.schedule.openFolder")}
+				</Button>
+			</div>
+			{status && hasFolder ? (
+				<p className="settings__hint" role="status">
+					{backupScheduleLines(status).join(" · ")}
+				</p>
+			) : null}
+			{hasFolder ? (
+				<div className="backup-migration__stack" data-testid="backup-migration-restore-points">
+					<h5 className="backup-migration__subtitle">
+						{t("shell.settings.backupMigration.schedule.restoreTitle")}
+					</h5>
+					<p className="settings__hint">{t("shell.settings.backupMigration.schedule.restoreHint")}</p>
+					{points.length === 0 ? (
+						<p className="settings__hint">{t("shell.settings.backupMigration.schedule.restoreEmpty")}</p>
+					) : (
+						<ul className="backup-migration__points">
+							{points.map((point) => (
+								<li key={point.name} className="backup-migration__point">
+									<span>
+										{t("shell.settings.backupMigration.schedule.point", {
+											when: formatWhen(point.createdAt),
+											size: formatBytes(point.bytes),
+										})}
+									</span>
+									<Button
+										variant={confirming === point.name ? ButtonVariant.Primary : ButtonVariant.Ghost}
+										size={ButtonSize.Md}
+										loading={restoring === point.name}
+										disabled={restoring !== null && restoring !== point.name}
+										onClick={() => onRestore(point.name)}
+										data-testid="backup-migration-restore"
+									>
+										{t(
+											confirming === point.name
+												? "shell.settings.backupMigration.schedule.restoreConfirm"
+												: "shell.settings.backupMigration.schedule.restore",
+										)}
+									</Button>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			) : null}
+			{restoreReport ? (
+				<p className="settings__hint" role="status" data-testid="backup-migration-restore-done">
+					{t("shell.settings.backupMigration.schedule.restoreDone", {
+						created: restoreReport.created,
+						skipped: restoreReport.skipped,
+					})}
+				</p>
+			) : null}
+			{error ? (
+				<p className="settings__error" role="alert">
+					{error}
+				</p>
+			) : null}
 		</div>
 	);
 }
