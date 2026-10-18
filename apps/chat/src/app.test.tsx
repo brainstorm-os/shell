@@ -763,3 +763,102 @@ describe("ChatApp — read state that follows the user (Chats-2)", () => {
 		expect(badgeSet).toHaveBeenLastCalledWith({ count: 0 });
 	});
 });
+
+describe("ChatApp — composer expand + absolute timestamps (Chats-3)", () => {
+	it("expands and collapses the composer from its button and CmdOrCtrl+Shift+E", async () => {
+		await mount([channel("c1", "general")]);
+		const wrap = () => container.querySelector('[data-testid="composer"]') as HTMLElement;
+		const btn = container.querySelector('[data-testid="composer-expand"]') as HTMLButtonElement;
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(false);
+		await act(async () => btn.click());
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(true);
+		expect(btn.getAttribute("aria-pressed")).toBe("true");
+		pressChord("e", { cmdOrCtrl: true, shift: true });
+		expect(wrap().classList.contains("chat__composer-wrap--expanded")).toBe(false);
+	});
+
+	it("toggles full dates from the header menu and persists the preference", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const kv = new Map<string, unknown>();
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "hi")], {
+			get: (key) => Promise.resolve(kv.get(key) ?? null),
+			put: (key, value) => {
+				kv.set(key, value);
+				return Promise.resolve();
+			},
+		});
+		const time = () => container.querySelector(".chat__time")?.textContent ?? "";
+		expect(time()).not.toContain("2026");
+
+		open.mockClear();
+		act(() => (container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click());
+		const item = open.mock.calls[0]?.[1].find((i) => i.label === "Show full dates and times");
+		expect(item?.selected).toBe(false);
+		await act(async () => item?.onSelect?.());
+		expect(time()).toContain("2026");
+		expect(kv.get("chat:prefs")).toEqual({ absoluteTimestamps: true });
+	});
+
+	it("restores the persisted preference on the next launch", async () => {
+		const kv = new Map<string, unknown>([["chat:prefs", { absoluteTimestamps: true }]]);
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "hi")], {
+			get: (key) => Promise.resolve(kv.get(key) ?? null),
+			put: () => Promise.resolve(),
+		});
+		await act(async () => undefined);
+		expect(container.querySelector(".chat__time")?.textContent).toContain("2026");
+	});
+});
+
+describe("ChatApp — preferences follow the user (Chats-3)", () => {
+	it("reads the synced preference and writes a change back onto the per-user row", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		const roster = {
+			self: vi.fn(() =>
+				Promise.resolve({ pubkey: "pk-me", displayName: "Me", fingerprint: "ed25519:aa" }),
+			),
+			members: vi.fn(() => Promise.resolve([])),
+		};
+		await mount(
+			[
+				channel("c1", "general"),
+				message("m1", "c1", "Mira", "hi"),
+				{
+					id: "us-1",
+					type: USER_STATE_TYPE,
+					properties: {
+						owner: "pk-me",
+						watermarks: { c1: 1 },
+						prefs: { absoluteTimestamps: true },
+						updatedAt: "2026-06-20T09:00:00.000Z",
+					},
+				},
+			],
+			undefined,
+			{ roster },
+		);
+		await act(async () => undefined);
+		expect(container.querySelector(".chat__time")?.textContent).toContain("2026");
+
+		open.mockClear();
+		act(() => (container.querySelector(".bs-object-menu__more") as HTMLButtonElement).click());
+		const item = open.mock.calls[0]?.[1].find((i) => i.label === "Show full dates and times");
+		expect(item?.selected).toBe(true);
+		await act(async () => item?.onSelect?.());
+		expect(container.querySelector(".chat__time")?.textContent).not.toContain("2026");
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, USER_STATE_WRITE_DEBOUNCE_MS + 50));
+		});
+		const update = (
+			window as unknown as {
+				brainstorm: { services: { entities: { update: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities.update;
+		expect(update).toHaveBeenLastCalledWith(
+			"us-1",
+			expect.objectContaining({ owner: "pk-me", prefs: { absoluteTimestamps: false } }),
+		);
+	});
+});

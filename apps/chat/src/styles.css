@@ -784,3 +784,25 @@ body {
 	margin-left: auto;
 	flex-shrink: 0;
 }
+
+/* ── composer expand (Chats-3) ────────────────────────────────── */
+.chat__composer-expand {
+	flex: 0 0 auto;
+	width: 40px;
+	height: 40px;
+}
+
+.chat__composer-wrap--expanded .chat__composer {
+	align-items: stretch;
+}
+
+.chat__composer-wrap--expanded .chat__composer-input {
+	min-height: 30vh;
+	max-height: 55vh;
+}
+
+.chat__composer-wrap--expanded .chat__composer-expand,
+.chat__composer-wrap--expanded .chat__send,
+.chat__composer-wrap--expanded .bs-composer-context__attach {
+	align-self: flex-end;
+}

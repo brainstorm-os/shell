@@ -127,5 +127,8 @@
   "menu.markAllRead": "Mark all as read",
   "sidebar.channelMenu": "Channel actions",
   "sidebar.channelUnread.one": "{name}, {count} unread message",
-  "sidebar.channelUnread.other": "{name}, {count} unread messages"
+  "sidebar.channelUnread.other": "{name}, {count} unread messages",
+  "menu.absoluteTimestamps": "Show full dates and times",
+  "composer.expand": "Expand composer",
+  "composer.collapse": "Collapse composer"
 }

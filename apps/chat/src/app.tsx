@@ -343,7 +343,11 @@ export function ChatApp(): ReactElement {
 		canSync: !!roster && selfStatus !== SelfStatus.Failed,
 		ownerRef: selfStatus === SelfStatus.Resolved ? identity.personRef : "",
 	});
-	const { ready: marksReady, watermarks, raiseWatermarks } = userState;
+	const { ready: marksReady, watermarks, raiseWatermarks, prefs, setPrefs } = userState;
+	const [composerExpanded, setComposerExpanded] = useState(false);
+	useChatShortcut(ChatAction.ToggleComposer, () => setComposerExpanded((v) => !v), {
+		enabled: !!activeId,
+	});
 
 	useEffect(() => {
 		if (!marksReady) return;
@@ -636,6 +640,11 @@ export function ChatApp(): ReactElement {
 					disabled: unread === 0,
 					onSelect: markAllRead,
 				},
+				{
+					label: t("menu.absoluteTimestamps"),
+					selected: prefs.absoluteTimestamps,
+					onSelect: () => setPrefs({ absoluteTimestamps: !prefs.absoluteTimestamps }),
+				},
 				...(canShare
 					? [
 							{
@@ -653,7 +662,7 @@ export function ChatApp(): ReactElement {
 			],
 			{ menuLabel: t("header.moreActions"), anchor: el, align: MenuAlign.End },
 		);
-	}, [canShare, unread, markAllRead]);
+	}, [canShare, unread, markAllRead, prefs.absoluteTimestamps, setPrefs]);
 
 	return (
 		<div
@@ -754,8 +763,11 @@ export function ChatApp(): ReactElement {
 								emptyName={activeChannel.name}
 								proposalHost={proposalHost}
 								highlight={highlight}
+								absoluteTimestamps={prefs.absoluteTimestamps}
 							/>
 							<Composer
+								expanded={composerExpanded}
+								onToggleExpanded={() => setComposerExpanded((v) => !v)}
 								channelName={activeChannel.name}
 								onSend={sendMessage}
 								disabled={!entitiesSvc}
@@ -976,6 +988,7 @@ function MessageView({
 	emptyName,
 	proposalHost,
 	highlight,
+	absoluteTimestamps,
 }: {
 	channel: ChatChannel;
 	groups: ReturnType<typeof groupMessages>;
@@ -984,6 +997,8 @@ function MessageView({
 	proposalHost: ProposalHost;
 	/** Chats-1 — a search jump target; `nonce` re-fires a repeat pick. */
 	highlight: { messageId: string; nonce: number } | null;
+	/** Chats-3 — full date + time instead of Today / Yesterday + clock. */
+	absoluteTimestamps: boolean;
 }): ReactElement {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const count = groups.reduce((n, g) => n + g.messages.length, 0);
@@ -1035,7 +1050,7 @@ function MessageView({
 				const avatarRef = avatarByAuthor.get(g.authorRef);
 				return (
 					<div key={`${channel.id}-${first?.id ?? i}`}>
-						{showDivider ? <DayDivider dayKey={g.dayKey} /> : null}
+						{showDivider ? <DayDivider dayKey={g.dayKey} absolute={absoluteTimestamps} /> : null}
 						<article className="chat__group">
 							<Avatar name={g.authorName} color={g.color} {...(avatarRef ? { avatarRef } : {})} />
 							<div className="chat__group-body">
@@ -1044,7 +1059,7 @@ function MessageView({
 										{g.authorName}
 									</span>
 									<time className="chat__time" dateTime={first?.createdAt}>
-										{formatTime(first?.createdAt ?? "")}
+										{formatTime(first?.createdAt ?? "", absoluteTimestamps)}
 									</time>
 								</header>
 								{g.messages.map((m) => {
@@ -1087,10 +1102,10 @@ function MessageView({
 	);
 }
 
-function DayDivider({ dayKey }: { dayKey: string }): ReactElement {
+function DayDivider({ dayKey, absolute }: { dayKey: string; absolute: boolean }): ReactElement {
 	return (
 		<div className="chat__day">
-			<span className="chat__day-label">{formatDay(dayKey)}</span>
+			<span className="chat__day-label">{formatDay(dayKey, absolute)}</span>
 		</div>
 	);
 }
@@ -1098,6 +1113,8 @@ function DayDivider({ dayKey }: { dayKey: string }): ReactElement {
 // ───────────────────────────── composer ─────────────────────────────
 
 function Composer({
+	expanded,
+	onToggleExpanded,
 	channelName,
 	onSend,
 	disabled,
@@ -1106,6 +1123,9 @@ function Composer({
 	onLinkDocument,
 	onUploadMedia,
 }: {
+	/** Chats-3 — the taller drafting mode (`chat.toggle-composer`). */
+	expanded: boolean;
+	onToggleExpanded: () => void;
 	channelName: string;
 	onSend: (body: string, richBody: string, atts: readonly MessageAttachment[]) => void;
 	disabled: boolean;
@@ -1135,7 +1155,8 @@ function Composer({
 	const placeholder = t("composer.placeholder", { name: channelName });
 	return (
 		<div
-			className={`chat__composer-wrap${objectDrop.isOver ? " chat__composer-wrap--drop" : ""}`}
+			className={`chat__composer-wrap${objectDrop.isOver ? " chat__composer-wrap--drop" : ""}${expanded ? " chat__composer-wrap--expanded" : ""}`}
+			data-testid="composer"
 			{...objectDrop.dropProps}
 		>
 			<ComposerContextRail
@@ -1180,6 +1201,17 @@ function Composer({
 						emptyLabel={t("composer.attach.empty")}
 					/>
 				</CompactEditor>
+				<button
+					type="button"
+					className="chat__icon-btn chat__composer-expand"
+					aria-pressed={expanded}
+					aria-label={expanded ? t("composer.collapse") : t("composer.expand")}
+					data-bs-tooltip={expanded ? t("composer.collapse") : t("composer.expand")}
+					onClick={onToggleExpanded}
+					data-testid="composer-expand"
+				>
+					<Icon name={expanded ? IconName.CaretDown : IconName.CaretUp} size={16} />
+				</button>
 				<button
 					type="button"
 					className="chat__send"
