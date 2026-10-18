@@ -13,6 +13,8 @@ import {
 	ColumnNode,
 	ColumnsNode,
 	InlineImageNode,
+	TabPaneNode,
+	TabsNode,
 	TitleNode,
 	ToggleNode,
 } from "@brainstorm-os/editor";
@@ -81,5 +83,7 @@ export const NOTES_ADDITIONAL_NODES: ReadonlyArray<Klass<LexicalNode>> = [
 	InlineTransclusionNode,
 	ColumnsNode,
 	ColumnNode,
+	TabsNode,
+	TabPaneNode,
 	TableOfContentsNode,
 ];

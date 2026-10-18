@@ -258,6 +258,17 @@ export type EditorI18nKey =
 	// Media block commands (createMediaBlockCommands) + the click-to-edit
 	// inspector (MediaInspectorPlugin). Surfaced when the host enables the
 	// `media` flag on `<FullEditorPlugins>` and wires `uploadFile`.
+	| "editor.block.tabs"
+	| "editor.block.tabs.description"
+	| "editor.tabs.region"
+	| "editor.tabs.defaultTitle"
+	| "editor.tabs.add"
+	| "editor.tabs.menu"
+	| "editor.tabs.rename"
+	| "editor.tabs.renameLabel"
+	| "editor.tabs.moveLeft"
+	| "editor.tabs.moveRight"
+	| "editor.tabs.delete"
 	| "editor.media.image"
 	| "editor.media.image.description"
 	| "editor.media.video"
@@ -501,6 +512,17 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.rightPanel.tabs": "Panel tabs",
 	"editor.rightPanel.properties": "Properties",
 	"editor.rightPanel.comments": "Comments",
+	"editor.block.tabs": "Tabs",
+	"editor.block.tabs.description": "Switch between panes of content",
+	"editor.tabs.region": "Tabs",
+	"editor.tabs.defaultTitle": "Tab {n}",
+	"editor.tabs.add": "Add tab",
+	"editor.tabs.menu": "Tab options",
+	"editor.tabs.rename": "Rename",
+	"editor.tabs.renameLabel": "Tab name",
+	"editor.tabs.moveLeft": "Move left",
+	"editor.tabs.moveRight": "Move right",
+	"editor.tabs.delete": "Delete tab",
 	"editor.media.image": "Image",
 	"editor.media.image.description": "Upload or embed an image",
 	"editor.media.video": "Video",

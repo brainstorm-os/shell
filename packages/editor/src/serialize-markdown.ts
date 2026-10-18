@@ -96,6 +96,15 @@ function renderBlock(node: SerializedNode): string {
 			const src = str(node.src);
 			return src ? `![${str(node.altText)}](${src})` : "";
 		}
+		case "tabs":
+			return asNodes(node.children)
+				.filter((pane) => str(pane.type) === "tab-pane")
+				.map((pane) =>
+					[`### ${str(pane.title)}`, ...asNodes(pane.children).map(renderBlock)]
+						.filter((b) => b !== "")
+						.join("\n\n"),
+				)
+				.join("\n\n");
 		case "image-block": {
 			const src = str(node.src);
 			if (!src) return "";

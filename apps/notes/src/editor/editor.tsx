@@ -78,6 +78,7 @@ import {
 	SlashMenuPlugin,
 	TableColumnResizePlugin,
 	TablesPlugin,
+	TabsPlugin,
 	TitlePlugin,
 	TogglePlugin,
 	TransclusionTypeaheadPlugin,
@@ -292,6 +293,7 @@ export function Editor({
 							<TogglePlugin docId={noteId} />
 							<EmbedPlugin />
 							<ColumnsPlugin />
+							<TabsPlugin />
 							<MentionTypeaheadPlugin currentNoteId={noteId} />
 							<TransclusionTypeaheadPlugin currentNoteId={noteId} />
 							<BlockEmbedPickerPlugin currentNoteId={noteId} />

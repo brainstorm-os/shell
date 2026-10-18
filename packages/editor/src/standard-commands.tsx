@@ -56,6 +56,7 @@ import {
 	ParagraphIcon,
 	QuoteIcon,
 	TableIcon,
+	TabsIcon,
 	TodoListIcon,
 	ToggleIcon,
 	TrashIcon,
@@ -63,6 +64,7 @@ import {
 import { duplicateBlocks, moveBlocksDown, moveBlocksUp } from "./plugins/block-ops";
 import { INSERT_COLUMNS_COMMAND } from "./plugins/columns-plugin";
 import { openEntityEmbedPicker } from "./plugins/embed-picker-store";
+import { INSERT_TABS_COMMAND } from "./plugins/tabs-plugin";
 import { INSERT_TOGGLE_COMMAND } from "./plugins/toggle-plugin";
 import { TURN_INTO_COMMAND } from "./plugins/turn-into-plugin";
 
@@ -288,6 +290,15 @@ export function createStandardBlockCommands(t: EditorT): readonly BlockCommand[]
 			icon: <ColumnsIcon />,
 			keywords: ["columns", "column", "layout", "three", "3"],
 			run: ({ editor }) => editor.dispatchCommand(INSERT_COLUMNS_COMMAND, 3),
+		},
+		{
+			id: "block.tabs",
+			category: CommandCategory.Layout,
+			label: t("editor.block.tabs"),
+			description: t("editor.block.tabs.description"),
+			icon: <TabsIcon />,
+			keywords: ["tabs", "tab", "tabbed", "panes", "sections", "layout"],
+			run: ({ editor }) => editor.dispatchCommand(INSERT_TABS_COMMAND, 2),
 		},
 	];
 }

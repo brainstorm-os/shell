@@ -105,6 +105,15 @@ function renderNode(node: SerializedNode): string {
 			const fig = `<img src="${src}" alt="${alt}" />`;
 			return caption ? `<figure>${fig}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : fig;
 		}
+		case "tabs":
+			// No portable tab widget: every pane renders in order under its
+			// title, so nothing hidden behind an inactive tab is lost.
+			return `<div>${asNodes(node.children)
+				.filter((pane) => str(pane.type) === "tab-pane")
+				.map(
+					(pane) => `<section><h3>${escapeHtml(str(pane.title))}</h3>${renderChildren(pane)}</section>`,
+				)
+				.join("")}</div>`;
 		case "image-block": {
 			const src = safeUrl(str(node.src));
 			if (!src) return "";
