@@ -136,7 +136,7 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		const t = await setup({
 			grants: ["entities.read:*", `entities.write:${BOOK}`],
 		});
-		t.repo.create({ id: "p1", type: PERSON, properties: {}, createdBy: "x", now: 1 });
+		t.repo.create({ id: "p1", type: PERSON, properties: {}, createdBy: "x", now: 1, dekId: null });
 		await t.create("b1", BOOK, {});
 		await expect(
 			t.call("update", { id: "b1", patch: { authors: [{ value: "p1" }] } }),
