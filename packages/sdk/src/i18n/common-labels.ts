@@ -19,6 +19,8 @@ export type IconPickerLabels = {
 	remove: string;
 	search: string;
 	noMatch: string;
+	/** Heading of the recent emoji / icons row (8.11). */
+	recent: string;
 	tabEmoji: string;
 	tabIcon: string;
 	tabUpload: string;
@@ -136,6 +138,7 @@ export const DEFAULT_ICON_PICKER_LABELS: IconPickerLabels = {
 	remove: "Remove icon",
 	search: "Search",
 	noMatch: "No matches",
+	recent: "Recent",
 	tabEmoji: "Emoji",
 	tabIcon: "Icon",
 	tabUpload: "Upload",

@@ -77,6 +77,7 @@
     "./radio": "./src/radio/index.ts",
     "./properties-panel": "./src/properties-panel/index.tsx",
     "./icon-picker": "./src/icon-picker/index.ts",
+    "./icon-recents": "./src/icon-picker/recent-icons.ts",
     "./cover-picker": "./src/cover-picker/index.ts",
     "./color-picker": "./src/color-picker/index.ts",
     "./share-dialog": "./src/share-dialog/index.ts",

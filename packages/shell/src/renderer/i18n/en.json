@@ -788,6 +788,8 @@
   "shell.iconPicker.search": "Search…",
   "shell.iconPicker.remove": "Remove icon",
   "shell.iconPicker.noMatch": "No match.",
+  "shell.iconPicker.recent": "Recent",
+  "shell.iconPicker.allIcons": "All icons",
   "shell.iconPicker.uploading": "Uploading…",
   "shell.iconPicker.dropHint": "Drop an image here or click to choose",
   "shell.iconPicker.libraryEmpty": "No uploaded icons yet. Upload one from the Upload tab.",
