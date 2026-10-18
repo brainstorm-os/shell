@@ -28,6 +28,7 @@ import { isEntityLocked, lockRefusesWrite, lockTogglePatch } from "@brainstorm-o
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
 import { formatBytes } from "@brainstorm-os/sdk/format-bytes";
 import { type NavHistory, createNavHistory } from "@brainstorm-os/sdk/nav-history";
+import { importDroppedOsFiles, mimeFromName } from "@brainstorm-os/sdk/os-file-drop";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plural, t } from "../i18n";
 import { type BreadcrumbSegment, deriveBreadcrumbs } from "../logic/breadcrumbs";
@@ -71,7 +72,7 @@ import {
 	defaultDirectionFor,
 	sortEntities,
 } from "../logic/sort";
-import { collisionName, mimeFromName, sha256Hex } from "../logic/upload";
+import { collisionName, sha256Hex } from "../logic/upload";
 import { type RetainedMembersMap, buildVaultFileTree } from "../logic/vault-tree";
 import {
 	applyViewOptionsToAllFolders,
@@ -832,24 +833,25 @@ export function useFilesStore() {
 				return;
 			}
 			const parentId = navRef.current.current;
-			const createdIds: string[] = [];
 			uploadInFlightRef.current = true;
-			for (const file of dropped) {
-				let stored: StoredUpload;
-				try {
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					const reply = await filesSvc.import({ name: file.name, bytes });
-					stored = {
-						size: reply.size,
-						hash: reply.contentHash,
-						assetId: reply.assetId,
-						assetMime: reply.mime,
-					};
-				} catch (error) {
-					console.warn(`[files] ${t("brainstorm.files.upload.readFailed", { name: file.name })}`, error);
-					continue;
-				}
-				const id = ingestStoredFile(file.name, stored, parentId);
+			const imported = await importDroppedOsFiles(
+				dropped,
+				{ import: filesSvc.import.bind(filesSvc) },
+				{
+					onError: (file, error) =>
+						console.warn(
+							`[files] ${t("brainstorm.files.upload.readFailed", { name: file.name })}`,
+							error,
+						),
+				},
+			);
+			const createdIds: string[] = [];
+			for (const file of imported) {
+				const id = ingestStoredFile(
+					file.name,
+					{ size: file.size, hash: file.hash, assetId: file.assetId, assetMime: file.assetMime },
+					parentId,
+				);
 				if (id) createdIds.push(id);
 			}
 			finishUpload(parentId, createdIds);
