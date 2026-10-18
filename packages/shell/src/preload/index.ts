@@ -2111,6 +2111,15 @@ function resolveAnalyticsDeviceId(): string {
 	}
 }
 
+/** 6.15 — remembered "Don't ask again" choices for the dashboard's own
+ *  confirm prompts, and the Settings reset that clears every app's. Kinds are
+ *  `ConfirmKind` values; main refuses to remember an irreversible one. */
+const confirmations = {
+	list: (): Promise<string[]> => ipcRenderer.invoke("confirmations:list"),
+	remember: (kind: string): Promise<boolean> => ipcRenderer.invoke("confirmations:remember", kind),
+	reset: (): Promise<number> => ipcRenderer.invoke("confirmations:reset"),
+};
+
 const brainstorm = {
 	version: resolveAppVersion(),
 	platform: process.platform,
@@ -2152,6 +2161,7 @@ const brainstorm = {
 	feedback,
 	help,
 	shortcuts,
+	confirmations,
 	shellActions: { on: onShellAction },
 	capabilityPrompt: { on: onCapabilityPrompt, respond: respondCapabilityPrompt },
 	toolApprovalPrompt: { on: onToolApprovalPrompt, respond: respondToolApprovalPrompt },

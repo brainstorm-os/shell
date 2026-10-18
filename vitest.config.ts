@@ -302,6 +302,7 @@ export default defineConfig({
 			"@brainstorm-os/sdk/date-grid": resolve(__dirname, "packages/sdk/src/date-grid/index.ts"),
 			"@brainstorm-os/sdk/calendar": resolve(__dirname, "packages/sdk/src/calendar/index.ts"),
 			"@brainstorm-os/sdk/panel-toggle": resolve(__dirname, "packages/sdk/src/panel-toggle/index.ts"),
+			"@brainstorm-os/sdk/confirm-memory": resolve(__dirname, "packages/sdk/src/confirm-memory.ts"),
 			"@brainstorm-os/sdk/pdf-engine": resolve(__dirname, "packages/sdk/src/pdf-engine/index.ts"),
 			"@brainstorm-os/sdk/checkbox": resolve(__dirname, "packages/sdk/src/checkbox/index.ts"),
 			"@brainstorm-os/sdk/count-badge": resolve(__dirname, "packages/sdk/src/count-badge/index.ts"),

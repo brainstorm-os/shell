@@ -602,6 +602,10 @@ body.is-resizing .contacts__resize {
 	color: var(--text-dim);
 }
 
+.contacts-confirm__remember {
+	margin-top: var(--space-3);
+}
+
 .contacts-confirm__actions {
 	display: flex;
 	justify-content: flex-end;

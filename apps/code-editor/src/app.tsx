@@ -18,7 +18,9 @@
 
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { NavigationMode, navModeFromEvent, openEntity } from "@brainstorm-os/sdk";
-import type { VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { ConfirmKind, type VaultEntitiesService } from "@brainstorm-os/sdk-types";
+import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
+import { createConfirmMemory } from "@brainstorm-os/sdk/confirm-memory";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { recallLastViewed, rememberLastViewed } from "@brainstorm-os/sdk/last-viewed";
@@ -878,33 +880,56 @@ export function CodeEditorApp(): ReactElement {
 			const del = getCodeEditorRuntime()?.services?.entities?.delete;
 			if (!del) return;
 			const name = fileName(row.path);
+			// 6.15 — "Don't ask again" for move-to-Bin (reversible: the Bin restores).
+			const memory = createConfirmMemory(getCodeEditorRuntime()?.services?.settings);
 
-			const actions = document.createElement("div");
-			actions.className = "editor__rename-actions";
-			const cancelBtn = document.createElement("button");
-			cancelBtn.type = "button";
-			cancelBtn.className = "bs-btn bs-btn--ghost";
-			cancelBtn.textContent = t("deleteCancel");
-			const confirmBtn = document.createElement("button");
-			confirmBtn.type = "button";
-			confirmBtn.className = "bs-btn bs-btn--danger";
-			confirmBtn.textContent = t("deleteConfirm");
-			actions.append(cancelBtn, confirmBtn);
+			void memory.isSkipped(ConfirmKind.MoveToBin).then((skipped) => {
+				if (skipped) {
+					void deleteFile(row);
+					return;
+				}
+				const actions = document.createElement("div");
+				actions.className = "editor__rename-actions";
+				const cancelBtn = document.createElement("button");
+				cancelBtn.type = "button";
+				cancelBtn.className = "bs-btn bs-btn--ghost";
+				cancelBtn.textContent = t("deleteCancel");
+				const confirmBtn = document.createElement("button");
+				confirmBtn.type = "button";
+				confirmBtn.className = "bs-btn bs-btn--danger";
+				confirmBtn.textContent = t("deleteConfirm");
+				actions.append(cancelBtn, confirmBtn);
 
-			const handle = createPopoverElement({
-				title: t("deleteTitle", { name }),
-				body: t("deleteBody", { name }),
-				footer: actions,
-				size: PopoverSize.Small,
-				testId: "code-delete",
-				onClose: () => handle.close(),
+				const remember = memory.canRemember(ConfirmKind.MoveToBin)
+					? createCheckbox({ label: t("deleteDontAskAgain") })
+					: null;
+				let body: HTMLElement | string = t("deleteBody", { name });
+				if (remember) {
+					const wrap = document.createElement("div");
+					const text = document.createElement("p");
+					text.className = "editor__delete-body";
+					text.textContent = t("deleteBody", { name });
+					remember.element.classList.add("editor__delete-remember");
+					wrap.append(text, remember.element);
+					body = wrap;
+				}
+
+				const handle = createPopoverElement({
+					title: t("deleteTitle", { name }),
+					body,
+					footer: actions,
+					size: PopoverSize.Small,
+					testId: "code-delete",
+					onClose: () => handle.close(),
+				});
+				cancelBtn.addEventListener("click", () => handle.close());
+				confirmBtn.addEventListener("click", () => {
+					handle.close();
+					if (remember?.input.checked) void memory.remember(ConfirmKind.MoveToBin);
+					void deleteFile(row);
+				});
+				confirmBtn.focus();
 			});
-			cancelBtn.addEventListener("click", () => handle.close());
-			confirmBtn.addEventListener("click", () => {
-				handle.close();
-				void deleteFile(row);
-			});
-			confirmBtn.focus();
 		},
 		[deleteFile],
 	);

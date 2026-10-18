@@ -70,6 +70,7 @@
     "./calendar": "./src/calendar/index.ts",
     "./error-boundary": "./src/error-boundary/index.ts",
     "./panel-toggle": "./src/panel-toggle/index.ts",
+    "./confirm-memory": "./src/confirm-memory.ts",
     "./pdf-engine": "./src/pdf-engine/index.ts",
     "./checkbox": "./src/checkbox/index.ts",
     "./count-badge": "./src/count-badge/index.ts",

@@ -3327,3 +3327,13 @@ export {
 	buildNoteInsertPayload,
 	parseNoteInsertPayload,
 } from "./insert-intent";
+export {
+	CONFIRM_KIND_REVERSIBILITY,
+	CONFIRM_SKIP_KEY_PREFIX,
+	ConfirmKind,
+	ConfirmReversibility,
+	canRememberConfirm,
+	confirmKindFromSkipKey,
+	confirmSkipKey,
+	isConfirmKind,
+} from "./confirm-kind";

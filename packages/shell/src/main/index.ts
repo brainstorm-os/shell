@@ -220,6 +220,7 @@ import { registerBrokerHandler } from "./ipc/broker-handler";
 import { getCapabilityPromptHost } from "./ipc/capability-prompt";
 import { wireCapabilityPromptIpc } from "./ipc/capability-prompt-ipc";
 import { registerChromeTabsHandlers } from "./ipc/chrome-tabs-handlers";
+import { makeConfirmationsApi, registerConfirmationsHandlers } from "./ipc/confirmations-handlers";
 import { listCovers } from "./ipc/covers-handlers";
 import { registerCoversHandlers } from "./ipc/covers-handlers";
 import {
@@ -2942,6 +2943,9 @@ void app.whenReady().then(async () => {
 			return null;
 		}
 	};
+	// 6.15 — remembered "Don't ask again" confirmation choices + the Settings
+	// reset, over the same per-device settings store apps write their own to.
+	registerConfirmationsHandlers(ipcMain, makeConfirmationsApi(getSettingsRepoForActiveSession));
 
 	const SEARCH_INDEX_OP_ID = "search-index";
 	const INDEXING_ACTIVITY_DELAY_MS = 500;

@@ -95,6 +95,7 @@
   "delete.confirm.body": "“{name}” será movido para a lixeira. Isso não pode ser desfeito aqui.",
   "delete.confirm.confirm": "Excluir",
   "delete.confirm.cancel": "Cancelar",
+  "delete.confirm.dontAskAgain": "Não perguntar novamente",
   "demo.banner": "Dados de visualização — abra um vault para gerenciar contatos reais.",
   "vcard.import": "Importar vCard…",
   "vcard.export": "Exportar vCard…",
