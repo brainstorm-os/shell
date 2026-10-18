@@ -15,6 +15,7 @@ import {
 	TocIcon,
 	applySuggestionInEditor,
 	denormalizeBody,
+	serializedStateWithBlockStyles,
 	useCommentMentionHost,
 } from "@brainstorm-os/editor";
 import { useBlankRecoveryGap } from "@brainstorm-os/react-yjs";
@@ -841,7 +842,10 @@ export function NotesApp() {
 		return {
 			files,
 			title: headerTitle,
-			getState: () => editorHandleRef.current?.getEditorState().toJSON() ?? null,
+			getState: () => {
+				const editor = editorHandleRef.current;
+				return editor ? serializedStateWithBlockStyles(editor) : null;
+			},
 			...(exportService ? { exportPdf: (html: string) => exportService.printToPdf({ html }) } : {}),
 			labels: {
 				filterName: (format) => filterByFormat[format],

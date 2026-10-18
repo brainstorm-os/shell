@@ -117,10 +117,12 @@ export {
 	BackgroundSwatch,
 	BlockBackgroundPlugin,
 	applyBlockBackground,
+	blockBackgroundExportCss,
 	blockBackgroundToken,
 	createBlockBackgroundActions,
 	readBlockBackground,
 	registerBlockBackground,
+	serializedStateWithBlockStyles,
 	swatchLabel,
 	withBlockBackground,
 } from "./block-background";

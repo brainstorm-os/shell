@@ -14,6 +14,7 @@
  * reused from `preview.ts` rather than re-declared.
  */
 
+import { blockBackgroundExportCss } from "./block-background";
 import { type SerializedEditorStateLike, type SerializedNode, TextFormat } from "./preview";
 
 /** URL schemes safe to keep in an exported `href`/`src`. Anything else (incl.
@@ -66,22 +67,28 @@ function renderChildren(node: SerializedNode): string {
 	return asNodes(node.children).map(renderNode).join("");
 }
 
+/** ` style="…"` for a block's stored background (B11.23), or "". */
+function blockStyleAttr(node: SerializedNode): string {
+	const css = blockBackgroundExportCss(node.style);
+	return css ? ` style="${escapeHtml(css)}"` : "";
+}
+
 function renderNode(node: SerializedNode): string {
 	switch (str(node.type)) {
 		case "paragraph":
-			return `<p>${renderChildren(node)}</p>`;
+			return `<p${blockStyleAttr(node)}>${renderChildren(node)}</p>`;
 		case "heading": {
 			const tag = ["h1", "h2", "h3", "h4", "h5", "h6"].includes(str(node.tag)) ? str(node.tag) : "h2";
-			return `<${tag}>${renderChildren(node)}</${tag}>`;
+			return `<${tag}${blockStyleAttr(node)}>${renderChildren(node)}</${tag}>`;
 		}
 		case "quote":
-			return `<blockquote>${renderChildren(node)}</blockquote>`;
+			return `<blockquote${blockStyleAttr(node)}>${renderChildren(node)}</blockquote>`;
 		case "list": {
 			const tag = str(node.listType) === "number" ? "ol" : "ul";
 			return `<${tag}>${renderChildren(node)}</${tag}>`;
 		}
 		case "listitem":
-			return `<li>${renderChildren(node)}</li>`;
+			return `<li${blockStyleAttr(node)}>${renderChildren(node)}</li>`;
 		case "link":
 		case "autolink": {
 			const href = safeUrl(str(node.url));
