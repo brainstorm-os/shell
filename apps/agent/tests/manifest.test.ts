@@ -109,11 +109,17 @@ describe("apps/agent/manifest.json", () => {
 		// re-checked server-side). It can never offer a provider the manifest lacks.
 		const result = validateManifest(readManifest());
 		if (!result.ok) throw new Error(result.reason);
-		for (const id of ["ollama", "anthropic", "openai", "glm", "gemini", "solheim"]) {
+		for (const id of ["ollama", "anthropic", "openai", "glm", "mistral", "gemini", "solheim"]) {
 			expect(result.manifest.capabilities, `manifest declares ai.provider:${id}`).toContain(
 				`ai.provider:${id}`,
 			);
 		}
+	});
+
+	it("Agent-14 — holds ai.provider:* so user-added custom endpoints can be pinned", () => {
+		const result = validateManifest(readManifest());
+		if (!result.ok) throw new Error(result.reason);
+		expect(result.manifest.capabilities).toContain("ai.provider:*");
 	});
 
 	it("holds entities.read:* — useVaultEntities reads the whole-vault live snapshot", () => {

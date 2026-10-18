@@ -25,9 +25,11 @@
 
 import {
 	type AiChatMessage,
+	type AiProviderInfo,
 	OLLAMA_PROVIDER_ID,
 	capabilityImplies,
 	estimateTokens,
+	isValidModelId,
 } from "@brainstorm-os/sdk-types";
 
 // ─── Tool grants ─────────────────────────────────────────────────────────────
@@ -158,6 +160,12 @@ export function grantedProviderIds(appCaps: readonly string[]): string[] {
 	return sorted;
 }
 
+/** Does the app hold a cap implying `ai.provider:<id>` (exact or `*`)? */
+export function holdsProvider(appCaps: readonly string[], id: string): boolean {
+	const needed = `${PROVIDER_CAP_PREFIX}${id}`;
+	return appCaps.some((cap) => capabilityImplies(cap, needed));
+}
+
 /** Resolve a conversation's stored provider to the value the picker shows: the
  *  stored provider if the app still holds it, else AUTO (a stored provider the
  *  app no longer has caps for can't be used — fail safe to shell routing). */
@@ -165,8 +173,43 @@ export function resolveProvider(
 	appCaps: readonly string[],
 	storedProvider: string | undefined,
 ): string {
-	if (!storedProvider) return AUTO_PROVIDER;
-	return grantedProviderIds(appCaps).includes(storedProvider) ? storedProvider : AUTO_PROVIDER;
+	if (!storedProvider || storedProvider === AUTO_PROVIDER) return AUTO_PROVIDER;
+	return holdsProvider(appCaps, storedProvider) ? storedProvider : AUTO_PROVIDER;
+}
+
+/** One picker row: a provider id plus, when the shell reported it, its
+ *  display metadata (label, default model, suggestions). */
+export type PickerProvider = { id: string; info?: AiProviderInfo };
+
+/**
+ * Agent-14 — the providers the picker offers. With the shell's live list
+ * (`ai.providers()`, already ledger-filtered) it is that list narrowed again to
+ * the app's caps, so user-added custom endpoints appear; without it (an older
+ * shell) it falls back to the explicit `ai.provider:<id>` caps.
+ */
+export function pickerProviders(
+	appCaps: readonly string[],
+	available: readonly AiProviderInfo[] | null,
+): PickerProvider[] {
+	if (!available) return grantedProviderIds(appCaps).map((id) => ({ id }));
+	const allowed = available.filter((info) => holdsProvider(appCaps, info.id));
+	const local = allowed.filter((info) => info.id === OLLAMA_PROVIDER_ID);
+	const rest = allowed.filter((info) => info.id !== OLLAMA_PROVIDER_ID);
+	return [...local, ...rest].map((info) => ({ id: info.id, info }));
+}
+
+/** Model suggestions for a provider: its default first, then the rest. */
+export function modelSuggestions(info: AiProviderInfo | undefined): string[] {
+	if (!info) return [];
+	return [...new Set([info.defaultModel, ...info.models])].filter(isValidModelId);
+}
+
+/** The model a request pins: the trimmed stored value when it is a sane id,
+ *  else `undefined` (provider default). Never forwards a value the broker
+ *  would refuse. */
+export function modelForRequest(stored: string | undefined): string | undefined {
+	const trimmed = stored?.trim();
+	return trimmed && isValidModelId(trimmed) ? trimmed : undefined;
 }
 
 /** Build the `ai.generate`/loop request provider override from the resolved

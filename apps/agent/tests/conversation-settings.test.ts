@@ -19,7 +19,10 @@ import {
 	grantedProviderIds,
 	grantsCover,
 	isToggleableGrant,
+	modelForRequest,
+	modelSuggestions,
 	nonToggleableAppCaps,
+	pickerProviders,
 	providerForRequest,
 	resolveProvider,
 	toggleableAppCaps,
@@ -191,5 +194,49 @@ describe("accrueSpend", () => {
 	it("clamps corrupt inputs to zero before adding", () => {
 		expect(accrueSpend(Number.NaN, 200)).toBe(200);
 		expect(accrueSpend(-10, -5)).toBe(0);
+	});
+});
+
+describe("Agent-14 — provider list + model pinning", () => {
+	const info = (id: string, custom = false) => ({
+		id,
+		label: id.toUpperCase(),
+		defaultModel: `${id}-default`,
+		models: [`${id}-default`, `${id}-big`],
+		custom,
+	});
+	const live = [info("anthropic"), info("ollama"), info("custom-0123abcd", true), info("gemini")];
+
+	it("narrows the shell's live list to the app's caps, local model first", () => {
+		expect(pickerProviders(APP_CAPS, live).map((p) => p.id)).toEqual(["ollama", "anthropic"]);
+	});
+
+	it("ai.provider:* admits custom endpoints", () => {
+		const caps = [...APP_CAPS, "ai.provider:*"];
+		expect(pickerProviders(caps, live).map((p) => p.id)).toEqual([
+			"ollama",
+			"anthropic",
+			"custom-0123abcd",
+			"gemini",
+		]);
+		expect(resolveProvider(caps, "custom-0123abcd")).toBe("custom-0123abcd");
+		expect(resolveProvider(APP_CAPS, "custom-0123abcd")).toBe(AUTO_PROVIDER);
+	});
+
+	it("falls back to cap-derived ids when the shell has no providers list", () => {
+		expect(pickerProviders(APP_CAPS, null)).toEqual([{ id: "ollama" }, { id: "anthropic" }]);
+	});
+
+	it("suggests the default model first, de-duplicated", () => {
+		expect(modelSuggestions(info("ollama"))).toEqual(["ollama-default", "ollama-big"]);
+		expect(modelSuggestions(undefined)).toEqual([]);
+	});
+
+	it("forwards only a sane model id", () => {
+		expect(modelForRequest(" anthropic/claude-sonnet-4.6 ")).toBe("anthropic/claude-sonnet-4.6");
+		expect(modelForRequest("")).toBeUndefined();
+		expect(modelForRequest(undefined)).toBeUndefined();
+		expect(modelForRequest("gpt\nX: y")).toBeUndefined();
+		expect(modelForRequest("m".repeat(201))).toBeUndefined();
 	});
 });
