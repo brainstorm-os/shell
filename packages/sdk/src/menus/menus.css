@@ -509,3 +509,17 @@ button.fm-row {
 	inline-size: 14px;
 	block-size: 14px;
 }
+
+/* A row's secondary text (ContextMenuItem.description), in the caption slot:
+ * muted and truncated so a long description never widens the menu or breaks
+ * the fixed row height. */
+.bs-menu-row__description {
+	display: inline-block;
+	max-width: 180px;
+	vertical-align: bottom;
+	overflow: hidden;
+	color: var(--text-faint);
+	font-size: var(--text-size-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

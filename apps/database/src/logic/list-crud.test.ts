@@ -13,6 +13,7 @@ import {
 	renameList,
 	renameView,
 	resolveListView,
+	setListDescription,
 	setListIcon,
 	uniqueName,
 } from "./list-crud";
@@ -120,6 +121,21 @@ describe("renameList", () => {
 		const list = emptyList("a", "Tasks");
 		expect(renameList(list, "Tasks")).toBe(list);
 		expect(renameList(list, "   ")).toBe(list);
+	});
+});
+
+describe("setListDescription (9.12.27)", () => {
+	test("trims and updates the description + updatedAt", () => {
+		const list = emptyList("a", "Tasks");
+		const next = setListDescription(list, "  Everything due this week  ");
+		expect(next.description).toBe("Everything due this week");
+		expect(next.updatedAt).toBeGreaterThan(list.updatedAt);
+	});
+
+	test("clears to empty, and returns the same instance when unchanged", () => {
+		const described = { ...emptyList("a", "Tasks"), description: "Due soon" };
+		expect(setListDescription(described, "   ").description).toBe("");
+		expect(setListDescription(described, "Due soon ")).toBe(described);
 	});
 });
 

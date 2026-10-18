@@ -219,6 +219,7 @@ import {
 	duplicateView,
 	renameList as renameListLogic,
 	resolveListView,
+	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
 import { deriveListMode } from "./logic/list-mode";
@@ -873,6 +874,11 @@ function buildListNavRow(state: AppState, list: List): HTMLButtonElement {
 	name.className = "db-sidebar__list-name";
 	name.textContent = list.name;
 	item.appendChild(name);
+	const description = list.description.trim();
+	if (description) {
+		item.dataset.bsTooltip = description;
+		item.setAttribute("aria-description", description);
+	}
 
 	item.appendChild(createCountBadge(memberCount(list, state)));
 
@@ -1093,7 +1099,7 @@ function renderStageHeader(state: AppState): void {
 	const headerName = document.getElementById("active-list-name");
 	if (headerName) headerName.textContent = list.name;
 	const descEl = document.getElementById("stage-description");
-	if (descEl) descEl.textContent = list.description;
+	if (descEl) bindListDescription(state, descEl, list);
 	const countEl = document.getElementById("stage-count");
 	if (countEl) countEl.textContent = String(memberCount(list, state));
 
@@ -1103,6 +1109,44 @@ function renderStageHeader(state: AppState): void {
 		badge.textContent = badgeLabel(mode);
 		badge.dataset.mode = mode;
 	}
+}
+
+/** The List description under the stage title (9.12.27): the paragraph IS
+ *  the edit field — click in and type, like the title. Enter (or blur)
+ *  commits, Escape reverts. Only entity-backed Lists are editable; a
+ *  vault-derived type list is regenerated every load, so an edit there would
+ *  silently vanish. Skips the rewrite while focused so a re-render can't
+ *  clobber an edit in progress. */
+function bindListDescription(state: AppState, el: HTMLElement, list: List): void {
+	if (el === document.activeElement) return;
+	const editable = !isVaultDerivedListId(list.id);
+	el.textContent = list.description;
+	el.contentEditable = editable ? "plaintext-only" : "false";
+	el.dataset.placeholder = editable ? t("brainstorm.database.stage.descriptionPlaceholder") : "";
+	if (editable) el.setAttribute("aria-label", t("brainstorm.database.stage.descriptionAria"));
+	else el.removeAttribute("aria-label");
+	el.dataset.listId = list.id;
+	el.onblur = () => {
+		const id = el.dataset.listId;
+		const current = state.lists.find((l) => l.id === id);
+		if (!current) return;
+		const next = (el.textContent ?? "").trim();
+		if (next !== current.description) commitListDescription(state, current.id, next);
+		else el.textContent = current.description;
+	};
+	if (el.dataset.shortcutsBound === "1") return;
+	el.dataset.shortcutsBound = "1";
+	attachShortcut(el, "Enter", () => el.blur(), { allowWhileSuppressed: true });
+	attachShortcut(
+		el,
+		"Escape",
+		() => {
+			const current = state.lists.find((l) => l.id === el.dataset.listId);
+			el.textContent = current?.description ?? "";
+			el.blur();
+		},
+		{ allowWhileSuppressed: true },
+	);
 }
 
 function badgeLabel(mode: ListMode): string {
@@ -1832,6 +1876,7 @@ function openAddToCollectionMenu(
 		point,
 		candidates.map((list) => ({
 			label: list.name,
+			...(list.description.trim() ? { description: list.description.trim() } : {}),
 			onSelect: () => toggleEntityInList(state, list.id, entity, true),
 		})),
 		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion") },
@@ -4168,6 +4213,17 @@ function commitListRename(state: AppState, listId: string, name: string): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
 	const next = renameListLogic(list, name);
+	if (next === list) return;
+	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
+	renderListNav(state);
+	renderStageHeader(state);
+	schedulePersist(state);
+}
+
+function commitListDescription(state: AppState, listId: string, description: string): void {
+	const list = state.lists.find((l) => l.id === listId);
+	if (!list) return;
+	const next = setListDescriptionLogic(list, description);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
 	renderListNav(state);

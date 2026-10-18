@@ -102,6 +102,14 @@ export function renameList(list: List, name: string): List {
 	return { ...list, name: trimmed, updatedAt: nowMs() };
 }
 
+/** Set a list's description (9.12.27). Trimmed; an unchanged value returns
+ *  the same object so callers can skip the write. */
+export function setListDescription(list: List, description: string): List {
+	const trimmed = description.trim();
+	if (trimmed === list.description) return list;
+	return { ...list, description: trimmed, updatedAt: nowMs() };
+}
+
 function sameIcon(a: Icon | null, b: Icon | null): boolean {
 	if (a === b) return true;
 	if (!a || !b) return false;

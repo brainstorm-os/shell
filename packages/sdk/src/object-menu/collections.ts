@@ -37,6 +37,9 @@ export type CollectionOption = {
 	id: string;
 	name: string;
 	icon: Icon | null;
+	/** The Collection's description ("" when it has none) — the picker shows
+	 *  it as the row's secondary line (9.12.27). */
+	description: string;
 	/** Manual member — the entity is in `members.include`. */
 	isMember: boolean;
 };
@@ -57,6 +60,7 @@ export async function listCollectionsForObject(
 			id: list.id,
 			name: list.name,
 			icon: list.icon,
+			description: list.description.trim(),
 			isMember: list.members.include.some((m) => m.entityId === entityId),
 		});
 	}

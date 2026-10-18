@@ -82,6 +82,8 @@
   "brainstorm.database.mode.manual": "Manuell",
   "brainstorm.database.mode.hybrid": "Hybrid",
   "brainstorm.database.stage.changeListIcon": "Listensymbol ändern",
+  "brainstorm.database.stage.descriptionPlaceholder": "Beschreibung hinzufügen…",
+  "brainstorm.database.stage.descriptionAria": "Beschreibung der Sammlung",
   "brainstorm.database.empty.vault.title": "Noch nichts hier",
   "brainstorm.database.empty.vault.body": "Dieser Vault enthält keine Entitäten. Erstellen Sie Notizen, Aufgaben oder andere Elemente in ihren Apps — sie erscheinen hier automatisch.",
   "brainstorm.database.empty.noView.title": "Keine Ansicht ausgewählt",

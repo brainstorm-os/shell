@@ -82,6 +82,8 @@
   "brainstorm.database.mode.manual": "Manuelle",
   "brainstorm.database.mode.hybrid": "Hybride",
   "brainstorm.database.stage.changeListIcon": "Changer l'icône de la liste",
+  "brainstorm.database.stage.descriptionPlaceholder": "Ajouter une description…",
+  "brainstorm.database.stage.descriptionAria": "Description de la collection",
   "brainstorm.database.empty.vault.title": "Rien ici pour l'instant",
   "brainstorm.database.empty.vault.body": "Ce coffre ne contient aucune entité. Créez des notes, des tâches ou d'autres éléments dans leurs applications et ils apparaîtront ici automatiquement.",
   "brainstorm.database.empty.noView.title": "Aucune vue sélectionnée",

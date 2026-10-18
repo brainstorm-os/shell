@@ -57,6 +57,14 @@
 	white-space: nowrap;
 }
 
+.bs-object-menu__description {
+	display: block;
+	overflow: hidden;
+	color: var(--text-faint);
+	font-size: var(--text-size-xs);
+	text-overflow: ellipsis;
+}
+
 /* Trailing accelerator hint — muted, right-aligned after the label (the
  * no-host fallback twin of the fancy-menus `.fm-row__caption` slot). */
 .bs-object-menu__shortcut {

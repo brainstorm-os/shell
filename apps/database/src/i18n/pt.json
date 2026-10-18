@@ -82,6 +82,8 @@
   "brainstorm.database.mode.manual": "Manual",
   "brainstorm.database.mode.hybrid": "Híbrida",
   "brainstorm.database.stage.changeListIcon": "Alterar o ícone da lista",
+  "brainstorm.database.stage.descriptionPlaceholder": "Adicionar uma descrição…",
+  "brainstorm.database.stage.descriptionAria": "Descrição da coleção",
   "brainstorm.database.empty.vault.title": "Ainda não há nada aqui",
   "brainstorm.database.empty.vault.body": "Este vault não tem entidades. Crie notas, tarefas ou outros itens em seus aplicativos e eles aparecerão aqui automaticamente.",
   "brainstorm.database.empty.noView.title": "Nenhuma visualização selecionada",
