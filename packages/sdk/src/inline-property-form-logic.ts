@@ -60,10 +60,13 @@ export enum InlineTextFormat {
 	Url = "url",
 	Email = "email",
 	Phone = "phone",
+	/** Formatted text (bold / links / lists) — the RichText preset (9.12.26). */
+	RichText = "rich-text",
 }
 
 export const INLINE_TEXT_FORMAT_ORDER: readonly InlineTextFormat[] = Object.freeze([
 	InlineTextFormat.Plain,
+	InlineTextFormat.RichText,
 	InlineTextFormat.Url,
 	InlineTextFormat.Email,
 	InlineTextFormat.Phone,
@@ -123,6 +126,8 @@ export function resolveInlinePreset(
 				return PropertyKindPreset.Email;
 			case InlineTextFormat.Phone:
 				return PropertyKindPreset.Phone;
+			case InlineTextFormat.RichText:
+				return PropertyKindPreset.RichText;
 			default:
 				return PropertyKindPreset.Text;
 		}

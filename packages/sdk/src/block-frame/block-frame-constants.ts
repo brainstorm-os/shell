@@ -210,6 +210,23 @@ export interface BlockFrameBootstrap {
 	readonly entityId: string;
 }
 
+/** Upper bound on a host entity id carried in the Startup payload. Vault ids
+ *  are short opaque tokens; anything longer is not one. */
+export const BLOCK_FRAME_MAX_HOST_ENTITY_ID_LENGTH = 256;
+
+const HOST_ENTITY_ID_RE = /^[\x21-\x7e]+$/;
+
+/** The validated host entity id (9.12.24), or `null`. Applied on BOTH sides of
+ *  the Startup channel — the host never sends a malformed id and the block
+ *  never trusts one — so a structured, bounded id is the only shape that
+ *  crosses: printable ASCII, no whitespace, at most
+ *  {@link BLOCK_FRAME_MAX_HOST_ENTITY_ID_LENGTH} chars. */
+export function sanitizeHostEntityId(value: unknown): string | null {
+	if (typeof value !== "string") return null;
+	if (value.length === 0 || value.length > BLOCK_FRAME_MAX_HOST_ENTITY_ID_LENGTH) return null;
+	return HOST_ENTITY_ID_RE.test(value) ? value : null;
+}
+
 /** Neutralise the byte sequences a JSON string field could carry that would
  *  otherwise break out of the inline `<script>` (`</script>`, HTML comment
  *  openers) or terminate the script per the JS spec's line terminators

@@ -102,6 +102,7 @@ const PRESET_LABEL_KEY: Record<PropertyKindPreset, string> = {
 	[PropertyKindPreset.Email]: "shell.settings.data.properties.kindBadge.email",
 	[PropertyKindPreset.Phone]: "shell.settings.data.properties.kindBadge.phone",
 	[PropertyKindPreset.Formula]: "shell.settings.data.properties.kindBadge.formula",
+	[PropertyKindPreset.RichText]: "shell.settings.data.properties.kindBadge.rich-text",
 };
 
 const PRESET_ICON: Record<PropertyKindPreset, IconName> = {
@@ -118,6 +119,7 @@ const PRESET_ICON: Record<PropertyKindPreset, IconName> = {
 	[PropertyKindPreset.Phone]: IconName.KindPhone,
 	// TODO: a dedicated KindFormula glyph (phosphor `function`); reuse KindNumber for now.
 	[PropertyKindPreset.Formula]: IconName.KindNumber,
+	[PropertyKindPreset.RichText]: IconName.KindText,
 };
 
 const PRESET_TINT: Record<PropertyKindPreset, string> = {
@@ -133,6 +135,7 @@ const PRESET_TINT: Record<PropertyKindPreset, string> = {
 	[PropertyKindPreset.Email]: "#ca8a04",
 	[PropertyKindPreset.Phone]: "#65a30d",
 	[PropertyKindPreset.Formula]: "#7c3aed",
+	[PropertyKindPreset.RichText]: "#4f46e5",
 };
 
 // ─── Primary kind (UX-layer): 7 tiles instead of 11 presets ─────────────────

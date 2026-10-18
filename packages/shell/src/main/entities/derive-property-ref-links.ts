@@ -90,7 +90,7 @@ function catalogLinkType(entityType: string, propertyKey: string): string {
  *  storage shapes per : a bare scalar id (`count.max === 1`)
  *  or an array of `{ value, label? }` envelopes / bare strings
  *  (`count.max > 1`). Non-string / empty values contribute nothing. */
-function readEntityRefIds(raw: unknown): string[] {
+export function readEntityRefIds(raw: unknown): string[] {
 	const push = (out: string[], v: unknown): void => {
 		if (typeof v === "string") {
 			if (v !== "") out.push(v);

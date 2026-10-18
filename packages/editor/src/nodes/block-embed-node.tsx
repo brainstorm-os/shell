@@ -58,6 +58,7 @@ import {
 	subscribeEntityTitles,
 } from "../plugins/entity-index";
 import { dispatchOpenEntity } from "../plugins/open-entity-dispatch";
+import { useTransclusionRender } from "../plugins/transclusion-render-context";
 
 /** Non-React `t` for the imperative `exportDOM` clipboard path (English
  *  defaults — the live decorator uses the reactive `useEditorT`). */
@@ -469,6 +470,7 @@ export function BlockEmbedView({
 			? blockProtocolSubtitle(renderer, entityType, t)
 			: entityTypeLabel(entityType, t);
 	const bpService = getEditorHost().bp;
+	const hostEntityId = embedHostEntityId(useTransclusionRender().ancestorChain, entityId);
 	const source = useBlockSource(effectiveBlockId, isBp);
 	const [height, setHeight] = useState<number | null>(null);
 	const mountHandle = useRef<BpBlockMountHandle | null>(null);
@@ -568,6 +570,7 @@ export function BlockEmbedView({
 					<BpBlockMount
 						entityId={entityId}
 						capabilities={EMPTY_CAPS}
+						{...(hostEntityId !== null ? { hostEntityId } : {})}
 						blockId={effectiveBlockId}
 						handleRef={mountHandle}
 						onMessage={onBlockMessage}
@@ -599,6 +602,18 @@ export function BlockEmbedView({
 			</span>
 		</a>
 	);
+}
+
+/** The document an embed renders inside: the innermost entry of the render
+ *  chain (the open note, or the transcluded body this embed sits in). A
+ *  self-embed has no meaningful host, so it gets none. */
+export function embedHostEntityId(
+	ancestorChain: readonly string[],
+	embeddedEntityId: string,
+): string | null {
+	const host = ancestorChain.at(-1);
+	if (host === undefined || host === "" || host === embeddedEntityId) return null;
+	return host;
 }
 
 /** Stable empty-capabilities reference. `<BpBlockMount>` keys its remount

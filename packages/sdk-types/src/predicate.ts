@@ -30,8 +30,15 @@ export type ScalarValue = string | number | boolean | null;
  *  the current clock (`$now`, resolved at evaluation/compile time) instead of a
  *  fixed literal — e.g. `due < now()` or `assignee = owner`. Comparison ops
  *  accept a `PropertyRef` anywhere a literal is allowed; the evaluator and the
- *  SQL compiler resolve it the same way. */
-export type PropertyRef = { $prop: PropertyPath } | { $now: true };
+ *  SQL compiler resolve it the same way.
+ *
+ *  `$host` (9.12.24) resolves to the id of the HOST entity an embedded view is
+ *  rendered inside (a Database block dropped into a page: "Books where author
+ *  contains this page"). It is supplied by the evaluation context, never the
+ *  row; with no host in context a predicate that references `$host` matches
+ *  NOTHING — the SQL compiler, which has no host, always compiles it to
+ *  match-nothing. */
+export type PropertyRef = { $prop: PropertyPath } | { $now: true } | { $host: true };
 
 /** A comparison right-hand side: either a literal or a computed `PropertyRef`. */
 export type Comparand = number | string | PropertyRef;
@@ -39,8 +46,8 @@ export type Comparand = number | string | PropertyRef;
 export type PropertyPredicate =
 	| { $eq: Record<PropertyPath, ScalarValue | PropertyRef> }
 	| { $neq: Record<PropertyPath, ScalarValue | PropertyRef> }
-	| { $contains: Record<PropertyPath, ScalarValue> }
-	| { $notContains: Record<PropertyPath, ScalarValue> }
+	| { $contains: Record<PropertyPath, ScalarValue | PropertyRef> }
+	| { $notContains: Record<PropertyPath, ScalarValue | PropertyRef> }
 	| { $gt: Record<PropertyPath, Comparand> }
 	| { $lt: Record<PropertyPath, Comparand> }
 	| { $gte: Record<PropertyPath, Comparand> }
@@ -68,7 +75,29 @@ export type PropertyPredicate =
  *  literal. Shared by the evaluator + SQL compiler + filter-builder so all
  *  three branch on the same shape (9.12.21). */
 export function isPropertyRef(v: unknown): v is PropertyRef {
-	return typeof v === "object" && v !== null && ("$prop" in v || "$now" in v);
+	return typeof v === "object" && v !== null && ("$prop" in v || "$now" in v || "$host" in v);
+}
+
+/** True when the ref resolves to the evaluation context's host entity. */
+export function isHostRef(v: unknown): v is { $host: true } {
+	return isPropertyRef(v) && "$host" in v;
+}
+
+/** True when any leaf of `pred` compares against `$host`. A host-relative
+ *  predicate evaluated with no host must match nothing — including under
+ *  `$not` / `$neq` / `$notContains`, which a per-leaf `false` would invert into
+ *  match-everything — so evaluators gate on this before walking rows. */
+export function predicateReferencesHost(pred: PropertyPredicate): boolean {
+	if ("$and" in pred) return pred.$and.some(predicateReferencesHost);
+	if ("$or" in pred) return pred.$or.some(predicateReferencesHost);
+	if ("$not" in pred) return predicateReferencesHost(pred.$not);
+	for (const map of Object.values(pred) as unknown[]) {
+		if (!map || typeof map !== "object") continue;
+		for (const rhs of Object.values(map as Record<string, unknown>)) {
+			if (isHostRef(rhs)) return true;
+		}
+	}
+	return false;
 }
 
 /** Filter UI tree — a stack of predicates organised in AND/OR groups.

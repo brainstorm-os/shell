@@ -17,6 +17,7 @@ function makeCtx(bookmark: unknown): {
 	const ctx = {
 		entityId: "bm-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: (async (messageName: string) =>
 			messageName === "getEntity" ? bookmark : null) as unknown as <T>(
@@ -109,6 +110,7 @@ describe("bookmark block", () => {
 		const ctx = {
 			entityId: "bm-1",
 			capabilities: () => [],
+			hostEntityId: () => null,
 			root,
 			graph: (async () => null) as unknown as <T>(m: string, d: unknown) => Promise<T>,
 			navigate: vi.fn(),

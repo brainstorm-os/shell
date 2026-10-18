@@ -35,7 +35,7 @@ import "@brainstorm-os/editor/editor.css";
 import "@brainstorm-os/sdk/virtual-list.css";
 import "@brainstorm-os/sdk/property-ui/dictionary-editor.css";
 import "@brainstorm-os/sdk/count-badge.css";
-import { EntityCommentsPanel } from "@brainstorm-os/editor";
+import { EntityCommentsPanel, RichTextPropertyEditor } from "@brainstorm-os/editor";
 import { inheritedPropertyDefs, openEntity, quickLookEntity } from "@brainstorm-os/sdk";
 import {
 	COLLECTION_TYPE_URL,
@@ -196,12 +196,14 @@ import {
 	type FilterCompareTo,
 	type FilterDraft,
 	FilterOp,
+	FilterRefKind,
 	type FilterRule,
 	countDraftRules,
 	describeGroup,
 	describeRule,
 	draftToFilterNode,
 	filterNodeToDraft,
+	opAcceptsHostRef,
 	opAcceptsRef,
 	opIsList,
 	opLabel,
@@ -217,6 +219,7 @@ import {
 	duplicateView,
 	renameList as renameListLogic,
 	resolveListView,
+	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
 import { deriveListMode } from "./logic/list-mode";
@@ -501,6 +504,15 @@ function selectLabelForValue(propertyId: string, value: string): string {
 /** The human label for a rule's value in the filter chip / menu: a relative-
  *  date rule shows its range name ("Last 7 days"), a vocabulary value its
  *  option label, everything else the raw value. */
+function describeFilterRule(rule: FilterRule): string {
+	return describeRule(
+		rule,
+		colLabel(rule.propertyId),
+		ruleValueLabel(rule),
+		undefined,
+		t("brainstorm.database.filter.thisObject"),
+	);
+}
 function ruleValueLabel(rule: FilterRule): string {
 	return rule.op === FilterOp.RelativeDate
 		? relativeRangeLabel(rule.value)
@@ -862,6 +874,11 @@ function buildListNavRow(state: AppState, list: List): HTMLButtonElement {
 	name.className = "db-sidebar__list-name";
 	name.textContent = list.name;
 	item.appendChild(name);
+	const description = list.description.trim();
+	if (description) {
+		item.dataset.bsTooltip = description;
+		item.setAttribute("aria-description", description);
+	}
 
 	item.appendChild(createCountBadge(memberCount(list, state)));
 
@@ -1082,7 +1099,7 @@ function renderStageHeader(state: AppState): void {
 	const headerName = document.getElementById("active-list-name");
 	if (headerName) headerName.textContent = list.name;
 	const descEl = document.getElementById("stage-description");
-	if (descEl) descEl.textContent = list.description;
+	if (descEl) bindListDescription(state, descEl, list);
 	const countEl = document.getElementById("stage-count");
 	if (countEl) countEl.textContent = String(memberCount(list, state));
 
@@ -1092,6 +1109,44 @@ function renderStageHeader(state: AppState): void {
 		badge.textContent = badgeLabel(mode);
 		badge.dataset.mode = mode;
 	}
+}
+
+/** The List description under the stage title (9.12.27): the paragraph IS
+ *  the edit field — click in and type, like the title. Enter (or blur)
+ *  commits, Escape reverts. Only entity-backed Lists are editable; a
+ *  vault-derived type list is regenerated every load, so an edit there would
+ *  silently vanish. Skips the rewrite while focused so a re-render can't
+ *  clobber an edit in progress. */
+function bindListDescription(state: AppState, el: HTMLElement, list: List): void {
+	if (el === document.activeElement) return;
+	const editable = !isVaultDerivedListId(list.id);
+	el.textContent = list.description;
+	el.contentEditable = editable ? "plaintext-only" : "false";
+	el.dataset.placeholder = editable ? t("brainstorm.database.stage.descriptionPlaceholder") : "";
+	if (editable) el.setAttribute("aria-label", t("brainstorm.database.stage.descriptionAria"));
+	else el.removeAttribute("aria-label");
+	el.dataset.listId = list.id;
+	el.onblur = () => {
+		const id = el.dataset.listId;
+		const current = state.lists.find((l) => l.id === id);
+		if (!current) return;
+		const next = (el.textContent ?? "").trim();
+		if (next !== current.description) commitListDescription(state, current.id, next);
+		else el.textContent = current.description;
+	};
+	if (el.dataset.shortcutsBound === "1") return;
+	el.dataset.shortcutsBound = "1";
+	attachShortcut(el, "Enter", () => el.blur(), { allowWhileSuppressed: true });
+	attachShortcut(
+		el,
+		"Escape",
+		() => {
+			const current = state.lists.find((l) => l.id === el.dataset.listId);
+			el.textContent = current?.description ?? "";
+			el.blur();
+		},
+		{ allowWhileSuppressed: true },
+	);
 }
 
 function badgeLabel(mode: ListMode): string {
@@ -1374,6 +1429,7 @@ function withProperties(state: AppState, element: ReactElement): ReactElement {
 	return createElement(PropertiesProvider, {
 		runtime: { services: { properties } },
 		entityTitleSource: getTitleSource(state),
+		richTextEditor: RichTextPropertyEditor,
 		// biome-ignore lint/correctness/noChildrenProp: app.ts is .ts (no JSX); the createElement overload for a component with a required `children` prop only type-checks when `children` is in the props object, not the variadic 3rd arg.
 		children: element,
 	});
@@ -1820,6 +1876,7 @@ function openAddToCollectionMenu(
 		point,
 		candidates.map((list) => ({
 			label: list.name,
+			...(list.description.trim() ? { description: list.description.trim() } : {}),
 			onSelect: () => toggleEntityInList(state, list.id, entity, true),
 		})),
 		{ menuLabel: t("brainstorm.database.menu.addToCollectionRegion") },
@@ -2762,7 +2819,7 @@ function openFilterMenu(state: AppState, anchor: HTMLElement): void {
 	// value / change condition / remove) — one consistent gesture across the
 	// manager and the pills bar, instead of "click here = silently delete".
 	const items: MenuItem[] = draft.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: propertyKindIcon(rule.propertyId),
 		onClick: () => openFilterRulePillMenu(state, anchor, view.id, draft, i),
 	}));
@@ -2856,7 +2913,7 @@ function openFilterGroupMenu(
 	};
 
 	const items: MenuItem[] = group.rules.map((rule, i) => ({
-		label: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		label: describeFilterRule(rule),
 		icon: IconName.Close,
 		onClick: () => replaceGroup({ ...group, rules: group.rules.filter((_, j) => j !== i) }),
 	}));
@@ -2937,6 +2994,7 @@ function openFilterOperatorMenu(
 	// of every other property's operator menu.
 	const def = cachedVaultProperties.find((d) => d.key === propertyId);
 	const isDateProperty = def ? def.valueType === ValueType.Date : /at$/i.test(propertyId);
+	const isRefProperty = def ? def.valueType === ValueType.EntityRef : /ids?$/i.test(propertyId);
 	const operators = FILTER_OPERATORS.filter((o) => o.op !== FilterOp.RelativeDate || isDateProperty);
 	openSubmenuNextFrame(() =>
 		openContextMenu(
@@ -2987,23 +3045,40 @@ function openFilterOperatorMenu(
 					// option id (so is/contains matches the stored id), instead of
 					// free-texting a label that never matches (F-027).
 					// Comparison op → offer a literal, the clock (now), or another
-					// property as the right-hand side (9.12.21 cross-property).
-					if (opAcceptsRef(o.op)) {
-						const cols = (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
-							(c) => c.visible !== false && c.propertyId !== propertyId,
-						);
+					// property as the right-hand side (9.12.21 cross-property). A
+					// relation also offers "this object" — the page an embedded view
+					// sits in (9.12.24 contextual views).
+					const hostRef = isRefProperty && opAcceptsHostRef(o.op);
+					if (opAcceptsRef(o.op) || hostRef) {
+						const cols = opAcceptsRef(o.op)
+							? (state.views.find((x) => x.id === viewId)?.columns ?? []).filter(
+									(c) => c.visible !== false && c.propertyId !== propertyId,
+								)
+							: [];
 						const refItems: MenuItem[] = [
 							{
 								label: t("brainstorm.database.filter.dateValuePlaceholder"),
 								onClick: () => promptInline(anchor, "", (v) => append(v.trim())),
 							},
-							{
-								label: t("brainstorm.database.filter.dateNow"),
-								onClick: () => append("", { kind: "now" }),
-							},
+							...(hostRef
+								? [
+										{
+											label: t("brainstorm.database.filter.thisObject"),
+											onClick: () => append("", { kind: FilterRefKind.Host }),
+										},
+									]
+								: []),
+							...(opAcceptsRef(o.op)
+								? [
+										{
+											label: t("brainstorm.database.filter.dateNow"),
+											onClick: () => append("", { kind: FilterRefKind.Now }),
+										},
+									]
+								: []),
 							...cols.map((c) => ({
 								label: `property: ${colLabel(c.propertyId)}`,
-								onClick: () => append("", { kind: "prop", propertyId: c.propertyId }),
+								onClick: () => append("", { kind: FilterRefKind.Prop, propertyId: c.propertyId }),
 							})),
 						];
 						openSubmenuNextFrame(() => openContextMenu({ x: r.left, y: r.bottom + 4 }, refItems, anchor));
@@ -3386,7 +3461,7 @@ function buildFilterRulePill(
 	return createPill({
 		variant: "filter",
 		icon: DatabaseIcon.Filter,
-		text: describeRule(rule, colLabel(rule.propertyId), ruleValueLabel(rule)),
+		text: describeFilterRule(rule),
 		title: t("brainstorm.database.filter.editRule"),
 		onClick: (anchor) => openFilterRulePillMenu(state, anchor, viewId, draft, index),
 		onRemove: remove,
@@ -4145,6 +4220,17 @@ function commitListRename(state: AppState, listId: string, name: string): void {
 	schedulePersist(state);
 }
 
+function commitListDescription(state: AppState, listId: string, description: string): void {
+	const list = state.lists.find((l) => l.id === listId);
+	if (!list) return;
+	const next = setListDescriptionLogic(list, description);
+	if (next === list) return;
+	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
+	renderListNav(state);
+	renderStageHeader(state);
+	schedulePersist(state);
+}
+
 function commitListIcon(state: AppState, listId: string, icon: Icon | null): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
@@ -4821,6 +4907,7 @@ function inlinePropertyFormLabels() {
 		formatUrl: t("brainstorm.database.property.form.formatUrl"),
 		formatEmail: t("brainstorm.database.property.form.formatEmail"),
 		formatPhone: t("brainstorm.database.property.form.formatPhone"),
+		formatRichText: t("brainstorm.database.property.form.formatRichText"),
 		formatCurrency: t("brainstorm.database.property.form.formatCurrency"),
 		formatPercent: t("brainstorm.database.property.form.formatPercent"),
 		formatDuration: t("brainstorm.database.property.form.formatDuration"),

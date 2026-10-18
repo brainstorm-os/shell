@@ -336,6 +336,7 @@
   "notes.inlinePropertyForm.format.url": "URL",
   "notes.inlinePropertyForm.format.email": "Email",
   "notes.inlinePropertyForm.format.phone": "Phone",
+  "notes.inlinePropertyForm.format.richText": "Rich text",
   "notes.inlinePropertyForm.format.currency": "Currency",
   "notes.inlinePropertyForm.format.percent": "Percent",
   "notes.inlinePropertyForm.format.duration": "Duration",

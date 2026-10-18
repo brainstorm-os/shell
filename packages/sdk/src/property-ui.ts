@@ -79,6 +79,8 @@ export {
 	type EscapeMatcher,
 	type KeyLike,
 	type PropertyUiLabels,
+	type RichTextEditorComponent,
+	type RichTextEditorProps,
 	DEFAULT_DICTIONARY_EDITOR_MATCHERS,
 	DEFAULT_PROPERTY_UI_LABELS,
 	EMPTY_ENTITY_TITLE_SOURCE,

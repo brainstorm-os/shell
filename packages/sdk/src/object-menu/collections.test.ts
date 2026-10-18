@@ -68,6 +68,14 @@ describe("listCollectionsForObject", () => {
 		]);
 	});
 
+	it("carries each Collection's description for the picker's secondary line (9.12.27)", async () => {
+		const described = listEntity("c1", "Reading");
+		described.properties.description = "  Books to finish this year ";
+		const svc = fakeService([described, listEntity("c2", "Archive")]);
+		const options = await listCollectionsForObject(svc, "x");
+		expect(options.map((o) => o.description)).toEqual(["Books to finish this year", ""]);
+	});
+
 	it("drops foreign / malformed rows (codec returns null)", async () => {
 		const svc = fakeService([
 			listEntity("c1", "Reading"),

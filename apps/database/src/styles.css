@@ -3583,6 +3583,36 @@ body.is-resizing .dbv-tl__labels-resize {
 	display: none;
 }
 
+/* An editable description (9.12.27) stays out of the way while empty, but is
+ * revealed — as a faint "Add a description…" placeholder — when the header is
+ * hovered or the field is focused (keyboard users reach it by Tab: an empty
+ * contenteditable keeps its tab stop at zero height). */
+.db-stage__description[contenteditable="plaintext-only"] {
+	border-radius: var(--radius-sm);
+	outline: none;
+	cursor: text;
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:empty {
+	display: block;
+	height: 0;
+	overflow: hidden;
+}
+
+.db-stage__header:hover .db-stage__description[contenteditable="plaintext-only"]:empty,
+.db-stage__description[contenteditable="plaintext-only"]:focus {
+	height: auto;
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:empty::before {
+	content: attr(data-placeholder);
+	color: var(--text-faint);
+}
+
+.db-stage__description[contenteditable="plaintext-only"]:focus {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus-ring) 55%, transparent);
+}
+
 /* ── Empty vault / no-selection placeholder (9.12.2) ──────────────── */
 
 .db-stage__empty {

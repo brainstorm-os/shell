@@ -156,6 +156,13 @@ export type CompactEditorProps = {
 	children?: ReactNode;
 	/** Host overrides for editor-internal strings (inline toolbar labels). */
 	i18nOverrides?: Partial<EditorManifest>;
+	/** Seed content: a serialized Lexical state (a previously-read
+	 *  `CompactEditorPayload.state`). Read once at mount; a state that does
+	 *  not parse falls back to `initialText`. */
+	initialState?: string;
+	/** Seed content as plain text, used when there is no usable
+	 *  `initialState`. Read once at mount. */
+	initialText?: string;
 };
 
 /** The composer node set: links + the Slack-sized blocks (lists / quote /
@@ -227,6 +234,31 @@ function nodesForRoot(nodes: readonly LexicalNode[]): LexicalNode[] {
 		}
 	}
 	return out;
+}
+
+/** The composer's `editorState` seed: a parseable serialized state as-is,
+ *  else a single paragraph per line of plain text, else nothing. */
+function seedEditorState(
+	state: string | undefined,
+	text: string | undefined,
+): string | (() => void) | undefined {
+	if (state) {
+		try {
+			const parsed = JSON.parse(state) as { root?: unknown } | null;
+			if (parsed && typeof parsed === "object" && parsed.root) return state;
+		} catch {
+			// Fall through to the plain-text seed.
+		}
+	}
+	if (!text) return undefined;
+	return () => {
+		const root = $getRoot();
+		for (const line of text.split("\n")) {
+			const paragraph = $createParagraphNode();
+			if (line) paragraph.append($createTextNode(line));
+			root.append(paragraph);
+		}
+	};
 }
 
 function readPayload(editor: LexicalEditor): CompactEditorPayload {
@@ -399,16 +431,21 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 			additionalNodes,
 			children,
 			i18nOverrides,
+			initialState,
+			initialText,
 		} = props;
 
 		// `editable` is reconciled live by the behaviour plugin's `setEditable`
 		// effect, so the static config is always editable — rebuilding it on a
 		// `disabled` flip would remount the composer and lose draft content.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: the seed is read once at mount — re-seeding on a prop change would remount the composer mid-edit
+		const seed = useMemo(() => seedEditorState(initialState, initialText), []);
 		const initialConfig = useMemo(
 			() => ({
 				namespace: "brainstorm-compact-editor",
 				theme: mergeTheme(),
 				editable: true,
+				...(seed !== undefined ? { editorState: seed } : {}),
 				nodes: additionalNodes
 					? [...COMPOSER_BASELINE_NODES, ...additionalNodes]
 					: COMPOSER_BASELINE_NODES,
@@ -416,7 +453,7 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 					console.error("[brainstorm-compact-editor]", error);
 				},
 			}),
-			[additionalNodes],
+			[additionalNodes, seed],
 		);
 
 		return (

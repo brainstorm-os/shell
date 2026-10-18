@@ -169,6 +169,14 @@ describe("validatePropertyDef — entityRef modifiers", () => {
 		).toBe(true);
 	});
 
+	it("accepts inverseOf on entityRef only (9.12.25)", () => {
+		expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: "prop_books" })).ok).toBe(
+			true,
+		);
+		expect(validatePropertyDef(makeDef(ValueType.Text, { inverseOf: "prop_books" })).ok).toBe(false);
+		expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: "" })).ok).toBe(false);
+	});
+
 	it("rejects allowedTypes on text", () => {
 		expect(validatePropertyDef(makeDef(ValueType.Text, { allowedTypes: ["x"] })).ok).toBe(false);
 	});

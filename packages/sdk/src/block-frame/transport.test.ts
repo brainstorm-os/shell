@@ -234,6 +234,26 @@ describe("createBlockFrameTransport — startup envelope", () => {
 		t.close();
 	});
 
+	it("carries a valid host entity id in the startup payload, and drops a malformed one (9.12.24)", () => {
+		const startupFor = (hostEntityId: string) => {
+			const handle = makeFakeHandle();
+			handle.setPhase(BlockFramePhase.Mounted);
+			const t = createBlockFrameTransport({
+				handle,
+				entityId: "ent_list",
+				capabilities: [],
+				hostEntityId,
+				host: makeFakeHost(),
+			});
+			const payload = lastEnvelope(handle)?.payload as BlockFrameStartupPayload;
+			t.close();
+			return payload;
+		};
+		expect(startupFor("ent_page").hostEntityId).toBe("ent_page");
+		expect(startupFor("ent page")).not.toHaveProperty("hostEntityId");
+		expect(startupFor("")).not.toHaveProperty("hostEntityId");
+	});
+
 	it("flushStartup is idempotent — startup envelope sent exactly once", () => {
 		const handle = makeFakeHandle();
 		handle.setPhase(BlockFramePhase.Mounted);

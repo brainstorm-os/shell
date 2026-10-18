@@ -56,6 +56,7 @@ const labels = {
 	formatUrl: "URL",
 	formatEmail: "Email",
 	formatPhone: "Phone",
+	formatRichText: "Rich text",
 	formatCurrency: "Currency",
 	formatPercent: "Percent",
 	formatDuration: "Duration",

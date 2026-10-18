@@ -23,6 +23,7 @@ import {
 	Vertical,
 	defineMenu,
 } from "@react-fancy-menus/core";
+import { createElement } from "react";
 import { getActiveMenuStore } from "./active-store";
 import { blankMenuIcon } from "./sdk-icon";
 
@@ -57,6 +58,10 @@ export type ContextMenuItem = {
 	 *  Set it ONLY when the action has a real registered shortcut; it's a
 	 *  display label, not a binding. Empty/absent collapses the slot. */
 	shortcut?: string;
+	/** Muted secondary text after the label (e.g. a collection's description
+	 *  in a "pick a collection" menu), truncated to one line with the full text
+	 *  on hover. Ignored when the row carries a `shortcut`. */
+	description?: string;
 	/** Nested submenu. When set (non-empty) the row paints a trailing chevron
 	 *  and opens this child list to its right on hover (200 ms latch) /
 	 *  ArrowRight — the cascade pattern for grouped option sets (Diff layout,
@@ -150,7 +155,18 @@ function contextMenuRows(): RowSpec<ContextMenuItem>[] {
 			// The caption slot is `flex: 0 0 auto` + muted in the runtime CSS,
 			// so a shortcut paints right-aligned after the label and collapses
 			// when absent — the standard menu accelerator hint.
-			caption: (it: ContextMenuItem) => it.shortcut,
+			// A description rides the same slot when there is no shortcut — one
+			// truncated muted line, so the fixed (virtualized) row height holds;
+			// the full text is the hover title.
+			caption: (it: ContextMenuItem) =>
+				it.shortcut ??
+				(it.description
+					? createElement(
+							"span",
+							{ className: "bs-menu-row__description", title: it.description },
+							it.description,
+						)
+					: undefined),
 			disabled: (it: ContextMenuItem) => it.disabled === true,
 			// A row with children paints the cascade chevron and opens the shared
 			// child on hover; `subMenuData` hands that child its own `items`.

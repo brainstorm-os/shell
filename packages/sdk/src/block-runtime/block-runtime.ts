@@ -28,6 +28,7 @@ import {
 	type BlockFrameBootstrap,
 	type BlockFrameInnerTransport,
 	createBlockFrameInnerTransport,
+	sanitizeHostEntityId,
 } from "@brainstorm-os/sdk/block-frame/inner";
 
 /** Host→block control messages that are NOT BP protocol traffic (they carry
@@ -90,8 +91,13 @@ interface BpWireMessage {
 
 /** The context a block's boot callback receives. */
 export interface BlockRuntimeContext {
-	/** The embedding entity id (the entity this block was dropped onto). */
+	/** The embedded entity id — the entity this block renders (for the
+	 *  Database block, the `List`). */
 	readonly entityId: string;
+	/** The entity whose document embeds this block (9.12.24) — e.g. the Note
+	 *  a Database view was dropped into — or `null` when the host gave none
+	 *  (or before Startup arrives). Validated; never the raw wire value. */
+	hostEntityId(): string | null;
 	/** Capability snapshot from the host Startup envelope. Advisory — the
 	 *  broker re-checks every call; empty until Startup arrives. */
 	capabilities(): readonly string[];
@@ -167,6 +173,7 @@ export function startBlock(boot: BlockBoot, opts: StartBlockOptions = {}): () =>
 	}
 
 	let caps: readonly string[] = [];
+	let hostEntityId: string | null = null;
 	let loader: (() => void | Promise<void>) | null = null;
 	const pending = new Map<
 		string,
@@ -194,6 +201,7 @@ export function startBlock(boot: BlockBoot, opts: StartBlockOptions = {}): () =>
 		...(opts.parent ? { parent: opts.parent } : {}),
 		onStartup: (payload) => {
 			caps = payload.capabilities;
+			hostEntityId = sanitizeHostEntityId(payload.hostEntityId);
 			// The frame can't read the embedder's `:root`, and the host doesn't
 			// know when our inner transport started listening — so pull the theme
 			// now that Startup proves the channel is live. The host answers with a
@@ -233,6 +241,7 @@ export function startBlock(boot: BlockBoot, opts: StartBlockOptions = {}): () =>
 	const ctx: BlockRuntimeContext = {
 		entityId: bootstrap.entityId,
 		capabilities: () => caps,
+		hostEntityId: () => hostEntityId,
 		root,
 		graph<T = unknown>(messageName: string, data: unknown): Promise<T> {
 			return new Promise<T>((resolve, reject) => {

@@ -23,7 +23,9 @@ import {
 	BrainstormMenuProvider,
 	CONTEXT_MENU_ID,
 	CONTEXT_SUBMENU_ID,
+	type ContextMenuItem,
 	MenuAlign,
+	RowKind,
 	blankMenuIcon,
 	closeContextMenu,
 	contextMenuConfig,
@@ -158,6 +160,20 @@ describe("<BrainstormMenuProvider> suppression seam", () => {
 		expect(rect).toMatchObject({ left: 120, top: 240, width: 0, height: 0 });
 		act(() => closeContextMenu());
 		act(() => root.unmount());
+	});
+
+	it("paints an item's description as muted caption text with a hover title (9.12.27)", () => {
+		const body = contextMenuConfig.body;
+		const itemRow =
+			body.kind === BodyKind.List ? body.rows.find((r) => r.kind === RowKind.Item) : undefined;
+		const caption = (itemRow as { caption?: (it: ContextMenuItem) => unknown } | undefined)?.caption;
+		const described = caption?.({ id: "a", label: "Reading", description: "Books to finish" }) as
+			| { props?: { title?: string; className?: string; children?: unknown } }
+			| undefined;
+		expect(described?.props?.title).toBe("Books to finish");
+		expect(described?.props?.className).toBe("bs-menu-row__description");
+		expect(caption?.({ id: "b", label: "Archive" })).toBeUndefined();
+		expect(caption?.({ id: "c", label: "C", shortcut: "⌘K", description: "x" })).toBe("⌘K");
 	});
 
 	it("never opens a cursor menu inside the app-header band (S4)", () => {

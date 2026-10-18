@@ -17,6 +17,7 @@ function makeCtx(event: unknown): {
 	const ctx = {
 		entityId: "evt-1",
 		capabilities: () => [],
+		hostEntityId: () => null,
 		root,
 		graph: (async (messageName: string) =>
 			messageName === "getEntity" ? event : null) as unknown as <T>(
@@ -91,6 +92,7 @@ describe("inline-event block", () => {
 		const ctx = {
 			entityId: "evt-1",
 			capabilities: () => [],
+			hostEntityId: () => null,
 			root,
 			graph: (async () => null) as unknown as <T>(m: string, d: unknown) => Promise<T>,
 			navigate: vi.fn(),

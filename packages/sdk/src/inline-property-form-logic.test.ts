@@ -44,9 +44,10 @@ describe("inline-property-form-logic — helpers", () => {
 		expect(Object.isFrozen(INLINE_PRIMARY_KIND_ORDER)).toBe(true);
 	});
 
-	it("text format order covers plain + URL + Email + Phone", () => {
+	it("text format order covers plain + rich text + URL + Email + Phone", () => {
 		expect(INLINE_TEXT_FORMAT_ORDER).toEqual([
 			InlineTextFormat.Plain,
+			InlineTextFormat.RichText,
 			InlineTextFormat.Url,
 			InlineTextFormat.Email,
 			InlineTextFormat.Phone,
@@ -72,6 +73,12 @@ describe("inline-property-form-logic — helpers", () => {
 		for (const kind of INLINE_PRIMARY_KIND_ORDER) {
 			expect(supportsNumberFormat(kind)).toBe(kind === InlinePrimaryKind.Number);
 		}
+	});
+
+	it("Text + Rich text format resolves to the RichText preset (9.12.26)", () => {
+		expect(resolveInlinePreset(InlinePrimaryKind.Text, InlineTextFormat.RichText, false)).toBe(
+			PropertyKindPreset.RichText,
+		);
 	});
 
 	it("resolveInlinePreset maps each (primary, textFormat) to the right preset", () => {

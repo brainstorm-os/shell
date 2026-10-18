@@ -607,6 +607,7 @@
   "shell.settings.data.properties.kindBadge.email": "Email",
   "shell.settings.data.properties.kindBadge.phone": "Phone",
   "shell.settings.data.properties.kindBadge.formula": "Formula",
+  "shell.settings.data.properties.kindBadge.rich-text": "Rich text",
   "shell.settings.data.properties.formatLabel": "Format",
   "shell.settings.data.properties.format.plain": "Plain",
   "shell.settings.data.properties.format.url": "URL",

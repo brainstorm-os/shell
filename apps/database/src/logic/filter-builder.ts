@@ -53,9 +53,22 @@ export enum FilterOp {
 	RelativeDate = "relativeDate",
 }
 
+/** What a reference right-hand side points at. Wire-compatible with the
+ *  pre-enum `"prop"` / `"now"` literals. */
+export enum FilterRefKind {
+	Prop = "prop",
+	Now = "now",
+	/** The entity the view is embedded in (9.12.24) — "this object". */
+	Host = "host",
+}
+
 /** A comparison right-hand side that references something else instead of a
- *  typed-in value (9.12.21): another property on the same row, or the clock. */
-export type FilterCompareTo = { kind: "prop"; propertyId: string } | { kind: "now" };
+ *  typed-in value (9.12.21): another property on the same row, the clock, or
+ *  the host object an embedded view renders inside (9.12.24). */
+export type FilterCompareTo =
+	| { kind: FilterRefKind.Prop; propertyId: string }
+	| { kind: FilterRefKind.Now }
+	| { kind: FilterRefKind.Host };
 
 /** The comparison ops that accept a `compareTo` reference (`due < now()`,
  *  `assignee is owner`). The list ops + text ops stay literal-only. */
@@ -70,6 +83,23 @@ const REF_OPS: ReadonlySet<FilterOp> = new Set([
 
 export function opAcceptsRef(op: FilterOp): boolean {
 	return REF_OPS.has(op);
+}
+
+/** The ops a "this object" (`$host`) right-hand side makes sense for: identity
+ *  (`is` / `is not`) on a single ref, membership (`contains`) on a relation. */
+const HOST_REF_OPS: ReadonlySet<FilterOp> = new Set([
+	FilterOp.Eq,
+	FilterOp.Neq,
+	FilterOp.Contains,
+	FilterOp.NotContains,
+]);
+
+export function opAcceptsHostRef(op: FilterOp): boolean {
+	return HOST_REF_OPS.has(op);
+}
+
+function refAllowed(compareTo: FilterCompareTo, op: FilterOp): boolean {
+	return compareTo.kind === FilterRefKind.Host ? opAcceptsHostRef(op) : opAcceptsRef(op);
 }
 
 /** The multi-value ops whose raw input is a comma-separated list rather
@@ -146,8 +176,8 @@ export function isRuleComplete(rule: FilterRule): boolean {
 	if (!rule.propertyId) return false;
 	if (!opNeedsValue(rule.op)) return true;
 	// A comparison referencing another property / the clock needs no literal.
-	if (rule.compareTo && opAcceptsRef(rule.op)) {
-		return rule.compareTo.kind === "now" || rule.compareTo.propertyId !== "";
+	if (rule.compareTo && refAllowed(rule.compareTo, rule.op)) {
+		return rule.compareTo.kind !== FilterRefKind.Prop || rule.compareTo.propertyId !== "";
 	}
 	if (opIsList(rule.op)) return coerceList(rule.value).length > 0;
 	return rule.value.trim() !== "";
@@ -156,9 +186,15 @@ export function isRuleComplete(rule: FilterRule): boolean {
 /** The `PropertyRef` a comparison rule's `compareTo` resolves to, or `null`
  *  when the rule is a plain literal (or the ref is incomplete). */
 function refOperand(rule: FilterRule): PropertyRef | null {
-	if (!rule.compareTo || !opAcceptsRef(rule.op)) return null;
-	if (rule.compareTo.kind === "now") return { $now: true };
-	return rule.compareTo.propertyId ? { $prop: rule.compareTo.propertyId } : null;
+	if (!rule.compareTo || !refAllowed(rule.compareTo, rule.op)) return null;
+	switch (rule.compareTo.kind) {
+		case FilterRefKind.Now:
+			return { $now: true };
+		case FilterRefKind.Host:
+			return { $host: true };
+		case FilterRefKind.Prop:
+			return rule.compareTo.propertyId ? { $prop: rule.compareTo.propertyId } : null;
+	}
 }
 
 /** Split a comma-separated input into coerced scalars: trimmed, empties
@@ -198,9 +234,9 @@ export function ruleToPredicate(rule: FilterRule): PropertyPredicate | null {
 		case FilterOp.RelativeDate:
 			return { $relativeDate: { [p]: rule.value } };
 		case FilterOp.Contains:
-			return { $contains: { [p]: rule.value } };
+			return { $contains: { [p]: refOperand(rule) ?? rule.value } };
 		case FilterOp.NotContains:
-			return { $notContains: { [p]: rule.value } };
+			return { $notContains: { [p]: refOperand(rule) ?? rule.value } };
 		case FilterOp.Like:
 			return { $like: { [p]: rule.value } };
 		case FilterOp.NotLike:
@@ -302,7 +338,11 @@ function predicateToRule(pred: PropertyPredicate): FilterRule | null {
 			// `compareTo` reference rather than a literal value (9.12.21).
 			if (isPropertyRef(raw)) {
 				const compareTo: FilterCompareTo =
-					"$now" in raw ? { kind: "now" } : { kind: "prop", propertyId: raw.$prop };
+					"$now" in raw
+						? { kind: FilterRefKind.Now }
+						: "$host" in raw
+							? { kind: FilterRefKind.Host }
+							: { kind: FilterRefKind.Prop, propertyId: raw.$prop };
 				return { propertyId, op, value: "", compareTo };
 			}
 			let value = "";
@@ -343,21 +383,25 @@ export function filterNodeToDraft(node: FilterNode | null): FilterDraft {
 }
 
 /** Compact one-line description for the menu, e.g. `status is "Done"`,
- *  `due less than now`, or `assignee is owner`. A `compareTo` reference shows
- *  the referenced property / `now` unquoted; a literal stays quoted. */
+ *  `due less than now`, `assignee is owner`, or `author contains this object`.
+ *  A `compareTo` reference shows the referenced property / `now` / the host
+ *  label unquoted; a literal stays quoted. */
 export function describeRule(
 	rule: FilterRule,
 	propertyLabel: string,
 	valueLabel?: string,
 	refLabelOf?: (propertyId: string) => string,
+	hostLabel = "this object",
 ): string {
 	const head = `${propertyLabel} ${opLabel(rule.op)}`;
 	if (!opNeedsValue(rule.op)) return head;
-	if (rule.compareTo && opAcceptsRef(rule.op)) {
+	if (rule.compareTo && refAllowed(rule.compareTo, rule.op)) {
 		const ref =
-			rule.compareTo.kind === "now"
+			rule.compareTo.kind === FilterRefKind.Now
 				? "now"
-				: (refLabelOf?.(rule.compareTo.propertyId) ?? rule.compareTo.propertyId);
+				: rule.compareTo.kind === FilterRefKind.Host
+					? hostLabel
+					: (refLabelOf?.(rule.compareTo.propertyId) ?? rule.compareTo.propertyId);
 		return `${head} ${ref}`;
 	}
 	return `${head} "${valueLabel ?? rule.value}"`;

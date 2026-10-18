@@ -6,7 +6,7 @@
  * membership semantics cannot drift between client and service.
  */
 
-export { evaluatePredicate } from "./evaluate-predicate";
+export { type PredicateContext, evaluatePredicate } from "./evaluate-predicate";
 export {
 	applyMemberOverrides,
 	byLinkAnchors,

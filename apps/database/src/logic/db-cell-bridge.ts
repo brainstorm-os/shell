@@ -20,6 +20,7 @@ import {
 	type DateValue,
 	type LabeledValue,
 	type PropertyDef,
+	type RichTextValue,
 	ValueType,
 	isMultiValued,
 } from "@brainstorm-os/sdk-types";
@@ -48,6 +49,15 @@ function asLabeledValues(raw: unknown): LabeledValue<string>[] {
 	return out;
 }
 
+/** A stored rich-text value; a legacy bare string reads as its own text. */
+function asRichTextValue(raw: unknown): RichTextValue | null {
+	if (typeof raw === "string") return raw.length > 0 ? { text: raw } : null;
+	if (raw && typeof raw === "object" && typeof (raw as { text?: unknown }).text === "string") {
+		return raw as RichTextValue;
+	}
+	return null;
+}
+
 /** DB raw → the value shape the cell for `def` renders. */
 export function toCellValue(def: PropertyDef, raw: unknown): unknown {
 	if (def.valueType === ValueType.Date) return asDateValue(raw, def.granularity);
@@ -57,6 +67,8 @@ export function toCellValue(def: PropertyDef, raw: unknown): unknown {
 			return raw === true;
 		case ValueType.Number:
 			return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+		case ValueType.RichText:
+			return asRichTextValue(raw);
 		default:
 			// Text / EntityRef scalar — a bare string id, else empty.
 			return typeof raw === "string" && raw.length > 0 ? raw : null;

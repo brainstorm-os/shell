@@ -63,6 +63,8 @@ export type AnchoredMenuItem = {
 	/** Render as a horizontal divider fencing off a logical group (no label,
 	 *  no action). Skipped in keyboard nav. */
 	divider?: boolean;
+	/** Muted secondary line under the label (a collection's description). */
+	description?: string;
 	/** Trailing accelerator caption (e.g. "⌘⌫") shown muted on the right.
 	 *  Provide only when the action has a real registered shortcut. */
 	shortcut?: string;
@@ -93,6 +95,7 @@ function toContextItem(item: AnchoredMenuItem, index: number): ContextMenuItem {
 		...(item.section ? { section: true } : {}),
 		...(item.divider ? { divider: true } : {}),
 		...(item.shortcut ? { shortcut: item.shortcut } : {}),
+		...(item.description ? { description: item.description } : {}),
 		// Children carry the same shape — map them through the same converter so
 		// a nested row renders (and can itself nest) exactly like a top-level one.
 		...(item.submenu ? { submenu: item.submenu.map(toContextItem) } : {}),
@@ -208,6 +211,12 @@ function openLegacyAnchoredMenu(
 		const labelEl = document.createElement("span");
 		labelEl.className = "bs-object-menu__label";
 		labelEl.textContent = item.label ?? "";
+		if (item.description) {
+			const desc = document.createElement("span");
+			desc.className = "bs-object-menu__description";
+			desc.textContent = item.description;
+			labelEl.appendChild(desc);
+		}
 		btn.appendChild(labelEl);
 
 		if (item.shortcut) {

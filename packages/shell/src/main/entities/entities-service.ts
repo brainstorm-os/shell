@@ -29,10 +29,12 @@ import {
 	EntityEventVerb,
 	type EntityMergeResult,
 	type EntityQuery,
+	type PropertyDef,
 	buildAgentProvenance,
 	parseProvenanceRequest,
 	stripReservedProperties,
 } from "@brainstorm-os/sdk-types";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
 import type { EntitiesRepository, EntityRow } from "../storage/entities-repo";
@@ -42,6 +44,13 @@ import { assetRefRoleForKind, extractAssetIds } from "./derive-asset-refs";
 import type { EntityChange } from "./entity-change-emitter";
 import type { EntityDekStore } from "./entity-dek-store";
 import type { EntityDocProjection } from "./entity-doc-codec";
+import {
+	type FarWrite,
+	inversePairs,
+	multiplicityOf,
+	planInverseBackfill,
+	planInverseWrites,
+} from "./inverse-relations";
 import { rewriteEntityRefs } from "./merge-refs";
 import { isShellOwnedEntityType } from "./shell-owned-types";
 
@@ -184,7 +193,22 @@ export type EntitiesServiceOptions = {
 	 *  call an ungated `applyUpdate`; the engine invokes it for inbound frames
 	 *  on entities it already read-gated + tracks. */
 	bindApplyRemoteDoc?: (apply: ApplyRemoteDocFn) => void;
+	/** 9.12.25 — the vault property catalog. Its `inverseOf` pairs make a
+	 *  relation two-way: create/update/delete mirror the change onto every far
+	 *  end in the same service call. Absent / failing ⇒ relations stay
+	 *  one-way (the pre-9.12.25 behaviour), never a failed write. */
+	getPropertyDefs?: () => Promise<ReadonlyArray<PropertyDef> | null>;
+	/** 9.12.25 — hands out the system-side backfill closure ONCE at
+	 *  construction (kept off the broker, like `bindApplyRemoteDoc`); the
+	 *  properties service runs it when a def first declares `inverseOf`. */
+	bindInverseBackfill?: (backfill: InverseBackfillFn) => void;
 };
+
+/** Make an existing one-sided relation two-sided across the vault, acting as
+ *  `app` (its `entities.write` grants gate every far end). Checks every write
+ *  first and refuses the whole backfill — `Denied` — if any far end is not
+ *  writable or is read-only-locked. Resolves the number of entities written. */
+export type InverseBackfillFn = (app: string, def: PropertyDef) => Promise<number>;
 
 /** Apply a decrypted remote Y.Doc delta to the live doc + persist + materialise
  *  + deliver to open windows. `updateB64` is the base64 plaintext Yjs update. */
@@ -196,6 +220,31 @@ export type ApplyRemoteDocFn = (entityId: string, updateB64: string) => Promise<
 enum EntityAccess {
 	Read = "read",
 	Write = "write",
+}
+
+function canAccess(
+	ledger: CapabilityLedger,
+	app: string,
+	verb: EntityAccess,
+	type: string,
+): boolean {
+	// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
+	// broad its grants. An `Agent/v1` record binds a ledger principal to a
+	// pubkey and a system-prompt persona: an app that could write one could
+	// hijack a granted agent's ceiling with its own persona, orphan a real
+	// agent's authority by mangling its identity, or trick a delete into
+	// destroying another agent's unrecoverable key. Only the privileged
+	// agent directory (which writes through the repo, not this service)
+	// may author them.
+	if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
+	try {
+		return ledger.has(app, `entities.${verb}:${type}`);
+	} catch (error) {
+		if (error instanceof LedgerUnavailableError) {
+			throw named("Unavailable", "entities service: capability ledger unavailable");
+		}
+		throw error;
+	}
 }
 
 function named(name: string, message: string): Error {
@@ -395,6 +444,105 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		return repo.update(row.id, propsForRow, clock());
 	};
 
+	// 9.12.25 — two-way relations. The pair map comes from the live catalog
+	// on every write (a def edit takes effect immediately); a catalog failure
+	// degrades to one-way relations rather than failing the write.
+	const inverseCatalog = async (): Promise<{
+		pairs: ReturnType<typeof inversePairs>;
+		multi: ReturnType<typeof multiplicityOf>;
+	} | null> => {
+		if (!options.getPropertyDefs) return null;
+		let defs: ReadonlyArray<PropertyDef>;
+		try {
+			defs = (await options.getPropertyDefs()) ?? [];
+		} catch (error) {
+			console.warn(`[entities] property catalog unavailable: ${(error as Error).message}`);
+			return null;
+		}
+		const pairs = inversePairs(defs);
+		return pairs.size === 0 ? null : { pairs, multi: multiplicityOf(defs) };
+	};
+
+	type StagedFarWrite = { row: EntityRow; patch: Record<string, unknown> };
+
+	// Every far end is checked BEFORE anything is written, so a refusal never
+	// leaves the pair half-applied: the far type must be writable by the
+	// caller, and a read-only-locked far end refuses the whole operation.
+	const stageFarWrites = (
+		repo: EntitiesRepository,
+		allow: (type: string) => boolean,
+		writes: ReadonlyArray<FarWrite>,
+		verb: string,
+	): StagedFarWrite[] =>
+		writes.flatMap((w) => {
+			const row = repo.get(w.entityId);
+			if (!row) return [];
+			if (!allow(row.type)) {
+				throw named(
+					"Denied",
+					`${verb}: two-way relation needs entities.write for ${row.type} (${row.id})`,
+				);
+			}
+			if (isLockedProperties(row.properties)) {
+				throw named("Denied", `${verb}: two-way relation target ${row.id} is locked (read-only)`);
+			}
+			return [{ row, patch: w.patch }];
+		});
+
+	const planFarWrites = async (
+		repo: EntitiesRepository,
+		allow: (type: string) => boolean,
+		entityId: string,
+		before: Readonly<Record<string, unknown>>,
+		after: Readonly<Record<string, unknown>>,
+		verb: string,
+	): Promise<StagedFarWrite[]> => {
+		const catalog = await inverseCatalog();
+		if (!catalog) return [];
+		const writes = planInverseWrites({
+			entityId,
+			before,
+			after,
+			...catalog,
+			read: (id) => repo.get(id)?.properties ?? null,
+		});
+		return stageFarWrites(repo, allow, writes, verb);
+	};
+
+	const applyFarWrites = async (
+		repo: EntitiesRepository,
+		staged: ReadonlyArray<StagedFarWrite>,
+	): Promise<void> => {
+		for (const { row, patch } of staged) {
+			const updated = await writePropsThroughDoc(repo, row, patch);
+			if (updated) emitChange(EntityEventVerb.Update, row.id, row.type);
+		}
+	};
+
+	if (options.bindInverseBackfill) {
+		options.bindInverseBackfill(async (app, def) => {
+			const repo = await options.getRepo();
+			const ledger = await options.getLedger();
+			if (!repo || !ledger) throw named("Unavailable", "entities service: no active vault session");
+			const inverse = def.inverseOf;
+			if (!inverse) return 0;
+			const known = (await options.getPropertyDefs?.()) ?? [];
+			const defs = [...known.filter((d) => d.key !== def.key), def];
+			if (inversePairs(defs).get(def.key) !== inverse) return 0;
+			const multi = multiplicityOf(defs);
+			const rows = repo.query({}).filter((r) => canAccess(ledger, app, EntityAccess.Read, r.type));
+			const writes = planInverseBackfill({ key: def.key, inverse, rows, multi });
+			const staged = stageFarWrites(
+				repo,
+				(type) => canAccess(ledger, app, EntityAccess.Write, type),
+				writes,
+				"properties.setProperty",
+			);
+			await applyFarWrites(repo, staged);
+			return staged.length;
+		});
+	}
+
 	// 10.12 — the system-only remote-apply path. NOT registered on the broker
 	// (an app must never be able to apply an ungated Y.Doc update): handed to
 	// the live-sync wiring via `bindApplyRemoteDoc`. The engine only calls it
@@ -424,25 +572,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			throw named("Unavailable", "entities service: no active vault session");
 		}
 
-		const can = (verb: EntityAccess, type: string): boolean => {
-			// Agent-Teams-1 — shell-owned types are READ-ONLY to every app, however
-			// broad its grants. An `Agent/v1` record binds a ledger principal to a
-			// pubkey and a system-prompt persona: an app that could write one could
-			// hijack a granted agent's ceiling with its own persona, orphan a real
-			// agent's authority by mangling its identity, or trick a delete into
-			// destroying another agent's unrecoverable key. Only the privileged
-			// agent directory (which writes through the repo, not this service)
-			// may author them.
-			if (verb === EntityAccess.Write && isShellOwnedEntityType(type)) return false;
-			try {
-				return ledger.has(app, `entities.${verb}:${type}`);
-			} catch (error) {
-				if (error instanceof LedgerUnavailableError) {
-					throw named("Unavailable", "entities service: capability ledger unavailable");
-				}
-				throw error;
-			}
-		};
+		const can = (verb: EntityAccess, type: string): boolean => canAccess(ledger, app, verb, type);
 
 		const compose = (row: EntityRow): Entity => ({
 			id: row.id,
@@ -515,6 +645,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					throw named("Invalid", `entities.create: ${explicitId} already exists`);
 				}
 				const entityId = explicitId ?? options.newId();
+				const farOnCreate = await planFarWrites(
+					repo,
+					(t) => can(EntityAccess.Write, t),
+					entityId,
+					{},
+					properties,
+					"entities.create",
+				);
 				// Stage 10.1 + 10.3a — the row is born with its sealed per-entity
 				// DEK and this device's member wrap, through the ONE shared seam
 				// the channel-approve path also uses (`create-with-dek.ts`). A
@@ -573,6 +711,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
+					await applyFarWrites(repo, farOnCreate);
 					return compose(row);
 				}
 			}
@@ -591,9 +730,18 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const patch = stripReservedProperties(
 					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : {},
 				);
+				const farOnUpdate = await planFarWrites(
+					repo,
+					(t) => can(EntityAccess.Write, t),
+					id,
+					existing.properties,
+					{ ...existing.properties, ...patch },
+					"entities.update",
+				);
 				const updated = await writePropsThroughDoc(repo, existing, patch);
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
+				await applyFarWrites(repo, farOnUpdate);
 				// Asset-B4 — reconcile against the row's FULL post-write property
 				// set (a patch merges into existing, so pruning off just the patch
 				// would drop refs for assets the patch never touched).
@@ -608,8 +756,17 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (!can(EntityAccess.Write, existing.type)) {
 					throw named("Denied", `entities.delete: no entities.write for ${existing.type}`);
 				}
+				const farOnDelete = await planFarWrites(
+					repo,
+					(t) => can(EntityAccess.Write, t),
+					id,
+					existing.properties,
+					{},
+					"entities.delete",
+				);
 				repo.softDelete(id, clock());
 				emitChange(EntityEventVerb.Delete, id, existing.type);
+				await applyFarWrites(repo, farOnDelete);
 				// Asset-B4 — this is a SOFT delete (the row persists), so the
 				// `asset_refs.entity_id` ON DELETE CASCADE never fires; drop the
 				// owner's refs explicitly or they'd strand and keep the asset

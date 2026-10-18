@@ -7,8 +7,11 @@
  * over the BP graph module).
  *
  * Data flow: the host hands us the embedded entity id (a `brainstorm/List/v1`).
- * We `getEntity` it for the title + membership, resolve its rows (explicit
- * `members.include`, else a type query against `source`), derive a small
+ * We `getEntity` it for the title + membership, resolve its rows the way the
+ * Database app does — source ∪ include \ exclude, then the default view's
+ * filter + sort, with the host document as the `$host` context so a
+ * contextual filter ("author contains this page") resolves against the page
+ * the block sits in (`./resolve-rows.ts`, 9.12.24) — derive a small
  * column set from the rows' properties, resolve any referenced entities'
  * titles, and paint a grid. A row click asks the host to open that entity
  * (`navigate`); a host `refresh` ping re-queries. Pure DOM — no framework in
@@ -28,68 +31,7 @@ import {
 	formatCell,
 	plainText,
 } from "./format";
-
-interface BpEntity {
-	entityId: string;
-	entityTypeId: string;
-	properties: Record<string, unknown>;
-	updatedAt: number;
-}
-
-interface QueryResult {
-	results?: { vertices?: Record<string, [BpEntity]> };
-}
-
-function asId(member: unknown): string | null {
-	if (typeof member === "string") return member;
-	if (member && typeof member === "object") {
-		const id =
-			(member as { id?: unknown; entityId?: unknown }).id ??
-			(member as { entityId?: unknown }).entityId;
-		if (typeof id === "string") return id;
-	}
-	return null;
-}
-
-/** Best-effort read of a type id from a List's `source` object (the
- *  type-derived list case). Defensive: the shape is app-internal and may
- *  evolve, so unknown shapes resolve to null (→ empty grid, not a throw). */
-function sourceType(list: BpEntity): string | null {
-	const source = list.properties.source as
-		| { type?: unknown; query?: { type?: unknown } }
-		| null
-		| undefined;
-	if (!source || typeof source !== "object") return null;
-	if (typeof source.type === "string") return source.type;
-	if (source.query && typeof source.query.type === "string") return source.query.type;
-	return null;
-}
-
-async function resolveRows(
-	graph: <T>(m: string, d: unknown) => Promise<T>,
-	list: BpEntity,
-): Promise<BpEntity[]> {
-	const members = (list.properties.members as { include?: unknown } | undefined)?.include;
-	if (Array.isArray(members) && members.length > 0) {
-		const ids = members
-			.map(asId)
-			.filter((x): x is string => x !== null)
-			.slice(0, MAX_ROWS);
-		const got = await Promise.all(
-			ids.map((entityId) => graph<BpEntity>("getEntity", { entityId }).catch(() => null)),
-		);
-		return got.filter((x): x is BpEntity => x !== null);
-	}
-	const type = sourceType(list);
-	if (type) {
-		const res = await graph<QueryResult>("queryEntities", { operation: { entityTypeId: type } });
-		const vertices = res.results?.vertices ?? {};
-		return Object.values(vertices)
-			.map((v) => v[0])
-			.slice(0, MAX_ROWS);
-	}
-	return [];
-}
+import { type BpEntity, resolveEmbeddedRows } from "./resolve-rows";
 
 /** Resolve stored ref-like ids to their entities' titles via the graph.
  *  Entity ids (`ent_…`) resolve; catalog ids (`di_…` dictionary options the
@@ -158,7 +100,7 @@ export function bootEmbeddedList(ctx: BlockRuntimeContext): void {
 	ctx.onLoad(async () => {
 		try {
 			const list = await ctx.graph<BpEntity>("getEntity", { entityId: ctx.entityId });
-			const rows = await resolveRows(ctx.graph, list);
+			const rows = await resolveEmbeddedRows(ctx.graph, list, ctx.hostEntityId());
 			const columns = deriveColumns(rows);
 			const titles = await resolveRefTitles(ctx.graph, collectRefIds(rows, columns));
 			renderGrid(ctx.root, list, rows, columns, titles, (row) =>
