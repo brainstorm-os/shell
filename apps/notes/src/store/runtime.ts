@@ -17,6 +17,7 @@ import type {
 	SearchService,
 	SharingService,
 	VaultEntitiesService,
+	VersionHistoryService,
 } from "@brainstorm-os/sdk-types";
 
 type StorageValue = unknown;
@@ -126,6 +127,8 @@ export type NotesBrainstorm = {
 		 *  declares the scarce `sharing.share` cap so its object-menu "Share…"
 		 *  opens the shared `<ShareDialog>`. */
 		sharing?: SharingService;
+		/** 10.16 — version history (older shells omit it). */
+		history?: VersionHistoryService;
 		/** Stage 9.3 preview surface — used by the `@`-mention typeahead
 		 *  to enumerate vault-wide entities for cross-app linking. Goes
 		 *  away when the full entities service lands; the SDK swaps the

@@ -101,4 +101,24 @@ describe("CommentsRightPanel", () => {
 		render(staticAdapter([comment("a", 5)]), RightPanelTab.Properties);
 		expect(container.querySelector(".bs-panel-tab-badge")).toBeNull();
 	});
+
+	it("adds a History tab only when the host passes a history panel (10.16)", () => {
+		act(() => {
+			root.render(
+				<CommentsProvider adapter={staticAdapter([])}>
+					<CommentsRightPanel
+						documentId="ent_doc"
+						active={RightPanelTab.History}
+						onTabChange={() => {}}
+						properties={<div data-testid="props-panel" />}
+						history={<div data-testid="history-panel" />}
+					/>
+				</CommentsProvider>,
+			);
+		});
+		const tabs = [...container.querySelectorAll('[role="tab"]')].map((t) => t.textContent);
+		expect(tabs).toEqual(["Properties", "Comments", "History"]);
+		expect(container.querySelector('[data-testid="history-panel"]')).not.toBeNull();
+		expect(container.querySelector('[data-testid="props-panel"]')).toBeNull();
+	});
 });

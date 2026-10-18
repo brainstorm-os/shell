@@ -27,6 +27,7 @@ import type {
 	PropertyValueByValueType,
 	ValueType,
 } from "@brainstorm-os/sdk-types";
+import { VersionCause, VersionPropertyChangeKind } from "@brainstorm-os/sdk-types";
 import { LiveRegion } from "@brainstorm-os/sdk/a11y";
 import { CoverPicker, type CoverPickerService } from "@brainstorm-os/sdk/cover-picker";
 import { EmptyState } from "@brainstorm-os/sdk/empty-state";
@@ -53,6 +54,7 @@ import { useSelfDisplayName } from "@brainstorm-os/sdk/self-display-name";
 import { ShareDialog, type ShareDialogLabels } from "@brainstorm-os/sdk/share-dialog";
 import { publishTabIdentity } from "@brainstorm-os/sdk/tab-identity";
 import { TEMPLATE_ENTITY_TYPE, objectToTemplateProperties } from "@brainstorm-os/sdk/templates";
+import { type VersionHistoryLabels, VersionHistoryPanel } from "@brainstorm-os/sdk/version-history";
 import type { LexicalEditor, SerializedEditorState } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "./editor/editor";
@@ -137,6 +139,44 @@ const COVERS_UNAVAILABLE: CoverPickerService = {
 	uploadBytes: () => Promise.reject(new Error("covers service unavailable")),
 	list: () => Promise.resolve([]),
 };
+
+function historyLabels(): VersionHistoryLabels {
+	return {
+		title: t("notes.history.title"),
+		empty: t("notes.history.empty"),
+		emptyHint: t("notes.history.emptyHint"),
+		loadFailed: t("notes.history.loadFailed"),
+		today: t("notes.history.today"),
+		tomorrow: t("notes.history.tomorrow"),
+		yesterday: t("notes.history.yesterday"),
+		you: t("notes.history.you"),
+		causes: {
+			[VersionCause.Idle]: t("notes.history.cause.idle"),
+			[VersionCause.BeforeBulk]: t("notes.history.cause.beforeBulk"),
+			[VersionCause.BeforeRestore]: t("notes.history.cause.beforeRestore"),
+			[VersionCause.AgentRun]: t("notes.history.cause.agentRun"),
+			[VersionCause.Import]: t("notes.history.cause.import"),
+			[VersionCause.Manual]: t("notes.history.cause.manual"),
+		},
+		listOnlyNotice: t("notes.history.listOnly"),
+		previewOnlyNotice: t("notes.history.previewOnly"),
+		back: t("notes.history.back"),
+		changesHeading: t("notes.history.changes"),
+		noChanges: t("notes.history.noChanges"),
+		bodyHeading: t("notes.history.body"),
+		emptyBody: t("notes.history.emptyBody"),
+		changeKinds: {
+			[VersionPropertyChangeKind.Added]: t("notes.history.change.added"),
+			[VersionPropertyChangeKind.Removed]: t("notes.history.change.removed"),
+			[VersionPropertyChangeKind.Changed]: t("notes.history.change.changed"),
+		},
+		restore: t("notes.history.restore"),
+		restoring: t("notes.history.restoring"),
+		restoreFailed: t("notes.history.restoreFailed"),
+		restored: t("notes.history.restored"),
+		previewFailed: t("notes.history.previewFailed"),
+	};
+}
 
 const SHARE_DIALOG_LABELS: ShareDialogLabels = {
 	title: t("notes.share.title"),
@@ -1202,6 +1242,17 @@ export function NotesApp() {
 								{...(pendingCommentAnchor ? { pendingAnchor: pendingCommentAnchor } : {})}
 								focusRequest={commentFocusRequest}
 								onApplySuggestion={onApplySuggestion}
+								{...(runtime?.services.history
+									? {
+											history: (
+												<VersionHistoryPanel
+													entityId={note.id}
+													service={runtime.services.history}
+													labels={historyLabels()}
+												/>
+											),
+										}
+									: {})}
 							/>
 						</CommentsProvider>
 					) : (

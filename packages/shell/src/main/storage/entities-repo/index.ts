@@ -12,6 +12,8 @@ import { AssetRefsRepository } from "./asset-refs-repo";
 import { AssetsRepository } from "./assets-repo";
 import { EntitiesRepository } from "./entities-repo";
 import { EntityDeksRepository } from "./entity-deks-repo";
+import { EntityVersionsRepository } from "./entity-versions-repo";
+import { HistoryChangeSetsRepository } from "./history-change-sets-repo";
 import { PendingRotationsRepository } from "./pending-rotations-repo";
 import { ShareInvitesRepository } from "./share-invites-repo";
 
@@ -48,6 +50,14 @@ export {
 export type { AgentWriteBefore, AgentWriteInsert, AgentWriteRecord } from "./agent-writes-repo";
 export { LastEditsRepository } from "./last-edits-repo";
 export type { LastEditRecord } from "./last-edits-repo";
+export { EntityVersionsRepository } from "./entity-versions-repo";
+export type {
+	EntityVersionRecord,
+	EntityVersionRetentionRow,
+	StoredPrincipal,
+} from "./entity-versions-repo";
+export { HistoryChangeSetsRepository } from "./history-change-sets-repo";
+export type { ChangeSetPrincipal, HistoryChangeSetRecord } from "./history-change-sets-repo";
 export type { MintShareInviteInput } from "./share-invites-repo";
 
 export class EntitiesRepositories {
@@ -58,6 +68,8 @@ export class EntitiesRepositories {
 	readonly assetRefs: AssetRefsRepository;
 	readonly pendingRotations: PendingRotationsRepository;
 	readonly shareInvites: ShareInvitesRepository;
+	readonly entityVersions: EntityVersionsRepository;
+	readonly historyChangeSets: HistoryChangeSetsRepository;
 
 	constructor(db: SqliteDatabase) {
 		this.entities = new EntitiesRepository(db);
@@ -67,5 +79,7 @@ export class EntitiesRepositories {
 		this.assetRefs = new AssetRefsRepository(db);
 		this.pendingRotations = new PendingRotationsRepository(db);
 		this.shareInvites = new ShareInvitesRepository(db);
+		this.entityVersions = new EntityVersionsRepository(db);
+		this.historyChangeSets = new HistoryChangeSetsRepository(db);
 	}
 }

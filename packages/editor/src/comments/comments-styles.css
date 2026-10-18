@@ -399,3 +399,10 @@
 	font-size: var(--text-size-sm);
 	color: var(--danger, #c0392b);
 }
+
+/* 10.16 — the History tab body: hosts fill the panel below the tab strip
+ * (`> :not(.bs-panel-tabs)`), this scrolls the history inside it. */
+.bs-panel-scroll {
+	overflow-y: auto;
+	min-height: 0;
+}

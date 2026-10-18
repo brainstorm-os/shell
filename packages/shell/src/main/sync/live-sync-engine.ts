@@ -85,7 +85,13 @@ export type LiveSyncEngineContext = {
 	 *  open renderers. Implemented by the wiring over the ydoc worker +
 	 *  `deliverDocUpdate`; deliberately NOT the `entities.applyDoc` verb (that
 	 *  would re-enter the emit hook). */
-	applyRemoteUpdate: (entityId: string, type: string, update: Uint8Array) => Promise<void>;
+	applyRemoteUpdate: (
+		entityId: string,
+		type: string,
+		update: Uint8Array,
+		/** 10.16 — the authenticated sender (base64url Ed25519 key). */
+		senderB64Url?: string,
+	) => Promise<void>;
 	/** Presence (Stage 10.6 wiring) — deliver a decrypted remote AWARENESS update
 	 *  (cursors / selection / "who's here") for a tracked entity to the open app
 	 *  renderers, which apply it to their `y-protocols` `Awareness`. Implemented by
@@ -443,8 +449,8 @@ export class LiveSyncEngine {
 		const relay = this.#ctx.getRelay();
 		if (!relay) return;
 		try {
-			await receiveAndApply(frame, this.#makeCtx(relay.currentPort()), async (plaintext) => {
-				await this.#ctx.applyRemoteUpdate(entityId, type, plaintext);
+			await receiveAndApply(frame, this.#makeCtx(relay.currentPort()), async (plaintext, sender) => {
+				await this.#ctx.applyRemoteUpdate(entityId, type, plaintext, sender);
 			});
 		} catch (error) {
 			console.warn(`[live-sync] receive failed for ${entityId}: ${(error as Error).message}`);

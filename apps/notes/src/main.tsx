@@ -2,6 +2,7 @@ import "@brainstorm-os/sdk/app-theme.css";
 import { initAnalytics } from "@brainstorm-os/sdk/analytics";
 import "@brainstorm-os/sdk/empty-state.css";
 import "@brainstorm-os/sdk/share-dialog.css";
+import "@brainstorm-os/sdk/version-history.css";
 import { mountMenuHost } from "@brainstorm-os/sdk/menus";
 import { mountSpellcheckMenuFromWindow } from "@brainstorm-os/sdk/spellcheck-menu";
 import "@brainstorm-os/editor/editor.css";

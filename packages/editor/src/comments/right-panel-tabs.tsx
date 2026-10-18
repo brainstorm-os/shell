@@ -26,28 +26,40 @@ import {
 export enum RightPanelTab {
 	Properties = "properties",
 	Comments = "comments",
+	/** 10.16 — present only when the host passes a `history` panel. */
+	History = "history",
 }
 
-const TAB_ORDER = [RightPanelTab.Properties, RightPanelTab.Comments] as const;
+const BASE_TABS = [RightPanelTab.Properties, RightPanelTab.Comments] as const;
+const WITH_HISTORY = [...BASE_TABS, RightPanelTab.History] as const;
+
+const TAB_LABEL_KEY = {
+	[RightPanelTab.Properties]: "editor.rightPanel.properties",
+	[RightPanelTab.Comments]: "editor.rightPanel.comments",
+	[RightPanelTab.History]: "editor.rightPanel.history",
+} as const;
 
 export function RightPanelTabs({
 	active,
 	onChange,
 	openCommentCount,
+	withHistory = false,
 }: {
 	active: RightPanelTab;
 	onChange: (tab: RightPanelTab) => void;
 	openCommentCount: number;
+	withHistory?: boolean;
 }): ReactNode {
 	const t = useEditorT();
-	const activeIndex = Math.max(0, TAB_ORDER.indexOf(active));
+	const order: readonly RightPanelTab[] = withHistory ? WITH_HISTORY : BASE_TABS;
+	const activeIndex = Math.max(0, order.indexOf(active));
 	const commit = (index: number): void => {
-		const tab = TAB_ORDER[index];
+		const tab = order[index];
 		if (tab) onChange(tab);
 	};
 	const { containerProps, getItemProps } = useCompositeKeyboard({
 		orientation: Orientation.Horizontal,
-		count: TAB_ORDER.length,
+		count: order.length,
 		activeIndex,
 		onActiveIndexChange: commit,
 		onActivate: commit,
@@ -58,7 +70,7 @@ export function RightPanelTabs({
 
 	return (
 		<div {...containerProps} className="bs-panel-tabs" aria-label={t("editor.rightPanel.tabs")}>
-			{TAB_ORDER.map((tab, index) => (
+			{order.map((tab, index) => (
 				<button
 					key={tab}
 					type="button"
@@ -67,9 +79,7 @@ export function RightPanelTabs({
 					data-active={tab === active}
 					onClick={() => onChange(tab)}
 				>
-					{tab === RightPanelTab.Properties
-						? t("editor.rightPanel.properties")
-						: t("editor.rightPanel.comments")}
+					{t(TAB_LABEL_KEY[tab])}
 					{tab === RightPanelTab.Comments && openCommentCount > 0 && (
 						<span className="bs-panel-tab-badge">{openCommentCount}</span>
 					)}
@@ -90,11 +100,14 @@ export function CommentsRightPanel({
 	onClearPending,
 	focusRequest,
 	onApplySuggestion,
+	history,
 }: {
 	documentId: string;
 	active: RightPanelTab;
 	onTabChange: (tab: RightPanelTab) => void;
 	properties: ReactNode;
+	/** 10.16 — the host's `<VersionHistoryPanel>`; adds a History tab. */
+	history?: ReactNode;
 	pendingAnchor?: CommentAnchor;
 	onClearPending?: () => void;
 	focusRequest?: CommentsFocusRequest | null;
@@ -103,9 +116,16 @@ export function CommentsRightPanel({
 	const { openCount } = useComments();
 	return (
 		<>
-			<RightPanelTabs active={active} onChange={onTabChange} openCommentCount={openCount} />
+			<RightPanelTabs
+				active={active}
+				onChange={onTabChange}
+				openCommentCount={openCount}
+				withHistory={history !== undefined}
+			/>
 			{active === RightPanelTab.Properties ? (
 				properties
+			) : active === RightPanelTab.History && history !== undefined ? (
+				<div className="bs-panel-scroll">{history}</div>
 			) : (
 				<CommentsPanel
 					documentId={documentId}

@@ -43,6 +43,7 @@ import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
 import { UndoOpKind, buildRunChanges, planRunUndo } from "../agents/run-undo/agent-run-undo";
 import { type AssetKind, AssetRefRole } from "../assets/asset-types";
+import { restorePatch } from "../history/property-diff";
 import type { AgentWriteBefore, EntitiesRepository, EntityRow } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import { DekWrapFailurePolicy, createEntityWithDek } from "./create-with-dek";
@@ -98,10 +99,12 @@ export type EntitiesServiceOptions = {
 	 *  through this service so the per-type capability check (read to
 	 *  load, write to apply) is reused; no new privileged channel. */
 	ydoc?: (
-		method: "load" | "applyUpdate" | "close" | "setEntityState",
+		method: "load" | "applyUpdate" | "close" | "setEntityState" | "historyRestoreBody",
 		args: {
 			vaultPath: string;
 			entityId: string;
+			offset?: number;
+			length?: number;
 			updateB64?: string;
 			props?: Record<string, unknown>;
 			links?: EntityDocLink[];
@@ -192,6 +195,11 @@ export type EntitiesServiceOptions = {
 	 *  update bytes. SECURITY: fired ONLY after the per-type write gate passed
 	 *  and the write committed; a throw is contained and never fails the edit. */
 	onLocalDocUpdate?: (entityId: string, type: string, update: Uint8Array) => void;
+	/** 10.16 — the same commit as `onLocalDocUpdate`, carrying WHO wrote it:
+	 *  the broker-verified app, and whether it wrote as an agent (a provenance-
+	 *  carrying create/update/delete). Version history derives its principals
+	 *  from this — never from anything the client claims. Contained. */
+	onLocalWrite?: (entityId: string, type: string, writer: LocalWriter) => void;
 	/** 10.14 — the entity's backing Y.Doc just compacted (its on-disk tail
 	 *  crossed the threshold). The live-sync engine emits a full-state `Snapshot`
 	 *  frame so the durable node compacts its tail too. Contained: a throw never
@@ -223,7 +231,27 @@ export type EntitiesServiceOptions = {
 	bindAgentRunOps?: (ops: AgentRunOps) => void;
 	/** Agent-15 — a run was undone (post-commit, contained). */
 	onAgentRunUndone?: (runId: string) => void;
+	/** 10.16 — hands the system-side version-restore closure to version
+	 *  history ONCE at construction (off the broker, like `bindApplyRemoteDoc`):
+	 *  the history service authorises the caller, this re-checks write + lock
+	 *  and writes through the normal update path. */
+	bindRestoreEntity?: (restore: RestoreEntityFn) => void;
 };
+
+/** Who committed a local write (10.16). */
+export type LocalWriter = { app: string; agent: boolean };
+
+const SHELL_WRITER: LocalWriter = { app: "io.brainstorm.shell", agent: false };
+
+/** Restore a checkpoint onto `entityId` as a forward edit: properties through
+ *  the update path (caps, lock, inverse relations, asset refs), the body
+ *  replaced in one Y transaction by the worker from the `.yhist` frame. */
+export type RestoreEntityFn = (input: {
+	app: string;
+	entityId: string;
+	properties: Record<string, unknown>;
+	frame: { offset: number; length: number };
+}) => Promise<void>;
 
 /** Who is asking for a run's diff / undo. `Privileged` is the shell's own
  *  Settings surface acting for the user; an app principal is limited to the
@@ -390,6 +418,25 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 	// the local `applyDoc` path; `null` on the remote-apply path (every open
 	// window is a peer of a remote edit). Shared by `applyDoc` and the
 	// off-broker `applyRemoteDoc` so the materialise+deliver logic lives once.
+	const deliverToOpenWindows = (
+		vaultPath: string,
+		id: string,
+		updateB64: string,
+		excludeApp: string | null,
+	): void => {
+		if (!options.deliverDocUpdate) return;
+		const sk = subKey(vaultPath, id);
+		const subs = docSubscribers.get(sk);
+		if (!subs) return;
+		const targets = [...subs.keys()].filter((a) => excludeApp === null || a !== excludeApp);
+		if (targets.length === 0) return;
+		// 9.3.2d — prune any target whose renderer is gone (closed without
+		// `closeDoc`) so its refcount can't leak forever.
+		const deadApps = options.deliverDocUpdate(id, updateB64, targets);
+		for (const dead of deadApps) subs.delete(dead);
+		if (subs.size === 0) docSubscribers.delete(sk);
+	};
+
 	const applyCanonicalDelta = async (
 		vaultPath: string,
 		id: string,
@@ -416,28 +463,26 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				}
 			}
 		}
-		if (options.deliverDocUpdate) {
-			const sk = subKey(vaultPath, id);
-			const subs = docSubscribers.get(sk);
-			if (subs) {
-				const targets = [...subs.keys()].filter((a) => excludeApp === null || a !== excludeApp);
-				if (targets.length > 0) {
-					// 9.3.2d — prune any target whose renderer is gone (closed
-					// without `closeDoc`) so its refcount can't leak forever.
-					const deadApps = options.deliverDocUpdate(id, updateB64, targets);
-					for (const dead of deadApps) subs.delete(dead);
-					if (subs.size === 0) docSubscribers.delete(sk);
-				}
-			}
-		}
+		deliverToOpenWindows(vaultPath, id, updateB64, excludeApp);
 		return applied;
 	};
 
 	// 10.12 — fire the live-sync emit hook for a committed local Y.Doc write.
 	// Contained: a listener throw can never surface as a failed edit (the
 	// write already committed). Skipped for an empty/idempotent diff.
-	const emitLocalDoc = (id: string, type: string, updateB64: string | null | undefined): void => {
-		if (!options.onLocalDocUpdate || !updateB64) return;
+	const emitLocalDoc = (
+		id: string,
+		type: string,
+		updateB64: string | null | undefined,
+		writer: LocalWriter = SHELL_WRITER,
+	): void => {
+		if (!updateB64) return;
+		try {
+			options.onLocalWrite?.(id, type, writer);
+		} catch (error) {
+			console.error("[entities] onLocalWrite hook failed:", error);
+		}
+		if (!options.onLocalDocUpdate) return;
 		try {
 			options.onLocalDocUpdate(id, type, new Uint8Array(Buffer.from(updateB64, "base64")));
 		} catch (error) {
@@ -458,6 +503,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		repo: EntitiesRepository,
 		row: EntityRow,
 		patch: Record<string, unknown>,
+		writer: LocalWriter = SHELL_WRITER,
 	): Promise<EntityRow | null> => {
 		let propsForRow: Record<string, unknown> = patch;
 		const vaultPath = options.getVaultPath?.() ?? null;
@@ -470,7 +516,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
 			if (res?.projection?.properties) propsForRow = res.projection.properties;
 			// 10.12 — emit the property write through live-sync if shared.
-			emitLocalDoc(row.id, row.type, res?.updateB64);
+			emitLocalDoc(row.id, row.type, res?.updateB64, writer);
 		}
 		return repo.update(row.id, propsForRow, clock());
 	};
@@ -543,9 +589,10 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 	const applyFarWrites = async (
 		repo: EntitiesRepository,
 		staged: ReadonlyArray<StagedFarWrite>,
+		writer: LocalWriter = SHELL_WRITER,
 	): Promise<void> => {
 		for (const { row, patch } of staged) {
-			const updated = await writePropsThroughDoc(repo, row, patch);
+			const updated = await writePropsThroughDoc(repo, row, patch, writer);
 			if (updated) emitChange(EntityEventVerb.Update, row.id, row.type);
 		}
 	};
@@ -569,7 +616,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				writes,
 				"properties.setProperty",
 			);
-			await applyFarWrites(repo, staged);
+			await applyFarWrites(repo, staged, { app, agent: false });
 			return staged.length;
 		});
 	}
@@ -584,6 +631,60 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			const vaultPath = options.getVaultPath?.() ?? null;
 			if (!vaultPath) return;
 			await applyCanonicalDelta(vaultPath, id, updateB64, null);
+		});
+	}
+
+	// 10.16 — the system-only version-restore path (see `bindRestoreEntity`).
+	// Re-checks the write gate + lock itself: the history service is not the
+	// write authority, this service is.
+	if (options.bindRestoreEntity) {
+		options.bindRestoreEntity(async ({ app, entityId, properties, frame }) => {
+			const repo = await options.getRepo();
+			const ledger = await options.getLedger();
+			if (!repo || !ledger) throw named("Unavailable", "entities service: no active vault session");
+			const row = repo.get(entityId);
+			if (!row) throw named("Invalid", `history.restore: ${entityId} not found`);
+			if (!canAccess(ledger, app, EntityAccess.Write, row.type)) {
+				throw named("Denied", `history.restore: no entities.write for ${row.type}`);
+			}
+			if (isLockedProperties(row.properties)) {
+				throw named("Denied", `history.restore: ${entityId} is locked (read-only)`);
+			}
+			const writer: LocalWriter = { app, agent: false };
+			const patch = restorePatch(properties, row.properties);
+			if (Object.keys(patch).length > 0) {
+				const far = await planFarWrites(
+					repo,
+					(t) => canAccess(ledger, app, EntityAccess.Write, t),
+					entityId,
+					row.properties,
+					{ ...row.properties, ...patch },
+					"history.restore",
+				);
+				const updated = await writePropsThroughDoc(repo, row, patch, writer);
+				if (!updated) throw named("Invalid", `history.restore: ${entityId} not found`);
+				emitChange(EntityEventVerb.Update, entityId, row.type);
+				await applyFarWrites(repo, far, writer);
+				await reconcileAssetRefs(repo, entityId, updated.properties);
+			}
+			const vaultPath = options.getVaultPath?.() ?? null;
+			if (!options.ydoc || !vaultPath) return;
+			const res = (await options.ydoc("historyRestoreBody", {
+				vaultPath,
+				entityId,
+				offset: frame.offset,
+				length: frame.length,
+			})) as { updateB64?: string | null; compacted?: boolean } | null;
+			if (!res?.updateB64) return;
+			deliverToOpenWindows(vaultPath, entityId, res.updateB64, null);
+			emitLocalDoc(entityId, row.type, res.updateB64, writer);
+			if (res.compacted && options.onDocCompacted) {
+				try {
+					options.onDocCompacted(entityId, row.type);
+				} catch (error) {
+					console.error("[entities] onDocCompacted hook failed:", error);
+				}
+			}
 		});
 	}
 
@@ -854,7 +955,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 								props: properties,
 							})) as { updateB64?: string | null } | null;
 							// 10.12 — emit the initial property write if shared.
-							emitLocalDoc(entityId, type, seeded?.updateB64);
+							emitLocalDoc(entityId, type, seeded?.updateB64, { app, agent: provReq !== null });
 						} catch (error) {
 							console.warn(
 								`[entities] create: failed to seed Y.Doc for ${entityId}: ${(error as Error).message}`,
@@ -887,7 +988,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
-					await applyFarWrites(repo, farOnCreate);
+					await applyFarWrites(repo, farOnCreate, { app, agent: provReq !== null });
 					return compose(row);
 				}
 			}
@@ -914,10 +1015,14 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					{ ...existing.properties, ...patch },
 					"entities.update",
 				);
-				const updated = await writePropsThroughDoc(repo, existing, patch);
+				const writer: LocalWriter = {
+					app,
+					agent: parseProvenanceRequest(a.provenance) !== null,
+				};
+				const updated = await writePropsThroughDoc(repo, existing, patch, writer);
 				if (!updated) throw named("Invalid", `entities.update: ${id} not found`);
 				emitChange(EntityEventVerb.Update, id, existing.type);
-				await applyFarWrites(repo, farOnUpdate);
+				await applyFarWrites(repo, farOnUpdate, writer);
 				// Agent-15 — an agent-attributed edit journals the prior values of
 				// exactly the keys it touched, read from the row BEFORE the write.
 				if (a.provenance !== undefined && Object.keys(patch).length > 0) {
@@ -961,7 +1066,10 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				);
 				repo.softDelete(id, clock());
 				emitChange(EntityEventVerb.Delete, id, existing.type);
-				await applyFarWrites(repo, farOnDelete);
+				await applyFarWrites(repo, farOnDelete, {
+					app,
+					agent: parseProvenanceRequest(a.provenance) !== null,
+				});
 				if (a.provenance !== undefined) {
 					await journalAgentWrite(repo, app, a.provenance, {
 						entityId: id,
@@ -1035,7 +1143,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				// lives) lands on the survivor through the standard Y.Doc-first
 				// write path.
 				if (patch && Object.keys(patch).length > 0) {
-					const updated = await writePropsThroughDoc(repo, survivor, patch);
+					const updated = await writePropsThroughDoc(repo, survivor, patch, { app, agent: false });
 					if (updated) {
 						emitChange(EntityEventVerb.Update, survivorId, survivor.type);
 						await reconcileAssetRefs(repo, survivorId, updated.properties);
@@ -1065,7 +1173,10 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 						if (isShellOwnedEntityType(row.type)) continue;
 						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
 						if (!refPatch) continue;
-						const updated = await writePropsThroughDoc(repo, row, refPatch);
+						const updated = await writePropsThroughDoc(repo, row, refPatch, {
+							app,
+							agent: false,
+						});
 						if (!updated) continue;
 						refsRewritten += 1;
 						emitChange(EntityEventVerb.Update, row.id, row.type);
@@ -1172,7 +1283,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const applied = await applyCanonicalDelta(vaultPath, id, updateB64, app);
 				// 10.12 — emit this local body edit through the always-on live-
 				// sync engine (no-op unless the entity is shared + tracked).
-				emitLocalDoc(id, row.type, updateB64);
+				emitLocalDoc(id, row.type, updateB64, { app, agent: false });
 				// 10.14 — if the worker compacted the doc's tail, let the engine
 				// emit a full-state Snapshot so the durable node compacts too.
 				if ((applied as { compacted?: boolean } | null)?.compacted && options.onDocCompacted) {

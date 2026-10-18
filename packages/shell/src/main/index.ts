@@ -182,6 +182,7 @@ import {
 	type AgentRunOps,
 	type ApplyRemoteDocFn,
 	type InverseBackfillFn,
+	type RestoreEntityFn,
 	makeEntitiesServiceHandler,
 } from "./entities/entities-service";
 import { EntityChangeEmitter } from "./entities/entity-change-emitter";
@@ -212,6 +213,14 @@ import { APP_FILES_WATCH_CHANNEL, makeFilesServiceHandler } from "./files/files-
 import { gatherStorageInventory } from "./files/gather-storage-inventory";
 import { servedMimeForName } from "./files/upload-mime";
 import { listWallpaperEntries } from "./files/wallpaper-entries";
+import {
+	HISTORY_SERVICE,
+	agentPrincipal,
+	makeHistoryServiceHandler,
+	memberPrincipal,
+} from "./history/history-service";
+import { createSessionHistory, resolveLocalHistoryRole } from "./history/history-wiring";
+import type { VersionHistory } from "./history/version-history";
 import {
 	ALLOWED_ICON_EXTS,
 	deleteIconByUrl,
@@ -316,7 +325,7 @@ import { LinkPreviewCache } from "./network/preview-cache";
 import { schedulePreviewCachePrune } from "./network/preview-cache-scheduler";
 import { DEFAULT_ON_PRIVACY } from "./network/privacy-config";
 import { DEFAULT_PROXY_CONFIG } from "./network/proxy-config";
-import { base64UrlToBytes } from "./pairing/pairing-channel";
+import { base64UrlToBytes, bytesToBase64Url } from "./pairing/pairing-channel";
 import { makePlatformServiceHandler } from "./platform/platform-service";
 import { makePropertiesServiceHandler } from "./properties/properties-service";
 import { UsageIndex } from "./properties/usage-index";
@@ -350,6 +359,7 @@ import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcut
 import type { ShortcutRegistry } from "./shortcuts/shortcut-registry";
 import { makeShortcutsServiceHandler } from "./shortcuts/shortcuts-service";
 import { makeSpellcheckServiceHandler } from "./spellcheck/spellcheck-service";
+import type { ChangeSetPrincipal } from "./storage/entities-repo";
 import {
 	AssetRefsRepository,
 	AssetsRepository,
@@ -3742,6 +3752,37 @@ void app.whenReady().then(async () => {
 	// here at construction; the live-sync engine's `applyRemoteUpdate` routes
 	// inbound decrypted frames through it (off the broker — never app-callable).
 	let applyRemoteDocFn: ApplyRemoteDocFn | null = null;
+	// 10.16 — version history. The restore closure comes out of the entities
+	// service at construction (off the broker); the engine is per session.
+	let restoreEntityFn: RestoreEntityFn | null = null;
+	let activeHistory: VersionHistory | null = null;
+	const callYDocWorker = async (method: string, args: Record<string, unknown>): Promise<unknown> => {
+		const handler = workersRef.broker.getServiceHandler("ydoc");
+		if (!handler) throw new Error("ydoc worker service unavailable");
+		return handler({
+			v: 1,
+			msg: `ydoc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+			app: "io.brainstorm.shell",
+			service: "ydoc",
+			method,
+			args: [args],
+			caps: [],
+		});
+	};
+	const historySelf = (): ChangeSetPrincipal | null => {
+		const session = getActiveVaultSession();
+		return session ? memberPrincipal(bytesToBase64Url(session.identity.publicKey)) : null;
+	};
+	onActiveVaultSessionChanged((session) => {
+		activeHistory?.dispose();
+		activeHistory = session
+			? createSessionHistory({
+					session,
+					callWorker: callYDocWorker,
+					getRestorer: () => restoreEntityFn,
+				})
+			: null;
+	});
 	let inverseBackfillFn: InverseBackfillFn | null = null;
 	const getVaultPropertyDefs = async (): Promise<ReadonlyArray<PropertyDef> | null> => {
 		const session = getActiveVaultSession();
@@ -3790,6 +3831,17 @@ void app.whenReady().then(async () => {
 		onAssetBound: (entityId, assetId) => {
 			void uploadBoundAssetNow(entityId, assetId);
 			void ensureThumbnailNow(entityId, assetId);
+		},
+		bindRestoreEntity: (fn) => {
+			restoreEntityFn = fn;
+		},
+		// 10.16 — attribute every committed local write, server-side: an agent
+		// write (provenance-carrying) to the agent, anything else to this vault's
+		// own identity.
+		onLocalWrite: (entityId, _type, writer) => {
+			const self = historySelf();
+			if (!activeHistory || !self) return;
+			activeHistory.noteWrite(entityId, [writer.agent ? agentPrincipal(writer.app) : self]);
 		},
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;
@@ -4022,8 +4074,9 @@ void app.whenReady().then(async () => {
 							doc.destroy();
 						}
 					},
-					applyRemoteUpdate: async (entityId, _type, update) => {
+					applyRemoteUpdate: async (entityId, _type, update, sender) => {
 						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
+						if (sender) activeHistory?.noteWrite(entityId, [memberPrincipal(sender)]);
 					},
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
 					// here") for a tracked entity. Route it into this session's presence
@@ -4230,6 +4283,23 @@ void app.whenReady().then(async () => {
 		// run + events for every channel mention turn.
 		trace: agentTraceRecorder,
 	};
+	workers.broker.registerService(
+		HISTORY_SERVICE,
+		makeHistoryServiceHandler({
+			getHistory: () => activeHistory,
+			getRepo: getEntitiesRepoForActiveSession,
+			getLedger: async () => {
+				const session = getActiveVaultSession();
+				return session ? await session.capabilityLedger() : null;
+			},
+			resolveRole: async (entityId) => {
+				const session = getActiveVaultSession();
+				if (!session) throw new Error("no active vault");
+				return resolveLocalHistoryRole(session, entityId);
+			},
+			selfPrincipal: historySelf,
+		}),
+	);
 	workers.broker.registerService("entities", async (envelope) => {
 		const result = await entitiesHandler(envelope);
 		if (

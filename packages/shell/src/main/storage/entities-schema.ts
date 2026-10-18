@@ -392,4 +392,46 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 13,
+		description: "entities.db v13 — entity_versions + history_change_sets (10.16 version history)",
+		up: (db) => {
+			// 10.16 — checkpoint metadata. The body bytes live in the entity's
+			// append-only `.yhist` at (frame_offset, frame_length); `properties`
+			// is the property map at capture time, kept here so a diff never has
+			// to decode a body. `principals` is server-derived JSON: who wrote
+			// since the previous checkpoint, each with their last write time (the
+			// change-set revert's "edited since" rule reads it). `state_key` hashes
+			// the doc's content (properties, links, body), so "only if changed"
+			// ignores an idempotent re-write and still sees a pure deletion. Several rows may share one frame (a change-set
+			// checkpoint of an unchanged doc).
+			// LOCAL state (OQ-VH-1) — never syncs, never exported. Overlaps Agent-15's
+			// `agent_writes` journal by design: that holds per-write property diffs
+			// for run undo; this holds whole-object checkpoints (body included).
+			db.exec(`
+				CREATE TABLE entity_versions (
+					version_id     TEXT PRIMARY KEY,
+					entity_id      TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+					at             INTEGER NOT NULL,
+					cause          TEXT NOT NULL,
+					change_set_id  TEXT,
+					principals     TEXT NOT NULL,
+					frame_offset   INTEGER NOT NULL,
+					frame_length   INTEGER NOT NULL,
+					state_key      TEXT NOT NULL,
+					properties     TEXT NOT NULL
+				);
+				CREATE INDEX idx_entity_versions_entity ON entity_versions(entity_id, at);
+				CREATE INDEX idx_entity_versions_change_set ON entity_versions(change_set_id)
+					WHERE change_set_id IS NOT NULL;
+
+				CREATE TABLE history_change_sets (
+					change_set_id  TEXT PRIMARY KEY,
+					cause          TEXT NOT NULL,
+					principals     TEXT NOT NULL,
+					created_at     INTEGER NOT NULL
+				);
+			`);
+		},
+	},
 ];

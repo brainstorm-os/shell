@@ -85,6 +85,8 @@
     "./color-picker": "./src/color-picker/index.ts",
     "./share-dialog": "./src/share-dialog/index.ts",
     "./share-dialog.css": "./src/share-dialog/share-dialog.css",
+    "./version-history": "./src/version-history/index.ts",
+    "./version-history.css": "./src/version-history/version-history.css",
     "./composer-context": "./src/composer-context/index.ts",
     "./composer-context.css": "./src/composer-context/composer-context.css",
     "./picker-host": "./src/picker-host.tsx",

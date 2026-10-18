@@ -40,6 +40,7 @@ import type { McpAgentTool } from "./mcp";
 import type { PropertyPredicate } from "./predicate";
 import type { Dictionary, PropertyDef } from "./properties";
 import type { ThemePreviewSpec } from "./theme-preview";
+import type { VersionHistoryService } from "./version-history";
 import type { WebViewClient } from "./web-view";
 
 // ─── Identity / boot handshake ──────────────────────────────────────────────
@@ -2266,6 +2267,8 @@ export type AppRuntime = {
 		/** Agent-12a/12b — own-run trace demarcation + reads (no capability). */
 		readonly agentTrace: AgentTraceService;
 		readonly sharing: SharingService;
+		/** 10.16 — per-object version history (gated by the entity's own grants). */
+		readonly history: VersionHistoryService;
 		readonly presence: PresenceService;
 		readonly ui: UiService;
 		readonly theme: ThemeService;
@@ -3425,3 +3428,21 @@ export {
 	confirmSkipKey,
 	isConfirmKind,
 } from "./confirm-kind";
+
+// Version history (rung 10.16) — the `history` service contract + its enums.
+export {
+	type ChangeSetRevertResult,
+	HistoryAccess,
+	type HistoryPrincipal,
+	HistoryPrincipalKind,
+	type RevertSkipped,
+	RevertSkipReason,
+	VersionCause,
+	type VersionHistoryList,
+	type VersionHistoryService,
+	type VersionPreview,
+	type VersionPropertyChange,
+	VersionPropertyChangeKind,
+	type VersionRestoreResult,
+	type VersionSummary,
+} from "./version-history";

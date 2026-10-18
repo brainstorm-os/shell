@@ -255,6 +255,7 @@ export type EditorI18nKey =
 	| "editor.rightPanel.tabs"
 	| "editor.rightPanel.properties"
 	| "editor.rightPanel.comments"
+	| "editor.rightPanel.history"
 	// Media block commands (createMediaBlockCommands) + the click-to-edit
 	// inspector (MediaInspectorPlugin). Surfaced when the host enables the
 	// `media` flag on `<FullEditorPlugins>` and wires `uploadFile`.
@@ -488,6 +489,7 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.rightPanel.tabs": "Panel tabs",
 	"editor.rightPanel.properties": "Properties",
 	"editor.rightPanel.comments": "Comments",
+	"editor.rightPanel.history": "History",
 	"editor.media.image": "Image",
 	"editor.media.image.description": "Upload or embed an image",
 	"editor.media.video": "Video",
