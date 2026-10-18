@@ -107,6 +107,11 @@ export default defineConfig({
 				"packages/sdk/src/tool-outcome/tool-outcome.css",
 			),
 			"@brainstorm-os/sdk/tool-outcome": resolve(__dirname, "packages/sdk/src/tool-outcome/index.ts"),
+			"@brainstorm-os/sdk/run-changes.css": resolve(
+				__dirname,
+				"packages/sdk/src/run-changes/run-changes.css",
+			),
+			"@brainstorm-os/sdk/run-changes": resolve(__dirname, "packages/sdk/src/run-changes/index.ts"),
 			"@brainstorm-os/sdk/proposal-tray.css": resolve(
 				__dirname,
 				"packages/sdk/src/proposal-tray/proposal-tray.css",

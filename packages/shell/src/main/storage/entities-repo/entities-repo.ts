@@ -33,6 +33,7 @@ import {
 	MULTI_HOP_CTE_ROW_LIMIT,
 	compilePattern,
 } from "../../entities/pattern-compiler";
+import { AgentWritesRepository } from "./agent-writes-repo";
 import { AssetRefsRepository } from "./asset-refs-repo";
 
 export type EntityRow = {
@@ -176,6 +177,7 @@ export class EntitiesRepository {
 	// adds up to GB of native memory before any JS-side reference is dropped.
 	private readonly statements = new Map<string, SqliteStatement>();
 	private assetRefsRepo: AssetRefsRepository | null = null;
+	private agentWritesRepo: AgentWritesRepository | null = null;
 
 	constructor(private readonly db: SqliteDatabase) {}
 
@@ -186,6 +188,13 @@ export class EntitiesRepository {
 	get assetRefs(): AssetRefsRepository {
 		if (!this.assetRefsRepo) this.assetRefsRepo = new AssetRefsRepository(this.db);
 		return this.assetRefsRepo;
+	}
+
+	/** Agent-15 — the agent write journal over this same handle, for the
+	 *  entities service's run-diff capture + undo. */
+	get agentWrites(): AgentWritesRepository {
+		if (!this.agentWritesRepo) this.agentWritesRepo = new AgentWritesRepository(this.db);
+		return this.agentWritesRepo;
 	}
 
 	/** Run `fn` inside a single SQLite transaction against `entities.db`.
@@ -249,6 +258,15 @@ export class EntitiesRepository {
 			createdAt: input.now,
 			updatedAt,
 		};
+	}
+
+	/** The entity whether live or in the Bin, with its deletion time (null when
+	 *  live). Null only when the row does not exist at all (purged / never). */
+	getIncludingDeleted(id: string): (EntityRow & { deletedAt: number | null }) | null {
+		const row = this.stmt(
+			"SELECT id, type, space_id, properties, created_by, created_at, updated_at, deleted_at FROM entities WHERE id = ?",
+		).get(id) as (DbEntityRow & { deleted_at: number | null }) | undefined;
+		return row ? { ...rowToEntity(row), deletedAt: row.deleted_at } : null;
 	}
 
 	/** Live (non-deleted) entity, or null. */

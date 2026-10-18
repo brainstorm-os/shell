@@ -43,6 +43,7 @@ import {
 	type PinResolution,
 	type PropertyDef,
 } from "@brainstorm-os/sdk-types";
+import type { AgentRunChanges, AgentUndoResult } from "@brainstorm-os/sdk-types";
 import type { ThemeName } from "@brainstorm-os/tokens";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
@@ -700,6 +701,12 @@ const agentActivity = {
 	entityHistory: (entityId: string): Promise<AgentActivityEventsResultView> =>
 		ipcRenderer.invoke("agent-activity:entity-history", entityId),
 	agents: (): Promise<{ agents: readonly string[] }> => ipcRenderer.invoke("agent-activity:agents"),
+	/** Agent-15 — what one run changed (created / edited / trashed objects). */
+	changes: (runId: string): Promise<AgentRunChanges | null> =>
+		ipcRenderer.invoke("agent-activity:changes", runId),
+	/** Agent-15 — undo one run's writes (refuses on later edits). */
+	undo: (runId: string): Promise<AgentUndoResult> =>
+		ipcRenderer.invoke("agent-activity:undo", runId),
 };
 
 /** Mirrors the main-side `AgentActivityRunsQuery` (agent-activity-handlers).

@@ -26,13 +26,17 @@
 
 import {
 	AGENT_TRACE_ID_MAX,
+	type AgentRunChanges,
 	type AgentRunSummary,
 	AgentRunSurface,
 	type AgentTraceEventRecord,
+	AgentUndoRefusal,
+	type AgentUndoResult,
 	sanitizeTraceText,
 } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../../ipc/broker";
 import type { Envelope } from "../../../ipc/envelope";
+import type { AgentRunOps } from "../../entities/entities-service";
 import type { AgentTraceRecorder } from "./agent-trace-recorder";
 import {
 	AGENT_EVENTS_PAGE_MAX,
@@ -44,6 +48,9 @@ export type AgentTraceServiceOptions = {
 	recorder: AgentTraceRecorder;
 	/** The active vault's trace repo, or null when no vault is open. */
 	getRepo: () => Promise<AgentTraceRepository | null>;
+	/** Agent-15 — the run diff + undo operations (bound by the entities
+	 *  service). Absent → `listChanges` reads null and `undoRun` refuses. */
+	getRunOps?: () => AgentRunOps | null;
 };
 
 enum AgentTraceMethod {
@@ -51,6 +58,8 @@ enum AgentTraceMethod {
 	EndTurn = "endTurn",
 	ListRuns = "listRuns",
 	ListEvents = "listEvents",
+	ListChanges = "listChanges",
+	UndoRun = "undoRun",
 }
 
 function makeError(name: string, message: string): Error {
@@ -141,6 +150,32 @@ export function makeAgentTraceServiceHandler(options: AgentTraceServiceOptions):
 					limit: Math.min(optionalNumber(a.limit) ?? AGENT_EVENTS_PAGE_MAX, AGENT_EVENTS_PAGE_MAX),
 				});
 				return { events };
+			}
+
+			// Agent-15 — the diff + undo of one OWN run. The run must be the
+			// caller's (a foreign id reads exactly like a missing one), and the
+			// ops then scope by the same principal: only this app's journaled
+			// writes, only types its ledger still grants.
+			case AgentTraceMethod.ListChanges: {
+				const run = await ownRun(envelope, String(arg(envelope).runId ?? ""));
+				const ops = options.getRunOps?.() ?? null;
+				if (!run || !ops) return null as AgentRunChanges | null;
+				return await ops.changes(run.id, { privileged: false, app: envelope.app });
+			}
+
+			case AgentTraceMethod.UndoRun: {
+				const run = await ownRun(envelope, String(arg(envelope).runId ?? ""));
+				const ops = options.getRunOps?.() ?? null;
+				if (!run || !ops) {
+					const refused: AgentUndoResult = {
+						ok: false,
+						reason: AgentUndoRefusal.NotFound,
+						entityId: null,
+						field: null,
+					};
+					return refused;
+				}
+				return await ops.undo(run.id, { privileged: false, app: envelope.app });
 			}
 
 			default:

@@ -12,9 +12,11 @@
 import type {
 	AgentProposalDecision,
 	AgentProposalsService,
+	AgentRunChanges,
 	AgentRunSummary,
 	AgentTraceEventRecord,
 	AgentTraceService,
+	AgentUndoResult,
 	AiCostEstimate,
 	AiExtractRequest,
 	AiExtractResult,
@@ -862,8 +864,22 @@ function entitiesProxy(bridge: Bridge): EntitiesService {
 				],
 				[],
 			),
-		update: (id, patch) => callService<Entity>(bridge, "entities", "update", [{ id, patch }], []),
-		delete: (id) => callService<void>(bridge, "entities", "delete", [{ id }], []),
+		update: (id, patch, provenance) =>
+			callService<Entity>(
+				bridge,
+				"entities",
+				"update",
+				[provenance === undefined ? { id, patch } : { id, patch, provenance }],
+				[],
+			),
+		delete: (id, provenance) =>
+			callService<void>(
+				bridge,
+				"entities",
+				"delete",
+				[provenance === undefined ? { id } : { id, provenance }],
+				[],
+			),
 		merge: (survivorId, loserIds, patch) =>
 			callService<EntityMergeResult>(
 				bridge,
@@ -1134,6 +1150,9 @@ function agentTraceProxy(bridge: Bridge): AgentTraceService {
 				[input],
 				[],
 			),
+		listChanges: (input) =>
+			callService<AgentRunChanges | null>(bridge, "agent-trace", "listChanges", [input], []),
+		undoRun: (input) => callService<AgentUndoResult>(bridge, "agent-trace", "undoRun", [input], []),
 	};
 }
 

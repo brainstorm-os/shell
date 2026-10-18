@@ -22,6 +22,7 @@
  */
 
 import { type AgentLoopStep, ToolRefusalReason } from "./agent-loop";
+import type { AgentRunChanges, AgentUndoResult } from "./agent-run-changes";
 import {
 	type AgentTool,
 	StepKind,
@@ -61,6 +62,8 @@ export enum AgentEventKind {
 	ProposalDiscarded = "proposal-discarded",
 	McpCall = "mcp-call",
 	Error = "error",
+	/** Agent-15 — the run's writes were reverted (one row, on the undone run). */
+	RunUndone = "run-undone",
 }
 
 /** Per-event outcome. Free error text never rides here — it goes to the
@@ -165,6 +168,13 @@ export type AgentTraceService = {
 		afterSeq?: number;
 		limit?: number;
 	}): Promise<{ events: readonly AgentTraceEventRecord[] }>;
+	/** Agent-15 — what one own-run changed (objects created / edited /
+	 *  trashed), limited to types this app can read. Null for a foreign or
+	 *  unknown run. Optional: an older shell may not expose it. */
+	listChanges?(input: { runId: string }): Promise<AgentRunChanges | null>;
+	/** Agent-15 — revert one own-run's writes as one operation, or refuse with
+	 *  a named reason when later work touched the same thing. */
+	undoRun?(input: { runId: string }): Promise<AgentUndoResult>;
 };
 
 function draft(

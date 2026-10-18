@@ -285,8 +285,16 @@ export type EntitiesService = {
 		id?: EntityId,
 		provenance?: AgentProvenanceRequest,
 	): Promise<Entity>;
-	update(id: EntityId, patch: Record<string, unknown>): Promise<Entity>;
-	delete(id: EntityId): Promise<void>;
+	/** `provenance` (optional, Agent-15) marks this edit as part of an agent
+	 *  approval in that conversation, so the shell journals the prior values
+	 *  for the run's diff + undo. Like create's, the agent is the verified
+	 *  caller — an app can only ever attribute an edit to itself. */
+	update(
+		id: EntityId,
+		patch: Record<string, unknown>,
+		provenance?: AgentProvenanceRequest,
+	): Promise<Entity>;
+	delete(id: EntityId, provenance?: AgentProvenanceRequest): Promise<void>;
 	/** Merge duplicate entities of ONE type into a survivor (F-158): applies
 	 *  `patch` to the survivor, repoints every stored link + property ref that
 	 *  targeted a loser onto the survivor, then soft-deletes the losers (they
@@ -2837,6 +2845,27 @@ export type {
 	AgentLoopStep,
 	AgentToolCall,
 } from "./agent-loop";
+
+// ─── Agent run diff + undo (Agent-15) ───────────────────────────────────────
+export {
+	AGENT_CHANGE_FIELDS_MAX,
+	AGENT_CHANGE_PREVIEW_MAX,
+	AGENT_RUN_CHANGES_MAX,
+	AgentUndoRefusal,
+	AgentWriteKind,
+	describeFieldChange,
+	isAgentUndoRefusal,
+	isAgentWriteKind,
+	lineDelta,
+	summarizeChangeValue,
+} from "./agent-run-changes";
+export type {
+	AgentFieldChange,
+	AgentLineDelta,
+	AgentRunChange,
+	AgentRunChanges,
+	AgentUndoResult,
+} from "./agent-run-changes";
 
 // ─── Agent trace (Agent-12a — doc 77 agent observability) ───────────────────
 export {

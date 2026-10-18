@@ -338,4 +338,38 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			`);
 		},
 	},
+	{
+		version: 11,
+		description: "entities.db v11 — agent_writes (Agent-15 run diff + undo)",
+		up: (db) => {
+			// Agent-15 — the pre-write journal behind "what did this run change"
+			// and "Undo this run". One row per agent-attributed write (create /
+			// property update / trash), stamped server-side with the run it
+			// belongs to. It holds VAULT CONTENT (the prior and written property
+			// values), which is why it lives here beside the rows it describes and
+			// not in the metadata-only `account.db` trace. `before_json` /
+			// `after_json` are NULL with `oversize = 1` when a value was too large
+			// to journal: the diff says so and undo refuses rather than half-
+			// reverting. LOCAL state — never syncs. Retention is bounded per
+			// principal and globally (`agent-writes-repo.ts`).
+			db.exec(`
+				CREATE TABLE agent_writes (
+					id           INTEGER PRIMARY KEY AUTOINCREMENT,
+					run_id       TEXT NOT NULL,
+					agent        TEXT NOT NULL,
+					entity_id    TEXT NOT NULL,
+					entity_type  TEXT NOT NULL,
+					kind         TEXT NOT NULL,
+					before_json  TEXT,
+					after_json   TEXT,
+					oversize     INTEGER NOT NULL DEFAULT 0,
+					ts           INTEGER NOT NULL,
+					reverted_at  INTEGER
+				);
+				CREATE INDEX idx_agent_writes_run ON agent_writes(run_id, id);
+				CREATE INDEX idx_agent_writes_agent ON agent_writes(agent, ts);
+				CREATE INDEX idx_agent_writes_ts ON agent_writes(ts);
+			`);
+		},
+	},
 ];

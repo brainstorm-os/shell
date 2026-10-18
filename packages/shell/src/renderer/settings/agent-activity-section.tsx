@@ -28,14 +28,22 @@
 
 import {
 	AgentEventKind,
+	type AgentRunChanges,
 	AgentRunOutcome,
 	AgentRunSurface,
+	AgentUndoRefusal,
+	AgentWriteKind,
 	isAgentEventKind,
 	isAgentRunOutcome,
 	isAgentRunSurface,
 } from "@brainstorm-os/sdk-types";
 import { EmptyState, EmptyStateTone } from "@brainstorm-os/sdk/empty-state";
 import { IconName as SdkIconName } from "@brainstorm-os/sdk/icon";
+import {
+	RUN_UNDO_REFUSAL_KEYS,
+	RunChanges,
+	type RunChangesLabels,
+} from "@brainstorm-os/sdk/run-changes";
 import { useCallback, useEffect, useId, useState } from "react";
 import type { AgentActivityEventView, AgentActivityRunView } from "../../preload";
 import { t } from "../i18n/t";
@@ -43,6 +51,7 @@ import { Button, ButtonSize, ButtonVariant } from "../ui/button";
 import { Icon, IconName } from "../ui/icon";
 import { SettingSelect } from "./settings-controls";
 import "@brainstorm-os/sdk/empty-state.css";
+import "@brainstorm-os/sdk/run-changes.css";
 import "./agent-activity-section.css";
 
 const PAGE_SIZE = 25;
@@ -86,7 +95,42 @@ const KIND_KEY: Record<AgentEventKind, string> = {
 	[AgentEventKind.ProposalDiscarded]: "shell.settings.ai.activity.kindProposalDiscarded",
 	[AgentEventKind.McpCall]: "shell.settings.ai.activity.kindMcpCall",
 	[AgentEventKind.Error]: "shell.settings.ai.activity.kindError",
+	[AgentEventKind.RunUndone]: "shell.settings.ai.activity.kindRunUndone",
 };
+
+const CHANGES = "shell.settings.ai.activity.changes";
+
+/** The shared `<RunChanges>` labels, through the shell's ICU `t()`. */
+function runChangesLabels(): RunChangesLabels {
+	return {
+		heading: t(`${CHANGES}.heading`),
+		empty: t(`${CHANGES}.empty`),
+		untitled: t(`${CHANGES}.untitled`),
+		oversize: t(`${CHANGES}.oversize`),
+		kind: {
+			[AgentWriteKind.Created]: t(`${CHANGES}.kindCreated`),
+			[AgentWriteKind.Updated]: t(`${CHANGES}.kindUpdated`),
+			[AgentWriteKind.Trashed]: t(`${CHANGES}.kindTrashed`),
+		},
+		field: (key, before, after) =>
+			after === null
+				? t(`${CHANGES}.fieldCleared`, { key })
+				: before === null
+					? t(`${CHANGES}.fieldSet`, { key, after })
+					: t(`${CHANGES}.fieldChanged`, { key, before, after }),
+		lines: (added, removed) =>
+			t(`${CHANGES}.lines`, { added: String(added), removed: String(removed) }),
+		more: (count) => t(`${CHANGES}.more`, { count }),
+		undo: t(`${CHANGES}.undo`),
+		undoing: t(`${CHANGES}.undoing`),
+		undone: t(`${CHANGES}.undone`),
+		failed: t(`${CHANGES}.failed`),
+		refusal: (reason: AgentUndoRefusal, field: string | null) =>
+			reason === AgentUndoRefusal.EditedSince && field
+				? t(`${CHANGES}.refusal.editedSinceField`, { field })
+				: t(`${CHANGES}.refusal.${RUN_UNDO_REFUSAL_KEYS[reason]}`),
+	};
+}
 
 function surfaceLabel(surface: string): string {
 	return isAgentRunSurface(surface) ? t(SURFACE_KEY[surface]) : surface;
@@ -174,6 +218,8 @@ function RunRow({
 }: { run: AgentActivityRunView; onEntityHistory: (entityId: string) => void }) {
 	const [expanded, setExpanded] = useState(false);
 	const [events, setEvents] = useState<readonly AgentActivityEventView[] | null>(null);
+	const [changes, setChanges] = useState<AgentRunChanges | null>(null);
+	const [changesEpoch, setChangesEpoch] = useState(0);
 	const panelId = useId();
 
 	useEffect(() => {
@@ -189,6 +235,22 @@ function RunRow({
 			live = false;
 		};
 	}, [expanded, events, run.id]);
+
+	// Agent-15 — the run's content diff, refetched after an undo.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: changesEpoch is the intended refetch trigger.
+	useEffect(() => {
+		if (!expanded) return undefined;
+		const bridge = activityBridge();
+		if (!bridge || typeof bridge.changes !== "function") return undefined;
+		let live = true;
+		void bridge
+			.changes(run.id)
+			.then((reply) => live && setChanges(reply))
+			.catch(() => live && setChanges(null));
+		return () => {
+			live = false;
+		};
+	}, [expanded, run.id, changesEpoch]);
 
 	return (
 		<li className="settings__activity-run" data-denied={run.denialCount > 0 || undefined}>
@@ -236,6 +298,20 @@ function RunRow({
 							))}
 						</ul>
 					)}
+					{changes && changes.changes.length > 0 ? (
+						<RunChanges
+							changes={changes}
+							labels={runChangesLabels()}
+							onOpenEntity={openEntity}
+							onUndo={() => {
+								const bridge = activityBridge();
+								if (!bridge) return Promise.reject(new Error("no bridge"));
+								return bridge.undo(run.id);
+							}}
+							onUndone={() => setChangesEpoch((n) => n + 1)}
+							testId="agent-activity-run-changes"
+						/>
+					) : null}
 					<div className="settings__activity-run-actions">
 						{run.conversationId ? (
 							<Button

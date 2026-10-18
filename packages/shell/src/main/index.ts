@@ -17,6 +17,7 @@ import {
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
 	ActionTrustTier,
+	AgentEventKind,
 	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
@@ -169,7 +170,11 @@ import { makeDndServiceHandler } from "./dnd/dnd-service";
 import { DragSessionStore } from "./dnd/drag-session";
 import { createFileExporter } from "./dnd/file-exporter";
 import { createElectronGhostWindow, createGhostOverlay } from "./dnd/ghost-overlay";
-import { type ApplyRemoteDocFn, makeEntitiesServiceHandler } from "./entities/entities-service";
+import {
+	type AgentRunOps,
+	type ApplyRemoteDocFn,
+	makeEntitiesServiceHandler,
+} from "./entities/entities-service";
 import { EntityChangeEmitter } from "./entities/entity-change-emitter";
 import { installEntityDek } from "./entities/install-wrap";
 import { rehomeAssetDeks } from "./entities/rehome-asset-deks";
@@ -210,7 +215,10 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
-import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
+import {
+	bindAgentActivityRunOps,
+	registerAgentActivityHandlers,
+} from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
@@ -3645,6 +3653,9 @@ void app.whenReady().then(async () => {
 			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
 		},
 	});
+	// Agent-15 — bound by the entities service below; read lazily so the
+	// trace service and Settings both reach the same ops.
+	let agentRunOps: AgentRunOps | null = null;
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,
 		makeAgentTraceServiceHandler({
@@ -3653,6 +3664,7 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				return session ? await session.agentTraceRepo() : null;
 			},
+			getRunOps: () => agentRunOps,
 		}),
 	);
 	// The chat-surface chokepoint: every identity-verified envelope an app
@@ -3689,6 +3701,16 @@ void app.whenReady().then(async () => {
 				approved: true,
 				entityId,
 			});
+		},
+		// Agent-15 — journal agent-attributed writes against the run they
+		// belong to, and hand the diff/undo ops to the trace service + Settings.
+		resolveAgentRun: (app, conversationId) => agentTraceRecorder.latestRunIdFor(app, conversationId),
+		bindAgentRunOps: (ops) => {
+			agentRunOps = ops;
+			bindAgentActivityRunOps(ops);
+		},
+		onAgentRunUndone: (runId) => {
+			void agentTraceRecorder.event(runId, { kind: AgentEventKind.RunUndone });
 		},
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
