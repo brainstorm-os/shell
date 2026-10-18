@@ -411,5 +411,13 @@
   "notes.transclusion.lockedHint": "Die Quellseite ist gesperrt – entsperre sie, um hier zu bearbeiten",
   "notes.transclusion.editingBadge": "Quellseite wird bearbeitet",
   "notes.action.turnIntoPage.label": "Seite",
-  "notes.action.turnIntoPage.description": "Diese Blöcke in eine neue Unterseite verschieben"
+  "notes.action.turnIntoPage.description": "Diese Blöcke in eine neue Unterseite verschieben",
+  "notes.outline.show": "Gliederung anzeigen",
+  "notes.outline.hide": "Gliederung ausblenden",
+  "notes.outline.region": "Gliederung",
+  "notes.outline.list": "Überschriften in dieser Notiz",
+  "notes.outline.emptyTitle": "Noch keine Überschriften",
+  "notes.outline.emptyHint": "Füge dieser Notiz Überschriften hinzu, um ihre Gliederung aufzubauen.",
+  "notes.outline.noNoteTitle": "Keine Notiz geöffnet",
+  "notes.outline.noNoteHint": "Öffne eine Notiz, um ihre Gliederung zu sehen."
 }

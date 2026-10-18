@@ -22,6 +22,8 @@ export enum ActionId {
 	ToggleSidebar = "notes.toggle-sidebar",
 	/** Show/hide the right-hand Properties panel. Bound to `Mod+Shift+\`. */
 	ToggleProperties = "notes.toggle-properties",
+	/** Show/hide the side Outline panel (B11.26). Bound to `Mod+Alt+o`. */
+	ToggleOutline = "notes.toggle-outline",
 	/** Lock/unlock the open note (page-level read-only). Bound to `Mod+Alt+l`
 	 *  (OQ-235 (a): `Mod+Shift+L` stays on the shell appearance toggle). */
 	ToggleNoteLock = "notes.toggle-note-lock",

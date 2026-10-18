@@ -116,6 +116,8 @@ import { MediaInspectorPlugin } from "./media-inspector-plugin";
 import { NormalizeEmptyDocPlugin } from "./normalize-empty-plugin";
 import { NoteContextProvider, type NoteContextValue } from "./note-context";
 import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";
+import type { OutlineEntry } from "./outline";
+import { OutlinePlugin } from "./outline-plugin";
 import { localPresence } from "./presence";
 import { makeNoteBootstrap } from "./seed-title";
 import { editorTheme } from "./theme";
@@ -171,6 +173,8 @@ export type EditorProps = {
 	/** Lets a transcluded body be edited in place (B11.22). Omit ⇒ every
 	 *  transclusion in this document stays read-only. */
 	transclusionHost?: TransclusionEditHost | null;
+	/** Receives the live heading outline (B11.26) for the side panel. */
+	onOutlineChange?: (entries: OutlineEntry[]) => void;
 };
 
 export function Editor({
@@ -187,6 +191,7 @@ export function Editor({
 	insertRequest = null,
 	onInsertDone,
 	transclusionHost = null,
+	onOutlineChange,
 }: EditorProps) {
 	const doc = useYDoc(noteId);
 	const whenLoaded = useYDocLoaded(noteId);
@@ -323,6 +328,7 @@ export function Editor({
 							<MediaInspectorPlugin />
 							<AddPropertyMenuPlugin />
 							{editorHandleRef && <EditorHandlePlugin handleRef={editorHandleRef} />}
+							{onOutlineChange && <OutlinePlugin onChange={onOutlineChange} />}
 							<EmojiTypeaheadPlugin />
 							<FormatChordsPlugin />
 							<InlineToolbarPlugin />

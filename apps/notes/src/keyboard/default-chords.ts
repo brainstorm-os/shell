@@ -22,6 +22,7 @@ export const DEFAULT_CHORDS: Readonly<Record<ActionId, readonly string[]>> = {
 	[ActionId.DeleteSelectedBlocks]: ["Backspace", "Delete"],
 	[ActionId.ToggleSidebar]: ["Mod+\\"],
 	[ActionId.ToggleProperties]: ["Mod+Shift+\\"],
+	[ActionId.ToggleOutline]: ["Mod+Alt+o"],
 	[ActionId.ToggleNoteLock]: ["Mod+Alt+l"],
 	[ActionId.CloseIconPicker]: ["Escape"],
 	[ActionId.CloseActionMenu]: ["Escape"],

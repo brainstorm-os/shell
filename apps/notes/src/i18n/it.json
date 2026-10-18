@@ -411,5 +411,13 @@
   "notes.transclusion.lockedHint": "La pagina di origine è bloccata: sbloccala per modificarla qui",
   "notes.transclusion.editingBadge": "Modifica della pagina di origine",
   "notes.action.turnIntoPage.label": "Pagina",
-  "notes.action.turnIntoPage.description": "Sposta questi blocchi in una nuova sottopagina"
+  "notes.action.turnIntoPage.description": "Sposta questi blocchi in una nuova sottopagina",
+  "notes.outline.show": "Mostra struttura",
+  "notes.outline.hide": "Nascondi struttura",
+  "notes.outline.region": "Struttura",
+  "notes.outline.list": "Intestazioni di questa nota",
+  "notes.outline.emptyTitle": "Ancora nessuna intestazione",
+  "notes.outline.emptyHint": "Aggiungi intestazioni a questa nota per costruirne la struttura.",
+  "notes.outline.noNoteTitle": "Nessuna nota aperta",
+  "notes.outline.noNoteHint": "Apri una nota per vederne la struttura."
 }

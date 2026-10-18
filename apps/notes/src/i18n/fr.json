@@ -411,5 +411,13 @@
   "notes.transclusion.lockedHint": "La page source est verrouillée — déverrouillez-la pour la modifier ici",
   "notes.transclusion.editingBadge": "Modification de la page source",
   "notes.action.turnIntoPage.label": "Page",
-  "notes.action.turnIntoPage.description": "Déplacer ces blocs dans une nouvelle sous-page"
+  "notes.action.turnIntoPage.description": "Déplacer ces blocs dans une nouvelle sous-page",
+  "notes.outline.show": "Afficher le plan",
+  "notes.outline.hide": "Masquer le plan",
+  "notes.outline.region": "Plan",
+  "notes.outline.list": "Titres de cette note",
+  "notes.outline.emptyTitle": "Aucun titre pour l’instant",
+  "notes.outline.emptyHint": "Ajoutez des titres à cette note pour construire son plan.",
+  "notes.outline.noNoteTitle": "Aucune note ouverte",
+  "notes.outline.noNoteHint": "Ouvrez une note pour voir son plan."
 }
