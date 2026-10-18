@@ -45,6 +45,10 @@ function safeUrl(raw: string): string | null {
 	return escapeHtml(url);
 }
 
+function clampPercent(value: number): number {
+	return Number.isFinite(value) ? Math.min(100, Math.max(10, Math.round(value))) : 100;
+}
+
 function renderText(node: SerializedNode): string {
 	const text = str(node.text);
 	if (text === "") return "";
@@ -100,6 +104,25 @@ function renderNode(node: SerializedNode): string {
 			const caption = str(node.caption);
 			const fig = `<img src="${src}" alt="${alt}" />`;
 			return caption ? `<figure>${fig}<figcaption>${escapeHtml(caption)}</figcaption></figure>` : fig;
+		}
+		case "image-block": {
+			const src = safeUrl(str(node.src));
+			if (!src) return "";
+			const alt = escapeHtml(str(node.alt));
+			const width = typeof node.widthPercent === "number" ? clampPercent(node.widthPercent) : 100;
+			const style = width < 100 ? ` style="width:${width}%"` : "";
+			const caption = str(node.caption);
+			const fig = `<img src="${src}" alt="${alt}"${style} />`;
+			return `<figure>${fig}${caption ? `<figcaption>${escapeHtml(caption)}</figcaption>` : ""}</figure>`;
+		}
+		case "inline-image": {
+			const src = safeUrl(str(node.src));
+			if (!src) return "";
+			const height =
+				typeof node.heightEm === "number" && Number.isFinite(node.heightEm)
+					? Math.min(4, Math.max(0.75, node.heightEm))
+					: 1.25;
+			return `<img src="${src}" alt="${escapeHtml(str(node.alt))}" style="height:${height}em;vertical-align:text-bottom" />`;
 		}
 		default:
 			// Unknown / decorator nodes (mentions, embeds, equations…) have no

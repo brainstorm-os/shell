@@ -451,6 +451,7 @@
 }
 
 .notes__image {
+	position: relative;
 	margin: 0;
 	display: flex;
 	flex-direction: column;
@@ -488,6 +489,43 @@
 	display: block;
 	object-fit: contain;
 	background: var(--bg-elev);
+}
+
+/* Trailing-edge resize grip (B11.28) — revealed on hover / while dragging;
+   pointer-only, the inspector's width slider is the keyboard path. */
+.notes__image-resize {
+	position: absolute;
+	top: 50%;
+	inset-inline-end: calc(-1 * var(--space-1));
+	width: 6px;
+	height: 40px;
+	max-height: 60%;
+	transform: translateY(-50%);
+	border-radius: var(--radius-full);
+	background: var(--color-border-strong);
+	cursor: ew-resize;
+	opacity: 0;
+	touch-action: none;
+	transition: opacity 80ms ease;
+}
+
+.notes__image:hover .notes__image-resize,
+.notes__image-resize:active {
+	opacity: 1;
+}
+
+/* Inline image (B11.28) — sits on the text baseline, sized in em by the node. */
+.bs-inline-image-host {
+	display: inline;
+}
+
+.bs-inline-image {
+	display: inline-block;
+	width: auto;
+	max-width: 100%;
+	vertical-align: text-bottom;
+	border-radius: var(--radius-sm);
+	object-fit: contain;
 }
 
 .notes__media-edit-button {

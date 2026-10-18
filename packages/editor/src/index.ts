@@ -295,6 +295,22 @@ export {
 	type SerializedImageBlockNode,
 } from "./nodes/image-block-node";
 export {
+	$createInlineImageNode,
+	$isInlineImageNode,
+	DEFAULT_INLINE_IMAGE_HEIGHT_EM,
+	INLINE_IMAGE_TYPE,
+	InlineImageNode,
+	type SerializedInlineImageNode,
+} from "./nodes/inline-image-node";
+export {
+	VaultMediaFilter,
+	type VaultMedia,
+	filterVaultMedia,
+	isImageMime,
+	vaultMediaFromEntity,
+} from "./vault-media";
+export { openVaultMediaPicker, type VaultMediaPick } from "./vault-media-picker";
+export {
 	$createVideoBlockNode,
 	$isVideoBlockNode,
 	VIDEO_BLOCK_TYPE,

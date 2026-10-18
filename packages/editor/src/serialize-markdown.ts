@@ -38,6 +38,10 @@ function renderInline(nodes: SerializedNode[]): string {
 				return url ? `[${label}](${url})` : label;
 			}
 			if (type === "linebreak") return "  \n"; // Markdown hard break
+			if (type === "inline-image") {
+				const src = str(node.src);
+				return src ? `![${str(node.alt)}](${src})` : str(node.alt);
+			}
 			if (type === "text" || type === "code-highlight") {
 				const text = str(node.text);
 				if (text === "") return "";
@@ -91,6 +95,12 @@ function renderBlock(node: SerializedNode): string {
 		case "image": {
 			const src = str(node.src);
 			return src ? `![${str(node.altText)}](${src})` : "";
+		}
+		case "image-block": {
+			const src = str(node.src);
+			if (!src) return "";
+			const caption = str(node.caption);
+			return `![${str(node.alt)}](${src})${caption ? `\n\n*${caption}*` : ""}`;
 		}
 		case "horizontalrule":
 			return "---";

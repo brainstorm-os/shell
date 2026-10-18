@@ -10,7 +10,18 @@
  * `createStandardBlockCommands`.
  */
 
-import { $getRoot, $getSelection, $isRangeSelection, type LexicalEditor } from "lexical";
+import {
+	$getNodeByKey,
+	$getRoot,
+	$getSelection,
+	$insertNodes,
+	$isParagraphNode,
+	$isRangeSelection,
+	$setSelection,
+	type LexicalEditor,
+	type LexicalNode,
+	type NodeKey,
+} from "lexical";
 import { type BlockCommand, CommandCategory } from "./block-command";
 import type { EditorT } from "./i18n";
 import { AudioIcon, FileIcon, ImageIcon, VideoIcon } from "./icons";
@@ -18,15 +29,21 @@ import { MediaFileKind, resolveBinarySrc, resolveImageSrc, tryUploadFile } from 
 import { $createAudioBlockNode } from "./nodes/audio-block-node";
 import { $createFileBlockNode } from "./nodes/file-block-node";
 import { $createImageBlockNode } from "./nodes/image-block-node";
+import { $createInlineImageNode } from "./nodes/inline-image-node";
 import { $createVideoBlockNode } from "./nodes/video-block-node";
+import { VaultMediaFilter, isImageMime } from "./vault-media";
+import { type VaultMediaPick, openVaultMediaPicker } from "./vault-media-picker";
 
 /** Slash-menu ids for the media commands, in display order — so a host
  *  that curates its slash palette can include them explicitly. */
 export const MEDIA_COMMAND_IDS: readonly string[] = [
 	"block.media.image",
+	"block.media.image.vault",
+	"block.media.image.inline",
 	"block.media.video",
 	"block.media.audio",
 	"block.media.file",
+	"block.media.file.vault",
 ];
 
 export function createMediaBlockCommands(t: EditorT): readonly BlockCommand[] {
@@ -40,6 +57,40 @@ export function createMediaBlockCommands(t: EditorT): readonly BlockCommand[] {
 			keywords: ["image", "photo", "picture", "img", "media"],
 			run: ({ editor }) => {
 				insertImageViaPicker(editor);
+			},
+		},
+		{
+			id: "block.media.image.vault",
+			category: CommandCategory.Media,
+			label: t("editor.media.imageFromVault"),
+			description: t("editor.media.imageFromVault.description"),
+			icon: <ImageIcon />,
+			keywords: ["image", "vault", "existing", "library", "reuse", "photo", "media"],
+			run: ({ editor }) => {
+				setTimeout(
+					() =>
+						openVaultMediaPicker(editor, VaultMediaFilter.Image, t, (pick) =>
+							insertVaultMedia(editor, pick),
+						),
+					0,
+				);
+			},
+		},
+		{
+			id: "block.media.image.inline",
+			category: CommandCategory.Media,
+			label: t("editor.media.inlineImage"),
+			description: t("editor.media.inlineImage.description"),
+			icon: <ImageIcon />,
+			keywords: ["inline", "image", "icon", "emoji", "logo", "vault", "media"],
+			run: ({ editor }) => {
+				setTimeout(
+					() =>
+						openVaultMediaPicker(editor, VaultMediaFilter.Image, t, (pick) =>
+							insertInlineImage(editor, pick),
+						),
+					0,
+				);
 			},
 		},
 		{
@@ -75,6 +126,23 @@ export function createMediaBlockCommands(t: EditorT): readonly BlockCommand[] {
 				pickFile(editor, "", (e, file) => insertBinaryBlock(e, file, MediaFileKind.File));
 			},
 		},
+		{
+			id: "block.media.file.vault",
+			category: CommandCategory.Media,
+			label: t("editor.media.fileFromVault"),
+			description: t("editor.media.fileFromVault.description"),
+			icon: <FileIcon />,
+			keywords: ["file", "vault", "existing", "library", "attachment", "reuse"],
+			run: ({ editor }) => {
+				setTimeout(
+					() =>
+						openVaultMediaPicker(editor, VaultMediaFilter.Any, t, (pick) =>
+							insertVaultMedia(editor, pick),
+						),
+					0,
+				);
+			},
+		},
 	];
 }
 
@@ -93,23 +161,7 @@ function insertImageViaPicker(editor: LexicalEditor): void {
 async function insertImageFile(editor: LexicalEditor, file: File): Promise<void> {
 	const src = await resolveImageSrc(file);
 	if (!src) return;
-	editor.update(
-		() => {
-			const sel = $getSelection();
-			const block = $createImageBlockNode(src, file.name);
-			if ($isRangeSelection(sel)) {
-				const anchor = sel.anchor.getNode();
-				try {
-					anchor.getTopLevelElementOrThrow().replace(block);
-					return;
-				} catch {
-					// fall through to root append
-				}
-			}
-			$getRoot().append(block);
-		},
-		{ discrete: true },
-	);
+	editor.update(() => $placeMediaBlock($createImageBlockNode(src, file.name)), { discrete: true });
 }
 
 function insertVideoViaPicker(editor: LexicalEditor): void {
@@ -132,23 +184,7 @@ async function insertVideoFile(editor: LexicalEditor, file: File): Promise<void>
 		);
 		return;
 	}
-	editor.update(
-		() => {
-			const sel = $getSelection();
-			const block = $createVideoBlockNode(url, file.type);
-			if ($isRangeSelection(sel)) {
-				const anchor = sel.anchor.getNode();
-				try {
-					anchor.getTopLevelElementOrThrow().replace(block);
-					return;
-				} catch {
-					// fall through
-				}
-			}
-			$getRoot().append(block);
-		},
-		{ discrete: true },
-	);
+	editor.update(() => $placeMediaBlock($createVideoBlockNode(url, file.type)), { discrete: true });
 }
 
 function pickFile(
@@ -174,22 +210,66 @@ async function insertBinaryBlock(
 	const src = await resolveBinarySrc(file);
 	if (!src) return;
 	editor.update(
-		() => {
-			const block =
+		() =>
+			$placeMediaBlock(
 				kind === MediaFileKind.Audio
 					? $createAudioBlockNode(src, file.type, file.name)
-					: $createFileBlockNode(src, file.name, file.size, file.type);
-			const sel = $getSelection();
-			if ($isRangeSelection(sel)) {
-				const anchor = sel.anchor.getNode();
-				try {
-					anchor.getTopLevelElementOrThrow().replace(block);
-					return;
-				} catch {
-					// fall through to root append
-				}
+					: $createFileBlockNode(src, file.name, file.size, file.type),
+			),
+		{ discrete: true },
+	);
+}
+
+/** Put a media block where the user asked for it: in place of the caret's
+ *  block (the slash command's emptied paragraph), or after `blockKey` when
+ *  that block still holds content, else at the end of the document. */
+export function $placeMediaBlock(block: LexicalNode, blockKey: NodeKey | null = null): void {
+	const target = blockKey
+		? $getNodeByKey(blockKey)
+		: (() => {
+				const sel = $getSelection();
+				return $isRangeSelection(sel) ? sel.anchor.getNode().getTopLevelElement() : null;
+			})();
+	if (target && blockKey && !($isParagraphNode(target) && target.getTextContentSize() === 0)) {
+		target.insertAfter(block);
+		return;
+	}
+	if (target) {
+		target.replace(block);
+		return;
+	}
+	$getRoot().append(block);
+}
+
+function insertVaultMedia(editor: LexicalEditor, { media, blockKey }: VaultMediaPick): void {
+	editor.update(
+		() => {
+			const block = isImageMime(media.mime)
+				? $createImageBlockNode(media.url, media.name)
+				: media.mime.startsWith("video/")
+					? $createVideoBlockNode(media.url, media.mime)
+					: media.mime.startsWith("audio/")
+						? $createAudioBlockNode(media.url, media.mime, media.name)
+						: $createFileBlockNode(media.url, media.name, media.size ?? 0, media.mime);
+			$placeMediaBlock(block, blockKey);
+		},
+		{ discrete: true },
+	);
+}
+
+function insertInlineImage(editor: LexicalEditor, { media, selection }: VaultMediaPick): void {
+	editor.update(
+		() => {
+			const restored = selection?.clone() ?? null;
+			if (
+				$isRangeSelection(restored) &&
+				$getNodeByKey(restored.anchor.key) &&
+				$getNodeByKey(restored.focus.key)
+			) {
+				$setSelection(restored);
 			}
-			$getRoot().append(block);
+			if (!$isRangeSelection($getSelection())) $getRoot().selectEnd();
+			$insertNodes([$createInlineImageNode(media.url, media.name)]);
 		},
 		{ discrete: true },
 	);
