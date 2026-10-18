@@ -51,8 +51,9 @@ describe("apps/journal/manifest.json", () => {
 	it("quick capture (9.16.14) files into a collection with the two narrow writes it needs, no wider", () => {
 		// A `#collection` capture mints a generic Object (the shared
 		// `decideRowCreate` member type for a manual collection) and pins it
-		// into the List's manual members. Typed lists (Tasks, Notes…) are NOT
-		// offered — Journal holds no write for their types.
+		// into the List's manual members. A typed list is offered only for a
+		// type Journal can write: Task/v1 (granted for `/task`, B11.24), never
+		// Notes or other apps' types.
 		const result = validateManifest(readManifest());
 		if (!result.ok) throw new Error(result.reason);
 		const caps = result.manifest.capabilities;
@@ -62,6 +63,7 @@ describe("apps/journal/manifest.json", () => {
 			"entities.write:brainstorm/Comment/v1",
 			"entities.write:brainstorm/List/v1",
 			"entities.write:brainstorm/Object/v1",
+			"entities.write:brainstorm/Task/v1",
 			"entities.write:io.brainstorm.journal/Entry/v1",
 		]);
 	});
