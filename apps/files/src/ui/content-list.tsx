@@ -26,6 +26,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { dragItemsForEntry } from "../logic/drag-items";
+import { hasActiveFilters } from "../logic/filters";
 import {
 	DEFAULT_LIST_COLUMNS,
 	LIST_COLUMN_WIDTH,
@@ -398,7 +399,29 @@ export function ContentList({
 	);
 
 	if (rows.length === 0) {
-		const searching = store.searchQuery.trim() !== "";
+		const filtered = hasActiveFilters(store.filters);
+		const searching = !store.duplicatesActive && store.searchQuery.trim() !== "";
+		const empty = store.duplicatesActive
+			? {
+					icon: IconName.Copy,
+					title: t("brainstorm.files.duplicates.emptyTitle"),
+					hint: filtered
+						? t("brainstorm.files.filter.emptyBody")
+						: t("brainstorm.files.duplicates.emptyBody"),
+				}
+			: searching
+				? {
+						icon: IconName.Search,
+						title: t("brainstorm.files.empty.searchTitle"),
+						hint: t("brainstorm.files.empty.searchBody", { query: store.searchQuery }),
+					}
+				: filtered
+					? {
+							icon: IconName.Search,
+							title: t("brainstorm.files.filter.emptyTitle"),
+							hint: t("brainstorm.files.filter.emptyBody"),
+						}
+					: null;
 		return (
 			<div
 				className="content-empty"
@@ -409,31 +432,45 @@ export function ContentList({
 				onDragLeave={onOsDragLeave}
 				onDrop={onOsDrop}
 			>
-				<EmptyState
-					icon={searching ? IconName.Search : IconName.Folder}
-					title={searching ? t("brainstorm.files.empty.searchTitle") : t("brainstorm.files.empty.title")}
-					hint={
-						searching
-							? t("brainstorm.files.empty.searchBody", { query: store.searchQuery })
-							: t("brainstorm.files.empty.body")
-					}
-					{...(searching
-						? {}
-						: {
-								action: (
-									<button
-										type="button"
-										className="bs-btn"
-										data-bs-primary=""
-										data-testid="content-empty-new-folder"
-										onClick={store.newFolder}
-									>
-										<Icon name={IconName.Plus} size={15} />
-										{t("brainstorm.files.empty.newFolder")}
-									</button>
-								),
-							})}
-				/>
+				{empty ? (
+					<EmptyState
+						icon={empty.icon}
+						title={empty.title}
+						hint={empty.hint}
+						{...(filtered
+							? {
+									action: (
+										<button
+											type="button"
+											className="bs-btn"
+											data-testid="content-empty-clear-filters"
+											onClick={store.clearFilters}
+										>
+											{t("brainstorm.files.filter.clear")}
+										</button>
+									),
+								}
+							: {})}
+					/>
+				) : (
+					<EmptyState
+						icon={IconName.Folder}
+						title={t("brainstorm.files.empty.title")}
+						hint={t("brainstorm.files.empty.body")}
+						action={
+							<button
+								type="button"
+								className="bs-btn"
+								data-bs-primary=""
+								data-testid="content-empty-new-folder"
+								onClick={store.newFolder}
+							>
+								<Icon name={IconName.Plus} size={15} />
+								{t("brainstorm.files.empty.newFolder")}
+							</button>
+						}
+					/>
+				)}
 			</div>
 		);
 	}
