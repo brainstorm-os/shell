@@ -90,6 +90,9 @@ export enum ListViewKind {
 	Board = "board",
 	Calendar = "calendar",
 	Timeline = "timeline",
+	/** Chart (9.12.30) — the group-by × aggregation engine drawn as a bar /
+	 *  line / pie chart or a single number. */
+	Chart = "chart",
 }
 
 export enum SortDirection {
@@ -158,7 +161,22 @@ export type ColumnSpec = {
 	 *  `AggregationKind` value (a plain string, same rationale as
 	 *  `ColumnRollup.aggregation`). Absent → the column's type default. */
 	aggregation?: string;
+	/** Per-VIEW short label (9.12.29) — renames the column header in this view
+	 *  only; the property's catalog name is untouched. */
+	label?: string;
+	/** Compact header (9.12.29): the property-kind glyph instead of the label
+	 *  (the label stays the accessible name + tooltip). */
+	iconOnly?: boolean;
+	/** Per-column text-wrap override (9.12.29). Absent → the view's Wrap
+	 *  setting. */
+	wrap?: ColumnWrap;
 };
+
+/** A column's text-wrap override (9.12.29). */
+export enum ColumnWrap {
+	Wrap = "wrap",
+	NoWrap = "no-wrap",
+}
 
 /** Per-kind layout option shapes. Discriminated by `ListView.kind`.
  *
@@ -182,11 +200,33 @@ export type ListLayoutOptions = {
 	showIcon: boolean;
 };
 
+/** Where a gallery card's cover comes from (9.12.31). `Default` keeps the
+ *  existing rule (the view's cover property, else the object's own cover). */
+export enum GalleryCoverSource {
+	Default = "default",
+	/** The first image in the object's body. */
+	FirstMedia = "first-media",
+	/** No cover band at all in this view. */
+	None = "none",
+}
+
 export type GalleryLayoutOptions = {
 	thumbnailSize: "small" | "medium" | "large";
 	cardAspectRatio: "square" | "video" | "portrait";
 	showFilename: boolean;
+	coverSource?: GalleryCoverSource;
+	/** Hide the field names on cards — values only (9.12.31). */
+	hideFieldLabels?: boolean;
 };
+
+/** How a grouped view orders its groups (9.12.28). `Default` = the group
+ *  property's option rank, then any manual `groupOrder`; the count modes
+ *  sort by how many items each group holds and ignore `groupOrder`. */
+export enum GroupOrderMode {
+	Default = "default",
+	CountDesc = "count-desc",
+	CountAsc = "count-asc",
+}
 
 export type BoardLayoutOptions = {
 	columnWidth: number;
@@ -196,6 +236,17 @@ export type BoardLayoutOptions = {
 	 *  null / "Uncategorized" group). Keys not listed render after, in
 	 *  data order; unknown keys are ignored. Absent → pure data order. */
 	groupOrder?: string[];
+	/** Horizontal swimlanes (9.12.28): a second property splitting the board
+	 *  into rows; each lane holds the full set of columns. Absent / null → one
+	 *  unlaned board. */
+	swimlaneBy?: string | null;
+	/** Group ordering mode (9.12.28). Absent → `GroupOrderMode.Default`. */
+	groupOrderMode?: GroupOrderMode;
+	/** Column group keys rendered collapsed (same `""` null-key wire form as
+	 *  `groupOrder`). */
+	collapsedGroups?: string[];
+	/** Swimlane keys rendered collapsed. */
+	collapsedLanes?: string[];
 };
 
 export enum CalendarRange {
@@ -263,7 +314,27 @@ export type TimelineLayoutOptions = {
 	labelProperty: string | null;
 };
 
+/** Chart form (9.12.30). */
+export enum ChartType {
+	Bar = "bar",
+	Line = "line",
+	Pie = "pie",
+	Number = "number",
+}
+
+export type ChartLayoutOptions = {
+	chartType: ChartType;
+	/** An `AggregationKind` value (plain string, same rationale as
+	 *  `ColumnSpec.aggregation`). `countAll` needs no `valueProperty`. */
+	aggregation: string;
+	/** The property the aggregation reduces; null for a row count. */
+	valueProperty: string | null;
+	/** Render the accessible data table instead of the plot. */
+	showTable?: boolean;
+};
+
 export type LayoutOptions =
+	| ChartLayoutOptions
 	| GridLayoutOptions
 	| ListLayoutOptions
 	| GalleryLayoutOptions

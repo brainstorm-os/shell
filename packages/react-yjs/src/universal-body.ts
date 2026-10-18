@@ -23,6 +23,7 @@ import { useMemo } from "react";
 import * as Y from "yjs";
 import { UNIVERSAL_BODY_FRAGMENT_NAME } from "./brainstorm-types";
 import { useYXmlText } from "./hooks";
+import { b64ToBytes } from "./resolver-accessor";
 
 /**
  * Resolve the universal body `Y.XmlText` on `doc`. Yjs caches the root
@@ -69,4 +70,68 @@ export function useUniversalBody(doc: Y.Doc): Y.XmlText {
 	const body = useMemo(() => getUniversalBody(doc), [doc]);
 	useYXmlText(body);
 	return body;
+}
+
+/** What a body's first media block is (9.12.31 gallery "first media" cover). */
+export enum BodyMediaKind {
+	Image = "image",
+	Video = "video",
+	Embed = "embed",
+}
+
+export type BodyMedia = { kind: BodyMediaKind; url: string };
+
+/** Decorator-node `__type`s the gallery treats as media, with the attribute
+ *  carrying each one's URL. Mirrors the editor's node type constants
+ *  (`image-block`, `video-block`, `web-embed`) — kept here as data so this
+ *  package takes no editor dependency. */
+const MEDIA_NODES: ReadonlyArray<[string, BodyMediaKind, string]> = [
+	["image-block", BodyMediaKind.Image, "__src"],
+	["video-block", BodyMediaKind.Video, "__src"],
+	["web-embed", BodyMediaKind.Embed, "__embedUrl"],
+];
+
+const MAX_MEDIA_WALK = 2000;
+
+/**
+ * The first image / video / embed in a doc's universal body, in document
+ * order, read straight off the `@lexical/yjs` encoding (decorator nodes are
+ * `Y.XmlElement`s whose attributes are the node's `__` fields) — no editor
+ * is mounted. Bounded walk so a huge body never stalls a gallery paint.
+ */
+export function firstBodyMedia(doc: Y.Doc): BodyMedia | null {
+	const stack: Y.XmlText[] = [getUniversalBody(doc)];
+	let visited = 0;
+	while (stack.length > 0 && visited < MAX_MEDIA_WALK) {
+		const node = stack.shift() as Y.XmlText;
+		const nested: Y.XmlText[] = [];
+		for (const op of node.toDelta() as Array<{ insert?: unknown }>) {
+			visited += 1;
+			const insert = op.insert;
+			if (insert instanceof Y.XmlElement) {
+				const type = insert.getAttribute("__type");
+				const spec = MEDIA_NODES.find(([t]) => t === type);
+				const url = spec ? insert.getAttribute(spec[2]) : undefined;
+				if (spec && typeof url === "string" && url.length > 0) return { kind: spec[1], url };
+			} else if (insert instanceof Y.XmlText) {
+				nested.push(insert);
+			}
+		}
+		stack.unshift(...nested);
+	}
+	return null;
+}
+
+/** `firstBodyMedia` over a base64 Y.Doc state update (the `entities.loadDoc`
+ *  transport shape) — decodes into a throwaway doc and destroys it. */
+export function firstBodyMediaFromUpdate(updateB64: string): BodyMedia | null {
+	const doc = new Y.Doc();
+	try {
+		Y.applyUpdate(doc, b64ToBytes(updateB64));
+		return firstBodyMedia(doc);
+	} catch {
+		return null;
+	} finally {
+		doc.destroy();
+	}
 }

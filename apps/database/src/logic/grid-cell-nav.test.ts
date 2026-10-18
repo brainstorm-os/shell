@@ -74,4 +74,9 @@ describe("cellActivationOpensRecord", () => {
 		expect(cellActivationOpensRecord(2, columns)).toBe(false); // row 0, col 2
 		expect(cellActivationOpensRecord(5, columns)).toBe(false); // row 1, col 2
 	});
+
+	it("follows the Name column when the view moved it (9.12.29)", () => {
+		expect(cellActivationOpensRecord(2, 3, 2)).toBe(true);
+		expect(cellActivationOpensRecord(0, 3, 2)).toBe(false);
+	});
 });

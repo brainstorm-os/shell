@@ -23,6 +23,7 @@ export {
 	parseNaturalDate,
 	parseNumberInput,
 	parseScalar,
+	withUnit,
 } from "./property-ui/cells/format";
 export {
 	DICTIONARY_SORT_ORDER,

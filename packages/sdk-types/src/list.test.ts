@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	CalendarRange,
 	CalendarWeekStart,
+	ChartType,
 	CompositeOp,
 	EmptyPlacement,
 	IconKind,
@@ -27,7 +28,7 @@ describe("list/source/view enums (wire format — values ARE the on-disk strings
 		expect(ListSourceKind.Composite).toBe("composite");
 	});
 
-	it("ListViewKind maps to the six canonical kinds", () => {
+	it("ListViewKind maps to the seven canonical kinds", () => {
 		expect(Object.values(ListViewKind)).toEqual([
 			"grid",
 			"list",
@@ -35,6 +36,7 @@ describe("list/source/view enums (wire format — values ARE the on-disk strings
 			"board",
 			"calendar",
 			"timeline",
+			"chart",
 		]);
 	});
 
@@ -105,6 +107,7 @@ describe("canonical List / ListSource / ListView shapes", () => {
 
 	it("every ListViewKind has a constructible LayoutOptions member", () => {
 		const layouts: Record<ListViewKind, LayoutOptions> = {
+			[ListViewKind.Chart]: { chartType: ChartType.Bar, aggregation: "countAll", valueProperty: null },
 			[ListViewKind.Grid]: {
 				rowHeight: "comfortable",
 				showRowNumbers: false,
@@ -141,7 +144,7 @@ describe("canonical List / ListSource / ListView shapes", () => {
 				labelProperty: "name",
 			},
 		};
-		expect(Object.keys(layouts)).toHaveLength(6);
+		expect(Object.keys(layouts)).toHaveLength(7);
 	});
 
 	it("supports the composite + by-link + by-vocabulary source variants", () => {

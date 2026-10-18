@@ -283,12 +283,17 @@ export enum ViewCoverMode {
 	/** The user explicitly chose "no cover" for this view — omit the
 	 *  band for this view only (NOT the seeded gradient). */
 	None = "none",
+	/** The first image in the object's body (9.12.31). The caller derives
+	 *  `mediaUrl` (no editor mounted); absent / not a local `brainstorm:`
+	 *  image → the object's own cover. */
+	FirstMedia = "first-media",
 }
 
 export type CoverViewSource =
 	| { mode: ViewCoverMode.Inherit }
 	| { mode: ViewCoverMode.Property; key: string }
-	| { mode: ViewCoverMode.None };
+	| { mode: ViewCoverMode.None }
+	| { mode: ViewCoverMode.FirstMedia; mediaUrl: string | null };
 
 /**
  * Per-view cover resolution — the typed primitive for OQ-COV-1 (2)'s
@@ -313,6 +318,13 @@ export function resolveCoverForView(
 	if (source.mode === ViewCoverMode.None) return { kind: CoverRenderKind.Suppressed };
 	if (source.mode === ViewCoverMode.Property) {
 		return resolveCoverBackground(subject, parseCover(subject.properties?.[source.key]));
+	}
+	if (source.mode === ViewCoverMode.FirstMedia) {
+		// `parseCover` is the one chokepoint that admits only local
+		// `brainstorm:` images, so a remote body image can never become a
+		// background egress beacon here either.
+		const media = parseCover({ kind: CoverKind.Image, value: source.mediaUrl ?? "" });
+		return resolveCoverBackground(subject, media ?? coverOf(subject));
 	}
 	return resolveCoverBackground(subject);
 }

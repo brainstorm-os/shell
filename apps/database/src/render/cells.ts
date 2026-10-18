@@ -307,10 +307,16 @@ function truncateForTitle(text: string): string {
  *  override, or the id-seeded gradient. The ONE precedence rule lives in
  *  the SDK's `resolveCoverForView` (per-object-covers-everywhere — never
  *  a per-app cover rule, never keyed off `entity.type`). */
-export function coverBackgroundFor(entity: EntityRow, coverProperty: string | null): string {
-	const source: CoverViewSource = coverProperty
-		? { mode: ViewCoverMode.Property, key: coverProperty }
-		: { mode: ViewCoverMode.Inherit };
+export function coverBackgroundFor(
+	entity: EntityRow,
+	coverProperty: string | null,
+	firstMedia?: { mediaUrl: string | null },
+): string {
+	const source: CoverViewSource = firstMedia
+		? { mode: ViewCoverMode.FirstMedia, mediaUrl: firstMedia.mediaUrl }
+		: coverProperty
+			? { mode: ViewCoverMode.Property, key: coverProperty }
+			: { mode: ViewCoverMode.Inherit };
 	const r = resolveCoverForView({ id: entity.id, properties: entity.properties }, source);
 	if (r.kind === CoverRenderKind.Paint) return r.css;
 	if (r.kind === CoverRenderKind.Image) {

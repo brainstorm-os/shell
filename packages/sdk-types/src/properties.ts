@@ -25,8 +25,9 @@ import type { Icon } from "./index";
 // ─── Base value types + modifier value enums ──────────────────────────────────
 
 /** The six base value types. Anything else collapses into these via
- *  modifiers. Immutable post-creation — changing valueType would
- *  invalidate every bound value across the vault. */
+ *  modifiers. Never flipped in place: a type change goes through the
+ *  Database change-type flow (9.12.33), which previews and converts every
+ *  bound value before the def changes. */
 export enum ValueType {
 	Text = "text",
 	Number = "number",
@@ -208,6 +209,9 @@ export type PropertyDef = {
 	/** ISO-4217 currency code (e.g. "USD") for `number + format=currency`.
 	 *  Defaulted to "USD" by the formatter when unset. */
 	currency?: string;
+	/** Free-text unit suffix for a plain `number` (9.12.33) — "kg", "km/h",
+	 *  "pts". Display only; the stored value stays a bare number. */
+	unit?: string;
 	/** Arithmetic expression over the entity's other properties (keys in
 	 *  `{braces}`, e.g. `{qty} * {rate}`). Applies to `number + format=formula`;
 	 *  evaluated read-only per entity via `@brainstorm-os/sdk/formula`. */

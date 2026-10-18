@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 // @vitest-environment jsdom
 import { UNIVERSAL_BODY_FRAGMENT_NAME } from "./brainstorm-types";
-import { getUniversalBody, useUniversalBody } from "./universal-body";
+import { bytesToB64 } from "./resolver-accessor";
+import {
+	BodyMediaKind,
+	firstBodyMedia,
+	firstBodyMediaFromUpdate,
+	getUniversalBody,
+	useUniversalBody,
+} from "./universal-body";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -130,5 +137,52 @@ describe("useUniversalBody", () => {
 		expect(container.textContent).toBe("1");
 		// All renders observed the same root instance.
 		expect(new Set(seen).size).toBe(1);
+	});
+});
+
+describe("firstBodyMedia (9.12.31)", () => {
+	function bodyWith(...nodes: Array<[string, Record<string, string>]>): Y.Doc {
+		const doc = new Y.Doc();
+		const root = getUniversalBody(doc);
+		const para = new Y.XmlText();
+		root.insertEmbed(0, para);
+		nodes.forEach(([type, attrs], i) => {
+			const el = new Y.XmlElement();
+			el.setAttribute("__type", type);
+			for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+			root.insertEmbed(i + 1, el);
+		});
+		return doc;
+	}
+
+	it("returns the first media block in document order", () => {
+		const doc = bodyWith(
+			["bookmark", { __url: "https://x.test" }],
+			["image-block", { __src: "brainstorm://a.png" }],
+			["web-embed", { __embedUrl: "https://e.test" }],
+		);
+		expect(firstBodyMedia(doc)).toEqual({ kind: BodyMediaKind.Image, url: "brainstorm://a.png" });
+	});
+
+	it("finds media nested inside an element node and round-trips an update", () => {
+		const doc = new Y.Doc();
+		const root = getUniversalBody(doc);
+		const callout = new Y.XmlText();
+		root.insertEmbed(0, callout);
+		const el = new Y.XmlElement();
+		el.setAttribute("__type", "web-embed");
+		el.setAttribute("__embedUrl", "https://e.test/v");
+		callout.insertEmbed(0, el);
+		expect(firstBodyMedia(doc)?.kind).toBe(BodyMediaKind.Embed);
+		const b64 = bytesToB64(Y.encodeStateAsUpdate(doc));
+		expect(firstBodyMediaFromUpdate(b64)).toEqual({
+			kind: BodyMediaKind.Embed,
+			url: "https://e.test/v",
+		});
+	});
+
+	it("is null for an empty body or a bad update", () => {
+		expect(firstBodyMedia(new Y.Doc())).toBeNull();
+		expect(firstBodyMediaFromUpdate("!!!")).toBeNull();
 	});
 });

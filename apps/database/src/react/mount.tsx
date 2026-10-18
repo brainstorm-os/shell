@@ -51,14 +51,26 @@ export function mountInspectorProps(host: HTMLElement, element: ReactElement): v
  *  body when more than one entity is selected. Pulled out of `app.ts`'s
  *  imperative `renderSelectionBar` unchanged in markup / behavior. */
 export function SelectionBar({
-	count,
+	countLabel,
 	clearLabel,
 	onClear,
-}: { count: number; clearLabel: string; onClear: () => void }): ReactElement {
+	actions,
+}: SelectionProps): ReactElement {
 	return (
 		<div className="db-selection-bar">
-			{/* Database scaffold has no app-side `t()` yet; moves behind `createT` with `clearLabel` when Database adopts SDK i18n. i18n-exempt */}
-			<span className="db-selection-bar__count">{count} selected</span>
+			<span className="db-selection-bar__count">{countLabel}</span>
+			{(actions ?? []).map((action) => (
+				<button
+					key={action.id}
+					type="button"
+					className="bs-btn bs-btn--secondary bs-btn--sm db-selection-bar__action"
+					data-testid={`db-selection-${action.id}`}
+					{...(action.opensMenu ? { "aria-haspopup": "menu" as const } : {})}
+					onClick={(event) => action.onClick(event.currentTarget)}
+				>
+					{action.label}
+				</button>
+			))}
 			<button
 				type="button"
 				className="bs-btn bs-btn--secondary bs-btn--sm db-selection-bar__clear"
@@ -87,17 +99,13 @@ export function ActiveBody({
 	selection,
 	children,
 }: {
-	selection: { count: number; clearLabel: string; onClear: () => void } | null;
+	selection: SelectionProps | null;
 	children?: ReactNode;
 }): ReactElement {
 	return (
 		<>
-			{selection && selection.count > 1 ? (
-				<SelectionBar
-					count={selection.count}
-					clearLabel={selection.clearLabel}
-					onClear={selection.onClear}
-				/>
+			{selection && (selection.count > 1 || (selection.actions?.length ?? 0) > 0) ? (
+				<SelectionBar {...selection} />
 			) : null}
 			{children}
 		</>
@@ -106,7 +114,21 @@ export function ActiveBody({
 
 /* ── Public, JSX-free helpers for `app.ts` (which stays `.ts`) ─────── */
 
-export type SelectionProps = { count: number; clearLabel: string; onClear: () => void };
+export type SelectionAction = {
+	id: string;
+	label: string;
+	opensMenu?: boolean;
+	onClick: (anchor: HTMLElement) => void;
+};
+
+export type SelectionProps = {
+	count: number;
+	countLabel: string;
+	clearLabel: string;
+	onClear: () => void;
+	/** Bulk actions over the selection (9.12.32). */
+	actions?: ReadonlyArray<SelectionAction>;
+};
 
 /** Mount an empty-state into the stage body. */
 export function renderEmpty(host: HTMLElement, props: { title: string; body: string }): void {

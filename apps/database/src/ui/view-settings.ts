@@ -18,16 +18,28 @@
  * without a host round-trip.
  */
 
-import type { PropertyDef } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { createCheckbox } from "@brainstorm-os/sdk/checkbox";
 import { IconName, createIconElement } from "@brainstorm-os/sdk/icon";
 import { openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
 import { createSelectMenu } from "@brainstorm-os/sdk/select-menu";
+import { attachShortcut } from "@brainstorm-os/sdk/shortcut";
+import { type TranslationKey, t } from "../i18n";
+import { AggregationKind, aggregationLabel } from "../logic/aggregations";
+import { CollapseAllAction } from "../logic/board-groups";
+import { CONVERTIBLE_TYPES } from "../logic/change-type";
+import { CHART_AGGREGATIONS, chartAggregationKind } from "../logic/chart-data";
 import {
 	ColumnAdderOptionKind,
 	appendColumnForProperty,
 	buildColumnAdderOptions,
 } from "../logic/column-adder";
+import {
+	TITLE_COLUMN_ID,
+	columnHeaderLabel,
+	setColumnPresentation,
+	withTitleColumn,
+} from "../logic/column-layout";
 import {
 	FormulaDraftErrorKind,
 	type FormulaDraftResult,
@@ -44,6 +56,7 @@ import {
 import type {
 	BoardLayoutOptions,
 	CalendarLayoutOptions,
+	ChartLayoutOptions,
 	ColumnSpec,
 	GalleryLayoutOptions,
 	GridLayoutOptions,
@@ -54,6 +67,10 @@ import type {
 import {
 	CalendarRange,
 	CalendarWeekStart,
+	ChartType,
+	ColumnWrap,
+	GalleryCoverSource,
+	GroupOrderMode,
 	ListViewKind,
 	TimelineDensity,
 } from "../types/list-view";
@@ -120,13 +137,16 @@ export type ViewSettingsProps = {
 	sourceEditable?: boolean;
 	/** Live-applies a new type set to the list's source. */
 	onChangeSource?: (types: string[]) => void;
+	/** Change-type + unit hooks for the column options menu (9.12.33). */
+	columnType?: ColumnTypeHost;
+	/** Numeric properties a Chart view can measure (9.12.30). */
+	numericProperties?: ReadonlyArray<string>;
+	/** Board "Collapse all" / "Expand all" (9.12.28) — the host resolves the
+	 *  live group / lane keys. Omitted → the buttons are hidden. */
+	onCollapseAll?: (action: CollapseAllAction) => void;
 	onChange: (patch: ViewSettingsPatch) => void;
 	onClose: () => void;
 };
-
-/** The synthetic Name/title column id (mirrors `grid-view`'s `TITLE_COL`).
- *  The title column is the collection's identity — never removable. */
-const TITLE_COLUMN_ID = "__title__";
 
 /** The drill-down pages the popover can show. Held in module state (not a
  *  closure) so the page survives the host's re-open-on-`onChange`. */
@@ -147,6 +167,7 @@ const VIEW_KIND_META: ReadonlyArray<[ListViewKind, string, DatabaseIcon]> = [
 	[ListViewKind.Board, "Board", DatabaseIcon.Board],
 	[ListViewKind.Calendar, "Calendar", DatabaseIcon.Calendar],
 	[ListViewKind.Timeline, "Timeline", DatabaseIcon.Timeline],
+	[ListViewKind.Chart, "Chart", DatabaseIcon.Chart],
 ];
 
 function viewKindLabel(kind: ListViewKind): string {
@@ -299,7 +320,10 @@ function parentPage(page: SettingsPage): SettingsPage {
 
 function groupingApplies(kind: ListViewKind): boolean {
 	return (
-		kind === ListViewKind.Board || kind === ListViewKind.Calendar || kind === ListViewKind.Timeline
+		kind === ListViewKind.Board ||
+		kind === ListViewKind.Calendar ||
+		kind === ListViewKind.Timeline ||
+		kind === ListViewKind.Chart
 	);
 }
 
@@ -326,11 +350,12 @@ function layoutPageLabel(kind: ListViewKind): string {
 	if (kind === ListViewKind.Gallery) return "Cards";
 	if (kind === ListViewKind.Calendar) return "Calendar";
 	if (kind === ListViewKind.Timeline) return "Timeline";
+	if (kind === ListViewKind.Chart) return t("brainstorm.database.settings.chart");
 	return "Layout";
 }
 
 function groupingPageLabel(kind: ListViewKind): string {
-	if (kind === ListViewKind.Board) return "Grouping";
+	if (kind === ListViewKind.Board || kind === ListViewKind.Chart) return "Grouping";
 	return "Dates";
 }
 
@@ -630,6 +655,9 @@ function renderLayoutPage(body: HTMLElement, props: ViewSettingsProps): void {
 				props.onChange({ layoutOptions: { ...(view.layoutOptions as TimelineLayoutOptions), ...p } }),
 			);
 			break;
+		case ListViewKind.Chart:
+			chartControls(rows, props);
+			break;
 	}
 	body.appendChild(rows);
 }
@@ -711,13 +739,32 @@ function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
 		),
 	);
 	rows.appendChild(
-		selectRow("Cover", propOpts, view.coverProperty ?? "", (v) =>
-			props.onChange({ coverProperty: v || null }),
+		segmented(
+			t("brainstorm.database.settings.gallery.coverSource"),
+			[
+				[GalleryCoverSource.Default, t("brainstorm.database.settings.gallery.coverDefault")],
+				[GalleryCoverSource.FirstMedia, t("brainstorm.database.settings.gallery.coverFirstMedia")],
+				[GalleryCoverSource.None, t("brainstorm.database.settings.gallery.coverNone")],
+			],
+			layout.coverSource ?? GalleryCoverSource.Default,
+			(v) => patch({ coverSource: v as GalleryCoverSource }),
 		),
 	);
+	if ((layout.coverSource ?? GalleryCoverSource.Default) === GalleryCoverSource.Default) {
+		rows.appendChild(
+			selectRow("Cover", propOpts, view.coverProperty ?? "", (v) =>
+				props.onChange({ coverProperty: v || null }),
+			),
+		);
+	}
 	rows.appendChild(
 		selectRow("Subtitle", propOpts, view.cardSubtitleProperty ?? "", (v) =>
 			props.onChange({ cardSubtitleProperty: v || null }),
+		),
+	);
+	rows.appendChild(
+		toggleRow(t("brainstorm.database.settings.gallery.showLabels"), !layout.hideFieldLabels, (v) =>
+			patch({ hideFieldLabels: !v }),
 		),
 	);
 }
@@ -746,6 +793,57 @@ function boardControls(
 			patch({ collapseEmptyColumns: v }),
 		),
 	);
+}
+
+function chartControls(rows: HTMLElement, props: ViewSettingsProps): void {
+	const layout = props.view.layoutOptions as ChartLayoutOptions;
+	const patch = (p: Partial<ChartLayoutOptions>): void =>
+		props.onChange({ layoutOptions: { ...layout, ...p } });
+	rows.appendChild(
+		segmented(
+			t("brainstorm.database.settings.chart.type"),
+			[
+				[ChartType.Bar, t("brainstorm.database.settings.chart.bar")],
+				[ChartType.Line, t("brainstorm.database.settings.chart.line")],
+				[ChartType.Pie, t("brainstorm.database.settings.chart.pie")],
+				[ChartType.Number, t("brainstorm.database.settings.chart.number")],
+			],
+			layout.chartType,
+			(v) => patch({ chartType: v as ChartType }),
+		),
+	);
+	const numeric = props.numericProperties ?? [];
+	const valueRow = selectRow(
+		t("brainstorm.database.settings.chart.measure"),
+		[
+			["", t("brainstorm.database.settings.chart.rowCount")],
+			...propertyOptions(numeric, false, nameMap(props)),
+		],
+		layout.valueProperty ?? "",
+		(v) =>
+			patch(
+				v
+					? {
+							valueProperty: v,
+							aggregation:
+								layout.aggregation === AggregationKind.CountAll ? AggregationKind.Sum : layout.aggregation,
+						}
+					: { valueProperty: null, aggregation: AggregationKind.CountAll },
+			),
+	);
+	rows.appendChild(valueRow);
+	if (layout.valueProperty) {
+		rows.appendChild(
+			selectRow(
+				t("brainstorm.database.settings.chart.aggregation"),
+				CHART_AGGREGATIONS.filter((k) => k !== AggregationKind.CountAll).map(
+					(k) => [k, aggregationLabel(k)] as [string, string],
+				),
+				chartAggregationKind(layout.aggregation, layout.valueProperty),
+				(v) => patch({ aggregation: v }),
+			),
+		);
+	}
 }
 
 function calendarControls(
@@ -817,12 +915,60 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 	const rows = document.createElement("div");
 	rows.className = "db-popover__rows";
 
-	if (view.kind === ListViewKind.Board) {
+	if (view.kind === ListViewKind.Chart) {
 		rows.appendChild(
 			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
 				props.onChange({ groupBy: v ? { propertyId: v } : null }),
 			),
 		);
+	} else if (view.kind === ListViewKind.Board) {
+		const layout = view.layoutOptions as BoardLayoutOptions;
+		const patchLayout = (p: Partial<BoardLayoutOptions>): void =>
+			props.onChange({ layoutOptions: { ...layout, ...p } });
+		rows.appendChild(
+			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
+				props.onChange({ groupBy: v ? { propertyId: v } : null }),
+			),
+		);
+		const laneKeys = keys.filter((k) => k !== view.groupBy?.propertyId);
+		const laneRow = selectRow(
+			t("brainstorm.database.settings.swimlanes"),
+			propertyOptions(laneKeys, true, names),
+			layout.swimlaneBy ?? "",
+			(v) => patchLayout({ swimlaneBy: v || null }),
+		);
+		laneRow.dataset.testid = "db-view-settings-swimlanes";
+		rows.appendChild(laneRow);
+		rows.appendChild(
+			segmented(
+				t("brainstorm.database.settings.groupOrder"),
+				[
+					[GroupOrderMode.Default, t("brainstorm.database.settings.groupOrder.default")],
+					[GroupOrderMode.CountDesc, t("brainstorm.database.settings.groupOrder.countDesc")],
+					[GroupOrderMode.CountAsc, t("brainstorm.database.settings.groupOrder.countAsc")],
+				],
+				layout.groupOrderMode ?? GroupOrderMode.Default,
+				(v) => patchLayout({ groupOrderMode: v as GroupOrderMode }),
+			),
+		);
+		const onCollapseAll = props.onCollapseAll;
+		if (onCollapseAll) {
+			const actions = document.createElement("div");
+			actions.className = "db-popover__row db-popover__row--actions";
+			for (const [action, key] of [
+				[CollapseAllAction.Collapse, "brainstorm.database.settings.collapseAll"],
+				[CollapseAllAction.Expand, "brainstorm.database.settings.expandAll"],
+			] as const) {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "bs-btn db-popover__action-btn";
+				btn.dataset.testid = `db-view-settings-${action}-all`;
+				btn.textContent = t(key);
+				btn.addEventListener("click", () => onCollapseAll(action));
+				actions.appendChild(btn);
+			}
+			rows.appendChild(actions);
+		}
 	} else if (view.kind === ListViewKind.Calendar) {
 		const layout = view.layoutOptions as CalendarLayoutOptions;
 		rows.appendChild(
@@ -859,6 +1005,7 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 		props.availableProperties ?? [],
 		props.vaultProperties ?? [],
 		props.onCreateProperty,
+		props.columnType,
 	);
 
 	// "Add rollup…" — a computed column aggregating a property of the row's
@@ -1143,6 +1290,7 @@ function renderColumns(
 	available: string[],
 	vaultProperties: ReadonlyArray<PropertyDef>,
 	onCreateProperty: ((seedName: string) => void) | undefined,
+	columnType?: ColumnTypeHost,
 ): void {
 	// A user-created property has a generated key (`prop_<…>`) but a real display
 	// name in the catalog — show the name, not "Prop Mpx6xww2 2vzk7i" (F-017,
@@ -1152,7 +1300,11 @@ function renderColumns(
 	const list = document.createElement("ul");
 	list.className = "db-popover__column-list";
 
-	columns.forEach((column, index) => {
+	// Name is an ordinary reorderable row (9.12.29) — present even when the
+	// view never moved it, so it can be dragged anywhere.
+	const allColumns = withTitleColumn(columns);
+	allColumns.forEach((column, index) => {
+		const isTitle = column.propertyId === TITLE_COLUMN_ID;
 		const li = document.createElement("li");
 		li.className = "db-popover__column-row";
 		li.draggable = true;
@@ -1164,14 +1316,18 @@ function renderColumns(
 		handle.appendChild(createIconElement(IconName.DragHandle, { size: 16 }));
 		li.appendChild(handle);
 
-		const defName = column.rollup?.name ?? nameByKey.get(column.propertyId);
-		const labelText = defName?.trim() ? defName : humanize(column.propertyId);
+		const defName = isTitle
+			? t("brainstorm.database.grid.nameColumn")
+			: (column.rollup?.name ?? column.formula?.name ?? nameByKey.get(column.propertyId));
+		const resolvedName = defName?.trim() ? defName : humanize(column.propertyId);
+		const labelText = columnHeaderLabel(column, resolvedName);
 
 		const toggle = createCheckbox({
-			checked: column.visible !== false,
+			checked: isTitle || column.visible !== false,
+			disabled: isTitle,
 			ariaLabel: `Show column ${labelText}`,
 			onChange: (checked) => {
-				const next = columns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
+				const next = allColumns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
 				onChange(next);
 			},
 		});
@@ -1181,13 +1337,38 @@ function renderColumns(
 		const label = document.createElement("span");
 		label.className = "db-popover__column-name";
 		label.textContent = labelText;
+		if (column.label) label.title = resolvedName;
 		li.appendChild(label);
+
+		const more = document.createElement("button");
+		more.type = "button";
+		more.className = "db-popover__column-more";
+		more.dataset.testid = "db-view-settings-column-options";
+		more.setAttribute("aria-haspopup", "menu");
+		more.setAttribute(
+			"aria-label",
+			t("brainstorm.database.settings.columnOptions", { name: labelText }),
+		);
+		more.dataset.bsTooltip = t("brainstorm.database.settings.columnOptions", { name: labelText });
+		setSharedIcon(more, IconName.More);
+		more.addEventListener("click", (event) => {
+			event.stopPropagation();
+			openColumnOptionsMenu(
+				more,
+				column,
+				resolvedName,
+				label,
+				(patch) => onChange(setColumnPresentation(allColumns, column.propertyId, patch)),
+				columnType,
+			);
+		});
+		li.appendChild(more);
 
 		// Remove the column from this collection (F-022). Drops it from the
 		// view's columns only — the property def stays in the vault catalog, so
 		// it can be re-added later via "Add column". The Name column is the
 		// collection's identity and can't be removed.
-		if (column.propertyId !== TITLE_COLUMN_ID) {
+		if (!isTitle) {
 			const remove = document.createElement("button");
 			remove.type = "button";
 			remove.className = "db-popover__column-remove";
@@ -1197,7 +1378,7 @@ function renderColumns(
 			setSharedIcon(remove, IconName.Close);
 			remove.addEventListener("click", (event) => {
 				event.stopPropagation();
-				onChange(columns.filter((_, i) => i !== index));
+				onChange(allColumns.filter((_, i) => i !== index));
 			});
 			li.appendChild(remove);
 		}
@@ -1220,7 +1401,7 @@ function renderColumns(
 			if (!raw) return;
 			const from = Number.parseInt(raw, 10);
 			if (Number.isNaN(from) || from === index) return;
-			const next = columns.slice();
+			const next = allColumns.slice();
 			const [moved] = next.splice(from, 1);
 			if (!moved) return;
 			next.splice(index, 0, moved);
@@ -1257,6 +1438,135 @@ function renderColumns(
 		});
 	});
 	body.appendChild(adderBtn);
+}
+
+/** Per-column presentation menu (9.12.29): a per-view alias, an icon-only
+ *  header, and the wrap override. */
+function openColumnOptionsMenu(
+	anchor: HTMLElement,
+	column: ColumnSpec,
+	resolvedName: string,
+	labelEl: HTMLElement,
+	commit: (patch: { label?: string | null; iconOnly?: boolean; wrap?: ColumnWrap | null }) => void,
+	columnType?: ColumnTypeHost,
+): void {
+	const typeInfo =
+		column.rollup || column.formula ? null : (columnType?.infoFor(column.propertyId) ?? null);
+	const typeItems = typeInfo
+		? [
+				{ divider: true },
+				...(typeInfo.convertible
+					? [
+							{
+								label: t("brainstorm.database.settings.column.changeType"),
+								submenu: CONVERTIBLE_TYPES.filter((vt) => vt !== typeInfo.valueType).map((vt) => ({
+									label: valueTypeLabel(vt),
+									onSelect: () => columnType?.onChangeType(column.propertyId, vt),
+								})),
+							},
+						]
+					: []),
+				...(typeInfo.valueType === ValueType.Number && typeInfo.plainNumber
+					? [
+							{
+								label: typeInfo.unit
+									? t("brainstorm.database.settings.column.unitIs", { unit: typeInfo.unit })
+									: t("brainstorm.database.settings.column.unit"),
+								onSelect: () => columnType?.onEditUnit(column.propertyId, anchor),
+							},
+						]
+					: []),
+			]
+		: [];
+	const wrapItem = (value: ColumnWrap | null, key: TranslationKey) => ({
+		label: t(key),
+		selected: (column.wrap ?? null) === value,
+		onSelect: () => commit({ wrap: value }),
+	});
+	openAnchoredMenu(
+		anchorPoint(anchor),
+		[
+			{
+				label: t("brainstorm.database.settings.column.rename"),
+				onSelect: () => beginAliasEdit(labelEl, column.label ?? resolvedName, resolvedName, commit),
+			},
+			...(column.label
+				? [
+						{
+							label: t("brainstorm.database.settings.column.resetName", { name: resolvedName }),
+							onSelect: () => commit({ label: null }),
+						},
+					]
+				: []),
+			{
+				label: t("brainstorm.database.settings.column.iconOnly"),
+				selected: column.iconOnly === true,
+				onSelect: () => commit({ iconOnly: !column.iconOnly }),
+			},
+			{ divider: true },
+			{ label: t("brainstorm.database.settings.column.wrap"), section: true },
+			wrapItem(null, "brainstorm.database.settings.column.wrap.default"),
+			wrapItem(ColumnWrap.Wrap, "brainstorm.database.settings.column.wrap.wrap"),
+			wrapItem(ColumnWrap.NoWrap, "brainstorm.database.settings.column.wrap.noWrap"),
+			...typeItems,
+		],
+		{ menuLabel: t("brainstorm.database.settings.columnOptions", { name: resolvedName }), anchor },
+	);
+}
+
+/** Host hooks for a column's type + unit (9.12.33). */
+export type ColumnTypeHost = {
+	infoFor: (propertyId: string) => {
+		valueType: ValueType;
+		convertible: boolean;
+		plainNumber: boolean;
+		unit?: string;
+	} | null;
+	onChangeType: (propertyId: string, to: ValueType) => void;
+	onEditUnit: (propertyId: string, anchor: HTMLElement) => void;
+};
+
+function valueTypeLabel(vt: ValueType): string {
+	switch (vt) {
+		case ValueType.Number:
+			return t("brainstorm.database.property.form.kindNumber");
+		case ValueType.Boolean:
+			return t("brainstorm.database.property.form.kindBoolean");
+		case ValueType.Date:
+			return t("brainstorm.database.property.form.kindDate");
+		default:
+			return t("brainstorm.database.property.form.kindText");
+	}
+}
+
+/** Swap the column-row label for an inline input; Enter / blur commits the
+ *  alias (blank or the full name clears it), Escape reverts. */
+function beginAliasEdit(
+	labelEl: HTMLElement,
+	current: string,
+	resolvedName: string,
+	commit: (patch: { label: string | null }) => void,
+): void {
+	const input = document.createElement("input");
+	input.type = "text";
+	input.className = "db-popover__input db-popover__column-alias";
+	input.dataset.testid = "db-view-settings-column-alias";
+	input.value = current;
+	input.setAttribute("aria-label", t("brainstorm.database.settings.column.rename"));
+	let done = false;
+	const finish = (save: boolean): void => {
+		if (done) return;
+		done = true;
+		const next = input.value.trim();
+		if (save && next !== current) commit({ label: next && next !== resolvedName ? next : null });
+		else input.replaceWith(labelEl);
+	};
+	attachShortcut(input, "Enter", () => finish(true), { allowWhileSuppressed: true });
+	attachShortcut(input, "Escape", () => finish(false), { allowWhileSuppressed: true });
+	input.addEventListener("blur", () => finish(true));
+	labelEl.replaceWith(input);
+	input.focus();
+	input.select();
 }
 
 type OpenColumnAdderPickerOptions = {

@@ -29,6 +29,7 @@
     "properties.write"
   ],
   "registrations": {
+    "widgets": [{ "id": "chart-view", "name": "Chart", "size": "medium" }],
     "entityTypes": [
       {
         "id": "brainstorm/List/v1",
@@ -84,7 +85,7 @@
             "icon": { "type": ["object", "null"] },
             "kind": {
               "type": "string",
-              "enum": ["grid", "list", "gallery", "board", "calendar", "timeline"]
+              "enum": ["grid", "list", "gallery", "board", "calendar", "timeline", "chart"]
             },
             "filters": { "type": ["array", "object", "null"] },
             "sorts": { "type": "array" },

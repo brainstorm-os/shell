@@ -114,6 +114,7 @@ const VIEW_KIND_LABELS: Readonly<Record<ListViewKind, string>> = {
 	[ListViewKind.Board]: "Board",
 	[ListViewKind.Calendar]: "Calendar",
 	[ListViewKind.Timeline]: "Timeline",
+	[ListViewKind.Chart]: "Chart",
 };
 
 export function viewKindLabel(kind: ListViewKind): string {
@@ -148,7 +149,8 @@ function applyKind(
 	if (switched === view) return view;
 	if (kind === ListViewKind.Timeline) return bindTimelineDate(switched, rows, siblingViews);
 	if (switched.groupBy) return switched;
-	if (kind !== ListViewKind.Board && kind !== ListViewKind.Calendar) return switched;
+	if (kind !== ListViewKind.Board && kind !== ListViewKind.Calendar && kind !== ListViewKind.Chart)
+		return switched;
 	const axis = autoGroupBy(kind === ListViewKind.Calendar, rows);
 	return axis ? { ...switched, groupBy: axis } : switched;
 }

@@ -30,7 +30,10 @@ import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
 import { CaretLeft } from "@phosphor-icons/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { InlinePropertyFormLabels } from "./i18n/common-labels";
+import {
+	DEFAULT_INLINE_PROPERTY_FORM_LABELS,
+	type InlinePropertyFormLabels,
+} from "./i18n/common-labels";
 import {
 	DEFAULT_CURRENCY_CODE,
 	INLINE_CURRENCY_CODES,
@@ -40,6 +43,9 @@ import {
 	InlineNumberFormat,
 	InlinePrimaryKind,
 	InlineTextFormat,
+	type InverseCandidate,
+	type InverseChoice,
+	InverseChoiceKind,
 	type RelationTargetType,
 	draftInlineProperty,
 	parseSelectOptions,
@@ -54,6 +60,8 @@ export type { InlinePropertyFormLabels } from "./i18n/common-labels";
 export type InlinePropertyFormCommit = {
 	def: PropertyDef;
 	dictionary: Dictionary | null;
+	/** New far-end relation for a two-way pair; persist after `def`. */
+	partner?: PropertyDef;
 };
 
 export type InlinePropertyFormProps = {
@@ -69,7 +77,22 @@ export type InlinePropertyFormProps = {
 	 *  `allowedTypes`. Hosts pass their own vault types; omitting the prop
 	 *  keeps the prior link-to-anything behaviour (no picker shown). */
 	relationTargetTypes?: readonly RelationTargetType[];
+	/** Existing relations a new Relation can pair with (two-way, 9.12.25).
+	 *  When supplied, the Relation kind surfaces a "Two-way with" picker:
+	 *  one-way, itself, each candidate, or a new paired property. */
+	inverseCandidates?: readonly InverseCandidate[];
 };
+
+const INVERSE_NONE = "";
+const INVERSE_SELF = "__self__";
+const INVERSE_NEW = "__new__";
+
+function inverseChoiceFor(value: string, newName: string): InverseChoice {
+	if (value === INVERSE_NONE) return { kind: InverseChoiceKind.None };
+	if (value === INVERSE_SELF) return { kind: InverseChoiceKind.Self };
+	if (value === INVERSE_NEW) return { kind: InverseChoiceKind.New, name: newName };
+	return { kind: InverseChoiceKind.Existing, key: value };
+}
 
 export function InlinePropertyForm({
 	labels,
@@ -77,6 +100,7 @@ export function InlinePropertyForm({
 	onCancel,
 	autoFocus = true,
 	relationTargetTypes,
+	inverseCandidates,
 }: InlinePropertyFormProps): ReactNode {
 	useInjectedStyles();
 
@@ -90,6 +114,8 @@ export function InlinePropertyForm({
 	const [formulaExpression, setFormulaExpression] = useState("");
 	// "" = link to anything (no allowedTypes); a type string pins the relation.
 	const [targetType, setTargetType] = useState<string>("");
+	const [inverseValue, setInverseValue] = useState<string>(INVERSE_NONE);
+	const [inverseName, setInverseName] = useState("");
 	const [multi, setMulti] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
@@ -153,6 +179,7 @@ export function InlinePropertyForm({
 			options: parseSelectOptions(optionsText),
 			allowedTypes: targetType.length > 0 ? [targetType] : [],
 			formulaExpression,
+			inverse: inverseChoiceFor(inverseValue, inverseName),
 		});
 		if (!result.ok) {
 			setError(result.errors[0] ?? "invalid property");
@@ -340,6 +367,50 @@ export function InlinePropertyForm({
 						onChange={setTargetType}
 					/>
 				</div>
+			)}
+
+			{primary === InlinePrimaryKind.Relation && inverseCandidates && (
+				<div className="bs-inline-property-form__field">
+					<span className="bs-inline-property-form__field-label">
+						{labels.inverseLabel ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseLabel}
+					</span>
+					<SelectMenu
+						className="bs-inline-property-form__select"
+						ariaLabel={labels.inverseLabel ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseLabel ?? ""}
+						value={inverseValue}
+						options={[
+							{
+								value: INVERSE_NONE,
+								label: labels.inverseNone ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseNone ?? "",
+							},
+							{
+								value: INVERSE_SELF,
+								label: labels.inverseSelf ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseSelf ?? "",
+							},
+							...inverseCandidates.map((c) => ({ value: c.key, label: c.label })),
+							{
+								value: INVERSE_NEW,
+								label: labels.inverseNew ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseNew ?? "",
+							},
+						]}
+						onChange={setInverseValue}
+					/>
+				</div>
+			)}
+
+			{primary === InlinePrimaryKind.Relation && inverseValue === INVERSE_NEW && (
+				<label className="bs-inline-property-form__field">
+					<span className="bs-inline-property-form__field-label">
+						{labels.inverseNewNameLabel ?? DEFAULT_INLINE_PROPERTY_FORM_LABELS.inverseNewNameLabel}
+					</span>
+					<input
+						type="text"
+						className="bs-inline-property-form__input"
+						data-testid="bs-inline-property-inverse-name"
+						value={inverseName}
+						onChange={(event) => setInverseName(event.target.value)}
+					/>
+				</label>
 			)}
 
 			{supportsMultiToggle(primary) && (

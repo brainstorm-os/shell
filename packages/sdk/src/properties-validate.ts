@@ -200,6 +200,15 @@ export function validatePropertyDef(def: PropertyDef): ValidationResult {
 		}
 	}
 
+	// Unit suffix — plain number only, short display text (9.12.33).
+	if (def.unit !== undefined) {
+		if (def.valueType !== ValueType.Number || def.format !== undefined) {
+			errors.push("unit is only valid for a plain number");
+		} else if (typeof def.unit !== "string" || def.unit.trim().length === 0 || def.unit.length > 16) {
+			errors.push("unit must be 1–16 characters");
+		}
+	}
+
 	return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }
 

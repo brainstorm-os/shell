@@ -15,6 +15,7 @@ import {
 	parseNaturalDate,
 	parseNumberInput,
 	parseScalar,
+	withUnit,
 } from "./format";
 
 function def(over: Partial<PropertyDef> & { valueType: ValueType }): PropertyDef {
@@ -344,5 +345,13 @@ describe("formatRelativeDate", () => {
 
 	it("returns empty for a null value", () => {
 		expect(formatRelativeDate(null, now)).toBe("");
+	});
+});
+
+describe("formatNumber — unit suffix (9.12.33)", () => {
+	it("appends a plain number's unit", () => {
+		const def = { key: "w", name: "W", icon: null, valueType: ValueType.Number, unit: "kg" } as const;
+		expect(formatNumber(12, def, { locale: "en-US" })).toBe("12 kg");
+		expect(withUnit("3", undefined)).toBe("3");
 	});
 });

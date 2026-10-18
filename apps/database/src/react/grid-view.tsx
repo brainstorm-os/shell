@@ -75,6 +75,12 @@ import {
 	defaultAggregationFor,
 	formatAggregation,
 } from "../logic/aggregations";
+import {
+	TITLE_COLUMN_ID,
+	columnHeaderLabel,
+	columnWraps,
+	withTitleColumn,
+} from "../logic/column-layout";
 import { columnValueSuggestions } from "../logic/column-suggestions";
 import type { CompiledView } from "../logic/compile-view";
 import { dragItemsForRow } from "../logic/drag-items";
@@ -89,6 +95,7 @@ import {
 } from "../logic/grid-cell-nav";
 import { type EntityRow, readPropertyPath } from "../logic/in-memory-entities";
 import { isNumericColumn } from "../logic/numeric-column";
+import { propertyKindIconFor } from "../logic/property-kind-icon";
 import { parseAggregationKind } from "../logic/rollup";
 import { entityIcon, entityTitle } from "../render/cells";
 import type { ColumnSpec, GridLayoutOptions } from "../types/list-view";
@@ -143,9 +150,16 @@ export type GridViewProps = {
 	onPendingTitleEditHandled?: () => void;
 };
 
-const TITLE_COL = "__title__";
+const TITLE_COL = TITLE_COLUMN_ID;
 const TITLE_WIDTH = 320;
 const DEFAULT_COLUMN_WIDTH = 160;
+const ICON_ONLY_COLUMN_WIDTH = 72;
+
+function columnWidthOf(column: ColumnSpec): number {
+	if (column.width !== undefined) return column.width;
+	if (column.propertyId === TITLE_COL) return TITLE_WIDTH;
+	return column.iconOnly ? ICON_ONLY_COLUMN_WIDTH : DEFAULT_COLUMN_WIDTH;
+}
 const ENTITY_MIME = "application/x-brainstorm-entity";
 const noopReorder = (_: string[]): void => {};
 const noopEdit: EntityPropertyEdit = () => {};
@@ -189,22 +203,23 @@ export function GridView(props: GridViewProps): ReactElement {
 		dragItemsForRow(entity, selectedIds, compiled.rows),
 	);
 
-	// The synthetic Name column always pins to the left — see imperative
-	// renderer's comment. Any `title`/`name` column the view declares is
-	// dropped to avoid duplicating it (Notion-style).
-	const visible = useMemo<ColumnSpec[]>(() => {
-		const title: ColumnSpec = { propertyId: TITLE_COL, width: TITLE_WIDTH, visible: true };
-		return [
-			title,
-			...columns.filter(
-				(c) => c.visible !== false && c.propertyId !== "title" && c.propertyId !== "name",
+	// The synthetic Name column sits wherever the view placed it (first when
+	// never moved — 9.12.29) and is always shown. Any `title`/`name` column the
+	// view declares is dropped to avoid duplicating it (Notion-style).
+	const visible = useMemo<ColumnSpec[]>(
+		() =>
+			withTitleColumn(columns).filter(
+				(c) =>
+					c.propertyId === TITLE_COL ||
+					(c.visible !== false && c.propertyId !== "title" && c.propertyId !== "name"),
 			),
-		];
-	}, [columns]);
+		[columns],
+	);
 
-	const reorderableIds = useMemo(
-		() => visible.filter((c) => c.propertyId !== TITLE_COL).map((c) => c.propertyId),
-		[visible],
+	const reorderableIds = useMemo(() => visible.map((c) => c.propertyId), [visible]);
+	const titleIndex = Math.max(
+		0,
+		visible.findIndex((c) => c.propertyId === TITLE_COL),
 	);
 
 	// The effective editing def per column (catalog def, else inferred from
@@ -285,7 +300,7 @@ export function GridView(props: GridViewProps): ReactElement {
 			if (!onReorderColumns) return;
 			const { active, over } = event;
 			if (!over) return;
-			const next = computeColumnReorder(columns, String(active.id), String(over.id));
+			const next = computeColumnReorder(withTitleColumn(columns), String(active.id), String(over.id));
 			if (next) onReorderColumns(next);
 		},
 		[columns, onReorderColumns],
@@ -347,7 +362,7 @@ export function GridView(props: GridViewProps): ReactElement {
 	);
 	const activateCell = useCallback(
 		(flat: number) => {
-			if (cellActivationOpensRecord(flat, columnCount)) {
+			if (cellActivationOpensRecord(flat, columnCount, titleIndex)) {
 				const entity = compiled.rows[cellRowOf(flat, columnCount)];
 				if (entity) onOpen(entity);
 				return;
@@ -356,7 +371,7 @@ export function GridView(props: GridViewProps): ReactElement {
 			const column = visible[cellColOf(flat, columnCount)];
 			if (entity && column) setEditCell({ entityId: entity.id, propertyId: column.propertyId });
 		},
-		[compiled.rows, columnCount, visible, onOpen],
+		[compiled.rows, columnCount, visible, onOpen, titleIndex],
 	);
 	const clearEditCell = useStableCallback(() => setEditCell(null));
 	const { containerProps: gridKeyboardProps, getItemProps: getCellProps } = useCompositeKeyboard({
@@ -442,20 +457,22 @@ export function GridView(props: GridViewProps): ReactElement {
 								#
 							</div>
 						) : null}
-						<PinnedHeaderCell width={TITLE_WIDTH} label={t("brainstorm.database.grid.nameColumn")} />
 						<SortableContext items={reorderableIds} strategy={horizontalListSortingStrategy}>
-							{visible
-								.filter((c) => c.propertyId !== TITLE_COL)
-								.map((c) => (
-									<SortableHeaderCell
-										key={c.propertyId}
-										column={c}
-										label={columnLabel(c, columnDefs)}
-										isActive={activeColumn === c.propertyId}
-										numeric={numericById.has(c.propertyId)}
-										onResize={onResizeColumn}
-									/>
-								))}
+							{visible.map((c) => (
+								<SortableHeaderCell
+									key={c.propertyId}
+									column={c}
+									label={columnLabel(c, columnDefs)}
+									icon={propertyKindIconFor(
+										c.propertyId,
+										c.rollup || c.formula ? null : columnDefs.get(c.propertyId),
+									)}
+									isActive={activeColumn === c.propertyId}
+									numeric={numericById.has(c.propertyId)}
+									wraps={columnWraps(c, layout.wrap ?? false)}
+									onResize={onResizeColumn}
+								/>
+							))}
 						</SortableContext>
 					</div>
 
@@ -490,6 +507,7 @@ export function GridView(props: GridViewProps): ReactElement {
 										rollupById={rollupById}
 										rollupTargetDefs={rollupTargetDefs}
 										numericById={numericById}
+										viewWrap={layout.wrap ?? false}
 										pendingTitleEdit={pendingTitleEditId === entity.id}
 										onPendingTitleEditHandled={onPendingTitleEditHandled}
 										onSelect={onSelect}
@@ -550,8 +568,7 @@ function GridFooter({
 		<div className="dbv-grid__row dbv-grid__row--foot" role="row" tabIndex={-1}>
 			{showRowNumber ? <div className="dbv-grid__cell dbv-grid__cell--num" role="cell" /> : null}
 			{columns.map((column) => {
-				const width =
-					column.width ?? (column.propertyId === TITLE_COL ? TITLE_WIDTH : DEFAULT_COLUMN_WIDTH);
+				const width = columnWidthOf(column);
 				if (column.propertyId === TITLE_COL) {
 					const count = computeAggregation(AggregationKind.CountAll, rows);
 					return (
@@ -620,21 +637,6 @@ function GridFooter({
 	);
 }
 
-/** Name column header — first cell, not sortable. `data-col="title"` lets
- *  the CSS make it sticky-left when `pinFirstColumn` is on. */
-function PinnedHeaderCell({ width, label }: { width: number; label: string }): ReactElement {
-	return (
-		<div
-			className="dbv-grid__cell dbv-grid__cell--head"
-			role="columnheader"
-			data-col="title"
-			style={{ width }}
-		>
-			{label}
-		</div>
-	);
-}
-
 /** Header cell wired into dnd-kit's `useSortable`. Resize handle stops
  *  the pointer event from starting a reorder drag. */
 /** The header label for a column: the property def's display `name` when the
@@ -642,6 +644,11 @@ function PinnedHeaderCell({ width, label }: { width: number; label: string }): R
  *  property has a generated key (`prop_<…>`) but a real name ("Status"); without
  *  this the header would read "Prop Mpx6xww2 2vzk7i" (F-017). */
 function columnLabel(column: ColumnSpec, defs: ColumnDefs): string {
+	return columnHeaderLabel(column, resolvedColumnName(column, defs));
+}
+
+function resolvedColumnName(column: ColumnSpec, defs: ColumnDefs): string {
+	if (column.propertyId === TITLE_COL) return t("brainstorm.database.grid.nameColumn");
 	if (column.rollup) return column.rollup.name;
 	if (column.formula) return column.formula.name;
 	const name = defs.get(column.propertyId)?.name;
@@ -651,22 +658,29 @@ function columnLabel(column: ColumnSpec, defs: ColumnDefs): string {
 function SortableHeaderCell({
 	column,
 	label,
+	icon,
 	isActive,
 	numeric,
+	wraps,
 	onResize,
 }: {
 	column: ColumnSpec;
 	label: string;
+	/** The property-kind glyph — the whole header face for an icon-only
+	 *  column (9.12.29). */
+	icon: IconName;
 	isActive: boolean;
 	/** Numeric column → header right-aligns with its cells (POLISH-PROP-2). */
 	numeric: boolean;
+	wraps: boolean;
 	onResize: ((propertyId: string, width: number) => void) | undefined;
 }): ReactElement {
+	const isTitle = column.propertyId === TITLE_COL;
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
 		id: column.propertyId,
 		attributes: { role: "columnheader", roleDescription: "sortable column" },
 	});
-	const baseWidth = column.width ?? DEFAULT_COLUMN_WIDTH;
+	const baseWidth = columnWidthOf(column);
 	const [liveWidth, setLiveWidth] = useState<number | null>(null);
 	const width = liveWidth ?? baseWidth;
 
@@ -733,10 +747,14 @@ function SortableHeaderCell({
 			{...listeners}
 			style={style}
 			data-prop={column.propertyId}
+			data-col={isTitle ? "title" : undefined}
+			data-icon-only={column.iconOnly ? "true" : undefined}
+			data-wrap={wraps ? "true" : "false"}
 			data-dragging={isDragging || isActive ? "true" : undefined}
 			title={label}
+			{...(column.iconOnly ? { "aria-label": label } : {})}
 		>
-			{label}
+			{column.iconOnly ? <Icon name={icon} size={14} /> : label}
 			<span className="dbv-grid__resize" aria-hidden="true" onPointerDown={handleResizePointerDown} />
 		</div>
 	);
@@ -771,6 +789,8 @@ type GridRowProps = {
 	rollupTargetDefs: ColumnDefs;
 	/** Columns that render numerals → cells right-align (POLISH-PROP-2). */
 	numericById: ReadonlySet<string>;
+	/** The view's Wrap setting — a column's own `wrap` override wins. */
+	viewWrap: boolean;
 	/** This row should take the keyboard on mount (F-215/F-216): the title
 	 *  editor when editable, plain row focus otherwise. */
 	pendingTitleEdit: boolean;
@@ -804,6 +824,7 @@ const GridRow = memo(function GridRow({
 	rollupById,
 	rollupTargetDefs,
 	numericById,
+	viewWrap,
 	pendingTitleEdit,
 	onPendingTitleEditHandled,
 	onSelect,
@@ -947,6 +968,7 @@ const GridRow = memo(function GridRow({
 						rollupById={rollupById}
 						rollupTargetDef={rollupTargetDefs.get(c.propertyId) ?? null}
 						numeric={numericById.has(c.propertyId)}
+						wraps={columnWraps(c, viewWrap)}
 						cellProps={getCellProps(flat)}
 						autoEdit={editCell?.entityId === entity.id && editCell?.propertyId === c.propertyId}
 						onAutoEditHandled={onEditCellHandled}
@@ -969,6 +991,7 @@ function GridCell({
 	rollupById,
 	rollupTargetDef,
 	numeric,
+	wraps,
 	cellProps,
 	autoEdit,
 	onAutoEditHandled,
@@ -988,6 +1011,8 @@ function GridCell({
 	/** Numeric column → the cell (and its inline editor) right-aligns so
 	 *  numerals share an edge with the footer aggregate (POLISH-PROP-2). */
 	numeric: boolean;
+	/** The column's effective wrap (its override, else the view's). */
+	wraps: boolean;
 	/** Composite-keyboard props for this cell's flat cursor index — `id`
 	 *  (`aria-activedescendant` target), `role="gridcell"`, `aria-selected`
 	 *  (the cursor ring), `data-composite-index`, `tabIndex: -1`. */
@@ -1001,14 +1026,15 @@ function GridCell({
 	onEdit: EntityPropertyEdit | undefined;
 	onOpenInspector: (entity: EntityRow) => void;
 }): ReactElement {
-	const width =
-		column.width ?? (column.propertyId === TITLE_COL ? TITLE_WIDTH : DEFAULT_COLUMN_WIDTH);
+	const width = columnWidthOf(column);
 	const numericClass = numeric ? " dbv-grid__cell--numeric" : "";
+	const wrapAttr = wraps ? "true" : "false";
 	if (column.rollup) {
 		return (
 			<div
 				className={`dbv-grid__cell dbv-grid__cell--rollup${numericClass}`}
 				style={{ width }}
+				data-wrap={wrapAttr}
 				{...cellProps}
 			>
 				<RollupCell
@@ -1025,6 +1051,7 @@ function GridCell({
 			<div
 				className={`dbv-grid__cell dbv-grid__cell--formula${numericClass}`}
 				style={{ width }}
+				data-wrap={wrapAttr}
 				{...cellProps}
 			>
 				<FormulaCell formula={column.formula} entity={entity} />
@@ -1037,7 +1064,13 @@ function GridCell({
 		// stays on the trailing open-arrow + Enter, so rename never shadows it.
 		const titleEditable = onEdit !== undefined;
 		return (
-			<div className="dbv-grid__cell" data-col="title" style={{ width }} {...cellProps}>
+			<div
+				className="dbv-grid__cell"
+				data-col="title"
+				data-wrap={wrapAttr}
+				style={{ width }}
+				{...cellProps}
+			>
 				<DomSlot
 					className="dbv-grid__title-glyph"
 					build={() => entityIcon(entity, 16)}

@@ -153,6 +153,16 @@ export async function resolveEmbeddedRows(
 	list: BpEntity,
 	hostEntityId: string | null,
 ): Promise<BpEntity[]> {
+	return (await resolveEmbedded(graph, list, hostEntityId)).rows;
+}
+
+/** The embed's rows plus the view they were filtered + sorted by (the "New"
+ *  affordance drafts from the same view). */
+export async function resolveEmbedded(
+	graph: BlockGraph,
+	list: BpEntity,
+	hostEntityId: string | null,
+): Promise<{ rows: BpEntity[]; view: ListView | null }> {
 	const ctx: PredicateContext = hostEntityId === null ? {} : { hostEntityId };
 	const source = readSource(list);
 	const types = sourceTypes(source);
@@ -189,5 +199,5 @@ export async function resolveEmbeddedRows(
 		view?.manualOrder && view.manualOrder.length > 0
 			? applyManualOrder(sorted, view.manualOrder)
 			: sorted;
-	return ordered.slice(0, MAX_ROWS).map((r) => candidates.get(r.id) as BpEntity);
+	return { rows: ordered.slice(0, MAX_ROWS).map((r) => candidates.get(r.id) as BpEntity), view };
 }

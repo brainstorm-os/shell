@@ -11,7 +11,7 @@
  */
 
 import { type PropertyDef, PropertyFormat, ValueType } from "@brainstorm-os/sdk-types";
-import { formatDuration } from "@brainstorm-os/sdk/property-ui/pure";
+import { formatDuration, withUnit } from "@brainstorm-os/sdk/property-ui/pure";
 
 export enum AggregationKind {
 	None = "none",
@@ -276,7 +276,7 @@ export function formatAggregation(result: AggregationResult, def?: PropertyDef):
 			if (def?.format === PropertyFormat.Duration) {
 				return formatDuration(result.value);
 			}
-			return NUMBER_FMT.format(result.value);
+			return withUnit(NUMBER_FMT.format(result.value), def?.unit);
 		case AggregationUnit.Ratio:
 			return PERCENT_FMT.format(result.value);
 		case AggregationUnit.Timestamp:

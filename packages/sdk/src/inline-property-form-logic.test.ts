@@ -20,6 +20,7 @@ import {
 	InlineNumberFormat,
 	InlinePrimaryKind,
 	InlineTextFormat,
+	InverseChoiceKind,
 	dedupeSelectOptions,
 	draftInlineProperty,
 	parseSelectOptions,
@@ -572,5 +573,51 @@ describe("inline-property-form-logic — draftInlineProperty", () => {
 			formulaExpression: "{a} * * {b}",
 		});
 		expect(broken.ok).toBe(false);
+	});
+});
+
+describe("draftInlineProperty — two-way relations (9.12.25 picker)", () => {
+	const base = {
+		name: "Authors",
+		primary: InlinePrimaryKind.Relation,
+		textFormat: InlineTextFormat.Plain,
+		multi: true,
+	};
+
+	it("pairs with an existing relation", () => {
+		const out = draftInlineProperty({
+			...base,
+			inverse: { kind: InverseChoiceKind.Existing, key: "prop_books" },
+		});
+		expect(out.ok && out.value.def.inverseOf).toBe("prop_books");
+		expect(out.ok && out.value.partner).toBeUndefined();
+	});
+
+	it("pairs with itself", () => {
+		const out = draftInlineProperty({ ...base, inverse: { kind: InverseChoiceKind.Self } });
+		expect(out.ok && out.value.def.inverseOf).toBe(out.ok ? out.value.def.key : null);
+	});
+
+	it("mints a named partner that declares the pairing back", () => {
+		const out = draftInlineProperty({
+			...base,
+			inverse: { kind: InverseChoiceKind.New, name: "Books written" },
+		});
+		if (!out.ok) throw new Error(out.errors.join());
+		expect(out.value.partner?.name).toBe("Books written");
+		expect(out.value.partner?.inverseOf).toBe(out.value.def.key);
+		expect(out.value.def.inverseOf).toBeUndefined();
+	});
+
+	it("rejects an unnamed partner and ignores the choice for non-relations", () => {
+		expect(
+			draftInlineProperty({ ...base, inverse: { kind: InverseChoiceKind.New, name: " " } }).ok,
+		).toBe(false);
+		const text = draftInlineProperty({
+			...base,
+			primary: InlinePrimaryKind.Text,
+			inverse: { kind: InverseChoiceKind.Self },
+		});
+		expect(text.ok && text.value.def.inverseOf).toBeUndefined();
 	});
 });

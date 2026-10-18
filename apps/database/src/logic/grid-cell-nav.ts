@@ -47,10 +47,14 @@ export function clampCellCursor(cursor: number, count: number): number {
 	return cursor;
 }
 
-/** What Enter (composite Activate) does on the focused cell: the pinned Name
- *  column (col 0) opens the record (the prior row-level Enter); every other
- *  column begins in-cell editing. Pure so the split is unit-tested without the
- *  virtualized grid. */
-export function cellActivationOpensRecord(flatIndex: number, columnCount: number): boolean {
-	return cellColOf(flatIndex, columnCount) === 0;
+/** What Enter (composite Activate) does on the focused cell: the Name column
+ *  (wherever the view placed it — `titleIndex`, first by default) opens the
+ *  record (the prior row-level Enter); every other column begins in-cell
+ *  editing. Pure so the split is unit-tested without the virtualized grid. */
+export function cellActivationOpensRecord(
+	flatIndex: number,
+	columnCount: number,
+	titleIndex = 0,
+): boolean {
+	return cellColOf(flatIndex, columnCount) === titleIndex;
 }
