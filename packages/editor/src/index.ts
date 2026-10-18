@@ -101,6 +101,15 @@ export {
 	BlockGutterPlugin,
 } from "./plugins/block-gutter-plugin";
 export { isEventInNestedEditor, useEditorShortcut } from "./plugins/editor-shortcut";
+export { TaskCheckbox } from "./task-checkbox";
+export {
+	TASK_CHECK_ATTR,
+	TASK_ENTITY_TYPE,
+	isTaskDone,
+	newTaskProperties,
+	taskCompletionPatch,
+} from "./task-entity";
+export { createTaskCommand, insertTaskMention, newTaskId, taskPickerRows } from "./task-mention";
 export {
 	$canHaveBlockBackground,
 	BLOCK_BACKGROUND_ATTR,
@@ -309,6 +318,7 @@ export {
 } from "./nodes/file-block-node";
 export {
 	type EditorBlocksHost,
+	type EditorEntitiesHost,
 	type EditorHost,
 	type EditorUploadFn,
 	type EditorUploadResult,
@@ -333,6 +343,7 @@ export {
 	fetchEntities,
 	getEntityDisplayIcon,
 	getEntityIcon,
+	getEntityProperties,
 	getEntityTitle,
 	setEntityIndexSource,
 	subscribeEntityIcons,

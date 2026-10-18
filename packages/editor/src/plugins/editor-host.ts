@@ -47,6 +47,14 @@ export type EditorBlocksHost = {
 	source: (blockId: string) => Promise<string | null>;
 };
 
+/** The slice of the shell's `services.entities` the editor's entity-creating
+ *  commands need (`/task`, B11.24) and live decorators write through (a task
+ *  mention's checkbox). Capability-gated shell-side like any app write. */
+export type EditorEntitiesHost = {
+	create: (type: string, properties: Record<string, unknown>, id?: string) => Promise<unknown>;
+	update: (id: string, patch: Record<string, unknown>) => Promise<unknown>;
+};
+
 export type EditorHost = {
 	/** Navigate to an entity (link-markup click, mention chip, backlink,
 	 *  page-ref). Wraps the shell's open-entity intent. `mode` carries the
@@ -70,6 +78,9 @@ export type EditorHost = {
 	 *  embedded block can query/update entities through the host broker.
 	 *  Unwired → the block mounts without graph traffic. */
 	bp?: BpService;
+	/** Entity create / update for `/task` and the task-mention checkbox.
+	 *  Unwired → `/task` is a quiet no-op and the checkbox is read-only. */
+	entities?: EditorEntitiesHost;
 };
 
 let host: EditorHost = {};

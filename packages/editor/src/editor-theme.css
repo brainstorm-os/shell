@@ -2838,3 +2838,19 @@ body.bs-table-col-resizing * {
 	border: var(--border-width) solid var(--border-subtle);
 	border-radius: var(--radius-sm);
 }
+
+/* B11.24 — the live checkbox inside a task mention chip. */
+.bs-editor__task-check {
+	display: inline-flex;
+	align-items: center;
+	cursor: default;
+}
+
+.notes__mention-chip--task .notes__mention-label {
+	color: var(--text);
+}
+
+.notes__mention-chip--task:has(.checkbox__input:checked) .notes__mention-label {
+	color: var(--text-dim);
+	text-decoration: line-through;
+}

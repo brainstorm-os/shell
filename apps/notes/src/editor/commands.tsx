@@ -35,6 +35,7 @@ import {
 	createMediaBlockCommands,
 	createStandardBlockActions,
 	createStandardBlockCommands,
+	createTaskCommand,
 	createTransclusionCommand,
 	getBlockAnchorsController,
 	insertSnippet,
@@ -363,6 +364,9 @@ const NOTES_EMBED_COMMANDS: readonly BlockCommand[] = [
 
 export const BLOCK_COMMANDS: readonly BlockCommand[] = [
 	...shared(PALETTE_TEXT),
+	// `/task` (B11.24) — a real Task/v1 entity, inlined as a live-checkbox
+	// chip; Notes wires the `entities` editor host in main.tsx.
+	createTaskCommand(editorT),
 	...NOTES_MEDIA_COMMANDS,
 	NOTES_PROPERTY_COMMAND,
 	...shared(PALETTE_STRUCTURE),
