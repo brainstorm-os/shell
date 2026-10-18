@@ -21,6 +21,7 @@ import type {
 	NotificationRecord,
 	NotificationsState,
 	RegionalState,
+	StartupPage,
 } from "@brainstorm-os/protocol/shell-prefs";
 import {
 	type AutoUpdateState,
@@ -485,6 +486,8 @@ export type DashboardSnapshot = {
 	/** Settings → Appearance visibility preferences (12.18). Optional so a
 	 *  renderer newer than its main process degrades to the defaults. */
 	display?: DisplayPrefs;
+	/** 7.17 — what opens once after unlock. Optional for a stale main. */
+	startupPage?: StartupPage;
 	/** Notification preferences: OS-native toggle, DND, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped. */
@@ -1634,6 +1637,9 @@ const dashboard = {
 		ipcRenderer.invoke("dashboard:set-clock-prefs", partial),
 	/** Reset all interface (chrome) settings to defaults. */
 	resetChrome: (): Promise<void> => ipcRenderer.invoke("dashboard:reset-chrome"),
+	/** Set what opens once after unlock (7.17). */
+	setStartupPage: (page: StartupPage): Promise<void> =>
+		ipcRenderer.invoke("dashboard:set-startup-page", page),
 	/** Patch the Settings → Appearance visibility preferences (12.18). */
 	setDisplayPrefs: (partial: Partial<DisplayPrefs>): Promise<void> =>
 		ipcRenderer.invoke("dashboard:set-display-prefs", partial),

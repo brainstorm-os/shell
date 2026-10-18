@@ -2590,3 +2590,10 @@
 
 /* The DND time pickers ride the shared `<TextField>` face at Sm (F-304) —
  * box, focus chrome, and disabled state come from the primitive. */
+
+/* 7.17 — startup-object search: field + Find share the md control height. */
+.settings__startup-search {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}

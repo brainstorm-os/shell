@@ -63,9 +63,11 @@ import {
 	type NotificationsState,
 	REGIONAL_AUTO,
 	type RegionalState,
+	type StartupPage,
 	isHeaderControlId,
 	isNotificationKind,
 	toDisplayPrefs,
+	toStartupPage,
 } from "@brainstorm-os/protocol/shell-prefs";
 import { OsHandoffConsent } from "@brainstorm-os/sdk-types";
 import {
@@ -184,6 +186,8 @@ export type DashboardSnapshot = {
 	chrome: ChromeState;
 	/** Settings → Appearance visibility preferences (12.18). */
 	display: DisplayPrefs;
+	/** 7.17 — what opens once after unlock (Settings → General). */
+	startupPage: StartupPage;
 	/** Notification preferences: OS-native toggle, DND window, per-app mutes. */
 	notifications: NotificationsState;
 	/** Notification center history (newest last), capped + drop-oldest. */
@@ -341,6 +345,7 @@ export class DashboardStore {
 			regional: this.readRegional(),
 			chrome: this.readChrome(),
 			display: this.displayPrefs(),
+			startupPage: toStartupPage(this.doc.getMap<unknown>("startup").toJSON()),
 			notifications: this.readNotifications(),
 			notificationHistory: this.readNotificationHistory(),
 			disabledContributors: this.readDisabledContributors(),
@@ -544,6 +549,16 @@ export class DashboardStore {
 				const value = partial[key];
 				if (typeof value === "boolean") map.set(key, value);
 			}
+		});
+	}
+
+	/** Replace the startup-page choice (normalised; junk ⇒ dashboard). */
+	setStartupPage(raw: unknown): void {
+		const page = toStartupPage(raw);
+		const map = this.doc.getMap<unknown>("startup");
+		this.doc.transact(() => {
+			map.clear();
+			for (const [key, value] of Object.entries(page)) map.set(key, value);
 		});
 	}
 

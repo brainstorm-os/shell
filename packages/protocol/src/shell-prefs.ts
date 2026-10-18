@@ -308,3 +308,45 @@ export function resolveDisplayPaint(prefs: DisplayPrefs, tokens: Tokens): Displa
 		vars: prefs.higherContrast ? higherContrastOverrides(tokens) : {},
 	};
 }
+
+/** 7.17 — what the shell opens once after the vault is unlocked. */
+export enum StartupPageKind {
+	/** The dashboard alone — today's behaviour, the default. */
+	Dashboard = "dashboard",
+	/** Today's Journal entry (Journal lands on today when launched fresh). */
+	TodayJournal = "today-journal",
+	/** One chosen object, opened through `intent.open`. */
+	Object = "object",
+}
+
+export type StartupPage =
+	| { kind: StartupPageKind.Dashboard }
+	| { kind: StartupPageKind.TodayJournal }
+	| {
+			kind: StartupPageKind.Object;
+			entityId: string;
+			/** Display label captured when picked (Settings shows it without a
+			 *  lookup); the open itself goes by `entityId`. */
+			title: string;
+	  };
+
+export const DEFAULT_STARTUP_PAGE: StartupPage = { kind: StartupPageKind.Dashboard };
+
+const STARTUP_TITLE_MAX = 200;
+
+/** Normalise an untrusted payload (IPC arg, persisted map) — anything
+ *  malformed, including an object choice without an id, is the default. */
+export function toStartupPage(raw: unknown): StartupPage {
+	if (!raw || typeof raw !== "object") return DEFAULT_STARTUP_PAGE;
+	const record = raw as Record<string, unknown>;
+	if (record.kind === StartupPageKind.TodayJournal) return { kind: StartupPageKind.TodayJournal };
+	if (
+		record.kind === StartupPageKind.Object &&
+		typeof record.entityId === "string" &&
+		record.entityId.length > 0
+	) {
+		const title = typeof record.title === "string" ? record.title.slice(0, STARTUP_TITLE_MAX) : "";
+		return { kind: StartupPageKind.Object, entityId: record.entityId, title };
+	}
+	return DEFAULT_STARTUP_PAGE;
+}

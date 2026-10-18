@@ -7,6 +7,7 @@ import {
 	DateStylePref,
 	HeaderControlId,
 	HourCyclePref,
+	StartupPageKind,
 	isHeaderControlVisible,
 	isWithinDnd,
 } from "@brainstorm-os/protocol/shell-prefs";
@@ -664,6 +665,20 @@ describe("DashboardStore — shell prefs (locale / regional / chrome / notificat
 		const reopened = await DashboardStore.open(yStore);
 		expect(reopened.displayPrefs()).toEqual({ ...DEFAULT_DISPLAY_PREFS, higherContrast: true });
 		expect(reopened.snapshot().display.higherContrast).toBe(true);
+		await reopened.close();
+	});
+
+	it("startup page (7.17): defaults to the dashboard, replaces cleanly, survives reopen", async () => {
+		const store = await DashboardStore.open(yStore);
+		expect(store.snapshot().startupPage).toEqual({ kind: StartupPageKind.Dashboard });
+		store.setStartupPage({ kind: StartupPageKind.Object, entityId: "e1", title: "Plan" });
+		store.setStartupPage({ kind: StartupPageKind.TodayJournal });
+		await store.flush();
+		await store.close();
+		const reopened = await DashboardStore.open(yStore);
+		expect(reopened.snapshot().startupPage).toEqual({ kind: StartupPageKind.TodayJournal });
+		reopened.setStartupPage({ kind: "nonsense" });
+		expect(reopened.snapshot().startupPage).toEqual({ kind: StartupPageKind.Dashboard });
 		await reopened.close();
 	});
 

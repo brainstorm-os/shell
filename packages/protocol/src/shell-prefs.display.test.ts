@@ -2,11 +2,14 @@ import { DisplayAttribute, DisplayAttributeValue, ThemeName, themes } from "@bra
 import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_DISPLAY_PREFS,
+	DEFAULT_STARTUP_PAGE,
 	DISPLAY_PREF_KEYS,
+	StartupPageKind,
 	decodeDisplayPrefs,
 	encodeDisplayPrefs,
 	resolveDisplayPaint,
 	toDisplayPrefs,
+	toStartupPage,
 } from "./shell-prefs";
 
 describe("display prefs (12.18)", () => {
@@ -50,5 +53,29 @@ describe("display prefs (12.18)", () => {
 		expect(paint.attributes[DisplayAttribute.Scrollbars]).toBe(DisplayAttributeValue.Always);
 		expect(paint.attributes[DisplayAttribute.AutoHideSidebars]).toBe(DisplayAttributeValue.On);
 		expect(Object.keys(paint.vars)).toContain("--color-border-default");
+	});
+});
+
+describe("startup page (7.17)", () => {
+	it("defaults to the dashboard for anything malformed", () => {
+		expect(toStartupPage(null)).toEqual(DEFAULT_STARTUP_PAGE);
+		expect(toStartupPage({ kind: "elsewhere" })).toEqual(DEFAULT_STARTUP_PAGE);
+		expect(toStartupPage({ kind: StartupPageKind.Object })).toEqual(DEFAULT_STARTUP_PAGE);
+		expect(toStartupPage({ kind: StartupPageKind.Object, entityId: "" })).toEqual(
+			DEFAULT_STARTUP_PAGE,
+		);
+	});
+
+	it("keeps a journal or object choice, bounding the captured title", () => {
+		expect(toStartupPage({ kind: StartupPageKind.TodayJournal, entityId: "x" })).toEqual({
+			kind: StartupPageKind.TodayJournal,
+		});
+		const page = toStartupPage({
+			kind: StartupPageKind.Object,
+			entityId: "e1",
+			title: "t".repeat(500),
+		});
+		expect(page).toMatchObject({ kind: StartupPageKind.Object, entityId: "e1" });
+		expect(page.kind === StartupPageKind.Object && page.title.length).toBe(200);
 	});
 });

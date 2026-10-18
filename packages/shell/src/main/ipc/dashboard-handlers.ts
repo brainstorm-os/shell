@@ -528,6 +528,11 @@ export function registerDashboardHandlers(
 	);
 
 	ipcMain.handle(
+		"dashboard:set-startup-page",
+		(_event, page: unknown): Promise<void> => withStore((store) => store.setStartupPage(page)),
+	);
+
+	ipcMain.handle(
 		"dashboard:reset-chrome",
 		(): Promise<void> => withStore((store) => store.resetChrome()),
 	);
