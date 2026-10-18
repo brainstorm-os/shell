@@ -281,6 +281,23 @@ export class AgentTraceRecorder {
 		}
 	}
 
+	/** Agent-15 — the run an agent-attributed write belongs to: the
+	 *  principal's latest run in that conversation (the same attachment rule
+	 *  as {@link recordProposalDecision}). Null when none, or on any failure. */
+	async latestRunIdFor(agent: string, conversationId: string): Promise<string | null> {
+		try {
+			const repo = await this.deps.getRepo();
+			if (!repo) return null;
+			const principal = sanitizeTraceText(agent, AGENT_TRACE_ID_MAX);
+			const conversation = nullableId(conversationId);
+			if (!principal || !conversation) return null;
+			return repo.latestRunFor(principal, conversation)?.id ?? null;
+		} catch (error) {
+			warn("resolve", error);
+			return null;
+		}
+	}
+
 	/** Late-bind the persisted `WorkflowRun/v1` entity id onto an automation
 	 *  run (the trace run opens BEFORE the run entity exists — see repo). */
 	async attachWorkflowRunId(runId: string, workflowRunId: string): Promise<void> {

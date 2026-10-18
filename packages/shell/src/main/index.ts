@@ -17,9 +17,11 @@ import {
 	APP_TAB_COMMAND_CHANNEL,
 	APP_WEBVIEW_EVENT_CHANNEL,
 	ActionTrustTier,
+	AgentEventKind,
 	AgentRouting,
 	GEMINI_PROVIDER_ID,
 	GLM_PROVIDER_ID,
+	INVITE_LINK_PREFIX,
 	MISTRAL_PROVIDER_ID,
 	OLLAMA_PROVIDER_ID,
 	OPENAI_PROVIDER_ID,
@@ -31,6 +33,7 @@ import {
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
 	extractFieldsFromTypeSchema,
+	sanitizeTraceText,
 } from "@brainstorm-os/sdk-types";
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
@@ -146,6 +149,7 @@ import { isAuthorizedWriter, keyBytesEqual, resolveMembers } from "./collab/acce
 import { createAutoShareReactor } from "./collab/auto-share-reactor";
 import { ContactsStore, contactsStorePath } from "./collab/contacts-store";
 import { deriveInviteSecret } from "./collab/invite-anchor";
+import { LastEditRecorder } from "./collab/last-edit-recorder";
 import { ShareBootstrapVerdict, authorizeShareBootstrap } from "./collab/share-bootstrap-authz";
 import { authorizesWrapInstall } from "./collab/wrap-install-authz";
 import { makeConnectorsServiceHandler } from "./connectors/connectors-service";
@@ -175,6 +179,7 @@ import { DragSessionStore } from "./dnd/drag-session";
 import { createFileExporter } from "./dnd/file-exporter";
 import { createElectronGhostWindow, createGhostOverlay } from "./dnd/ghost-overlay";
 import {
+	type AgentRunOps,
 	type ApplyRemoteDocFn,
 	type InverseBackfillFn,
 	makeEntitiesServiceHandler,
@@ -219,7 +224,10 @@ import { makeImportServiceHandler } from "./import/import-service";
 import { OPEN_VERB } from "./intents/intents-bus";
 import { makeIntentsServiceHandler } from "./intents/intents-service";
 import { registerActivityHandlers } from "./ipc/activity-handlers";
-import { registerAgentActivityHandlers } from "./ipc/agent-activity-handlers";
+import {
+	bindAgentActivityRunOps,
+	registerAgentActivityHandlers,
+} from "./ipc/agent-activity-handlers";
 import { registerAgentHandlers } from "./ipc/agent-handlers";
 import { registerAiSettingsHandlers } from "./ipc/ai-settings-handlers";
 import { registerAppsHandlers } from "./ipc/apps-handlers";
@@ -271,6 +279,7 @@ import {
 } from "./ipc/properties-handlers";
 import { registerDashboard } from "./ipc/renderer-identity";
 import { registerSearchHandlers } from "./ipc/search-handlers";
+import { registerSharingSettingsHandlers } from "./ipc/sharing-settings-handlers";
 import { registerShortcutsHandlers } from "./ipc/shortcuts-handlers";
 import { registerSideloadHandlers } from "./ipc/sideload-handlers";
 import { registerSpellcheckHandlers } from "./ipc/spellcheck-handlers";
@@ -333,6 +342,7 @@ import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-s
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
+import { PendingInviteSlot } from "./sharing/pending-invite";
 import { makeEngineHolder, makeSharingServiceHandler } from "./sharing/sharing-service";
 import { setActiveShortcutRegistry } from "./shortcuts/active-registry";
 import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcuts/bindings-entity";
@@ -1459,6 +1469,9 @@ setupSingleInstance();
 // arrive before then — a cold-start `open-url` on macOS, or the launch argv —
 // queue here and flush once ready.
 const pendingDeepLinks: string[] = [];
+// Collab-C7 — the single, short-lived slot an invite deep link fills. The link
+// only PRE-FILLS the share dialog; see `sharing/pending-invite.ts`.
+const pendingInviteSlot = new PendingInviteSlot();
 let deepLinkRouter: ((url: string) => void) | null = null;
 function handleInboundDeepLink(url: string): void {
 	if (deepLinkRouter) deepLinkRouter(url);
@@ -1687,14 +1700,35 @@ void app.whenReady().then(async () => {
 	// dashboard, and dispatch an `open` for that entity through the same ladder
 	// a dashboard link uses (shell-sourced). Then flush any links queued during
 	// boot + the cold-start launch argv.
-	deepLinkRouter = (url: string) => {
-		const entityId = parseEntityDeepLink(url);
-		if (!entityId) return;
+	const surfaceDashboardForLink = () => {
 		if (dashboardWindow && !dashboardWindow.isDestroyed()) {
 			if (dashboardWindow.isMinimized()) dashboardWindow.restore();
 			revealWindow(dashboardWindow);
 			if (!focusStealingDisabled()) dashboardWindow.focus();
 		}
+	};
+	deepLinkRouter = (url: string) => {
+		// Collab-C7 — an invite link. Strictly parsed + verified, then parked
+		// for the share dialog to pre-fill; it never shares anything itself.
+		if (url.startsWith(INVITE_LINK_PREFIX)) {
+			const pending = pendingInviteSlot.offerLink(url, Date.now());
+			if (!pending) {
+				console.warn("[deep-link] refused a malformed or unverifiable invite link");
+				return;
+			}
+			surfaceDashboardForLink();
+			const from = sanitizeTraceText(pending.label, 80);
+			getUiNotifyHost().post({
+				appId: "io.brainstorm.shell",
+				kind: "info",
+				title: "Invite link received",
+				body: `${from ? `${from} (${pending.fingerprint})` : pending.fingerprint} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
+			});
+			return;
+		}
+		const entityId = parseEntityDeepLink(url);
+		if (!entityId) return;
+		surfaceDashboardForLink();
 		void launchSetup
 			.getIntents()
 			.then((intents) =>
@@ -3658,6 +3692,9 @@ void app.whenReady().then(async () => {
 			clear: (runId) => activityStore.clear(`agent-run:${runId}`),
 		},
 	});
+	// Agent-15 — bound by the entities service below; read lazily so the
+	// trace service and Settings both reach the same ops.
+	let agentRunOps: AgentRunOps | null = null;
 	workers.broker.registerService(
 		AGENT_TRACE_SERVICE,
 		makeAgentTraceServiceHandler({
@@ -3666,6 +3703,7 @@ void app.whenReady().then(async () => {
 				const session = getActiveVaultSession();
 				return session ? await session.agentTraceRepo() : null;
 			},
+			getRunOps: () => agentRunOps,
 		}),
 	);
 	// The chat-surface chokepoint: every identity-verified envelope an app
@@ -3714,6 +3752,16 @@ void app.whenReady().then(async () => {
 				approved: true,
 				entityId,
 			});
+		},
+		// Agent-15 — journal agent-attributed writes against the run they
+		// belong to, and hand the diff/undo ops to the trace service + Settings.
+		resolveAgentRun: (app, conversationId) => agentTraceRecorder.latestRunIdFor(app, conversationId),
+		bindAgentRunOps: (ops) => {
+			agentRunOps = ops;
+			bindAgentActivityRunOps(ops);
+		},
+		onAgentRunUndone: (runId) => {
+			void agentTraceRecorder.event(runId, { kind: AgentEventKind.RunUndone });
 		},
 		// Asset-B4 — the local asset-kind lookup that drives + gates the implicit
 		// asset-ref bind writer (a null result skips a dangling/remote URL).
@@ -3846,6 +3894,9 @@ void app.whenReady().then(async () => {
 				// container. Opened once per session alongside the DEK store.
 				const entitiesDb = await session.dataStores.open("entities");
 				const entitiesRepo = new EntitiesRepository(entitiesDb);
+				// Collab-C7 — the sync path records who last edited each shared
+				// object (verified inbound sender, or this device on a local edit).
+				const lastEditRecorder = new LastEditRecorder(entitiesRepo.lastEdits);
 				const shareInvites = new ShareInvitesRepository(entitiesDb);
 				// Collab-C5 - see `authorizesWrapInstall`: a DEK ROTATION must come
 				// from an Owner (or ourselves), or any member could re-key an entity
@@ -3882,6 +3933,7 @@ void app.whenReady().then(async () => {
 				};
 				const engine = installLiveSyncEngine({
 					getRelay: () => getActiveRelay(),
+					onEdit: (entityId, editor) => lastEditRecorder.note(entityId, editor),
 					dekStore,
 					devicePub: session.identity.publicKey,
 					deviceSign: (bytes) => session.signPayload(bytes),
@@ -4529,9 +4581,16 @@ void app.whenReady().then(async () => {
 				if (!session) return null;
 				return new ContactsStore({ path: contactsStorePath(session.vaultPath) });
 			},
+			// Collab-C7 — the deep-link invite slot, the default share role, and
+			// the last-editor read.
+			takePendingInvite: () => pendingInviteSlot.take(Date.now()),
+			getSettingsRepo: getSettingsRepoForActiveSession,
+			getEntitiesRepo: getEntitiesRepoForActiveSession,
 			now: () => Date.now(),
 		}),
 	);
+	onActiveVaultSessionChanged(() => pendingInviteSlot.clear());
+	registerSharingSettingsHandlers({ getSettingsRepo: getSettingsRepoForActiveSession });
 
 	// PRES-2b — the `presence` service: the sandbox surface for live presence
 	// (avatar stack + remote cursors). `publish` is re-checked against

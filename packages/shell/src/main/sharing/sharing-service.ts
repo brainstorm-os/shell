@@ -30,7 +30,13 @@
 
 import { Buffer } from "node:buffer";
 import { type CapabilityLedger, LedgerUnavailableError } from "@brainstorm-os/capabilities/ledger";
-import type { ShareInviteToken, SharedContact, SharedMember } from "@brainstorm-os/sdk-types";
+import type {
+	PendingInvite,
+	ShareInviteToken,
+	SharedContact,
+	SharedLastEdit,
+	SharedMember,
+} from "@brainstorm-os/sdk-types";
 import { RosterRole } from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
@@ -40,7 +46,10 @@ import { cacheRemoteProfile } from "../collab/profile-store";
 import { type ShareInvite, inviteProfile, verifyShareInvite } from "../collab/share-invite";
 import type { CollabAccessView, CollabRelayLike } from "../collab/sharing-engine";
 import { SharingEngine } from "../collab/sharing-engine";
+import type { EntitiesRepository } from "../storage/entities-repo";
+import type { SettingsRepository } from "../storage/settings-repo";
 import type { VaultSession } from "../vault/session";
+import { readDefaultShareRole } from "./share-defaults";
 
 /** Capabilities gating the share surface. `read` is a default grant (mint your
  *  own invite / read access you can already see); `share` is scarce. */
@@ -65,6 +74,13 @@ export type SharingServiceOptions = {
 	 *  ⇒ the contacts methods + the `contact` share shorthand are unavailable
 	 *  (paste-a-code still works). */
 	readonly getContactsStore?: () => Promise<ContactsStore | null>;
+	/** Collab-C7 — hand over (and forget) the invite a deep link delivered. */
+	readonly takePendingInvite?: () => PendingInvite | null;
+	/** Collab-C7 — the per-vault settings store holding the default share role. */
+	readonly getSettingsRepo?: () => Promise<SettingsRepository | null>;
+	/** Collab-C7 — the active vault's entities repo: resolves an entity's type
+	 *  server-side (the read gate) and reads its last recorded editor. */
+	readonly getEntitiesRepo?: () => Promise<EntitiesRepository | null>;
 	readonly now?: () => number;
 };
 
@@ -126,6 +142,16 @@ function decodeInviteToken(token: unknown): ShareInvite {
 		throw makeError("Invalid", "sharing: invite failed verification");
 	}
 	return parsed;
+}
+
+/** Collab-C7 — {@link decodeInviteToken} as a predicate: the verified invite,
+ *  or null for anything malformed / forged. */
+export function verifyInviteToken(token: unknown): ShareInvite | null {
+	try {
+		return decodeInviteToken(token);
+	} catch {
+		return null;
+	}
 }
 
 function parseRole(value: unknown): AccessRole {
@@ -310,8 +336,51 @@ export function makeSharingServiceHandler(options: SharingServiceOptions): Servi
 		return (await engineFor().access(entityId)).map(toSharedMember);
 	}
 
+	/** Collab-C7 — the deep-link invite, for the share dialog to pre-fill.
+	 *  SCARCE like `share` itself: only a surface that could add a member may
+	 *  see an invite waiting to be added. Consumed on read. */
+	async function handlePendingInvite(envelope: Envelope): Promise<PendingInvite | null> {
+		await requireCapability(envelope, options, SHARING_SHARE_CAPABILITY);
+		return options.takePendingInvite?.() ?? null;
+	}
+
+	async function handleDefaultRole(envelope: Envelope): Promise<RosterRole> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		return readDefaultShareRole((await options.getSettingsRepo?.()) ?? null);
+	}
+
+	/** Collab-C7 — the last recorded editor of a shared object. Gated on
+	 *  `sharing.read` AND `entities.read:<type>`, the type resolved HERE from
+	 *  the repo (never the caller's claim): who-edited-what is information
+	 *  about an object the caller must already be able to read. */
+	async function handleLastEdit(envelope: Envelope): Promise<SharedLastEdit | null> {
+		await requireCapability(envelope, options, SHARING_READ_CAPABILITY);
+		const entityId = typeof envelope.args[0] === "string" ? envelope.args[0] : "";
+		if (!entityId) throw makeError("Invalid", "sharing.lastEdit: entityId required");
+		const repo = (await options.getEntitiesRepo?.()) ?? null;
+		if (!repo) return null;
+		const type = repo.get(entityId)?.type;
+		if (!type) return null;
+		// A type the caller cannot read answers exactly like an unknown id — a
+		// Denied naming the type would itself leak what the object is.
+		try {
+			await requireCapability(envelope, options, `entities.read:${type}`);
+		} catch (error) {
+			if ((error as Error).name === "Denied") return null;
+			throw error;
+		}
+		const edit = repo.lastEdits.get(entityId);
+		return edit ? { editor: edit.editor, editedAt: edit.editedAt } : null;
+	}
+
 	return async (envelope: Envelope): Promise<unknown> => {
 		switch (envelope.method) {
+			case "pendingInvite":
+				return await handlePendingInvite(envelope);
+			case "defaultRole":
+				return await handleDefaultRole(envelope);
+			case "lastEdit":
+				return await handleLastEdit(envelope);
 			case "createInvite":
 				return await handleCreateInvite(envelope);
 			case "share":

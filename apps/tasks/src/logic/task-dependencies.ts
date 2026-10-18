@@ -9,6 +9,7 @@
  */
 
 import type { Task } from "../types/task";
+import { isClosed } from "./task-status";
 
 /** A task's dependency ids, normalised (absent → []). */
 export function dependenciesOf(task: Task): readonly string[] {
@@ -26,7 +27,7 @@ export function blockingTasks(task: Task, byId: ReadonlyMap<string, Task>): Task
 	const out: Task[] = [];
 	for (const id of dependenciesOf(task)) {
 		const dep = byId.get(id);
-		if (dep && dep.completedAt === null) out.push(dep);
+		if (dep && !isClosed(dep)) out.push(dep);
 	}
 	return out;
 }

@@ -101,15 +101,20 @@ describe("persistApprovedProposal (the approve gesture's write path)", () => {
 			collectionMembers: { include: [{ entityId: "ent_a", addedAt: 1, by: "user" }], exclude: [] },
 			now: NOW,
 		});
-		expect(entities.update).toHaveBeenCalledWith("list_crm", {
-			members: {
-				include: [
-					{ entityId: "ent_a", addedAt: 1, by: "user" },
-					{ entityId: "ent_new", addedAt: NOW, by: "app:io.brainstorm.agent" },
-				],
-				exclude: [],
+		expect(entities.update).toHaveBeenCalledWith(
+			"list_crm",
+			{
+				members: {
+					include: [
+						{ entityId: "ent_a", addedAt: 1, by: "user" },
+						{ entityId: "ent_new", addedAt: NOW, by: "app:io.brainstorm.agent" },
+					],
+					exclude: [],
+				},
 			},
-		});
+			// Agent-15 — the pin is part of the run, so it is journaled for undo.
+			{ conversationId: "conv_1" },
+		);
 	});
 
 	it("never touches membership for a typed database (the source picks the row up)", async () => {

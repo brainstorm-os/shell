@@ -14,6 +14,13 @@ import { summarizeRecurrence } from "@brainstorm-os/sdk-types";
 import type { RecurrenceSummaryLabels } from "@brainstorm-os/sdk-types";
 import type { Project } from "../types/project";
 import { Priority, type Task } from "../types/task";
+import { CompletionState, completionStateOf } from "./task-status";
+
+const QUICK_LOOK_COMPLETION_KEY = {
+	[CompletionState.Open]: "tasks.quickLook.value.open",
+	[CompletionState.Done]: "tasks.quickLook.value.done",
+	[CompletionState.WontDo]: "tasks.quickLook.value.wontDo",
+} as const;
 
 export type QuickLookRow = {
 	/** i18n key for the row's field name. */
@@ -54,8 +61,7 @@ export function buildQuickLookSheet(ctx: QuickLookContext): QuickLookSheet {
 
 	rows.push({
 		labelKey: "tasks.quickLook.field.status",
-		value:
-			task.completedAt !== null ? t("tasks.quickLook.value.done") : t("tasks.quickLook.value.open"),
+		value: t(QUICK_LOOK_COMPLETION_KEY[completionStateOf(task)]),
 	});
 
 	if (task.projectId !== null) {

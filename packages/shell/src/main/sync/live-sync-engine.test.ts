@@ -151,6 +151,25 @@ async function settle(...devices: Device[]): Promise<void> {
 }
 
 describe("LiveSyncEngine — always-on live sync (10.12)", () => {
+	it("Collab-C7: records the editor on both sides — local emitter, and the verified remote sender", async () => {
+		const [pa, pb] = LoopbackRelayPort.pair(2);
+		if (!pa || !pb) throw new Error("missing ports");
+		const dekA = new FakeDekStore();
+		dekA.mint(ENT);
+		const dekB = new FakeDekStore();
+		dekB.seedFrom(dekA, ENT);
+		const editsA: Array<[string, string]> = [];
+		const editsB: Array<[string, string]> = [];
+		const a = makeDevice(pa, dekA, () => true, { onEdit: (id, ed) => editsA.push([id, ed]) });
+		const b = makeDevice(pb, dekB, () => true, { onEdit: (id, ed) => editsB.push([id, ed]) });
+		await a.engine.trackOpen(ENT, TYPE);
+		await b.engine.trackOpen(ENT, TYPE);
+		a.doc.getText("body").insert(0, "hi");
+		await settle(a, b);
+		expect(editsA).toHaveLength(1);
+		expect(editsB).toEqual(editsA);
+	});
+
 	it("a local edit on one shared, tracked device reaches the other's live doc", async () => {
 		const [pa, pb] = LoopbackRelayPort.pair(2);
 		if (!pa || !pb) throw new Error("missing ports");

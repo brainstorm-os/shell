@@ -20,6 +20,8 @@ async function fresh() {
 
 type TableInfo = { name: string; sql: string };
 
+const LATEST_VERSION = ENTITIES_MIGRATIONS[ENTITIES_MIGRATIONS.length - 1]?.version ?? 0;
+
 function listTables(db: Awaited<ReturnType<typeof fresh>>): TableInfo[] {
 	return db
 		.prepare(
@@ -29,11 +31,11 @@ function listTables(db: Awaited<ReturnType<typeof fresh>>): TableInfo[] {
 }
 
 describe("entities.db schema", () => {
-	it("fresh install applies v1..v11 in order and ends at version 11", async () => {
+	it("fresh install applies every migration in order and ends at the latest version", async () => {
 		const db = await fresh();
 		try {
-			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(11);
-			expect(getSchemaVersion(db)).toBe(11);
+			expect(await applyMigrations(db, ENTITIES_MIGRATIONS)).toBe(LATEST_VERSION);
+			expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
 			const names = listTables(db).map((t) => t.name);
 			expect(names).toContain("entities");
 			expect(names).toContain("links");
@@ -45,6 +47,8 @@ describe("entities.db schema", () => {
 			expect(names).toContain("share_invites");
 			expect(names).toContain("entity_versions");
 			expect(names).toContain("history_change_sets");
+			expect(names).toContain("agent_writes");
+			expect(names).toContain("entity_last_edits");
 		} finally {
 			db.close();
 		}
@@ -54,10 +58,10 @@ describe("entities.db schema", () => {
 		const db = await fresh();
 		try {
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(11);
+			expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
 			// Second pass — nothing pending, version unchanged.
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(11);
+			expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
 		} finally {
 			db.close();
 		}
@@ -81,7 +85,7 @@ describe("entities.db schema", () => {
 			insert.run("journal-ideas", NOTE, "{}", "io.brainstorm.notes", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(11);
+			expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
 
 			const typeOf = (id: string) =>
 				(db.prepare("SELECT type, created_by FROM entities WHERE id = ?").get(id) as {
@@ -113,7 +117,7 @@ describe("entities.db schema", () => {
 			insert.run("p_kenji", PERSON, JSON.stringify({ name: "Kenji" }), "x", 1, 2);
 
 			await applyMigrations(db, ENTITIES_MIGRATIONS);
-			expect(getSchemaVersion(db)).toBe(11);
+			expect(getSchemaVersion(db)).toBe(LATEST_VERSION);
 
 			// Two Company entities created, one per distinct name.
 			const companies = db

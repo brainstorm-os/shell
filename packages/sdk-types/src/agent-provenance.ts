@@ -43,12 +43,21 @@ export const AGENT_PROPOSAL_PROPERTY_KEY = "agentProposal";
  *  the two keys above were both learned the expensive way. */
 export const AGENT_DELEGATED_BY_PROPERTY_KEY = "agentDelegatedBy";
 
+/** Agent-16 — the flat, filterable "created by agent" system property: the
+ *  provenance stamp's `agent`, projected onto every read of an entity so a list
+ *  can filter / group on it like any scalar column. DERIVED, never stored: the
+ *  repo projects it from the stamp on read and strips it on write, so the value
+ *  a surface sees can only ever be the stamp's — a caller that writes the key
+ *  writes nothing (it is reserved, so the service drops it first). */
+export const CREATED_BY_AGENT_PROPERTY_KEY = "createdByAgent";
+
 /** Property keys an app may never write. The service strips each on create and
  *  update; the host writes them through the repo directly. */
 export const RESERVED_PROPERTY_KEYS: readonly string[] = [
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AGENT_PROPOSAL_PROPERTY_KEY,
 	AGENT_DELEGATED_BY_PROPERTY_KEY,
+	CREATED_BY_AGENT_PROPERTY_KEY,
 ];
 
 /** Drop every reserved key from a caller-supplied bag. Returns the same
@@ -157,5 +166,33 @@ export function readAgentProvenance(
 export function stripAgentProvenance(properties: Record<string, unknown>): Record<string, unknown> {
 	if (!(AGENT_PROVENANCE_PROPERTY_KEY in properties)) return properties;
 	const { [AGENT_PROVENANCE_PROPERTY_KEY]: _drop, ...rest } = properties;
+	return rest;
+}
+
+/** Agent-16 — a stored property bag as a reader sees it: the derived
+ *  {@link CREATED_BY_AGENT_PROPERTY_KEY} set from the provenance stamp when one
+ *  is present and well-formed, and REMOVED otherwise (a stray stored value can
+ *  never surface). Returns the same reference when nothing changes. */
+export function projectAgentAuthorship(
+	properties: Record<string, unknown>,
+): Record<string, unknown> {
+	const agent = readAgentProvenance(properties)?.agent ?? null;
+	const current = properties[CREATED_BY_AGENT_PROPERTY_KEY];
+	if (agent === null) {
+		if (!(CREATED_BY_AGENT_PROPERTY_KEY in properties)) return properties;
+		const { [CREATED_BY_AGENT_PROPERTY_KEY]: _drop, ...rest } = properties;
+		return rest;
+	}
+	if (current === agent) return properties;
+	return { ...properties, [CREATED_BY_AGENT_PROPERTY_KEY]: agent };
+}
+
+/** Agent-16 — the bag to PERSIST: the derived key removed (it is recomputed on
+ *  every read). Same reference when absent. */
+export function stripDerivedAuthorship(
+	properties: Record<string, unknown>,
+): Record<string, unknown> {
+	if (!(CREATED_BY_AGENT_PROPERTY_KEY in properties)) return properties;
+	const { [CREATED_BY_AGENT_PROPERTY_KEY]: _drop, ...rest } = properties;
 	return rest;
 }

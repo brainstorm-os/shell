@@ -12,9 +12,11 @@
 import type {
 	AgentProposalDecision,
 	AgentProposalsService,
+	AgentRunChanges,
 	AgentRunSummary,
 	AgentTraceEventRecord,
 	AgentTraceService,
+	AgentUndoResult,
 	AiCostEstimate,
 	AiExtractRequest,
 	AiExtractResult,
@@ -95,6 +97,7 @@ import type {
 	NetworkService,
 	ObjectDragItem,
 	PatternQueryResult,
+	PendingInvite,
 	PlatformCatalog,
 	PlatformService,
 	PresenceService,
@@ -104,6 +107,7 @@ import type {
 	RosterAgent,
 	RosterMember,
 	RosterProfileInput,
+	RosterRole,
 	RosterSelf,
 	RosterService,
 	SearchHit,
@@ -114,6 +118,7 @@ import type {
 	SettingsService,
 	ShareInviteToken,
 	SharedContact,
+	SharedLastEdit,
 	SharedMember,
 	SharingService,
 	ShortcutDeclaration,
@@ -862,8 +867,22 @@ function entitiesProxy(bridge: Bridge): EntitiesService {
 				],
 				[],
 			),
-		update: (id, patch) => callService<Entity>(bridge, "entities", "update", [{ id, patch }], []),
-		delete: (id) => callService<void>(bridge, "entities", "delete", [{ id }], []),
+		update: (id, patch, provenance) =>
+			callService<Entity>(
+				bridge,
+				"entities",
+				"update",
+				[provenance === undefined ? { id, patch } : { id, patch, provenance }],
+				[],
+			),
+		delete: (id, provenance) =>
+			callService<void>(
+				bridge,
+				"entities",
+				"delete",
+				[provenance === undefined ? { id } : { id, provenance }],
+				[],
+			),
 		merge: (survivorId, loserIds, patch) =>
 			callService<EntityMergeResult>(
 				bridge,
@@ -1134,6 +1153,9 @@ function agentTraceProxy(bridge: Bridge): AgentTraceService {
 				[input],
 				[],
 			),
+		listChanges: (input) =>
+			callService<AgentRunChanges | null>(bridge, "agent-trace", "listChanges", [input], []),
+		undoRun: (input) => callService<AgentUndoResult>(bridge, "agent-trace", "undoRun", [input], []),
 	};
 }
 
@@ -1180,6 +1202,15 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<SharedMember[]>(bridge, "sharing", "revoke", [input], ["sharing.share"]),
 		access: (entityId) =>
 			callService<SharedMember[]>(bridge, "sharing", "access", [entityId], ["sharing.read"]),
+		// Collab-C7 — the deep-link invite (scarce, like `share`), the default
+		// share role, and the last recorded editor (also read-gated on the
+		// entity's type, resolved server-side).
+		pendingInvite: () =>
+			callService<PendingInvite | null>(bridge, "sharing", "pendingInvite", [], ["sharing.share"]),
+		defaultRole: () =>
+			callService<RosterRole>(bridge, "sharing", "defaultRole", [], ["sharing.read"]),
+		lastEdit: (entityId) =>
+			callService<SharedLastEdit | null>(bridge, "sharing", "lastEdit", [entityId], ["sharing.read"]),
 	};
 }
 

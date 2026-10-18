@@ -9,7 +9,7 @@
  * entirely rather than rendering a single unlabelled group.
  */
 
-import { type Entity, FILE_TYPE, FOLDER_TYPE, readName } from "../types/entity";
+import { type Entity, FILE_TYPE, FOLDER_TYPE, readExtension, readName } from "../types/entity";
 
 export enum GroupKey {
 	None = "none",
@@ -53,10 +53,8 @@ export type GroupLabels = {
 function typeBucket(entity: Entity, labels: GroupLabels): { key: string; label: string } {
 	if (entity.type === FOLDER_TYPE) return { key: "folder", label: labels.folders };
 	if (entity.type === FILE_TYPE) {
-		const name = readName(entity);
-		const dot = name.lastIndexOf(".");
-		const ext = dot > 0 ? name.slice(dot + 1) : "";
-		if (ext.length > 0 && ext.length <= 8 && !ext.includes(" ")) {
+		const ext = readExtension(entity);
+		if (ext.length > 0) {
 			const upper = ext.toUpperCase();
 			return { key: `ext:${upper}`, label: upper };
 		}
