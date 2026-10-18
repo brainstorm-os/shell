@@ -41,6 +41,7 @@ import type {
 	CalDavCalendarInfo,
 	CalDavService,
 	CalDavSyncSummary,
+	ChangeSetRevertResult,
 	ConnectorRequestResult,
 	ConnectorWebhookEndpoint,
 	ConnectorWebhookStatus,
@@ -132,6 +133,10 @@ import type {
 	UiService,
 	VaultEntitiesService,
 	VaultEntitiesSnapshot,
+	VersionHistoryList,
+	VersionHistoryService,
+	VersionPreview,
+	VersionRestoreResult,
 	WebViewClient,
 	WebViewEvent,
 	WebViewExtractedText,
@@ -299,6 +304,7 @@ export function buildRuntime(options: BuildRuntimeOptions): AppRuntime {
 			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			history: historyProxy(bridge),
 			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
@@ -385,6 +391,7 @@ export function buildRuntimeWithEmitter(options: BuildRuntimeOptions): {
 			agentTrace: agentTraceProxy(bridge),
 			roster: rosterProxy(bridge),
 			sharing: sharingProxy(bridge),
+			history: historyProxy(bridge),
 			presence: presenceProxy(bridge),
 			ui: uiProxy(bridge),
 			theme: themeProxy(bridge),
@@ -1211,6 +1218,18 @@ function sharingProxy(bridge: Bridge): SharingService {
 			callService<RosterRole>(bridge, "sharing", "defaultRole", [], ["sharing.read"]),
 		lastEdit: (entityId) =>
 			callService<SharedLastEdit | null>(bridge, "sharing", "lastEdit", [entityId], ["sharing.read"]),
+	};
+}
+
+function historyProxy(bridge: Bridge): VersionHistoryService {
+	// 10.16 — no capability on the wire: the shell gates every call by the
+	// entity's own `entities.read|write:<type>` plus the OQ-VH-2 role rule.
+	return {
+		list: (entityId) => callService<VersionHistoryList>(bridge, "history", "list", [entityId], []),
+		preview: (input) => callService<VersionPreview>(bridge, "history", "preview", [input], []),
+		restore: (input) => callService<VersionRestoreResult>(bridge, "history", "restore", [input], []),
+		revertChangeSet: (changeSetId) =>
+			callService<ChangeSetRevertResult>(bridge, "history", "revertChangeSet", [changeSetId], []),
 	};
 }
 

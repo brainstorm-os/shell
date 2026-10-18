@@ -41,6 +41,8 @@ export type HistoryPrincipal = {
 export enum HistoryAccess {
 	/** Preview content, diff properties, restore. */
 	Restore = "restore",
+	/** Preview and diff, but no write grant to restore with. */
+	Preview = "preview",
 	/** The version list only — no earlier content. */
 	ListOnly = "list-only",
 }
@@ -71,10 +73,8 @@ export enum VersionPropertyChangeKind {
 export type VersionPropertyChange = {
 	key: string;
 	kind: VersionPropertyChangeKind;
-	/** Value in the version. */
-	then: unknown;
-	/** Value now. */
-	now: unknown;
+	versionValue: unknown;
+	currentValue: unknown;
 };
 
 export type VersionPreview = {
@@ -109,6 +109,8 @@ export type RevertSkipped = {
 export type ChangeSetRevertResult = {
 	reverted: string[];
 	skipped: RevertSkipped[];
+	/** Entities skipped that the caller may not read — counted, never named. */
+	hiddenCount: number;
 	/** The `BeforeRestore` change set the revert itself recorded. */
 	revertChangeSetId: string;
 };

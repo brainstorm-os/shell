@@ -103,7 +103,12 @@ export type VersionHistoryOptions = {
 	idleMinIntervalMs?: number;
 	retentionIntervalMs?: number;
 	/** Perf gate — every real capture's encode time and size. */
-	onCapture?: (info: { entityId: string; cause: VersionCause; encodeMs: number; bytes: number }) => void;
+	onCapture?: (info: {
+		entityId: string;
+		cause: VersionCause;
+		encodeMs: number;
+		bytes: number;
+	}) => void;
 };
 
 const principalKey = (p: { kind: HistoryPrincipalKind; id: string }): string => `${p.kind}:${p.id}`;
@@ -181,7 +186,10 @@ export class VersionHistory {
 	}
 
 	/** A `Manual` checkpoint (also the test seam for an immediate capture). */
-	captureNow(entityId: string, cause: VersionCause = VersionCause.Manual): Promise<EntityVersionRecord | null> {
+	captureNow(
+		entityId: string,
+		cause: VersionCause = VersionCause.Manual,
+	): Promise<EntityVersionRecord | null> {
 		return this.run(async () => {
 			const stores = await this.requireStores();
 			return this.captureLocked(stores, entityId, cause, null, cause !== VersionCause.Idle);
@@ -198,7 +206,9 @@ export class VersionHistory {
 		return stores.versions.get(versionId);
 	}
 
-	preview(record: EntityVersionRecord): Promise<{ bodyText: string; properties: Record<string, unknown> }> {
+	preview(
+		record: EntityVersionRecord,
+	): Promise<{ bodyText: string; properties: Record<string, unknown> }> {
 		return this.run(async () => {
 			const body = await this.options.worker.preview(record.entityId, frameOf(record));
 			return { bodyText: body.bodyText, properties: record.properties };
@@ -239,7 +249,11 @@ export class VersionHistory {
 		app: string;
 		changeSetId: string;
 		principal: ChangeSetPrincipal;
-		gate: (entity: { id: string; type: string; properties: Record<string, unknown> }) => RevertGateResult;
+		gate: (entity: {
+			id: string;
+			type: string;
+			properties: Record<string, unknown>;
+		}) => RevertGateResult | Promise<RevertGateResult>;
 	}): Promise<{ results: RevertEntityResult[]; revertChangeSetId: string }> {
 		return this.run(async () => {
 			const stores = await this.requireStores();
@@ -260,7 +274,7 @@ export class VersionHistory {
 					results.push({ entityId, outcome: RevertOutcome.Deleted });
 					continue;
 				}
-				const gate = input.gate(entity);
+				const gate = await input.gate(entity);
 				if (gate !== RevertGateResult.Allow) {
 					results.push({
 						entityId,
@@ -272,13 +286,7 @@ export class VersionHistory {
 					results.push({ entityId, outcome: RevertOutcome.EditedSince });
 					continue;
 				}
-				await this.captureLocked(
-					stores,
-					entityId,
-					VersionCause.BeforeRestore,
-					revertChangeSetId,
-					true,
-				);
+				await this.captureLocked(stores, entityId, VersionCause.BeforeRestore, revertChangeSetId, true);
 				await this.restoreLocked(input.app, checkpoint);
 				this.noteWrite(entityId, [input.principal]);
 				results.push({ entityId, outcome: RevertOutcome.Reverted });
@@ -482,10 +490,7 @@ export class VersionHistory {
 				keep.set(r.frameOffset, { offset: r.frameOffset, length: r.frameLength });
 			}
 			const moved = await this.options.worker.compact(entityId, [...keep.values()]);
-			stores.versions.relocateFrames(
-				entityId,
-				new Map(moved.filter(([from, to]) => from !== to)),
-			);
+			stores.versions.relocateFrames(entityId, new Map(moved.filter(([from, to]) => from !== to)));
 		}
 		stores.changeSets.deleteOrphans();
 		return plan.drop.size;

@@ -25,7 +25,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CapabilityLedger as CapabilityLedgerType } from "@brainstorm-os/capabilities/ledger";
 import { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	type ChangeSetRevertResult,
+	HistoryAccess,
+	HistoryPrincipalKind,
+	type PropertyDef,
+	RevertSkipReason,
+	ValueType,
+	VersionCause,
+	type VersionHistoryList,
+	type VersionPreview,
+} from "@brainstorm-os/sdk-types";
 // `PropertyStore` is the exact store the Notes `PropertiesProvider`
 // feeds the snapshot into; the picker lists `store.getSnapshot()`. It
 // only imports `@brainstorm-os/sdk-types` (no Lexical / no Notes `Window`
@@ -52,14 +62,27 @@ import { bootstrapApps } from "../apps/seed-packaged-apps";
 import { generateSymmetricKey } from "../credentials/crypto";
 import type { DashboardStore } from "../dashboard/dashboard-store";
 import { makeEntitiesServiceHandler } from "../entities/entities-service";
+import type { RestoreEntityFn } from "../entities/entities-service";
 import { EntityDekStore } from "../entities/entity-dek-store";
 import { readEntityDocProjection } from "../entities/entity-doc-codec";
 import { makeVaultEntitiesServiceHandler } from "../entities/vault-entities-service";
+import {
+	HistoryRole,
+	agentPrincipal,
+	makeHistoryServiceHandler,
+	memberPrincipal,
+} from "../history/history-service";
+import { type HistoryCaptureReply, VersionHistory } from "../history/version-history";
 import { IntentsBus } from "../intents/intents-bus";
 import { makePropertiesServiceHandler } from "../properties/properties-service";
 import { PROPERTIES_DOC_ID, PropertiesStore } from "../properties/properties-store";
 import { DataStores } from "../storage/data-stores";
-import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import {
+	EntitiesRepository,
+	EntityDeksRepository,
+	EntityVersionsRepository,
+	HistoryChangeSetsRepository,
+} from "../storage/entities-repo";
 import { RegistryRepositories } from "../storage/registry-repo";
 import { AppsRepository } from "../storage/registry-repo/apps-repo";
 import { YDocStore } from "../storage/ydoc-store";
@@ -1079,5 +1102,428 @@ describe("packaged-app upgrade path (13.10 — stale install → seed-upgrade �
 		expect(second.skipped).toEqual([UPGRADE_APP.expectedAppId]);
 		expect(second.upgraded).toEqual([]);
 		expect(second.installed).toEqual([]);
+	});
+});
+
+// 10.16 — version history end to end: the REAL entities service + REAL ydoc
+// worker (in-process) + VersionHistory + the `history` broker handler. Proves
+// capture, restore-as-forward-edit, the OQ-VH-2 role rule, server-side version
+// resolution and the change-set revert's "edited since" rule.
+describe("version history pipeline (entities service → ydoc worker → history)", () => {
+	const SELF = memberPrincipal("self-key");
+	const OTHER = memberPrincipal("other-key");
+	let env: Awaited<ReturnType<typeof setup>>;
+	let clock: number;
+
+	beforeEach(async () => {
+		env = await setup();
+		__ydocCacheResetForTest();
+		clock = 1_800_000_000_000;
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	});
+	afterEach(async () => {
+		vi.useRealTimers();
+		__ydocCacheResetForTest();
+		env.stores.close();
+		await rm(env.vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+		await rm(env.sourceDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(
+			() => {},
+		);
+	});
+
+	const ydoc = async (method: string, a: unknown): Promise<unknown> => {
+		const reply = await handleYDocEnvelope({
+			v: 1,
+			msg: "y",
+			app: "io.brainstorm.shell",
+			service: "ydoc",
+			method,
+			args: [a],
+			caps: [],
+		});
+		if (!reply.ok) throw new Error(`ydoc.${method} failed: ${reply.error.message}`);
+		return reply.value;
+	};
+
+	function grantLedger(grants: Record<string, string[]>): CapabilityLedgerType {
+		return {
+			has(app: string, required: string): boolean {
+				const mine = grants[app] ?? [];
+				const [cap] = required.split(":");
+				return mine.includes(required) || mine.includes(`${cap}:*`);
+			},
+		} as unknown as CapabilityLedgerType;
+	}
+
+	async function makeStack(
+		opts: {
+			grants?: Record<string, string[]>;
+			role?: (entityId: string) => HistoryRole;
+			cap?: number;
+		} = {},
+	) {
+		const db = await env.stores.open("entities");
+		const repo = new EntitiesRepository(db);
+		const versions = new EntityVersionsRepository(db);
+		const changeSets = new HistoryChangeSetsRepository(db);
+		const dekStore = new EntityDekStore(new EntityDeksRepository(db), generateSymmetricKey());
+		const ledger = grantLedger(opts.grants ?? { "io.x": ["entities.read:*", "entities.write:*"] });
+		let restorer: RestoreEntityFn | null = null;
+		const captures: Array<{ encodeMs: number; bytes: number }> = [];
+		const history = new VersionHistory({
+			getStores: async () => ({ entities: repo, versions, changeSets }),
+			getRestorer: () => restorer,
+			getPolicy: async () => ({
+				capBytes: opts.cap ?? Number.MAX_SAFE_INTEGER,
+				agentPrincipalCapBytes: Number.MAX_SAFE_INTEGER,
+				agentPrincipalCapCount: Number.MAX_SAFE_INTEGER,
+			}),
+			now: () => clock,
+			onCapture: (c) => captures.push(c),
+			worker: {
+				capture: async (entityId, sinceStateKey) =>
+					(await ydoc("historyCapture", {
+						vaultPath: env.vaultDir,
+						entityId,
+						sinceStateKey,
+					})) as HistoryCaptureReply,
+				preview: async (entityId, frame) =>
+					(await ydoc("historyPreview", { vaultPath: env.vaultDir, entityId, ...frame })) as {
+						bodyText: string;
+						properties: Record<string, unknown> | null;
+					},
+				compact: async (entityId, keep) =>
+					(
+						(await ydoc("historyCompact", { vaultPath: env.vaultDir, entityId, keep })) as {
+							moved: Array<[number, number]>;
+						}
+					).moved,
+			},
+		});
+		const entities = makeEntitiesServiceHandler({
+			getRepo: async () => repo,
+			getLedger: async () => ledger,
+			getDekStore: async () => dekStore,
+			newId: () => `ent_${Math.random().toString(36).slice(2)}`,
+			now: () => clock,
+			getVaultPath: () => env.vaultDir,
+			ydoc: ydoc as never,
+			bindRestoreEntity: (fn) => {
+				restorer = fn;
+			},
+			onLocalWrite: (entityId, _type, writer) =>
+				history.noteWrite(entityId, [writer.agent ? agentPrincipal(writer.app) : SELF]),
+		});
+		const historyHandler = makeHistoryServiceHandler({
+			getHistory: () => history,
+			getRepo: async () => repo,
+			getLedger: async () => ledger,
+			resolveRole: async (id) => opts.role?.(id) ?? HistoryRole.NotShared,
+			selfPrincipal: () => SELF,
+			labelPrincipal: (p) => (p.id === SELF.id ? "You" : p.id),
+		});
+		const ent = (method: string, a: unknown, app = "io.x") =>
+			entities({ v: 1, msg: "m", app, service: "entities", method, args: [a], caps: [] });
+		const hist = (method: string, a: unknown, app = "io.x") =>
+			historyHandler({ v: 1, msg: "h", app, service: "history", method, args: [a], caps: [] });
+		return { repo, versions, history, ent, hist, captures };
+	}
+
+	type Stack = Awaited<ReturnType<typeof makeStack>>;
+
+	async function writeBody(stack: Stack, id: string, text: string): Promise<void> {
+		const loaded = (await stack.ent("loadDoc", { id })) as { snapshotB64: string };
+		const doc = new Y.Doc();
+		Y.applyUpdate(doc, Buffer.from(loaded.snapshotB64, "base64"));
+		const before = Y.encodeStateVector(doc);
+		const root = doc.get("root", Y.XmlText) as Y.XmlText;
+		doc.transact(() => {
+			if (root.length > 0) root.delete(0, root.length);
+			const p = new Y.XmlText();
+			p.setAttribute("__type", "paragraph");
+			p.insert(0, text);
+			root.insertEmbed(0, p);
+		});
+		const update = Y.encodeStateAsUpdate(doc, before);
+		await stack.ent("applyDoc", { id, updateB64: Buffer.from(update).toString("base64") });
+	}
+
+	async function bodyText(id: string): Promise<string> {
+		__ydocCacheResetForTest();
+		const loaded = (await ydoc("load", { vaultPath: env.vaultDir, entityId: id })) as {
+			snapshotB64: string;
+		};
+		const doc = new Y.Doc();
+		Y.applyUpdate(doc, Buffer.from(loaded.snapshotB64, "base64"));
+		const root = doc.get("root", Y.XmlText) as Y.XmlText;
+		return (root.toDelta() as Array<{ insert: unknown }>)
+			.map((op) => (op.insert instanceof Y.XmlText ? op.insert.toString() : ""))
+			.join("|");
+	}
+
+	const advance = async (ms: number, stack: Stack) => {
+		clock += ms;
+		await vi.advanceTimersByTimeAsync(ms);
+		await stack.history.idle();
+	};
+
+	it("Idle: captures 2 min after the last write, only if changed, ≤1 per 10 min", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "T", statusKey: "todo" },
+		})) as { id: string };
+		await advance(60_000, stack);
+		expect(stack.versions.listByEntity(made.id)).toHaveLength(0);
+		await advance(61_000, stack);
+		const first = stack.versions.listByEntity(made.id);
+		expect(first).toHaveLength(1);
+		expect(first[0]?.cause).toBe(VersionCause.Idle);
+		expect(first[0]?.principals.map((p) => p.id)).toEqual([SELF.id]);
+
+		await stack.ent("update", { id: made.id, patch: { statusKey: "doing" } });
+		await advance(3 * 60_000, stack);
+		expect(stack.versions.listByEntity(made.id)).toHaveLength(1);
+		await advance(8 * 60_000, stack);
+		expect(stack.versions.listByEntity(made.id)).toHaveLength(2);
+
+		// A write that leaves the doc as it was is not a change.
+		await stack.ent("update", { id: made.id, patch: { statusKey: "doing" } });
+		await advance(20 * 60_000, stack);
+		expect(stack.versions.listByEntity(made.id)).toHaveLength(2);
+	});
+
+	it("restore is a forward edit of properties AND body, and is itself undoable", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "Plan", statusKey: "todo" },
+		})) as { id: string };
+		await writeBody(stack, made.id, "first draft");
+		const v1 = await stack.history.captureNow(made.id);
+		if (!v1) throw new Error("expected a checkpoint");
+
+		clock += 1_000;
+		await stack.ent("update", { id: made.id, patch: { statusKey: "done", extra: "x" } });
+		await writeBody(stack, made.id, "rewritten");
+		expect(await bodyText(made.id)).toBe("rewritten");
+
+		const preview = (await stack.hist("preview", {
+			entityId: made.id,
+			versionId: v1.versionId,
+		})) as VersionPreview;
+		expect(preview.bodyText).toBe("first draft");
+		expect(preview.changes.map((c) => c.key).sort()).toEqual(["extra", "statusKey"]);
+
+		const restored = (await stack.hist("restore", {
+			entityId: made.id,
+			versionId: v1.versionId,
+		})) as { beforeRestoreVersionId: string };
+		expect(stack.repo.get(made.id)?.properties).toMatchObject({ statusKey: "todo", extra: null });
+		expect(await bodyText(made.id)).toBe("first draft");
+
+		await stack.hist("restore", { entityId: made.id, versionId: restored.beforeRestoreVersionId });
+		expect(stack.repo.get(made.id)?.properties).toMatchObject({ statusKey: "done", extra: "x" });
+		expect(await bodyText(made.id)).toBe("rewritten");
+		const causes = stack.versions.listByEntity(made.id).map((v) => v.cause);
+		expect(causes.filter((c) => c === VersionCause.BeforeRestore)).toHaveLength(2);
+	});
+
+	it("never trusts the client's (entity, version) pairing", async () => {
+		const stack = await makeStack();
+		const a = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		const b = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "B" },
+		})) as {
+			id: string;
+		};
+		const va = await stack.history.captureNow(a.id);
+		await expect(
+			stack.hist("restore", { entityId: b.id, versionId: va?.versionId }),
+		).rejects.toMatchObject({ name: "Invalid" });
+		await expect(
+			stack.hist("preview", { entityId: b.id, versionId: va?.versionId }),
+		).rejects.toMatchObject({ name: "Invalid" });
+		await expect(stack.hist("list", "../../etc")).rejects.toMatchObject({ name: "Invalid" });
+	});
+
+	it("gates by the entity's own grants and is no existence oracle", async () => {
+		const stack = await makeStack({
+			grants: {
+				"io.x": ["entities.read:*", "entities.write:*"],
+				"io.reader": ["entities.read:brainstorm/Task/v1"],
+				"io.stranger": ["entities.read:brainstorm/Other/v1"],
+			},
+		});
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		const v = await stack.history.captureNow(made.id);
+		const asReader = (await stack.hist("list", made.id, "io.reader")) as VersionHistoryList;
+		expect(asReader.access).toBe(HistoryAccess.Preview);
+		await expect(
+			stack.hist("restore", { entityId: made.id, versionId: v?.versionId }, "io.reader"),
+		).rejects.toMatchObject({ name: "Denied" });
+		const hidden = Promise.resolve(stack.hist("list", made.id, "io.stranger"));
+		const missing = Promise.resolve(stack.hist("list", "ent_nope", "io.stranger"));
+		await expect(hidden).rejects.toMatchObject({ name: "Invalid" });
+		await expect(missing).rejects.toMatchObject({ name: "Invalid" });
+		await expect(hidden.catch((e: Error) => e.message)).resolves.toBe(
+			await missing.catch((e: Error) => e.message),
+		);
+	});
+
+	it("refuses to restore a locked object", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		const v = await stack.history.captureNow(made.id);
+		await stack.ent("update", { id: made.id, patch: { locked: true } });
+		await expect(
+			stack.hist("restore", { entityId: made.id, versionId: v?.versionId }),
+		).rejects.toMatchObject({ name: "Denied" });
+	});
+
+	it("OQ-VH-2: a Viewer of a shared object gets the list, never earlier content", async () => {
+		const stack = await makeStack({ role: () => HistoryRole.Viewer });
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		const v = await stack.history.captureNow(made.id);
+		const list = (await stack.hist("list", made.id)) as VersionHistoryList;
+		expect(list.access).toBe(HistoryAccess.ListOnly);
+		expect(list.versions).toHaveLength(1);
+		expect(JSON.stringify(list)).not.toContain('"title"');
+		await expect(
+			stack.hist("preview", { entityId: made.id, versionId: v?.versionId }),
+		).rejects.toMatchObject({ name: "Denied" });
+		await expect(
+			stack.hist("restore", { entityId: made.id, versionId: v?.versionId }),
+		).rejects.toMatchObject({ name: "Denied" });
+	});
+
+	it("a bulk change reverts as one action; an entity someone else edited since is skipped by name", async () => {
+		const stack = await makeStack();
+		const ids: string[] = [];
+		for (const title of ["One", "Two", "Three"]) {
+			const made = (await stack.ent("create", {
+				type: "brainstorm/Task/v1",
+				properties: { title, statusKey: "todo" },
+			})) as { id: string };
+			ids.push(made.id);
+		}
+		clock += 1_000;
+		const cs = await stack.history.beginChangeSet(VersionCause.BeforeBulk, [SELF]);
+		await stack.history.checkpointBefore(ids, cs);
+		expect(await stack.history.checkpointBefore(ids, cs)).toEqual([]);
+		for (const id of ids) await stack.ent("update", { id, patch: { statusKey: "done" } });
+		clock += 1_000;
+		const two = ids[1] as string;
+		await stack.ent("update", { id: two, patch: { note: "by a teammate" } });
+		stack.history.noteWrite(two, [OTHER]);
+
+		const result = (await stack.hist("revertChangeSet", cs)) as ChangeSetRevertResult;
+		expect(result.reverted.sort()).toEqual([ids[0], ids[2]].sort());
+		expect(result.skipped).toEqual([
+			{ entityId: two, title: "Two", reason: RevertSkipReason.EditedSince },
+		]);
+		expect(stack.repo.get(ids[0] as string)?.properties.statusKey).toBe("todo");
+		expect(stack.repo.get(two)?.properties.statusKey).toBe("done");
+		// The revert recorded its own change set, so it can be undone too.
+		expect(stack.versions.listByChangeSet(result.revertChangeSetId)).toHaveLength(2);
+	});
+
+	it("an agent's writes are attributed to the agent, server-side", async () => {
+		const stack = await makeStack({
+			grants: { "io.brainstorm.agent": ["entities.read:*", "entities.write:*"] },
+		});
+		const made = (await stack.ent(
+			"create",
+			{ type: "brainstorm/Task/v1", properties: { title: "A" }, provenance: { conversationId: "c1" } },
+			"io.brainstorm.agent",
+		)) as { id: string };
+		const v = await stack.history.captureNow(made.id);
+		expect(v?.principals).toEqual([
+			expect.objectContaining({ kind: HistoryPrincipalKind.Agent, id: "io.brainstorm.agent" }),
+		]);
+	});
+
+	it("retention reclaims .yhist bytes and relocated frames still preview", async () => {
+		const stack = await makeStack({ cap: 1 });
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		for (const text of ["one", "two", "three"]) {
+			await writeBody(stack, made.id, text);
+			clock += 1_000;
+			await stack.history.captureNow(made.id);
+		}
+		expect(await stack.history.prune()).toBe(2);
+		const left = stack.versions.listByEntity(made.id);
+		expect(left).toHaveLength(1);
+		const preview = (await stack.hist("preview", {
+			entityId: made.id,
+			versionId: left[0]?.versionId,
+		})) as VersionPreview;
+		expect(preview.bodyText).toBe("three");
+	});
+
+	it("perf: Idle-capture encode cost for a typical and a large doc", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "A" },
+		})) as {
+			id: string;
+		};
+		const measure = async (paragraphs: number, label: string) => {
+			const loaded = (await stack.ent("loadDoc", { id: made.id })) as { snapshotB64: string };
+			const doc = new Y.Doc();
+			Y.applyUpdate(doc, Buffer.from(loaded.snapshotB64, "base64"));
+			const sv = Y.encodeStateVector(doc);
+			const root = doc.get("root", Y.XmlText) as Y.XmlText;
+			doc.transact(() => {
+				for (let i = 0; i < paragraphs; i++) {
+					const p = new Y.XmlText();
+					p.setAttribute("__type", "paragraph");
+					p.insert(0, `Paragraph ${i} — the quick brown fox jumps over the lazy dog. `.repeat(3));
+					root.insertEmbed(root.length, p);
+				}
+			});
+			const update = Y.encodeStateAsUpdate(doc, sv);
+			await stack.ent("applyDoc", { id: made.id, updateB64: Buffer.from(update).toString("base64") });
+			stack.captures.length = 0;
+			const started = performance.now();
+			await stack.history.captureNow(made.id);
+			const totalMs = performance.now() - started;
+			const c = stack.captures[0];
+			process.stderr.write(
+				`[perf] history capture ${label}: ${c?.bytes} bytes, encode ${c?.encodeMs.toFixed(2)} ms, end-to-end ${totalMs.toFixed(2)} ms\n`,
+			);
+			expect(c?.encodeMs).toBeLessThan(500);
+		};
+		await measure(40, "typical (~40 paragraphs)");
+		await measure(5_000, "large (~5k paragraphs)");
 	});
 });

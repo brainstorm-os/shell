@@ -402,8 +402,8 @@ export const ENTITIES_MIGRATIONS: SqliteMigration[] = [
 			// to decode a body. `principals` is server-derived JSON: who wrote
 			// since the previous checkpoint, each with their last write time (the
 			// change-set revert's "edited since" rule reads it). `state_key` hashes
-			// the doc's state vector + delete set, so "only if changed" also sees a
-			// pure deletion. Several rows may share one frame (a change-set
+			// the doc's content (properties, links, body), so "only if changed"
+			// ignores an idempotent re-write and still sees a pure deletion. Several rows may share one frame (a change-set
 			// checkpoint of an unchanged doc).
 			// LOCAL state (OQ-VH-1) — never syncs, never exported. Overlaps Agent-15's
 			// `agent_writes` journal by design: that holds per-write property diffs

@@ -116,7 +116,13 @@ describe("tiers", () => {
 
 describe("per-principal AgentRun cap", () => {
 	const agentRun = (agent: string, at: number, over: Partial<RetentionCandidate> = {}) =>
-		cp({ at, cause: VersionCause.AgentRun, changeSetId: `run-${agent}`, agentPrincipal: agent, ...over });
+		cp({
+			at,
+			cause: VersionCause.AgentRun,
+			changeSetId: `run-${agent}`,
+			agentPrincipal: agent,
+			...over,
+		});
 
 	it("caps an agent by count, newest first", () => {
 		const runs = Array.from({ length: 10 }, (_, i) => agentRun("bot", NOW - i * 1_000));
@@ -142,7 +148,9 @@ describe("per-principal AgentRun cap", () => {
 	it("a looping agent never evicts another agent or the user's history", () => {
 		const loop = Array.from({ length: 500 }, (_, i) => agentRun("looper", NOW - i));
 		const other = agentRun("polite", NOW - 10_000);
-		const user = Array.from({ length: 20 }, (_, i) => cp({ at: NOW - i * 60_000, entityId: `u${i}` }));
+		const user = Array.from({ length: 20 }, (_, i) =>
+			cp({ at: NOW - i * 60_000, entityId: `u${i}` }),
+		);
 		const policy: RetentionPolicy = {
 			capBytes: 100_000,
 			agentPrincipalCapBytes: 1_100,

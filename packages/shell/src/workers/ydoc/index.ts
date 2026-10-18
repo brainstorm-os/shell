@@ -43,7 +43,7 @@ import {
 	writeEntityLinks,
 	writeEntityProps,
 } from "../../main/entities/entity-doc-codec";
-import { bodyPlainText, replaceBody } from "../../main/history/body-replace";
+import { bodyContent, bodyPlainText, replaceBody } from "../../main/history/body-replace";
 import { assertSafeEntityId } from "../../main/storage/entity-id";
 import { YDocStore } from "../../main/storage/ydoc-store";
 import { type HistFrameRef, YHistStore } from "../../main/storage/yhist-store";
@@ -151,10 +151,11 @@ function histFor(vaultPath: string): YHistStore {
 	return store;
 }
 
-/** Identity of a doc's CRDT state: state vector AND delete set, so a pure
- *  deletion (which does not advance the state vector) still reads as a change. */
+/** Identity of a doc's CONTENT — properties, links and body — so "only if
+ *  changed" ignores an idempotent re-write and still sees a pure deletion. */
 function docStateKey(doc: Y.Doc): string {
-	return createHash("sha256").update(Y.encodeSnapshot(Y.snapshot(doc))).digest("base64url");
+	const content = { ...readEntityDocProjection(doc), body: bodyContent(doc) };
+	return createHash("sha256").update(JSON.stringify(content)).digest("base64url");
 }
 
 function frameRefArg(raw: { offset?: unknown; length?: unknown }, method: string): HistFrameRef {
@@ -168,7 +169,11 @@ function frameRefArg(raw: { offset?: unknown; length?: unknown }, method: string
 	return { offset: offset as number, length: length as number };
 }
 
-async function readCheckpointDoc(vaultPath: string, entityId: string, ref: HistFrameRef): Promise<Y.Doc> {
+async function readCheckpointDoc(
+	vaultPath: string,
+	entityId: string,
+	ref: HistFrameRef,
+): Promise<Y.Doc> {
 	const bytes = await histFor(vaultPath).read(entityId, ref);
 	const doc = new Y.Doc();
 	Y.applyUpdate(doc, bytes);

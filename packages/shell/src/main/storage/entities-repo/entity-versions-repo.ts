@@ -6,8 +6,8 @@
  * never syncs (OQ-VH-1).
  */
 
-import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 import type { HistoryPrincipalKind, VersionCause } from "@brainstorm-os/sdk-types";
+import type { SqliteDatabase } from "@brainstorm-os/sqlite";
 
 /** A writer recorded on a checkpoint, with the time of its last write in the
  *  window the checkpoint closes. */

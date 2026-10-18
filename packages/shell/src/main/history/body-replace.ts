@@ -16,16 +16,21 @@ import * as Y from "yjs";
 
 type DeltaOp = { insert?: unknown; attributes?: Record<string, unknown> };
 
+export type CloneableYType =
+	| Y.XmlText
+	| Y.Text
+	| Y.XmlElement
+	| Y.XmlFragment
+	| Y.Map<unknown>
+	| Y.Array<unknown>;
+
 function cloneValue(value: unknown): unknown {
-	if (value instanceof Y.AbstractType) return cloneType(value);
+	if (value instanceof Y.AbstractType) return cloneType(value as CloneableYType);
 	if (value === null || typeof value !== "object") return value;
 	return structuredClone(value);
 }
 
-function cloneAttributes(
-	source: Y.XmlText | Y.XmlElement,
-	target: Y.XmlText | Y.XmlElement,
-): void {
+function cloneAttributes(source: Y.XmlText | Y.XmlElement, target: Y.XmlText | Y.XmlElement): void {
 	const attrs = source.getAttributes() as Record<string, unknown>;
 	for (const [key, value] of Object.entries(attrs)) {
 		(target as Y.XmlElement).setAttribute(key, cloneValue(value) as string);
@@ -40,7 +45,7 @@ function cloneDelta(delta: readonly DeltaOp[]): DeltaOp[] {
 	}));
 }
 
-export function cloneType(type: Y.AbstractType<unknown>): Y.AbstractType<unknown> {
+export function cloneType(type: CloneableYType): CloneableYType {
 	if (type instanceof Y.XmlText) {
 		const out = new Y.XmlText();
 		cloneAttributes(type, out);
@@ -57,7 +62,7 @@ export function cloneType(type: Y.AbstractType<unknown>): Y.AbstractType<unknown
 		cloneAttributes(type, out);
 		out.insert(
 			0,
-			type.toArray().map((child) => cloneType(child as Y.AbstractType<unknown>)) as Y.XmlElement[],
+			type.toArray().map((child) => cloneType(child as CloneableYType)) as Y.XmlElement[],
 		);
 		return out;
 	}
@@ -65,7 +70,7 @@ export function cloneType(type: Y.AbstractType<unknown>): Y.AbstractType<unknown
 		const out = new Y.XmlFragment();
 		out.insert(
 			0,
-			type.toArray().map((child) => cloneType(child as Y.AbstractType<unknown>)) as Y.XmlElement[],
+			type.toArray().map((child) => cloneType(child as CloneableYType)) as Y.XmlElement[],
 		);
 		return out;
 	}
@@ -81,7 +86,7 @@ export function cloneType(type: Y.AbstractType<unknown>): Y.AbstractType<unknown
 		out.push(type.toArray().map(cloneValue));
 		return out;
 	}
-	throw new Error(`body-replace: cannot clone ${type.constructor.name}`);
+	throw new Error(`body-replace: cannot clone ${(type as object).constructor.name}`);
 }
 
 export function bodyRoot(doc: Y.Doc): Y.XmlText {
@@ -131,4 +136,31 @@ export function bodyPlainText(doc: Y.Doc, maxChars = BODY_PREVIEW_MAX_CHARS): st
 	};
 	walk(bodyRoot(doc));
 	return lines.join("\n").slice(0, maxChars);
+}
+
+function serialize(value: unknown): unknown {
+	if (value instanceof Y.XmlText) {
+		return {
+			t: "xt",
+			a: value.getAttributes(),
+			d: (value.toDelta() as DeltaOp[]).map((op) => ({ i: serialize(op.insert), f: op.attributes })),
+		};
+	}
+	if (value instanceof Y.XmlElement) {
+		return {
+			t: "xe",
+			n: value.nodeName,
+			a: value.getAttributes(),
+			c: value.toArray().map(serialize),
+		};
+	}
+	if (value instanceof Y.AbstractType) return (value as Y.Map<unknown>).toJSON();
+	return value;
+}
+
+/** The body's CONTENT, canonically serialised. Two docs with the same body
+ *  serialise equally even when their CRDT histories differ — what "only if
+ *  changed" means to a person (an idempotent re-write is not a change). */
+export function bodyContent(doc: Y.Doc): unknown {
+	return doc.share.has(UNIVERSAL_BODY_FRAGMENT_NAME) ? serialize(bodyRoot(doc)) : null;
 }
