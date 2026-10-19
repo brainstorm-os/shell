@@ -20,6 +20,7 @@
  */
 
 import { type BlockRuntimeContext, startBlock } from "@brainstorm-os/sdk/block-runtime";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { entityTitleOr, resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { createEmbeddedRow } from "./create-row";
 import {
@@ -171,6 +172,13 @@ function renderGrid(
 	add.className = "bsdb__new";
 	add.textContent = t("embed.new");
 	add.setAttribute("aria-label", t("embed.newIn", { name }));
+	if (isLockedProperties(list.properties)) {
+		// A disabled control fires no pointer events, so the native title is the
+		// one place the reason can live.
+		add.disabled = true;
+		add.title = t("embed.locked", { name });
+		add.setAttribute("aria-label", t("embed.locked", { name }));
+	}
 	add.addEventListener("click", () => {
 		add.disabled = true;
 		actions.onNew().catch(() => {

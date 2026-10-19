@@ -32,6 +32,8 @@ import {
 	type MemberOverrides,
 } from "@brainstorm-os/sdk-types";
 
+import { isLockedProperties } from "./entity-lock";
+
 /** Re-exported for call sites that create/query the entity by type. */
 export const LIST_ENTITY_TYPE = COLLECTION_TYPE_URL;
 
@@ -85,6 +87,7 @@ export function entityToList(entity: ListEntityRow): List | null {
 		views: asStringArray(p.views),
 		defaultViewId: asStringOrNull(p.defaultViewId),
 		defaultTemplate: asStringOrNull(p.defaultTemplate),
+		...(isLockedProperties(p) ? { locked: true as const } : {}),
 		createdAt: entity.createdAt,
 		updatedAt: entity.updatedAt,
 	};

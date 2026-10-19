@@ -74,4 +74,11 @@ describe("embedded block New (9.12.24 follow-up)", () => {
 			.properties.members;
 		expect(members.include.map((m) => m.entityId)).toEqual(["new_1"]);
 	});
+
+	it("refuses to create into a locked List — no row, no members write", async () => {
+		const locked = list({ source: null, members: { include: [], exclude: [] }, locked: true });
+		const graph = vi.fn(async () => ({}));
+		await expect(createEmbeddedRow(graph as never, locked, VIEW, null)).rejects.toThrow();
+		expect(graph).not.toHaveBeenCalled();
+	});
 });

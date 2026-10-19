@@ -21,6 +21,7 @@ const EN = {
 	"embed.createFailed": "Couldn't create",
 	"embed.empty": "No items yet",
 	"embed.loadFailed": "Couldn't load this database.",
+	"embed.locked": "{name} is locked — unlock it to add items",
 };
 
 type EmbedManifest = typeof EN;
@@ -34,6 +35,7 @@ export const EMBED_PACKS: Readonly<Record<string, EmbedManifest>> = {
 		"embed.createFailed": "Erstellen fehlgeschlagen",
 		"embed.empty": "Noch keine Elemente",
 		"embed.loadFailed": "Diese Datenbank konnte nicht geladen werden.",
+		"embed.locked": "{name} ist gesperrt – entsperren, um Elemente hinzuzufügen",
 	},
 	es: {
 		"embed.fallbackTitle": "Base de datos",
@@ -42,6 +44,7 @@ export const EMBED_PACKS: Readonly<Record<string, EmbedManifest>> = {
 		"embed.createFailed": "No se pudo crear",
 		"embed.empty": "Aún no hay elementos",
 		"embed.loadFailed": "No se pudo cargar esta base de datos.",
+		"embed.locked": "{name} está bloqueada: desbloquéala para añadir elementos",
 	},
 	fr: {
 		"embed.fallbackTitle": "Base de données",
@@ -50,6 +53,7 @@ export const EMBED_PACKS: Readonly<Record<string, EmbedManifest>> = {
 		"embed.createFailed": "Création impossible",
 		"embed.empty": "Aucun élément pour l'instant",
 		"embed.loadFailed": "Impossible de charger cette base de données.",
+		"embed.locked": "{name} est verrouillée — déverrouillez-la pour ajouter des éléments",
 	},
 	it: {
 		"embed.fallbackTitle": "Database",
@@ -58,6 +62,7 @@ export const EMBED_PACKS: Readonly<Record<string, EmbedManifest>> = {
 		"embed.createFailed": "Impossibile creare",
 		"embed.empty": "Ancora nessun elemento",
 		"embed.loadFailed": "Impossibile caricare questo database.",
+		"embed.locked": "{name} è bloccato: sbloccalo per aggiungere elementi",
 	},
 	pt: {
 		"embed.fallbackTitle": "Banco de dados",
@@ -66,6 +71,7 @@ export const EMBED_PACKS: Readonly<Record<string, EmbedManifest>> = {
 		"embed.createFailed": "Não foi possível criar",
 		"embed.empty": "Ainda não há itens",
 		"embed.loadFailed": "Não foi possível carregar este banco de dados.",
+		"embed.locked": "{name} está bloqueado — desbloqueie para adicionar itens",
 	},
 };
 

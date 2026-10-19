@@ -11,6 +11,7 @@ import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 import type { List } from "../types/list";
 import { sourceMatches } from "./collections-for-entity";
 import type { EntityRow, InMemoryEntities } from "./in-memory-entities";
+import { isListLocked } from "./list-lock";
 import { AddOutcome, MembersCapacityError, addToList } from "./members";
 
 export type EntityPatch = { id: string; patch: Record<string, unknown> };
@@ -99,6 +100,7 @@ export function revertBulkAdd(
 	undo: Extract<BulkUndo, { kind: BulkUndoKind.AddToCollection }>,
 	now: number = Date.now(),
 ): List {
+	if (isListLocked(list)) return list;
 	const included = new Set(undo.included);
 	const include = list.members.include.filter((m) => !included.has(m.entityId));
 	const present = new Set([
@@ -167,6 +169,8 @@ export type BulkAddPlan = {
 	lockedSkipped: number;
 	/** Rows not added because the list hit the members hard cap. */
 	overCapacity: number;
+	/** The List itself is locked — nothing was added. */
+	listLocked: boolean;
 	undo: BulkUndo;
 };
 
@@ -179,6 +183,22 @@ export function planBulkAddToList(
 	now: number = Date.now(),
 ): BulkAddPlan {
 	const { writable, lockedSkipped } = partition(rows, ids);
+	if (isListLocked(list)) {
+		return {
+			next: list,
+			added: 0,
+			lockedSkipped,
+			overCapacity: 0,
+			listLocked: true,
+			undo: {
+				kind: BulkUndoKind.AddToCollection,
+				at: now,
+				listId: list.id,
+				included: [],
+				unexcluded: [],
+			},
+		};
+	}
 	let members = list.members;
 	let added = 0;
 	let overCapacity = 0;
@@ -207,6 +227,7 @@ export function planBulkAddToList(
 		added,
 		lockedSkipped,
 		overCapacity,
+		listLocked: false,
 		undo: { kind: BulkUndoKind.AddToCollection, at: now, listId: list.id, included, unexcluded },
 	};
 }
