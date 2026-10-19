@@ -887,12 +887,22 @@ export class WindowContainer {
 				}
 			} else this.cycleTab(chord === TabChord.NextTab ? 1 : -1);
 		};
+		// A renderer torn down from outside the container (DevTools, a crash
+		// handler, another `webContents.close()`) must not linger as a pane:
+		// a dead side pane would keep the split open and pin the primary at pane
+		// width for the rest of the window's life. The container's own teardown
+		// detaches this listener before it closes the renderer.
+		const onGone = () => {
+			if (tab === this.side) this.closeSidePane();
+			else this.closeTab(tab.tabId);
+		};
 		wc.on("page-title-updated", onTitle);
 		wc.on("page-favicon-updated", onFavicon);
 		wc.on("did-finish-load", onLoaded);
 		wc.on("dom-ready", onLoaded);
 		wc.on("before-input-event", onChord);
 		wc.on("focus", onFocus);
+		wc.on("destroyed", onGone);
 		this.perTabDetach.set(tab.tabId, () => {
 			try {
 				wc.off("page-title-updated", onTitle);
@@ -901,6 +911,7 @@ export class WindowContainer {
 				wc.off("dom-ready", onLoaded);
 				wc.off("before-input-event", onChord);
 				wc.off("focus", onFocus);
+				wc.off("destroyed", onGone);
 			} catch {
 				// Renderer already gone — Electron cleaned the listeners up.
 			}
