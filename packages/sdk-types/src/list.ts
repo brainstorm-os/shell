@@ -386,6 +386,10 @@ export type List = {
 	 *  (`view.defaultTemplate → collection.defaultTemplate → type-default →
 	 *  blank`); see 66-templates.md. */
 	defaultTemplate: string | null;
+	/** The shared read-only lock (`properties.locked`), decoded so every
+	 *  membership writer can refuse a locked List. Read-side only: the codec
+	 *  never writes it back — the lock flips through its own lock-only patch. */
+	locked?: true;
 	createdAt: number;
 	updatedAt: number;
 };

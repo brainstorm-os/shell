@@ -8,6 +8,7 @@
  */
 
 import { type ListView, type MemberOverrides, decideRowCreate } from "@brainstorm-os/sdk-types";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { draftForList } from "../../logic/entity-draft";
 import { addToList } from "../../logic/members";
 import { type BlockGraph, type BpEntity, readSource } from "./resolve-rows";
@@ -55,6 +56,9 @@ export async function createEmbeddedRow(
 	view: ListView | null,
 	hostEntityId: string | null,
 ): Promise<BpEntity> {
+	// A locked List is read-only: no row is drafted into it and its members
+	// are never rewritten (9.16.14). The UI disables "+ New"; this is the gate.
+	if (isLockedProperties(list.properties)) throw new Error("embedded list is locked");
 	const plan = planEmbeddedRow(list, view, hostEntityId);
 	const created = await graph<BpEntity>("createEntity", {
 		entityTypeId: plan.entityTypeId,
