@@ -168,7 +168,7 @@ button:focus-visible {
 	will-change: transform;
 }
 
-.tasks-main[data-nav-open="false"] #tasks-sidebar-slot {
+.tasks-main[data-nav-open="false"] #tasks-sidebar-slot:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
 	visibility: hidden;

@@ -553,10 +553,16 @@ textarea {
 	min-width: 0;
 }
 
-.notes[data-nav-open="false"] .notes__nav {
+.notes[data-nav-open="false"] .notes__nav:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-color: transparent;
 	visibility: hidden;
+}
+
+/* Auto-hide (7.15): the hot-zone and the overlay start below the header row. */
+.notes > .bs-autohide-edge,
+.notes__nav[data-bs-autohide] {
+	top: 44px;
 }
 
 /* PHYSICAL-AXIS INTENTIONAL: resize handle straddles the nav's right edge geometrically */

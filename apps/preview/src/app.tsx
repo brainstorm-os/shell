@@ -18,6 +18,7 @@ import { EmptyState } from "@brainstorm-os/sdk/empty-state";
 import { requestSaveBytes } from "@brainstorm-os/sdk/export-file";
 import { IconName } from "@brainstorm-os/sdk/icon";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
+import { PanelSide, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PreviewFile } from "./demo/dataset";
@@ -300,6 +301,8 @@ export function PreviewApp(): ReactElement {
 		};
 	}, [navigateTo, focusById, applyGallery]);
 
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
+
 	const chip = useMemo(() => chipLabelFor(context, total), [context, total]);
 	const counterText =
 		total > 0 ? t("counter.position", { index: cursor + 1, total }) : t("counter.empty");
@@ -347,7 +350,14 @@ export function PreviewApp(): ReactElement {
 				</div>
 			</header>
 			<main className={rootClass} id="preview-root">
-				<FileSidebar files={vaultFiles} activeId={activeFile?.id ?? null} onOpen={openLibraryFile} />
+				<FileSidebar
+					files={vaultFiles}
+					activeId={activeFile?.id ?? null}
+					onOpen={openLibraryFile}
+					open={sidebarAutoHide.visible}
+					autoHide={sidebarAutoHide.panelProps}
+				/>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 				<div className="preview__main">
 					<div className="preview__body">
 						<div className="preview__stage">
