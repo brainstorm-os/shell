@@ -20,7 +20,12 @@ import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository } from "../storage/entities-repo";
 import { SettingsRepository } from "../storage/settings-repo";
 import { VaultSession } from "../vault/session";
-import { PENDING_INVITE_TTL_MS, PendingInviteSlot } from "./pending-invite";
+import {
+	InviteOfferOutcome,
+	PENDING_INVITE_TTL_MS,
+	PendingInviteSlot,
+	sanitizeInviteLabel,
+} from "./pending-invite";
 import { readDefaultShareRole, writeDefaultShareRole } from "./share-defaults";
 import { makeSharingServiceHandler } from "./sharing-service";
 
@@ -82,7 +87,8 @@ describe("Collab-C7", () => {
 
 	describe("invite deep link slot", () => {
 		it("parks a verified invite with who it is from, and hands it over once", () => {
-			const pending = slot.offerLink(inviteLinkFor(token), 1_000);
+			const { outcome, pending } = slot.offerLink(inviteLinkFor(token), 1_000);
+			expect(outcome).toBe(InviteOfferOutcome.Held);
 			expect(pending).toMatchObject({ invite: token, receivedAt: 1_000 });
 			expect(pending?.fingerprint.startsWith("ed25519:")).toBe(true);
 			expect(slot.take(1_001)?.invite).toBe(token);
@@ -101,9 +107,46 @@ describe("Collab-C7", () => {
 				inviteLinkFor(forged),
 				42,
 			]) {
-				expect(slot.offerLink(url, 1_000)).toBeNull();
+				expect(slot.offerLink(url, 1_000)).toEqual({
+					outcome: InviteOfferOutcome.Refused,
+					pending: null,
+				});
 			}
 			expect(slot.take(1_000)).toBeNull();
+		});
+
+		it("a second, different link never silently replaces the waiting one", async () => {
+			const minter = makeSharingServiceHandler({ getSession: () => session, getRelay: () => null });
+			const other = (await minter(envelope("createInvite", ["Other"]))) as ShareInviteToken;
+			expect(slot.offerLink(inviteLinkFor(token), 1_000).outcome).toBe(InviteOfferOutcome.Held);
+			expect(slot.offerLink(inviteLinkFor(token), 1_100).outcome).toBe(InviteOfferOutcome.Duplicate);
+			const busy = slot.offerLink(inviteLinkFor(other), 1_200);
+			expect(busy.outcome).toBe(InviteOfferOutcome.Busy);
+			expect(busy.pending?.invite).toBe(token);
+			expect(slot.take(1_300)?.invite).toBe(token);
+			expect(slot.offerLink(inviteLinkFor(other), 1_400).outcome).toBe(InviteOfferOutcome.Held);
+		});
+
+		it("an expired waiting invite gives way to a new link", async () => {
+			const minter = makeSharingServiceHandler({ getSession: () => session, getRelay: () => null });
+			const other = (await minter(envelope("createInvite", ["Other"]))) as ShareInviteToken;
+			slot.offerLink(inviteLinkFor(token), 0);
+			expect(slot.offerLink(inviteLinkFor(other), PENDING_INVITE_TTL_MS + 1).outcome).toBe(
+				InviteOfferOutcome.Held,
+			);
+		});
+
+		it("sanitizes the sender-chosen label: no controls, bidi, or fake fingerprints", async () => {
+			const minter = makeSharingServiceHandler({ getSession: () => session, getRelay: () => null });
+			const spoof = (await minter(
+				envelope("createInvite", ["Mara\u202e (ed25519:ab:cd:ef)\u0007"]),
+			)) as ShareInviteToken;
+			const { pending } = slot.offerLink(inviteLinkFor(spoof), 1_000);
+			expect(pending?.label).toBe("Mara ()");
+			expect(pending?.label).not.toMatch(/ed25519/i);
+			expect(pending?.label).not.toContain("\u202e");
+			expect(pending?.label).not.toContain("\u0007");
+			expect(sanitizeInviteLabel("x".repeat(500))).toHaveLength(80);
 		});
 
 		it("expires an untaken invite", () => {

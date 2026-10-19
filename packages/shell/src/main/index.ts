@@ -33,7 +33,6 @@ import {
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
 	extractFieldsFromTypeSchema,
-	sanitizeTraceText,
 } from "@brainstorm-os/sdk-types";
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
@@ -352,7 +351,7 @@ import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-s
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
-import { PendingInviteSlot } from "./sharing/pending-invite";
+import { InviteOfferOutcome, PendingInviteSlot } from "./sharing/pending-invite";
 import { makeEngineHolder, makeSharingServiceHandler } from "./sharing/sharing-service";
 import { setActiveShortcutRegistry } from "./shortcuts/active-registry";
 import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcuts/bindings-entity";
@@ -1732,18 +1731,28 @@ void app.whenReady().then(async () => {
 		// Collab-C7 — an invite link. Strictly parsed + verified, then parked
 		// for the share dialog to pre-fill; it never shares anything itself.
 		if (url.startsWith(INVITE_LINK_PREFIX)) {
-			const pending = pendingInviteSlot.offerLink(url, Date.now());
-			if (!pending) {
+			const offer = pendingInviteSlot.offerLink(url, Date.now());
+			if (offer.outcome === InviteOfferOutcome.Refused) {
 				console.warn("[deep-link] refused a malformed or unverifiable invite link");
 				return;
 			}
 			surfaceDashboardForLink();
-			const from = sanitizeTraceText(pending.label, 80);
+			const { pending } = offer;
+			const from = pending.label ? `${pending.label} (${pending.fingerprint})` : pending.fingerprint;
+			if (offer.outcome === InviteOfferOutcome.Busy) {
+				getUiNotifyHost().post({
+					appId: "io.brainstorm.shell",
+					kind: "warning",
+					title: "Another invite is already waiting",
+					body: `The invite from ${from} is still waiting, so the new link was ignored. Open Share to use the waiting invite first, then open the new link again.`,
+				});
+				return;
+			}
 			getUiNotifyHost().post({
 				appId: "io.brainstorm.shell",
 				kind: "info",
 				title: "Invite link received",
-				body: `${from ? `${from} (${pending.fingerprint})` : pending.fingerprint} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
+				body: `${from} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
 			});
 			return;
 		}
