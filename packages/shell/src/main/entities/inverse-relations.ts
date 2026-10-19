@@ -15,17 +15,22 @@
  * side then drops the far entity — one bounded extra hop, never a cascade.
  */
 
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { type PropertyDef, RESERVED_PROPERTY_KEYS, ValueType } from "@brainstorm-os/sdk-types";
 import { readEntityRefIds } from "./derive-property-ref-links";
 
 /** Property key → its paired key. Symmetric: a pair declared on one side maps
  *  both ways. A property that would pair with two different partners is
- *  ambiguous and pairs with neither. */
+ *  ambiguous and pairs with neither. A reserved (host-owned) key never pairs,
+ *  whatever the catalog says — it would let any write overwrite provenance. */
 export type InversePairs = ReadonlyMap<string, string>;
 
 export function inversePairs(defs: ReadonlyArray<PropertyDef>): InversePairs {
 	const refs = new Map<string, PropertyDef>();
-	for (const d of defs) if (d.valueType === ValueType.EntityRef) refs.set(d.key, d);
+	for (const d of defs) {
+		if (d.valueType === ValueType.EntityRef && !RESERVED_PROPERTY_KEYS.includes(d.key)) {
+			refs.set(d.key, d);
+		}
+	}
 	const pairs = new Map<string, string>();
 	const ambiguous = new Set<string>();
 	const bind = (a: string, b: string): void => {

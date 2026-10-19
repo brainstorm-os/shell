@@ -124,6 +124,15 @@ describe("toggleCollectionMembership", () => {
 		expect(members.include[0]?.by).toBe("app:notes");
 	});
 
+	it("refuses to write a locked Collection", async () => {
+		const locked = listEntity("c1", "Reading");
+		locked.properties = { ...locked.properties, locked: true };
+		const svc = fakeService([locked]);
+		const updateSpy = vi.spyOn(svc, "update");
+		expect(await toggleCollectionMembership(svc, "c1", "note-1", true, "notes")).toBe(false);
+		expect(updateSpy).not.toHaveBeenCalled();
+	});
+
 	it("returns false for an unknown Collection id", async () => {
 		const svc = fakeService();
 		expect(await toggleCollectionMembership(svc, "missing", "note-1", true, "notes")).toBe(false);

@@ -13,9 +13,15 @@
  * Agent-14: `providers` lists the providers the caller may pin (ledger-
  * filtered display metadata). A pinned `model` must pass `isValidModelId`
  * before it reaches a provider body. A pinned **custom endpoint** must also be
- * covered by an `ai.provider:<id>` cap on the envelope — the broker has
- * verified every declared cap against the ledger, and in-process callers
+ * covered by an `ai.provider:<id>` cap on the envelope — in-process callers
  * (automations, agents) carry their frozen grants there.
+ *
+ * The broker only verifies the caps an envelope DECLARES (`caps: []` passes),
+ * so every model verb re-checks the LEDGER here, fail closed: the caller must
+ * hold `ai.use`, and pinning a provider other than the on-device one
+ * (`OLLAMA_PROVIDER_ID`, which spends no cloud key and is what LocalOnly
+ * agents pin) needs `ai.provider:<id>` too. An unpinned call routes to the
+ * user's configured default under `ai.use` alone.
  */
 
 import {
@@ -25,6 +31,7 @@ import {
 	type AiGenerateRequest,
 	type AiProviderInfo,
 	type AiTransformRequest,
+	OLLAMA_PROVIDER_ID,
 	buildExtractMessages,
 	buildTransformMessages,
 	capabilityImplies,
@@ -91,6 +98,20 @@ function requireCustomProviderCap(envelope: Envelope, provider: string | undefin
 	if (!envelope.caps.some((cap) => capabilityImplies(cap, needed))) {
 		throw new AiServiceError("Unavailable", `ai.${envelope.method}: missing capability ${needed}`);
 	}
+}
+
+async function requireLedgerGrants(
+	options: AiServiceOptions,
+	envelope: Envelope,
+	provider: string | undefined,
+): Promise<void> {
+	const holds = options.appHoldsCapability;
+	const missing = (cap: string) =>
+		new AiServiceError("Unavailable", `ai.${envelope.method}: missing capability ${cap}`);
+	if (!holds || !(await holds(envelope.app, "ai.use"))) throw missing("ai.use");
+	if (provider === undefined || provider === OLLAMA_PROVIDER_ID) return;
+	const needed = `ai.provider:${provider}`;
+	if (!(await holds(envelope.app, needed))) throw missing(needed);
 }
 
 /** Providers that report no token counts still consume the caller's budget:
@@ -320,6 +341,7 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 				case "generate": {
 					const req = requireRequest(envelope);
 					requireCustomProviderCap(envelope, req.provider);
+					await requireLedgerGrants(options, envelope, req.provider);
 					const result = await resolveProvider(options, req.provider, "generate").generate(req);
 					record(
 						result.provider,
@@ -333,6 +355,7 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 					// Same request shape as generate; estimate without calling the model.
 					const req = requireRequest(envelope);
 					requireCustomProviderCap(envelope, req.provider);
+					await requireLedgerGrants(options, envelope, req.provider);
 					const provider = resolveProvider(options, req.provider, "cost");
 					return {
 						promptTokens: estimateTokens(req.messages),
@@ -343,6 +366,7 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 				case "transform": {
 					const req = requireTransformRequest(envelope);
 					requireCustomProviderCap(envelope, req.provider);
+					await requireLedgerGrants(options, envelope, req.provider);
 					const provider = resolveProvider(options, req.provider, "transform");
 					const messages = buildTransformMessages(req);
 					const result = await provider.generate({
@@ -365,6 +389,8 @@ export function makeAiServiceHandler(options: AiServiceOptions): ServiceHandler 
 				}
 				case "extract": {
 					const req = requireExtractRequest(envelope);
+					requireCustomProviderCap(envelope, req.provider);
+					await requireLedgerGrants(options, envelope, req.provider);
 					// `intoType` (11.5): derive fields from the type's registered
 					// schema, then let any explicit fields override by name. Fail
 					// closed when the type is unknown / exposes nothing extractable.

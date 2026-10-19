@@ -687,3 +687,97 @@ describe("ydoc worker — version history methods (10.16)", () => {
 		expect(reply.ok).toBe(false);
 	});
 });
+
+describe("ydoc worker — releaseVault", () => {
+	let a: string;
+	let b: string;
+	beforeEach(async () => {
+		a = await mkdtemp(join(tmpdir(), "bs-ydoc-rel-a-"));
+		b = await mkdtemp(join(tmpdir(), "bs-ydoc-rel-b-"));
+		__ydocCacheResetForTest();
+	});
+	afterEach(async () => {
+		__ydocCacheResetForTest();
+		await rm(a, { recursive: true, force: true });
+		await rm(b, { recursive: true, force: true });
+	});
+
+	const as = (app: string, method: string, args: unknown) =>
+		handleYDocEnvelope(
+			makeEnvelope({ msg: "r1", app, service: "ydoc", method, args: [args], caps: [] }),
+		);
+
+	it("drops only the released vault's cached docs, and only for the shell", async () => {
+		await as("io.brainstorm.shell", "load", { vaultPath: a, entityId: "ent_1" });
+		await as("io.brainstorm.shell", "load", { vaultPath: b, entityId: "ent_2" });
+		expect(__ydocCacheSizeForTest()).toBe(2);
+		const denied = await as("io.evil", "releaseVault", { vaultPath: a });
+		expect(denied.ok).toBe(false);
+		const released = await as("io.brainstorm.shell", "releaseVault", { vaultPath: a });
+		expect(released.ok).toBe(true);
+		expect(__ydocCacheSizeForTest()).toBe(1);
+	});
+});
+
+describe("ydoc worker — history state-key memo", () => {
+	let dir: string;
+	beforeEach(async () => {
+		dir = await mkdtemp(join(tmpdir(), "bs-ydoc-memo-"));
+		__ydocCacheResetForTest();
+	});
+	afterEach(async () => {
+		__ydocCacheResetForTest();
+		await rm(dir, { recursive: true, force: true });
+	});
+
+	const shell = async (method: string, args: unknown) => {
+		const reply = await handleYDocEnvelope(
+			makeEnvelope({
+				msg: "k1",
+				app: "io.brainstorm.shell",
+				service: "ydoc",
+				method,
+				args: [args],
+				caps: [],
+			}),
+		);
+		if (!reply.ok) throw new Error(reply.error.message);
+		return reply.value as { captured: boolean; stateKey: string };
+	};
+
+	it("a pure deletion still reads as a change after a memoised key", async () => {
+		const local = new Y.Doc();
+		const root = local.get("root", Y.XmlText) as Y.XmlText;
+		let sv = Y.encodeStateVector(local);
+		root.insert(0, "hello");
+		await shell("applyUpdate", {
+			vaultPath: dir,
+			entityId: "ent_m",
+			updateB64: Buffer.from(Y.encodeStateAsUpdate(local, sv)).toString("base64"),
+		});
+		const first = await shell("historyCapture", {
+			vaultPath: dir,
+			entityId: "ent_m",
+			sinceStateKey: null,
+		});
+		const same = await shell("historyCapture", {
+			vaultPath: dir,
+			entityId: "ent_m",
+			sinceStateKey: first.stateKey,
+		});
+		expect(same.captured).toBe(false);
+		sv = Y.encodeStateVector(local);
+		root.delete(0, 5);
+		await shell("applyUpdate", {
+			vaultPath: dir,
+			entityId: "ent_m",
+			updateB64: Buffer.from(Y.encodeStateAsUpdate(local, sv)).toString("base64"),
+		});
+		const after = await shell("historyCapture", {
+			vaultPath: dir,
+			entityId: "ent_m",
+			sinceStateKey: first.stateKey,
+		});
+		expect(after.captured).toBe(true);
+	});
+});

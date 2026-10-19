@@ -12,6 +12,8 @@ import {
 	AGENT_PROVENANCE_PROPERTY_KEY,
 	AgentUndoRefusal,
 	AgentWriteKind,
+	type PropertyDef,
+	ValueType,
 } from "@brainstorm-os/sdk-types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
@@ -52,6 +54,23 @@ function env(app: string, method: string, arg: unknown): Envelope {
 
 const ALL = ["entities.read:*", "entities.write:*"];
 
+const PAIRED_DEFS: PropertyDef[] = [
+	{
+		key: "project",
+		name: "Project",
+		icon: null,
+		valueType: ValueType.EntityRef,
+		inverseOf: "tasks",
+	},
+	{
+		key: "tasks",
+		name: "Tasks",
+		icon: null,
+		valueType: ValueType.EntityRef,
+		count: { min: 0, max: 50 },
+	},
+];
+
 describe("entities service — Agent-15 run journal + undo", () => {
 	let vaultDir: string;
 	let stores: DataStores;
@@ -63,6 +82,7 @@ describe("entities service — Agent-15 run journal + undo", () => {
 	let grants: Record<string, string[]>;
 	let runFor: (app: string, conversationId: string) => string | null;
 	const undone: string[] = [];
+	let onChange: ((change: { entityId: string }) => void) | null = null;
 
 	beforeEach(async () => {
 		vaultDir = await mkdtemp(join(tmpdir(), "brainstorm-agent-undo-"));
@@ -75,6 +95,7 @@ describe("entities service — Agent-15 run journal + undo", () => {
 		grants = { [AGENT]: ALL, [OTHER]: ALL };
 		runFor = (app, conversationId) => (app === AGENT && conversationId === CONV ? RUN : null);
 		undone.length = 0;
+		onChange = null;
 		handler = makeEntitiesServiceHandler({
 			getRepo: async () => repo,
 			getLedger: async () => ledger(grants),
@@ -86,6 +107,9 @@ describe("entities service — Agent-15 run journal + undo", () => {
 				ops = bound;
 			},
 			onAgentRunUndone: (runId) => undone.push(runId),
+			// 9.12.25 — `project` (one Project) ⇄ `tasks` (many Tasks).
+			getPropertyDefs: async () => PAIRED_DEFS,
+			onEntityChange: (change) => onChange?.(change),
 		});
 	});
 	afterEach(async () => {
@@ -183,7 +207,7 @@ describe("entities service — Agent-15 run journal + undo", () => {
 		expect(repo.get(edited)?.properties.status).toBe("done");
 	});
 
-	it("untrashes what the run trashed, and refuses once it was purged", async () => {
+	it("untrashes what the run trashed; a purge takes the journal with it", async () => {
 		const id = await create({ title: "Keep" });
 		await call(AGENT, "delete", { id, provenance: { conversationId: CONV } });
 		expect(repo.get(id)).toBeNull();
@@ -196,8 +220,7 @@ describe("entities service — Agent-15 run journal + undo", () => {
 		repo.hardDelete(gone);
 		expect(await ops.undo("run_2", { privileged: true })).toMatchObject({
 			ok: false,
-			reason: AgentUndoRefusal.Purged,
-			entityId: gone,
+			reason: AgentUndoRefusal.NotFound,
 		});
 	});
 
@@ -239,5 +262,99 @@ describe("entities service — Agent-15 run journal + undo", () => {
 		});
 		expect(repo.get(id)?.properties[AGENT_PROVENANCE_PROPERTY_KEY]).toBeUndefined();
 		expect(repo.agentWrites.count()).toBe(0);
+	});
+
+	describe("two-way relations (9.12.25) undo with the run", () => {
+		const prov = { conversationId: CONV };
+		const asUser = async (props: Record<string, unknown>) =>
+			((await call(OTHER, "create", { type: TASK, properties: props })) as { id: string }).id;
+
+		it("a run that creates two linked objects can be undone", async () => {
+			const p = await create({ title: "P" }, prov, TASK);
+			const x = await create({ title: "X", project: p }, prov, TASK);
+			expect(repo.get(p)?.properties.tasks).toEqual([{ value: x }]);
+			expect(await ops.undo(RUN, { privileged: true })).toMatchObject({ ok: true });
+			expect(repo.get(p)).toBeNull();
+			expect(repo.get(x)).toBeNull();
+		});
+
+		it("undoing an agent create drops the back-link it added to an existing object", async () => {
+			const p = await asUser({ title: "P" });
+			const x = await create({ title: "X", project: p }, prov, TASK);
+			expect(repo.get(p)?.properties.tasks).toEqual([{ value: x }]);
+			expect(await ops.undo(RUN, { privileged: true })).toMatchObject({ ok: true });
+			expect(repo.get(x)).toBeNull();
+			expect(repo.get(p)?.properties.tasks ?? null).toBeNull();
+		});
+
+		it("undoing an agent link edit reverts both ends", async () => {
+			const p = await asUser({ title: "P" });
+			const x = await asUser({ title: "X" });
+			await call(AGENT, "update", { id: x, patch: { project: p }, provenance: prov });
+			expect(repo.get(p)?.properties.tasks).toEqual([{ value: x }]);
+			expect(await ops.undo(RUN, { privileged: true })).toMatchObject({ ok: true });
+			expect(repo.get(x)?.properties.project ?? null).toBeNull();
+			expect(repo.get(p)?.properties.tasks ?? null).toBeNull();
+		});
+
+		it("undoing an agent delete restores the back-links the delete removed", async () => {
+			const p = await asUser({ title: "P" });
+			const x = await asUser({ title: "X", project: p });
+			expect(repo.get(p)?.properties.tasks).toEqual([{ value: x }]);
+			await call(AGENT, "delete", { id: x, provenance: prov });
+			expect(repo.get(p)?.properties.tasks).toEqual([]);
+			expect(await ops.undo(RUN, { privileged: true })).toMatchObject({ ok: true });
+			expect(repo.get(x)).not.toBeNull();
+			expect(repo.get(p)?.properties.tasks).toEqual([{ value: x }]);
+		});
+
+		it("journals the primary write before its far ends", async () => {
+			const p = await asUser({ title: "P" });
+			const x = await create({ title: "X" }, prov, TASK);
+			await call(AGENT, "update", { id: x, patch: { project: p }, provenance: prov });
+			const kinds = repo.agentWrites.listForRun(RUN).map((e) => [e.entityId, e.kind]);
+			expect(kinds).toEqual([
+				[x, AgentWriteKind.Created],
+				[x, AgentWriteKind.Updated],
+				[p, AgentWriteKind.Updated],
+			]);
+		});
+	});
+
+	it("re-checks each object right before its undo write (a lock set mid-undo holds)", async () => {
+		const a = (
+			(await call(OTHER, "create", { type: NOTE, properties: { title: "A" } })) as { id: string }
+		).id;
+		const b = (
+			(await call(OTHER, "create", { type: NOTE, properties: { title: "B" } })) as { id: string }
+		).id;
+		await call(AGENT, "update", {
+			id: a,
+			patch: { title: "A2" },
+			provenance: { conversationId: CONV },
+		});
+		await call(AGENT, "update", {
+			id: b,
+			patch: { title: "B2" },
+			provenance: { conversationId: CONV },
+		});
+		onChange = (change) => {
+			if (change.entityId === a) repo.update(b, { locked: true }, ++clock);
+		};
+		expect(await ops.undo(RUN, { privileged: true })).toMatchObject({
+			ok: false,
+			reason: AgentUndoRefusal.Locked,
+			entityId: b,
+		});
+		expect(repo.get(a)?.properties.title).toBe("A");
+		expect(repo.get(b)?.properties.title).toBe("B2");
+	});
+
+	it("purging an entity purges its journal rows", async () => {
+		const id = await create({ title: "Gone" }, { conversationId: CONV });
+		expect(repo.agentWrites.listForRun(RUN)).toHaveLength(1);
+		await call(AGENT, "delete", { id });
+		repo.hardDelete(id);
+		expect(repo.agentWrites.listForRun(RUN).filter((e) => e.entityId === id)).toEqual([]);
 	});
 });

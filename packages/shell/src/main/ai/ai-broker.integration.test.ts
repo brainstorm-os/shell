@@ -37,7 +37,15 @@ function envelope(app: string, caps: string[]) {
 function brokerWithAi(grantedTo: Record<string, Set<string>>): Broker {
 	const reg = new ProviderRegistry();
 	reg.register(provider());
-	const services = new Map([["ai", makeAiServiceHandler({ getProvider: (id) => reg.get(id) })]]);
+	const services = new Map([
+		[
+			"ai",
+			makeAiServiceHandler({
+				getProvider: (id) => reg.get(id),
+				appHoldsCapability: async (app, cap) => grantedTo[app]?.has(cap) ?? false,
+			}),
+		],
+	]);
 	return new Broker({
 		services,
 		checkCapability: (app, _svc, _method, caps) => caps.every((c) => grantedTo[app]?.has(c) ?? false),

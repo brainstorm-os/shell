@@ -49,7 +49,13 @@ describe("RendererIdentityRegistry", () => {
 		// privileged capability set under. A renderer registered under it would
 		// VERIFY as the dashboard and inherit that set with no consent sheet.
 		const reg = new RendererIdentityRegistry();
-		for (const reserved of ["shell", "SHELL", "brainstorm"]) {
+		for (const reserved of [
+			"shell",
+			"SHELL",
+			"brainstorm",
+			"io.brainstorm.shell",
+			"IO.Brainstorm.Shell",
+		]) {
 			expect(() => reg.register(9, reserved)).toThrow(/reserved platform principal/);
 		}
 		expect(reg.get(9)).toBeUndefined();

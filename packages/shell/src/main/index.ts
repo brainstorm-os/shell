@@ -219,8 +219,11 @@ import {
 	makeHistoryServiceHandler,
 	memberPrincipal,
 } from "./history/history-service";
-import { createSessionHistory, resolveLocalHistoryRole } from "./history/history-wiring";
-import type { VersionHistory } from "./history/version-history";
+import {
+	bindSessionHistory,
+	createSessionHistory,
+	resolveLocalHistoryRole,
+} from "./history/history-wiring";
 import {
 	ALLOWED_ICON_EXTS,
 	deleteIconByUrl,
@@ -420,11 +423,14 @@ import {
 	ROOT_FOLDER_ENTITY_ID,
 	type VaultSession,
 	activeVaultHasPin,
+	drainActiveVaultSession,
+	followActiveVaultSession,
 	getActiveVaultAutoLockMinutes,
 	getActiveVaultSession,
 	isVaultLocked,
 	lockOnBootIfPinSet,
 	onActiveVaultSessionChanged,
+	onActiveVaultSessionReleasing,
 } from "./vault/session";
 import { activateVault, getDefaultVault } from "./vault/vault";
 import { CAPTURE_BOOKMARK_ENTITY_TYPE, captureBookmarkProperties } from "./web/web-capture";
@@ -3755,7 +3761,6 @@ void app.whenReady().then(async () => {
 	// 10.16 — version history. The restore closure comes out of the entities
 	// service at construction (off the broker); the engine is per session.
 	let restoreEntityFn: RestoreEntityFn | null = null;
-	let activeHistory: VersionHistory | null = null;
 	const callYDocWorker = async (method: string, args: Record<string, unknown>): Promise<unknown> => {
 		const handler = workersRef.broker.getServiceHandler("ydoc");
 		if (!handler) throw new Error("ydoc worker service unavailable");
@@ -3773,22 +3778,33 @@ void app.whenReady().then(async () => {
 		const session = getActiveVaultSession();
 		return session ? memberPrincipal(bytesToBase64Url(session.identity.publicKey)) : null;
 	};
-	onActiveVaultSessionChanged((session) => {
-		activeHistory?.dispose();
-		activeHistory = session
-			? createSessionHistory({
-					session,
-					callWorker: callYDocWorker,
-					getRestorer: () => restoreEntityFn,
-				})
-			: null;
+	const historyBinding = bindSessionHistory(
+		{ follow: followActiveVaultSession, onReleasing: onActiveVaultSessionReleasing },
+		(session) =>
+			createSessionHistory({
+				session,
+				callWorker: callYDocWorker,
+				getRestorer: () => restoreEntityFn,
+			}),
+	);
+	// After history has flushed (hooks drain in order): drop the outgoing
+	// vault's docs and stores from the ydoc worker's caches.
+	onActiveVaultSessionReleasing(async (session) => {
+		await callYDocWorker("releaseVault", { vaultPath: session.vaultPath });
 	});
 	let inverseBackfillFn: InverseBackfillFn | null = null;
+	// 9.12.25 — the catalog is read on every entity write; rebuild it only when
+	// the store changes (a full snapshot per write was the perf trap), and keep
+	// one array identity per change so the service's memo holds.
+	const propertyDefsByStore = new WeakMap<object, ReadonlyArray<PropertyDef>>();
 	const getVaultPropertyDefs = async (): Promise<ReadonlyArray<PropertyDef> | null> => {
 		const session = getActiveVaultSession();
 		if (!session) return null;
 		const store = await session.propertiesStore();
-		return Object.values(store.snapshot().properties);
+		if (!propertyDefsByStore.has(store)) {
+			store.subscribe((snap) => propertyDefsByStore.set(store, Object.values(snap.properties)));
+		}
+		return propertyDefsByStore.get(store) ?? [];
 	};
 	const entitiesHandler = makeEntitiesServiceHandler({
 		// 9.12.25 — `inverseOf` pairs make relations two-way.
@@ -3840,8 +3856,9 @@ void app.whenReady().then(async () => {
 		// own identity.
 		onLocalWrite: (entityId, _type, writer) => {
 			const self = historySelf();
-			if (!activeHistory || !self) return;
-			activeHistory.noteWrite(entityId, [writer.agent ? agentPrincipal(writer.app) : self]);
+			const history = historyBinding.current();
+			if (!history || !self) return;
+			history.noteWrite(entityId, [writer.agent ? agentPrincipal(writer.app) : self]);
 		},
 		bindApplyRemoteDoc: (fn) => {
 			applyRemoteDocFn = fn;
@@ -4076,7 +4093,7 @@ void app.whenReady().then(async () => {
 					},
 					applyRemoteUpdate: async (entityId, _type, update, sender) => {
 						await applyRemoteDocFn?.(entityId, Buffer.from(update).toString("base64"));
-						if (sender) activeHistory?.noteWrite(entityId, [memberPrincipal(sender)]);
+						if (sender) historyBinding.current()?.noteWrite(entityId, [memberPrincipal(sender)]);
 					},
 					// PRES-2b — a decrypted remote AWARENESS frame (cursors / "who's
 					// here") for a tracked entity. Route it into this session's presence
@@ -4286,7 +4303,7 @@ void app.whenReady().then(async () => {
 	workers.broker.registerService(
 		HISTORY_SERVICE,
 		makeHistoryServiceHandler({
-			getHistory: () => activeHistory,
+			getHistory: () => historyBinding.current(),
 			getRepo: getEntitiesRepoForActiveSession,
 			getLedger: async () => {
 				const session = getActiveVaultSession();
@@ -4493,6 +4510,15 @@ void app.whenReady().then(async () => {
 			},
 			backfillInverse: (app, def) =>
 				inverseBackfillFn ? inverseBackfillFn(app, def) : Promise.resolve(0),
+			canWriteType: async (app, type) => {
+				const session = getActiveVaultSession();
+				if (!session) return false;
+				try {
+					return (await session.capabilityLedger()).has(app, `entities.write:${type}`);
+				} catch {
+					return false;
+				}
+			},
 		}),
 	);
 
@@ -6871,6 +6897,16 @@ app.on("window-all-closed", () => {
 	) {
 		app.quit();
 	}
+});
+
+// Release drains (10.16 history's pending checkpoints) need the vault still
+// open, so the first quit waits for them once, bounded, then quits for real.
+let quitDrained = false;
+app.on("before-quit", (event) => {
+	if (quitDrained) return;
+	quitDrained = true;
+	event.preventDefault();
+	void drainActiveVaultSession().finally(() => app.quit());
 });
 
 app.on("will-quit", () => {

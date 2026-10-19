@@ -535,6 +535,8 @@ export class EntitiesRepository {
 		// ROT-3a-ii — the deferred-rotation mark (same pragma-independent posture).
 		this.stmt("DELETE FROM pending_rotations WHERE entity_id = ?").run(id);
 		this.stmt("DELETE FROM entity_last_edits WHERE entity_id = ?").run(id);
+		// Agent-15 — the journal holds the purged object's property values.
+		this.stmt("DELETE FROM agent_writes WHERE entity_id = ?").run(id);
 		return true;
 	}
 

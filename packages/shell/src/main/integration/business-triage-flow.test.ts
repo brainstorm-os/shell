@@ -149,7 +149,10 @@ function buildHost(opts: {
 	entityChanges: EntityChangeSource;
 	created?: Array<{ type: string; properties: Record<string, unknown> }>;
 }): AutomationsHost {
-	const aiHandler = makeAiServiceHandler({ getProvider: () => opts.provider });
+	const aiHandler = makeAiServiceHandler({
+		getProvider: () => opts.provider,
+		appHoldsCapability: async () => true,
+	});
 	const entities = entitiesHandler(opts.rows, opts.created);
 	const intents = intentsHandler(opts.dispatched);
 	const getServiceHandler = (name: string) => {

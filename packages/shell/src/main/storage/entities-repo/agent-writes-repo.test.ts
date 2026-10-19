@@ -93,6 +93,20 @@ describe("AgentWritesRepository (Agent-15 journal)", () => {
 		expect(kept[runs - 1]).toBe(AGENT_WRITES_PER_RUN_MAX);
 	});
 
+	it("per-principal cap holds at insert, between prunes, evicting whole old runs", () => {
+		write("victim", "victim-agent", 1);
+		const runs = Math.ceil((AGENT_WRITES_PER_AGENT_MAX + 50) / AGENT_WRITES_PER_RUN_MAX);
+		let ts = 10;
+		for (let r = 0; r < runs; r++) {
+			for (let i = 0; i < AGENT_WRITES_PER_RUN_MAX; i++) write(`spam_${r}`, "spammer", ts++);
+		}
+		expect(repo.count() - 1).toBeLessThanOrEqual(AGENT_WRITES_PER_AGENT_MAX);
+		const kept = Array.from({ length: runs }, (_, r) => repo.listForRun(`spam_${r}`).length);
+		expect(kept[0]).toBe(0);
+		expect(kept[runs - 1]).toBe(AGENT_WRITES_PER_RUN_MAX);
+		expect(repo.listForRun("victim")).toHaveLength(1);
+	});
+
 	it("marks a run reverted", () => {
 		write("r1", "agent", 1);
 		repo.markRunReverted("r1", 42);

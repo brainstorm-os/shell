@@ -18,6 +18,14 @@
  * into structured `Invalid` errors. If no vault session is active the
  * handler throws `Unavailable` (same pattern as `intents-service`).
  *
+ * Two-way relations (9.12.25): `properties.write` is a default grant, but a
+ * pair makes EVERY app's writes fan out onto far ends. So changing a def's
+ * `inverseOf` (declaring, re-targeting or clearing it) requires
+ * `entities.write` for every target type of each side touched — the def, its
+ * new partner and its old one (`allowedTypes`; a side with none needs
+ * `entities.write:*`). A pair is then something the declarer could have
+ * written by hand anyway. Reserved keys are never pair members.
+ *
  * Capability gating happens in the broker via the envelope's `caps`
  * field; the SDK proxy declares `properties.read` for reads and
  * `properties.write` for writes (see `propertiesProxy` in
@@ -27,7 +35,11 @@
  */
 
 import { validatePropertyDef } from "@brainstorm-os/sdk";
-import type { Dictionary, PropertyDef } from "@brainstorm-os/sdk-types";
+import {
+	type Dictionary,
+	type PropertyDef,
+	RESERVED_PROPERTY_KEYS,
+} from "@brainstorm-os/sdk-types";
 import type { ServiceHandler } from "../../ipc/broker";
 import type { Envelope } from "../../ipc/envelope";
 import type { PropertiesStore } from "./properties-store";
@@ -42,7 +54,32 @@ export type PropertiesServiceOptions = {
 	 *  can't write, or a locked one) leaves both the catalog and the data
 	 *  untouched. */
 	backfillInverse?: (app: string, def: PropertyDef) => Promise<number>;
+	/** Live ledger check: may `app` write entities of `type` (`"*"` = every
+	 *  type)? Absent → no app may change a def's `inverseOf` (fail closed). */
+	canWriteType?: (app: string, type: string) => Promise<boolean>;
 };
+
+const ANY_TYPE = "*";
+
+/** Every type a change to `def`'s pairing can steer writes onto. */
+function pairTargetTypes(
+	def: PropertyDef,
+	prior: PropertyDef | undefined,
+	catalog: Readonly<Record<string, PropertyDef>>,
+): Set<string> {
+	const sides = [def, prior];
+	for (const partnerKey of [def.inverseOf, prior?.inverseOf]) {
+		if (partnerKey) sides.push(partnerKey === def.key ? def : catalog[partnerKey]);
+	}
+	const types = new Set<string>();
+	for (const side of sides) {
+		if (!side) continue;
+		const allowed = side.allowedTypes ?? [];
+		if (allowed.length === 0) types.add(ANY_TYPE);
+		for (const t of allowed) types.add(t);
+	}
+	return types;
+}
 
 export function makePropertiesServiceHandler(options: PropertiesServiceOptions): ServiceHandler {
 	return async (envelope: Envelope): Promise<unknown> => {
@@ -63,7 +100,25 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 
 			case "setProperty": {
 				const def = requireDef(envelope);
-				const prior = store.snapshot().properties[def.key];
+				const catalog = store.snapshot().properties;
+				const prior = catalog[def.key];
+				if (def.inverseOf !== prior?.inverseOf) {
+					if (
+						RESERVED_PROPERTY_KEYS.includes(def.key) ||
+						(def.inverseOf !== undefined && RESERVED_PROPERTY_KEYS.includes(def.inverseOf))
+					) {
+						throw makeError("Invalid", "properties.setProperty: a reserved key cannot be paired");
+					}
+					const canWrite = options.canWriteType;
+					for (const type of pairTargetTypes(def, prior, catalog)) {
+						if (!canWrite || !(await canWrite(envelope.app, type))) {
+							throw makeError(
+								"Denied",
+								"properties.setProperty: changing a two-way relation needs entities.write for the types it links",
+							);
+						}
+					}
+				}
 				if (def.inverseOf && def.inverseOf !== prior?.inverseOf && options.backfillInverse) {
 					const validation = validatePropertyDef(def);
 					if (!validation.ok) throw makeError("Invalid", validation.errors.join("; "));
@@ -111,7 +166,7 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 	};
 }
 
-function makeError(kind: "Unavailable" | "Invalid", message: string): Error {
+function makeError(kind: "Unavailable" | "Invalid" | "Denied", message: string): Error {
 	const err = new Error(message);
 	err.name = kind;
 	return err;
