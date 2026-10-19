@@ -14,6 +14,7 @@
 
 import { SkinTone as ST, type SkinTone } from "@brainstorm-os/sdk-types";
 import emojisByGroup from "unicode-emoji-json/data-by-group.json";
+import { EMOJI_KEYWORDS } from "./emoji-keywords";
 
 export type EmojiData = {
 	char: string;
@@ -102,14 +103,23 @@ export function emojiUrl(char: string): string {
 	return `brainstorm://emoji/${emojiFilename(char)}`;
 }
 
-/** Case-insensitive substring search across name + slug, returns a flat
- *  list ordered by group → original index (matches the visible order). */
+/** The aliases people actually type for an emoji (`coffee` for
+ *  `hot_beverage`), or none. Dataset-driven via `EMOJI_KEYWORDS`. */
+export function emojiKeywords(e: EmojiData): readonly string[] {
+	return EMOJI_KEYWORDS[e.slug] ?? [];
+}
+
+/** Case-insensitive substring search across name + slug + keyword aliases,
+ *  returns a flat list ordered by group → original index (matches the
+ *  visible order). */
 export function searchEmojis(query: string): readonly EmojiData[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return ALL_EMOJIS;
 	const matches: EmojiData[] = [];
 	for (const e of ALL_EMOJIS) {
-		if (e.name.includes(q) || e.slug.includes(q)) matches.push(e);
+		if (e.name.includes(q) || e.slug.includes(q) || emojiKeywords(e).some((k) => k.includes(q))) {
+			matches.push(e);
+		}
 	}
 	return matches;
 }
