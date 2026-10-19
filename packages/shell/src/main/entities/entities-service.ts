@@ -1341,7 +1341,9 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const survivorId = String(a.survivorId ?? "");
 				const rawLoserIds = Array.isArray(a.loserIds) ? a.loserIds : [];
 				const patch =
-					a.patch && typeof a.patch === "object" ? (a.patch as Record<string, unknown>) : null;
+					a.patch && typeof a.patch === "object"
+						? stripReservedProperties(a.patch as Record<string, unknown>)
+						: null;
 				const survivor = repo.get(survivorId);
 				if (!survivor) throw named("Invalid", `entities.merge: survivor ${survivorId} not found`);
 				if (!can(EntityAccess.Write, survivor.type)) {
@@ -1382,6 +1384,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				const loserIdSet = new Set(losers.map((l) => l.id));
 				let refsRewritten = 0;
 				let linksRepointed = 0;
+				let lockedReferrers = 0;
 				if (losers.length > 0) {
 					// Referrer union across losers. The losers themselves are
 					// excluded (they're about to be binned); the survivor is NOT
@@ -1403,6 +1406,12 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 						if (isShellOwnedEntityType(row.type)) continue;
 						const refPatch = rewriteEntityRefs(row.properties, loserIdSet, survivorId, row.id);
 						if (!refPatch) continue;
+						// A read-only object keeps its refs (a locked List keeps its
+						// members): counted, never named — the caller may not read it.
+						if (isLockedProperties(row.properties)) {
+							lockedReferrers += 1;
+							continue;
+						}
 						const updated = await writePropsThroughDoc(repo, row, refPatch, {
 							app,
 							agent: false,
@@ -1435,6 +1444,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					mergedIds: losers.map((l) => l.id),
 					linksRepointed,
 					refsRewritten,
+					lockedReferrers,
 				} satisfies EntityMergeResult;
 			}
 

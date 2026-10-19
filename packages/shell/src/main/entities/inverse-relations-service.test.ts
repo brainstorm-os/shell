@@ -413,4 +413,48 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 			expect(loose.saved).toHaveLength(1);
 		});
 	});
+
+	describe("entities.merge", () => {
+		it("strips reserved keys from the merge patch", async () => {
+			const t = await setup({ defs: [] });
+			await t.create("s1", BOOK, { title: "S" });
+			await t.create("l1", BOOK, { title: "L" });
+			await t.call("merge", {
+				survivorId: "s1",
+				loserIds: ["l1"],
+				patch: {
+					title: "Merged",
+					agentProvenance: { agent: "io.brainstorm.agent", conversationId: "c", createdAt: 1 },
+					agentProposal: { forged: true },
+				},
+			});
+			expect(t.props("s1")?.title).toBe("Merged");
+			expect(t.props("s1")).not.toHaveProperty("agentProvenance");
+			expect(t.props("s1")).not.toHaveProperty("agentProposal");
+		});
+
+		it("never rewrites a locked referrer (a locked List keeps its members) and reports it", async () => {
+			const LIST = "brainstorm/List/v1";
+			const t = await setup({ defs: [] });
+			await t.create("s1", BOOK, { title: "S" });
+			await t.create("l1", BOOK, { title: "L" });
+			const members = { include: [{ entityId: "l1", addedAt: 1, by: "user" }], exclude: [] };
+			t.repo.create({
+				id: "list1",
+				type: LIST,
+				properties: { name: "Locked", members, pinned: [{ entityId: "l1" }], locked: true },
+				createdBy: "x",
+				now: 1,
+				dekId: null,
+			});
+			const result = (await t.call("merge", { survivorId: "s1", loserIds: ["l1"] })) as {
+				refsRewritten: number;
+				lockedReferrers: number;
+			};
+			expect(t.props("list1")?.members).toEqual(members);
+			expect(t.props("list1")?.pinned).toEqual([{ entityId: "l1" }]);
+			expect(result.refsRewritten).toBe(0);
+			expect(result.lockedReferrers).toBe(1);
+		});
+	});
 });

@@ -282,6 +282,9 @@ export type EntityMergeResult = {
 	linksRepointed: number;
 	/** Referrer entities whose property refs were rewritten to the survivor. */
 	refsRewritten: number;
+	/** Referrers left untouched because they are locked (read-only); they
+	 *  still point at a binned loser. Counted, never named. */
+	lockedReferrers: number;
 };
 
 export type EntitiesService = {
