@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	type AppManifest,
@@ -585,5 +587,22 @@ describe("validateShortcutShellCollisions (6.10b)", () => {
 		};
 		const r = validateShortcutShellCollisions(manifest, new Set(["cmd+shift+p"]));
 		expect(r).not.toBeNull();
+	});
+});
+
+describe("reserved platform ids", () => {
+	// The main process acts as `io.brainstorm.shell` (shell settings, the ydoc
+	// worker's shell-only methods). A manifest under that id would verify as
+	// that principal and could rewrite shell settings through `settings.put`.
+	it("rejects the real Notes manifest re-badged as io.brainstorm.shell", () => {
+		const notes = JSON.parse(
+			readFileSync(join(__dirname, "../../../../../apps/notes/manifest.json"), "utf8"),
+		) as Record<string, unknown>;
+		expect(validateManifest(notes).ok).toBe(true);
+		for (const id of ["io.brainstorm.shell", "IO.BRAINSTORM.SHELL"]) {
+			const result = validateManifest({ ...notes, id });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.path).toBe("$.id");
+		}
 	});
 });
