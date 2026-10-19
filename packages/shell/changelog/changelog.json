@@ -3,6 +3,737 @@
   "format": "brainstorm/changelog/v2",
   "releases": [
     {
+      "version": "0.15.0",
+      "date": "2026-10-19",
+      "icon": "🧭",
+      "title": "Two-way relations, split view, and a history for every object",
+      "summary": "Forty-eight additions across Database, Notes, the shell, the Agent and Chat, each one a gap people in this product category keep asking to have closed. Link objects both ways, work in two panes, step back through any object's history, and let the app back itself up on a schedule.",
+      "body": [
+        {
+          "kind": "h1",
+          "text": "Database"
+        },
+        {
+          "kind": "p",
+          "text": "Database grew the most. Relations now run in both directions, a view can live inside the object it belongs to, and you can change your mind about a column's type without losing the rows that still fit."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Two-way relations.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Link a deliverable to its project and the project lists it back under "
+            },
+            {
+              "text": "Deliverables",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on its own. Add, remove and delete keep both sides in step, and a locked far end refuses the change rather than half-applying it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Views inside an object.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An embedded view can filter on the object that holds it with "
+            },
+            {
+              "text": "This object",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " in the filter builder, so one template shows each project its own tasks."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Rich text in a cell.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A property can hold bold, links and lists. The grid shows one line, the inspector shows the full editor."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Descriptions.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Type a description straight under a collection's title. It shows up as a caption wherever you pick that collection."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Board swimlanes and group controls.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Split a board by a second property, order groups by how many items they hold, and collapse or expand every group at once. Drag-moves on board, calendar and timeline now survive a reload."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Columns the way you want them.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Name is an ordinary column you can reorder. Rename a column for one view, show it as an icon only, and choose how each column wraps."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Chart view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Bar, line, pie and number charts over any group-by and aggregation, with a data table toggle, and a Chart widget for the dashboard."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Gallery covers and fields.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Pick the cover from a Cover property, the first image, or none; turn field names on or off; a URL property renders as a button."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Bulk edit.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Select rows and set a property or add them to a collection in one go. Locked rows are skipped and counted, and the last bulk edit has a one-step undo."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Change a property's type.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Switch between text, number, checkbox and date with a preview of every value that converts and every one that would be cleared. Numbers can carry a unit."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Next and previous object.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Step through a view from the inspector with "
+            },
+            {
+              "text": "Alt+↑/↓",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and a counter showing where you are."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Pin a view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Pin a specific view to the dashboard from its tab, and it opens straight to that view."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Notes"
+        },
+        {
+          "kind": "p",
+          "text": "The editor gains the block tools people reach for most, and the ones that were missing outright."
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Insert menu.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The gutter "
+            },
+            {
+              "text": "+",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " opens the whole block catalogue as a picker, and the block menu inserts above or below."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Synced blocks you can edit in place.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Choose "
+            },
+            {
+              "text": "Edit here",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " on a synced block to write into its source with the source's own undo. It stays read-only while the source is locked or unloaded."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Block and table-cell backgrounds.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Tint any block or table cell from a palette that holds contrast in all fourteen themes."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Inline tasks.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " "
+            },
+            {
+              "text": "/task",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " creates a real task and leaves a live checkbox in the text."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Turn a block into a page.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " One command moves a block and its children into a new page and leaves a link behind; one undo brings it back."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Outline panel.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A side outline of the headings with scroll tracking, opened with "
+            },
+            {
+              "text": "Mod+Alt+O",
+              "marks": ["highlight"]
+            },
+            {
+              "text": "."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Regex find and replace.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Capture groups, named groups and "
+            },
+            {
+              "text": "$&",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " work in the replace field, with limits so a bad pattern cannot freeze the editor."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Media from the vault.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Insert an image or file that already lives in the vault, resize inline images with a drag handle, and images now appear in HTML and Markdown exports."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tabs block.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Tabs with real content in each pane, including embedded views; every pane is exported."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "List guides and outliner keys.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Guide lines on lists and toggles, and Tab, Shift+Tab and Enter behave like an outliner inside toggles."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Spell-check languages.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Pick up to eight dictionaries per device; macOS keeps automatic detection."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Shell"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Split view.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Open any object to the side with "
+            },
+            {
+              "text": "Alt+click",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and work in two panes, each with its own app, divider and keyboard shortcuts."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Version history for every object.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Idle edits are captured automatically, an agent run is one checkpoint, and restoring is a forward edit you can undo. Lives in the object's history panel."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Scheduled backups.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " The vault backs itself up an hour after launch and hourly after that, keeps a bounded set of restore points, and restores only what is missing."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Whole-vault Markdown export.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " One dated folder, one Markdown file per object with front matter, assets alongside, and links to anything not exported become plain labels."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Startup page.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Open the dashboard, today's journal entry, or a chosen object when the app starts."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Search when the field is empty.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Saved searches, recents and apps appear before you type, and every result shows how many objects link to it."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Don't ask again.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Move-to-Bin prompts can be remembered; anything irreversible always asks. Reset under Settings → Interface."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Auto-hide sidebars.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A hidden sidebar reveals on the window edge or its shortcut, and leaves the tab order while hidden."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Close to tray.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " On Windows and Linux the app can keep running in the background with a tray icon."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Visibility preferences.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Higher contrast, a stronger text cursor and selection, and always-visible scrollbars, carried into every app."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Recent emoji and icons.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Both pickers keep a Recent row of the last twenty-four."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Agent"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Provider and model settings.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Custom endpoints, an OpenRouter preset, an Ollama tile, and a per-conversation model. Every provider call now goes through the network broker, and usage is estimated when a provider reports none."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "See and undo a run.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each run lists what it changed. "
+            },
+            {
+              "text": "Undo this run",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " checks the whole run first and refuses it whole, with a reason, if anything was edited since."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Authorship shown.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " An object an agent created says so in a read-only Created by row, and the mark cannot be forged through any write path."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Chat and collaboration"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Message search.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " "
+            },
+            {
+              "text": "Mod+F",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " searches the open channel and jumps to the hit."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Read state that follows you.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " What you have read is yours, merged across devices, with per-channel badges and mark-all-read."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Pins and typing.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Pin up to fifty messages per channel, and see who is typing."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "A bigger composer.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Expand the composer with "
+            },
+            {
+              "text": "Mod+Shift+E",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " and choose full dates on timestamps."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Invite links with safer defaults.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A "
+            },
+            {
+              "text": "brainstorm://invite",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " link pre-fills the share dialog and never grants anything by itself; Viewer is the default role; the last editor of an object is recorded."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Everywhere else"
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Tasks.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A checkbox cycles open, done and won't do. A closed task never nags, blocks or goes overdue."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Journal.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Jot lines into today's entry. A "
+            },
+            {
+              "text": "#collection",
+              "marks": ["highlight"]
+            },
+            {
+              "text": " tag files the line as an object in that collection and leaves a mention on the day."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Files.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Filter by kind, size, date and extension, find duplicates by content, and drop files from your desktop straight into a collection."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Preview.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " A context panel with the caption, every backlink, and Move to Bin."
+            }
+          ]
+        },
+        {
+          "kind": "li",
+          "text": [
+            {
+              "text": "Whiteboard.",
+              "marks": ["bold"]
+            },
+            {
+              "text": " Each board reopens exactly where you left it."
+            }
+          ]
+        },
+        {
+          "kind": "h1",
+          "text": "Under the hood"
+        },
+        {
+          "kind": "p",
+          "text": "The release went through four review passes and an adversarial round. The AI service re-checks the capability ledger on every call, the document worker is capability-gated on the broker, reserved property keys are stripped at every import and merge, and a locked collection refuses rename, delete and every membership write, including the ones that race a lock."
+        },
+        {
+          "kind": "callout",
+          "icon": "🔄",
+          "text": [
+            {
+              "text": "Update in place. ",
+              "marks": ["bold"]
+            },
+            {
+              "text": "Existing installs update from "
+            },
+            {
+              "text": "Settings → Updates",
+              "marks": ["highlight"]
+            },
+            {
+              "text": ". Your vault format gains two new tables and migrates on first open; keep a backup of anything important."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.14.0",
       "date": "2026-08-25",
       "icon": "✨",
