@@ -4,7 +4,7 @@
  * store, which is the path `writePropsThroughDoc` takes without one).
  */
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
@@ -20,6 +20,7 @@ import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import { type AgentRunOps, makeEntitiesServiceHandler } from "./entities-service";
 import { EntityDekStore } from "./entity-dek-store";
 
@@ -114,7 +115,7 @@ describe("entities service — Agent-15 run journal + undo", () => {
 	});
 	afterEach(async () => {
 		stores.close();
-		await rm(vaultDir, { recursive: true, force: true });
+		await removeTestDir(vaultDir);
 	});
 
 	const call = (app: string, method: string, arg: unknown) => handler(env(app, method, arg));

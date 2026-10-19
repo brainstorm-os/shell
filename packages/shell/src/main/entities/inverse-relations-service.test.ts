@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
@@ -10,6 +10,7 @@ import { makePropertiesServiceHandler } from "../properties/properties-service";
 import type { PropertiesStore } from "../properties/properties-store";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
+import { removeTestDir } from "../test-support/remove-test-dir";
 import {
 	type InverseBackfillFn,
 	MAX_FAR_WRITES_PER_CALL,
@@ -81,7 +82,7 @@ async function setup(
 	});
 	cleanups.push(async () => {
 		stores.close();
-		await rm(dir, { recursive: true, force: true });
+		await removeTestDir(dir);
 	});
 	const call = (method: string, arg: unknown) => handler(env(method, arg));
 	const props = (id: string) => repo.get(id)?.properties ?? null;
