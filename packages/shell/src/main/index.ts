@@ -77,6 +77,7 @@ import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { createAnthropicProvider } from "./ai/anthropic-provider";
+import { pinCustomDefaultProvider } from "./ai/default-route-gate";
 import { DEMO_AGENT_PROVIDER_ID, createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
@@ -311,7 +312,7 @@ import { connectMcpServer } from "./mcp/mcp-connect";
 import { makeMcpServiceHandler } from "./mcp/mcp-service";
 import { nodeStdioSpawn } from "./mcp/mcp-stdio-spawn";
 import { makeFileAuditSink } from "./network/audit-log";
-import { executeNetworkFetch } from "./network/network-service";
+import { RedirectPolicy, executeNetworkFetch } from "./network/network-service";
 import {
 	type NetworkServiceOptions,
 	enrichBlocksWithAssets,
@@ -4871,6 +4872,9 @@ void app.whenReady().then(async () => {
 					headers: { "Content-Type": "application/json", ...headers },
 					body: new TextEncoder().encode(JSON.stringify(bodyJson)),
 					...(allowPrivate ? { allowPrivate: true } : {}),
+					// The body is the transcript and the headers carry the key: a
+					// redirect may not re-send them, drop TLS, or wander onto the LAN.
+					redirectPolicy: RedirectPolicy.Strict,
 					timeoutMs: 120_000,
 					sizeCapBytes: 8 * 1024 * 1024,
 				},
@@ -5075,31 +5079,34 @@ void app.whenReady().then(async () => {
 	});
 	workers.broker.registerService(
 		"ai",
-		makeAiServiceHandler({
-			getProvider: (id) => aiProviders.get(id),
-			quota: aiQuota,
-			listProviders: () => aiProviders.list(),
-			appHoldsCapability: async (appId, capability) => {
-				const session = getActiveVaultSession();
-				if (!session) return false;
-				return (await session.capabilityLedger()).has(appId, capability);
-			},
-			onUsage: (rec) => {
-				void recordAiUsage(aiUsageSink, rec);
-				void aiQuota.recordUsage(rec);
-			},
-			// 11.5 `extract({ intoType })` — resolve a registered entity type's
-			// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
-			// an unknown type / no schema returns null → the handler fails closed.
-			resolveTypeFields: async (typeId) => {
-				const session = getActiveVaultSession();
-				if (!session) return null;
-				const registry = await session.dataStores.open("registry");
-				const record = new EntityTypesRepository(registry).get(typeId);
-				if (!record?.schemaInline) return null;
-				return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
-			},
-		}),
+		pinCustomDefaultProvider(
+			makeAiServiceHandler({
+				getProvider: (id) => aiProviders.get(id),
+				quota: aiQuota,
+				listProviders: () => aiProviders.list(),
+				appHoldsCapability: async (appId, capability) => {
+					const session = getActiveVaultSession();
+					if (!session) return false;
+					return (await session.capabilityLedger()).has(appId, capability);
+				},
+				onUsage: (rec) => {
+					void recordAiUsage(aiUsageSink, rec);
+					void aiQuota.recordUsage(rec);
+				},
+				// 11.5 `extract({ intoType })` — resolve a registered entity type's
+				// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
+				// an unknown type / no schema returns null → the handler fails closed.
+				resolveTypeFields: async (typeId) => {
+					const session = getActiveVaultSession();
+					if (!session) return null;
+					const registry = await session.dataStores.open("registry");
+					const record = new EntityTypesRepository(registry).get(typeId);
+					if (!record?.schemaInline) return null;
+					return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
+				},
+			}),
+			() => aiProviders.defaultProviderId(),
+		),
 	);
 
 	// 14.1 — the billing service. Reports the current plan + entitlement from
