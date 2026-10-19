@@ -30,6 +30,18 @@ const textProperty = (key: string, name = "Title"): PropertyDef => ({
 	valueType: ValueType.Text,
 });
 
+const BOOK = "io.example/Book/v1";
+const PERSON = "io.example/Person/v1";
+const THING = "io.example/Thing/v1";
+
+const refProperty = (key: string, extra: Partial<PropertyDef> = {}): PropertyDef => ({
+	key,
+	name: key,
+	icon: null,
+	valueType: ValueType.EntityRef,
+	...extra,
+});
+
 const dictionary = (id: string, name = "Status"): Dictionary => ({
 	id,
 	name,
@@ -179,6 +191,102 @@ describe("makePropertiesServiceHandler", () => {
 		});
 		await expect(handler(envelope("setProperty", [["array"]]))).rejects.toMatchObject({
 			name: "Invalid",
+		});
+	});
+
+	describe("pair gate (9.12.25)", () => {
+		function grantedHandler(
+			grants: ReadonlySet<string>,
+			gateOpen: Promise<void> = Promise.resolve(),
+		) {
+			return makePropertiesServiceHandler({
+				getStore: async () => store,
+				canWriteType: async (_app, type) => {
+					await gateOpen;
+					return grants.has(type);
+				},
+			});
+		}
+
+		it("concurrent setProperty calls cannot interleave past the gate (reshape of a fresh partner)", async () => {
+			store.setProperty(refProperty("books", { allowedTypes: [BOOK] }));
+			let release!: () => void;
+			const gateOpen = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const handler = grantedHandler(new Set([BOOK]), gateOpen);
+
+			const pairing = handler(
+				envelope("setProperty", [
+					{ def: refProperty("authors", { allowedTypes: [BOOK], inverseOf: "books" }) },
+				]),
+			);
+			const widening = handler(
+				envelope("setProperty", [{ def: refProperty("books", { allowedTypes: [PERSON] }) }]),
+			);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			release();
+
+			await expect(pairing).resolves.toBeUndefined();
+			await expect(widening).rejects.toMatchObject({ name: "Denied" });
+			const snap = store.snapshot().properties;
+			expect(snap.authors?.inverseOf).toBe("books");
+			expect(snap.books?.allowedTypes).toEqual([BOOK]);
+		});
+
+		it("reads stay unserialised while a mutation waits on the gate", async () => {
+			let release!: () => void;
+			const gateOpen = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const handler = grantedHandler(new Set([BOOK]), gateOpen);
+			const pairing = handler(
+				envelope("setProperty", [
+					{ def: refProperty("authors", { allowedTypes: [BOOK], inverseOf: "books" }) },
+				]),
+			);
+			const listed = await Promise.race([
+				handler(envelope("list", [])),
+				new Promise((_, reject) => setTimeout(() => reject(new Error("list blocked")), 200)),
+			]);
+			expect(listed).toEqual({ properties: {}, dictionaries: {} });
+			release();
+			await expect(pairing).rejects.toMatchObject({ name: "Denied" });
+		});
+
+		it("a third def naming one half of a pair is gated over the partner's partner too", async () => {
+			store.setProperty(refProperty("authors", { allowedTypes: [BOOK], inverseOf: "books" }));
+			store.setProperty(refProperty("books", { allowedTypes: [PERSON], inverseOf: "authors" }));
+			const def = refProperty("editors", { allowedTypes: [THING], inverseOf: "authors" });
+
+			const narrow = grantedHandler(new Set([BOOK, THING]));
+			await expect(narrow(envelope("setProperty", [{ def }]))).rejects.toMatchObject({
+				name: "Denied",
+			});
+			expect(store.snapshot().properties.editors).toBeUndefined();
+
+			const wide = grantedHandler(new Set([BOOK, THING, PERSON]));
+			await expect(wide(envelope("setProperty", [{ def }]))).resolves.toBeUndefined();
+			expect(store.snapshot().properties.editors?.inverseOf).toBe("authors");
+		});
+
+		it("the pair walk closes over a chain in both directions and terminates on a cycle", async () => {
+			store.setProperty(refProperty("a", { allowedTypes: [BOOK], inverseOf: "b" }));
+			store.setProperty(refProperty("b", { allowedTypes: [BOOK], inverseOf: "c" }));
+			store.setProperty(refProperty("c", { allowedTypes: [PERSON], inverseOf: "a" }));
+
+			const narrow = grantedHandler(new Set([BOOK, THING]));
+			await expect(
+				narrow(
+					envelope("setProperty", [
+						{ def: refProperty("d", { allowedTypes: [THING], inverseOf: "b" }) },
+					]),
+				),
+			).rejects.toMatchObject({ name: "Denied" });
+			await expect(narrow(envelope("removeProperty", [{ key: "a" }]))).rejects.toMatchObject({
+				name: "Denied",
+			});
+			expect(Object.keys(store.snapshot().properties).sort()).toEqual(["a", "b", "c"]);
 		});
 	});
 });
