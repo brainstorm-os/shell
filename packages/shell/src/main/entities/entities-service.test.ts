@@ -1291,6 +1291,7 @@ describe("entities.merge (F-158 duplicate merge)", () => {
 			mergedIds: [loser],
 			linksRepointed: 0,
 			refsRewritten: 0,
+			lockedReferrers: 0,
 		});
 		expect(e.repo.get(survivor)?.properties).toMatchObject({ email: ["dana@x.com"] });
 		// The loser is gone from the live set but recoverable from the Bin.
@@ -1395,6 +1396,7 @@ describe("entities.merge (F-158 duplicate merge)", () => {
 			mergedIds: [],
 			linksRepointed: 0,
 			refsRewritten: 0,
+			lockedReferrers: 0,
 		});
 		expect(e.repo.get(task)?.properties).toMatchObject({ assignee: survivor });
 		expect(e.repo.get(loser)).toBeNull();

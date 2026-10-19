@@ -131,3 +131,20 @@ describe("list-entity-codec", () => {
 		});
 	});
 });
+
+describe("List lock (9.16.14)", () => {
+	const row = (properties: Record<string, unknown>) => ({
+		id: "l1",
+		type: LIST_ENTITY_TYPE,
+		properties,
+		createdAt: 0,
+		updatedAt: 0,
+	});
+
+	it("decodes the shared lock and never re-encodes it into a save patch", () => {
+		const locked = entityToList(row({ name: "L", locked: true }));
+		expect(locked?.locked).toBe(true);
+		expect(entityToList(row({ name: "L", locked: "true" }))?.locked).toBeUndefined();
+		expect(locked ? "locked" in listToEntityProperties(locked) : true).toBe(false);
+	});
+});

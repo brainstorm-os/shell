@@ -15,12 +15,13 @@
 
 import type { ValueType } from "@brainstorm-os/sdk-types";
 import { ulid } from "ulid";
-import { EntitiesRepository } from "../storage/entities-repo";
+import type { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import { planImport, runImport } from "./import-engine";
 import { inferMapping } from "./import-map";
 import { parseTable } from "./import-parse";
 import { projectRecord } from "./import-project";
+import { ImportEntitiesRepository } from "./import-repo";
 import {
 	type EntityDraft,
 	IMPORT_EXTERNAL_ID_PROP,
@@ -100,7 +101,7 @@ export async function planRecordsImport(
 	text: string,
 	options: ImportRecordsOptions,
 ): Promise<ImportPlan> {
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	const deps = makeWriteDeps(repo, options.importedBy, options.targetType);
 	return planImport(buildDrafts(text, options), options.source, deps);
 }
@@ -113,7 +114,7 @@ export async function importRecordsIntoVault(
 	options: ImportRecordsOptions,
 	run: ImportRunOptions = {},
 ): Promise<ImportRunReport> {
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	const deps = makeWriteDeps(repo, options.importedBy, options.targetType);
 	return runImport(buildDrafts(text, options), options.source, deps, options.now, run);
 }

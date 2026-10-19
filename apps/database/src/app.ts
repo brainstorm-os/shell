@@ -267,6 +267,7 @@ import {
 	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
+import { isListLocked, withLiveListLocks } from "./logic/list-lock";
 import { deriveListMode } from "./logic/list-mode";
 import {
 	deleteUserList,
@@ -1997,6 +1998,12 @@ function openAddToCollectionMenu(
 	);
 }
 
+/** The refusal every membership writer shows for a locked List (9.16.14). */
+function flashListLocked(listId: string, state: AppState): void {
+	const name = state.lists.find((l) => l.id === listId)?.name ?? "";
+	flashStatus(t("brainstorm.database.status.listLocked", { name }), "warn");
+}
+
 /** Commit a single add/remove against a List's `members` overrides.
  *  Decision is pure (`decideToggleMembership`); this wrapper applies the
  *  decision to `state.lists` and re-renders the surfaces that reflect
@@ -2015,7 +2022,10 @@ function toggleEntityInList(
 		db: state.db,
 		isVaultDerived: isVaultDerivedListId,
 	});
-	if (decision.kind === "skip") return;
+	if (decision.kind === "skip") {
+		if (decision.reason === "locked") flashListLocked(listId, state);
+		return;
+	}
 
 	const { next, verb } = decision;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -2386,7 +2396,7 @@ async function applyBulkSet(state: AppState, propertyId: string, value: unknown)
 }
 
 function openBulkAddToCollectionMenu(state: AppState, anchor: HTMLElement): void {
-	const candidates = state.lists.filter((l) => !isVaultDerivedListId(l.id));
+	const candidates = state.lists.filter((l) => !isVaultDerivedListId(l.id) && !isListLocked(l));
 	if (candidates.length === 0) {
 		flashStatus(t("brainstorm.database.status.noCollectionsToAdd"), "warn");
 		return;
@@ -2406,6 +2416,10 @@ function applyBulkAddToList(state: AppState, listId: string): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
 	const plan = planBulkAddToList(list, state.db.entities, state.selection.selectedIds, state.db);
+	if (plan.listLocked) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	if (plan.added > 0) {
 		lastBulkUndo = plan.undo;
 		state.lists = state.lists.map((l) => (l.id === listId ? plan.next : l));
@@ -2440,6 +2454,11 @@ async function undoBulkEdit(state: AppState): Promise<void> {
 			t("brainstorm.database.bulk.undone") + lockedSuffix(revert.lockedSkipped),
 			revert.lockedSkipped > 0 ? "warn" : "ready",
 		);
+		return;
+	}
+	const target = state.lists.find((l) => l.id === undo.listId);
+	if (target && isListLocked(target)) {
+		flashListLocked(target.id, state);
 		return;
 	}
 	state.lists = state.lists.map((l) => (l.id === undo.listId ? revertBulkAdd(l, undo) : l));
@@ -3023,6 +3042,12 @@ async function onDropObjectToGroup(
 		return;
 	}
 	const list = activeList(state);
+	// The drop both re-groups the objects AND pins them into the collection;
+	// a locked collection takes neither half (9.16.14).
+	if (list && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const groupValue = groupKey ?? "";
 	const now = Date.now();
 	let members = list?.members;
@@ -3656,6 +3681,12 @@ async function createEntityInActiveList(state: AppState): Promise<void> {
 		return;
 	}
 	const plan = decideRowCreate(list);
+	// A manual collection pins the new row into its members — refused when
+	// locked, before an orphan row is ever created (9.16.14).
+	if (plan.addToMembers && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 
 	// Offer applicable object templates through the shared create-flow picker.
 	// A query failure or a shell without `entities.query` falls back to blank.
@@ -3703,6 +3734,12 @@ async function performRowCreate(
 	option: CreateTemplateOption,
 ): Promise<void> {
 	if (rowCreateInFlight) return;
+	// A manual collection pins the new row into its members — refused when
+	// locked, before an orphan row is ever created (9.16.14).
+	if (plan.addToMembers && isListLocked(list)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const entities = getRuntime()?.services?.entities;
 	if (!entities?.create) {
 		flashStatus(t("brainstorm.database.status.createNeedsEntities"), "warn");
@@ -5854,10 +5891,12 @@ async function loadVaultEntities(state: AppState): Promise<void> {
 function applyVaultSnapshot(state: AppState, snapshot: VaultSnapshot): void {
 	const built = buildVaultLists(snapshot);
 	state.db = built.db;
-	state.lists = [
-		...built.lists,
-		...persistedUserDeltas.lists.filter((l) => !isVaultDerivedListId(l.id)),
-	];
+	// The lock can flip from another surface while Database is open — re-read
+	// it from the live List rows on every rebuild (9.16.14).
+	state.lists = withLiveListLocks(
+		[...built.lists, ...persistedUserDeltas.lists.filter((l) => !isVaultDerivedListId(l.id))],
+		built.db.entities,
+	);
 	state.views = [
 		// Re-attach the user's saved per-view config onto the freshly
 		// regenerated vault views (stable ids), so sort/filter/columns/

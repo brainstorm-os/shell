@@ -233,7 +233,21 @@ export type Entity<P extends Record<string, unknown> = Record<string, unknown>> 
 	createdBy: string;
 	createdAt: number;
 	updatedAt: number;
+	/** On a create/update result only: linked objects of a two-way relation
+	 *  that could not take their back-link when it was applied (e.g. locked in
+	 *  the meantime). Absent when every back-link landed. */
+	skippedLinks?: ReadonlyArray<SkippedLink>;
 };
+
+/** Why a two-way relation's back-link was not written (9.12.25). */
+export enum LinkSkipReason {
+	/** The linked object became read-only after the write was checked. */
+	Locked = "locked",
+	/** The caller lost write access to the linked object's type meanwhile. */
+	Denied = "denied",
+}
+
+export type SkippedLink = { entityId: EntityId; reason: LinkSkipReason };
 
 export type EntityQuery = {
 	type?: string | string[];
@@ -268,6 +282,9 @@ export type EntityMergeResult = {
 	linksRepointed: number;
 	/** Referrer entities whose property refs were rewritten to the survivor. */
 	refsRewritten: number;
+	/** Referrers left untouched because they are locked (read-only); they
+	 *  still point at a binned loser. Counted, never named. */
+	lockedReferrers: number;
 };
 
 export type EntitiesService = {

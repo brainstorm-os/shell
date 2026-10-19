@@ -11,6 +11,7 @@
 
 import { FILE_ENTITY_TYPE } from "@brainstorm-os/sdk/os-file-drop";
 import { type List, ListSourceKind, type MemberOverrides } from "../types";
+import { isListLocked } from "./list-lock";
 import { MembersCapacityError, addToList } from "./members";
 
 export function sourceShowsFiles(list: List): boolean {
@@ -19,7 +20,7 @@ export function sourceShowsFiles(list: List): boolean {
 }
 
 export function acceptsFileDrop(list: List | null | undefined, isVaultDerived: boolean): boolean {
-	if (!list) return false;
+	if (!list || isListLocked(list)) return false;
 	return !isVaultDerived || sourceShowsFiles(list);
 }
 
@@ -39,7 +40,8 @@ export function membersWithDroppedFiles(
 	fileIds: ReadonlyArray<string>,
 	now: number = Date.now(),
 ): DroppedFilesMembers {
-	if (isVaultDerived || fileIds.length === 0) return { members: null, overCapacity: 0 };
+	if (isVaultDerived || isListLocked(list) || fileIds.length === 0)
+		return { members: null, overCapacity: 0 };
 	const matchesSource = sourceShowsFiles(list);
 	let members = list.members;
 	let overCapacity = 0;

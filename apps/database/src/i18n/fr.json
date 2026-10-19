@@ -117,6 +117,7 @@
   "brainstorm.database.selection.count": "{count} sélectionnés",
   "brainstorm.database.selection.clear": "Effacer",
   "brainstorm.database.status.noCollectionsToAdd": "Aucune autre collection d'utilisateur à laquelle ajouter",
+  "brainstorm.database.status.listLocked": "{name} est verrouillée — déverrouillez-la pour modifier ses éléments.",
   "brainstorm.database.membership.verb.added": "Ajouté",
   "brainstorm.database.membership.verb.readded": "Rajouté",
   "brainstorm.database.membership.verb.excluded": "Exclu",

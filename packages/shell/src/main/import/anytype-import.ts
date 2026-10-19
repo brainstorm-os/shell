@@ -37,13 +37,13 @@ import {
 import { ulid } from "ulid";
 import { AssetKind } from "../assets/asset-types";
 import { extensionForMime, servedMimeForName } from "../files/upload-mime";
-import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
 import type { ApplyDocUpdate } from "../welcome/seed-deps";
 import { WelcomeEntityType } from "../welcome/welcome-content";
 import { anytypeBlocksToLexical, anytypeDateToMs } from "./anytype-blocks-to-lexical";
 import { yieldToEventLoop } from "./import-engine";
 import { inferValueType } from "./import-map";
+import { ImportEntitiesRepository } from "./import-repo";
 import { IMPORT_BODY_HASH_PROP, IMPORT_EXTERNAL_ID_PROP } from "./import-types";
 import {
 	type ImportedBodyState,
@@ -1340,7 +1340,7 @@ export async function importAnytypeExport(
 			files,
 			attachments.map((a) => a.path),
 		);
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	// Resolve every dedupe key (objects, referenced files, collections) in one
 	// batched query up front — one map hit per row in the loops below instead
 	// of one full-table `json_extract` scan per entity.

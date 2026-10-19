@@ -59,7 +59,10 @@ export async function deleteUserList(svc: ListEntitiesService, id: string): Prom
  *  load-time snapshot seed and the reconcile diff must agree on this so an
  *  unchanged List never reads as dirty. */
 export function serializeListForReconcile(list: List): string {
-	return JSON.stringify(list);
+	// The lock is read-only here (it flips through its own lock-only patch), so
+	// a lock flip must never make the List look dirty and trigger a re-save.
+	const { locked: _lock, ...persisted } = list;
+	return JSON.stringify(persisted);
 }
 
 /** What a reconcile pass must apply to `entities.db`: the items whose

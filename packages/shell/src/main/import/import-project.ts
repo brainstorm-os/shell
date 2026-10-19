@@ -9,7 +9,12 @@
  * so a partial source row produces a partial entity, not one full of empties.
  */
 
-import { DateGranularity, type DateValue, ValueType } from "@brainstorm-os/sdk-types";
+import {
+	DateGranularity,
+	type DateValue,
+	RESERVED_PROPERTY_KEYS,
+	ValueType,
+} from "@brainstorm-os/sdk-types";
 import type { EntityDraft, ImportRecord, MappingPlan } from "./import-types";
 
 const TRUE_TOKENS = new Set(["true", "1", "yes", "y", "on"]);
@@ -68,6 +73,9 @@ export function projectRecord(record: ImportRecord, plan: MappingPlan): EntityDr
 	for (const mapping of plan.columns) {
 		if (!mapping.include) continue;
 		if (!(mapping.column in record.fields)) continue;
+		// Host-owned keys never come from a source file (the sink strips them
+		// too; dropping them here keeps the dry-run honest).
+		if (RESERVED_PROPERTY_KEYS.includes(mapping.property)) continue;
 		properties[mapping.property] = coerceToValueType(
 			mapping.valueType,
 			record.fields[mapping.column],

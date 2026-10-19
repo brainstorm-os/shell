@@ -117,6 +117,7 @@
   "brainstorm.database.selection.count": "{count} selected",
   "brainstorm.database.selection.clear": "Clear",
   "brainstorm.database.status.noCollectionsToAdd": "No more user collections to add to",
+  "brainstorm.database.status.listLocked": "{name} is locked — unlock it to change its items.",
   "brainstorm.database.membership.verb.added": "Added",
   "brainstorm.database.membership.verb.readded": "Re-added",
   "brainstorm.database.membership.verb.excluded": "Excluded",

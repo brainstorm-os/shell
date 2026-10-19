@@ -119,6 +119,22 @@ describe("embedded-list (database grid) block", () => {
 		expect(h.root.querySelectorAll(".bsdb__row")).toHaveLength(2);
 	});
 
+	it("disables + New with a reason when the List is locked (9.16.14)", async () => {
+		const h = makeCtx({
+			list: {
+				entityId: "list-1",
+				entityTypeId: LIST_TYPE,
+				properties: { name: "Clients", locked: true, members: { include: ["c1"], exclude: [] } },
+				updatedAt: 1,
+			},
+			rowsById: { c1: row("c1", { name: "Acme" }) },
+		});
+		await h.run();
+		const add = h.root.querySelector<HTMLButtonElement>(".bsdb__new");
+		expect(add?.disabled).toBe(true);
+		expect(add?.title).toBe("Clients is locked — unlock it to add items");
+	});
+
 	it("clicking a row navigates to that entity", async () => {
 		const h = makeCtx({
 			list: {

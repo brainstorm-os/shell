@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { LinkSkipReason, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
@@ -49,7 +49,13 @@ afterEach(async () => {
 	for (const c of cleanups.splice(0)) await c();
 });
 
-async function setup(opts: { grants?: string[]; defs?: PropertyDef[] } = {}) {
+async function setup(
+	opts: {
+		grants?: string[];
+		defs?: PropertyDef[];
+		onChange?: (entityId: string, repo: EntitiesRepository) => void;
+	} = {},
+) {
 	const dir = await mkdtemp(join(tmpdir(), "brainstorm-inverse-"));
 	const stores = new DataStores(dir);
 	const db = await stores.open("entities");
@@ -71,6 +77,7 @@ async function setup(opts: { grants?: string[]; defs?: PropertyDef[] } = {}) {
 		bindInverseBackfill: (fn) => {
 			backfill = fn;
 		},
+		onEntityChange: (change) => opts.onChange?.(change.entityId, repo),
 	});
 	cleanups.push(async () => {
 		stores.close();
@@ -325,5 +332,231 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		]);
 		const ids = ((t.props("p1")?.books ?? []) as Array<{ value: string }>).map((v) => v.value).sort();
 		expect(ids).toEqual(["b1", "b2", "b3"]);
+	});
+
+	it("a far end whose type is outside the pair's allowedTypes is refused", async () => {
+		const NOTE = "io.test/Note/v1";
+		const t = await setup({
+			defs: [
+				ref("authors", { ...MANY, allowedTypes: [PERSON], inverseOf: "books" }),
+				ref("books", { ...MANY, allowedTypes: [BOOK] }),
+			],
+		});
+		t.repo.create({ id: "n1", type: NOTE, properties: {}, createdBy: "x", now: 1, dekId: null });
+		await t.create("p1", PERSON);
+		await expect(t.create("b1", BOOK, { authors: [{ value: "n1" }] })).rejects.toMatchObject({
+			name: "Denied",
+		});
+		expect(t.props("n1")?.books).toBeUndefined();
+		expect(t.props("b1")).toBeNull();
+		await t.create("b2", BOOK, { authors: [{ value: "p1" }] });
+		expect(t.props("p1")?.books).toEqual([{ value: "b2" }]);
+	});
+
+	it("a far end locked after planning is skipped AND reported in the result", async () => {
+		const t = await setup({
+			onChange: (id, repo) => {
+				if (id === "b1") repo.update("p1", { locked: true }, 2000);
+			},
+		});
+		await t.create("p1", PERSON);
+		const made = (await t.create("b1", BOOK, { authors: [{ value: "p1" }] })) as {
+			skippedLinks?: Array<{ entityId: string; reason: string }>;
+		};
+		expect(t.props("p1")?.books).toBeUndefined();
+		expect(made.skippedLinks).toEqual([{ entityId: "p1", reason: LinkSkipReason.Locked }]);
+	});
+
+	describe("re-shaping a paired def passes the pair gate (old AND new allowedTypes)", () => {
+		const paired = {
+			authors: ref("authors", { ...MANY, allowedTypes: [PERSON], inverseOf: "books" }),
+			books: ref("books", { ...MANY, allowedTypes: [PERSON] }),
+			loose: ref("loose", { allowedTypes: [PERSON] }),
+		};
+		function service(grants: Set<string>) {
+			const saved: PropertyDef[] = [];
+			const store = {
+				snapshot: () => ({ properties: paired, dictionaries: {} }),
+				setProperty: (d: PropertyDef) => saved.push(d),
+			} as unknown as PropertiesStore;
+			const handler = makePropertiesServiceHandler({
+				getStore: async () => store,
+				canWriteType: async (_app, type) => grants.has(type),
+			});
+			return {
+				saved,
+				set: (def: PropertyDef) => handler(env("setProperty", { def }, "properties")),
+			};
+		}
+
+		it("an app that can write only its own type cannot narrow a pair onto it", async () => {
+			const { set, saved } = service(new Set([BOOK]));
+			for (const def of [
+				{ ...paired.authors, allowedTypes: [BOOK] },
+				{ ...paired.books, allowedTypes: [BOOK] },
+				{ ...paired.books, allowedTypes: undefined },
+				{ ...paired.books, valueType: ValueType.Text },
+				{ ...paired.books, count: { min: 0, max: 1 } },
+			] as PropertyDef[]) {
+				await expect(set(def)).rejects.toMatchObject({ name: "Denied" });
+			}
+			expect(saved).toEqual([]);
+		});
+
+		it("holding every linked type (old and new) allows it; an unpaired def is not gated", async () => {
+			const { set, saved } = service(new Set([BOOK, PERSON]));
+			await set({ ...paired.books, allowedTypes: [BOOK] });
+			await set({ ...paired.books, name: "Renamed" });
+			const loose = service(new Set());
+			await loose.set({ ...paired.loose, allowedTypes: [BOOK] });
+			expect(saved).toHaveLength(2);
+			expect(loose.saved).toHaveLength(1);
+		});
+	});
+
+	describe("entities.merge", () => {
+		it("strips reserved keys from the merge patch", async () => {
+			const t = await setup({ defs: [] });
+			await t.create("s1", BOOK, { title: "S" });
+			await t.create("l1", BOOK, { title: "L" });
+			await t.call("merge", {
+				survivorId: "s1",
+				loserIds: ["l1"],
+				patch: {
+					title: "Merged",
+					agentProvenance: { agent: "io.brainstorm.agent", conversationId: "c", createdAt: 1 },
+					agentProposal: { forged: true },
+				},
+			});
+			expect(t.props("s1")?.title).toBe("Merged");
+			expect(t.props("s1")).not.toHaveProperty("agentProvenance");
+			expect(t.props("s1")).not.toHaveProperty("agentProposal");
+		});
+
+		it("never rewrites a locked referrer (a locked List keeps its members) and reports it", async () => {
+			const LIST = "brainstorm/List/v1";
+			const t = await setup({ defs: [] });
+			await t.create("s1", BOOK, { title: "S" });
+			await t.create("l1", BOOK, { title: "L" });
+			const members = { include: [{ entityId: "l1", addedAt: 1, by: "user" }], exclude: [] };
+			t.repo.create({
+				id: "list1",
+				type: LIST,
+				properties: { name: "Locked", members, pinned: [{ entityId: "l1" }], locked: true },
+				createdBy: "x",
+				now: 1,
+				dekId: null,
+			});
+			const result = (await t.call("merge", { survivorId: "s1", loserIds: ["l1"] })) as {
+				refsRewritten: number;
+				lockedReferrers: number;
+			};
+			expect(t.props("list1")?.members).toEqual(members);
+			expect(t.props("list1")?.pinned).toEqual([{ entityId: "l1" }]);
+			expect(result.refsRewritten).toBe(0);
+			expect(result.lockedReferrers).toBe(1);
+		});
+	});
+
+	it("the far-end cap is per call, across every paired key", async () => {
+		const t = await setup({
+			defs: [
+				ref("authors", { ...MANY, count: { min: 0, max: 500 }, inverseOf: "books" }),
+				ref("books", MANY),
+				ref("editors", { ...MANY, count: { min: 0, max: 500 }, inverseOf: "edited" }),
+				ref("edited", MANY),
+			],
+		});
+		const half = Math.ceil((MAX_FAR_WRITES_PER_CALL + 1) / 2) + 10;
+		const authors: Array<{ value: string }> = [];
+		const editors: Array<{ value: string }> = [];
+		for (let i = 0; i < half; i++) {
+			for (const [prefix, list] of [
+				["a", authors],
+				["e", editors],
+			] as const) {
+				t.repo.create({
+					id: `${prefix}${i}`,
+					type: PERSON,
+					properties: {},
+					createdBy: "x",
+					now: 1,
+					dekId: null,
+				});
+				list.push({ value: `${prefix}${i}` });
+			}
+		}
+		await t.create("b1", BOOK, {});
+		await expect(t.call("update", { id: "b1", patch: { authors, editors } })).rejects.toMatchObject({
+			name: "Invalid",
+		});
+		expect(t.props("b1")?.authors).toBeUndefined();
+		await expect(t.create("b2", BOOK, { authors, editors })).rejects.toMatchObject({
+			name: "Invalid",
+		});
+		expect(t.props("b2")).toBeNull();
+	});
+
+	describe("pair gate edge cases (properties.setProperty / removeProperty)", () => {
+		function service(catalog: Record<string, PropertyDef>, grants: Set<string>) {
+			const saved: PropertyDef[] = [];
+			const removed: string[] = [];
+			const store = {
+				snapshot: () => ({ properties: catalog, dictionaries: {} }),
+				setProperty: (d: PropertyDef) => saved.push(d),
+				removeProperty: (k: string) => removed.push(k),
+			} as unknown as PropertiesStore;
+			const handler = makePropertiesServiceHandler({
+				getStore: async () => store,
+				canWriteType: async (_app, type) => grants.has(type),
+			});
+			return {
+				saved,
+				removed,
+				set: (def: PropertyDef) => handler(env("setProperty", { def }, "properties")),
+				remove: (key: string) => handler(env("removeProperty", { key }, "properties")),
+			};
+		}
+
+		it("refuses a reserved key as the key of ANY def, paired or not", async () => {
+			const s = service({}, new Set(["*"]));
+			for (const key of ["agentProvenance", "createdByAgent", "agentProposal", "agentDelegatedBy"]) {
+				await expect(s.set(ref(key))).rejects.toMatchObject({ name: "Invalid" });
+			}
+			expect(s.saved).toEqual([]);
+		});
+
+		it("declaring inverseOf onto a partner not in the catalog yet is gated as any type", async () => {
+			const s = service({}, new Set([BOOK]));
+			await expect(
+				s.set(ref("authors", { allowedTypes: [BOOK], inverseOf: "later" })),
+			).rejects.toMatchObject({ name: "Denied" });
+			expect(s.saved).toEqual([]);
+		});
+
+		it("creating the def an existing one names as its partner passes the full gate", async () => {
+			const s = service(
+				{ authors: ref("authors", { allowedTypes: [BOOK], inverseOf: "later" }) },
+				new Set([BOOK]),
+			);
+			await expect(s.set(ref("later"))).rejects.toMatchObject({ name: "Denied" });
+			expect(s.saved).toEqual([]);
+		});
+
+		it("removing half of a pair is gated like declaring it", async () => {
+			const catalog = {
+				authors: ref("authors", { allowedTypes: [PERSON], inverseOf: "books" }),
+				books: ref("books", { allowedTypes: [PERSON] }),
+				loose: ref("loose"),
+			};
+			const narrow = service(catalog, new Set([BOOK]));
+			await expect(narrow.remove("books")).rejects.toMatchObject({ name: "Denied" });
+			await expect(narrow.remove("authors")).rejects.toMatchObject({ name: "Denied" });
+			await narrow.remove("loose");
+			expect(narrow.removed).toEqual(["loose"]);
+			const wide = service(catalog, new Set([PERSON]));
+			await wide.remove("books");
+			expect(wide.removed).toEqual(["books"]);
+		});
 	});
 });

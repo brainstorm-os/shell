@@ -17,8 +17,8 @@
  */
 
 import { ulid } from "ulid";
-import { EntitiesRepository } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
+import { ImportEntitiesRepository } from "./import-repo";
 import { IMPORT_EXTERNAL_ID_PROP } from "./import-types";
 
 export const WHITEBOARD_TYPE = "brainstorm/Whiteboard/v1";
@@ -154,7 +154,7 @@ export async function importObsidianCanvas(
 	files: readonly CanvasFile[],
 	options: CanvasImportOptions,
 ): Promise<CanvasImportReport> {
-	const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+	const repo = new ImportEntitiesRepository(await session.dataStores.open("entities"));
 	let boardsCreated = 0;
 	let boardsUpdated = 0;
 	let edgesCreated = 0;

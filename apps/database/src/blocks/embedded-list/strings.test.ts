@@ -12,7 +12,7 @@ describe("embedded-list block strings", () => {
 
 	it("ships every key in every pack", () => {
 		const english = Object.keys(EMBED_PACKS.de ?? {}).sort();
-		expect(english).toHaveLength(6);
+		expect(english).toHaveLength(7);
 		for (const pack of Object.values(EMBED_PACKS)) expect(Object.keys(pack).sort()).toEqual(english);
 	});
 });
