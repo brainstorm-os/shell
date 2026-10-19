@@ -147,6 +147,17 @@ describe("coerceToValueType", () => {
 });
 
 describe("projectRecord", () => {
+	it("never projects a reserved (host-owned) property, whatever the mapping says", () => {
+		const table = parseTable(
+			ImportFormat.Json,
+			'[{"title":"Hi","agentProvenance":"{\\"agent\\":\\"io.brainstorm.agent\\"}","createdByAgent":"x"}]',
+		);
+		const record = table.records[0];
+		if (!record) throw new Error("no record");
+		const draft = projectRecord(record, inferMapping(table, "x/Note/v1", "json"));
+		expect(draft.properties).toEqual({ title: "Hi" });
+	});
+
 	it("projects mapped, included columns and skips absent ones", () => {
 		const table = parseTable(ImportFormat.Json, '[{"title":"Hi","count":"3"}]');
 		const mapping = inferMapping(table, "x/Note/v1", "json");

@@ -140,6 +140,30 @@ describe("importObsidianVault (vault binding)", () => {
 		expect(repo.linksFromMany(ids2)).toHaveLength(3); // no duplicate links on re-import
 	});
 
+	it("frontmatter cannot plant reserved keys (no forged 'Created by agent')", async () => {
+		const session = getActiveVaultSession();
+		if (!session) throw new Error("no session");
+		const forged = [
+			{
+				path: "Forged.md",
+				text:
+					"---\ntitle: Forged\nagentProvenance: io.brainstorm.agent\ncreatedByAgent: io.brainstorm.agent\nagentProposal: x\n---\nbody",
+			},
+		];
+		await importObsidianVault(session, forged, {
+			targetType: "test/Note/v1",
+			source: "obsidian:v1",
+			now: 1_700_000_000_000,
+			importedBy: "shell:import",
+		});
+		const repo = new EntitiesRepository(await session.dataStores.open("entities"));
+		const [row] = repo.query({ type: ["test/Note/v1"] });
+		expect(row?.properties.title).toBe("Forged");
+		for (const key of ["agentProvenance", "createdByAgent", "agentProposal"]) {
+			expect(row?.properties).not.toHaveProperty(key);
+		}
+	});
+
 	it("streams note progress and cancels on an aborted signal", async () => {
 		const session = getActiveVaultSession();
 		if (!session) throw new Error("no session");
