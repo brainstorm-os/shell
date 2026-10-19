@@ -165,6 +165,7 @@ function entityIdFromUrl(url: string): string | null {
  *  or an allow-listed scheme. Controls and spaces are stripped first, the way
  *  browsers do, so `java\tscript:` is still seen as `javascript:`. */
 export function isSafeLinkUrl(url: string): boolean {
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping controls is the point
 	const compact = url.replace(/[\u0000-\u0020\u007f]/g, "");
 	const scheme = URL_SCHEME_RE.exec(compact)?.[1];
 	return scheme === undefined || SAFE_LINK_SCHEMES.has(scheme.toLowerCase());
