@@ -1,3 +1,4 @@
+import { MEMBERS_HARD_CAP } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import { type List, ListSourceKind } from "../types";
 import { acceptsFileDrop, membersWithDroppedFiles } from "./file-drop";
@@ -33,10 +34,27 @@ describe("file drop into a collection (9.8.17)", () => {
 
 	it("pins new files unless the source already shows them", () => {
 		expect(
-			membersWithDroppedFiles(MANUAL, false, ["f1", "f2"], 1)?.include.map((m) => m.entityId),
+			membersWithDroppedFiles(MANUAL, false, ["f1", "f2"], 1).members?.include.map((m) => m.entityId),
 		).toEqual(["f1", "f2"]);
-		expect(membersWithDroppedFiles(FILES, false, ["f1"], 1)).toBeNull();
-		expect(membersWithDroppedFiles(FILES, true, ["f1"], 1)).toBeNull();
-		expect(membersWithDroppedFiles(MANUAL, false, [], 1)).toBeNull();
+		expect(membersWithDroppedFiles(FILES, false, ["f1"], 1).members).toBeNull();
+		expect(membersWithDroppedFiles(FILES, true, ["f1"], 1).members).toBeNull();
+		expect(membersWithDroppedFiles(MANUAL, false, [], 1).members).toBeNull();
+	});
+
+	it("counts files past the members cap instead of throwing", () => {
+		const full = {
+			...MANUAL,
+			members: {
+				include: Array.from({ length: MEMBERS_HARD_CAP }, (_, i) => ({
+					entityId: `m${i}`,
+					addedAt: 0,
+					by: "user" as const,
+				})),
+				exclude: [],
+			},
+		};
+		const result = membersWithDroppedFiles(full, false, ["f1", "f2"], 1);
+		expect(result.overCapacity).toBe(2);
+		expect(result.members).toBeNull();
 	});
 });

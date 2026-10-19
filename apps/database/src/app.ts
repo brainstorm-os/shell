@@ -5052,7 +5052,11 @@ function bindFileDrop(state: AppState, body: HTMLElement): void {
 				acceptsFileDrop(list, list ? isVaultDerivedListId(list.id) : false)
 			);
 		},
-		onFiles: (files) => void importDroppedFiles(state, files),
+		onFiles: (files) => {
+			void importDroppedFiles(state, files).catch((error: unknown) => {
+				console.warn("[database] file drop failed:", error);
+			});
+		},
 	});
 }
 
@@ -5077,14 +5081,17 @@ async function importDroppedFiles(state: AppState, files: File[]): Promise<void>
 			},
 		},
 	);
-	const members = membersWithDroppedFiles(
-		list,
-		isVaultDerivedListId(list.id),
+	// Re-read the list: membership may have changed while files uploaded, and
+	// writing members derived from the pre-import copy would drop that change.
+	const current = state.lists.find((l) => l.id === list.id) ?? list;
+	const { members, overCapacity } = membersWithDroppedFiles(
+		current,
+		isVaultDerivedListId(current.id),
 		created.map((c) => c.id),
 	);
 	if (members) {
 		state.lists = state.lists.map((l) =>
-			l.id === list.id ? { ...l, members, updatedAt: Date.now() } : l,
+			l.id === current.id ? { ...l, members, updatedAt: Date.now() } : l,
 		);
 		schedulePersist(state);
 	}
@@ -5100,8 +5107,12 @@ async function importDroppedFiles(state: AppState, files: File[]): Promise<void>
 				count: created.length,
 				name: list.name,
 			},
-		) + (failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : ""),
-		failed > 0 ? "warn" : "ready",
+		) +
+			(failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : "") +
+			(overCapacity > 0
+				? ` ${t("brainstorm.database.bulk.overCapacity", { count: overCapacity })}`
+				: ""),
+		failed > 0 || overCapacity > 0 ? "warn" : "ready",
 	);
 }
 
