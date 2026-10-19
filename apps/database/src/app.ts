@@ -107,6 +107,7 @@ import {
 import { type VirtualListHandle, createVirtualList } from "@brainstorm-os/sdk/virtual-list";
 import {
 	type CollapseAllAction,
+	boardVisibleOrder,
 	buildSwimlanes,
 	cellMovePatch,
 	collapseAllPatch,
@@ -2176,6 +2177,21 @@ function orderedVisibleIds(state: AppState): string[] {
 		groupLabelResolver(state),
 		groupOrderResolver(state),
 	);
+	if (view.kind === ListViewKind.Board && view.groupBy) {
+		const layout = view.layoutOptions as BoardLayoutOptions;
+		const groups = compiledView.groups.length
+			? compiledView.groups
+			: [{ key: null, label: "", rows: compiledView.rows }];
+		const lanes = layout.swimlaneBy
+			? buildSwimlanes(
+					compiledView.rows,
+					layout.swimlaneBy,
+					groupLabelResolver(state),
+					groupOrderResolver(state),
+				)
+			: null;
+		return boardVisibleOrder(groups, lanes, layout, view.groupBy.propertyId);
+	}
 	if (compiledView.groups.length === 0) return compiledView.rows.map((e) => e.id);
 	const out: string[] = [];
 	for (const group of compiledView.groups) {

@@ -3,6 +3,7 @@ import { GroupOrderMode } from "../types/list-view";
 import {
 	type BoardGroup,
 	CollapseAllAction,
+	boardVisibleOrder,
 	buildSwimlanes,
 	cellMovePatch,
 	collapseAllPatch,
@@ -108,5 +109,50 @@ describe("collapse sets", () => {
 			collapsedGroups: ["x", ""],
 		});
 		expect(collapseAllPatch({}, ["x"], CollapseAllAction.Expand)).toEqual({ collapsedGroups: [] });
+	});
+});
+
+describe("boardVisibleOrder (prev/next walks what the board paints)", () => {
+	const groups = [group("a", 2), group("b", 1), group("c", 0)];
+
+	it("follows the manual column order and skips collapsed columns", () => {
+		expect(
+			boardVisibleOrder(groups, null, { groupOrder: ["b", "a"], collapseEmptyColumns: false }, "s"),
+		).toEqual(["b-0", "a-0", "a-1"]);
+		expect(
+			boardVisibleOrder(groups, null, { collapsedGroups: ["a"], collapseEmptyColumns: true }, "s"),
+		).toEqual(["b-0"]);
+	});
+
+	it("follows a count sort", () => {
+		expect(
+			boardVisibleOrder(
+				groups,
+				null,
+				{ groupOrderMode: GroupOrderMode.CountAsc, collapseEmptyColumns: false },
+				"s",
+			),
+		).toEqual(["b-0", "a-0", "a-1"]);
+	});
+
+	it("reads swimlanes lane by lane, skipping collapsed lanes", () => {
+		const rows = [
+			row("1", { s: "a", lane: "x" }),
+			row("2", { s: "b", lane: "y" }),
+			row("3", { s: "b", lane: "x" }),
+		];
+		const cols: BoardGroup[] = [
+			{ key: "a", label: "a", rows: [rows[0] as EntityRow] },
+			{ key: "b", label: "b", rows: [rows[1] as EntityRow, rows[2] as EntityRow] },
+		];
+		const lanes = buildSwimlanes(rows, "lane");
+		expect(boardVisibleOrder(cols, lanes, { collapseEmptyColumns: false }, "s")).toEqual([
+			"1",
+			"3",
+			"2",
+		]);
+		expect(
+			boardVisibleOrder(cols, lanes, { collapsedLanes: ["x"], collapseEmptyColumns: false }, "s"),
+		).toEqual(["2"]);
 	});
 });
