@@ -30,7 +30,13 @@
  * and new shape — a partner not in the catalog counts as any type — or an app
  * could narrow `allowedTypes` onto a type it holds, then declare the pair. The entities service also refuses far
  * ends outside the declared types, so the catalog bounds the far writes.
- * Reserved keys are never pair members.
+ * Reserved keys are never pair members. The gate closes over the whole pair
+ * component — every def reachable through `inverseOf` in either direction —
+ * because a third def naming one half of a pair steers writes onto the
+ * other half's types too. Catalog mutations are serialised per store, so a
+ * gate check and the write it guards are atomic against other callers: two
+ * interleaved calls could otherwise each pass against a catalog missing the
+ * other's def.
  *
  * Capability gating happens in the broker via the envelope's `caps`
  * field; the SDK proxy declares `properties.read` for reads and
@@ -67,6 +73,22 @@ export type PropertiesServiceOptions = {
 
 const ANY_TYPE = "*";
 
+export enum PropertiesMethod {
+	List = "list",
+	GetProperty = "getProperty",
+	SetProperty = "setProperty",
+	RemoveProperty = "removeProperty",
+	GetDictionary = "getDictionary",
+	SetDictionary = "setDictionary",
+	RemoveDictionary = "removeDictionary",
+}
+
+/** Methods that read the catalog to decide what they write. */
+const CATALOG_MUTATORS: ReadonlySet<string> = new Set([
+	PropertiesMethod.SetProperty,
+	PropertiesMethod.RemoveProperty,
+]);
+
 /** Keys of every def currently paired WITH `key` from the other side. */
 function declaredPartnersOf(key: string, catalog: Readonly<Record<string, PropertyDef>>): string[] {
 	return Object.values(catalog)
@@ -89,28 +111,41 @@ function reshapesPair(def: PropertyDef, prior: PropertyDef | undefined): boolean
 }
 
 /** Every type a change to the pairing of `key` can steer writes onto: the
- *  def as it is now and as it will be, plus every partner. A partner not in
- *  the catalog yet has no type limits by definition — it counts as any type,
- *  or it could be created later, unrestricted, past the gate. */
+ *  def as it is now and as it will be, plus the whole pair component — every
+ *  def linked to it through `inverseOf` in either direction, transitively.
+ *  A partner not in the catalog yet has no type limits by definition — it
+ *  counts as any type, or it could be created later, unrestricted, past the
+ *  gate. The walk is bounded by a visited set, so a cycle terminates. */
 function pairTargetTypes(
 	key: string,
 	shapes: ReadonlyArray<PropertyDef | undefined>,
 	catalog: Readonly<Record<string, PropertyDef>>,
 ): Set<string> {
-	const sides: Array<PropertyDef | undefined> = [...shapes];
 	const types = new Set<string>();
-	const partnerKeys = [...shapes.map((d) => d?.inverseOf), ...declaredPartnersOf(key, catalog)];
-	for (const partnerKey of partnerKeys) {
-		if (!partnerKey || partnerKey === key) continue;
-		const partner = catalog[partnerKey];
-		if (partner) sides.push(partner);
-		else types.add(ANY_TYPE);
-	}
-	for (const side of sides) {
-		if (!side) continue;
+	const visited = new Set<string>([key]);
+	const pending: string[] = [];
+	const visit = (partnerKey: string | undefined) => {
+		if (!partnerKey || visited.has(partnerKey)) return;
+		visited.add(partnerKey);
+		pending.push(partnerKey);
+	};
+	const collect = (side: PropertyDef | undefined) => {
+		if (!side) return;
 		const allowed = side.allowedTypes ?? [];
 		if (allowed.length === 0) types.add(ANY_TYPE);
 		for (const t of allowed) types.add(t);
+		visit(side.inverseOf);
+	};
+	for (const shape of shapes) collect(shape);
+	for (const partnerKey of declaredPartnersOf(key, catalog)) visit(partnerKey);
+	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+		const partner = catalog[next];
+		if (!partner) {
+			types.add(ANY_TYPE);
+			continue;
+		}
+		collect(partner);
+		for (const partnerKey of declaredPartnersOf(next, catalog)) visit(partnerKey);
 	}
 	return types;
 }
@@ -133,23 +168,31 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 		}
 	};
 
-	return async (envelope: Envelope): Promise<unknown> => {
-		const store = await options.getStore();
-		if (!store) {
-			throw makeError("Unavailable", "properties store is not available (no active vault session)");
-		}
+	// One chain per store: a mutator's catalog read, gate and write run as a
+	// unit against every other mutator. Reads never queue.
+	const locks = new WeakMap<PropertiesStore, Promise<unknown>>();
+	const serialised = <T>(store: PropertiesStore, run: () => Promise<T>): Promise<T> => {
+		const prior = locks.get(store) ?? Promise.resolve();
+		const next = prior.then(run, run);
+		locks.set(
+			store,
+			next.catch(() => undefined),
+		);
+		return next;
+	};
 
+	const dispatch = async (store: PropertiesStore, envelope: Envelope): Promise<unknown> => {
 		switch (envelope.method) {
-			case "list":
+			case PropertiesMethod.List:
 				return store.snapshot();
 
-			case "getProperty": {
+			case PropertiesMethod.GetProperty: {
 				const { key } = requireKey(envelope);
 				const snap = store.snapshot();
 				return snap.properties[key] ?? null;
 			}
 
-			case "setProperty": {
+			case PropertiesMethod.SetProperty: {
 				const def = requireDef(envelope);
 				// A reserved key is host-owned state, never a catalog property.
 				if (
@@ -184,7 +227,7 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 				return undefined;
 			}
 
-			case "removeProperty": {
+			case PropertiesMethod.RemoveProperty: {
 				const { key } = requireKey(envelope);
 				const catalog = store.snapshot().properties;
 				// Removing half of a pair frees its key to be re-added wider.
@@ -199,13 +242,13 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 				return undefined;
 			}
 
-			case "getDictionary": {
+			case PropertiesMethod.GetDictionary: {
 				const { id } = requireId(envelope);
 				const snap = store.snapshot();
 				return snap.dictionaries[id] ?? null;
 			}
 
-			case "setDictionary": {
+			case PropertiesMethod.SetDictionary: {
 				const dict = requireDict(envelope);
 				try {
 					store.setDictionary(dict);
@@ -215,7 +258,7 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 				return undefined;
 			}
 
-			case "removeDictionary": {
+			case PropertiesMethod.RemoveDictionary: {
 				const { id } = requireId(envelope);
 				store.removeDictionary(id);
 				return undefined;
@@ -224,6 +267,17 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 			default:
 				throw makeError("Invalid", `unknown properties method: ${envelope.method}`);
 		}
+	};
+
+	return async (envelope: Envelope): Promise<unknown> => {
+		const store = await options.getStore();
+		if (!store) {
+			throw makeError("Unavailable", "properties store is not available (no active vault session)");
+		}
+		if (CATALOG_MUTATORS.has(envelope.method)) {
+			return serialised(store, () => dispatch(store, envelope));
+		}
+		return dispatch(store, envelope);
 	};
 }
 
