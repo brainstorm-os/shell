@@ -30,8 +30,10 @@ function makeCtx(opts: {
 }): {
 	root: HTMLElement;
 	navigate: ReturnType<typeof vi.fn>;
+	queries: Array<string | undefined>;
 	run(): Promise<void>;
 } {
+	const queries: Array<string | undefined> = [];
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	const navigate = vi.fn();
@@ -46,6 +48,7 @@ function makeCtx(opts: {
 		}
 		if (messageName === "queryEntities") {
 			const type = (data as { operation: { entityTypeId?: string } }).operation.entityTypeId;
+			queries.push(type);
 			const vertices: Record<string, [unknown]> = {};
 			for (const r of opts.queryRows ?? []) {
 				const e = r as { entityId: string; entityTypeId: string };
@@ -68,7 +71,7 @@ function makeCtx(opts: {
 		},
 	} satisfies BlockRuntimeContext;
 	bootEmbeddedList(ctx);
-	return { root, navigate, run: async () => loader?.() };
+	return { root, navigate, queries, run: async () => loader?.() };
 }
 
 afterEach(() => {
@@ -327,6 +330,18 @@ describe("embedded-list contextual views (9.12.24)", () => {
 		});
 		await h.run();
 		expect(rowNames(h.root)).toEqual(["b2"]);
+	});
+
+	it("fetches the List's own view by id instead of scanning every ListView", async () => {
+		const h = makeCtx({
+			list: list(),
+			rowsById: { "view-1": view(hostFilter) },
+			queryRows: books,
+			hostEntityId: "page-1",
+		});
+		await h.run();
+		expect(rowNames(h.root)).toEqual(["b1", "b3"]);
+		expect(h.queries).toEqual([BOOK]);
 	});
 
 	it("applies the view sort", async () => {

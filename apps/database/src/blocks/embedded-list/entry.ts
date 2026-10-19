@@ -101,7 +101,7 @@ export function bootEmbeddedList(ctx: BlockRuntimeContext): void {
 
 	const report = (): void => ctx.reportHeight(ctx.root.scrollHeight);
 
-	const load = async (): Promise<void> => {
+	const loadOnce = async (): Promise<void> => {
 		try {
 			const list = await ctx.graph<BpEntity>("getEntity", { entityId: ctx.entityId });
 			const host = ctx.hostEntityId();
@@ -120,6 +120,25 @@ export function bootEmbeddedList(ctx: BlockRuntimeContext): void {
 			renderError(ctx.root);
 		}
 		report();
+	};
+	// A reload asked for while one is in flight (onLoad + "New" + a host
+	// refresh) runs once after it, never as a parallel duplicate resolve.
+	let inFlight: Promise<void> | null = null;
+	let again = false;
+	const load = (): Promise<void> => {
+		if (inFlight) {
+			again = true;
+			return inFlight;
+		}
+		inFlight = (async () => {
+			do {
+				again = false;
+				await loadOnce();
+			} while (again);
+		})().finally(() => {
+			inFlight = null;
+		});
+		return inFlight;
 	};
 	ctx.onLoad(load);
 }
