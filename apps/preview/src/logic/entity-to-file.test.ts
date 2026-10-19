@@ -69,4 +69,32 @@ describe("entityToPreviewFile", () => {
 			entityToPreviewFile({ id: "ent_4", properties: { name: "x", assetId: "asset_z" } }),
 		).toBeNull();
 	});
+
+	test("reads Modified from the entity's own updatedAt when the row carries none", () => {
+		// A freshly imported `File/v1` row has no `properties.updatedAt`; its
+		// recency lives on the envelope, which is what Files' "Today" reads.
+		const file = entityToPreviewFile({
+			id: "ent_5",
+			updatedAt: 1_700_000_000_000,
+			properties: { name: "a.png", assetId: "asset_a", assetMime: "image/png" },
+		});
+		expect(file?.info.modifiedAt).toBe(1_700_000_000_000);
+	});
+
+	test("prefers the envelope updatedAt over a stale property copy", () => {
+		const file = entityToPreviewFile({
+			id: "ent_6",
+			updatedAt: 2_000,
+			properties: { name: "a.png", assetId: "asset_a", assetMime: "image/png", updatedAt: 1_000 },
+		});
+		expect(file?.info.modifiedAt).toBe(2_000);
+	});
+
+	test("still reads a property updatedAt when the envelope has none", () => {
+		const file = entityToPreviewFile({
+			id: "ent_7",
+			properties: { name: "a.png", assetId: "asset_a", assetMime: "image/png", updatedAt: 1_000 },
+		});
+		expect(file?.info.modifiedAt).toBe(1_000);
+	});
 });
