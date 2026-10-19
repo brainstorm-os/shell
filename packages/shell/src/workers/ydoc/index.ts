@@ -158,6 +158,25 @@ function docStateKey(doc: Y.Doc): string {
 	return createHash("sha256").update(JSON.stringify(content)).digest("base64url");
 }
 
+/** A doc's state key is a full-content hash, so recompute it only after the
+ *  doc changed: any applied update (deletions included, which a state vector
+ *  alone would miss) clears the memo. Weak: an evicted doc's memo goes too. */
+const stateKeyMemo = new WeakMap<Y.Doc, { key: string | null }>();
+
+function cachedDocStateKey(doc: Y.Doc): string {
+	let memo = stateKeyMemo.get(doc);
+	if (!memo) {
+		const fresh: { key: string | null } = { key: null };
+		doc.on("update", () => {
+			fresh.key = null;
+		});
+		stateKeyMemo.set(doc, fresh);
+		memo = fresh;
+	}
+	memo.key ??= docStateKey(doc);
+	return memo.key;
+}
+
 /** History methods are main-process-only: the entities + history services
  *  authorise the caller and resolve the version before reaching here. The
  *  shell's id is reserved (no manifest or renderer may claim it), and the
@@ -424,7 +443,7 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		assertShellCaller(envelope, "historyCapture");
 		const args = parseArgs<HistoryCaptureArgs>(envelope, "historyCapture");
 		const { doc } = await ensureDoc(args.vaultPath, args.entityId);
-		const stateKey = docStateKey(doc);
+		const stateKey = cachedDocStateKey(doc);
 		if (typeof args.sinceStateKey === "string" && args.sinceStateKey === stateKey) {
 			return { captured: false, stateKey };
 		}
