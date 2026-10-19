@@ -722,7 +722,11 @@ describe("executeNetworkFetch — RedirectPolicy.Strict (Agent-14)", () => {
 	it("leaves the default policy unchanged", async () => {
 		const res = await executeNetworkFetch(
 			{ appId: "app.test", url: "https://example.com/", method: "POST", body: new Uint8Array([1]) },
-			{ fetchImpl: redirectTo("https://example.com/x", 307), lookupHost: async () => [PUBLIC_IP] },
+			{
+				fetchImpl: redirectTo("https://example.com/x", 307),
+				lookupHost: async () => [PUBLIC_IP],
+				auditSink: () => undefined,
+			},
 		);
 		expect(res.status).toBe(200);
 	});
