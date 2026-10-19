@@ -36,6 +36,7 @@ import {
 	AgentWriteKind,
 	RESERVED_PROPERTY_KEYS,
 	describeFieldChange,
+	isAgentChangeHiddenKey,
 } from "@brainstorm-os/sdk-types";
 import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
@@ -159,25 +160,28 @@ export function buildRunChanges(
 		if (entry.revertedAt !== null) revertedAt = Math.max(revertedAt ?? 0, entry.revertedAt);
 		if (changes.length >= AGENT_RUN_CHANGES_MAX) continue;
 		const after = entry.after ?? {};
-		const keys = Object.keys(after).filter((k) => !isReserved(k));
-		const listed = keys.slice(0, AGENT_CHANGE_FIELDS_MAX);
 		const before = entry.before;
-		changes.push({
-			entityId: entry.entityId,
-			entityType: entry.entityType,
-			kind: entry.kind,
-			title: resolveEntityTitle(entry.kind === AgentWriteKind.Created ? after : null),
-			fields:
-				entry.kind === AgentWriteKind.Trashed
-					? []
-					: listed.map((key) =>
+		const rows =
+			entry.kind === AgentWriteKind.Trashed
+				? []
+				: Object.keys(after)
+						.filter((key) => !isAgentChangeHiddenKey(key))
+						.map((key) =>
 							describeFieldChange(
 								key,
 								before && key in before.present ? before.present[key] : null,
 								after[key],
 							),
-						),
-			moreFields: Math.max(0, keys.length - listed.length),
+						)
+						.filter((row) => row.before !== null || row.after !== null);
+		const listed = rows.slice(0, AGENT_CHANGE_FIELDS_MAX);
+		changes.push({
+			entityId: entry.entityId,
+			entityType: entry.entityType,
+			kind: entry.kind,
+			title: resolveEntityTitle(entry.kind === AgentWriteKind.Created ? after : null),
+			fields: listed,
+			moreFields: rows.length - listed.length,
 			oversize: entry.oversize,
 			at: entry.ts,
 		});

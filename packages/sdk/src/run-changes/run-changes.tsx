@@ -22,9 +22,11 @@ import {
 	AgentUndoRefusal,
 	type AgentUndoResult,
 	AgentWriteKind,
+	type FormatContext,
 } from "@brainstorm-os/sdk-types";
 import { type ReactElement, useState } from "react";
 import { Icon, IconName } from "../icon";
+import { humanFieldChanges } from "./run-changes-fields";
 
 export type RunChangesLabels = {
 	heading: string;
@@ -53,6 +55,8 @@ export type RunChangesProps = {
 	onUndo?: () => Promise<AgentUndoResult>;
 	/** Called after a successful undo so the host can refetch. */
 	onUndone?: () => void;
+	/** Regional formatting for date-valued fields; the host locale otherwise. */
+	format?: FormatContext;
 	testId?: string;
 };
 
@@ -84,6 +88,7 @@ export function RunChanges({
 	onOpenEntity,
 	onUndo,
 	onUndone,
+	format,
 	testId,
 }: RunChangesProps): ReactElement {
 	const [busy, setBusy] = useState(false);
@@ -122,6 +127,7 @@ export function RunChanges({
 				<ul className="bs-run-changes__list">
 					{changes.changes.map((change, i) => {
 						const title = change.title ?? labels.untitled;
+						const fields = humanFieldChanges(change.fields, format);
 						return (
 							<li
 								key={`${change.entityId}:${change.at}:${i}`}
@@ -145,9 +151,9 @@ export function RunChanges({
 								</div>
 								{change.oversize ? (
 									<p className="bs-run-changes__note">{labels.oversize}</p>
-								) : change.fields.length > 0 ? (
+								) : fields.length > 0 ? (
 									<ul className="bs-run-changes__fields">
-										{change.fields.map((field) => (
+										{fields.map((field) => (
 											<FieldRow key={field.key} field={field} labels={labels} />
 										))}
 										{change.moreFields > 0 ? (

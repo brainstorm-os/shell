@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { AGENT_PROVENANCE_PROPERTY_KEY } from "./agent-provenance";
 import {
 	AGENT_CHANGE_PREVIEW_MAX,
 	describeFieldChange,
+	isAgentChangeHiddenKey,
 	lineDelta,
 	summarizeChangeValue,
 } from "./agent-run-changes";
@@ -11,6 +13,8 @@ describe("agent run changes (Agent-15)", () => {
 		expect(summarizeChangeValue(undefined)).toBeNull();
 		expect(summarizeChangeValue("  ")).toBeNull();
 		expect(summarizeChangeValue([])).toBeNull();
+		expect(summarizeChangeValue({})).toBeNull();
+		expect(summarizeChangeValue({ a: 1 })).toBe('{"a":1}');
 		expect(summarizeChangeValue(3)).toBe("3");
 		expect(summarizeChangeValue(["a", 2])).toBe("a, 2");
 		expect(summarizeChangeValue([{ x: 1 }])).toBe("[1]");
@@ -18,6 +22,14 @@ describe("agent run changes (Agent-15)", () => {
 		const long = summarizeChangeValue("x".repeat(1000)) ?? "";
 		expect(long.length).toBe(AGENT_CHANGE_PREVIEW_MAX);
 		expect(long.endsWith("…")).toBe(true);
+	});
+
+	it("hides host bookkeeping and provenance keys from a diff", () => {
+		for (const key of ["createdAt", "updatedAt", "values", AGENT_PROVENANCE_PROPERTY_KEY]) {
+			expect(isAgentChangeHiddenKey(key)).toBe(true);
+		}
+		expect(isAgentChangeHiddenKey("dueAt")).toBe(false);
+		expect(isAgentChangeHiddenKey("title")).toBe(false);
 	});
 
 	it("counts added / removed lines as a multiset difference", () => {

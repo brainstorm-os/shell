@@ -76,6 +76,43 @@ describe("<RunChanges>", () => {
 		expect(undoButton()).toBeUndefined();
 	});
 
+	it("hides host bookkeeping and empty bags, and reads date stamps for people", () => {
+		const stamp = 1792445200119;
+		const created: AgentRunChanges = {
+			...changes,
+			changes: [
+				{
+					entityId: "e2",
+					entityType: "t",
+					kind: AgentWriteKind.Created,
+					title: "Signage checklist",
+					fields: [
+						{ key: "title", before: null, after: "Signage checklist" },
+						{ key: "values", before: null, after: "{}" },
+						{ key: "createdAt", before: null, after: String(stamp) },
+						{ key: "updatedAt", before: null, after: String(stamp) },
+						{ key: "dueAt", before: null, after: String(stamp) },
+					],
+					moreFields: 0,
+					oversize: false,
+					at: 1,
+				},
+			],
+		};
+		act(() =>
+			root.render(
+				<RunChanges changes={created} labels={labels} format={{ locale: "en-GB", timeZone: "UTC" }} />,
+			),
+		);
+		const text = host.textContent ?? "";
+		expect(text).toContain("title: - -> Signage checklist");
+		expect(text).not.toContain("values");
+		expect(text).not.toContain("createdAt");
+		expect(text).not.toContain("updatedAt");
+		expect(text).not.toContain(String(stamp));
+		expect(text).toMatch(/dueAt: - -> .*2026/);
+	});
+
 	it("names the refusal in a status line and keeps the button usable", async () => {
 		const onUndo = vi.fn(
 			async (): Promise<AgentUndoResult> => ({
