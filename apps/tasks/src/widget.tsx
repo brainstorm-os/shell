@@ -199,7 +199,9 @@ export function TasksWidget({ launch }: { launch: WidgetLaunch }) {
 
 	const open = useMemo(
 		() =>
-			entities.filter((e) => e.type === TASK_TYPE && e.deletedAt === null && !isTaskClosed(e.properties)),
+			entities.filter(
+				(e) => e.type === TASK_TYPE && e.deletedAt === null && !isTaskClosed(e.properties),
+			),
 		[entities],
 	);
 	const total = open.length;

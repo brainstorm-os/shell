@@ -8,8 +8,8 @@
  */
 
 import { INSERT_TABS_COMMAND, isEventInNestedEditor } from "@brainstorm-os/editor";
-import { $getRoot, type LexicalEditor } from "lexical";
 import { YDocProvider, createYDocResolver } from "@brainstorm-os/react-yjs";
+import { $getRoot, type LexicalEditor } from "lexical";
 import { type ReactNode, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

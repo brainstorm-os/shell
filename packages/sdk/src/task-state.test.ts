@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	isTaskClosed,
-	isTaskDone,
-	isTaskWontDo,
-	reopenedStatusKey,
-} from "./task-state";
+import { isTaskClosed, isTaskDone, isTaskWontDo, reopenedStatusKey } from "./task-state";
 
 describe("task-state", () => {
 	it("reads done from a completion stamp or the done status", () => {
