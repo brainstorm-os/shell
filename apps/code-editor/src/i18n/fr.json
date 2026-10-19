@@ -49,7 +49,7 @@
   "renameErrorEmpty": "Saisissez un nom de fichier.",
   "renameErrorDuplicate": "Un fichier portant ce nom existe déjà.",
   "deleteTitle": "Supprimer {name} ?",
-  "deleteBody": "« {name} » sera déplacé vers la corbeille. Cela ne peut pas être annulé ici.",
+  "deleteBody": "« {name} » sera déplacé vers la corbeille. Vous pourrez le restaurer depuis celle-ci.",
   "deleteConfirm": "Supprimer",
   "deleteCancel": "Annuler",
   "deleteDontAskAgain": "Ne plus demander",

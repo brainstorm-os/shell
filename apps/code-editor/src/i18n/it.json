@@ -49,7 +49,7 @@
   "renameErrorEmpty": "Inserisci un nome di file.",
   "renameErrorDuplicate": "Esiste già un file con quel nome.",
   "deleteTitle": "Eliminare {name}?",
-  "deleteBody": "«{name}» verrà spostato nel cestino. Non può essere annullato qui.",
+  "deleteBody": "“{name}” verrà spostato nel cestino. Potrai ripristinarlo da lì.",
   "deleteConfirm": "Elimina",
   "deleteCancel": "Annulla",
   "deleteDontAskAgain": "Non chiedere più",

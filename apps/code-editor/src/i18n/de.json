@@ -49,7 +49,7 @@
   "renameErrorEmpty": "Gib einen Dateinamen ein.",
   "renameErrorDuplicate": "Eine Datei mit diesem Namen existiert bereits.",
   "deleteTitle": "{name} löschen?",
-  "deleteBody": "„{name}“ wird in den Papierkorb verschoben. Das kann hier nicht rückgängig gemacht werden.",
+  "deleteBody": "„{name}“ wird in den Papierkorb verschoben. Von dort kann es wiederhergestellt werden.",
   "deleteConfirm": "Löschen",
   "deleteCancel": "Abbrechen",
   "deleteDontAskAgain": "Nicht mehr fragen",

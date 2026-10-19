@@ -92,7 +92,7 @@
   "prop.related": "Pessoas relacionadas",
   "prop.empty": "Vazio",
   "delete.confirm.title": "Excluir este contato?",
-  "delete.confirm.body": "“{name}” será movido para a lixeira. Isso não pode ser desfeito aqui.",
+  "delete.confirm.body": "“{name}” será movido para a lixeira. Você poderá restaurá-lo de lá.",
   "delete.confirm.confirm": "Excluir",
   "delete.confirm.cancel": "Cancelar",
   "delete.confirm.dontAskAgain": "Não perguntar novamente",
