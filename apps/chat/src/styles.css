@@ -127,7 +127,7 @@ body {
 	will-change: transform;
 }
 
-.chat[data-sidebar-open="false"] .chat__sidebar {
+.chat[data-sidebar-open="false"] .chat__sidebar:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	visibility: hidden;
 }

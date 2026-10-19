@@ -40,7 +40,7 @@ import {
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import type { PdfEngineDocument } from "@brainstorm-os/sdk/pdf-engine";
 import { openPdfDocument, resolvePdfOutline } from "@brainstorm-os/sdk/pdf-engine";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
@@ -284,6 +284,7 @@ export function BooksApp(): ReactElement {
 	const [status, setStatus] = useState<ReaderStatus>(ReaderStatus.Idle);
 	const [toc, setToc] = useState<readonly TocEntry[]>([]);
 	const [showLibrary, setShowLibrary] = useState(true);
+	const libraryAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !showLibrary });
 	const [showInspector, setShowInspector] = useState(readInspectorPref);
 	// A failed import used to vanish into a console.warn (the "Book never
 	// appeared" report); surface it so the user knows what happened.
@@ -881,11 +882,13 @@ export function BooksApp(): ReactElement {
 				<LibraryPanel
 					books={books}
 					selectedId={selectedId}
-					open={showLibrary}
+					open={libraryAutoHide.visible}
+					autoHide={libraryAutoHide.panelProps}
 					onSelect={openBook}
 					importError={importError}
 					onDismissError={() => setImportError(null)}
 				/>
+				{libraryAutoHide.edgeProps && <div {...libraryAutoHide.edgeProps} />}
 				<div className="books__content">
 					<main className="books" ref={stageRef} />
 					{status !== ReaderStatus.Ready ? (

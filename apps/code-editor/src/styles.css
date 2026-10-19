@@ -90,10 +90,16 @@ body.is-resizing .editor__files-resize {
 	grid-template-columns: 0 minmax(0, 1fr);
 }
 
-.editor[data-nav-open="false"] .editor__files {
+.editor[data-nav-open="false"] .editor__files:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
 	visibility: hidden;
+}
+
+/* Auto-hide (7.15): the collapsed list floats over the buffer at its
+   pinned width — the grid track it would occupy is 0. */
+.editor__files[data-bs-autohide] {
+	width: var(--code-files-width, 248px);
 }
 
 .editor__files {

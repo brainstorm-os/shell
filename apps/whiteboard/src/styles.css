@@ -92,7 +92,7 @@ button {
 	will-change: transform;
 }
 
-.whiteboard[data-nav-open="false"] .whiteboard__nav {
+.whiteboard[data-nav-open="false"] .whiteboard__nav:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-color: transparent;
 	visibility: hidden;

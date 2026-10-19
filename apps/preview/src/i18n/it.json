@@ -76,5 +76,14 @@
   "inspector.properties": "Proprietà",
   "inspector.noProperties": "Ancora nessuna proprietà",
   "inspector.addProperty": "Aggiungi proprietà",
-  "inspector.removeProperty": "Rimuovi {name}"
+  "inspector.removeProperty": "Rimuovi {name}",
+  "inspector.caption": "Didascalia",
+  "inspector.linkedFrom.one": "Collegato da {count} oggetto",
+  "inspector.linkedFrom.other": "Collegato da {count} oggetti",
+  "inspector.noBacklinks": "Ancora nulla rimanda qui",
+  "inspector.openInNewTab": "Apri “{name}” in una nuova scheda",
+  "inspector.moveToBin": "Sposta nel cestino",
+  "inspector.lockedHint": "Sblocca questo file per modificarlo",
+  "inspector.deleted": "“{name}” spostato nel cestino",
+  "inspector.deleteFailed": "Impossibile spostare “{name}” nel cestino"
 }

@@ -133,5 +133,11 @@
   "chrome.meta": "Créé / modifié",
   "chrome.windowControls": "Contrôles de fenêtre",
   "chrome.entityHeader": "En-tête (icône + titre + actions)",
-  "chrome.tabs": "Onglets"
+  "chrome.tabs": "Onglets",
+  "action.applyToType": "Appliquer au type",
+  "action.applyToTypeHint": "En faire la mise en page par défaut des nouvelles entités {type}",
+  "status.applying": "Application…",
+  "status.appliedToType": "Appliqué comme mise en page par défaut pour {type}.",
+  "status.applyInvalid": "Cette mise en page ne peut pas être appliquée — corrigez-la d'abord dans l'éditeur.",
+  "status.applyFailed": "Impossible d'appliquer la mise en page."
 }

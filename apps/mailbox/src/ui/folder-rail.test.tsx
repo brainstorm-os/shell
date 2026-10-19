@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { AutoHideFace, PanelSide } from "@brainstorm-os/sdk/panel-toggle";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,11 +37,12 @@ const FOLDERS: FolderView[] = [
 	},
 ];
 
-function render(open: boolean): void {
+function render(open: boolean, autoHide?: Parameters<typeof FolderRail>[0]["autoHide"]): void {
 	act(() =>
 		root.render(
 			<FolderRail
 				open={open}
+				{...(autoHide ? { autoHide } : {})}
 				accounts={ACCOUNTS}
 				folders={FOLDERS}
 				selection={{ kind: "unified-inbox" }}
@@ -66,5 +68,14 @@ describe("FolderRail collapsed state", () => {
 		render(false);
 		expect(rail().hasAttribute("inert")).toBe(true);
 		expect(rail().getAttribute("aria-hidden")).toBe("true");
+	});
+});
+
+describe("FolderRail auto-hide (7.15)", () => {
+	it("carries the overlay wiring from useAutoHidePanel onto the rail", () => {
+		render(false, { "data-bs-autohide": AutoHideFace.Hidden, "data-bs-side": PanelSide.Left });
+		expect(rail().getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(rail().getAttribute("data-bs-side")).toBe("left");
+		expect(rail().hasAttribute("inert")).toBe(true);
 	});
 });

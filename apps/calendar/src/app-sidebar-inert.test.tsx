@@ -39,3 +39,45 @@ describe("CalendarApp collapsed sidebar (F-489)", () => {
 		expect(slot.getAttribute("aria-hidden")).toBe("true");
 	});
 });
+
+describe("CalendarApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+	});
+
+	const pressToggle = async () => {
+		await act(async () => {
+			window.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "\\",
+					...(/mac/i.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true }),
+					bubbles: true,
+				}),
+			);
+		});
+	};
+
+	it("without the preference, the shortcut collapses the sidebar normally", async () => {
+		handle = await renderInto(<CalendarApp />);
+		await flush();
+		const slot = handle.container.querySelector("#calendar-sidebar-slot") as HTMLElement;
+		await pressToggle();
+		expect(slot.hasAttribute("inert")).toBe(true);
+		expect(slot.hasAttribute("data-bs-autohide")).toBe(false);
+		expect(handle.container.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed sidebar becomes a hidden overlay the shortcut reveals", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		localStorage.setItem("calendar:sidebar-open", "false");
+		handle = await renderInto(<CalendarApp />);
+		await flush();
+		const slot = handle.container.querySelector("#calendar-sidebar-slot") as HTMLElement;
+		expect(slot.getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(slot.hasAttribute("inert")).toBe(true);
+		expect(handle.container.querySelector(".bs-autohide-edge")).not.toBeNull();
+		await pressToggle();
+		expect(slot.getAttribute("data-bs-autohide")).toBe("revealed");
+		expect(slot.hasAttribute("inert")).toBe(false);
+	});
+});

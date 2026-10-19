@@ -31,6 +31,7 @@ export enum CodeEditorAction {
 	UnfoldAtCaret = "code-editor.unfold",
 	UnfoldAll = "code-editor.unfold-all",
 	FormatDocument = "code-editor.format-document",
+	ToggleFiles = "code-editor.toggle-files",
 }
 
 export const CODE_EDITOR_CHORDS: Readonly<Record<CodeEditorAction, string>> = {
@@ -69,4 +70,7 @@ export const CODE_EDITOR_CHORDS: Readonly<Record<CodeEditorAction, string>> = {
 	// Formatter (9.7.8). Not VSCode's `Shift+Alt+F` — same macOS
 	// Option-composition gotcha as the fold chords.
 	[CodeEditorAction.FormatDocument]: "CmdOrCtrl+Shift+F",
+	// Show/hide the file list — while auto-hide (7.15) governs a collapsed
+	// list, the same chord reveals it as an overlay instead of pinning it.
+	[CodeEditorAction.ToggleFiles]: "CmdOrCtrl+\\",
 };

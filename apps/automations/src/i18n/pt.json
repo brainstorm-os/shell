@@ -225,5 +225,18 @@
   "template.email-follow-up-nudge.name": "Lembrete de acompanhamento de e-mails",
   "template.email-follow-up-nudge.desc": "Um lembrete diário para cobrar as conversas de e-mail que ainda aguardam resposta.",
   "template.email-follow-up-nudge.trigger": "Todo dia útil às 16:00",
-  "menu.more": "Mais ações"
+  "menu.more": "Mais ações",
+  "runs.denied.title": "Bloqueado por uma permissão ausente",
+  "runs.denied.hint": "Conceda-a nas Configurações ou reduza a lista de permissões do fluxo e execute novamente.",
+  "runs.denialBadge.one": "{count} negação",
+  "runs.denialBadge.other": "{count} negações",
+  "runs.trace.title": "Rastro do agente",
+  "runs.trace.loading": "Carregando rastro…",
+  "runs.trace.empty": "Nenhum rastro do agente registrado para esta execução.",
+  "runs.trace.denied": "Negado — permissão {capability} ausente",
+  "runs.trace.deniedUnknown": "Negado",
+  "runs.trace.durationMs": "{ms} ms",
+  "runs.trace.outcome.ok": "OK",
+  "runs.trace.outcome.error": "Erro",
+  "runs.trace.outcome.denied": "Negado"
 }

@@ -49,6 +49,7 @@ body {
  * `.app-header` rule in `@brainstorm-os/sdk/app-theme.css`. Nothing local. */
 
 .mb-app__panes {
+	position: relative; /* anchor for the auto-hide rail overlay (7.15) */
 	flex: 1;
 	min-height: 0;
 	display: grid;
@@ -69,10 +70,20 @@ body {
  * rendered, tabbable and announced. It rides the same duration as the track
  * so the rail stays painted for the whole collapse and is visible from the
  * first frame of the expand — see `.mb-rail`'s transition. */
-.mb-app__panes--rail-closed .mb-rail {
+.mb-app__panes--rail-closed .mb-rail:not([data-bs-autohide]) {
 	border-inline-end-color: transparent;
 	padding-inline: 0;
 	visibility: hidden;
+}
+
+/* Auto-hide (7.15): the rail leaves the grid flow as an overlay, so its zero
+ * track goes too — otherwise the message list would fall into it. */
+.mb-app__panes--rail-closed:has(> .mb-rail[data-bs-autohide]) {
+	grid-template-columns: 340px 1fr;
+}
+
+.mb-rail[data-bs-autohide] {
+	inline-size: 248px;
 }
 
 .mb-demo-banner {

@@ -97,7 +97,7 @@ button:focus-visible {
 	will-change: transform;
 }
 
-.calendar-main[data-sidebar-open="false"] #calendar-sidebar-slot {
+.calendar-main[data-sidebar-open="false"] #calendar-sidebar-slot:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
 	visibility: hidden;

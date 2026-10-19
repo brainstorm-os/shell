@@ -460,3 +460,33 @@ describe("AgentApp — app-icon attention badge (7.14)", () => {
 		expect(handle.container.querySelector('[data-testid="agent-escalation"]')).not.toBeNull();
 	});
 });
+
+describe("AgentApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+		window.localStorage.removeItem("agent:sidebar-open");
+	});
+
+	const sidebar = () => handle?.container.querySelector("#agent-sidebar") as HTMLElement;
+
+	it("without the preference, a collapsed sidebar is plainly hidden", async () => {
+		window.localStorage.setItem("agent:sidebar-open", "false");
+		installShell([]);
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		expect(sidebar().hasAttribute("inert")).toBe(true);
+		expect(sidebar().hasAttribute("data-bs-autohide")).toBe(false);
+		expect(handle?.container.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed sidebar becomes a hidden overlay with an edge hot-zone", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		window.localStorage.setItem("agent:sidebar-open", "false");
+		installShell([]);
+		handle = await renderInto(<AgentApp />);
+		await flush();
+		expect(sidebar().getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(sidebar().hasAttribute("inert")).toBe(true);
+		expect(handle?.container.querySelector(".bs-autohide-edge")).not.toBeNull();
+	});
+});

@@ -45,7 +45,7 @@ import {
 	ObjectMenuTrigger,
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { Searchbar } from "@brainstorm-os/sdk/searchbar";
 import { SelectMenu, type SelectMenuOption } from "@brainstorm-os/sdk/select-menu";
 import { useShortcut } from "@brainstorm-os/sdk/shortcut";
@@ -473,7 +473,11 @@ export function FilesApp() {
 	// ─── Keyboard (shared SDK useShortcut, chords from the registry) ──────
 	const chord = (id: ActionId) => chordFor(id) ?? "";
 	useShortcut(chord(ActionId.Search), () => searchInputRef.current?.focus());
-	useShortcut(chord(ActionId.ToggleSidebar), store.toggleNav);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !store.navOpen });
+	useShortcut(chord(ActionId.ToggleSidebar), () => {
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else store.toggleNav();
+	});
 	useShortcut(chord(ActionId.ToggleInspector), store.toggleInspector);
 	useShortcut(chord(ActionId.NewFolder), store.newFolder);
 	useShortcut(chord(ActionId.NewMenu), openNewMenu);
@@ -617,11 +621,12 @@ export function FilesApp() {
 
 			<main className="window" id="window">
 				<aside
+					{...sidebarAutoHide.panelProps}
 					className="sidebar"
 					data-testid="sidebar"
 					aria-label={t("brainstorm.files.sidebar.label")}
-					aria-hidden={!store.navOpen}
-					inert={!store.navOpen ? true : undefined}
+					aria-hidden={!sidebarAutoHide.visible}
+					inert={!sidebarAutoHide.visible ? true : undefined}
 				>
 					<SidebarSection titleKey="brainstorm.files.sidebar.folders">
 						<SidebarTree store={store} onCycle={onCycle} />
@@ -677,6 +682,7 @@ export function FilesApp() {
 						</ul>
 					</SidebarSection>
 				</aside>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<section
 					ref={contentRef}

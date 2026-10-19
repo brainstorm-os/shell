@@ -42,7 +42,7 @@ import {
 } from "@brainstorm-os/sdk/object-menu";
 import { ObjectMenuMoreButton } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { createIconPickerButton, openIconPicker } from "@brainstorm-os/sdk/picker-host";
 import { PopoverBodyPadding, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
@@ -1151,6 +1151,15 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 			return next;
 		});
 	}, []);
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const navAutoHideRef = navAutoHide.panelProps.ref;
+	const setSidebarSlot = useCallback(
+		(el: HTMLDivElement | null) => {
+			sidebarSlotRef.current = el;
+			navAutoHideRef?.(el);
+		},
+		[navAutoHideRef],
+	);
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
@@ -2176,9 +2185,16 @@ export function TasksApp({ entityTitleSource }: TasksAppProps) {
 				data-detail-open={String(openTaskRecord !== null)}
 				data-data-source={source}
 			>
-				<div id="tasks-sidebar-slot" ref={sidebarSlotRef}>
+				<div
+					{...navAutoHide.panelProps}
+					id="tasks-sidebar-slot"
+					ref={setSidebarSlot}
+					aria-hidden={navAutoHide.visible ? undefined : true}
+					inert={navAutoHide.visible ? undefined : true}
+				>
 					<div ref={sidebarHostRef} style={{ display: "contents" }} />
 				</div>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<div
 					className="tasks-resize"
 					id="tasks-resize"

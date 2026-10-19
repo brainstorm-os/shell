@@ -143,5 +143,7 @@
   "pins.pin": "Fijar mensaje",
   "pins.unpin": "Dejar de fijar",
   "pins.pinned": "Fijado",
-  "message.menu": "Acciones del mensaje"
+  "message.menu": "Acciones del mensaje",
+  "pins.item": "{author}: {text}",
+  "shortcut.markAllRead": "Mayús+Esc"
 }

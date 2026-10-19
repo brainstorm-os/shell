@@ -144,5 +144,6 @@
   "pins.pin": "Pin message",
   "pins.unpin": "Unpin message",
   "pins.pinned": "Pinned",
-  "message.menu": "Message actions"
+  "message.menu": "Message actions",
+  "shortcut.markAllRead": "Shift+Esc"
 }

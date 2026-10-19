@@ -47,7 +47,7 @@ import {
 	ObjectMenuTrigger,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { AddIconGlyph } from "@brainstorm-os/sdk/picker-host";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { PropertiesProvider, type ValuesMap } from "@brainstorm-os/sdk/property-ui";
@@ -715,14 +715,18 @@ export function NotesApp() {
 		),
 	);
 
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const navAutoHideActive = navAutoHide.active;
+	const navAutoHideToggle = navAutoHide.toggle;
 	useShortcut(
 		ActionId.ToggleSidebar,
 		useCallback(
 			(event: KeyboardEvent) => {
 				event.preventDefault();
-				toggleNav();
+				if (navAutoHideActive) navAutoHideToggle();
+				else toggleNav();
 			},
-			[toggleNav],
+			[toggleNav, navAutoHideActive, navAutoHideToggle],
 		),
 	);
 
@@ -1124,11 +1128,12 @@ export function NotesApp() {
 			</header>
 
 			<aside
+				{...navAutoHide.panelProps}
 				id="notes-nav"
 				className="notes__nav"
 				aria-label={t("notes.sidebar.region")}
-				aria-hidden={!navOpen}
-				inert={!navOpen ? true : undefined}
+				aria-hidden={!navAutoHide.visible}
+				inert={!navAutoHide.visible ? true : undefined}
 			>
 				<div className="notes__search">
 					<Searchbar
@@ -1157,6 +1162,7 @@ export function NotesApp() {
 					onLinkInto={onLinkInto}
 				/>
 			</aside>
+			{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 			<div
 				ref={navResizeRef}
 				className="notes__nav-resize"

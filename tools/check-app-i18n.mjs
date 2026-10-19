@@ -14,7 +14,11 @@
  *   2. that file is valid JSON of `string → string`,
  *   3. no overlay file on disk is left UNdeclared (orphan packs drift),
  *   4. when the source catalog is resolvable, every pack key exists in it (a
- *      typo'd or stale key in an overlay never silently ships).
+ *      typo'd or stale key in an overlay never silently ships),
+ *   5. when the source is an extracted `<source>.json` catalog, every pack
+ *      carries every source key — a string added to en.json without its
+ *      translations ships English to every other locale, and nothing else
+ *      notices (seven apps fell behind this way in one release).
  *
  * Apps that don't declare `i18n` are skipped — adoption is opt-in (the rest of
  * the fleet rides the documented English fallback until their packs land, 15d).
@@ -39,9 +43,17 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  * @param {Record<string, { ok: true, keys: string[] } | { ok: false, error: string } | undefined>} input.packs
  *        resolved overlay packs for each declared non-source locale (undefined = file missing)
  * @param {string[]} input.discoveredLocales  locale tags found as `src/i18n/<tag>.json` on disk
+ * @param {boolean} [input.requireComplete]  every source key must appear in every pack
  * @returns {string[]} human-readable errors (empty = clean)
  */
-export function auditAppI18n({ appId, decl, sourceKeys, packs, discoveredLocales }) {
+export function auditAppI18n({
+	appId,
+	decl,
+	sourceKeys,
+	packs,
+	discoveredLocales,
+	requireComplete = false,
+}) {
 	const errors = [];
 	if (!decl.locales.includes(decl.source)) {
 		errors.push(`${appId}: i18n.source "${decl.source}" is not listed in i18n.locales`);
@@ -67,6 +79,15 @@ export function auditAppI18n({ appId, decl, sourceKeys, packs, discoveredLocales
 				errors.push(
 					`${appId}: src/i18n/${locale}.json has keys absent from the source catalog: ${shown}${more}`,
 				);
+			}
+		}
+		if (sourceKeys && requireComplete) {
+			const packKeySet = new Set(pack.keys);
+			const missing = sourceKeys.filter((k) => !packKeySet.has(k));
+			if (missing.length > 0) {
+				const shown = missing.slice(0, 5).join(", ");
+				const more = missing.length > 5 ? `, …(+${missing.length - 5})` : "";
+				errors.push(`${appId}: src/i18n/${locale}.json is missing source keys: ${shown}${more}`);
 			}
 		}
 	}
@@ -147,14 +168,17 @@ function main() {
 		}
 
 		const sourceKeys = resolveSourceKeys(join(appsDir, appId), decl.source);
-		errors.push(...auditAppI18n({ appId, decl, sourceKeys, packs, discoveredLocales }));
+		const requireComplete = existsSync(join(i18nDir, `${decl.source}.json`));
+		errors.push(
+			...auditAppI18n({ appId, decl, sourceKeys, packs, discoveredLocales, requireComplete }),
+		);
 	}
 
 	if (errors.length > 0) {
 		console.error("App i18n declaration gate failed:\n");
 		for (const e of errors) console.error(`  ✗ ${e}`);
 		console.error(
-			"\nDeclare every shipped overlay in manifest.json `i18n.locales`, ship a src/i18n/<tag>.json for each, and keep pack keys within the source catalog.",
+			"\nDeclare every shipped overlay in manifest.json `i18n.locales`, ship a src/i18n/<tag>.json for each, keep pack keys within the source catalog, and translate every key an extracted source catalog adds.",
 		);
 		process.exit(1);
 	}

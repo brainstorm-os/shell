@@ -130,5 +130,7 @@
   "widget.messages.one": "{count} mensaje",
   "widget.messages.other": "{count} mensajes",
   "widget.empty": "La bandeja de entrada está vacía",
-  "widget.open": "Abrir Buzón"
+  "widget.open": "Abrir Buzón",
+  "sync.errorAuth": "La sincronización falló: el servidor de correo rechazó las credenciales. Comprueba el usuario y la contraseña de aplicación (la mayoría de los proveedores exigen una contraseña específica de aplicación, no la de tu cuenta) y vuelve a conectar la cuenta.",
+  "sync.errorConnect": "La sincronización falló: no se pudo contactar con el servidor de correo. Comprueba el host y el puerto IMAP/SMTP y vuelve a conectar la cuenta."
 }

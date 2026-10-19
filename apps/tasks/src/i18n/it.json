@@ -279,5 +279,12 @@
   "tasks.export.cancel": "Annulla",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Segna come completata",
+  "tasks.menu.markWontDo": "Segna come da non fare",
+  "tasks.menu.reopen": "Riapri",
+  "tasks.row.toggle.open": "Segna “{name}” come completata",
+  "tasks.row.toggle.done": "“{name}” è completata — segna come da non fare",
+  "tasks.row.toggle.wontDo": "“{name}” non verrà fatta — riapri",
+  "tasks.quickLook.value.wontDo": "Da non fare"
 }

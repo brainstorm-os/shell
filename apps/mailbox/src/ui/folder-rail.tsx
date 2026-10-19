@@ -5,6 +5,7 @@
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign } from "@brainstorm-os/sdk/menus";
 import { type AnchoredMenuItem, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
+import type { AutoHidePanelProps } from "@brainstorm-os/sdk/panel-toggle";
 import type { ReactElement, MouseEvent as ReactMouseEvent } from "react";
 import { t } from "../i18n";
 import {
@@ -77,6 +78,8 @@ export type FolderRailProps = {
 	/** The rail collapses to a zero grid track rather than sliding away, so it
 	 *  stays laid out and — without this — tabbable and announced (F-489). */
 	open: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 	accounts: AccountView[];
 	folders: FolderView[];
 	selection: FolderSelection;
@@ -91,6 +94,7 @@ export type FolderRailProps = {
 
 export function FolderRail({
 	open,
+	autoHide,
 	accounts,
 	folders,
 	selection,
@@ -111,6 +115,7 @@ export function FolderRail({
 
 	return (
 		<nav
+			{...autoHide}
 			className="mb-rail"
 			id="mb-rail"
 			aria-label={t("folders.aria")}

@@ -33,6 +33,7 @@ import {
 	plainText,
 } from "./format";
 import { type BpEntity, resolveEmbedded } from "./resolve-rows";
+import { t } from "./strings";
 
 /** Resolve stored ref-like ids to their entities' titles via the graph.
  *  Entity ids (`ent_…`) resolve; catalog ids (`di_…` dictionary options the
@@ -140,7 +141,7 @@ function renderGrid(
 
 	const title = doc.createElement("div");
 	title.className = "bsdb__title";
-	const name = entityTitleOr(list.properties, "Database");
+	const name = entityTitleOr(list.properties, t("embed.fallbackTitle"));
 	title.append(name);
 	const count = doc.createElement("span");
 	count.className = "bsdb__count";
@@ -149,13 +150,13 @@ function renderGrid(
 	const add = doc.createElement("button");
 	add.type = "button";
 	add.className = "bsdb__new";
-	add.textContent = "+ New";
-	add.setAttribute("aria-label", `New item in ${name}`);
+	add.textContent = t("embed.new");
+	add.setAttribute("aria-label", t("embed.newIn", { name }));
 	add.addEventListener("click", () => {
 		add.disabled = true;
 		actions.onNew().catch(() => {
 			add.disabled = false;
-			add.textContent = "Couldn't create";
+			add.textContent = t("embed.createFailed");
 		});
 	});
 	title.append(add);
@@ -164,7 +165,7 @@ function renderGrid(
 	if (rows.length === 0) {
 		const empty = doc.createElement("div");
 		empty.className = "bsdb__empty";
-		empty.textContent = "No items yet";
+		empty.textContent = t("embed.empty");
 		root.append(empty);
 		return;
 	}
@@ -211,6 +212,6 @@ function renderError(root: HTMLElement): void {
 	root.replaceChildren();
 	const err = doc.createElement("div");
 	err.className = "bsdb__error";
-	err.textContent = "Couldn't load this database.";
+	err.textContent = t("embed.loadFailed");
 	root.append(err);
 }

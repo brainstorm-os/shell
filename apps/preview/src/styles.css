@@ -59,6 +59,7 @@ button {
 	grid-template-columns: auto minmax(0, 1fr);
 	grid-template-rows: 1fr;
 	overflow: hidden;
+	position: relative; /* anchor for the auto-hide sidebar overlay (7.15) */
 }
 
 /* Main column: the stage/inspector body over the filmstrip — the original
@@ -90,7 +91,7 @@ button {
 	overflow: hidden;
 }
 
-.preview--sidebar-collapsed .preview__sidebar {
+.preview--sidebar-collapsed .preview__sidebar:not([data-bs-autohide]) {
 	display: none;
 }
 

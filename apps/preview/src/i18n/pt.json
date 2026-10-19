@@ -76,5 +76,14 @@
   "inspector.properties": "Propriedades",
   "inspector.noProperties": "Ainda sem propriedades",
   "inspector.addProperty": "Adicionar propriedade",
-  "inspector.removeProperty": "Remover {name}"
+  "inspector.removeProperty": "Remover {name}",
+  "inspector.caption": "Legenda",
+  "inspector.linkedFrom.one": "Vinculado a partir de {count} objeto",
+  "inspector.linkedFrom.other": "Vinculado a partir de {count} objetos",
+  "inspector.noBacklinks": "Nada aponta para cá ainda",
+  "inspector.openInNewTab": "Abrir “{name}” em uma nova aba",
+  "inspector.moveToBin": "Mover para a lixeira",
+  "inspector.lockedHint": "Desbloqueie este arquivo para alterá-lo",
+  "inspector.deleted": "“{name}” movido para a lixeira",
+  "inspector.deleteFailed": "Não foi possível mover “{name}” para a lixeira"
 }

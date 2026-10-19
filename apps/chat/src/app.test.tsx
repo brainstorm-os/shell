@@ -1072,3 +1072,45 @@ describe("ChatApp — typing indicator over presence (Chats-4)", () => {
 		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("");
 	});
 });
+
+describe("ChatApp — auto-hide sidebar (7.15)", () => {
+	afterEach(() => {
+		document.documentElement.removeAttribute("data-bs-autohide-sidebars");
+	});
+
+	const pressToggle = async () => {
+		await act(async () => {
+			window.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "\\",
+					...(/mac/i.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true }),
+					bubbles: true,
+				}),
+			);
+		});
+	};
+
+	it("without the preference, the shortcut collapses the sidebar normally", async () => {
+		await mount([channel("c1", "general")]);
+		const sidebar = container.querySelector(".chat__sidebar") as HTMLElement;
+		await pressToggle();
+		expect(sidebar.hasAttribute("inert")).toBe(true);
+		expect(sidebar.hasAttribute("data-bs-autohide")).toBe(false);
+		expect(container.querySelector(".bs-autohide-edge")).toBeNull();
+	});
+
+	it("with the preference on, a collapsed sidebar becomes a hidden overlay the shortcut reveals", async () => {
+		document.documentElement.setAttribute("data-bs-autohide-sidebars", "on");
+		await mount([channel("c1", "general")]);
+		const sidebar = container.querySelector(".chat__sidebar") as HTMLElement;
+		await act(async () => {
+			(container.querySelector('[data-testid="sidebar-toggle"]') as HTMLButtonElement).click();
+		});
+		expect(sidebar.getAttribute("data-bs-autohide")).toBe("hidden");
+		expect(sidebar.hasAttribute("inert")).toBe(true);
+		expect(container.querySelector(".bs-autohide-edge")).not.toBeNull();
+		await pressToggle();
+		expect(sidebar.getAttribute("data-bs-autohide")).toBe("revealed");
+		expect(sidebar.hasAttribute("inert")).toBe(false);
+	});
+});

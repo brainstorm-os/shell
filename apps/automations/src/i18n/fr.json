@@ -225,5 +225,18 @@
   "template.email-follow-up-nudge.name": "Rappel de relance d'e-mails",
   "template.email-follow-up-nudge.desc": "Un rappel quotidien pour relancer les fils d'e-mails toujours sans réponse.",
   "template.email-follow-up-nudge.trigger": "Chaque jour ouvré à 16h00",
-  "menu.more": "Plus d'actions"
+  "menu.more": "Plus d'actions",
+  "runs.denied.title": "Bloqué par une autorisation manquante",
+  "runs.denied.hint": "Accordez-la dans les Réglages ou réduisez la liste d'autorisations du flux, puis relancez.",
+  "runs.denialBadge.one": "{count} refus",
+  "runs.denialBadge.other": "{count} refus",
+  "runs.trace.title": "Trace de l'agent",
+  "runs.trace.loading": "Chargement de la trace…",
+  "runs.trace.empty": "Aucune trace d'agent enregistrée pour cette exécution.",
+  "runs.trace.denied": "Refusé — autorisation {capability} manquante",
+  "runs.trace.deniedUnknown": "Refusé",
+  "runs.trace.durationMs": "{ms} ms",
+  "runs.trace.outcome.ok": "OK",
+  "runs.trace.outcome.error": "Erreur",
+  "runs.trace.outcome.denied": "Refusé"
 }

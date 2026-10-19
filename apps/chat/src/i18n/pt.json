@@ -143,5 +143,7 @@
   "pins.pin": "Fixar mensagem",
   "pins.unpin": "Desafixar mensagem",
   "pins.pinned": "Fixada",
-  "message.menu": "Ações da mensagem"
+  "message.menu": "Ações da mensagem",
+  "pins.item": "{author}: {text}",
+  "shortcut.markAllRead": "Shift+Esc"
 }
