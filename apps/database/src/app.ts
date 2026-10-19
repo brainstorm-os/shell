@@ -113,7 +113,15 @@ import {
 	groupWireKey,
 	toggleCollapsed,
 } from "./logic/board-groups";
-import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
+import {
+	type BulkUndo,
+	BulkUndoKind,
+	isBulkUndoLive,
+	planBulkAddToList,
+	planBulkSet,
+	planBulkSetRevert,
+	revertBulkAdd,
+} from "./logic/bulk-edit";
 import { canChangeType, planTypeChange, typeChangePatches } from "./logic/change-type";
 import { buildChartModel } from "./logic/chart-data";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
@@ -2194,12 +2202,17 @@ function updateSelectionBar(state: AppState): void {
 }
 
 /** The pending one-step undo for the last bulk edit (9.12.32). Cleared by the
- *  undo itself or by the next bulk edit. */
+ *  undo itself or by the next bulk edit, and stale after `BULK_UNDO_TTL_MS`. */
 let lastBulkUndo: BulkUndo | null = null;
+
+function liveBulkUndo(): BulkUndo | null {
+	if (!isBulkUndoLive(lastBulkUndo)) lastBulkUndo = null;
+	return lastBulkUndo;
+}
 
 function selectionBarProps(state: AppState): SelectionProps | null {
 	const count = state.selection.selectedIds.size;
-	const undoAction = lastBulkUndo
+	const undoAction = liveBulkUndo()
 		? [
 				{
 					id: "undo",
@@ -2401,17 +2414,22 @@ function applyBulkAddToList(state: AppState, listId: string): void {
 
 /** Revert the last bulk edit as one step. */
 async function undoBulkEdit(state: AppState): Promise<void> {
-	const undo = lastBulkUndo;
+	const undo = liveBulkUndo();
 	if (!undo) return;
 	lastBulkUndo = null;
 	if (undo.kind === BulkUndoKind.SetProperty) {
-		await persistEntityPatches(state, undo.revert);
-	} else {
-		state.lists = state.lists.map((l) => (l.id === undo.listId ? undo.previous : l));
-		schedulePersist(state);
-		renderActiveView(state);
-		renderInspector(state);
+		const revert = planBulkSetRevert(undo, state.db.entities);
+		if (revert.apply.length > 0) await persistEntityPatches(state, revert.apply);
+		flashStatus(
+			t("brainstorm.database.bulk.undone") + lockedSuffix(revert.lockedSkipped),
+			revert.lockedSkipped > 0 ? "warn" : "ready",
+		);
+		return;
 	}
+	state.lists = state.lists.map((l) => (l.id === undo.listId ? revertBulkAdd(l, undo) : l));
+	schedulePersist(state);
+	renderActiveView(state);
+	renderInspector(state);
 	flashStatus(t("brainstorm.database.bulk.undone"), "ready");
 }
 
@@ -5125,7 +5143,7 @@ function bindStageKeyboard(state: AppState): void {
 		body,
 		"Mod+Z",
 		(event) => {
-			if (!lastBulkUndo || isEditableElement(event.target)) return;
+			if (!liveBulkUndo() || isEditableElement(event.target)) return;
 			event.preventDefault();
 			event.stopPropagation();
 			void undoBulkEdit(state);
