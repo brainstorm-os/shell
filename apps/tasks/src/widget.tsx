@@ -9,6 +9,7 @@
 
 import { useVaultEntities } from "@brainstorm-os/react-yjs";
 import { SelectMenu } from "@brainstorm-os/sdk/select-menu";
+import { isTaskClosed } from "@brainstorm-os/sdk/task-state";
 import "@brainstorm-os/sdk/select-menu.css";
 import {
 	WidgetEmpty,
@@ -53,13 +54,6 @@ type OpenTask = { id: string; title: string };
 function taskTitle(properties: Record<string, unknown>): string {
 	const name = properties.name;
 	return typeof name === "string" && name.trim().length > 0 ? name : t("tasks.widget.untitled");
-}
-
-/** A task is done when `completedAt` is a truthy timestamp (the canonical
- *  "is this done?" signal — see `types/task.ts`). */
-function isDone(properties: Record<string, unknown>): boolean {
-	const completedAt = properties.completedAt;
-	return typeof completedAt === "number" && completedAt > 0;
 }
 
 function OpenTasks({
@@ -205,7 +199,7 @@ export function TasksWidget({ launch }: { launch: WidgetLaunch }) {
 
 	const open = useMemo(
 		() =>
-			entities.filter((e) => e.type === TASK_TYPE && e.deletedAt === null && !isDone(e.properties)),
+			entities.filter((e) => e.type === TASK_TYPE && e.deletedAt === null && !isTaskClosed(e.properties)),
 		[entities],
 	);
 	const total = open.length;
