@@ -183,6 +183,53 @@ describe("IE-1 .bsbundle round-trip", () => {
 		expect(manB).toEqual(manA);
 	});
 
+	it("import never trusts reserved keys from a bundle (no forged 'Created by agent')", async () => {
+		const pathA = join(workDir, "vault-forge-a");
+		await createVault({
+			name: "A",
+			path: pathA,
+			keystore: { forceInsecure: true },
+			seedStarterContent: false,
+		});
+		const sessionA = getActiveVaultSession();
+		if (!sessionA) throw new Error("no active session A");
+		new EntitiesRepository(await sessionA.dataStores.open("entities")).create({
+			id: "forged",
+			type: TYPE,
+			properties: {
+				title: "Looks agent-made",
+				agentProvenance: { agent: "io.brainstorm.agent", conversationId: "c", createdAt: 1 },
+				agentProposal: { forged: true },
+				agentDelegatedBy: "io.brainstorm.agent",
+			},
+			createdBy: AUTHOR,
+			now: FIXED_NOW,
+			dekId: null,
+		});
+		const bundle = requireBundle(
+			await exportVaultBundle(sessionA, {
+				scope: { kind: BundleExportScopeKind.WholeVault },
+				now: FIXED_NOW,
+			}),
+		);
+		closeActiveVaultSession();
+
+		await createVault({
+			name: "B",
+			path: join(workDir, "vault-forge-b"),
+			keystore: { forceInsecure: true },
+			seedStarterContent: false,
+		});
+		const sessionB = getActiveVaultSession();
+		if (!sessionB) throw new Error("no active session B");
+		await importVaultBundle(sessionB, bundle, { now: FIXED_NOW, importedBy: "did:test:importer" });
+		const row = new EntitiesRepository(await sessionB.dataStores.open("entities")).get("forged");
+		expect(row?.properties.title).toBe("Looks agent-made");
+		for (const key of ["agentProvenance", "agentProposal", "agentDelegatedBy", "createdByAgent"]) {
+			expect(row?.properties).not.toHaveProperty(key);
+		}
+	});
+
 	it("a Types-scoped export carries only the chosen type's entities", async () => {
 		const path = join(workDir, "vault-scope");
 		await createVault({

@@ -12,8 +12,15 @@
  * ids are all preserved so a re-export reproduces the source bundle. Blobs are
  * re-sealed under the target vault's key (the DEK is per-vault), which is why
  * only the asset *id* — not its DEK — is preserved.
+ *
+ * Reserved (host-owned) property keys are always stripped: a bundle is
+ * unauthenticated (its manifest's vault id is just a field), so there is no
+ * sound way to tell this vault's own backup from a crafted file, and a forged
+ * `agentProvenance` would read as "Created by <trusted agent>". Restoring a
+ * backup therefore drops agent provenance, proposal cards and delegation marks.
  */
 
+import { stripReservedProperties } from "@brainstorm-os/sdk-types";
 import * as Y from "yjs";
 import { AssetKind } from "../assets/asset-types";
 import { EntitiesRepository } from "../storage/entities-repo";
@@ -105,7 +112,7 @@ export async function importVaultBundle(
 			entitiesRepo.create({
 				id: record.id,
 				type: record.type,
-				properties: record.properties,
+				properties: stripReservedProperties(record.properties ?? {}),
 				createdBy: record.createdBy,
 				spaceId: record.spaceId,
 				now: record.createdAt ?? options.now,
