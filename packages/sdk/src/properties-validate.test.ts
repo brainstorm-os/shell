@@ -46,6 +46,13 @@ describe("validatePropertyDef — base shape", () => {
 		expect(result.ok).toBe(false);
 	});
 
+	it("rejects a prototype key as the key or the partner", () => {
+		for (const key of ["__proto__", "constructor", "prototype"]) {
+			expect(validatePropertyDef(makeDef(ValueType.Text, { key })).ok).toBe(false);
+			expect(validatePropertyDef(makeDef(ValueType.EntityRef, { inverseOf: key })).ok).toBe(false);
+		}
+	});
+
 	it("rejects an unknown valueType", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: tests an invalid runtime value
 		const result = validatePropertyDef({ ...BASE, valueType: "bogus" as any });
