@@ -227,6 +227,7 @@ export default defineConfig({
 				"packages/sdk/src/entity-authorship.ts",
 			),
 			"@brainstorm-os/sdk/entity-lock": resolve(__dirname, "packages/sdk/src/entity-lock.ts"),
+			"@brainstorm-os/sdk/task-state": resolve(__dirname, "packages/sdk/src/task-state.ts"),
 			"@brainstorm-os/sdk/tab-identity": resolve(__dirname, "packages/sdk/src/tab-identity.ts"),
 			"@brainstorm-os/sdk/entity-cover": resolve(__dirname, "packages/sdk/src/entity-cover.ts"),
 			"@brainstorm-os/sdk/entity-body-copy": resolve(

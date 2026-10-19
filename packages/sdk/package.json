@@ -55,6 +55,7 @@
     "./entity-title": "./src/entity-title.ts",
     "./entity-authorship": "./src/entity-authorship.ts",
     "./entity-lock": "./src/entity-lock.ts",
+    "./task-state": "./src/task-state.ts",
     "./tab-identity": "./src/tab-identity.ts",
     "./entity-cover": "./src/entity-cover.ts",
     "./entity-drag": "./src/entity-drag.ts",
