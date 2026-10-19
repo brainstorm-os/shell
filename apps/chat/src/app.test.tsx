@@ -698,6 +698,42 @@ describe("ChatApp — read state that follows the user (Chats-2)", () => {
 		expect(created.some((c) => c.type === USER_STATE_TYPE)).toBe(false);
 	});
 
+	it("ignores a UserState row planted through a share, even one claiming my owner", async () => {
+		const { stub } = kvStub({});
+		const plantedRoster = {
+			self: vi.fn(() => Promise.resolve(SELF)),
+			members: vi.fn((id: string) =>
+				Promise.resolve(
+					id === "us-0"
+						? [
+								{ pubkey: "pk-them", isSelf: false, role: "owner" },
+								{ pubkey: "pk-me", isSelf: true, role: "editor" },
+							]
+						: [],
+				),
+			),
+		};
+		await mount(
+			[
+				channel("c1", "general"),
+				channel("c2", "design"),
+				message("m1", "c2", "Mira", "a"),
+				message("m2", "c2", "Mira", "b"),
+				userStateRow("us-0", { c2: 5 }),
+				userStateRow("us-1", { c1: -1, c2: 0 }),
+			],
+			stub,
+			{ roster: plantedRoster },
+		);
+		await settle();
+		expect(badgeSet).toHaveBeenLastCalledWith({ count: 2 });
+		pressChord("Escape", { shift: true });
+		await settle();
+		const updates = services().entities.update.mock.calls.map((c) => c[0]);
+		expect(updates).not.toContain("us-0");
+		expect(updates).toContain("us-1");
+	});
+
 	it("marks every channel read from the channel context menu and the header menu", async () => {
 		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
 		const open = vi.mocked(openAnchoredMenu);

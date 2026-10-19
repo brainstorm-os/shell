@@ -375,6 +375,7 @@ export function ChatApp(): ReactElement {
 		storage,
 		canSync: !!roster && selfStatus !== SelfStatus.Failed,
 		ownerRef: selfStatus === SelfStatus.Resolved ? identity.personRef : "",
+		roster,
 	});
 	const { ready: marksReady, watermarks, raiseWatermarks, prefs, setPrefs } = userState;
 	const [composerExpanded, setComposerExpanded] = useState(false);
