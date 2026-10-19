@@ -671,13 +671,45 @@ describe("AppLauncher split view (6.14)", () => {
 		expect(env.launcher.containerForTabSender(side.webContentsId)?.appId).toBe(TASKS);
 	});
 
-	it("parks and restores a split window as one unit", () => {
+	it("parking a split window closes a different-app side pane, so its opens never land hidden", () => {
 		const { primary, side } = openSplit();
 		env.containers[0]?.window.close();
 		expect(env.launcher.runningAppIds()).toEqual([]);
-		expect(side.webContents.isDestroyed()).toBe(false);
+		expect(primary.container.sidePane()).toBeNull();
+		expect(env.identities.get(side.webContentsId)).toBeUndefined();
+		expect(env.launcher.windowsFor(TASKS)).toEqual([]);
+		expect(env.launcher.focusTabByRoute("brainstorm://entity/task_1")).toBeNull();
 		env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
-		expect(primary.container.sidePane()?.webContentsId).toBe(side.webContentsId);
+		expect(primary.container.sidePane()).toBeNull();
+	});
+
+	it("parks a same-app side pane with its window", () => {
+		const primary = env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		const side = env.launcher.openSidePane(primary.container.id, {
+			...baseLaunch,
+			bundleDir: env.bundleDir,
+			launch: { reason: "open-entity", entityId: "note_2" },
+		});
+		env.containers[0]?.window.close();
+		env.launcher.launch({ ...baseLaunch, bundleDir: env.bundleDir });
+		expect(primary.container.sidePane()?.webContentsId).toBe(side?.webContentsId);
+	});
+
+	it("closing the PRIMARY app re-homes a different-app side pane instead of killing it", () => {
+		const { primary, side } = openSplit();
+		env.launcher.closeApp("io.example.notes");
+		expect(primary.container.baseWindow.isDestroyed()).toBe(true);
+		const rehomed = env.launcher.windowsFor(TASKS);
+		expect(rehomed.map((w) => w.webContentsId)).toEqual([side.webContentsId]);
+		expect(side.webContents.isDestroyed()).toBe(false);
+		expect(env.identities.get(side.webContentsId)).toBe(TASKS);
+	});
+
+	it("containerForTabSender names the SENDER pane's app, not the container's", () => {
+		const { primary, side } = openSplit();
+		expect(env.launcher.containerForTabSender(side.webContentsId)?.appId).toBe(TASKS);
+		expect(env.launcher.containerForTabSender(primary.webContentsId)?.appId).toBe("io.example.notes");
+		expect(env.launcher.containerForTabSender(side.webContentsId)?.container).toBe(primary.container);
 	});
 
 	it("refuses to split a self-tabbing app's window on either side", () => {
