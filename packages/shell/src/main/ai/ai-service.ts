@@ -21,7 +21,9 @@
  * hold `ai.use`, and pinning a provider other than the on-device one
  * (`OLLAMA_PROVIDER_ID`, which spends no cloud key and is what LocalOnly
  * agents pin) needs `ai.provider:<id>` too. An unpinned call routes to the
- * user's configured default under `ai.use` alone.
+ * user's configured default under `ai.use` alone, unless that default is a
+ * custom endpoint: `pinCustomDefaultProvider` pins it first, so the gate above
+ * applies.
  */
 
 import {
