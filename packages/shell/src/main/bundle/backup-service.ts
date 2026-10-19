@@ -77,6 +77,10 @@ export type BackupServiceDeps = {
 
 export class BackupService {
 	private running = false;
+	/** The run in progress. A second caller (Run now during a scheduled run, or
+	 *  a double click) joins it instead of getting an early "running" status
+	 *  that lands after the real result. */
+	private inflight: Promise<BackupStatus> | null = null;
 	private timers: { first: unknown; interval: unknown } | null = null;
 
 	constructor(private readonly deps: BackupServiceDeps) {}
@@ -142,29 +146,50 @@ export class BackupService {
 		return vault ? this.runBackup(vault) : null;
 	}
 
-	private async runBackup(vault: BackupVault): Promise<BackupStatus> {
+	private runBackup(vault: BackupVault): Promise<BackupStatus> {
+		if (this.inflight) return this.inflight;
 		const settings = this.read(vault);
-		if (this.running || settings.folder === null) return this.status(settings);
+		if (settings.folder === null) return Promise.resolve(this.status(settings));
+		const run = this.doRunBackup(vault, settings, settings.folder)
+			.then((done) => this.status(done))
+			.finally(() => {
+				this.inflight = null;
+			});
+		this.inflight = run;
+		return run;
+	}
+
+	private async doRunBackup(
+		vault: BackupVault,
+		settings: BackupSettings,
+		folder: string,
+	): Promise<BackupSettings> {
 		this.running = true;
-		const folder = settings.folder;
+		let partial: string | null = null;
 		try {
 			const bytes = await vault.exportBundle();
-			if (bytes === null) return this.status(this.read(vault));
+			if (bytes === null) return this.read(vault);
 			const at = this.now();
 			const target = join(folder, backupFileName(vault.vaultId, at));
-			const partial = `${target}${PARTIAL_SUFFIX}`;
-			await writeFile(partial, bytes);
+			partial = `${target}${PARTIAL_SUFFIX}`;
+			// `wx` = O_CREAT|O_EXCL: never opens through a symlink planted at the
+			// partial's name. A stale partial from a crashed run is unlinked
+			// first (`rm` removes a link itself, never its target).
+			await rm(partial, { force: true });
+			await writeFile(partial, bytes, { flag: "wx" });
 			await rename(partial, target);
+			partial = null;
 			await this.prune(folder, vault.vaultId, settings.retention);
 			const next: BackupSettings = { ...this.read(vault), lastBackupAt: at, lastError: null };
 			this.write(vault, next);
-			return this.status(next);
+			return next;
 		} catch (error) {
+			if (partial !== null) await rm(partial, { force: true }).catch(() => undefined);
 			const message = error instanceof Error ? error.message : String(error);
 			console.warn("[brainstorm] scheduled backup failed:", error);
 			const failed: BackupSettings = { ...this.read(vault), lastError: message };
 			this.write(vault, failed);
-			return this.status(failed);
+			return failed;
 		} finally {
 			this.running = false;
 		}

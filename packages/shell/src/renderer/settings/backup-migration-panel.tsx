@@ -515,6 +515,9 @@ function ScheduledBackupSection() {
 	const [restoring, setRestoring] = useState<string | null>(null);
 	const [restoreReport, setRestoreReport] = useState<BackupRestoreReport | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	// The status only says `running` once the run is over, so the spinner and
+	// the double-click guard track the request itself.
+	const [runRequested, setRunRequested] = useState(false);
 
 	const refreshPoints = useCallback(() => {
 		void window.brainstorm.backup.restorePoints().then(setPoints, () => setPoints([]));
@@ -545,6 +548,20 @@ function ScheduledBackupSection() {
 		},
 		[refreshPoints],
 	);
+
+	const onRunNow = useCallback(() => {
+		if (runRequested) return;
+		setRunRequested(true);
+		setError(null);
+		window.brainstorm.backup
+			.runNow()
+			.then((next) => {
+				if (next) setStatus(next);
+				refreshPoints();
+			})
+			.catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+			.finally(() => setRunRequested(false));
+	}, [runRequested, refreshPoints]);
 
 	const onRestore = useCallback(
 		(name: string) => {
@@ -641,9 +658,9 @@ function ScheduledBackupSection() {
 				<Button
 					variant={ButtonVariant.Neutral}
 					size={ButtonSize.Md}
-					loading={status?.running ?? false}
-					disabled={!hasFolder}
-					onClick={() => apply(window.brainstorm.backup.runNow(), true)}
+					loading={runRequested || (status?.running ?? false)}
+					disabled={!hasFolder || runRequested}
+					onClick={onRunNow}
 					data-testid="backup-migration-schedule-run"
 				>
 					{t("shell.settings.backupMigration.schedule.runNow")}

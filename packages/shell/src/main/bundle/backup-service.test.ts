@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,6 +104,49 @@ describe("BackupService", () => {
 		expect((await service.runNow())?.lastError).toBe("disk full");
 		expect(await readdir(folder)).toEqual([]);
 		expect((await service.runNow())?.lastError).toBeNull();
+	});
+
+	it("a second Run now joins the run in flight instead of starting another", async () => {
+		await service.setFolder(folder);
+		let release: () => void = () => undefined;
+		exportBundle.mockImplementationOnce(
+			() =>
+				new Promise<Uint8Array>((resolve) => {
+					release = () => resolve(new Uint8Array([9]));
+				}),
+		);
+		const first = service.runNow();
+		const second = service.runNow();
+		await new Promise((r) => setTimeout(r, 0));
+		release();
+		const [a, b] = await Promise.all([first, second]);
+		expect(exportBundle).toHaveBeenCalledTimes(1);
+		expect(b).toEqual(a);
+		expect(a?.running).toBe(false);
+		expect(a?.lastBackupAt).toBe(clock);
+	});
+
+	it("never writes through a symlink planted at the .partial name", async () => {
+		await service.setFolder(folder);
+		const outside = await mkdtemp(join(tmpdir(), "bs-backup-outside-"));
+		const victim = join(outside, "victim.txt");
+		await writeFile(victim, "untouched");
+		await symlink(victim, join(folder, `${backupFileName(VAULT, clock)}.partial`));
+		const status = await service.runNow();
+		expect(status?.lastError).toBeNull();
+		expect(await readFile(victim, "utf8")).toBe("untouched");
+		expect(await readdir(folder)).toEqual([backupFileName(VAULT, clock)]);
+		await rm(outside, { recursive: true, force: true });
+	});
+
+	it("removes the .partial when the write fails", async () => {
+		const ro = join(folder, "sub");
+		await mkdir(ro);
+		await service.setFolder(ro);
+		await mkdir(join(ro, backupFileName(VAULT, clock)));
+		const status = await service.runNow();
+		expect(status?.lastError).not.toBeNull();
+		expect((await readdir(ro)).filter((n) => n.endsWith(".partial"))).toEqual([]);
 	});
 
 	it("restores only this vault's restore points by bare name", async () => {
