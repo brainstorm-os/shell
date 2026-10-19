@@ -16,8 +16,10 @@ import {
 	exportVaultMarkdown,
 	fileSafeName,
 	frontMatter,
+	isSafeLinkUrl,
 	planEntityPaths,
 	relativeLink,
+	rewriteBodyTree,
 	rewritePropertyValue,
 } from "./vault-markdown-export";
 
@@ -62,6 +64,24 @@ describe("path planning", () => {
 		expect(fileSafeName("x".repeat(300))).toHaveLength(80);
 	});
 
+	it("never cuts a surrogate pair, and drops lone surrogates", () => {
+		const name = fileSafeName(`${"x".repeat(79)}\u{1F600}tail`);
+		expect(Array.from(name)).toHaveLength(80);
+		expect(name.endsWith("\u{1F600}")).toBe(true);
+		expect(fileSafeName("a\uD800b")).toBe("a b");
+		expect(fileSafeName("\u{1F600}".repeat(100))).toBe("\u{1F600}".repeat(80));
+	});
+
+	it("treats NFC and NFD spellings of a name as one file", () => {
+		const nfc = "Caf\u00e9";
+		const nfd = "Cafe\u0301";
+		const paths = planEntityPaths([
+			{ id: "a", type: NOTE, title: nfc },
+			{ id: "b", type: NOTE, title: nfd },
+		]);
+		expect([...paths.values()]).toEqual([`Notes/${nfc}.md`, `Notes/${nfc} (2).md`]);
+	});
+
 	it("groups by type and dedupes names case-insensitively", () => {
 		const paths = planEntityPaths([
 			{ id: "a", type: NOTE, title: "Plan" },
@@ -102,6 +122,37 @@ describe("reference rewriting", () => {
 		expect(JSON.stringify(rewritePropertyValue({ hidden: 1, x: "hidden" }, resolve))).not.toContain(
 			"hidden",
 		);
+	});
+
+	it("keeps only http(s) / mailto / relative links; script-ish schemes degrade to their label", () => {
+		for (const bad of [
+			"javascript:alert(1)",
+			" JaVa\tScRiPt:x",
+			"data:text/html,x",
+			"file:///etc/passwd",
+			"vbscript:x",
+		]) {
+			expect(isSafeLinkUrl(bad)).toBe(false);
+		}
+		for (const ok of ["https://x.test/a", "http://x", "mailto:a@b.c", "../Notes/A.md", "#h"]) {
+			expect(isSafeLinkUrl(ok)).toBe(true);
+		}
+		const out = rewriteBodyTree(
+			{
+				root: el("root", [
+					el("paragraph", [
+						el("link", [text("click")], { url: "javascript:alert(1)" }),
+						el("link", [text("ok")], { url: "https://x.test/a b)c" }),
+						text('<a href="javascript:x">raw</a>'),
+					]),
+				]),
+			} as never,
+			resolve,
+		);
+		const json = JSON.stringify(out);
+		expect(json).not.toContain("javascript:alert");
+		expect(json).toContain("https://x.test/a%20b%29c");
+		expect(json).toContain("\\\\<a href");
 	});
 
 	it("writes front matter as JSON-quoted YAML", () => {

@@ -21,7 +21,11 @@
 
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { serializedStateFromDoc, serializedStateToMarkdown } from "@brainstorm-os/editor";
+import {
+	TextFormat,
+	serializedStateFromDoc,
+	serializedStateToMarkdown,
+} from "@brainstorm-os/editor";
 import { friendlyTypeName, isPlumbingEntityType } from "@brainstorm-os/sdk/system-entities";
 import { deriveEntityTitle } from "../entities/derive-title";
 import { STRUCTURAL_ENTITY_TYPES } from "../entities/vault-entities-service";
@@ -39,6 +43,11 @@ const ENTITY_URL_PREFIX = "brainstorm://entity/";
 const ASSET_URL_RE = /brainstorm:\/\/asset\/([A-Za-z0-9_-]+)/g;
 const OMITTED_PROPS = new Set(["body", IMPORT_EXTERNAL_ID_PROP, IMPORT_BODY_HASH_PROP]);
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
+/** Schemes a link may keep. Anything else (`javascript:`, `data:`, `file:`,
+ *  `vbscript:` …) would run or reach local files from the exported Markdown
+ *  in whatever viewer opens it, so the link degrades to its label. */
+const SAFE_LINK_SCHEMES = new Set(["http", "https", "mailto"]);
+const URL_SCHEME_RE = /^([a-z][a-z0-9+.-]*):/i;
 
 const MIME_EXTENSIONS: Record<string, string> = {
 	"image/png": "png",
@@ -85,21 +94,29 @@ export type MarkdownExportResult = {
 
 /** A name that is safe as one path segment on macOS, Windows and Linux. */
 export function fileSafeName(raw: string, fallback: string = UNTITLED): string {
-	const cleaned = raw
-		.replace(/\p{Cc}/gu, " ")
+	const spaced = raw
+		.normalize("NFC")
+		.replace(/[\p{Cc}\p{Cs}]/gu, " ")
 		.replace(/[\\/:*?"<>|#^[\]]/g, " ")
 		.replace(/\s+/g, " ")
 		.trim()
-		.replace(/^[.\s]+|[.\s]+$/g, "")
-		.slice(0, MAX_NAME_CHARS)
-		.trim();
+		.replace(/^[.\s]+|[.\s]+$/g, "");
+	// Cut by code point, never by UTF-16 unit: a slice through a surrogate
+	// pair leaves half an emoji, which some file systems refuse outright.
+	const cleaned = Array.from(spaced).slice(0, MAX_NAME_CHARS).join("").trim();
 	if (cleaned.length === 0) return fallback;
 	return WINDOWS_RESERVED.test(cleaned) ? `${cleaned}_` : cleaned;
 }
 
+/** The identity a file system gives a name: APFS / NTFS fold case, and APFS
+ *  folds Unicode normalisation (`é` precomposed == `e` + combining accent). */
+function collisionKey(path: string): string {
+	return path.normalize("NFC").toLowerCase();
+}
+
 /** id → `Folder/Name.md` for every exported object. Names are unique per
- *  folder case-insensitively (APFS / NTFS fold case), with ` (2)` suffixes in
- *  the given row order. */
+ *  folder under {@link collisionKey}, with ` (2)` suffixes in the given row
+ *  order, so no export overwrites another. */
 export function planEntityPaths(
 	rows: ReadonlyArray<{ id: string; type: string; title: string }>,
 ): Map<string, string> {
@@ -109,8 +126,8 @@ export function planEntityPaths(
 		const folder = fileSafeName(friendlyTypeName(row.type), "Objects");
 		const base = fileSafeName(row.title);
 		let name = base;
-		for (let n = 2; taken.has(`${folder}/${name}`.toLowerCase()); n += 1) name = `${base} (${n})`;
-		taken.add(`${folder}/${name}`.toLowerCase());
+		for (let n = 2; taken.has(collisionKey(`${folder}/${name}`)); n += 1) name = `${base} (${n})`;
+		taken.add(collisionKey(`${folder}/${name}`));
 		out.set(row.id, `${folder}/${name}.md`);
 	}
 	return out;
@@ -130,8 +147,12 @@ function assetFileName(assetId: string, mime: string): string {
 	return `${assetId}.${MIME_EXTENSIONS[mime.toLowerCase()] ?? "bin"}`;
 }
 
+function escapeHtmlOpen(text: string): string {
+	return text.replace(/</g, "\\<");
+}
+
 function textNode(text: string): Node {
-	return { type: "text", text, format: 0 };
+	return { type: "text", text: escapeHtmlOpen(text), format: 0 };
 }
 
 function entityIdFromUrl(url: string): string | null {
@@ -140,14 +161,38 @@ function entityIdFromUrl(url: string): string | null {
 	return id.length > 0 ? id : null;
 }
 
+/** True for a link target safe to keep: a relative path / anchor (no scheme)
+ *  or an allow-listed scheme. Controls and spaces are stripped first, the way
+ *  browsers do, so `java\tscript:` is still seen as `javascript:`. */
+export function isSafeLinkUrl(url: string): boolean {
+	const compact = url.replace(/[\u0000-\u0020\u007f]/g, "");
+	const scheme = URL_SCHEME_RE.exec(compact)?.[1];
+	return scheme === undefined || SAFE_LINK_SCHEMES.has(scheme.toLowerCase());
+}
+
+/** Keep a kept URL inside its `(…)`: an unescaped `)`, space or `<` would end
+ *  the link early and turn the rest into live Markdown / HTML. */
+function linkSafeUrl(url: string): string {
+	return url.replace(
+		/[\s()<>]/g,
+		(c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+	);
+}
+
 function rewriteAssetUrls(value: string, resolve: ReferenceResolver): string {
 	return value.replace(ASSET_URL_RE, (_match, id: string) => resolve.assetLink(id) ?? "");
 }
 
-function rewriteNode(node: Node, resolve: ReferenceResolver, topLevel: boolean): Node {
+function rewriteNode(
+	node: Node,
+	resolve: ReferenceResolver,
+	topLevel: boolean,
+	inCode = false,
+): Node {
 	const type = typeof node.type === "string" ? node.type : "";
+	const childInCode = inCode || type === "code";
 	const children = Array.isArray(node.children)
-		? (node.children as Node[]).map((child) => rewriteNode(child, resolve, false))
+		? (node.children as Node[]).map((child) => rewriteNode(child, resolve, false, childInCode))
 		: undefined;
 
 	const mentionId = type === "mention" && typeof node.entityId === "string" ? node.entityId : null;
@@ -164,7 +209,18 @@ function rewriteNode(node: Node, resolve: ReferenceResolver, topLevel: boolean):
 		const targetId = entityIdFromUrl(node.url);
 		const link = targetId ? resolve.entityLink(targetId) : null;
 		if (link) return { ...node, url: link, ...(children ? { children } : {}) };
-		if (node.url.startsWith("brainstorm://")) return { type: "inline", children: children ?? [] };
+		if (node.url.startsWith("brainstorm://") || !isSafeLinkUrl(node.url)) {
+			return { type: "inline", children: children ?? [] };
+		}
+		return { ...node, url: linkSafeUrl(node.url), ...(children ? { children } : {}) };
+	}
+
+	// Body text is written as-is by the Markdown serializer, so a typed
+	// `<a href="javascript:…">` would become live HTML in most viewers.
+	// Code spans render `<` literally already; everything else escapes it.
+	if (type === "text" && typeof node.text === "string" && !inCode) {
+		const format = typeof node.format === "number" ? node.format : 0;
+		if ((format & TextFormat.Code) === 0) return { ...node, text: escapeHtmlOpen(node.text) };
 	}
 
 	if (type === "title" && topLevel) {
