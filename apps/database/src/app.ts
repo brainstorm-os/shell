@@ -245,6 +245,7 @@ import {
 	opNeedsValue,
 } from "./logic/filter-builder";
 import { type EntityRow, type InMemoryEntities, emptyEntities } from "./logic/in-memory-entities";
+import { pairableInverseCandidates } from "./logic/inverse-candidates";
 import {
 	createList,
 	createView,
@@ -5547,9 +5548,10 @@ function inlinePropertyFormLabels() {
 
 /** Existing relations a new Relation can pair with (two-way, 9.12.25). */
 function inverseCandidates(): { key: string; label: string }[] {
-	return cachedVaultProperties
-		.filter((d) => d.valueType === ValueType.EntityRef && !d.inverseOf)
-		.map((d) => ({ key: d.key, label: d.name?.trim() ? d.name : humanize(d.key) }));
+	return pairableInverseCandidates(cachedVaultProperties).map((d) => ({
+		key: d.key,
+		label: d.name?.trim() ? d.name : humanize(d.key),
+	}));
 }
 
 function openColumnPropertyConstructor(state: AppState, view: ListView, _seedName: string): void {
