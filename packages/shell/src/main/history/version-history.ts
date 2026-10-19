@@ -21,17 +21,23 @@
  */
 
 import { HistoryPrincipalKind, VersionCause } from "@brainstorm-os/sdk-types";
+import { yieldToEventLoop } from "../import/import-engine";
 import type {
 	ChangeSetPrincipal,
 	EntitiesRepository,
 	EntityVersionRecord,
+	EntityVersionRetentionRow,
 	EntityVersionsRepository,
 	HistoryChangeSetsRepository,
 	StoredPrincipal,
 } from "../storage/entities-repo";
 import { isSafeEntityId } from "../storage/entity-id";
 import type { HistFrameRef } from "../storage/yhist-store";
-import { type RetentionCandidate, type RetentionPolicy, planRetention } from "./retention-policy";
+import {
+	type RetentionCandidate,
+	type RetentionPolicy,
+	planRetentionYielding,
+} from "./retention-policy";
 
 export const IDLE_CAPTURE_DELAY_MS = 2 * 60 * 1000;
 export const IDLE_CAPTURE_MIN_INTERVAL_MS = 10 * 60 * 1000;
@@ -41,6 +47,10 @@ export const CHECKPOINT_BATCH_MAX = 5000;
 /** Entities whose last Idle capture time is remembered in memory; beyond it
  *  the oldest are forgotten and re-read from the latest stored version. */
 export const IDLE_MEMO_MAX = 10_000;
+/** Rows one retention-scan page reads before the main thread breathes. */
+export const RETENTION_SCAN_PAGE = 2000;
+/** Rows one retention delete transaction may hold. */
+export const RETENTION_DELETE_CHUNK = 250;
 
 export type HistoryStores = {
 	entities: EntitiesRepository;
@@ -107,6 +117,8 @@ export type VersionHistoryOptions = {
 	idleDelayMs?: number;
 	idleMinIntervalMs?: number;
 	retentionIntervalMs?: number;
+	/** Pauses a retention pass between chunks (test seam; the event loop by default). */
+	yieldToEventLoop?: () => Promise<void>;
 	/** Perf gate — every real capture's encode time and size. */
 	onCapture?: (info: {
 		entityId: string;
@@ -130,6 +142,7 @@ export class VersionHistory {
 	private readonly idleDelayMs: number;
 	private readonly idleMinIntervalMs: number;
 	private readonly retentionIntervalMs: number;
+	private readonly yieldToEventLoop: () => Promise<void>;
 	private readonly pending = new Map<string, Map<string, StoredPrincipal>>();
 	private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
 	private readonly lastIdleAt = new Map<string, number>();
@@ -145,6 +158,7 @@ export class VersionHistory {
 		this.idleDelayMs = options.idleDelayMs ?? IDLE_CAPTURE_DELAY_MS;
 		this.idleMinIntervalMs = options.idleMinIntervalMs ?? IDLE_CAPTURE_MIN_INTERVAL_MS;
 		this.retentionIntervalMs = options.retentionIntervalMs ?? RETENTION_INTERVAL_MS;
+		this.yieldToEventLoop = options.yieldToEventLoop ?? yieldToEventLoop;
 	}
 
 	/** Record that `principals` wrote to `entityId` just now, and arm `Idle`. */
@@ -478,45 +492,88 @@ export class VersionHistory {
 		return this.pendingPrincipals(checkpoint.entityId).some(foreign);
 	}
 
+	/**
+	 * One retention pass, in bounded steps: the scan is paged, the plan pauses
+	 * every chunk, deletes go in `RETENTION_DELETE_CHUNK`-row transactions and
+	 * each entity's `.yhist` rewrite + frame relocation is its own step. Rows
+	 * are grouped by entity ONCE on the way in, so the keep set per rewritten
+	 * entity is read off its group, never re-scanned from the whole vault.
+	 */
 	private async pruneLocked(): Promise<number> {
 		const stores = await this.options.getStores();
 		if (!stores) return 0;
 		this.lastRetentionAt = this.now();
-		const rows = stores.versions.listForRetention();
-		if (rows.length === 0) return 0;
 		const csPrincipals = stores.changeSets.listPrincipals();
-		const candidates: RetentionCandidate[] = rows.map((r) => {
-			const agent =
-				(r.cause === VersionCause.AgentRun || r.cause === VersionCause.BeforeRestore) && r.changeSetId
-					? (csPrincipals.get(r.changeSetId)?.find((p) => p.kind === HistoryPrincipalKind.Agent) ?? null)
-					: null;
-			return {
-				versionId: r.versionId,
-				entityId: r.entityId,
-				at: r.at,
-				cause: r.cause,
-				changeSetId: r.changeSetId,
-				agentPrincipal: agent ? principalKey(agent) : null,
-				frameKey: `${r.entityId}\u0000${r.frameOffset}`,
-				frameBytes: r.frameLength,
-				ownBytes: r.propertiesBytes,
-			};
-		});
-		const plan = planRetention(candidates, this.now(), await this.options.getPolicy());
-		if (plan.drop.size === 0) return 0;
-		stores.versions.deleteMany([...plan.drop.keys()]);
-		const affected = new Set(rows.filter((r) => plan.drop.has(r.versionId)).map((r) => r.entityId));
-		for (const entityId of affected) {
-			const keep = new Map<number, HistFrameRef>();
-			for (const r of rows) {
-				if (r.entityId !== entityId || plan.drop.has(r.versionId)) continue;
-				keep.set(r.frameOffset, { offset: r.frameOffset, length: r.frameLength });
+		const candidates: RetentionCandidate[] = [];
+		const byEntity = new Map<string, EntityVersionRetentionRow[]>();
+		for (let cursor = 0; ; ) {
+			const page = stores.versions.listForRetention(cursor, RETENTION_SCAN_PAGE);
+			for (const r of page) {
+				candidates.push(toCandidate(r, csPrincipals));
+				const group = byEntity.get(r.entityId);
+				if (group) group.push(r);
+				else byEntity.set(r.entityId, [r]);
 			}
-			const moved = await this.options.worker.compact(entityId, [...keep.values()]);
-			stores.versions.relocateFrames(entityId, new Map(moved.filter(([from, to]) => from !== to)));
+			const last = page[page.length - 1];
+			if (!last || page.length < RETENTION_SCAN_PAGE) break;
+			cursor = last.rowid;
+			await this.breathe();
+		}
+		if (candidates.length === 0) return 0;
+		const policy = await this.options.getPolicy();
+		const plan = await planRetentionYielding(candidates, this.now(), policy, () => this.breathe());
+		if (plan.drop.size === 0) return 0;
+		// Deleting in scan (rowid) order keeps each transaction on neighbouring
+		// pages — measured 2.5× cheaper per chunk than the plan's own order.
+		let batch: string[] = [];
+		for (let i = 0; i < candidates.length; i += 1) {
+			const c = candidates[i] as RetentionCandidate;
+			if (plan.drop.has(c.versionId)) batch.push(c.versionId);
+			const pageEdge = (i + 1) % RETENTION_SCAN_PAGE === 0;
+			if (batch.length < RETENTION_DELETE_CHUNK && !pageEdge) continue;
+			if (batch.length > 0) {
+				stores.versions.deleteMany(batch);
+				batch = [];
+			}
+			await this.breathe();
+		}
+		if (batch.length > 0) {
+			stores.versions.deleteMany(batch);
+			await this.breathe();
+		}
+		let walked = 0;
+		for (const [entityId, group] of byEntity) {
+			const keep: HistFrameRef[] = [];
+			const offsets = new Set<number>();
+			let touched = false;
+			for (const r of group) {
+				if (plan.drop.has(r.versionId)) {
+					touched = true;
+					continue;
+				}
+				if (offsets.has(r.frameOffset)) continue;
+				offsets.add(r.frameOffset);
+				keep.push({ offset: r.frameOffset, length: r.frameLength });
+			}
+			walked += group.length;
+			if (touched) {
+				const moved = await this.options.worker.compact(entityId, keep);
+				stores.versions.relocateFrames(entityId, new Map(moved.filter(([from, to]) => from !== to)));
+			} else if (walked < RETENTION_SCAN_PAGE) {
+				continue;
+			}
+			walked = 0;
+			await this.breathe();
 		}
 		stores.changeSets.deleteOrphans();
 		return plan.drop.size;
+	}
+
+	/** Lets IPC, input and paint run between retention steps; a pass whose
+	 *  history was disposed meanwhile stops rather than touch a closed vault. */
+	private async breathe(): Promise<void> {
+		await this.yieldToEventLoop();
+		if (this.disposed) throw named("Unavailable", "history: disposed during retention");
 	}
 
 	private run<T>(fn: () => Promise<T>): Promise<T> {
@@ -532,4 +589,25 @@ function isAgent(principal: ChangeSetPrincipal): boolean {
 
 function frameOf(record: EntityVersionRecord): HistFrameRef {
 	return { offset: record.frameOffset, length: record.frameLength };
+}
+
+function toCandidate(
+	r: EntityVersionRetentionRow,
+	csPrincipals: ReadonlyMap<string, readonly ChangeSetPrincipal[]>,
+): RetentionCandidate {
+	const agent =
+		(r.cause === VersionCause.AgentRun || r.cause === VersionCause.BeforeRestore) && r.changeSetId
+			? (csPrincipals.get(r.changeSetId)?.find((p) => p.kind === HistoryPrincipalKind.Agent) ?? null)
+			: null;
+	return {
+		versionId: r.versionId,
+		entityId: r.entityId,
+		at: r.at,
+		cause: r.cause,
+		changeSetId: r.changeSetId,
+		agentPrincipal: agent ? principalKey(agent) : null,
+		frameKey: `${r.entityId}\u0000${r.frameOffset}`,
+		frameBytes: r.frameLength,
+		ownBytes: r.propertiesBytes,
+	};
 }

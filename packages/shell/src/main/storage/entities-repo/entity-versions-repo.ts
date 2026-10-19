@@ -26,8 +26,10 @@ export type EntityVersionRecord = {
 	properties: Record<string, unknown>;
 };
 
-/** The columns retention needs — no properties JSON is parsed. */
+/** The columns retention needs — no properties JSON is parsed. `rowid` is
+ *  the scan cursor. */
 export type EntityVersionRetentionRow = {
+	rowid: number;
 	versionId: string;
 	entityId: string;
 	at: number;
@@ -125,17 +127,23 @@ export class EntityVersionsRepository {
 		return rows.map(toRecord);
 	}
 
-	listForRetention(): EntityVersionRetentionRow[] {
+	/** One page of the retention scan: up to `limit` rows past `afterRowid`, in
+	 *  rowid order. Paged so a vault-sized table is never read in one block. */
+	listForRetention(afterRowid: number, limit: number): EntityVersionRetentionRow[] {
 		const rows = this.db
 			.prepare(
-				`SELECT version_id, entity_id, at, cause, change_set_id, frame_offset, frame_length,
+				`SELECT rowid, version_id, entity_id, at, cause, change_set_id, frame_offset, frame_length,
 					length(properties) AS properties_bytes
-				FROM entity_versions`,
+				FROM entity_versions WHERE rowid > ? ORDER BY rowid LIMIT ?`,
 			)
-			.all() as Array<
-			Omit<Row, "principals" | "state_key" | "properties"> & { properties_bytes: number }
+			.all(afterRowid, limit) as Array<
+			Omit<Row, "principals" | "state_key" | "properties"> & {
+				rowid: number;
+				properties_bytes: number;
+			}
 		>;
 		return rows.map((r) => ({
+			rowid: r.rowid,
 			versionId: r.version_id,
 			entityId: r.entity_id,
 			at: r.at,
