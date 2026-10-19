@@ -24,10 +24,11 @@
  * `entities.write` for every target type of each side touched — the def, its
  * new partner and its old one (`allowedTypes`; a side with none needs
  * `entities.write:*`). A pair is then something the declarer could have
- * written by hand anyway. Re-shaping a def that is ALREADY half of a pair —
- * its `allowedTypes`, `valueType` or `count` — passes the same gate over the
- * old and new shape, or an app could first narrow `allowedTypes` onto a type
- * it holds and then declare the pair. The entities service also refuses far
+ * written by hand anyway. Re-shaping a def that is ALREADY half of a pair
+ * (its `allowedTypes`, `valueType` or `count`), creating the def a partner
+ * already names, or removing half of a pair passes the same gate over the old
+ * and new shape — a partner not in the catalog counts as any type — or an app
+ * could narrow `allowedTypes` onto a type it holds, then declare the pair. The entities service also refuses far
  * ends outside the declared types, so the catalog bounds the far writes.
  * Reserved keys are never pair members.
  *
@@ -87,18 +88,24 @@ function reshapesPair(def: PropertyDef, prior: PropertyDef | undefined): boolean
 	);
 }
 
-/** Every type a change to `def`'s pairing can steer writes onto. */
+/** Every type a change to the pairing of `key` can steer writes onto: the
+ *  def as it is now and as it will be, plus every partner. A partner not in
+ *  the catalog yet has no type limits by definition — it counts as any type,
+ *  or it could be created later, unrestricted, past the gate. */
 function pairTargetTypes(
-	def: PropertyDef,
-	prior: PropertyDef | undefined,
+	key: string,
+	shapes: ReadonlyArray<PropertyDef | undefined>,
 	catalog: Readonly<Record<string, PropertyDef>>,
 ): Set<string> {
-	const sides = [def, prior];
-	const partnerKeys = [def.inverseOf, prior?.inverseOf, ...declaredPartnersOf(def.key, catalog)];
-	for (const partnerKey of partnerKeys) {
-		if (partnerKey) sides.push(partnerKey === def.key ? def : catalog[partnerKey]);
-	}
+	const sides: Array<PropertyDef | undefined> = [...shapes];
 	const types = new Set<string>();
+	const partnerKeys = [...shapes.map((d) => d?.inverseOf), ...declaredPartnersOf(key, catalog)];
+	for (const partnerKey of partnerKeys) {
+		if (!partnerKey || partnerKey === key) continue;
+		const partner = catalog[partnerKey];
+		if (partner) sides.push(partner);
+		else types.add(ANY_TYPE);
+	}
 	for (const side of sides) {
 		if (!side) continue;
 		const allowed = side.allowedTypes ?? [];
@@ -108,7 +115,24 @@ function pairTargetTypes(
 	return types;
 }
 
+/** Half of a pair right now: it declares a partner, or a partner declares it. */
+function isPaired(key: string, catalog: Readonly<Record<string, PropertyDef>>): boolean {
+	return catalog[key]?.inverseOf !== undefined || declaredPartnersOf(key, catalog).length > 0;
+}
+
 export function makePropertiesServiceHandler(options: PropertiesServiceOptions): ServiceHandler {
+	const assertPairGate = async (app: string, types: ReadonlySet<string>, verb: string) => {
+		const canWrite = options.canWriteType;
+		for (const type of types) {
+			if (!canWrite || !(await canWrite(app, type))) {
+				throw makeError(
+					"Denied",
+					`properties.${verb}: changing a two-way relation needs entities.write for the types it links`,
+				);
+			}
+		}
+	};
+
 	return async (envelope: Envelope): Promise<unknown> => {
 		const store = await options.getStore();
 		if (!store) {
@@ -127,27 +151,25 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 
 			case "setProperty": {
 				const def = requireDef(envelope);
+				// A reserved key is host-owned state, never a catalog property.
+				if (
+					RESERVED_PROPERTY_KEYS.includes(def.key) ||
+					(def.inverseOf !== undefined && RESERVED_PROPERTY_KEYS.includes(def.inverseOf))
+				) {
+					throw makeError("Invalid", "properties.setProperty: that property key is reserved");
+				}
 				const catalog = store.snapshot().properties;
 				const prior = catalog[def.key];
 				const pairChange = def.inverseOf !== prior?.inverseOf;
-				const paired =
-					prior?.inverseOf !== undefined || declaredPartnersOf(def.key, catalog).length > 0;
-				if (pairChange || (paired && reshapesPair(def, prior))) {
-					if (
-						RESERVED_PROPERTY_KEYS.includes(def.key) ||
-						(def.inverseOf !== undefined && RESERVED_PROPERTY_KEYS.includes(def.inverseOf))
-					) {
-						throw makeError("Invalid", "properties.setProperty: a reserved key cannot be paired");
-					}
-					const canWrite = options.canWriteType;
-					for (const type of pairTargetTypes(def, prior, catalog)) {
-						if (!canWrite || !(await canWrite(envelope.app, type))) {
-							throw makeError(
-								"Denied",
-								"properties.setProperty: changing a two-way relation needs entities.write for the types it links",
-							);
-						}
-					}
+				// Creating a def some existing def already names as its partner
+				// completes that pair, so it is gated like declaring it.
+				const reshape = isPaired(def.key, catalog) && (!prior || reshapesPair(def, prior));
+				if (pairChange || reshape) {
+					await assertPairGate(
+						envelope.app,
+						pairTargetTypes(def.key, [def, prior], catalog),
+						"setProperty",
+					);
 				}
 				if (def.inverseOf && def.inverseOf !== prior?.inverseOf && options.backfillInverse) {
 					const validation = validatePropertyDef(def);
@@ -164,6 +186,15 @@ export function makePropertiesServiceHandler(options: PropertiesServiceOptions):
 
 			case "removeProperty": {
 				const { key } = requireKey(envelope);
+				const catalog = store.snapshot().properties;
+				// Removing half of a pair frees its key to be re-added wider.
+				if (isPaired(key, catalog)) {
+					await assertPairGate(
+						envelope.app,
+						pairTargetTypes(key, [catalog[key]], catalog),
+						"removeProperty",
+					);
+				}
 				store.removeProperty(key);
 				return undefined;
 			}

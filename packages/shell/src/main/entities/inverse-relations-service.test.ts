@@ -457,4 +457,106 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 			expect(result.lockedReferrers).toBe(1);
 		});
 	});
+
+	it("the far-end cap is per call, across every paired key", async () => {
+		const t = await setup({
+			defs: [
+				ref("authors", { ...MANY, count: { min: 0, max: 500 }, inverseOf: "books" }),
+				ref("books", MANY),
+				ref("editors", { ...MANY, count: { min: 0, max: 500 }, inverseOf: "edited" }),
+				ref("edited", MANY),
+			],
+		});
+		const half = Math.ceil((MAX_FAR_WRITES_PER_CALL + 1) / 2) + 10;
+		const authors: Array<{ value: string }> = [];
+		const editors: Array<{ value: string }> = [];
+		for (let i = 0; i < half; i++) {
+			for (const [prefix, list] of [
+				["a", authors],
+				["e", editors],
+			] as const) {
+				t.repo.create({
+					id: `${prefix}${i}`,
+					type: PERSON,
+					properties: {},
+					createdBy: "x",
+					now: 1,
+					dekId: null,
+				});
+				list.push({ value: `${prefix}${i}` });
+			}
+		}
+		await t.create("b1", BOOK, {});
+		await expect(t.call("update", { id: "b1", patch: { authors, editors } })).rejects.toMatchObject({
+			name: "Invalid",
+		});
+		expect(t.props("b1")?.authors).toBeUndefined();
+		await expect(t.create("b2", BOOK, { authors, editors })).rejects.toMatchObject({
+			name: "Invalid",
+		});
+		expect(t.props("b2")).toBeNull();
+	});
+
+	describe("pair gate edge cases (properties.setProperty / removeProperty)", () => {
+		function service(catalog: Record<string, PropertyDef>, grants: Set<string>) {
+			const saved: PropertyDef[] = [];
+			const removed: string[] = [];
+			const store = {
+				snapshot: () => ({ properties: catalog, dictionaries: {} }),
+				setProperty: (d: PropertyDef) => saved.push(d),
+				removeProperty: (k: string) => removed.push(k),
+			} as unknown as PropertiesStore;
+			const handler = makePropertiesServiceHandler({
+				getStore: async () => store,
+				canWriteType: async (_app, type) => grants.has(type),
+			});
+			return {
+				saved,
+				removed,
+				set: (def: PropertyDef) => handler(env("setProperty", { def }, "properties")),
+				remove: (key: string) => handler(env("removeProperty", { key }, "properties")),
+			};
+		}
+
+		it("refuses a reserved key as the key of ANY def, paired or not", async () => {
+			const s = service({}, new Set(["*"]));
+			for (const key of ["agentProvenance", "createdByAgent", "agentProposal", "agentDelegatedBy"]) {
+				await expect(s.set(ref(key))).rejects.toMatchObject({ name: "Invalid" });
+			}
+			expect(s.saved).toEqual([]);
+		});
+
+		it("declaring inverseOf onto a partner not in the catalog yet is gated as any type", async () => {
+			const s = service({}, new Set([BOOK]));
+			await expect(
+				s.set(ref("authors", { allowedTypes: [BOOK], inverseOf: "later" })),
+			).rejects.toMatchObject({ name: "Denied" });
+			expect(s.saved).toEqual([]);
+		});
+
+		it("creating the def an existing one names as its partner passes the full gate", async () => {
+			const s = service(
+				{ authors: ref("authors", { allowedTypes: [BOOK], inverseOf: "later" }) },
+				new Set([BOOK]),
+			);
+			await expect(s.set(ref("later"))).rejects.toMatchObject({ name: "Denied" });
+			expect(s.saved).toEqual([]);
+		});
+
+		it("removing half of a pair is gated like declaring it", async () => {
+			const catalog = {
+				authors: ref("authors", { allowedTypes: [PERSON], inverseOf: "books" }),
+				books: ref("books", { allowedTypes: [PERSON] }),
+				loose: ref("loose"),
+			};
+			const narrow = service(catalog, new Set([BOOK]));
+			await expect(narrow.remove("books")).rejects.toMatchObject({ name: "Denied" });
+			await expect(narrow.remove("authors")).rejects.toMatchObject({ name: "Denied" });
+			await narrow.remove("loose");
+			expect(narrow.removed).toEqual(["loose"]);
+			const wide = service(catalog, new Set([PERSON]));
+			await wide.remove("books");
+			expect(wide.removed).toEqual(["books"]);
+		});
+	});
 });
