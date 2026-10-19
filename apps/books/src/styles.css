@@ -151,7 +151,7 @@ body {
 	will-change: transform;
 }
 
-.books__library--closed {
+.books__library--closed:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-color: transparent;
 	visibility: hidden;

@@ -64,7 +64,7 @@ import {
 	type ObjectMenuRuntime,
 	ObjectMenuTrigger,
 } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { friendlyTypeName } from "@brainstorm-os/sdk/system-entities";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ReactElement } from "react";
@@ -544,6 +544,7 @@ export function AgentApp(): ReactElement {
 			return next;
 		});
 	}, []);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !sidebarOpen });
 	// The composer is a CompactEditor (rich draft) — the latest payload rides in
 	// a ref (reading it doesn't need a render); `draftEmpty` drives the Send
 	// button's enabled state.
@@ -1617,7 +1618,13 @@ export function AgentApp(): ReactElement {
 			</header>
 
 			<div className="agent__body" data-sidebar-open={String(sidebarOpen)}>
-				<aside className="agent__sidebar" id="agent-sidebar">
+				<aside
+					{...sidebarAutoHide.panelProps}
+					className="agent__sidebar"
+					id="agent-sidebar"
+					aria-hidden={sidebarAutoHide.visible ? undefined : true}
+					inert={sidebarAutoHide.visible ? undefined : true}
+				>
 					<nav className="agent__convs">
 						{conversations.length === 0 ? (
 							<EmptyState icon={IconName.Chat} title={t("sidebar.empty")} tone={EmptyStateTone.Compact} />
@@ -1635,6 +1642,7 @@ export function AgentApp(): ReactElement {
 						)}
 					</nav>
 				</aside>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<section className="agent__main">
 					<div className="agent__transcript" data-testid="agent-transcript">

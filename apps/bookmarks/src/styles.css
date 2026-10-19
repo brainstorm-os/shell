@@ -114,7 +114,7 @@ button {
 	grid-template-columns: 0 minmax(0, 1fr);
 }
 
-.bookmarks[data-nav-open="false"] .bookmarks__sidebar {
+.bookmarks[data-nav-open="false"] .bookmarks__sidebar:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
 	visibility: hidden;
