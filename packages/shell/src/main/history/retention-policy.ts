@@ -111,28 +111,62 @@ const AGENT_CHARGED: ReadonlySet<VersionCause> = new Set([
 	VersionCause.BeforeRestore,
 ]);
 
+/** Candidates handled between two pauses of the chunked planner — sized so
+ *  one step stays inside the 8 ms IPC budget on a 100k-row vault. */
+export const PLAN_CHUNK = 2048;
+
 export function planRetention(
 	candidates: readonly RetentionCandidate[],
 	now: number,
 	policy: RetentionPolicy,
 ): RetentionPlan {
+	const steps = retentionSteps(candidates, now, policy);
+	for (;;) {
+		const step = steps.next();
+		if (step.done) return step.value;
+	}
+}
+
+/** The same plan, pausing on `yieldNow` every `PLAN_CHUNK` candidates (and
+ *  inside the sort) so the main thread never blocks for a whole vault's rows. */
+export async function planRetentionYielding(
+	candidates: readonly RetentionCandidate[],
+	now: number,
+	policy: RetentionPolicy,
+	yieldNow: () => Promise<void>,
+): Promise<RetentionPlan> {
+	const steps = retentionSteps(candidates, now, policy);
+	for (;;) {
+		const step = steps.next();
+		if (step.done) return step.value;
+		await yieldNow();
+	}
+}
+
+type Steps<T> = Generator<undefined, T, undefined>;
+
+function* retentionSteps(
+	candidates: readonly RetentionCandidate[],
+	now: number,
+	policy: RetentionPolicy,
+): Steps<RetentionPlan> {
 	const drop = new Map<string, RetentionDropReason>();
-	const sorted = [...candidates].sort(newestFirst);
+	const sorted = yield* sortChunked(candidates, newestFirst);
 
 	const seenBuckets = new Set<string>();
-	for (const c of sorted) {
-		if (c.changeSetId !== null) continue;
+	yield* each(sorted, (c) => {
+		if (c.changeSetId !== null) return;
 		const tier = tierOf(Math.max(0, now - c.at));
-		if (tier === Tier.Recent) continue;
+		if (tier === Tier.Recent) return;
 		const bucket = `${c.entityId}\u0000${tier}\u0000${Math.floor(c.at / BUCKET_MS[tier])}`;
 		if (seenBuckets.has(bucket)) drop.set(c.versionId, RetentionDropReason.Thinned);
 		else seenBuckets.add(bucket);
-	}
+	});
 
 	const byAgent = new Map<string, { count: number; bytes: number; frames: Set<string> }>();
-	for (const c of sorted) {
+	yield* each(sorted, (c) => {
 		if (drop.has(c.versionId) || !AGENT_CHARGED.has(c.cause) || c.agentPrincipal === null) {
-			continue;
+			return;
 		}
 		let usage = byAgent.get(c.agentPrincipal);
 		if (!usage) {
@@ -145,18 +179,20 @@ export function planRetention(
 			usage.bytes + addBytes > policy.agentPrincipalCapBytes
 		) {
 			drop.set(c.versionId, RetentionDropReason.AgentPrincipalCap);
-			continue;
+			return;
 		}
 		usage.count += 1;
 		usage.bytes += addBytes;
 		usage.frames.add(c.frameKey);
-	}
+	});
 
-	const kept = sorted.filter((c) => !drop.has(c.versionId));
+	const kept: RetentionCandidate[] = [];
 	const frameRefs = new Map<string, number>();
 	const frameBytes = new Map<string, number>();
 	let total = 0;
-	for (const c of kept) {
+	yield* each(sorted, (c) => {
+		if (drop.has(c.versionId)) return;
+		kept.push(c);
 		total += c.ownBytes;
 		const refs = frameRefs.get(c.frameKey) ?? 0;
 		if (refs === 0) {
@@ -164,17 +200,20 @@ export function planRetention(
 			frameBytes.set(c.frameKey, c.frameBytes);
 		}
 		frameRefs.set(c.frameKey, refs + 1);
-	}
+	});
 
 	if (total > policy.capBytes) {
 		const newestPerEntity = new Set<string>();
 		const seenEntities = new Set<string>();
-		for (const c of kept) {
-			if (seenEntities.has(c.entityId)) continue;
+		yield* each(kept, (c) => {
+			if (seenEntities.has(c.entityId)) return;
 			seenEntities.add(c.entityId);
 			newestPerEntity.add(c.versionId);
-		}
+		});
+		let walked = 0;
 		for (let i = kept.length - 1; i >= 0 && total > policy.capBytes; i -= 1) {
+			walked += 1;
+			if (walked % PLAN_CHUNK === 0) yield;
 			const c = kept[i];
 			if (!c || newestPerEntity.has(c.versionId)) continue;
 			drop.set(c.versionId, RetentionDropReason.ByteCap);
@@ -186,4 +225,64 @@ export function planRetention(
 	}
 
 	return { drop, keptBytes: total };
+}
+
+/** Visit every item, pausing between `PLAN_CHUNK`-sized slices. */
+function* each<T>(items: readonly T[], visit: (item: T) => void): Steps<void> {
+	for (let start = 0; start < items.length; start += PLAN_CHUNK) {
+		const end = Math.min(items.length, start + PLAN_CHUNK);
+		for (let i = start; i < end; i += 1) visit(items[i] as T);
+		if (end < items.length) yield;
+	}
+}
+
+/** Merge sort over `PLAN_CHUNK`-sized natively sorted runs: the same order as
+ *  one `Array.prototype.sort`, but no single step touches more than a chunk. */
+function* sortChunked<T>(items: readonly T[], compare: (a: T, b: T) => number): Steps<T[]> {
+	let runs: T[][] = [];
+	for (let start = 0; start < items.length; start += PLAN_CHUNK) {
+		runs.push(items.slice(start, start + PLAN_CHUNK).sort(compare));
+		yield;
+	}
+	while (runs.length > 1) {
+		const merged: T[][] = [];
+		for (let i = 0; i < runs.length; i += 2) {
+			const left = runs[i] as T[];
+			const right = runs[i + 1];
+			merged.push(right ? yield* mergeRuns(left, right, compare) : left);
+		}
+		runs = merged;
+	}
+	return runs[0] ?? [];
+}
+
+function* mergeRuns<T>(left: T[], right: T[], compare: (a: T, b: T) => number): Steps<T[]> {
+	const out: T[] = new Array(left.length + right.length);
+	let l = 0;
+	let r = 0;
+	let k = 0;
+	while (l < left.length && r < right.length) {
+		if (k > 0 && k % PLAN_CHUNK === 0) yield;
+		const a = left[l] as T;
+		const b = right[r] as T;
+		if (compare(a, b) <= 0) {
+			out[k] = a;
+			l += 1;
+		} else {
+			out[k] = b;
+			r += 1;
+		}
+		k += 1;
+	}
+	while (l < left.length) {
+		out[k] = left[l] as T;
+		l += 1;
+		k += 1;
+	}
+	while (r < right.length) {
+		out[k] = right[r] as T;
+		r += 1;
+		k += 1;
+	}
+	return out;
 }

@@ -1,16 +1,25 @@
+import { createHash } from "node:crypto";
 import { VersionCause } from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
+import {
+	RETENTION_FIXTURE_NOW,
+	RETENTION_FIXTURE_POLICY,
+	retentionFixture,
+} from "../test-support/retention-fixture";
 import {
 	DAY_MS,
 	HOUR_MS,
 	MIN_HISTORY_CAP_BYTES,
+	PLAN_CHUNK,
 	type RetentionCandidate,
 	RetentionDropReason,
+	type RetentionPlan,
 	type RetentionPolicy,
 	WEEK_MS,
 	defaultHistoryCapBytes,
 	defaultRetentionPolicy,
 	planRetention,
+	planRetentionYielding,
 } from "./retention-policy";
 
 const NOW = 1_000 * WEEK_MS;
@@ -273,5 +282,70 @@ describe("plan properties", () => {
 			const onlyNewest = [...perEntity.values()].every((n) => n === 1);
 			expect(plan.keptBytes <= policy.capBytes || onlyNewest).toBe(true);
 		}
+	});
+});
+
+describe("chunked planner (10.16 perf)", () => {
+	// sha256 over the sorted `versionId:reason` lines of the plan the ORIGINAL
+	// single-pass planner produced for this fixture — the keep set must not move.
+	const GOLDEN_SHA256 = "b79ebc07110cd5ef5c03ca7173cfac900e6249e7257f5d88969c2cfc3b205691";
+	const GOLDEN_DROP = { total: 9327, thinned: 2672, agentCap: 1769, byteCap: 4886 };
+
+	const digest = (plan: RetentionPlan): string =>
+		createHash("sha256")
+			.update(
+				[...plan.drop]
+					.map(([id, reason]) => `${id}:${reason}`)
+					.sort()
+					.join("\n"),
+			)
+			.digest("hex");
+
+	it("a 20k-row / 2k-entity pass reproduces the golden keep set", () => {
+		const plan = planRetention(
+			retentionFixture(2000, 10),
+			RETENTION_FIXTURE_NOW,
+			RETENTION_FIXTURE_POLICY,
+		);
+		const by = (reason: RetentionDropReason) =>
+			[...plan.drop.values()].filter((r) => r === reason).length;
+		expect(plan.drop.size).toBe(GOLDEN_DROP.total);
+		expect(by(RetentionDropReason.Thinned)).toBe(GOLDEN_DROP.thinned);
+		expect(by(RetentionDropReason.AgentPrincipalCap)).toBe(GOLDEN_DROP.agentCap);
+		expect(by(RetentionDropReason.ByteCap)).toBe(GOLDEN_DROP.byteCap);
+		expect(plan.keptBytes).toBeLessThanOrEqual(RETENTION_FIXTURE_POLICY.capBytes);
+		expect(digest(plan)).toBe(GOLDEN_SHA256);
+	});
+
+	it("the yielding planner pauses between chunks and lands on the same plan", async () => {
+		const cands = retentionFixture(2000, 10);
+		let pauses = 0;
+		const plan = await planRetentionYielding(
+			cands,
+			RETENTION_FIXTURE_NOW,
+			RETENTION_FIXTURE_POLICY,
+			async () => {
+				pauses += 1;
+			},
+		);
+		// At least one pause per chunk of every pass: sort runs + merges + three
+		// linear passes over 20k rows.
+		expect(pauses).toBeGreaterThanOrEqual(Math.floor(cands.length / PLAN_CHUNK) * 4);
+		expect(digest(plan)).toBe(GOLDEN_SHA256);
+		expect(plan.keptBytes).toBe(
+			planRetention(cands, RETENTION_FIXTURE_NOW, RETENTION_FIXTURE_POLICY).keptBytes,
+		);
+	});
+
+	it("sorts across chunk boundaries exactly like a single sort", () => {
+		const cands = retentionFixture(700, 7);
+		const plan = planRetention(cands, RETENTION_FIXTURE_NOW, RETENTION_FIXTURE_POLICY);
+		const reverse = planRetention(
+			[...cands].reverse(),
+			RETENTION_FIXTURE_NOW,
+			RETENTION_FIXTURE_POLICY,
+		);
+		expect(digest(plan)).toBe(digest(reverse));
+		expect(cands.length).toBeGreaterThan(PLAN_CHUNK * 2);
 	});
 });
