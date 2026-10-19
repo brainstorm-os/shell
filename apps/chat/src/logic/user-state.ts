@@ -66,11 +66,35 @@ export function maxMergeWatermarks(a: ReadWatermarks, b: ReadWatermarks): ReadWa
 	return next ?? a;
 }
 
-export function readUserState(entities: readonly EntityLike[], ownerRef: string): UserState {
-	if (!ownerRef) return EMPTY_USER_STATE;
-	const rows = entities
+/** The rows that CLAIM to be `ownerRef`'s. `owner` is an ordinary property,
+ *  so this is only a candidate list — see {@link readUserState}'s `isOwn`. */
+export function userStateCandidates(
+	entities: readonly EntityLike[],
+	ownerRef: string,
+): EntityLike[] {
+	if (!ownerRef) return [];
+	return entities
 		.filter((e) => e.type === USER_STATE_TYPE && e.properties.owner === ownerRef)
 		.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** A UserState row is the local member's own only when nobody else is on its
+ *  access record: the row is never shared, so one that arrived through a share
+ *  was planted by whoever shared it, whatever its `owner` claims. */
+export function isOwnUserStateRow(members: readonly { isSelf: boolean }[]): boolean {
+	return members.every((m) => m.isSelf);
+}
+
+/** `isOwn` gates every candidate: a foreign row (planted by a collaborator
+ *  with my `owner`) must never feed my state nor become my write target, or
+ *  my read positions would sync back to them. Omit it only where every row is
+ *  known to be local. */
+export function readUserState(
+	entities: readonly EntityLike[],
+	ownerRef: string,
+	isOwn: (id: string) => boolean = () => true,
+): UserState {
+	const rows = userStateCandidates(entities, ownerRef).filter((e) => isOwn(e.id));
 	const first = rows[0];
 	if (!first) return EMPTY_USER_STATE;
 	let watermarks: ReadWatermarks = {};

@@ -23,7 +23,7 @@ import * as Y from "yjs";
 import { yieldToEventLoop } from "../import/import-engine";
 import { EntitiesRepository, type EntityRow } from "../storage/entities-repo";
 import type { VaultSession } from "../vault/session";
-import { packBundle, preferredCompression } from "./bundle-archive";
+import { packBundleAsync, preferredCompression } from "./bundle-archive";
 import {
 	BUNDLE_FORMAT_VERSION,
 	type BundleAssetRecord,
@@ -212,5 +212,5 @@ export async function exportVaultBundle(
 	};
 	files.set(BundlePath.Manifest, enc(canonicalJson(manifest)));
 
-	return packBundle(files, compression);
+	return await packBundleAsync(files, compression);
 }

@@ -11,7 +11,7 @@
  * entity write per incoming message would be pure sync churn.
  */
 
-import type { EntitiesService, StorageService } from "@brainstorm-os/sdk-types";
+import type { EntitiesService, RosterService, StorageService } from "@brainstorm-os/sdk-types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EntityLike } from "./logic/chat";
 import {
@@ -25,8 +25,10 @@ import {
 	DEFAULT_PREFS,
 	USER_STATE_TYPE,
 	buildUserStateProperties,
+	isOwnUserStateRow,
 	maxMergeWatermarks,
 	readUserState,
+	userStateCandidates,
 } from "./logic/user-state";
 
 export const USER_STATE_WRITE_DEBOUNCE_MS = 500;
@@ -56,9 +58,50 @@ export function useChatUserState(args: {
 	canSync: boolean;
 	/** The resolved sovereign pubkey, or "" while resolving. */
 	ownerRef: string;
+	/** Tells the local member's own rows from planted ones (see
+	 *  `isOwnUserStateRow`). Required for synced mode. */
+	roster: Pick<RosterService, "members"> | null;
 }): ChatUserState {
-	const { entities, entitiesSvc, storage, canSync, ownerRef } = args;
-	const synced = canSync && !!entitiesSvc;
+	const { entities, entitiesSvc, storage, canSync, ownerRef, roster } = args;
+	const synced = canSync && !!entitiesSvc && !!roster;
+
+	// id → own? Unclassified candidates are held back (not merged, not written
+	// to) until the access record answers; a lookup failure counts as foreign.
+	const [ownership, setOwnership] = useState<ReadonlyMap<string, boolean>>(new Map());
+	const candidateIds = useMemo(
+		() => userStateCandidates(entities, synced ? ownerRef : "").map((e) => e.id),
+		[entities, synced, ownerRef],
+	);
+	const createdIdRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (!roster) return;
+		const unknown = candidateIds.filter((id) => !ownership.has(id) && id !== createdIdRef.current);
+		if (unknown.length === 0) return;
+		let live = true;
+		void Promise.all(
+			unknown.map((id) =>
+				roster.members(id).then(
+					(members) => [id, isOwnUserStateRow(members)] as const,
+					() => [id, false] as const,
+				),
+			),
+		).then((answers) => {
+			if (!live) return;
+			setOwnership((prev) => {
+				const next = new Map(prev);
+				for (const [id, own] of answers) next.set(id, own);
+				return next;
+			});
+		});
+		return () => {
+			live = false;
+		};
+	}, [roster, candidateIds, ownership]);
+	const isOwn = useCallback(
+		(id: string) => id === createdIdRef.current || ownership.get(id) === true,
+		[ownership],
+	);
+	const classified = candidateIds.every((id) => id === createdIdRef.current || ownership.has(id));
 
 	const [legacy, setLegacy] = useState<ReadWatermarks | null>(null);
 	const [localPrefsLoaded, setLocalPrefsLoaded] = useState<ChatPrefs | null>(null);
@@ -89,8 +132,8 @@ export function useChatUserState(args: {
 	}, [storage, synced]);
 
 	const remote = useMemo(
-		() => readUserState(entities, synced ? ownerRef : ""),
-		[entities, synced, ownerRef],
+		() => readUserState(entities, synced ? ownerRef : "", isOwn),
+		[entities, synced, ownerRef, isOwn],
 	);
 
 	const [raised, setRaised] = useState<ReadWatermarks>({});
@@ -108,19 +151,32 @@ export function useChatUserState(args: {
 		if (synced && pendingPrefs && samePrefs(pendingPrefs, remote.prefs)) setPendingPrefs(null);
 	}, [synced, pendingPrefs, remote.prefs]);
 
-	const ready = legacy !== null && (!synced || ownerRef !== "");
+	const ready = legacy !== null && (!synced || (ownerRef !== "" && classified));
 
-	const latest = useRef({ watermarks, prefs, remote, ownerRef });
-	latest.current = { watermarks, prefs, remote, ownerRef };
-	const createdIdRef = useRef<string | null>(null);
+	const latest = useRef({ watermarks, prefs, remote, ownerRef, classified });
+	latest.current = { watermarks, prefs, remote, ownerRef, classified };
 	const creatingRef = useRef<Promise<void> | null>(null);
 	const migratedRef = useRef(false);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const disposedRef = useRef(false);
 
-	const flush = useCallback(async () => {
+	const flush = useCallback(async (): Promise<void> => {
 		timerRef.current = null;
-		const { watermarks: marks, prefs: p, remote: r, ownerRef: owner } = latest.current;
+		const {
+			watermarks: marks,
+			prefs: p,
+			remote: r,
+			ownerRef: owner,
+			classified: known,
+		} = latest.current;
 		if (!synced || !entitiesSvc || !owner) return;
+		// An own row still being classified is not yet a write target; writing
+		// now would mint a duplicate row instead of updating it.
+		if (!known) {
+			if (disposedRef.current) return;
+			timerRef.current = setTimeout(() => void flush(), USER_STATE_WRITE_DEBOUNCE_MS);
+			return;
+		}
 		const props = buildUserStateProperties({
 			owner,
 			watermarks: marks,
@@ -157,6 +213,7 @@ export function useChatUserState(args: {
 
 	useEffect(
 		() => () => {
+			disposedRef.current = true;
 			if (timerRef.current === null) return;
 			clearTimeout(timerRef.current);
 			void flush();

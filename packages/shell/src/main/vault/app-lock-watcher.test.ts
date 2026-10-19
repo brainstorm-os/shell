@@ -2,6 +2,7 @@ import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vite
 import {
 	type AppLockWatcherDeps,
 	createAppLockWatcher,
+	createBackgroundedClock,
 	shouldAutoLockOnIdle,
 } from "./app-lock-watcher";
 
@@ -112,6 +113,54 @@ describe("createAppLockWatcher", () => {
 		tick?.();
 		await flush();
 		expect(lock).not.toHaveBeenCalled();
+	});
+
+	it("locks a vault backgrounded past the timeout even while the user types elsewhere", async () => {
+		idle = 2; // active in other apps
+		appIdle = 2;
+		let backgrounded = 0;
+		const w = createAppLockWatcher({ ...deps, getBackgroundedSeconds: () => backgrounded });
+		w.start();
+		tick?.();
+		await flush();
+		expect(lock).not.toHaveBeenCalled();
+		backgrounded = 5 * 60;
+		tick?.();
+		await flush();
+		expect(lock).toHaveBeenCalledTimes(1);
+	});
+
+	it("a backgrounded vault still honours auto-lock-off and the no-PIN rule", async () => {
+		idle = 0;
+		const w = createAppLockWatcher({ ...deps, getBackgroundedSeconds: () => 99_999 });
+		minutes = 0;
+		w.start();
+		tick?.();
+		await flush();
+		minutes = 5;
+		pin = false;
+		tick?.();
+		await flush();
+		expect(lock).not.toHaveBeenCalled();
+	});
+
+	it("the backgrounded clock starts when the last window hides and resets when one shows", () => {
+		let visible = true;
+		let t = 1_000;
+		const clock = createBackgroundedClock(
+			() => visible,
+			() => t,
+		);
+		expect(clock()).toBe(0);
+		visible = false;
+		expect(clock()).toBe(0);
+		t += 90_000;
+		expect(clock()).toBe(90);
+		visible = true;
+		expect(clock()).toBe(0);
+		visible = false;
+		t += 5_000;
+		expect(clock()).toBe(0);
 	});
 
 	it("a system signal locks immediately even while the app is active", async () => {

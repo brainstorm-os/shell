@@ -33,11 +33,11 @@ import {
 	type TypeSchemaForExtract,
 	WEBVIEW_SERVICE,
 	extractFieldsFromTypeSchema,
-	sanitizeTraceText,
 } from "@brainstorm-os/sdk-types";
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
 	net,
+	BaseWindow,
 	BrowserWindow,
 	Menu,
 	Tray,
@@ -78,6 +78,7 @@ import { AiQuotaService } from "./ai/ai-quota";
 import { makeAiServiceHandler } from "./ai/ai-service";
 import { recordAiUsage } from "./ai/ai-usage-log";
 import { createAnthropicProvider } from "./ai/anthropic-provider";
+import { pinCustomDefaultProvider } from "./ai/default-route-gate";
 import { DEMO_AGENT_PROVIDER_ID, createDemoAgentProvider } from "./ai/demo-agent-provider";
 import { createGeminiProvider } from "./ai/gemini-provider";
 import { createOpenAiProvider } from "./ai/openai-provider";
@@ -315,7 +316,7 @@ import { connectMcpServer } from "./mcp/mcp-connect";
 import { makeMcpServiceHandler } from "./mcp/mcp-service";
 import { nodeStdioSpawn } from "./mcp/mcp-stdio-spawn";
 import { makeFileAuditSink } from "./network/audit-log";
-import { executeNetworkFetch } from "./network/network-service";
+import { RedirectPolicy, executeNetworkFetch } from "./network/network-service";
 import {
 	type NetworkServiceOptions,
 	enrichBlocksWithAssets,
@@ -355,7 +356,7 @@ import { SemanticPrefsStore, semanticPrefsPath } from "./search/semantic-prefs-s
 import { type VectorIndexer, createVectorIndexer } from "./search/vector-indexer";
 import { SelectionStore, makeSelectionServiceHandler } from "./selection/selection-service";
 import { makeSettingsServiceHandler } from "./settings/settings-service";
-import { PendingInviteSlot } from "./sharing/pending-invite";
+import { InviteOfferOutcome, PendingInviteSlot } from "./sharing/pending-invite";
 import { makeEngineHolder, makeSharingServiceHandler } from "./sharing/sharing-service";
 import { setActiveShortcutRegistry } from "./shortcuts/active-registry";
 import { migrateBindingsFileToEntity, readOverridesFromEntity } from "./shortcuts/bindings-entity";
@@ -417,7 +418,7 @@ import { UpdatePrefsStore, updatePrefsPath } from "./update/update-prefs-store";
 import { UpdateService } from "./update/update-service";
 import { type AiSettings, defaultAiSettings, readAiSettings } from "./vault/ai-settings-store";
 import { appActivityIdleSeconds, noteAppActivity } from "./vault/app-activity-tracker";
-import { createAppLockWatcher } from "./vault/app-lock-watcher";
+import { createAppLockWatcher, createBackgroundedClock } from "./vault/app-lock-watcher";
 import { readRegistry, writeRegistry } from "./vault/registry";
 import {
 	ROOT_FOLDER_ENTITY_ID,
@@ -1738,18 +1739,28 @@ void app.whenReady().then(async () => {
 		// Collab-C7 — an invite link. Strictly parsed + verified, then parked
 		// for the share dialog to pre-fill; it never shares anything itself.
 		if (url.startsWith(INVITE_LINK_PREFIX)) {
-			const pending = pendingInviteSlot.offerLink(url, Date.now());
-			if (!pending) {
+			const offer = pendingInviteSlot.offerLink(url, Date.now());
+			if (offer.outcome === InviteOfferOutcome.Refused) {
 				console.warn("[deep-link] refused a malformed or unverifiable invite link");
 				return;
 			}
 			surfaceDashboardForLink();
-			const from = sanitizeTraceText(pending.label, 80);
+			const { pending } = offer;
+			const from = pending.label ? `${pending.label} (${pending.fingerprint})` : pending.fingerprint;
+			if (offer.outcome === InviteOfferOutcome.Busy) {
+				getUiNotifyHost().post({
+					appId: "io.brainstorm.shell",
+					kind: "warning",
+					title: "Another invite is already waiting",
+					body: `The invite from ${from} is still waiting, so the new link was ignored. Open Share to use the waiting invite first, then open the new link again.`,
+				});
+				return;
+			}
 			getUiNotifyHost().post({
 				appId: "io.brainstorm.shell",
 				kind: "info",
 				title: "Invite link received",
-				body: `${from ? `${from} (${pending.fingerprint})` : pending.fingerprint} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
+				body: `${from} sent you an invite. Open Share on the object you want to share: the code is filled in, and nothing is shared until you choose a role and press Add.`,
 			});
 			return;
 		}
@@ -4440,6 +4451,11 @@ void app.whenReady().then(async () => {
 	const appLockWatcher = createAppLockWatcher({
 		getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
 		getAppIdleSeconds: () => appActivityIdleSeconds(),
+		// Closed to the tray (7.16) the vault would otherwise stay unlocked for
+		// as long as the user keeps using other apps.
+		getBackgroundedSeconds: createBackgroundedClock(() =>
+			BaseWindow.getAllWindows().some((w) => !w.isDestroyed() && w.isVisible()),
+		),
 		getAutoLockMinutes: () => getActiveVaultAutoLockMinutes(),
 		hasPin: () => activeVaultHasPin(),
 		isLocked: () => isVaultLocked(),
@@ -4888,6 +4904,9 @@ void app.whenReady().then(async () => {
 					headers: { "Content-Type": "application/json", ...headers },
 					body: new TextEncoder().encode(JSON.stringify(bodyJson)),
 					...(allowPrivate ? { allowPrivate: true } : {}),
+					// The body is the transcript and the headers carry the key: a
+					// redirect may not re-send them, drop TLS, or wander onto the LAN.
+					redirectPolicy: RedirectPolicy.Strict,
 					timeoutMs: 120_000,
 					sizeCapBytes: 8 * 1024 * 1024,
 				},
@@ -5092,31 +5111,34 @@ void app.whenReady().then(async () => {
 	});
 	workers.broker.registerService(
 		"ai",
-		makeAiServiceHandler({
-			getProvider: (id) => aiProviders.get(id),
-			quota: aiQuota,
-			listProviders: () => aiProviders.list(),
-			appHoldsCapability: async (appId, capability) => {
-				const session = getActiveVaultSession();
-				if (!session) return false;
-				return (await session.capabilityLedger()).has(appId, capability);
-			},
-			onUsage: (rec) => {
-				void recordAiUsage(aiUsageSink, rec);
-				void aiQuota.recordUsage(rec);
-			},
-			// 11.5 `extract({ intoType })` — resolve a registered entity type's
-			// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
-			// an unknown type / no schema returns null → the handler fails closed.
-			resolveTypeFields: async (typeId) => {
-				const session = getActiveVaultSession();
-				if (!session) return null;
-				const registry = await session.dataStores.open("registry");
-				const record = new EntityTypesRepository(registry).get(typeId);
-				if (!record?.schemaInline) return null;
-				return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
-			},
-		}),
+		pinCustomDefaultProvider(
+			makeAiServiceHandler({
+				getProvider: (id) => aiProviders.get(id),
+				quota: aiQuota,
+				listProviders: () => aiProviders.list(),
+				appHoldsCapability: async (appId, capability) => {
+					const session = getActiveVaultSession();
+					if (!session) return false;
+					return (await session.capabilityLedger()).has(appId, capability);
+				},
+				onUsage: (rec) => {
+					void recordAiUsage(aiUsageSink, rec);
+					void aiQuota.recordUsage(rec);
+				},
+				// 11.5 `extract({ intoType })` — resolve a registered entity type's
+				// inline JSON-Schema to extract fields (registry-coupled). Best-effort:
+				// an unknown type / no schema returns null → the handler fails closed.
+				resolveTypeFields: async (typeId) => {
+					const session = getActiveVaultSession();
+					if (!session) return null;
+					const registry = await session.dataStores.open("registry");
+					const record = new EntityTypesRepository(registry).get(typeId);
+					if (!record?.schemaInline) return null;
+					return extractFieldsFromTypeSchema(record.schemaInline as TypeSchemaForExtract);
+				},
+			}),
+			() => aiProviders.defaultProviderId(),
+		),
 	);
 
 	// 14.1 — the billing service. Reports the current plan + entitlement from
@@ -6442,9 +6464,17 @@ void app.whenReady().then(async () => {
 	dashboardWindow.once("ready-to-show", () => bootStage("dashboard-window-shown"));
 	dashboardWindow.webContents.once("dom-ready", () => bootStage("dashboard-renderer-domready"));
 	dashboardWindow.webContents.once("did-finish-load", () => bootStage("dashboard-renderer-paint"));
-	dashboardWindow.on("closed", () => {
-		attachDashboardHosts(null);
-	});
+	// Every dashboard (the boot one AND each reopen) drops the prompt hosts
+	// reference when it closes: under close-to-tray the process can run for
+	// hours windowless, and a host holding a destroyed WebContents both pins it
+	// and posts prompts into nothing.
+	const detachHostsOnClose = (win: BrowserWindow): void => {
+		const senderId = win.webContents.id;
+		win.on("closed", () => {
+			if (dashboardWebContentsId === senderId) attachDashboardHosts(null);
+		});
+	};
+	detachHostsOnClose(dashboardWindow);
 
 	// Bring the dashboard back: surface the live one, or recreate it after the
 	// user closed it (dock activation, the close-to-tray "Open" item).
@@ -6461,6 +6491,7 @@ void app.whenReady().then(async () => {
 		// requests, OS-handoff consent, the open-with picker and tool
 		// approval all refused silently.
 		attachDashboardHosts(dashboardWindow.webContents);
+		detachHostsOnClose(dashboardWindow);
 		wireDashboardLinkRouting(dashboardWindow.webContents);
 	}
 

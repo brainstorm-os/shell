@@ -21,7 +21,7 @@ import {
 	type AiGenerateResult,
 	MessageRole,
 } from "@brainstorm-os/sdk-types";
-import { type ModelProvider, buildUsage } from "./provider";
+import type { ModelProvider } from "./provider";
 
 export const DEMO_AGENT_PROVIDER_ID = "demo";
 
@@ -451,13 +451,13 @@ export function createDemoAgentProvider(mode?: string): ModelProvider {
 	return {
 		id: DEMO_AGENT_PROVIDER_ID,
 		async generate(req: AiGenerateRequest): Promise<AiGenerateResult> {
-			const usage = buildUsage(0, 0);
 			return {
 				content: nextDemoReply(req.messages, script),
 				provider: DEMO_AGENT_PROVIDER_ID,
 				model: "demo-agent",
 				finishReason: "stop",
-				...(usage ? { usage } : {}),
+				// Scripted and in-process: genuinely free, unlike an endpoint claiming 0.
+				usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
 			};
 		},
 	};

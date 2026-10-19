@@ -18,6 +18,7 @@
  */
 
 import { Buffer } from "node:buffer";
+import { promisify } from "node:util";
 import * as zlib from "node:zlib";
 import { BUNDLE_CONTAINER_VERSION, BUNDLE_MAGIC, BundleCompression } from "./bundle-format";
 import { type TarEntry, packTar, unpackTar } from "./bundle-tar";
@@ -38,12 +39,14 @@ const CODE_COMPRESSION: Record<number, BundleCompression> = {
 
 type ZstdCapableZlib = typeof zlib & {
 	zstdCompressSync: (buf: Buffer) => Buffer;
+	zstdCompress: (buf: Buffer, cb: (error: Error | null, out: Buffer) => void) => void;
 	zstdDecompressSync: (buf: Buffer, options?: { maxOutputLength?: number }) => Buffer;
 };
 
 function zstdCapable(): ZstdCapableZlib | null {
 	const candidate = zlib as Partial<ZstdCapableZlib>;
 	return typeof candidate.zstdCompressSync === "function" &&
+		typeof candidate.zstdCompress === "function" &&
 		typeof candidate.zstdDecompressSync === "function"
 		? (zlib as ZstdCapableZlib)
 		: null;
@@ -92,22 +95,57 @@ function decompress(algo: BundleCompression, bytes: Buffer, maxOutputBytes?: num
 	}
 }
 
-/** Pack a path→bytes map into a finished `.bsbundle` byte buffer. Entries are
- *  sorted by path so the same content always produces the same archive. */
-export function packBundle(
-	files: ReadonlyMap<string, Uint8Array>,
-	algo: BundleCompression = preferredCompression(),
-): Uint8Array {
+const gzipAsync = promisify(zlib.gzip);
+
+/** The async twin of {@link compress}: zlib's callback APIs run on the libuv
+ *  threadpool, so a whole-vault backup no longer stalls every IPC on the main
+ *  thread. Same algorithm and level, so the bytes are identical. */
+async function compressAsync(algo: BundleCompression, bytes: Buffer): Promise<Buffer> {
+	switch (algo) {
+		case BundleCompression.None:
+			return bytes;
+		case BundleCompression.Gzip:
+			return await gzipAsync(bytes, { level: GZIP_LEVEL });
+		case BundleCompression.Zstd: {
+			const z = zstdCapable();
+			if (!z) throw new Error("bundle: zstd requested but unavailable in this runtime");
+			return await promisify(z.zstdCompress)(bytes);
+		}
+	}
+}
+
+function tarOf(files: ReadonlyMap<string, Uint8Array>): Buffer {
 	const entries: TarEntry[] = [...files.entries()]
 		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
 		.map(([path, data]) => ({ path, data }));
-	const tar = Buffer.from(packTar(entries));
-	const payload = compress(algo, tar);
+	return Buffer.from(packTar(entries));
+}
+
+function frame(algo: BundleCompression, payload: Buffer): Uint8Array {
 	const head = Buffer.alloc(MAGIC_BYTES.length + 2);
 	MAGIC_BYTES.copy(head, 0);
 	head[MAGIC_BYTES.length] = BUNDLE_CONTAINER_VERSION;
 	head[MAGIC_BYTES.length + 1] = COMPRESSION_CODE[algo];
 	return Buffer.concat([head, payload]);
+}
+
+/** Pack a path→bytes map into a finished `.bsbundle` byte buffer. Entries are
+ *  sorted by path so the same content always produces the same archive.
+ *  Synchronous — for small archives only; whole-vault exports use
+ *  {@link packBundleAsync}. */
+export function packBundle(
+	files: ReadonlyMap<string, Uint8Array>,
+	algo: BundleCompression = preferredCompression(),
+): Uint8Array {
+	return frame(algo, compress(algo, tarOf(files)));
+}
+
+/** {@link packBundle} with compression off the main thread. */
+export async function packBundleAsync(
+	files: ReadonlyMap<string, Uint8Array>,
+	algo: BundleCompression = preferredCompression(),
+): Promise<Uint8Array> {
+	return frame(algo, await compressAsync(algo, tarOf(files)));
 }
 
 export type UnpackBundleOptions = {

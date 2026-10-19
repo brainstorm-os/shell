@@ -14,6 +14,16 @@ import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShareDialog, type ShareDialogLabels } from "./share-dialog";
 
+vi.mock("../select-menu", () => ({
+	SelectMenu: (props: { options: { value: string }[]; onChange: (v: string) => void }) => (
+		<button
+			type="button"
+			data-testid="role-pick"
+			onClick={() => props.onChange(props.options[0]?.value ?? "")}
+		/>
+	),
+}));
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const LABELS: ShareDialogLabels = {
@@ -273,6 +283,30 @@ describe("ShareDialog", () => {
 		it("starts at the configured default role", async () => {
 			Object.assign(sharing, { defaultRole: vi.fn(async () => RosterRole.Editor) });
 			await mount(true);
+			const input = codeInput();
+			if (!input) throw new Error("expected code input");
+			await act(async () => typeInto(input, "PASTED-CODE"));
+			await act(async () => addBtn()?.click());
+			await flush();
+			expect(sharing.share).toHaveBeenCalledWith(expect.objectContaining({ role: RosterRole.Editor }));
+		});
+
+		it("a late default-role reply never overwrites a role the user already picked", async () => {
+			let resolveDefault: (r: RosterRole) => void = () => undefined;
+			Object.assign(sharing, {
+				defaultRole: vi.fn(
+					() =>
+						new Promise<RosterRole>((r) => {
+							resolveDefault = r;
+						}),
+				),
+			});
+			await mount(true);
+			await act(async () =>
+				host.querySelector<HTMLButtonElement>('[data-testid="role-pick"]')?.click(),
+			);
+			await act(async () => resolveDefault(RosterRole.Viewer));
+			await flush();
 			const input = codeInput();
 			if (!input) throw new Error("expected code input");
 			await act(async () => typeInto(input, "PASTED-CODE"));

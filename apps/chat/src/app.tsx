@@ -73,7 +73,7 @@ import {
 	toPanelMembers,
 } from "./logic/chat";
 import { type LocalIdentity, mintPersonRef } from "./logic/identity";
-import { pinnedMessages, togglePin } from "./logic/pins";
+import { pinnedMessages, readPinned, setPinned } from "./logic/pins";
 import {
 	ProposalDecision,
 	ProposalDecisionFailure,
@@ -375,6 +375,7 @@ export function ChatApp(): ReactElement {
 		storage,
 		canSync: !!roster && selfStatus !== SelfStatus.Failed,
 		ownerRef: selfStatus === SelfStatus.Resolved ? identity.personRef : "",
+		roster,
 	});
 	const { ready: marksReady, watermarks, raiseWatermarks, prefs, setPrefs } = userState;
 	const [composerExpanded, setComposerExpanded] = useState(false);
@@ -675,14 +676,26 @@ export function ChatApp(): ReactElement {
 		[activeChannel, pinOverride],
 	);
 	const pinnedSet = useMemo(() => new Set(activePinned), [activePinned]);
+	const pinChainRef = useRef<Promise<void>>(Promise.resolve());
 	const togglePinMessage = useCallback(
 		async (messageId: string) => {
 			if (!entitiesSvc || !activeChannel) return;
 			const channelId = activeChannel.id;
-			const next = togglePin(activePinned, messageId);
-			setPinOverride((prev) => new Map(prev).set(channelId, next));
-			try {
+			const pin = !activePinned.includes(messageId);
+			setPinOverride((prev) => new Map(prev).set(channelId, setPinned(activePinned, messageId, pin)));
+			// Serialized + re-read: the write is the CURRENT stored list with this
+			// one change, so a pin another member (or a rapid second click) landed
+			// meanwhile survives instead of being overwritten by a stale copy.
+			const run = pinChainRef.current.then(async () => {
+				const fresh = await entitiesSvc.get(channelId);
+				const base = fresh ? readPinned(fresh.properties.pinned) : activePinned;
+				const next = setPinned(base, messageId, pin);
+				setPinOverride((prev) => new Map(prev).set(channelId, next));
 				await entitiesSvc.update(channelId, { pinned: next });
+			});
+			pinChainRef.current = run.catch(() => undefined);
+			try {
+				await run;
 			} catch (err) {
 				console.warn("[chat] failed to update pins:", err);
 				setPinOverride((prev) => {

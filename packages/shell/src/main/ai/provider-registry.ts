@@ -46,6 +46,11 @@ export class ProviderRegistry {
 		return this.providers.get(this.defaultId) ?? null;
 	}
 
+	/** The id an unpinned request resolves to, or null. */
+	defaultProviderId(): string | null {
+		return this.defaultId !== null && this.providers.has(this.defaultId) ? this.defaultId : null;
+	}
+
 	has(id: string): boolean {
 		return this.providers.has(id);
 	}

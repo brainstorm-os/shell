@@ -5,6 +5,7 @@ import {
 	EMPTY_USER_STATE,
 	USER_STATE_TYPE,
 	buildUserStateProperties,
+	isOwnUserStateRow,
 	maxMergeWatermarks,
 	readUserState,
 } from "./user-state";
@@ -57,6 +58,18 @@ describe("readUserState", () => {
 		expect(state.primaryId).toBe("u1");
 		expect(state.watermarks).toEqual({ c1: 4, c2: 7 });
 		expect(state.prefs).toEqual({ absoluteTimestamps: true });
+	});
+
+	it("drops rows the caller does not own, even with a matching owner and a lower id", () => {
+		const rows = [
+			row("u0", { owner: "pk-a", watermarks: { c: 9 } }),
+			row("u1", { owner: "pk-a", watermarks: { c: 1 } }),
+		];
+		const state = readUserState(rows, "pk-a", (id) => id !== "u0");
+		expect(state.primaryId).toBe("u1");
+		expect(state.watermarks).toEqual({ c: 1 });
+		expect(isOwnUserStateRow([])).toBe(true);
+		expect(isOwnUserStateRow([{ isSelf: true }, { isSelf: false }])).toBe(false);
 	});
 
 	it("defaults malformed prefs", () => {

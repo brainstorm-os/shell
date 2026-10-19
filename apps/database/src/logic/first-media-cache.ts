@@ -56,13 +56,19 @@ export function createFirstMediaCache(
 			inFlight += 1;
 			transport
 				.loadDoc(job.entityId)
-				.then(({ snapshotB64 }) => {
-					const media = decode(snapshotB64);
-					settle(job.key, media?.kind === BodyMediaKind.Image ? media.url : null);
-				})
+				.then(
+					({ snapshotB64 }) => {
+						// Close only what a load opened: a rejected load holds no
+						// subscription, and closing anyway would drop one this app
+						// holds elsewhere for the same doc.
+						void transport.closeDoc(job.entityId).catch(() => {});
+						const media = decode(snapshotB64);
+						settle(job.key, media?.kind === BodyMediaKind.Image ? media.url : null);
+					},
+					() => settle(job.key, null),
+				)
 				.catch(() => settle(job.key, null))
 				.finally(() => {
-					void transport.closeDoc(job.entityId).catch(() => {});
 					inFlight -= 1;
 					pump();
 				});

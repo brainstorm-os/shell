@@ -37,6 +37,21 @@ describe("first-media cache (9.12.31)", () => {
 		expect(cache.read("v", 0)).toBeNull();
 	});
 
+	it("still closes the doc when decoding a loaded snapshot throws", async () => {
+		const transport = {
+			loadDoc: vi.fn(async () => ({ snapshotB64: "x" })),
+			closeDoc: vi.fn(async () => {}),
+		};
+		const cache = createFirstMediaCache(transport, () => {
+			throw new Error("bad doc");
+		});
+		cache.read("e1", 0);
+		await flush();
+		await flush();
+		expect(transport.closeDoc).toHaveBeenCalledTimes(1);
+		expect(cache.read("e1", 0)).toBeNull();
+	});
+
 	it("caps concurrent loads and answers null without a transport or on failure", async () => {
 		let resolveAll: () => void = () => {};
 		const gate = new Promise<void>((r) => {
@@ -56,6 +71,9 @@ describe("first-media cache (9.12.31)", () => {
 		for (let i = 0; i < 6; i++) await flush();
 		expect(transport.loadDoc).toHaveBeenCalledTimes(6);
 		expect(cache.read("e0", 0)).toBeNull();
+		// A rejected load opened nothing, so nothing is closed (a stray close
+		// would drop a subscription the app holds elsewhere for that doc).
+		expect(transport.closeDoc).not.toHaveBeenCalled();
 		expect(createFirstMediaCache(null).read("x", 0)).toBeNull();
 	});
 });

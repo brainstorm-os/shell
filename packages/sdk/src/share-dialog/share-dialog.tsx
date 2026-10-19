@@ -25,7 +25,7 @@ import {
 	inviteTokenFromInput,
 	parseShareDefaultRole,
 } from "@brainstorm-os/sdk-types";
-import { type ReactElement, useCallback, useEffect, useState } from "react";
+import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
 import { type LastEditView, resolveLastEdit } from "../entity-authorship";
 import { Icon, IconName } from "../icon";
 import { Popover } from "../popover";
@@ -155,6 +155,13 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 	// Collab-C7 — a new share starts at the user's configured default, which is
 	// Viewer unless they widened it (read-only until deliberately changed).
 	const [role, setRole] = useState<RosterRole>(DEFAULT_SHARE_ROLE);
+	// The default-role reply is async; a late one must never overwrite a role
+	// the user already picked.
+	const rolePicked = useRef(false);
+	const pickRole = useCallback((next: RosterRole) => {
+		rolePicked.current = true;
+		setRole(next);
+	}, []);
 	const [myCode, setMyCode] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
 	const [linkCopied, setLinkCopied] = useState(false);
@@ -197,7 +204,9 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 		let live = true;
 		void sharing
 			.defaultRole?.()
-			.then((r) => live && setRole(parseShareDefaultRole(r)))
+			.then((r) => {
+				if (live && !rolePicked.current) setRole(parseShareDefaultRole(r));
+			})
 			.catch(() => undefined);
 		if (canManage) {
 			void sharing
@@ -409,7 +418,7 @@ export function ShareDialog(props: ShareDialogProps): ReactElement {
 									{ value: VIEWER, label: labels.canView },
 								]}
 								value={role}
-								onChange={setRole}
+								onChange={pickRole}
 								ariaLabel={labels.addHeading}
 							/>
 							<button

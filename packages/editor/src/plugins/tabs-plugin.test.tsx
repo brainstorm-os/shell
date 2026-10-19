@@ -9,6 +9,7 @@ import { act, useEffect } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TabPaneNode, TabsNode } from "../nodes/tabs-node";
+import { tabsActiveStore } from "./tabs-active-store";
 import { INSERT_TABS_COMMAND, TabsPlugin } from "./tabs-plugin";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -114,6 +115,16 @@ describe("TabsPlugin", () => {
 		});
 		expect(tabs().map((t) => t.textContent)).toEqual(["Tab 1", "Tab 2", "Tab 3"]);
 		expect(panes()[2]?.hasAttribute("hidden")).toBe(false);
+	});
+
+	it("forgets a destroyed tabs block's active pane", () => {
+		const editor = mount();
+		act(() => tabs()[1]?.click());
+		expect(tabsActiveStore(editor).size).toBe(1);
+		act(() => {
+			editor.update(() => $getRoot().clear().append($createParagraphNode()), { discrete: true });
+		});
+		expect(tabsActiveStore(editor).size).toBe(0);
 	});
 
 	it("strip events never reach the editor's input pipeline", () => {

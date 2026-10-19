@@ -337,6 +337,10 @@ export class AppLauncher {
 				}
 				continue;
 			}
+			// The side pane is another app's live renderer; uninstalling or
+			// updating THIS app is no reason to kill it.
+			const side = record.container.sidePane();
+			if (side && side.appId !== appId) this.rehomeSidePane(record);
 			this.evict(key, record);
 			removed = true;
 		}
@@ -416,17 +420,17 @@ export class AppLauncher {
 
 	/** Resolve the container owning a TAB renderer's webContents — used by the
 	 *  "New Tab" menu action to target the focused window (the focused
-	 *  webContents is the active tab's view, not the strip). */
+	 *  webContents is the active tab's view, not the strip). `appId` is the
+	 *  SENDER's app: in a split window the side pane is a different app from
+	 *  the container, and its Cmd+T must open that app, not the primary. */
 	containerForTabSender(
 		webContentsId: number,
 	): { container: WindowContainer; appId: string; windowId: string } | null {
 		const hit = this.tabIndex.get(webContentsId);
 		if (!hit || hit.record.container.baseWindow.isDestroyed()) return null;
-		return {
-			container: hit.record.container,
-			appId: hit.record.appId,
-			windowId: hit.record.windowId,
-		};
+		const tab = hit.record.container.panes().find((t) => t.tabId === hit.tabId);
+		if (!tab) return null;
+		return { container: hit.record.container, appId: tab.appId, windowId: hit.record.windowId };
 	}
 
 	// ── internal ───────────────────────────────────────────────────────────
@@ -595,6 +599,11 @@ export class AppLauncher {
 
 	private park(key: string, record: ContainerRecord): void {
 		record.parked = true;
+		// A different app's side pane does not park with the window: kept alive
+		// hidden, `windowsFor` / intents would route that app's opens into an
+		// invisible window instead of one of its own.
+		const side = record.container.sidePane();
+		if (side && side.appId !== record.appId) record.container.closeSidePane();
 		const window = record.container.baseWindow;
 		const hideAndHandOff = () => {
 			if (!record.parked) return; // unparked while leaving fullscreen

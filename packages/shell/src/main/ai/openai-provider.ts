@@ -71,6 +71,20 @@ type OpenAiResponse = {
 	usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
 
+const REDACTED = "[redacted]";
+
+/** A user-added endpoint is arbitrary code and may echo the request headers
+ *  back — in an error body OR in a 2xx completion. Every string from it that
+ *  reaches the app passes through here, covering the raw key and the escaped
+ *  forms an echo would take (JSON-quoted, URL-encoded). */
+export function scrubApiKey(text: string, apiKey: string | null): string {
+	if (!apiKey) return text;
+	let out = text;
+	const forms = new Set([apiKey, JSON.stringify(apiKey).slice(1, -1), encodeURIComponent(apiKey)]);
+	for (const form of forms) if (form) out = out.split(form).join(REDACTED);
+	return out;
+}
+
 function completionsUrl(baseUrl: string): string {
 	return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 }
@@ -110,18 +124,16 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 			} catch (error) {
 				throw new AiServiceError(
 					"Unavailable",
-					`${label} API unreachable: ${(error as Error).message}`,
+					scrubApiKey(`${label} API unreachable: ${(error as Error).message}`, apiKey),
 				);
 			}
 
 			if (res.status < 200 || res.status >= 300) {
-				// The error text reaches the calling app. A user-added endpoint is
-				// arbitrary code on the other end and may echo request headers back,
-				// so the key is scrubbed before the body is quoted.
-				const body = apiKey ? res.text.split(apiKey).join("[redacted]") : res.text;
+				// Scrub BEFORE slicing, or a key straddling the cut survives in part.
+				const body = scrubApiKey(res.text, apiKey).slice(0, 200);
 				throw new AiServiceError(
 					"Unavailable",
-					`${label} API returned HTTP ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`,
+					`${label} API returned HTTP ${res.status}${body ? `: ${body}` : ""}`,
 				);
 			}
 
@@ -140,10 +152,10 @@ export function createOpenAiProvider(config: OpenAiProviderConfig): ModelProvide
 
 			const usage = buildUsage(parsed.usage?.prompt_tokens, parsed.usage?.completion_tokens);
 			return {
-				content,
+				content: scrubApiKey(content, apiKey),
 				provider: id,
-				model: parsed.model ?? model,
-				...(choice?.finish_reason ? { finishReason: choice.finish_reason } : {}),
+				model: scrubApiKey(parsed.model ?? model, apiKey),
+				...(choice?.finish_reason ? { finishReason: scrubApiKey(choice.finish_reason, apiKey) } : {}),
 				...(usage ? { usage } : {}),
 			};
 		},

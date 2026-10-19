@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "./chat";
-import { PINNED_MAX, pinnedMessages, readPinned, togglePin } from "./pins";
+import { PINNED_MAX, pinnedMessages, readPinned, setPinned, togglePin } from "./pins";
 
 const msg = (id: string): ChatMessage => ({
 	id,
@@ -14,6 +14,13 @@ const msg = (id: string): ChatMessage => ({
 });
 
 describe("pins (Chats-4)", () => {
+	it("setPinned is idempotent: re-pinning or re-unpinning changes nothing", () => {
+		expect(setPinned(["a", "b"], "b", true)).toEqual(["a", "b"]);
+		expect(setPinned(["a"], "b", false)).toEqual(["a"]);
+		expect(setPinned(["a"], "b", true)).toEqual(["a", "b"]);
+		expect(setPinned(["a", "b"], "a", false)).toEqual(["b"]);
+	});
+
 	it("decodes defensively: strings only, de-duplicated, bounded", () => {
 		expect(readPinned(["m1", 3, "", "m1", "m2", null])).toEqual(["m1", "m2"]);
 		expect(readPinned("m1")).toEqual([]);
