@@ -6,7 +6,11 @@ import type { DataStoreKind } from "../storage/data-stores";
 import { VaultCorruptionError } from "../storage/recovery-plan";
 import { detectCloudSync } from "../vault/cloud-sync";
 import { defaultVaultPath } from "../vault/paths";
-import { closeActiveVaultSession, getActiveVaultSession } from "../vault/session";
+import {
+	closeActiveVaultSession,
+	drainActiveVaultSession,
+	getActiveVaultSession,
+} from "../vault/session";
 import {
 	type CreateVaultOptions,
 	activateVault,
@@ -117,7 +121,8 @@ export function registerVaultHandlers(): void {
 		return session ? session.meta : null;
 	});
 
-	ipcMain.handle("vaults:close", () => {
+	ipcMain.handle("vaults:close", async () => {
+		await drainActiveVaultSession();
 		closeActiveVaultSession();
 	});
 

@@ -29,6 +29,7 @@ import { productionScanForVaults } from "./registry-recovery";
 import {
 	VaultSession,
 	closeActiveVaultSession,
+	drainActiveVaultSession,
 	getActiveVaultSession,
 	setActiveVaultSession,
 } from "./session";
@@ -199,6 +200,7 @@ export async function createVault(options: CreateVaultOptions): Promise<VaultEnt
 	};
 
 	await persistEntry(entry, { setDefault: true });
+	await drainActiveVaultSession();
 	setActiveVaultSession(session);
 	await appendAuditEvent(path, {
 		kind: "vault.create",
@@ -264,6 +266,7 @@ export async function openVault(path: string, options: OpenVaultOptions = {}): P
 	};
 
 	await persistEntry(entry, { setDefault: true });
+	await drainActiveVaultSession();
 	setActiveVaultSession(session);
 	await appendAuditEvent(path, {
 		kind: "vault.open",
@@ -377,6 +380,7 @@ export async function activateVault(
 	if (recordedAtRestMode !== reconcile.effectiveMode) {
 		await rewriteVaultJsonAtRestMode(vaultJsonPath, rawVaultJson, reconcile.effectiveMode);
 	}
+	await drainActiveVaultSession();
 	setActiveVaultSession(session);
 
 	void appendAuditEvent(entry.path, {
@@ -447,6 +451,7 @@ export async function forgetVault(id: string): Promise<void> {
 	await writeRegistry(registry);
 	const active = getActiveVaultSession();
 	if (active && active.vaultId === id) {
+		await drainActiveVaultSession();
 		closeActiveVaultSession();
 	}
 }

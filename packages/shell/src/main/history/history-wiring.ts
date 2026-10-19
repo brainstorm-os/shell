@@ -17,6 +17,42 @@ import { measureVaultBytes } from "./vault-size";
 import type { EntityRestorer } from "./version-history";
 import { type HistoryCaptureReply, RETENTION_INTERVAL_MS, VersionHistory } from "./version-history";
 
+/** The active-session seams `bindSessionHistory` needs (injectable in tests). */
+export type SessionHistoryHooks = {
+	follow: (listener: (session: VaultSession | null) => void) => () => void;
+	onReleasing: (hook: (session: VaultSession) => Promise<void>) => () => void;
+};
+
+/**
+ * Keep one `VersionHistory` per active session. `follow` must replay the
+ * session already active at subscribe time: the default vault is restored at
+ * boot BEFORE this is wired, and a plain change-listener would leave history
+ * off until the user switched vaults. Pending writes are captured while the
+ * outgoing session is still open (release drain), not dropped on dispose.
+ */
+export function bindSessionHistory(
+	hooks: SessionHistoryHooks,
+	build: (session: VaultSession) => VersionHistory,
+): { current: () => VersionHistory | null; dispose: () => void } {
+	let history: VersionHistory | null = null;
+	const offFollow = hooks.follow((session) => {
+		history?.dispose();
+		history = session ? build(session) : null;
+	});
+	const offRelease = hooks.onReleasing(async () => {
+		await history?.flush();
+	});
+	return {
+		current: () => history,
+		dispose: () => {
+			offFollow();
+			offRelease();
+			history?.dispose();
+			history = null;
+		},
+	};
+}
+
 export type YDocWorkerCall = (method: string, args: Record<string, unknown>) => Promise<unknown>;
 
 export function createSessionHistory(input: {

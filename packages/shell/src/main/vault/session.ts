@@ -1114,6 +1114,50 @@ export function onActiveVaultSessionChanged(
 	};
 }
 
+/** Like `onActiveVaultSessionChanged`, but also delivers the session that is
+ *  ALREADY active. A vault auto-restored at boot is set before most listeners
+ *  register, and a plain subscriber would never see it. */
+export function followActiveVaultSession(
+	listener: (session: VaultSession | null) => void,
+): () => void {
+	const off = onActiveVaultSessionChanged(listener);
+	if (active) listener(active);
+	return off;
+}
+
+/** Upper bound on how long a vault switch / close / quit waits for drains. */
+export const SESSION_DRAIN_TIMEOUT_MS = 3_000;
+
+const releaseHooks = new Set<(session: VaultSession) => Promise<void>>();
+
+/** Register work that must finish against the active session while it is
+ *  still open (its stores close synchronously inside `dispose`). Runs only
+ *  where the caller awaits `drainActiveVaultSession` before releasing it. */
+export function onActiveVaultSessionReleasing(
+	hook: (session: VaultSession) => Promise<void>,
+): () => void {
+	releaseHooks.add(hook);
+	return () => {
+		releaseHooks.delete(hook);
+	};
+}
+
+/** Run every release hook on the active session, bounded by `timeoutMs`.
+ *  Never throws: a failed or slow drain must not block a switch or a quit. */
+export async function drainActiveVaultSession(
+	timeoutMs: number = SESSION_DRAIN_TIMEOUT_MS,
+): Promise<void> {
+	const session = active;
+	if (!session || releaseHooks.size === 0) return;
+	const drains = Promise.allSettled([...releaseHooks].map((hook) => hook(session)));
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<void>((resolve) => {
+		timer = setTimeout(resolve, timeoutMs);
+	});
+	await Promise.race([drains, timeout]);
+	if (timer) clearTimeout(timer);
+}
+
 export function closeActiveVaultSession(): void {
 	if (!active) return;
 	// See setActiveVaultSession — the security-relevant teardown is
