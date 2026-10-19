@@ -18,6 +18,7 @@
  * is what persists.
  */
 
+import { RICH_TEXT_STATE_MAX_CHARS } from "@brainstorm-os/sdk-types";
 import { CodeNode } from "@lexical/code";
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
@@ -236,20 +237,52 @@ function nodesForRoot(nodes: readonly LexicalNode[]): LexicalNode[] {
 	return out;
 }
 
-/** The composer's `editorState` seed: a parseable serialized state as-is,
+/** Node types Lexical registers on every editor, whatever `nodes` says. */
+const CORE_NODE_TYPES = ["root", "paragraph", "text", "linebreak", "tab"] as const;
+
+/** The node types an editor built from `nodes` can deserialize. */
+export function registeredNodeTypes(nodes: ReadonlyArray<Klass<LexicalNode>>): ReadonlySet<string> {
+	return new Set<string>([...CORE_NODE_TYPES, ...nodes.map((klass) => klass.getType())]);
+}
+
+/** Whether a stored serialized state is safe to hand Lexical as a seed: within
+ *  the size cap, well-formed, and made ONLY of node types this editor
+ *  registers. Lexical throws on an unregistered type mid-parse, which takes
+ *  the whole render tree down — a state written by a richer editor, pasted,
+ *  or sent by a peer must degrade to its plain text instead. */
+export function isSeedableState(state: string, registered: ReadonlySet<string>): boolean {
+	if (state.length > RICH_TEXT_STATE_MAX_CHARS) return false;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(state);
+	} catch {
+		return false;
+	}
+	const root = (parsed as { root?: unknown } | null)?.root;
+	if (!root || typeof root !== "object" || (root as { type?: unknown }).type !== "root") {
+		return false;
+	}
+	const stack: unknown[] = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (!node || typeof node !== "object") return false;
+		const { type, children } = node as { type?: unknown; children?: unknown };
+		if (typeof type !== "string" || !registered.has(type)) return false;
+		if (children === undefined) continue;
+		if (!Array.isArray(children)) return false;
+		for (const child of children) stack.push(child);
+	}
+	return true;
+}
+
+/** The composer's `editorState` seed: a seedable serialized state as-is,
  *  else a single paragraph per line of plain text, else nothing. */
 function seedEditorState(
 	state: string | undefined,
 	text: string | undefined,
+	registered: ReadonlySet<string>,
 ): string | (() => void) | undefined {
-	if (state) {
-		try {
-			const parsed = JSON.parse(state) as { root?: unknown } | null;
-			if (parsed && typeof parsed === "object" && parsed.root) return state;
-		} catch {
-			// Fall through to the plain-text seed.
-		}
-	}
+	if (state && isSeedableState(state, registered)) return state;
 	if (!text) return undefined;
 	return () => {
 		const root = $getRoot();
@@ -439,7 +472,17 @@ export const CompactEditor = forwardRef<CompactEditorHandle, CompactEditorProps>
 		// effect, so the static config is always editable — rebuilding it on a
 		// `disabled` flip would remount the composer and lose draft content.
 		// biome-ignore lint/correctness/useExhaustiveDependencies: the seed is read once at mount — re-seeding on a prop change would remount the composer mid-edit
-		const seed = useMemo(() => seedEditorState(initialState, initialText), []);
+		const seed = useMemo(
+			() =>
+				seedEditorState(
+					initialState,
+					initialText,
+					registeredNodeTypes(
+						additionalNodes ? [...COMPOSER_BASELINE_NODES, ...additionalNodes] : COMPOSER_BASELINE_NODES,
+					),
+				),
+			[],
+		);
 		const initialConfig = useMemo(
 			() => ({
 				namespace: "brainstorm-compact-editor",

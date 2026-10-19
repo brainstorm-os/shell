@@ -245,6 +245,12 @@ export type RichTextValue = {
 	state?: string;
 };
 
+/** Upper bound on a stored RichText `state` (serialized editor JSON). A
+ *  property is a document fragment, not a document: a larger state is not
+ *  persisted (the plain-text half still is) and is never seeded into an
+ *  editor, so a pasted or peer-written blob can't stall a cell render. */
+export const RICH_TEXT_STATE_MAX_CHARS = 256 * 1024;
+
 /** The plain-text projection of a stored RichText value. A legacy bare
  *  string reads as itself; anything else malformed reads as empty. */
 export function richTextPlain(value: unknown): string {

@@ -3242,6 +3242,7 @@ export {
 	type PropertyValueByValueType,
 	PropertyView,
 	type Range,
+	RICH_TEXT_STATE_MAX_CHARS,
 	richTextPlain,
 	type RichTextValue,
 	type ScalarValueByValueType,

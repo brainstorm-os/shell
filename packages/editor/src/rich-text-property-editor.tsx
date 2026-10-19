@@ -10,12 +10,15 @@
  * submit: a property is a document fragment, not a chat message.
  */
 
-import type { RichTextValue } from "@brainstorm-os/sdk-types";
+import { RICH_TEXT_STATE_MAX_CHARS, type RichTextValue } from "@brainstorm-os/sdk-types";
 import type { RichTextEditorProps } from "@brainstorm-os/sdk/property-ui";
 import { type JSX, useCallback } from "react";
 import { CompactEditor, type CompactEditorPayload } from "./compact-editor";
 
+/** Over the size cap the formatting is dropped and only the text is kept —
+ *  never a state no editor will agree to re-open. */
 export function richTextValueFromPayload(payload: CompactEditorPayload): RichTextValue {
+	if (payload.state.length > RICH_TEXT_STATE_MAX_CHARS) return { text: payload.text };
 	return { text: payload.text, state: payload.state };
 }
 
