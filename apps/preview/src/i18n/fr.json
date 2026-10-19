@@ -76,5 +76,14 @@
   "inspector.properties": "Propriétés",
   "inspector.noProperties": "Pas encore de propriétés",
   "inspector.addProperty": "Ajouter une propriété",
-  "inspector.removeProperty": "Retirer {name}"
+  "inspector.removeProperty": "Retirer {name}",
+  "inspector.caption": "Légende",
+  "inspector.linkedFrom.one": "Lié depuis {count} objet",
+  "inspector.linkedFrom.other": "Lié depuis {count} objets",
+  "inspector.noBacklinks": "Rien ne pointe encore ici",
+  "inspector.openInNewTab": "Ouvrir « {name} » dans un nouvel onglet",
+  "inspector.moveToBin": "Placer dans la corbeille",
+  "inspector.lockedHint": "Déverrouillez ce fichier pour le modifier",
+  "inspector.deleted": "« {name} » placé dans la corbeille",
+  "inspector.deleteFailed": "Impossible de placer « {name} » dans la corbeille"
 }

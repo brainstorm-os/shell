@@ -133,5 +133,11 @@
   "chrome.meta": "Creato / modificato",
   "chrome.windowControls": "Controlli finestra",
   "chrome.entityHeader": "Intestazione (icona + titolo + azioni)",
-  "chrome.tabs": "Schede"
+  "chrome.tabs": "Schede",
+  "action.applyToType": "Applica al tipo",
+  "action.applyToTypeHint": "Rendi questo il layout predefinito per le nuove entità {type}",
+  "status.applying": "Applicazione…",
+  "status.appliedToType": "Applicato come layout predefinito per {type}.",
+  "status.applyInvalid": "Questo layout non può essere applicato — correggilo prima nell'editor.",
+  "status.applyFailed": "Impossibile applicare il layout."
 }

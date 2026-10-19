@@ -92,5 +92,16 @@
   "properties.meta.dateKey": "Datum",
   "properties.openInNotesHint": "Nutzen Sie Notes für die erweiterte Bearbeitung von Eigenschaften.",
   "widget.noEntryToday": "Heute noch kein Eintrag",
-  "widget.writeToday": "Heutigen Eintrag schreiben"
+  "widget.writeToday": "Heutigen Eintrag schreiben",
+  "bodyDamagedTitle": "Ein Teil dieses Eintrags fehlt",
+  "bodyDamagedHint": "Ein Teil des hier Geschriebenen ging verloren, bevor er gespeichert wurde, und kann nicht wiederhergestellt werden. Alles, was Sie jetzt schreiben, wird normal gespeichert.",
+  "captureLabel": "Schnellerfassung",
+  "capturePlaceholder": "Gedanken festhalten — Enter fügt ihn zu heute hinzu",
+  "capturePlaceholderTagged": "Gedanken festhalten — mit #Sammlung dort ablegen",
+  "captureSubmit": "Hinzufügen",
+  "captureAppended": "Zu heute hinzugefügt",
+  "captureFiled": "In {collection} abgelegt und von heute verlinkt",
+  "captureFiledWithoutMembership": "Erstellt und von heute verlinkt, konnte aber nicht zu {collection} hinzugefügt werden",
+  "captureFileFailed": "Konnte nicht in {collection} abgelegt werden — als Zeile in heute behalten",
+  "captureUnavailable": "Der heutige Eintrag ist noch nicht bereit zum Schreiben"
 }

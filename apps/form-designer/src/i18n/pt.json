@@ -133,5 +133,11 @@
   "chrome.meta": "Criado / modificado",
   "chrome.windowControls": "Controles da janela",
   "chrome.entityHeader": "Cabeçalho (ícone + título + ações)",
-  "chrome.tabs": "Abas"
+  "chrome.tabs": "Abas",
+  "action.applyToType": "Aplicar ao tipo",
+  "action.applyToTypeHint": "Tornar este o layout padrão para novas entidades {type}",
+  "status.applying": "Aplicando…",
+  "status.appliedToType": "Aplicado como layout padrão para {type}.",
+  "status.applyInvalid": "Este layout não pode ser aplicado — corrija-o primeiro no editor.",
+  "status.applyFailed": "Não foi possível aplicar o layout."
 }

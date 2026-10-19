@@ -279,5 +279,12 @@
   "tasks.export.cancel": "Annuler",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Marquer comme terminée",
+  "tasks.menu.markWontDo": "Marquer comme abandonnée",
+  "tasks.menu.reopen": "Rouvrir",
+  "tasks.row.toggle.open": "Marquer « {name} » comme terminée",
+  "tasks.row.toggle.done": "« {name} » est terminée — marquer comme abandonnée",
+  "tasks.row.toggle.wontDo": "« {name} » est abandonnée — rouvrir",
+  "tasks.quickLook.value.wontDo": "Abandonnée"
 }

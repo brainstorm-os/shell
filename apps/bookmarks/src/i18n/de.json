@@ -124,5 +124,6 @@
   "contentKind.profile": "Profil",
   "contentKind.product": "Produkt",
   "contentKind.website": "Website",
-  "contentKind.page": "Seite"
+  "contentKind.page": "Seite",
+  "menu.lockedHint": "Dieses Lesezeichen ist gesperrt — entsperren Sie es, um Änderungen vorzunehmen"
 }

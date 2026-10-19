@@ -225,5 +225,18 @@
   "template.email-follow-up-nudge.name": "Spinta al follow-up delle email",
   "template.email-follow-up-nudge.desc": "Un promemoria quotidiano per sollecitare i thread email ancora in attesa di risposta.",
   "template.email-follow-up-nudge.trigger": "Ogni giorno feriale alle 16:00",
-  "menu.more": "Altre azioni"
+  "menu.more": "Altre azioni",
+  "runs.denied.title": "Bloccato da un permesso mancante",
+  "runs.denied.hint": "Concedilo nelle Impostazioni o riduci l'elenco dei permessi del flusso, poi esegui di nuovo.",
+  "runs.denialBadge.one": "{count} rifiuto",
+  "runs.denialBadge.other": "{count} rifiuti",
+  "runs.trace.title": "Traccia dell'agente",
+  "runs.trace.loading": "Caricamento traccia…",
+  "runs.trace.empty": "Nessuna traccia dell'agente registrata per questa esecuzione.",
+  "runs.trace.denied": "Negato — permesso {capability} mancante",
+  "runs.trace.deniedUnknown": "Negato",
+  "runs.trace.durationMs": "{ms} ms",
+  "runs.trace.outcome.ok": "OK",
+  "runs.trace.outcome.error": "Errore",
+  "runs.trace.outcome.denied": "Negato"
 }

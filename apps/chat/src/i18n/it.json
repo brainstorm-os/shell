@@ -143,5 +143,6 @@
   "pins.pin": "Fissa il messaggio",
   "pins.unpin": "Rimuovi dai fissati",
   "pins.pinned": "Fissato",
-  "message.menu": "Azioni del messaggio"
+  "message.menu": "Azioni del messaggio",
+  "pins.item": "{author}: {text}"
 }

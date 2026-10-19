@@ -279,5 +279,12 @@
   "tasks.export.cancel": "Abbrechen",
   "tasks.export.markdown": "Markdown",
   "tasks.export.csv": "CSV",
-  "tasks.export.json": "JSON"
+  "tasks.export.json": "JSON",
+  "tasks.menu.markDone": "Als erledigt markieren",
+  "tasks.menu.markWontDo": "Als „wird nicht erledigt“ markieren",
+  "tasks.menu.reopen": "Wieder öffnen",
+  "tasks.row.toggle.open": "„{name}“ als erledigt markieren",
+  "tasks.row.toggle.done": "„{name}“ ist erledigt — als „wird nicht erledigt“ markieren",
+  "tasks.row.toggle.wontDo": "„{name}“ wird nicht erledigt — wieder öffnen",
+  "tasks.quickLook.value.wontDo": "Wird nicht erledigt"
 }

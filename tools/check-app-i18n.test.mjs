@@ -36,6 +36,16 @@ describe("auditAppI18n (12.15 15c)", () => {
 		expect(errors[0]).toMatch(/typo\.key/);
 	});
 
+	it("flags a pack missing source keys when the catalog is extracted", () => {
+		const errors = auditAppI18n({ ...base, requireComplete: true });
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatch(/missing source keys: bye/);
+	});
+
+	it("tolerates a partial pack when the source is an inline manifest", () => {
+		expect(auditAppI18n({ ...base, requireComplete: false })).toEqual([]);
+	});
+
 	it("skips the subset check when the source catalog can't be resolved", () => {
 		const errors = auditAppI18n({
 			...base,

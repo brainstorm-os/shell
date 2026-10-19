@@ -143,5 +143,6 @@
   "pins.pin": "Épingler le message",
   "pins.unpin": "Désépingler le message",
   "pins.pinned": "Épinglé",
-  "message.menu": "Actions du message"
+  "message.menu": "Actions du message",
+  "pins.item": "{author} : {text}"
 }

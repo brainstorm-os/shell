@@ -143,5 +143,6 @@
   "pins.pin": "Nachricht anheften",
   "pins.unpin": "Nachricht lösen",
   "pins.pinned": "Angeheftet",
-  "message.menu": "Nachrichtenaktionen"
+  "message.menu": "Nachrichtenaktionen",
+  "pins.item": "{author}: {text}"
 }

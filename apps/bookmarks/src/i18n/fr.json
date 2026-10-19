@@ -124,5 +124,6 @@
   "contentKind.profile": "Profil",
   "contentKind.product": "Produit",
   "contentKind.website": "Site web",
-  "contentKind.page": "Page"
+  "contentKind.page": "Page",
+  "menu.lockedHint": "Ce signet est verrouillé — déverrouillez-le pour le modifier"
 }

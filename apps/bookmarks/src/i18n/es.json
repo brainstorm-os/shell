@@ -124,5 +124,6 @@
   "contentKind.profile": "Perfil",
   "contentKind.product": "Producto",
   "contentKind.website": "Sitio web",
-  "contentKind.page": "Página"
+  "contentKind.page": "Página",
+  "menu.lockedHint": "Este marcador está bloqueado: desbloquéalo para hacer cambios"
 }

@@ -92,5 +92,16 @@
   "properties.meta.dateKey": "Date",
   "properties.openInNotesHint": "Utilisez Notes pour l'édition avancée des propriétés.",
   "widget.noEntryToday": "Pas encore d'entrée aujourd'hui",
-  "widget.writeToday": "Écrire l'entrée du jour"
+  "widget.writeToday": "Écrire l'entrée du jour",
+  "bodyDamagedTitle": "Une partie de cette entrée est manquante",
+  "bodyDamagedHint": "Une partie de ce qui a été écrit ici a été perdue avant d'atteindre le disque et ne peut pas être récupérée. Tout ce que vous écrivez maintenant est enregistré normalement.",
+  "captureLabel": "Capture rapide",
+  "capturePlaceholder": "Notez une idée — Entrée l'ajoute à aujourd'hui",
+  "capturePlaceholderTagged": "Notez une idée — ajoutez #collection pour la classer",
+  "captureSubmit": "Ajouter",
+  "captureAppended": "Ajouté à aujourd'hui",
+  "captureFiled": "Classé dans {collection} et lié depuis aujourd'hui",
+  "captureFiledWithoutMembership": "Créé et lié depuis aujourd'hui, mais impossible de l'ajouter à {collection}",
+  "captureFileFailed": "Impossible de classer dans {collection} — conservé comme ligne dans aujourd'hui",
+  "captureUnavailable": "L'entrée d'aujourd'hui n'est pas encore prête"
 }

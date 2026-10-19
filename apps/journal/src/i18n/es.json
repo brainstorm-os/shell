@@ -92,5 +92,16 @@
   "properties.meta.dateKey": "Fecha",
   "properties.openInNotesHint": "Use Notes para la edición avanzada de propiedades.",
   "widget.noEntryToday": "Aún no hay entrada hoy",
-  "widget.writeToday": "Escribir la entrada de hoy"
+  "widget.writeToday": "Escribir la entrada de hoy",
+  "bodyDamagedTitle": "Falta parte de esta entrada",
+  "bodyDamagedHint": "Parte de lo escrito aquí se perdió antes de llegar al disco y no se puede recuperar. Lo que escribas ahora se guarda con normalidad.",
+  "captureLabel": "Captura rápida",
+  "capturePlaceholder": "Anota una idea: Intro la añade a hoy",
+  "capturePlaceholderTagged": "Anota una idea: añade #colección para archivarla allí",
+  "captureSubmit": "Añadir",
+  "captureAppended": "Añadido a hoy",
+  "captureFiled": "Archivado en {collection} y enlazado desde hoy",
+  "captureFiledWithoutMembership": "Creado y enlazado desde hoy, pero no pudo unirse a {collection}",
+  "captureFileFailed": "No se pudo archivar en {collection}: se mantuvo como una línea en hoy",
+  "captureUnavailable": "La entrada de hoy aún no está lista para escribir en ella"
 }

@@ -77,5 +77,12 @@
   "reader.aria": "Leseansicht",
   "reader.loading": "Leseansicht wird vorbereitet…",
   "reader.empty": "Diese Seite enthält keinen lesbaren Artikel.",
-  "reader.truncated": "Der Artikel wurde gekürzt – öffne die Originalseite für den Rest."
+  "reader.truncated": "Der Artikel wurde gekürzt – öffne die Originalseite für den Rest.",
+  "download.saving": "Wird im Vault gespeichert…",
+  "download.saved": "Im Vault gespeichert",
+  "download.dismiss": "Schließen",
+  "download.failed.generic": "Download fehlgeschlagen",
+  "download.failed.tooLarge": "Datei zu groß zum Speichern",
+  "download.failed.empty": "Nichts zu speichern",
+  "download.failed.interrupted": "Download unterbrochen"
 }

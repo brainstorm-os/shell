@@ -124,5 +124,6 @@
   "contentKind.profile": "Perfil",
   "contentKind.product": "Produto",
   "contentKind.website": "Site",
-  "contentKind.page": "Página"
+  "contentKind.page": "Página",
+  "menu.lockedHint": "Este favorito está bloqueado — desbloqueie para fazer alterações"
 }
