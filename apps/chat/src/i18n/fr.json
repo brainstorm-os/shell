@@ -144,5 +144,6 @@
   "pins.unpin": "Désépingler le message",
   "pins.pinned": "Épinglé",
   "message.menu": "Actions du message",
-  "pins.item": "{author} : {text}"
+  "pins.item": "{author} : {text}",
+  "shortcut.markAllRead": "Maj+Échap"
 }

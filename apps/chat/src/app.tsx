@@ -751,6 +751,7 @@ export function ChatApp(): ReactElement {
 				{
 					label: t("menu.markAllRead"),
 					icon: IconName.Read,
+					shortcut: t("shortcut.markAllRead"),
 					disabled: unread === 0,
 					onSelect: markAllRead,
 				},
@@ -1009,6 +1010,7 @@ function ChannelSidebar({
 				{
 					label: t("menu.markAllRead"),
 					icon: IconName.Read,
+					shortcut: t("shortcut.markAllRead"),
 					disabled: !anyUnread,
 					onSelect: onMarkAllRead,
 				},

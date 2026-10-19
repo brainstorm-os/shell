@@ -144,5 +144,6 @@
   "pins.unpin": "Rimuovi dai fissati",
   "pins.pinned": "Fissato",
   "message.menu": "Azioni del messaggio",
-  "pins.item": "{author}: {text}"
+  "pins.item": "{author}: {text}",
+  "shortcut.markAllRead": "Maiusc+Esc"
 }
