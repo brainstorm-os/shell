@@ -64,7 +64,7 @@ import type { DashboardStore } from "../dashboard/dashboard-store";
 import { makeEntitiesServiceHandler } from "../entities/entities-service";
 import type { RestoreEntityFn } from "../entities/entities-service";
 import { EntityDekStore } from "../entities/entity-dek-store";
-import { readEntityDocProjection } from "../entities/entity-doc-codec";
+import { readEntityDocProjection, writeEntityProps } from "../entities/entity-doc-codec";
 import { makeVaultEntitiesServiceHandler } from "../entities/vault-entities-service";
 import {
 	HistoryRole,
@@ -1268,6 +1268,37 @@ describe("version history pipeline (entities service → ydoc worker → history
 		await vi.advanceTimersByTimeAsync(ms);
 		await stack.history.idle();
 	};
+
+	it("Agent-16: the doc channel cannot forge reserved keys (createdByAgent / provenance / proposal)", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "mine" },
+		})) as { id: string };
+		const loaded = (await stack.ent("loadDoc", { id: made.id })) as { snapshotB64: string };
+		const doc = new Y.Doc();
+		Y.applyUpdate(doc, Buffer.from(loaded.snapshotB64, "base64"));
+		const before = Y.encodeStateVector(doc);
+		writeEntityProps(doc, {
+			title: "edited",
+			agentProvenance: { agent: "io.brainstorm.agent", conversationId: "c1", createdAt: 1 },
+			agentProposal: { forged: true },
+			agentDelegatedBy: "io.brainstorm.agent",
+			createdByAgent: "io.brainstorm.agent",
+		});
+		const update = Y.encodeStateAsUpdate(doc, before);
+		await stack.ent("applyDoc", { id: made.id, updateB64: Buffer.from(update).toString("base64") });
+		const read = stack.repo.get(made.id);
+		expect(read?.properties.title).toBe("edited");
+		for (const key of ["agentProvenance", "agentProposal", "agentDelegatedBy", "createdByAgent"]) {
+			expect(read?.properties).not.toHaveProperty(key);
+		}
+		// A later ordinary write re-materialises the doc's projection — the
+		// forged keys still sitting in the doc must not ride in on it.
+		await stack.ent("update", { id: made.id, patch: { statusKey: "doing" } });
+		expect(stack.repo.get(made.id)?.properties).not.toHaveProperty("createdByAgent");
+		expect(stack.repo.get(made.id)?.properties).not.toHaveProperty("agentProvenance");
+	});
 
 	it("Idle: captures 2 min after the last write, only if changed, ≤1 per 10 min", async () => {
 		const stack = await makeStack();

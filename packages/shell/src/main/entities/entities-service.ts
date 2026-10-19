@@ -34,6 +34,7 @@ import {
 	type EntityMergeResult,
 	type EntityQuery,
 	type PropertyDef,
+	RESERVED_PROPERTY_KEYS,
 	buildAgentProvenance,
 	parseProvenanceRequest,
 	stripDerivedAuthorship,
@@ -317,6 +318,12 @@ function arg(envelope: { args: unknown[] }): Record<string, unknown> {
 	return a && typeof a === "object" ? (a as Record<string, unknown>) : {};
 }
 
+function reservedOf(patch: Record<string, unknown>): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const key of RESERVED_PROPERTY_KEYS) if (key in patch) out[key] = patch[key];
+	return out;
+}
+
 export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): ServiceHandler {
 	const clock = options.now ?? (() => Date.now());
 
@@ -449,7 +456,12 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		if (projection?.properties || projection?.links) {
 			const repo = await options.getRepo();
 			if (repo) {
-				if (projection.properties) repo.update(id, projection.properties, clock());
+				// The doc is app-writable (and peer-writable on the remote path):
+				// reserved keys in its projection are never authority, so the
+				// stored values survive the row's merge untouched.
+				if (projection.properties) {
+					repo.update(id, stripReservedProperties(projection.properties), clock());
+				}
 				if (projection.links) {
 					for (const link of projection.links) {
 						repo.putLink({
@@ -514,7 +526,11 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				props: patch,
 				seedProps: stripDerivedAuthorship(row.properties),
 			})) as { projection?: EntityDocProjection; updateB64?: string | null } | null;
-			if (res?.projection?.properties) propsForRow = res.projection.properties;
+			// The doc may still hold a reserved key an app planted through
+			// `applyDoc`; only this write's own (host-supplied) patch may set one.
+			if (res?.projection?.properties) {
+				propsForRow = { ...stripReservedProperties(res.projection.properties), ...reservedOf(patch) };
+			}
 			// 10.12 — emit the property write through live-sync if shared.
 			emitLocalDoc(row.id, row.type, res?.updateB64, writer);
 		}
