@@ -107,6 +107,20 @@ describe("openInlinePropertyForm", () => {
 		}
 	});
 
+	it("builds every text input on the shared .bs-input face (F-511e)", () => {
+		try {
+			open();
+			const inputs = Array.from(
+				document.querySelectorAll('.bs-inline-property-form input[type="text"]'),
+			);
+			expect(inputs.length).toBeGreaterThan(0);
+			for (const input of inputs)
+				expect(input.classList.contains("bs-input"), input.outerHTML).toBe(true);
+		} finally {
+			teardown();
+		}
+	});
+
 	it("clicking the backdrop closes the picker and fires onCancel", () => {
 		const onCancel = vi.fn();
 		try {

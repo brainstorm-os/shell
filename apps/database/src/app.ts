@@ -200,7 +200,7 @@ import { TYPE_LABELS } from "./demo/dataset";
 import { type TranslationKey, plural, t } from "./i18n";
 import { onTranslatorChange, startLocaleSync } from "./i18n-boot";
 import { PERSON_TYPE } from "./logic/contact-import";
-import { commitCsvImport, csvToEntityImport } from "./logic/csv-import";
+import { commitCsvImport, csvToEntityImport, propertyDefsForCsvImport } from "./logic/csv-import";
 import { registerBuiltInImportMappers } from "./logic/import-registry";
 import { ListExportFormat, type ListExportOptions } from "./logic/list-export";
 import { runListExport } from "./ui/export-flow";
@@ -269,6 +269,7 @@ import {
 	duplicateView,
 	renameList as renameListLogic,
 	resolveListView,
+	seedColumnsForNewView,
 	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
@@ -4525,6 +4526,13 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 		flashStatus(t("brainstorm.database.status.importFailed", { message }), "warn");
 		return;
 	}
+	// Every imported column lands in the catalog (F-511): without a def the
+	// column has no "Change type" and can't carry a number unit. The first
+	// failed write already warned; stop rather than toast once per column.
+	for (const def of propertyDefsForCsvImport(imported, cachedVaultProperties)) {
+		if (!(await persistNewPropertyDef(def, null))) break;
+	}
+	await loadVaultProperties(state);
 	const baseName =
 		handle.displayName.replace(/\.csv$/i, "").trim() ||
 		t("brainstorm.database.import.csv.defaultName");
@@ -4634,6 +4642,8 @@ function updateListSource(state: AppState, listId: string, types: ReadonlyArray<
 }
 
 function createNewViewAndSelect(state: AppState, listId: string): void {
+	const siblings = viewsForList(state, listId);
+	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	const view = createView({
 		// A new view is a Grid until retyped — name it after its kind with a
 		// collision counter ("Grid", "Grid 2", …), not the anonymous "New
@@ -4641,11 +4651,11 @@ function createNewViewAndSelect(state: AppState, listId: string): void {
 		// it on the spot (the same flow as "Blank collection" / "New folder")
 		// — F-038 / F-208.
 		listId,
-		name: defaultViewName(ListViewKind.Grid, viewsForList(state, listId)),
-		existingViewsForList: viewsForList(state, listId),
+		name: defaultViewName(ListViewKind.Grid, siblings),
+		existingViewsForList: siblings,
+		columns: seedColumnsForNewView(siblings, afterId),
 	});
 	state.views.push(view);
-	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	state.lists = state.lists.map((l) => (l.id === listId ? insertViewAfter(l, view.id, afterId) : l));
 	state.active = { listId, viewId: view.id };
 	state.selection = clearSelection();

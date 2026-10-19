@@ -13,6 +13,7 @@ import {
 	renameList,
 	renameView,
 	resolveListView,
+	seedColumnsForNewView,
 	setListDescription,
 	setListIcon,
 	uniqueName,
@@ -278,5 +279,49 @@ describe("resolveListView", () => {
 
 	test("returns undefined for a List with no views", () => {
 		expect(resolveListView([], "v1", "v1")).toBeUndefined();
+	});
+});
+
+describe("seedColumnsForNewView (F-511c)", () => {
+	const withColumns = (id: string, columns: ListView["columns"]): ListView => ({
+		...emptyView(id, "a", id),
+		columns,
+	});
+	const grid = withColumns("grid", [
+		{ propertyId: "status", visible: true, width: 160 },
+		{ propertyId: "secret", visible: false },
+		{ propertyId: "url", visible: true },
+	]);
+	const other = withColumns("other", [{ propertyId: "owner", visible: true }]);
+
+	test("copies the visible columns of the view the user is looking at", () => {
+		expect(seedColumnsForNewView([other, grid], "grid")).toEqual([
+			{ propertyId: "status", visible: true, width: 160 },
+			{ propertyId: "url", visible: true },
+		]);
+	});
+
+	test("falls back to the list's first view when no sibling is active", () => {
+		expect(seedColumnsForNewView([other, grid], null).map((c) => c.propertyId)).toEqual(["owner"]);
+	});
+
+	test("yields no columns for a list without views", () => {
+		expect(seedColumnsForNewView([], "grid")).toEqual([]);
+	});
+
+	test("copies, never shares, the column specs", () => {
+		const seeded = seedColumnsForNewView([grid], "grid");
+		expect(seeded[0]).not.toBe(grid.columns[0]);
+	});
+
+	test("createView carries the seeded columns onto the new view", () => {
+		const v = createView({
+			listId: "a",
+			name: "Gallery",
+			kind: ListViewKind.Gallery,
+			existingViewsForList: [grid],
+			columns: seedColumnsForNewView([grid], "grid"),
+		});
+		expect(v.columns.map((c) => c.propertyId)).toEqual(["status", "url"]);
 	});
 });
