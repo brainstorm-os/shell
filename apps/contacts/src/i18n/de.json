@@ -92,7 +92,7 @@
   "prop.related": "Verbundene Personen",
   "prop.empty": "Leer",
   "delete.confirm.title": "Diesen Kontakt löschen?",
-  "delete.confirm.body": "„{name}“ wird in den Papierkorb verschoben. Das kann hier nicht rückgängig gemacht werden.",
+  "delete.confirm.body": "„{name}“ wird in den Papierkorb verschoben. Von dort kann es wiederhergestellt werden.",
   "delete.confirm.confirm": "Löschen",
   "delete.confirm.cancel": "Abbrechen",
   "delete.confirm.dontAskAgain": "Nicht mehr fragen",

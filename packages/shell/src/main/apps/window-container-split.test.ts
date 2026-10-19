@@ -291,6 +291,47 @@ describe("WindowContainer split view", () => {
 		expect(t.container.closeSidePane()).toBe(false);
 	});
 
+	it("un-splitting hands the whole window body back to the surviving pane", () => {
+		const t = setup();
+		t.container.openSidePane({ ...t.spec("Side"), appId: OTHER });
+		t.container.stepSplit(SplitStep.Left);
+		expect(view(t.primary).bounds()?.width).toBeLessThan(WIDTH / 2);
+		t.container.closeSidePane();
+		expect(view(t.primary).bounds()).toEqual({ x: 0, y: 0, width: WIDTH, height: 700 });
+	});
+
+	it("a divider drag or step resizes the panes, never the OS window", () => {
+		const t = setup();
+		t.container.openSidePane({ ...t.spec("Side"), appId: OTHER });
+		t.container.stepSplit(SplitStep.Left);
+		t.container.dragSplitTo(400);
+		expect(view(t.primary).bounds()?.width).not.toBe(WIDTH);
+		expect(t.baseWindow.setBounds).not.toHaveBeenCalled();
+		expect(t.baseWindow.getBounds().width).toBe(WIDTH);
+	});
+
+	it("a side pane whose renderer is destroyed from outside un-splits the window", () => {
+		const t = setup();
+		const side = t.container.openSidePane({ ...t.spec("Side"), appId: OTHER });
+		// Mimic Electron: the webContents is already gone when `destroyed` fires.
+		side.view.webContents.close();
+		view(side).fire("destroyed");
+		expect(t.container.sidePane()).toBeNull();
+		expect(t.container.splitState().open).toBe(false);
+		expect(view(t.primary).bounds()).toEqual({ x: 0, y: 0, width: WIDTH, height: 700 });
+		expect(t.closed.map((tab) => tab.tabId)).toContain(side.tabId);
+		expect(view(side).listeners("destroyed")).toBe(0);
+	});
+
+	it("a strip tab whose renderer is destroyed from outside leaves the strip", () => {
+		const t = setup();
+		const second = t.container.addTab(t.spec("Second"));
+		second.view.webContents.close();
+		view(second).fire("destroyed");
+		expect(t.container.tabs().map((tab) => tab.tabId)).toEqual([t.primary.tabId]);
+		expect(view(t.primary).bounds()?.width).toBe(WIDTH);
+	});
+
 	it("re-opening a split in the same window keeps the dragged width", () => {
 		const t = setup();
 		t.container.openSidePane({ ...t.spec("Side"), appId: OTHER });

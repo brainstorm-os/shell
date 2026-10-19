@@ -92,7 +92,7 @@
   "prop.related": "Related people",
   "prop.empty": "Empty",
   "delete.confirm.title": "Delete this contact?",
-  "delete.confirm.body": "“{name}” will be moved to the bin. This can't be undone here.",
+  "delete.confirm.body": "“{name}” will be moved to the Bin. You can restore it from there.",
   "delete.confirm.confirm": "Delete",
   "delete.confirm.cancel": "Cancel",
   "delete.confirm.dontAskAgain": "Don't ask again",

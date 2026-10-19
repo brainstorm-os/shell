@@ -49,7 +49,7 @@
   "renameErrorEmpty": "Insira um nome de arquivo.",
   "renameErrorDuplicate": "Já existe um arquivo com esse nome.",
   "deleteTitle": "Excluir {name}?",
-  "deleteBody": "“{name}” será movido para a lixeira. Isso não pode ser desfeito aqui.",
+  "deleteBody": "“{name}” será movido para a lixeira. Você poderá restaurá-lo de lá.",
   "deleteConfirm": "Excluir",
   "deleteCancel": "Cancelar",
   "deleteDontAskAgain": "Não perguntar novamente",

@@ -92,7 +92,7 @@
   "prop.related": "Persone correlate",
   "prop.empty": "Vuoto",
   "delete.confirm.title": "Eliminare questo contatto?",
-  "delete.confirm.body": "“{name}” verrà spostato nel cestino. Non può essere annullato qui.",
+  "delete.confirm.body": "“{name}” verrà spostato nel cestino. Potrai ripristinarlo da lì.",
   "delete.confirm.confirm": "Elimina",
   "delete.confirm.cancel": "Annulla",
   "delete.confirm.dontAskAgain": "Non chiedere più",

@@ -208,6 +208,22 @@ describe("indexByDateKey", () => {
 		expect(idx.get("2026-05-15")?.noteId).toBe("n2");
 		expect(idx.get("2026-05-16")).toBeUndefined();
 	});
+
+	it("resolves a day with two rows to the earliest-created one, whatever the snapshot order", () => {
+		const welcome = {
+			id: "welcome-journal-day-one",
+			title: "2026-10-19",
+			body: "Your first journal entry.",
+			createdAt: 100,
+		};
+		const minted = { id: "journal-2026-10-19", title: "2026-10-19", createdAt: 200 };
+		expect(indexByDateKey(projectJournalEntries([minted, welcome])).get("2026-10-19")?.noteId).toBe(
+			"welcome-journal-day-one",
+		);
+		expect(indexByDateKey(projectJournalEntries([welcome, minted])).get("2026-10-19")?.noteId).toBe(
+			"welcome-journal-day-one",
+		);
+	});
 });
 
 // 9.3.5.7 — Journal renders REAL data. Journal entries are written to

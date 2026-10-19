@@ -92,7 +92,7 @@
   "prop.related": "Personas relacionadas",
   "prop.empty": "Vacío",
   "delete.confirm.title": "¿Eliminar este contacto?",
-  "delete.confirm.body": "«{name}» se moverá a la papelera. No se puede deshacer aquí.",
+  "delete.confirm.body": "«{name}» se moverá a la papelera. Podrás restaurarlo desde allí.",
   "delete.confirm.confirm": "Eliminar",
   "delete.confirm.cancel": "Cancelar",
   "delete.confirm.dontAskAgain": "No volver a preguntar",
