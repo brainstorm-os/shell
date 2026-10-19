@@ -116,6 +116,34 @@ describe("TabsPlugin", () => {
 		expect(panes()[2]?.hasAttribute("hidden")).toBe(false);
 	});
 
+	it("F2 renames the focused tab; Enter commits and returns focus, Escape cancels", async () => {
+		mount();
+		const key = (target: Element | null | undefined, k: string) =>
+			act(() => {
+				target?.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+			});
+		key(tabs()[0], "F2");
+		const input = () => container.querySelector<HTMLInputElement>(".bs-tabs__rename");
+		expect(document.activeElement).toBe(input());
+		act(() => {
+			const el = input();
+			if (!el) return;
+			Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, "Plan");
+			el.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+		key(input(), "Enter");
+		await act(async () => {
+			await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+		});
+		expect(tabs()[0]?.textContent).toBe("Plan");
+		expect(document.activeElement).toBe(tabs()[0]);
+
+		key(tabs()[0], "F2");
+		key(input(), "Escape");
+		expect(input()).toBeNull();
+		expect(tabs()[0]?.textContent).toBe("Plan");
+	});
+
 	it("strip events never reach the editor's input pipeline", () => {
 		mount();
 		const event = new KeyboardEvent("keydown", { key: "a", bubbles: true });

@@ -67,6 +67,8 @@ import {
 
 export const INSERT_TABS_COMMAND = createCommand<number>("INSERT_TABS_COMMAND");
 
+/** F2 starts renaming the focused tab — the keyboard twin of double-click. */
+const RENAME_START_CHORD = "F2";
 const RENAME_COMMIT_CHORDS = ["Enter"] as const;
 const RENAME_CANCEL_CHORDS = ["Escape"] as const;
 
@@ -223,6 +225,7 @@ function TabStrip({ tabsKey }: { tabsKey: NodeKey }): ReactNode {
 				id: "rename",
 				label: t("editor.tabs.rename"),
 				icon: nodeIcon(<RenameIcon />),
+				shortcut: RENAME_START_CHORD,
 				onSelect: () => setRenaming(paneKey),
 			},
 			{
@@ -268,9 +271,12 @@ function TabStrip({ tabsKey }: { tabsKey: NodeKey }): ReactNode {
 								key={pane.key}
 								initial={pane.title}
 								label={t("editor.tabs.renameLabel")}
-								onDone={(value) => {
+								onDone={(value, fromKeyboard) => {
 									setRenaming(null);
 									if (value !== null) run(() => $renameTab(pane.key, value));
+									if (fromKeyboard) {
+										requestAnimationFrame(() => document.getElementById(tabDomId(pane.key))?.focus());
+									}
 								}}
 							/>
 						);
@@ -286,6 +292,11 @@ function TabStrip({ tabsKey }: { tabsKey: NodeKey }): ReactNode {
 							data-active={isActive}
 							onClick={() => select(index)}
 							onDoubleClick={() => editable && setRenaming(pane.key)}
+							onKeyDown={(event) => {
+								if (!editable || !matchesChord(event.nativeEvent, RENAME_START_CHORD)) return;
+								event.preventDefault();
+								setRenaming(pane.key);
+							}}
 							onContextMenu={(event) => {
 								if (!editable) return;
 								event.preventDefault();
@@ -331,7 +342,7 @@ function TabRenameInput({
 }: {
 	initial: string;
 	label: string;
-	onDone: (value: string | null) => void;
+	onDone: (value: string | null, fromKeyboard: boolean) => void;
 }): ReactNode {
 	const [value, setValue] = useState(initial);
 	const ref = useRef<HTMLInputElement>(null);
@@ -340,10 +351,10 @@ function TabRenameInput({
 		ref.current?.focus();
 		ref.current?.select();
 	}, []);
-	const finish = (next: string | null): void => {
+	const finish = (next: string | null, fromKeyboard = false): void => {
 		if (done.current) return;
 		done.current = true;
-		onDone(next);
+		onDone(next, fromKeyboard);
 	};
 	return (
 		<input
@@ -357,10 +368,10 @@ function TabRenameInput({
 				const native = event.nativeEvent;
 				if (RENAME_COMMIT_CHORDS.some((c) => matchesChord(native, c))) {
 					event.preventDefault();
-					finish(value);
+					finish(value, true);
 				} else if (RENAME_CANCEL_CHORDS.some((c) => matchesChord(native, c))) {
 					event.preventDefault();
-					finish(null);
+					finish(null, true);
 				}
 			}}
 		/>
