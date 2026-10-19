@@ -85,7 +85,7 @@ button {
 	will-change: transform;
 }
 
-.journal[data-nav-open="false"] .journal__nav {
+.journal[data-nav-open="false"] .journal__nav:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-color: transparent;
 	visibility: hidden;

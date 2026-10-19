@@ -51,7 +51,7 @@ import {
 	openAnchoredMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { IconPickerButton } from "@brainstorm-os/sdk/picker-host";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
@@ -1035,6 +1035,7 @@ export function JournalApp(): ReactElement {
 			return next;
 		});
 	}, []);
+	const navAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
 	const toggleProps = useCallback(() => {
 		setPropsOpen((open) => {
 			const next = !open;
@@ -1177,10 +1178,11 @@ export function JournalApp(): ReactElement {
 				data-props-open={String(propsOpen)}
 			>
 				<aside
+					{...navAutoHide.panelProps}
 					className="journal__nav"
 					id="journal-nav"
-					aria-hidden={!navOpen}
-					inert={!navOpen ? true : undefined}
+					aria-hidden={!navAutoHide.visible}
+					inert={!navAutoHide.visible ? true : undefined}
 				>
 					<div className="journal__nav-inner">
 						<StreakBadge entries={mergedEntries} todayKey={todayKey} />
@@ -1207,6 +1209,7 @@ export function JournalApp(): ReactElement {
 						/>
 					</div>
 				</aside>
+				{navAutoHide.edgeProps && <div {...navAutoHide.edgeProps} />}
 				<div
 					className="journal__nav-resize"
 					ref={navResizeRef}

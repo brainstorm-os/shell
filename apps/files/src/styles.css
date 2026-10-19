@@ -241,7 +241,7 @@ body.is-resizing .window-resize {
 	will-change: transform;
 }
 
-body[data-nav-open="false"] .sidebar {
+body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	transform: translateX(-100%);
 	border-inline-end-color: transparent;
 	visibility: hidden;
