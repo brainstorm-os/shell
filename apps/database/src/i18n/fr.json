@@ -254,6 +254,8 @@
   "brainstorm.database.property.form.relationTargetLabel": "Lie à",
   "brainstorm.database.property.form.relationTargetAny": "N'importe quoi",
   "brainstorm.database.status.propertyReused": "Propriété existante « {name} » ajoutée",
+  "brainstorm.database.status.propertyAdopted": "Propriété existante « {name} » mise à jour avec les nouveaux réglages de relation",
+  "brainstorm.database.status.propertyDistinct": "« {name} » créée à part — la propriété existante est déjà appariée avec « {other} »",
   "brainstorm.database.status.propertyAdded": "Propriété « {name} » ajoutée",
   "brainstorm.database.status.propertyExists": "La propriété « {name} » existe déjà — réutilisez-la au lieu de créer un doublon",
   "brainstorm.database.status.propertyAddedToCollection": "« {name} » ajoutée à cette collection",

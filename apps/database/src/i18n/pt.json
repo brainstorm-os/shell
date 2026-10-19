@@ -254,6 +254,8 @@
   "brainstorm.database.property.form.relationTargetLabel": "Vincula a",
   "brainstorm.database.property.form.relationTargetAny": "Qualquer coisa",
   "brainstorm.database.status.propertyReused": "Propriedade existente “{name}” adicionada",
+  "brainstorm.database.status.propertyAdopted": "Propriedade existente “{name}” atualizada com as novas definições de relação",
+  "brainstorm.database.status.propertyDistinct": "Criada uma “{name}” separada — a existente já está emparelhada com “{other}”",
   "brainstorm.database.status.propertyAdded": "Propriedade “{name}” adicionada",
   "brainstorm.database.status.propertyExists": "A propriedade “{name}” já existe — reutilize-a em vez de criar uma duplicata",
   "brainstorm.database.status.propertyAddedToCollection": "“{name}” adicionada a esta coleção",

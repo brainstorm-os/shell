@@ -254,6 +254,8 @@
   "brainstorm.database.property.form.relationTargetLabel": "Verknüpft mit",
   "brainstorm.database.property.form.relationTargetAny": "Beliebig",
   "brainstorm.database.status.propertyReused": "Vorhandene Eigenschaft „{name}“ hinzugefügt",
+  "brainstorm.database.status.propertyAdopted": "Vorhandene Eigenschaft „{name}“ mit den neuen Relationseinstellungen aktualisiert",
+  "brainstorm.database.status.propertyDistinct": "Separate Eigenschaft „{name}“ erstellt — die vorhandene ist bereits mit „{other}“ gekoppelt",
   "brainstorm.database.status.propertyAdded": "Eigenschaft „{name}“ hinzugefügt",
   "brainstorm.database.status.propertyExists": "Die Eigenschaft „{name}“ existiert bereits — verwenden Sie sie wieder, statt ein Duplikat zu erstellen",
   "brainstorm.database.status.propertyAddedToCollection": "„{name}“ zu dieser Sammlung hinzugefügt",
