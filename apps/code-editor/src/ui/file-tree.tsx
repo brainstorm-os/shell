@@ -22,6 +22,7 @@ import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { type ContextMenuItem, openContextMenu, sdkMenuIcon } from "@brainstorm-os/sdk/menus";
 import { DropSemantic, effectForSemantic, useDropTarget } from "@brainstorm-os/sdk/object-dnd";
 import { ObjectMenuMoreButton, openObjectMenu } from "@brainstorm-os/sdk/object-menu";
+import type { AutoHidePanelProps } from "@brainstorm-os/sdk/panel-toggle";
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import { type CodeFileRow, isCodeFileEditable } from "../logic/code-projection";
@@ -68,6 +69,10 @@ export interface FileTreeProps {
 	onMoveFiles: (entityIds: readonly string[], folderPath: string) => void;
 	onMoveFolder: (folderPath: string, destFolder: string) => void;
 	menuContext: (row: CodeFileRow) => ReturnType<typeof codeFileObjectMenuContext>;
+	/** The list is on screen — pinned open, or revealed by auto-hide. */
+	open?: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 }
 
 export function FileTree(props: FileTreeProps): ReactElement {
@@ -161,7 +166,13 @@ export function FileTree(props: FileTreeProps): ReactElement {
 	);
 
 	return (
-		<nav className="editor__files" aria-label={t("filesRegion")}>
+		<nav
+			{...props.autoHide}
+			className="editor__files"
+			aria-label={t("filesRegion")}
+			aria-hidden={props.open === false ? true : undefined}
+			inert={props.open === false ? true : undefined}
+		>
 			<div className="editor__files-head">
 				<span className="editor__files-heading" id={HEADING_ID}>
 					{t("filesHeading")}

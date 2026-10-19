@@ -40,7 +40,12 @@ import { resolveEntityTitle } from "@brainstorm-os/sdk/entity-title";
 import { Icon, IconName } from "@brainstorm-os/sdk/icon";
 import { MenuAlign, type SearchPickerItem, openSearchPicker } from "@brainstorm-os/sdk/menus";
 import { closeObjectMenu, openAnchoredMenu } from "@brainstorm-os/sdk/object-menu";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import {
+	type AutoHidePanelProps,
+	PanelSide,
+	PanelToggleButton,
+	useAutoHidePanel,
+} from "@brainstorm-os/sdk/panel-toggle";
 import { Popover } from "@brainstorm-os/sdk/popover";
 import {
 	PresenceActivity,
@@ -644,6 +649,11 @@ export function ChatApp(): ReactElement {
 		},
 		[activeId],
 	);
+	const sidebarAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !showSidebar });
+	useChatShortcut(ChatAction.ToggleSidebar, () => {
+		if (sidebarAutoHide.active) sidebarAutoHide.toggle();
+		else setShowSidebar((v) => !v);
+	});
 	useChatShortcut(ChatAction.Search, () => openSearch(SearchScope.Channel));
 	useChatShortcut(ChatAction.SearchAll, () => openSearch(SearchScope.All));
 	const jumpToHit = useCallback((hit: SearchHit) => {
@@ -848,7 +858,8 @@ export function ChatApp(): ReactElement {
 
 			<div className="chat__body">
 				<ChannelSidebar
-					open={showSidebar}
+					open={sidebarAutoHide.visible}
+					autoHide={sidebarAutoHide.panelProps}
 					channels={channels}
 					activeId={activeId}
 					unreadCounts={unreadCounts}
@@ -857,6 +868,7 @@ export function ChatApp(): ReactElement {
 					onMarkRead={(id) => markRead([id])}
 					onMarkAllRead={markAllRead}
 				/>
+				{sidebarAutoHide.edgeProps && <div {...sidebarAutoHide.edgeProps} />}
 
 				<main className="chat__main">
 					{searchOpen ? (
@@ -960,6 +972,7 @@ export function ChatApp(): ReactElement {
 
 function ChannelSidebar({
 	open,
+	autoHide,
 	channels,
 	activeId,
 	unreadCounts,
@@ -971,6 +984,8 @@ function ChannelSidebar({
 	/** The CSS guard lands only at the END of the 180ms slide (F-489); `inert`
 	 *  removes the panel from the tab order and the a11y tree immediately. */
 	open: boolean;
+	/** 7.15 — auto-hide overlay wiring from `useAutoHidePanel`. */
+	autoHide?: AutoHidePanelProps;
 	channels: readonly ChatChannel[];
 	activeId: string | null;
 	unreadCounts: ReadonlyMap<string, number>;
@@ -1003,6 +1018,7 @@ function ChannelSidebar({
 	};
 	return (
 		<nav
+			{...autoHide}
 			className="chat__sidebar"
 			aria-label={t("sidebar.channels")}
 			aria-hidden={open ? undefined : true}

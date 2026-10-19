@@ -13,6 +13,7 @@ export enum ChatAction {
 	CloseSearch = "chat.close-search",
 	MarkAllRead = "chat.mark-all-read",
 	ToggleComposer = "chat.toggle-composer",
+	ToggleSidebar = "chat.toggle-sidebar",
 }
 
 export const CHAT_CHORDS: Readonly<Record<ChatAction, string>> = {
@@ -21,6 +22,7 @@ export const CHAT_CHORDS: Readonly<Record<ChatAction, string>> = {
 	[ChatAction.CloseSearch]: "Escape",
 	[ChatAction.MarkAllRead]: "Shift+Escape",
 	[ChatAction.ToggleComposer]: "CmdOrCtrl+Shift+E",
+	[ChatAction.ToggleSidebar]: "CmdOrCtrl+\\",
 };
 
 /** Single-key chords that must fire even while focus is in a text field

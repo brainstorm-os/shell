@@ -32,7 +32,7 @@ import {
 	openObjectMenu,
 } from "@brainstorm-os/sdk/object-menu";
 import { readPanelOpen, writePanelOpen } from "@brainstorm-os/sdk/panel-state";
-import { PanelSide, PanelToggleButton } from "@brainstorm-os/sdk/panel-toggle";
+import { PanelSide, PanelToggleButton, useAutoHidePanel } from "@brainstorm-os/sdk/panel-toggle";
 import { PopoverSize, createPopoverElement } from "@brainstorm-os/sdk/popover";
 import { PresenceStack, usePresence, useSelf } from "@brainstorm-os/sdk/presence-stack";
 import { applyPersistedPanelWidth, attachResizable } from "@brainstorm-os/sdk/resizable";
@@ -318,6 +318,13 @@ export function CodeEditorApp(): ReactElement {
 
 	const [navOpen, setNavOpen] = useState(() => readPanelPref(NAV_OPEN_KEY, true));
 	const [refsOpen, setRefsOpen] = useState(() => readPanelOpen(REFS_OPEN_KEY, true));
+	const filesAutoHide = useAutoHidePanel({ side: PanelSide.Left, collapsed: !navOpen });
+	const filesAutoHideActive = filesAutoHide.active;
+	const toggleFilesAutoHide = filesAutoHide.toggle;
+	const toggleFiles = useCallback((): void => {
+		if (filesAutoHideActive) toggleFilesAutoHide();
+		else setNavOpen((v) => !v);
+	}, [filesAutoHideActive, toggleFilesAutoHide]);
 
 	// ── Folder tree view state (9.7.12) ───────────────────────────────────────
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
@@ -1092,7 +1099,7 @@ export function CodeEditorApp(): ReactElement {
 				id: "code-editor.toggle-files",
 				label: t("command.toggleFiles"),
 				keywords: ["sidebar", "panel", "explorer"],
-				run: () => setNavOpen((v) => !v),
+				run: toggleFiles,
 			},
 			{
 				id: "code-editor.toggle-references",
@@ -1102,7 +1109,7 @@ export function CodeEditorApp(): ReactElement {
 			},
 		);
 		return commands;
-	}, [canCreateFile, showQuickOpen, persistSelected, createNewFile, focusReferences]);
+	}, [canCreateFile, showQuickOpen, persistSelected, createNewFile, focusReferences, toggleFiles]);
 
 	const showCommandPalette = useCallback((): void => {
 		if (commandPaletteRef.current) return;
@@ -1208,11 +1215,19 @@ export function CodeEditorApp(): ReactElement {
 			attachShortcut(window, CODE_EDITOR_CHORDS[CodeEditorAction.FormatDocument], () => {
 				void paneRef.current?.formatBuffer();
 			}),
+			attachShortcut(window, CODE_EDITOR_CHORDS[CodeEditorAction.ToggleFiles], toggleFiles),
 		];
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
-	}, [persistSelected, moveSelection, focusReferences, showQuickOpen, showCommandPalette]);
+	}, [
+		persistSelected,
+		moveSelection,
+		focusReferences,
+		showQuickOpen,
+		showCommandPalette,
+		toggleFiles,
+	]);
 
 	const selectedContent = selectedRow ? contentOf(selectedRow, edits) : "";
 	// `edits` changes on every keystroke, so deriving the inspector straight off
@@ -1383,7 +1398,10 @@ export function CodeEditorApp(): ReactElement {
 							onMoveFiles={moveFiles}
 							onMoveFolder={moveFolder}
 							menuContext={fileMenuContext}
+							open={filesAutoHide.visible}
+							autoHide={filesAutoHide.panelProps}
 						/>
+						{filesAutoHide.edgeProps && <div {...filesAutoHide.edgeProps} />}
 						<div
 							ref={filesResizeRef}
 							className="editor__files-resize"
