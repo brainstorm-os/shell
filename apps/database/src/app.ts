@@ -270,6 +270,8 @@ import {
 import { isListLocked, withLiveListLocks } from "./logic/list-lock";
 import { deriveListMode } from "./logic/list-mode";
 import {
+	DeleteListOutcome,
+	SaveListOutcome,
 	deleteUserList,
 	loadUserLists,
 	planListReconcile,
@@ -1117,7 +1119,7 @@ function renderStageHeader(state: AppState): void {
 		// dedicated edit mode. Skip the rewrite while it's focused so a
 		// re-render mid-edit can't clobber the caret / in-progress text.
 		titleEl.textContent = list.name;
-		titleEl.contentEditable = "plaintext-only";
+		titleEl.contentEditable = isListLocked(list) ? "false" : "plaintext-only";
 		titleEl.spellcheck = false;
 		titleEl.onkeydown = (event) => {
 			if (event.key === "Enter") {
@@ -1176,7 +1178,7 @@ function renderStageHeader(state: AppState): void {
  *  clobber an edit in progress. */
 function bindListDescription(state: AppState, el: HTMLElement, list: List): void {
 	if (el === document.activeElement) return;
-	const editable = !isVaultDerivedListId(list.id);
+	const editable = !isVaultDerivedListId(list.id) && !isListLocked(list);
 	el.textContent = list.description;
 	el.contentEditable = editable ? "plaintext-only" : "false";
 	el.dataset.placeholder = editable ? t("brainstorm.database.stage.descriptionPlaceholder") : "";
@@ -2004,6 +2006,16 @@ function flashListLocked(listId: string, state: AppState): void {
 	flashStatus(t("brainstorm.database.status.listLocked", { name }), "warn");
 }
 
+/** The lock as it stands NOW, by id — `state.lists` is refreshed by
+ *  `withLiveListLocks` on every vault rebuild, so a writer that awaited
+ *  (entity creates, body copies) re-reads this right before it commits
+ *  members, instead of trusting the List it captured before the await. A
+ *  List gone meanwhile refuses too: there is nothing to pin into. */
+function liveListLocked(state: AppState, listId: string): boolean {
+	const live = state.lists.find((l) => l.id === listId);
+	return live === undefined || isListLocked(live);
+}
+
 /** Commit a single add/remove against a List's `members` overrides.
  *  Decision is pure (`decideToggleMembership`); this wrapper applies the
  *  decision to `state.lists` and re-renders the surfaces that reflect
@@ -2735,6 +2747,8 @@ function bindHeaderObjectMenu(state: AppState): void {
 			return {
 				target: { entityId: list.id, entityType: COLLECTION_TYPE_URL, label: list.name },
 				runtime,
+				locked: isListLocked(list),
+				labels: { lockedHint: t("brainstorm.database.list.menu.lockedHint") },
 				...(canDelete ? { onRemove: () => deleteListAndCleanup(state, list) } : {}),
 				...(extraItems.length > 0 ? { extraItems } : {}),
 			};
@@ -3050,25 +3064,32 @@ async function onDropObjectToGroup(
 	}
 	const groupValue = groupKey ?? "";
 	const now = Date.now();
-	let members = list?.members;
-	let added = 0;
+	const added: string[] = [];
 	for (const item of payload.items) {
 		try {
 			await update(item.entityId, { [propertyId]: groupValue });
 		} catch {
 			continue; // a write the target can't make (fail-closed cap) — skip it
 		}
-		if (members)
-			members = addToList(members, item.entityId, { matchesSource: false, by: "user", now }).members;
-		added += 1;
+		added.push(item.entityId);
 	}
-	if (added === 0) return;
-	if (list && members) {
-		const committed = members;
-		state.lists = state.lists.map((l) =>
-			l.id === list.id ? { ...l, members: committed, updatedAt: now } : l,
-		);
-		schedulePersist(state);
+	if (added.length === 0) return;
+	if (list) {
+		// Re-grouped already; the pin half is re-gated against the live lock,
+		// since the updates above awaited.
+		if (liveListLocked(state, list.id)) {
+			flashListLocked(list.id, state);
+		} else {
+			state.lists = state.lists.map((l) => {
+				if (l.id !== list.id) return l;
+				let members = l.members;
+				for (const entityId of added) {
+					members = addToList(members, entityId, { matchesSource: false, by: "user", now }).members;
+				}
+				return { ...l, members, updatedAt: now };
+			});
+			schedulePersist(state);
+		}
 	}
 	await loadVaultEntities(state);
 	renderActiveView(state);
@@ -3762,18 +3783,28 @@ async function performRowCreate(
 			await copyEntityBody(entities, option.template.id, entity.id);
 		}
 		// A manual / custom collection has no type source to pick the row up, so
-		// pin the new generic Object into the collection's manual members.
+		// pin the new generic Object into the collection's manual members — unless
+		// the List locked while the create awaited: the row then stays unpinned
+		// rather than written into a read-only collection.
 		if (plan.addToMembers && entity?.id) {
-			const { members } = addToList(list.members, entity.id, {
-				matchesSource: false,
-				by: "user",
-				now,
-			});
-			state.lists = state.lists.map((l) => (l.id === list.id ? { ...l, members, updatedAt: now } : l));
-			// Sync the membership into the overlay BEFORE the rebuild below, else
-			// `applyVaultSnapshot` re-layers the pre-add collection and the new
-			// row drops out of the manual members (same seam as F-010).
-			schedulePersist(state);
+			if (liveListLocked(state, list.id)) {
+				flashListLocked(list.id, state);
+			} else {
+				const entityId = entity.id;
+				state.lists = state.lists.map((l) =>
+					l.id === list.id
+						? {
+								...l,
+								members: addToList(l.members, entityId, { matchesSource: false, by: "user", now }).members,
+								updatedAt: now,
+							}
+						: l,
+				);
+				// Sync the membership into the overlay BEFORE the rebuild below, else
+				// `applyVaultSnapshot` re-layers the pre-add collection and the new
+				// row drops out of the manual members (same seam as F-010).
+				schedulePersist(state);
+			}
 		}
 		// Hand focus off to the new row once the grid paints it: typing names
 		// the row, Enter commits — the Notion/Anytype create pattern.
@@ -4676,10 +4707,16 @@ function openListContextMenu(
 	labelEl: HTMLElement,
 	point: { x: number; y: number },
 ): void {
+	const locked = isListLocked(list);
+	const lockedRow = locked
+		? { disabled: true, hint: t("brainstorm.database.list.menu.lockedHint") }
+		: {};
+	const last = state.lists.length <= 1;
 	openContextMenu(point, [
 		{
 			label: t("brainstorm.database.list.menu.rename"),
 			icon: IconName.Pencil,
+			...lockedRow,
 			onClick: () =>
 				beginInlineRename(labelEl, list.name, (next) => commitListRename(state, list.id, next)),
 		},
@@ -4692,8 +4729,8 @@ function openListContextMenu(
 			label: t("brainstorm.database.list.menu.delete"),
 			icon: IconName.Trash,
 			destructive: true,
-			disabled: state.lists.length <= 1,
-			...(state.lists.length <= 1 ? { hint: t("brainstorm.database.list.menu.delete.lastHint") } : {}),
+			disabled: last || locked,
+			...(last ? { hint: t("brainstorm.database.list.menu.delete.lastHint") } : lockedRow),
 			onClick: () => deleteListAndCleanup(state, list),
 		},
 	]);
@@ -4767,9 +4804,19 @@ async function openViewContextMenu(
 	]);
 }
 
+/* A locked List refuses rename / description / icon / delete (9.16.14): the
+ * pure CRUD already returns the List untouched, this is where the user hears
+ * why. `saveUserList` re-reads the lock again at the commit. */
+
 function commitListRename(state: AppState, listId: string, name: string): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		renderListNav(state);
+		renderStageHeader(state);
+		return;
+	}
 	const next = renameListLogic(list, name);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -4781,6 +4828,11 @@ function commitListRename(state: AppState, listId: string, name: string): void {
 function commitListDescription(state: AppState, listId: string, description: string): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		renderStageHeader(state);
+		return;
+	}
 	const next = setListDescriptionLogic(list, description);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -4792,6 +4844,10 @@ function commitListDescription(state: AppState, listId: string, description: str
 function commitListIcon(state: AppState, listId: string, icon: Icon | null): void {
 	const list = state.lists.find((l) => l.id === listId);
 	if (!list) return;
+	if (isListLocked(list)) {
+		flashListLocked(listId, state);
+		return;
+	}
 	const next = setListIconLogic(list, icon);
 	if (next === list) return;
 	state.lists = state.lists.map((l) => (l.id === listId ? next : l));
@@ -4849,6 +4905,11 @@ function duplicateViewAndSelect(state: AppState, source: ListView): void {
 
 function deleteListAndCleanup(state: AppState, list: List): void {
 	if (state.lists.length <= 1) return;
+	// The menu captured `list` when it opened; the lock is read live.
+	if (liveListLocked(state, list.id)) {
+		flashListLocked(list.id, state);
+		return;
+	}
 	const result = deleteListLogic(state.lists, state.views, list.id);
 	state.lists = result.lists;
 	state.views = result.views;
@@ -6075,16 +6136,52 @@ async function reconcileUserLists(state: AppState): Promise<void> {
 	const plan = planListReconcile(current, reconciledListSnapshot);
 	try {
 		for (const id of plan.toDelete) {
-			await deleteUserList(entities, id);
+			const result = await deleteUserList(entities, id);
+			if (result.outcome === DeleteListOutcome.RefusedLocked) {
+				revertRefusedListWrite(state, id, result.persisted);
+				continue;
+			}
 			reconciledListSnapshot.delete(id);
 		}
 		for (const list of plan.toSave) {
-			await saveUserList(entities, list);
+			const result = await saveUserList(entities, list);
+			if (result.outcome === SaveListOutcome.RefusedLocked) {
+				revertRefusedListWrite(state, list.id, result.persisted);
+				continue;
+			}
 			reconciledListSnapshot.set(list.id, serializeListForReconcile(list));
 		}
 	} catch (error) {
 		console.warn("[database] reconcile user lists failed:", error);
 	}
+}
+
+/** A List write refused at the commit because the row locked between the
+ *  writer's check and the debounced reconcile (9.16.14): drop the stale local
+ *  List for the persisted row (re-adding it when the refused write was a
+ *  delete), so the UI stops showing a change that never landed, and say so.
+ *  A refused delete's views were already reconciled away; the List comes
+ *  back on its fallback Grid. */
+function revertRefusedListWrite(state: AppState, listId: string, persisted: List | null): void {
+	console.warn(`[database] write to locked List ${listId} refused at commit`);
+	if (persisted) {
+		const present = state.lists.some((l) => l.id === listId);
+		state.lists = present
+			? state.lists.map((l) => (l.id === listId ? persisted : l))
+			: [...state.lists, persisted];
+		if (!present) {
+			state.views.push(...synthesizeFallbackViews(state.lists, state.views, state.db.entities));
+		}
+		reconciledListSnapshot.set(listId, serializeListForReconcile(persisted));
+		resetCompileCache();
+		renderListNav(state);
+		renderViewTabs(state);
+		renderStageHeader(state);
+		renderActiveView(state);
+		renderInspector(state);
+		schedulePersist(state);
+	}
+	flashListLocked(listId, state);
 }
 
 /** Reconcile the user-created views into `entities.db` (9.12.8): the
@@ -6191,9 +6288,12 @@ async function loadPersistedState(state: AppState): Promise<void> {
 						for (const l of kvLists) {
 							if (reconciledListSnapshot.has(l.id)) continue;
 							try {
-								await saveUserList(entities, l);
-								userLists.push(l);
-								reconciledListSnapshot.set(l.id, serializeListForReconcile(l));
+								const result = await saveUserList(entities, l);
+								// A locked row keeps what it has; the kv copy is the stale one.
+								const kept = result.outcome === SaveListOutcome.RefusedLocked ? result.persisted : l;
+								if (!kept) continue;
+								userLists.push(kept);
+								reconciledListSnapshot.set(kept.id, serializeListForReconcile(kept));
 							} catch (error) {
 								console.warn("[database] migrate kv list failed:", error);
 							}
