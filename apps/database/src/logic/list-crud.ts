@@ -15,6 +15,7 @@ import type { List } from "../types/list";
 import type { ListSource } from "../types/list-source";
 import { ChartType, type ColumnSpec, type ListView, ListViewKind } from "../types/list-view";
 import { AggregationKind } from "./aggregations";
+import { isListLocked } from "./list-lock";
 
 let idCounter = 0;
 
@@ -97,9 +98,14 @@ export function createList(opts: {
 	return { list, view };
 }
 
+/* A locked List is read-only (9.16.14): rename / description / icon / delete
+ * return their input unchanged, so a caller that skips the write on identity
+ * (`next === list`) is gated without re-deriving the lock. The app layer owns
+ * the refusal message. */
+
 export function renameList(list: List, name: string): List {
 	const trimmed = name.trim();
-	if (!trimmed || trimmed === list.name) return list;
+	if (isListLocked(list) || !trimmed || trimmed === list.name) return list;
 	return { ...list, name: trimmed, updatedAt: nowMs() };
 }
 
@@ -107,7 +113,7 @@ export function renameList(list: List, name: string): List {
  *  the same object so callers can skip the write. */
 export function setListDescription(list: List, description: string): List {
 	const trimmed = description.trim();
-	if (trimmed === list.description) return list;
+	if (isListLocked(list) || trimmed === list.description) return list;
 	return { ...list, description: trimmed, updatedAt: nowMs() };
 }
 
@@ -124,7 +130,7 @@ function sameIcon(a: Icon | null, b: Icon | null): boolean {
 
 /** Set (or clear, with `null`) the list's own universal icon. */
 export function setListIcon(list: List, icon: Icon | null): List {
-	if (sameIcon(list.icon, icon)) return list;
+	if (isListLocked(list) || sameIcon(list.icon, icon)) return list;
 	return { ...list, icon, updatedAt: nowMs() };
 }
 
@@ -160,12 +166,14 @@ export function duplicateList(
 	return { list, views: clonedViews };
 }
 
-/** Remove a list and all its views. Returns the filtered arrays. */
+/** Remove a list and all its views. Returns the filtered arrays; a locked
+ *  List returns them untouched. */
 export function deleteList(
 	lists: ReadonlyArray<List>,
 	views: ReadonlyArray<ListView>,
 	id: string,
 ): { lists: List[]; views: ListView[] } {
+	if (isListLocked(lists.find((l) => l.id === id))) return { lists: [...lists], views: [...views] };
 	return {
 		lists: lists.filter((l) => l.id !== id),
 		views: views.filter((v) => v.listId !== id),

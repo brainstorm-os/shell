@@ -16,6 +16,7 @@
 
 import { LIST_ENTITY_TYPE, entityToList, listToEntityProperties } from "@brainstorm-os/sdk";
 import type { EntitiesService, List } from "@brainstorm-os/sdk-types";
+import { isEntityLocked } from "@brainstorm-os/sdk/entity-lock";
 
 /** The slice of the entities service this adapter needs — narrowed so a host
  *  can inject a stub and so the dependency is explicit. */
@@ -37,22 +38,66 @@ export async function loadUserLists(svc: ListEntitiesService): Promise<List[]> {
 	return lists;
 }
 
-/** Create-or-update a user List as a `brainstorm/List/v1` entity, keyed by the
- *  List's own id (so a re-save overwrites in place). `get` decides the branch;
- *  the timestamps are owned by the entity, not the property bag. */
-export async function saveUserList(svc: ListEntitiesService, list: List): Promise<void> {
-	const properties = listToEntityProperties(list);
-	const existing = await svc.get(list.id);
-	if (existing) {
-		await svc.update(list.id, properties);
-	} else {
-		await svc.create(LIST_ENTITY_TYPE, properties, list.id);
-	}
+export enum SaveListOutcome {
+	Created = "created",
+	Saved = "saved",
+	/** The persisted row is locked: nothing was written. `persisted` is the
+	 *  row as it stands (null only when the row under this id is not a List),
+	 *  so the caller can drop its stale local copy instead of showing a change
+	 *  that never landed. */
+	RefusedLocked = "refused-locked",
 }
 
-/** Remove a user List (soft-delete through the entities service → Bin). */
-export async function deleteUserList(svc: ListEntitiesService, id: string): Promise<void> {
+export type SaveListResult =
+	| { outcome: SaveListOutcome.Created | SaveListOutcome.Saved }
+	| { outcome: SaveListOutcome.RefusedLocked; persisted: List | null };
+
+/** Create-or-update a user List as a `brainstorm/List/v1` entity, keyed by the
+ *  List's own id (so a re-save overwrites in place). `get` decides the branch;
+ *  the timestamps are owned by the entity, not the property bag.
+ *
+ *  The lock is re-read HERE, at the commit, not only at the writer's entry:
+ *  every membership / rename / description write checks `isListLocked` up
+ *  front, then awaits (entity creates, the 400 ms persist debounce) before
+ *  this runs — a lock flipped by another surface in that window must still
+ *  hold. The codec never re-encodes `locked`, so this patch is never the
+ *  lock-only exemption; a locked row takes no write at all. */
+export async function saveUserList(svc: ListEntitiesService, list: List): Promise<SaveListResult> {
+	const properties = listToEntityProperties(list);
+	const existing = await svc.get(list.id);
+	if (!existing) {
+		await svc.create(LIST_ENTITY_TYPE, properties, list.id);
+		return { outcome: SaveListOutcome.Created };
+	}
+	if (isEntityLocked(existing)) {
+		return { outcome: SaveListOutcome.RefusedLocked, persisted: entityToList(existing) };
+	}
+	await svc.update(list.id, properties);
+	return { outcome: SaveListOutcome.Saved };
+}
+
+export enum DeleteListOutcome {
+	Deleted = "deleted",
+	RefusedLocked = "refused-locked",
+}
+
+export type DeleteListResult =
+	| { outcome: DeleteListOutcome.Deleted }
+	| { outcome: DeleteListOutcome.RefusedLocked; persisted: List | null };
+
+/** Remove a user List (soft-delete through the entities service → Bin). Same
+ *  commit-point lock re-read as {@link saveUserList}: a List locked since the
+ *  delete was confirmed stays. */
+export async function deleteUserList(
+	svc: ListEntitiesService,
+	id: string,
+): Promise<DeleteListResult> {
+	const existing = await svc.get(id);
+	if (existing && isEntityLocked(existing)) {
+		return { outcome: DeleteListOutcome.RefusedLocked, persisted: entityToList(existing) };
+	}
 	await svc.delete(id);
+	return { outcome: DeleteListOutcome.Deleted };
 }
 
 /** Canonical serialized form of a List for change detection — both the

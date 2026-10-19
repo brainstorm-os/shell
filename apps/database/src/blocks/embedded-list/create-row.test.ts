@@ -55,6 +55,7 @@ describe("embedded block New (9.12.24 follow-up)", () => {
 					updatedAt: 0,
 				};
 			}
+			if (message === "getEntity") return manual;
 			return {};
 		});
 		const created = await createEmbeddedRow(
@@ -68,8 +69,8 @@ describe("embedded block New (9.12.24 follow-up)", () => {
 			entityTypeId: GENERIC_OBJECT_TYPE,
 			properties: { authors: ["page_1"] },
 		});
-		const update = graph.mock.calls[1];
-		expect(update?.[0]).toBe("updateEntity");
+		expect(graph.mock.calls.map((c) => c[0])).toEqual(["createEntity", "getEntity", "updateEntity"]);
+		const update = graph.mock.calls[2];
 		const members = (update?.[1] as { properties: { members: { include: { entityId: string }[] } } })
 			.properties.members;
 		expect(members.include.map((m) => m.entityId)).toEqual(["new_1"]);
@@ -80,5 +81,36 @@ describe("embedded block New (9.12.24 follow-up)", () => {
 		const graph = vi.fn(async () => ({}));
 		await expect(createEmbeddedRow(graph as never, locked, VIEW, null)).rejects.toThrow();
 		expect(graph).not.toHaveBeenCalled();
+	});
+
+	it("leaves the new row unpinned when the List locked between create and the members write", async () => {
+		const manual = list({ source: null, members: { include: [], exclude: [] } });
+		const graph = vi.fn(async (message: string, data: unknown) => {
+			if (message === "createEntity") {
+				const d = data as { entityTypeId: string; properties: Record<string, unknown> };
+				return {
+					entityId: "new_1",
+					entityTypeId: d.entityTypeId,
+					properties: d.properties,
+					updatedAt: 0,
+				};
+			}
+			if (message === "getEntity") return list({ ...manual.properties, locked: true });
+			return {};
+		});
+		await expect(createEmbeddedRow(graph as never, manual, VIEW, null)).rejects.toThrow(/new_1/);
+		expect(graph.mock.calls.map((c) => c[0])).toEqual(["createEntity", "getEntity"]);
+	});
+
+	it("refuses the members write when the List cannot be re-read (fail closed)", async () => {
+		const manual = list({ source: null, members: { include: [], exclude: [] } });
+		const graph = vi.fn(async (message: string) => {
+			if (message === "createEntity") {
+				return { entityId: "new_2", entityTypeId: "x", properties: {}, updatedAt: 0 };
+			}
+			throw new Error("graph down");
+		});
+		await expect(createEmbeddedRow(graph as never, manual, VIEW, null)).rejects.toThrow(/new_2/);
+		expect(graph.mock.calls.map((c) => c[0])).toEqual(["createEntity", "getEntity"]);
 	});
 });

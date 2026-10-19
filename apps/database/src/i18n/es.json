@@ -25,6 +25,7 @@
   "brainstorm.database.list.menu.duplicate": "Duplicar",
   "brainstorm.database.list.menu.delete": "Eliminar",
   "brainstorm.database.list.menu.delete.lastHint": "Una base de datos necesita al menos una lista",
+  "brainstorm.database.list.menu.lockedHint": "Esta lista está bloqueada: desbloquéala para cambiarle el nombre o eliminarla",
   "brainstorm.database.list.duplicated": "Duplicado en “{name}”",
   "brainstorm.database.list.deleted": "“{name}” eliminado",
   "brainstorm.database.list.created": "“{name}” creado",

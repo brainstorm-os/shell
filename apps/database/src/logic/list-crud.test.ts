@@ -280,3 +280,20 @@ describe("resolveListView", () => {
 		expect(resolveListView([], "v1", "v1")).toBeUndefined();
 	});
 });
+
+describe("a locked List is read-only in the pure CRUD (9.16.14 at-commit)", () => {
+	const locked: List = { ...emptyList("l1", "Sprint"), locked: true };
+
+	test("rename, description and icon return the same object", () => {
+		expect(renameList(locked, "Renamed")).toBe(locked);
+		expect(setListDescription(locked, "A description")).toBe(locked);
+		expect(setListIcon(locked, { kind: IconKind.Emoji, value: "📁" })).toBe(locked);
+	});
+
+	test("delete keeps the List and its views", () => {
+		const views = [emptyView("v1", "l1", "Grid"), emptyView("v2", "l2", "Grid")];
+		const result = deleteList([locked, emptyList("l2", "Other")], views, "l1");
+		expect(result.lists.map((l) => l.id)).toEqual(["l1", "l2"]);
+		expect(result.views.map((v) => v.id)).toEqual(["v1", "v2"]);
+	});
+});

@@ -25,6 +25,7 @@
   "brainstorm.database.list.menu.duplicate": "Dupliquer",
   "brainstorm.database.list.menu.delete": "Supprimer",
   "brainstorm.database.list.menu.delete.lastHint": "Une base de données nécessite au moins une liste",
+  "brainstorm.database.list.menu.lockedHint": "Cette liste est verrouillée — déverrouillez-la pour la renommer ou la supprimer",
   "brainstorm.database.list.duplicated": "Dupliqué vers « {name} »",
   "brainstorm.database.list.deleted": "« {name} » supprimé",
   "brainstorm.database.list.created": "« {name} » créé",

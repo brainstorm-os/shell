@@ -65,7 +65,17 @@ export async function createEmbeddedRow(
 		properties: plan.properties,
 	});
 	if (plan.addToMembers) {
-		const members = addToList(readMembers(list), created.entityId, {
+		// The lock is re-read at the commit, after the create awaited: a List
+		// locked in that window takes no members write. The row already exists
+		// and stays as an unpinned orphan — better than a write into a
+		// read-only collection. A failed re-read refuses too (fail closed).
+		const live = await graph<BpEntity | null>("getEntity", { entityId: list.entityId }).catch(
+			() => null,
+		);
+		if (!live?.properties || isLockedProperties(live.properties)) {
+			throw new Error(`embedded list locked before pinning; row ${created.entityId} left unpinned`);
+		}
+		const members = addToList(readMembers(live), created.entityId, {
 			matchesSource: false,
 			by: "user",
 		}).members;
