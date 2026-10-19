@@ -931,6 +931,24 @@ describe("ChatApp — pinned messages (Chats-4)", () => {
 		expect(open.mock.calls[0]?.[1][0]?.label).toBe("Unpin message");
 	});
 
+	it("a pin applies to the freshest stored list, keeping another member's concurrent pin", async () => {
+		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
+		const open = vi.mocked(openAnchoredMenu);
+		await mount([channel("c1", "general"), message("m1", "c1", "Mira", "remember this")]);
+		const svc = (
+			window as unknown as {
+				brainstorm: { services: { entities: { get: ReturnType<typeof vi.fn> } } };
+			}
+		).brainstorm.services.entities;
+		svc.get.mockImplementation(async () => ({ id: "c1", properties: { pinned: ["m-theirs"] } }));
+		open.mockClear();
+		act(() => {
+			(container.querySelector(".chat__line-more") as HTMLButtonElement).click();
+		});
+		await act(async () => open.mock.calls[0]?.[1][0]?.onSelect?.());
+		expect(entitiesSvc().update).toHaveBeenLastCalledWith("c1", { pinned: ["m-theirs", "m1"] });
+	});
+
 	it("lists a channel's pins from the header and jumps to one", async () => {
 		const { openAnchoredMenu } = await import("@brainstorm-os/sdk/object-menu");
 		const open = vi.mocked(openAnchoredMenu);

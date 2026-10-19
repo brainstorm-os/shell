@@ -28,7 +28,16 @@ export function readPinned(raw: unknown): string[] {
 
 /** Pin (append) or unpin `messageId`. Pinning past the cap drops the oldest. */
 export function togglePin(pinned: readonly string[], messageId: string): string[] {
-	if (pinned.includes(messageId)) return pinned.filter((id) => id !== messageId);
+	return setPinned(pinned, messageId, !pinned.includes(messageId));
+}
+
+/** Idempotent pin/unpin. The intent is fixed by what the user saw; applying
+ *  it to the freshest list (rather than re-toggling) keeps another member's
+ *  concurrent pin instead of overwriting it with a stale copy. */
+export function setPinned(pinned: readonly string[], messageId: string, pin: boolean): string[] {
+	const has = pinned.includes(messageId);
+	if (!pin) return has ? pinned.filter((id) => id !== messageId) : [...pinned];
+	if (has) return [...pinned];
 	const next = [...pinned, messageId];
 	return next.length > PINNED_MAX ? next.slice(next.length - PINNED_MAX) : next;
 }
