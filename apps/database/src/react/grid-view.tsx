@@ -430,13 +430,17 @@ export function GridView(props: GridViewProps): ReactElement {
 		[onChooseAggregation],
 	);
 
+	// The sticky pin is on the Name cells, so it only holds while Name IS the
+	// first column — pinned mid-grid it would slide over the columns before it.
+	const pinTitle = layout.pinFirstColumn && visible[0]?.propertyId === TITLE_COL;
+
 	return (
 		<div
 			ref={scrollRef}
 			className="dbv-grid"
 			data-density={layout.rowHeight}
 			data-wrap={layout.wrap ? "true" : "false"}
-			data-pinned={layout.pinFirstColumn ? "true" : "false"}
+			data-pinned={pinTitle ? "true" : "false"}
 		>
 			<div className="dbv-grid__table" {...gridKeyboardProps}>
 				<DndContext
