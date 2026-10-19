@@ -835,13 +835,16 @@ body.is-resizing .notes__props-resize {
 	z-index: 99;
 	transition:
 		transform var(--motion-duration-normal) ease,
-		inset-inline-end var(--motion-duration-normal) ease,
 		visibility var(--motion-duration-normal) ease;
 	will-change: transform;
 }
 
+/* Docking beside the properties panel is a transform too, so opening or
+   closing that panel slides the outline on the compositor, not via layout.
+   PHYSICAL-AXIS INTENTIONAL: the shift follows the screen edge, like the
+   closed-state slide below. */
 .notes[data-props-open="true"] .notes__outline {
-	inset-inline-end: var(--notes-props-width, 320px);
+	transform: translateX(calc(-1 * var(--notes-props-width, 320px)));
 }
 
 .notes[data-outline-open="false"] .notes__outline {
