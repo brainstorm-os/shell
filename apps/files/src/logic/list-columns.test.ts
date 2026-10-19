@@ -34,21 +34,14 @@ describe("list columns (9.8.11)", () => {
 });
 
 describe("listIconTrack", () => {
-	it("reserves one shared track when ANY row in the folder has an icon", () => {
-		// The regression: `grid-template-columns` is per-row, so an `auto`
-		// leading track collapsed to 0 on iconless rows and reserved space on
-		// icon-bearing ones — two column geometries in one list, with name,
-		// kind and modified each landing at two different x positions.
-		expect(listIconTrack(true, 18)).toBe("18px");
-	});
-
-	it("collapses the track when NOTHING in the folder has an icon", () => {
-		// The no-default-type-icon-fallback rule survives: a uniformly iconless
-		// folder still slides every name left into the slot.
-		expect(listIconTrack(false, 18)).toBe("0px");
+	it("reserves one fixed track so every row shares a column geometry", () => {
+		// `grid-template-columns` is per-row: a track that varied with the row
+		// (or collapsed to 0) put name, kind and modified at different x — and a
+		// 0 track let the name land in the icon column as a sliver.
+		expect(listIconTrack(18)).toBe("18px");
 	});
 
 	it("tracks the mode's icon size so density presets stay aligned", () => {
-		expect(listIconTrack(true, 28)).toBe("28px");
+		expect(listIconTrack(28)).toBe("28px");
 	});
 });

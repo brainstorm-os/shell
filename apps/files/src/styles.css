@@ -791,12 +791,11 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 
 .content-row {
 	display: grid;
-	/* Per [[feedback_no_default_type_icon_fallback]] (project-wide), the
-	 * icon column auto-sizes so it collapses to 0 (gap included) when an
-	 * entity has no own icon — the name then slides left into the slot
-	 * instead of every iconless row staying indented under the fixed 24px
-	 * track that used to be `24px ...`. */
-	grid-template-columns: auto minmax(0, 1fr) minmax(0, 160px) 120px;
+	/* The leading track is FIXED and the glyph host is always rendered: an
+	 * `auto` track + a collapsed empty host let the NAME become the first grid
+	 * item and shrink to the icon column (0.15.0 "file names invisible"). List
+	 * modes override the template inline from the mode's icon size. */
+	grid-template-columns: 20px minmax(0, 1fr) minmax(0, 160px) 120px;
 	align-items: center;
 	gap: var(--space-2);
 	padding: var(--space-2);
@@ -825,12 +824,6 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 }
 .content-row[data-view-mode="icon-list"] {
 	height: 47px;
-}
-
-/* Inner host of `<EntityIcon>`: collapse the empty wrapper too so the
- * grid's `auto` column has nothing to size to. */
-.content-row__glyph:empty {
-	display: none;
 }
 
 .content-row:hover {
@@ -914,6 +907,9 @@ body[data-nav-open="false"] .sidebar:not([data-bs-autohide]) {
 	justify-content: center;
 	width: 20px;
 	height: 20px;
+	flex-shrink: 0;
+	overflow: hidden;
+	border-radius: var(--radius-sm);
 	color: var(--glyph-folder);
 }
 
@@ -1104,10 +1100,6 @@ body[data-view-mode="grid"] .content-row__glyph {
 	 * folder-tint surface its padding ring. */
 	width: calc(var(--glyph-size, 36px) * 1.25);
 	height: calc(var(--glyph-size, 36px) * 1.25);
-	/* Explicit display beats the global `.content-row__glyph:empty
-	 * { display: none }` collapse — in tile modes the media slot is part
-	 * of the tile's anatomy (folder tint / thumb / chip), so an empty
-	 * slot keeps its box instead of leaving a name-only "button". */
 	display: flex;
 	align-items: center;
 	justify-content: center;
