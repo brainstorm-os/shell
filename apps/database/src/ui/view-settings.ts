@@ -160,18 +160,19 @@ enum SettingsPage {
 	ShownObjects = "shown-objects",
 }
 
-const VIEW_KIND_META: ReadonlyArray<[ListViewKind, string, DatabaseIcon]> = [
-	[ListViewKind.Grid, "Grid", DatabaseIcon.Grid],
-	[ListViewKind.List, "List", DatabaseIcon.List],
-	[ListViewKind.Gallery, "Gallery", DatabaseIcon.Gallery],
-	[ListViewKind.Board, "Board", DatabaseIcon.Board],
-	[ListViewKind.Calendar, "Calendar", DatabaseIcon.Calendar],
-	[ListViewKind.Timeline, "Timeline", DatabaseIcon.Timeline],
-	[ListViewKind.Chart, "Chart", DatabaseIcon.Chart],
+const VIEW_KIND_META: ReadonlyArray<[ListViewKind, TranslationKey, DatabaseIcon]> = [
+	[ListViewKind.Grid, "brainstorm.database.settings.kind.grid", DatabaseIcon.Grid],
+	[ListViewKind.List, "brainstorm.database.settings.kind.list", DatabaseIcon.List],
+	[ListViewKind.Gallery, "brainstorm.database.settings.kind.gallery", DatabaseIcon.Gallery],
+	[ListViewKind.Board, "brainstorm.database.settings.kind.board", DatabaseIcon.Board],
+	[ListViewKind.Calendar, "brainstorm.database.settings.kind.calendar", DatabaseIcon.Calendar],
+	[ListViewKind.Timeline, "brainstorm.database.settings.kind.timeline", DatabaseIcon.Timeline],
+	[ListViewKind.Chart, "brainstorm.database.settings.chart", DatabaseIcon.Chart],
 ];
 
 function viewKindLabel(kind: ListViewKind): string {
-	return VIEW_KIND_META.find((m) => m[0] === kind)?.[1] ?? kind;
+	const key = VIEW_KIND_META.find((m) => m[0] === kind)?.[1];
+	return key ? t(key) : kind;
 }
 
 function viewKindIcon(kind: ListViewKind): DatabaseIcon {
@@ -216,7 +217,7 @@ export function openViewSettings(anchor: HTMLElement, props: ViewSettingsProps):
 	const popover = document.createElement("div");
 	popover.className = "db-popover glass--strong";
 	popover.setAttribute("role", "dialog");
-	popover.setAttribute("aria-label", "View settings");
+	popover.setAttribute("aria-label", t("brainstorm.database.settings.dialogLabel"));
 
 	const header = document.createElement("header");
 	header.className = "db-popover__header";
@@ -330,33 +331,34 @@ function groupingApplies(kind: ListViewKind): boolean {
 function pageTitle(page: SettingsPage, props: ViewSettingsProps): string {
 	switch (page) {
 		case SettingsPage.Root:
-			return `${props.view.name} settings`;
+			return t("brainstorm.database.settings.title", { name: props.view.name });
 		case SettingsPage.ViewType:
-			return "View type";
+			return t("brainstorm.database.settings.viewType");
 		case SettingsPage.Layout:
 			return layoutPageLabel(props.view.kind);
 		case SettingsPage.Grouping:
 			return groupingPageLabel(props.view.kind);
 		case SettingsPage.Properties:
-			return "Properties";
+			return t("brainstorm.database.settings.properties");
 		case SettingsPage.Formula:
-			return "New formula";
+			return t("brainstorm.database.settings.newFormula");
 		case SettingsPage.ShownObjects:
-			return "Shown objects";
+			return t("brainstorm.database.settings.shownObjects");
 	}
 }
 
 function layoutPageLabel(kind: ListViewKind): string {
-	if (kind === ListViewKind.Gallery) return "Cards";
-	if (kind === ListViewKind.Calendar) return "Calendar";
-	if (kind === ListViewKind.Timeline) return "Timeline";
+	if (kind === ListViewKind.Gallery) return t("brainstorm.database.settings.page.cards");
+	if (kind === ListViewKind.Calendar) return t("brainstorm.database.settings.page.calendar");
+	if (kind === ListViewKind.Timeline) return t("brainstorm.database.settings.page.timeline");
 	if (kind === ListViewKind.Chart) return t("brainstorm.database.settings.chart");
-	return "Layout";
+	return t("brainstorm.database.settings.page.layout");
 }
 
 function groupingPageLabel(kind: ListViewKind): string {
-	if (kind === ListViewKind.Board || kind === ListViewKind.Chart) return "Grouping";
-	return "Dates";
+	if (kind === ListViewKind.Board || kind === ListViewKind.Chart)
+		return t("brainstorm.database.settings.page.grouping");
+	return t("brainstorm.database.settings.page.dates");
 }
 
 function renderPage(): void {
@@ -377,7 +379,7 @@ function renderPage(): void {
 		const back = document.createElement("button");
 		back.type = "button";
 		back.className = "db-popover__back";
-		back.setAttribute("aria-label", "Back");
+		back.setAttribute("aria-label", t("brainstorm.database.settings.back"));
 		setSharedIcon(back, IconName.CaretLeft);
 		back.addEventListener("click", () => navigate(parentPage(page)));
 		header.appendChild(back);
@@ -389,7 +391,7 @@ function renderPage(): void {
 	const close = document.createElement("button");
 	close.type = "button";
 	close.className = "db-popover__close";
-	close.setAttribute("aria-label", "Close settings");
+	close.setAttribute("aria-label", t("brainstorm.database.settings.close"));
 	setSharedIcon(close, IconName.Close);
 	close.addEventListener("click", () => props.onClose());
 	header.appendChild(close);
@@ -437,7 +439,7 @@ function renderRoot(body: HTMLElement, props: ViewSettingsProps): void {
 	nameLabel.className = "db-popover__field";
 	const nameText = document.createElement("span");
 	nameText.className = "db-popover__field-label";
-	nameText.textContent = "View name";
+	nameText.textContent = t("brainstorm.database.settings.viewName");
 	const nameInput = document.createElement("input");
 	nameInput.type = "text";
 	nameInput.className = "db-popover__input";
@@ -463,7 +465,7 @@ function renderRoot(body: HTMLElement, props: ViewSettingsProps): void {
 	nav.appendChild(
 		navRow({
 			icon: viewKindIcon(view.kind),
-			label: "View type",
+			label: t("brainstorm.database.settings.viewType"),
 			value: viewKindLabel(view.kind),
 			onClick: () => navigate(SettingsPage.ViewType),
 		}),
@@ -493,7 +495,7 @@ function renderRoot(body: HTMLElement, props: ViewSettingsProps): void {
 		nav.appendChild(
 			navRow({
 				icon: DatabaseIcon.List,
-				label: "Properties",
+				label: t("brainstorm.database.settings.properties"),
 				...(count ? { value: count } : {}),
 				onClick: () => navigate(SettingsPage.Properties),
 			}),
@@ -504,7 +506,7 @@ function renderRoot(body: HTMLElement, props: ViewSettingsProps): void {
 		nav.appendChild(
 			navRow({
 				icon: DatabaseIcon.Database,
-				label: "Shown objects",
+				label: t("brainstorm.database.settings.shownObjects"),
 				onClick: () => navigate(SettingsPage.ShownObjects),
 			}),
 		);
@@ -570,11 +572,11 @@ function navRow(opts: {
 function renderViewTypePage(body: HTMLElement, props: ViewSettingsProps): void {
 	const list = document.createElement("div");
 	list.className = "db-popover__options";
-	for (const [kind, label, icon] of VIEW_KIND_META) {
+	for (const [kind, labelKey, icon] of VIEW_KIND_META) {
 		list.appendChild(
 			optionRow({
 				icon,
-				label,
+				label: t(labelKey),
 				selected: props.view.kind === kind,
 				onClick: () => {
 					if (kind !== props.view.kind) props.onChange({ kind });
@@ -669,23 +671,31 @@ function gridControls(
 ): void {
 	rows.appendChild(
 		segmented(
-			"Row height",
+			t("brainstorm.database.settings.rowHeight"),
 			[
-				["compact", "Compact"],
-				["comfortable", "Normal"],
-				["tall", "Tall"],
+				["compact", t("brainstorm.database.settings.compact")],
+				["comfortable", t("brainstorm.database.settings.normal")],
+				["tall", t("brainstorm.database.settings.tall")],
 			],
 			layout.rowHeight,
 			(v) => patch({ rowHeight: v as GridLayoutOptions["rowHeight"] }),
 		),
 	);
 	rows.appendChild(
-		toggleRow("Row numbers", layout.showRowNumbers, (v) => patch({ showRowNumbers: v })),
+		toggleRow(t("brainstorm.database.settings.rowNumbers"), layout.showRowNumbers, (v) =>
+			patch({ showRowNumbers: v }),
+		),
 	);
 	rows.appendChild(
-		toggleRow("Pin first column", layout.pinFirstColumn, (v) => patch({ pinFirstColumn: v })),
+		toggleRow(t("brainstorm.database.settings.pinFirstColumn"), layout.pinFirstColumn, (v) =>
+			patch({ pinFirstColumn: v }),
+		),
 	);
-	rows.appendChild(toggleRow("Wrap text", layout.wrap ?? false, (v) => patch({ wrap: v })));
+	rows.appendChild(
+		toggleRow(t("brainstorm.database.settings.wrapText"), layout.wrap ?? false, (v) =>
+			patch({ wrap: v }),
+		),
+	);
 }
 
 function listControls(
@@ -695,16 +705,20 @@ function listControls(
 ): void {
 	rows.appendChild(
 		segmented(
-			"Density",
+			t("brainstorm.database.settings.density"),
 			[
-				["compact", "Compact"],
-				["comfortable", "Comfortable"],
+				["compact", t("brainstorm.database.settings.compact")],
+				["comfortable", t("brainstorm.database.settings.comfortable")],
 			],
 			layout.density,
 			(v) => patch({ density: v as ListLayoutOptions["density"] }),
 		),
 	);
-	rows.appendChild(toggleRow("Show type icon", layout.showIcon, (v) => patch({ showIcon: v })));
+	rows.appendChild(
+		toggleRow(t("brainstorm.database.settings.showTypeIcon"), layout.showIcon, (v) =>
+			patch({ showIcon: v }),
+		),
+	);
 }
 
 function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
@@ -716,7 +730,7 @@ function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
 
 	rows.appendChild(
 		segmented(
-			"Size",
+			t("brainstorm.database.settings.size"),
 			[
 				["small", "S"],
 				["medium", "M"],
@@ -728,7 +742,7 @@ function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
 	);
 	rows.appendChild(
 		segmented(
-			"Aspect",
+			t("brainstorm.database.settings.aspect"),
 			[
 				["square", "1:1"],
 				["video", "16:9"],
@@ -752,14 +766,17 @@ function galleryControls(rows: HTMLElement, props: ViewSettingsProps): void {
 	);
 	if ((layout.coverSource ?? GalleryCoverSource.Default) === GalleryCoverSource.Default) {
 		rows.appendChild(
-			selectRow("Cover", propOpts, view.coverProperty ?? "", (v) =>
+			selectRow(t("brainstorm.database.settings.cover"), propOpts, view.coverProperty ?? "", (v) =>
 				props.onChange({ coverProperty: v || null }),
 			),
 		);
 	}
 	rows.appendChild(
-		selectRow("Subtitle", propOpts, view.cardSubtitleProperty ?? "", (v) =>
-			props.onChange({ cardSubtitleProperty: v || null }),
+		selectRow(
+			t("brainstorm.database.settings.subtitle"),
+			propOpts,
+			view.cardSubtitleProperty ?? "",
+			(v) => props.onChange({ cardSubtitleProperty: v || null }),
 		),
 	);
 	rows.appendChild(
@@ -776,21 +793,25 @@ function boardControls(
 ): void {
 	rows.appendChild(
 		segmented(
-			"Card",
+			t("brainstorm.database.settings.card"),
 			[
-				["minimal", "Minimal"],
-				["rich", "Rich"],
+				["minimal", t("brainstorm.database.settings.minimal")],
+				["rich", t("brainstorm.database.settings.rich")],
 			],
 			layout.cardPreview,
 			(v) => patch({ cardPreview: v as BoardLayoutOptions["cardPreview"] }),
 		),
 	);
 	rows.appendChild(
-		sliderRow("Column width", layout.columnWidth, 220, 380, 20, (v) => patch({ columnWidth: v })),
+		sliderRow(t("brainstorm.database.settings.columnWidth"), layout.columnWidth, 220, 380, 20, (v) =>
+			patch({ columnWidth: v }),
+		),
 	);
 	rows.appendChild(
-		toggleRow("Collapse empty columns", layout.collapseEmptyColumns, (v) =>
-			patch({ collapseEmptyColumns: v }),
+		toggleRow(
+			t("brainstorm.database.settings.collapseEmptyColumns"),
+			layout.collapseEmptyColumns,
+			(v) => patch({ collapseEmptyColumns: v }),
 		),
 	);
 }
@@ -853,11 +874,11 @@ function calendarControls(
 ): void {
 	rows.appendChild(
 		segmented(
-			"Range",
+			t("brainstorm.database.settings.range"),
 			[
-				[CalendarRange.Week, "Week"],
-				[CalendarRange.Month, "Month"],
-				[CalendarRange.Year, "Year"],
+				[CalendarRange.Week, t("brainstorm.database.settings.week")],
+				[CalendarRange.Month, t("brainstorm.database.settings.month")],
+				[CalendarRange.Year, t("brainstorm.database.settings.year")],
 			],
 			layout.range,
 			(v) => patch({ range: v as CalendarRange }),
@@ -865,10 +886,10 @@ function calendarControls(
 	);
 	rows.appendChild(
 		segmented(
-			"Week starts",
+			t("brainstorm.database.settings.weekStarts"),
 			[
-				[CalendarWeekStart.Sunday, "Sun"],
-				[CalendarWeekStart.Monday, "Mon"],
+				[CalendarWeekStart.Sunday, t("brainstorm.database.settings.sunday")],
+				[CalendarWeekStart.Monday, t("brainstorm.database.settings.monday")],
 			],
 			layout.startWeekOn,
 			(v) => patch({ startWeekOn: v as CalendarWeekStart }),
@@ -884,21 +905,29 @@ function timelineControls(
 	rows.appendChild(
 		sliderRow("Zoom (px / day)", layout.pxPerDay, 4, 320, 4, (v) => patch({ pxPerDay: v })),
 	);
-	rows.appendChild(toggleRow('Show "Now" line', layout.showNow, (v) => patch({ showNow: v })));
 	rows.appendChild(
-		toggleRow("Show weekends", layout.showWeekends, (v) => patch({ showWeekends: v })),
+		toggleRow(t("brainstorm.database.settings.showNow"), layout.showNow, (v) =>
+			patch({ showNow: v }),
+		),
+	);
+	rows.appendChild(
+		toggleRow(t("brainstorm.database.settings.showWeekends"), layout.showWeekends, (v) =>
+			patch({ showWeekends: v }),
+		),
 	);
 	// 9.12.10 — arrows draw for the layout's `dependencyLinkTypes` (a
 	// data-configured allow-list); the toggle only controls visibility.
 	rows.appendChild(
-		toggleRow("Show dependencies", layout.showDependencies, (v) => patch({ showDependencies: v })),
+		toggleRow(t("brainstorm.database.settings.showDependencies"), layout.showDependencies, (v) =>
+			patch({ showDependencies: v }),
+		),
 	);
 	rows.appendChild(
 		segmented(
-			"Density",
+			t("brainstorm.database.settings.density"),
 			[
-				[TimelineDensity.Compact, "Compact"],
-				[TimelineDensity.Comfortable, "Comfortable"],
+				[TimelineDensity.Compact, t("brainstorm.database.settings.compact")],
+				[TimelineDensity.Comfortable, t("brainstorm.database.settings.comfortable")],
 			],
 			layout.density,
 			(v) => patch({ density: v as TimelineDensity }),
@@ -917,8 +946,11 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 
 	if (view.kind === ListViewKind.Chart) {
 		rows.appendChild(
-			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
-				props.onChange({ groupBy: v ? { propertyId: v } : null }),
+			selectRow(
+				t("brainstorm.database.settings.groupBy"),
+				propertyOptions(keys, true, names),
+				view.groupBy?.propertyId ?? "",
+				(v) => props.onChange({ groupBy: v ? { propertyId: v } : null }),
 			),
 		);
 	} else if (view.kind === ListViewKind.Board) {
@@ -926,8 +958,11 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 		const patchLayout = (p: Partial<BoardLayoutOptions>): void =>
 			props.onChange({ layoutOptions: { ...layout, ...p } });
 		rows.appendChild(
-			selectRow("Group by", propertyOptions(keys, true, names), view.groupBy?.propertyId ?? "", (v) =>
-				props.onChange({ groupBy: v ? { propertyId: v } : null }),
+			selectRow(
+				t("brainstorm.database.settings.groupBy"),
+				propertyOptions(keys, true, names),
+				view.groupBy?.propertyId ?? "",
+				(v) => props.onChange({ groupBy: v ? { propertyId: v } : null }),
 			),
 		);
 		const laneKeys = keys.filter((k) => k !== view.groupBy?.propertyId);
@@ -973,7 +1008,7 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 		const layout = view.layoutOptions as CalendarLayoutOptions;
 		rows.appendChild(
 			selectRow(
-				"Place on",
+				t("brainstorm.database.settings.placeOn"),
 				propertyOptions(keys, false, names),
 				layout.primaryDateProperty ?? "",
 				(v) => props.onChange({ layoutOptions: { ...layout, primaryDateProperty: v } }),
@@ -982,13 +1017,19 @@ function renderGroupingPage(body: HTMLElement, props: ViewSettingsProps): void {
 	} else if (view.kind === ListViewKind.Timeline) {
 		const layout = view.layoutOptions as TimelineLayoutOptions;
 		rows.appendChild(
-			selectRow("Start", propertyOptions(keys, false, names), layout.primaryDateProperty ?? "", (v) =>
-				props.onChange({ layoutOptions: { ...layout, primaryDateProperty: v } }),
+			selectRow(
+				t("brainstorm.database.settings.start"),
+				propertyOptions(keys, false, names),
+				layout.primaryDateProperty ?? "",
+				(v) => props.onChange({ layoutOptions: { ...layout, primaryDateProperty: v } }),
 			),
 		);
 		rows.appendChild(
-			selectRow("End", propertyOptions(keys, true, names), layout.endDateProperty ?? "", (v) =>
-				props.onChange({ layoutOptions: { ...layout, endDateProperty: v || null } }),
+			selectRow(
+				t("brainstorm.database.settings.end"),
+				propertyOptions(keys, true, names),
+				layout.endDateProperty ?? "",
+				(v) => props.onChange({ layoutOptions: { ...layout, endDateProperty: v || null } }),
 			),
 		);
 	}
@@ -1012,7 +1053,7 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 	// related entities (9.12.17). Only when the list actually has a relation.
 	const rollup = props.rollup;
 	if (rollup && rollup.relations.length > 0) {
-		const adderBtn = buildPopoverAction("Add rollup…");
+		const adderBtn = buildPopoverAction(t("brainstorm.database.settings.addRollup"));
 		adderBtn.dataset.testid = "db-view-settings-add-rollup";
 		adderBtn.setAttribute("aria-haspopup", "menu");
 		adderBtn.addEventListener("click", () => openRollupRelationPicker(adderBtn, rollup));
@@ -1023,7 +1064,7 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 	// over the row's other properties (9.12.17). Drills into a focused authoring
 	// sub-page (free-text expression needs a form, not a menu).
 	if (props.formula) {
-		const formulaBtn = buildPopoverAction("Add formula…");
+		const formulaBtn = buildPopoverAction(t("brainstorm.database.settings.addFormulaEllipsis"));
 		formulaBtn.dataset.testid = "db-view-settings-add-formula";
 		formulaBtn.addEventListener("click", () => navigate(SettingsPage.Formula));
 		body.appendChild(formulaBtn);
@@ -1036,7 +1077,7 @@ function renderPropertiesPage(body: HTMLElement, props: ViewSettingsProps): void
 		collBtn.type = "button";
 		collBtn.className = "db-popover__add-column";
 		collBtn.dataset.testid = "db-view-settings-add-collection-property";
-		collBtn.textContent = "Add collection property…";
+		collBtn.textContent = t("brainstorm.database.settings.addCollectionProperty");
 		collBtn.addEventListener("click", () => props.onCreateCollectionProperty?.());
 		body.appendChild(collBtn);
 	}
@@ -1059,14 +1100,14 @@ function renderFormulaPage(body: HTMLElement, props: ViewSettingsProps): void {
 	exprField.className = "db-popover__field";
 	const exprLabel = document.createElement("span");
 	exprLabel.className = "db-popover__field-label";
-	exprLabel.textContent = "Formula";
+	exprLabel.textContent = t("brainstorm.database.settings.formula");
 	const exprInput = document.createElement("input");
 	exprInput.type = "text";
 	exprInput.className = "db-popover__input db-popover__input--mono";
 	exprInput.placeholder = "{fee} * {quantity}";
 	exprInput.value = formulaDraft.expression;
 	exprInput.dataset.testid = "db-formula-expression";
-	exprInput.setAttribute("aria-label", "Formula expression");
+	exprInput.setAttribute("aria-label", t("brainstorm.database.settings.formulaExpression"));
 	exprField.append(exprLabel, exprInput);
 	rows.appendChild(exprField);
 
@@ -1090,7 +1131,7 @@ function renderFormulaPage(body: HTMLElement, props: ViewSettingsProps): void {
 				},
 			}));
 			openAnchoredMenu(anchorPoint(insertBtn), items, {
-				menuLabel: "Insert property reference",
+				menuLabel: t("brainstorm.database.settings.insertPropertyReference"),
 				anchor: insertBtn,
 			});
 		});
@@ -1102,13 +1143,13 @@ function renderFormulaPage(body: HTMLElement, props: ViewSettingsProps): void {
 	nameField.className = "db-popover__field";
 	const nameLabel = document.createElement("span");
 	nameLabel.className = "db-popover__field-label";
-	nameLabel.textContent = "Name";
+	nameLabel.textContent = t("brainstorm.database.settings.formulaName.label");
 	const nameInput = document.createElement("input");
 	nameInput.type = "text";
 	nameInput.className = "db-popover__input";
 	nameInput.value = formulaDraft.name;
 	nameInput.dataset.testid = "db-formula-name";
-	nameInput.setAttribute("aria-label", "Formula name");
+	nameInput.setAttribute("aria-label", t("brainstorm.database.settings.formulaName"));
 	nameField.append(nameLabel, nameInput);
 	rows.appendChild(nameField);
 
@@ -1123,7 +1164,7 @@ function renderFormulaPage(body: HTMLElement, props: ViewSettingsProps): void {
 	addBtn.type = "button";
 	addBtn.className = "db-popover__formula-add bs-filled";
 	addBtn.dataset.testid = "db-formula-submit";
-	addBtn.textContent = "Add formula";
+	addBtn.textContent = t("brainstorm.database.settings.addFormula");
 	rows.appendChild(addBtn);
 
 	body.appendChild(rows);
@@ -1242,7 +1283,7 @@ function openRollupTargetPicker(
 		onSelect: () => openRollupAggregationPicker(anchor, rollup, relation, target),
 	}));
 	openAnchoredMenu(anchorPoint(anchor), items, {
-		menuLabel: `Aggregate which property of ${relation.name}?`,
+		menuLabel: t("brainstorm.database.settings.rollupProperty", { relation: relation.name }),
 		anchor,
 	});
 }
@@ -1325,7 +1366,7 @@ function renderColumns(
 		const toggle = createCheckbox({
 			checked: isTitle || column.visible !== false,
 			disabled: isTitle,
-			ariaLabel: `Show column ${labelText}`,
+			ariaLabel: t("brainstorm.database.settings.showColumn", { name: labelText }),
 			onChange: (checked) => {
 				const next = allColumns.map((c, i) => (i === index ? { ...c, visible: checked } : c));
 				onChange(next);
@@ -1373,8 +1414,11 @@ function renderColumns(
 			remove.type = "button";
 			remove.className = "db-popover__column-remove";
 			remove.dataset.testid = "db-view-settings-remove-column";
-			remove.setAttribute("aria-label", `Remove column ${label.textContent}`);
-			remove.dataset.bsTooltip = "Remove column";
+			remove.setAttribute(
+				"aria-label",
+				t("brainstorm.database.settings.removeColumnNamed", { name: label.textContent ?? "" }),
+			);
+			remove.dataset.bsTooltip = t("brainstorm.database.settings.removeColumn");
 			setSharedIcon(remove, IconName.Close);
 			remove.addEventListener("click", (event) => {
 				event.stopPropagation();
@@ -1424,7 +1468,7 @@ function renderColumns(
 	// existing-vault catalog defs, data-derived properties, and the
 	// always-present "+ Create new property" affordance (omitted when the
 	// host can't accept new property defs — `onCreateProperty` undefined).
-	const adderBtn = buildPopoverAction("Add column…");
+	const adderBtn = buildPopoverAction(t("brainstorm.database.settings.addColumnEllipsis"));
 	adderBtn.dataset.testid = "db-view-settings-add-column";
 	adderBtn.setAttribute("aria-haspopup", "menu");
 	adderBtn.addEventListener("click", () => {
@@ -1603,7 +1647,7 @@ function openColumnAdderPicker(opts: OpenColumnAdderPickerOptions): void {
 			},
 		}));
 	openAnchoredMenu({ x: rect.left, y: rect.bottom + 4 }, items, {
-		menuLabel: "Add column",
+		menuLabel: t("brainstorm.database.settings.addColumn"),
 		anchor: opts.anchor,
 	});
 }
