@@ -61,6 +61,14 @@ describe("fileableCollections", () => {
 		]);
 	});
 
+	it("skips a locked collection (read-only lists take no new members)", () => {
+		const locked = list("l", "Archive");
+		locked.properties = { ...locked.properties, locked: true } as typeof locked.properties;
+		expect(fileableCollections([locked, list("a", "Reading list")], CAPS).map((c) => c.id)).toEqual([
+			"a",
+		]);
+	});
+
 	it("offers nothing without the List write grant", () => {
 		expect(
 			fileableCollections([list("a", "Reading list")], ["entities.write:brainstorm/Object/v1"]),

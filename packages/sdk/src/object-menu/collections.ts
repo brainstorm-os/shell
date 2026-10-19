@@ -16,6 +16,7 @@
 
 import type { Entity, EntityQuery, Icon, MemberOverrideSource } from "@brainstorm-os/sdk-types";
 import { AddOutcome, RemoveOutcome, addToList, removeFromList } from "../collections";
+import { isLockedProperties } from "../entity-lock";
 import { LIST_ENTITY_TYPE, type ListEntityRow, entityToList } from "../list-entity-codec";
 
 /** The slice of the entities service the collection surface needs — narrowed
@@ -78,7 +79,7 @@ export async function listCollectionsForObject(
 /** Toggle this entity's MANUAL membership of a Collection. `add` is the
  *  intent (true = ensure member). Writes only when membership actually
  *  changed (so a no-op never broadcasts). Returns the resulting membership
- *  state; `false` if the Collection can't be loaded. */
+ *  state; `false` if the Collection can't be loaded or is locked (read-only). */
 export async function toggleCollectionMembership(
 	svc: CollectionMembershipService,
 	listId: string,
@@ -87,7 +88,8 @@ export async function toggleCollectionMembership(
 	appId: string,
 ): Promise<boolean> {
 	const row = await svc.get(listId);
-	const list = row ? entityToList(row) : null;
+	if (!row || isLockedProperties(row.properties)) return false;
+	const list = entityToList(row);
 	if (!list) return false;
 	const ctx = { matchesSource: false, by: `app:${appId}` as MemberOverrideSource };
 	const result = add

@@ -18,6 +18,7 @@
 
 import { LIST_ENTITY_TYPE, entityToList } from "@brainstorm-os/sdk";
 import { decideRowCreate } from "@brainstorm-os/sdk-types";
+import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import {
 	type CollectionMembershipService,
 	toggleCollectionMembership,
@@ -80,6 +81,7 @@ export function fileableCollections(
 	const out: FileableCollection[] = [];
 	for (const row of rows) {
 		if (row.type !== LIST_ENTITY_TYPE || row.deletedAt !== null) continue;
+		if (isLockedProperties(row.properties)) continue;
 		const list = entityToList(row);
 		if (!list || list.name.trim() === "") continue;
 		const plan = decideRowCreate(list);
