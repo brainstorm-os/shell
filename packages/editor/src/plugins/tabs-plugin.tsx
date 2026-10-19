@@ -141,8 +141,10 @@ export function TabsPlugin(): ReactNode {
 				TabsNode,
 				(mutations) => {
 					for (const [key, mutation] of mutations) {
-						if (mutation === "destroyed") tracked.delete(key);
-						else tracked.add(key);
+						if (mutation === "destroyed") {
+							tracked.delete(key);
+							store.delete(key);
+						} else tracked.add(key);
 					}
 					refreshHosts();
 				},

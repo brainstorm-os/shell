@@ -23,6 +23,17 @@ export class TabsActiveStore {
 		for (const l of this.listeners) l();
 	}
 
+	/** Forget a destroyed tabs block, so the map is bounded by the blocks that
+	 *  exist rather than every block the editor ever held. No notify: a block
+	 *  that is gone has nothing to repaint. */
+	delete(tabsKey: NodeKey): void {
+		this.active.delete(tabsKey);
+	}
+
+	get size(): number {
+		return this.active.size;
+	}
+
 	snapshot(): number {
 		return this.version;
 	}
