@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapabilityLedger } from "@brainstorm-os/capabilities/ledger";
-import { type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
+import { LinkSkipReason, type PropertyDef, ValueType } from "@brainstorm-os/sdk-types";
 import { afterEach, describe, expect, it } from "vitest";
 import { ENVELOPE_PROTOCOL_VERSION, type Envelope } from "../../ipc/envelope";
 import { generateSymmetricKey } from "../credentials/crypto";
@@ -49,7 +49,13 @@ afterEach(async () => {
 	for (const c of cleanups.splice(0)) await c();
 });
 
-async function setup(opts: { grants?: string[]; defs?: PropertyDef[] } = {}) {
+async function setup(
+	opts: {
+		grants?: string[];
+		defs?: PropertyDef[];
+		onChange?: (entityId: string, repo: EntitiesRepository) => void;
+	} = {},
+) {
 	const dir = await mkdtemp(join(tmpdir(), "brainstorm-inverse-"));
 	const stores = new DataStores(dir);
 	const db = await stores.open("entities");
@@ -71,6 +77,7 @@ async function setup(opts: { grants?: string[]; defs?: PropertyDef[] } = {}) {
 		bindInverseBackfill: (fn) => {
 			backfill = fn;
 		},
+		onEntityChange: (change) => opts.onChange?.(change.entityId, repo),
 	});
 	cleanups.push(async () => {
 		stores.close();
@@ -325,5 +332,85 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		]);
 		const ids = ((t.props("p1")?.books ?? []) as Array<{ value: string }>).map((v) => v.value).sort();
 		expect(ids).toEqual(["b1", "b2", "b3"]);
+	});
+
+	it("a far end whose type is outside the pair's allowedTypes is refused", async () => {
+		const NOTE = "io.test/Note/v1";
+		const t = await setup({
+			defs: [
+				ref("authors", { ...MANY, allowedTypes: [PERSON], inverseOf: "books" }),
+				ref("books", { ...MANY, allowedTypes: [BOOK] }),
+			],
+		});
+		t.repo.create({ id: "n1", type: NOTE, properties: {}, createdBy: "x", now: 1, dekId: null });
+		await t.create("p1", PERSON);
+		await expect(t.create("b1", BOOK, { authors: [{ value: "n1" }] })).rejects.toMatchObject({
+			name: "Denied",
+		});
+		expect(t.props("n1")?.books).toBeUndefined();
+		expect(t.props("b1")).toBeNull();
+		await t.create("b2", BOOK, { authors: [{ value: "p1" }] });
+		expect(t.props("p1")?.books).toEqual([{ value: "b2" }]);
+	});
+
+	it("a far end locked after planning is skipped AND reported in the result", async () => {
+		const t = await setup({
+			onChange: (id, repo) => {
+				if (id === "b1") repo.update("p1", { locked: true }, 2000);
+			},
+		});
+		await t.create("p1", PERSON);
+		const made = (await t.create("b1", BOOK, { authors: [{ value: "p1" }] })) as {
+			skippedLinks?: Array<{ entityId: string; reason: string }>;
+		};
+		expect(t.props("p1")?.books).toBeUndefined();
+		expect(made.skippedLinks).toEqual([{ entityId: "p1", reason: LinkSkipReason.Locked }]);
+	});
+
+	describe("re-shaping a paired def passes the pair gate (old AND new allowedTypes)", () => {
+		const paired = {
+			authors: ref("authors", { ...MANY, allowedTypes: [PERSON], inverseOf: "books" }),
+			books: ref("books", { ...MANY, allowedTypes: [PERSON] }),
+			loose: ref("loose", { allowedTypes: [PERSON] }),
+		};
+		function service(grants: Set<string>) {
+			const saved: PropertyDef[] = [];
+			const store = {
+				snapshot: () => ({ properties: paired, dictionaries: {} }),
+				setProperty: (d: PropertyDef) => saved.push(d),
+			} as unknown as PropertiesStore;
+			const handler = makePropertiesServiceHandler({
+				getStore: async () => store,
+				canWriteType: async (_app, type) => grants.has(type),
+			});
+			return {
+				saved,
+				set: (def: PropertyDef) => handler(env("setProperty", { def }, "properties")),
+			};
+		}
+
+		it("an app that can write only its own type cannot narrow a pair onto it", async () => {
+			const { set, saved } = service(new Set([BOOK]));
+			for (const def of [
+				{ ...paired.authors, allowedTypes: [BOOK] },
+				{ ...paired.books, allowedTypes: [BOOK] },
+				{ ...paired.books, allowedTypes: undefined },
+				{ ...paired.books, valueType: ValueType.Text },
+				{ ...paired.books, count: { min: 0, max: 1 } },
+			] as PropertyDef[]) {
+				await expect(set(def)).rejects.toMatchObject({ name: "Denied" });
+			}
+			expect(saved).toEqual([]);
+		});
+
+		it("holding every linked type (old and new) allows it; an unpaired def is not gated", async () => {
+			const { set, saved } = service(new Set([BOOK, PERSON]));
+			await set({ ...paired.books, allowedTypes: [BOOK] });
+			await set({ ...paired.books, name: "Renamed" });
+			const loose = service(new Set());
+			await loose.set({ ...paired.loose, allowedTypes: [BOOK] });
+			expect(saved).toHaveLength(2);
+			expect(loose.saved).toHaveLength(1);
+		});
 	});
 });

@@ -33,8 +33,10 @@ import {
 	EntityEventVerb,
 	type EntityMergeResult,
 	type EntityQuery,
+	LinkSkipReason,
 	type PropertyDef,
 	RESERVED_PROPERTY_KEYS,
+	type SkippedLink,
 	buildAgentProvenance,
 	parseProvenanceRequest,
 	stripDerivedAuthorship,
@@ -326,7 +328,37 @@ function authorityOf(ledger: CapabilityLedger, app: string): EntityAuthority {
 	};
 }
 
-type InverseCatalog = { pairs: InversePairs; multi: Multiplicity };
+type InverseCatalog = {
+	pairs: InversePairs;
+	multi: Multiplicity;
+	/** A relation's declared target types (`[]` = any type). */
+	allowedTypes: (key: string) => readonly string[];
+};
+
+function catalogOf(defs: ReadonlyArray<PropertyDef>): InverseCatalog | null {
+	const pairs = inversePairs(defs);
+	if (pairs.size === 0) return null;
+	const allowed = new Map(defs.map((d) => [d.key, d.allowedTypes ?? []] as const));
+	return { pairs, multi: multiplicityOf(defs), allowedTypes: (key) => allowed.get(key) ?? [] };
+}
+
+/** Whether an object of `type` may hold every key of a far patch: it is a
+ *  target of each key's PARTNER, so it must be one of that partner's
+ *  `allowedTypes`. The far-write path is bounded by the catalog's declared
+ *  types, never only by who can edit the catalog. */
+function farTypeAllowed(
+	catalog: InverseCatalog,
+	type: string,
+	patch: Readonly<Record<string, unknown>>,
+): boolean {
+	for (const key of Object.keys(patch)) {
+		const partner = catalog.pairs.get(key);
+		if (partner === undefined) return false;
+		const allowed = catalog.allowedTypes(partner);
+		if (allowed.length > 0 && !allowed.includes(type)) return false;
+	}
+	return true;
+}
 
 /** Journals one far-end write of a two-way relation (Agent-15). */
 type FarWriteJournal = (
@@ -337,6 +369,10 @@ type FarWriteJournal = (
 
 /** Upper bound on far ends one write may update through two-way relations. */
 export const MAX_FAR_WRITES_PER_CALL = 256;
+
+function withSkippedLinks(entity: Entity, skipped: readonly SkippedLink[]): Entity {
+	return skipped.length === 0 ? entity : { ...entity, skippedLinks: skipped };
+}
 
 function named(name: string, message: string): Error {
 	const err = new Error(message);
@@ -583,13 +619,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			console.warn(`[entities] property catalog unavailable: ${(error as Error).message}`);
 			return null;
 		}
-		if (catalogMemo?.defs !== defs) {
-			const pairs = inversePairs(defs);
-			catalogMemo = {
-				defs,
-				catalog: pairs.size === 0 ? null : { pairs, multi: multiplicityOf(defs) },
-			};
-		}
+		if (catalogMemo?.defs !== defs) catalogMemo = { defs, catalog: catalogOf(defs) };
 		return catalogMemo.catalog;
 	};
 
@@ -610,6 +640,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 	const stageFarWrites = (
 		repo: EntitiesRepository,
 		authority: EntityAuthority,
+		catalog: InverseCatalog,
 		writes: ReadonlyArray<FarWrite>,
 		verb: string,
 	): StagedFarWrite[] => {
@@ -622,6 +653,9 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		return writes.flatMap((w) => {
 			const row = repo.get(w.entityId);
 			if (!row || !authority.read(row.type)) return [];
+			if (!farTypeAllowed(catalog, row.type, w.patch)) {
+				throw named("Denied", `${verb}: a linked object is not a type this two-way relation links`);
+			}
 			if (!authority.write(row.type)) {
 				throw named("Denied", `${verb}: a linked object of a two-way relation is not writable`);
 			}
@@ -657,7 +691,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			...catalog,
 			read: readableProps(repo, authority),
 		});
-		if (stageFarWrites(repo, authority, writes, verb).length === 0) return null;
+		if (stageFarWrites(repo, authority, catalog, writes, verb).length === 0) return null;
 		return { authority, entityId, before, after, catalog };
 	};
 
@@ -672,22 +706,35 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		return next;
 	};
 
+	// Re-checked at apply time (the plan was checked before the primary write,
+	// and awaits sit between): a far end that can no longer take its back-link
+	// is skipped and REPORTED. A far end outside the catalog's types, or one
+	// the caller cannot read, is skipped silently — it was never part of the
+	// checked plan, and naming it would be an oracle.
 	const writeFarPatch = async (
 		repo: EntitiesRepository,
 		authority: EntityAuthority,
+		catalog: InverseCatalog,
 		farId: string,
 		rawPatch: Record<string, unknown>,
 		writer: LocalWriter,
 		journal: FarWriteJournal | undefined,
-	): Promise<void> => {
+	): Promise<SkippedLink | null> => {
 		const row = repo.get(farId);
-		if (!row || !authority.write(row.type) || isLockedProperties(row.properties)) return;
+		if (!row || !authority.read(row.type) || !farTypeAllowed(catalog, row.type, rawPatch)) {
+			return null;
+		}
+		if (!authority.write(row.type)) return { entityId: farId, reason: LinkSkipReason.Denied };
+		if (isLockedProperties(row.properties)) {
+			return { entityId: farId, reason: LinkSkipReason.Locked };
+		}
 		const patch = stripReservedProperties(rawPatch);
-		if (Object.keys(patch).length === 0) return;
+		if (Object.keys(patch).length === 0) return null;
 		const updated = await writePropsThroughDoc(repo, row, patch, writer);
-		if (!updated) return;
+		if (!updated) return null;
 		emitChange(EntityEventVerb.Update, row.id, row.type);
 		await journal?.(row, patch, updated);
+		return null;
 	};
 
 	const applyFarWrites = (
@@ -695,8 +742,8 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 		plan: FarPlan | null,
 		writer: LocalWriter = SHELL_WRITER,
 		journal?: FarWriteJournal,
-	): Promise<void> => {
-		if (!plan) return Promise.resolve();
+	): Promise<SkippedLink[]> => {
+		if (!plan) return Promise.resolve([]);
 		return onFarChain(async () => {
 			const writes = planInverseWrites({
 				entityId: plan.entityId,
@@ -705,9 +752,20 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				...plan.catalog,
 				read: readableProps(repo, plan.authority),
 			}).slice(0, MAX_FAR_WRITES_PER_CALL);
+			const skipped: SkippedLink[] = [];
 			for (const w of writes) {
-				await writeFarPatch(repo, plan.authority, w.entityId, w.patch, writer, journal);
+				const skip = await writeFarPatch(
+					repo,
+					plan.authority,
+					plan.catalog,
+					w.entityId,
+					w.patch,
+					writer,
+					journal,
+				);
+				if (skip) skipped.push(skip);
 			}
+			return skipped;
 		});
 	};
 
@@ -720,16 +778,16 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			if (!inverse) return 0;
 			const known = (await options.getPropertyDefs?.()) ?? [];
 			const defs = [...known.filter((d) => d.key !== def.key), def];
-			if (inversePairs(defs).get(def.key) !== inverse) return 0;
-			const multi = multiplicityOf(defs);
+			const catalog = catalogOf(defs);
+			if (!catalog || catalog.pairs.get(def.key) !== inverse) return 0;
 			const authority = authorityOf(ledger, app);
 			const rows = repo.query({}).filter((r) => authority.read(r.type));
-			const writes = planInverseBackfill({ key: def.key, inverse, rows, multi });
-			const staged = stageFarWrites(repo, authority, writes, "properties.setProperty");
+			const writes = planInverseBackfill({ key: def.key, inverse, rows, multi: catalog.multi });
+			const staged = stageFarWrites(repo, authority, catalog, writes, "properties.setProperty");
 			const writer: LocalWriter = { app, agent: false };
 			await onFarChain(async () => {
 				for (const { row, patch } of staged) {
-					await writeFarPatch(repo, authority, row.id, patch, writer, undefined);
+					await writeFarPatch(repo, authority, catalog, row.id, patch, writer, undefined);
 				}
 			});
 			return staged.length;
@@ -1161,13 +1219,13 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 					// Asset-B4 — bind `asset_refs` to the `brainstorm://asset/`
 					// URLs the new row's properties carry (post-commit, contained).
 					await reconcileAssetRefs(repo, entityId, row.properties);
-					await applyFarWrites(
+					const skippedLinks = await applyFarWrites(
 						repo,
 						farOnCreate,
 						{ app, agent: provReq !== null },
 						farJournalFor(repo, app, a.provenance),
 					);
-					return compose(row);
+					return withSkippedLinks(compose(row), skippedLinks);
 				}
 			}
 
@@ -1205,12 +1263,17 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 				if (a.provenance !== undefined && Object.keys(patch).length > 0) {
 					await journalAgentUpdate(repo, app, a.provenance, existing, patch, updated);
 				}
-				await applyFarWrites(repo, farOnUpdate, writer, farJournalFor(repo, app, a.provenance));
+				const skippedLinks = await applyFarWrites(
+					repo,
+					farOnUpdate,
+					writer,
+					farJournalFor(repo, app, a.provenance),
+				);
 				// Asset-B4 — reconcile against the row's FULL post-write property
 				// set (a patch merges into existing, so pruning off just the patch
 				// would drop refs for assets the patch never touched).
 				await reconcileAssetRefs(repo, id, updated.properties);
-				return compose(updated);
+				return withSkippedLinks(compose(updated), skippedLinks);
 			}
 
 			case "delete": {
