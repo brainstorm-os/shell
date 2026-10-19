@@ -255,6 +255,8 @@
   "brainstorm.database.property.form.relationTargetLabel": "Links to",
   "brainstorm.database.property.form.relationTargetAny": "Anything",
   "brainstorm.database.status.propertyReused": "Added existing property “{name}”",
+  "brainstorm.database.status.propertyAdopted": "Updated existing property “{name}” with the new relation settings",
+  "brainstorm.database.status.propertyDistinct": "Created a separate “{name}” — the existing one is already paired with “{other}”",
   "brainstorm.database.status.propertyAdded": "Added property “{name}”",
   "brainstorm.database.status.propertyExists": "Property “{name}” already exists — reuse it instead of creating a twin",
   "brainstorm.database.status.propertyAddedToCollection": "Added “{name}” to this collection",

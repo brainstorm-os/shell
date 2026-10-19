@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 import type { ColumnSpec } from "../types/list-view";
 import {
 	ColumnAdderOptionKind,
+	PropertyReuseKind,
 	appendColumnForProperty,
 	buildColumnAdderOptions,
 	findReusablePropertyDef,
+	resolvePropertyReuse,
 } from "./column-adder";
 
 function def(key: string, name: string, valueType: ValueType = ValueType.Text): PropertyDef {
@@ -249,5 +251,104 @@ describe("findReusablePropertyDef (F-034)", () => {
 
 	it("returns null for a blank name", () => {
 		expect(findReusablePropertyDef(catalog, "   ", ValueType.Number)).toBeNull();
+	});
+});
+
+describe("resolvePropertyReuse (F-508)", () => {
+	const relation = (key: string, name: string, extra: Partial<PropertyDef> = {}): PropertyDef => ({
+		...def(key, name, ValueType.EntityRef),
+		...extra,
+	});
+	const project = relation("prop_project", "Project");
+	const catalog: PropertyDef[] = [project, def("prop_a", "Deal size", ValueType.Number)];
+
+	it("creates when no catalog def shares the name + type", () => {
+		const draft = relation("prop_new", "Owner");
+		expect(resolvePropertyReuse(catalog, { def: draft })).toEqual({
+			kind: PropertyReuseKind.Create,
+		});
+	});
+
+	it("reuses when the draft expresses no relation settings (same name + type is the same property)", () => {
+		const draft = relation("prop_new", "project");
+		expect(resolvePropertyReuse(catalog, { def: draft })).toEqual({
+			kind: PropertyReuseKind.Reuse,
+			def: project,
+		});
+	});
+
+	it("reuses when the draft's target + pairing match the existing def", () => {
+		const existing = relation("prop_project", "Project", {
+			allowedTypes: ["Project/v1"],
+			inverseOf: "prop_tasks",
+		});
+		const draft = relation("prop_new", "Project", {
+			allowedTypes: ["Project/v1"],
+			inverseOf: "prop_tasks",
+		});
+		expect(resolvePropertyReuse([existing], { def: draft }).kind).toBe(PropertyReuseKind.Reuse);
+	});
+
+	it("adopts a new target onto the existing def instead of dropping it", () => {
+		const draft = relation("prop_new", "Project", { allowedTypes: ["Project/v1"] });
+		const decision = resolvePropertyReuse(catalog, { def: draft });
+		expect(decision).toEqual({
+			kind: PropertyReuseKind.Adopt,
+			def: { ...project, allowedTypes: ["Project/v1"] },
+		});
+	});
+
+	it("adopts a brand-new paired property, re-pointing the partner at the existing key", () => {
+		const draft = relation("prop_new", "Project", { inverseOf: "prop_partner" });
+		const partner = relation("prop_partner", "Tasks", { inverseOf: "prop_new" });
+		const decision = resolvePropertyReuse(catalog, { def: draft, partner });
+		expect(decision).toEqual({
+			kind: PropertyReuseKind.Adopt,
+			def: { ...project, inverseOf: "prop_partner" },
+			partner: { ...partner, inverseOf: "prop_project" },
+		});
+	});
+
+	it("maps a self-pairing onto the existing def's own key", () => {
+		const draft = relation("prop_new", "Project", { inverseOf: "prop_new" });
+		const decision = resolvePropertyReuse(catalog, { def: draft });
+		expect(decision).toEqual({
+			kind: PropertyReuseKind.Adopt,
+			def: { ...project, inverseOf: "prop_project" },
+		});
+	});
+
+	it("adopts a pairing with an existing relation", () => {
+		const draft = relation("prop_new", "Project", { inverseOf: "prop_tasks" });
+		const decision = resolvePropertyReuse(catalog, { def: draft });
+		expect(decision).toEqual({
+			kind: PropertyReuseKind.Adopt,
+			def: { ...project, inverseOf: "prop_tasks" },
+		});
+	});
+
+	it("keeps the draft distinct when the existing def is already paired elsewhere", () => {
+		const paired = relation("prop_project", "Project", { inverseOf: "prop_milestones" });
+		const draft = relation("prop_new", "Project", { inverseOf: "prop_tasks" });
+		expect(resolvePropertyReuse([paired], { def: draft })).toEqual({
+			kind: PropertyReuseKind.Distinct,
+			conflictsWith: paired,
+			pairedWith: "prop_milestones",
+		});
+	});
+
+	it("still adopts a new target when the existing pairing is left alone", () => {
+		const paired = relation("prop_project", "Project", { inverseOf: "prop_milestones" });
+		const draft = relation("prop_new", "Project", { allowedTypes: ["Project/v1"] });
+		expect(resolvePropertyReuse([paired], { def: draft })).toEqual({
+			kind: PropertyReuseKind.Adopt,
+			def: { ...paired, allowedTypes: ["Project/v1"] },
+		});
+	});
+
+	it("treats a same-set target in a different order as no change", () => {
+		const existing = relation("prop_project", "Project", { allowedTypes: ["A/v1", "B/v1"] });
+		const draft = relation("prop_new", "Project", { allowedTypes: ["B/v1", "A/v1"] });
+		expect(resolvePropertyReuse([existing], { def: draft }).kind).toBe(PropertyReuseKind.Reuse);
 	});
 });

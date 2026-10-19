@@ -200,7 +200,7 @@ import { TYPE_LABELS } from "./demo/dataset";
 import { type TranslationKey, plural, t } from "./i18n";
 import { onTranslatorChange, startLocaleSync } from "./i18n-boot";
 import { PERSON_TYPE } from "./logic/contact-import";
-import { commitCsvImport, csvToEntityImport } from "./logic/csv-import";
+import { commitCsvImport, csvToEntityImport, propertyDefsForCsvImport } from "./logic/csv-import";
 import { registerBuiltInImportMappers } from "./logic/import-registry";
 import { ListExportFormat, type ListExportOptions } from "./logic/list-export";
 import { runListExport } from "./ui/export-flow";
@@ -224,7 +224,12 @@ import { subscribe as subscribePerf, time } from "@brainstorm-os/sdk/perf";
 import { type ReactElement, createElement } from "react";
 import { type Backlink, backlinksFor } from "./logic/backlinks";
 import { pickerCandidatesForEntity, sourceMatches } from "./logic/collections-for-entity";
-import { appendColumnForProperty, findReusablePropertyDef } from "./logic/column-adder";
+import {
+	type PropertyReuseDecision,
+	PropertyReuseKind,
+	appendColumnForProperty,
+	resolvePropertyReuse,
+} from "./logic/column-adder";
 import {
 	compileViewCached,
 	filterEntitiesCached,
@@ -264,6 +269,7 @@ import {
 	duplicateView,
 	renameList as renameListLogic,
 	resolveListView,
+	seedColumnsForNewView,
 	setListDescription as setListDescriptionLogic,
 	setListIcon as setListIconLogic,
 } from "./logic/list-crud";
@@ -4551,6 +4557,13 @@ async function importCsvAsCollection(state: AppState): Promise<void> {
 		flashStatus(t("brainstorm.database.status.importFailed", { message }), "warn");
 		return;
 	}
+	// Every imported column lands in the catalog (F-511): without a def the
+	// column has no "Change type" and can't carry a number unit. The first
+	// failed write already warned; stop rather than toast once per column.
+	for (const def of propertyDefsForCsvImport(imported, cachedVaultProperties)) {
+		if (!(await persistNewPropertyDef(def, null))) break;
+	}
+	await loadVaultProperties(state);
 	const baseName =
 		handle.displayName.replace(/\.csv$/i, "").trim() ||
 		t("brainstorm.database.import.csv.defaultName");
@@ -4660,6 +4673,8 @@ function updateListSource(state: AppState, listId: string, types: ReadonlyArray<
 }
 
 function createNewViewAndSelect(state: AppState, listId: string): void {
+	const siblings = viewsForList(state, listId);
+	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	const view = createView({
 		// A new view is a Grid until retyped — name it after its kind with a
 		// collision counter ("Grid", "Grid 2", …), not the anonymous "New
@@ -4667,11 +4682,11 @@ function createNewViewAndSelect(state: AppState, listId: string): void {
 		// it on the spot (the same flow as "Blank collection" / "New folder")
 		// — F-038 / F-208.
 		listId,
-		name: defaultViewName(ListViewKind.Grid, viewsForList(state, listId)),
-		existingViewsForList: viewsForList(state, listId),
+		name: defaultViewName(ListViewKind.Grid, siblings),
+		existingViewsForList: siblings,
+		columns: seedColumnsForNewView(siblings, afterId),
 	});
 	state.views.push(view);
-	const afterId = state.active.listId === listId ? state.active.viewId : null;
 	state.lists = state.lists.map((l) => (l.id === listId ? insertViewAfter(l, view.id, afterId) : l));
 	state.active = { listId, viewId: view.id };
 	state.selection = clearSelection();
@@ -5707,16 +5722,28 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			// minting a duplicate (F-034): re-adding "Deal size · Number" should
 			// land the column on the property that already exists, not a fourth
 			// identical def. Same name + type IS the same property (Notion/
-			// Anytype rule); attach its column and skip the persist entirely.
-			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
-			if (reusable) {
-				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, reusable.key));
+			// Anytype rule) — unless the draft carries relation settings the
+			// existing def lacks (F-508): those are adopted onto it, or, when it
+			// is already paired elsewhere, the draft stays a distinct def.
+			const decision = resolvePropertyReuse(cachedVaultProperties, {
+				def,
+				...(partner ? { partner } : {}),
+			});
+			if (decision.kind === PropertyReuseKind.Reuse) {
+				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, decision.def.key));
 				renderActiveView(state);
 				schedulePersist(state);
 				flashStatus(
-					t("brainstorm.database.status.propertyReused", { name: reusable.name || reusable.key }),
+					t("brainstorm.database.status.propertyReused", { name: propertyLabel(decision.def) }),
 					"ready",
 				);
+				return;
+			}
+			if (decision.kind === PropertyReuseKind.Adopt) {
+				if (!(await adoptRelationSettings(state, decision.def, decision.partner))) return;
+				updateViewColumns(state, view.id, appendColumnForProperty(view.columns, decision.def.key));
+				renderActiveView(state);
+				schedulePersist(state);
 				return;
 			}
 			// Bail before touching the view if the def never reached the vault
@@ -5731,10 +5758,7 @@ function openColumnPropertyConstructor(state: AppState, view: ListView, _seedNam
 			updateViewColumns(state, view.id, [...view.columns, { propertyId: def.key, visible: true }]);
 			renderActiveView(state);
 			schedulePersist(state);
-			flashStatus(
-				t("brainstorm.database.status.propertyAdded", { name: def.name || def.key }),
-				"ready",
-			);
+			flashStatus(propertyCreatedStatus(def, decision), "ready");
 		},
 	});
 }
@@ -5753,13 +5777,24 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 		inverseCandidates: inverseCandidates(),
 		onCommit: async ({ def, dictionary, partner }) => {
 			// Same name + type already exists → reuse, never mint a twin that
-			// silently splits values across two defs (F-419 / F-034).
-			const reusable = findReusablePropertyDef(cachedVaultProperties, def.name ?? "", def.valueType);
-			if (reusable) {
+			// silently splits values across two defs (F-419 / F-034). Relation
+			// settings the draft adds are adopted onto the existing def, and a
+			// conflicting pairing keeps the draft distinct (F-508).
+			const decision = resolvePropertyReuse(cachedVaultProperties, {
+				def,
+				...(partner ? { partner } : {}),
+			});
+			if (decision.kind === PropertyReuseKind.Reuse) {
 				flashStatus(
-					t("brainstorm.database.status.propertyExists", { name: reusable.name || reusable.key }),
+					t("brainstorm.database.status.propertyExists", { name: propertyLabel(decision.def) }),
 					"ready",
 				);
+				return;
+			}
+			if (decision.kind === PropertyReuseKind.Adopt) {
+				if (!(await adoptRelationSettings(state, decision.def, decision.partner))) return;
+				renderActiveView(state);
+				schedulePersist(state);
 				return;
 			}
 			const scoped: PropertyDef = { ...def, scope: { kind: "list", target: list.id } };
@@ -5769,11 +5804,48 @@ function openCollectionPropertyConstructor(state: AppState, list: List): void {
 			renderActiveView(state);
 			schedulePersist(state);
 			flashStatus(
-				t("brainstorm.database.status.propertyAddedToCollection", { name: scoped.name || scoped.key }),
+				decision.kind === PropertyReuseKind.Distinct
+					? propertyCreatedStatus(scoped, decision)
+					: t("brainstorm.database.status.propertyAddedToCollection", { name: propertyLabel(scoped) }),
 				"ready",
 			);
 		},
 	});
+}
+
+function propertyLabel(def: PropertyDef): string {
+	return def.name || def.key;
+}
+
+/** Write the draft's relation settings onto the existing catalog def (F-508
+ *  Adopt) and refresh the cache; the toast names what happened so the user
+ *  knows their target / pairing landed on the property that already existed. */
+async function adoptRelationSettings(
+	state: AppState,
+	def: PropertyDef,
+	partner: PropertyDef | undefined,
+): Promise<boolean> {
+	if (!(await persistNewPropertyDef(def, null))) return false;
+	if (partner) await persistNewPropertyDef(partner, null);
+	await loadVaultProperties(state);
+	flashStatus(
+		t("brainstorm.database.status.propertyAdopted", { name: propertyLabel(def) }),
+		"ready",
+	);
+	return true;
+}
+
+/** The toast for a freshly-minted def: plain "added", or — when a same-name
+ *  relation exists but is paired elsewhere (F-508 Distinct) — why this one
+ *  is a separate property rather than a reuse. */
+function propertyCreatedStatus(def: PropertyDef, decision: PropertyReuseDecision): string {
+	if (decision.kind === PropertyReuseKind.Distinct) {
+		return t("brainstorm.database.status.propertyDistinct", {
+			name: propertyLabel(def),
+			other: propertyDisplayName(decision.pairedWith),
+		});
+	}
+	return t("brainstorm.database.status.propertyAdded", { name: propertyLabel(def) });
 }
 
 /** Change a property's type (9.12.33): preview every bound value's

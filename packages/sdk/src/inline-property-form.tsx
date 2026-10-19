@@ -224,7 +224,7 @@ export function InlinePropertyForm({
 				<input
 					ref={nameRef}
 					type="text"
-					className="bs-inline-property-form__name"
+					className="bs-input"
 					value={name}
 					placeholder={labels.namePlaceholder}
 					aria-invalid={error !== null}
@@ -405,7 +405,7 @@ export function InlinePropertyForm({
 					</span>
 					<input
 						type="text"
-						className="bs-inline-property-form__input"
+						className="bs-input"
 						data-testid="bs-inline-property-inverse-name"
 						value={inverseName}
 						onChange={(event) => setInverseName(event.target.value)}
@@ -510,28 +510,6 @@ const STYLES = `
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	padding: 0;
-}
-.bs-inline-property-form__name {
-	width: 100%;
-	height: 28px;
-	padding: 0 8px;
-	border: 1px solid var(--color-border-subtle, var(--border, rgba(127,127,127,0.25)));
-	border-radius: 6px;
-	background: var(--bg-elev, transparent);
-	color: var(--color-text-primary, var(--text, inherit));
-	font: inherit;
-	font-size: var(--text-size-md, 14px);
-	outline: none;
-	transition: border-color 100ms ease, background 100ms ease;
-}
-.bs-inline-property-form__name:focus {
-	border-color: transparent;
-	outline: 2px solid color-mix(in srgb, var(--color-focus-ring) 60%, transparent);
-	outline-offset: -1px;
-	background: var(--bg, transparent);
-}
-.bs-inline-property-form__name::placeholder {
-	color: var(--text-faint, #999);
 }
 .bs-inline-property-form__options {
 	width: 100%;

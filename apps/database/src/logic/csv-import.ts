@@ -5,12 +5,18 @@
  * generic Objects: the first column becomes each row's title (`name`), the
  * remaining columns become per-row properties keyed by their header, coerced to
  * the inferred type so the Database renders + edits them as the right cell
- * (Number / Boolean / Date / Text) via `effective-def` inference — no catalog
- * registration needed (a user upgrades a column to a typed/select property
- * later through the normal "Add column" path).
+ * (Number / Boolean / Date / Text). Each property column also gets a catalog
+ * def (`propertyDefsForCsvImport`, F-511): an inferred-only column has no
+ * "Change type" and can't carry a number unit, because both read the catalog.
  */
 
-import { GENERIC_OBJECT_TYPE, coerceScalarValue } from "@brainstorm-os/sdk-types";
+import {
+	DateGranularity,
+	GENERIC_OBJECT_TYPE,
+	type PropertyDef,
+	ValueType,
+	coerceScalarValue,
+} from "@brainstorm-os/sdk-types";
 import { type InferredCsvColumn, inferCsvColumns } from "./csv-infer";
 
 export type CsvEntityImport = {
@@ -59,4 +65,28 @@ export async function commitCsvImport(
 		if (created?.id) ids.push(created.id);
 	}
 	return ids;
+}
+
+/** One catalog def per imported property column, keyed by the header the
+ *  row values were written under, typed as inferred. A key the catalog
+ *  already holds is left alone — overwriting a def someone else authored
+ *  is worse than a mismatched cell. Shape mirrors `effective-def`'s
+ *  inference so a registered column renders exactly as it did before. */
+export function propertyDefsForCsvImport(
+	imported: CsvEntityImport,
+	existing: ReadonlyArray<PropertyDef>,
+): PropertyDef[] {
+	const taken = new Set(existing.map((d) => d.key));
+	const out: PropertyDef[] = [];
+	for (const col of imported.propertyColumns) {
+		if (taken.has(col.name)) continue;
+		out.push({
+			key: col.name,
+			name: col.name,
+			icon: null,
+			valueType: col.valueType,
+			...(col.valueType === ValueType.Date ? { granularity: DateGranularity.Date } : {}),
+		});
+	}
+	return out;
 }

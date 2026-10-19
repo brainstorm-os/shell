@@ -255,6 +255,8 @@
   "brainstorm.database.property.form.relationTargetLabel": "Collega a",
   "brainstorm.database.property.form.relationTargetAny": "Qualsiasi cosa",
   "brainstorm.database.status.propertyReused": "Proprietà esistente “{name}” aggiunta",
+  "brainstorm.database.status.propertyAdopted": "Proprietà esistente “{name}” aggiornata con le nuove impostazioni di relazione",
+  "brainstorm.database.status.propertyDistinct": "Creata una “{name}” separata — quella esistente è già abbinata a “{other}”",
   "brainstorm.database.status.propertyAdded": "Proprietà “{name}” aggiunta",
   "brainstorm.database.status.propertyExists": "La proprietà “{name}” esiste già — riutilizzala invece di creare un duplicato",
   "brainstorm.database.status.propertyAddedToCollection": "“{name}” aggiunta a questa raccolta",

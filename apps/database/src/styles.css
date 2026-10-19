@@ -1370,7 +1370,11 @@ body.is-resizing .db-inspector__resize {
  * during horizontal scroll. Opaque backgrounds let other columns scroll
  * underneath; the row state (hover / selected) is mirrored onto the pinned
  * cell so it doesn't read as detached. The header title cell needs the
- * highest z to win the top-left corner against the sticky header row. */
+ * highest z to win the top-left corner against the sticky header row.
+ * `--hover` / `--accent-soft` are translucent tints meant to sit on a
+ * surface, so the mirrored faces layer them over the page colour — painted
+ * bare, the cells scrolling underneath showed through the pinned cell
+ * (F-509). */
 .dbv-grid[data-pinned="true"] .dbv-grid__cell[data-col="title"] {
 	position: sticky;
 	left: 0;
@@ -1379,11 +1383,11 @@ body.is-resizing .db-inspector__resize {
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row:not(.dbv-grid__row--head):hover .dbv-grid__cell[data-col="title"] {
-	background: var(--hover);
+	background: linear-gradient(var(--hover), var(--hover)), var(--bg);
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row[data-selected="true"] .dbv-grid__cell[data-col="title"] {
-	background: var(--accent-soft);
+	background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--bg);
 }
 
 .dbv-grid[data-pinned="true"] .dbv-grid__row--head .dbv-grid__cell[data-col="title"] {
@@ -2653,8 +2657,15 @@ body.is-resizing .dbv-tl__labels-resize {
 	display: contents;
 }
 
+/* The title is the ONE header item that gives way: it grows into the free
+ * space and shrinks to an ellipsis, so the controls after it keep their
+ * width. Without `min-width: 0` + a no-shrink nav slot the flex algorithm
+ * squeezed the "3 of 4" counter onto three lines under a long title
+ * (F-510). */
 .db-inspector__title {
 	margin: 0;
+	flex: 1 1 auto;
+	min-width: 0;
 	font-size: var(--text-size-md);
 	font-weight: var(--text-weight-semibold);
 	overflow: hidden;
@@ -2666,6 +2677,7 @@ body.is-resizing .dbv-tl__labels-resize {
 .db-inspector__nav-slot {
 	display: inline-flex;
 	align-items: center;
+	flex-shrink: 0;
 	gap: var(--space-0_5);
 	margin-inline-start: auto;
 }
@@ -2675,6 +2687,8 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-inspector__nav-count {
+	flex-shrink: 0;
+	white-space: nowrap;
 	font-size: var(--text-size-xs);
 	color: var(--text-dim);
 	font-variant-numeric: tabular-nums;
@@ -3598,7 +3612,7 @@ body.is-resizing .dbv-tl__labels-resize {
 }
 
 .db-popover__segment {
-	padding: var(--space-0_5);
+	padding: var(--space-1) var(--space-2);
 	background: transparent;
 	border: 0;
 	color: var(--text-dim);

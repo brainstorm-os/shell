@@ -188,6 +188,8 @@ export function createView(opts: {
 	name: string;
 	kind?: ListViewKind;
 	existingViewsForList: ReadonlyArray<ListView>;
+	/** Columns the new view starts with (see `seedColumnsForNewView`). */
+	columns?: ReadonlyArray<ColumnSpec>;
 }): ListView {
 	const kind = opts.kind ?? ListViewKind.Grid;
 	const name = uniqueName(opts.name, opts.existingViewsForList);
@@ -202,12 +204,25 @@ export function createView(opts: {
 		groupBy: null,
 		coverProperty: null,
 		cardSubtitleProperty: null,
-		columns: [],
+		columns: (opts.columns ?? []).map((c) => ({ ...c })),
 		defaultTypeUrl: null,
 		defaultTemplate: null,
 		pageSize: 50,
 		layoutOptions: defaultLayoutFor(kind),
 	};
+}
+
+/** The columns a new view starts with: the visible columns of the view the
+ *  user is looking at (else the list's first view). A view born with no
+ *  columns shows only the Name column as a grid and NO fields as a gallery
+ *  (F-511) — the user expects the new surface to show what the grid did. */
+export function seedColumnsForNewView(
+	siblings: ReadonlyArray<ListView>,
+	activeViewId: string | null,
+): ColumnSpec[] {
+	const source = siblings.find((v) => v.id === activeViewId) ?? siblings[0];
+	if (!source) return [];
+	return source.columns.filter((c) => c.visible !== false).map((c) => ({ ...c }));
 }
 
 /** Switch a view to another kind. Layout options are kind-specific, so
