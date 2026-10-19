@@ -67,6 +67,7 @@ import { EntityDekStore } from "../entities/entity-dek-store";
 import { readEntityDocProjection, writeEntityProps } from "../entities/entity-doc-codec";
 import { makeVaultEntitiesServiceHandler } from "../entities/vault-entities-service";
 import {
+	HISTORY_RESTORE_RATE_MAX,
 	HistoryRole,
 	agentPrincipal,
 	makeHistoryServiceHandler,
@@ -1223,6 +1224,7 @@ describe("version history pipeline (entities service → ydoc worker → history
 			resolveRole: async (id) => opts.role?.(id) ?? HistoryRole.NotShared,
 			selfPrincipal: () => SELF,
 			labelPrincipal: (p) => (p.id === SELF.id ? "You" : p.id),
+			now: () => clock,
 		});
 		const ent = (method: string, a: unknown, app = "io.x") =>
 			entities({ v: 1, msg: "m", app, service: "entities", method, args: [a], caps: [] });
@@ -1480,6 +1482,65 @@ describe("version history pipeline (entities service → ydoc worker → history
 		expect(stack.repo.get(two)?.properties.statusKey).toBe("done");
 		// The revert recorded its own change set, so it can be undone too.
 		expect(stack.versions.listByChangeSet(result.revertChangeSetId)).toHaveLength(2);
+	});
+
+	it("revertChangeSet never names a reverted object the caller cannot read", async () => {
+		const stack = await makeStack({
+			grants: {
+				"io.x": ["entities.read:*", "entities.write:*"],
+				"io.blind": ["entities.write:*"],
+			},
+		});
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "Secret", statusKey: "todo" },
+		})) as { id: string };
+		clock += 1_000;
+		const cs = await stack.history.beginChangeSet(VersionCause.BeforeBulk, [SELF]);
+		await stack.history.checkpointBefore([made.id], cs);
+		await stack.ent("update", { id: made.id, patch: { statusKey: "done" } });
+		const result = (await stack.hist("revertChangeSet", cs, "io.blind")) as ChangeSetRevertResult;
+		expect(result.reverted).toEqual([]);
+		expect(result.hiddenCount).toBe(1);
+	});
+
+	it("restores are rate limited per app", async () => {
+		const stack = await makeStack();
+		const made = (await stack.ent("create", {
+			type: "brainstorm/Task/v1",
+			properties: { title: "T", statusKey: "todo" },
+		})) as { id: string };
+		const v = await stack.history.captureNow(made.id);
+		const restore = () => stack.hist("restore", { entityId: made.id, versionId: v?.versionId });
+		for (let i = 0; i < HISTORY_RESTORE_RATE_MAX; i++) await restore();
+		await expect(restore()).rejects.toMatchObject({ name: "Denied" });
+		clock += 61_000;
+		await expect(restore()).resolves.toBeDefined();
+	});
+
+	it("an agent's restore is attributed to the agent and charged to it", async () => {
+		const AGENT_APP = "io.brainstorm.agent";
+		const stack = await makeStack({
+			grants: { [AGENT_APP]: ["entities.read:*", "entities.write:*"] },
+		});
+		const made = (await stack.ent(
+			"create",
+			{ type: "brainstorm/Task/v1", properties: { title: "A", statusKey: "todo" } },
+			AGENT_APP,
+		)) as { id: string };
+		const v = await stack.history.captureNow(made.id);
+		await stack.ent("update", { id: made.id, patch: { statusKey: "done" } }, AGENT_APP);
+		const { beforeRestoreVersionId } = (await stack.hist(
+			"restore",
+			{ entityId: made.id, versionId: v?.versionId, provenance: { conversationId: "c1" } },
+			AGENT_APP,
+		)) as { beforeRestoreVersionId: string };
+		const before = stack.versions.get(beforeRestoreVersionId);
+		expect(before?.changeSetId).not.toBeNull();
+		const after = await stack.history.captureNow(made.id);
+		expect(after?.principals).toEqual([
+			expect.objectContaining({ kind: HistoryPrincipalKind.Agent, id: AGENT_APP }),
+		]);
 	});
 
 	it("an agent's writes are attributed to the agent, server-side", async () => {

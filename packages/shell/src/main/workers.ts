@@ -7,8 +7,8 @@ import {
 	type ExtractionWorkerHandle,
 	createExtractionWorkerHandle,
 } from "./extraction/extraction-worker-handle";
-import { type ResilientWorker, createResilientWorker } from "./resilient-worker";
 import { gateYDocService } from "./ipc/ydoc-service-gate";
+import { type ResilientWorker, createResilientWorker } from "./resilient-worker";
 import { BrokerContext } from "./runtime/broker-context";
 import { getActiveVaultSession } from "./vault/session";
 

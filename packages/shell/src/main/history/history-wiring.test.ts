@@ -53,6 +53,22 @@ describe("bindSessionHistory (10.16 boot ordering)", () => {
 		binding.dispose();
 	});
 
+	it("release hooks drain in registration order", async () => {
+		setActiveVaultSession(fakeSession("ordered"));
+		const seen: string[] = [];
+		const offA = onActiveVaultSessionReleasing(async () => {
+			await new Promise((r) => setTimeout(r, 5));
+			seen.push("flush");
+		});
+		const offB = onActiveVaultSessionReleasing(async () => {
+			seen.push("release");
+		});
+		await drainActiveVaultSession();
+		expect(seen).toEqual(["flush", "release"]);
+		offA();
+		offB();
+	});
+
 	it("a drain that hangs is bounded", async () => {
 		setActiveVaultSession(fakeSession("slow"));
 		const off = onActiveVaultSessionReleasing(() => new Promise(() => {}));

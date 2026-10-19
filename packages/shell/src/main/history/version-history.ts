@@ -38,6 +38,9 @@ export const IDLE_CAPTURE_MIN_INTERVAL_MS = 10 * 60 * 1000;
 export const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
 /** Upper bound on entities one `checkpointBefore` call may touch. */
 export const CHECKPOINT_BATCH_MAX = 5000;
+/** Entities whose last Idle capture time is remembered in memory; beyond it
+ *  the oldest are forgotten and re-read from the latest stored version. */
+export const IDLE_MEMO_MAX = 10_000;
 
 export type HistoryStores = {
 	entities: EntitiesRepository;
@@ -74,6 +77,8 @@ export type EntityRestorer = (input: {
 	entityId: string;
 	properties: Record<string, unknown>;
 	frame: HistFrameRef;
+	/** The acting principal is an agent: its write is attributed to it. */
+	agent: boolean;
 }) => Promise<void>;
 
 export enum RevertGateResult {
@@ -226,15 +231,20 @@ export class VersionHistory {
 			const stores = await this.requireStores();
 			const record = stores.versions.get(input.versionId);
 			if (!record) throw named("Invalid", "history: unknown version");
+			// An agent's restore checkpoint is filed under its own change set,
+			// so retention charges it to that agent's per-principal cap.
+			const changeSetId = isAgent(input.principal)
+				? this.beginChangeSetLocked(stores, VersionCause.BeforeRestore, [input.principal])
+				: null;
 			const before = await this.captureLocked(
 				stores,
 				record.entityId,
 				VersionCause.BeforeRestore,
-				null,
+				changeSetId,
 				true,
 			);
 			if (!before) throw named("Invalid", `history: ${record.entityId} not found`);
-			await this.restoreLocked(input.app, record);
+			await this.restoreLocked(input.app, record, isAgent(input.principal));
 			this.noteWrite(record.entityId, [input.principal]);
 			return before.versionId;
 		});
@@ -287,7 +297,7 @@ export class VersionHistory {
 					continue;
 				}
 				await this.captureLocked(stores, entityId, VersionCause.BeforeRestore, revertChangeSetId, true);
-				await this.restoreLocked(input.app, checkpoint);
+				await this.restoreLocked(input.app, checkpoint, isAgent(input.principal));
 				this.noteWrite(entityId, [input.principal]);
 				results.push({ entityId, outcome: RevertOutcome.Reverted });
 			}
@@ -329,6 +339,14 @@ export class VersionHistory {
 		return [...(this.pending.get(entityId)?.values() ?? [])];
 	}
 
+	private rememberIdle(entityId: string, at: number): void {
+		this.lastIdleAt.delete(entityId);
+		this.lastIdleAt.set(entityId, at);
+		if (this.lastIdleAt.size <= IDLE_MEMO_MAX) return;
+		const oldest = this.lastIdleAt.keys().next().value;
+		if (oldest !== undefined) this.lastIdleAt.delete(oldest);
+	}
+
 	private arm(entityId: string, dueAt: number): void {
 		const prior = this.timers.get(entityId);
 		if (prior) clearTimeout(prior);
@@ -347,7 +365,7 @@ export class VersionHistory {
 			if (!stores) return;
 			if (!this.lastIdleAt.has(entityId)) {
 				const latest = stores.versions.latestForEntity(entityId);
-				if (latest?.cause === VersionCause.Idle) this.lastIdleAt.set(entityId, latest.at);
+				if (latest?.cause === VersionCause.Idle) this.rememberIdle(entityId, latest.at);
 			}
 			const lastIdle = this.lastIdleAt.get(entityId);
 			if (lastIdle !== undefined && this.now() < lastIdle + this.idleMinIntervalMs) {
@@ -403,7 +421,7 @@ export class VersionHistory {
 			frame = frameOf(last);
 		} else {
 			this.pending.delete(entityId);
-			if (cause === VersionCause.Idle) this.lastIdleAt.set(entityId, this.now());
+			if (cause === VersionCause.Idle) this.rememberIdle(entityId, this.now());
 			return null;
 		}
 		const row = stores.entities.get(entityId);
@@ -427,11 +445,15 @@ export class VersionHistory {
 			clearTimeout(timer);
 			this.timers.delete(entityId);
 		}
-		if (cause === VersionCause.Idle) this.lastIdleAt.set(entityId, record.at);
+		if (cause === VersionCause.Idle) this.rememberIdle(entityId, record.at);
 		return record;
 	}
 
-	private async restoreLocked(app: string, record: EntityVersionRecord): Promise<void> {
+	private async restoreLocked(
+		app: string,
+		record: EntityVersionRecord,
+		agent: boolean,
+	): Promise<void> {
 		const restorer = this.options.getRestorer();
 		if (!restorer) throw named("Unavailable", "history: restore path not wired");
 		await restorer({
@@ -439,6 +461,7 @@ export class VersionHistory {
 			entityId: record.entityId,
 			properties: record.properties,
 			frame: frameOf(record),
+			agent,
 		});
 	}
 
@@ -464,7 +487,7 @@ export class VersionHistory {
 		const csPrincipals = stores.changeSets.listPrincipals();
 		const candidates: RetentionCandidate[] = rows.map((r) => {
 			const agent =
-				r.cause === VersionCause.AgentRun && r.changeSetId
+				(r.cause === VersionCause.AgentRun || r.cause === VersionCause.BeforeRestore) && r.changeSetId
 					? (csPrincipals.get(r.changeSetId)?.find((p) => p.kind === HistoryPrincipalKind.Agent) ?? null)
 					: null;
 			return {
@@ -501,6 +524,10 @@ export class VersionHistory {
 		this.chain = next.catch(() => undefined);
 		return next;
 	}
+}
+
+function isAgent(principal: ChangeSetPrincipal): boolean {
+	return principal.kind === HistoryPrincipalKind.Agent;
 }
 
 function frameOf(record: EntityVersionRecord): HistFrameRef {

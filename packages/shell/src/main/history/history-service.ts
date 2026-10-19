@@ -13,6 +13,11 @@
  *   revertChangeSet per entity, as restore; the rest is skipped, and only
  *                   entities the caller may read are named
  *
+ * `restore` / `revertChangeSet` are rate limited per app (each one force-
+ * captures `BeforeRestore` checkpoints), and an agent caller (one carrying an
+ * agent `provenance`, exactly as on `entities` writes) acts — and is charged
+ * in retention — as itself, not as the user.
+ *
  * Fail closed: a ledger outage is `Unavailable`; a role that cannot be
  * resolved is treated as Viewer. A missing and an unreadable entity give the
  * SAME error, so the service is no existence oracle.
@@ -29,6 +34,7 @@ import {
 	type VersionHistoryList,
 	type VersionPreview,
 	type VersionRestoreResult,
+	parseProvenanceRequest,
 } from "@brainstorm-os/sdk-types";
 import { isLockedProperties } from "@brainstorm-os/sdk/entity-lock";
 import type { ServiceHandler } from "../../ipc/broker";
@@ -64,7 +70,12 @@ export type HistoryServiceOptions = {
 	/** Display label for a principal (contact name, agent name); the raw id
 	 *  when nothing better is known. */
 	labelPrincipal?: (principal: ChangeSetPrincipal) => string;
+	now?: () => number;
 };
+
+/** Restores + change-set reverts one app may start per window. */
+export const HISTORY_RESTORE_RATE_MAX = 30;
+export const HISTORY_RESTORE_RATE_WINDOW_MS = 60_000;
 
 enum Verb {
 	Read = "read",
@@ -113,6 +124,20 @@ export function makeHistoryServiceHandler(options: HistoryServiceOptions): Servi
 
 	const canRestoreAsRole = (role: HistoryRole): boolean => role !== HistoryRole.Viewer;
 
+	const clock = options.now ?? Date.now;
+	const recentRestores = new Map<string, number[]>();
+	const chargeRestore = (app: string): void => {
+		const now = clock();
+		const recent = (recentRestores.get(app) ?? []).filter(
+			(at) => now - at < HISTORY_RESTORE_RATE_WINDOW_MS,
+		);
+		if (recent.length >= HISTORY_RESTORE_RATE_MAX) {
+			throw named("Denied", "history: too many restores — try again in a minute");
+		}
+		recent.push(now);
+		recentRestores.set(app, recent);
+	};
+
 	return async (envelope) => {
 		const history = options.getHistory();
 		const repo = await options.getRepo();
@@ -157,7 +182,10 @@ export function makeHistoryServiceHandler(options: HistoryServiceOptions): Servi
 			return { row, record };
 		};
 
-		const actingPrincipal = (): ChangeSetPrincipal => {
+		const actingPrincipal = (input: unknown): ChangeSetPrincipal => {
+			const provenance =
+				input && typeof input === "object" ? (input as { provenance?: unknown }).provenance : undefined;
+			if (parseProvenanceRequest(provenance)) return agentPrincipal(app);
 			if (!self) throw named("Unavailable", "history: no vault identity");
 			return self;
 		};
@@ -211,23 +239,29 @@ export function makeHistoryServiceHandler(options: HistoryServiceOptions): Servi
 				if (isLockedProperties(row.properties)) {
 					throw named("Denied", "history.restore: the object is locked (read-only)");
 				}
+				const principal = actingPrincipal(arg(envelope));
+				chargeRestore(app);
 				const beforeRestoreVersionId = await history.restore({
 					app,
 					versionId: record.versionId,
-					principal: actingPrincipal(),
+					principal,
 				});
 				return { beforeRestoreVersionId } satisfies VersionRestoreResult;
 			}
 
 			case "revertChangeSet": {
-				const changeSetId = arg(envelope);
+				const input = arg(envelope);
+				const changeSetId =
+					input && typeof input === "object" ? (input as { changeSetId?: unknown }).changeSetId : input;
 				if (typeof changeSetId !== "string" || !SAFE_VERSION_ID_RE.test(changeSetId)) {
 					throw named("Invalid", "history.revertChangeSet: changeSetId");
 				}
+				const principal = actingPrincipal(input);
+				chargeRestore(app);
 				const outcome = await history.revertChangeSet({
 					app,
 					changeSetId,
-					principal: actingPrincipal(),
+					principal,
 					gate: async (entity) => {
 						if (!can(Verb.Write, entity.type)) return RevertGateResult.Deny;
 						if (!canRestoreAsRole(await roleOf(entity.id))) return RevertGateResult.Deny;
@@ -243,13 +277,12 @@ export function makeHistoryServiceHandler(options: HistoryServiceOptions): Servi
 				};
 				for (const r of outcome.results) {
 					const row = repo.get(r.entityId);
-					const readable = row !== null && can(Verb.Read, row.type);
-					if (r.outcome === RevertOutcome.Reverted) {
-						result.reverted.push(r.entityId);
+					if (!row || !can(Verb.Read, row.type)) {
+						result.hiddenCount += 1;
 						continue;
 					}
-					if (!readable) {
-						result.hiddenCount += 1;
+					if (r.outcome === RevertOutcome.Reverted) {
+						result.reverted.push(r.entityId);
 						continue;
 					}
 					result.skipped.push({

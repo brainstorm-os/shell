@@ -687,3 +687,34 @@ describe("ydoc worker — version history methods (10.16)", () => {
 		expect(reply.ok).toBe(false);
 	});
 });
+
+describe("ydoc worker — releaseVault", () => {
+	let a: string;
+	let b: string;
+	beforeEach(async () => {
+		a = await mkdtemp(join(tmpdir(), "bs-ydoc-rel-a-"));
+		b = await mkdtemp(join(tmpdir(), "bs-ydoc-rel-b-"));
+		__ydocCacheResetForTest();
+	});
+	afterEach(async () => {
+		__ydocCacheResetForTest();
+		await rm(a, { recursive: true, force: true });
+		await rm(b, { recursive: true, force: true });
+	});
+
+	const as = (app: string, method: string, args: unknown) =>
+		handleYDocEnvelope(
+			makeEnvelope({ msg: "r1", app, service: "ydoc", method, args: [args], caps: [] }),
+		);
+
+	it("drops only the released vault's cached docs, and only for the shell", async () => {
+		await as("io.brainstorm.shell", "load", { vaultPath: a, entityId: "ent_1" });
+		await as("io.brainstorm.shell", "load", { vaultPath: b, entityId: "ent_2" });
+		expect(__ydocCacheSizeForTest()).toBe(2);
+		const denied = await as("io.evil", "releaseVault", { vaultPath: a });
+		expect(denied.ok).toBe(false);
+		const released = await as("io.brainstorm.shell", "releaseVault", { vaultPath: a });
+		expect(released.ok).toBe(true);
+		expect(__ydocCacheSizeForTest()).toBe(1);
+	});
+});

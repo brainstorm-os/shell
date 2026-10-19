@@ -3787,6 +3787,11 @@ void app.whenReady().then(async () => {
 				getRestorer: () => restoreEntityFn,
 			}),
 	);
+	// After history has flushed (hooks drain in order): drop the outgoing
+	// vault's docs and stores from the ydoc worker's caches.
+	onActiveVaultSessionReleasing(async (session) => {
+		await callYDocWorker("releaseVault", { vaultPath: session.vaultPath });
+	});
 	let inverseBackfillFn: InverseBackfillFn | null = null;
 	// 9.12.25 — the catalog is read on every entity write; rebuild it only when
 	// the store changes (a full snapshot per write was the perf trap), and keep

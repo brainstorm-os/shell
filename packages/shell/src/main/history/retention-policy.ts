@@ -7,7 +7,8 @@
  *     7 days; one per day under 30 days; one per week after that. The newest
  *     checkpoint in each bucket survives. A checkpoint that belongs to a change
  *     set is exempt — thinning it would silently break "Revert this change".
- *  2. **Per-principal cap** for `AgentRun` checkpoints: each agent keeps at most
+ *  2. **Per-principal cap** for `AgentRun` checkpoints (and an agent's own
+ *     `BeforeRestore` ones — a restore force-captures): each agent keeps at most
  *     `agentPrincipalCapCount` checkpoints / `agentPrincipalCapBytes` bytes,
  *     newest first. Without it a looping agent could fill the vault cap and
  *     evict the user's own history (an eviction attack).
@@ -104,6 +105,12 @@ function newestFirst(a: RetentionCandidate, b: RetentionCandidate): number {
 	return b.at - a.at || (a.versionId < b.versionId ? 1 : a.versionId > b.versionId ? -1 : 0);
 }
 
+/** Causes charged to an acting agent's per-principal cap. */
+const AGENT_CHARGED: ReadonlySet<VersionCause> = new Set([
+	VersionCause.AgentRun,
+	VersionCause.BeforeRestore,
+]);
+
 export function planRetention(
 	candidates: readonly RetentionCandidate[],
 	now: number,
@@ -124,7 +131,7 @@ export function planRetention(
 
 	const byAgent = new Map<string, { count: number; bytes: number; frames: Set<string> }>();
 	for (const c of sorted) {
-		if (drop.has(c.versionId) || c.cause !== VersionCause.AgentRun || c.agentPrincipal === null) {
+		if (drop.has(c.versionId) || !AGENT_CHARGED.has(c.cause) || c.agentPrincipal === null) {
 			continue;
 		}
 		let usage = byAgent.get(c.agentPrincipal);

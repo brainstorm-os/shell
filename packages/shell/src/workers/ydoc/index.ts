@@ -160,8 +160,8 @@ function docStateKey(doc: Y.Doc): string {
 
 /** History methods are main-process-only: the entities + history services
  *  authorise the caller and resolve the version before reaching here. The
- *  broker verifies `envelope.app` against the renderer identity, so no app
- *  can present the shell's id. */
+ *  shell's id is reserved (no manifest or renderer may claim it), and the
+ *  main-side gate refuses every other caller before an envelope gets here. */
 const SHELL_APP_ID = "io.brainstorm.shell";
 
 function assertShellCaller(envelope: Envelope, method: string): void {
@@ -504,6 +504,22 @@ const handlers: Record<string, (envelope: Envelope) => Promise<unknown> | unknow
 		docs.delete(key);
 		victim?.destroy();
 		return { closed: true };
+	},
+	// Vault switch / close: forget everything cached for the outgoing vault so
+	// the per-vault maps never grow across sessions. Every write was already
+	// appended to disk when it was applied, so nothing is lost here.
+	releaseVault: async (envelope) => {
+		assertShellCaller(envelope, "releaseVault");
+		const { vaultPath } = parseArgs<{ vaultPath: string }>(envelope, "releaseVault");
+		const prefix = docKey(vaultPath, "");
+		for (const [key, doc] of [...docs]) {
+			if (!key.startsWith(prefix)) continue;
+			docs.delete(key);
+			doc.destroy();
+		}
+		stores.delete(vaultPath);
+		histStores.delete(vaultPath);
+		return { released: true };
 	},
 	recover: async (envelope) => {
 		const args = parseArgs<LoadArgs>(envelope, "recover");

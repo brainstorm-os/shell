@@ -162,6 +162,13 @@ describe("per-principal AgentRun cap", () => {
 		for (const u of user) expect(result.has(u.versionId)).toBe(true);
 	});
 
+	it("charges an agent's BeforeRestore checkpoints to the same cap", () => {
+		const restores = Array.from({ length: 6 }, (_, i) =>
+			agentRun("bot", NOW - i * 1_000, { cause: VersionCause.BeforeRestore }),
+		);
+		expect(kept(restores, { ...ROOMY, agentPrincipalCapCount: 2 })).toHaveLength(2);
+	});
+
 	it("does not cap AgentRun rows with no resolvable agent, nor other causes", () => {
 		const orphan = cp({ at: NOW, cause: VersionCause.AgentRun, changeSetId: "x" });
 		const bulk = cp({ at: NOW - 1, cause: VersionCause.BeforeBulk, changeSetId: "y" });

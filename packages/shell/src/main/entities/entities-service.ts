@@ -259,6 +259,7 @@ export type RestoreEntityFn = (input: {
 	entityId: string;
 	properties: Record<string, unknown>;
 	frame: { offset: number; length: number };
+	agent: boolean;
 }) => Promise<void>;
 
 /** Who is asking for a run's diff / undo. `Privileged` is the shell's own
@@ -752,7 +753,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 	// Re-checks the write gate + lock itself: the history service is not the
 	// write authority, this service is.
 	if (options.bindRestoreEntity) {
-		options.bindRestoreEntity(async ({ app, entityId, properties, frame }) => {
+		options.bindRestoreEntity(async ({ app, entityId, properties, frame, agent }) => {
 			const repo = await options.getRepo();
 			const ledger = await options.getLedger();
 			if (!repo || !ledger) throw named("Unavailable", "entities service: no active vault session");
@@ -764,7 +765,7 @@ export function makeEntitiesServiceHandler(options: EntitiesServiceOptions): Ser
 			if (isLockedProperties(row.properties)) {
 				throw named("Denied", `history.restore: ${entityId} is locked (read-only)`);
 			}
-			const writer: LocalWriter = { app, agent: false };
+			const writer: LocalWriter = { app, agent };
 			const patch = restorePatch(properties, row.properties);
 			if (Object.keys(patch).length > 0) {
 				const far = await planFarWrites(

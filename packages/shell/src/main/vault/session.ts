@@ -1142,14 +1142,24 @@ export function onActiveVaultSessionReleasing(
 	};
 }
 
-/** Run every release hook on the active session, bounded by `timeoutMs`.
- *  Never throws: a failed or slow drain must not block a switch or a quit. */
+/** Run every release hook on the active session, IN REGISTRATION ORDER (a
+ *  later hook may release what an earlier one still flushes through), bounded
+ *  by `timeoutMs`. Never throws: a failed or slow drain must not block a
+ *  switch or a quit. */
 export async function drainActiveVaultSession(
 	timeoutMs: number = SESSION_DRAIN_TIMEOUT_MS,
 ): Promise<void> {
 	const session = active;
 	if (!session || releaseHooks.size === 0) return;
-	const drains = Promise.allSettled([...releaseHooks].map((hook) => hook(session)));
+	const drains = (async () => {
+		for (const hook of [...releaseHooks]) {
+			try {
+				await hook(session);
+			} catch (error) {
+				console.warn("[brainstorm] vault release hook failed:", error);
+			}
+		}
+	})();
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timeout = new Promise<void>((resolve) => {
 		timer = setTimeout(resolve, timeoutMs);
