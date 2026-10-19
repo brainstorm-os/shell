@@ -10,7 +10,11 @@ import { makePropertiesServiceHandler } from "../properties/properties-service";
 import type { PropertiesStore } from "../properties/properties-store";
 import { DataStores } from "../storage/data-stores";
 import { EntitiesRepository, EntityDeksRepository } from "../storage/entities-repo";
-import { type InverseBackfillFn, makeEntitiesServiceHandler } from "./entities-service";
+import {
+	type InverseBackfillFn,
+	MAX_FAR_WRITES_PER_CALL,
+	makeEntitiesServiceHandler,
+} from "./entities-service";
 import { EntityDekStore } from "./entity-dek-store";
 
 const BOOK = "io.test/Book/v1";
@@ -163,6 +167,7 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		const properties = makePropertiesServiceHandler({
 			getStore: async () => store,
 			backfillInverse: (app, def) => t.backfill()(app, def),
+			canWriteType: async () => true,
 		});
 		const paired = ref("authors", { ...MANY, inverseOf: "books" });
 		await properties(env("setProperty", { def: paired }, "properties"));
@@ -182,6 +187,7 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		const properties = makePropertiesServiceHandler({
 			getStore: async () => store,
 			backfillInverse: (app, def) => t.backfill()(app, def),
+			canWriteType: async () => true,
 		});
 		await expect(
 			properties(
@@ -190,5 +196,134 @@ describe("two-way relations through the entities service (9.12.25)", () => {
 		).rejects.toMatchObject({ name: "Denied" });
 		expect(saved).toEqual([]);
 		expect(t.props("p1")?.books).toBeUndefined();
+	});
+
+	it("an app that cannot write the pair's types cannot declare inverseOf (steering others' writes)", async () => {
+		const t = await setup({ defs: [ref("project", { allowedTypes: [BOOK] }), ref("owner")] });
+		const saved: PropertyDef[] = [];
+		const store = {
+			snapshot: () => ({
+				properties: { project: ref("project", { allowedTypes: [BOOK] }), owner: ref("owner") },
+				dictionaries: {},
+			}),
+			setProperty: (d: PropertyDef) => saved.push(d),
+		} as unknown as PropertiesStore;
+		const grants = new Set([`entities.write:${PERSON}`]);
+		const properties = makePropertiesServiceHandler({
+			getStore: async () => store,
+			backfillInverse: (app, def) => t.backfill()(app, def),
+			canWriteType: async (_app, type) => grants.has(`entities.write:${type}`),
+		});
+		const set = (def: PropertyDef) => properties(env("setProperty", { def }, "properties"));
+		await expect(
+			set(ref("project", { allowedTypes: [BOOK], inverseOf: "owner" })),
+		).rejects.toMatchObject({ name: "Denied" });
+		grants.add(`entities.write:${BOOK}`);
+		// `owner` targets any type — pairing it needs the unrestricted grant.
+		await expect(
+			set(ref("project", { allowedTypes: [BOOK], inverseOf: "owner" })),
+		).rejects.toMatchObject({ name: "Denied" });
+		grants.add("entities.write:*");
+		await set(ref("project", { allowedTypes: [BOOK], inverseOf: "owner" }));
+		expect(saved).toHaveLength(1);
+		// No ledger seam wired → declaring a pair fails closed.
+		const unwired = makePropertiesServiceHandler({ getStore: async () => store });
+		await expect(
+			unwired(env("setProperty", { def: ref("x", { inverseOf: "owner" }) }, "properties")),
+		).rejects.toMatchObject({ name: "Denied" });
+	});
+
+	it("a reserved key can never be a pair member", async () => {
+		const store = {
+			snapshot: () => ({ properties: {}, dictionaries: {} }),
+			setProperty: () => {},
+		} as unknown as PropertiesStore;
+		const properties = makePropertiesServiceHandler({
+			getStore: async () => store,
+			canWriteType: async () => true,
+		});
+		for (const def of [
+			ref("rel", { inverseOf: "agentProvenance" }),
+			ref("agentProposal", { inverseOf: "rel" }),
+		]) {
+			await expect(properties(env("setProperty", { def }, "properties"))).rejects.toMatchObject({
+				name: "Invalid",
+			});
+		}
+	});
+
+	it("far writes never touch reserved keys, even from a catalog that pairs one", async () => {
+		const t = await setup({
+			defs: [ref("rel", { inverseOf: "agentProvenance" }), ref("agentProvenance")],
+		});
+		t.repo.create({
+			id: "agentmade",
+			type: PERSON,
+			properties: {
+				agentProvenance: { agent: "io.brainstorm.agent", conversationId: "c", createdAt: 1 },
+			},
+			createdBy: "x",
+			now: 1,
+			dekId: null,
+		});
+		await t.create("mine", BOOK, { rel: "agentmade" });
+		expect(t.props("agentmade")?.agentProvenance).toEqual({
+			agent: "io.brainstorm.agent",
+			conversationId: "c",
+			createdAt: 1,
+		});
+	});
+
+	it("a far end the caller cannot read is skipped, never named (no existence oracle)", async () => {
+		const t = await setup({ grants: [`entities.read:${BOOK}`, `entities.write:${BOOK}`] });
+		t.repo.create({
+			id: "secret",
+			type: PERSON,
+			properties: {},
+			createdBy: "x",
+			now: 1,
+			dekId: null,
+		});
+		await t.create("b1", BOOK, { authors: [{ value: "secret" }] });
+		expect(t.props("secret")?.books).toBeUndefined();
+	});
+
+	it("a refused far end does not name its type or id", async () => {
+		const t = await setup({ grants: ["entities.read:*", `entities.write:${BOOK}`] });
+		t.repo.create({ id: "p1", type: PERSON, properties: {}, createdBy: "x", now: 1, dekId: null });
+		const err = await t.create("b1", BOOK, { authors: [{ value: "p1" }] }).catch((e: Error) => e);
+		expect(err).toMatchObject({ name: "Denied" });
+		expect((err as Error).message).not.toContain("p1");
+		expect((err as Error).message).not.toContain(PERSON);
+	});
+
+	it("caps the far writes one call may fan out to", async () => {
+		const t = await setup();
+		const ids: Array<{ value: string }> = [];
+		for (let i = 0; i < MAX_FAR_WRITES_PER_CALL + 1; i++) {
+			t.repo.create({
+				id: `p${i}`,
+				type: PERSON,
+				properties: {},
+				createdBy: "x",
+				now: 1,
+				dekId: null,
+			});
+			ids.push({ value: `p${i}` });
+		}
+		await expect(t.create("b1", BOOK, { authors: ids })).rejects.toMatchObject({ name: "Invalid" });
+		expect(t.props("b1")).toBeNull();
+	});
+
+	it("concurrent creates that both link one far end keep both back-links", async () => {
+		const t = await setup();
+		await t.create("p1", PERSON);
+		await Promise.all([
+			t.create("b1", BOOK, { authors: [{ value: "p1" }] }),
+			t.create("b2", BOOK, { authors: [{ value: "p1" }] }),
+			t.create("b3", BOOK, { authors: [{ value: "p1" }] }),
+		]);
+		const ids = ((t.props("p1")?.books ?? []) as Array<{ value: string }>).map((v) => v.value).sort();
+		expect(ids).toEqual(["b1", "b2", "b3"]);
 	});
 });

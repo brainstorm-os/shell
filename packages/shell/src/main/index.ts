@@ -3788,11 +3788,18 @@ void app.whenReady().then(async () => {
 			}),
 	);
 	let inverseBackfillFn: InverseBackfillFn | null = null;
+	// 9.12.25 — the catalog is read on every entity write; rebuild it only when
+	// the store changes (a full snapshot per write was the perf trap), and keep
+	// one array identity per change so the service's memo holds.
+	const propertyDefsByStore = new WeakMap<object, ReadonlyArray<PropertyDef>>();
 	const getVaultPropertyDefs = async (): Promise<ReadonlyArray<PropertyDef> | null> => {
 		const session = getActiveVaultSession();
 		if (!session) return null;
 		const store = await session.propertiesStore();
-		return Object.values(store.snapshot().properties);
+		if (!propertyDefsByStore.has(store)) {
+			store.subscribe((snap) => propertyDefsByStore.set(store, Object.values(snap.properties)));
+		}
+		return propertyDefsByStore.get(store) ?? [];
 	};
 	const entitiesHandler = makeEntitiesServiceHandler({
 		// 9.12.25 — `inverseOf` pairs make relations two-way.
@@ -4498,6 +4505,15 @@ void app.whenReady().then(async () => {
 			},
 			backfillInverse: (app, def) =>
 				inverseBackfillFn ? inverseBackfillFn(app, def) : Promise.resolve(0),
+			canWriteType: async (app, type) => {
+				const session = getActiveVaultSession();
+				if (!session) return false;
+				try {
+					return (await session.capabilityLedger()).has(app, `entities.write:${type}`);
+				} catch {
+					return false;
+				}
+			},
 		}),
 	);
 
