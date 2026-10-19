@@ -843,20 +843,17 @@ body {
 	opacity: 1;
 }
 
-.chat__composer-wrap {
-	position: relative;
-}
-
+/* An in-flow row of fixed height between the transcript and the composer:
+ * reserved even while empty, so the list neither jumps when someone starts
+ * typing nor gets painted over by the label. */
 .chat__typing {
-	position: absolute;
-	bottom: 100%;
-	left: 18px;
-	right: 18px;
+	flex-shrink: 0;
+	height: 20px;
+	line-height: 20px;
 	margin: 0;
-	padding: 2px 0;
+	padding: 0 18px;
 	font-size: var(--text-size-xs);
 	color: var(--text-faint);
-	pointer-events: none;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;

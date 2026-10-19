@@ -1071,6 +1071,17 @@ describe("ChatApp — typing indicator over presence (Chats-4)", () => {
 		});
 		expect(container.querySelector('[data-testid="typing"]')?.textContent).toBe("");
 	});
+
+	it("reserves the typing row in flow between the transcript and the composer", async () => {
+		await mountWithPresence();
+		const typing = container.querySelector('[data-testid="typing"]');
+		const composer = container.querySelector('[data-testid="composer"]');
+		expect(typing?.parentElement).toBe(composer);
+		expect(composer?.firstElementChild).toBe(typing);
+		expect(composer?.querySelector(".chat__composer")?.compareDocumentPosition(typing as Node)).toBe(
+			Node.DOCUMENT_POSITION_PRECEDING,
+		);
+	});
 });
 
 describe("ChatApp — auto-hide sidebar (7.15)", () => {
