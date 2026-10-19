@@ -16,6 +16,7 @@ import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import type { ValuesMap } from "@brainstorm-os/sdk/property-ui";
 import type { JournalEntry } from "../types/entry";
 import { parseHabits, parseMood } from "./check-in";
+import { compareDayRows } from "./day-entry";
 import { dateKeyForJournal, isJournalNoteTitle, parseJournalDateKey } from "./journal-keys";
 
 /** Loose Note shape — anything with a title + a body string. Matches the
@@ -141,10 +142,16 @@ export function projectJournalEntries(notes: readonly NoteLike[]): JournalEntry[
 	return out;
 }
 
-/** Index entries by date key for O(1) lookup from grid cells. */
+/** Index entries by date key for O(1) lookup from grid cells. A day with
+ *  more than one row resolves to the earliest-created one (`compareDayRows`),
+ *  never to whichever the snapshot listed last — every path that opens or
+ *  writes "today" must land on the entry the list shows. */
 export function indexByDateKey(entries: readonly JournalEntry[]): Map<string, JournalEntry> {
 	const out = new Map<string, JournalEntry>();
-	for (const e of entries) out.set(e.dateKey, e);
+	for (const e of entries) {
+		const held = out.get(e.dateKey);
+		if (!held || compareDayRows(e, held) < 0) out.set(e.dateKey, e);
+	}
 	return out;
 }
 

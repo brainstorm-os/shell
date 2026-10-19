@@ -189,6 +189,8 @@ describe("commitCapture", () => {
 	});
 });
 
+const DAY_ID = "journal-2026-10-19";
+
 describe("appendJournalLine", () => {
 	let editor: ReturnType<typeof createEditor> | null = null;
 	afterEach(() => {
@@ -197,7 +199,7 @@ describe("appendJournalLine", () => {
 	});
 
 	it("is a no-op without a mounted editor", () => {
-		expect(appendJournalLine([{ kind: CapturePartKind.Text, text: "x" }])).toBeNull();
+		expect(appendJournalLine(DAY_ID, [{ kind: CapturePartKind.Text, text: "x" }])).toBeNull();
 	});
 
 	it("appends a paragraph at the end, reusing a fresh day's lone empty paragraph", () => {
@@ -207,11 +209,11 @@ describe("appendJournalLine", () => {
 				throw e;
 			},
 		});
-		setJournalEditor(editor);
+		setJournalEditor(editor, DAY_ID);
 		editor.update(() => $getRoot().append($createParagraphNode()), { discrete: true });
-		const first = appendJournalLine([{ kind: CapturePartKind.Text, text: "first" }]);
+		const first = appendJournalLine(DAY_ID, [{ kind: CapturePartKind.Text, text: "first" }]);
 		expect(first?.root.children).toHaveLength(1);
-		const second = appendJournalLine([
+		const second = appendJournalLine(DAY_ID, [
 			{
 				kind: CapturePartKind.Mention,
 				entityId: "obj-1",

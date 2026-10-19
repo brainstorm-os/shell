@@ -73,9 +73,9 @@ import { shiftByDays } from "./logic/calendar-grid";
 import {
 	type CaptureWriter,
 	type FileableCollection,
-	commitCapture,
 	fileableCollections,
 } from "./logic/capture-filing";
+import { captureIntoDay } from "./logic/capture-into-day";
 import {
 	HABIT_LABEL_KEY,
 	type HabitId,
@@ -86,6 +86,7 @@ import {
 	toggleHabit,
 } from "./logic/check-in";
 import { JournalDayBodyMode, journalDayBodyMode } from "./logic/day-body-mode";
+import { dateMsForEntryId, ensureDayEntry } from "./logic/day-entry";
 import { buildJournalDenormalizer } from "./logic/denormalize-entry";
 import { groupEntriesByMonth, monthLabelFromKey } from "./logic/entry-overview";
 import { type EntryWriteContext, writeEntryPatch } from "./logic/entry-writes";
@@ -100,7 +101,6 @@ import { journalPlural, t } from "./logic/journal-i18n";
 import {
 	dateKeyForJournal,
 	journalEntryIdForKey,
-	journalEntryIdToDateMs,
 	journalNoteTitle,
 	parseJournalDateKey,
 } from "./logic/journal-keys";
@@ -114,7 +114,6 @@ import {
 	periodLabel,
 	periodStableId,
 } from "./logic/periods";
-import { CaptureKind } from "./logic/quick-capture";
 import { currentStreak, densityBucket, streakAtRisk } from "./logic/streaks";
 import {
 	JOURNAL_TEMPLATE_SPECS,
@@ -128,6 +127,7 @@ import {
 	type VaultSnapshot,
 	getJournalRuntime,
 	notesFromSnapshot,
+	vaultEntityToNoteLike,
 } from "./runtime";
 import { pushEntityIndex, wireEditorIndex } from "./store/editor-index";
 import { getYDocResolverApi } from "./store/ydoc-resolver";
@@ -139,12 +139,7 @@ import {
 	type JournalMenuResolver,
 	bindDelegatedObjectMenu,
 } from "./ui/delegated-object-menu";
-import {
-	appendJournalLine,
-	applyJournalSuggestion,
-	hasJournalEditor,
-	insertEntityMention,
-} from "./ui/editor-bridge";
+import { appendJournalLine, applyJournalSuggestion, insertEntityMention } from "./ui/editor-bridge";
 import type { JournalCommentHooks, JournalDenormalizeFn } from "./ui/entry-editor-mount";
 import { attachOverviewKeyboard } from "./ui/overview-keyboard";
 import { JournalPropertiesIsland, type JournalPropertiesOptions } from "./ui/properties-panel";
@@ -413,9 +408,14 @@ export function JournalApp(): ReactElement {
 		[recordNav],
 	);
 
+	// Loaded entries behind a ref: the boot-time `open` lands on a seeded
+	// entry (its own id, not `journal-<key>`) only via the list, and the
+	// handler is bound once.
+	const mergedEntriesRef = useRef<readonly JournalEntry[]>(mergedEntries);
+	mergedEntriesRef.current = mergedEntries;
 	const focusJournalEntry = useCallback(
 		(entityId: string): boolean => {
-			const ms = journalEntryIdToDateMs(entityId);
+			const ms = dateMsForEntryId(entityId, mergedEntriesRef.current);
 			if (ms !== null) {
 				focusTo(new Date(ms));
 				return true;
@@ -470,7 +470,10 @@ export function JournalApp(): ReactElement {
 	);
 
 	/** Ensure a journal entry exists for `date`. Returns its id (or null when
-	 *  there's no entities service / the create rejected non-idempotently). */
+	 *  there's no entities service / the create rejected non-idempotently).
+	 *  The day resolves to ONE entry: the one the list shows, else the one the
+	 *  vault already holds (the live snapshot can still be the empty initial
+	 *  one when the editor autofocuses on open), else a fresh `journal-<key>`. */
 	const ensureEntry = useCallback(
 		async (date: Date, init?: { icon?: Icon | null }): Promise<string | null> => {
 			const dateKey = dateKeyForJournal(date);
@@ -478,8 +481,10 @@ export function JournalApp(): ReactElement {
 			if (existing) return existing.noteId;
 
 			const bs = getJournalRuntime();
-			const create = bs?.services?.entities?.create;
-			if (!create) return null;
+			const entities = bs?.services?.entities;
+			const create = entities?.create;
+			const list = bs?.services?.vaultEntities?.list;
+			if (!create || !list) return null;
 
 			const stableId = journalEntryIdForKey(dateKey);
 			const pending = inflightCreateRef.current.get(stableId);
@@ -489,33 +494,37 @@ export function JournalApp(): ReactElement {
 			if (init?.icon !== undefined) properties.icon = init.icon;
 
 			const job = (async (): Promise<string | null> => {
-				try {
-					await create.call(bs?.services?.entities, JOURNAL_ENTRY_TYPE, properties, stableId);
-				} catch (error) {
-					const msg = error instanceof Error ? error.message : String(error);
-					if (!/already exists/i.test(msg)) {
-						console.warn("[journal] entities.create failed:", error);
-						return null;
-					}
-				}
-				const ts = Date.now();
-				const synthetic: JournalEntry = {
-					noteId: stableId,
-					icon: init?.icon ?? null,
-					dateEpochMs: parseJournalDateKey(dateKey) ?? date.getTime(),
+				const resolved = await ensureDayEntry({
 					dateKey,
-					rawTitle: dateKey,
-					preview: "",
-					wordCount: 0,
-					seedBody: null,
-					values: {},
-					mood: null,
-					habits: [],
-					createdAt: ts,
-					updatedAt: ts,
-				};
-				setOptimistic((prev) => new Map(prev).set(dateKey, synthetic));
-				return stableId;
+					existing: null,
+					stableId,
+					listRows: async () =>
+						(await list.call(bs?.services?.vaultEntities, { types: [JOURNAL_ENTRY_TYPE] })).entities,
+					create: async (id) => {
+						await create.call(entities, JOURNAL_ENTRY_TYPE, properties, id);
+					},
+				});
+				if (!resolved) return null;
+				const ts = Date.now();
+				const synthetic: JournalEntry | undefined = resolved.row
+					? projectJournalEntries([vaultEntityToNoteLike(resolved.row)])[0]
+					: {
+							noteId: resolved.noteId,
+							icon: init?.icon ?? null,
+							dateEpochMs: parseJournalDateKey(dateKey) ?? date.getTime(),
+							dateKey,
+							rawTitle: dateKey,
+							preview: "",
+							wordCount: 0,
+							seedBody: null,
+							values: {},
+							mood: null,
+							habits: [],
+							createdAt: ts,
+							updatedAt: ts,
+						};
+				if (synthetic) setOptimistic((prev) => new Map(prev).set(dateKey, synthetic));
+				return resolved.noteId;
 			})();
 			inflightCreateRef.current.set(stableId, job);
 			try {
@@ -1759,50 +1768,25 @@ function PeriodicBody({
 // ── Quick capture (9.16.14). ──
 const JOURNAL_APP_ID = "io.brainstorm.journal";
 
-/** Make sure today's entry exists, then commit the capture through the live
- *  editor; the appended state is mirrored into the `body` snippet directly,
- *  since the interaction-gated autosave never sees a programmatic edit. */
-async function captureIntoDay(input: {
-	raw: string;
-	noteId: string;
-	collections: readonly FileableCollection[];
-	ensureEntry: () => Promise<string | null>;
-	denormalize: JournalDenormalizeFn;
-}): Promise<QuickCaptureResult> {
-	const created = await input.ensureEntry();
+/** The vault writer a filed capture creates its object through. */
+function captureWriter(): CaptureWriter | null {
 	const entities = getJournalRuntime()?.services?.entities;
 	const create = entities?.create;
 	const get = entities?.get;
 	const update = entities?.update;
-	const writer: CaptureWriter | null = create
-		? {
-				create: (type, properties) => create.call(entities, type, properties),
-				membership:
-					get && update
-						? {
-								get: (id) => get.call(entities, id),
-								update: (id, patch) => update.call(entities, id, patch),
-							}
-						: null,
-				appId: JOURNAL_APP_ID,
-				now: Date.now(),
-			}
-		: null;
-	const result = await commitCapture({
-		raw: input.raw,
-		collections: input.collections,
-		writer,
-		canAppend: () => created !== null && hasJournalEditor(),
-		append: (parts) => {
-			const state = appendJournalLine(parts);
-			if (!state) return false;
-			input.denormalize(input.noteId, state);
-			return true;
-		},
-	});
-	const collectionName =
-		result.route.kind === CaptureKind.File ? result.route.collection.name : null;
-	return { outcome: result.outcome, collectionName };
+	if (!create) return null;
+	return {
+		create: (type, properties) => create.call(entities, type, properties),
+		membership:
+			get && update
+				? {
+						get: (id) => get.call(entities, id),
+						update: (id, patch) => update.call(entities, id, patch),
+					}
+				: null,
+		appId: JOURNAL_APP_ID,
+		now: Date.now(),
+	};
 }
 
 // ── Day entry body. ──
@@ -1938,12 +1922,13 @@ function EntryBody({
 			{captureEnabled && editable && resolver ? (
 				<QuickCapture
 					collectionCount={captureCollections.length}
-					onCapture={(raw) =>
+					onCapture={(raw): Promise<QuickCaptureResult> =>
 						captureIntoDay({
 							raw,
-							noteId,
 							collections: captureCollections,
+							writer: captureWriter(),
 							ensureEntry: () => onPlaceholderCreate(focus),
+							append: appendJournalLine,
 							denormalize: journalDenormalize,
 						})
 					}
