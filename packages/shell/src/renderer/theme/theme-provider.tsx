@@ -12,6 +12,7 @@ import {
 import {
 	DEFAULT_THEME,
 	ThemeName,
+	type Tokens,
 	flattenTokens,
 	isThemeName,
 	themes,
@@ -76,6 +77,40 @@ export function applyThemeVars(
 		else root.setAttribute(name, value);
 	}
 	root.dataset.theme = resolved;
+}
+
+/** `base` with every leaf whose flattened `--var` name `vars` carries
+ *  replaced — the token tree a preview paints, so derived layers (the
+ *  display prefs) can be computed from what is actually on screen. */
+function overlayTokens(base: Tokens, vars: Readonly<Record<string, string>>): Tokens {
+	const overlay = (node: Record<string, unknown>, path: string[]): Record<string, unknown> => {
+		const out: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(node)) {
+			const next = [...path, key.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()];
+			if (typeof value === "string") out[key] = vars[`--${next.join("-")}`] ?? value;
+			else if (value && typeof value === "object")
+				out[key] = overlay(value as Record<string, unknown>, next);
+			else out[key] = value;
+		}
+		return out;
+	};
+	return overlay(base as unknown as Record<string, unknown>, []) as unknown as Tokens;
+}
+
+/** Paint a transient theme preview (9.9.6): the sanitized preview vars, then
+ *  the display prefs re-layered over them. Without the second step a preview
+ *  silently dropped "Higher contrast" and the other visibility overrides
+ *  until it ended. */
+export function applyThemePreviewVars(
+	vars: Readonly<Record<string, string>>,
+	theme: ThemeName | string,
+	display: DisplayPrefs = DEFAULT_DISPLAY_PREFS,
+): void {
+	const root = document.documentElement;
+	for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
+	const resolved = isThemeName(theme) ? theme : DEFAULT_THEME;
+	const paint = resolveDisplayPaint(display, overlayTokens(themes[resolved], vars));
+	for (const [key, value] of Object.entries(paint.vars)) root.style.setProperty(key, value);
 }
 
 /**
@@ -162,10 +197,7 @@ export function ThemeProvider({ children }: Props) {
 				applyThemeVars(theme, displayRef.current);
 				return;
 			}
-			const root = document.documentElement;
-			for (const [key, value] of Object.entries(payload.vars ?? {})) {
-				root.style.setProperty(key, value);
-			}
+			applyThemePreviewVars(payload.vars ?? {}, theme, displayRef.current);
 		});
 	}, [theme]);
 
