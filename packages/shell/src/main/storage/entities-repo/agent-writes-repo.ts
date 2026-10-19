@@ -141,6 +141,7 @@ export class AgentWritesRepository {
 		);
 		const overflow = count >= AGENT_WRITES_PER_RUN_MAX;
 		if (overflow && this.hasOversize(write.runId)) return false;
+		this.makeRoomFor(write.agent, write.runId);
 		const before = overflow || write.before === null ? null : boundedJson(write.before);
 		const after = overflow ? null : boundedJson(write.after);
 		const oversize = overflow || after === null || (write.before !== null && before === null);
@@ -159,6 +160,22 @@ export class AgentWritesRepository {
 			write.ts,
 		);
 		return !overflow;
+	}
+
+	/** The per-principal cap, enforced at insert (prune only runs hourly, and
+	 *  one app must not grow the table without bound in between): evict the
+	 *  agent's oldest OTHER runs, whole, until one more row fits. */
+	private makeRoomFor(agent: string, runId: string): void {
+		const countFor = this.stmt("SELECT COUNT(*) AS n FROM agent_writes WHERE agent = ?");
+		const oldest = this.stmt(
+			"SELECT run_id FROM agent_writes WHERE agent = ? AND run_id != ? GROUP BY run_id ORDER BY MIN(id) ASC LIMIT 1",
+		);
+		const drop = this.stmt("DELETE FROM agent_writes WHERE run_id = ?");
+		while (Number((countFor.get(agent) as { n: number }).n) >= AGENT_WRITES_PER_AGENT_MAX) {
+			const victim = oldest.get(agent, runId) as { run_id: string } | undefined;
+			if (!victim) return;
+			drop.run(victim.run_id);
+		}
 	}
 
 	/** One run's writes, oldest first, clamped. */
