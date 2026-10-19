@@ -116,7 +116,23 @@ export class TabsNode extends ElementNode {
 	override getDOMSlot(element: HTMLElement): ElementDOMSlot {
 		const panes = element.querySelector<HTMLElement>(`:scope > .${PANES_CLASS}`);
 		const slot = super.getDOMSlot(element);
-		return panes ? slot.withElement(panes) : slot;
+		if (!panes) return slot;
+		const paneSlot = slot.withElement(panes);
+		const inherited = paneSlot.resolveChildIndex.bind(paneSlot);
+		// Lexical 0.21's `resolveChildIndex` walks the DOM lineage of a point
+		// outside the slot element with a loop that never advances (`indexPath`
+		// re-reads `child.parentNode`), so a DOM selection in the strip — a
+		// focused tab, the rename input — pushes until the renderer throws
+		// `RangeError: Invalid array length` and Lexical resets the editor.
+		// Such a point belongs to the pane being shown: resolving there keeps
+		// `$selectionPane` from switching tabs under a rename, and Lexical's
+		// own descent lands the caret inside that pane.
+		paneSlot.resolveChildIndex = (node, elementDOM, initialDOM, initialOffset) => {
+			if (initialDOM === panes) return inherited(node, elementDOM, initialDOM, initialOffset);
+			const shown = [...panes.children].findIndex((pane) => !pane.hasAttribute("hidden"));
+			return [node, Math.max(0, shown)];
+		};
+		return paneSlot;
 	}
 
 	override updateDOM(): false {

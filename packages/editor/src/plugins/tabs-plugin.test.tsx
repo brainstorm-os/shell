@@ -4,11 +4,18 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
-import { $createParagraphNode, $getRoot, type LexicalEditor } from "lexical";
+import {
+	$createParagraphNode,
+	$getRoot,
+	$getSelection,
+	$isRangeSelection,
+	type LexicalEditor,
+	type LexicalNode,
+} from "lexical";
 import { act, useEffect } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TabPaneNode, TabsNode } from "../nodes/tabs-node";
+import { $isTabPaneNode, TabPaneNode, TabsNode, tabPanelDomId } from "../nodes/tabs-node";
 import { tabsActiveStore } from "./tabs-active-store";
 import { INSERT_TABS_COMMAND, TabsPlugin } from "./tabs-plugin";
 
@@ -38,7 +45,7 @@ describe("TabsPlugin", () => {
 		editorRef = null;
 	});
 
-	function mount(editable = true): LexicalEditor {
+	function mount(editable = true, onError?: (error: Error) => void): LexicalEditor {
 		act(() =>
 			root.render(
 				<LexicalComposer
@@ -46,9 +53,11 @@ describe("TabsPlugin", () => {
 						namespace: "tabs-plugin",
 						nodes: [TabsNode, TabPaneNode],
 						editable,
-						onError: (e) => {
-							throw e;
-						},
+						onError:
+							onError ??
+							((e) => {
+								throw e;
+							}),
 					}}
 				>
 					<RichTextPlugin contentEditable={<ContentEditable />} ErrorBoundary={LexicalErrorBoundary} />
@@ -153,6 +162,82 @@ describe("TabsPlugin", () => {
 		key(input(), "Escape");
 		expect(input()).toBeNull();
 		expect(tabs()[0]?.textContent).toBe("Plan");
+	});
+
+	/** The renderer's `Array.prototype.push` throws `RangeError: Invalid array
+	 *  length` past the fast-array ceiling (~10^8 elements). Lowering the
+	 *  ceiling makes the pre-fix lineage walk fail in milliseconds instead of
+	 *  gigabytes, with the exact error the shell logged. */
+	function withPushCeiling<T>(ceiling: number, run: () => T): T {
+		const push = Array.prototype.push;
+		Array.prototype.push = function (this: unknown[], ...items: unknown[]): number {
+			if (this.length >= ceiling) throw new RangeError("Invalid array length");
+			return push.apply(this, items);
+		};
+		try {
+			return run();
+		} finally {
+			Array.prototype.push = push;
+		}
+	}
+
+	/** Chrome reports a focused `<input>` (or a clicked strip control) as a
+	 *  collapsed document selection at its parent + child index — a DOM point
+	 *  inside the tabs block but outside the panes slot. Lexical resolves it
+	 *  synchronously on the `selectionchange` and commits on a microtask. */
+	async function placeDomSelectionAt(node: Element): Promise<void> {
+		const parent = node.parentNode;
+		if (!parent) throw new Error("detached");
+		const index = Array.prototype.indexOf.call(parent.childNodes, node);
+		withPushCeiling(100_000, () =>
+			act(() => {
+				window.getSelection()?.setBaseAndExtent(parent, index, parent, index);
+				document.dispatchEvent(new Event("selectionchange"));
+			}),
+		);
+		await act(async () => {
+			await Promise.resolve();
+		});
+	}
+
+	it("a DOM selection inside the strip resolves into the shown pane instead of walking the DOM lineage", async () => {
+		const errors: Error[] = [];
+		const editor = mount(true, (e) => errors.push(e));
+		act(() => tabs()[1]?.click());
+		act(() => {
+			tabs()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true }));
+		});
+		const input = container.querySelector<HTMLInputElement>(".bs-tabs__rename");
+		expect(input).not.toBeNull();
+		if (!input) return;
+		await placeDomSelectionAt(input);
+		expect(errors).toEqual([]);
+		expect(container.querySelector(".bs-tabs__rename")).toBe(input);
+		expect(panes()[1]?.hasAttribute("hidden")).toBe(false);
+		const paneKey = editor.getEditorState().read(() => {
+			const selection = $getSelection();
+			if (!$isRangeSelection(selection)) return null;
+			for (let n: LexicalNode | null = selection.anchor.getNode(); n; n = n.getParent()) {
+				if ($isTabPaneNode(n)) return n.getKey();
+			}
+			return null;
+		});
+		expect(paneKey).not.toBeNull();
+		expect(document.getElementById(tabPanelDomId(paneKey ?? ""))).toBe(panes()[1]);
+	});
+
+	it("a DOM selection on the add button leaves add-tab working", async () => {
+		const errors: Error[] = [];
+		mount(true, (e) => errors.push(e));
+		const add = container.querySelector<HTMLElement>("[aria-label='Add tab']");
+		if (!add) throw new Error("no add button");
+		await placeDomSelectionAt(add);
+		await act(async () => {
+			add.click();
+			await Promise.resolve();
+		});
+		expect(errors).toEqual([]);
+		expect(tabs().map((t) => t.textContent)).toEqual(["Tab 1", "Tab 2", "Tab 3"]);
 	});
 
 	it("strip events never reach the editor's input pipeline", () => {

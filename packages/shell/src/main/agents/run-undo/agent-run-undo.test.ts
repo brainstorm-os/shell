@@ -1,4 +1,8 @@
-import { AgentUndoRefusal, AgentWriteKind } from "@brainstorm-os/sdk-types";
+import {
+	AGENT_PROVENANCE_PROPERTY_KEY,
+	AgentUndoRefusal,
+	AgentWriteKind,
+} from "@brainstorm-os/sdk-types";
 import { describe, expect, it } from "vitest";
 import type { AgentWriteRecord } from "../../storage/entities-repo";
 import { UndoOpKind, type UndoTargetState, buildRunChanges, planRunUndo } from "./agent-run-undo";
@@ -159,5 +163,26 @@ describe("buildRunChanges", () => {
 			{ key: "tags", before: null, after: "x, y" },
 		]);
 		expect(diff.revertedAt).toBeNull();
+	});
+
+	it("lists only the fields the agent chose: no host bookkeeping, no empty bags", () => {
+		const diff = buildRunChanges("run", [
+			rec({
+				entityId: "a",
+				kind: AgentWriteKind.Created,
+				before: null,
+				after: {
+					title: "Signage checklist",
+					values: {},
+					createdAt: 1792445200119,
+					updatedAt: 1792445200119,
+					[AGENT_PROVENANCE_PROPERTY_KEY]: { runId: "run" },
+				},
+			}),
+		]);
+		expect(diff.changes[0]?.fields).toEqual([
+			{ key: "title", before: null, after: "Signage checklist" },
+		]);
+		expect(diff.changes[0]?.moreFields).toBe(0);
 	});
 });

@@ -2923,11 +2923,13 @@ export {
 // ─── Agent run diff + undo (Agent-15) ───────────────────────────────────────
 export {
 	AGENT_CHANGE_FIELDS_MAX,
+	AGENT_CHANGE_HIDDEN_KEYS,
 	AGENT_CHANGE_PREVIEW_MAX,
 	AGENT_RUN_CHANGES_MAX,
 	AgentUndoRefusal,
 	AgentWriteKind,
 	describeFieldChange,
+	isAgentChangeHiddenKey,
 	isAgentUndoRefusal,
 	isAgentWriteKind,
 	lineDelta,

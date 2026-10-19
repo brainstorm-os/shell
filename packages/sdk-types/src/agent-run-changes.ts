@@ -19,6 +19,7 @@
  * can be named). Nothing is reverted unless everything can be.
  */
 
+import { RESERVED_PROPERTY_KEYS } from "./agent-provenance";
 import { sanitizeTraceText } from "./agent-trace";
 import { enumGuard } from "./enum-guard";
 
@@ -62,6 +63,20 @@ export const AGENT_CHANGE_FIELDS_MAX = 24;
 
 /** Change ceiling per run projection. */
 export const AGENT_RUN_CHANGES_MAX = 200;
+
+/** Keys a run diff never lists: the provenance keys an app may not write,
+ *  plus the bookkeeping every row carries (timestamps, the empty property
+ *  bag) — host-owned noise, not a change the agent chose to make. */
+export const AGENT_CHANGE_HIDDEN_KEYS: readonly string[] = [
+	...RESERVED_PROPERTY_KEYS,
+	"createdAt",
+	"updatedAt",
+	"values",
+];
+
+export function isAgentChangeHiddenKey(key: string): boolean {
+	return AGENT_CHANGE_HIDDEN_KEYS.includes(key);
+}
 
 export type AgentLineDelta = { added: number; removed: number };
 
@@ -128,6 +143,7 @@ export function summarizeChangeValue(
 		if (scalars.length === value.length) return clean(scalars.join(", "), max);
 		return `[${value.length}]`;
 	}
+	if (typeof value === "object" && Object.keys(value).length === 0) return null;
 	try {
 		return clean(JSON.stringify(value), max);
 	} catch {

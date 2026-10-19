@@ -11,6 +11,7 @@
 
 import type { AgentRunChanges, AgentTraceService } from "@brainstorm-os/sdk-types";
 import { AgentUndoRefusal, AgentWriteKind } from "@brainstorm-os/sdk-types";
+import { useFormatContext } from "@brainstorm-os/sdk/i18n-react";
 import {
 	RUN_UNDO_REFUSAL_KEYS,
 	RunChanges,
@@ -67,6 +68,7 @@ export function RunChangesPanel({
 	const [runs, setRuns] = useState<readonly AgentRunChanges[]>([]);
 	const [epoch, setEpoch] = useState(0);
 	const text = labels();
+	const format = useFormatContext();
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey / epoch are the intended refetch triggers.
 	useEffect(() => {
@@ -101,6 +103,7 @@ export function RunChangesPanel({
 					key={run.runId}
 					changes={run}
 					labels={text}
+					format={format}
 					onOpenEntity={onOpenEntity}
 					{...(undoRun ? { onUndo: () => undoRun({ runId: run.runId }) } : {})}
 					onUndone={() => setEpoch((n) => n + 1)}
