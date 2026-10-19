@@ -46,6 +46,7 @@ export type EditorI18nKey =
 	| "editor.task.picker.empty"
 	| "editor.task.markDone"
 	| "editor.task.markOpen"
+	| "editor.task.reopenWontDo"
 	// Block selection — aria-live announcements (BlockSelectionPlugin).
 	| "editor.a11y.blocksSelected.one"
 	| "editor.a11y.blocksSelected.other"
@@ -332,6 +333,7 @@ export const EDITOR_I18N_DEFAULTS: EditorManifest = Object.freeze({
 	"editor.task.picker.empty": "Type a name, then press Enter",
 	"editor.task.markDone": "Mark “{name}” done",
 	"editor.task.markOpen": "Mark “{name}” not done",
+	"editor.task.reopenWontDo": "“{name}” won’t be done — reopen",
 	"editor.a11y.blocksSelected.one": "1 block selected",
 	"editor.a11y.blocksSelected.other": "{count} blocks selected",
 	"editor.gutter.addBelow": "Add block below",

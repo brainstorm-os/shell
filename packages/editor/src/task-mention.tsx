@@ -13,13 +13,17 @@
 
 import { type SearchPickerItem, openSearchPicker } from "@brainstorm-os/sdk/menus";
 import {
+	$createRangeSelection,
 	$createTextNode,
 	$getNodeByKey,
 	$getSelection,
 	$isElementNode,
 	$isRangeSelection,
+	$isTextNode,
+	$setSelection,
 	type LexicalEditor,
 	type NodeKey,
+	type RangeSelection,
 } from "lexical";
 import { type BlockCommand, CommandCategory } from "./block-command";
 import type { EditorT } from "./i18n";
@@ -39,14 +43,43 @@ export function newTaskId(): string {
 	return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Insert a task mention into `blockKey` (or at the caret), then persist the
- *  task. A failed create removes the chip so the note never links to a task
- *  that doesn't exist. Returns the new task id, or `null` when nothing was
- *  inserted (no host, no target block, empty name). */
+/** Where `/task` was typed — the collapsed caret captured before the picker
+ *  takes focus, restored on Enter so the chip lands exactly there (inside the
+ *  list item, mid-paragraph), not at the end of the top-level block. */
+export type TaskCaret = { key: NodeKey; offset: number; type: "text" | "element" };
+
+function $restoreCaret(caret: TaskCaret | null): RangeSelection | null {
+	if (caret) {
+		const node = $getNodeByKey(caret.key);
+		const size =
+			caret.type === "text"
+				? $isTextNode(node)
+					? node.getTextContentSize()
+					: null
+				: $isElementNode(node)
+					? node.getChildrenSize()
+					: null;
+		if (size !== null) {
+			const offset = Math.min(caret.offset, size);
+			const selection = $createRangeSelection();
+			selection.anchor.set(caret.key, offset, caret.type);
+			selection.focus.set(caret.key, offset, caret.type);
+			$setSelection(selection);
+			return selection;
+		}
+	}
+	const current = $getSelection();
+	return $isRangeSelection(current) ? current : null;
+}
+
+/** Insert a task mention at `caret` (or the live selection when the caret is
+ *  gone), then persist the task. A failed create removes the chip so the note
+ *  never links to a task that doesn't exist. Returns the new task id, or
+ *  `null` when nothing was inserted (no host, no caret, empty name). */
 export function insertTaskMention(
 	editor: LexicalEditor,
 	rawName: string,
-	blockKey: NodeKey | null,
+	caret: TaskCaret | null,
 ): string | null {
 	const name = rawName.trim().slice(0, TASK_NAME_MAX);
 	const entities = getEditorHost().entities;
@@ -55,17 +88,12 @@ export function insertTaskMention(
 	let chipKey: NodeKey | null = null;
 	editor.update(
 		() => {
+			const selection = $restoreCaret(caret);
+			if (!selection) return;
 			const chip = $createMentionNode(id, TASK_ENTITY_TYPE, name);
-			const block = blockKey ? $getNodeByKey(blockKey) : null;
-			if ($isElementNode(block)) {
-				const trailing = $createTextNode(" ");
-				block.append(chip, trailing);
-				trailing.select(1, 1);
-			} else {
-				const selection = $getSelection();
-				if (!$isRangeSelection(selection)) return;
-				selection.insertNodes([chip, $createTextNode(" ")]);
-			}
+			const trailing = $createTextNode(" ");
+			selection.insertNodes([chip, trailing]);
+			trailing.select(1, 1);
 			chipKey = chip.getKey();
 		},
 		{ discrete: true },
@@ -94,19 +122,20 @@ export function taskPickerRows(t: EditorT, query: string): readonly SearchPicker
 	];
 }
 
-function caretBlock(editor: LexicalEditor): { key: NodeKey; rect: DOMRect | null } | null {
-	let key: NodeKey | null = null;
+function captureCaret(editor: LexicalEditor): { caret: TaskCaret; rect: DOMRect | null } | null {
+	let caret: TaskCaret | null = null;
+	let blockKey: NodeKey | null = null;
 	editor.getEditorState().read(() => {
 		const selection = $getSelection();
 		if (!$isRangeSelection(selection)) return;
-		try {
-			key = selection.anchor.getNode().getTopLevelElementOrThrow().getKey();
-		} catch {
-			key = null;
-		}
+		const { anchor } = selection;
+		caret = { key: anchor.key, offset: anchor.offset, type: anchor.type };
+		const block = anchor.getNode();
+		blockKey = ($isElementNode(block) ? block : block.getParent())?.getKey() ?? null;
 	});
-	if (key === null) return null;
-	return { key, rect: editor.getElementByKey(key)?.getBoundingClientRect() ?? null };
+	if (caret === null) return null;
+	const rect = blockKey ? (editor.getElementByKey(blockKey)?.getBoundingClientRect() ?? null) : null;
+	return { caret, rect };
 }
 
 /** `/task`: name the task in the shared search picker, Enter creates it. */
@@ -123,7 +152,7 @@ export function createTaskCommand(t: EditorT): BlockCommand {
 				console.info("[editor/task] no entities host wired — /task needs entities.create.");
 				return;
 			}
-			const target = caretBlock(editor);
+			const target = captureCaret(editor);
 			let query = "";
 			openSearchPicker({
 				placeholder: t("editor.task.picker.placeholder"),
@@ -136,7 +165,7 @@ export function createTaskCommand(t: EditorT): BlockCommand {
 					if (id !== CREATE_ROW_ID) return;
 					const name = query;
 					setTimeout(() => {
-						insertTaskMention(editor, name, target?.key ?? null);
+						insertTaskMention(editor, name, target?.caret ?? null);
 						editor.getRootElement()?.focus({ preventScroll: true });
 					}, 0);
 				},

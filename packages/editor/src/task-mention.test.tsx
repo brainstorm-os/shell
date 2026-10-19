@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
 import { NoteReferenceKind, extractNoteReferences } from "@brainstorm-os/sdk/note-references";
+import {
+	$createListItemNode,
+	$createListNode,
+	$isListItemNode,
+	ListItemNode,
+	ListNode,
+} from "@lexical/list";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import {
 	$createParagraphNode,
@@ -7,7 +14,6 @@ import {
 	$getRoot,
 	type LexicalEditor,
 	type LexicalNode,
-	type NodeKey,
 	createEditor,
 } from "lexical";
 import { type ReactNode, act } from "react";
@@ -33,7 +39,12 @@ vi.mock("@brainstorm-os/sdk/menus", () => ({
 	openSearchPicker: (options: Record<string, unknown>) => picker.open(options),
 }));
 
-import { createTaskCommand, insertTaskMention, taskPickerRows } from "./task-mention";
+import {
+	type TaskCaret,
+	createTaskCommand,
+	insertTaskMention,
+	taskPickerRows,
+} from "./task-mention";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -41,25 +52,27 @@ const t = createEditorT();
 
 function makeEditor(): LexicalEditor {
 	return createEditor({
-		nodes: [MentionNode],
+		nodes: [MentionNode, ListNode, ListItemNode],
 		onError(error) {
 			throw error;
 		},
 	});
 }
 
-function seed(editor: LexicalEditor): NodeKey {
-	let key: NodeKey = "";
+function seed(editor: LexicalEditor): TaskCaret {
+	let caret: TaskCaret | null = null;
 	editor.update(
 		() => {
-			const p = $createParagraphNode().append($createTextNode("Ship "));
+			const text = $createTextNode("Ship ");
+			const p = $createParagraphNode().append(text);
 			$getRoot().clear().append(p);
-			p.selectEnd();
-			key = p.getKey();
+			text.select(5, 5);
+			caret = { key: text.getKey(), offset: 5, type: "text" };
 		},
 		{ discrete: true },
 	);
-	return key;
+	if (caret === null) throw new Error("seed failed");
+	return caret;
 }
 
 function mentions(editor: LexicalEditor): MentionNode[] {
@@ -124,6 +137,51 @@ describe("insertTaskMention", () => {
 			expect.objectContaining({ name: "Write the spec" }),
 			id,
 		);
+	});
+
+	it("lands at the caret mid-paragraph, not at the end of the block", () => {
+		setEditorHost({ entities: { create: vi.fn(async () => ({})), update: vi.fn() } });
+		const editor = makeEditor();
+		let caret: TaskCaret | null = null;
+		editor.update(
+			() => {
+				const text = $createTextNode("before after");
+				$getRoot().clear().append($createParagraphNode().append(text));
+				caret = { key: text.getKey(), offset: 7, type: "text" };
+			},
+			{ discrete: true },
+		);
+		insertTaskMention(editor, "Mid", caret);
+		const text = editor.getEditorState().read(() => $getRoot().getTextContent());
+		expect(text.indexOf("before")).toBe(0);
+		expect(text.endsWith("after")).toBe(true);
+		expect(text.startsWith("before after")).toBe(false);
+	});
+
+	it("stays inside the list item the caret is in, not new items at the list end", () => {
+		setEditorHost({ entities: { create: vi.fn(async () => ({})), update: vi.fn() } });
+		const editor = makeEditor();
+		let caret: TaskCaret | null = null;
+		editor.update(
+			() => {
+				const first = $createTextNode("first");
+				const list = $createListNode("bullet").append(
+					$createListItemNode().append(first),
+					$createListItemNode().append($createTextNode("second")),
+				);
+				$getRoot().clear().append(list);
+				caret = { key: first.getKey(), offset: 5, type: "text" };
+			},
+			{ discrete: true },
+		);
+		insertTaskMention(editor, "In list", caret);
+		editor.getEditorState().read(() => {
+			const list = $getRoot().getFirstChildOrThrow() as ListNode;
+			expect(list.getChildrenSize()).toBe(2);
+			const firstItem = list.getFirstChildOrThrow();
+			expect($isListItemNode(firstItem)).toBe(true);
+			expect((firstItem as ListItemNode).getChildren().some($isMentionNode)).toBe(true);
+		});
 	});
 
 	it("is the note's reference to the task (the task's backlink)", () => {
@@ -204,6 +262,7 @@ describe("<TaskCheckbox>", () => {
 	let container: HTMLDivElement;
 	let root: Root;
 	let properties: Record<string, unknown>;
+	let entityType: string;
 	let notify: (() => void) | null;
 
 	beforeEach(() => {
@@ -211,13 +270,14 @@ describe("<TaskCheckbox>", () => {
 		document.body.append(container);
 		root = createRoot(container);
 		properties = { name: "T", completedAt: null, statusKey: null };
+		entityType = TASK_ENTITY_TYPE;
 		notify = null;
 		setEntityIndexSource({
 			list: async () => ({
 				entities: [
 					{
 						id: "task-1",
-						type: TASK_ENTITY_TYPE,
+						type: entityType,
 						properties,
 						createdAt: 0,
 						updatedAt: 0,
@@ -287,6 +347,35 @@ describe("<TaskCheckbox>", () => {
 		await act(async () => input?.click());
 		expect(update).toHaveBeenCalledWith("task-1", expect.objectContaining({ statusKey: "done" }));
 		expect(input?.checked).toBe(true);
+	});
+
+	it("refuses to write when the id resolves to something that is not a Task", async () => {
+		const update = vi.fn(async () => ({}));
+		setEditorHost({ entities: { create: vi.fn(), update } });
+		entityType = "brainstorm/Note/v1";
+		properties = { name: "Secret note" };
+		const input = await render(true);
+		expect(input?.disabled).toBe(true);
+		await act(async () => input?.click());
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it("reads won't do as closed and reopens it keeping no terminal status", async () => {
+		const update = vi.fn(async () => ({}));
+		setEditorHost({ entities: { create: vi.fn(), update } });
+		properties.statusKey = "cancelled";
+		const input = await render(true);
+		expect(input?.checked).toBe(false);
+		expect(input?.indeterminate).toBe(true);
+		await act(async () => input?.click());
+		expect(update).toHaveBeenCalledWith("task-1", { statusKey: null, completedAt: null });
+	});
+
+	it("reopening a done task keeps a non-terminal status", () => {
+		expect(taskCompletionPatch(false, 1, "in-progress")).toEqual({
+			statusKey: "in-progress",
+			completedAt: null,
+		});
 	});
 
 	it("stays read-only for a locked task or a read-only editor", async () => {

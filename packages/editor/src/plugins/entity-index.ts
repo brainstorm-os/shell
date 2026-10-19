@@ -51,6 +51,7 @@ let titlesById = new Map<string, string>();
 let iconsById = new Map<string, Icon | null>();
 let entityList: readonly VaultEntity[] = [];
 let propertiesById = new Map<string, Readonly<Record<string, unknown>>>();
+let typesById = new Map<string, string>();
 let tick = 0;
 let started = false;
 let unsubscribeSource: (() => void) | null = null;
@@ -83,6 +84,7 @@ function refresh(): void {
 			titlesById = nextTitles;
 			iconsById = nextIcons;
 			propertiesById = new Map(snapshot.entities.map((e) => [e.id, e.properties]));
+			typesById = new Map(snapshot.entities.map((e) => [e.id, e.type]));
 			entityList = snapshot.entities;
 			emit();
 		})
@@ -177,6 +179,13 @@ export function getEntityProperties(
 	entityId: string,
 ): Readonly<Record<string, unknown>> | undefined {
 	return propertiesById.get(entityId);
+}
+
+/** An entity's REAL type from the current snapshot (`undefined` when not
+ *  loaded) — what a decorator checks before acting on a node's stored
+ *  type, which a paste or a peer can set to anything. */
+export function getEntityType(entityId: string): string | undefined {
+	return typesById.get(entityId);
 }
 
 /** The full entity list from the last snapshot — the Link picker reads
