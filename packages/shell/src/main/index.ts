@@ -37,6 +37,7 @@ import {
 import { DEFAULT_THEME, ThemeName, themes } from "@brainstorm-os/tokens";
 import {
 	net,
+	BaseWindow,
 	BrowserWindow,
 	Menu,
 	Tray,
@@ -414,7 +415,7 @@ import { UpdatePrefsStore, updatePrefsPath } from "./update/update-prefs-store";
 import { UpdateService } from "./update/update-service";
 import { type AiSettings, defaultAiSettings, readAiSettings } from "./vault/ai-settings-store";
 import { appActivityIdleSeconds, noteAppActivity } from "./vault/app-activity-tracker";
-import { createAppLockWatcher } from "./vault/app-lock-watcher";
+import { createAppLockWatcher, createBackgroundedClock } from "./vault/app-lock-watcher";
 import { readRegistry, writeRegistry } from "./vault/registry";
 import {
 	ROOT_FOLDER_ENTITY_ID,
@@ -4433,6 +4434,11 @@ void app.whenReady().then(async () => {
 	const appLockWatcher = createAppLockWatcher({
 		getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
 		getAppIdleSeconds: () => appActivityIdleSeconds(),
+		// Closed to the tray (7.16) the vault would otherwise stay unlocked for
+		// as long as the user keeps using other apps.
+		getBackgroundedSeconds: createBackgroundedClock(() =>
+			BaseWindow.getAllWindows().some((w) => !w.isDestroyed() && w.isVisible()),
+		),
 		getAutoLockMinutes: () => getActiveVaultAutoLockMinutes(),
 		hasPin: () => activeVaultHasPin(),
 		isLocked: () => isVaultLocked(),
@@ -6432,9 +6438,17 @@ void app.whenReady().then(async () => {
 	dashboardWindow.once("ready-to-show", () => bootStage("dashboard-window-shown"));
 	dashboardWindow.webContents.once("dom-ready", () => bootStage("dashboard-renderer-domready"));
 	dashboardWindow.webContents.once("did-finish-load", () => bootStage("dashboard-renderer-paint"));
-	dashboardWindow.on("closed", () => {
-		attachDashboardHosts(null);
-	});
+	// Every dashboard (the boot one AND each reopen) drops the prompt hosts
+	// reference when it closes: under close-to-tray the process can run for
+	// hours windowless, and a host holding a destroyed WebContents both pins it
+	// and posts prompts into nothing.
+	const detachHostsOnClose = (win: BrowserWindow): void => {
+		const senderId = win.webContents.id;
+		win.on("closed", () => {
+			if (dashboardWebContentsId === senderId) attachDashboardHosts(null);
+		});
+	};
+	detachHostsOnClose(dashboardWindow);
 
 	// Bring the dashboard back: surface the live one, or recreate it after the
 	// user closed it (dock activation, the close-to-tray "Open" item).
@@ -6451,6 +6465,7 @@ void app.whenReady().then(async () => {
 		// requests, OS-handoff consent, the open-with picker and tool
 		// approval all refused silently.
 		attachDashboardHosts(dashboardWindow.webContents);
+		detachHostsOnClose(dashboardWindow);
 		wireDashboardLinkRouting(dashboardWindow.webContents);
 	}
 
