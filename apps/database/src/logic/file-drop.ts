@@ -11,7 +11,7 @@
 
 import { FILE_ENTITY_TYPE } from "@brainstorm-os/sdk/os-file-drop";
 import { type List, ListSourceKind, type MemberOverrides } from "../types";
-import { addToList } from "./members";
+import { MembersCapacityError, addToList } from "./members";
 
 export function sourceShowsFiles(list: List): boolean {
 	const source = list.source;
@@ -23,19 +23,33 @@ export function acceptsFileDrop(list: List | null | undefined, isVaultDerived: b
 	return !isVaultDerived || sourceShowsFiles(list);
 }
 
+export type DroppedFilesMembers = {
+	/** The new members, or `null` when nothing changed. */
+	members: MemberOverrides | null;
+	/** Files created but not pinned because the list hit the members cap. */
+	overCapacity: number;
+};
+
 /** The list's members with every new file pinned (none when the source
- *  already shows files, or for a vault-derived list). */
+ *  already shows files, or for a vault-derived list). Pass the list as it
+ *  is AFTER the import — membership may have moved while files uploaded. */
 export function membersWithDroppedFiles(
 	list: List,
 	isVaultDerived: boolean,
 	fileIds: ReadonlyArray<string>,
 	now: number = Date.now(),
-): MemberOverrides | null {
-	if (isVaultDerived || fileIds.length === 0) return null;
+): DroppedFilesMembers {
+	if (isVaultDerived || fileIds.length === 0) return { members: null, overCapacity: 0 };
 	const matchesSource = sourceShowsFiles(list);
 	let members = list.members;
+	let overCapacity = 0;
 	for (const id of fileIds) {
-		members = addToList(members, id, { matchesSource, by: "user", now }).members;
+		try {
+			members = addToList(members, id, { matchesSource, by: "user", now }).members;
+		} catch (error) {
+			if (!(error instanceof MembersCapacityError)) throw error;
+			overCapacity += 1;
+		}
 	}
-	return members === list.members ? null : members;
+	return { members: members === list.members ? null : members, overCapacity };
 }

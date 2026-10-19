@@ -49,6 +49,7 @@ import {
 	MentionTypeaheadPlugin,
 	SlashMenuPlugin,
 	TablesPlugin,
+	TabsPlugin,
 	TitlePlugin,
 	TogglePlugin,
 	TransclusionTypeaheadPlugin,
@@ -71,6 +72,7 @@ import { useCallback, useMemo, useState } from "react";
 import { t } from "../i18n/t";
 import { BLOCK_ACTIONS, BLOCK_COMMANDS } from "./commands";
 import { BlockContextMenuPlugin } from "./context-menu-plugin";
+import { FormatChordsPlugin } from "./format-chords-plugin";
 import { LinkMarkupPlugin } from "./link-markup-plugin";
 import { NOTES_ADDITIONAL_NODES } from "./notes-nodes";
 import { editorTheme } from "./theme";
@@ -119,6 +121,7 @@ function TransclusionEditingPlugins({
 			<ListMarkdownShortcutsPlugin />
 			<TabIndentationPlugin />
 			<TurnIntoPlugin />
+			<FormatChordsPlugin nested />
 			<SlashMenuPlugin commands={BLOCK_COMMANDS} />
 			<TablesPlugin />
 			<TogglePlugin docId={entityId} />
@@ -224,6 +227,8 @@ function TransclusionBodyMount({
 					}}
 				>
 					<EditablePlugin editable={editing} />
+					{/* Read-only too: a transcluded tabs block needs its strip. */}
+					<TabsPlugin />
 					{editing && <TransclusionEditingPlugins entityId={entityId} onChange={onSourceChange} />}
 				</BrainstormEditor>
 			</TransclusionRenderProvider>

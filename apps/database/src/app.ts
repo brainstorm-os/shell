@@ -107,13 +107,22 @@ import {
 import { type VirtualListHandle, createVirtualList } from "@brainstorm-os/sdk/virtual-list";
 import {
 	type CollapseAllAction,
+	boardVisibleOrder,
 	buildSwimlanes,
 	cellMovePatch,
 	collapseAllPatch,
 	groupWireKey,
 	toggleCollapsed,
 } from "./logic/board-groups";
-import { type BulkUndo, BulkUndoKind, planBulkAddToList, planBulkSet } from "./logic/bulk-edit";
+import {
+	type BulkUndo,
+	BulkUndoKind,
+	isBulkUndoLive,
+	planBulkAddToList,
+	planBulkSet,
+	planBulkSetRevert,
+	revertBulkAdd,
+} from "./logic/bulk-edit";
 import { canChangeType, planTypeChange, typeChangePatches } from "./logic/change-type";
 import { buildChartModel } from "./logic/chart-data";
 import { patchColumn, propertyColumns } from "./logic/column-layout";
@@ -245,6 +254,7 @@ import {
 	opNeedsValue,
 } from "./logic/filter-builder";
 import { type EntityRow, type InMemoryEntities, emptyEntities } from "./logic/in-memory-entities";
+import { pairableInverseCandidates } from "./logic/inverse-candidates";
 import {
 	createList,
 	createView,
@@ -2167,6 +2177,21 @@ function orderedVisibleIds(state: AppState): string[] {
 		groupLabelResolver(state),
 		groupOrderResolver(state),
 	);
+	if (view.kind === ListViewKind.Board && view.groupBy) {
+		const layout = view.layoutOptions as BoardLayoutOptions;
+		const groups = compiledView.groups.length
+			? compiledView.groups
+			: [{ key: null, label: "", rows: compiledView.rows }];
+		const lanes = layout.swimlaneBy
+			? buildSwimlanes(
+					compiledView.rows,
+					layout.swimlaneBy,
+					groupLabelResolver(state),
+					groupOrderResolver(state),
+				)
+			: null;
+		return boardVisibleOrder(groups, lanes, layout, view.groupBy.propertyId);
+	}
 	if (compiledView.groups.length === 0) return compiledView.rows.map((e) => e.id);
 	const out: string[] = [];
 	for (const group of compiledView.groups) {
@@ -2193,12 +2218,17 @@ function updateSelectionBar(state: AppState): void {
 }
 
 /** The pending one-step undo for the last bulk edit (9.12.32). Cleared by the
- *  undo itself or by the next bulk edit. */
+ *  undo itself or by the next bulk edit, and stale after `BULK_UNDO_TTL_MS`. */
 let lastBulkUndo: BulkUndo | null = null;
+
+function liveBulkUndo(): BulkUndo | null {
+	if (!isBulkUndoLive(lastBulkUndo)) lastBulkUndo = null;
+	return lastBulkUndo;
+}
 
 function selectionBarProps(state: AppState): SelectionProps | null {
 	const count = state.selection.selectedIds.size;
-	const undoAction = lastBulkUndo
+	const undoAction = liveBulkUndo()
 		? [
 				{
 					id: "undo",
@@ -2400,17 +2430,22 @@ function applyBulkAddToList(state: AppState, listId: string): void {
 
 /** Revert the last bulk edit as one step. */
 async function undoBulkEdit(state: AppState): Promise<void> {
-	const undo = lastBulkUndo;
+	const undo = liveBulkUndo();
 	if (!undo) return;
 	lastBulkUndo = null;
 	if (undo.kind === BulkUndoKind.SetProperty) {
-		await persistEntityPatches(state, undo.revert);
-	} else {
-		state.lists = state.lists.map((l) => (l.id === undo.listId ? undo.previous : l));
-		schedulePersist(state);
-		renderActiveView(state);
-		renderInspector(state);
+		const revert = planBulkSetRevert(undo, state.db.entities);
+		if (revert.apply.length > 0) await persistEntityPatches(state, revert.apply);
+		flashStatus(
+			t("brainstorm.database.bulk.undone") + lockedSuffix(revert.lockedSkipped),
+			revert.lockedSkipped > 0 ? "warn" : "ready",
+		);
+		return;
 	}
+	state.lists = state.lists.map((l) => (l.id === undo.listId ? revertBulkAdd(l, undo) : l));
+	schedulePersist(state);
+	renderActiveView(state);
+	renderInspector(state);
 	flashStatus(t("brainstorm.database.bulk.undone"), "ready");
 }
 
@@ -5033,7 +5068,11 @@ function bindFileDrop(state: AppState, body: HTMLElement): void {
 				acceptsFileDrop(list, list ? isVaultDerivedListId(list.id) : false)
 			);
 		},
-		onFiles: (files) => void importDroppedFiles(state, files),
+		onFiles: (files) => {
+			void importDroppedFiles(state, files).catch((error: unknown) => {
+				console.warn("[database] file drop failed:", error);
+			});
+		},
 	});
 }
 
@@ -5058,14 +5097,17 @@ async function importDroppedFiles(state: AppState, files: File[]): Promise<void>
 			},
 		},
 	);
-	const members = membersWithDroppedFiles(
-		list,
-		isVaultDerivedListId(list.id),
+	// Re-read the list: membership may have changed while files uploaded, and
+	// writing members derived from the pre-import copy would drop that change.
+	const current = state.lists.find((l) => l.id === list.id) ?? list;
+	const { members, overCapacity } = membersWithDroppedFiles(
+		current,
+		isVaultDerivedListId(current.id),
 		created.map((c) => c.id),
 	);
 	if (members) {
 		state.lists = state.lists.map((l) =>
-			l.id === list.id ? { ...l, members, updatedAt: Date.now() } : l,
+			l.id === current.id ? { ...l, members, updatedAt: Date.now() } : l,
 		);
 		schedulePersist(state);
 	}
@@ -5081,8 +5123,12 @@ async function importDroppedFiles(state: AppState, files: File[]): Promise<void>
 				count: created.length,
 				name: list.name,
 			},
-		) + (failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : ""),
-		failed > 0 ? "warn" : "ready",
+		) +
+			(failed > 0 ? ` ${t("brainstorm.database.status.filesFailed", { count: failed })}` : "") +
+			(overCapacity > 0
+				? ` ${t("brainstorm.database.bulk.overCapacity", { count: overCapacity })}`
+				: ""),
+		failed > 0 || overCapacity > 0 ? "warn" : "ready",
 	);
 }
 
@@ -5124,7 +5170,7 @@ function bindStageKeyboard(state: AppState): void {
 		body,
 		"Mod+Z",
 		(event) => {
-			if (!lastBulkUndo || isEditableElement(event.target)) return;
+			if (!liveBulkUndo() || isEditableElement(event.target)) return;
 			event.preventDefault();
 			event.stopPropagation();
 			void undoBulkEdit(state);
@@ -5547,9 +5593,10 @@ function inlinePropertyFormLabels() {
 
 /** Existing relations a new Relation can pair with (two-way, 9.12.25). */
 function inverseCandidates(): { key: string; label: string }[] {
-	return cachedVaultProperties
-		.filter((d) => d.valueType === ValueType.EntityRef && !d.inverseOf)
-		.map((d) => ({ key: d.key, label: d.name?.trim() ? d.name : humanize(d.key) }));
+	return pairableInverseCandidates(cachedVaultProperties).map((d) => ({
+		key: d.key,
+		label: d.name?.trim() ? d.name : humanize(d.key),
+	}));
 }
 
 function openColumnPropertyConstructor(state: AppState, view: ListView, _seedName: string): void {

@@ -25,6 +25,7 @@
  * test pins the shared constants.
  */
 
+import { isTaskClosed } from "@brainstorm-os/sdk/task-state";
 import type { UiNotification } from "../ui/notify-host";
 import { OnMissedPolicy, type TimeTriggerConfig } from "./trigger-schedule";
 
@@ -118,7 +119,7 @@ export function taskAlertRegistrations(
 	const out: ItemAlertRegistration[] = [];
 	for (const row of tasks) {
 		const p = row.properties;
-		if (finiteNumber(p.completedAt) !== null) continue;
+		if (isTaskClosed(p)) continue;
 		const title = typeof p.name === "string" && p.name !== "" ? p.name : "Task";
 		const dueAt = finiteNumber(p.dueAt);
 		const scheduledAt = finiteNumber(p.scheduledAt);

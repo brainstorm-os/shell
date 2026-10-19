@@ -101,6 +101,28 @@ describe("GridView — structural DnD wiring", () => {
 		]);
 	});
 
+	it("pins Name only while it is the first column — moved mid-grid it would overlap", () => {
+		const props = {
+			compiled: COMPILED,
+			layout: LAYOUT,
+			selectedIds: new Set<string>(),
+			onSelect: () => {},
+			onOpen: () => {},
+			onOpenInspector: () => {},
+			onReorderColumns: vi.fn(),
+		};
+		h = mountGrid({ ...props, columns: columns(["status", "priority"]) });
+		expect(h.container.querySelector<HTMLElement>(".dbv-grid")?.dataset.pinned).toBe("true");
+		h.cleanup();
+		h = mountGrid({ ...props, columns: columns(["status", "__title__", "priority"]) });
+		expect(
+			Array.from(h.container.querySelectorAll<HTMLElement>("[data-prop]")).map(
+				(el) => el.dataset.prop,
+			),
+		).toEqual(["status", "__title__", "priority"]);
+		expect(h.container.querySelector<HTMLElement>(".dbv-grid")?.dataset.pinned).toBe("false");
+	});
+
 	it("pluralizes the footer row count (1 row, not 1 rows)", () => {
 		h = mountGrid({
 			compiled: COMPILED,

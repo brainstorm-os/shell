@@ -247,6 +247,13 @@ describe("createLexicalSearchProvider — regex (B11.27)", () => {
 		expect(text(editor)).toContain("call [1234]-[555] or [555]-[9876]");
 	});
 
+	it("a regex replace-all reaches every node, not just the first search budget's worth", () => {
+		const editor = editorWith(Array.from({ length: 1500 }, (_, i) => `item ${i}`));
+		const p = createLexicalSearchProvider(editor);
+		expect(p.replaceAll(q("\\d+", { regex: true }), "#")).toBe(1500);
+		expect(p.search(q("\\d+", { regex: true }))).toHaveLength(0);
+	});
+
 	it("a literal replace never expands $ tokens", () => {
 		const editor = editorWith(["price"]);
 		const p = createLexicalSearchProvider(editor);

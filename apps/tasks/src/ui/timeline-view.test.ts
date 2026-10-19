@@ -76,6 +76,14 @@ describe("renderTimelineView", () => {
 		expect(byId("gated")?.dataset.blocked).toBe("true");
 	});
 
+	it("paints a won't-do task closed, never overdue", () => {
+		const { el } = render([
+			task("wont", { dueAt: prevDayStart(TODAY), completedAt: null, statusKey: "cancelled" }),
+		]);
+		const bar = el.querySelector<HTMLElement>('.tasks-timeline__bar[data-gantt-task-id="wont"]');
+		expect(bar?.dataset.state).toBe("done");
+	});
+
 	it("draws one dependency edge with an arrowhead", () => {
 		const { el } = render([
 			task("dep", { scheduledAt: prevDayStart(TODAY) }),

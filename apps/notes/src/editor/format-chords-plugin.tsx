@@ -12,12 +12,20 @@
  * selected we first bridge them to a range selection spanning the set — the
  * same `selectBlocksAsRange` the gutter action menu uses — so a single chord
  * strikes / turns-into every selected block at once.
+ *
+ * Nested editors ("Edit here", B11.22): the host skips a keystroke that comes
+ * from an editor nested inside it (`isEventInNestedEditor`) — otherwise
+ * Mod+Alt+1 typed in the transcluded body would turn the HOST's last-caret
+ * block into a heading. The nested body mounts its own instance with
+ * `nested`, which only answers keystrokes from inside its own root (or while
+ * its own blocks are selected), so each chord reaches exactly one editor.
  */
 
 import {
 	BlockType,
 	TURN_INTO_COMMAND,
 	formatTextInBlocks,
+	isEventInNestedEditor,
 	useBlockSelectionStore,
 } from "@brainstorm-os/editor";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
@@ -42,9 +50,21 @@ const TURN_INTO_CHORDS: ReadonlyArray<[ActionId, BlockType]> = [
 	[ActionId.TurnIntoCallout, BlockType.Callout],
 ];
 
-export function FormatChordsPlugin(): null {
+export function FormatChordsPlugin({ nested = false }: { nested?: boolean } = {}): null {
 	const [editor] = useLexicalComposerContext();
 	const blockSelection = useBlockSelectionStore();
+
+	const ownsEvent = useCallback(
+		(event: KeyboardEvent): boolean => {
+			const root = editor.getRootElement();
+			if (isEventInNestedEditor(event, root)) return false;
+			if (!nested) return true;
+			const target = event.target;
+			const insideRoot = root !== null && target instanceof Node && root.contains(target);
+			return insideRoot || blockSelection.getSnapshot().selectedKeys.size > 0;
+		},
+		[editor, blockSelection, nested],
+	);
 
 	// In block-selection mode there's no Lexical caret, so a mark applies to
 	// every text node in the selected blocks (a bridged element-boundary range
@@ -72,10 +92,11 @@ export function FormatChordsPlugin(): null {
 		ActionId.ToggleStrikeMark,
 		useCallback(
 			(event: KeyboardEvent) => {
+				if (!ownsEvent(event)) return;
 				event.preventDefault();
 				applyMark("strikethrough");
 			},
-			[applyMark],
+			[applyMark, ownsEvent],
 		),
 	);
 
@@ -83,10 +104,11 @@ export function FormatChordsPlugin(): null {
 		ActionId.ToggleCodeMark,
 		useCallback(
 			(event: KeyboardEvent) => {
+				if (!ownsEvent(event)) return;
 				event.preventDefault();
 				applyMark("code");
 			},
-			[applyMark],
+			[applyMark, ownsEvent],
 		),
 	);
 
@@ -94,6 +116,7 @@ export function FormatChordsPlugin(): null {
 	// `useShortcut` per chord would be ten listeners for one concern).
 	useEffect(() => {
 		function onKeydown(event: KeyboardEvent) {
+			if (!ownsEvent(event)) return;
 			for (const [id, blockType] of TURN_INTO_CHORDS) {
 				if (matchesActionChord(id, event)) {
 					event.preventDefault();
@@ -108,7 +131,7 @@ export function FormatChordsPlugin(): null {
 		// keyboard-exempt
 		document.addEventListener("keydown", onKeydown, true);
 		return () => document.removeEventListener("keydown", onKeydown, true);
-	}, [editor, bridgeBlockSelection]);
+	}, [editor, bridgeBlockSelection, ownsEvent]);
 
 	return null;
 }

@@ -14,6 +14,7 @@
 
 import {
 	FIND_SEED_MAX_LEN,
+	type FindBudget,
 	type FindQuery,
 	type FindRange,
 	type Match,
@@ -101,6 +102,11 @@ function withinSpan(span: SelectionSpan, idx: number, start: number, end: number
 	const afterStart = idx > span.startIdx || (idx === span.startIdx && start >= span.startOffset);
 	const beforeEnd = idx < span.endIdx || (idx === span.endIdx && end <= span.endOffset);
 	return afterStart && beforeEnd;
+}
+
+/** A per-node budget with the match + step caps but no deadline. */
+function untimedBudget(): FindBudget {
+	return { ...createFindBudget(), deadline: Number.POSITIVE_INFINITY };
 }
 
 export function createLexicalSearchProvider(editor: LexicalEditor): TextSearchProvider {
@@ -197,14 +203,17 @@ export function createLexicalSearchProvider(editor: LexicalEditor): TextSearchPr
 			editor.update(() => {
 				const nodes: TextNode[] = [];
 				collectTextNodes($getRoot(), nodes);
-				// A regex replace-all shares one budget (a hostile pattern stays
-				// bounded); a literal one can't backtrack, so each node gets its
-				// own and replace-all is never silently capped at the match limit.
-				const shared = query.options.regex ? (query.budget ?? createFindBudget()) : null;
+				// Every node gets its own budget, literal or regex: a shared
+				// match/step/wall-clock budget silently stopped a regex
+				// replace-all partway — at a point that varied run to run. Per
+				// node the scan stays bounded (unsafe patterns are refused up
+				// front, a segment is capped at FIND_MAX_SEGMENT_CHARS), and no
+				// wall-clock cap keeps the result deterministic for one explicit
+				// user action.
 				for (const node of nodes) {
 					const ranges = rangesIn(node.getTextContent(), {
 						...query,
-						budget: shared ?? createFindBudget(),
+						budget: query.options.regex ? untimedBudget() : createFindBudget(),
 					});
 					for (let r = ranges.length - 1; r >= 0; r--) {
 						const range = ranges[r];

@@ -79,6 +79,36 @@ export function laneCells(
 	return cells;
 }
 
+/** Card ids in the order the board PAINTS them — the order prev/next,
+ *  shift-click ranges and select-all walk. Columns follow `orderBoardGroups`
+ *  (manual drag order or a count mode), empty columns drop out under
+ *  `collapseEmptyColumns`, and a collapsed column or lane hides its cards.
+ *  With swimlanes the board reads lane by lane, each lane left to right. */
+export function boardVisibleOrder(
+	groups: ReadonlyArray<BoardGroup>,
+	lanes: ReadonlyArray<BoardGroup> | null,
+	layout: Pick<
+		BoardLayoutOptions,
+		"groupOrder" | "groupOrderMode" | "collapseEmptyColumns" | "collapsedGroups" | "collapsedLanes"
+	>,
+	groupByProperty: string,
+): string[] {
+	const ordered = orderBoardGroups(groups, layout);
+	const columns = layout.collapseEmptyColumns ? ordered.filter((g) => g.rows.length > 0) : ordered;
+	const collapsedGroups = new Set(layout.collapsedGroups ?? []);
+	const open = columns.filter((g) => !collapsedGroups.has(groupWireKey(g.key)));
+	if (!lanes) return open.flatMap((g) => g.rows.map((r) => r.id));
+	const collapsedLanes = new Set(layout.collapsedLanes ?? []);
+	const columnKeys = open.map((g) => groupWireKey(g.key));
+	const out: string[] = [];
+	for (const lane of lanes) {
+		if (collapsedLanes.has(groupWireKey(lane.key))) continue;
+		const cells = laneCells(lane.rows, groupByProperty, columnKeys);
+		for (const key of columnKeys) for (const row of cells.get(key) ?? []) out.push(row.id);
+	}
+	return out;
+}
+
 /** Toggle one key in a collapse set, returning a new array. */
 export function toggleCollapsed(current: ReadonlyArray<string> | undefined, key: string): string[] {
 	const set = new Set(current ?? []);

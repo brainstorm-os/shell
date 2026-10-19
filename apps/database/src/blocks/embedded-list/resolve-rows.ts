@@ -10,7 +10,10 @@
  *
  * Jail limits, by design: links are not visible to the block, so a `byLink`
  * source contributes no members here; a source with no type scope (`byFilter`,
- * `byVocabulary`) scans every readable entity.
+ * `byVocabulary`) scans every readable entity — the shell's graph router
+ * coalesces identical concurrent scans, so N embeds loading together on one
+ * page cost one query, not N. The view is fetched by id, not by a ListView
+ * scan.
  */
 
 import { LIST_VIEW_ENTITY_TYPE, entityToListView } from "@brainstorm-os/sdk";
@@ -130,9 +133,30 @@ async function queryVertices(graph: BlockGraph, entityTypeId?: string): Promise<
 		.filter((x): x is BpEntity => !!x && typeof x.entityId === "string");
 }
 
+/** How many of the List's listed view ids are fetched directly before the
+ *  resolver falls back to scanning every ListView. */
+const DIRECT_VIEW_LOOKUPS = 4;
+
+function listViewOf(e: BpEntity | null, listId: string): ListView | null {
+	if (!e || e.entityTypeId !== LIST_VIEW_ENTITY_TYPE) return null;
+	const view = entityToListView(toEntity(e));
+	return view && view.listId === listId ? view : null;
+}
+
 /** The view the embed paints: the List's `defaultViewId`, else its first
- *  listed view, else any view bound to the List. `null` ⇒ unfiltered. */
+ *  listed view, else any view bound to the List. `null` ⇒ unfiltered. The
+ *  listed ids are fetched by id first — a vault-wide ListView scan per embed
+ *  is only the fallback for a List that names no reachable view. */
 async function resolveView(graph: BlockGraph, list: BpEntity): Promise<ListView | null> {
+	const preferredIds = [
+		list.properties.defaultViewId,
+		...(Array.isArray(list.properties.views) ? list.properties.views : []),
+	].filter((id, i, all): id is string => typeof id === "string" && all.indexOf(id) === i);
+	for (const entityId of preferredIds.slice(0, DIRECT_VIEW_LOOKUPS)) {
+		const fetched = await graph<BpEntity>("getEntity", { entityId }).catch(() => null);
+		const view = listViewOf(fetched, list.entityId);
+		if (view) return view;
+	}
 	const views = (await queryVertices(graph, LIST_VIEW_ENTITY_TYPE).catch(() => []))
 		.map((e) => entityToListView(toEntity(e)))
 		.filter((v): v is ListView => v !== null && v.listId === list.entityId);

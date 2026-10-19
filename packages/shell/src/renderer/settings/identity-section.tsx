@@ -79,10 +79,17 @@ function ShareDefaultRoleControl() {
 					{ value: RosterRole.Editor, label: t("shell.settings.identity.shareRoleEditor") },
 				]}
 				onChange={(next) => {
+					const prior = role;
 					setRole(next);
+					// A refused save (vault locked, main rejects) must not leave the
+					// select showing a role that was never stored.
 					void window.brainstorm.sharingSettings
 						.setDefaultRole(next)
-						.then((applied) => setRole(parseShareDefaultRole(applied)));
+						.then((applied) => setRole(parseShareDefaultRole(applied)))
+						.catch((error: unknown) => {
+							console.warn("[settings/identity] default share role save failed:", error);
+							setRole(prior);
+						});
 				}}
 				ariaLabel={t("shell.settings.identity.shareDefaultRole")}
 			/>

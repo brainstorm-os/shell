@@ -7,8 +7,9 @@
  * holds the source, and the source isn't locked.
  */
 
-import { isEventInNestedEditor } from "@brainstorm-os/editor";
+import { INSERT_TABS_COMMAND, isEventInNestedEditor } from "@brainstorm-os/editor";
 import { YDocProvider, createYDocResolver } from "@brainstorm-os/react-yjs";
+import { $getRoot, type LexicalEditor } from "lexical";
 import { type ReactNode, act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -154,6 +155,23 @@ describe("transclusion body edit mode", () => {
 		expect(toggle()?.getAttribute("aria-pressed")).toBe("true");
 		await act(async () => toggle()?.click());
 		expect(editableRoot()).toBe("false");
+	});
+
+	it("handles the Tabs insert command it offers (TabsPlugin is mounted)", async () => {
+		await render(host(), true);
+		await act(async () => toggle()?.click());
+		const nested = (
+			container.querySelector(".notes__transclusion-body-content") as
+				| (HTMLElement & { __lexicalEditor?: LexicalEditor })
+				| null
+		)?.__lexicalEditor;
+		expect(nested).toBeDefined();
+		let handled = false;
+		await act(async () => {
+			nested?.update(() => $getRoot().selectEnd(), { discrete: true });
+			handled = nested?.dispatchCommand(INSERT_TABS_COMMAND, 2) ?? false;
+		});
+		expect(handled).toBe(true);
 	});
 
 	it("mounts its own block gutter while editing, and drops it on Done", async () => {

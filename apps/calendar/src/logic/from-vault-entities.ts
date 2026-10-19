@@ -24,6 +24,7 @@
 import { yearlyRecurrenceForDate } from "@brainstorm-os/sdk-types";
 import { parseIcon } from "@brainstorm-os/sdk/entity-icon";
 import { entityTitleOr } from "@brainstorm-os/sdk/entity-title";
+import { TASK_ENTITY_TYPE, isTaskClosed } from "@brainstorm-os/sdk/task-state";
 import { type TKey, t } from "../i18n/t";
 import { JOURNAL_ENTRY_TYPE, type VaultEntity, type VaultSnapshot } from "../runtime";
 import { EVENT_TYPE } from "../storage/entities-repository";
@@ -123,7 +124,8 @@ export function entityToScheduledItems(
 	const title = entityTitle(props);
 	const icon = parseIcon(props.icon);
 	const colorHint = typeof props.colorHint === "string" ? props.colorHint : null;
-	const done = props.completedAt != null;
+	const done =
+		props.completedAt != null || (entity.type === TASK_ENTITY_TYPE && isTaskClosed(props));
 	for (const key of dateKeyInfo.keys) {
 		const value = props[key];
 		if (!isPlausibleDate(value)) continue;

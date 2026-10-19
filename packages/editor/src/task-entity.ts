@@ -4,27 +4,31 @@
  * importing the `/task` command module.
  */
 
-export const TASK_ENTITY_TYPE = "brainstorm/Task/v1";
+import {
+	TASK_ENTITY_TYPE,
+	TerminalTaskStatus,
+	isTaskClosed,
+	isTaskDone,
+	isTaskWontDo,
+	reopenedStatusKey,
+} from "@brainstorm-os/sdk/task-state";
+
+export { TASK_ENTITY_TYPE, isTaskClosed, isTaskDone, isTaskWontDo };
 
 /** Marks the checkbox so click-to-open handlers on mention chips skip it. */
 export const TASK_CHECK_ATTR = "data-bs-task-check";
 
-/** The seeded `task-status` key the Tasks app treats as done. */
-const TASK_STATUS_DONE = "done";
-
-export function isTaskDone(properties: Readonly<Record<string, unknown>> | undefined): boolean {
-	if (!properties) return false;
-	return properties.completedAt != null || properties.statusKey === TASK_STATUS_DONE;
-}
-
-/** The completion patch — identical to the Tasks inline-task block's. */
+/** The completion patch — identical to the Tasks inline-task block's: done
+ *  stamps `done`, reopening clears only a terminal status so an in-progress
+ *  or custom state survives. */
 export function taskCompletionPatch(
 	done: boolean,
 	now: number = Date.now(),
+	priorStatusKey: unknown = null,
 ): Record<string, unknown> {
 	return done
-		? { statusKey: TASK_STATUS_DONE, completedAt: now }
-		: { statusKey: null, completedAt: null };
+		? { statusKey: TerminalTaskStatus.Done, completedAt: now }
+		: { statusKey: reopenedStatusKey(priorStatusKey), completedAt: null };
 }
 
 /** A new task's property bag (mirrors the agent `propose-task` persist plan). */

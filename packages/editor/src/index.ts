@@ -105,7 +105,9 @@ export { TaskCheckbox } from "./task-checkbox";
 export {
 	TASK_CHECK_ATTR,
 	TASK_ENTITY_TYPE,
+	isTaskClosed,
 	isTaskDone,
+	isTaskWontDo,
 	newTaskProperties,
 	taskCompletionPatch,
 } from "./task-entity";
@@ -365,6 +367,7 @@ export {
 	getEntityIcon,
 	getEntityProperties,
 	getEntityTitle,
+	getEntityType,
 	setEntityIndexSource,
 	subscribeEntityIcons,
 	subscribeEntityTitles,

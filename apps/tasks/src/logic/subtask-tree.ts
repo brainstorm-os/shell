@@ -9,6 +9,7 @@
  */
 
 import type { Task } from "../types/task";
+import { isClosed } from "./task-status";
 
 /** Direct children of `parentId`, in the order they appear in `tasks`. */
 export function childrenOf(tasks: readonly Task[], parentId: string): Task[] {
@@ -30,12 +31,13 @@ export type SubtaskProgress = {
 };
 
 /** Completion of a task's *direct* children. `total === 0` means no subtasks
- *  (the caller hides the progress chip). A child is done when `completedAt`
- *  is set. */
+ *  (the caller hides the progress chip). A child counts once it is closed —
+ *  done or won't do — so a parent whose last open child is dropped reaches
+ *  100%. */
 export function subtaskProgress(tasks: readonly Task[], parentId: string): SubtaskProgress {
 	const kids = childrenOf(tasks, parentId);
 	return {
-		done: kids.filter((t) => t.completedAt !== null).length,
+		done: kids.filter(isClosed).length,
 		total: kids.length,
 	};
 }

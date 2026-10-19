@@ -105,6 +105,36 @@ describe("TogglePlugin outliner keys (B11.30)", () => {
 		expect(topLevel(editor)).toHaveLength(1);
 	});
 
+	it("leaves Tab / Shift+Tab to indentation when there is nothing to nest under or out of", () => {
+		const editor = mount();
+		act(() =>
+			editor.update(
+				() =>
+					(
+						$getRoot().getFirstChildOrThrow<ToggleNode>().getFirstChild() as unknown as {
+							selectEnd(): void;
+						}
+					).selectEnd(),
+				{ discrete: true },
+			),
+		);
+		for (const shiftKey of [false, true]) {
+			const event = new KeyboardEvent("keydown", { key: "Tab", shiftKey, cancelable: true });
+			let handled = true;
+			act(() =>
+				editor.update(
+					() => {
+						handled = editor.dispatchCommand(KEY_TAB_COMMAND, event);
+					},
+					{ discrete: true },
+				),
+			);
+			expect(handled).toBe(false);
+			expect(event.defaultPrevented).toBe(false);
+		}
+		expect(topLevel(editor)).toHaveLength(2);
+	});
+
 	it("Enter on a summary starts a sibling toggle; Shift+Enter is left alone", () => {
 		const editor = mount();
 		const shift = new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, cancelable: true });

@@ -148,13 +148,17 @@ export function TogglePlugin({ docId }: TogglePluginProps = {}) {
 				(event) => {
 					const toggle = $summaryToggle();
 					if (!toggle) return false;
-					event.preventDefault();
+					// Nothing to nest under / out of → not ours: Tab falls through to
+					// TabIndentationPlugin instead of being swallowed.
 					if (event.shiftKey) {
-						$outdentToggle(toggle);
+						if (!$outdentToggle(toggle)) return false;
+						event.preventDefault();
 						return true;
 					}
 					const parent = $indentToggle(toggle);
-					if (parent) store.setCollapsed(parent.getBlockId(), false);
+					if (!parent) return false;
+					event.preventDefault();
+					store.setCollapsed(parent.getBlockId(), false);
 					return true;
 				},
 				COMMAND_PRIORITY_NORMAL,
