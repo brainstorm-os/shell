@@ -168,7 +168,9 @@
 	flex: 0 0 auto;
 	display: flex;
 	gap: var(--space-1, var(--space-1));
-	padding: var(--space-1, var(--space-1)) var(--space-2, var(--space-2));
+	/* Inline inset matches the panel body's (`--space-4`) so the strip's
+	 * outer edges line up with the rows, headings and buttons below it. */
+	padding: var(--space-1, var(--space-1)) var(--space-4, var(--space-4));
 	border-bottom: var(--border-width) solid var(--border, rgba(127, 127, 127, 0.18));
 }
 

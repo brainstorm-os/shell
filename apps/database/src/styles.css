@@ -2842,6 +2842,13 @@ body.is-resizing .dbv-tl__labels-resize {
  * full-height flex / nested scroll / outer padding neutralization lives in
  * the SDK sheet now. */
 
+/* The Properties|Comments strip (shared `EntityCommentsPanel`) mounts INSIDE
+ * the padded body here, not at the panel's top edge like Preview / Notes, so
+ * its own `--space-4` inset would double up against the body's. */
+.db-inspector__props-host .bs-panel-tabs {
+	padding-inline: 0;
+}
+
 /* Two-column property grid — label left, value right, baseline-aligned.
  * Used by the System metadata block (created / updated / id). */
 .db-inspector__props {
